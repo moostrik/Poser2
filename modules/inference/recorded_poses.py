@@ -17,6 +17,7 @@ import logging
 import time
 from collections import defaultdict
 from threading import Condition, Lock, Thread
+from typing import Any
 
 import numpy as np
 
@@ -27,7 +28,6 @@ from modules.settings import BaseSettings, Field
 from modules.utils import Rect
 
 from .pose_inference import PoseInference
-from .uploader import ImageSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -126,17 +126,13 @@ class RecordedPoses(FrameDictCallbackMixin):
 
     # ── The async step ─────────────────────────────────────────────────
 
-    def set_images(self, snapshot: ImageSnapshot | None) -> None:
-        """The images the next crops are cut from (`PoseInference.set_images`)."""
-        self._inference.set_images(snapshot)
-
-    def submit(self, frames: FrameDict) -> None:
-        """The stage's poses: with `enabled`, the crops cut without the pose model and the recorded poses played;
-        without, the crops and the pose model, as live."""
+    def submit(self, frames: FrameDict, images: Any) -> None:
+        """The stage's poses with the images they are for: with `enabled`, the crops cut from them without the pose
+        model and the recorded poses played; without, the crops and the pose model, as live."""
         if not self.settings.enabled:
-            self._inference.submit(frames)
+            self._inference.submit(frames, images)
             return
-        cropped, _ = self._inference.cut_crops(frames)
+        cropped, _ = self._inference.cut_crops(frames, images)
         by_cam: dict[int, FrameDict] = defaultdict(dict)
         for track_id, frame in cropped.items():
             by_cam[frame.cam_id][track_id] = frame

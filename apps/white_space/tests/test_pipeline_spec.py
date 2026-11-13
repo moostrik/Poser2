@@ -25,7 +25,7 @@ class _Async:
     def __init__(self) -> None:
         self.submitted: list[FrameDict] = []
 
-    def submit(self, frames: FrameDict) -> None:
+    def submit(self, frames: FrameDict, images: object) -> None:
         self.submitted.append(frames)
 
     def add_frames_callback(self, callback) -> None:

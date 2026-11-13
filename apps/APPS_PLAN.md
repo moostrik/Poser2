@@ -16,19 +16,10 @@ The pipeline's one source of poses is the `FrameSource` (`modules/pose/pipeline/
 pushes a pose per tracked player, from the player's newest tracklet (its box, and the camera's keypoints, azimuth
 and distance where it has them), never waiting for tracklets. A pose may hold only its box, so the RAW stage
 smooths and predicts boxes with the pipeline's own filters before the async step crops the image and adds the
-keypoints. That source is `TrackerFrameSource` (`modules/tracker`), and its call carries no images: the crop
-takes the images its caller set before (`set_images`), right only because both run on one thread in that order.
+keypoints. That source is `TrackerFrameSource` (`modules/tracker`); it pushes its poses with the images they are
+for, and the crop cuts exactly those (INPUT_THREADS.md). white_space and hd_trio call its `process` without images,
+which `PoseInference` refuses, so they stop at start until C and E wire their syncs to `submit`.
 
-2. **The images travel with the call.** `TrackerFrameSource.submit(timestamp, cam_id, images)` takes the uploader's
-   `ImageSnapshot` of the moment; its thread makes the poses and emits them with those images through its own
-   callback, the `FrameSource` protocol's (`add_frames_callback(callback(frames, images))`); it no longer inherits
-   `FrameDictCallbackMixin`, whose `add_frames_callback` takes frames alone, and the trackers keep the mixin. The
-   pipeline's `push` hands the images along the stage's chain to the async step; the chain's other entries, the
-   tick (`PosePipeline.update`) and the crossing (`cross`), pass none, so the entry's images default to none:
-   `AsyncNode.submit(frames, images)`; `PoseInference.submit(frames, images)` and `cut_crops` crop exactly those,
-   `RecordedPoses` passes them through, and without images they raise: white_space and hd_trio stop at start until
-   C and E wire their syncs to `submit`. `set_images` and deep_flow's bang callback go; the asked callback stays,
-   with the camera and the time from the call.
 3. **A repeated box is one sample.** On every image between tracker updates the source pushes the same latched box
    again: the smoother skips the repeat (`array_euro_smooth`, a step of 0), the predictor keeps it as another
    sample at the same time (`array_predict.add_sample`), so its three-sample fit spans fewer boxes and with three
@@ -46,9 +37,8 @@ takes the images its caller set before (`set_images`), right only because both r
    asked) counts the poses carrying the camera's points, so a recording waits for them. deep_flow has the path
    now; white_space has it when its cameras send keypoints (the `oak` backend, depthai 2, sends none).
 
-Checked by: the pipeline's (the images reach the async node with their poses), the
-pose step's (the crop uses the images it was given, not the uploader's newest; with the host model off a pose with
-the camera's points comes out with them, one without none), `Predict`'s (a repeated stamp keeps the fit of distinct
+Checked by: the pose step's (with the host model off a pose with the camera's points comes out with them, one
+without none), `Predict`'s (a repeated stamp keeps the fit of distinct
 samples) and an interpolator's through `PredictBlend` (a repeated target keeps its blend), the recorded poses' tests
 updated; then one run on `measure` 9–19 s against A6's numbers (capture
 latency, pose RAW and SMOOTH latency, poses out of RAW). One commit per step.
@@ -65,7 +55,7 @@ recording thread's recorder for every app and the oak backend's capture time
    `submit_tracklets`) and the recorder only.
 2. The uploader's images go to the -sim detector, the board's `set_camera_image` (the previews) and the frames'
    `CameraSync`, whose sync is one uploaded image per camera, fired on its own thread once every camera's image is
-   on the GPU; its callback is `TrackerFrameSource.submit` (B2), with every camera's image of the sync, which the
+   on the GPU; its callback is `TrackerFrameSource.submit`, with every camera's image of the sync, which the
    async step crops at the model's size; the crops go to the board.
 3. The uploader's tracklets go to the tracker (`submit_cam_tracklets`), the board, the tracker journal and the
    tracklets' `CameraSync`, each a store or an enqueue (the journal's `submit_cam_tracklets` checked for it); the
@@ -127,7 +117,6 @@ does not run), and a submit before `start` is an error.
 
 ## Rules it touches
 
-- A callback stores or enqueues what it receives and returns, with the data it is for: the images with the call, B2.
 - A callback stores or enqueues what it receives and returns: C's wiring.
 - A receiver does its work on its own thread: white_space starts the `CameraSync`s' threads; a sync stays inline
   only if its wait says so, as a stated exception.

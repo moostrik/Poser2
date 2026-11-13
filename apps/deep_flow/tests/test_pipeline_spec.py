@@ -18,16 +18,16 @@ class _Source:
     def add_frames_callback(self, callback) -> None:
         self._callbacks.append(callback)
 
-    def emit(self, frames: FrameDict) -> None:
+    def emit(self, frames: FrameDict, images: object = None) -> None:
         for callback in self._callbacks:
-            callback(frames)
+            callback(frames, images)
 
 
 class _Async:
     def __init__(self) -> None:
         self.submitted: list[FrameDict] = []
 
-    def submit(self, frames: FrameDict) -> None:
+    def submit(self, frames: FrameDict, images: object) -> None:
         self.submitted.append(frames)
 
     def add_frames_callback(self, callback) -> None:

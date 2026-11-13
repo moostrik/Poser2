@@ -23,6 +23,9 @@ def pose(track_id: int, timestamp: float, with_points: bool = False) -> Frame:
     return Frame(track_id=track_id, cam_id=0, timestamp=timestamp, features=features)
 
 
+IMAGES: object = object()       # the images a pose step is handed; the fake crop does not read them
+
+
 class FakeInference(FrameDictCallbackMixin):
     """`PoseInference` without a GPU: the crop gives the poses back, the model is counted."""
     def __init__(self) -> None:
@@ -30,11 +33,11 @@ class FakeInference(FrameDictCallbackMixin):
         self.model_runs: int = 0
         self.crops: int = 0
 
-    def submit(self, frames: FrameDict) -> None:
+    def submit(self, frames: FrameDict, images: object) -> None:
         self.crops += 1
         self.model_runs += 1
 
-    def cut_crops(self, frames: FrameDict) -> tuple[FrameDict, dict]:
+    def cut_crops(self, frames: FrameDict, images: object) -> tuple[FrameDict, dict]:
         self.crops += 1
         return dict(frames), {}
 
@@ -81,7 +84,7 @@ class RecordedPosesTest(unittest.TestCase):
     def test_the_recorded_box_and_points_play_after_their_latency(self) -> None:
         captured = time.perf_counter()
         self.clip(captured, 10.0, {3: (BOX, POINTS)})
-        self.node.submit({3: pose(3, captured)})
+        self.node.submit({3: pose(3, captured)}, IMAGES)
         self.assertTrue(wait_for(lambda: self.played))
         came, frames = self.played[0]
         self.assertGreaterEqual(came, captured + 0.029)
@@ -93,7 +96,7 @@ class RecordedPosesTest(unittest.TestCase):
     def test_a_track_id_the_recording_has_not_goes_on_without_points_and_is_counted(self) -> None:
         captured = time.perf_counter()
         self.clip(captured, 10.0, {3: (BOX, POINTS)}, 0.0)
-        self.node.submit({3: pose(3, captured), 4: pose(4, captured)})
+        self.node.submit({3: pose(3, captured), 4: pose(4, captured)}, IMAGES)
         self.assertTrue(wait_for(lambda: self.played))
         self.assertFalse(np.any(self.played[0][1][4][Points2D].scores > 0.0))
         self.assertEqual(self.node.missed.total('track_id'), 1)
@@ -101,24 +104,24 @@ class RecordedPosesTest(unittest.TestCase):
     def test_a_frame_without_recorded_poses_sends_none(self) -> None:
         captured = time.perf_counter()
         self.clip(captured, 10.0, None, 0.0)
-        self.node.submit({3: pose(3, captured)})
+        self.node.submit({3: pose(3, captured)}, IMAGES)
         time.sleep(0.05)
         self.assertEqual(self.played, [])
 
     def test_a_jump_drops_what_waits(self) -> None:
         captured = time.perf_counter()
         self.clip(captured, 10.0, {3: (BOX, POINTS)}, 0.2)
-        self.node.submit({3: pose(3, captured)})
+        self.node.submit({3: pose(3, captured)}, IMAGES)
         self.node.clear_waiting()                                   # the player's jump: a loop
         self.clip(captured + 0.01, 2.0, {3: (BOX, POINTS)}, 0.0)
-        self.node.submit({3: pose(3, captured + 0.01)})
+        self.node.submit({3: pose(3, captured + 0.01)}, IMAGES)
         self.assertTrue(wait_for(lambda: self.played))
         time.sleep(0.25)
         self.assertEqual([frames[3].timestamp for _, frames in self.played], [captured + 0.01])
 
     def test_off_the_pose_model_runs_and_its_poses_go_on(self) -> None:
         self.settings.enabled = False
-        self.node.submit({3: pose(3, 1.0)})
+        self.node.submit({3: pose(3, 1.0)}, IMAGES)
         self.assertEqual(self.inference.model_runs, 1)
         self.inference._notify_frames_callbacks({3: pose(3, 1.0, with_points=True)})
         self.assertEqual(len(self.played), 1)

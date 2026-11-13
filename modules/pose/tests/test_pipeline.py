@@ -23,7 +23,7 @@ class S(IntEnum):
 
 
 class _Source:
-    """A frame source: pushes what it is given to the stage that reads it."""
+    """A frame source: pushes what it is given, with the images it is for, to the stage that reads it."""
 
     def __init__(self, track_ids: list[int]) -> None:
         self.track_ids = track_ids
@@ -32,9 +32,9 @@ class _Source:
     def add_frames_callback(self, callback) -> None:
         self._callbacks.append(callback)
 
-    def emit(self, frames: FrameDict) -> None:
+    def emit(self, frames: FrameDict, images: object = None) -> None:
         for callback in self._callbacks:
-            callback(frames)
+            callback(frames, images)
 
 
 class _TickSource:
@@ -55,10 +55,12 @@ class _Async:
 
     def __init__(self) -> None:
         self.submitted: list[FrameDict] = []
+        self.images: list[object] = []
         self._callbacks: list = []
 
-    def submit(self, frames: FrameDict) -> None:
+    def submit(self, frames: FrameDict, images: object) -> None:
         self.submitted.append(frames)
+        self.images.append(images)
 
     def add_frames_callback(self, callback) -> None:
         self._callbacks.append(callback)
@@ -220,6 +222,16 @@ class BuildTest(unittest.TestCase):
         node.release()
         self.assertEqual([tag for tag, _, _ in log], ['before', 'after'])
         self.assertEqual(out.events, [('raw', {0})])
+
+    def test_the_images_a_source_pushes_reach_the_async_step_with_their_poses(self) -> None:
+        source = _Source([0])
+        node = _Async()
+        PosePipeline(PipelineSpec([
+            StageSpec(S.RAW, source, [PoseStep(_Tag, 'before', []), AsyncStep(node)]),
+        ]))
+        images: object = object()
+        source.emit(_frames(0), images)
+        self.assertIs(node.images[0], images)
 
     def test_the_tick_enters_at_the_crossing_and_polls_the_sources(self) -> None:
         source = _Source([0, 1])

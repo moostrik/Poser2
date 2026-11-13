@@ -63,13 +63,13 @@ When an image is on the GPU, the uploader hands it to four others, each of which
 - the capture sync, which queues the image for its own thread;
 - the detector (-sim), which keeps the newest image for its own thread;
 - the frame source, which queues the frame bang with the uploader's images as they are now (`Uploader.snapshot`),
-  two waiting at most (the oldest dropped, `dropped` on the panel). Its own thread holds those images for the crops
-  (`set_images`), so the crops are cut from this very image and not a newer one; `TrackerFrameSource.process` makes
-  a pose per player from the tracker's newest boxes, the RAW stage's two box filters smooth them, and
-  `PoseInference.submit` cuts the crops (`CropExtractor`), at the pose model's input size, queued on the GPU and not
-  waited for; it records a "crops ready" event and hands crops, poses and event to the pose model, whose thread has
-  RTMPose wait for that event on its own stream. Then the recorder hears whether poses were asked for the image.
-  The `Uploader` knows nothing of poses;
+  two waiting at most (the oldest dropped, `dropped` on the panel). On its own thread `TrackerFrameSource.process`
+  makes a pose per player from the tracker's newest boxes and pushes them with those images; the RAW stage's two
+  box filters smooth them, and the pipeline hands the images to `PoseInference.submit(frames, images)`, which cuts
+  the crops from exactly those, this very image and not a newer one (`CropExtractor`), at the pose model's input
+  size, queued on the GPU and not waited for; it records a "crops ready" event and hands crops, poses and event to
+  the pose model, whose thread has RTMPose wait for that event on its own stream. Then the recorder hears whether
+  poses were asked for the image. The `Uploader` knows nothing of poses;
 - the camera-interval time sample.
 
 The pose model stays FP32: it loses precision in FP16.

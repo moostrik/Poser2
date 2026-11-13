@@ -1,10 +1,12 @@
-"""TrackerFrameSource: a pose per player from the tracker's newest boxes, at each frame bang.
+"""TrackerFrameSource: the pose pipeline's frame source fed by the tracker, a pose per player from the tracker's
+newest boxes, at each frame bang.
 
-`process(now)` makes them on the caller's thread. `submit(now, payload)` queues the bang for this one's own thread
-and returns: at most `WAITING` wait, beyond that the oldest is dropped, counted as `dropped`. The thread hands each
-bang's time and payload to the bang callbacks, makes the poses (`process`, whose frames callbacks run the stage
-after it), then hands the poses asked to the asked callbacks with the same time and payload. While the thread does
-not run, a bang is processed on the thread it comes on."""
+`submit(timestamp, cam_id, images)` queues a frame bang, with the images of that moment, for this one's own thread
+and returns: at most `WAITING` wait, beyond that the oldest is dropped, counted as `dropped`. The thread makes the
+poses (`process`), hands them with those images to the frames callbacks (the pipeline's push, which carries the
+images to the crop), then hands the poses asked to the asked callbacks with the bang's time and camera. The images
+are carried, never read: the tracker does not know the GPU's. While the thread does not run, a bang is processed on
+the thread it comes on."""
 
 import logging
 import math
@@ -15,7 +17,7 @@ from typing import Any, Callable, TypeAlias
 
 import numpy as np
 
-from modules.pose import Frame, FrameDict, FrameDictCallbackMixin, BBox, BBoxAzimuth, Distance, Points2D
+from modules.pose import Frame, FrameDict, BBox, BBoxAzimuth, Distance, Points2D
 from modules.settings import BaseSettings, Field
 from modules.utils import PerformanceTimer, Rect
 from .tracklet import Tracklet
@@ -25,8 +27,8 @@ logger = logging.getLogger(__name__)
 
 WAITING: int = 2        # bangs waiting for the thread; a newer image makes an older one's poses late
 
-BangCallback: TypeAlias = Callable[[float, Any], None]                  # (now, payload), before the poses
-AskedCallback: TypeAlias = Callable[[float, Any, FrameDict], None]      # (now, payload, the poses asked)
+SourceFramesCallback: TypeAlias = Callable[[FrameDict, Any], None]      # (the poses, the images they are for), the pipeline's
+AskedCallback: TypeAlias = Callable[[float, int, FrameDict], None]      # (timestamp, cam_id, the poses asked)
 
 
 class TrackerFrameSourceSettings(BaseSettings):
@@ -47,14 +49,13 @@ class TrackerFrameSourceSettings(BaseSettings):
     dropped:           Field[int]   = Field(0, access=Field.READ, description="Frame bangs dropped while the pose step fell behind")
 
 
-class TrackerFrameSource(FrameDictCallbackMixin, Thread):
-    """Generates poses from tracklets, maintaining state per track; see the module docstring."""
+class TrackerFrameSource(Thread):
+    """The pipeline's frame source fed by the tracker; see the module docstring."""
 
     def __init__(self, settings: TrackerFrameSourceSettings, max_players: int, frame_aspect: float = 1.0) -> None:
         """`frame_aspect` is the delivered frame's width over its height, the one thing the keypoint
         window needs to know about the image; it is 1.0 for the square frames of the rigs."""
-        FrameDictCallbackMixin.__init__(self)
-        Thread.__init__(self, daemon=True, name='TrackerFrameSource')
+        super().__init__(daemon=True, name='TrackerFrameSource')
         self.settings: TrackerFrameSourceSettings = settings
         self.frame_aspect: float = frame_aspect
         # The incoming dict keys are used directly as slot indices below, so the feeding tracker
@@ -70,25 +71,25 @@ class TrackerFrameSource(FrameDictCallbackMixin, Thread):
         }
         self._lock = Lock()
         self._batch_id_counter = 0
-        # The bangs waiting for the thread, each with its payload and the moment it was queued
+        # The bangs waiting for the thread: (timestamp, cam_id, images, the moment it was queued)
         self._wake: Condition = Condition()
         self._running: bool = False
-        self._bangs: deque[tuple[float, Any, float]] = deque()
+        self._bangs: deque[tuple[float, int, Any, float]] = deque()
         self._dropped: int = 0
         self._wait: PerformanceTimer = PerformanceTimer(name="Wait pose step")
         self._inline_lock: Lock = Lock()            # bangs processed on the callers' threads while the thread does not run
         self._callback_lock: Lock = Lock()
-        self._bang_callbacks: list[BangCallback] = []
+        self._frames_callbacks: list[SourceFramesCallback] = []     # run in registration order
         self._asked_callbacks: list[AskedCallback] = []
 
-    def add_bang_callback(self, callback: BangCallback) -> None:
-        """Each bang's time and payload, on the thread that processes it, before its poses are made."""
+    def add_frames_callback(self, callback: SourceFramesCallback) -> None:
+        """Each bang's poses with the images they are for (the pipeline's push)."""
         with self._callback_lock:
-            if callback not in self._bang_callbacks:
-                self._bang_callbacks.append(callback)
+            if callback not in self._frames_callbacks:
+                self._frames_callbacks.append(callback)
 
     def add_asked_callback(self, callback: AskedCallback) -> None:
-        """Each bang's time and payload with the poses asked, once the stage after has taken them."""
+        """Each bang's time and camera with the poses asked, once the frames callbacks have taken them."""
         with self._callback_lock:
             if callback not in self._asked_callbacks:
                 self._asked_callbacks.append(callback)
@@ -119,16 +120,16 @@ class TrackerFrameSource(FrameDictCallbackMixin, Thread):
                     self._wake.wait()
                 if not self._running:
                     return
-                now, payload, queued = self._bangs.popleft()
+                timestamp, cam_id, images, queued = self._bangs.popleft()
             self._wait.add_time((time.perf_counter() - queued) * 1000.0, report=False)
             try:
-                self._bang(now, payload)
+                self._bang(timestamp, cam_id, images)
             except Exception:
                 logger.exception("TrackerFrameSource: a frame bang failed")
 
-    def submit(self, now: float, payload: Any = None) -> None:
-        """A frame bang at `now` (the image's capture time), with what the callbacks need of it: queued for the
-        thread, the oldest dropped beyond `WAITING`."""
+    def submit(self, timestamp: float, cam_id: int, images: Any) -> None:
+        """A frame bang: camera `cam_id`'s image captured at `timestamp`, with the images of that moment the crop is to
+        cut (`Uploader.snapshot`), queued for the thread, the oldest dropped beyond `WAITING`."""
         dropped: int | None = None
         with self._wake:
             running: bool = self._running
@@ -137,28 +138,22 @@ class TrackerFrameSource(FrameDictCallbackMixin, Thread):
                     self._bangs.popleft()
                     self._dropped += 1
                     dropped = self._dropped
-                self._bangs.append((now, payload, time.perf_counter()))
+                self._bangs.append((timestamp, cam_id, images, time.perf_counter()))
                 self._wake.notify()
         if dropped is not None:
             self.settings.dropped = dropped
         if running:
             return
         with self._inline_lock:
-            self._bang(now, payload)
+            self._bang(timestamp, cam_id, images)
 
-    def _bang(self, now: float, payload: Any) -> None:
+    def _bang(self, timestamp: float, cam_id: int, images: Any) -> None:
+        asked: FrameDict = self.process(timestamp, images)
         with self._callback_lock:
-            bang_callbacks: list[BangCallback] = list(self._bang_callbacks)
             asked_callbacks: list[AskedCallback] = list(self._asked_callbacks)
-        for bang_callback in bang_callbacks:
-            try:
-                bang_callback(now, payload)
-            except Exception:
-                logger.exception("TrackerFrameSource: a bang callback failed")
-        asked: FrameDict = self.process(now)
         for asked_callback in asked_callbacks:
             try:
-                asked_callback(now, payload, asked)
+                asked_callback(timestamp, cam_id, asked)
             except Exception:
                 logger.exception("TrackerFrameSource: an asked callback failed")
 
@@ -187,9 +182,9 @@ class TrackerFrameSource(FrameDictCallbackMixin, Thread):
                 else:
                     self._tracklets[track_id] = None
 
-    def process(self, now: float) -> FrameDict:
-        """Generate poses from all ready tracklets; `now` is the time of the frame bang that asks,
-        the clock a latched box's age is judged on.
+    def process(self, now: float, images: Any = None) -> FrameDict:
+        """Generate poses from all ready tracklets and hand them, with `images`, to the frames callbacks; `now` is
+        the time of the frame bang that asks, the clock a latched box's age is judged on.
 
         Returns:
             Dictionary of track_id -> Frame for tracks with valid tracklets
@@ -234,7 +229,13 @@ class TrackerFrameSource(FrameDictCallbackMixin, Thread):
                     f"TrackerFrameSource: Error generating pose "
                     f"{track_id}: {e}"
                 )
-        self._notify_frames_callbacks(generated_poses)
+        with self._callback_lock:
+            frames_callbacks: list[SourceFramesCallback] = list(self._frames_callbacks)
+        for frames_callback in frames_callbacks:
+            try:
+                frames_callback(generated_poses, images)
+            except Exception:
+                logger.exception("TrackerFrameSource: a frames callback failed")
 
         return generated_poses
 

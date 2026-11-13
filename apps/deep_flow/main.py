@@ -17,7 +17,7 @@ from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, TrackerFrameSource
 from modules.pose import configure_features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import optical_flow, detection, GpuImage, ImageSnapshot, PoseInference, RecordedPoses, Capture, CaptureSync, Uploader, frame_poses
+from modules.inference import optical_flow, detection, GpuImage, PoseInference, RecordedPoses, Capture, CaptureSync, Uploader, frame_poses
 from modules.pose import FrameDict
 from modules.utils import FPS, PerformanceTimer
 
@@ -117,10 +117,8 @@ class DeepFlowMain:
         self.optical_flow_predictor  = optical_flow.Predictor(p.optical_flow)
 
         self.tracker.add_tracklet_callback(self.frame_source.set_tracklets)
-        # The pose step's thread: each bang's images held for its crops, then its poses, then the poses asked
-        self.frame_source.add_bang_callback(self._set_images)
+        # The frame source's thread: each bang's poses with its images to the pipeline, then the poses asked
         self.frame_source.add_asked_callback(self._on_asked)
-        self._pose_step: PoseInference | RecordedPoses = pose_step
 
         # The optical flow reads the same crops the pose model gets.
         self.pose_inference.add_crop_callback(self.optical_flow_predictor.submit)
@@ -199,24 +197,20 @@ class DeepFlowMain:
         self.render.start()
 
     def _on_image(self, image: GpuImage) -> None:
-        """An uploaded image, on the uploader's thread: the pose step for it, queued with the images as they are
-        now, and the camera's interval. With one camera every image is a round, so the frame domain runs on each,
-        at the image's capture time."""
-        self.frame_source.submit(image.timestamp, (image.cam_id, self.uploader.snapshot()))
+        """An uploaded image, on the uploader's thread: the frame source's bang for it, queued with the images as
+        they are now, which the crop cuts, and the camera's interval. With one camera every image is a round, so the
+        frame domain runs on each, at the image's capture time."""
+        self.frame_source.submit(image.timestamp, image.cam_id, self.uploader.snapshot())
         last: float | None = self._last_camera_frame.get(image.cam_id)
         self._last_camera_frame[image.cam_id] = image.timestamp
         if last is not None:
             self.board.submit_time_sample(Series.CAMERA_INTERVAL, (image.timestamp - last) * 1000.0, image.timestamp)
 
-    def _set_images(self, now: float, bang: tuple[int, ImageSnapshot]) -> None:
-        """A frame bang, on the pose step's thread: its crops are cut from the images it was submitted with."""
-        self._pose_step.set_images(bang[1])
-
-    def _on_asked(self, now: float, bang: tuple[int, ImageSnapshot], asked: FrameDict) -> None:
-        """A frame bang's poses, on the pose step's thread: the recorder hears whether the pose model was asked
+    def _on_asked(self, timestamp: float, cam_id: int, asked: FrameDict) -> None:
+        """A frame bang's poses, on the frame source's thread: the recorder hears whether the pose model was asked
         poses for the image, so a frame without a player does not wait."""
         posing: bool = (self.recorded_poses is not None and self.settings.camera.recorded_poses.enabled) or self.settings.pose.pose.enabled
-        self.recorder.expect_poses(bang[0], now, bool(asked) and posing)
+        self.recorder.expect_poses(cam_id, timestamp, bool(asked) and posing)
 
     def _record_poses(self, frames: FrameDict) -> None:
         """The RAW stage's poses, on the pose model's thread, to the recorder: their hand-over, stamped here."""

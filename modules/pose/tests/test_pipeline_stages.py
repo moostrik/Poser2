@@ -68,9 +68,9 @@ class _Source:
     def add_frames_callback(self, callback) -> None:
         self._callbacks.append(callback)
 
-    def emit(self, frames: FrameDict) -> None:
+    def emit(self, frames: FrameDict, images: object = None) -> None:
         for callback in self._callbacks:
-            callback(frames)
+            callback(frames, images)
 
 
 class _Settings:

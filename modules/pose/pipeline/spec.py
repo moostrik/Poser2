@@ -3,7 +3,8 @@
 A ``PipelineSpec`` is plain data: node classes with their settings objects, built node instances for the
 steps that are made once, and the sources the app owns. ``PosePipeline`` turns it into callback chains at
 startup. Every stage belongs to a clock domain: the frame domain runs on the camera's frame bang (the
-source pushes, the async step emits on its thread), an output domain runs on the consumer's tick
+source pushes poses with the images they are for, the async step is handed those images and emits on its
+thread), an output domain runs on the consumer's tick
 (``PosePipeline.update``). The interpolators of a stage are the one crossing from the frame domain to an
 output domain; a tick source joins at a stage the tick drives. A stage emits its poses and a group record
 (``GroupRecord``): the per-pose steps and the group steps stamp the poses, the group steps write the record.
@@ -13,12 +14,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, TypeAlias, runtime_checkable
 
 from ..features import BaseScalarFeature
 from ..frame import FrameDict, FrameDictCallback
 from ..nodes import FilterNode, GroupNode, InterpolatorNode
 from ..window import WindowNodeSettings
+
+# A frame source's poses with the images they are for: the pipeline carries the images, unread, to the async step
+SourceFramesCallback: TypeAlias = Callable[[FrameDict, Any], None]
 
 
 class Domain(IntEnum):
@@ -28,14 +32,15 @@ class Domain(IntEnum):
 
 @runtime_checkable
 class FrameSource(Protocol):
-    """A source that pushes poses in the frame domain (``TrackerFrameSource``)."""
+    """A source that pushes poses in the frame domain (``TrackerFrameSource``), each push with the images its poses
+    are for."""
 
     @property
     def track_ids(self) -> list[int]:
         """The ids this source can emit."""
         ...
 
-    def add_frames_callback(self, callback: FrameDictCallback) -> None: ...
+    def add_frames_callback(self, callback: SourceFramesCallback) -> None: ...
 
 
 @runtime_checkable
@@ -59,9 +64,10 @@ class TickSource(Protocol):
 
 @runtime_checkable
 class AsyncNode(Protocol):
-    """A step that emits later, on its own thread, and may drop frames (the crop and pose predictor)."""
+    """A step that emits later, on its own thread, and may drop frames (the crop and pose predictor); it is handed
+    the images the source pushed with the poses."""
 
-    def submit(self, frames: FrameDict) -> None: ...
+    def submit(self, frames: FrameDict, images: Any) -> None: ...
 
     def add_frames_callback(self, callback: FrameDictCallback) -> None: ...
 
