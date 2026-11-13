@@ -1,35 +1,8 @@
-"""Velocity Lowpass.
-
-The bridge's lowpass: a flow's 3D velocity in image widths per second, smoothed in time and in space, the
-reading `trail`. Its output stays in widths per second; how strongly the fluid takes it is the fluid's.
-
-Before each step the trail moves with the motion it holds (`advect`): each pixel takes the trail from
-where its own x/y says it came from, so the average follows a moving limb instead of a fixed pixel,
-and a fast move is not cut off by a smoothing time longer than it takes to cross.
-
-The smoothing is one unit-gain Ema per pixel. Where the 3D speed rises it follows over `attack`, else over
-`smooth`, so a flick reaches the fluid at full strength and a stop still coasts. x, y and z alike: z's noise
-is the motion's to filter (its depth velocity's `smooth`).
-
-The blur runs inside the Ema's loop, on the trail each step feeds back, so blurring every step is diffusion:
-`blur` is how far the trail spreads in one second, in widths at half its height, and each step blurs by
-sigma = blur / 2.355 × sqrt(dt) widths (σ² = 2 D dt), the same spread at any frame rate and resolution; what
-is seen also grows with the trail's memory. The blur is the textbook Gaussian (`gaussian_blur`).
-
-The trail holds the history of the motion: its velocity and its z position. The z position is where the
-motion it holds was: the motion's z position (`set_z_position`) through the same Ema step, weighted by the
-speed each step brings, moved and blurred with the trail (red the z position times its weight, green the
-weight). So an arm leaving the torso leaves its trail at the arm's depth, as the still torso brings no speed,
-and a z position whose motion has died counts for nothing. One dispatch moves, steps and rates the trail
-and its z position (`LowpassStep`), one blurs them (`LowpassBlur`).
-
-The trail is read in two units:
-    trail                the trail, widths/s
-    trail_acceleration   the trail's rate, widths/s²: its Ema step over dt, (1 − w)(velocity − trail) / dt,
-                         which is (velocity − trail) / τ for a dt well under τ, τ the attack where the speed
-                         rises, else the smooth: the highpass over the lowpass's time, a spike at a start, a
-                         brake over the coast at a stop. Its sum × dt is the trail's change, at any frame rate.
-                         Advected with the trail and blurred as it is; written only when asked
+"""Velocity Lowpass, the bridge's lowpass: the flow's 3D velocity advected, smoothed over `attack` and `smooth`
+and blurred, the reading `trail` (widths/s), its rate `trail_acceleration` (widths/s², written only when asked)
+and its z position (red the z position times its weight, green the weight). One dispatch moves, steps and rates
+them (`LowpassStep`), one blurs them (`LowpassBlur`). How and why: modules/flow/BRIDGE_3D.md, "The trail" and
+"The z positions".
 """
 
 import math

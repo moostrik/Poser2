@@ -1,56 +1,9 @@
-"""Velocity Bandpass.
-
-Next to the lowpass, which reads the motion itself, this reads the motion's changes: its velocity changes,
-Δv, where a move starts and where it stops. Two short trails on the flow's velocity, fast and slow, unit-gain
-Emas; their difference is the band between their times. Along the motion's direction it rises where a move
-starts and falls where it stops. The difference is divided by its step peak (`step_peak`): a limb at speed v
-that starts or stops at once reads v, so the changes are in the motion's own unit, image widths per second; a
-gradual start or stop reads less, by how much of the speed changes within the trails' times.
-
-Each reading also comes as an acceleration, widths/s²: the same difference over the band's width (`band_width`,
-`slow_smooth` − `fast_smooth` for a short frame) instead of the step peak. For any change of speed the
-difference's integral over time is the band's width × Δv, so the acceleration × dt adds up to the Δv once,
-whatever the frame rate and the trails' times; the velocity's height reads the Δv only for a sudden change.
-
-A pixel cannot tell a move starting from a limb arriving at it, nor a move stopping from a limb leaving
-it: its speed rises or falls either way. The region around it (`start_region_size`, `stop_region_size`)
-can, so the region splits each pixel's rise and fall in two, by its region weight (`start_region_weight`,
-`stop_region_weight`; 0 = all of it is the region's):
-    start   the share of a rise its region shares: a part of the body speeding up
-    bow     the rest: a limb arriving, the wave in front of a moving limb
-    stop    the share of a fall its region shares: a part of the body slowing down
-    wake    the rest: a limb leaving, the wake behind it
-Start + bow is the pixel's whole rise, stop + wake its whole fall. A change lasts about `slow_smooth`, as
-the slow trail catches up; it takes no hold, so what a stop injects is the speed it ended.
-
-What a region shares:
-    rise    the region's mean velocity over its moving pixels (those the motion gives a velocity), smoothed per region
-            by the fast and the slow trail, rises: a limb arriving adds moving pixels at its own speed and
-            leaves that mean as it was, a limb speeding up raises it, and jitter on a still body moves no
-            pixel. Taken over all of a region's pixels, an arriving limb would raise the mean like a speedup;
-            taken of the two trails, the slow trail's lag at the pixels it arrives at would too
-    fall    the region's mean speed of the fast trail falls below the slow one's: jitter never lowers it, and a
-            turning limb keeps it, where a mean velocity would shrink and read as a stop. The trails lag at the
-            pixels a limb leaves, so a leaving limb lowers it too, and part of a wake reads as a stop
-
-The changes read the flow's x, y and z alike. They filter in time only: noise within a frame is the
-motion's to filter. No blur and no advect: the changes stay sharp.
-
-Out come the readings, each as a velocity in image widths per second and, when asked, an acceleration in
-widths/s² (RGBA16F, xyz):
-    change                          (fast − slow) itself, signed: the whole change, before the direction and the regions
-    start, bow, stop, wake          the motion's direction times its part of the change: a start and a bow along
-                                    the fast trail's direction, a stop and a wake along the slow one's, the motion
-                                    it ended
-and each part's size, `<part>_speed` (R16F, widths/s).
-
-Each trail holds its z position beside it, where the motion it holds was: the motion's z position
-(`set_z_position`) through the trail's own Ema step, weighted by the speed each step brings (red the z
-position times its weight, green the weight). A start and a bow are where the fast trail's motion was, a stop
-and a wake where the slow trail's was: what a limb leaves behind stays at the limb's depth. One dispatch
-steps both trails and their z positions (`BandpassTrails`).
-
-Steps every tick on its dt while it runs.
+"""Velocity Bandpass, the bridge's bandpass: the motion's changes of speed from a fast and a slow trail of the
+flow's velocity, split by their regions. Out come the readings `change`, `start`, `bow`, `stop`, `wake`, each as
+a velocity (widths/s, RGBA16F xyz) and, when asked, an acceleration (widths/s²), each part's size
+`<part>_speed` (R16F, widths/s), and each trail's z position (red over green). One dispatch steps both trails
+and their z positions (`BandpassTrails`); it steps every tick on its dt while it runs. How and why:
+modules/flow/BRIDGE_3D.md, "The changes", "The pulse's area" and "The z positions".
 """
 
 import logging
