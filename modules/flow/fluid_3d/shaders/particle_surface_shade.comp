@@ -1,7 +1,7 @@
 #version 460 core
 
 /*
- * ParticleSurfaceShade - the surface's shading: the normals from the smoothed depth, the ink's
+ * ParticleSurfaceShade - the surface's shading: the normals from the smoothed depth, the density's
  * color through its thickness (Beer-Lambert, absorption, the water's tint), a diffuse light, a
  * specular and a Fresnel edge; the fog by its depth. The viewer looks along +z from the front.
  */

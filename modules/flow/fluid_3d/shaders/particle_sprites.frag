@@ -26,7 +26,7 @@ void emit(vec4 c) {
         fragColor = c;
         return;
     }
-    // A particle's emission and its opacity per channel; the depth weight puts near ink over far
+    // A particle's emission and its opacity per channel; the depth weight puts near density over far
     // (McGuire and Bavoil 2013), its range kept inside a float's
     vec3 e = uEmission * max(c.rgb, vec3(0.0));
     vec3 alpha = vec3(1.0 - exp(-uAbsorption * max(c.a, 0.0)));

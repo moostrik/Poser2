@@ -4,11 +4,11 @@
  * ParticleEmit - new particles from a density source, into the ring.
  *
  * Per texel of the source (RGBA: the amount times the color, the amount as alpha): its expected
- * count this step is rate × dt × g, g = min(amount / floor, 1), rounded by a hash so faint ink still
+ * count this step is rate × dt × g, g = min(amount / floor, 1), rounded by a hash so faint density still
  * spawns now and then; each new particle takes amount × gain × dt × slab / expected as its mass, so
  * the texel's mass is the grid's in expectation (slab: the gaussian's sum over the grid's layers)
  * and a strong drop makes heavy particles. Its color is the source's, its place a random point in
- * the texel, its z drawn from the injection's gaussian around the texel's z position (uLayer without one). The slots come from an atomic head, modulo
+ * the texel, its z drawn from the injection's gaussian around the texel's z position (none without one). The slots come from an atomic head, modulo
  * the count: a ring, the oldest overwritten.
  *
  * A particle: position (xyz in the volume's uv, w = packHalf2x16(mass, age)), previous (xyz,
@@ -26,7 +26,7 @@ layout(binding = 1) uniform sampler2D uZPosition;   // the source's z position, 
 
 uniform float uGain;        // the source's gain × the injection's weight
 uniform float uDt;          // s
-uniform float uRate;        // particles per texel per second where ink is
+uniform float uRate;        // particles per texel per second where density is
 uniform float uFloor;       // the amount below which a texel spawns fewer
 uniform bool  uHasZPosition;
 uniform int   uLayers;      // the grid's layers, which place the center and sum the slab

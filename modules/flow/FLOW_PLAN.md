@@ -51,7 +51,6 @@ arguments. The other findings are small by comparison.
 |-----|------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|
 | 1.1 | the reasons out of the docstrings into the stage documents, each fact once                           | a docstring says what the thing is; reasons in the package's document |
 | 1.2 | "drag" alone renamed by what it acts on                                                              | the glossary: "drag" pairs with what it acts on                     |
-| 1.4 | "ink" said as density                                                                                | one term per concept                                                |
 | 1.5 | `__init__` exports only what other packages and the tests use                                        | `__init__.py` holds what other packages use                         |
 | 1.6 | files named after what they hold                                                                     | a file holds one class or subject, named after it                   |
 | 1.7 | seven `Field` descriptions to one short line                                                         | a `Field` description is one short line of panel text               |
@@ -64,7 +63,6 @@ What each takes:
   its test), `AddToFaces3D.drag` and its `DRAG` mode; "exponential drag" in the docstrings of `FlowUtil`'s
   dampen, `Fluid2D`'s and `Dampen`. A mouse drag in `orbit.py` and the monitor is the panel's word, not the
   fluid's, and stays.
-- 1.4: `particle_density.py`, `particle_emit.py`.
 - 1.5: 5 names used by nothing outside the package (`change_acceleration_scale`, `WallMode`, `FiniteGuard`,
   `GuardSlot`, `ParticleDraw`), whose own users import them from their files already. The 14 the flow's tests
   use stay, as a test may import absolutely.
@@ -119,7 +117,7 @@ question.
 ### The temperature
 
 Whether the temperature needs a field of its own. Buoyancy needs only a scalar the water is lighter or
-heavier by: the density alone can be it (ink sinks), and the temperature adds currents apart from the dye
+heavier by: the density alone can be it (dyed water sinks), and the temperature adds currents apart from the dye
 (warm clear water rising), the textbook smoke's soot and heat. Off in the preset (`buoyancy` 0), and nothing
 is injected into it then.
 
@@ -246,7 +244,7 @@ Not worked on until asked for; each with what is known.
 ## Rules it touches
 
 - A docstring says what the thing is; reasons sit in the package's document: 1.1.
-- Use the terms in the glossary; one term per concept: 1.2, 1.4.
+- Use the terms in the glossary; one term per concept: 1.2.
 - `__init__.py` holds what other packages use: 1.5.
 - A file holds one class or subject, named after it: 1.6.
 - A `Field` description is one short line of panel text: 1.7.

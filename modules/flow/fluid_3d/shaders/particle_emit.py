@@ -29,7 +29,7 @@ class ParticleEmit(ComputeShader):
             count: The ring's size
             gain: The source's gain × the injection's weight
             dt: The step (s)
-            rate: Particles per texel per second where ink is
+            rate: Particles per texel per second where density is
             floor: The amount below which a texel spawns fewer
             layers: The grid's layers, which place the center and sum the slab for the mass
             spread: Its sigma

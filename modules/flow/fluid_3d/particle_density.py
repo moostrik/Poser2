@@ -1,7 +1,7 @@
 """The density as particles: millions of points in one storage buffer, moved through the grid's velocity.
 
 Everything stays on the GPU: the CPU dispatches and draws a fixed count and reads no particle back.
-    emission     per texel of a density source, `rate` × dt particles where ink is (fewer below a floor),
+    emission     per texel of a density source, `rate` × dt particles where density is (fewer below a floor),
                  each the texel's amount × gain × dt × the slab's sum over the grid's layers over the
                  expected count as its mass: a texel's mass is the grid's in expectation, a strong drop
                  heavy particles; into a ring by an atomic head, the oldest overwritten

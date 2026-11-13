@@ -2,7 +2,7 @@
 
 /*
  * ParticleWeighted - the weighted look's two targets into the 2D output (McGuire and Bavoil 2013): the
- * weighted emission over the weighted opacity is the ink's color where it shows, times the opacity the
+ * weighted emission over the weighted opacity is the density's color where it shows, times the opacity the
  * revealage leaves.
  */
 

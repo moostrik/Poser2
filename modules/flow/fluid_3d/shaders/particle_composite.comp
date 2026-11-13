@@ -2,8 +2,8 @@
 
 /*
  * ParticleComposite - the particles' depth slices marched front to back into the 2D output, as
- * Composite3D marches the grid: per slice, per-channel Beer-Lambert extinction (near ink covers far
- * ink), the water's fog per channel. A slice holds the sum of the grid's
+ * Composite3D marches the grid: per slice, per-channel Beer-Lambert extinction (near density covers far
+ * density), the water's fog per channel. A slice holds the sum of the grid's
  * layers it spans, so its extinction is theirs. One slice is the additive look: its fog and tint
  * were given per particle, so uFog is 0 then.
  */
