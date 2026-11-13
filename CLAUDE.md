@@ -151,7 +151,9 @@ python -m unittest discover -s modules/<pkg>/tests -t .    # camera/oak4 in .ven
 - A plan ends with the rules it touches and how it meets each
 - A plan is built on the user's literal "go"
 - Separate what the code or a measurement shows from what is inferred, and say which is which
-- One plan step is one commit; experiments and half steps are not committed
+- A plan step that is checked by a run or a test is one commit
+- The rest of a plan is one commit
+- Experiments and half steps are not committed
 - A finished plan is reported with the rules it touched and how it meets each
 - Push only on the user's word
 - Never delete or rewrite a plan without confirmation; propose the change first

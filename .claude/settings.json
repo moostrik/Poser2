@@ -37,6 +37,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git commit *)",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/commit_rules.py\" --hook"
+          }
+        ]
+      }
     ]
   }
 }
