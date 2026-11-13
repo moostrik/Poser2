@@ -59,8 +59,6 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 
 - Prefer composition over inheritance for runtime assembly
 - Pass collaborators and fixed structure (counts known at startup) through constructors; tunable values come from settings
-- A consumer that needs every item gets a callback
-- A consumer that needs the latest value reads the board
 - Name public data-flow methods by execution timing: `set` stores for polling, `submit` enqueues deferred work, `process` transforms and emits synchronously, `update` advances on a tick
 - Name output channels verb + domain noun (`submit_frames`, `add_similarity_callback`)
 - Share runtime data through `modules/board/` protocol + mixin pairs; each app composes its own `RenderBoard` from the mixins it needs, and keeps a slice only it reads in `apps/<app>/board/`
@@ -71,8 +69,11 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 
 - Use threads with explicit synchronization, not async/await
 - Use `Lock` and `Event` for shared mutable state and lifecycle signals
-- A callback stores or enqueues what it receives and returns
-- A receiver does its work on its own thread
+- A producer calls its callbacks itself, from the thread that made the item. It has no thread for dispatching
+- A callback only hands the item over and returns
+- The part that works on the item has its own thread and does all its work there, its inner steps included
+- When that part can't keep up, its queue drops the oldest item and counts it
+- A part that only needs the latest value, like the render, reads it at its own tick
 - A callback list has its own lock; register under it, copy the list under it, call the callbacks outside it
 - Avoid heavy pure-Python loops in hot paths; they hold the GIL, while numpy, ONNX Runtime, OpenGL and depthai release it
 
@@ -147,8 +148,7 @@ python -m unittest discover -s modules/<pkg>/tests -t .    # camera/oak4 in .ven
 
 ## Plans and commits
 
-- A plan is a file named after what it plans (`FLOW_PLAN.md`, `APPS_PLAN.md`), in the package or app it changes
-- A plan that crosses packages is in the app it serves
+- A plan is named after the package, app or folder it is for, and sits in it (`FLOW_PLAN.md` in `modules/flow`, `APPS_PLAN.md` in `apps`)
 - A document describes what is built; what is not built is in the plan
 - A built step leaves the plan
 - A plan ends with the rules it touches, one line each
