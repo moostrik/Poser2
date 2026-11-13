@@ -6,7 +6,7 @@ import unittest
 
 from modules.camera import FrameType
 from modules.recording import RecordedCapture, RecordingSync
-from modules.recording.tests.recordings import cam_frame, cam_tracklets
+from modules.recording.tests.recordings import as_recorded, cam_frame, cam_tracklets
 
 FRAMES: int = 12           # under `KEPT`: one sender may run that far ahead of the other
 INTERVAL: float = 0.02      # s between captures, 50 fps
@@ -14,7 +14,7 @@ INTERVAL: float = 0.02      # s between captures, 50 fps
 
 class RecordingSyncThreadTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.sync = RecordingSync(with_depth=False)
+        self.sync = RecordingSync(with_depth=False, pack_poses=as_recorded)
         self.captures: list[RecordedCapture] = []
         self.threads: list[str] = []
 
@@ -84,7 +84,7 @@ class RecordingSyncThreadTest(unittest.TestCase):
 
 class RecordingSyncInlineTest(unittest.TestCase):
     def test_without_its_thread_a_part_is_matched_on_the_caller(self) -> None:
-        sync = RecordingSync(with_depth=False)
+        sync = RecordingSync(with_depth=False, pack_poses=as_recorded)
         captures: list[RecordedCapture] = []
         sync.add_capture_callback(captures.append)
         sync.submit_frame(cam_frame(0, 0, 0.0))

@@ -155,7 +155,7 @@ class TwoRecordingsTest(unittest.TestCase):
                 rec.submit_frame(cam_frame(0, 40, t))
                 rec.submit_frame(CameraFrame(0, FrameType.DEPTH, np.full((120, 160), 3000, np.uint16), t))
                 rec.expect_poses(0, t, True)
-                rec.submit_poses(poses(t))
+                rec.submit_poses(poses(t), t + 0.05)
                 time.sleep(0.003)
 
         def color_only(rec: Recorder) -> None:

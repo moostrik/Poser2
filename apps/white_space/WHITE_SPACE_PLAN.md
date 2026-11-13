@@ -6,14 +6,6 @@ runs on the same code before the plan: white_space (`scripts/white_space_probe.p
 `20250514-130512_4_wide_mono` 18–30 s, run C1follow) and deep_flow, which step 2 touches
 (`scripts/cadence_probe.py`, `measure` 9–19 s, run C1fix).
 
-## 2. The recorder packs the poses on its own thread
-
-`_record_poses` packs the RAW stage's frames into arrays (`frame_poses`) on the pose model's thread, in white_space
-and deep_flow. The recorder takes the frames as they are with their arrival and packs them on its thread.
-`modules/recording` knows no pose frames, so the packing is handed to the recorder at construction
-(`frame_poses` from `modules.inference`), not imported by it. Both apps' calls change with it.
-Checked by: the recorder's tests (`modules/recording`), a pose frame in and its `FramePoses` out.
-
 ## 3. The motor and the light sender on `perf_counter()`
 
 `light/motor.py` reads `monotonic()` for the fall edge, the fall timing and the simulated motor's tick;
@@ -46,7 +38,6 @@ Checked by: the guard tests and white_space's tests.
 
 ## Rules it touches
 
-- A callback only hands the item over and returns: 2.
 - Read `time.perf_counter()` for every stamp and duration: 3, 4.
 - Inside a package, import relatively; one `from` line per package: 5.
 - Name public data-flow methods by execution timing: 6.

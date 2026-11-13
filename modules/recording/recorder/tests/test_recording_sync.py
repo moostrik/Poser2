@@ -135,7 +135,7 @@ class TrackletTest(unittest.TestCase):
         self.recorder.submit_frame(video_frame(0))
         self.recorder.submit_frame(depth_frame(1000, 0.0))
         self.assertTrue(self.recorder.frames[0].empty())
-        self.recorder.submit_poses(poses(0.0))
+        self.recorder.submit_poses(poses(0.0), 0.05)
         capture = self.recorder.frames[0].get_nowait()
         assert capture.poses is not None
         self.assertEqual(list(capture.poses.poses), [3])
@@ -162,7 +162,7 @@ class TrackletTest(unittest.TestCase):
         self.recorder.submit_frame(video_frame(0))
         self.recorder.submit_frame(depth_frame(1000, 0.0))
         self.assertTrue(self.recorder.frames[0].empty())
-        self.recorder.submit_poses(poses(1.0))                  # the batch of frame 0 was dropped
+        self.recorder.submit_poses(poses(1.0), 1.05)                  # the batch of frame 0 was dropped
         self.assertIsNone(self.recorder.frames[0].get_nowait().poses)
         self.assertEqual(self.recorder.sync.missed.total('poses'), 1)
 
@@ -181,7 +181,7 @@ class TrackletTest(unittest.TestCase):
         self.recorder.submit_frame(depth_frame(1000, 0.0))      # waits for its poses
         for i in range(1, KEPT + 2):
             self.recorder.submit_tracklets(tracklets(float(i)))  # its own tracklets pushed out of the stream
-        self.recorder.submit_poses(poses(0.0))
+        self.recorder.submit_poses(poses(0.0), 0.05)
         capture = self.recorder.frames[0].get_nowait()
         assert capture.tracklets is not None
         self.assertEqual(capture.tracklets.timestamp, 0.0)

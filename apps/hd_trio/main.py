@@ -12,7 +12,7 @@ from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker, TrackerFrameSource
 from modules.pose import nodes, features, analytics, FrameDict, Recorder as PoseRecorder, RecorderSettings as PoseRecorderSettings
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import segmentation, detection, CameraSync, PoseInference
+from modules.inference import segmentation, detection, CameraSync, PoseInference, frame_poses
 from modules.session import Session, SessionSettings, SequencerState
 from modules.gl import WindowSettings
 
@@ -68,7 +68,7 @@ class HDTrioMain:
         self.sequencer = Sequencer(self.settings.session.sequencer)
         self.sequencer.add_state_callback(self.board.set_sequencer_state)
         self.sequencer.add_state_callback(self.osc_sound.set_sequencer_state)
-        self.video_recorder = VideoRecorder(self.settings.session.video, data_path=DATA_PATH)
+        self.video_recorder = VideoRecorder(self.settings.session.video, frame_poses, data_path=DATA_PATH)
         self.pose_recorder = PoseRecorder(self.settings.session.pose, data_path=DATA_PATH)
 
         # Authoring recorder for the white example figure. Deliberately not part of

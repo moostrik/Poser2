@@ -30,7 +30,7 @@ def two_cameras(rec: Recorder) -> None:
         rec.submit_frame(CameraFrame(0, FrameType.DEPTH, np.full((120, 160), 1000 + i * 30, np.uint16), t))
         rec.submit_tracklets(cam_tracklets(0, t))
         rec.expect_poses(0, t, True)
-        rec.submit_poses(poses(t))
+        rec.submit_poses(poses(t), t + 0.05)
         if i % 5 != 4:
             rec.submit_frame(cam_frame(1, i * 4 % 250, t + 0.003))
         time.sleep(0.003)
@@ -149,7 +149,7 @@ def rig(with_depth: bool) -> Callable[[Recorder], None]:
                     rec.submit_frame(CameraFrame(cam, FrameType.DEPTH, np.full((120, 160), 1000 + i * 30, np.uint16), t))
                 rec.submit_tracklets(cam_tracklets(cam, t))
                 rec.expect_poses(cam, t, True)
-                rec.submit_poses(FramePoses(cam, t, {3: (np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32), POINTS)}, t + 0.05))
+                rec.submit_poses(FramePoses(cam, t, {3: (np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32), POINTS)}, t + 0.05), t + 0.05)
             time.sleep(0.004)
     return feed
 

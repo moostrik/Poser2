@@ -33,6 +33,11 @@ def poses(timestamp: float) -> FramePoses:
     return FramePoses(0, timestamp, {3: (np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32), POINTS)}, timestamp + 0.05)
 
 
+def as_recorded(poses: FramePoses, arrival: float) -> list[FramePoses]:
+    """The tests' poses are packed already: the recorder's packing hands them on as they are."""
+    return [poses]
+
+
 def tracklets(timestamp: float) -> CameraTracklets:
     tracklet = CameraTracklet(cam_id=0, id=1, status=TrackingStatus.TRACKED, roi=Rect(0.1, 0.2, 0.3, 0.4), age=1, timestamp=timestamp)
     return CameraTracklets(0, timestamp, [tracklet], arrival=timestamp + 0.033)
@@ -50,7 +55,7 @@ def recorder(types: list[FrameType], temp: str = 'temp', output: str = 'out', da
     settings.output_path = output
     settings.fps = 60.0
     settings.keyframe_interval = keyframe_interval
-    return Recorder(settings, data_path)
+    return Recorder(settings, as_recorded, data_path)
 
 
 def stream_frames(path: Path, stream: int) -> int:
@@ -84,7 +89,7 @@ def record(root: Path, types: list[FrameType], num_cams: int, feed: Callable[[Re
     settings.fps = 60.0
     settings.keyframe_interval = 1
     settings.name = name                # two recordings in one second have their own folders
-    rec = Recorder(settings, str(root))
+    rec = Recorder(settings, as_recorded, str(root))
     before = set((root / 'recordings').iterdir()) if (root / 'recordings').is_dir() else set()
     rec.start()
     try:

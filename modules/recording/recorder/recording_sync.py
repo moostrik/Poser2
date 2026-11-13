@@ -59,6 +59,7 @@ class RecordedCapture:
 
 
 RecordedCaptureCallback: TypeAlias = Callable[[RecordedCapture], None]
+PosesPacker: TypeAlias = Callable[[Any, float], list[FramePoses]]     # the app's poses and their arrival, per camera
 
 
 class _Part(IntEnum):
@@ -66,7 +67,7 @@ class _Part(IntEnum):
     FRAME = 0
     TRACKLETS = auto()
     ASKED = auto()      # (cam_id, timestamp, asked): whether poses were asked for a frame
-    POSES = auto()
+    POSES = auto()      # (the app's poses, arrival), packed on the sync's thread
     FLUSH = auto()      # an Event, set once every capture waiting has gone out
     RESET = auto()      # an Event, set once nothing is kept
     SETTLE = auto()     # an Event, set once every part queued before it is matched
@@ -106,9 +107,12 @@ def _later(stream: CaptureStream, timestamp: float) -> bool:
 
 
 class RecordingSync(Thread):
-    def __init__(self, with_depth: bool) -> None:
+    def __init__(self, with_depth: bool, pack_poses: PosesPacker) -> None:
+        """`pack_poses`: the app's poses and their arrival into `FramePoses`, one per camera; the recording knows no
+        pose frames, so the app that has them hands this in."""
         super().__init__(daemon=True, name='RecordingSync')
         self.with_depth: bool = with_depth
+        self._pack_poses: PosesPacker = pack_poses
         self._cameras_lock: Lock = Lock()
         self._cameras: dict[int, _Camera] = {}
         self._expected: dict[int, tuple[bool, bool]] = {}      # each camera's parts said ahead: (tracklets, poses)
@@ -227,8 +231,10 @@ class RecordingSync(Thread):
         """Whether the pose model was asked poses for the camera's frame captured at `timestamp`."""
         self._queue(_Part.ASKED, (cam_id, timestamp, asked))
 
-    def submit_poses(self, frame_poses: FramePoses) -> None:
-        self._queue(_Part.POSES, frame_poses)
+    def submit_poses(self, poses: Any, arrival: float) -> None:
+        """The app's poses as they came out, handed over at `arrival`; packed into `FramePoses` on the sync's thread
+        (`pack_poses`)."""
+        self._queue(_Part.POSES, (poses, arrival))
 
     def flush(self) -> None:
         """Send out every capture waiting, without the parts that have not come: the recording ends. Returns once
@@ -256,6 +262,14 @@ class RecordingSync(Thread):
                 self._emit(released)
             value.set()
             return
+        if part == _Part.POSES:
+            for frame_poses in self._pack_poses(*value):
+                self._take_part(_Part.POSES, frame_poses)
+            return
+        self._take_part(part, value)
+
+    def _take_part(self, part: _Part, value: Any) -> None:
+        """One camera's part: a frame, its tracklets, whether poses were asked, or its packed poses."""
         cam_id: int = value[0] if part == _Part.ASKED else value.cam_id
         camera: _Camera = self._camera(cam_id)
         with camera.lock:

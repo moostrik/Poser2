@@ -75,7 +75,7 @@ class WhiteSpaceMain:
         # tick, so it is a pose like any other from there.
         self.dummy = Dummy(self.settings.pose_instrument.dummy, ps.angle_extractor, ps.angle_calibrator, dummy_id(max_players),
                            Path(DATA_PATH) / "poses.json")
-        self.video_recorder = VideoRecorder(self.settings.session.video, data_path=DATA_PATH)
+        self.video_recorder = VideoRecorder(self.settings.session.video, frame_poses, data_path=DATA_PATH)
 
         # CAMERA
         self.cameras: list[CameraSource] = []
@@ -272,10 +272,9 @@ class WhiteSpaceMain:
         self.video_recorder.expect_poses(cam_id, timestamp, bool(asked) and posing)
 
     def _record_poses(self, frames: FrameDict) -> None:
-        """The RAW stage's poses, on the pose model's thread, to the recorder: their hand-over, stamped here."""
-        arrival: float = time.perf_counter()
-        for poses in frame_poses(frames, arrival):
-            self.video_recorder.submit_poses(poses)
+        """The RAW stage's poses, on the pose model's thread, to the recorder as they are: their hand-over, stamped
+        here; the recorder packs them on its own thread (`frame_poses`)."""
+        self.video_recorder.submit_poses(frames, time.perf_counter())
 
     def _update_drops(self, _now: float) -> None:
         """The panel's drops, counted where they happen (the frame source's are on its own panel)."""

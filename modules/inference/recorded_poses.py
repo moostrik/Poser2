@@ -2,7 +2,8 @@
 
 Recording: `frame_poses` turns the RAW stage's poses into what the camera's recorder keeps of them (`FramePoses`,
 per camera: each pose's crop box and the model's points with their scores, by track_id), stamped with their
-arrival here, the one clock read for them: the poses come from the host's pipeline, not from a camera backend.
+arrival, the one clock read for them: the poses come from the host's pipeline, not from a camera backend. An app
+hands it to its recorder, which runs it on its own thread.
 
 Playback: `RecordedPoses` is the RAW stage's async step in -sim, around `PoseInference`. It hears the player's
 frames (`set_clip_frame`, a `ClipFrameCallback`) and keeps each frame's recorded poses by its capture on the play's
