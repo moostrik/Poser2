@@ -25,7 +25,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from modules.camera import WARP_MESH, warp_mesh_points, frame_window, frame_coverage, source_lens
+from modules.camera.geometry import WARP_MESH, warp_mesh_points, frame_window, frame_coverage, source_lens
 
 
 W, H = 1280, 800

@@ -5,7 +5,7 @@ turn the board mounts it at (`IMU_BOARD_ROLL`). The angles themselves are the co
 import math
 import unittest
 
-from modules.camera import orientation_from_gravity, imu_to_camera, unroll_imu_frame
+from modules.camera.geometry import orientation_from_gravity, imu_to_camera, unroll_imu_frame
 from modules.camera.oak.imu import IMU_BOARD_ROLL
 
 

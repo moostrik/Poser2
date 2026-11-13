@@ -4,7 +4,8 @@ import unittest
 
 import numpy as np
 
-from modules.camera import CameraTracklet, CameraTracklets, TrackingStatus, corrected_roi, straightened_tracklets
+from modules.camera import CameraTracklet, CameraTracklets, TrackingStatus, straightened_tracklets
+from modules.camera.geometry import corrected_roi
 from modules.utils import Rect
 
 SHIFT: np.ndarray = np.array([[1.0, 0.0, 0.25], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])

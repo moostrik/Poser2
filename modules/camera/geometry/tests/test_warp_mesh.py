@@ -11,13 +11,16 @@ import unittest
 
 import numpy as np
 
-from modules.camera import (
-    WARP_MESH, degrees_per_pixel, frame_fov, warp_mesh_points, horizon_row,
+from modules.camera.geometry import (
+    WARP_MESH, degrees_per_pixel, warp_mesh_points, horizon_row,
     FrameWindow, frame_window, frame_coverage, coverage_summary,
-    output_focal, source_lens, lens_field, rectilinear_field, lens_deviation,
+    source_lens, lens_field, rectilinear_field, lens_deviation,
     CameraResolution, resolve_resolution,
-    mono_frame_size, color_frame_size, mode_size, frame_size, full_frame_height, aligned_height,
+    mono_frame_size, mode_size, frame_size,
 )
+from modules.camera.geometry.frame_window import frame_fov
+from modules.camera.geometry.lens import output_focal
+from modules.camera.geometry.sensor_modes import color_frame_size, full_frame_height, aligned_height
 
 
 MONO_W, MONO_H = 1280, 800

@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.camera import TiltCorrection, TiltCorrectionSettings, tilt_homography
+from modules.camera.geometry.tilt_correction import TiltCorrection, TiltCorrectionSettings, tilt_homography
 
 LENS: list[list[float]] = [[538.0, 0.0, 450.0], [0.0, 538.0, 360.0], [0.0, 0.0, 1.0]]
 SIZE: tuple[int, int] = (900, 720)

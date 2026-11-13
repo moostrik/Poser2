@@ -9,8 +9,9 @@ the backend's (`modules/camera/oak/tests/test_imu.py`).
 import math
 import unittest
 
-from modules.camera import CameraHealth, CameraHealthSettings, RigCameraReadings, RigCameraSettings, \
-    orientation_from_gravity, mount_deviation, fps_deviation
+from modules.camera import CameraHealth, CameraHealthSettings, RigCameraReadings, RigCameraSettings, mount_deviation, \
+    fps_deviation
+from modules.camera.geometry import orientation_from_gravity
 from modules.settings import Field
 
 

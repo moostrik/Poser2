@@ -20,7 +20,7 @@ import os
 
 import depthai as dai
 
-from .. import CameraResolution, frame_size, WARP_MESH, warp_mesh_points
+from ..geometry import CameraResolution, frame_size, WARP_MESH, warp_mesh_points
 
 from .device import SYSTEM_RATE_HZ
 from .imu import IMU_RATE_HZ

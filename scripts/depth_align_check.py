@@ -19,8 +19,8 @@ import torch  # noqa: E402
 from OpenGL.GL import GL_NEAREST, GL_R32F, GL_R32UI, GL_RED, GL_FLOAT, GL_TEXTURE_2D, glBindTexture, glFinish, glGetTexImage  # noqa: E402
 
 import monitor_harness as mh  # noqa: E402
-from modules.camera import (DepthAlignment, FrameType, TiltCorrection, TiltCorrectionSettings, aligned_depth_size, depth_projection,  # noqa: E402
-                            read_metadata)
+from modules.camera import (DepthAlignment, FrameType, TiltCorrection, TiltCorrectionSettings, aligned_depth_size, depth_projection)  # noqa: E402
+from modules.recording import read_metadata  # noqa: E402
 from modules.gl import Image, Texture  # noqa: E402
 from modules.inference.depth_align import DepthAligner, depth_metres  # noqa: E402
 from modules.render.shaders import DepthAlign  # noqa: E402

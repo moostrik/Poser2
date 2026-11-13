@@ -4,7 +4,8 @@ import unittest
 
 import numpy as np
 
-from modules.camera import CameraFrame, FrameType, mirrored_image
+from modules.camera import CameraFrame, FrameType
+from modules.camera.frame import mirrored_image
 
 
 def _frame(image: np.ndarray, nv12: bool = False) -> CameraFrame:

@@ -8,7 +8,7 @@ import depthai as dai
 
 from modules.utils import Rect
 
-from .. import CameraResolution, resolve_resolution, mode_size, mirrored_roi
+from ..geometry import CameraResolution, resolve_resolution, mode_size, mirrored_roi
 
 # The color sensor (IMX586), and with `depth_model` the OV9282 stereo pair. Grey is the ISP's luma of the color
 # sensor. A resolution label here is a delivered size; the Camera node picks the sensor mode from it.

@@ -9,7 +9,8 @@ import depthai as dai
 import numpy as np
 from cv2 import resize, COLOR_BGR2GRAY, cvtColor
 
-from .. import ClipSource, FrameType, frame_size, mode_size
+from .. import ClipSource, FrameType
+from ..geometry import frame_size, mode_size
 
 from .camera import Camera
 from .pipeline import build_pipeline, CLIPS_STREAM

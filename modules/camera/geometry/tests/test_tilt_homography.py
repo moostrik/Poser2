@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.camera import homography_points, tilt_homography
+from modules.camera.geometry.tilt_correction import homography_points, tilt_homography
 
 SIZE: tuple[int, int] = (900, 720)
 FOCAL: float = 538.0

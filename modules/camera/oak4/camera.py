@@ -32,8 +32,9 @@ import depthai as dai
 from numpy import ndarray
 
 from .. import CameraResolution, CameraFrame, DepthAlignment, FrameReadings, RigCameraReadings, CameraTracklet, CameraTracklets, FrameType, CameraFrameCallback, \
-    TrackletCallback, orientation_from_gravity, frame_window, frame_coverage, coverage_summary, \
-    delivered_height, lens_field, rectilinear_field, lens_deviation, imu_to_camera, unroll_imu_frame, TiltCorrection
+    TrackletCallback, TiltCorrection
+from ..geometry import orientation_from_gravity, frame_window, frame_coverage, coverage_summary, delivered_height, lens_field, \
+    rectilinear_field, lens_deviation, imu_to_camera, unroll_imu_frame
 from modules.utils import FPS, Rect
 
 from .control import DepthControl, SensorControl

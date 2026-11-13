@@ -2,7 +2,7 @@
 
 from depthai import MonoCameraProperties, ColorCameraProperties
 
-from .. import CameraResolution, resolve_resolution
+from ..geometry import CameraResolution, resolve_resolution
 
 # The depthai 2.30 modes behind the labels; which sensor has which label is `MONO_RESOLUTIONS`, `COLOR_RESOLUTIONS`.
 MONO_MODES: dict[CameraResolution, MonoCameraProperties.SensorResolution] = {
