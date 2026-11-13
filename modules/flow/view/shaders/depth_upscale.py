@@ -1,11 +1,11 @@
-"""Depth Upscale shader: the aligned depth read into the view (`view_window.edge_aware_depth`, `mask_sided_depth`,
+"""Depth Upscale shader: the aligned depth read into the view (`depth_read.edge_aware_depth`, `mask_sided_depth`,
 `joint_bilateral_depth`), one of `DepthRead`'s ways."""
 
 from OpenGL.GL import (GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f,
                        glUniform1i, glUniform4f, glUseProgram)
 from modules.gl import Shader, draw_quad, Texture
 from modules.utils import Rect
-from ..view_window import DepthRead
+from ..depth_read import DepthRead
 
 
 class DepthUpscale(Shader):

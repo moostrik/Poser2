@@ -6,7 +6,7 @@ uploader's corrected camera frame, is in [INPUT_THREADS.md](INPUT_THREADS.md#the
 at and why are in [RESOLUTION.md](RESOLUTION.md). **(deduction)** marks what is inferred.
 
 The stage is `ViewLayer` (settings `view`, `modules/render/layers/flow/view_layer.py`); its geometry and the
-depth's read are plain modules in `modules/flow/view` (`view_window.py`, `DepthUpscale`).
+depth's read are plain modules in `modules/flow/view` (`view_window.py`, `depth_read.py`, `DepthUpscale`).
 
 ## The stage
 
@@ -50,7 +50,7 @@ pixel reads it between its pixels (`DepthUpscale`). `depth_read` chooses how; on
 | `MASK`       | as `SURFACE`                      | the nearest depth pixel on the side the mask gives it       | our own rule            |
 | `BILATERAL`  | a weighted mean of the 5 × 5 around it | the same mean, weighed by the image                     | Kopf et al. 2007, eq. 3 |
 
-`SURFACE` (`view_window.edge_aware_depth`): the four depth pixels around a view pixel, interpolated bilinearly
+`SURFACE` (`depth_read.edge_aware_depth`): the four depth pixels around a view pixel, interpolated bilinearly
 where they lie within the motion's `z.tolerance` of each other, else the one it lies in, so an edge never reads
 as a distance in between; a 0, no depth, is never blended.
 
