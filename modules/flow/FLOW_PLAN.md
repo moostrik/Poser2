@@ -9,12 +9,13 @@ inferred, **(site fact)** what the operator saw.
 
 | #   | Line                                                                      | State                                                         | Documents                                                    |
 |-----|---------------------------------------------------------------------------|---------------------------------------------------------------|--------------------------------------------------------------|
-| 1   | [The 3D fluid's input](#1-the-3d-fluids-input)                            | built; the depth read to choose                               | [VIEW.md](VIEW.md), [BRIDGE_3D.md](BRIDGE_3D.md)             |
-| 2   | [The 3D fluid's look at 4K](#2-the-3d-fluids-look-at-4k)                  | next                                                          | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md)           |
-| 3   | [One unit across the stages](#3-one-unit-across-the-stages)               | not started                                                   | [FLOW.md](FLOW.md)                                           |
-| 4   | [The apps on deep_flow's input](#4-the-apps-on-deep_flows-input)          | its own plan                                                  | [APPS_PLAN.md](../../apps/APPS_PLAN.md)                      |
-| 5   | [The 2D flow follows the 3D](#5-the-2d-flow-follows-the-3d)               | not started                                                   | [FLOW.md](FLOW.md)                                           |
-| 6   | [A camera without depth](#6-a-camera-without-depth)                       | not started                                                   | [FLOW.md](FLOW.md), [VIEW.md](VIEW.md)                       |
+| 1   | [The flow held up to the rules](#1-the-flow-held-up-to-the-rules)         | started; three findings so far                                | `CLAUDE.md`, `.claude/rules`                                 |
+| 2   | [The 3D fluid's input](#2-the-3d-fluids-input)                            | built; the depth read to choose                               | [VIEW.md](VIEW.md), [BRIDGE_3D.md](BRIDGE_3D.md)             |
+| 3   | [The 3D fluid's look at 4K](#3-the-3d-fluids-look-at-4k)                  | next                                                          | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md)           |
+| 4   | [One unit across the stages](#4-one-unit-across-the-stages)               | not started                                                   | [FLOW.md](FLOW.md)                                           |
+| 5   | [The apps on deep_flow's input](#5-the-apps-on-deep_flows-input)          | its own plan                                                  | [APPS_PLAN.md](../../apps/APPS_PLAN.md)                      |
+| 6   | [The 2D flow follows the 3D](#6-the-2d-flow-follows-the-3d)               | not started                                                   | [FLOW.md](FLOW.md)                                           |
+| 7   | [A camera without depth](#7-a-camera-without-depth)                       | not started                                                   | [FLOW.md](FLOW.md), [VIEW.md](VIEW.md)                       |
 
 Recording and -sim, deep_flow's live checks among them, have their own plan,
 [RECORDING_PLAN.md](../recording/RECORDING_PLAN.md).
@@ -22,7 +23,27 @@ Recording and -sim, deep_flow's live checks among them, have their own plan,
 The 3D fluid's lines are weighed by [its goal](FLUID_3D.md#the-goal): sharp, translucent ink patterns, layers
 distinct.
 
-## 1. The 3D fluid's input
+## 1. The flow held up to the rules
+
+The flow's packages (`modules/flow`: `motion`, `view`, `bridge_2d`, `bridge_3d`, `fluid_2d`, `fluid_3d`,
+`visualization`, `shaders` and its files) and its layers (`modules/render/layers/flow`) against `CLAUDE.md` and
+`.claude/rules`: reported per package, then a step for each finding that does not meet them. Form only: a name,
+a file, a docstring, an import; nothing changes what the flow does for a rule's sake.
+
+Found so far, by the apps' plan's module pass ([APPS_PLAN.md](../../apps/APPS_PLAN.md)), which stopped partway:
+the code reads time from `perf_counter`, prints nothing, has no `# type: ignore`, and imports other packages from
+their `__init__`. Open:
+
+| Finding                                                                                                 | Rule                                                        |
+|---------------------------------------------------------------------------------------------------------|-------------------------------------------------------------|
+| `drag_share`, `drag_gate`, `drag_velocity_step`, `DRAG_FLOOR`, `drag_time` in `fluid_3d` say "drag" alone | the glossary: "drag" pairs with what it acts on            |
+| "ink" in the particles' comments, a docstring and a parameter description (`particle_density.py`, `particle_emit.py`) | one term per concept: the fluid carries density; no rule names "ink" yet |
+| "centre" and "colour" in five docstrings in `motion` and `view`                                          | the glossary: American spelling                             |
+| 17 test files import the flow absolutely                                                                | inside a package, its tests included, import relatively    |
+
+The rest of the packages are not yet read.
+
+## 2. The 3D fluid's input
 
 The input as good as it gets, before the 4K density's heavy side. Built: every capture reaches the motion
 ([INPUT_THREADS.md](INPUT_THREADS.md)), the mask's edge on the image's and the depth read across a surface
@@ -40,7 +61,7 @@ its readings' depth ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)).
   the fluid keeps taking it, where the motion holds its last velocity. What the flow should do then is not
   decided.
 
-## 2. The 3D fluid's look at 4K
+## 3. The 3D fluid's look at 4K
 
 ### The velocity for the fine density
 
@@ -88,7 +109,7 @@ gravity) weighs dyed water wherever it is, with `buoyancy` 0, in the same pass, 
 - The run-to-run spread of the pose's load, 1 to 1.5 ms of the step between two runs of one configuration:
   the person detection's rate is not fixed.
 
-## 3. One unit across the stages
+## 4. One unit across the stages
 
 Every length in the flow is in widths: the motion's velocity (widths/s of the camera's image), the bridge's
 readings, the fluid's inputs (`spread`), its look (`opacity`, `fog`), the box's depth, the monitor's scale.
@@ -97,11 +118,11 @@ then mean less against what is seen. One unit across the stages, the smaller sid
 and feel when the box turns: in portrait nothing changes. It reaches past the fluid (the motion, the
 bridge, the monitor), so it is one rule for all of them, made where each length is made.
 
-## 4. The apps on deep_flow's input
+## 5. The apps on deep_flow's input
 
 Not the flow's: its own plan, [apps/APPS_PLAN.md](../../apps/APPS_PLAN.md).
 
-## 5. The 2D flow follows the 3D
+## 6. The 2D flow follows the 3D
 
 The 2D system (`GradientFlow`, `bridge_2d`, `Fluid2D`, hd_trio) runs as on `main`
 ([FLOW.md's constraints](FLOW.md#constraints)). It follows the 3D's principles once the 3D is finished:
@@ -122,7 +143,7 @@ The 2D system (`GradientFlow`, `bridge_2d`, `Fluid2D`, hd_trio) runs as on `main
 
 Each 2D stage gets its document as it is rebuilt (`BRIDGE_2D.md`, `FLUID_2D.md`).
 
-## 6. A camera without depth
+## 7. A camera without depth
 
 - The depth's mask with another mask source: deep_flow's mask is the depth's ([VIEW.md](VIEW.md#the-mask-and-the-depth-mask));
   a mask from RVM, for a camera without depth, would come back from hd_trio. With it the motion's `depth_mask`,
@@ -182,3 +203,17 @@ Not worked on until asked for; each with what is known.
   at the top shared down to both, or a share between panels. In a field panel the system's name is
   dropped as in `input`.
 - The camera as a standalone OAK app: the depth's alignment, the PC's now, then needs a home.
+
+## Rules it touches
+
+- Every rule in `CLAUDE.md` and `.claude/rules`, the flow's code against each: line 1.
+- Inside a package, its tests included, import relatively: the 17 test files, line 1.
+- Use the terms in the glossary: "drag" alone and the spelling, line 1.
+- Remove obsolete pathways; keep presets and settings schemas in sync: the two depth reads not chosen,
+  `bilateral_contrast` and the preset's `view.depth_read`, line 2.
+- Choose a data path by its latency: the chain before the fluid timed as one, line 2.
+- A setting's default is the textbook value: the tricubic read, line 3.
+- A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
+
+Not designed yet, so their rules are not named: the dye's brightness and no captures (line 2); the fade and the
+evaporation, the temperature and the details (line 3); lines 4, 6 and 7; the motion's details.

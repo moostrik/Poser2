@@ -79,7 +79,7 @@ this branch: its `main.py` still calls what C removed (`PoseInference.set_camera
 `add_gpu_image_callback`, `add_camera_images_callback`, `CameraSync.add_sync_callback`,
 `TrackerFrameSource.process`). Its input is white_space's model, three cameras' frames of a moment as one set, so it
 takes C's wiring. The 2D fluid stays as it is (`Motion2DLayer`, `Bridge2DLayer`, `Fluid2DLayer`, which the render
-already uses); [the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2d-flow-follows-the-3d) rebuilds it later.
+already uses); [the flow's line 6](../modules/flow/FLOW_PLAN.md#6-the-2d-flow-follows-the-3d) rebuilds it later.
 Its recordings stay as they are (mp4 chunks any player plays, stored mirrored, a pose file per chunk), and so do its
 pose-following center layers. One step per commit.
 
@@ -105,7 +105,7 @@ values are the presets'); 9, `HD_TRIO.md` holds the app's reasons, its render's 
    pose and recording tests, and each app's start for 10 s: deep_flow, white_space and hd_trio in -sim, smile on
    its image input.
 
-Parked for [the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2d-flow-follows-the-3d), which rebuilds the 2D
+Parked for [the flow's line 6](../modules/flow/FLOW_PLAN.md#6-the-2d-flow-follows-the-3d), which rebuilds the 2D
 fluid and its input: hd_trio's render writes `fluid.density.fade_time` every tick from the player's motion, and its
 show stages write `similarity_scale` (and the center geometry's `stage`), settings used to carry values while
 running; they reach the fluid and the color mask through their inputs once those are rebuilt, instead of changing
