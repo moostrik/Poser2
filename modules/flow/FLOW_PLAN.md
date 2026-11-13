@@ -63,9 +63,7 @@ What each takes:
 - 1.6: `log_axis.py` holds `AxisLine`, `volume_cut.py` `VolumeCutShader`, `volume_cube.py` `VolumeCubeShader`
   and `CubeColor`, `view_window.py` `DepthRead` beside the window's geometry.
 
-Each step is one commit, built on your "go", its call sites and tests in the same change. The body's velocity
-keeps its two gains, the motion's `x_gain`, `y_gain`, `z_gain` and the fluid's `input.boundary.velocity_gain`
-**(site fact)**: the rule "one quantity has one gain" is for the rules thread.
+Each step is one commit, built on your "go", its call sites and tests in the same change.
 
 Not judged by a scan: whether every unit means something on its own, beyond the names above. The flow runs on the
 render thread, so the concurrency rules touch none of it.
