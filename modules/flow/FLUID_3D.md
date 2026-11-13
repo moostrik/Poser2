@@ -35,7 +35,7 @@ A step (`Fluid3D.update`), in order, at the code's defaults:
 
 | Pass        | What                                                                                                                                                                                                                                                                    | On                  | Depends on the input |
 |-------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|----------------------|
-| advect_vel  | self-advection on the faces by `velocity.advection`, each face traced on its own ([The staggered velocity](#the-staggered-velocity)), `velocity.advection_scale` 1, fade 60 s; on its result the guard ([The guard](#the-guard)) and the slip | velocity's faces    | the trace distance   |
+| advect_vel  | self-advection on the faces by `velocity.advection`, each face traced on its own ([The staggered velocity](#the-staggered-velocity)), `velocity.advection_scale` 1, no fade; on its result the guard ([The guard](#the-guard)) and the slip | velocity's faces    | the trace distance   |
 | viscosity   | Jacobi diffusion on the faces, off (`viscosity` 0)                                                                                                                                                                                                                      | velocity's faces    | no                   |
 | vorticity   | the confinements (`vorticity.strength_1` to `_3`, each at its `vorticity.radius_1` to `_3`): every running one's curl at the cells from the faces in one pass, their forces summed at the cells in one, each face given its two cells' mean | faces, curl         | no                   |
 | advect_temp | off: `buoyancy` 0 clears the temperature once, and nothing is injected into it                                                                                                                                                                                          | temperature         | the trace distance   |
@@ -380,9 +380,9 @@ as a tuning:
 | `wall` (every field, the volume)                                                                                                           | closed          | the operator's settings                                                                                                          |
 
 The fields' physics take the textbook's water, with no artificial decay or thickness, as defaults: the
-velocity's `fade_time` 60 s (it keeps its momentum), `viscosity` 0 (water at this scale),
-`pressure.iterations` 40 (GPU Gems' 40 to 80 for a Jacobi solve), the density's `fade_time` and
-`evaporation_time` 0 (off: it stays until the water carries it away), `temperature.sink` 0 and `ambient`
+fields' `fade_time` and `evaporation_time` 0 (off: the water keeps its momentum, the density and the warmth
+stay until the water carries them away), `viscosity` 0 (water at this scale), `pressure.iterations` 40
+(GPU Gems' 40 to 80 for a Jacobi solve), `temperature.sink` 0 and `ambient`
 0 (the density as heavy as the water, no buoyancy), gravity down the screen, every wall closed; the top
 speed off, a failsafe; the bridge's mix the boundary's trail alone and its lowpass's `smooth` its default
 160 ms, since the coast is the fluid's; the three confinements off (`vorticity.strength_1` to `_3` 0), each over its neighbors

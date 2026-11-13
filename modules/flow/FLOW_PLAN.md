@@ -53,7 +53,6 @@ arguments. The other findings are small by comparison.
 | 1.2  | "drag" alone renamed by what it acts on                                    | the glossary: "drag" pairs with what it acts on                          |
 | 1.6  | files named after what they hold                                           | a file holds one class or subject, named after it                        |
 | 1.8  | FLUID_3D.md and TIMING.md read line by line for history stated as a story  | a document reads as if the current design had always been it             |
-| 1.9  | `velocity.fade_time` and `temperature.fade_time` default to 0, off         | a setting's default is the textbook value                                |
 | 1.10 | every setting and its description gone through, last, after the refactor   | a `Field` description is one short line of panel text: what and its unit |
 
 What each takes:
@@ -64,8 +63,6 @@ What each takes:
   fluid's, and stays.
 - 1.6: `log_axis.py` holds `AxisLine`, `volume_cut.py` `VolumeCutShader`, `volume_cube.py` `VolumeCubeShader`
   and `CubeColor`, `view_window.py` `DepthRead` beside the window's geometry.
-- 1.9: the defaults only; deep_flow's preset keeps its own values (velocity 0, temperature 12 s), and hd_trio's
-  presets run the 2D fluid's.
 
 Each step is one commit, built on your "go", its call sites and tests in the same change. The body's velocity
 keeps its two gains, the motion's `x_gain`, `y_gain`, `z_gain` and the fluid's `input.boundary.velocity_gain`
@@ -242,7 +239,6 @@ Not worked on until asked for; each with what is known.
 - A file holds one class or subject, named after it: 1.6.
 - A `Field` description is one short line of panel text: 1.10.
 - A document reads as if the current design had always been it: 1.8.
-- A setting's default is the textbook value: 1.9.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the two depth reads not chosen,
   `bilateral_contrast` and the preset's `view.depth_read`, line 2.
 - Choose a data path by its latency: the chain before the fluid timed as one, line 2.
