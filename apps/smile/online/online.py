@@ -193,7 +193,7 @@ class Online:
             return
         image: np.ndarray | None = cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)
         if image is not None:
-            self.camera.process_online_frame(image)
+            self.camera.submit_online_frame(image)
 
     def on_face(self, frame: FaceFrame) -> None:
         """Every detector frame (Main.face_callback): the judging goes to the phone during its turn."""

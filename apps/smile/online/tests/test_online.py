@@ -80,7 +80,7 @@ class FakeCamera:
     def set_online(self, active: bool) -> None:
         self.online = active
 
-    def process_online_frame(self, frame) -> None:
+    def submit_online_frame(self, frame) -> None:
         self.pushed += 1
 
 

@@ -2,6 +2,7 @@
 
 import os
 import tempfile
+import threading
 import time
 import unittest
 
@@ -88,7 +89,7 @@ class TestCamera(unittest.TestCase):
         frame = np.zeros((12, 8, 3), dtype=np.uint8)
         frame[4:8] = 255                    # a band across the middle
         device.push(frame)
-        self.assertEqual(len(self.frames), 1)
+        self.assertTrue(wait_for(lambda: len(self.frames) == 1))     # fitted and handed on by the camera's own thread
         shown = self.camera.frame()[0]
         self.assertEqual(shown.shape, (6, 8, 3))
         self.assertEqual(int(shown[0, 0, 0]), 0)
@@ -109,12 +110,39 @@ class TestCamera(unittest.TestCase):
         frame = np.zeros((6, 8, 3), dtype=np.uint8)
         before = time.perf_counter()
         device.push(frame)
+        self.assertTrue(wait_for(lambda: self.camera.frame()[1] != 0.0))
         image, arrived = self.camera.frame()
         self.assertIs(image, frame)
         self.assertGreaterEqual(arrived, before)
         self.assertFalse(self.camera.stalled)
         # a camera that stops keeps its last frame, with the time of that frame
         self.assertEqual(self.camera.frame()[1], arrived)
+
+    def test_device_and_phone_frames_are_fitted_on_the_cameras_thread(self):
+        threads: list[str] = []
+        device = FakeDevice()
+        self.make(device)
+        self.camera.add_frame_callback(lambda _frame: threads.append(threading.current_thread().name))
+        device.push(np.zeros((12, 8, 3), dtype=np.uint8))
+        self.assertTrue(wait_for(lambda: len(self.frames) == 1))
+        self.camera.set_online(True)
+        self.camera.submit_online_frame(np.zeros((24, 16, 3), dtype=np.uint8))
+        self.assertTrue(wait_for(lambda: len(self.frames) == 2))
+        self.assertEqual(self.frames[1].shape, (6, 8, 3))
+        self.assertEqual(threads, ['SmileCamera', 'SmileCamera'])
+
+    def test_a_failing_callback_is_logged_and_the_camera_goes_on(self):
+        device = FakeDevice()
+        self.make(device)
+
+        def fail(_frame) -> None:
+            raise RuntimeError('a receiver failed')
+        self.camera.add_frame_callback(fail)
+        with self.assertLogs('apps.smile.cam.camera', level='ERROR'):
+            device.push(np.zeros((6, 8, 3), dtype=np.uint8))
+            self.assertTrue(wait_for(lambda: len(self.frames) == 1))
+        device.push(np.zeros((6, 8, 3), dtype=np.uint8))
+        self.assertTrue(wait_for(lambda: len(self.frames) == 2))
 
     def test_a_missing_device_is_none_and_the_image_still_works(self):
         self.make(FakeDevice(connects=False))
@@ -132,7 +160,7 @@ class TestCamera(unittest.TestCase):
         self.assertTrue(wait_for(lambda: self.settings.device == 'fake'))
         frame = np.zeros((6, 8, 3), dtype=np.uint8)
         device.push(frame)
-        self.assertIs(self.camera.frame()[0], frame)
+        self.assertTrue(wait_for(lambda: self.camera.frame()[0] is frame))
         device.connects = False                 # and gone again
         self.assertTrue(wait_for(lambda: self.settings.device == 'none'))
 

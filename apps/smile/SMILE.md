@@ -24,8 +24,9 @@ alive and does nothing (the face finder: nobody is ever chosen; the generator: t
 `cam/camera.py` is the one source the app reads: it wraps the device, a camera backend of `modules/camera/` on the
 camera contract (`modules.camera.vimba.Camera` default, `modules.camera.webcam.Camera` with `-wc`; both take
 `rotate90` for the portrait mode at construction), and an image source from `data/input/` that the panel's `use_image` switch puts in
-place of the device frames at any time. `Camera` fits every frame to the render size with `cover()`
-(scaled to fill it, the middle kept, no distortion); the backends only rotate and flip. A missing device is a warning and `device: none`, never an
+place of the device frames at any time. The device and the phone only hand their newest frame over; `Camera`'s own
+thread fits every frame to the render size with `cover()` (scaled to fill it, the middle kept, no distortion) and
+hands it on; the backends only rotate and flip. A missing device is a warning and `device: none`, never an
 automatic switch to the image. The Vimba backend's thread keeps the camera: `start()` makes the first try, and
 the thread searches again every 5 s while there is none and opens it again (user set, packet size, the
 panel's values) when no complete frame arrived for 5 s; the `device` readout follows its `connected`. Without the Vimba SDK
@@ -292,7 +293,7 @@ is SMILE's side: `Link` (a websocket client thread that reconnects, plus an uplo
 from `Main.sequence_callback`, the only place its phase changes: OFF, IDLE, ASKING, JUDGING, TRANSFORMING; the files
 after a turn are a `Delivery` record beside the phase) and
 `fake.py`, a stand-in for SMILE at the relay. A turn puts the phone's frames into `Camera` as a third source
-(`set_online`, `process_online_frame`; the device and the image are muted meanwhile and back once the capture is taken) and the face finder,
+(`set_online`, `submit_online_frame`; the device and the image are muted meanwhile and back once the capture is taken) and the face finder,
 the charge, the flash and the generation run unchanged; `Online.on_face` sends the judging, and from the flash to the
 end of the timeout the phone gets the main screen as rendered (`ScreenGrab` in `render/screen_grab.py`, taken in
 `SmileRender._render_credit` from a credit pass without the QR code and the title and before the status line, `stream_fps` x `stream_width`,

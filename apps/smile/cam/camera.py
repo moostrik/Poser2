@@ -1,8 +1,9 @@
 """The app's image source: the frames of a camera device (a `CameraSource`: the Vimba camera or the
 webcam, `modules/camera/`), or, with `use_image` on, an image from `input/`, whether a device was
-found or not; or, during an online turn, the frames of a phone (`set_online`, `process_online_frame`: SMILE
-Online, modules/online/). Every frame is fitted to the output size here (`cover`: scaled to fill it,
-the middle kept, no distortion); the device only rotates and flips. A missing device is a warning
+found or not; or, during an online turn, the frames of a phone (`set_online`, `submit_online_frame`: SMILE
+Online, modules/online/). The device and the phone only hand their newest frame over; this one's own thread fits
+every frame to the output size (`cover`: scaled to fill it, the middle kept, no distortion) and hands it to the
+callbacks, and paces the image input; the device only rotates and flips. A missing device is a warning
 and the `device` readout says `none`; there is no automatic fallback to the image, so a failed
 camera on site stays visible. The device is kept when it did not connect: one that keeps trying
 (Vimba) delivers when it is there, and the readout follows it. Every frame has the time it arrived
@@ -11,8 +12,8 @@ its backend stamped), so a source that stopped is told from one that delivers (`
 
 import logging
 import os
-from threading import Lock, Thread
-from time import perf_counter, sleep
+from threading import Condition, Lock, Thread
+from time import perf_counter
 from typing import Any, Callable
 
 import cv2
@@ -27,6 +28,7 @@ IMAGE_FOLDER: str = 'apps/smile/data/input'
 IMAGE_EXTENSIONS: tuple[str, ...] = ('.jpg', '.jpeg', '.png')
 IMAGE_FPS: float = 25.0
 STALLED_AFTER: float = 3.0      # s without a frame: the source has stopped
+READOUT_EVERY: float = 0.1      # s: the longest the thread waits, so the device readout follows the device
 
 FrameCallback = Callable[[np.ndarray], None]
 
@@ -65,9 +67,12 @@ class Camera:
         self._frame_time: float = 0.0       # when the newest frame arrived; 0 before the first
         self._image: np.ndarray | None = None
         self._online: bool = False          # the online source has the image: the device and the image source are muted
+        # The newest frame handed over (the device's or the phone's) and when it arrived, for this thread to fit
+        self._wake: Condition = Condition()
+        self._handed: tuple[np.ndarray, float] | None = None
 
         self._running: bool = False
-        self._thread: Thread = Thread(target=self._run, daemon=True)
+        self._thread: Thread = Thread(target=self._run, daemon=True, name='SmileCamera')
 
         self.settings.bind(CameraSettings.image, self._on_image)
         self.settings.bind(CameraSettings.reload, self._on_reload)
@@ -93,7 +98,9 @@ class Camera:
         self.settings.unbind(CameraSettings.image, self._on_image)
         self.settings.unbind(CameraSettings.reload, self._on_reload)
         if self._running:
-            self._running = False
+            with self._wake:
+                self._running = False
+                self._wake.notify()
             self._thread.join()
         if self._device is not None:
             self._device.stop()
@@ -121,11 +128,15 @@ class Camera:
             self._callbacks = []
 
     def _on_device_frame(self, frame: CameraFrame) -> None:
-        # on the device's thread
+        """On the device's thread: the frame handed over as it is, with the time its backend stamped."""
         if self.settings.use_image or self._online:
             return
-        # the one fit of every source to the output size: the device sends its frames as they are
-        self._emit(cover(frame.image, self._width, self._height), frame.timestamp)
+        self._hand_over(frame.image, frame.timestamp)
+
+    def _hand_over(self, image: np.ndarray, arrived: float) -> None:
+        with self._wake:
+            self._handed = (image, arrived)
+            self._wake.notify()
 
     # ONLINE SOURCE: the frames of a phone during its turn (modules/online/), in place of the device
     # and the image; the device keeps running underneath and is back the moment the turn ends
@@ -137,22 +148,38 @@ class Camera:
         with self._mutex:
             self._online = active
 
-    def process_online_frame(self, frame: np.ndarray) -> None:
-        """A frame of the online source: fitted like any other; dropped while the source is off."""
+    def submit_online_frame(self, frame: np.ndarray) -> None:
+        """A frame of the online source, handed over to be fitted like any other; dropped while the source is off."""
         if not self._online:
             return
-        self._emit(cover(frame, self._width, self._height), perf_counter())
+        self._hand_over(frame, perf_counter())
 
     def _run(self) -> None:
-        # the image source: emitted at its own rate while it is in use
-        while self._running:
+        """Fits each frame handed over and hands it on as it comes, and emits the image input at its own rate while it
+        is in use; what the fit or a callback raises is logged and the loop goes on."""
+        next_image: float = 0.0
+        while True:
             self._show_device()
             image: np.ndarray | None = self._image
-            if self.settings.use_image and image is not None and not self._online:
-                self._emit(image, perf_counter())
-                sleep(1.0 / IMAGE_FPS)
-            else:
-                sleep(0.01)
+            image_on: bool = self.settings.use_image and image is not None and not self._online
+            now: float = perf_counter()
+            timeout: float = min(READOUT_EVERY, max(0.0, next_image - now)) if image_on else READOUT_EVERY
+            with self._wake:
+                if self._running and self._handed is None:
+                    self._wake.wait(timeout)
+                if not self._running:
+                    return
+                handed: tuple[np.ndarray, float] | None = self._handed
+                self._handed = None
+            try:
+                if handed is not None and (self._online or not self.settings.use_image):
+                    self._emit(cover(handed[0], self._width, self._height), handed[1])
+                now = perf_counter()
+                if image_on and image is not None and now >= next_image:
+                    next_image = now + 1.0 / IMAGE_FPS
+                    self._emit(image, now)
+            except Exception:
+                logger.exception('Camera: a frame failed')
 
     def _show_device(self) -> None:
         """The device readout: its name while it is connected, `none` while it is not (yet, or any more)."""
