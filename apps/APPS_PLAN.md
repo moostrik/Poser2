@@ -85,28 +85,13 @@ pose-following center layers. One step per commit.
 
 Built: 1, the pose model's crop settings are `pose_crop` in every app; 2, `PoseInference` cuts the
 segmentation's crops beside the pose model's, given their settings (`add_segmentation_crop_callback`); 3, the
-recorder's `mirrored` stores a frame still to be mirrored as shown, its tracklets with it, `flip_h` off.
+recorder's `mirrored` stores a frame still to be mirrored as shown, its tracklets with it, `flip_h` off; 4, hd_trio
+runs on C's wiring (its -sim on `intro_1` at the clips' 23 sets a second, two poses a set, a mask a player a set,
+no drop; a recording of it plays back the same, its poses on the players).
 
-4. **hd_trio on C's wiring.** The frames' sync hands its set to a `BatchUploader`; the uploader's images go to the
-   board (and the detector in -sim replay) and its snapshot to `TrackerFrameSource.submit`; the tracklets' sync's
-   set to the tracker's update; the frame source and the pipeline start their threads before the cameras. The pose
-   model gets `pose_crop` at its input size (as white_space's), the segmentation and the board `segmentation_crop`
-   at 768 × 1024 (a new group in its settings and both presets). hd_trio's recordings hold no tracklets, so its
-   -sim runs in replay with the person detector, as white_space's: its two presets set `simulator.replay` and
-   `yolo` on and the detector's `model_type` to TRT (`yolov8n_coco_512x448.trt` in `apps/hd_trio/data/models`).
-   The recorder takes frames and tracklets per camera with `expect_parts`, `expect_poses` from the frame source's
-   asked callback, and the RAW stage's poses, with `mirrored` on in both presets, so its clips stay mirrored as all
-   its recordings are (with its tilt at 0 nothing is straightened, so mirroring before the straightening changes
-   nothing **(deduction)**). The drops are pinned on the panel, in a `cadence` group of hd_trio's own, as deep_flow
-   and white_space each have (in its settings and both presets). The stop in `__init__` goes, and so do the
-   optical-flow model's settings group and `enable_prev_crop` in its settings and presets: hd_trio builds no
-   optical-flow predictor, its motion is the 2D flow on the centered mask. Its old recordings are stored mirrored
-   and carry no chunk info, so the replay hands their frames on with `flip_h` off, as they are: already mirrored,
-   as a live frame is once the uploader mirrors it, and the detector's boxes are found on them **(deduction from
-   `replay/camera.py`)**. Checked by: hd_trio's tests, and a -sim run on `intro_1` (the studio preset's recording,
-   on this PC; `umu`'s is not), 20 s, recording 10 s of it, then that recording played back 10 s; reported in
-   numbers: sets uploaded a second, poses per set, masks drawn per player, the panel's drops (frame sync, tracklet
-   sync, upload, pose), which stay 0; and in both runs the boxes and poses on the players.
+Checked at the rig: a live recording with `mirrored` on (a live frame comes with `flip_h` on, which a -sim clip
+does not, so the run stored the clips as they came; the recorder's test covers the mirroring); the fluid's look.
+
 5. **The app held up to the rules**, as white_space and smile were: its threads, clocks, imports, names, logging
    and settings. Reported; what does not meet them becomes steps here, built on your go.
 6. **The inline paths go.** Once every app starts its threads, `CameraSync`, `CaptureSync`, `RecordingSync`,
@@ -144,6 +129,4 @@ recorder's `mirrored` stores a frame still to be mirrored as shown, its tracklet
 - A callback only hands the item over; the part that works on it has its own thread: G4, G6.
 - Remove obsolete pathways: hd_trio's calls into what C removed, G4; the inline paths, G6.
 - Name a concept after what it is; rename it everywhere in the same change: `segmentation_crop`, G4.
-- Keep presets and settings schemas in sync: `mirrored`, the crops, `cadence`, the replay and detector, G4.
-- A plan step checked by a run or a test is one commit: G4.
 

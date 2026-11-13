@@ -82,7 +82,7 @@ def load_app_settings(app: str) -> BaseSettings:
     settings = importlib.import_module(f"apps.{app}.settings").Settings()
     if not presets.load(settings, presets.startup_path()):
         raise FileNotFoundError(f"No startup preset for '{app}' at {presets.startup_path()}")
-    if app == 'white_space':   # White Space cuts its crops at the pose model's size (apps/white_space/main.py)
+    if app in ('white_space', 'hd_trio'):   # they cut the pose model's crops at its size (their main.py)
         settings.pose.pose_crop.output_width = settings.pose.pose.width
         settings.pose.pose_crop.output_height = settings.pose.pose.height
     settings.initialize()
@@ -211,7 +211,6 @@ def main() -> None:
 
     model_type = ModelType.ONNX if args.model_type == 'onnx' else ModelType.TRT
     app_settings = load_app_settings(args.app)
-    crop = app_settings.pose.pose_crop
     stats: dict[str, dict[str, float]] = {}
     memory: dict[str, float] = {}
     outputs: dict[str, np.ndarray] = {}
@@ -219,6 +218,8 @@ def main() -> None:
         group = getattr(app_settings.pose, model.name, None)
         if group is None or not group.enabled:
             continue
+        # the segmentation's own crops where the app cuts them, else the pose model's
+        crop = getattr(app_settings.pose, f"{model.name}_crop", None) or app_settings.pose.pose_crop
         settings = model_settings(group, model_type)
         logger.info("%s: %s, batch %d, crop %dx%d", model.name, settings.model, settings.max_players,
                     crop.output_width, crop.output_height)

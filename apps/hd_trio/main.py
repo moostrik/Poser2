@@ -1,6 +1,7 @@
 """HD Trio — 3-camera interactive installation with fluid rendering."""
 
 import logging
+import time
 from functools import partial
 
 from modules.camera import CameraSource, CameraHealth
@@ -12,7 +13,8 @@ from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker, TrackerFrameSource
 from modules.pose import nodes, features, analytics, FrameDict, Recorder as PoseRecorder, RecorderSettings as PoseRecorderSettings
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import segmentation, detection, CameraSync, PoseInference, frame_poses
+from modules.inference import segmentation, detection, BatchUploader, CameraSync, ImageSnapshot, PoseInference, SyncMessage, \
+    frame_poses, has_points
 from modules.session import Session, SessionSettings, SequencerState
 from modules.gl import WindowSettings
 
@@ -30,9 +32,6 @@ DATA_PATH = 'apps/hd_trio/data'
 
 class HDTrioMain:
     def __init__(self, simulation: bool = False, interface: bool = True) -> None:
-        raise RuntimeError("hd_trio waits for the input refactor: the uploader has its own thread now, and hd_trio still runs its "
-                           "pose step on the camera's thread (modules/flow/FLOW_PLAN.md, line 4). Run it from the main branch.")
-
         self.is_running: bool = False
         self.is_finished: bool = False
 
@@ -48,6 +47,11 @@ class HDTrioMain:
         # Never resume armed: a preset saved mid-take would otherwise record the
         # first show after startup.
         self.settings.render.intro_sequence.arm_record = False
+        # The pose model's crop is cut at its input size: one antialiased resample from the camera frame, rather than
+        # a larger crop the runner scales down again. The segmentation's is cut beside it at its own size.
+        pose_crop = self.settings.pose.pose_crop
+        pose_crop.output_width = self.settings.pose.pose.width
+        pose_crop.output_height = self.settings.pose.pose.height
         self.settings.initialize()
         self.panel_server = PanelServer(self.settings, self.settings.panel, on_exit=self.stop)
 
@@ -100,39 +104,58 @@ class HDTrioMain:
             for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.frame_sync = CameraSync(self.settings.camera.frame_sync, 'frame_sync')
+        self.uploader = BatchUploader()          # a synced set of the cameras' frames onto the GPU as one batch, on its own thread
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
         self.tracklet_sync = CameraSync(self.settings.camera.tracklet_sync, 'tracklet_sync')
-        self.pose_inference = PoseInference(ps.pose_crop, ps.pose)      # the crop and the pose model, the frame domain's async step
-        if self.person_detector is not None:
-            self.pose_inference.add_gpu_image_callback(self.person_detector.submit)     # it looks at the uploaded images
+        # the crops and the pose model, the frame domain's async step; the segmentation's crops cut beside the pose model's
+        self.pose_inference = PoseInference(ps.pose_crop, ps.pose, ps.segmentation_crop)
 
+        # The camera's thread only hands its frames and tracklets over: the frames to the frames' sync and the
+        # recorder, the tracklets as they come to the tracker, the board, the tracklets' sync and the recorder
         for camera in self.cameras:
+            camera.add_frame_callback(self.frame_sync.submit_frame)          # the live path first, the recorder after it
             camera.add_frame_callback(self.video_recorder.submit_frame)
-            camera.add_frame_callback(self.pose_inference.set_camera_frame)
-            camera.add_frame_callback(self.frame_sync.submit_frame)
             camera.add_tracklet_callback(self.tracker.submit_cam_tracklets)
             camera.add_tracklet_callback(self.board.set_camera_tracklets)
             camera.add_tracklet_callback(self.tracklet_sync.submit_tracklets)
+            camera.add_tracklet_callback(self.video_recorder.submit_tracklets)
+        # What each camera's captures wait for from the first: live and through the clip camera, the device sends
+        # tracklets (a replay's come or not with the recording); the frame source says per set whether it asked poses
+        # (`_on_asked`)
+        device_tracklets: bool = not (self.settings.camera.sim_enabled and self.settings.camera.simulator.replay)
+        for i in range(num_cams):
+            self.video_recorder.expect_parts(i, tracklets=device_tracklets, poses=True)
 
         # DETECTION
         features.configure_features(max_players)
 
         self.frame_source = TrackerFrameSource(ps.frame_source, max_players)
-        self.segmentation_predictor  = segmentation.Predictor(ps.segmentation)
+        self.segmentation_predictor = segmentation.Predictor(ps.segmentation)
 
         self.tracker.add_tracklet_callback(self.frame_source.set_tracklets)
-        self.tracklet_sync.add_sync_callback(self.tracker.update)
-        self.frame_sync.add_sync_callback(self.frame_source.process)
+        # The frame source's thread: each set's poses with its images to the pipeline, then the poses asked per camera
+        self.frame_source.add_asked_callback(self._on_asked)
 
-        # The segmentation and the board read the same crops the pose model gets.
-        self.pose_inference.add_camera_images_callback(self.board.set_camera_images)
-        self.pose_inference.add_crop_callback(self.segmentation_predictor.submit)
-        self.pose_inference.add_crop_callback(lambda _f, crops: self.board.set_crop_images(crops))
+        # THE SYNCS' HAND-OFFS, each on its own thread: the frames' set to the uploader, the tracklets' to the tracker
+        self.frame_sync.add_set_callback(self.uploader.submit_set)
+        self.tracklet_sync.add_set_callback(self._on_tracklet_set)
+
+        # THE UPLOADER'S HAND-OFFS, in order on its thread: each uploaded image to the detector (-sim replay) and the
+        # board, then the set's snapshot to the frame source
+        if self.person_detector is not None:
+            self.uploader.add_gpu_image_callback(self.person_detector.submit)
+        self.uploader.add_gpu_image_callback(self.board.set_camera_image)
+        self.uploader.add_snapshot_callback(self._on_snapshot)
+
+        # The segmentation and the board read the segmentation's crops, cut from the same images and boxes as the pose model's
+        self.pose_inference.add_segmentation_crop_callback(self.segmentation_predictor.submit)
+        self.pose_inference.add_segmentation_crop_callback(lambda _f, crops: self.board.set_crop_images(crops))
         self.segmentation_predictor.add_segmentation_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
 
-        # POSE PIPELINE — the stages are declared in pose/pipeline.py. The camera's frame bang drives the frame
-        # domain through the tracklet poses; the render tick drives the output domain (LERP). Every stage's frames
-        # go to the board, the recorders and the sound; the board also reads each stage's window.
+        # POSE PIPELINE — the stages are declared in pose/pipeline.py. Each uploaded set drives the frame domain
+        # through the tracklet poses (`_on_snapshot`); the render tick drives the output domain (LERP). Every stage's
+        # frames go to the board, the pose recorders and the sound; the board also reads each stage's window; the RAW
+        # stage's poses go to the video recorder with their frames.
         self.similarity_hold = nodes.SimilarityResultHold()              # the threaded analytics' way back into SMOOTH
         self.pipeline = PosePipeline(pipeline_spec(ps, self.frame_source, self.pose_inference, self.similarity_hold))
         for stage in Stage:
@@ -141,6 +164,7 @@ class HDTrioMain:
             self.pipeline.add_frames_callback(stage, partial(self._submit_intro_frames, stage))
             self.pipeline.add_frames_callback(stage, partial(self.osc_sound.submit_frames, stage))
             self.board.set_window_source(stage, self.pipeline.window(stage))
+        self.pipeline.add_frames_callback(Stage.RAW, self._record_poses)
 
         # The threaded analytics read the SMOOTH window and hand their result to the hold.
         self.window_similarity  = analytics.WindowSimilarity(ps.similarity.window_similarity)
@@ -158,6 +182,7 @@ class HDTrioMain:
                                    self.settings.camera.camera_health, data_path=DATA_PATH)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
         self.render.add_update_callback(self.camera_health.update)
+        self.render.add_update_callback(self._update_drops)
         self.render.add_update_callback(self.sequencer.update)
         self.render.add_update_callback(self._update_poses)
         self.render.add_exit_callback(self.stop)
@@ -167,6 +192,11 @@ class HDTrioMain:
 
         if self.person_detector is not None:
             self.person_detector.start()
+        self.pipeline.start()
+        self.frame_source.start()
+        self.uploader.start()
+        self.frame_sync.start()
+        self.tracklet_sync.start()
         for camera in self.cameras:
             camera.start()
 
@@ -188,6 +218,35 @@ class HDTrioMain:
         self.is_running = True
         self.render.start()
 
+    def _on_snapshot(self, snapshot: ImageSnapshot) -> None:
+        """An uploaded set, on the uploader's thread: the frame source's bang for it, each player judged on its own
+        camera's capture time, with exactly those images for the crops."""
+        self.frame_source.submit(snapshot[2], snapshot)
+
+    def _on_tracklet_set(self, items: dict[int, SyncMessage]) -> None:
+        """A set of the cameras' tracklet messages, on the tracklets' sync's thread: the tracker's update, at the newest
+        of their capture times."""
+        self.tracker.update(max(message.timestamp for message in items.values()))
+
+    def _on_asked(self, timestamp: float, cam_id: int, asked: FrameDict) -> None:
+        """A set's poses for one camera, on the frame source's thread: the recorder hears whether poses come for the
+        camera's image, so a frame without a player does not wait."""
+        posing: bool = self.settings.pose.pose.enabled or any(has_points(frame) for frame in asked.values())
+        self.video_recorder.expect_poses(cam_id, timestamp, bool(asked) and posing)
+
+    def _record_poses(self, frames: FrameDict) -> None:
+        """The RAW stage's poses, on the pose model's thread, to the recorder as they are: their hand-over, stamped
+        here; the recorder packs them on its own thread (`frame_poses`)."""
+        self.video_recorder.submit_poses(frames, time.perf_counter())
+
+    def _update_drops(self, _now: float) -> None:
+        """The panel's drops, counted where they happen (the frame source's are on its own panel)."""
+        cadence = self.settings.cadence
+        cadence.frame_sync_drops = self.frame_sync.dropped
+        cadence.tracklet_sync_drops = self.tracklet_sync.dropped
+        cadence.upload_drops = self.uploader.dropped
+        cadence.pose_drops = self.pipeline.dropped
+
     def _update_poses(self, now: float) -> None:
         """The render tick drives the pipeline's output domain (LERP) at the frame's time."""
         self.pipeline.update(Domain.OUTPUT, now)
@@ -205,6 +264,11 @@ class HDTrioMain:
             self.player.stop()
         for camera in self.cameras:
             camera.stop()
+        self.frame_sync.stop()
+        self.tracklet_sync.stop()
+        self.uploader.stop()
+        self.frame_source.stop()
+        self.pipeline.stop()
         self.video_recorder.stop()
         # The pose recorders have no stop() — an in-flight chunk is only written
         # when the stop button fires, so flush it explicitly.

@@ -118,9 +118,10 @@
         "VIDEO"
       ],
       "folder": "intro_1",
-      "replay": false
+      "replay": true
     },
     "person_detector": {
+      "model_type": "TRT",
       "engine_path": "apps/hd_trio/data/models",
       "model_path": "data/models",
       "confidence": 0.5,
@@ -214,14 +215,16 @@
       "enabled": true,
       "reset_interval": 240
     },
-    "optical_flow": {
-      "resolution": "EXTREME",
-      "enabled": false
-    },
     "frame_source": {
       "detection_timeout": 2.0
     },
     "pose_crop": {
+      "padding": 0.1,
+      "output_width": 192,
+      "output_height": 256,
+      "enable_prev_crop": false
+    },
+    "segmentation_crop": {
       "padding": 0.1,
       "output_width": 768,
       "output_height": 1024,
@@ -757,6 +760,8 @@
       "video_frame_types": [
         "VIDEO"
       ],
+      "container": "MP4",
+      "mirrored": true,
       "enabled": false
     },
     "pose": {

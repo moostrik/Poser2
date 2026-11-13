@@ -258,9 +258,9 @@ class PoseGroup(BaseSettings):
 
     pose            : Group[inference.pose.Settings]          = Group(inference.pose.Settings, share=_batch_share)
     segmentation    : Group[inference.segmentation.Settings]  = Group(inference.segmentation.Settings, share=_batch_share)
-    optical_flow    : Group[inference.optical_flow.Settings]  = Group(inference.optical_flow.Settings, share=_batch_share)
     frame_source    : Group[TrackerFrameSourceSettings]       = Group(TrackerFrameSourceSettings)
     pose_crop       : Group[inference.crop.Settings]          = Group(inference.crop.Settings, share=[max_players])
+    segmentation_crop: Group[inference.crop.Settings]         = Group(inference.crop.Settings, share=[max_players])
     angle_extractor : Group[nodes.AngleExtractorSettings]     = Group(nodes.AngleExtractorSettings)
     bbox            : Group[BboxFeature]                      = Group(BboxFeature, share=_feature_share)
     point           : Group[PointFeature]                     = Group(PointFeature, share=_feature_share)
@@ -398,6 +398,18 @@ class RenderSettings(BaseSettings):
     window : Group[WindowSettings]            = Group(WindowSettings)
 
 
+class CadenceSettings(BaseSettings):
+    """Pinned: the drops counted where they happen, on the way from the cameras to the poses."""
+    frame_sync_drops:    Field[int] = Field(0, access=Field.READ, pinned=True, label="Frame sync drops",
+                                            description="Camera frames the frames' sync dropped, its queue full")
+    tracklet_sync_drops: Field[int] = Field(0, access=Field.READ, pinned=True, label="Tracklet sync drops",
+                                            description="Tracklet messages the tracklets' sync dropped, its queue full")
+    upload_drops:        Field[int] = Field(0, access=Field.READ, pinned=True, label="Upload drops",
+                                            description="Camera sets the uploader dropped whole, its queue full")
+    pose_drops:          Field[int] = Field(0, access=Field.READ, pinned=True, label="Pose drops",
+                                            description="Pose model results dropped before the stages after it took them")
+
+
 # ---------------------------------------------------------------------------
 #  Root settings
 # ---------------------------------------------------------------------------
@@ -414,3 +426,4 @@ class Settings(BaseSettings):
     render : Group[RenderSettings]  = Group(RenderSettings, share=[max_players, num_cams, input_fps])
     panel : Group[PanelSettings] = Group(PanelSettings)
     session: Group[SessionGroup] = Group(SessionGroup, share=[num_cams, input_fps.as_('fps')])
+    cadence: Group[CadenceSettings] = Group(CadenceSettings)
