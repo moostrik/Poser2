@@ -39,10 +39,19 @@ in that order.
    alike predicts no motion. A sample stamped as the newest replaces it instead of adding one; every predictor
    takes the fix.
 
+4. **The camera's keypoints come out.** A tracklet from an OAK4 pose chain carries the camera's keypoints, and the
+   source puts them on the pose (`Points2D` in the crop's window, `keypoint_window`); then the async step drops
+   them: with the host pose model on, its points replace them, and with it off `pose.Predictor.submit` returns
+   without emitting, so no pose reaches RAW. With the host model off, `PoseInference` still cuts the crops (the
+   optical flow and the board read them) and hands on the poses that carry the camera's points as they are, as
+   `RecordedPoses` hands on recorded ones; with it on, the model's points replace them, as now. deep_flow has the
+   path now; white_space has it when its cameras send keypoints (the `oak` backend, depthai 2, sends none).
+
 Checked by: the tracker's tests renamed, the pipeline's (the images reach the async node with their poses), the
-pose step's (the crop uses the images it was given, not the uploader's newest), `Predict`'s (a repeated stamp keeps
-the fit of distinct samples), the recorded poses' tests updated; then one run on `measure` 9–19 s against A6's
-numbers (capture latency, pose RAW and SMOOTH latency, poses out of RAW). One commit per step.
+pose step's (the crop uses the images it was given, not the uploader's newest; with the host model off a pose with
+the camera's points comes out with them, one without none), `Predict`'s (a repeated stamp keeps the fit of distinct
+samples), the recorded poses' tests updated; then one run on `measure` 9–19 s against A6's numbers (capture
+latency, pose RAW and SMOOTH latency, poses out of RAW). One commit per step.
 
 ## C. white_space back
 
