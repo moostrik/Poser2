@@ -40,19 +40,17 @@ the set as its `ImageSnapshot` to its snapshot callbacks. `CameraSync` hands on 
 left out). white_space is wired on them: the frames' sync hands its set to the `BatchUploader`, whose snapshot
 callback calls `TrackerFrameSource.submit`; the tracklets' sync hands its set to `tracker.update` at the newest of
 their times; the tracklets go as they come to the tracker, the board, the journal (which queues them raw) and the
-tracklets' sync; the threads start after the wiring, before the cameras.
+tracklets' sync; the threads start after the wiring, before the cameras. The recorder takes the frames and
+tracklets from each camera as they come, `expect_parts` per camera, `expect_poses` per camera and set (the frame
+source's asked callback) and the RAW stage's poses. The calibration layer reads the uploaded image (`CameraColumns`:
+its band reduced to one row on the GPU, read back a tick later without waiting); the board's video images are gone.
+The drops are pinned on the panel (`cadence`: the two syncs', the uploader's sets, the pipeline's; the frame
+source's on its own panel). The clip camera (`oak.ClipCamera`) needs no change: its frames come out of the device
+as the camera's do, and through the same callbacks without one (`clip_passthrough`). The probe is
+`scripts/white_space_probe.py`.
 
-5. **The recorder.** Wired in white_space: the frames and tracklets from each camera as they come, `expect_parts`
-   per camera, `expect_poses` per camera and set (the frame source's asked callback), the RAW stage's poses. The
-   calibration layer reads the uploaded image (`CameraColumns`: its band reduced to one row on the GPU, read back a
-   tick later without waiting); the board's video images are gone. The drops are pinned on the panel (`cadence`:
-   the two syncs', the uploader's sets, the pipeline's; the frame source's on its own panel). The clip camera
-   (`oak.ClipCamera`) needs no change: its frames come out of the device as the camera's do, and through the same
-   callbacks without one (`clip_passthrough`). The OAK-D's capture stamp, as the oak4's `capture_time`, needs an OAK-D to test. Old show recordings
-   keep playing; new ones are the new layout.
-9. **A white_space probe** (`scripts/white_space_probe.py`), beside deep_flow's, which is built on deep_flow's
-   classes: the camera's thread per frame, the syncs per second against the cameras' rate, the uploader's time per
-   set, the pose rate per camera, the pose latency (RAW, SMOOTH), the tracker's update rate, the drops.
+What is left of C is its runs, below. The OAK-D's capture stamp, as the oak4's `capture_time`, needs an OAK-D to
+test; old show recordings keep playing, new ones are the new layout.
 
 hd_trio's `main.py` still uses `CameraSync`'s `add_sync_callback` and follows in E (it stops at start on this branch
 already).
@@ -62,14 +60,11 @@ If a sync's wait (`Wait camera sync …`) comes out in milliseconds: the switch 
 give up the GIL; if that still does not hold the latencies, the sync stays on its sender's thread as a stated
 exception to the rule, chosen by the measurement.
 
-Assumed, to confirm while building: the four cameras deliver one frame size (the stack needs it; frames of another
-size go up as their own stack).
-
 Checked by: `CameraSync`'s tests (a set per sync, a camera's newest frame), the core's (a stack uploaded at once
 gives each image as one by one does), the `SerialUploader`'s (its tests renamed; the set callback carries each color image's snapshot), the `BatchUploader`'s (a set in, its
 images and the set out; the oldest whole set dropped), the
 frame source's (the asked callback per camera; a player judged on its camera's time), the calibration layer's (its
-row reduced on the GPU matches the CPU row of a recorded frame), white_space's pipeline spec; the recorder's wiring
+row reduced on the GPU matches the CPU row of the same frame); the clip camera at the rig only, as it needs an OAK, white_space's pipeline spec; the recorder's wiring
 by a short -sim recording on the same recording, played back;
 a -sim run with the probe on `20250514-130512_4_wide_mono`, an old-layout recording without recorded tracklets, so
 in replay with the host detector (`simulator.replay`, `yolo`), not `ClipCamera`, which needs an OAK: the uploader's
