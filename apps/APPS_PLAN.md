@@ -5,7 +5,8 @@ the input works is in [INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md); the 
 [RECORDING_PLAN.md](../modules/recording/RECORDING_PLAN.md#2-the-recorder-in-the-other-apps). **(deduction)** marks what is inferred.
 
 
-Three parts, in this order: C white_space comes back on deep_flow's input; D smile is checked; E hd_trio comes back after the 2D fluid ([the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2d-flow-follows-the-3d)). The rules they keep:
+In this order: C white_space comes back on deep_flow's input; D smile is checked; E the face detection is looked at;
+F every module is held up to the rules; G hd_trio comes back after the 2D fluid ([the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2d-flow-follows-the-3d)). The rules they keep:
 a callback only hands the item over and returns, the part that works on it does all its work on its own thread, a
 queue that can't keep up drops its oldest and counts it, the camera's thread runs only the camera, and every drop is
 counted on the panel ([INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md)).
@@ -19,7 +20,7 @@ deep_flow has reaches it only when they do. Every receiver works on its own thre
 by frame, color first to start the pose and depth after it, paired by `CaptureSync`; white_space's four cameras'
 frames of a moment travel together, synced first and uploaded as one set, cropped as one batch. So the uploader is
 two, named by how they upload: deep_flow's `SerialUploader`, each frame on its own as it comes, and white_space's
-`BatchUploader`, a moment's frames as one batch, which hd_trio takes too in E (its input is the same model). They
+`BatchUploader`, a moment's frames as one batch, which hd_trio takes too in G (its input is the same model). They
 share the core upload, `ImageUpload`. Both hand on what they uploaded, each camera's image with its previous one
 (the optical flow's previous crop, in deep_flow and hd_trio) and the ready event, as one `ImageSnapshot`, through
 a set callback, so a receiver gets exactly the images it is for. An upload's cost is not its copy (about 0.1 ms)
@@ -54,7 +55,7 @@ The -sim runs are done (white_space on `20250514-130512_4_wide_mono` 23–31 s i
 and a recording of it played back; deep_flow on `measure` 9–19 s); nothing is open from them.
 
 The OAK-D's capture stamp, as the oak4's `capture_time`, needs an OAK-D to test; old show recordings keep playing,
-new ones are the new layout. hd_trio's `main.py` still uses `CameraSync`'s `add_sync_callback` and follows in E (it
+new ones are the new layout. hd_trio's `main.py` still uses `CameraSync`'s `add_sync_callback` and follows in G (it
 stops at start on this branch already).
 
 Checked at the rig: the clip camera, which needs an OAK; and the playhead's smoothing (`playhead.tracking`,
@@ -67,11 +68,26 @@ with you at the rig, and its tests pass.
 ## D. smile checked
 
 smile imports `modules.camera`, `gl`, `face`, `video`, `inout`, `settings`, `panel` and `utils`, not `inference`
-or `board`, and was committed today (its document, `SMILE.md`). The check: whether it runs on this branch, which of
-its threads run a receiver's work in a callback (its camera's frame callback into the render and the face finder),
-and what moving it onto the rules would take; reported, nothing changed.
+or `board` (its document, `SMILE.md`). The check, reported, nothing changed:
 
-## E. hd_trio back, after the 2D fluid
+1. Whether it runs on this branch, without its camera: the image input (`use_image`, an image from `data/input/`,
+   switched to when no camera frames come), a short start of the app.
+2. The app (`apps/smile`, not the modules it uses) held up to the rules, as white_space was: which of its threads
+   do a receiver's work in a callback (its camera's frame callback into the render and the face finder), its
+   clocks, imports, names and logging; and what moving it onto the rules would take.
+
+## E. The face detection
+
+`modules/face` finds faces outside `modules/inference`, which holds the other models (detection, pose,
+segmentation, optical flow). Why it sits there, and whether it belongs in `inference`: looked at, reported, a
+proposal if it should move.
+
+## F. The modules held up to the rules
+
+Every package in `modules/`, one at a time, against `CLAUDE.md` and `.claude/rules`: reported per package, a plan
+for what does not meet them.
+
+## G. hd_trio back, after the 2D fluid
 
 hd_trio comes back once [the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2d-flow-follows-the-3d) has rebuilt the 2D fluid, on C's wiring. Known
 now: its crops (the pose model's at its input size, RVM's at 768 × 1024 from the same region, both by
