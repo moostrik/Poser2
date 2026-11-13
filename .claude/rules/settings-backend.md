@@ -17,7 +17,7 @@ Maintain the settings engine contract and reactive behavior in `modules/settings
 - Keep callback fan-out fault-tolerant so one failure does not stop other callbacks
 - Preserve shared field propagation behavior: bidirectional sharing via `share=` (parent↔child)
 - Preserve `.as_()` alias mapping behavior for child constructor names while serialization stays parent-keyed
-- Keep JSON serialization/deserialization deterministic and backward-compatible with existing presets
+- Keep JSON serialization/deserialization deterministic
 - Treat GUI metadata as hint-only data; backend logic must never depend on GUI frameworks
 
 ## Scope note

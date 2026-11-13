@@ -3,48 +3,31 @@ description: Board protocols, mixins, and app render board composition
 paths:
   - "modules/board/**"
   - "apps/*/board/**"
-  - "apps/*/render_board.py"
-  - "apps/*/render/render_board.py"
   - "modules/render/layers/**"
 ---
-# Board Guidelines
+# Board
 
-## Package structure
+## Package
 
-`modules/board/` is a package. Each file contains one protocol + one mixin pair.
-`__init__.py` re-exports all protocols and mixins.
+- Each file holds one protocol and its mixin
+- `__init__.py` exports every protocol and mixin
+- `modules/board/` holds what a module or more than one app reads; a slice only one app reads sits in `apps/<app>/board/`, as the same pair
 
-## Adding a new capability
+## Protocol and mixin
 
-1. Create a new file with the protocol and mixin
-2. The mixin owns its own `Lock` — never share locks between mixins
-3. Add re-exports to `__init__.py`
-4. Add the mixin to whichever app `RenderBoard` classes need it
-5. A slice only one app reads lives in that app's board package (`apps/<app>/board/`), as the same protocol +
-   mixin pair; `modules/board/` holds only what a module or more than one app reads
+- A protocol holds the read and write signatures only
+- A mixin is self-contained: its own lock, its own storage, its own methods
+- Prefix the lock and the storage with the capability name (`_frame_lock`, `_frames`)
+- Keep method bodies minimal: get or set under the lock, plus any change of storage layout (the window pivot)
+- Import a type that is only named in annotations under `TYPE_CHECKING`
 
-## Protocol rules
+## The app's board
 
-- Protocols define the public read/write contract only (method signatures)
-- Use `from __future__ import annotations` and `TYPE_CHECKING` for annotation-only imports
-- Protocols live in `modules/board/` so module layers can import them without depending on app code
-
-## Mixin rules
-
-- Each mixin is self-contained: own lock, own storage attributes, own methods
-- Use `TYPE_CHECKING` for types used only in annotations; use runtime imports for types constructed in `__init__`
-- Prefix lock and storage attributes with the capability name (`_frame_lock`, `_frames`) to avoid collisions
-- Keep method bodies minimal — get/set with lock, plus any storage-layout transformation (e.g. the window pivot)
-
-## App render board
-
-- `apps/*/render_board.py`, or `apps/*/board/render_board.py` when the app has slices of its own, defines `class RenderBoard(Mixin1, Mixin2, ...):`
-- `__init__` calls each mixin's `__init__` explicitly
-- App render boards have no additional methods — they are pure mixin composition
-- App renders and main type-hint the concrete `RenderBoard`; module layers type-hint the protocol they need
+- `apps/<app>/board/render_board.py` defines `class RenderBoard(Mixin1, Mixin2, ...)`
+- Its `__init__` calls each mixin's `__init__`; it has no other methods
 
 ## Consumer typing
 
-- Module layers import and type-hint the narrowest protocol: `HasFrames`, `HasWindows`, etc.
-- Never type-hint the concrete `RenderBoard` in module code — that would couple modules to apps
-- Compositors that only pass the board through to children without calling methods on it may use `Any`
+- App code type-hints the concrete `RenderBoard`
+- Module code type-hints the narrowest protocol (`HasFrames`, `HasWindows`), never the `RenderBoard`
+- A compositor that only passes the board on to its children may use `Any`
