@@ -6,13 +6,18 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import io
+import json
+
 import numpy as np
 
 from modules import video
-from modules.camera import FrameType
+from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, FrameType, TrackingStatus
 from modules.recording import RecorderSettings
+from modules.recording.recorder import RecordedCapture
 from modules.recording.recorder.recorder import RecState
-from modules.recording.tests.recordings import video_frame, recorder
+from modules.recording.tests.recordings import LENS, video_frame, recorder
+from modules.utils import Rect
 
 
 class QueueTest(unittest.TestCase):
@@ -84,6 +89,59 @@ class ColorOnlyTest(unittest.TestCase):
         color.submit_frame(video_frame(0))
         self.assertIsNone(color.frames[0].get_nowait().depth)
         self.assertFalse(color.with_depth)
+
+
+class _Writer:
+    """A writer that keeps what it is handed."""
+    def __init__(self) -> None:
+        self.images: list[np.ndarray] = []
+
+    def submit_frame(self, image: np.ndarray, nv12: bool = False) -> None:
+        self.images.append(image)
+
+
+def _half_lit(flip_h: bool) -> RecordedCapture:
+    """A capture still to be mirrored or not: its left half lit, one tracklet on the left."""
+    image: np.ndarray = np.zeros((4, 8, 3), np.uint8)
+    image[:, :4] = 255
+    frame = CameraFrame(0, FrameType.VIDEO, image, 1.0, flip_h=flip_h, intrinsics=LENS)
+    tracklet = CameraTracklet(cam_id=0, id=1, status=TrackingStatus.TRACKED, roi=Rect(0.1, 0.2, 0.3, 0.4), age=1, timestamp=1.0)
+    return RecordedCapture(frame, None, CameraTracklets(0, 1.0, [tracklet]))
+
+
+class MirroredTest(unittest.TestCase):
+    def _written(self, mirrored: bool, flip_h: bool) -> tuple[np.ndarray, list[str]]:
+        """What the recorder's thread writes of one capture: the image and the metadata lines."""
+        rec = recorder([FrameType.VIDEO])
+        rec.settings.mirrored = mirrored
+        writer = _Writer()
+        rec.recorders[0] = {FrameType.VIDEO: writer}
+        lines = io.StringIO()
+        rec.metadata[0] = lines
+        rec.metadata_frames[0] = 0
+        rec.chunks[0] = 0
+        rec.frames[0].put(_half_lit(flip_h))
+        rec._write_queued()
+        rec.settings.unbind(RecorderSettings.start, rec._on_start)
+        return writer.images[0], lines.getvalue().splitlines()
+
+    def test_on_a_frame_still_to_be_mirrored_is_stored_mirrored_with_its_tracklets_and_flip_h_off(self) -> None:
+        image, lines = self._written(mirrored=True, flip_h=True)
+        self.assertTrue(np.all(image[:, 4:] == 255) and np.all(image[:, :4] == 0))      # the lit half on the right
+        info, frame = json.loads(lines[0]), json.loads(lines[1])
+        self.assertFalse(info['flip_h'])
+        self.assertAlmostEqual(info['intrinsics'][0][2], 8 - LENS[0][2])                # the lens's center mirrored
+        self.assertAlmostEqual(frame['tracklets'][0]['roi'][0], 0.6)                     # 1 - 0.1 - 0.3
+
+    def test_off_a_frame_is_stored_as_the_camera_delivered_it(self) -> None:
+        image, lines = self._written(mirrored=False, flip_h=True)
+        self.assertTrue(np.all(image[:, :4] == 255))
+        self.assertTrue(json.loads(lines[0])['flip_h'])
+
+    def test_on_a_frame_not_to_be_mirrored_is_stored_as_it_is(self) -> None:
+        image, lines = self._written(mirrored=True, flip_h=False)
+        self.assertTrue(np.all(image[:, :4] == 255))
+        self.assertFalse(json.loads(lines[0])['flip_h'])
 
 
 if __name__ == '__main__':

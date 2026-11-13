@@ -40,6 +40,13 @@ class CameraTracklets:
     straightened: bool = False              # in the frame as the uploader makes it, straightened and mirrored
 
 
+def mirrored_tracklets(cam_tracklets: CameraTracklets) -> CameraTracklets:
+    """The tracklets in their frame flipped left to right, not straightened: their boxes and keypoints mirrored."""
+    tracklets: list[CameraTracklet] = [replace(tracklet, roi=mirrored_roi(tracklet.roi), keypoints=mirrored_keypoints(tracklet.keypoints))
+                                       for tracklet in cam_tracklets.tracklets]
+    return replace(cam_tracklets, tracklets=tracklets)
+
+
 def straightened_tracklets(cam_tracklets: CameraTracklets, homography: np.ndarray | None, flip_h: bool) -> CameraTracklets:
     """The tracklets in the frame as the uploader makes it: straightened with their frame's
     homography, then mirrored when the frame is, as the image is."""

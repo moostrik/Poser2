@@ -14,10 +14,13 @@ chunk hold the same frames. A split cuts every camera's chunk at one capture tim
 the new chunk with its first capture after it. On stop no frame is taken any more, and the captures
 still waiting are settled by the parts that still come, for at most `STOP_WAIT`. Recordings hold what
 the camera delivered, not straightened and not mirrored, so the correction can still be tuned on them;
-`flip_h` says the frames are still to be mirrored. What a capture went without is counted on the panel
+`flip_h` says the frames are still to be mirrored. With `mirrored` a frame still to be mirrored is stored
+mirrored instead, with its depth, lens, alignment and tracklets to match, and `flip_h` off: the recording
+is the image as shown (the poses are found on it already). What a capture went without is counted on the panel
 and warned of. Both streams share `keyframe_interval`: a seek in a chunk goes to a color keyframe, so a
 depth stream with its keyframes elsewhere comes back with its references missing."""
 
+from dataclasses import replace
 from threading import Thread, Lock, Event
 from pathlib import Path
 import time
@@ -25,7 +28,8 @@ from enum import Enum, auto
 from queue import Queue, Empty
 from typing import Any, TextIO
 
-from modules.camera import CameraFrame, CameraTracklets, FrameType
+from modules.camera import CameraFrame, CameraTracklets, FrameType, mirrored_alignment, mirrored_image, mirrored_intrinsics, \
+    mirrored_tracklets
 from modules.settings import BaseSettings, Field, Widget
 from modules.video import CoderType, CoderFormat, DEPTH_ENCODER, encoder_name, StreamWriter
 
@@ -49,6 +53,7 @@ class RecorderSettings(BaseSettings):
     container:          Field[Container]        = Field(Container.MKV, access=Field.INIT, description="Chunk file: mkv with depth and metadata, or mp4 with the metadata beside")
     video_quality:      Field[int]              = Field(0, min=0, max=51, access=Field.INIT, description="Video constant quality, lower is better (0 = encoder default)")
     video_frame_types:  Field[list[FrameType]]  = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record", visible=False)
+    mirrored:           Field[bool]             = Field(False, access=Field.INIT, description="Store the frames mirrored, as shown")
 
     # ── Recording controls ────────────────────────────────────────────
     enabled:            Field[bool]             = Field(True, widget=Widget.switch, description="Enable video recording")
@@ -71,6 +76,21 @@ class RecorderSettings(BaseSettings):
 STOP_WAIT: float = 1.0          # s a stopping recording waits for the parts its last captures wait for
 SPLIT_WAIT: float = 1.0         # s a split waits for a camera's first capture after its time, before it cuts that camera's chunk anyway
 HELD: int = 1 << 30             # bytes waiting for the encoders, queued here and in the writers: 1 GB, some 6 s of four cameras with depth
+
+
+def mirrored_capture(capture: RecordedCapture) -> RecordedCapture:
+    """A capture as shown: its frames flipped left to right with their lens and the depth's alignment, its
+    tracklets' boxes and keypoints mirrored, `flip_h` off; the poses as they are, found on the mirrored image."""
+    video: CameraFrame = capture.video
+    width: int = video.image.shape[1]
+    video = replace(video, image=mirrored_image(video), flip_h=False,
+                    intrinsics=mirrored_intrinsics(video.intrinsics, width) if video.intrinsics is not None else None)
+    depth: CameraFrame | None = capture.depth
+    if depth is not None:
+        depth = replace(depth, image=mirrored_image(depth), flip_h=False,
+                        alignment=mirrored_alignment(depth.alignment, depth.image.shape[1]) if depth.alignment is not None else None)
+    tracklets: CameraTracklets | None = mirrored_tracklets(capture.tracklets) if capture.tracklets is not None else None
+    return replace(capture, video=video, depth=depth, tracklets=tracklets)
 
 
 def _latency(arrival: float | None, timestamp: float) -> float | None:
@@ -358,6 +378,8 @@ class Recorder(Thread):
                     self._queued_bytes -= capture.nbytes
                 if self._split_at is not None and capture.video.timestamp > self._split_at and self.chunks[c] == split_from:
                     self._split_camera(c)
+                if self.settings.mirrored and capture.video.flip_h:
+                    capture = mirrored_capture(capture)
                 self.recorders[c][FrameType.VIDEO].submit_frame(capture.video.image, capture.video.nv12)
                 if capture.depth is not None:
                     self.recorders[c][FrameType.DEPTH].submit_frame(capture.depth.image)

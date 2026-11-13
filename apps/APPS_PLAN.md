@@ -84,14 +84,9 @@ Its recordings stay as they are (mp4 chunks any player plays, stored mirrored, a
 pose-following center layers. One step per commit.
 
 Built: 1, the pose model's crop settings are `pose_crop` in every app; 2, `PoseInference` cuts the
-segmentation's crops beside the pose model's, given their settings (`add_segmentation_crop_callback`).
+segmentation's crops beside the pose model's, given their settings (`add_segmentation_crop_callback`); 3, the
+recorder's `mirrored` stores a frame still to be mirrored as shown, its tracklets with it, `flip_h` off.
 
-3. **The recorder's `mirrored`.** A recorder setting, off by default: on, it stores each frame mirrored (one flip
-   and copy a frame on the recorder's thread) with its tracklets' boxes mirrored to match (the camera gives them
-   unmirrored), its poses as they come (the pipeline's are found on the uploaded image, mirrored already), and
-   writes `flip_h` off, so a playback hands the frames on as stored; off, a recording holds what the camera
-   delivered, as now. RECORDING.md says both. Checked by: a recording test (a stored frame and a tracklet's box
-   flipped, `flip_h` off; with it off, unchanged) and the recording tests.
 4. **hd_trio on C's wiring.** The frames' sync hands its set to a `BatchUploader`; the uploader's images go to the
    board (and the detector in -sim replay) and its snapshot to `TrackerFrameSource.submit`; the tracklets' sync's
    set to the tracker's update; the frame source and the pipeline start their threads before the cameras. The pose
@@ -149,7 +144,6 @@ segmentation's crops beside the pose model's, given their settings (`add_segment
 - A callback only hands the item over; the part that works on it has its own thread: G4, G6.
 - Remove obsolete pathways: hd_trio's calls into what C removed, G4; the inline paths, G6.
 - Name a concept after what it is; rename it everywhere in the same change: `segmentation_crop`, G4.
-- Keep presets and settings schemas in sync: `mirrored`, G3; the crops, `cadence`, the replay and
-  detector, G4.
-- A plan step checked by a run or a test is one commit: G2–G4 each.
+- Keep presets and settings schemas in sync: `mirrored`, the crops, `cadence`, the replay and detector, G4.
+- A plan step checked by a run or a test is one commit: G4.
 
