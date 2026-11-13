@@ -100,11 +100,11 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 
 ## Imports
 
-- Import from a package's `__init__.py`, never from its internal files
+- From outside a package, import from its `__init__.py`, never from its internal files
 - Import the package as a namespace (`from modules import X`, then `X.Y`) when the qualifier adds clarity; import names directly otherwise
 - Put all imports from one package on a single `from` line
 - `__init__.py` defines no `__all__`
-- Inside a package, use relative imports, never the full `modules.X.Y` path
+- Inside a package, its subpackages and tests included, import relatively
 
 ## Error handling
 
