@@ -28,7 +28,7 @@ class Domain(IntEnum):
 
 @runtime_checkable
 class FrameSource(Protocol):
-    """A source that pushes poses in the frame domain (``PosesFromTracklets``)."""
+    """A source that pushes poses in the frame domain (``TrackerFrameSource``)."""
 
     @property
     def track_ids(self) -> list[int]:

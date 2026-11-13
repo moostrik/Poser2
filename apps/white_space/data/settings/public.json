@@ -390,7 +390,7 @@
       "enabled": true,
       "resolution": "STANDARD"
     },
-    "tracklets": {
+    "frame_source": {
       "detection_timeout": 1.0
     },
     "image_crop": {

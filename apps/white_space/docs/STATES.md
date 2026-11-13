@@ -8,7 +8,7 @@ Vocabulary:
 
 - **P** — the live player count: the LERP poses on the board (`LAYERS.md`, *Inputs*). Presence is the
   pose itself; how long a player keeps one after their last detection is
-  `pose.tracklets.detection_timeout` (`modules/tracker/poses_from_tracklets.py`)
+  `pose.frame_source.detection_timeout` (`modules/tracker/tracker_frame_source.py`)
 - **min_players** — `states.min_players`, the players the show needs (`studio.json`: 2): that many alike hits
   in a row spin it up, fewer present end it, and END winds back to PLAY once they are back
 - **in sync** — the most recent hits, within one round, whose poses are alike: every pair of them fully

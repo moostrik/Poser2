@@ -132,7 +132,7 @@
       "resolution": "STANDARD",
       "enabled": false
     },
-    "tracklets": {
+    "frame_source": {
       "detection_timeout": 2.0,
       "crop_aspect": 0.75,
       "crop_padding": 0.0

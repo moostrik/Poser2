@@ -1,4 +1,4 @@
-"""PosesFromTracklets: a pose per player from the tracker's newest boxes, at each frame bang.
+"""TrackerFrameSource: a pose per player from the tracker's newest boxes, at each frame bang.
 
 `process(now)` makes them on the caller's thread. `submit(now, payload)` queues the bang for this one's own thread
 and returns: at most `WAITING` wait, beyond that the oldest is dropped, counted as `dropped`. The thread hands each
@@ -29,7 +29,7 @@ BangCallback: TypeAlias = Callable[[float, Any], None]                  # (now, 
 AskedCallback: TypeAlias = Callable[[float, Any, FrameDict], None]      # (now, payload, the poses asked)
 
 
-class PosesFromTrackletsSettings(BaseSettings):
+class TrackerFrameSourceSettings(BaseSettings):
     # How long after their last detection a person is still cropped from their last box. Judged here
     # rather than in the tracker, which emits everyone it still remembers: inside this window a
     # person the detector dropped keeps their pose, so a missed detection neither interrupts it nor
@@ -47,22 +47,22 @@ class PosesFromTrackletsSettings(BaseSettings):
     dropped:           Field[int]   = Field(0, access=Field.READ, description="Frame bangs dropped while the pose step fell behind")
 
 
-class PosesFromTracklets(FrameDictCallbackMixin, Thread):
+class TrackerFrameSource(FrameDictCallbackMixin, Thread):
     """Generates poses from tracklets, maintaining state per track; see the module docstring."""
 
-    def __init__(self, settings: PosesFromTrackletsSettings, max_players: int, frame_aspect: float = 1.0) -> None:
+    def __init__(self, settings: TrackerFrameSourceSettings, max_players: int, frame_aspect: float = 1.0) -> None:
         """`frame_aspect` is the delivered frame's width over its height, the one thing the keypoint
         window needs to know about the image; it is 1.0 for the square frames of the rigs."""
         FrameDictCallbackMixin.__init__(self)
-        Thread.__init__(self, daemon=True, name='PosesFromTracklets')
-        self.settings: PosesFromTrackletsSettings = settings
+        Thread.__init__(self, daemon=True, name='TrackerFrameSource')
+        self.settings: TrackerFrameSourceSettings = settings
         self.frame_aspect: float = frame_aspect
         # The incoming dict keys are used directly as slot indices below, so the feeding tracker
         # must key by a slot under `max_players` (the panoramic tracker's player slots; cam ids for
         # one-per-cam rigs): a key at or above it would vanish here without a trace. Both come from
         # `max_players` in main.py — an invariant spanning two modules, so it is worth stating.
         if max_players <= 0:
-            raise ValueError(f"PosesFromTracklets needs at least one track slot, got {max_players}")
+            raise ValueError(f"TrackerFrameSource needs at least one track slot, got {max_players}")
         self._max_players = max_players
         # Store submitted tracklets per track ID
         self._tracklets: dict[int, Tracklet | None] = {
@@ -108,7 +108,7 @@ class PosesFromTracklets(FrameDictCallbackMixin, Thread):
             self._bangs.clear()
             self._wake.notify()
         if dropped:
-            logger.info("PosesFromTracklets: %d frame bangs dropped at stop", dropped)
+            logger.info("TrackerFrameSource: %d frame bangs dropped at stop", dropped)
         if self.is_alive():
             self.join(timeout=2.0)
 
@@ -124,7 +124,7 @@ class PosesFromTracklets(FrameDictCallbackMixin, Thread):
             try:
                 self._bang(now, payload)
             except Exception:
-                logger.exception("PosesFromTracklets: a frame bang failed")
+                logger.exception("TrackerFrameSource: a frame bang failed")
 
     def submit(self, now: float, payload: Any = None) -> None:
         """A frame bang at `now` (the image's capture time), with what the callbacks need of it: queued for the
@@ -154,13 +154,13 @@ class PosesFromTracklets(FrameDictCallbackMixin, Thread):
             try:
                 bang_callback(now, payload)
             except Exception:
-                logger.exception("PosesFromTracklets: a bang callback failed")
+                logger.exception("TrackerFrameSource: a bang callback failed")
         asked: FrameDict = self.process(now)
         for asked_callback in asked_callbacks:
             try:
                 asked_callback(now, payload, asked)
             except Exception:
-                logger.exception("PosesFromTracklets: an asked callback failed")
+                logger.exception("TrackerFrameSource: an asked callback failed")
 
     @property
     def track_ids(self) -> list[int]:
@@ -176,7 +176,7 @@ class PosesFromTracklets(FrameDictCallbackMixin, Thread):
         dropped: list[int] = [k for k in tracklet_dict if k >= self._max_players]
         if dropped:
             logger.warning(
-                f"PosesFromTracklets: track ids {dropped} are beyond {self._max_players} slots "
+                f"TrackerFrameSource: track ids {dropped} are beyond {self._max_players} slots "
                 f"and produce no pose — the feeding tracker has more slots than max_players."
             )
         with self._lock:
@@ -231,7 +231,7 @@ class PosesFromTracklets(FrameDictCallbackMixin, Thread):
                 )
             except Exception as e:
                 logger.error(
-                    f"PosesFromTracklets: Error generating pose "
+                    f"TrackerFrameSource: Error generating pose "
                     f"{track_id}: {e}"
                 )
         self._notify_frames_callbacks(generated_poses)

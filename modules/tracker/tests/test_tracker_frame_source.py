@@ -1,4 +1,4 @@
-"""Tests for PosesFromTracklets: which latched tracklets become pose frames, and what they carry."""
+"""Tests for TrackerFrameSource: which latched tracklets become pose frames, and what they carry."""
 
 import math
 import threading
@@ -8,7 +8,7 @@ import unittest
 import numpy as np
 
 from modules.pose import Azimuth, BBox, BBoxAzimuth, Distance, Points2D
-from modules.tracker import PanoramicAnnotation, PosesFromTracklets, PosesFromTrackletsSettings, Tracklet
+from modules.tracker import PanoramicAnnotation, TrackerFrameSource, TrackerFrameSourceSettings, Tracklet
 from modules.utils import Rect
 
 
@@ -26,15 +26,15 @@ def tracklet(world_id: int, seconds_ago: float = 0.0, world_angle: float | None 
                     annotation=annotation, **stamps(seconds_ago))
 
 
-class PosesFromTrackletsCase(unittest.TestCase):
+class TrackerFrameSourceCase(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.settings = PosesFromTrackletsSettings()
+        self.settings = TrackerFrameSourceSettings()
         self.settings.detection_timeout = 1.0
-        self.poses = PosesFromTracklets(self.settings, max_players=4)
+        self.poses = TrackerFrameSource(self.settings, max_players=4)
 
 
-class TestDetectionTimeout(PosesFromTrackletsCase):
+class TestDetectionTimeout(TrackerFrameSourceCase):
     """A person last detected longer ago than `detection_timeout` is not cropped; the tracker leaves
     that call to pose."""
 
@@ -57,7 +57,7 @@ class TestDetectionTimeout(PosesFromTrackletsCase):
         self.assertFalse(self.poses.is_ready(time.perf_counter()))
 
 
-class TestFrameContents(PosesFromTrackletsCase):
+class TestFrameContents(TrackerFrameSourceCase):
 
     def test_the_box_and_the_world_azimuth_are_carried(self) -> None:
         self.poses.set_tracklets({2: tracklet(2, world_angle=90.0)})
@@ -88,7 +88,7 @@ class TestFrameContents(PosesFromTrackletsCase):
         # pose's box; a keypoint at the box's top-left corner lands at the window's left edge, a
         # quarter down, and one at the box's centre in the window's centre.
         self.settings.crop_aspect = 0.5
-        poses = PosesFromTracklets(self.settings, max_players=4, frame_aspect=2.0)
+        poses = TrackerFrameSource(self.settings, max_players=4, frame_aspect=2.0)
         keypoints = np.full((17, 3), (0.375, 0.5, 0.9), dtype=np.float32)
         keypoints[0, :2] = (0.25, 0.25)
         poses.set_tracklets({0: Tracklet(cam_id=0, id=0, roi=Rect(x=0.25, y=0.25, width=0.25, height=0.5),
@@ -103,12 +103,12 @@ class TestFrameContents(PosesFromTrackletsCase):
         self.assertAlmostEqual(float(points.scores[0]), 0.9, places=5)
 
     def test_an_id_beyond_the_slots_warns_and_is_not_posed(self) -> None:
-        with self.assertLogs('modules.tracker.poses_from_tracklets', level='WARNING'):
+        with self.assertLogs('modules.tracker.tracker_frame_source', level='WARNING'):
             self.poses.set_tracklets({5: tracklet(5)})
         self.assertEqual(self.poses.process(time.perf_counter()), {})
 
 
-class TestThread(PosesFromTrackletsCase):
+class TestThread(TrackerFrameSourceCase):
     """`submit` queues a frame bang for the thread: its payload first, then its poses, then the poses asked."""
 
     def setUp(self) -> None:
@@ -131,8 +131,8 @@ class TestThread(PosesFromTrackletsCase):
         self.poses.start()
         self.poses.submit(time.perf_counter(), 'image 1')
         self.wait_for(3)
-        self.assertEqual(self.order, [('bang', 'PosesFromTracklets', 'image 1'), ('poses', 'PosesFromTracklets', {0}),
-                                      ('asked', 'PosesFromTracklets', {0})])
+        self.assertEqual(self.order, [('bang', 'TrackerFrameSource', 'image 1'), ('poses', 'TrackerFrameSource', {0}),
+                                      ('asked', 'TrackerFrameSource', {0})])
 
     def test_beyond_two_waiting_the_oldest_is_dropped_and_counted(self) -> None:
         release: threading.Event = threading.Event()

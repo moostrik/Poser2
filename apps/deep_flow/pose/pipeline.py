@@ -13,11 +13,11 @@ from modules.pose.pipeline import AsyncNode, AsyncStep, Domain, FrameSource, Gro
 from ..settings import PoseGroup, Stage
 
 
-def pipeline_spec(ps: PoseGroup, tracklet_poses: FrameSource, pose_inference: AsyncNode) -> PipelineSpec:
-    """The pipeline on the app's pose settings ``ps``; ``tracklet_poses`` is the camera source and
+def pipeline_spec(ps: PoseGroup, frame_source: FrameSource, pose_inference: AsyncNode) -> PipelineSpec:
+    """The pipeline on the app's pose settings ``ps``; ``frame_source`` is the tracker's frame source and
     ``pose_inference`` the crop and pose model."""
     return PipelineSpec([
-        StageSpec(Stage.RAW, tracklet_poses, [
+        StageSpec(Stage.RAW, frame_source, [
             PoseStep(nodes.BBoxEuroSmoother, ps.bbox.smoother),
             PoseStep(nodes.BBoxPredictor, ps.bbox.prediction),
             AsyncStep(pose_inference),

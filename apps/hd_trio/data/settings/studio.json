@@ -218,7 +218,7 @@
       "resolution": "EXTREME",
       "enabled": false
     },
-    "tracklets": {
+    "frame_source": {
       "detection_timeout": 2.0
     },
     "image_crop": {

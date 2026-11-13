@@ -9,7 +9,7 @@ from modules.recording import Player, Recorder as VideoRecorder, replay
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscSound, ArtNetBars, OscReceiver
-from modules.tracker import OnePerCamTracker, PosesFromTracklets
+from modules.tracker import OnePerCamTracker, TrackerFrameSource
 from modules.pose import nodes, features, analytics, FrameDict, Recorder as PoseRecorder, RecorderSettings as PoseRecorderSettings
 from modules.pose.pipeline import Domain, PosePipeline
 from modules.inference import segmentation, detection, CameraSync, PoseInference
@@ -117,12 +117,12 @@ class HDTrioMain:
         # DETECTION
         features.configure_features(max_players)
 
-        self.poses_from_tracklets = PosesFromTracklets(ps.tracklets, max_players)
+        self.frame_source = TrackerFrameSource(ps.frame_source, max_players)
         self.segmentation_predictor  = segmentation.Predictor(ps.segmentation)
 
-        self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
+        self.tracker.add_tracklet_callback(self.frame_source.set_tracklets)
         self.tracklet_sync.add_sync_callback(self.tracker.update)
-        self.frame_sync.add_sync_callback(self.poses_from_tracklets.process)
+        self.frame_sync.add_sync_callback(self.frame_source.process)
 
         # The segmentation and the board read the same crops the pose model gets.
         self.pose_inference.add_camera_images_callback(self.board.set_camera_images)
@@ -134,7 +134,7 @@ class HDTrioMain:
         # domain through the tracklet poses; the render tick drives the output domain (LERP). Every stage's frames
         # go to the board, the recorders and the sound; the board also reads each stage's window.
         self.similarity_hold = nodes.SimilarityResultHold()              # the threaded analytics' way back into SMOOTH
-        self.pipeline = PosePipeline(pipeline_spec(ps, self.poses_from_tracklets, self.pose_inference, self.similarity_hold))
+        self.pipeline = PosePipeline(pipeline_spec(ps, self.frame_source, self.pose_inference, self.similarity_hold))
         for stage in Stage:
             self.pipeline.add_frames_callback(stage, partial(self.board.set_frames, stage))
             self.pipeline.add_frames_callback(stage, partial(self.pose_recorder.submit_frames, stage))

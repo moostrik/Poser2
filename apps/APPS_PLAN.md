@@ -16,17 +16,9 @@ The pipeline's one source of poses is the `FrameSource` (`modules/pose/pipeline/
 pushes a pose per tracked player, from the player's newest tracklet (its box, and the camera's keypoints, azimuth
 and distance where it has them), never waiting for tracklets. A pose may hold only its box, so the RAW stage
 smooths and predicts boxes with the pipeline's own filters before the async step crops the image and adds the
-keypoints. Today that source is called `PosesFromTracklets`, a name for how it is made, and its call carries no
-images: the crop takes the images its caller set before (`set_images`), right only because both run on one thread
-in that order.
+keypoints. That source is `TrackerFrameSource` (`modules/tracker`), and its call carries no images: the crop
+takes the images its caller set before (`set_images`), right only because both run on one thread in that order.
 
-1. **The name.** `PosesFromTracklets` becomes `TrackerFrameSource`, the pipeline's frame source fed by the tracker,
-   in `modules/tracker` (`modules/pose` imports nothing of ours, and it needs `Tracklet`): settings
-   `TrackerFrameSourceSettings`, the group `tracklets` becomes `frame_source` in the three apps' settings and their
-   presets (deep_flow `settings.json`, `very nice.json`; hd_trio `studio.json`, `umu.json`; white_space
-   `public.json`, `studio.json`; in each the pose group's one `tracklets`, the one holding `detection_timeout`), its
-   test file and every mention: the code, INPUT_THREADS.md, white_space's `TRACKING.md` and `STATES.md`
-   (`pose.tracklets.detection_timeout` becomes `pose.frame_source.detection_timeout`).
 2. **The images travel with the call.** `TrackerFrameSource.submit(timestamp, cam_id, images)` takes the uploader's
    `ImageSnapshot` of the moment; its thread makes the poses and emits them with those images through its own
    callback, the `FrameSource` protocol's (`add_frames_callback(callback(frames, images))`); it no longer inherits
@@ -54,7 +46,7 @@ in that order.
    asked) counts the poses carrying the camera's points, so a recording waits for them. deep_flow has the path
    now; white_space has it when its cameras send keypoints (the `oak` backend, depthai 2, sends none).
 
-Checked by: the tracker's tests renamed, the pipeline's (the images reach the async node with their poses), the
+Checked by: the pipeline's (the images reach the async node with their poses), the
 pose step's (the crop uses the images it was given, not the uploader's newest; with the host model off a pose with
 the camera's points comes out with them, one without none), `Predict`'s (a repeated stamp keeps the fit of distinct
 samples) and an interpolator's through `PredictBlend` (a repeated target keeps its blend), the recorded poses' tests
@@ -135,7 +127,6 @@ does not run), and a submit before `start` is an error.
 
 ## Rules it touches
 
-- Name a concept after what it is: `TrackerFrameSource`, B1.
 - A callback stores or enqueues what it receives and returns, with the data it is for: the images with the call, B2.
 - A callback stores or enqueues what it receives and returns: C's wiring.
 - A receiver does its work on its own thread: white_space starts the `CameraSync`s' threads; a sync stays inline
@@ -144,7 +135,6 @@ does not run), and a submit before `start` is an error.
 - A consumer that needs every item gets a callback; one that needs the latest reads the board: C2, C3.
 - Log exceptions with context, never fail silently: drops counted on the panel, C7.
 - Treat latency as a first-order concern: B's run compares with A6's numbers, C's with `main`.
-- Keep presets and settings schemas in sync: `tracklets` to `frame_source` in six presets, B1.
 - Fix a problem where it is made: the repeated sample in `Predict`, B3.
 - Update all call sites, remove obsolete pathways: white_space's video images go.
 - Plans and commits: one commit per checked step, built on your go.

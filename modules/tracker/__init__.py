@@ -6,4 +6,4 @@ from .panoramic.settings import TrackerSettings as PanoramicTrackerSettings
 from .panoramic.projection import azimuth_to_camera_x, camera_azimuth, camera_bearing, camera_local_to_azimuth, \
     center_distance, elevation_from_row, focus_distance, row_from_elevation, row_model, wrap180
 from .onepercam.tracker import Tracker as OnePerCamTracker, TrackerSettings as OnePerCamTrackerSettings
-from .poses_from_tracklets import PosesFromTracklets, PosesFromTrackletsSettings
+from .tracker_frame_source import TrackerFrameSource, TrackerFrameSourceSettings

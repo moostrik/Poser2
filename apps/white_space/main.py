@@ -13,7 +13,7 @@ from modules.recording import Player, Recorder as VideoRecorder, replay
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscReceiver
-from modules.tracker import PanoramicTracker, PosesFromTracklets
+from modules.tracker import PanoramicTracker, TrackerFrameSource
 from modules.pose import features
 from modules.pose.pipeline import Domain, PosePipeline
 from modules.inference import detection, CameraSync, PoseInference
@@ -117,15 +117,15 @@ class WhiteSpaceMain:
         # DETECTION
         features.configure_features(max_players)
 
-        self.poses_from_tracklets = PosesFromTracklets(ps.tracklets, max_players)
+        self.frame_source = TrackerFrameSource(ps.frame_source, max_players)
 
-        self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
+        self.tracker.add_tracklet_callback(self.frame_source.set_tracklets)
         self.tracker.add_tracklet_callback(self.board.set_tracklets)
         # The unfused view, for the calibration display only — two observations of one person on
         # a seam, which the line above reduces to one.
         self.tracker.add_observation_callback(self.board.set_observations)
         self.tracklet_sync.add_sync_callback(self.tracker.update)
-        self.frame_sync.add_sync_callback(self.poses_from_tracklets.process)
+        self.frame_sync.add_sync_callback(self.frame_source.process)
 
         # DIAGNOSIS — a subscribe-only journal of the tracker's inputs, observations and emitted
         # primaries (JSONL under data/diagnosis), for dissecting identity incidents offline.
@@ -146,7 +146,7 @@ class WhiteSpaceMain:
         # domain through the tracklet poses; the light tick drives the output domain (LERP, where the dummy joins).
         # Every stage's frames and group record go to the board, which also reads each stage's window; the sound
         # reads LERP, and so do the instrument and the state machine (the group sync on the LERP record).
-        self.pipeline = PosePipeline(pipeline_spec(ps, self.settings.light, self.poses_from_tracklets, self.pose_inference,
+        self.pipeline = PosePipeline(pipeline_spec(ps, self.settings.light, self.frame_source, self.pose_inference,
                                                    self.dummy, self._column_to_azimuth, self.board.get_playhead_phase,
                                                    self.board.get_playhead_bars))
         for stage in Stage:

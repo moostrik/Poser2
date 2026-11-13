@@ -19,8 +19,8 @@ Per thread, the callbacks in the order they are registered (`apps/deep_flow/main
 | the uploader's (`Uploader`)                       | uploads each frame and hands it on ([below](#the-uploader))    | the GPU, in a copy while its queue is full |
 | the recording sync's (`RecordingSync`)            | matches a capture's parts, hands the capture to the recorder   | nothing                                    |
 | the tracklets' (depthai)                          | queues them for the tracker, the board; `tracker.update`       | nothing                                    |
-| the tracker's                                     | associates the tracklets, to `PosesFromTracklets` and the board | nothing                                   |
-| the pose step's (`PosesFromTracklets`)            | a pose per player, the RAW box steps, the crops, the submit    | nothing                                    |
+| the tracker's                                     | associates the tracklets, to the frame source and the board    | nothing                                    |
+| the frame source's (`TrackerFrameSource`)         | a pose per player, the RAW box steps, the crops, the submit    | nothing                                    |
 | the pose model's (`pose.RunnerTRT`)               | RTMPose on the crops, queues the poses for the pipeline        | its own model                              |
 | the pipeline's (`PosePipeline raw`)               | the RAW stage after the model, CLEAN, SMOOTH, their users      | nothing                                    |
 | the detector's (-sim)                             | YOLOv8n on the uploaded image, boxes to the replay camera      | its own model                              |
@@ -62,9 +62,9 @@ When an image is on the GPU, the uploader hands it to four others, each of which
 
 - the capture sync, which queues the image for its own thread;
 - the detector (-sim), which keeps the newest image for its own thread;
-- the pose step, which queues the frame bang with the uploader's images as they are now (`Uploader.snapshot`), two
-  waiting at most (the oldest dropped, `dropped` on the panel). Its own thread holds those images for the crops
-  (`set_images`), so the crops are cut from this very image and not a newer one; `PosesFromTracklets.process` makes
+- the frame source, which queues the frame bang with the uploader's images as they are now (`Uploader.snapshot`),
+  two waiting at most (the oldest dropped, `dropped` on the panel). Its own thread holds those images for the crops
+  (`set_images`), so the crops are cut from this very image and not a newer one; `TrackerFrameSource.process` makes
   a pose per player from the tracker's newest boxes, the RAW stage's two box filters smooth them, and
   `PoseInference.submit` cuts the crops (`CropExtractor`), at the pose model's input size, queued on the GPU and not
   waited for; it records a "crops ready" event and hands crops, poses and event to the pose model, whose thread has

@@ -29,7 +29,7 @@ state machine also reads the board's hit streak (`HitSync`, `STATES.md` *Vocabul
 instrument does, the group sync on the board's LERP group record (`GroupSync`, the pipeline's gate; `STATES.md`
 *Vocabulary*: group sync); the live `Similarity` feature stays the pipeline's and the sound's.
 A player is present while their pose exists: the pose pipeline stops posing a player
-`pose.tracklets.detection_timeout` (1.0 s) after their last detection, and every filter downstream
+`pose.frame_source.detection_timeout` (1.0 s) after their last detection, and every filter downstream
 resets a track the moment its pose is missing. A layer adds no presence test of its own. A player's
 azimuth is the pose's `Azimuth`, at their eyes: raw from CLEAN, smoothed at SMOOTH, predicted at
 PREDICT and interpolated at LERP. The LERP stage runs inside the light tick at `light_rate`, one live root

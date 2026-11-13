@@ -24,15 +24,15 @@ from .neutral_weight import NeutralWeight
 from .playhead_offset import PlayheadOffset, PlayheadOffsetExtractor
 
 
-def pipeline_spec(ps: PoseGroup, light: LightSettings, tracklet_poses: FrameSource, pose_inference: AsyncNode, dummy: Dummy,
+def pipeline_spec(ps: PoseGroup, light: LightSettings, frame_source: FrameSource, pose_inference: AsyncNode, dummy: Dummy,
                   column_to_azimuth: Callable[[int, float], float], playhead_phase: Callable[[], float],
                   playhead_bars: Callable[[], float]) -> PipelineSpec:
     """The pipeline on the app's pose settings ``ps`` and the light settings (the playhead's rate, for the hit);
-    ``tracklet_poses`` is the camera source, ``pose_inference`` the crop and pose model, ``column_to_azimuth`` the
+    ``frame_source`` is the tracker's frame source, ``pose_inference`` the crop and pose model, ``column_to_azimuth`` the
     tracker's geometry for the eye azimuth, ``playhead_phase`` and ``playhead_bars`` the board's playhead for the
     LERP stage's playhead offset and the hit sync's round."""
     return PipelineSpec([
-        StageSpec(Stage.RAW, tracklet_poses, [
+        StageSpec(Stage.RAW, frame_source, [
             AsyncStep(pose_inference),
         ], window=ps.window_raw),
 

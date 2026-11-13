@@ -485,7 +485,7 @@ free player slot is drawn in white with no lane, labelled `#- … waiting` at th
 - A line fading to grey, its field fading out, is an identity the tracker holds but no longer counts —
   a LOST observation: the device missed them, or a filter stopped counting them (the label then ends
   in the rejection, `past R3.5` or `small`). How far it has faded says how close it is to being
-  forgotten: their pose leaves the show after `pose.tracklets.detection_timeout`, the identity at
+  forgotten: their pose leaves the show after `pose.frame_source.detection_timeout`, the identity at
   `lost_timeout`, the moment the line is fully grey and the field gone.
 - A white line with its field is a person tracked while every player slot is in use, labelled
   `waiting` at its top: they enter the show when a slot frees, oldest waiter first (`max_players`;

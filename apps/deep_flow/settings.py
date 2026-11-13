@@ -19,7 +19,7 @@ from modules.recording import PlayerSettings, RecorderSettings
 from modules.session import SessionSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
-from modules.tracker import OnePerCamTrackerSettings, PosesFromTrackletsSettings
+from modules.tracker import OnePerCamTrackerSettings, TrackerFrameSourceSettings
 from modules.pose import nodes, trackers, window
 from modules import inference
 from modules.gl import WindowSettings
@@ -206,7 +206,7 @@ class PoseGroup(BaseSettings):
 
     pose           : Group[inference.pose.Settings]          = Group(inference.pose.Settings, share=_batch_share)
     optical_flow   : Group[inference.optical_flow.Settings]  = Group(inference.optical_flow.Settings, share=_batch_share)
-    tracklets      : Group[PosesFromTrackletsSettings]       = Group(PosesFromTrackletsSettings)
+    frame_source   : Group[TrackerFrameSourceSettings]       = Group(TrackerFrameSourceSettings)
     image_crop     : Group[inference.crop.Settings]          = Group(inference.crop.Settings, share=[max_players])
     capture_sync   : Group[inference.CaptureSyncSettings]    = Group(inference.CaptureSyncSettings)
     angle_extractor: Group[nodes.AngleExtractorSettings]     = Group(nodes.AngleExtractorSettings)

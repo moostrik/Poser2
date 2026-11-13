@@ -141,7 +141,7 @@ class StateMachine:
         dt = tick.dt
         signals = self._board.get_playhead_signals()
 
-        # The people present are the people with a pose: `pose.tracklets.detection_timeout` decides.
+        # The people present are the people with a pose: `pose.frame_source.detection_timeout` decides.
         frames = self._board.get_frames(self._pose_stage)
         players = len(frames)
         # This tick's hit and the hit streak: the pipeline's, on the LERP poses and group record just written.

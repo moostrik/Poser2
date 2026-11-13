@@ -18,7 +18,7 @@ from modules.camera.oak import OakCameraSettings
 from modules.recording import PlayerSettings, RecorderSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
-from modules.tracker import PanoramicTrackerSettings, PosesFromTrackletsSettings
+from modules.tracker import PanoramicTrackerSettings, TrackerFrameSourceSettings
 from modules.pose import nodes, trackers, window, analytics
 from modules import inference
 from modules.session import SessionSettings
@@ -248,7 +248,7 @@ class PoseGroup(BaseSettings):
     _feature_share: list = [frequency, output_frequency]
 
     pose            : Group[inference.pose.Settings]         = Group(inference.pose.Settings, share=[max_players, model_type, model_path, verbose])
-    tracklets       : Group[PosesFromTrackletsSettings]      = Group(PosesFromTrackletsSettings)
+    frame_source    : Group[TrackerFrameSourceSettings]      = Group(TrackerFrameSourceSettings)
     image_crop      : Group[inference.crop.Settings]         = Group(inference.crop.Settings, share=[max_players])
     angle_extractor : Group[nodes.AngleExtractorSettings]    = Group(nodes.AngleExtractorSettings)
     angle_calibrator: Group[nodes.AngleCalibratorSettings]   = Group(nodes.AngleCalibratorSettings)

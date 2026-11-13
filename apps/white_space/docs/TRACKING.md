@@ -123,20 +123,20 @@ so the blend lies between them.
 
 | consumer                   | what it takes                                                   |
 |----------------------------|-----------------------------------------------------------------|
-| `PosesFromTracklets`       | per world: `BBox` from the primary, `BBoxAzimuth` of the world  |
+| `TrackerFrameSource`       | per world: `BBox` from the primary, `BBoxAzimuth` of the world  |
 | `AzimuthExtractor`         | `Azimuth` at the eyes from `BBoxAzimuth`, in the primary camera |
 | show layers, state machine | pose frames only (`LAYERS.md`, *Inputs*)                        |
 | panorama                   | every observation and rejected detection; primaries by `obs_id` |
 
-`PosesFromTracklets` poses a world while its primary's last detection is younger than
-`pose.tracklets.detection_timeout`.
+`TrackerFrameSource` poses a world while its primary's last detection is younger than
+`pose.frame_source.detection_timeout`.
 
 Two clocks follow a person the cameras lose:
 
-| after                              | studio | what ends                                          |
-|------------------------------------|--------|----------------------------------------------------|
-| `pose.tracklets.detection_timeout` | 1.0 s  | the pose, so the person leaves the show            |
-| `lost_timeout`                     | 2.0 s  | the identity: no more seam links or re-acquisition |
+| after                                 | studio | what ends                                          |
+|---------------------------------------|--------|----------------------------------------------------|
+| `pose.frame_source.detection_timeout` | 1.0 s  | the pose, so the person leaves the show            |
+| `lost_timeout`                        | 2.0 s  | the identity: no more seam links or re-acquisition |
 
 The tracker itself filters nothing on freshness; how stale is too stale is each consumer's call.
 
@@ -324,7 +324,7 @@ barely acts and nobody is wrongly dropped. Too much makes people inside the zone
 
 The same radius reaches the pose as the `Distance` feature: the radius within the zone, 0 at
 `rig.zone_min_radius` and 1 at `rig.zone_max_radius`, clamped (`Rig.zone_distance`, carried on the
-annotation as `zone_distance` and stamped by `PosesFromTracklets`). It is a read-out for the light
+annotation as `zone_distance` and stamped by `TrackerFrameSource`). It is a read-out for the light
 and the sound (`SOUND.md`, *Conversion table*), never a gate: the tracker decides nothing on it.
 Without a reading (feet at or above the horizon) or without a zone (both edges at one radius) it is
 absent. Changing the zone in the panel changes the reading at once.

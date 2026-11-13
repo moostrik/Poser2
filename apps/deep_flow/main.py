@@ -14,7 +14,7 @@ from modules.session import Session
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscSound
-from modules.tracker import OnePerCamTracker, PosesFromTracklets
+from modules.tracker import OnePerCamTracker, TrackerFrameSource
 from modules.pose import configure_features
 from modules.pose.pipeline import Domain, PosePipeline
 from modules.inference import optical_flow, detection, GpuImage, ImageSnapshot, PoseInference, RecordedPoses, Capture, CaptureSync, Uploader, frame_poses
@@ -113,13 +113,13 @@ class DeepFlowMain:
         self.uploader.add_tracklet_callback(self._on_tracklets)
 
         # DETECTION
-        self.poses_from_tracklets = PosesFromTracklets(p.tracklets, max_players)
+        self.frame_source = TrackerFrameSource(p.frame_source, max_players)
         self.optical_flow_predictor  = optical_flow.Predictor(p.optical_flow)
 
-        self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
+        self.tracker.add_tracklet_callback(self.frame_source.set_tracklets)
         # The pose step's thread: each bang's images held for its crops, then its poses, then the poses asked
-        self.poses_from_tracklets.add_bang_callback(self._set_images)
-        self.poses_from_tracklets.add_asked_callback(self._on_asked)
+        self.frame_source.add_bang_callback(self._set_images)
+        self.frame_source.add_asked_callback(self._on_asked)
         self._pose_step: PoseInference | RecordedPoses = pose_step
 
         # The optical flow reads the same crops the pose model gets.
@@ -128,7 +128,7 @@ class DeepFlowMain:
         # POSE PIPELINE — the stages are declared in pose/pipeline.py. Each uploaded image drives the frame domain
         # through the tracklet poses (`_on_image`); the render tick drives the output domain (LERP). Every stage's frames
         # go to the board and the sound; the board also reads each stage's window.
-        self.pipeline = PosePipeline(pipeline_spec(p, self.poses_from_tracklets, pose_step))
+        self.pipeline = PosePipeline(pipeline_spec(p, self.frame_source, pose_step))
         for stage in Stage:
             self.pipeline.add_frames_callback(stage, partial(self.board.set_frames, stage))
             self.pipeline.add_frames_callback(stage, partial(self.osc_sound.submit_frames, stage))
@@ -176,7 +176,7 @@ class DeepFlowMain:
         if self.person_detector is not None:
             self.person_detector.start()
         self.pipeline.start()
-        self.poses_from_tracklets.start()
+        self.frame_source.start()
         self.uploader.start()
         for camera in self.cameras:
             camera.start()
@@ -202,7 +202,7 @@ class DeepFlowMain:
         """An uploaded image, on the uploader's thread: the pose step for it, queued with the images as they are
         now, and the camera's interval. With one camera every image is a round, so the frame domain runs on each,
         at the image's capture time."""
-        self.poses_from_tracklets.submit(image.timestamp, (image.cam_id, self.uploader.snapshot()))
+        self.frame_source.submit(image.timestamp, (image.cam_id, self.uploader.snapshot()))
         last: float | None = self._last_camera_frame.get(image.cam_id)
         self._last_camera_frame[image.cam_id] = image.timestamp
         if last is not None:
@@ -280,7 +280,7 @@ class DeepFlowMain:
         for camera in self.cameras:
             camera.stop()
         self.uploader.stop()
-        self.poses_from_tracklets.stop()
+        self.frame_source.stop()
         self.pipeline.stop()
         self.recorder.stop()
 

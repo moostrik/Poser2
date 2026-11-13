@@ -188,7 +188,7 @@ class Tracker(Thread, BaseTracker):
         # Too young, too small, or past the zone's far edge: not counted — handled exactly like a
         # missed detection, before every branch below, so nobody is born, re-acquired or linked on
         # it. Someone already tracked goes LOST: their pose carries on from their last box for
-        # `pose.tracklets.detection_timeout`, so a jump or a moment of hidden feet changes nothing
+        # `pose.frame_source.detection_timeout`, so a jump or a moment of hidden feet changes nothing
         # visible; forgotten after `lost_timeout`; the same person again if they are counted before
         # that. Their latest box is kept with its rejection, so the panorama's mark follows them and says why it
         # is fading.
@@ -319,7 +319,7 @@ class Tracker(Thread, BaseTracker):
         # id everything downstream indexes on. A world waiting for a slot is tracked but kept to the
         # observation channel; a world is remembered until `lost_timeout` retires it, LOST only when
         # no camera sees the person. How stale is too stale is the consumer's call: pose stops posing
-        # a person after `pose.tracklets.detection_timeout`, and the show reads poses. A world
+        # a person after `pose.frame_source.detection_timeout`, and the show reads poses. A world
         # retired just above is still in the store until the end of this tick; it is not emitted.
         # The primary supplies the box and the camera (the crop); the azimuth is the world's blend of
         # its views, so it does not step when the primary changes camera.
