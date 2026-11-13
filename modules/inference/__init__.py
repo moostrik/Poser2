@@ -5,7 +5,7 @@ from .source import GpuDepth, GpuImage
 from .crop_extractor import CropExtractor
 from .uploader import ImageSnapshot, Uploader, UploaderSettings
 from .depth_align import DepthAligner, depth_metres
-from .pose_inference import PoseInference
+from .pose_inference import PoseInference, has_points
 from .recorded_poses import RecordedPoses, RecordedPosesSettings, frame_poses
 from .capture import Capture
 from .capture_sync import CaptureSync, CaptureSyncSettings

@@ -69,8 +69,6 @@ class Predictor(FrameDictCallbackMixin):
         """
         if not self._runner.is_ready:
             return
-        if not self._settings.enabled:
-            return
 
         track_ids: list[int] = []
         gpu_image_list: list = []  # list[cp.ndarray]

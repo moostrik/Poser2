@@ -17,7 +17,7 @@ from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, TrackerFrameSource
 from modules.pose import configure_features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import optical_flow, detection, GpuImage, PoseInference, RecordedPoses, Capture, CaptureSync, Uploader, frame_poses
+from modules.inference import optical_flow, detection, GpuImage, PoseInference, has_points, RecordedPoses, Capture, CaptureSync, Uploader, frame_poses
 from modules.pose import FrameDict
 from modules.utils import FPS, PerformanceTimer
 
@@ -207,9 +207,11 @@ class DeepFlowMain:
             self.board.submit_time_sample(Series.CAMERA_INTERVAL, (image.timestamp - last) * 1000.0, image.timestamp)
 
     def _on_asked(self, timestamp: float, cam_id: int, asked: FrameDict) -> None:
-        """A frame bang's poses, on the frame source's thread: the recorder hears whether the pose model was asked
-        poses for the image, so a frame without a player does not wait."""
-        posing: bool = (self.recorded_poses is not None and self.settings.camera.recorded_poses.enabled) or self.settings.pose.pose.enabled
+        """A frame bang's poses, on the frame source's thread: the recorder hears whether poses come for the image
+        (the pose model asked, the recording's played, or the camera's own keypoints handed on), so a frame without
+        a player does not wait."""
+        modelled: bool = (self.recorded_poses is not None and self.settings.camera.recorded_poses.enabled) or self.settings.pose.pose.enabled
+        posing: bool = modelled or any(has_points(frame) for frame in asked.values())
         self.recorder.expect_poses(cam_id, timestamp, bool(asked) and posing)
 
     def _record_poses(self, frames: FrameDict) -> None:

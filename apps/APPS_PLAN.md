@@ -5,39 +5,16 @@ the input works is in [INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md); the 
 [RECORDING_PLAN.md](../modules/recording/RECORDING_PLAN.md#2-the-recorder-in-the-other-apps). **(deduction)** marks what is inferred.
 
 
-Four parts, in this order: B the frame source and its images; C white_space comes back on deep_flow's input; D smile is
-checked; E hd_trio comes back after the 2D fluid ([the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2d-flow-follows-the-3d)). The rules they keep:
+Three parts, in this order: C white_space comes back on deep_flow's input; D smile is checked; E hd_trio comes back after the 2D fluid ([the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2d-flow-follows-the-3d)). The rules they keep:
 a callback stores or enqueues what it receives and returns, a receiver does its work on its own thread, the camera's
 thread runs only the camera, and every drop is counted on the panel ([INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md)).
-
-## B. The frame source and its images
-
-The pipeline's one source of poses is the `FrameSource` (`modules/pose/pipeline/spec.py`): on each image it
-pushes a pose per tracked player, from the player's newest tracklet (its box, and the camera's keypoints, azimuth
-and distance where it has them), never waiting for tracklets. A pose may hold only its box, so the RAW stage
-smooths and predicts boxes with the pipeline's own filters before the async step crops the image and adds the
-keypoints. That source is `TrackerFrameSource` (`modules/tracker`); it pushes its poses with the images they are
-for, and the crop cuts exactly those (INPUT_THREADS.md). white_space and hd_trio call its `process` without images,
-which `PoseInference` refuses, so they stop at start until C and E wire their syncs to `submit`.
-
-4. **The camera's keypoints come out.** A tracklet from an OAK4 pose chain carries the camera's keypoints, and the
-   source puts them on the pose (`Points2D` in the crop's window, `keypoint_window`); then the async step drops
-   them: with the host pose model on, its points replace them, and with it off `pose.Predictor.submit` returns
-   without emitting, so no pose reaches RAW. The check of `pose.enabled` moves from `pose.Predictor.submit` to
-   `PoseInference`: with the host model off it still cuts the crops (the optical flow and the board read them) and
-   hands on the poses that carry the camera's points as they are, as `RecordedPoses` hands on recorded ones; with
-   it on, the model's points replace them, as now. deep_flow's `posing` (what the recorder hears of the poses
-   asked) counts the poses carrying the camera's points, so a recording waits for them. deep_flow has the path
-   now; white_space has it when its cameras send keypoints (the `oak` backend, depthai 2, sends none).
-
-Checked by: the pose step's (with the host model off a pose with the camera's points comes out with them, one
-without none), the recorded poses' tests updated; then one run on `measure` 9–19 s against A6's numbers (capture
-latency, pose RAW and SMOOTH latency, poses out of RAW). One commit per step.
 
 ## C. white_space back
 
 white_space (four mono OAK-D cameras at 23 fps, the panoramic tracker, the light) runs on `.venv` (depthai 2, the
-`oak` backend), no depth; on this branch it stops at start. It moves onto deep_flow's input, every receiver on its
+`oak` backend), no depth; on this branch it stops at start: it calls the frame source's `process` without the
+images the crop needs, which `PoseInference` refuses. Its cameras send no keypoints, so the camera-keypoint path
+deep_flow has reaches it only when they do. It moves onto deep_flow's input, every receiver on its
 own thread ([INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md)), and its step 4 waits for the
 recording thread's recorder for every app and the oak backend's capture time
 ([RECORDING_PLAN.md](../modules/recording/RECORDING_PLAN.md#2-the-recorder-in-the-other-apps)):
@@ -96,7 +73,7 @@ does not run), and a submit before `start` is an error.
 ## Details
 
 - The box predictor's `lead`, a fixed 1/30 s past the tracklet's stamp, against the box predicted to the image's own
-  capture time: open, not part of B.
+  capture time: open.
 
 - One line per stream, average and 1% low: the panel's rates as frame-time analysis gives them (RTSS,
   CapFrameX), one pinned line per stream, Render, Video, Captures and Motion,
@@ -114,7 +91,7 @@ does not run), and a submit before `start` is an error.
 - The camera's thread runs only the camera: C1.
 - A consumer that needs every item gets a callback; one that needs the latest reads the board: C2, C3.
 - Log exceptions with context, never fail silently: drops counted on the panel, C7.
-- Treat latency as a first-order concern: B's run compares with A6's numbers, C's with `main`.
+- Treat latency as a first-order concern: C's run compares with `main`.
 - Update all call sites, remove obsolete pathways: white_space's video images go.
 - Plans and commits: one commit per checked step, built on your go.
 
