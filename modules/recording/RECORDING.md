@@ -269,7 +269,7 @@ Not in this plan:
 
 - The OAK-D's capture time: the oak backend (depthai 2) stamps a frame's arrival, so hd_trio and white_space record
   USB's jitter in their times. Oak4's `capture_time` shows the way; it needs an OAK-D to test, and comes with the
-  apps' move ([PLAN.md's line 4](../flow/PLAN.md#4-the-other-apps-on-deep_flows-input)).
+  apps' move ([PLAN.md's line 4](../flow/PLAN.md#4-the-apps-on-deep_flows-input)).
 - hd_trio and white_space: their settings (`MP4`, `mirror` for hd_trio), their wiring (tracklets through the
   uploader, `expect_poses` per camera and image), and hd_trio's pose `.h5` cut at the recorder's split, with their
   refactors.
