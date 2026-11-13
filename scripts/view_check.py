@@ -26,7 +26,8 @@ import torch  # noqa: E402
 from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_FLOAT, GL_NEAREST, GL_RED, GL_RGBA, GL_TEXTURE_2D, glBindTexture, glFinish, glGetTexImage  # noqa: E402
 
 import monitor_harness as mh  # noqa: E402
-from modules.camera import CameraFrame, FrameType, read_metadata  # noqa: E402
+from modules.camera import CameraFrame, FrameType  # noqa: E402
+from modules.recording import read_metadata  # noqa: E402
 from modules.flow import DepthRead, DepthVelocitySettings, edge_aware_depth, joint_bilateral_depth, mask_sided_depth  # noqa: E402
 from modules.gl import Tensor, Texture  # noqa: E402
 from modules.inference import GpuDepth, GpuImage, Uploader, UploaderSettings  # noqa: E402

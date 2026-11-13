@@ -13,8 +13,9 @@ from enum import IntEnum, auto
 
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.panel import PanelSettings
-from modules.camera import CameraCheckSettings, CameraResolution, PlayerSettings, RecorderSettings
+from modules.camera import CameraCheckSettings, CameraResolution
 from modules.camera.oak4 import Oak4CameraSettings
+from modules.recording import PlayerSettings, RecorderSettings
 from modules.session import SessionSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings

@@ -9,7 +9,7 @@ import depthai as dai
 import numpy as np
 from cv2 import resize, COLOR_BGR2GRAY, cvtColor
 
-from .. import FrameType, Player, PlayerSettings, frame_size, mode_size
+from .. import ClipSource, FrameType, frame_size, mode_size
 
 from .camera import Camera
 from .pipeline import build_pipeline, CLIPS_STREAM
@@ -20,14 +20,14 @@ logger = logging.getLogger(__name__)
 
 class Simulator(Camera):
 
-    def __init__(self, player: Player, settings: OakCameraSettings, player_settings: PlayerSettings) -> None:
+    def __init__(self, player: ClipSource, settings: OakCameraSettings) -> None:
         super().__init__(settings)
 
-        self.player: Player = player
+        self.player: ClipSource = player
         self.clips: dai.DataInputQueue | None = None
 
-        self.passthrough: bool = player_settings.sim_passthrough
-        self.warp_clips: bool = player_settings.apply_warp
+        self.passthrough: bool = settings.clip_passthrough
+        self.warp_clips: bool = settings.clip_warp
 
         # Last clip size reported by _check_frame_size, so the warning fires once per size.
         self._warned_frame_size: tuple[int, int] | None = None
@@ -98,7 +98,7 @@ class Simulator(Camera):
         The fix is in the preset, not here: set `camera.resolution` to the label the clip was
         shot at and the whole chain derives correctly again.
 
-        A clip that is being warped (`apply_warp`) feeds the warp's INPUT, so it must be the
+        A clip that is being warped (`clip_warp`) feeds the warp's INPUT, so it must be the
         sensor's size; one that passes through must be the delivered size, its derived height and all.
         """
         expected: tuple[int, int] = (mode_size(self.color, self.resolution) if self.warp_clips

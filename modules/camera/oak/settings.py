@@ -55,6 +55,10 @@ class OakCameraSettings(RigCameraSettings):
                                          description="Camera up-tilt (°), positive = aimed up. Exclusive with keystone")
     keystone:       Field[float] = Field(0.0, access=Field.INIT,
                                          description="Keystone (fraction of frame)")
+    clip_warp:      Field[bool]  = Field(False, access=Field.INIT,
+                                         description="Run recorded clips through the warp; only for raw (unwarped, tilt 0) clips")
+    clip_passthrough: Field[bool] = Field(False, access=Field.INIT, visible=False,
+                                          description="Recorded clips go to the callbacks without the device")
 
     # Two values arrive shared from the camera group and are relayed one level further into
     # `mono_sensor`, so the panel shows them where the rest of the mono controls are rather than

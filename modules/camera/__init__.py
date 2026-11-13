@@ -1,4 +1,4 @@
-from .source import         CameraSource, CameraFrameCallback, TrackletCallback
+from .source import         CameraSource, CameraFrameCallback, TrackletCallback, ClipSource, ClipFrameCallback
 from .frame import          CAPTURE_TOLERANCE, FrameType, FrameReadings, DepthAlignment, CameraFrame, mirrored_image
 from .tracklet import       TrackingStatus, CameraTracklet, CameraTracklets, straightened_tracklets
 from .settings import       CameraSettings, CameraReadings, RigCameraSettings, RigCameraReadings, CameraCheckSettings, TiltCorrectionSettings
@@ -12,8 +12,4 @@ from .geometry import       CameraResolution, RESOLUTION_SIZES, MONO_RESOLUTIONS
                             corrected_roi, corrected_keypoints, mirrored_roi, mirrored_keypoints, mirrored_intrinsics, depth_projection, \
                             mirrored_alignment, aligned_depth_size, TiltCorrection, TILT_STEP
 from .sync import           CaptureStream, MissedParts, FrameTrigger, FrameTriggerSettings
-from .recording import      ChunkInfo, ChunkMetadata, FrameMetadata, PoseArrays, merge_chunk, read_metadata, finish_unmerged, \
-                            make_file_name, make_chunk_name, make_folder_name, RecordingFolder, Timeline, \
-                            RecordingSync, RecordedCapture, FramePoses, Recorder, RecorderSettings, \
-                            PlayClock, ClipFrameCallback, Player, PlayerSettings, LoopCallback
 from .depthai_backend import oak_backend, require_backend

@@ -1,7 +1,7 @@
 # The camera package
 
 What `modules/camera` is for, what is wrong with it now, and the plan to make it clear and concise. Recording and
-playback have their own document ([RECORDING.md](recording/RECORDING.md)), the OAK4 its own
+playback have their own document ([RECORDING.md](../recording/RECORDING.md)), the OAK4 its own
 ([OAK4.md](oak4/OAK4.md)).
 
 ## What it is for

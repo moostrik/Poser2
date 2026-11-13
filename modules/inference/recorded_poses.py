@@ -20,7 +20,8 @@ from threading import Condition, Lock, Thread
 
 import numpy as np
 
-from modules.camera import CaptureStream, FrameMetadata, FramePoses, FrameType, MissedParts, PoseArrays
+from modules.camera import CaptureStream, FrameType, MissedParts
+from modules.recording import FrameMetadata, FramePoses, PoseArrays
 from modules.pose import BBox, Frame, FrameDict, FrameDictCallbackMixin, Points2D, replace
 from modules.settings import BaseSettings, Field
 from modules.utils import Rect

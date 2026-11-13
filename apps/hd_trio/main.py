@@ -3,8 +3,9 @@
 import logging
 from functools import partial
 
-from modules.camera import CameraSource, CameraCheck, Player, FrameTrigger, Recorder as VideoRecorder, replay
+from modules.camera import CameraSource, CameraCheck, FrameTrigger
 from modules.camera.oak import Camera, Simulator
+from modules.recording import Player, Recorder as VideoRecorder, replay
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscSound, ArtNetBars, OscReceiver
@@ -94,7 +95,7 @@ class HDTrioMain:
                     self.cameras.append(replay.Camera(self.player, self.settings.camera.cameras[i], self.person_detector, replay.Tracker(), i))
             else:
                 for i in range(num_cams):
-                    self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
+                    self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i]))
         else:
             for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))

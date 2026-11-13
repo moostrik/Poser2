@@ -2,12 +2,22 @@
 
 from typing import Callable, Protocol, TypeAlias
 
-from .frame import CameraFrame
+import numpy as np
+
+from .frame import CameraFrame, FrameType
 from .settings import CameraReadings
 from .tracklet import CameraTracklets
 
 CameraFrameCallback: TypeAlias = Callable[[CameraFrame], None]
 TrackletCallback: TypeAlias = Callable[[CameraTracklets], None]
+# A recorded frame: (cam_id, frame_type, image, what was recorded with it, its capture on the play's clock).
+ClipFrameCallback: TypeAlias = Callable[[int, FrameType, np.ndarray, object, float | None], None]
+
+
+class ClipSource(Protocol):
+    """Recorded frames for a camera to feed through its device: the recording's player."""
+
+    def add_frame_callback(self, callback: ClipFrameCallback) -> None: ...
 
 
 class CameraSource(Protocol):

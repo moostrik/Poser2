@@ -24,7 +24,8 @@ from queue import Empty, Full, Queue
 from threading import Lock, Thread
 from typing import Callable
 
-from modules.camera import CameraTracklets, make_folder_name
+from modules.camera import CameraTracklets
+from modules.recording import make_folder_name
 from modules.settings import BaseSettings, Field, Widget
 from modules.tracker import PanoramicAnnotation, Tracklet, TrackletDict
 

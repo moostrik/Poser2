@@ -27,7 +27,7 @@ OpenGL.ERROR_CHECKING = False
 import numpy as np  # noqa: E402
 
 from modules.log_config import setup_logging, install_excepthooks  # noqa: E402
-from modules.camera import read_metadata  # noqa: E402
+from modules.recording import read_metadata  # noqa: E402
 from modules.pose import BBox, FrameDict, Points2D  # noqa: E402
 from apps.deep_flow.main import DATA_PATH, DeepFlowMain  # noqa: E402
 from apps.deep_flow.settings import Stage  # noqa: E402

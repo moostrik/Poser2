@@ -14,8 +14,9 @@ from typing import Any
 
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.panel import PanelSettings
-from modules.camera import CameraCheckSettings, CameraResolution, PlayerSettings, RecorderSettings, FrameTriggerSettings
+from modules.camera import CameraCheckSettings, CameraResolution, FrameTriggerSettings
 from modules.camera.oak import OakCameraSettings
+from modules.recording import PlayerSettings, RecorderSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, ArtNetBarsSettings, OscReceiverSettings
 from modules.utils import Color

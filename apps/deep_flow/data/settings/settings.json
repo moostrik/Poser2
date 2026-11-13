@@ -75,9 +75,7 @@
         "VIDEO",
         "DEPTH"
       ],
-      "apply_warp": false,
       "folder": "20261112-124918_hands",
-      "sim_passthrough": false,
       "replay": true
     },
     "uploader": {

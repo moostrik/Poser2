@@ -7,8 +7,9 @@ recordings on the host with the replay backend, with no camera attached.
 import time
 from functools import partial
 
-from modules.camera import CameraSource, CameraCheck, CameraTracklets, Player, Recorder, replay
+from modules.camera import CameraSource, CameraCheck, CameraTracklets
 from modules.camera.oak4 import Camera, ModelChain
+from modules.recording import Player, Recorder, replay
 from modules.session import Session
 from modules.settings import presets
 from modules.panel import PanelServer

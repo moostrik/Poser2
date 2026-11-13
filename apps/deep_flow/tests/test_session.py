@@ -4,7 +4,7 @@ import time
 import unittest
 
 from apps.deep_flow.settings import Settings
-from modules.camera import RecorderSettings
+from modules.recording import RecorderSettings
 from modules.session import Session, SessionSettings
 
 

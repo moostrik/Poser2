@@ -347,9 +347,7 @@
       "video_frame_types": [
         "VIDEO"
       ],
-      "apply_warp": false,
       "folder": "20260924-200758_2_person",
-      "sim_passthrough": false,
       "replay": false
     },
     "person_detector": {

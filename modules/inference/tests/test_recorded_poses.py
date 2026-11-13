@@ -6,7 +6,8 @@ import unittest
 
 import numpy as np
 
-from modules.camera import FrameMetadata, FrameType
+from modules.camera import FrameType
+from modules.recording import FrameMetadata
 from modules.inference import RecordedPoses, RecordedPosesSettings, frame_poses
 from modules.pose import BBox, Frame, FrameDict, FrameDictCallbackMixin, Points2D
 from modules.utils import Rect

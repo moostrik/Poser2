@@ -866,7 +866,7 @@ sound and both screen views are self-consistent.
   playback preset and the whole chain derives correctly — the frame height, the window and the horizon
   row, the distance estimate and the panorama's geometry. Left at P800 the warp expects an 800-row clip
   and every frame-relative number is off (the simulator warns once).
-- `camera.simulator.apply_warp` applies `tilt` to a raw clip. It assumes the clip was shot at exactly
+- `camera.cam_N.clip_warp` applies `tilt` to a raw clip. It assumes the clip was shot at exactly
   that tilt; capture-time tilt is not stored with clips, so old footage can carry a horizon error.
 
 ---

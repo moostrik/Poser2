@@ -7,8 +7,9 @@ from functools import partial
 import glfw
 import numpy as np
 
-from modules.camera import CameraSource, CameraFrame, FrameType, Player, FrameTrigger, Recorder as VideoRecorder, CameraCheck, replay
+from modules.camera import CameraSource, CameraFrame, FrameType, FrameTrigger, CameraCheck
 from modules.camera.oak import Camera, Simulator
+from modules.recording import Player, Recorder as VideoRecorder, replay
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscReceiver
@@ -94,7 +95,7 @@ class WhiteSpaceMain:
                     self.cameras.append(replay.Camera(self.player, self.settings.camera.cameras[i], self.person_detector, replay.Tracker(), i))
             else:
                 for i in range(num_cams):
-                    self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
+                    self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i]))
         else:
             for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))

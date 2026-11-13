@@ -118,7 +118,6 @@
         "VIDEO"
       ],
       "folder": "intro_1",
-      "sim_passthrough": false,
       "replay": false
     },
     "person_detector": {

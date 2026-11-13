@@ -334,7 +334,7 @@ The filter's latency is the latency of a message: a moving body's depth lags by 
 
 For a camera above a big screen, looking down. A tilt is a pure rotation about the camera, so where a pixel lands does not depend on its distance. One homography therefore serves color, depth and boxes, with no point cloud and no holes.
 
-`H = K' R K⁻¹`, normalized uv to uv (`tilt_homography` in [geometry.py](../geometry.py)). `K` is the delivered lens and `R` the tilt. The frame's rows run opposite to the lens's and the IMU's **(site fact)**, so `TiltCorrection` makes `H` in their rows and turns it over to the frame's (`FLIP_V`). That is the opposite tilt on the lens with its center row mirrored. `K'` refits the picture to the frame, because plain `K` at 30° moves the frame's center by 0.58 focal lengths, about 310 of 720 rows.
+`H = K' R K⁻¹`, normalized uv to uv (`tilt_homography` in [geometry.py](../geometry/geometry.py)). `K` is the delivered lens and `R` the tilt. The frame's rows run opposite to the lens's and the IMU's **(site fact)**, so `TiltCorrection` makes `H` in their rows and turns it over to the frame's (`FLIP_V`). That is the opposite tilt on the lens with its center row mirrored. `K'` refits the picture to the frame, because plain `K` at 30° moves the frame's center by 0.58 focal lengths, about 310 of 720 rows.
 
 Depth pixels move by `H`, and their values change too. Depth is measured along the tilted axis, so a standing player of 1.8 m at 30° reads as leaning by 0.9 m. The corrected depth is `z' = z × w`, with `w` from `H`'s third row, the distance along the level axis.
 
@@ -351,7 +351,7 @@ The whole picture stays in the frame, which leaves wedges without picture at the
 
 ## Recording and replay
 
-The format is in [chunk.py](../chunk.py) and [depth_frame.py](../../video/depth_frame.py). Each chunk is one self-contained `.mkv`: stream 0 color, stream 1 depth, fixed info in the tags and per-frame readings attached. Recording starts at the first depth frame, and each depth frame is written with the color frame captured with it ([Capture time](#capture-time)), so both streams have equal frame counts. A color frame whose depth never comes is left out. Recordings made before capture times paired each color frame with the newest depth, which was captured one or two frames earlier **(deduction)**. Replay plays a recorded frame's color and depth with one time.
+How recording and playback work is in [RECORDING.md](../../recording/RECORDING.md); this section holds what is the OAK4's. The format is in [chunk.py](../../recording/container/chunk.py) and [depth_frame.py](../../video/depth_frame.py). Each chunk is one self-contained `.mkv`: stream 0 color, stream 1 depth, fixed info in the tags and per-frame readings attached. Recording starts at the first depth frame, and each depth frame is written with the color frame captured with it ([Capture time](#capture-time)), so both streams have equal frame counts. A color frame whose depth never comes is left out. Recordings made before capture times paired each color frame with the newest depth, which was captured one or two frames earlier **(deduction)**. Replay plays a recorded frame's color and depth with one time.
 
 Encoding runs on the iGPU because it does nothing else in the installation **(site fact)**, so recording stays out of the way of the show.
 
@@ -396,12 +396,6 @@ FFV1 is the fallback, exact and on the CPU. The second row is one H.264 picture 
 A 10 s recording at `P720` and one at `P1080` each held 60 fps with the recorder's queues at 1 or less, and gave 600 frames in both streams with 600 metadata lines. At `P1080`, color was 36.8 ms and depth 46.9 ms while recording.
 
 The iGPU decodes both `P720` streams together at more than 670 fps color and 1700 fps depth. It plays both `P1080` streams together at real time, 600 frames each, and a seek to frame 240 matched the full read exactly in both.
-
-### Replay
-
-`replay.Camera` emits both streams and rebuilds `H` from the tagged lens and each frame's recorded tilt, plus the live `tilt.offset`. The recorded frames are already mirrored, so the lens's `cx` is mirrored for this and `flip_h` stays off.
-
-Dragging a marker on the player's bar pauses playback and shows the frame under it, the newest position as fast as a frame can be fetched. Letting go plays from the in marker. Pressing the bar anywhere else moves only the playhead: playback goes on from there to the out marker, and a place outside the markers shows its frame and plays from the in marker. Each recording keeps its markers in `in_out.json` in its folder.
 
 ### Detector in replay
 
