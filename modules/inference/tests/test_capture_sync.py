@@ -85,6 +85,23 @@ class CaptureSyncTest(unittest.TestCase):
         self.assertEqual(len(self.captured()), 1)
         self.assertTrue(self.captures[0].poses_synced)
 
+    def test_a_capture_whose_poses_were_not_asked_goes_out_at_once_with_the_ones_before(self) -> None:
+        self.sync.submit_poses(poses(1.0 - FRAME))              # a player is in view, posed the frame before
+        self.sync.expect_poses(0, 1.0, False)                   # this frame was passed (`pose_interval`)
+        self.sync.submit_image(image(1.0))
+        self.sync.submit_depth(depth(1.0))
+        self.assertEqual(len(self.captured()), 1)               # no wait for poses that will not come
+        self.assertEqual(self.captures[0].poses[0].timestamp, 1.0 - FRAME)
+
+    def test_poses_asked_are_waited_for(self) -> None:
+        self.sync.submit_poses(poses(1.0 - FRAME))
+        self.sync.expect_poses(0, 1.0, True)
+        self.sync.submit_image(image(1.0))
+        self.sync.submit_depth(depth(1.0))
+        self.assertEqual(self.captured(), [])
+        self.sync.submit_poses(poses(1.0))
+        self.assertTrue(self.captured()[0].poses_synced)
+
     def test_poses_that_do_not_come_in_time_leave_the_capture_with_the_ones_before(self) -> None:
         self.settings.pose_wait = 5.0
         self.sync.submit_poses(poses(1.0 - FRAME))

@@ -6,8 +6,9 @@ They arrive on their own threads at their own times: the image and the depth fra
 depth. Each is kept a few frames per camera and matched by capture time within `CAPTURE_TOLERANCE`.
 A capture is complete with its image and its depth. While the poses keep up, the newest as new as
 the last capture, it waits up to `pose_wait` for its own, and while the masks keep up, up to
-`mask_wait` for its own; otherwise (nobody in view, no masks, or either behind) it takes the newest
-from before it at once, so a missing pose or mask never holds it longer. Every complete capture goes
+`mask_wait` for its own; otherwise (nobody in view, no masks, either behind, or its poses not asked:
+`expect_poses`) it takes the newest from before it at once, so a missing pose or mask never holds it
+longer. Every complete capture goes
 out, in the order of capture: one still waiting goes out with what it has as soon as a newer one is
 complete, so a late part never costs a capture.
 
@@ -58,6 +59,7 @@ class _Part(IntEnum):
     IMAGE = 0
     DEPTH = auto()
     POSES = auto()      # (timestamp, one camera's poses)
+    ASKED = auto()      # (timestamp, whether poses were asked for the camera's image)
     MASKS = auto()      # (timestamp, one camera's masks)
     SETTLE = auto()     # an Event, set once every part queued before it is matched
 
@@ -90,6 +92,7 @@ class CaptureSync(Thread):
         self._images: dict[int, CaptureStream[GpuImage]] = defaultdict(lambda: CaptureStream(KEPT))
         self._depths: dict[int, CaptureStream[GpuDepth]] = defaultdict(lambda: CaptureStream(KEPT))
         self._poses: dict[int, CaptureStream[FrameDict]] = defaultdict(lambda: CaptureStream(KEPT))
+        self._asks: dict[int, CaptureStream[bool]] = defaultdict(lambda: CaptureStream(KEPT))
         self._masks: dict[int, CaptureStream[ImageDict]] = defaultdict(lambda: CaptureStream(KEPT))
         self._last: dict[int, float] = {}               # the capture time of each camera's last capture
         self._waiting: dict[int, _Waiting] = {}
@@ -181,6 +184,11 @@ class CaptureSync(Thread):
         for cam_id, cam_poses in by_cam.items():
             self._queue(_Part.POSES, cam_id, (max(pose.timestamp for pose in cam_poses.values()), cam_poses))
 
+    def expect_poses(self, cam_id: int, timestamp: float, asked: bool) -> None:
+        """Whether poses were asked for the camera's image captured at `timestamp` (the frame source's asked
+        callback): a capture whose poses were not asked waits neither for poses nor for the masks cut for them."""
+        self._queue(_Part.ASKED, cam_id, (timestamp, asked))
+
     def submit_masks(self, poses: FrameDict, masks: ImageDict) -> None:
         """RVM's masks per track_id, with the poses they were cut for, each stamped with its image's time.
         A result without masks passes: the last ones stay, as on the board."""
@@ -227,6 +235,8 @@ class CaptureSync(Thread):
             self._depths[cam_id].add(value.timestamp, value)
         elif part == _Part.POSES:
             self._poses[cam_id].add(*value)
+        elif part == _Part.ASKED:
+            self._asks[cam_id].add(*value)
         else:
             self._masks[cam_id].add(*value)
         return self._match(cam_id)
@@ -246,7 +256,8 @@ class CaptureSync(Thread):
                 complete.append((image, depth))
         for index, (image, depth) in enumerate(complete):
             wait: float = 0.0
-            if index + 1 == len(complete):          # the newest: it may wait; an older one goes out now
+            unasked: bool = self._asks[cam_id].at(depth.timestamp) is False
+            if index + 1 == len(complete) and not unasked:      # the newest may wait, for poses asked; an older one goes out now
                 poses, masks = self._poses[cam_id], self._masks[cam_id]
                 if poses.at(depth.timestamp) is None and poses.keeps_up(last):
                     wait = max(wait, self.settings.pose_wait / 1000.0)

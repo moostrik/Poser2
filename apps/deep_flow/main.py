@@ -212,12 +212,13 @@ class DeepFlowMain:
             self.board.submit_time_sample(Series.CAMERA_INTERVAL, (image.timestamp - last) * 1000.0, image.timestamp)
 
     def _on_asked(self, timestamp: float, cam_id: int, asked: FrameDict) -> None:
-        """A frame bang's poses, on the frame source's thread: the recorder hears whether poses come for the image
-        (the pose model asked, the recording's played, or the camera's own keypoints handed on), so a frame without
-        a player does not wait."""
+        """A frame bang's poses, on the frame source's thread: the recorder and the capture sync hear whether poses
+        come for the image (the pose model asked, the recording's played, or the camera's own keypoints handed on),
+        so a frame without a player, or passed by `pose_interval`, does not wait."""
         modelled: bool = (self.recorded_poses is not None and self.settings.camera.recorded_poses.enabled) or self.settings.pose.pose.enabled
         posing: bool = modelled or any(has_points(frame) for frame in asked.values())
         self.recorder.expect_poses(cam_id, timestamp, bool(asked) and posing)
+        self.capture_sync.expect_poses(cam_id, timestamp, bool(asked) and posing)
 
     def _record_poses(self, frames: FrameDict) -> None:
         """The RAW stage's poses, on the pose model's thread, to the recorder as they are: their hand-over, stamped

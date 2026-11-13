@@ -135,7 +135,8 @@
     "frame_source": {
       "detection_timeout": 2.0,
       "crop_aspect": 0.75,
-      "crop_padding": 0.0
+      "crop_padding": 0.0,
+      "pose_interval": 2
     },
     "image_crop": {
       "padding": 0.1,

@@ -178,6 +178,13 @@ class TestThread(TrackerFrameSourceCase):
         self.poses.submit({0: now, 1: now + 0.01}, 'set')
         self.assertEqual(times, [(0, now, {0}), (1, now + 0.01, {1})])
 
+    def test_with_interval_two_every_other_bang_is_posed_and_the_others_told_not_asked(self) -> None:
+        self.settings.pose_interval = 2
+        for name in ('a', 'b', 'c', 'd'):
+            self.poses.submit(camera_0_now(), name)
+        self.assertEqual([images for kind, _, images in self.order if kind == 'poses'], ['a', 'c'])
+        self.assertEqual([asked for kind, _, asked in self.order if kind == 'asked'], [(0, {0}), (0, set()), (0, {0}), (0, set())])
+
 
 if __name__ == '__main__':
     unittest.main()
