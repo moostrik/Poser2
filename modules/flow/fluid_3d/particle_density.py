@@ -1,20 +1,6 @@
-"""The density as particles: millions of points in one storage buffer, moved through the grid's velocity.
-
-Everything stays on the GPU: the CPU dispatches and draws a fixed count and reads no particle back.
-    emission     per texel of a density source, `rate` × dt particles where density is (fewer below a floor),
-                 each the texel's amount × gain × dt × the slab's sum over the grid's layers over the
-                 expected count as its mass: a texel's mass is the grid's in expectation, a strong drop
-                 heavy particles; into a ring by an atomic head, the oldest overwritten
-    the ring     a particle's place, (head − 1 − slot) mod count over count, fades it over the ring's last
-                 `ring_fade` before the ring overwrites it
-    advection    RK2 through the velocity, the grid advection's uv metric; the mass faded by
-                 `density.fade_time` and evaporated; a closed wall stops it, an open one takes it
-    drawing      from the buffer by gl_VertexID, no copy: points, streaks or blobs into depth slices at the
-                 output's size (a layered draw), marched front to back as the grid is (`OCCLUDED`), or into
-                 one slice with the fog per particle (`ADDITIVE`); or spheres melted into one shaded
-                 surface (`SURFACE`, screen-space fluid rendering)
-A particle's value is its mass × the output's pixels per emitted texel, so its texel's particles sum to
-the grid's density there, whatever the look.
+"""The density as particles: points in one storage buffer, a ring, emitted from the density sources, moved
+through the grid's velocity, faded and drawn by `draw` and `overlap`. How and why: modules/flow/FLUID_3D.md,
+"The particles".
 """
 
 import math

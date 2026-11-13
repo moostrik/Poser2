@@ -1,36 +1,8 @@
-"""Fluid3D - 3D Navier-Stokes fluid simulation on the GPU.
-
-Every field is a GL_TEXTURE_3D on one grid of cubic cells: the velocity (RGBA16F), the temperature
-and the pressure (R16F) and the obstacle (R8) at the simulation's size, `depth` deep. The
-density is carried by the density always (`Density`, RGBA16F, color × amount at its own `density.width` ×
-`height` × `depth`), and where enabled by the fine density (`FineDensity`, its amount at `fine_density`'s size,
-its color the density's) and the particles (`ParticleDensity`), all moved through the same velocity and sampled
-by uv wherever a pass reads them against the simulation's fields. The volume drawn is the fine density where
-enabled, else the density; the particles are laid over it.
-
-Pipeline:
-    1. Advect velocity (3D self-advection, on its result the guard; every advection semi-Lagrangian
-       or MacCormack, `advection`; each field's advection sets its non-finite values to 0 and counts them, `FiniteGuard`)
-    2. (the top speed is the advection's)
-    3. Apply viscosity (3D Jacobi diffusion solver)
-    4. Confine vorticity (3D curl + confinement force)
-    5. Advect temperature
-    6. Apply buoyancy force
-    7. Enforce incompressibility (divergence -> Jacobi solve -> gradient subtraction)
-    8. Advect density
-    9. Composite the density -> 2D output
-
-The walls are per-field wrap modes (no explicit border obstacles):
-    Velocity:          GL_CLAMP_TO_BORDER(0,0,0,0)  -> no-slip / Dirichlet
-    Velocity z, density, pressure, temperature: by `wall`, every side alike
-    Obstacle:          GL_CLAMP_TO_BORDER(1,0,0,0)   -> OOB = obstacle
-
-The inputs are the bridge's two systems: the boundary, the body in the water, whose velocity the
-water is dragged toward where the body is (`drag_velocity`, never past it); and the body force, an
-acceleration added × dt (`add_acceleration`). The densities and the temperatures are sources, added
-× dt, each side at its own gain (`add_boundary_density`, `add_body_force_density`,
-`add_boundary_temperature`, `add_body_force_temperature`). Every input goes into the gaussian birth
-slab at each pixel's z position, its own; a pixel without one puts nothing in.
+"""Fluid3D - 3D Navier-Stokes fluid simulation on the GPU: the velocity on the cells' faces, the temperature, the
+pressure and the obstacle on one grid, the density carried by `Density` and, where enabled, `FineDensity` and
+`ParticleDensity`; the bridge's two systems go in by `drag_velocity`, `add_acceleration` and the density and
+temperature sources, each at its pixels' z positions; `update` steps it and composites the look. How and why:
+modules/flow/FLUID_3D.md, "The fluid", "The inputs" and "The walls".
 """
 import math
 from dataclasses import replace

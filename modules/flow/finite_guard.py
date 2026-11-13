@@ -1,11 +1,5 @@
-"""FiniteGuard: a stage's count of the non-finite values its shaders replaced with 0, and its warning.
-
-A shader that writes a stage's field tests each value's bits: a float whose exponent bits are all ones is an
-infinity or a NaN, whatever the rest, a test the driver cannot drop the way it may drop `isnan`. Such a value
-becomes 0 and adds 1 to its field's slot in the guard's buffer (`atomicAdd`), so a bad value stops where it was
-made and the show keeps running. The guard reads the counts about once a second, from the other of its two
-buffers once a fence says the GPU is done with it, so nothing waits; a count above 0 is logged as a warning
-naming the stage and the field, so nothing fails silently.
+"""FiniteGuard: a stage's count of the non-finite values its shaders replaced with 0, read about once a second
+from two buffers without waiting, and its warning. How and why: modules/flow/FLUID_3D.md, "The guard".
 
 The shader side, in each guarded shader:
 

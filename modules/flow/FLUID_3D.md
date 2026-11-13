@@ -284,7 +284,9 @@ and is never hidden:
 |-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | finite    | a value whose exponent bits are all ones, an infinity or a NaN, becomes 0: a cell that held one before the step, or that the step made one; each counted per field into the stage's `FiniteGuard` (`finite_guard.py`), read once a second from the other of two buffers once a fence says the GPU is done, so nothing waits, and logged as a warning naming the stage, the field and the count; on the velocity, the density and the temperature | `guard`, beside `reset`, on by default; off once the fluid is stable                                |
 
-The bit test, not `isnan`: GLSL may assume no NaN exists and drop `isnan`. A NaN slips past every comparison
+The counts sit in two buffers (`FiniteGuard`, `modules/flow/finite_guard.py`): about once a second the guard
+reads the one a fence says the GPU is done with, so nothing waits, and logs a count above 0 as a warning naming
+the stage and the field. The bit test, not `isnan`: GLSL may assume no NaN exists and drop `isnan`. A NaN slips past every comparison
 (`speed > threshold` is false), so a threshold could not catch it, and it spreads to every value computed from
 it. An infinite velocity traces off the grid and reads the border's 0, so it is caught where it is held. Where all
 eight texels MacCormack's limiter reads are non-finite it has no bounds, and the predictor stands for the guard
@@ -501,7 +503,10 @@ field advection, semi-Lagrangian or MacCormack, is one part they share (`FieldAd
 The particles draw into their own image, laid over the volume
 (`CompositeOver`, Porter–Duff over); the buoyancy weighs the density. Where a sprite would cover
 the frame its birth radius stops at twice `radius`, and the reference mass is a texel of fully dyed water, so
-how much dye there is sets how many drops there are, not how big a drop is.
+how much dye there is sets how many drops there are, not how big a drop is. A particle's value is its mass
+× the output's pixels per emitted texel, so a texel's particles sum to the grid's density there in
+expectation, whatever the look. Everything stays on the GPU: the CPU dispatches and draws a fixed count and
+reads no particle back.
 
 Measured in a hidden window, the output at 2160 × 3840, the grid 448 × 800 × 64, the step with the
 carrier's draw; with the ring full, and on stillslowfast through the harness at the preset (`rate` 2
