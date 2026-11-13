@@ -1,13 +1,4 @@
-"""HD Trio settings — 3-camera interactive installation with fluid rendering.
-
-PRESET MAINTENANCE
-------------------
-Preset JSON files live in ``apps/hd_trio/data/settings/``.
-Each JSON mirrors this settings tree exactly.  When you rename, add,
-or remove a Field here, update every ``.json`` file in that directory
-to match — delete stale keys, add new keys with their Field default.
-The root class is ``Settings``.
-"""
+"""HD Trio's settings tree, its root ``Settings``; its presets in ``apps/hd_trio/data/settings/``."""
 
 from enum import IntEnum, auto
 from typing import Any

@@ -97,11 +97,8 @@ Reported: 5, hd_trio held up to the rules; its findings are 7 to 9. Built: 6, th
 sequencer takes the panel's start, stop, skip and playlist changes as requests carried out at the next tick, its
 callbacks under their own lock and logged with their traceback, and the intro player plays on the tick's time;
 both, and `main`, unbind on stop what they bind; 8, the render's constructor writes no settings (its `data.b`
-values are the presets').
+values are the presets'); 9, `HD_TRIO.md` holds the app's reasons, its render's names say what they hold.
 
-9. **Its document and names.** `HD_TRIO.md` holds the app's reasons, now in its comments and the settings'
-   docstring, which say what each thing is; the render's names say what they hold (`lut`, `cmt`, `seq`); its
-   imports in order. Checked by: hd_trio's tests and the guard tests.
 10. **The inline paths go.** Once every app starts its threads, `CameraSync`, `CaptureSync`, `RecordingSync`,
    `TrackerFrameSource` and `PosePipeline` lose the path that matches a part on the caller's thread while their own
    does not run, and a submit before `start` is an error. Checked by: the apps' tests and the inference, tracker,

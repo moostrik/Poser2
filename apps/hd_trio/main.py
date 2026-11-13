@@ -44,12 +44,8 @@ class HDTrioMain:
         self.settings.camera.sim_enabled = simulation
         if not interface:
             self.settings.panel.browser = False  # launcher override; the preset cannot turn it back on
-        # Never resume armed: a preset saved mid-take would otherwise record the
-        # first show after startup.
-        self.settings.render.intro_sequence.arm_record = False
-        # The pose model's crop is cut at its input size: one antialiased resample from the camera frame, rather than
-        # a larger crop the runner scales down again. The segmentation's is cut beside it at its own size.
-        pose_crop = self.settings.pose.pose_crop
+        self.settings.render.intro_sequence.arm_record = False     # never armed at start (HD_TRIO.md, The intro figure)
+        pose_crop = self.settings.pose.pose_crop                   # cut at the pose model's input size (HD_TRIO.md, Input)
         pose_crop.output_width = self.settings.pose.pose.width
         pose_crop.output_height = self.settings.pose.pose.height
         self.settings.initialize()
@@ -75,8 +71,7 @@ class HDTrioMain:
         self.video_recorder = VideoRecorder(self.settings.session.video, frame_poses, data_path=DATA_PATH)
         self.pose_recorder = PoseRecorder(self.settings.session.pose, data_path=DATA_PATH)
 
-        # Authoring recorder for the white example figure. Deliberately not part of
-        # the session share group — its start/stop must not reach the sequencer.
+        # The intro figure's recorder, outside the session's shared start and stop (HD_TRIO.md, The intro figure)
         self.intro_recorder = PoseRecorder(self.settings.render.intro_sequence.recorder, data_path=DATA_PATH)
         self._prev_in_record_window: bool = False
         self.sequencer.add_state_callback(self._on_show_state)
@@ -273,8 +268,7 @@ class HDTrioMain:
         self.frame_source.stop()
         self.pipeline.stop()
         self.video_recorder.stop()
-        # The pose recorders have no stop() — an in-flight chunk is only written
-        # when the stop button fires, so flush it explicitly.
+        # a pose recorder writes its chunk on its stop button only
         if self.settings.render.intro_sequence.recorder.recording:
             PoseRecorderSettings.stop.fire(self.settings.render.intro_sequence.recorder)
 
@@ -312,12 +306,7 @@ class HDTrioMain:
         self.intro_recorder.submit_frames(stage, {track_id: frame} if frame is not None else {})
 
     def _on_show_state(self, state: SequencerState) -> None:
-        """Start and stop the intro recording on the configured stage window.
-
-        The window is a value range because ShowStage declaration order is show
-        order — so leaving it also covers the show being stopped or skipped
-        mid-recording, which a 'did we just leave stage X' rule would miss.
-        """
+        """Start and stop the intro recording on its stage window, `record_start` to `record_end` in show order."""
         intro = self.settings.render.intro_sequence
         stage = ShowStage(state.stage)
         in_window: bool = intro.record_start <= stage <= intro.record_end

@@ -15,10 +15,9 @@ from modules.render import ColorSettings, layers as ls, shaders, make_subdivisio
 from modules.utils import Rect, Point2f, Color
 
 from .render_board import RenderBoard
-from .settings import Layers, RenderSettings, ShowStage, Stage, IntroSequenceSettings
+from .settings import Layers, RenderSettings, ShowStage
 from .render_stages import STAGES, StageLayer
 from .intro_sequence import IntroSequencePlayer, SequenceDataProxy, FixedColorProxy
-from pathlib import Path
 
 
 UPDATE_LAYERS: list[Layers] = [
@@ -55,6 +54,7 @@ LARGE_LAYERS: list[Layers] = [
     Layers.composite,
 ]
 
+INTRO_STAGES: tuple[ShowStage, ...] = (ShowStage.WHITE_POSE, ShowStage.FLUID, ShowStage.PRACTICE, ShowStage.ENJOY_IN)    # the white example figure plays
 FADE_TIME_STILL: float = 18.0   # s: the density's fade while the player stands still
 FADE_TIME_RANGE: float = 14.0   # s: how much faster it fades at full motion
 BORDER: tuple[float, float, float, float] = (0.4, 0.4, 0.4, 1.0)    # the border around each panel in the main window, so a black layer shows
@@ -85,7 +85,7 @@ class HDTrioRender(RenderBase):
         self._intro_color_proxy = FixedColorProxy(settings.intro_sequence)
         self._intro_geometries: dict[int, ls.CenterGeometry] = {}
 
-        cmt: dict[int, Texture] = {}
+        center_masks: dict[int, Texture] = {}
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.board)
             cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.board)
@@ -98,22 +98,22 @@ class HDTrioRender(RenderBase):
 
             center_geometry = self.L[Layers.center_geometry][i] = ls.CenterGeometry( i, self.board,      cam_image.texture,          settings.center.geometry)
             center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask,               ls.SourceSpace.CROP, settings.center.mask)
-            cmt[i] = center_mask.texture
-            center_cam =    self.L[Layers.center_cam][i] =  ls.CenterCamLayer(      i, center_geometry, cam_image,          cmt[i], settings.center.cam)
-            center_foreground = self.L[Layers.center_foreground][i] = ls.CenterForegroundLayer(i, center_geometry, cam_foreground, cmt[i], ls.SourceSpace.CROP, False, settings.center.foreground, settings.colors)
+            center_masks[i] = center_mask.texture
+            center_cam =    self.L[Layers.center_cam][i] =  ls.CenterCamLayer(      i, center_geometry, cam_image,          center_masks[i], settings.center.cam)
+            center_foreground = self.L[Layers.center_foreground][i] = ls.CenterForegroundLayer(i, center_geometry, cam_foreground, center_masks[i], ls.SourceSpace.CROP, False, settings.center.foreground, settings.colors)
             center_pose =   self.L[Layers.center_pose][i] = ls.CenterPoseLayer(     i, center_geometry,                             settings.center.pose,       settings.colors)
 
             intro_geometry = self._intro_geometries[i] =     ls.CenterGeometry(      i, cast(HasFrames, self._intro_proxy), cam_image.texture, settings.center.geometry)
             self.L[Layers.intro_pose][i] =                   ls.CenterPoseLayer(     i, intro_geometry,                             settings.intro_sequence.pose, cast(ColorSettings, self._intro_color_proxy))
 
-            ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,      center_foreground.texture, cmt, settings.center.color,  settings.colors)
+            ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,      center_foreground.texture, center_masks, settings.center.color,  settings.colors)
             self.L[Layers.motion][i] =                      ls.Motion2DLayer(       settings.motion)
             self.L[Layers.bridge][i] =                      ls.Bridge2DLayer(       settings.bridge)
             fluid =         self.L[Layers.fluid][i] =       ls.Fluid2DLayer(        settings.fluid)
             self.L[Layers.monitor_a][i] =                   ls.MonitorLayer(        settings.monitor_a)
             self.L[Layers.monitor_b][i] =                   ls.MonitorLayer(        settings.monitor_b)
 
-            lut =           self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid, ms_mask],           settings.layer.composite)
+            self.L[Layers.composite][i] =                   ls.CompositeLayer(                          [fluid, ms_mask],           settings.layer.composite)
 
             self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.board, settings.data.a, settings.colors)
             self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.board, settings.data.a, settings.colors)
@@ -233,9 +233,9 @@ class HDTrioRender(RenderBase):
         self._preview_layers = self.settings.layer.select.preview
 
         # Stage transitions — enter/exit before layer updates so settings writes take effect
-        seq = self.board.get_sequencer_state()
-        stage = ShowStage(seq.stage)
-        progress = seq.stage_progress
+        sequencer_state = self.board.get_sequencer_state()
+        stage = ShowStage(sequencer_state.stage)
+        progress = sequencer_state.stage_progress
         prev_stage = self._prev_stage
         if stage != prev_stage:
             for s in self._active_stages:
@@ -258,9 +258,8 @@ class HDTrioRender(RenderBase):
                     layer.update()
 
         # Intro sequence overlay — tick player while the white example is on screen
-        _INTRO_STAGES = (ShowStage.WHITE_POSE, ShowStage.FLUID, ShowStage.PRACTICE, ShowStage.ENJOY_IN)
-        if stage in _INTRO_STAGES:
-            if prev_stage not in _INTRO_STAGES:  # first frame of intro sequence
+        if stage in INTRO_STAGES:
+            if prev_stage not in INTRO_STAGES:  # first frame of intro sequence
                 self._intro_player.start(self._last_tick)
             frames = self._intro_player.update(self._last_tick)
             self._intro_proxy.set_frames(frames)
