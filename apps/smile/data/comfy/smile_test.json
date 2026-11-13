@@ -5,7 +5,7 @@
     },
     "class_type": "LoadImage",
     "_meta": {
-      "title": "Input (the app's capture, or a photo cropped with modules.face.crop)"
+      "title": "Input (the app's capture, or a photo cropped with scripts/crop_faces.py)"
     }
   },
   "1003": {
@@ -34,44 +34,44 @@
   },
   "1024": {
     "inputs": {
-      "seed": 2659950773,
+      "seed": 2288764721,
       "frames": 250,
       "ease": "sine_in_out",
       "crop_factor": 1.7,
       "midpoint": 0.75,
       "midpoint_deviation": 0.18,
       "smile": 2.0,
-      "aaa": -16.759101478106974,
-      "eee": 5.283261834187146,
-      "eyebrow": 23.21381892401527,
-      "blink": -29.19349512087298,
+      "aaa": 7.8781415495913265,
+      "eee": 5.781722696022689,
+      "eyebrow": 29.12101711257138,
+      "blink": -27.48276482708121,
       "wink": 0.0,
-      "woo": -4.951752392729281,
+      "woo": 2.0681626617022513,
       "pupil_x": 0.0,
       "pupil_y": 0.0,
-      "rotate_pitch_min": -9.904068313487464,
-      "rotate_pitch_max": -9.904068313487464,
-      "rotate_yaw_min": 9.54403576824414,
-      "rotate_yaw_max": 9.54403576824414,
-      "rotate_roll_min": -9.324633437870252,
-      "rotate_roll_max": -9.324633437870252,
+      "rotate_pitch_min": -12.383563291146817,
+      "rotate_pitch_max": -12.383563291146817,
+      "rotate_yaw_min": -8.584919366111258,
+      "rotate_yaw_max": -8.584919366111258,
+      "rotate_roll_min": 6.551051194798511,
+      "rotate_roll_max": 6.551051194798511,
       "image": [
         "1002:36",
         0
       ],
       "stitching": false,
-      "smile_peak": 0.7408343452485837,
-      "aaa_peak": 0.9035564581857416,
-      "eee_peak": 0.6680751616863781,
-      "woo_peak": 0.5731073293799465,
-      "eyebrow_peak": 0.6743359974629217,
-      "blink_peak": 0.8599103569274599,
-      "wink_peak": 0.6372729009879157,
-      "pupil_x_peak": 0.9104779146229486,
-      "pupil_y_peak": 0.896871484580575,
-      "rotate_pitch_peak": 0.5996264447230291,
-      "rotate_yaw_peak": 0.8496878614593094,
-      "rotate_roll_peak": 0.8652343044398749,
+      "smile_peak": 0.6264360801609541,
+      "aaa_peak": 0.8042624200293509,
+      "eee_peak": 0.7104157430249479,
+      "woo_peak": 0.5890666034686449,
+      "eyebrow_peak": 0.8911312831510774,
+      "blink_peak": 0.9265761630806835,
+      "wink_peak": 0.7534318321046634,
+      "pupil_x_peak": 0.6716565295815332,
+      "pupil_y_peak": 0.8985744105814297,
+      "rotate_pitch_peak": 0.7206528627633892,
+      "rotate_yaw_peak": 0.6683403400005348,
+      "rotate_roll_peak": 0.5826361107697909,
       "still": false
     },
     "class_type": "GrinFrames",
@@ -100,7 +100,7 @@
       "custom_prompt": "Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips, happy ",
       "max_tokens": 64,
       "keep_model_loaded": true,
-      "seed": 2659950773,
+      "seed": 2288764721,
       "image": [
         "1006",
         0
@@ -111,7 +111,8 @@
       "top_p": 0.9,
       "num_beams": 1,
       "repetition_penalty": 1.0,
-      "frame_count": 16
+      "frame_count": 16,
+      "video_frame_size": "auto"
     },
     "class_type": "AILab_QwenVL_Advanced",
     "_meta": {
@@ -418,7 +419,7 @@
   },
   "1002:35": {
     "inputs": {
-      "seed": 2659950773,
+      "seed": 2288764721,
       "steps": 4,
       "cfg": 1.2,
       "sampler_name": "lcm",

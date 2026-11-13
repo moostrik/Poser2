@@ -265,7 +265,7 @@ of a pack installs clean. What each patch is and what replaces it:
    the face crop of `smile_test.json` in the ComfyUI page (the subgraph with `LivePortraitCropper`,
    `LivePortraitLoadFaceAlignmentCropper`, `DownloadAndLoadLivePortraitModels` and kjnodes' `ImageResizeKJv2`;
    `Workflow` strips it for SMILE, `testflow` puts it back behind the "use face crop" switch). It goes:
-   - a command `python -m modules.face.crop <photo> [-o out.png]` crops a photo as SMILE does (`FaceFinder` +
+   - a command `python apps/smile/scripts/crop_faces.py <photo> [-o folder]` crops a photo as SMILE does (`FaceFinder` +
      `portrait_crop`, the eyes levelled, the workflow's portrait size) so any photo can be tested in the page;
    - `testflow` loses the crop branch: the switch becomes a second `LoadImage` (the cropped photo) or goes
      altogether (a `LoadImage` is a file picker already);

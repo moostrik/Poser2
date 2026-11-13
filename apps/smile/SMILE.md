@@ -56,23 +56,27 @@ drop more easily, and the log warns at open. The size is only negotiated at open
 
 ## Face
 
-`modules/face` (Poser2's, promoted from SMILE): `FaceFinder` (own thread) detects every face of a camera frame (SCRFD,
-`data/models/scrfd_10g_bnkps.onnx`) and judges it in `quality.py`: detector confidence, size (the
+The faces come from `modules/inference/face`: each camera frame is uploaded by a `SerialUploader`, and the
+`FaceDetector` (own thread) finds every face of the uploaded image on the GPU (SCRFD, `scrfd_10g_bnkps`, and the
+106 landmarks, `2d106det`, on TensorRT with the engines in `data/models/` built by `scripts/makemodels.bat smile`,
+or ONNX Runtime), and hands on a `FaceFrame`: the faces with their head pose and eye openness, and the uploaded image
+with the camera frame it came from. `face/` is smile's own: `FaceFinder` (own thread) judges each `FaceFrame`'s
+faces in `quality.py`: detector confidence, size (the
 distance between the eyes, a minimum), the portrait crop's box at least `crop_margin` crop widths inside the image edge
 (`crop_edge`: the one check for too close and too near an edge; negative lets it reach past),
-pose from the 5 keypoints (the pitch's zero is `pitch_zero`, set on site with the "Set pitch zero"
-button: it depends on the camera height), eye openness from the 106 landmarks (`FaceLandmarks`,
-`data/models/2d106det.onnx`, only run for faces that passed the other checks); the first failing check
+pose from the 5 keypoints (the pitch's zero is the detector's `pitch_zero`, set on site with the "Set pitch zero"
+button: it depends on the camera height), eye openness from the 106 landmarks (only for faces that passed the
+other checks); the first failing check
 is the face's `Rejection`, and `distance()` says how far the face is from qualifying (0 good, a floor
 just past a limit, 1 when its worst check is `falloff` times the limit past it). Gaze is not checked: the "looking at viewer" LoRA corrects it. The subject of a frame is its largest qualifying face.
 The flash is earned: the `Sequencer` keeps a **charge** that rises while the newest detector frame
 has a qualifying subject (`sequence.charge` seconds to fill) and drains while it has none
-(`sequence.drain` seconds, slower); a detector frame is as old as its camera frame (`FaceFrame.timestamp`),
+(`sequence.drain` seconds, slower); a detector frame is as old as its camera frame (`FaceObservations.timestamp`),
 and one older than half a second counts as nobody. CAMERA_SHOW is an empty charge, CAMERA_DETECT a partial one
 (its progress is the charge, also for OSC and Art-Net), and a full one starts the flash. A manual
 start charges without a face; one that gets blocked before it is full is dropped, it does not wait. The capture is the last frame in which the subject qualified (the
-last frame at all when none did), cropped by
-`portrait_crop` (eyes levelled, at the workflow's portrait size). Every frame's faces go to the render
+last frame at all when none did), its own camera frame cropped by
+`portrait_crop` (`face/portrait.py`: eyes levelled, at the workflow's portrait size). Every frame's faces go to the render
 (`Inputs.faces`): `CameraLayer` draws the camera in black and white (`face_color.frag`). Every face's
 box (the portrait crop's, upright: `FaceObservation.crop`) shows the face's distance from good
 (`render.face_effect`: dark, pixels, blur or fog, at `render.face_amount`), so a visitor sees
@@ -133,7 +137,7 @@ not ready until a warm-up gets its events again; a warm-up that fails is retried
 ready. Keep no ComfyUI tab open on the installation, or exclude `127.0.0.1:8188` from Edge's sleeping tabs.
 For tests in the ComfyUI page, `python -m apps.smile.comfy.testflow` writes `data/comfy/smile_test.json`
 (drag it into the page): what the app sends with a preset's values, plus an input switch (the
-app's last capture; any other photo is cropped first with `python -m modules.face.crop`), previews and a video
+app's last capture; any other photo is cropped first with `python apps/smile/scripts/crop_faces.py`), previews and a video
 recorder from ComfyUI's own video nodes. Regenerate
 it after changing the workflow or the presets instead of editing a copy by hand.
 Our own ComfyUI nodes live in `data/comfy/aiia_grin/` (`ComfyUI/custom_nodes/aiia_grin` is a junction to it: restart ComfyUI after a change).

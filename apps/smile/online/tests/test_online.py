@@ -8,7 +8,9 @@ from unittest import mock
 
 import numpy as np
 
-from modules.face import FaceFrame, FaceObservation, HeadPose, Rejection
+from modules.inference.face import HeadPose
+
+from ...face import FaceObservation, FaceObservations, Rejection
 from apps.smile.online.online import ASK_TIMEOUT, INSIDE, LOOKING, SAVE_TIMEOUT, Online, Phase, face_message
 from apps.smile.online.settings import OnlineSettings
 from apps.smile.render.sequencer import SequenceMessage, SequenceType
@@ -226,7 +228,7 @@ class TestOnline(unittest.TestCase):
     def test_the_judging_goes_to_the_phone_with_the_charge(self):
         self.start_turn()
         self.step(seq=SequenceType.CAMERA_DETECT, progress=0.4)
-        frame = FaceFrame((observation(0.2, Rejection.TURNED), observation(0.0, None, subject=False)), self.now)
+        frame = FaceObservations((observation(0.2, Rejection.TURNED), observation(0.0, None, subject=False)), self.now)
         self.online.on_face(frame)
         face = self.link.last('face')
         self.assertEqual(face['charge'], 0.4)
@@ -509,7 +511,7 @@ class TestOnline(unittest.TestCase):
         self.assertEqual(self.link.uploads, [])
 
     def test_face_message_shape(self):
-        frame = FaceFrame((observation(0.5),), 1.0)
+        frame = FaceObservations((observation(0.5),), 1.0)
         message = face_message(frame, 1.0)
         self.assertEqual(message['faces'][0]['distance'], 0.5)
         self.assertTrue(message['faces'][0]['subject'])

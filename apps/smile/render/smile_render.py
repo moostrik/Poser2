@@ -7,7 +7,7 @@ from OpenGL.GL import GL_RGBA32F, glViewport
 from .grin_player import GrinPlayer
 from .screen_grab import ScreenGrab
 from ..comfy.messages import GeneratorMessage, GeneratorState
-from modules.face import FaceFrame
+from ..face import FaceObservations
 from .. import sphere
 from modules.gl import Blit, Fbo, MonitorId, RenderBase, Shader, Style, Texture, clear_color, fit
 from ..player import WallRender, WallsSettings
@@ -229,7 +229,7 @@ class SmileRender(RenderBase):
         """The step the generator's warm-up has reached: the camera is in pixels, smaller per step; None is ready."""
         self.layers.camera.warmup = step
 
-    def set_faces(self, frame: FaceFrame) -> None:
+    def set_faces(self, frame: FaceObservations) -> None:
         self.inputs.faces.set(frame)
 
     def set_online_cell(self, wall: int, cell: int, mode: str, page: str) -> None:

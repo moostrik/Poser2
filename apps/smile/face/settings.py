@@ -1,7 +1,9 @@
 from modules.settings import BaseSettings, Field, Widget
 
 
-class FaceSettings(BaseSettings):
+class FaceFinderSettings(BaseSettings):
+    """smile's choice of a subject among the detector's faces: the gates' limits, the pitch zero's calibration and the
+    portrait's framing."""
     confidence:    Field[float] = Field(0.7, min=0.5, max=1.0, step=0.01, newline=True, description="Minimum detector score")
 
     eye_min:       Field[float] = Field(0.05, min=0.0, max=0.3, step=0.01, newline=True, label="Min eye dist", description="Minimum distance between the eyes (fraction of the image width)")
@@ -14,8 +16,7 @@ class FaceSettings(BaseSettings):
 
     falloff:       Field[float] = Field(1.0, min=0.1, max=3.0, step=0.1, newline=True, label="Far at", description="Distance past a limit that counts as fully far (fraction of the limit)")
 
-    pitch_zero:   Field[float] = Field(0.48, min=0.3, max=0.7, step=0.01, newline=True, description="Nose position between eyes (0) and mouth (1) that reads as pitch 0")
-    calibrate:     Field[bool]  = Field(False, widget=Widget.button, label="Set pitch zero", description="Take the pitch zero from the current face: look straight at the camera")
+    calibrate:     Field[bool]  = Field(False, widget=Widget.button, newline=True, label="Set pitch zero", description="Take the detector's pitch zero from the current face: look straight at the camera")
 
     zoom:          Field[float] = Field(1.2, min=1.0, max=5.0, step=0.01, newline=True, label="Portrait zoom", description="Portrait width, relative to the face height")
     offset:        Field[float] = Field(0.0, min=-0.3, max=0.3, step=0.01, label="Portrait offset", description="Portrait vertical offset, relative to the face height")

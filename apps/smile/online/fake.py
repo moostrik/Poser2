@@ -23,8 +23,6 @@ from .link import Link, encode, read_token
 
 logger = logging.getLogger('fake-smile')
 
-MODEL: str = 'data/models/scrfd_10g_bnkps.onnx'
-
 CHARGE_SECONDS: float = 3.0
 WINDOW: float = 15.0
 STREAM_FPS: float = 10.0
@@ -35,8 +33,8 @@ class FakeSmile:
         self.link: Link = Link(link_url, token, self.on_message, self.on_frame, name='fake-smile')
         self.detector = None
         try:
-            from modules.face import FaceDetector
-            self.detector = FaceDetector(MODEL)
+            from modules.inference.face import FaceDetector, FaceDetectorSettings
+            self.detector = FaceDetector(FaceDetectorSettings())       # on ONNX Runtime, the models in data/models
         except Exception as e:
             logger.warning('no face detector (%s): the middle of every frame counts as a face', e)
         self.mutex: Lock = Lock()
@@ -69,6 +67,17 @@ class FakeSmile:
                     self.turn = False
                     self.link.submit({'type': 'turn_end', 'reason': 'lost'})
 
+    def uploaded(self, image: np.ndarray):
+        """The phone's frame on the GPU, as the face detector takes it."""
+        import torch
+        from modules.camera import CameraFrame, FrameType
+        from modules.inference import GpuImage, ImageUpload
+        if not hasattr(self, '_upload'):
+            self._upload, self._stream = ImageUpload(), torch.cuda.Stream()
+        frame = CameraFrame(0, FrameType.VIDEO, image, time.perf_counter())
+        images, ready = self._upload.upload([frame], self._stream)
+        return GpuImage(0, frame.timestamp, images[0], ready, frame)
+
     def on_frame(self, jpeg: bytes) -> None:
         with self.mutex:
             if not self.turn or self.busy:
@@ -80,7 +89,7 @@ class FakeSmile:
         h, w = image.shape[:2]
         found: list[tuple[float, float, float, float]]     # x, y, width, height of each face
         if self.detector is not None:
-            found = [(float(f.bbox[0]), float(f.bbox[1]), f.width, f.height) for f in self.detector.detect(image)]
+            found = [(float(f.bbox[0]), float(f.bbox[1]), f.width, f.height) for f in self.detector.detect(self.uploaded(image)).faces]
         else:
             found = [(w * 0.35, h * 0.3, w * 0.3, h * 0.3)]
         faces: list[dict] = []

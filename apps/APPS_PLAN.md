@@ -5,7 +5,7 @@ the input works is in [INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md); the 
 [RECORDING_PLAN.md](../modules/recording/RECORDING_PLAN.md#2-the-recorder-in-the-other-apps). **(deduction)** marks what is inferred.
 
 
-In this order: C white_space comes back on deep_flow's input; D smile is checked; E the face detection is looked at;
+In this order: C white_space comes back on deep_flow's input;
 F every module is held up to the rules; G hd_trio comes back after the 2D fluid ([the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2d-flow-follows-the-3d)). The rules they keep:
 a callback only hands the item over and returns, the part that works on it does all its work on its own thread, a
 queue that can't keep up drops its oldest and counts it, the camera's thread runs only the camera, and every drop is
@@ -64,23 +64,6 @@ on `monotonic` (simulated with the motor's own code, 2026-11-13), so the smoothi
 Done when white_space starts on this branch, its camera threads only hand over (under 1 ms per frame at p95), every
 sync runs the pose step, the pose latency and the light's tick are no worse than on `main`, live and back to back,
 with you at the rig, and its tests pass.
-
-## D. smile checked
-
-smile imports `modules.camera`, `gl`, `face`, `video`, `inout`, `settings`, `panel` and `utils`, not `inference`
-or `board` (its document, `SMILE.md`). The check, reported, nothing changed:
-
-1. Whether it runs on this branch, without its camera: the image input (`use_image`, an image from `data/input/`,
-   switched to when no camera frames come), a short start of the app.
-2. The app (`apps/smile`, not the modules it uses) held up to the rules, as white_space was: which of its threads
-   do a receiver's work in a callback (its camera's frame callback into the render and the face finder), its
-   clocks, imports, names and logging; and what moving it onto the rules would take.
-
-## E. The face detection
-
-`modules/face` finds faces outside `modules/inference`, which holds the other models (detection, pose,
-segmentation, optical flow). Why it sits there, and whether it belongs in `inference`: looked at, reported, a
-proposal if it should move.
 
 ## F. The modules held up to the rules
 

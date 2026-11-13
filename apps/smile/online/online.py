@@ -31,7 +31,7 @@ import cv2
 import numpy as np
 
 from ..cam import Camera
-from modules.face import FaceFinder, FaceFrame, rejection_label
+from ..face import FaceFinder, FaceObservations, rejection_label
 from .link import Link, http_base, read_token
 from .settings import OnlineSettings
 from ..render import CAMERA_STATES, ScreenGrab, SequenceMessage, Sequencer, SequenceType
@@ -86,7 +86,7 @@ class Delivery:
     started: bool = False
 
 
-def face_message(frame: FaceFrame, charge: float) -> dict:
+def face_message(frame: FaceObservations, charge: float) -> dict:
     return {'type': 'face', 'charge': round(charge, 3), 'faces': [
         {'box': [round(v, 4) for v in f.crop], 'distance': f.distance, 'subject': f.subject,
          'reject': rejection_label(f) if f.rejection is not None else None} for f in frame.faces]}
@@ -195,7 +195,7 @@ class Online:
         if image is not None:
             self.camera.submit_online_frame(image)
 
-    def on_face(self, frame: FaceFrame) -> None:
+    def on_face(self, frame: FaceObservations) -> None:
         """Every detector frame (Main.face_callback): the judging goes to the phone during its turn."""
         if self._phase == Phase.JUDGING and self._link is not None:
             self._link.submit(face_message(frame, self._charge))

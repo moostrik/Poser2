@@ -19,6 +19,11 @@
     "saturation": 1.0,
     "hue": 0.0,
     "gamma": 1.0,
+    "face_detector": {
+      "model_type": "TRT",
+      "engine_path": "apps/smile/data/models",
+      "pitch_zero": 0.48
+    },
     "face": {
       "confidence": 0.5,
       "eye_min": 0.1,
@@ -28,7 +33,6 @@
       "max_pitch": 25.0,
       "max_roll": 30.0,
       "falloff": 1.0,
-      "pitch_zero": 0.48,
       "zoom": 1.2,
       "offset": 0.0
     },

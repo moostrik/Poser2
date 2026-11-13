@@ -5,7 +5,7 @@ turns to color, and its mark when the face has left."""
 
 from dataclasses import dataclass
 
-from modules.face import FaceFrame, FaceObservation, rejection_label
+from ...face import FaceObservation, FaceObservations, rejection_label
 
 Color = tuple[float, float, float, float]
 
@@ -56,7 +56,7 @@ def fit_box(box: Box, pad: Pad = NO_PAD) -> Box:
     return (x0, y0, max(min(box[2], 1.0 - pad[0]), x0), max(min(box[3], 1.0 - pad[1]), y0))
 
 
-def face_fields(frame: FaceFrame, pad: Pad = NO_PAD) -> list[tuple[float, float, float, float, float]]:
+def face_fields(frame: FaceObservations, pad: Pad = NO_PAD) -> list[tuple[float, float, float, float, float]]:
     """Per face its box (`pad` inside the image) and distance from good (x, y, w, h, far): the fields the camera shows."""
     fields: list[tuple[float, float, float, float, float]] = []
     for face in frame.faces:
@@ -65,7 +65,7 @@ def face_fields(frame: FaceFrame, pad: Pad = NO_PAD) -> list[tuple[float, float,
     return fields
 
 
-def build_marks(frame: FaceFrame, subject_color: Color = SUBJECT_COLOR, charge: float = 0.0, pad: Pad = NO_PAD) -> list[Mark]:
+def build_marks(frame: FaceObservations, subject_color: Color = SUBJECT_COLOR, charge: float = 0.0, pad: Pad = NO_PAD) -> list[Mark]:
     """A mark per face (its box `pad` inside the image): rejected first, under everyone; the subject
     last, drawn over all. A rejected face is labelled with the failed check, its value and the limit;
     the panel has the readout. The subject's outline goes from grey to its color with the charge, its
@@ -99,7 +99,7 @@ class SubjectMark:
         self._box: tuple[Box, tuple[tuple[float, float], ...]] | None = None
         self._far: float = 1.0
 
-    def update(self, frame: FaceFrame | None, now: float, charge: float, active_color: Color = SUBJECT_COLOR, pad: Pad = NO_PAD) -> Mark | None:
+    def update(self, frame: FaceObservations | None, now: float, charge: float, active_color: Color = SUBJECT_COLOR, pad: Pad = NO_PAD) -> Mark | None:
         """The mark for this frame, its box `pad` inside the image."""
         subject: FaceObservation | None = None
         if frame is not None and now - frame.timestamp <= FACES_STALE:

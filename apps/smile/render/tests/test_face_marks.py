@@ -2,7 +2,9 @@
 
 import unittest
 
-from modules.face import FaceFrame, FaceObservation, HeadPose, Rejection
+from modules.inference.face import HeadPose
+
+from ...face import FaceObservation, FaceObservations, Rejection
 from apps.smile.render.layers.face_marks import ACCEPTED_COLOR, FACES_STALE, REJECTED_COLOR, SUBJECT_COLOR, SUBJECT_LINE_PX, LINE_PX, SubjectMark, build_marks, face_fields, fit_box, mix
 
 
@@ -15,7 +17,7 @@ def observation(rejection: Rejection | None = None, subject: bool = False, eyes:
 
 class TestSubjectMark(unittest.TestCase):
     def test_a_qualifying_subject_is_a_mark_without_label_and_with_grey_dots(self):
-        mark = SubjectMark().update(FaceFrame((observation(), observation(subject=True)), 10.0), 10.0, 1.0)
+        mark = SubjectMark().update(FaceObservations((observation(), observation(subject=True)), 10.0), 10.0, 1.0)
         self.assertEqual(mark.color, SUBJECT_COLOR)
         self.assertEqual(mark.dots, REJECTED_COLOR)
         self.assertEqual(mark.label, '')
@@ -24,8 +26,8 @@ class TestSubjectMark(unittest.TestCase):
     def test_the_outline_goes_from_grey_to_the_active_color_with_the_charge(self):
         subject = SubjectMark()
         blue = (0.0, 0.0, 1.0, 1.0)
-        good = FaceFrame((observation(subject=True),), 10.0)
-        away = FaceFrame((observation(Rejection.TURNED, subject=True),), 10.1)
+        good = FaceObservations((observation(subject=True),), 10.0)
+        away = FaceObservations((observation(Rejection.TURNED, subject=True),), 10.1)
         self.assertEqual(subject.update(good, 10.0, 0.0, blue).color, REJECTED_COLOR)
         self.assertEqual(subject.update(good, 10.0, 1.0, blue).color, blue)
         half = subject.update(good, 10.0, 0.5, blue)
@@ -35,7 +37,7 @@ class TestSubjectMark(unittest.TestCase):
         # the same while the charge drains
         self.assertEqual(subject.update(away, 10.1, 0.5, blue).color, half.color)
         # the subject among all faces is marked the same
-        both = FaceFrame((observation(subject=True), observation()), 0.0)
+        both = FaceObservations((observation(subject=True), observation()), 0.0)
         self.assertEqual([m.color for m in build_marks(both, blue, 1.0)], [ACCEPTED_COLOR, blue])
         self.assertEqual([m.color for m in build_marks(both, blue, 0.5)], [ACCEPTED_COLOR, half.color])
         self.assertEqual([m.dots for m in build_marks(both, blue, 0.5)], [None, REJECTED_COLOR])
@@ -43,13 +45,13 @@ class TestSubjectMark(unittest.TestCase):
     def test_nothing_without_a_charge_or_a_qualifying_subject(self):
         subject = SubjectMark()
         self.assertIsNone(subject.update(None, 10.0, 0.0))
-        self.assertIsNone(subject.update(FaceFrame((), 10.0), 10.0, 0.0))
-        self.assertIsNone(subject.update(FaceFrame((observation(Rejection.TURNED, subject=True),), 10.1), 10.1, 0.0))
+        self.assertIsNone(subject.update(FaceObservations((), 10.0), 10.0, 0.0))
+        self.assertIsNone(subject.update(FaceObservations((observation(Rejection.TURNED, subject=True),), 10.1), 10.1, 0.0))
 
     def test_on_the_face_while_the_charge_drains(self):
         subject = SubjectMark()
-        good = FaceFrame((observation(subject=True),), 10.0)
-        away = FaceFrame((observation(Rejection.TURNED, subject=True, bbox=(0.3, 0.2, 0.7, 0.7)),), 10.1)
+        good = FaceObservations((observation(subject=True),), 10.0)
+        away = FaceObservations((observation(Rejection.TURNED, subject=True, bbox=(0.3, 0.2, 0.7, 0.7)),), 10.1)
         subject.update(good, 10.0, 0.4)
         mark = subject.update(away, 10.1, 0.35)
         self.assertEqual(mark.color, mix(REJECTED_COLOR, SUBJECT_COLOR, 0.35))
@@ -58,9 +60,9 @@ class TestSubjectMark(unittest.TestCase):
 
     def test_where_the_face_was_when_it_left(self):
         subject = SubjectMark()
-        good = FaceFrame((observation(subject=True),), 10.0)
+        good = FaceObservations((observation(subject=True),), 10.0)
         subject.update(good, 10.0, 0.4)
-        mark = subject.update(FaceFrame((), 10.1), 10.1, 0.3)
+        mark = subject.update(FaceObservations((), 10.1), 10.1, 0.3)
         self.assertEqual(mark.color, mix(REJECTED_COLOR, SUBJECT_COLOR, 0.3))
         self.assertAlmostEqual(mark.x, 0.1)
         stale = subject.update(good, 10.0 + FACES_STALE + 0.1, 0.2)     # the detector stopped: its frame is old
@@ -68,14 +70,14 @@ class TestSubjectMark(unittest.TestCase):
 
     def test_a_stale_detector_frame_gives_no_mark(self):
         subject = SubjectMark()
-        good = FaceFrame((observation(subject=True),), 10.0)
+        good = FaceObservations((observation(subject=True),), 10.0)
         self.assertIsNone(subject.update(good, 20.0, 0.0))
 
 
 class TestLabels(unittest.TestCase):
     @staticmethod
     def label(face: FaceObservation) -> str:
-        return build_marks(FaceFrame((face,), 0.0))[0].label
+        return build_marks(FaceObservations((face,), 0.0))[0].label
 
     def test_a_qualifying_face_has_no_label(self):
         self.assertEqual(self.label(observation()), '')
@@ -90,14 +92,14 @@ class TestLabels(unittest.TestCase):
 
 class TestBuildMarks(unittest.TestCase):
     def test_colors_and_lines(self):
-        frame = FaceFrame((observation(subject=True), observation(), observation(Rejection.EYES)), 0.0)
+        frame = FaceObservations((observation(subject=True), observation(), observation(Rejection.EYES)), 0.0)
         marks = {m.color: m for m in build_marks(frame, charge=1.0)}
         self.assertEqual(marks[SUBJECT_COLOR].line, SUBJECT_LINE_PX)
         self.assertEqual(marks[ACCEPTED_COLOR].line, LINE_PX)
         self.assertEqual(marks[REJECTED_COLOR].line, LINE_PX)
 
     def test_a_rejected_subject_is_thick_labelled_and_follows_the_charge(self):
-        frame = FaceFrame((observation(Rejection.TURNED, subject=True, limit=20.0),), 0.0)
+        frame = FaceObservations((observation(Rejection.TURNED, subject=True, limit=20.0),), 0.0)
         mark = build_marks(frame)[0]
         self.assertEqual(mark.color, REJECTED_COLOR)
         self.assertEqual(mark.line, SUBJECT_LINE_PX)
@@ -105,13 +107,13 @@ class TestBuildMarks(unittest.TestCase):
         self.assertEqual(build_marks(frame, charge=0.5)[0].color, mix(REJECTED_COLOR, SUBJECT_COLOR, 0.5))
 
     def test_rejected_first_subject_last(self):
-        frame = FaceFrame((observation(subject=True), observation(Rejection.SMALL), observation()), 0.0)
+        frame = FaceObservations((observation(subject=True), observation(Rejection.SMALL), observation()), 0.0)
         colors = [m.color for m in build_marks(frame, charge=1.0)]
         self.assertEqual(colors, [REJECTED_COLOR, ACCEPTED_COLOR, SUBJECT_COLOR])
 
     def test_a_field_per_face(self):
-        self.assertEqual(face_fields(FaceFrame((), 0.0)), [])
-        frame = FaceFrame((observation(subject=True, bbox=(0.1, 0.2, 0.5, 0.7)),
+        self.assertEqual(face_fields(FaceObservations((), 0.0)), [])
+        frame = FaceObservations((observation(subject=True, bbox=(0.1, 0.2, 0.5, 0.7)),
                            observation(Rejection.SMALL, bbox=(0.5, 0.0, 0.75, 0.25), distance=0.6)), 0.0)
         fields = face_fields(frame)
         self.assertEqual(len(fields), 2)
@@ -121,15 +123,15 @@ class TestBuildMarks(unittest.TestCase):
 
     def test_the_subject_mark_carries_its_distance(self):
         subject = SubjectMark()
-        away = FaceFrame((observation(Rejection.TURNED, subject=True, distance=0.4),), 10.0)
-        self.assertEqual(subject.update(FaceFrame((observation(subject=True),), 10.0), 10.0, 0.5).far, 0.0)
+        away = FaceObservations((observation(Rejection.TURNED, subject=True, distance=0.4),), 10.0)
+        self.assertEqual(subject.update(FaceObservations((observation(subject=True),), 10.0), 10.0, 0.5).far, 0.0)
         mark = subject.update(away, 10.0, 0.5)
         self.assertEqual((mark.far, mark.subject), (0.4, True))
-        self.assertEqual(subject.update(FaceFrame((), 10.1), 10.1, 0.4).far, 1.0)     # the face left: as far as can be
+        self.assertEqual(subject.update(FaceObservations((), 10.1), 10.1, 0.4).far, 1.0)     # the face left: as far as can be
         self.assertEqual(build_marks(away)[0].far, 0.4)
 
     def test_box_from_bbox(self):
-        mark = build_marks(FaceFrame((observation(bbox=(0.1, 0.2, 0.5, 0.7)),), 0.0))[0]
+        mark = build_marks(FaceObservations((observation(bbox=(0.1, 0.2, 0.5, 0.7)),), 0.0))[0]
         self.assertAlmostEqual(mark.x, 0.1)
         self.assertAlmostEqual(mark.y, 0.2)
         self.assertAlmostEqual(mark.w, 0.4)
@@ -155,7 +157,7 @@ class TestFitBox(unittest.TestCase):
 
     def test_every_drawn_box_is_fitted(self):
         face = observation(subject=True, bbox=(-0.1, 0.2, 0.5, 1.1))
-        frame = FaceFrame((face,), 10.0)
+        frame = FaceObservations((face,), 10.0)
         mark = build_marks(frame, pad=self.PAD)[0]
         subject = SubjectMark().update(frame, 10.0, 0.5, pad=self.PAD)
         for x, y, w, h in ((mark.x, mark.y, mark.w, mark.h), face_fields(frame, self.PAD)[0][:4],

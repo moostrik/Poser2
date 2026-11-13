@@ -2,7 +2,7 @@ from threading import Lock
 
 import numpy as np
 
-from modules.face import FaceFrame
+from ..face import FaceObservations
 from modules.gl import Image
 
 
@@ -11,13 +11,13 @@ class Faces:
 
     def __init__(self) -> None:
         self._mutex: Lock = Lock()
-        self._frame: FaceFrame | None = None
+        self._frame: FaceObservations | None = None
 
-    def set(self, frame: FaceFrame) -> None:
+    def set(self, frame: FaceObservations) -> None:
         with self._mutex:
             self._frame = frame
 
-    def get(self) -> FaceFrame | None:
+    def get(self) -> FaceObservations | None:
         with self._mutex:
             return self._frame
 

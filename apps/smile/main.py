@@ -2,8 +2,10 @@
 and the grins of the visitors before play on the two walls of the sphere (README.md, SMILE.md)."""
 
 from .cam import Camera
-from modules.camera import vimba, webcam
-from modules.face import FaceFinder, FaceFrame
+from modules.camera import CameraFrame, FrameType, vimba, webcam
+from modules.inference import SerialUploader
+from modules.inference.face import FaceDetector
+from .face import FaceFinder, FaceObservations
 from .render.smile_render import SmileRender
 from .render import CAMERA_STATES, AnimationType, AnimationTypeNames, GrinPlayer, RenderSettings, Sequencer, SequenceMessage, SequenceType
 from .comfy.generator import Generator
@@ -92,7 +94,11 @@ class SmileMain():
         self.generator: Generator = Generator(self.settings.generator, self.grin_player)
         # the face crop is the image ComfyUI generates from, so it has the workflow's portrait size
         portrait_width, portrait_height = self.generator.workflow.portrait_size
-        self.face: FaceFinder = FaceFinder(self.settings.camera.face, portrait_width, portrait_height)
+        # the faces as the other apps find them: the frames to judge uploaded, the faces found on the GPU, and smile's
+        # choice of a subject among them (the camera states hand over frames, sequence_callback)
+        self.uploader: SerialUploader = SerialUploader(self.settings.camera.uploader)
+        self.face_detector: FaceDetector = FaceDetector(self.settings.camera.face_detector)
+        self.face: FaceFinder = FaceFinder(self.settings.camera.face, self.settings.camera.face_detector, portrait_width, portrait_height)
 
         # the camera device; the panel can switch to an image from input/ at any time
         if cam_type == CamType.VIMBA:
@@ -115,7 +121,7 @@ class SmileMain():
         self._grin_saved: bool = False      # the visitor's grin was saved to its last frame
         self._saving: bool = False          # the visitor's files are open in the saver
         self._style_picked: bool = False    # the style of the next visitor is picked: until the flash
-        self._face_frame_time: float = 0.0  # arrival of the camera frame the face finder got last
+        self._face_frame_time: float = 0.0  # arrival of the camera frame last handed over to be judged
         self._visitor_start: float | None = None    # the capture of the visitor the generator is working on
         self._flash_time: float = 0.0       # when the flash started: the music starts then (Max, the phone, the clip's sound)
         self.lights: Lights = Lights(self.settings.artnet, f'{DATA_PATH}/artnet.json')
@@ -138,7 +144,11 @@ class SmileMain():
 
         self.face.add_frame_callback(self.face_callback)
         self.face.add_frame_callback(self.render.set_faces)
+        self.face_detector.add_face_callback(self.face.submit)
+        self.uploader.add_gpu_image_callback(self.face_detector.submit)
         self.face.start()
+        self.face_detector.start()
+        self.uploader.start()
 
         self.osc.start()
         self.lights.start()
@@ -167,6 +177,7 @@ class SmileMain():
                  self.online.stop, self.lights.stop, self.osc.stop,
                  self.camera.stop,
                  self.generator.clear_message_callbacks, self.generator.stop,
+                 self.uploader.stop, self.face_detector.stop,
                  self.face.clear_frame_callbacks, self.face.stop,
                  self.save.stop,
                  self.panel_server.stop)
@@ -255,7 +266,7 @@ class SmileMain():
         if seq >= SequenceType.CAMERA_SHOW and seq <= SequenceType.CAMERA_DETECT and cam_time > self._face_frame_time:
             # new frames only, with the time they arrived: a camera that stopped then stops charging
             self._face_frame_time = cam_time
-            self.face.set_image(cam_image, cam_time)
+            self.uploader.submit_frame(CameraFrame(0, FrameType.VIDEO, cam_image, cam_time))
 
         if seq == SequenceType.CAPTURE:
             # the last frame of the recording in which the face qualified; the full camera frame without one
@@ -339,7 +350,7 @@ class SmileMain():
             style_id: str = self.generator.next_style()
             self.music_map.set_style(style_id)
 
-    def face_callback(self, frame: FaceFrame) -> None:
+    def face_callback(self, frame: FaceObservations) -> None:
         # the sequencer charges toward the flash while the face qualifies
         self.sequencer.set_face(frame.qualified, frame.timestamp)
         if frame.qualified:

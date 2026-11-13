@@ -1,7 +1,7 @@
 import math
 import time
 
-from modules.face import FaceFrame
+from ...face import FaceObservations
 from modules.gl import Fbo, Image, Style, SwapFbo, Text, Texture, shaders
 from ..inputs import Faces
 from ..settings import FaceEffect, FaceFill, RenderSettings
@@ -98,7 +98,7 @@ class CameraLayer(LayerBase):
             return
         r, g, b, a = self.settings.face_color
         now: float = time.perf_counter()
-        frame: FaceFrame | None = self._faces.get()
+        frame: FaceObservations | None = self._faces.get()
         if frame is not None and now - frame.timestamp > FACES_STALE:
             frame = None
         # not ready: the image in pixels that halve per step, and no face (nobody can start)

@@ -1,10 +1,13 @@
 """SMILE's camera settings: the Vimba camera's (`VimbaCameraSettings`, also read by the webcam for
 its flips) with the app's sources around it, the image from `input/` and the device readout, and the
-face settings."""
+faces' settings: the upload, the detector and smile's face finder."""
 
 from modules.camera.vimba import VimbaCameraSettings
-from modules.face import FaceSettings
+from modules.inference import SerialUploaderSettings
+from modules.inference.face import FaceDetectorSettings
 from modules.settings import Field, Group, Widget
+
+from ..face import FaceFinderSettings
 
 
 class CameraSettings(VimbaCameraSettings):
@@ -18,4 +21,6 @@ class CameraSettings(VimbaCameraSettings):
 
     device:        Field[str]       = Field("none", access=Field.READ, newline=True, description="Camera device in use")
 
-    face:        Group[FaceSettings] = Group(FaceSettings)     # SMILE's own face detection and crop, the image ComfyUI starts from
+    uploader:      Group[SerialUploaderSettings] = Group(SerialUploaderSettings)    # the frames to judge onto the GPU
+    face_detector: Group[FaceDetectorSettings] = Group(FaceDetectorSettings)        # the faces and what they measure
+    face:          Group[FaceFinderSettings] = Group(FaceFinderSettings)            # SMILE's choice of a subject and its crop, the image ComfyUI starts from
