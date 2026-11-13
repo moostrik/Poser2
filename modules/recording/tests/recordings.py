@@ -10,7 +10,7 @@ import numpy as np
 
 from modules import video
 from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, FrameReadings, FrameType, TrackingStatus
-from modules.recording import FrameMetadata, FramePoses, Player, PlayerSettings, Recorder, RecorderSettings
+from modules.recording import Container, FrameMetadata, FramePoses, Player, PlayerSettings, Recorder, RecorderSettings
 from modules.recording.recorder.recorder import RecState
 from modules.utils import Rect
 
@@ -71,11 +71,13 @@ def cam_tracklets(cam_id: int, timestamp: float) -> CameraTracklets:
     return CameraTracklets(cam_id, timestamp, [tracklet], arrival=timestamp + 0.033)
 
 
-def record(root: Path, types: list[FrameType], num_cams: int, feed: Callable[[Recorder], None], name: str = '') -> Path:
+def record(root: Path, types: list[FrameType], num_cams: int, feed: Callable[[Recorder], None], name: str = '',
+           container: Container = Container.MKV) -> Path:
     """A recording in `root`'s recordings, of what `feed` hands the recorder; its folder."""
     settings = RecorderSettings()
     settings.num_cams = num_cams
     settings.video_frame_types = types
+    settings.container = container
     settings.video_encoder = video.CoderType.iGPU
     settings.temp_path = str(root / 'temp')
     settings.output_path = 'recordings'

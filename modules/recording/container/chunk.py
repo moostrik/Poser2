@@ -1,6 +1,7 @@
-"""One recorded chunk as one file: color, depth when recorded, and what the camera reported, in a `.mkv`.
+"""One recorded chunk: color, depth when recorded, and what the camera reported, as one `.mkv` or as the color
+`.mp4` with the metadata `.jsonl` beside it (`Container`).
 
-The streams are recorded apart, in the temp folder, and merged by stream copy when the chunk ends,
+The streams are recorded apart, in the temp folder, and for a `.mkv` merged by stream copy when the chunk ends,
 which re-encodes nothing and takes moments. The fixed info of the chunk goes into the file's tags,
 where any tool can read it; the per-frame lines go in as an attachment. Stream 0 is color, 1 depth.
 
@@ -16,6 +17,7 @@ import subprocess
 import tempfile
 import time
 from dataclasses import asdict, dataclass
+from enum import Enum
 from pathlib import Path
 from collections.abc import Sequence
 from typing import TypeAlias, overload
@@ -36,6 +38,13 @@ FRAME_TYPE_LABELS: dict[FrameType, str] = {     # a stream's file while the chun
 }
 METADATA_LABEL: str = 'M'
 DEPTH_SUFFIX: str = '.mkv'
+
+
+class Container(Enum):
+    """The file a chunk ends as: one `.mkv` of its streams with the metadata attached, or its color stream as an
+    `.mp4` any player plays, with the metadata beside it and no depth."""
+    MKV = '.mkv'
+    MP4 = '.mp4'
 
 
 def make_file_name(cam_id: int, frame_type: FrameType, chunk: int, suffix: str) -> str:
@@ -231,8 +240,30 @@ def merge_chunk(video: Path, depth: Path | None, metadata: Path, output: Path) -
     return done
 
 
+def keep_chunk(video: Path, metadata: Path, output_folder: Path) -> bool:
+    """`video` and `metadata` moved as they are into `output_folder`: an `.mp4` chunk; False when a move failed."""
+    try:
+        shutil.move(video, output_folder / video.name)
+        shutil.move(metadata, output_folder / metadata.name)
+    except OSError as e:
+        logger.error('Chunk %s not kept: %s', video.name, e)
+        return False
+    return True
+
+
+def metadata_beside(clip: Path) -> Path:
+    """The metadata file beside an `.mp4` chunk's color clip: `0_M_001.jsonl` beside `0_C_001.mp4`."""
+    cam, _, chunk = clip.stem.split('_')
+    return clip.with_name(f'{cam}_{METADATA_LABEL}_{chunk}{METADATA_SUFFIX}')
+
+
 def read_metadata(path: Path, cam_id: int = 0) -> ChunkMetadata:
-    """The metadata attached to a chunk's `.mkv`; empty when it has none."""
+    """The metadata of a chunk: attached to its `.mkv`, or beside its `.mp4` clip; empty when it has none."""
+    if path.suffix != Container.MKV.value:
+        beside: Path = metadata_beside(path)
+        if not beside.is_file():
+            return ChunkMetadata(None, [])
+        return parse_metadata(beside.read_text(encoding='utf-8'), cam_id)
     with tempfile.TemporaryDirectory() as folder:
         dump: Path = Path(folder) / 'metadata.jsonl'
         _run(['-y', '-dump_attachment:t:0', str(dump), '-i', str(path), '-t', '0', '-f', 'null', '-'])
@@ -241,9 +272,9 @@ def read_metadata(path: Path, cam_id: int = 0) -> ChunkMetadata:
         return parse_metadata(dump.read_text(encoding='utf-8'), cam_id)
 
 
-def finish_unmerged(temp_path: Path, output_path: Path) -> None:
-    """Merge what a crash left in the temp folder: a chunk with its color, its depth when it has one,
-    and its metadata. A stream cut off mid-write has no playable file, so its merge fails and its
+def finish_unmerged(temp_path: Path, output_path: Path, container: Container = Container.MKV) -> None:
+    """Finish what a crash left in the temp folder as `container`: a chunk with its color, its depth when it has
+    one, and its metadata. A stream cut off mid-write has no playable file, so its merge fails and its
     parts stay."""
     if not temp_path.is_dir():
         return
@@ -257,6 +288,9 @@ def finish_unmerged(temp_path: Path, output_path: Path) -> None:
                 target: Path = output_path / folder.name
                 target.mkdir(parents=True, exist_ok=True)
                 logger.info('Finishing chunk %s_%s of %s', cam, chunk, folder.name)
-                merge_chunk(video, depth, metadata, target / f'{cam}_{chunk}.mkv')
+                if container == Container.MP4:
+                    keep_chunk(video, metadata, target)
+                else:
+                    merge_chunk(video, depth, metadata, target / f'{cam}_{chunk}.mkv')
         if not any(folder.iterdir()):
             shutil.rmtree(folder, ignore_errors=True)

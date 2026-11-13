@@ -1,7 +1,8 @@
 """Records every camera's frames to chunked clips: one ffmpeg stream per camera and frame kind,
 files named `<cam>_<kind>_<chunk>` in a folder named after the start time, written to a temp folder
-and merged into one `<cam>_<chunk>.mkv` per camera when a chunk ends (`chunk.merge_chunk`), with the
-metadata attached: the chunk's info line and one line per frame.
+and, when a chunk ends, merged into one `<cam>_<chunk>.mkv` per camera with the metadata attached
+(`chunk.merge_chunk`), or with `Container.MP4` kept as `<cam>_C_<chunk>.mp4` beside `<cam>_M_<chunk>.jsonl`:
+the chunk's info line and one line per frame.
 
 The parts of one capture are brought together by a `RecordingSync`: the color frame, its depth when
 DEPTH is in `video_frame_types` and the camera sends it, the camera's tracklets and the host's poses,
@@ -27,8 +28,8 @@ from modules.camera import CameraFrame, CameraTracklets, FrameType
 from modules.settings import BaseSettings, Field, Widget
 from modules.video import CoderType, CoderFormat, DEPTH_ENCODER, encoder_name, StreamWriter
 
-from ..container import DEPTH_SUFFIX, METADATA_LABEL, METADATA_SUFFIX, ChunkInfo, FrameMetadata, finish_unmerged, frame_line, info_line, \
-    make_chunk_name, make_file_name, make_folder_name, merge_chunk
+from ..container import DEPTH_SUFFIX, METADATA_LABEL, METADATA_SUFFIX, ChunkInfo, Container, FrameMetadata, finish_unmerged, \
+    frame_line, info_line, keep_chunk, make_chunk_name, make_file_name, make_folder_name, merge_chunk
 from .recording_sync import FramePoses, RecordedCapture, RecordingSync
 
 import logging
@@ -43,7 +44,8 @@ class RecorderSettings(BaseSettings):
     keyframe_interval:  Field[int]              = Field(0, access=Field.INIT, description="Keyframe interval in frames (0 = encoder default, 1 = every frame)")
     temp_path:          Field[str]              = Field("temp", access=Field.INIT, description="Temporary files directory")
     video_encoder:      Field[CoderType]        = Field(CoderType.iGPU, access=Field.INIT, description="Video encoder type")
-    video_format:       Field[CoderFormat]      = Field(CoderFormat.H264, access=Field.INIT, description="Video format")
+    video_format:       Field[CoderFormat]      = Field(CoderFormat.H264, access=Field.INIT, description="Video codec")
+    container:          Field[Container]        = Field(Container.MKV, access=Field.INIT, description="Chunk file: mkv with depth and metadata, or mp4 with the metadata beside")
     video_quality:      Field[int]              = Field(0, min=0, max=51, access=Field.INIT, description="Video constant quality, lower is better (0 = encoder default)")
     video_frame_types:  Field[list[FrameType]]  = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record", visible=False)
 
@@ -88,7 +90,12 @@ class Recorder(Thread):
 
         self.settings: RecorderSettings = settings
 
-        self.with_depth: bool = FrameType.DEPTH in settings.video_frame_types
+        self.container: Container = settings.container
+        self.types: list[FrameType] = list(settings.video_frame_types)      # the streams written
+        if self.container == Container.MP4 and FrameType.DEPTH in self.types:
+            logger.warning("An mp4 chunk holds no depth: recording color only")
+            self.types.remove(FrameType.DEPTH)
+        self.with_depth: bool = FrameType.DEPTH in self.types
         self.recorders: dict[int, dict[FrameType, StreamWriter]] = {}
         self.frames: dict[int, Queue[RecordedCapture]] = {}
         self._held_lock: Lock = Lock()
@@ -105,14 +112,15 @@ class Recorder(Thread):
         for c in range(settings.num_cams):
             self.recorders[c] = {}
             self.frames[c] = Queue()
-            for t in self.settings.video_frame_types:
+            for t in self.types:
                 vcodec: str = DEPTH_ENCODER if t == FrameType.DEPTH else encoder_name(settings.video_format, settings.video_encoder)
                 self.recorders[c][t] = StreamWriter(vcodec, settings.keyframe_interval, settings.video_quality)
 
-        if FrameType.DEPTH in settings.video_frame_types and settings.keyframe_interval <= 0:
+        if self.with_depth and settings.keyframe_interval <= 0:
             logger.warning("keyframe_interval 0 with depth: each encoder picks its own keyframes, so seeking will show the wrong depth")
 
-        self.suffix: str = settings.video_format.value
+        # The color stream's file: the chunk itself in an mp4, merged into the mkv otherwise.
+        self.suffix: str = Container.MP4.value if self.container == Container.MP4 else settings.video_format.value
         self.split_requested = Event()
         self._split_at: float | None = None             # the capture time the chunks are cut after, while a split goes on
         self._split_request_time: float = float('-inf')
@@ -196,7 +204,8 @@ class Recorder(Thread):
     def _start_recording(self) -> None:
         output_path: Path = Path(self.data_path) / self.settings.output_path
         if self._unmerged is None or not self._unmerged.is_alive():        # what a crash left, beside the recording
-            self._unmerged = Thread(target=finish_unmerged, args=(self.temp_path, output_path), daemon=True, name='RecorderUnmerged')
+            self._unmerged = Thread(target=finish_unmerged, args=(self.temp_path, output_path, self.container), daemon=True,
+                                    name='RecorderUnmerged')
             self._unmerged.start()
 
         self.folder_name = make_folder_name(self.settings.name)
@@ -221,7 +230,7 @@ class Recorder(Thread):
         self.split_requested.clear()
         for c in range(self.settings.num_cams):
             self.chunks[c] = 0
-            for t in self.settings.video_frame_types:
+            for t in self.types:
                 self.recorders[c][t].start(str(self._stream_path(c, t, 0)), self.settings.fps)
             self._open_metadata(c)
 
@@ -237,7 +246,7 @@ class Recorder(Thread):
         self.sync.flush()
         self._write_queued()
         for c in range(self.settings.num_cams):
-            for t in self.settings.video_frame_types:
+            for t in self.types:
                 self.recorders[c][t].stop()
 
         self._close_metadata()
@@ -258,7 +267,7 @@ class Recorder(Thread):
         in the next chunk together."""
         old_chunk: int = self.chunks[cam_id]
         self.chunks[cam_id] = old_chunk + 1
-        for t in self.settings.video_frame_types:
+        for t in self.types:
             self.recorders[cam_id][t].split(str(self._stream_path(cam_id, t, old_chunk + 1)), self.settings.fps)
         self._close_metadata(cam_id)
         self._open_metadata(cam_id)
@@ -278,6 +287,9 @@ class Recorder(Thread):
         if not (video.exists() and metadata.exists()):
             for part in (video, depth, metadata):
                 part.unlink(missing_ok=True)    # a chunk that never got a frame
+            return
+        if self.container == Container.MP4:
+            keep_chunk(video, metadata, self.output_folder_path)
             return
         # A camera that sent no depth has none: its depth writer never got a frame, and opened no file
         merge_chunk(video, depth if depth.exists() else None, metadata, self.output_folder_path / make_chunk_name(cam_id, chunk_index))
@@ -387,7 +399,7 @@ class Recorder(Thread):
     def submit_frame(self, frame: CameraFrame) -> None:
         """A camera's frame callback: while recording, a frame of a kind the recorder writes to its sync,
         which puts each capture on the queue once it is complete."""
-        if frame.kind in self.settings.video_frame_types and self._get_state() == RecState.REC:
+        if frame.kind in self.types and self._get_state() == RecState.REC:
             if frame.kind == FrameType.VIDEO:
                 with self._held_lock:
                     self._newest[frame.cam_id] = max(frame.timestamp, self._newest.get(frame.cam_id, float('-inf')))
