@@ -6,8 +6,9 @@ the input works is in [INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md); the 
 
 
 Three parts, in this order: C white_space comes back on deep_flow's input; D smile is checked; E hd_trio comes back after the 2D fluid ([the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2d-flow-follows-the-3d)). The rules they keep:
-a callback stores or enqueues what it receives and returns, a receiver does its work on its own thread, the camera's
-thread runs only the camera, and every drop is counted on the panel ([INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md)).
+a callback only hands the item over and returns, the part that works on it does all its work on its own thread, a
+queue that can't keep up drops its oldest and counts it, the camera's thread runs only the camera, and every drop is
+counted on the panel ([INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md)).
 
 ## C. white_space back
 
@@ -97,11 +98,12 @@ does not run), and a submit before `start` is an error.
 
 ## Rules it touches
 
-- A callback stores or enqueues what it receives and returns: C's wiring.
-- A receiver does its work on its own thread: white_space starts the `CameraSync`s' threads; a sync stays inline
-  only if its wait says so, as a stated exception.
+- A callback only hands the item over and returns: C's wiring, the journal's raw tracklets.
+- The part that works on the item has its own thread and does all its work there: the `BatchUploader`, the
+  `CameraSync`s, the frame source, the pipeline, each started by white_space.
+- When that part can't keep up, its queue drops the oldest item and counts it: the uploader's sets, the syncs.
+- A part that only needs the latest value reads it at its own tick: the calibration layer's rows, the board's images.
 - The camera's thread runs only the camera: C3, C4.
-- A consumer that needs every item gets a callback; one that needs the latest reads the board: C3, C4.
 - Log exceptions with context, never fail silently: drops counted on the panel, C8.
 - Remove obsolete pathways: the core upload written once, shared by both uploaders, C1; white_space's old wiring.
 - Treat latency as a first-order concern: C's run compares with `main`.
