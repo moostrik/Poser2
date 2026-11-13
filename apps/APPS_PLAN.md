@@ -49,27 +49,24 @@ source's on its own panel). The clip camera (`oak.ClipCamera`) needs no change: 
 as the camera's do, and through the same callbacks without one (`clip_passthrough`). The probe is
 `scripts/white_space_probe.py`.
 
-What is left of C is its runs, below. The OAK-D's capture stamp, as the oak4's `capture_time`, needs an OAK-D to
-test; old show recordings keep playing, new ones are the new layout.
+The -sim runs are done (white_space on `20250514-130512_4_wide_mono` 23–31 s in replay with its detector engine,
+and a recording of it played back; deep_flow on `measure` 9–19 s). Open from them:
 
-hd_trio's `main.py` still uses `CameraSync`'s `add_sync_callback` and follows in E (it stops at start on this branch
-already).
+- The syncs hand on 16.6 sets per second from four cameras at 23 fps, 46 of 101 gaps over 50 ms (measured); the
+  rule that picks the camera completing a set is unchanged by C, and how it skips sets is not yet traced.
+- deep_flow's color upload went from 6.1 to 9.0 ms mean, its latencies 2–4 ms with it, one run each (measured);
+  the cause, the shared `ImageUpload`'s stack per single frame or the snapshot callback inside the timed span, is
+  inferred.
+- The recording over 6.8 s of playhead holds 127 frames per camera, about 1.3 s fewer, none counted missed or
+  dropped (measured); the recorder's start is not yet traced.
+- white_space's preset leaves `person_detector.model_type` at ONNX; its engine is the app's
+  `yolov8n_coco_512x448.trt` (TRT).
 
-If a sync's wait (`Wait camera sync …`) comes out in milliseconds: the switch interval is lowered
-(`sys.setswitchinterval`, 0.5 ms to start), and a sender that keeps running Python after it queues is changed to
-give up the GIL; if that still does not hold the latencies, the sync stays on its sender's thread as a stated
-exception to the rule, chosen by the measurement.
+The OAK-D's capture stamp, as the oak4's `capture_time`, needs an OAK-D to test; old show recordings keep playing,
+new ones are the new layout. hd_trio's `main.py` still uses `CameraSync`'s `add_sync_callback` and follows in E (it
+stops at start on this branch already).
 
-Checked by: `CameraSync`'s tests (a set per sync, a camera's newest frame), the core's (a stack uploaded at once
-gives each image as one by one does), the `SerialUploader`'s (its tests renamed; the set callback carries each color image's snapshot), the `BatchUploader`'s (a set in, its
-images and the set out; the oldest whole set dropped), the
-frame source's (the asked callback per camera; a player judged on its camera's time), the calibration layer's (its
-row reduced on the GPU matches the CPU row of the same frame); the clip camera at the rig only, as it needs an OAK, white_space's pipeline spec; the recorder's wiring
-by a short -sim recording on the same recording, played back;
-a -sim run with the probe on `20250514-130512_4_wide_mono`, an old-layout recording without recorded tracklets, so
-in replay with the host detector (`simulator.replay`, `yolo`), not `ClipCamera`, which needs an OAK: the uploader's
-time per set, the pose latency and the tracker's update rate; deep_flow's probe on `measure` 9–19 s against B's
-numbers, for its uploader's snapshot handed on.
+Checked at the rig: the clip camera, which needs an OAK.
 Done when white_space starts on this branch, its camera threads only hand over (under 1 ms per frame at p95), every
 sync runs the pose step, the pose latency and the light's tick are no worse than on `main`, live and back to back,
 with you at the rig, and its tests pass.
