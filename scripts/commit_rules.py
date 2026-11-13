@@ -20,8 +20,8 @@ ROOT: Path = Path(__file__).resolve().parent.parent
 RULES: Path = ROOT / ".claude" / "rules"
 SHOWN: int = 6      # the files named per rule file; the rest are counted
 COMMIT: re.Pattern[str] = re.compile(r"\bgit\s+(?:-\S+\s+(?:[^-\s]\S*\s+)?)*commit\b")   # git, its options, commit
-REQUEST: str = ("Check this commit against the rules below and report to the user: "
-                "per rule file, what is met and what is not, with the file it is in.")
+REQUEST: str = ("Check this commit against the rules below and report to the user, brief: "
+                "one line per rule that is not met, with its file; one line when all are met.")
 
 
 def git(*args: str) -> str:

@@ -22,13 +22,13 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - A package is one thing, and its name is that thing
 - Its `__init__.py` holds what other packages use
 - Its files each hold one class or one subject, named after it
-- Its document opens with a table of its files: the name, what it is, who uses it
 - Its tests sit in its `tests/` folder
 - Command-line scripts sit in the repo's `scripts/` folder
 
 ## Naming
 
 - Name a concept after what it is in the domain, and use that one term everywhere it appears: file, class, method, setting, panel label, document
+- Similar things share the noun and differ by a qualifier (`Frame`, `CameraFrame`)
 - Use the terms in `.claude/rules/glossary.md`
 - Use no synonyms for one concept across modules; when a term changes, rename it everywhere in the same change
 
@@ -146,12 +146,12 @@ python -m unittest discover -s modules/<pkg>/tests -t .    # camera/oak4 in .ven
 
 ## Plans and commits
 
-- A plan ends with the rules it touches and how it meets each
+- A plan ends with the rules it touches, one line each
 - A plan is built on the user's literal "go"
 - Separate what the code or a measurement shows from what is inferred, and say which is which
 - A plan step that is checked by a run or a test is one commit
 - The rest of a plan is one commit
 - Experiments and half steps are not committed
-- A finished plan is reported with the rules it touched and how it meets each
+- A finished plan is reported with the rules it touched, one line each
 - Push only on the user's word
 - Never delete or rewrite a plan without confirmation; propose the change first
