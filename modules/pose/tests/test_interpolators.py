@@ -217,6 +217,13 @@ class PredictInterpolatorTest(unittest.TestCase):
         self.assertAlmostEqual(node.update(3 * TICK)[Angles][A.head], 0.45, places=6)   # halfway: old 0.15, new 0.75
         self.assertAlmostEqual(node.update(4 * TICK)[Angles][A.head], 1.0, places=6)    # the new fit, 15 rad/s
 
+    def test_a_repeated_frame_keeps_the_fit_of_distinct_frames(self) -> None:
+        node = _predict()
+        _ramp(node)
+        node.set(_angles(t=0.0, head=0.0))                                    # the newest frame again
+        node.update(0.0)
+        self.assertAlmostEqual(node.update(TICK)[Angles][A.head], 0.05, places=6)       # still 3 rad/s
+
     def test_frames_that_stop_hold_at_the_max_horizon(self) -> None:
         node = _predict(max_horizon=0.1)
         _ramp(node)

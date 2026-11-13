@@ -14,7 +14,8 @@ class PredictionMethod(IntEnum):
 class Predict:
     """A motion fit on the last samples of a vector and their stamps, evaluated at any time.
 
-    ``add_sample(values, timestamp)`` keeps the newest ``fit_frames`` samples; ``at(time)`` evaluates the fit
+    ``add_sample(values, timestamp)`` keeps the newest ``fit_frames`` samples, each a distinct stamp (a repeated
+    stamp replaces the newest sample); ``at(time)`` evaluates the fit
     there. LINEAR is the least-squares velocity over the window, through the newest sample; QUADRATIC adds
     the acceleration (three samples or more, else linear); NONE holds the newest sample. The fit is per
     component: a component's window reaches back to its last NaN, a component with one sample holds it, and
@@ -95,9 +96,14 @@ class Predict:
         return self._constrain(values)
 
     def add_sample(self, values: np.ndarray, timestamp: float) -> None:
-        """Add a sample with its stamp and refit."""
+        """Add a sample with its stamp and refit; a sample stamped as the newest replaces it, so the window holds
+        distinct moments."""
         if values.shape[0] != self._vector_size:
             raise ValueError(f"Expected array of size {self._vector_size}, got {values.shape[0]}")
+        if self._stamps.shape[0] > 0 and float(timestamp) == float(self._stamps[-1]):
+            self._samples[-1] = values
+            self._fit()
+            return
         keep = self._fit_frames - 1
         self._samples = np.vstack((self._samples[-keep:] if keep else self._samples[:0], values[np.newaxis, :]))
         self._stamps = np.append(self._stamps[-keep:] if keep else self._stamps[:0], float(timestamp))

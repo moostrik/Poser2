@@ -20,13 +20,6 @@ keypoints. That source is `TrackerFrameSource` (`modules/tracker`); it pushes it
 for, and the crop cuts exactly those (INPUT_THREADS.md). white_space and hd_trio call its `process` without images,
 which `PoseInference` refuses, so they stop at start until C and E wire their syncs to `submit`.
 
-3. **A repeated box is one sample.** On every image between tracker updates the source pushes the same latched box
-   again: the smoother skips the repeat (`array_euro_smooth`, a step of 0), the predictor keeps it as another
-   sample at the same time (`array_predict.add_sample`), so its three-sample fit spans fewer boxes and with three
-   alike predicts no motion. A sample stamped as the newest replaces it instead of adding one. Every user of
-   `Predict` takes the fix: the RAW predictors (`FeaturePredictor`) and the crossing's interpolators in LERP
-   (`PredictBlend.set_target`, behind `BBoxPredictInterpolator`, `PointPredictInterpolator` and the others).
-
 4. **The camera's keypoints come out.** A tracklet from an OAK4 pose chain carries the camera's keypoints, and the
    source puts them on the pose (`Points2D` in the crop's window, `keypoint_window`); then the async step drops
    them: with the host pose model on, its points replace them, and with it off `pose.Predictor.submit` returns
@@ -38,9 +31,7 @@ which `PoseInference` refuses, so they stop at start until C and E wire their sy
    now; white_space has it when its cameras send keypoints (the `oak` backend, depthai 2, sends none).
 
 Checked by: the pose step's (with the host model off a pose with the camera's points comes out with them, one
-without none), `Predict`'s (a repeated stamp keeps the fit of distinct
-samples) and an interpolator's through `PredictBlend` (a repeated target keeps its blend), the recorded poses' tests
-updated; then one run on `measure` 9–19 s against A6's numbers (capture
+without none), the recorded poses' tests updated; then one run on `measure` 9–19 s against A6's numbers (capture
 latency, pose RAW and SMOOTH latency, poses out of RAW). One commit per step.
 
 ## C. white_space back
@@ -124,7 +115,6 @@ does not run), and a submit before `start` is an error.
 - A consumer that needs every item gets a callback; one that needs the latest reads the board: C2, C3.
 - Log exceptions with context, never fail silently: drops counted on the panel, C7.
 - Treat latency as a first-order concern: B's run compares with A6's numbers, C's with `main`.
-- Fix a problem where it is made: the repeated sample in `Predict`, B3.
 - Update all call sites, remove obsolete pathways: white_space's video images go.
 - Plans and commits: one commit per checked step, built on your go.
 
