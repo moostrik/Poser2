@@ -204,7 +204,7 @@ class SerialUploader(Thread):
         self._previous[cam_id] = rgb
         self._timer.add_time((time.perf_counter() - start) * 1000.0, report=False)
 
-        gpu_image: GpuImage = GpuImage(cam_id, frame.timestamp, rgb, ready)
+        gpu_image: GpuImage = GpuImage(cam_id, frame.timestamp, rgb, ready, frame)
         snapshot: ImageSnapshot = ({cam_id: rgb}, {cam_id: previous} if previous is not None else {}, {cam_id: frame.timestamp}, ready)
         with self._callback_lock:
             image_callbacks: list[GpuImageCallback] = list(self._gpu_image_callbacks)

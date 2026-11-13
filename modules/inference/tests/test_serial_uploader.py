@@ -122,11 +122,13 @@ class HandOffTest(unittest.TestCase):
         images: list[GpuImage] = []
         self.uploader.add_gpu_image_callback(images.append)
         self.uploader.start()
-        self.uploader.submit_frame(_color(3.0))
+        frame = _color(3.0)
+        self.uploader.submit_frame(frame)
         self.wait_for(1)
         images[0].ready.synchronize()
         self.assertTrue(images[0].image.is_cuda)
         self.assertEqual(tuple(images[0].image.shape), (3, 48, 64))
+        self.assertIs(images[0].frame, frame)              # the camera frame it was uploaded from
 
     def test_the_depth_handed_on_is_metres_on_the_gpu_with_its_event(self) -> None:
         depths: list[GpuDepth] = []

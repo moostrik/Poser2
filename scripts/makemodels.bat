@@ -8,7 +8,7 @@ set "VENV_DIR=%~dp0..\.venv"
 
 if "%APP%"=="" (
     echo Usage: %~nx0 APP [rebuild]
-    echo   APP      hd_trio, white_space, deep_flow, all
+    echo   APP      hd_trio, white_space, deep_flow, smile, all
     echo   rebuild  build the engines that exist again ^(after a TensorRT upgrade^)
     goto endofscript
 )
@@ -22,9 +22,11 @@ call "%VENV_DIR%\Scripts\activate"
 if /I "%APP%"=="hd_trio"      call :section_hd_trio
 if /I "%APP%"=="white_space"  call :section_white_space
 if /I "%APP%"=="deep_flow"    call :section_deep_flow
+if /I "%APP%"=="smile"        call :section_smile
 if /I "%APP%"=="all"          call :section_hd_trio
 if /I "%APP%"=="all"          call :section_white_space
 if /I "%APP%"=="all"          call :section_deep_flow
+if /I "%APP%"=="all"          call :section_smile
 
 echo.
 echo TensorRT conversion complete
@@ -67,6 +69,13 @@ call :build "python tools\models\export_raft_onnx_to_trt.py --onnx data\models\r
 call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_480x384.onnx --output apps\deep_flow\data\models\yolov8n_coco_480x384.trt --opt-batch 1 --max-batch 1"
 call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_512x416.onnx --output apps\deep_flow\data\models\yolov8n_coco_512x416.trt --opt-batch 1 --max-batch 1"
 call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_640x512.onnx --output apps\deep_flow\data\models\yolov8n_coco_640x512.trt --opt-batch 1 --max-batch 1 --fp16"
+exit /b 0
+
+:section_smile
+echo.
+echo smile
+call :build "python tools\models\export_face_onnx_to_trt.py --onnx data\models\scrfd_10g_bnkps.onnx --output apps\smile\data\models\scrfd_10g_bnkps.trt --size 640"
+call :build "python tools\models\export_face_onnx_to_trt.py --onnx data\models\2d106det.onnx --output apps\smile\data\models\2d106det.trt --size 192 --opt-batch 2 --max-batch 8"
 exit /b 0
 
 :build

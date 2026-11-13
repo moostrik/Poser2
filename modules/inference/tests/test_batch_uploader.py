@@ -49,6 +49,9 @@ class BatchUploaderTest(unittest.TestCase):
         self.assertAlmostEqual(timestamps[2], 1.002)
         self.assertAlmostEqual(float(images[3][0, 0, 0]), 30 / 255, places=3)     # each camera's own image
         self.assertEqual(sorted(image.cam_id for image in self.images), [0, 1, 2, 3])
+        # each image keeps the camera frame it was uploaded from
+        self.assertTrue(all(image.frame is not None and image.frame.cam_id == image.cam_id and image.frame.timestamp == image.timestamp
+                            for image in self.images))
 
     def test_the_previous_set_is_each_cameras_previous_image(self) -> None:
         self.uploader.start()

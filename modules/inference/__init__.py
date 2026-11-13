@@ -1,6 +1,6 @@
 
 from .model_types import ModelType, Resolution, RESOLUTION_DIMS
-from . import crop, detection, optical_flow, pose, segmentation, source
+from . import crop, detection, face, optical_flow, pose, segmentation, source
 from .source import GpuDepth, GpuImage, ImageSnapshot, ImageSnapshotCallback
 from .crop_extractor import CropExtractor
 from .image_upload import ImageUpload

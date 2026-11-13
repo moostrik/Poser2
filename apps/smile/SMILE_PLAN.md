@@ -9,28 +9,10 @@ gates, the subject, the portrait) is smile's; `modules/face` is gone. One step p
 checked by the tests named; after the last, smile runs once on the image input (20 s, a face in every frame, as
 before) and, with ComfyUI started, through one whole visitor (its portrait crop as before).
 
-## 1. The face models in `modules/inference/face`
-
-A `GpuImage` keeps the `CameraFrame` it was uploaded from (`frame`, a reference, set by `ImageUpload`'s users,
-the `SerialUploader` and the `BatchUploader`), so the uploaded image and the CPU frame of one moment travel as one.
-
-`inference/face/`, shaped like `inference/detection`: `FaceDetector`, a thread that takes uploaded images
-(`submit(GpuImage)`, the newest of a camera replacing one still waiting) and hands each image's faces to its
-callbacks (`add_face_callback`) as one `FaceFrame`, as a pose frame carries its images: the image's time, the
-`GpuImage` the faces were found in (its CPU frame with it), carried unread, and per face its box, its five points
-and score, normalised to the image, its 106 landmarks, and what they measure (`head_pose`, `eye_openness`,
-`eye_distance`, from `quality.py`). The
-image is fitted into SCRFD's 640 input and the landmarks' 192 crops on the GPU (`grid_sample`, as the person
-detector stretches its images), the decode (anchors, NMS) as now. Each model runs on TensorRT or ONNX Runtime
-(`ModelType`, a `runner_trt` and a `runner_onnx` as in `detection`; ONNX Runtime set up once,
-`ort_runtime.preload_cuda`); the landmarks run the faces of an image as one batch. The engines are built by
-`tools/models/export_face_onnx_to_trt.py` (SCRFD at batch 1, the landmarks at a batch of faces: `2d106det.onnx`
-runs a batch, `(3, 212)` for 3 faces, but declares its output at batch 1, which the script makes dynamic first), from
-`scripts/makemodels.bat smile`, into `apps/smile/data/models/`. Its settings: the model type, the model and engine
-paths, the detection threshold; smile's preset sets TRT.
-Checked by: its tests: on the test photos of `apps/smile/data/input/`, the boxes, points and landmarks within a
-pixel of today's CPU path, on ONNX and on TRT, and the measures equal; a newer image replacing one waiting; a
-`FaceFrame` carrying its image and that image's `CameraFrame`; the uploaders' `GpuImage` keeping its frame.
+The face models are built in `modules/inference/face` (`FaceDetector`, `FaceFrame`, `Face`, `measures`, ONNX and
+TensorRT runners, `FaceDetectorSettings` with `pitch_zero`; the engines by `scripts/makemodels.bat smile`), and a
+`GpuImage` keeps its `CameraFrame` (`frame`). A `Face` is in the image's pixels, its `FaceFrame` with the image's
+size. `modules/face` is still there, for smile.
 
 ## 2. smile on the face detector
 
@@ -41,7 +23,8 @@ and new frames only, resetting at CAMERA_SHOW, so nothing is detected while the 
 What smile does with the faces moves into the app (`apps/smile/face/`): the gates and the subject (`gate`,
 `distance`, the largest qualifying face, the rejection and its label), `best()` (the portrait crop of the last
 `FaceFrame` the subject qualified in, cut from that frame's own CPU frame: no frames kept by time), the pitch
-calibration, and its settings (the gates' limits, the zoom and offset of the portrait). Its judged faces per frame
+calibration (writing the detector's `pitch_zero`), and its settings (the gates' limits, the zoom and offset of the
+portrait, beside the detector's, which its preset sets to TRT with `engine_path` `apps/smile/data/models`). Its judged faces per frame
 (today's `FaceFrame` of `FaceObservation`s, named in the step after what they are) and their users (the render's
 marks, the camera layer, the online turn, the sequencer's charge) take their names from there. `modules/face/crop.py`, the command-line portrait crop, moves to smile with it.
 `modules/face` goes, its tests with what they test.

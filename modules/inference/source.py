@@ -3,6 +3,8 @@ from typing import Callable, TypeAlias
 
 import torch
 
+from modules.camera import CameraFrame
+
 
 ImageDict: TypeAlias = dict[int, torch.Tensor]
 TimestampDict: TypeAlias = dict[int, float]     # each camera's image's capture time (`CameraFrame.timestamp`)
@@ -17,11 +19,14 @@ ImageSnapshotCallback: TypeAlias = Callable[[ImageSnapshot], None]
 class GpuImage:
     """One camera frame on the GPU as an uploader made it: float16 RGB CHW [0, 1], straightened and
     mirrored, with the frame's capture time. `ready` is recorded on the upload's stream after the
-    image is written: a reader on another stream waits on it (`stream.wait_event(ready)`) first."""
+    image is written: a reader on another stream waits on it (`stream.wait_event(ready)`) first.
+    `frame` is the camera frame it was uploaded from, so the image and the CPU frame of one moment travel as
+    one; None where nobody uploaded one."""
     cam_id: int
     timestamp: float
     image: torch.Tensor
     ready: torch.cuda.Event
+    frame: CameraFrame | None = None
 
 
 GpuImageCallback: TypeAlias = Callable[[GpuImage], None]

@@ -132,7 +132,7 @@ class BatchUploader(Thread):
             image_callbacks: list[GpuImageCallback] = list(self._image_callbacks)
             snapshot_callbacks: list[ImageSnapshotCallback] = list(self._snapshot_callbacks)
         for cam_id, image in images.items():
-            gpu_image: GpuImage = GpuImage(cam_id, timestamps[cam_id], image, ready)
+            gpu_image: GpuImage = GpuImage(cam_id, timestamps[cam_id], image, ready, frames[cam_id])
             for callback in image_callbacks:
                 try:
                     callback(gpu_image)
