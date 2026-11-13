@@ -43,12 +43,10 @@ their times; the tracklets go as they come to the tracker, the board, the journa
 tracklets' sync; the threads start after the wiring, before the cameras.
 
 5. **The recorder.** Wired in white_space: the frames and tracklets from each camera as they come, `expect_parts`
-   per camera, `expect_poses` per camera and set (the frame source's asked callback), the RAW stage's poses. The OAK-D's capture stamp, as the oak4's `capture_time`, needs an OAK-D to test. Old show recordings
+   per camera, `expect_poses` per camera and set (the frame source's asked callback), the RAW stage's poses. The
+   calibration layer reads the uploaded image (`CameraColumns`: its band reduced to one row on the GPU, read back a
+   tick later without waiting); the board's video images are gone. The OAK-D's capture stamp, as the oak4's `capture_time`, needs an OAK-D to test. Old show recordings
    keep playing; new ones are the new layout.
-6. **The calibration layer** (`test_calibration.py`) reads the uploaded image instead of the CPU frame the camera's
-   thread puts on the board: it reduces its band of rows to one row on the GPU, queues the row's copy into pinned
-   memory with an event, and uses on a later tick the newest row whose event has passed, so nothing waits. The
-   board's video images and `_store_video_frame` go with it.
 7. **The clip camera** (`oak.ClipCamera`, a recording played through an OAK) hands over as the camera does;
    checked only at the rig, as it needs an OAK.
 8. **The drops on the panel**, as deep_flow's: the uploader's sets, the sync's, the frame source's, the pipeline's,

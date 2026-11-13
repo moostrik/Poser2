@@ -1,8 +1,8 @@
 """TestCalibration composition — projects live camera slices into the projection, so a camera's
 columns can be checked on the wall against the azimuths the tracker assigns them.
 
-Each camera contributes a horizontal luminance slice (rows slice_top..slice_bottom).
-Columns that pass the brightness threshold are projected as a hard ON marker at
+Each camera contributes a horizontal luminance slice of its uploaded image, reduced to one row on the GPU and read
+back a tick later (`CameraColumns`). Columns that pass the brightness threshold are projected as a hard ON marker at
 ``level``, making it easy to verify that edges align across camera seams.
 
 ``show_overlap`` optionally renders the geometric overlap zones in blue so the
@@ -20,6 +20,7 @@ from modules.settings import Field
 
 from .._base_layer import ProjectionLayer, LayerSettings
 from ...frame import LightFrame
+from .camera_columns import CameraColumns, SampleMethod
 
 if TYPE_CHECKING:
     from ....board import RenderBoard
@@ -28,12 +29,6 @@ if TYPE_CHECKING:
 class DetectMode(IntEnum):
     BRIGHT = auto()
     DARK   = auto()
-
-
-class SampleMethod(IntEnum):
-    MAX = auto()
-    MIN = auto()
-    AVG = auto()
 
 
 class TestCalibrationSettings(LayerSettings):
@@ -63,6 +58,7 @@ class TestCalibration(ProjectionLayer):
         super().__init__(resolution, settings, board)
         self._settings: TestCalibrationSettings = settings
         self._num_cams = num_cams
+        self._columns: CameraColumns = CameraColumns()
 
     # ------------------------------------------------------------------
     # Layer interface
@@ -74,43 +70,22 @@ class TestCalibration(ProjectionLayer):
         nc   = self._num_cams
         res  = self.resolution
 
-        images = {cam_id: self._board.get_video_image(cam_id) for cam_id in range(nc)}
-
         # Geometry constants
         target_fov  = 360.0 / nc
         fov_overlap = (fov - target_fov) / 2.0
 
         thresh = settings.threshold
+        band_top: float = settings.slice_center - settings.slice_height * 0.5
+        band_bottom: float = settings.slice_center + settings.slice_height * 0.5
 
-        for cam_id, img in images.items():
-            if img is None or img.size == 0:
+        for cam_id in range(nc):
+            image = self._board.get_camera_image(cam_id)
+            if image is not None:
+                self._columns.submit(image, band_top, band_bottom, settings.method)
+            col_val: np.ndarray | None = self._columns.newest(cam_id)
+            if col_val is None:
                 continue
-
-            # ----------------------------------------------------------
-            # Extract horizontal luminance slice
-            # ----------------------------------------------------------
-            h, w = img.shape[:2]
-            row_top    = max(0, int((settings.slice_center - settings.slice_height * 0.5) * h))
-            row_bottom = min(h, int((settings.slice_center + settings.slice_height * 0.5) * h))
-            if row_bottom <= row_top:
-                continue
-
-            slice_rows = img[row_top:row_bottom]
-            if slice_rows.ndim == 3:
-                lum = slice_rows.mean(axis=2).astype(np.float32)
-            else:
-                lum = slice_rows.astype(np.float32)
-
-            if lum.max() > 1.0:
-                lum /= 255.0
-
-            # Reduce each column to a single value using the chosen method
-            if settings.method == SampleMethod.MAX:
-                col_val = lum.max(axis=0)
-            elif settings.method == SampleMethod.MIN:
-                col_val = lum.min(axis=0)
-            else:
-                col_val = lum.mean(axis=0)
+            w: int = col_val.shape[0]
 
             if settings.detect == DetectMode.BRIGHT:
                 on_mask = col_val > thresh

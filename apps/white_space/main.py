@@ -6,9 +6,8 @@ from pathlib import Path
 from functools import partial
 
 import glfw
-import numpy as np
 
-from modules.camera import CameraSource, CameraFrame, FrameType, CameraHealth
+from modules.camera import CameraSource, CameraHealth
 from modules.camera.oak import Camera, ClipCamera
 from modules.recording import Player, Recorder as VideoRecorder, replay
 from modules.settings import presets
@@ -186,8 +185,6 @@ class WhiteSpaceMain:
         # Sound levels from Max (one 0..1 float each) → board → the beam_blue_sound layer.
         self.osc_sound_receiver.bind("/WS/idle/blue/left",  self._on_sound_level_left)
         self.osc_sound_receiver.bind("/WS/idle/blue/right", self._on_sound_level_right)
-        for camera in self.cameras:
-            camera.add_frame_callback(self._store_video_frame)
         self.conductor.add_light_frame_callback(self.osc_light_sender.submit_light_frame)
         self.conductor.add_light_frame_callback(self.osc_sound_sender.set_light_frame)
 
@@ -278,11 +275,6 @@ class WhiteSpaceMain:
         arrival: float = time.perf_counter()
         for poses in frame_poses(frames, arrival):
             self.video_recorder.submit_poses(poses)
-
-    def _store_video_frame(self, frame: CameraFrame) -> None:
-        """Camera frame callback — store raw VIDEO frames on the board for the light renderer."""
-        if frame.kind == FrameType.VIDEO:
-            self.board.set_video_image(frame.cam_id, frame.image)
 
     def _column_to_azimuth(self, cam_id: int, x: float) -> float:
         """A camera column's world azimuth in radians, through the tracker's own geometry."""
