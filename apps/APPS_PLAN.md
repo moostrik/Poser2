@@ -5,52 +5,44 @@ the input works is in [INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md); the 
 [RECORDING_PLAN.md](../modules/recording/RECORDING_PLAN.md#2-the-recorder-in-the-other-apps). **(deduction)** marks what is inferred.
 
 
-Four parts, in this order: B poses come from images; C white_space comes back on deep_flow's input; D smile is
+Four parts, in this order: B the frame source and its images; C white_space comes back on deep_flow's input; D smile is
 checked; E hd_trio comes back after the 2D fluid ([the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2d-flow-follows-the-3d)). The rules they keep:
 a callback stores or enqueues what it receives and returns, a receiver does its work on its own thread, the camera's
 thread runs only the camera, and every drop is counted on the panel ([INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md)).
 
-## B. Poses come from images
+## B. The frame source and its images
 
-Poses are made from tracklets today: `PosesFromTracklets` turns the tracker's newest boxes into box-only pose frames
-on each image, the RAW stage smooths and predicts those boxes as pose steps (`BBoxEuroSmoother`, `BBoxPredictor`),
-and only then does the async step crop the image and run the model. So a pose exists before any image is looked at,
-and the image has to be fetched to the crop separately (`set_images`, the payload, the bang and asked callbacks). A
-pose is the model's keypoints on an image: the images make the poses, and the tracklets only say where to crop,
-the newest there is, never waited for.
+The pipeline's one source of poses is the `FrameSource` (`modules/pose/pipeline/spec.py`): on each image it
+pushes a pose per tracked player, from the player's newest tracklet (its box, and the camera's keypoints, azimuth
+and distance where it has them), never waiting for tracklets. A pose may hold only its box, so the RAW stage
+smooths and predicts boxes with the pipeline's own filters before the async step crops the image and adds the
+keypoints. Today that source is called `PosesFromTracklets`, a name for how it is made, and its call carries no
+images: the crop takes the images its caller set before (`set_images`), right only because both run on one thread
+in that order.
 
-1. **The boxes.** `PosesFromTracklets` becomes `TrackletBBoxes` (settings `TrackletBBoxesSettings`, group `bboxes`,
-   in the three apps and their presets): it keeps each player's newest box from the tracker, smooths it on the
-   tracker's updates (One Euro, the RAW stage's `bbox.smoother` moved here), and `at(timestamp)` gives each player
-   seen within `detection_timeout` its `BBox` predicted to that capture time. The fixed `lead` (1/30 s past the
-   box's stamp) goes: the box is predicted to the image's own capture time. What a box carries for the pose comes
-   with it: the camera, the azimuth and zone distance (white_space), and the camera's own keypoints (OAK4 model
-   chain, their window, `crop_aspect` and `crop_padding`, as now).
-2. **The pose step makes the poses.** `PoseInference` receives the cameras' images of a moment
-   (`submit(images: ImageSnapshot)`; deep_flow per uploaded image, white_space per frame sync) and works on its own
-   thread (the A3 queue, two waiting, the oldest dropped and counted, moves here): it asks `TrackletBBoxes` for the
-   boxes at each camera's image time, crops (`CropExtractor` takes boxes, not pose frames), batches the crops to
-   the model, and makes each pose from the model's result: the image's capture time, the crop as its box, the
-   keypoints, and what its box carried. It is the pipeline's `FrameSource`; the RAW stage starts at its poses, and
-   its emit is queued for the pipeline's own thread (the A4 queue moves from the async step to the source's push).
-   It tells the recorder per camera whether it asked poses for the image. `RecordedPoses` is the same step with the
-   recorded poses in place of the model's. The crops still go to the optical flow and the board.
-3. **What goes.** `AsyncStep`, `AsyncNode` and `_AsyncSplit` from the pipeline; `BBoxEuroSmoother` and
-   `BBoxPredictor` from the RAW stages (and their settings from the apps and presets, moved to `TrackletBBoxes`');
-   `set_images`, the bang and asked callbacks; deep_flow's `_on_image` pose call becomes `pose_inference.submit`.
-   white_space and hd_trio raise at start until C and E wire their image syncs to it; their pipeline specs and
-   settings change with the rest.
+1. **The name.** `PosesFromTracklets` becomes `TrackerFrameSource`, the pipeline's frame source fed by the tracker,
+   in `modules/tracker` (`modules/pose` imports nothing of ours, and it needs `Tracklet`): settings
+   `TrackerFrameSourceSettings`, the group `tracklets` becomes `frame_source` in the three apps' settings and their
+   presets (deep_flow `settings.json`, `very nice.json`; hd_trio `studio.json`, `umu.json`; white_space
+   `public.json`, `studio.json`), its test file and every mention in code and documents.
+2. **The images travel with the call.** `TrackerFrameSource.submit(timestamp, cam_id, images)` takes the uploader's
+   `ImageSnapshot` of the moment; its thread makes the poses and emits them with those images through its own
+   callback, the `FrameSource` protocol's (`add_frames_callback(callback(frames, images))`; the trackers' shared
+   mixin stays). The pipeline's `push` hands the images along the stage's chain to the async step,
+   `AsyncNode.submit(frames, images)`; `PoseInference.submit(frames, images)` and `cut_crops` crop exactly those,
+   `RecordedPoses` passes them through, and without images they raise: white_space and hd_trio stop at start until
+   C and E wire their syncs to `submit`. `set_images` and deep_flow's bang callback go; the asked callback stays,
+   with the camera and the time from the call.
+3. **A repeated box is one sample.** On every image between tracker updates the source pushes the same latched box
+   again: the smoother skips the repeat (`array_euro_smooth`, a step of 0), the predictor keeps it as another
+   sample at the same time (`array_predict.add_sample`), so its three-sample fit spans fewer boxes and with three
+   alike predicts no motion. A sample stamped as the newest replaces it instead of adding one; every predictor
+   takes the fix.
 
-Checked by: `TrackletBBoxes`' tests (the prediction to a capture time, the timeout), the pose step's with a fake
-model (a pose stamped with its image's time, cropped at the box predicted to it, none for a stale player), the
-pipeline's without the async step, the recorded poses' tests; then one run on `measure` 9–19 s against A6's numbers
-(pose RAW and SMOOTH latency, poses per capture, capture latency). One commit.
-
-The box filters today see the latched box again on every image between tracker updates: the smoother skips a
-repeat (`array_euro_smooth`, a step of 0), the predictor keeps it as a sample at the same time
-(`array_predict.add_sample`), so its three-sample fit spans fewer boxes and with three alike predicts no motion. On
-the tracker's updates each box comes once. No stage reads the RAW stage's box-only frames: a stage emits at the end
-of its chain, after the async step (`PosePipeline._chain`).
+Checked by: the tracker's tests renamed, the pipeline's (the images reach the async node with their poses), the
+pose step's (the crop uses the images it was given, not the uploader's newest), `Predict`'s (a repeated stamp keeps
+the fit of distinct samples), the recorded poses' tests updated; then one run on `measure` 9–19 s against A6's
+numbers (capture latency, pose RAW and SMOOTH latency, poses out of RAW). One commit per step.
 
 ## C. white_space back
 
@@ -64,8 +56,8 @@ recording thread's recorder for every app and the oak backend's capture time
    `submit_tracklets`) and the recorder only.
 2. The uploader's images go to the -sim detector, the board's `set_camera_image` (the previews) and the frames'
    `CameraSync`, whose sync is one uploaded image per camera, fired on its own thread once every camera's image is
-   on the GPU; its callback is `PoseInference.submit` (B2), with every camera's image of the sync, which it crops
-   at the model's size; the crops go to the board.
+   on the GPU; its callback is `TrackerFrameSource.submit` (B2), with every camera's image of the sync, which the
+   async step crops at the model's size; the crops go to the board.
 3. The uploader's tracklets go to the tracker (`submit_cam_tracklets`), the board, the tracker journal and the
    tracklets' `CameraSync`, each a store or an enqueue (the journal's `submit_cam_tracklets` checked for it); the
    sync's callback is `tracker.update`, which sets the tracker's event.
@@ -108,10 +100,13 @@ now: its crops (the pose model's at its input size, RVM's at 768 × 1024 from th
 RECORDING_PLAN.md), and its pose-following center layers, which stay. Planned when it starts.
 
 Its last step: once every app starts its threads, the inline path goes from `RecordingSync`, `CaptureSync`,
-`PoseInference`, `PosePipeline` and `CameraSync` (a part matched on the thread it comes on while the thread
+`TrackerFrameSource`, `PosePipeline` and `CameraSync` (a part matched on the thread it comes on while the thread
 does not run), and a submit before `start` is an error.
 
 ## Details
+
+- The box predictor's `lead`, a fixed 1/30 s past the tracklet's stamp, against the box predicted to the image's own
+  capture time: open, not part of B.
 
 - One line per stream, average and 1% low: the panel's rates as frame-time analysis gives them (RTSS,
   CapFrameX), one pinned line per stream, Render, Video, Captures and Motion,
@@ -123,8 +118,8 @@ does not run), and a submit before `start` is an error.
 
 ## Rules it touches
 
-- Only sources create poses: the pose step is the RAW stage's source, B2.
-- Name a concept after what it is: `TrackletBBoxes`, B1.
+- Name a concept after what it is: `TrackerFrameSource`, B1.
+- A callback stores or enqueues what it receives and returns, with the data it is for: the images with the call, B2.
 - A callback stores or enqueues what it receives and returns: C's wiring.
 - A receiver does its work on its own thread: white_space starts the `CameraSync`s' threads; a sync stays inline
   only if its wait says so, as a stated exception.
@@ -132,7 +127,8 @@ does not run), and a submit before `start` is an error.
 - A consumer that needs every item gets a callback; one that needs the latest reads the board: C2, C3.
 - Log exceptions with context, never fail silently: drops counted on the panel, C7.
 - Treat latency as a first-order concern: B's run compares with A6's numbers, C's with `main`.
-- Keep presets and settings schemas in sync: `bboxes` and the RAW box settings, B1 and B3.
+- Keep presets and settings schemas in sync: `tracklets` to `frame_source` in six presets, B1.
+- Fix a problem where it is made: the repeated sample in `Predict`, B3.
 - Update all call sites, remove obsolete pathways: white_space's video images go.
 - Plans and commits: one commit per checked step, built on your go.
 
