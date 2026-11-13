@@ -124,7 +124,7 @@ def joint_bilateral_depth(depth: np.ndarray, image: np.ndarray, u: np.ndarray, v
     """Joint bilateral upsampling (Kopf et al. 2007) of the depth (H, W metres, 0 for none, rows down) at uv (rows
     down), guided by `image` (h, w, 3, 0 to 1, rows down, on the depth's view, read bilinearly at uv): the depth
     pixels within `radius` of the point, each weighed by a gaussian of its distance (half a depth pixel, the paper's
-    σd) and of the image's colour distance at it and at the point (`contrast`, σr); a 0 is left out. Mirrors
+    σd) and of the image's color distance at it and at the point (`contrast`, σr); a 0 is left out. Mirrors
     DepthUpscale's BILATERAL."""
     height, width = depth.shape
 

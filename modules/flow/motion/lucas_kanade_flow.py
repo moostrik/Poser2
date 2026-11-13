@@ -11,7 +11,7 @@ pixel, in rows and columns.
 
 Out comes the displacement in uv per frame: `solved`, as solved, and `displacement`, with `threshold`
 (px per frame) taken off its length, as below it is the solve's jitter, not motion. With a depth and
-`same_surface`, only the window's samples within a tolerance of the centre's depth count.
+`same_surface`, only the window's samples within a tolerance of the center's depth count.
 `LucasKanadeFlow3D` composes this solve with the depth velocity into a 3D velocity.
 
 The settings in flow pixels go with the flow's resolution: `levels` (each level doubles the motion it
@@ -122,7 +122,7 @@ class LucasKanadeFlow:
 
     def update(self, depth: Texture | None = None, tolerance: float = 0.0) -> None:
         """Solve the displacement between the newest two frames; with `depth` (metres in red) and
-        `same_surface`, a window counts only the samples within `tolerance` of its centre's depth."""
+        `same_surface`, a window counts only the samples within `tolerance` of its center's depth."""
         if not self._frames.ready:
             self._solve.clear_all()
             self._displacement.clear()
@@ -176,7 +176,7 @@ def _bilinear(image: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
 def _solve_level(p_image: np.ndarray, c_image: np.ndarray, d: np.ndarray, u: np.ndarray, v: np.ndarray, window: int,
                  damping: float, depth: np.ndarray | None = None, tolerance: float = 0.0) -> np.ndarray:
     """One solve on one level: the displacement so far (uv) refined by the window's shift, with `depth`
-    only its samples of the centre's surface. Mirrors the shader."""
+    only its samples of the center's surface. Mirrors the shader."""
     h, w = u.shape
     lh, lw = c_image.shape
     sxx = sxy = syy = sxt = syt = np.zeros((h, w))
@@ -220,7 +220,7 @@ def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, win
     `previous` onto `current`: coarse to fine over `levels` mip levels, one solve per level over a
     (2·window+1)² window, each level solved at its own size from the coarser one's displacement read
     linear, the previous frame warped by it. With `depth` (H, W, m), only the window's samples within
-    `tolerance` of the centre's depth count. Mirrors the shaders."""
+    `tolerance` of the center's depth count. Mirrors the shaders."""
     h, w = current.shape
     previous_levels: list[np.ndarray] = _pyramid(previous.astype(np.float64), levels)
     current_levels: list[np.ndarray] = _pyramid(current.astype(np.float64), levels)

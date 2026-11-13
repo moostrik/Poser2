@@ -27,7 +27,7 @@ class LucasKanadeTile(ComputeShader):
             level: The mip level to solve at
             window: Window radius in texels of that level
             damping: Added to the window's gradient sums, so a flat window solves to no motion
-            depth: Metres (R); when given, only the samples within `tolerance` of the centre's depth count
+            depth: Metres (R); when given, only the samples within `tolerance` of the center's depth count
             tolerance: Same-surface depth difference (m), with depth
         """
         if not self.allocated or not self.shader_program:

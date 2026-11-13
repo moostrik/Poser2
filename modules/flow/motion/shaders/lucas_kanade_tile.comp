@@ -5,7 +5,7 @@
 // Run from the coarsest level to the finest, each into a target of its level's size, so every window sits on
 // the level's texel centers; `estimate` is the coarser level's solve, read linear (uv, so it needs no
 // scaling); the coarsest has none (`has_estimate` off) and starts from no motion. With `same_surface`, a sample
-// counts only where its depth is within `tolerance` of the centre's (so the background does not drag a
+// counts only where its depth is within `tolerance` of the center's (so the background does not drag a
 // silhouette along, at every level), and `damping` scales with the share kept. The numpy reference is
 // lucas_kanade_flow.lucas_kanade.
 // A 16 × 16 tile of the level's texels a workgroup: the current frame's luminance and the depth around the tile

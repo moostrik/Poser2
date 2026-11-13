@@ -59,7 +59,7 @@ float depth_at(vec2 uv) {
     return texelFetch(tex0, texel, 0).r;
 }
 
-// The track's disparity, rate and anchor (xyz) at `position` (texels, centres at integers), of the
+// The track's disparity, rate and anchor (xyz) at `position` (texels, centers at integers), of the
 // texels that hold one of the measurement's surface, within `tolerance` of it, each taken `ahead`
 // seconds on by its rate; their catch-up in `catch_up`. None of them: no track
 vec3 carried(vec2 position, float measured_depth, float ahead, out vec2 catch_up) {

@@ -9,7 +9,7 @@
 //              depth pixel on that side within `reach`, else SURFACE's.
 //   BILATERAL  joint bilateral upsampling (Kopf et al. 2007, eq. 3): the 5 × 5 depth pixels around the point, each
 //              weighed by its distance (a gaussian of half a depth pixel) and by how alike the camera image is at it
-//              and at the view pixel (a gaussian of `contrast`, the colour distance on 0 to 1); a 0 is left out.
+//              and at the view pixel (a gaussian of `contrast`, the color distance on 0 to 1); a 0 is left out.
 
 const int SURFACE = 0;
 const int MASK = 1;
