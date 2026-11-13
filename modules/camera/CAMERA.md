@@ -70,8 +70,9 @@ modules/recording/
 - In the same commit: `replay` and the recording names in the three apps' imports; `FrameMetadata`, `FramePoses`
   and `PoseArrays` in `modules/inference/recorded_poses.py`; the links to RECORDING.md; and OAK4.md's section
   "Recording and replay", cut to what is the OAK4's and a link to RECORDING.md.
-- The guard test's list of camera backends loses `replay`; `CLAUDE.md`'s project-shape and test lines follow, on the
-  user's word.
+- The guard test's list of camera backends loses `replay`. `CLAUDE.md` names no camera file, so it stays as it is.
+- RECORDING.md loses its two file tables (the player's parts, the camera module's layout); the modules' docstrings
+  say what each file is.
 
 ### 2. What is not a camera goes where it belongs
 
@@ -170,4 +171,5 @@ modules/camera/
 - A docstring says what the thing is; reasons sit in the package's document, history in the commit: step 6
 - Import from a package's `__init__.py`, never from its internal files: step 5
 - Keep presets and settings schemas in sync with code changes: steps 1 and 4
-- `modules/camera/` is the camera contract: its backends lose `replay` (project shape, on the user's word)
+- `modules/camera/` is the camera contract: the guard test's backends lose `replay`
+- A plan step that is checked by a run or a test is one commit: each step, checked by the import and guard tests
