@@ -67,9 +67,9 @@ with you at the rig, and its tests pass.
 
 ## F. The modules held up to the rules
 
-Every package in `modules/`, one at a time in alphabetical order (`board`, `camera`, `flow`, `gl`, `inference`,
-`inout`, `oak`, `panel`, `pose`, `recording`, `render`, `session`, `settings`, `tracker`, `utils`, `video`, and
-`log_config.py`), against `CLAUDE.md` and `.claude/rules`: reported per package, a plan
+Every package in `modules/`, one at a time in alphabetical order (`board`, `camera`, `gl`, `inference`, `inout`,
+`oak`, `panel`, `pose`, `recording`, `render`, `session`, `settings`, `tracker`, `utils`, `video`, and
+`log_config.py`; `flow` is held up in [its own plan](../modules/flow/FLOW_PLAN.md), line 1), against `CLAUDE.md` and `.claude/rules`: reported per package, a plan
 for what does not meet them.
 
 ## G. hd_trio back
