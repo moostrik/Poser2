@@ -135,7 +135,7 @@ center layers stay as they are until [line 5](#5-the-2d-flow-follows-the-3d).
    camera's thread puts on the board (`_store_video_frame`, the board's video images, which go): it reduces its
    band of rows to one row on the GPU, queues that row's copy into pinned memory with an event, and uses on a later
    tick the newest row whose event has passed, so nothing waits.
-4. The device simulator (`Simulator`, the recordings played through an OAK) hands over the same way as the camera.
+4. The clip camera (`oak.ClipCamera`, the recordings played through an OAK) hands over the same way as the camera.
 5. Measured live with four cameras and in -sim against `main`: the camera's thread per frame (deep_flow's is
    0.02 ms at the mean), the syncs per second against the cameras' rate, the pose rate per camera, the
    uploader's drops; the light's own tick unchanged.

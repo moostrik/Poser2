@@ -2,7 +2,7 @@ from .source import         CameraSource, CameraFrameCallback, TrackletCallback,
 from .frame import          CAPTURE_TOLERANCE, FrameType, FrameReadings, DepthAlignment, CameraFrame, mirrored_image
 from .tracklet import       TrackingStatus, CameraTracklet, CameraTracklets, straightened_tracklets
 from .settings import       CameraSettings, CameraReadings, RigCameraSettings, RigCameraReadings
-from .camera_check import   CameraCheck, CameraCheckSettings, FPS_TOLERANCE, MIN_RATE_FACTOR, mount_deviation, fps_deviation
+from .camera_health import  CameraHealth, CameraHealthSettings, FPS_TOLERANCE, MIN_RATE_FACTOR, mount_deviation, fps_deviation
 from .geometry import       CameraResolution, RESOLUTION_SIZES, MONO_RESOLUTIONS, COLOR_RESOLUTIONS, resolve_resolution, \
                             WARP_ALIGNMENT, aligned_height, mono_frame_size, color_frame_size, frame_size, mode_size, \
                             full_frame_height, delivered_height, degrees_per_pixel, output_focal, source_lens, \

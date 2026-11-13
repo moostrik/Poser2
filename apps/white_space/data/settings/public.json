@@ -337,7 +337,7 @@
         "ir_grid_light": 0.0
       }
     },
-    "camera_check": {
+    "camera_health": {
       "mount_tolerance": 2.0
     },
     "simulator": {

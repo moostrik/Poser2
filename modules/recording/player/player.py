@@ -1,7 +1,7 @@
 """Plays a folder of camera recordings: every camera's chunks in step on one clock, the recorded time
 (`PlayClock`), each frame handed over as late after its recorded capture as it came live, a frame's
 streams together (`FrameHandOver`), between in and out markers on the timeline, and the panel's playback
-readouts. It feeds a source (the oak `Simulator` or the replay backend). A chunk is one `.mkv` with color,
+readouts. It feeds a source (the oak `ClipCamera` or the replay camera). A chunk is one `.mkv` with color,
 depth when it was recorded, and metadata (`chunk`), or a color-only clip of before; a folder plays with the
 streams it has, whatever `video_frame_types` asks for. A chunk's readers are `ChunkReaders`; the folders,
 their markers and the timeline are `RecordingFolder` and `Timeline`.

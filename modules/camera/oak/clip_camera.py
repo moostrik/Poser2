@@ -1,5 +1,5 @@
-"""An OAK camera fed from recordings: the `Player`'s clips go through the real device's pipeline, so
-the detector and the tracker run as on the rig, and come out as the contract's frames and tracklets."""
+"""An OAK camera fed recorded clips: they go through the device's pipeline, so its detector and tracker run as on
+the rig."""
 
 import logging
 from datetime import timedelta
@@ -18,7 +18,7 @@ from .settings import OakCameraSettings
 logger = logging.getLogger(__name__)
 
 
-class Simulator(Camera):
+class ClipCamera(Camera):
 
     def __init__(self, player: ClipSource, settings: OakCameraSettings) -> None:
         super().__init__(settings)

@@ -107,7 +107,7 @@
       "mono_auto_exposure": true,
       "ir_flood_light": 0.0
     },
-    "camera_check": {
+    "camera_health": {
       "mount_tolerance": 2.0
     },
     "simulator": {

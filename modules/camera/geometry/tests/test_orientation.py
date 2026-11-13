@@ -1,6 +1,6 @@
 """The camera readout: gravity to angles, and the verdicts that summarise the readings.
 
-Neither needs a device. The gravity conversion is a pure function, and `CameraCheck` reads plain
+Neither needs a device. The gravity conversion is a pure function, and `CameraHealth` reads plain
 settings objects, so the interesting cases — a rig with no IMU, one camera out of four off — are
 all reachable without hardware. How the gravity vector gets out of an OAK board's IMU frame is
 the backend's (`modules/camera/oak/tests/test_imu.py`).
@@ -9,7 +9,7 @@ the backend's (`modules/camera/oak/tests/test_imu.py`).
 import math
 import unittest
 
-from modules.camera import CameraCheck, CameraCheckSettings, RigCameraReadings, RigCameraSettings, \
+from modules.camera import CameraHealth, CameraHealthSettings, RigCameraReadings, RigCameraSettings, \
     orientation_from_gravity, mount_deviation, fps_deviation
 from modules.settings import Field
 
@@ -91,9 +91,9 @@ def _cameras(readings: list[tuple[float, float]], configured_tilt: float = 12.0)
 
 
 def _mount(readings: list[tuple[float, float]], tolerance: float = 2.0) -> bool:
-    settings = CameraCheckSettings()
+    settings = CameraHealthSettings()
     settings.mount_tolerance = tolerance
-    CameraCheck(_cameras(readings), settings).update(0.0)
+    CameraHealth(_cameras(readings), settings).update(0.0)
     return settings.mount
 
 
@@ -104,8 +104,8 @@ def _camera_fps(rates: list[float], configured_fps: float = 30.0) -> bool:
         camera.fps = configured_fps
         camera.readings.video_fps = rate
         cameras.append(camera)
-    settings = CameraCheckSettings()
-    CameraCheck(cameras, settings).update(0.0)
+    settings = CameraHealthSettings()
+    CameraHealth(cameras, settings).update(0.0)
     return settings.camera_fps
 
 
@@ -166,8 +166,8 @@ class TestPinnedLatency(unittest.TestCase):
             camera.readings.video_latency = video
             camera.readings.depth_latency = depth
             cameras.append(camera)
-        settings = CameraCheckSettings()
-        CameraCheck(cameras, settings).update(0.0)
+        settings = CameraHealthSettings()
+        CameraHealth(cameras, settings).update(0.0)
         self.assertEqual(settings.video_latency, 28.0)
         self.assertEqual(settings.depth_latency, 47.0)
 

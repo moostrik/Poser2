@@ -1,13 +1,13 @@
 """CameraReadingsLayer — one camera's frame rate, tilt and roll error, over that camera's own view.
 
-The pinned camera check only says OK or WARNING; this says which camera and which value, where the
+The pinned camera health only says OK or WARNING; this says which camera and which value, where the
 operator is already looking.
 """
 
 import math
 
 from modules.gl import Text
-from modules.camera import RigCameraSettings, CameraCheckSettings, FPS_TOLERANCE, fps_deviation, mount_deviation
+from modules.camera import RigCameraSettings, CameraHealthSettings, FPS_TOLERANCE, fps_deviation, mount_deviation
 
 from ..layer_base import LayerBase
 
@@ -30,9 +30,9 @@ class CameraReadingsLayer(LayerBase):
     this camera's view, sized by the last `allocate`.
     """
 
-    def __init__(self, camera: RigCameraSettings, check: CameraCheckSettings) -> None:
+    def __init__(self, camera: RigCameraSettings, health: CameraHealthSettings) -> None:
         self._camera: RigCameraSettings = camera
-        self._check: CameraCheckSettings = check
+        self._health: CameraHealthSettings = health
         self._text: Text = Text()
         self._width: int = 1
         self._height: int = 1
@@ -67,7 +67,7 @@ class CameraReadingsLayer(LayerBase):
     def _mount_color(self, value: float) -> tuple[float, float, float, float]:
         if math.isnan(value):
             return _UNMEASURED_COLOR
-        return _OFF_COLOR if abs(value) > self._check.mount_tolerance else _OK_COLOR
+        return _OFF_COLOR if abs(value) > self._health.mount_tolerance else _OK_COLOR
 
     def _label(self, x: float, text: str, color: tuple[float, float, float, float]) -> float:
         """Draw one boxed label with its left edge at ``x``; return its right edge."""

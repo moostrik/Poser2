@@ -3,8 +3,8 @@
 import logging
 from functools import partial
 
-from modules.camera import CameraSource, CameraCheck
-from modules.camera.oak import Camera, Simulator
+from modules.camera import CameraSource, CameraHealth
+from modules.camera.oak import Camera, ClipCamera
 from modules.recording import Player, Recorder as VideoRecorder, replay
 from modules.settings import presets
 from modules.panel import PanelServer
@@ -95,7 +95,7 @@ class HDTrioMain:
                     self.cameras.append(replay.Camera(self.player, self.settings.camera.cameras[i], self.person_detector, replay.Tracker(), i))
             else:
                 for i in range(num_cams):
-                    self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i]))
+                    self.cameras.append(ClipCamera(self.player, self.settings.camera.cameras[i]))
         else:
             for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
@@ -150,14 +150,14 @@ class HDTrioMain:
         self.pipeline.window(Stage.SMOOTH).add_windows_callback(self.window_correlator.submit)
         self.window_correlator.add_similarity_callback(self.similarity_hold.set)
 
-        # CAMERA CHECK — each camera's IMU reading and frame rate against the preset, as pinned indicators
-        self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
+        # CAMERA HEALTH — each camera's IMU reading and frame rate against the preset, as pinned indicators
+        self.camera_health = CameraHealth(self.settings.camera.cameras, self.settings.camera.camera_health)
 
         # RENDER
         self.render = HDTrioRender(self.board, self.settings.render, self.settings.camera.cameras,
-                                   self.settings.camera.camera_check, data_path=DATA_PATH)
+                                   self.settings.camera.camera_health, data_path=DATA_PATH)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
-        self.render.add_update_callback(self.camera_check.update)
+        self.render.add_update_callback(self.camera_health.update)
         self.render.add_update_callback(self.sequencer.update)
         self.render.add_update_callback(self._update_poses)
         self.render.add_exit_callback(self.stop)

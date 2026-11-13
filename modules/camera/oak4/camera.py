@@ -6,7 +6,7 @@ queues on the node outputs, on depthai's callback thread, which is where the fra
 become the contract's and get their host time. The device runs the chain `model_chain` names.
 DETECTOR gives boxes only; with a pose chain a tracklet carries its keypoints: from its own
 detection in the one-model chain, or, in the two-model chain, from the pose of its crop, joined to
-it by frame (`PoseJoin`). With `depth_model` it also delivers depth, as DEPTH frames on the left
+it by frame (`KeypointJoin`). With `depth_model` it also delivers depth, as DEPTH frames on the left
 camera's view, each with the `DepthAlignment` that puts it on the frames' view on the GPU. The
 sensor controls are `SensorControl`'s for as long as the device is open.
 
@@ -43,7 +43,7 @@ from .messages import packed_nv12, smoothed_latency, capture_time
 from .models import ModelChain, model_archives, TRACKING_STATUS, tracklet_keypoints, keypoints_in_frame
 from .sensor import SENSOR_SOCKET, requested_size, DepthModel
 from .pipeline import build_pipeline, delivered_size, MountConfig, PipelineOutputs
-from .pose_join import PoseJoin, Box
+from .keypoint_join import KeypointJoin, Box
 from .settings import Oak4CameraSettings
 
 logger = logging.getLogger(__name__)
@@ -97,7 +97,7 @@ class Camera(Thread):
         pose, detector = model_archives(self.model_chain)
         self.pose_archive: Path | None = models / pose if pose else None
         self.detector_archive: Path | None = models / detector if detector else None
-        self.pose_join: PoseJoin | None = PoseJoin() if pose and detector else None
+        self.keypoint_join: KeypointJoin | None = KeypointJoin() if pose and detector else None
 
         # DEVICE — its pipeline and queues are made in `_open` and closed with it.
         self.device: dai.Device | None = None
@@ -346,7 +346,7 @@ class Camera(Thread):
         readings.video_min_fps = self.video_fps.get_rate_minimum()
         if self.control is not None:
             self.control.readback(msg)
-        if self.pose_join is not None:
+        if self.keypoint_join is not None:
             self._frame_transformation = msg.getTransformation()
         if self._video_transformation is None:
             self._video_transformation = msg.getTransformation()
@@ -405,18 +405,18 @@ class Camera(Thread):
         self.settings.readings.tracker_latency = smoothed_latency(self.settings.readings.tracker_latency, msg)
         self.tracklet_fps.processed()
         self.settings.readings.tracker_fps = self.tracklet_fps.get_rate_average()
-        one_model: bool = self.pose_join is None
+        one_model: bool = self.keypoint_join is None
         tracklets: list[CameraTracklet] = [
             self._tracklet(t, tracklet_keypoints(t.srcImgDetection) if one_model else None, timestamp)
             for t in msg.tracklets]
         self.num_tracklets = len(tracklets)
         self.settings.readings.tracklets = self.num_tracklets
-        if self.pose_join is None:
+        if self.keypoint_join is None:
             self._emit_tracklets(tracklets, timestamp, arrival)
             return
         boxes: list[Box] = [(t.srcImgDetection.xmin, t.srcImgDetection.ymin, t.srcImgDetection.xmax,
                              t.srcImgDetection.ymax) for t in msg.tracklets]
-        joined = self.pose_join.put_tracklets(msg.getSequenceNum(), tracklets, boxes)
+        joined = self.keypoint_join.put_tracklets(msg.getSequenceNum(), tracklets, boxes)
         if joined is not None:
             self._emit_tracklets(joined, timestamp, arrival)
 
@@ -424,7 +424,7 @@ class Camera(Thread):
         """The two-model chain's poses: depthai-nodes' `GatheredData`, the people's detections of one
         frame (`reference_data`) with one keypoint message per person (`items`, in the same order),
         each remapped from its crop into the delivered frame."""
-        if self.pose_join is None:
+        if self.keypoint_join is None:
             return
         arrival: float = time.perf_counter()
         detections = msg.reference_data
@@ -433,7 +433,7 @@ class Camera(Thread):
         if len(keypoints) != len(boxes):
             logger.debug(f'{self.device_id} frame {detections.getSequenceNum()}: {len(keypoints)} poses for {len(boxes)} people')
             keypoints = (keypoints + [None] * len(boxes))[:len(boxes)]
-        joined = self.pose_join.put_poses(detections.getSequenceNum(), boxes, keypoints)
+        joined = self.keypoint_join.put_keypoints(detections.getSequenceNum(), boxes, keypoints)
         if joined is not None:
             self._emit_tracklets(joined, capture_time(detections), arrival)
 

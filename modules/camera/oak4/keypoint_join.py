@@ -1,12 +1,5 @@
-"""The join of the two-model chain's two host streams: the tracker's tracklets and the gathered
-poses of the crops, per frame.
-
-Both reach the host for one frame with that frame's sequence number: the tracklets from the
-device's object tracker, and the gathered poses, the people's boxes beside one keypoint set per
-person in the same order (depthai-nodes' `GatherData`). A tracklet takes the keypoints of the person
-whose box is its source detection. Plain data in, plain data out: no depthai here, so it is tested
-without a device.
-"""
+"""The join of the two-model chain's two streams per frame: the tracker's tracklets and the keypoints the pose
+model found in each person's crop."""
 
 from dataclasses import replace
 
@@ -19,13 +12,9 @@ Box = tuple[float, float, float, float]      # xmin, ymin, xmax, ymax normalised
 BOX_MATCH_TOLERANCE: float = 1e-4            # the tracker's source detection is the detection, bit for bit
 
 
-class PoseJoin:
-    """Joins, per frame sequence number, the tracklets with the poses, into tracklets with keypoints.
-
-    A frame is complete when both its streams are in; whichever arrives second gets the joined
-    tracklets back. A frame older than `keep` newer ones that never completed is dropped and
-    counted in `dropped`, so a stream that stalls does not pile up.
-    """
+class KeypointJoin:
+    """Puts each frame's keypoints on its tracklets, by the frame's sequence number and the tracklet's source box;
+    a frame older than `keep` newer ones that never completed is dropped and counted (`dropped`)."""
 
     def __init__(self, keep: int = 8) -> None:
         self.keep: int = keep
@@ -34,20 +23,22 @@ class PoseJoin:
         self.joined: int = 0
 
     def put_tracklets(self, seq: int, tracklets: list[CameraTracklet], boxes: list[Box]) -> list[CameraTracklet] | None:
-        """The tracklets of frame `seq`, each with the box of its source detection."""
+        """The tracklets of frame `seq`, each with the box of its source detection; the joined tracklets when the
+        frame's keypoints are in."""
         frame = self._frame(seq)
         frame['tracklets'] = (tracklets, boxes)
         return self._complete(seq)
 
-    def put_poses(self, seq: int, boxes: list[Box], keypoints: list[np.ndarray | None]) -> list[CameraTracklet] | None:
-        """The people of frame `seq`, each box with its keypoints (None when the crop gave none)."""
+    def put_keypoints(self, seq: int, boxes: list[Box], keypoints: list[np.ndarray | None]) -> list[CameraTracklet] | None:
+        """The people of frame `seq`, each box with its keypoints (None when the crop gave none); the joined
+        tracklets when the frame's tracklets are in."""
         frame = self._frame(seq)
-        frame['poses'] = (boxes, keypoints)
+        frame['keypoints'] = (boxes, keypoints)
         return self._complete(seq)
 
     def _frame(self, seq: int) -> dict:
         if seq not in self.frames:
-            self.frames[seq] = {'tracklets': None, 'poses': None}
+            self.frames[seq] = {'tracklets': None, 'keypoints': None}
             for old in [s for s in self.frames if s < seq - self.keep]:
                 del self.frames[old]
                 self.dropped += 1
@@ -55,12 +46,12 @@ class PoseJoin:
 
     def _complete(self, seq: int) -> list[CameraTracklet] | None:
         frame = self.frames[seq]
-        if frame['tracklets'] is None or frame['poses'] is None:
+        if frame['tracklets'] is None or frame['keypoints'] is None:
             return None
         del self.frames[seq]
         self.joined += 1
         tracklets, tracklet_boxes = frame['tracklets']
-        boxes, keypoints = frame['poses']
+        boxes, keypoints = frame['keypoints']
         joined: list[CameraTracklet] = []
         for tracklet, box in zip(tracklets, tracklet_boxes):
             index = match_box(box, boxes)

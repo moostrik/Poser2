@@ -1,10 +1,10 @@
 """The depthai pipeline of one OAK camera, built in one pass.
 
-A source (the sensor, or an `XLinkIn` the simulator feeds with clips), the warp that turns the
+A source (the sensor, or an `XLinkIn` the clip camera feeds with clips), the warp that turns the
 sensor's frame into the contract's (`geometry.warp_mesh_points`, or the keystone of the older
 installations), the video output, and with `yolo` the detector branch: a manip that sizes the
 frame for the blob, the YOLO network, the device's object tracker and the tracklet output. A
-device also gets the IMU. Each part is one function; the simulation differs in its source, and in
+device also gets the IMU. Each part is one function; the clip camera differs in its source, and in
 whether the warp is applied (`warp_clips`: a raw clip goes through it, a recorded one is already
 warped). The warp mesh builders at the end are the geometry's adapters to depthai.
 """
@@ -33,7 +33,7 @@ VIDEO_STREAM: str = 'video'             # the delivered frames
 TRACKLETS_STREAM: str = 'tracklets'     # the object tracker's output
 IMU_STREAM: str = 'imu'                 # the accelerometer, on a device
 CONTROL_STREAM: str = 'control'         # the sensor controls, on a device
-CLIPS_STREAM: str = 'clips'             # the simulator's clip frames, in
+CLIPS_STREAM: str = 'clips'             # the clip camera's frames, in
 
 
 @dataclass
@@ -62,7 +62,7 @@ class WarpConfig:
 
 
 def model_path(models: str, square: bool, clips: bool) -> Path:
-    """The detector blob for this frame shape. The simulator's blob has one shave more: with no
+    """The detector blob for this frame shape. The clip camera's blob has one shave more: with no
     sensor on the device, the ISP's share of the SHAVEs is free for the network."""
     if square:
         name: str = YOLOV8_SQUARE_7S if clips else YOLOV8_SQUARE_6S
@@ -86,7 +86,7 @@ def build_pipeline(
 ) -> None:
     """Build the camera's pipeline into `pipeline`.
 
-    `clips` takes the frames from the host (the simulator) instead of the sensor, at the delivered
+    `clips` takes the frames from the host (the clip camera) instead of the sensor, at the delivered
     size, or at the sensor's size with `warp_clips`, when they go through the warp like the
     sensor's frames. `frame_height` is the delivered height the warp produces (`delivered_height`),
     0 for the sensor mode's rows.
@@ -139,7 +139,7 @@ def add_sensor(pipeline: dai.Pipeline, color: bool, resolution: CameraResolution
 
 def add_clip_input(pipeline: dai.Pipeline, src_size: tuple[int, int], out_size: tuple[int, int],
                    color: bool) -> dai.Node.Output:
-    """The simulator's frames, in. The ceiling takes a clip at the sensor's size or the delivered one."""
+    """The clip camera's frames, in. The ceiling takes a clip at the sensor's size or the delivered one."""
     channels: int = 3 if color else 1
     clips: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
     clips.setStreamName(CLIPS_STREAM)

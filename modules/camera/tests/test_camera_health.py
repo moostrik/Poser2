@@ -1,16 +1,16 @@
-"""What the camera check publishes for the pinned bar: the link the cameras really opened on."""
+"""What the cameras' health publishes for the pinned bar: the link the cameras really opened on."""
 
 import unittest
 
-from modules.camera import CameraCheck, CameraCheckSettings, RigCameraSettings
+from modules.camera import CameraHealth, CameraHealthSettings, RigCameraSettings
 
 
 def published_link(*links: str) -> str:
     cameras: list[RigCameraSettings] = [RigCameraSettings() for _ in links]
     for camera, link in zip(cameras, links):
         camera.readings.link = link
-    settings = CameraCheckSettings()
-    CameraCheck(cameras, settings).update(0.0)
+    settings = CameraHealthSettings()
+    CameraHealth(cameras, settings).update(0.0)
     return settings.link
 
 

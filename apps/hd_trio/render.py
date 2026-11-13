@@ -8,7 +8,7 @@ from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId
 from modules.board import HasFrames
-from modules.camera import RigCameraSettings, CameraCheckSettings
+from modules.camera import RigCameraSettings, CameraHealthSettings
 from modules.flow import Port, hold_tick
 from modules.pose import Frame, Similarity, AngleMotion
 from modules.render import ColorSettings, layers as ls, shaders, make_subdivision, SubdivisionRow, Subdivision
@@ -63,7 +63,7 @@ BORDER_WIDTH: float = 2.0       # px
 
 class HDTrioRender(RenderBase):
     def __init__(self, board: RenderBoard, settings: RenderSettings,
-                 cameras: Sequence[RigCameraSettings], camera_check: CameraCheckSettings, data_path: str = "") -> None:
+                 cameras: Sequence[RigCameraSettings], camera_health: CameraHealthSettings, data_path: str = "") -> None:
         super().__init__(settings.window)
         self.max_players: int = settings.max_players
         self.num_cams: int = settings.num_cams
@@ -99,7 +99,7 @@ class HDTrioRender(RenderBase):
 
             tracker_compositor = self.L[Layers.tracker][i] = ls.TrackerCompositor(  i, self.board,      cam_image.texture,          settings.preview.tracker,   settings.colors)
             pose_compositor = self.L[Layers.pose][i] =      ls.PoseCompositor(      i, self.board,      cam_image.texture, cam_crop, settings.preview.pose,      settings.colors)
-            self.L[Layers.cam_readings][i] =                 ls.CameraReadingsLayer( cameras[i], camera_check)
+            self.L[Layers.cam_readings][i] =                 ls.CameraReadingsLayer( cameras[i], camera_health)
 
             center_geometry = self.L[Layers.center_geometry][i] = ls.CenterGeometry( i, self.board,      cam_image.texture,          settings.center.geometry)
             center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask,               ls.SourceSpace.CROP, settings.center.mask)

@@ -7,8 +7,8 @@ from functools import partial
 import glfw
 import numpy as np
 
-from modules.camera import CameraSource, CameraFrame, FrameType, CameraCheck
-from modules.camera.oak import Camera, Simulator
+from modules.camera import CameraSource, CameraFrame, FrameType, CameraHealth
+from modules.camera.oak import Camera, ClipCamera
 from modules.recording import Player, Recorder as VideoRecorder, replay
 from modules.settings import presets
 from modules.panel import PanelServer
@@ -95,7 +95,7 @@ class WhiteSpaceMain:
                     self.cameras.append(replay.Camera(self.player, self.settings.camera.cameras[i], self.person_detector, replay.Tracker(), i))
             else:
                 for i in range(num_cams):
-                    self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i]))
+                    self.cameras.append(ClipCamera(self.player, self.settings.camera.cameras[i]))
         else:
             for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
@@ -186,14 +186,14 @@ class WhiteSpaceMain:
         self.state_machine.add_state_callback(self.board.set_sequencer_state)
         self.state_machine.add_state_callback(self.osc_sound_sender.set_sequencer_state)
 
-        # CAMERA CHECK — compares each camera's own IMU reading and frame rate against the preset,
+        # CAMERA HEALTH — compares each camera's own IMU reading and frame rate against the preset,
         # and summarises them as pinned indicators. A setup aid; nothing downstream reads it.
-        self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
+        self.camera_health = CameraHealth(self.settings.camera.cameras, self.settings.camera.camera_health)
 
         # RENDER
         self.render = WhiteSpaceRender(self.board, self.settings.render, self.settings.tracker,
-                                       self.settings.camera.cameras, self.settings.camera.camera_check, ps.angle_extractor)
-        self.render.add_update_callback(self.camera_check.update)
+                                       self.settings.camera.cameras, self.settings.camera.camera_health, ps.angle_extractor)
+        self.render.add_update_callback(self.camera_health.update)
         # In order: LERP first, which stamps this tick's hit on the poses and writes the streak and the group
         # sync to the board; then the state machine reads them; then the layers draw on the same.
         self.conductor.add_update_callback(self._update_poses)

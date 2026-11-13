@@ -174,7 +174,7 @@ stage's features for the show to play, on the wall clock, apart from the video.
 ## The package's layout
 
 `modules/recording` uses a camera and is not one: it depends on `modules/camera`, never the other way. A camera
-that feeds recorded clips through its device (`oak.Simulator`) takes them by the camera's `ClipSource` protocol.
+that feeds recorded clips through its device (`oak.ClipCamera`) takes them by the camera's `ClipSource` protocol.
 
 | Folder      | Role                   | Holds                                                      |
 |-------------|------------------------|------------------------------------------------------------|

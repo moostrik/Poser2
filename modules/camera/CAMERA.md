@@ -152,6 +152,27 @@ Depth comes from a stereo camera a few centimetres beside the video camera, so a
 shifted by an amount that depends on its distance. The GPU moves each depth pixel there and keeps the nearest where
 two land on one pixel; the background a near object uncovers stays empty, because the depth camera never saw it.
 
+## The cameras' health
+
+`CameraHealth` turns the cameras' readings into verdicts pinned on the panel, because the readings themselves sit
+on each camera's settings, deep in the panel, where a readout goes to be ignored; which camera and value is off is
+drawn on that camera's own view (`CameraReadingsLayer`).
+
+| Verdict      | Holds when                                                                      |
+|--------------|---------------------------------------------------------------------------------|
+| `mount`      | every tilt and roll deviation (`mount_deviation`) is within `mount_tolerance`   |
+| `camera_fps` | every camera's frame rate is within `FPS_TOLERANCE` (5 %) of its `fps`          |
+| `video_rate` | every camera's momentary rate (1 / its worst frame gap) is above half its `fps` |
+
+- A camera without an IMU is left out of `mount`: that is the board, nothing to fix on site; its view says `no IMU`.
+- The tilt deviation is against the tilt the warp was built with, so a camera off it is straightened by the wrong
+  amount; there is no configured roll, as the warp has no roll term, so any roll is a deviation.
+- A camera that delivers no frames reads 0 and fails `camera_fps`.
+- `video_rate` catches what the average hides: single late frames, which a viewer sees as stutter.
+- The slowest camera's latencies and each link are published without a verdict.
+- `fov_factory` and `lens_error` are not judged: they describe the build, not how the tripod was set this
+  morning, and a warning at every launch teaches the operator to ignore warnings.
+
 ## The OAK-D
 
 **The IMU's turn.** The OAK-D's IMU sits a quarter turn about the optical axis, which

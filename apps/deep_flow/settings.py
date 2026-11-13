@@ -13,7 +13,7 @@ from enum import IntEnum, auto
 
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.panel import PanelSettings
-from modules.camera import CameraCheckSettings, CameraResolution
+from modules.camera import CameraHealthSettings, CameraResolution
 from modules.camera.oak4 import Oak4CameraSettings
 from modules.recording import PlayerSettings, RecorderSettings
 from modules.session import SessionSettings
@@ -97,7 +97,7 @@ class LayerSettings(BaseSettings):
 #  OAK4 camera group (1 camera)
 # ---------------------------------------------------------------------------
 
-class _CameraCheckSettings(CameraCheckSettings):
+class _CameraHealthSettings(CameraHealthSettings):
     """No mount verdict here: tilt and roll are read in the camera's own `readings`."""
     mount:           Field[bool]  = Field(True, access=Field.READ, visible=False)
     mount_tolerance: Field[float] = Field(2.0, visible=False)
@@ -120,7 +120,7 @@ class Oak4Group(BaseSettings):
 
     _cam_share: list = [fps, color, resolution, model_path, fov]
     cam_0          : Group[Oak4CameraSettings]             = Group(Oak4CameraSettings, share=_cam_share)
-    camera_check   : Group[_CameraCheckSettings]           = Group(_CameraCheckSettings)
+    camera_health  : Group[_CameraHealthSettings]          = Group(_CameraHealthSettings)
     simulator      : Group[PlayerSettings]                 = Group(PlayerSettings, share=[num_cams, fps])
     uploader       : Group[inference.UploaderSettings]     = Group(inference.UploaderSettings)
     person_detector: Group[inference.detection.Settings]   = Group(inference.detection.Settings)   # the replay backend's person detector

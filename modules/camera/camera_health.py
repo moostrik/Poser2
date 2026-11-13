@@ -1,4 +1,4 @@
-"""Compare what the cameras report about themselves against what the preset says they should be."""
+"""The cameras' health: what they report about themselves against what the preset says they should be."""
 
 import math
 from collections.abc import Sequence
@@ -8,13 +8,8 @@ from modules.settings import BaseSettings, Field, Widget
 from .settings import RigCameraSettings
 
 
-class CameraCheckSettings(BaseSettings):
-    """Pinned verdicts saying whether the cameras are mounted and running the way the preset assumes.
-
-    The per-camera readings live on each `RigCameraSettings`, groups deep in the panel, which is
-    where a readout goes to be ignored. The pinned indicators say good or bad; which camera and
-    which value is drawn on that camera's own view in the renderer.
-    """
+class CameraHealthSettings(BaseSettings):
+    """The pinned verdicts on the cameras' mount and rate, and the worst of their readings."""
     mount_tolerance: Field[float] = Field(2.0, min=0.5, max=10.0, step=0.5,
                                           description="Tilt or roll deviation (°) a camera may have before the mount warns")
     mount:           Field[bool]  = Field(True, access=Field.READ, pinned=True, widget=Widget.status,
@@ -43,14 +38,8 @@ MIN_RATE_FACTOR: float = 0.5
 
 
 def mount_deviation(camera: RigCameraSettings) -> tuple[float, float]:
-    """The camera's signed ``(tilt, roll)`` deviation in degrees; NaN where it has no reading.
-
-    - **tilt** — ``tilt_measured - expected_tilt``. On an OAK-D that is the `tilt` the warp mesh
-      was baked with, so a camera that does not sit at it is being un-tilted by the wrong amount.
-    - **roll** — ``roll_measured``. There is no configured roll: `warp_mesh_points` has no
-      roll term at all, so the only correct value is zero, and any roll tips the horizon in a way
-      the panorama cannot distinguish from a wrong tilt.
-    """
+    """The camera's signed (tilt, roll) deviation (°): the measured tilt less the expected, and the measured roll;
+    NaN without a reading."""
     return (camera.readings.tilt_measured - camera.expected_tilt, camera.readings.roll_measured)
 
 
@@ -59,35 +48,12 @@ def fps_deviation(camera: RigCameraSettings) -> float:
     return camera.readings.video_fps / camera.fps - 1.0
 
 
-class CameraCheck:
-    """Turns the per-camera readings into two verdicts a person will actually read.
+class CameraHealth:
+    """The cameras' readings as the panel's verdicts: mounted as expected, at their rate, without stutter."""
 
-    - **mount** — every tilt and roll deviation (`mount_deviation`) within `mount_tolerance`.
-      Cameras without an IMU are left out; they are a property of the board, not something to fix
-      on site, so they never warn. The camera view says `no IMU` instead.
-    - **camera_fps** — every camera's video frame rate within `FPS_TOLERANCE` of its `fps`
-      (`fps_deviation`). A camera that delivers no frames reads 0 and warns.
-    - **video_rate** — every camera's momentary video rate (1 / its worst frame gap) above
-      `MIN_RATE_FACTOR` of its `fps`: the average rate can be fine while single frames arrive
-      late, which is what a viewer sees as stutter. The slowest average and the worst momentary
-      rate are published as `video_fps_avg` and `video_min_fps`.
-
-    The slowest camera's `video_latency` and `depth_latency` are published as they are, no verdict:
-    0 where a backend does not measure them. So is `link`, each different link once: empty where a
-    backend does not report one.
-
-    Which camera and axis is off is not repeated here: the renderer draws each camera's numbers
-    on its own view (`CameraReadingsLayer`).
-
-    `fov_factory` and `lens_error` are deliberately *not* checked. They describe the unit's lens
-    against the shared one, which is a property of the build, not of how the tripod was set
-    this morning — alarming on them would mean a warning every launch, which is the fastest way
-    to teach someone to ignore warnings.
-    """
-
-    def __init__(self, cameras: Sequence[RigCameraSettings], settings: CameraCheckSettings) -> None:
+    def __init__(self, cameras: Sequence[RigCameraSettings], settings: CameraHealthSettings) -> None:
         self._cameras: Sequence[RigCameraSettings] = cameras
-        self._settings: CameraCheckSettings = settings
+        self._settings: CameraHealthSettings = settings
 
     def update(self, _now: float) -> None:
         """Recompute both verdicts. Cheap; call it on the render tick (the frame time is not needed: the

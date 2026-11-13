@@ -536,7 +536,7 @@ class ResolutionTest(unittest.TestCase):
         self.assertIn('mono', captured.output[0])
 
     def test_the_fallback_warns_once_not_once_a_frame(self) -> None:
-        """`frame_size` is called per frame by the simulator's size check."""
+        """`frame_size` is called per frame by the clip camera's size check."""
         from modules.camera.geometry.sensor_modes import _warned_resolutions
         _warned_resolutions.discard((False, CameraResolution.P1080))
         with self.assertLogs('modules.camera.geometry.sensor_modes', level='WARNING') as captured:

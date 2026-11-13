@@ -7,7 +7,7 @@ recordings on the host with the replay backend, with no camera attached.
 import time
 from functools import partial
 
-from modules.camera import CameraSource, CameraCheck, CameraTracklets
+from modules.camera import CameraSource, CameraHealth, CameraTracklets
 from modules.camera.oak4 import Camera, ModelChain
 from modules.recording import Player, Recorder, replay
 from modules.session import Session
@@ -141,14 +141,14 @@ class DeepFlowMain:
         self.pipeline.add_frames_callback(Stage.SMOOTH, self.capture_sync.submit_poses)
         self.capture_sync.add_capture_callback(self._on_capture)
 
-        # CAMERA CHECK — the camera's IMU reading and frame rate against the preset, as pinned indicators
-        self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
+        # CAMERA HEALTH — the camera's IMU reading and frame rate against the preset, as pinned indicators
+        self.camera_health = CameraHealth(self.settings.camera.cameras, self.settings.camera.camera_health)
 
         # RENDER
         self.render = DeepFlowRender(self.board, self.settings.render, self.settings.camera.fov, f'{DATA_PATH}/screen_recordings',
                                      num_cams=len(self.cameras), max_players=max_players)
         self.render.add_exit_callback(self.stop)
-        self.render.add_update_callback(self.camera_check.update)
+        self.render.add_update_callback(self.camera_health.update)
 
         self.render.add_update_callback(self._update_poses)
         self.render.add_update_callback(self._update_cadence)

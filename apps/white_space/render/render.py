@@ -7,7 +7,7 @@ from typing import cast
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, clear_color, Style
-from modules.camera import RigCameraSettings, CameraCheckSettings, mono_frame_size, delivered_height
+from modules.camera import RigCameraSettings, CameraHealthSettings, mono_frame_size, delivered_height
 from modules.tracker import PanoramicTrackerSettings
 from apps.white_space.render.layers.light_simulation_layer import LightSimulationLayer
 from apps.white_space.render.layers.beam_light_simulation_layer import BeamLightSimulationLayer
@@ -47,7 +47,7 @@ _SWITCHED_ROWS: dict[str, tuple[Layers, ...]] = {
 class WhiteSpaceRender(RenderBase):
     def __init__(self, board: RenderBoard, settings: RenderSettings,
                  tracker: PanoramicTrackerSettings,
-                 cameras: Sequence[RigCameraSettings], camera_check: CameraCheckSettings,
+                 cameras: Sequence[RigCameraSettings], camera_health: CameraHealthSettings,
                  angle_extractor: nodes.AngleExtractorSettings) -> None:
         super().__init__(settings.window)
         self.max_players: int = settings.max_players
@@ -72,7 +72,7 @@ class WhiteSpaceRender(RenderBase):
                 settings.preview.tracker,
                 settings.colors,
             )
-            self.L[Layers.cam_readings][i] = layers.CameraReadingsLayer(cameras[i], camera_check)
+            self.L[Layers.cam_readings][i] = layers.CameraReadingsLayer(cameras[i], camera_health)
 
         # Row 5 — per-player: pose compositor + data overlays
         # cam_image[0] texture used as fallback for non-GPU crop path (GPU crop is default)
