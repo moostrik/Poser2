@@ -1,5 +1,5 @@
 from threading import Thread, Event, Lock
-from time import monotonic, perf_counter, sleep
+from time import perf_counter, sleep
 
 import numpy as np
 from pythonosc.udp_client import UDPClient
@@ -269,8 +269,8 @@ class OscLightSender:
         # motor (dark, stopped) for the whole session. The endpoint is read live, so a settings
         # change mid-retry is picked up.
         while self._running and not validate_connection(self.settings.ip, self.settings.port, "OscLightSender"):
-            retry_at = monotonic() + _CONNECT_RETRY_S
-            while self._running and monotonic() < retry_at:
+            retry_at = perf_counter() + _CONNECT_RETRY_S
+            while self._running and perf_counter() < retry_at:
                 self._update_event.wait(0.5)   # frames keep setting the event; the deadline paces the probe
                 self._update_event.clear()
         if not self._running:
@@ -305,7 +305,7 @@ class OscLightSender:
                 # While the fixture's speed latch is untrusted — boot, or a send gap long enough
                 # that its watchdog may have stopped the motor without recording it — hold rpm at
                 # 0, then release: the 0→target edge is the only speed command the firmware acts on.
-                now = monotonic()
+                now = perf_counter()
                 motor_rpm = self._latch.rpm_to_send(int(output.motor_command.target_rpm),
                                                     self.settings.resync_hold, now)
                 sent = self._send_config(motor_rpm)
@@ -328,7 +328,7 @@ class OscLightSender:
         Keeping these five datagrams out of the per-frame burst is what buys the fixture's socket
         buffer enough headroom for the six pixel chunks.
         """
-        now = monotonic()
+        now = perf_counter()
         due = self._config_dirty or motor_rpm != self._sent_rpm or (now - self._last_config_at) >= _CONFIG_KEEPALIVE_S
         if not due:
             return False

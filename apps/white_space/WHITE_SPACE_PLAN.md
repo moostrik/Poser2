@@ -6,14 +6,6 @@ runs on the same code before the plan: white_space (`scripts/white_space_probe.p
 `20250514-130512_4_wide_mono` 18–30 s, run C1follow) and deep_flow, which step 2 touches
 (`scripts/cadence_probe.py`, `measure` 9–19 s, run C1fix).
 
-## 3. The motor and the light sender on `perf_counter()`
-
-`light/motor.py` reads `monotonic()` for the fall edge, the fall timing and the simulated motor's tick;
-`inout/osc_light_sender.py` for its retry and hold deadlines. `monotonic()` is GetTickCount64 here, 15.6 ms steps,
-half a light tick at 32 fps, against 0.1 µs for `perf_counter()`; a call costs 17.6 ns against 37.2 ns (measured
-2026-11-13, `.venv`). Both read `perf_counter()`.
-Checked by: `apps/white_space/tests/test_playhead_motor.py`, `test_osc_light_protocol.py`.
-
 ## 4. The tracker journal on `perf_counter()`
 
 The journal stamps its entries with `time.time()`, which cannot be lined up with the tracklets' times. Its entries

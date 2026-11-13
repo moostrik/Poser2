@@ -2,7 +2,7 @@
 
 import math
 import unittest
-from time import monotonic
+from time import perf_counter
 
 from apps.white_space.light.motor import (MotorController, MotorSettings, MotorMeasurement, MotorCommand,
                                           MotorMode)
@@ -46,7 +46,7 @@ class MotorTest(unittest.TestCase):
     def _locked(self, mode: MotorMode = MotorMode.BEAM, period: float = 1.0) -> MotorController:
         m = MotorController(MotorSettings())
         m.set_mode(mode)
-        m._last_fall_time = monotonic() - 0.25
+        m._last_fall_time = perf_counter() - 0.25
         m._measured_period = period
         return m
 
@@ -79,7 +79,7 @@ class MotorTest(unittest.TestCase):
         # Two falls at the same instant (bouncing sensor / repeated packet) must not crash tick().
         m = MotorController(MotorSettings())
         m.set_mode(MotorMode.BEAM)
-        t = monotonic()
+        t = perf_counter()
         m._fire_fall_at(t)
         m._fire_fall_at(t)              # simultaneous duplicate → no positive period recorded
         st = m.tick()                  # must not raise ZeroDivisionError
@@ -90,7 +90,7 @@ class MotorTest(unittest.TestCase):
         # (without the debounce it would read ~1875 rpm for a full revolution).
         m = MotorController(MotorSettings())
         m.set_mode(MotorMode.BEAM)
-        t = monotonic()
+        t = perf_counter()
         m._fire_fall_at(t)
         m._fire_fall_at(t + 0.5)        # real revolution: 0.5 s → 120 rpm
         m._fire_fall_at(t + 0.532)      # duplicate 32 ms later → debounced
@@ -101,7 +101,7 @@ class MotorTest(unittest.TestCase):
     def test_zero_period_does_not_lock(self) -> None:
         # Defensive: a degenerate 0 period is treated as no measurement, not a div-by-zero.
         m = MotorController(MotorSettings())
-        m._last_fall_time = monotonic(); m._measured_period = 0.0
+        m._last_fall_time = perf_counter(); m._measured_period = 0.0
         self.assertFalse(m.tick().locked)
 
     def test_mode_is_commanded_immediately(self) -> None:
@@ -115,7 +115,7 @@ class MotorTest(unittest.TestCase):
         m = MotorController(MotorSettings())
         m.set_mode(MotorMode.BEAM)
         m._measured_period = 1.0                    # 60 rpm
-        m._last_fall_time  = monotonic() - 30.0     # 30 s since the last fall — would have stalled before
+        m._last_fall_time  = perf_counter() - 30.0     # 30 s since the last fall — would have stalled before
         st = m.tick()
         self.assertTrue(st.locked)
         self.assertAlmostEqual(st.measured_rpm, 60.0)
@@ -136,7 +136,7 @@ class MotorTest(unittest.TestCase):
         # reading (otherwise a frozen pre-PROJECTION reading would drive the crossfade).
         m = MotorController(MotorSettings())
         m.set_mode(MotorMode.PROJECTION)
-        m._last_fall_time = monotonic() - 0.001; m._measured_period = 1.0   # stale 60 rpm reading
+        m._last_fall_time = perf_counter() - 0.001; m._measured_period = 1.0   # stale 60 rpm reading
         st = m.tick()
         self.assertFalse(st.locked)
         self.assertEqual(st.measured_rpm, 0.0)        # stale reading not used in PROJECTION
@@ -148,7 +148,7 @@ class MotorTest(unittest.TestCase):
         # (sensor can't keep up / phase aliases) is not trusted; only the command stands.
         m = MotorController(MotorSettings())
         m.set_mode(MotorMode.BEAM)
-        m._last_fall_time = monotonic() - 0.001; m._measured_period = 0.040   # 1500 rpm, above ceiling
+        m._last_fall_time = perf_counter() - 0.001; m._measured_period = 0.040   # 1500 rpm, above ceiling
         st = m.tick()
         self.assertFalse(st.locked)
         self.assertEqual(st.measured_rpm, 0.0)        # >ceiling reading discarded

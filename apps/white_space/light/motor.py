@@ -5,7 +5,7 @@ continuous content clock and any calibration offset live in the Playhead.
 Real mode (simulate=False):
     Each "fall" signal marks one full revolution completing. The period is
     measured as the wall-clock time between consecutive falls; the phase is
-    computed with sub-tick precision from monotonic(). There is no stall
+    computed with sub-tick precision from perf_counter(). There is no stall
     detection: the last measurement persists until the next fall updates it
     (see _measure). External callers use notify_fall(); while simulate=True it is a no-op.
 
@@ -23,7 +23,7 @@ import math
 from dataclasses import dataclass
 from enum import IntEnum, auto
 from threading import Thread, Event, Lock
-from time import monotonic
+from time import perf_counter
 
 from modules.settings import BaseSettings, Field, Widget
 
@@ -159,7 +159,7 @@ class MotorController:
 
     def _fire_fall(self) -> None:
         """Record a real (hardware) fall at the current time."""
-        self._fire_fall_at(monotonic())
+        self._fire_fall_at(perf_counter())
 
     def _fire_fall_at(self, t: float) -> None:
         """Record a fall at time `t`, debouncing repeated/duplicate signals (and sub-tick sim falls)."""
@@ -199,17 +199,17 @@ class MotorController:
         """
         current_rpm: float = 0.0
         revs:        float = 0.0   # revolutions accumulated toward the next fall
-        last:        float = monotonic()
+        last:        float = perf_counter()
 
         while self._running:
             if not self._settings.simulate:
                 current_rpm, revs = 0.0, 0.0          # real hardware drives the falls
                 self._wakeup.wait(0.1)
                 self._wakeup.clear()
-                last = monotonic()
+                last = perf_counter()
                 continue
 
-            now  = monotonic()
+            now  = perf_counter()
             dt   = now - last
             last = now
 
@@ -294,7 +294,7 @@ class MotorController:
         target_mode = self._target_mode()
         target_rpm  = self._target_rpm(target_mode)
 
-        have_measurement, measured, phase, raw_rpm, fall_age = self._measure(monotonic())
+        have_measurement, measured, phase, raw_rpm, fall_age = self._measure(perf_counter())
         # A measurement is usable only in the sensor's range — both the commanded and the measured speed
         # below the ceiling (no falls above it; a >ceiling reading isn't trusted) — and not STOPPED.
         fast   = target_rpm > FIXTURE_PROJECTION_RPM or measured > FIXTURE_PROJECTION_RPM
