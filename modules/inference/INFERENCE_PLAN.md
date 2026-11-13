@@ -1,7 +1,7 @@
 # The inference package's plan
 
 What is not built in `modules/inference`, apart from the threads the app refactor moves
-([apps/REFACTOR.md](../../apps/REFACTOR.md)). How the input works is in
+([apps/APPS_PLAN.md](../../apps/APPS_PLAN.md)). How the input works is in
 [INPUT_THREADS.md](../flow/INPUT_THREADS.md). **(deduction)** marks what is inferred.
 
 ## 1. The color in one kernel

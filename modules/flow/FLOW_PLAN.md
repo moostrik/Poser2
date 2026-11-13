@@ -12,7 +12,7 @@ inferred, **(site fact)** what the operator saw.
 | 1   | [The 3D fluid's input](#1-the-3d-fluids-input)                            | built; the depth read to choose                               | [VIEW.md](VIEW.md), [BRIDGE_3D.md](BRIDGE_3D.md)             |
 | 2   | [The 3D fluid's look at 4K](#2-the-3d-fluids-look-at-4k)                  | next                                                          | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md)           |
 | 3   | [One unit across the stages](#3-one-unit-across-the-stages)               | not started                                                   | [FLOW.md](FLOW.md)                                           |
-| 4   | [The apps on deep_flow's input](#4-the-apps-on-deep_flows-input)          | its own plan                                                  | [REFACTOR.md](../../apps/REFACTOR.md)                        |
+| 4   | [The apps on deep_flow's input](#4-the-apps-on-deep_flows-input)          | its own plan                                                  | [APPS_PLAN.md](../../apps/APPS_PLAN.md)                      |
 | 5   | [The 2D flow follows the 3D](#5-the-2d-flow-follows-the-3d)               | not started                                                   | [FLOW.md](FLOW.md)                                           |
 | 6   | [A camera without depth](#6-a-camera-without-depth)                       | not started                                                   | [FLOW.md](FLOW.md), [VIEW.md](VIEW.md)                       |
 
@@ -110,7 +110,7 @@ bridge, the monitor), so it is one rule for all of them, made where each length 
 
 ## 4. The apps on deep_flow's input
 
-Not the flow's: its own plan, [apps/REFACTOR.md](../../apps/REFACTOR.md).
+Not the flow's: its own plan, [apps/APPS_PLAN.md](../../apps/APPS_PLAN.md).
 
 ## 5. The 2D flow follows the 3D
 

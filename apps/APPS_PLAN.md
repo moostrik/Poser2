@@ -1,4 +1,4 @@
-# The app refactor
+# The apps' plan
 
 The apps on deep_flow's input, this one plan: what is next, in order, each part's steps and how each is checked. How
 the input works is in [INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md); the recorder's plan for every app is in

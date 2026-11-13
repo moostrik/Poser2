@@ -1,7 +1,7 @@
 # The recording plan
 
 What is next for recording and -sim, in order. How it works is in [RECORDING.md](RECORDING.md); the apps' move to
-the recorder is in [the app refactor](../../apps/REFACTOR.md). **(deduction)** marks what is inferred, **(site
+the recorder is in [the app refactor](../../apps/APPS_PLAN.md). **(deduction)** marks what is inferred, **(site
 fact)** what was told.
 
 ## 1. Checks waiting for the camera
@@ -23,7 +23,7 @@ deep_flow live, with the camera and a player in view:
 
 ## 2. The recorder in the other apps
 
-With the apps' refactors ([REFACTOR.md](../../apps/REFACTOR.md)), each tested with its refactored app:
+With the apps' refactors ([APPS_PLAN.md](../../apps/APPS_PLAN.md)), each tested with its refactored app:
 
 - hd_trio and white_space: their settings (`MP4` for hd_trio), their wiring (tracklets through the uploader,
   `expect_parts` per camera, `expect_poses` per camera and image), and hd_trio's pose `.h5` cut at the recorder's
