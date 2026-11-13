@@ -176,7 +176,9 @@ class Camera:
                     self._emit(cover(handed[0], self._width, self._height), handed[1])
                 now = perf_counter()
                 if image_on and image is not None and now >= next_image:
-                    next_image = now + 1.0 / IMAGE_FPS
+                    # on an absolute schedule: a wait's timeout is late by up to the system tick (15.6 ms), so
+                    # each image is due a period after the last one's due time, not after it came out
+                    next_image = max(next_image + 1.0 / IMAGE_FPS, now - 1.0 / IMAGE_FPS)
                     self._emit(image, now)
             except Exception:
                 logger.exception('Camera: a frame failed')
