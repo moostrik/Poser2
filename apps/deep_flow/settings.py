@@ -22,6 +22,7 @@ from modules.tracker import OnePerCamTrackerSettings, PosesFromTrackletsSettings
 from modules.pose import nodes, trackers, window
 from modules import inference
 from modules.gl import WindowSettings
+from modules.video import ScreenRecorderSettings
 
 
 # ---------------------------------------------------------------------------
@@ -88,6 +89,7 @@ class LayerSettings(BaseSettings):
     left:   Field[list[Layers]] = Field([Layers.composite],                  description="Layers drawn in the left viewport",  widget=Widget.playlist)
     right:  Field[list[Layers]] = Field([Layers.pose],                       description="Layers drawn in the right viewport", widget=Widget.playlist)
     output: Field[list[Layers]] = Field([Layers.fluid, Layers.color_mask], description="Layers mixed into the show texture", widget=Widget.playlist)
+    record: Field[list[Layers]] = Field([Layers.composite],                  description="Layers drawn into the screen recording", widget=Widget.playlist)
 
 
 # ---------------------------------------------------------------------------
@@ -272,6 +274,7 @@ class RenderSettings(BaseSettings):
     time_series: Group[layers.TimeSeriesLayerSettings] = Group(layers.TimeSeriesLayerSettings)
     colors : Group[ColorSettings]                = Group(ColorSettings)
     window : Group[WindowSettings]               = Group(WindowSettings)
+    screen_recorder: Group[ScreenRecorderSettings] = Group(ScreenRecorderSettings)
 
 
 class CadenceSettings(BaseSettings):

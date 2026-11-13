@@ -6,7 +6,8 @@ from typing import Callable, cast
 import numpy as np
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import GpuTimer, RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId, MouseButton
+from modules.gl import GpuTimer, RenderBase, ScreenCapture, Shader, Style, clear_color, fill, fit, Texture, MonitorId, MouseButton
+from modules.video import ScreenRecorder, ScreenRecorderSettings
 from modules.flow import Port, hold_tick
 from modules.inference import Capture
 from modules.pose import Frame, Similarity, AngleMotion
@@ -93,8 +94,10 @@ SHAPE_LAYERS: dict[Layers, Layers] = {
 
 
 class DeepFlowRender(RenderBase):
-    def __init__(self, board: RenderBoard, settings: RenderSettings, fov: float, num_cams: int = 1, max_players: int = 1) -> None:
-        """`fov` is the camera image's horizontal field (degrees), for the metres a view width spans."""
+    def __init__(self, board: RenderBoard, settings: RenderSettings, fov: float, screen_recordings: str,
+                 num_cams: int = 1, max_players: int = 1) -> None:
+        """`fov` is the camera image's horizontal field (degrees), for the metres a view width spans;
+        `screen_recordings` the folder the screen recordings go to."""
         super().__init__(settings.window)
         self.max_players: int = max_players
         self.num_cams: int = num_cams
@@ -192,6 +195,11 @@ class DeepFlowRender(RenderBase):
         self.window_manager.add_mouse_move_callback(self._on_mouse_move)
         self.window_manager.add_mouse_scroll_callback(self._on_mouse_scroll)
 
+        # The screen recording: the `record` layers, or the main window, drawn into the capture's screen frame
+        self._screen_capture: ScreenCapture = ScreenCapture()
+        self.screen_recorder: ScreenRecorder = ScreenRecorder(settings.screen_recorder, self._screen_capture, screen_recordings)
+        settings.screen_recorder.bind(ScreenRecorderSettings.snap, self._on_snap)
+
     def _make_layout(self) -> Subdivision:
         width, height = self._window_size
         aspect_ratios: list[float] = self._panel_aspect_ratios
@@ -233,6 +241,7 @@ class DeepFlowRender(RenderBase):
                     layer.allocate(OUTPUT_WIDTH, OUTPUT_HEIGHT, GL_RGBA16F)
         self.allocate_window_renders()
         self._border.allocate()
+        self.screen_recorder.start()
         Shader.enable_hot_reload()
 
     def allocate_window_renders(self) -> None:
@@ -255,6 +264,10 @@ class DeepFlowRender(RenderBase):
                 layer.allocate(*size, GL_RGBA16F)
 
     def deallocate(self) -> None:
+        # the recording ends first: its encode finishes and frees its CUDA memory, then its GL objects go
+        self.settings.screen_recorder.unbind(ScreenRecorderSettings.snap, self._on_snap)
+        self.screen_recorder.stop()
+        self.screen_recorder.deallocate()
         for cam_dict in self.L.values():
             for layer in cam_dict.values():
                 layer.deallocate()
@@ -439,8 +452,51 @@ class DeepFlowRender(RenderBase):
     def draw_main(self, width: int, height: int) -> None:
         if self.settings.main_view == MainView.SHOW:
             self._draw_show(width, height)      # the show alone, on one screen
-            return
+        else:
+            self._draw_panels(width, height)
+        self._draw_screen_recording(width, height)
 
+    def _draw_screen_recording(self, width: int, height: int) -> None:
+        """The screen frame, when the recorder records this tick: the `record` layers, each fit and centered at its
+        own shape and added on black as the show draws them, or the main window just drawn; then the recorder's
+        tick, which copies it."""
+        recorder_settings: ScreenRecorderSettings = self.settings.screen_recorder
+        if self.screen_recorder.capturing:
+            capture: ScreenCapture = self._screen_capture
+            if recorder_settings.main_window:
+                capture.copy_window(width, height, recorder_settings.fill)
+            else:
+                place = fill if recorder_settings.fill else fit
+                capture.frame.begin()
+                clear_color()
+                Style.reset_state()
+                Style.push_style()
+                Style.set_blend_mode(Style.BlendMode.ADD)
+                for layer_type in self.settings.layer.select.record:
+                    if 0 in self.L[layer_type]:
+                        x, y, w, h = place(*self._layer_size(layer_type), capture.width, capture.height)
+                        glViewport(round(x), round(y), round(w), round(h))
+                        self.L[layer_type][0].draw()
+                Style.pop_style()
+                capture.frame.end()
+            glViewport(0, 0, width, height)
+        self.screen_recorder.update(self.window_manager.frame_time)
+
+    def _on_snap(self, _: bool) -> None:
+        """The recording's size: the first `record` layer's, or the main window's when it is recorded."""
+        recorder_settings: ScreenRecorderSettings = self.settings.screen_recorder
+        record: list[Layers] = self.settings.layer.select.record
+        if recorder_settings.main_window:
+            width, height = self._window_size
+        elif record:
+            width, height = self._layer_size(record[0])
+        else:
+            return
+        recorder_settings.width = width
+        recorder_settings.height = height
+
+    def _draw_panels(self, width: int, height: int) -> None:
+        """The debug panels: the left and the right layers, side by side or stacked."""
         clear_color()
 
         Style.reset_state()
