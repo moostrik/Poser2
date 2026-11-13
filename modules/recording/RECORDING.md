@@ -236,51 +236,51 @@ What the code shows, which the plan rests on:
   without an info line, which shows the frames as stored, already mirrored, and makes no homography without
   readings. So it plays right as it is, with no layout number.
 - The OAK-D straightens on the device (the warp), so its frames carry no homography; only the OAK4's do.
-- `mirrored_intrinsics` and `mirrored_alignment` exist, unused: the lens and the depth's alignment of a mirrored
-  frame.
+- The OAK-D mirrors on the device (`flip_h` in the warp's mesh) and hands its frames over with `flip_h` False, its
+  detector's boxes found on the mirrored frame: hd_trio's and white_space's frames come as seen, and stored as
+  delivered they are stored as seen. Only the OAK4 delivers unmirrored, and deep_flow stores as delivered.
+- While a chunk is recorded, its color stream is `<cam>_C_<chunk>.mp4`, h264 at a constant `fps` (`StreamWriter`
+  pipes raw frames at `fps`): the old recordings' layout.
 
 The steps, a commit each:
 
 1. **The container**, a recorder setting (`container`): `MKV`, as now (color, depth, the metadata attached), or
-   `MP4`: the color stream as `<cam>_<chunk>.mp4`, h264 at a constant `fps` so any player plays it, and the same
-   metadata lines beside it as `<cam>_<chunk>.jsonl`. `MP4` holds no depth: with depth asked for it records color
-   and warns once. A frame lost live is a frame missing from the mp4: another player shows the rest a frame early
-   **(deduction)**, ours plays the recorded times.
-2. **The reader** finds both: `RecordingFolder` lists `<cam>_<chunk>.mp4` as a chunk, `read_metadata` reads the
-   `.jsonl` beside it, and `ChunkReaders` plays it as a chunk without depth. The old `<cam>_C_<chunk>.mp4` clips
-   play as now.
-3. **The stored frames**, a recorder setting (`mirror`): off, as the camera delivered them (as now); on, mirrored as
-   seen: the recorder mirrors the image (`mirrored_image`), the tracklets' boxes and keypoints, the poses' boxes and
-   points, the lens (`mirrored_intrinsics`) and the depth's alignment (`mirrored_alignment`), and writes `flip_h`
-   False. A replay then shows it as stored, with no change to the player.
-4. **The first frame's parts**: the recorder is told at its start which parts each camera sends
+   `MP4`: the recorder keeps its stream files, `<cam>_C_<chunk>.mp4`, and writes the metadata beside them as
+   `<cam>_M_<chunk>.jsonl`, the same lines, instead of merging. `MP4` holds no depth: with depth asked for it records
+   color and warns once. The container decides the color file's extension; `video_format` is the codec alone. A frame
+   lost live is a frame missing from the mp4: another player shows the rest a frame early **(deduction)**, ours plays
+   the recorded times. "What is recorded" gains the `MP4` layout.
+2. **The reader**: the clip path reads the `.jsonl` beside a `<cam>_C_<chunk>.mp4` when there is one, so a new `MP4`
+   recording plays at its recorded times with its metadata, and an old one at `fps` as now.
+3. **The first frame's parts**: the recorder is told at its start which parts each camera sends
    (`Recorder.expect_parts`, wired by the app), so a camera's first frame waits for its tracklets and poses as every
    later one does.
-5. **The folder's name** takes a counter when the folder exists, so two recordings started in one second get two
+4. **The folder's name** takes a counter when the folder exists, so two recordings started in one second get two
    folders.
 
 Checked by tests through the real encoders: an `MP4` recording with its `.jsonl` played back, the frames at their
 recorded times and the metadata whole, and its mp4 opened by ffprobe alone at a constant rate; an `MKV` recording
-as now; a mirrored recording whose replay shows the frames, boxes and points where the unmirrored one's uploader
-puts them; the first frame with its tracklets; two folders in one second; one of white_space's recordings in
-`apps/white_space/data/recordings` played through the reader. deep_flow live records and plays as before.
+as now; the first frame with its tracklets; two folders in one second. Checked once by hand: one of white_space's
+recordings in `apps/white_space/data/recordings` played through the reader. deep_flow live records and plays as
+before.
 
 Not in this plan:
 
 - The OAK-D's capture time: the oak backend (depthai 2) stamps a frame's arrival, so hd_trio and white_space record
   USB's jitter in their times. Oak4's `capture_time` shows the way; it needs an OAK-D to test, and comes with the
   apps' move ([the app refactor](../../apps/REFACTOR.md)).
-- hd_trio and white_space: their settings (`MP4`, `mirror` for hd_trio), their wiring (tracklets through the
-  uploader, `expect_poses` per camera and image), and hd_trio's pose `.h5` cut at the recorder's split, with their
-  refactors.
+- hd_trio and white_space: their settings (`MP4` for hd_trio), their wiring (tracklets through the uploader,
+  `expect_poses` per camera and image), and hd_trio's pose `.h5` cut at the recorder's split, with their refactors.
+- The glossary's `Encoder` for `CoderFormat` and `CoderType`: a rename through `modules/video` and the three apps.
 
 The rules it touches:
 
-- A package is one thing, and its name is that thing: the container and the mirror are the recorder's
+- A package is one thing, and its name is that thing: the container is the recorder's
 - Its `__init__.py` holds what other packages use: `Container` exported for the apps' settings
-- Keep presets and settings schemas in sync with code changes: two recorder settings, at their defaults in no preset
-- Name a concept after what it is in the domain: `container`, `mirror`
-- A plan step that is checked by a run or a test is one commit: steps 1 to 5
+- Keep presets and settings schemas in sync with code changes: one recorder setting, at its default in no preset
+- Name a concept after what it is in the domain: `container`; `video_format` the codec alone
+- Use the terms in glossary.md: `CoderFormat` and `CoderType` stay until their rename
+- A plan step that is checked by a run or a test is one commit: steps 1 to 4
 
 ### 3. The poses the pose model drops
 
