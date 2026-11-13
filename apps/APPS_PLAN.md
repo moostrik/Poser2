@@ -12,8 +12,7 @@ thread runs only the camera, and every drop is counted on the panel ([INPUT_THRE
 ## C. white_space back
 
 white_space (four mono OAK-D cameras at 23 fps, the panoramic tracker, the light) runs on `.venv` (depthai 2, the
-`oak` backend), no depth; on this branch it stops at start: it calls the frame source's `process` without the
-images the crop needs, which `PoseInference` refuses. Its cameras send no keypoints, so the camera-keypoint path
+`oak` backend), no depth. Its cameras send no keypoints, so the camera-keypoint path
 deep_flow has reaches it only when they do. Every receiver works on its own thread, as in deep_flow
 ([INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md)), but its input is a different model: deep_flow uploads frame
 by frame, color first to start the pose and depth after it, paired by `CaptureSync`; white_space's four cameras'
@@ -38,24 +37,19 @@ uploader. white_space's `BatchUploader` is built beside it: a set in (`submit_se
 oldest set dropped whole and counted; uploaded as one stack per frame size; each image to its image callbacks and
 the set as its `ImageSnapshot` to its snapshot callbacks. `CameraSync` hands on a set
 (`add_set_callback(callback(items))`, each camera's newest message by `cam_id`, a camera more than a frame behind
-left out).
+left out). white_space is wired on them: the frames' sync hands its set to the `BatchUploader`, whose snapshot
+callback calls `TrackerFrameSource.submit`; the tracklets' sync hands its set to `tracker.update` at the newest of
+their times; the tracklets go as they come to the tracker, the board, the journal (which queues them raw) and the
+tracklets' sync; the threads start after the wiring, before the cameras.
 
-4. **white_space's wiring.** The frames: each camera hands its frames to the frames' `CameraSync` and the recorder,
-   and nothing else; the frames' sync hands its set to the `BatchUploader`, whose snapshot callback calls
-   `TrackerFrameSource.submit` with each camera's capture time; the tracklets' sync hands its set of messages to
-   `tracker.update`, which takes the newest of their times, as its `(timestamp)` did. The tracklets, as they
-   come: each camera hands its tracklet messages straight to the tracker
-   (`submit_cam_tracklets`), the board, the tracker journal, the tracklets' `CameraSync` and the recorder, each a
-   store or an enqueue (the journal's `submit_cam_tracklets` checked for it), never through an uploader: the `oak`
-   backend's frames carry no homography and no mirror (the device warps and flips), so there is nothing to
-   straighten.
 5. **The recorder.** Built for every app ([RECORDING_PLAN.md](../modules/recording/RECORDING_PLAN.md#2-the-recorder-in-the-other-apps)):
    white_space's settings and wiring, `expect_parts` per camera, `expect_poses` per camera and image (the frame source's asked
-   callback). The OAK-D's capture stamp, as the oak4's `capture_time`, needs an OAK-D to test. Old show recordings
+   callback), the tracklets handed to it by each camera as they come. The OAK-D's capture stamp, as the oak4's `capture_time`, needs an OAK-D to test. Old show recordings
    keep playing; new ones are the new layout.
 6. **The calibration layer** (`test_calibration.py`) reads the uploaded image instead of the CPU frame the camera's
    thread puts on the board: it reduces its band of rows to one row on the GPU, queues the row's copy into pinned
-   memory with an event, and uses on a later tick the newest row whose event has passed, so nothing waits.
+   memory with an event, and uses on a later tick the newest row whose event has passed, so nothing waits. The
+   board's video images and `_store_video_frame` go with it.
 7. **The clip camera** (`oak.ClipCamera`, a recording played through an OAK) hands over as the camera does;
    checked only at the rig, as it needs an OAK.
 8. **The drops on the panel**, as deep_flow's: the uploader's sets, the sync's, the frame source's, the pipeline's,
@@ -64,14 +58,10 @@ left out).
    classes: the camera's thread per frame, the syncs per second against the cameras' rate, the uploader's time per
    set, the pose rate per camera, the pose latency (RAW, SMOOTH), the tracker's update rate, the drops.
 
-What goes from white_space's wiring: `PoseInference`'s `set_camera_frame`, `add_gpu_image_callback`,
-`add_camera_images_callback`, `_store_video_frame` and the board's video images, and the
-frame sync's callback to `process`. `CameraSync`'s `add_sync_callback` goes for `add_set_callback`; hd_trio's
-`main.py` uses the old one and follows in E (it stops at start on this branch already).
+hd_trio's `main.py` still uses `CameraSync`'s `add_sync_callback` and follows in E (it stops at start on this branch
+already).
 
-Each thread (the `BatchUploader`, the two `CameraSync`s, the frame source, the pipeline) is started by `main.start` after
-the wiring, before the cameras, and stopped by `main.stop` after the cameras and the uploader, before the pose
-model. If a sync's wait (`Wait camera sync …`) comes out in milliseconds: the switch interval is lowered
+If a sync's wait (`Wait camera sync …`) comes out in milliseconds: the switch interval is lowered
 (`sys.setswitchinterval`, 0.5 ms to start), and a sender that keeps running Python after it queues is changed to
 give up the GIL; if that still does not hold the latencies, the sync stays on its sender's thread as a stated
 exception to the rule, chosen by the measurement.

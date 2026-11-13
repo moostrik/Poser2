@@ -205,7 +205,7 @@ class TrackerJournal:
         if kind == 'in':
             _, t, cam_id, tracklets = entry
             return json.dumps({'k': 'in', 't': t, 'cam': cam_id,
-                               'items': [in_item(x) for x in tracklets]})
+                               'items': [in_item(Tracklet.from_camera(x)) for x in tracklets]})
         if kind == 'obs':
             _, t, observations = entry
             return json.dumps({'k': 'obs', 't': t, 'items': [obs_item(x) for x in observations]})
@@ -224,11 +224,11 @@ class TrackerJournal:
 
     # INTAKE — wired beside the board's taps; one flag check when idle, one queue put capturing
     def submit_cam_tracklets(self, cam_tracklets: CameraTracklets) -> None:
-        """The raw camera tracklets, converted exactly as the tracker converts them."""
+        """The raw camera tracklets, queued as they came; the journal's thread converts them exactly as the tracker
+        converts them."""
         if not self._capturing:
             return
-        tracklets: list[Tracklet] = [Tracklet.from_camera(t) for t in cam_tracklets.tracklets]
-        self._put(('in', time.time(), cam_tracklets.cam_id, tracklets))
+        self._put(('in', time.time(), cam_tracklets.cam_id, cam_tracklets.tracklets))
 
     def submit_observations(self, observations: list[Tracklet]) -> None:
         """Every observation plus every rejected detection — once per tracker tick."""

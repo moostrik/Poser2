@@ -16,7 +16,7 @@ from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, TrackerFrameSource
 from modules.pose import features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import detection, CameraSync, PoseInference
+from modules.inference import detection, BatchUploader, CameraSync, ImageSnapshot, PoseInference, SyncMessage
 from modules.session import Session
 
 from .board import RenderBoard
@@ -38,9 +38,6 @@ logger = logging.getLogger(__name__)
 
 class WhiteSpaceMain:
     def __init__(self, simulation: bool = False, interface: bool = True) -> None:
-        raise RuntimeError("white_space waits for the input refactor: the uploader has its own thread now, and white_space still runs its "
-                           "pose step on the camera's thread (modules/flow/FLOW_PLAN.md, line 4). Run it from the main branch.")
-
         self.is_running: bool = False
         self.is_finished: bool = False
 
@@ -100,16 +97,16 @@ class WhiteSpaceMain:
             for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.frame_sync = CameraSync(self.settings.camera.frame_sync, False, 'frame_sync')
+        self.uploader = BatchUploader()          # a synced set of the cameras' frames onto the GPU as one batch, on its own thread
         self.tracker = PanoramicTracker(self.settings.tracker, max_players, num_cams)
         self.tracklet_sync = CameraSync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
         self.pose_inference = PoseInference(ps.image_crop, ps.pose)      # the crop and the pose model, the frame domain's async step
-        if self.person_detector is not None:
-            self.pose_inference.add_gpu_image_callback(self.person_detector.submit)     # it looks at the uploaded images
 
+        # The camera's thread only hands its frames and tracklets over: the frames to the recorder and the frames'
+        # sync, the tracklets as they come to the tracker, the board and the tracklets' sync (the journal's below)
         for camera in self.cameras:
+            camera.add_frame_callback(self.frame_sync.submit_frame)          # the live path first, the recorder after it
             camera.add_frame_callback(self.video_recorder.submit_frame)
-            camera.add_frame_callback(self.pose_inference.set_camera_frame)
-            camera.add_frame_callback(self.frame_sync.submit_frame)
             camera.add_tracklet_callback(self.tracker.submit_cam_tracklets)
             camera.add_tracklet_callback(self.board.set_camera_tracklets)
             camera.add_tracklet_callback(self.tracklet_sync.submit_tracklets)
@@ -124,8 +121,17 @@ class WhiteSpaceMain:
         # The unfused view, for the calibration display only — two observations of one person on
         # a seam, which the line above reduces to one.
         self.tracker.add_observation_callback(self.board.set_observations)
-        self.tracklet_sync.add_sync_callback(self.tracker.update)
-        self.frame_sync.add_sync_callback(self.frame_source.process)
+
+        # THE SYNCS' HAND-OFFS, each on its own thread: the frames' set to the uploader, the tracklets' to the tracker
+        self.frame_sync.add_set_callback(self.uploader.submit_set)
+        self.tracklet_sync.add_set_callback(self._on_tracklet_set)
+
+        # THE UPLOADER'S HAND-OFFS, in order on its thread: each uploaded image to the detector (-sim) and the board,
+        # then the set's snapshot to the frame source
+        if self.person_detector is not None:
+            self.uploader.add_gpu_image_callback(self.person_detector.submit)
+        self.uploader.add_gpu_image_callback(self.board.set_camera_image)
+        self.uploader.add_snapshot_callback(self._on_snapshot)
 
         # DIAGNOSIS — a subscribe-only journal of the tracker's inputs, observations and emitted
         # primaries (JSONL under data/diagnosis), for dissecting identity incidents offline.
@@ -139,11 +145,10 @@ class WhiteSpaceMain:
         self.tracker.add_observation_callback(self.tracker_journal.submit_observations)
         self.tracker.add_tracklet_callback(self.tracker_journal.submit_tracklets)
 
-        self.pose_inference.add_camera_images_callback(self.board.set_camera_images)
         self.pose_inference.add_crop_callback(lambda _f, gpu: self.board.set_crop_images(gpu))
 
-        # POSE PIPELINE — the stages are declared in pose/pipeline.py. The camera's frame bang drives the frame
-        # domain through the tracklet poses; the light tick drives the output domain (LERP, where the dummy joins).
+        # POSE PIPELINE — the stages are declared in pose/pipeline.py. Each uploaded set drives the frame domain
+        # through the tracklet poses (`_on_snapshot`); the light tick drives the output domain (LERP, where the dummy joins).
         # Every stage's frames and group record go to the board, which also reads each stage's window; the sound
         # reads LERP, and so do the instrument and the state machine (the group sync on the LERP record).
         self.pipeline = PosePipeline(pipeline_spec(ps, self.settings.light, self.frame_source, self.pose_inference,
@@ -206,6 +211,11 @@ class WhiteSpaceMain:
 
         if self.person_detector is not None:
             self.person_detector.start()
+        self.pipeline.start()
+        self.frame_source.start()
+        self.uploader.start()
+        self.frame_sync.start()
+        self.tracklet_sync.start()
         for camera in self.cameras:
             camera.start()
 
@@ -233,6 +243,16 @@ class WhiteSpaceMain:
     def _on_sound_level_right(self, level: float = 0.0, *_rest: object) -> None:
         """OSC callback for /WS/idle/blue/right — store the Max soundscape's right level."""
         self.board.set_sound_level_right(float(level))
+
+    def _on_snapshot(self, snapshot: ImageSnapshot) -> None:
+        """An uploaded set, on the uploader's thread: the frame source's bang for it, each player judged on its own
+        camera's capture time, with exactly those images for the crop."""
+        self.frame_source.submit(snapshot[2], snapshot)
+
+    def _on_tracklet_set(self, items: dict[int, SyncMessage]) -> None:
+        """A set of the cameras' tracklet messages, on the tracklets' sync's thread: the tracker's update, at the newest
+        of their capture times."""
+        self.tracker.update(max(message.timestamp for message in items.values()))
 
     def _store_video_frame(self, frame: CameraFrame) -> None:
         """Camera frame callback — store raw VIDEO frames on the board for the light renderer."""
@@ -279,6 +299,11 @@ class WhiteSpaceMain:
             self.player.stop()
         for camera in self.cameras:
             camera.stop()
+        self.frame_sync.stop()
+        self.tracklet_sync.stop()
+        self.uploader.stop()
+        self.frame_source.stop()
+        self.pipeline.stop()
         self.video_recorder.stop()
 
         self.tracker.stop()
