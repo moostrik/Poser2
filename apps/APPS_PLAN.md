@@ -52,9 +52,6 @@ as the camera's do, and through the same callbacks without one (`clip_passthroug
 The -sim runs are done (white_space on `20250514-130512_4_wide_mono` 23–31 s in replay with its detector engine,
 and a recording of it played back; deep_flow on `measure` 9–19 s). Open from them:
 
-- deep_flow's color upload went from 6.1 to 9.0 ms mean, its latencies 2–4 ms with it, one run each (measured);
-  the cause, the shared `ImageUpload`'s stack per single frame or the snapshot callback inside the timed span, is
-  inferred.
 - The recording over 6.8 s of playhead holds 127 frames per camera, about 1.3 s fewer, none counted missed or
   dropped (measured); the recorder's start is not yet traced.
 

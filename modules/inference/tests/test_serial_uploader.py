@@ -211,6 +211,21 @@ class ImageUploadTest(unittest.TestCase):
             self.assertEqual(tuple(image.shape), (3, 48, 64))
             self.assertTrue(torch.allclose(image.float(), alone[0].float(), atol=1e-3))
 
+    def test_an_nv12_stack_all_straightened_gives_each_image_as_one_by_one_does(self) -> None:
+        rng = np.random.default_rng(1)
+        shift = np.array([[1.0, 0.0, 0.1], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+        frames = [CameraFrame(cam, FrameType.VIDEO, rng.integers(0, 255, (72, 64), np.uint8), 1.0, nv12=True,
+                              homography=shift, flip_h=cam == 1) for cam in range(3)]
+        stream = torch.cuda.Stream()
+        stacked, ready = ImageUpload().upload(frames, stream)
+        ready.synchronize()
+        single = ImageUpload()
+        for frame, image in zip(frames, stacked):
+            alone, alone_ready = single.upload([frame], stream)
+            alone_ready.synchronize()
+            self.assertEqual(tuple(image.shape), (3, 48, 64))
+            self.assertTrue(torch.allclose(image.float(), alone[0].float(), atol=1e-3))
+
 
 if __name__ == '__main__':
     unittest.main()
