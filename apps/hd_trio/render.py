@@ -79,11 +79,6 @@ class HDTrioRender(RenderBase):
         self.L: dict[Layers, dict[int, ls.LayerBase]] = {layer: {} for layer in Layers}
         self._stages: dict[ShowStage, list[StageLayer]] = {stage: [] for stage in STAGES}
 
-        # Set data.b overrides
-        settings.data.b.line_width = 6.0
-        settings.data.b.line_smooth = 6.0
-        settings.data.b.use_history_color = True
-
         # intro sequence overlay — shared objects must exist before the per-camera loop
         self._intro_proxy = SequenceDataProxy()
         self._intro_player = IntroSequencePlayer(settings.intro_sequence, self.num_cams, data_path=data_path)

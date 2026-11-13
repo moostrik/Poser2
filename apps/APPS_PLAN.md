@@ -96,13 +96,9 @@ Reported: 5, hd_trio held up to the rules; its findings are 7 to 9. Built: 6, th
 (`crop.Settings.enable_prev_crop`): only the optical-flow model reads it, and no app turns it on; 7, the show's
 sequencer takes the panel's start, stop, skip and playlist changes as requests carried out at the next tick, its
 callbacks under their own lock and logged with their traceback, and the intro player plays on the tick's time;
-both, and `main`, unbind on stop what they bind.
+both, and `main`, unbind on stop what they bind; 8, the render's constructor writes no settings (its `data.b`
+values are the presets').
 
-8. **The render's inputs, not its settings.** The fluid's fade and the similarity scale reach the fluid through
-   its input each tick (`FluidInput`), as `dt` does, instead of the render and the show stages writing
-   `fluid.density.fade_time` and `similarity_scale`; the render's three `data.b` values go into the presets.
-   Checked by: the render and flow tests, hd_trio's tests and its -sim run
-   (20 s, the fluid drawing, no error).
 9. **Its document and names.** `HD_TRIO.md` holds the app's reasons, now in its comments and the settings'
    docstring, which say what each thing is; the render's names say what they hold (`lut`, `cmt`, `seq`); its
    imports in order. Checked by: hd_trio's tests and the guard tests.
@@ -111,6 +107,12 @@ both, and `main`, unbind on stop what they bind.
    does not run, and a submit before `start` is an error. Checked by: the apps' tests and the inference, tracker,
    pose and recording tests, and each app's start for 10 s: deep_flow, white_space and hd_trio in -sim, smile on
    its image input.
+
+Parked for [the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2d-flow-follows-the-3d), which rebuilds the 2D
+fluid and its input: hd_trio's render writes `fluid.density.fade_time` every tick from the player's motion, and its
+show stages write `similarity_scale` (and the center geometry's `stage`), settings used to carry values while
+running; they reach the fluid and the color mask through their inputs once those are rebuilt, instead of changing
+`Fluid2D`, which that line replaces, now.
 
 ## Details
 
