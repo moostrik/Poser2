@@ -49,17 +49,6 @@ kinks show as the cells in a sharp density. A tricubic read where the amount is 
 for 1 at each of 199 M texels a step, twice that with MacCormack **(deduction)**; kept if the look gains
 for its cost.
 
-### Swirls at more than one size
-
-The confinement keeps swirls alive at one size, `vorticity_radius`: fine wisps or big eddies, not both.
-More than one radius, each with its own strength (multi-scale vorticity confinement), keeps fine and large
-at once. Starting with two: the curl at both radii in the same pass (six more velocity reads a cell), the
-force from both curls in one pass (a curl volume more), their sum added to the faces once. About a third
-to a half more of the confinement's 0.57 ms at the preset, 0.2 to 0.3 ms **(deduction)**, measured as it
-lands. The fine density's turbulence already adds swirls below the grid to the dye, so what a second
-radius adds to the look is judged against it, and by whether the layers stay apart: the confinement
-also carries one layer's motion into the next.
-
 ### The fade and the evaporation
 
 Each field's `fade_time` (seconds to 1%, a share at a time) and `evaporation_time` (seconds a full value takes
@@ -180,8 +169,8 @@ Not worked on until asked for; each with what is known.
   recording, and the grid is built only if it is under half.
 - MacCormack's cost at 4K: a 4K texel reads 41 texels a step against semi-Lagrangian's 16 (the
   predictor, the velocity again, the forward trace, the cell, the limiter's eight), 3.7 ms for the
-  4K × 16 density. Two ways down: MacCormack on the velocity and semi-Lagrangian on the 4K density,
-  a setting; or the predictor reading its eight texels itself and keeping their min and max for the
+  4K × 16 density, where each field's `advection` already lets the 4K density run semi-Lagrangian. The
+  way down left: the predictor reading its eight texels itself and keeping their min and max for the
   limiter, about a fifth less **(deduction)**.
 - The density's detail carried by a flow map (BiMocq², Qu et al. 2019): the coordinates moved on
   the coarse grid and the 4K density read through them, baked every half second; its benefit to be
