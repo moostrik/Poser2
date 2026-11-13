@@ -47,7 +47,10 @@ camera's frame is a set of one, so no step has a path of its own for one camera.
    own GPU work (depth's alignment does not batch).
 4. **The tracklets.** The uploader's tracklets go to the tracker (`submit_cam_tracklets`), the board, the tracker
    journal and the tracklets' `CameraSync`, each a store or an enqueue (the journal's `submit_cam_tracklets` checked
-   for it); the sync's callback is `tracker.update`, which sets the tracker's event.
+   for it); the sync's callback is `tracker.update`, which sets the tracker's event. The `oak` backend's frames
+   carry no homography and no mirror (the device warps and flips), so the uploader hands white_space's tracklets
+   on as they are; they wait for it behind a running upload (deep_flow's `Wait upload tracklets`: 3.2–4.3 ms mean,
+   15–18 ms p95), which C's run measures against `main`, where they go to the tracker directly.
 5. **The recorder.** Built for every app ([RECORDING_PLAN.md](../modules/recording/RECORDING_PLAN.md#2-the-recorder-in-the-other-apps)):
    white_space's settings and wiring, `expect_parts` per camera, `expect_poses` per camera and image (step 1's asked
    callback). The OAK-D's capture stamp, as the oak4's `capture_time`, needs an OAK-D to test. Old show recordings
@@ -76,8 +79,8 @@ give up the GIL; if that still does not hold the latencies, the sync stays on it
 exception to the rule, chosen by the measurement.
 
 Assumed, to confirm while building: the four cameras deliver one frame size (the batch stacks them; frames of
-another size go as their own set); a tracklet message still finds its frame noted, now that the frame reaches the
-uploader at the sync, up to half a frame later **(deduction: tracklets come about two frames after their frame)**.
+another size go as their own set). A tracklet message whose frame is not noted yet takes the newest frame's
+straightening and never waits (`Uploader._straightening_at`), and white_space's frames carry none.
 
 Checked by: `CameraSync`'s tests (a set per sync, a camera's newest frame), the uploader's (a set uploaded as one
 batch gives each image as one by one does; a set of one is deep_flow's upload; the oldest whole set dropped), the
@@ -86,7 +89,7 @@ row reduced on the GPU matches the CPU row of a recorded frame), white_space's p
 by a short -sim recording on the same recording, played back;
 a -sim run with the probe on `20250514-130512_4_wide_mono`, an old-layout recording without recorded tracklets, so
 in replay with the host detector (`simulator.replay`, `yolo`), not `ClipCamera`, which needs an OAK: the uploader's
-time per set, the pose latency.
+time per set, the pose latency, the tracklets' wait in the uploader and the tracker's update rate.
 Done when white_space starts on this branch, its camera threads only hand over (under 1 ms per frame at p95), every
 sync runs the pose step, the pose latency and the light's tick are no worse than on `main`, live and back to back,
 with you at the rig, and its tests pass.
