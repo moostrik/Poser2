@@ -1,5 +1,6 @@
 """CaptureSync: the image, the depth, the poses and the masks of one moment of capture, matched by time; without a GPU or a camera."""
 
+import threading
 import time
 import unittest
 from typing import cast
@@ -45,33 +46,43 @@ class CaptureSyncTest(unittest.TestCase):
         self.settings.initialize()
         self.sync = CaptureSync(self.settings)
         self.captures: list[Capture] = []
-        self.sync.add_capture_callback(self.captures.append)
+        self.threads: list[str] = []
+
+        def on_capture(capture: Capture) -> None:
+            self.captures.append(capture)
+            self.threads.append(threading.current_thread().name)
+        self.sync.add_capture_callback(on_capture)
         self.sync.start()
 
     def tearDown(self) -> None:
         self.sync.stop()
 
+    def captured(self) -> list[Capture]:
+        """The captures handed on once everything submitted is matched."""
+        self.sync.settle()
+        return self.captures
+
     def test_an_image_and_its_depth_make_a_capture_when_nobody_is_in_view(self) -> None:
         self.sync.submit_image(image(1.0))
-        self.assertEqual(self.captures, [])
+        self.assertEqual(self.captured(), [])
         self.sync.submit_depth(depth(1.0005))                   # within the tolerance
-        self.assertEqual(len(self.captures), 1)
+        self.assertEqual(len(self.captured()), 1)
         self.assertEqual((self.captures[0].timestamp, self.captures[0].poses, self.captures[0].poses_synced), (1.0005, {}, False))
 
     def test_poses_in_before_the_depth_are_synced(self) -> None:
         self.sync.submit_image(image(1.0))
         self.sync.submit_poses(poses(1.0))
         self.sync.submit_depth(depth(1.0))
-        self.assertTrue(self.captures[0].poses_synced)
+        self.assertTrue(self.captured()[0].poses_synced)
         self.assertEqual(self.captures[0].poses[0].timestamp, 1.0)
 
     def test_with_a_player_in_view_the_capture_waits_for_its_own_poses(self) -> None:
         self.sync.submit_poses(poses(1.0 - FRAME))              # a player is in view
         self.sync.submit_image(image(1.0))
         self.sync.submit_depth(depth(1.0))
-        self.assertEqual(self.captures, [])                     # its poses are still on their way
+        self.assertEqual(self.captured(), [])                   # its poses are still on their way
         self.sync.submit_poses(poses(1.0))
-        self.assertEqual(len(self.captures), 1)
+        self.assertEqual(len(self.captured()), 1)
         self.assertTrue(self.captures[0].poses_synced)
 
     def test_poses_that_do_not_come_in_time_leave_the_capture_with_the_ones_before(self) -> None:
@@ -93,13 +104,13 @@ class CaptureSyncTest(unittest.TestCase):
         self.assertTrue(wait_for(lambda: len(self.captures) == 1))
         self.sync.submit_image(image(1.0 + FRAME))
         self.sync.submit_depth(depth(1.0 + FRAME))              # the player left: no poses waited for
-        self.assertEqual(len(self.captures), 2)
+        self.assertEqual(len(self.captured()), 2)
 
     def test_a_depth_frame_that_never_met_its_image_is_a_miss(self) -> None:
         self.sync.submit_depth(depth(1.0))                      # its image was dropped
         self.sync.submit_image(image(1.0 + FRAME))
         self.sync.submit_depth(depth(1.0 + FRAME))
-        self.assertEqual([c.timestamp for c in self.captures], [1.0 + FRAME])
+        self.assertEqual([c.timestamp for c in self.captured()], [1.0 + FRAME])
         self.assertEqual(self.settings.misses, 1)
 
     def test_a_capture_waiting_for_its_poses_goes_out_when_a_newer_one_is_complete(self) -> None:
@@ -108,7 +119,7 @@ class CaptureSyncTest(unittest.TestCase):
         self.sync.submit_depth(depth(1.0))                      # waits for its poses
         self.sync.submit_image(image(1.0 + FRAME))
         self.sync.submit_depth(depth(1.0 + FRAME))              # complete: the waiting one goes out, with what it has,
-        self.assertEqual([c.timestamp for c in self.captures], [1.0, 1.0 + FRAME])     # then this one, the poses behind
+        self.assertEqual([c.timestamp for c in self.captured()], [1.0, 1.0 + FRAME])  # then this one, the poses behind
         self.assertFalse(self.captures[0].poses_synced or self.captures[1].poses_synced)
         self.assertEqual(self.settings.misses, 0)
 
@@ -117,14 +128,14 @@ class CaptureSyncTest(unittest.TestCase):
             self.sync.submit_image(image(1.0 + i * FRAME))
         for i in range(5):
             self.sync.submit_depth(depth(1.0 + i * FRAME))
-        self.assertEqual([c.timestamp for c in self.captures], [1.0 + i * FRAME for i in range(5)])
+        self.assertEqual([c.timestamp for c in self.captured()], [1.0 + i * FRAME for i in range(5)])
 
     def test_with_pose_wait_zero_nothing_waits(self) -> None:
         self.settings.pose_wait = 0.0
         self.sync.submit_poses(poses(1.0 - FRAME))              # a player is in view
         self.sync.submit_image(image(1.0))
         self.sync.submit_depth(depth(1.0))
-        self.assertEqual(len(self.captures), 1)
+        self.assertEqual(len(self.captured()), 1)
         self.assertEqual(self.captures[0].poses[0].timestamp, 1.0 - FRAME)
 
     def test_masks_in_before_the_depth_are_synced(self) -> None:
@@ -132,7 +143,7 @@ class CaptureSyncTest(unittest.TestCase):
         self.sync.submit_poses(poses(1.0))
         self.sync.submit_masks(*masks(1.0))
         self.sync.submit_depth(depth(1.0))
-        self.assertEqual(len(self.captures), 1)
+        self.assertEqual(len(self.captured()), 1)
         self.assertTrue(self.captures[0].masks_synced)
         self.assertEqual(float(self.captures[0].masks[0].mask[0]), 1.0)
 
@@ -141,9 +152,9 @@ class CaptureSyncTest(unittest.TestCase):
         self.sync.submit_image(image(1.0))
         self.sync.submit_poses(poses(1.0))
         self.sync.submit_depth(depth(1.0))
-        self.assertEqual(self.captures, [])                     # its masks are still on their way
+        self.assertEqual(self.captured(), [])                   # its masks are still on their way
         self.sync.submit_masks(*masks(1.0))
-        self.assertEqual(len(self.captures), 1)
+        self.assertEqual(len(self.captured()), 1)
         self.assertTrue(self.captures[0].poses_synced and self.captures[0].masks_synced)
 
     def test_masks_that_do_not_come_in_time_leave_the_capture_with_the_ones_before(self) -> None:
@@ -163,21 +174,75 @@ class CaptureSyncTest(unittest.TestCase):
         self.sync.submit_image(image(1.0))
         self.sync.submit_poses(poses(1.0))
         self.sync.submit_depth(depth(1.0))                      # no RVM: nothing to wait for
-        self.assertEqual(len(self.captures), 1)
+        self.assertEqual(len(self.captured()), 1)
         self.assertEqual((self.captures[0].masks, self.captures[0].masks_synced), ({}, False))
 
     def test_a_result_without_masks_passes(self) -> None:
         self.sync.submit_masks(poses(1.0), {})                  # RVM found no mask: nothing to sync
         self.sync.submit_image(image(1.0))
         self.sync.submit_depth(depth(1.0))
-        self.assertEqual(len(self.captures), 1)
+        self.assertEqual(len(self.captured()), 1)
 
     def test_cameras_are_matched_apart(self) -> None:
         self.sync.submit_image(image(1.0, cam_id=0))
         self.sync.submit_depth(depth(1.0, cam_id=1))
-        self.assertEqual(self.captures, [])
+        self.assertEqual(self.captured(), [])
         self.sync.submit_image(image(1.0, cam_id=1))
-        self.assertEqual([(c.cam_id, c.timestamp) for c in self.captures], [(1, 1.0)])
+        self.assertEqual([(c.cam_id, c.timestamp) for c in self.captured()], [(1, 1.0)])
+
+    def test_captures_go_out_on_the_sync_thread(self) -> None:
+        self.sync.submit_image(image(1.0))
+        self.sync.submit_depth(depth(1.0))
+        self.assertEqual(len(self.captured()), 1)
+        self.assertEqual(self.threads, ['CaptureSync'])
+
+    def test_a_submit_returns_while_the_sync_hands_on_a_capture(self) -> None:
+        handed: threading.Event = threading.Event()
+        release: threading.Event = threading.Event()
+
+        def slow(capture: Capture) -> None:
+            handed.set()
+            release.wait(2.0)
+        self.sync.add_capture_callback(slow)
+        self.sync.submit_image(image(1.0))
+        self.sync.submit_depth(depth(1.0))
+        self.assertTrue(handed.wait(1.0))
+        start: float = time.perf_counter()
+        self.sync.submit_image(image(1.0 + FRAME))              # the sync's thread is held in the callback
+        self.assertLess(time.perf_counter() - start, 0.05)
+        release.set()
+
+    def test_a_stream_beyond_kept_drops_its_oldest_counted(self) -> None:
+        handed: threading.Event = threading.Event()
+        release: threading.Event = threading.Event()
+
+        def hold(capture: Capture) -> None:
+            handed.set()
+            release.wait(2.0)
+        self.sync.add_capture_callback(hold)
+        self.sync.submit_image(image(1.0))
+        self.sync.submit_depth(depth(1.0))
+        self.assertTrue(handed.wait(1.0))                       # the thread is held: what comes now waits in the inbox
+        for i in range(1, 11):
+            self.sync.submit_image(image(1.0 + i * FRAME))      # ten images, eight kept
+        release.set()
+        self.sync.settle()
+        self.sync.submit_image(image(2.0))
+        self.sync.submit_depth(depth(2.0))                      # a capture, so the count is published
+        self.sync.settle()
+        self.assertEqual(self.settings.dropped, 2)
+
+
+class CaptureSyncInlineTest(unittest.TestCase):
+    def test_without_its_thread_a_part_is_matched_on_the_caller(self) -> None:
+        settings = CaptureSyncSettings()
+        settings.initialize()
+        sync = CaptureSync(settings)
+        captures: list[Capture] = []
+        sync.add_capture_callback(captures.append)
+        sync.submit_image(image(1.0))
+        sync.submit_depth(depth(1.0))
+        self.assertEqual(len(captures), 1)
 
 
 if __name__ == '__main__':

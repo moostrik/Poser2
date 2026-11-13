@@ -9,24 +9,30 @@ the last capture, it waits up to `pose_wait` for its own, and while the masks ke
 `mask_wait` for its own; otherwise (nobody in view, no masks, or either behind) it takes the newest
 from before it at once, so a missing pose or mask never holds it longer. Every complete capture goes
 out, in the order of capture: one still waiting goes out with what it has as soon as a newer one is
-complete, so a late part never costs a capture. The wait runs on this sync's own thread: no submit
-blocks, and a capture goes out on whichever thread completes it, under one lock, so they leave in order.
-The parts are kept and found by capture time in `modules.camera.CaptureStream`s; an image or a depth no capture
-took is counted and warned of (`MissedParts`), the depths without an image as `misses`.
+complete, so a late part never costs a capture.
+
+The submits only queue what they take, on the threads they come on, at most `KEPT` of a stream per camera; beyond
+that the oldest is dropped, counted as `dropped`. The sync's own thread matches the parts in the order they came,
+waits for the next deadline in the same wait, and hands the captures on. While the thread does not run, a part is
+matched on the thread it comes on. The parts are kept and found by capture time in `modules.camera.CaptureStream`s;
+an image or a depth no capture took is counted and warned of (`MissedParts`), the depths without an image as
+`misses`.
 """
 
 from __future__ import annotations
 
 import logging
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass
-from threading import Condition, Lock, Thread
-from typing import TYPE_CHECKING
+from enum import IntEnum, auto
+from threading import Condition, Event, Lock, Thread
+from typing import TYPE_CHECKING, Any
 
 from modules.camera import CAPTURE_TOLERANCE, CaptureStream, MissedParts
 from modules.pose import FrameDict
 from modules.settings import BaseSettings, Field
+from modules.utils import PerformanceTimer
 
 from .capture import Capture, CaptureCallback
 from .source import GpuDepth, GpuImage
@@ -36,7 +42,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-KEPT: int = 8       # frames of each stream kept per camera: depth trails its image by about one
+KEPT: int = 8       # frames of each stream kept per camera, and queued per camera: depth trails its image by about one
 
 
 class CaptureSyncSettings(BaseSettings):
@@ -44,6 +50,16 @@ class CaptureSyncSettings(BaseSettings):
     pose_wait: Field[float] = Field(10.0, min=0.0, max=50.0, step=0.5, description="Longest a capture waits for its own poses (ms)")
     mask_wait: Field[float] = Field(8.0, min=0.0, max=50.0, step=0.5, description="Longest a capture waits for its own masks (ms)")
     misses:    Field[int]   = Field(0, access=Field.READ, description="Depth frames that found no image")
+    dropped:   Field[int]   = Field(0, access=Field.READ, description="Parts dropped while the sync fell behind")
+
+
+class _Part(IntEnum):
+    """What waits in the sync's inbox."""
+    IMAGE = 0
+    DEPTH = auto()
+    POSES = auto()      # (timestamp, one camera's poses)
+    MASKS = auto()      # (timestamp, one camera's masks)
+    SETTLE = auto()     # an Event, set once every part queued before it is matched
 
 
 @dataclass
@@ -62,9 +78,15 @@ class CaptureSync(Thread):
     def __init__(self, settings: CaptureSyncSettings) -> None:
         super().__init__(daemon=True, name='CaptureSync')
         self.settings: CaptureSyncSettings = settings
-        self._lock: Lock = Lock()
+        self._lock: Lock = Lock()                       # the inbox
         self._wake: Condition = Condition(self._lock)
         self._running: bool = False
+        self._inbox: deque[tuple[_Part, int, Any, float]] = deque()      # each with the moment it was queued
+        self._wait: PerformanceTimer = PerformanceTimer(name="Wait capture sync")
+        self._queued: dict[tuple[_Part, int], int] = defaultdict(int)     # what the inbox holds per stream and camera
+        self._dropped: int = 0
+        self._inline_lock: Lock = Lock()                # parts matched on the callers' threads while the thread does not run
+        # The sync's own, touched by one thread at a time
         self._images: dict[int, CaptureStream[GpuImage]] = defaultdict(lambda: CaptureStream(KEPT))
         self._depths: dict[int, CaptureStream[GpuDepth]] = defaultdict(lambda: CaptureStream(KEPT))
         self._poses: dict[int, CaptureStream[FrameDict]] = defaultdict(lambda: CaptureStream(KEPT))
@@ -72,69 +94,92 @@ class CaptureSync(Thread):
         self._last: dict[int, float] = {}               # the capture time of each camera's last capture
         self._waiting: dict[int, _Waiting] = {}
         self._missed: MissedParts = MissedParts('Capture sync')
-        self._emit_lock: Lock = Lock()                  # matching and sending as one step, so captures leave in order
+        self._callback_lock: Lock = Lock()
         self._callbacks: list[CaptureCallback] = []     # run in registration order
 
     def add_capture_callback(self, callback: CaptureCallback) -> None:
-        if callback not in self._callbacks:
-            self._callbacks.append(callback)
+        with self._callback_lock:
+            if callback not in self._callbacks:
+                self._callbacks.append(callback)
 
     # ── Lifecycle ──────────────────────────────────────────────────────
 
     def start(self) -> None:
-        self._running = True
+        with self._lock:
+            self._running = True
         super().start()
 
     def stop(self) -> None:
+        """The thread ends; what still waits in the inbox is dropped and logged."""
         with self._lock:
             self._running = False
+            dropped: list[tuple[_Part, int, Any, float]] = list(self._inbox)
+            self._inbox.clear()
+            self._queued.clear()
             self._wake.notify()
+        parts: int = 0
+        for part, _, value, _ in dropped:
+            if part == _Part.SETTLE:
+                value.set()             # nobody waits forever on a sync that stopped
+            else:
+                parts += 1
+        if parts:
+            logger.info("CaptureSync: %d parts dropped at stop", parts)
         if self.is_alive():
             self.join(timeout=2.0)
 
     def run(self) -> None:
-        """Send out a waiting capture whose deadline has passed, with what came in for it or before it."""
+        """Match what came in, in the order it came, and send out a waiting capture whose deadline has passed."""
         while True:
             with self._lock:
-                while self._running and not self._due():
-                    pass
+                while self._running and not self._inbox:
+                    remaining: float | None = self._remaining()
+                    if remaining is not None and remaining <= 0.0:
+                        break
+                    self._wake.wait(remaining)
                 if not self._running:
                     return
-            with self._emit_lock:
-                with self._lock:
-                    captures: list[Capture] = self._overdue()
+                parts: list[tuple[_Part, int, Any, float]] = list(self._inbox)
+                self._inbox.clear()
+                self._queued.clear()
+            try:
+                taken: float = time.perf_counter()
+                captures: list[Capture] = []
+                for part, cam_id, value, queued in parts:
+                    if part != _Part.SETTLE:
+                        self._wait.add_time((taken - queued) * 1000.0, report=False)
+                    captures += self._take(part, cam_id, value)
+                captures += self._overdue()
                 self._emit(captures)
+            except Exception:
+                logger.exception("CaptureSync: matching failed")
+                for part, _, value, _ in parts:
+                    if part == _Part.SETTLE:
+                        value.set()
 
-    # ── Inputs ─────────────────────────────────────────────────────────
+    def settle(self) -> None:
+        """Return once every part submitted before is matched and its capture, if complete, handed on."""
+        done: Event = Event()
+        self._queue(_Part.SETTLE, -1, done)
+        done.wait()
+
+    # ── Inputs: each queues and returns ────────────────────────────────
 
     def submit_image(self, image: GpuImage) -> None:
         """An uploaded color image (`Uploader`'s callback, the uploader's thread)."""
-        with self._emit_lock:
-            with self._lock:
-                self._images[image.cam_id].add(image.timestamp, image)
-                captures: list[Capture] = self._match(image.cam_id)
-            self._emit(captures)
+        self._queue(_Part.IMAGE, image.cam_id, image)
 
     def submit_depth(self, depth: GpuDepth) -> None:
         """An uploaded depth frame (`Uploader`'s GPU depth callback, the uploader's thread)."""
-        with self._emit_lock:
-            with self._lock:
-                self._depths[depth.cam_id].add(depth.timestamp, depth)
-                captures: list[Capture] = self._match(depth.cam_id)
-            self._emit(captures)
+        self._queue(_Part.DEPTH, depth.cam_id, depth)
 
     def submit_poses(self, poses: FrameDict) -> None:
         """A pipeline stage's poses, each camera's stamped with its image's time."""
         by_cam: dict[int, FrameDict] = defaultdict(dict)
         for track_id, pose in poses.items():
             by_cam[pose.cam_id][track_id] = pose
-        with self._emit_lock:
-            captures: list[Capture] = []
-            with self._lock:
-                for cam_id, cam_poses in by_cam.items():
-                    self._poses[cam_id].add(max(pose.timestamp for pose in cam_poses.values()), cam_poses)
-                    captures += self._match(cam_id)
-            self._emit(captures)
+        for cam_id, cam_poses in by_cam.items():
+            self._queue(_Part.POSES, cam_id, (max(pose.timestamp for pose in cam_poses.values()), cam_poses))
 
     def submit_masks(self, poses: FrameDict, masks: ImageDict) -> None:
         """RVM's masks per track_id, with the poses they were cut for, each stamped with its image's time.
@@ -147,15 +192,44 @@ class CaptureSync(Thread):
                 continue
             by_cam[pose.cam_id][track_id] = mask
             times[pose.cam_id] = max(times.get(pose.cam_id, pose.timestamp), pose.timestamp)
-        with self._emit_lock:
-            captures: list[Capture] = []
-            with self._lock:
-                for cam_id, cam_masks in by_cam.items():
-                    self._masks[cam_id].add(times[cam_id], cam_masks)
-                    captures += self._match(cam_id)
+        for cam_id, cam_masks in by_cam.items():
+            self._queue(_Part.MASKS, cam_id, (times[cam_id], cam_masks))
+
+    def _queue(self, part: _Part, cam_id: int, value: Any) -> None:
+        """Into the inbox, the stream's oldest dropped beyond `KEPT`; matched on this thread when the sync's does not run."""
+        with self._wake:
+            if self._running:
+                key: tuple[_Part, int] = (part, cam_id)
+                if part != _Part.SETTLE and self._queued[key] >= KEPT:
+                    for index, (queued, queued_cam, _, _) in enumerate(self._inbox):
+                        if queued == part and queued_cam == cam_id:
+                            del self._inbox[index]
+                            self._dropped += 1
+                            break
+                else:
+                    self._queued[key] += 1
+                self._inbox.append((part, cam_id, value, time.perf_counter()))
+                self._wake.notify()
+                return
+        with self._inline_lock:
+            captures: list[Capture] = self._take(part, cam_id, value)
             self._emit(captures)
 
-    # ── Matching, under the lock ───────────────────────────────────────
+    # ── Matching, on the sync's thread ─────────────────────────────────
+
+    def _take(self, part: _Part, cam_id: int, value: Any) -> list[Capture]:
+        if part == _Part.SETTLE:
+            value.set()
+            return []
+        if part == _Part.IMAGE:
+            self._images[cam_id].add(value.timestamp, value)
+        elif part == _Part.DEPTH:
+            self._depths[cam_id].add(value.timestamp, value)
+        elif part == _Part.POSES:
+            self._poses[cam_id].add(*value)
+        else:
+            self._masks[cam_id].add(*value)
+        return self._match(cam_id)
 
     def _match(self, cam_id: int) -> list[Capture]:
         """This camera's complete moments newer than its last capture, oldest first: each out with its poses and
@@ -182,26 +256,19 @@ class CaptureSync(Thread):
                 waiting: _Waiting | None = self._waiting.get(cam_id)
                 if waiting is None or waiting.depth is not depth:
                     self._waiting[cam_id] = _Waiting(image, depth, time.perf_counter() + wait)
-                    self._wake.notify()
                 break
             captures.append(self._capture(image, depth))
             last = depth.timestamp
         return captures
 
-    def _due(self) -> bool:
-        """Whether a waiting capture's deadline has passed, after waiting for the earliest one."""
+    def _remaining(self) -> float | None:
+        """The seconds until the earliest waiting capture's deadline; None while none waits."""
         if not self._waiting:
-            self._wake.wait()
-            return False
-        waiting: _Waiting = min(self._waiting.values(), key=lambda item: item.deadline)
-        remaining: float = waiting.deadline - time.perf_counter()
-        if remaining > 0.0:
-            self._wake.wait(remaining)
-            return False
-        return True
+            return None
+        return min(waiting.deadline for waiting in list(self._waiting.values())) - time.perf_counter()
 
     def _overdue(self) -> list[Capture]:
-        """The waiting captures whose deadline has passed, still waiting when this runs."""
+        """The waiting captures whose deadline has passed."""
         now: float = time.perf_counter()
         return [self._capture(waiting.image, waiting.depth) for waiting in list(self._waiting.values()) if waiting.deadline <= now]
 
@@ -224,15 +291,21 @@ class CaptureSync(Thread):
     # ── Output ─────────────────────────────────────────────────────────
 
     def _emit(self, captures: list[Capture]) -> None:
-        """Complete captures to the callbacks, in order, under the emit lock and outside the matching lock."""
+        """Complete captures to the callbacks, in order."""
         if not captures:
             return
         misses: int = self._missed.total('image') + self._missed.at_start('image')
         if self.settings.misses != misses:
             self.settings.misses = misses
-        self._missed.warn()         # outside the matching lock
+        with self._lock:
+            dropped: int = self._dropped
+        if self.settings.dropped != dropped:
+            self.settings.dropped = dropped
+        self._missed.warn()
+        with self._callback_lock:
+            callbacks: list[CaptureCallback] = list(self._callbacks)
         for capture in captures:
-            for callback in self._callbacks:
+            for callback in callbacks:
                 try:
                     callback(capture)
                 except Exception:

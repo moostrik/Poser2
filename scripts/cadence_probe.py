@@ -10,7 +10,8 @@ recording's metadata, `scripts/recording_motion.py`):
 - the latencies: from a capture's stamp to the capture on the board, and to the poses out of RAW and of SMOOTH;
 - every hand-over's wait: how long an item waits in a queue for its receiver (the timers named `Wait …`);
 - the uploader's time per color and per depth frame;
-- the drops: the uploader's queue, the board's captures, the sync's depth frames without an image.
+- the drops: the uploader's queue, the board's captures, the capture sync's depth frames without an image and its
+  inbox's.
 Writes the report as JSON in `--out` and prints it. The app is stopped in a `finally`, and the run is given up at
 twice the time it should take.
 
@@ -174,7 +175,7 @@ def main() -> int:
                           camera_thread_ms=spread(camera_thread), latency_ms={k: spread(v) for k, v in latency.items()},
                           waits_ms={k: spread(v) for k, v in sorted(waits.items())}, uploads_ms={k: spread(v) for k, v in uploads.items()},
                           drops=dict(uploader=app.uploader.dropped, board=app.board.get_dropped_captures(),
-                                     depth_without_image=app.capture_sync.settings.misses))
+                                     depth_without_image=app.capture_sync.settings.misses, capture_sync=app.capture_sync.settings.dropped))
             if args.record:
                 recorder = settings.camera.recorder
                 report['recorded'] = dict(missed_depth=recorder.missed_depth, missed_color=recorder.missed_color,

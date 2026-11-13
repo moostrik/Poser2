@@ -22,7 +22,7 @@ Per thread, the callbacks in the order they are registered (`apps/deep_flow/main
 | the tracker's                                     | associates the tracklets, to `PosesFromTracklets` and the board | nothing                                   |
 | the pose model's (`pose.Predictor`)               | RTMPose on the crops, the CLEAN and SMOOTH stages, their users | its own model                              |
 | the detector's (-sim)                             | YOLOv8n on the uploaded image, boxes to the replay camera      | its own model                              |
-| the capture sync's                                | a capture whose wait for its poses ran out                     | `pose_wait`, 0 in deep_flow                |
+| the capture sync's (`CaptureSync`)                | matches the image, depth and poses, hands the capture on       | the next part, or `pose_wait` (0 here)     |
 | the render                                        | every capture since the last tick, then the fluid              | the GPU, in a copy while its queue is full |
 
 ### The uploader
@@ -58,7 +58,7 @@ only; what only the flow needs (the view's window and size, the depth's read int
 
 When an image is on the GPU, the uploader hands it to four others, each of which only takes note and returns:
 
-- the capture sync, which pairs the image and the depth into a capture;
+- the capture sync, which queues the image for its own thread;
 - the detector (-sim), which keeps the newest image for its own thread;
 - the pose step: `PosesFromTracklets.process` makes a pose per player from the tracker's newest boxes, the RAW
   stage's two box filters smooth them, and `PoseInference.submit` cuts the crops from this very image
@@ -79,8 +79,10 @@ tracklet message; `CameraSync` is for the apps with several cameras.
 
 `CaptureSync` (`modules/inference/capture_sync.py`) matches an image, its depth and the poses of one moment by
 capture time. With `pose_wait` 0 a capture never waits for its poses: it carries the poses of the frame before,
-which with the view's window fixed only puts the pose's points drawn over the view a frame behind. Every complete
-capture goes out, in the order of capture, under one lock, to the board.
+which with the view's window fixed only puts the pose's points drawn over the view a frame behind. Its submits
+queue the parts, at most 8 of a stream per camera (the oldest dropped, `dropped` on the panel), and its own thread
+matches them and hands every complete capture, in the order of capture, to the board. A part waits 0.38 ms on
+average in that queue (p95 0.8 ms; `measure` 9–19 s, -sim, `Wait capture sync`).
 
 ### The render: every capture
 
