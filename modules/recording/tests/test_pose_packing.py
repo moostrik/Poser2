@@ -3,8 +3,7 @@
 import threading
 import unittest
 
-from modules.recording import FramePoses, RecordingSync
-
+from .. import FramePoses, RecordingSync
 from .recordings import cam_frame, poses
 
 
