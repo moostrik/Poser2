@@ -119,8 +119,8 @@ Four places run a receiver's work on another's thread (read on `deep-flow` at 5c
 |-------------------------------|----------------------------------------------------------------------------------------------------------|
 | the camera's                  | `RecordingSync` matching under its locks, from `Recorder.submit_frame` and `submit_tracklets`            |
 | the uploader's                | `CaptureSync.submit_image` and `submit_depth`: the matching and the capture's emit                       |
-| the uploader's                | `_on_image`: `PosesFromTracklets.process`, the RAW stage's box steps, `PoseInference.submit`, `expect_poses` |
-| the pose runner's callback    | the RAW emit, CLEAN, SMOOTH, `CaptureSync.submit_poses`, the crossing into LERP (-sim: `RecordedPoses`')  |
+| the uploader's                | `_on_image`: `PosesFromTracklets.process`, the box steps, `PoseInference.submit`, `expect_poses`         |
+| the pose runner's callback    | the RAW emit, CLEAN, SMOOTH, `CaptureSync.submit_poses`, LERP's crossing (-sim: `RecordedPoses`')        |
 
 Five steps, each one commit, checked by its tests and, on your go, by one run:
 
