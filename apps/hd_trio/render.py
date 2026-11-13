@@ -14,7 +14,7 @@ from modules.pose import Frame, Similarity, AngleMotion
 from modules.render import ColorSettings, layers as ls, shaders, make_subdivision, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, Color
 
-from .render_board import RenderBoard
+from .board import RenderBoard
 from .settings import Layers, RenderSettings, ShowStage
 from .render_stages import STAGES, StageLayer
 from .intro_sequence import IntroSequencePlayer, SequenceDataProxy, FixedColorProxy

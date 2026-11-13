@@ -21,7 +21,7 @@ from modules.inference import optical_flow, detection, GpuImage, ImageSnapshot, 
 from modules.pose import FrameDict
 from modules.utils import FPS, PerformanceTimer
 
-from .render_board import RenderBoard
+from .board import RenderBoard
 from .series import Series, TIMER_SERIES
 from .pose.pipeline import pipeline_spec
 from .settings import Settings, Stage

@@ -2,8 +2,10 @@
 
 from modules.board import (
     FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,
-    SegmentationImageStoreMixin, CameraTrackletStoreMixin, SequencerStateStoreMixin,
+    SegmentationImageStoreMixin, CameraTrackletStoreMixin,
 )
+
+from .sequencer_state import SequencerStateStoreMixin
 
 
 class RenderBoard(FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,

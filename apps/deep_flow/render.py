@@ -14,7 +14,7 @@ from modules.pose import Frame, Similarity, AngleMotion
 from modules.render import layers as ls, shaders, make_subdivision, best_grid, grid_cell_aspect_ratio, SubdivisionRow, Subdivision
 from modules.utils import FPS, Rect, Point2f
 
-from .render_board import RenderBoard
+from .board import RenderBoard
 from .settings import Layers, MainView, RenderSettings, FlowInputSettings
 
 

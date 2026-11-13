@@ -3,9 +3,10 @@
 import unittest
 from typing import cast
 
-from modules.board import CaptureStoreMixin
-from modules.board.captures import KEPT
 from modules.inference import Capture
+
+from .. import CaptureStoreMixin
+from ..captures import KEPT
 
 
 class _Capture:

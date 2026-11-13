@@ -1,9 +1,11 @@
 """Deep Flow render board — thread-safe shared data store for the Deep Flow app."""
 
 from modules.board import (
-    FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CaptureStoreMixin, CropImageStoreMixin,
-    CameraTrackletStoreMixin, TimeSeriesStoreMixin,
+    FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin, CameraTrackletStoreMixin,
+    TimeSeriesStoreMixin,
 )
+
+from .captures import CaptureStoreMixin
 
 
 class RenderBoard(FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CaptureStoreMixin, CropImageStoreMixin,

@@ -18,7 +18,7 @@ from modules.inference import segmentation, detection, BatchUploader, CameraSync
 from modules.session import Session, SessionSettings, SequencerState
 from modules.gl import WindowSettings
 
-from .render_board import RenderBoard
+from .board import RenderBoard
 from .pose.pipeline import pipeline_spec
 from .sequencer import Sequencer
 from .settings import Settings, Stage, ShowStage, IntroSequenceSettings

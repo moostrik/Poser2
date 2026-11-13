@@ -196,7 +196,6 @@ class WhiteSpaceMain:
             set_motor=self.conductor.set_motor_mode,
             pose_stage=int(Stage.LERP),
         )
-        self.state_machine.add_state_callback(self.board.set_sequencer_state)
         self.state_machine.add_state_callback(self.osc_sound_sender.set_sequencer_state)
 
         # CAMERA HEALTH — compares each camera's own IMU reading and frame rate against the preset,
