@@ -221,7 +221,7 @@ class Link(Thread):
                 break
 
     def _warn(self, text: str, *args) -> None:
-        now: float = time.time()
+        now: float = time.perf_counter()
         if now - self._warned > WARN_INTERVAL:
             self._warned = now
             logger.warning(text, *args)

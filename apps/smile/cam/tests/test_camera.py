@@ -47,8 +47,8 @@ class FakeDevice:
 
 
 def wait_for(condition, timeout: float = 1.0) -> bool:
-    end = time.time() + timeout
-    while time.time() < end:
+    end = time.perf_counter() + timeout
+    while time.perf_counter() < end:
         if condition():
             return True
         time.sleep(0.01)

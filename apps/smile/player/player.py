@@ -110,15 +110,15 @@ class Player:
         last_start: float = 0.0
         while empty and not self._stats_stop.is_set():
             clip: Clip | None = next_start(self.pool.clips(), started)
-            if clip is not None and (not started or time.time() - last_start >= MIN_START_GAP):
+            if clip is not None and (not started or time.perf_counter() - last_start >= MIN_START_GAP):
                 loader: ClipLoader = empty.pop()
                 self.pool.use(clip, loader.sector)
                 loader.assign(clip)
                 started.add(clip.id)
-                last_start = time.time()
+                last_start = time.perf_counter()
                 logger.info('Cell %d of %d starts on %s', len(self.loaders) - len(empty), len(self.loaders), clip.id)
                 continue
-            if clip is None and started and self.pool.idle and time.time() - last_start >= START_DELAY:
+            if clip is None and started and self.pool.idle and time.perf_counter() - last_start >= START_DELAY:
                 started.clear()     # every loaded clip has started a cell: round again from the first
                 continue
             self._stats_stop.wait(0.02)

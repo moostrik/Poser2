@@ -165,7 +165,7 @@ Send = Callable[[int, str, float, float, int, int, float, list[tuple[int, int]],
 
 class CreditScroller:
     """Hands the loops from the panel's Scroll settings (`RenderSettings`) to the walls (the clip player's
-    `scroll_loop`). `update` runs in SMILE's render loop (with `time.time()`) and never raises there: while
+    `scroll_loop`). `update` runs in SMILE's render loop (with `time.perf_counter()`) and never raises there: while
     `credit_scroll` is on and nothing blocks it (a recent face, the laughter test), every `SEND_EVERY` second each
     row of `credit_scroll_rows` gets its word of `credit_name` (`plan_loops`) with the time it began and its own
     speed (`credit_scroll_speed_1` for the first word, `_2` for the others). A speed changed in the panel moves

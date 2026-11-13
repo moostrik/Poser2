@@ -53,11 +53,11 @@ class ClipLoader(Thread):
                 return
         clip: Clip | None = self._first
         self._first = None
-        self._end_time = time.time()
+        self._end_time = time.perf_counter()
         while not self._stop_event.is_set():
             if clip is None:
-                self._sleep_until(time.time() + 1.0)
-                self._end_time = time.time()
+                self._sleep_until(time.perf_counter() + 1.0)
+                self._end_time = time.perf_counter()
                 clip = self.pool.get_clip(sector=self.sector)
                 continue
             self._play(clip)
@@ -78,13 +78,13 @@ class ClipLoader(Thread):
                 return
             self._image_callback(clip.frames[i], i == 0)
             self._end_time += interval
-            now: float = time.time()
+            now: float = time.perf_counter()
             if now > self._end_time + interval:     # fell behind: resync instead of bursting
                 self._end_time = now
             self._sleep_until(self._end_time)
 
     def _sleep_until(self, t: float) -> None:
-        while time.time() < t and not self._stop_event.is_set():
+        while time.perf_counter() < t and not self._stop_event.is_set():
             time.sleep(0.005)
 
     def stop(self) -> None:

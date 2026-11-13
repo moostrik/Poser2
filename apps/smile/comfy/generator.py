@@ -225,7 +225,7 @@ class Generator(Thread):
 
     def _generate(self, image: np.ndarray, timeout: float) -> str | None:
         """Run one job; returns why it was not made (a failure, or INTERRUPTED), or None when it was."""
-        start: float = time.time()
+        start: float = time.perf_counter()
         failure: str | None = None
         self._interrupt_event.clear()
         self.is_generating = True
@@ -254,7 +254,7 @@ class Generator(Thread):
         finally:
             self.is_generating = False
             self._interrupt_event.clear()
-            self.settings.connection.last_duration = round(time.time() - start, 1)
+            self.settings.connection.last_duration = round(time.perf_counter() - start, 1)
             if self.settings.connection.connected:
                 self.settings.connection.status = 'ready'
         return failure
@@ -263,7 +263,7 @@ class Generator(Thread):
         if self._stop_event.is_set() or self._interrupt_event.is_set():
             self._interrupt_comfy()
             raise Interrupted()
-        if time.time() > deadline:
+        if time.perf_counter() > deadline:
             self._interrupt_comfy()
             raise TimeoutError(f'longer than its time limit{last_event}')
 
@@ -281,8 +281,8 @@ class Generator(Thread):
 
     def _idle(self, seconds: float) -> None:
         """Wait with the websocket drained; stop and interrupt still end the job."""
-        end: float = time.time() + seconds
-        while time.time() < end:
+        end: float = time.perf_counter() + seconds
+        while time.perf_counter() < end:
             self._check(float('inf'))
             self.client.receive(0.05)
 
@@ -328,7 +328,7 @@ class Generator(Thread):
                 self._idle(0.1)
                 continue
             workflow = replay
-            depth, made = self._run_pass(workflow, time.time() + s.connection.job_timeout, replay=True)
+            depth, made = self._run_pass(workflow, time.perf_counter() + s.connection.job_timeout, replay=True)
             if depth is not None:
                 last_depth = depth
             if made == 0:
@@ -362,7 +362,7 @@ class Generator(Thread):
         last_depth: np.ndarray | None = None
         sampler_progress: float = 0.0
         last_event: str = 'queued'      # for the timeout message: where ComfyUI went silent
-        last_time: float = time.time()
+        last_time: float = time.perf_counter()
         step: str = 'queued'            # the same for the panel: the step that is running
         seen: bool = False              # an event of this workflow arrived
         silence_check: float = last_time + SILENT_AFTER
@@ -374,19 +374,19 @@ class Generator(Thread):
                 self._step(text)
 
         while True:
-            self._check(deadline, f", no event for {time.time() - last_time:.0f} s after '{last_event}' during '{step}'")
+            self._check(deadline, f", no event for {time.perf_counter() - last_time:.0f} s after '{last_event}' during '{step}'")
             event: ComfyEvent | None = self.client.receive(0.05)
             if event is None or event.data.get('prompt_id') != main_id:
                 # ComfyUI reports a workflow as soon as it starts: silence while it is no longer
                 # in the queue means its events don't reach us
-                if not seen and time.time() >= silence_check:
+                if not seen and time.perf_counter() >= silence_check:
                     if not self.client.busy():
                         raise NoEvents(NO_EVENTS)
-                    silence_check = time.time() + SILENT_RECHECK
+                    silence_check = time.perf_counter() + SILENT_RECHECK
                 continue
             seen = True
             last_event = f"{event.type} {event.data.get('node_id') or event.data.get('node') or ''}".strip()
-            last_time = time.time()
+            last_time = time.perf_counter()
 
             if event.type == 'preview' and event.image is not None:
                 node: str | None = event.data.get('node_id')

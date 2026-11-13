@@ -46,12 +46,10 @@ CAPTION_OUTLINE: list[tuple[int, int]] = [(x, y) for x in (-CAPTION_OUTLINE_PX, 
 
 class Scroll:
     """A word of the name going round a ring of `ring` screens on this wall (the scroller's loop): the
-    cells on the ring with their place round it, moving at `speed` px/s from `started` (`time.time()`),
-    with `gap` px of wall between two screens, until `expires`, the time the scroller's next message
-    is due by, or, told to leave, until it has run out at the left side of the screen `last`. The frames
-    are timed with `time.perf_counter()`: on Windows `time.time()` moves in steps of the system tick (15.6 ms
-    on Python 3.12), coarser than a frame, which made the word stand still one frame and jump the next.
-    `started` is carried onto that clock once, when it is new (`started_perf`)."""
+    cells on the ring with their place round it, moving at `speed` px/s from `started`, with `gap` px of
+    wall between two screens, until `expires`, the time the scroller's next message is due by, or, told
+    to leave, until it has run out at the left side of the screen `last`. Every time is
+    `time.perf_counter()`, the scroller's and the frames'."""
 
     def __init__(self, name: str, speed: float, gap: float, size: int, ring: int, cells: list[tuple[str, int]],
                  started: float, expires: float) -> None:
@@ -62,19 +60,15 @@ class Scroll:
         self.ring: int = ring
         self.cells: list[tuple[str, int]] = cells
         self.started: float = started
-        self.started_perf: float = time.perf_counter() - (time.time() - started)
         self.expires: float = expires
         self.last: int | None = None
 
     def renew(self, speed: float, gap: float, size: int, started: float, expires: float, last: int | None) -> None:
-        if started != self.started:         # a new phase (a speed changed in the panel): carry it over again
-            self.started_perf = time.perf_counter() - (time.time() - started)
-            self.started = started
-        self.speed, self.gap, self.size, self.expires, self.last = speed, gap, size, expires, last
+        self.speed, self.gap, self.size, self.started, self.expires, self.last = speed, gap, size, started, expires, last
 
     def travelled(self, now_perf: float) -> float:
         """The px the word moved by `now_perf` (`time.perf_counter()`)."""
-        return max(0.0, now_perf - self.started_perf) * self.speed
+        return max(0.0, now_perf - self.started) * self.speed
 
 
 def lit_cells(lit: dict[str, float], now: float) -> list[str]:
@@ -257,7 +251,7 @@ class WallRender:
                 elif self._initials[id] == 1:
                     self._initials[id] = 2
                     flashes.append(id)
-            lit: list[str] = lit_cells(self._lit, time.time())
+            lit: list[str] = lit_cells(self._lit, time.perf_counter())
             numbers: dict[str, int] = {id: self._numbers.get(id, 0) for id in lit}
             self._numbers = numbers
             captions: dict[str, str] = {id: c for id, c in self._captions.items() if id != online} if caption else {}
@@ -493,7 +487,7 @@ class WallRender:
     def scroll_loop(self, name: str, speed: float, gap: float, size: int, ring: int, started: float,
                     cells: list[tuple[str, int]], last: int | None = None) -> bool:
         """A word going round a ring of `ring` screens (any thread, the scroller renews it every second):
-        `started` is when it began by `time.time()`, so the position comes from the clock and a resend moves
+        `started` is when it began by `time.perf_counter()`, so the position comes from the clock and a resend moves
         nothing. The loop ends when no message renews it for `SCROLL_TIMEOUT`, or with `last` when the word
         has run out at the left side of that screen; a loop leaving takes no more messages, so a word
         that comes back meanwhile is a new loop. True for a loop that is new."""
@@ -517,5 +511,5 @@ class WallRender:
         if id not in self._rects:
             return
         with self._mutex:
-            self._lit[id] = time.time() + seconds
+            self._lit[id] = time.perf_counter() + seconds
             self._numbers[id] = number

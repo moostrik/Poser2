@@ -86,7 +86,7 @@ class Lights:
                 address += CAMERA_LEDS * 3
 
         self.sender: ArtNetSender = ArtNetSender(settings, address + 1, self.fill)
-        self.start_time: float = time.time() + 3
+        self.start_time: float = time.perf_counter() + 3
         self.cam_lights: np.ndarray = np.zeros((CAMERA_LEDS, 3), dtype=float)
 
     def start(self) -> None:
@@ -100,7 +100,7 @@ class Lights:
         self.process_cameras(packet)
 
     def process_module(self, packet: bytearray) -> None:
-        current_time: float = max(time.time() - self.start_time, 0)
+        current_time: float = max(time.perf_counter() - self.start_time, 0)
         breath: float = lfor(current_time, 0.1666, 0, 0.05, 1)
         b: int = min(max(int(breath * 255), 0), 255)
 

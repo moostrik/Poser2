@@ -21,7 +21,7 @@ class FakeClock:
     def __init__(self) -> None:
         self.now: float = 1000.0
 
-    def time(self) -> float:
+    def perf_counter(self) -> float:
         return self.now
 
 

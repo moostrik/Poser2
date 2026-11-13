@@ -64,8 +64,8 @@ def start_comfy(comfy: Path, python: Path, port: int, log: Path) -> subprocess.P
 
 
 def wait_for(client: ComfyClient, process: subprocess.Popen, timeout: float) -> None:
-    deadline: float = time.monotonic() + timeout
-    while time.monotonic() < deadline:
+    deadline: float = time.perf_counter() + timeout
+    while time.perf_counter() < deadline:
         if process.poll() is not None:
             raise Failed(f'ComfyUI ended with exit code {process.returncode} before it answered, see its log')
         try:
@@ -113,7 +113,7 @@ def warm_up(client: ComfyClient, preset: str, save: Path | None = None) -> float
         workflow: dict = wf.build(name, p.style_a, p)
     else:
         workflow = wf.build_warmup(name, p.style_a, p)
-    started: float = time.monotonic()
+    started: float = time.perf_counter()
     try:
         prompt_id: str = client.queue(workflow)
     except RuntimeError as e:
@@ -122,7 +122,7 @@ def warm_up(client: ComfyClient, preset: str, save: Path | None = None) -> float
     deadline: float = started + WARMUP_TIMEOUT
     last_grin_frame = None
     portrait = None
-    while time.monotonic() < deadline:
+    while time.perf_counter() < deadline:
         event: Event | None = client.receive(5.0)
         if event is None:
             continue
@@ -139,7 +139,7 @@ def warm_up(client: ComfyClient, preset: str, save: Path | None = None) -> float
             images: list[dict] = event.data.get('output', {}).get('images', [])
             portrait = client.view(images[0]) if images else None
         elif event.type == 'execution_success' or (event.type == 'executing' and event.data.get('node') is None and 'prompt_id' in event.data):
-            seconds: float = time.monotonic() - started
+            seconds: float = time.perf_counter() - started
             if save is not None:
                 save.mkdir(parents=True, exist_ok=True)
                 if portrait is not None:

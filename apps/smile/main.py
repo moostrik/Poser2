@@ -235,9 +235,9 @@ class SmileMain():
             self.osc.submit('/laughter_offset', audio.laughter_offset)
             # the test closes the gate of the clips' laughs in the patch; its own bangs pass that gate
             self.osc.submit('/laughter_test', int(audio.laughter_test))
-        # the laughter test steps on the app clock too (the lights on the walls, the test bangs to Max); this app clock
-        # is the wall clock: the scroller sends its times to the walls, which carry them onto perf_counter themselves
-        now: float = time.time()
+        # the laughter test steps on the app clock too (the lights on the walls, the test bangs to Max), as do the
+        # scrolling name and the online turn: `perf_counter`, the walls' clock as well
+        now: float = time.perf_counter()
         self.laughter_test.update(now)
         # and the scrolling name's passes, timed on the app clock too; only after `credit_scroll_idle` s without a
         # qualifying face (the finder sees no frames during a visitor, who counts as one) and not while the test lights the screens

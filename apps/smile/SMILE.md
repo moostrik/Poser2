@@ -188,14 +188,14 @@ a test keeps the file equal to it) all come from it; a cabling that differs is c
 The **scrolling name** (`credit_scroll.py`, no GL): while the installation is idle each word of `credit_name` goes round its own ring of the sphere, the first word on the
 first of `credit_scroll_rows` (`plan_loops`, `RingPath`: all the ring's screens from the rib at the camera down the rib numbers, since the ribs count to the camera's left,
 the visitor's right, and a ticker moves to the visitor's left; `reverse` the other way round; `row_screens`, `screen_cell`, screens counted from 0 there). `CreditScroller`
-(stepped from `Main.sequence_callback` with `time.time()`; blocked during the laughter test and until `credit_scroll_idle` seconds after `Main._face_seen`, the last qualifying face or sequence frame outside
+(stepped from `Main.sequence_callback` with `time.perf_counter()`; blocked during the laughter test and until `credit_scroll_idle` seconds after `Main._face_seen`, the last qualifying face or sequence frame outside
 the camera states, since the face finder gets no frames there) hands each wall its own cells with their place round the ring every `SEND_EVERY`
 second (`send_loops` to `Player.scroll_loop`: wall, word, px/s, gap, size, the ring's screens, `started` the time the loop began, the cells with their places, `last`),
 each word at its own speed (`credit_scroll_speed_1`, `_2`; a speed changed in the panel moves the start
 so the word goes on from where it is, `word_start`). Blocked or switched off, each loop gets one message with `last`, the screen its head has reached (`last_place`, counted on from lap to lap), and nothing more;
 `credit_scroll_last` is the readout. The walls
-(`WallRender.scroll_loop`, `_draw_scrolls`) take the position from that and the clock (a renewal moves nothing), carried once onto `time.perf_counter()` for the frames: on Windows
-`time.time()` moves in 15.6 ms steps on Python 3.12, coarser than a frame, which made the word stand still one frame and jump the next and drop a
+(`WallRender.scroll_loop`, `_draw_scrolls`) take the position from that and the clock, `time.perf_counter()` like the
+scroller's (a renewal moves nothing; on Windows `time.time()` moves in 15.6 ms steps, coarser than a frame), and drop a
 loop no message renewed for `TIMEOUT`. They draw a word as a ticker reading left to right and moving left: `name_strip` renders it once with freetype into one long BGRA image,
 640 high, the ink `credit_scroll_size` tall in the vertical middle, white with a black edge (not the font atlas: too big at that size); each cell on the ring blits the strip
 shifted by `scroll_copies` (its place times screen width plus `credit_scroll_gap`, minus the distance travelled, this lap's copy and the tail of the lap before) into its own portrait
