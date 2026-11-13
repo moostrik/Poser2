@@ -34,15 +34,10 @@ its own camera's capture time, the poses asked told per camera).
 
 The core is built (`ImageUpload`, for one frame or a stack of one size), deep_flow's `SerialUploader` uses it and
 hands each color image on as an `ImageSnapshot` of one (`add_snapshot_callback`), and `PoseInference` takes no
-uploader.
+uploader. white_space's `BatchUploader` is built beside it: a set in (`submit_set`), queued whole, two at most, the
+oldest set dropped whole and counted; uploaded as one stack per frame size; each image to its image callbacks and
+the set as its `ImageSnapshot` to its snapshot callbacks.
 
-2. **`BatchUploader`.** white_space's uploader, beside the `SerialUploader`, with its own thread: a synced set of the cameras'
-   frames in (`submit_set`), queued whole, two sets at most, beyond that the oldest set dropped whole and counted
-   (`dropped`), so a frame never leaves its set; the core uploads the set as one stack; out go each image to its
-   callbacks (the -sim detector, the board's `set_camera_image`) and the set as its `ImageSnapshot` (the set's
-   images, the previous set's as the previous ones, the ready event) to a set callback, whose receiver calls
-   `TrackerFrameSource.submit` with each camera's capture time. No store of the newest images, no tracklets, no
-   depth.
 3. **The sync before the upload.** Each camera hands its frames to the frames' `CameraSync` and the recorder, and
    nothing else. `CameraSync`'s callback hands on a set: `add_set_callback(callback(items))`, `items` by `cam_id`,
    each with its capture time. The frames' sync keeps each camera's newest video frame and hands the set to
