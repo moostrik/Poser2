@@ -20,7 +20,7 @@ Every number assumes this configuration unless its table says otherwise:
 ### First setup
 
 1. Build the second venv with `scripts\install.bat oak4` (see the [README](../../../README.md)).
-2. Put the model archives in `data/models`. `.venv-oak4\Scripts\python scripts/oak4_models.py` fetches the pose models; the detector archive is compiled through HubAI ([definitions.py](definitions.py), `PERSON_DETECTOR_ARCHIVE`).
+2. Put the model archives in `data/models`. `.venv-oak4\Scripts\python scripts/oak4_models.py` fetches the pose models; the detector archive is compiled through HubAI ([models.py](models.py), `PERSON_DETECTOR_ARCHIVE`).
 3. Update the camera to Luxonis OS 1.45.0 with `oakctl device update`. On 1.25.3 depthai could not start a session over USB. The `--info` form of that command needs `-y`, or it waits on a prompt.
 4. Connect USB. A camera on USB and Ethernet at once is listed twice under one id, so `link` picks the route; when that route is missing, the camera opens on the other with a warning.
 
@@ -106,7 +106,7 @@ Latency is `dai.Clock.now()` minus the message's timestamp, on depthai's clock, 
 
 ### Capture time
 
-Every frame and tracklet message is stamped with its moment of capture on `perf_counter` (`definitions.capture_time`): now less the message's latency. The message's timestamp is the end of the exposure. Color and depth of one capture carry the same time, so time pairs them (`CAPTURE_TOLERANCE`, 2 ms). Sequence numbers do not: depth's skip while every frame arrives.
+Every frame and tracklet message is stamped with its moment of capture on `perf_counter` (`messages.capture_time`): now less the message's latency. The message's timestamp is the end of the exposure. Color and depth of one capture carry the same time, so time pairs them (`CAPTURE_TOLERANCE`, 2 ms). Sequence numbers do not: depth's skip while every frame arrives.
 
 Measured over 90 s, deep_flow's setup (P720 color NV12 at 60 fps, the detector, NEURAL_480, flood light 1.0), USB:
 
@@ -334,7 +334,7 @@ The filter's latency is the latency of a message: a moving body's depth lags by 
 
 For a camera above a big screen, looking down. A tilt is a pure rotation about the camera, so where a pixel lands does not depend on its distance. One homography therefore serves color, depth and boxes, with no point cloud and no holes.
 
-`H = K' R K⁻¹`, normalized uv to uv (`tilt_homography` in [geometry.py](../geometry/geometry.py)). `K` is the delivered lens and `R` the tilt. The frame's rows run opposite to the lens's and the IMU's **(site fact)**, so `TiltCorrection` makes `H` in their rows and turns it over to the frame's (`FLIP_V`). That is the opposite tilt on the lens with its center row mirrored. `K'` refits the picture to the frame, because plain `K` at 30° moves the frame's center by 0.58 focal lengths, about 310 of 720 rows.
+`H = K' R K⁻¹`, normalized uv to uv (`tilt_homography` in [tilt_correction.py](../geometry/tilt_correction.py)). `K` is the delivered lens and `R` the tilt. The frame's rows run opposite to the lens's and the IMU's **(site fact)**, so `TiltCorrection` makes `H` in their rows and turns it over to the frame's (`FLIP_V`). That is the opposite tilt on the lens with its center row mirrored. `K'` refits the picture to the frame, because plain `K` at 30° moves the frame's center by 0.58 focal lengths, about 310 of 720 rows.
 
 Depth pixels move by `H`, and their values change too. Depth is measured along the tilted axis, so a standing player of 1.8 m at 30° reads as leaning by 0.9 m. The corrected depth is `z' = z × w`, with `w` from `H`'s third row, the distance along the level axis.
 

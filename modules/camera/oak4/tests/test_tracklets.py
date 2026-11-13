@@ -6,7 +6,7 @@ import unittest
 import depthai as dai
 
 from modules.camera import TrackingStatus
-from modules.camera.oak4.definitions import TRACKING_STATUS
+from modules.camera.oak4.models import TRACKING_STATUS
 
 
 class TrackingStatusMapTest(unittest.TestCase):

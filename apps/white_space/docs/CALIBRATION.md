@@ -223,9 +223,8 @@ Luxonis OAK-D Pro W; the app runs `color = false` and uses the left mono camera 
 `modules/camera/oak/pipeline.py`): OV9282 W, global shutter, 1280 × 800, lens 127° × 79.5° by the
 spec, a little more by the units' own calibrations (see *The lens*). The lens maps angle linearly to
 radius (equidistant): the factory calibrations confirm it to 0.5 % out to 75° off axis, and the warp
-relies on it. The sensor table for every OAK variant in use, with Luxonis links, lives beside the
-resolution tables in `modules/camera/geometry/geometry.py`; opening a device logs the sensor behind
-each socket and its lens.
+relies on it. The sensor table for every OAK variant in use, with Luxonis links, is in
+[CAMERA.md](../../../modules/camera/CAMERA.md#the-lens); opening a device logs the sensor behind each socket and its lens.
 
 The mono sensors carry an IR filter and do not see the light show (site fact); they use the 940 nm
 flood (`camera.ir_flood_light`). Keep the dot projector off. `camera.mono_auto_exposure` applies to
@@ -233,7 +232,7 @@ all four.
 
 ### The camera frame
 
-The warp (`warp_mesh_points`, `modules/camera/geometry/geometry.py`) delivers a levelled, cylindrical
+The warp (`warp_mesh_points`, `modules/camera/geometry/warp.py`) delivers a levelled, cylindrical
 frame: a column is one azimuth at every height, a row is one elevation at every column, and the rows
 are spaced by the tangent of the elevation. Column = azimuth is what the tracker assumes. Tangent rows
 are for the pose: a narrow band of columns is then exactly a level pinhole camera panned to that
@@ -275,7 +274,7 @@ the tilt rule pins — the floor-plane distance reads off the feet — and becau
 rows at the top. At the full-reach height the top row is the sensor's top on the center column:
 −20.1° to +52.3° at P720 and tilt 15 on 960 rows, −23.2° to +57.3° at P800 and tilt 16 on 1152. The
 horizon is therefore not the center row: row 747 of 960 and row 894 of 1152 respectively
-(`horizon_row` ≈ 0.78), and `frame_window` (`modules/camera/geometry/geometry.py`) is the one place that turns a row into
+(`horizon_row` ≈ 0.78), and `frame_window` (`modules/camera/geometry/frame_window.py`) is the one place that turns a row into
 an elevation or back. The open log prints the window per camera.
 
 **Black is where the sensor did not look.** The sensor is a rectangle in the lens's own projection,

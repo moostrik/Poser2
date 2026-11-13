@@ -6,10 +6,10 @@ from .. import RigCameraSettings, CameraResolution, TiltCorrectionSettings
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.utils import Rect
 
-from .definitions import (
-    ModelChain, CameraLink, DepthModel, AntiBanding, EXPOSURE_RANGE, ISO_RANGE, BALANCE_RANGE, CONTRAST_RANGE, BRIGHTNESS_RANGE,
-    LUMA_DENOISE_RANGE, CHROMA_DENOISE_RANGE, SATURATION_RANGE, SHARPNESS_RANGE, COMPENSATION_RANGE, DEPTH_SCORE_RANGE, FAR_LIMIT_M,
-)
+from .device import CameraLink
+from .models import ModelChain
+from .sensor import DepthModel, AntiBanding, EXPOSURE_RANGE, ISO_RANGE, BALANCE_RANGE, CONTRAST_RANGE, BRIGHTNESS_RANGE, \
+    LUMA_DENOISE_RANGE, CHROMA_DENOISE_RANGE, SATURATION_RANGE, SHARPNESS_RANGE, COMPENSATION_RANGE, DEPTH_SCORE_RANGE, FAR_LIMIT_M
 
 
 class SensorSettings(BaseSettings):

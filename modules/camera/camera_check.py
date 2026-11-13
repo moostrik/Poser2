@@ -3,7 +3,36 @@
 import math
 from collections.abc import Sequence
 
-from .settings import RigCameraSettings, CameraCheckSettings
+from modules.settings import BaseSettings, Field, Widget
+
+from .settings import RigCameraSettings
+
+
+class CameraCheckSettings(BaseSettings):
+    """Pinned verdicts saying whether the cameras are mounted and running the way the preset assumes.
+
+    The per-camera readings live on each `RigCameraSettings`, groups deep in the panel, which is
+    where a readout goes to be ignored. The pinned indicators say good or bad; which camera and
+    which value is drawn on that camera's own view in the renderer.
+    """
+    mount_tolerance: Field[float] = Field(2.0, min=0.5, max=10.0, step=0.5,
+                                          description="Tilt or roll deviation (°) a camera may have before the mount warns")
+    mount:           Field[bool]  = Field(True, access=Field.READ, pinned=True, widget=Widget.status,
+                                          description="Camera tilt and roll within tolerance; each camera view shows its error")
+    camera_fps:      Field[bool]  = Field(False, access=Field.READ, pinned=True, widget=Widget.status,
+                                          description="Camera frame rates within 5 % of fps; each camera view shows its rate")
+    video_rate:      Field[bool]  = Field(False, access=Field.READ, pinned=True, widget=Widget.status, label="Video",
+                                          description="Every camera's momentary video rate above half its fps")
+    video_fps_avg:   Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Video", unit="fps",
+                                          description="Slowest camera's average video rate")
+    video_min_fps:   Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Video min", unit="fps",
+                                          description="Worst momentary video rate across the cameras")
+    video_latency:   Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Video latency", unit="ms",
+                                          description="Slowest camera's frame capture to arrival on the PC")
+    depth_latency:   Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Depth latency", unit="ms",
+                                          description="Slowest camera's depth capture to arrival on the PC")
+    link:            Field[str]   = Field("", access=Field.READ, pinned=True, label="Link", description="How the cameras reach the PC")
+
 
 # The fraction a camera's measured frame rate may drift from its configured `fps` before it warns.
 FPS_TOLERANCE: float = 0.05

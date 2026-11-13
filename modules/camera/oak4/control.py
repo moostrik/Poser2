@@ -7,7 +7,7 @@ from typing import Callable
 
 import depthai as dai
 
-from .definitions import ANTI_BANDING_MODES, FAR_LIMIT_M, NO_FAR_LIMIT_MM, sensor_region
+from .sensor import ANTI_BANDING_MODES, FAR_LIMIT_M, NO_FAR_LIMIT_MM, sensor_region
 from .settings import DepthSettings, Oak4CameraSettings, SensorSettings
 
 logger = logging.getLogger(__name__)

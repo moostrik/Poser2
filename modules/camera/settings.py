@@ -3,33 +3,7 @@ rig camera has on top: its mount and lens. A backend's settings class extends on
 the fields of its device, so the preset keys stay flat: `cam_0.fov` and `cam_0.readings.roll_offset`
 are the same keys for every rig backend."""
 
-from modules.settings import BaseSettings, Field, Group, Widget
-
-
-class CameraCheckSettings(BaseSettings):
-    """Pinned verdicts saying whether the cameras are mounted and running the way the preset assumes.
-
-    The per-camera readings live on each `RigCameraSettings`, groups deep in the panel, which is
-    where a readout goes to be ignored. The pinned indicators say good or bad; which camera and
-    which value is drawn on that camera's own view in the renderer.
-    """
-    mount_tolerance: Field[float] = Field(2.0, min=0.5, max=10.0, step=0.5,
-                                          description="Tilt or roll deviation (°) a camera may have before the mount warns")
-    mount:           Field[bool]  = Field(True, access=Field.READ, pinned=True, widget=Widget.status,
-                                          description="Camera tilt and roll within tolerance; each camera view shows its error")
-    camera_fps:      Field[bool]  = Field(False, access=Field.READ, pinned=True, widget=Widget.status,
-                                          description="Camera frame rates within 5 % of fps; each camera view shows its rate")
-    video_rate:      Field[bool]  = Field(False, access=Field.READ, pinned=True, widget=Widget.status, label="Video",
-                                          description="Every camera's momentary video rate above half its fps")
-    video_fps_avg:   Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Video", unit="fps",
-                                          description="Slowest camera's average video rate")
-    video_min_fps:   Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Video min", unit="fps",
-                                          description="Worst momentary video rate across the cameras")
-    video_latency:   Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Video latency", unit="ms",
-                                          description="Slowest camera's frame capture to arrival on the PC")
-    depth_latency:   Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Depth latency", unit="ms",
-                                          description="Slowest camera's depth capture to arrival on the PC")
-    link:            Field[str]   = Field("", access=Field.READ, pinned=True, label="Link", description="How the cameras reach the PC")
+from modules.settings import BaseSettings, Field, Group
 
 
 class CameraReadings(BaseSettings):
@@ -67,13 +41,6 @@ class RigCameraReadings(CameraReadings):
     lens_error:     Field[float] = Field(float('nan'), access=Field.READ, description="Largest bearing error (°) this unit has under the shared lens")
 
 
-class TiltCorrectionSettings(BaseSettings):
-    """Straightening the frames for the camera's tilt: the IMU's tilt plus `offset`. Live, and the
-    same for a camera and for a recording of one."""
-    enabled: Field[bool]  = Field(False, widget=Widget.switch, description="Straighten color and depth for the camera's tilt")
-    offset:  Field[float] = Field(0.0, min=-60.0, max=60.0, step=0.5, widget=Widget.slider, description="Added to the IMU's tilt (°)")
-
-
 class CameraSettings(BaseSettings):
     """The camera as every app knows it: its rate, its flips and its readings.
 
@@ -97,8 +64,7 @@ class RigCameraSettings(CameraSettings):
     # Relayed down from the camera group so the warp can turn a tilt into pixels.
     fov:           Field[float] = Field(127.0, access=Field.INIT,
                                          description="Azimuth span (°) of the delivered frame, quoted for the full sensor width")
-    # The lens itself — see the lens geometry notes in `geometry.py`. Shared by an
-    # installation's cameras; 0 / 0 / 0 is the old model, the lens taken to be `fov`.
+    # The lens itself (CAMERA.md, the lens), shared by an installation's cameras; 0 / 0 / 0 takes the lens as `fov`.
     lens_fov:       Field[float] = Field(0.0, access=Field.INIT, step=0.1,
                                          description="Field (°) the lens spans across the full sensor width; 0 = same as fov")
     lens_center_x:  Field[float] = Field(0.0, access=Field.INIT, step=0.5,

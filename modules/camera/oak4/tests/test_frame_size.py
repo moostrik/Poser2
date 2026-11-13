@@ -3,7 +3,7 @@
 import unittest
 
 from modules.camera import CameraResolution
-from modules.camera.oak4.definitions import FRAME_WIDTH_ALIGNMENT, direct_size
+from modules.camera.oak4.sensor import FRAME_WIDTH_ALIGNMENT, direct_size
 from modules.camera.oak4.pipeline import delivered_size
 
 

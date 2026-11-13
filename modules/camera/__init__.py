@@ -1,8 +1,8 @@
 from .source import         CameraSource, CameraFrameCallback, TrackletCallback, ClipSource, ClipFrameCallback
 from .frame import          CAPTURE_TOLERANCE, FrameType, FrameReadings, DepthAlignment, CameraFrame, mirrored_image
 from .tracklet import       TrackingStatus, CameraTracklet, CameraTracklets, straightened_tracklets
-from .settings import       CameraSettings, CameraReadings, RigCameraSettings, RigCameraReadings, CameraCheckSettings, TiltCorrectionSettings
-from .camera_check import   CameraCheck, FPS_TOLERANCE, MIN_RATE_FACTOR, mount_deviation, fps_deviation
+from .settings import       CameraSettings, CameraReadings, RigCameraSettings, RigCameraReadings
+from .camera_check import   CameraCheck, CameraCheckSettings, FPS_TOLERANCE, MIN_RATE_FACTOR, mount_deviation, fps_deviation
 from .geometry import       CameraResolution, RESOLUTION_SIZES, MONO_RESOLUTIONS, COLOR_RESOLUTIONS, resolve_resolution, \
                             WARP_ALIGNMENT, aligned_height, mono_frame_size, color_frame_size, frame_size, mode_size, \
                             full_frame_height, delivered_height, degrees_per_pixel, output_focal, source_lens, \
@@ -10,6 +10,6 @@ from .geometry import       CameraResolution, RESOLUTION_SIZES, MONO_RESOLUTIONS
                             warp_mesh_points, frame_coverage, coverage_summary, orientation_from_gravity, \
                             imu_to_camera, unroll_imu_frame, tilt_homography, homography_points, \
                             corrected_roi, corrected_keypoints, mirrored_roi, mirrored_keypoints, mirrored_intrinsics, depth_projection, \
-                            mirrored_alignment, aligned_depth_size, TiltCorrection, TILT_STEP
+                            mirrored_alignment, aligned_depth_size, TiltCorrection, TiltCorrectionSettings, TILT_STEP
 from .capture_match import  CaptureStream, MissedParts
 from .depthai_backend import oak_backend, require_backend

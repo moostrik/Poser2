@@ -22,9 +22,11 @@ import depthai as dai
 
 from .. import CameraResolution, frame_size, WARP_MESH, warp_mesh_points
 
-from .definitions import SENSOR_SOCKET, STEREO_SOCKETS, STEREO_SIZE, DEPTH_MODELS, DepthModel, requested_size, \
-    direct_size, IMU_RATE_HZ, SYSTEM_RATE_HZ, nn_frame_type, POSE_CONFIDENCE_THRESHOLD, POSE_OVERLAP_THRESHOLD, \
-    POSE_CROP_PADDING, TRACKER_PERSON_LABEL, TRACKER_TYPE
+from .device import SYSTEM_RATE_HZ
+from .imu import IMU_RATE_HZ
+from .models import nn_frame_type, POSE_CONFIDENCE_THRESHOLD, POSE_OVERLAP_THRESHOLD, POSE_CROP_PADDING, TRACKER_PERSON_LABEL, \
+    TRACKER_TYPE
+from .sensor import SENSOR_SOCKET, STEREO_SOCKETS, STEREO_SIZE, DEPTH_MODELS, DepthModel, requested_size, direct_size
 
 logger = logging.getLogger(__name__)
 

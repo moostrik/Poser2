@@ -9,7 +9,7 @@ import depthai as dai
 
 from modules.camera.oak4 import Oak4CameraSettings
 from modules.camera.oak4.camera import Camera
-from modules.camera.oak4.definitions import link_name
+from modules.camera.oak4.device import link_name
 
 
 class SystemReadingsTest(unittest.TestCase):

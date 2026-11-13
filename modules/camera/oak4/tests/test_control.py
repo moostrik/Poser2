@@ -4,7 +4,7 @@ sensor's pixels. Runs on a depthai 3 install."""
 import unittest
 
 from modules.camera.oak4.control import DepthControl
-from modules.camera.oak4.definitions import ANTI_BANDING_MODES, FAR_LIMIT_M, NO_FAR_LIMIT_MM, AntiBanding, sensor_region
+from modules.camera.oak4.sensor import ANTI_BANDING_MODES, FAR_LIMIT_M, NO_FAR_LIMIT_MM, AntiBanding, sensor_region
 from modules.camera.oak4.settings import DepthSettings, Oak4CameraSettings
 from modules.utils import Rect
 

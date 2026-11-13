@@ -4,10 +4,8 @@ the sensor controls. Pure data; `SensorControl` writes the sensor fields to the 
 from .. import RigCameraSettings, CameraResolution
 from modules.settings import BaseSettings, Field, Group, Widget
 
-from .definitions import (
-    EXPOSURE_RANGE, ISO_RANGE, BALANCE_RANGE, CONTRAST_RANGE, BRIGHTNESS_RANGE,
-    LUMA_DENOISE_RANGE, SATURATION_RANGE, SHARPNESS_RANGE,
-)
+from .sensor import EXPOSURE_RANGE, ISO_RANGE, BALANCE_RANGE, CONTRAST_RANGE, BRIGHTNESS_RANGE, LUMA_DENOISE_RANGE, \
+    SATURATION_RANGE, SHARPNESS_RANGE
 
 
 class ColorSensorSettings(BaseSettings):

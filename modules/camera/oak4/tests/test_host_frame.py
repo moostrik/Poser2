@@ -8,7 +8,7 @@ import numpy as np
 
 from modules.camera import corrected_keypoints, corrected_roi
 from modules.camera import mirrored_keypoints, mirrored_roi
-from modules.camera.oak4.definitions import packed_nv12
+from modules.camera.oak4.messages import packed_nv12
 from modules.utils import Rect
 
 

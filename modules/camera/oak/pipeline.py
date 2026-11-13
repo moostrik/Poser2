@@ -20,11 +20,10 @@ import numpy as np
 
 from .. import CameraResolution, mode_size, frame_size, WARP_MESH, warp_mesh_points, source_lens
 
-from .definitions import (
-    YOLOV8_WIDE_6S, YOLOV8_WIDE_7S, YOLOV8_SQUARE_6S, YOLOV8_SQUARE_7S,
-    YOLO_CONFIDENCE_THRESHOLD, YOLO_OVERLAP_THRESHOLD, detector_input_size,
-    TRACKER_PERSON_LABEL, TRACKER_TYPE, mono_mode, color_mode, IMU_RATE_HZ,
-)
+from .imu import IMU_RATE_HZ
+from .models import YOLOV8_WIDE_6S, YOLOV8_WIDE_7S, YOLOV8_SQUARE_6S, YOLOV8_SQUARE_7S, YOLO_CONFIDENCE_THRESHOLD, \
+    YOLO_OVERLAP_THRESHOLD, detector_input_size, TRACKER_PERSON_LABEL, TRACKER_TYPE
+from .sensor import mono_mode, color_mode
 
 logger = logging.getLogger(__name__)
 

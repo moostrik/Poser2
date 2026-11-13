@@ -6,7 +6,7 @@ import math
 import unittest
 
 from modules.camera import orientation_from_gravity, imu_to_camera, unroll_imu_frame
-from modules.camera.oak.definitions import IMU_BOARD_ROLL
+from modules.camera.oak.imu import IMU_BOARD_ROLL
 
 
 def gravity(tilt: float, roll: float) -> tuple[float, float, float]:

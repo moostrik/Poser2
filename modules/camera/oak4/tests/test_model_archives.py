@@ -4,7 +4,7 @@ Runs on a depthai 3 install."""
 import unittest
 
 from modules.camera.oak4 import ModelChain
-from modules.camera.oak4.definitions import model_archives, DETECTOR_ARCHIVE, PERSON_DETECTOR_ARCHIVE, POSE_ARCHIVE, \
+from modules.camera.oak4.models import model_archives, DETECTOR_ARCHIVE, PERSON_DETECTOR_ARCHIVE, POSE_ARCHIVE, \
     TOP_DOWN_ARCHIVE
 
 

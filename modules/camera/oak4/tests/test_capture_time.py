@@ -8,8 +8,8 @@ from typing import cast
 
 import depthai as dai
 
-from modules.camera.oak4 import definitions
-from modules.camera.oak4.definitions import capture_time
+from modules.camera.oak4 import messages
+from modules.camera.oak4.messages import capture_time
 
 
 class FakeMessage:
@@ -32,9 +32,9 @@ class CaptureTimeTest(unittest.TestCase):
         self.assertLessEqual(stamp, after - 0.030 + 0.001)
 
     def test_a_capture_time_after_now_is_stamped_with_the_arrival_and_logged_once(self) -> None:
-        definitions._future_capture_warned = False
+        messages._future_capture_warned = False
         message = cast(dai.ImgFrame, FakeMessage(-0.040))       # 40 ms in the future
-        with self.assertLogs('modules.camera.oak4.definitions', 'WARNING') as logs:
+        with self.assertLogs('modules.camera.oak4.messages', 'WARNING') as logs:
             before: float = time.perf_counter()
             stamp: float = capture_time(message)
             after: float = time.perf_counter()
