@@ -1,5 +1,7 @@
 """The pipeline builder: what a spec becomes, in what order frames move, and what it refuses to build."""
 
+import threading
+import time
 import unittest
 from enum import IntEnum
 from functools import partial
@@ -421,6 +423,54 @@ class RefusalTest(unittest.TestCase):
             pipeline.window(S.RAW)
         with self.assertRaises(ValueError):
             pipeline.window(S.CLEAN)
+
+
+class AsyncThreadTest(unittest.TestCase):
+    """Once started, the steps after an async step run on the split's own thread; the node's thread only queues."""
+
+    def setUp(self) -> None:
+        self.source = _Source([0])
+        self.node = _Async()
+        self.pipeline = PosePipeline(PipelineSpec([
+            StageSpec(S.RAW, self.source, [AsyncStep(self.node)]),
+            StageSpec(S.CLEAN, S.RAW, []),
+        ]))
+        self.threads: list[str] = []
+        self.pipeline.add_frames_callback(S.CLEAN, lambda frames: self.threads.append(threading.current_thread().name))
+        self.pipeline.start()
+
+    def tearDown(self) -> None:
+        self.pipeline.stop()
+
+    def wait_for(self, count: int) -> None:
+        end: float = time.perf_counter() + 1.0
+        while len(self.threads) < count and time.perf_counter() < end:
+            time.sleep(0.001)
+
+    def test_the_steps_after_run_on_the_split_thread(self) -> None:
+        self.source.emit(_frames(0))
+        self.node.release()
+        self.wait_for(1)
+        self.assertEqual(self.threads, ['PosePipeline raw'])
+
+    def test_beyond_four_waiting_the_oldest_is_dropped_and_counted(self) -> None:
+        release: threading.Event = threading.Event()
+        held: threading.Event = threading.Event()
+
+        def hold(frames: FrameDict) -> None:
+            if not held.is_set():
+                held.set()
+                release.wait(2.0)
+        self.pipeline.add_frames_callback(S.RAW, hold)
+        self.source.emit(_frames(0))
+        self.node.release()
+        self.assertTrue(held.wait(1.0))                 # the split's thread is held: what comes now waits
+        for _ in range(6):
+            self.node.release()
+        release.set()
+        self.wait_for(5)
+        self.assertEqual(len(self.threads), 5)
+        self.assertEqual(self.pipeline.dropped, 2)
 
 
 if __name__ == "__main__":

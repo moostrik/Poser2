@@ -126,9 +126,9 @@ class RecordedPoses(FrameDictCallbackMixin):
 
     # ── The async step ─────────────────────────────────────────────────
 
-    def hold_images(self, snapshot: ImageSnapshot | None) -> None:
-        """The images the next crops are cut from (`PoseInference.hold_images`)."""
-        self._inference.hold_images(snapshot)
+    def set_images(self, snapshot: ImageSnapshot | None) -> None:
+        """The images the next crops are cut from (`PoseInference.set_images`)."""
+        self._inference.set_images(snapshot)
 
     def submit(self, frames: FrameDict) -> None:
         """The stage's poses: with `enabled`, the crops cut without the pose model and the recorded poses played;

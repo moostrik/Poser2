@@ -118,7 +118,7 @@ class DeepFlowMain:
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
         # The pose step's thread: each bang's images held for its crops, then its poses, then the poses asked
-        self.poses_from_tracklets.add_bang_callback(self._hold_images)
+        self.poses_from_tracklets.add_bang_callback(self._set_images)
         self.poses_from_tracklets.add_asked_callback(self._on_asked)
         self._pose_step: PoseInference | RecordedPoses = pose_step
 
@@ -175,6 +175,7 @@ class DeepFlowMain:
 
         if self.person_detector is not None:
             self.person_detector.start()
+        self.pipeline.start()
         self.poses_from_tracklets.start()
         self.uploader.start()
         for camera in self.cameras:
@@ -207,9 +208,9 @@ class DeepFlowMain:
         if last is not None:
             self.board.submit_time_sample(Series.CAMERA_INTERVAL, (image.timestamp - last) * 1000.0, image.timestamp)
 
-    def _hold_images(self, now: float, bang: tuple[int, ImageSnapshot]) -> None:
+    def _set_images(self, now: float, bang: tuple[int, ImageSnapshot]) -> None:
         """A frame bang, on the pose step's thread: its crops are cut from the images it was submitted with."""
-        self._pose_step.hold_images(bang[1])
+        self._pose_step.set_images(bang[1])
 
     def _on_asked(self, now: float, bang: tuple[int, ImageSnapshot], asked: FrameDict) -> None:
         """A frame bang's poses, on the pose step's thread: the recorder hears whether the pose model was asked
@@ -258,6 +259,7 @@ class DeepFlowMain:
         cadence.motion_min_fps = round(min((rate.get_rate_minimum() for rate in rates), default=0.0), 1)
         cadence.upload_drops = self.uploader.dropped
         cadence.capture_drops = self.board.get_dropped_captures()
+        cadence.pose_drops = self.pipeline.dropped
 
     def _update_poses(self, now: float) -> None:
         """The render tick drives the pipeline's output domain (LERP) at the frame's time."""
@@ -279,6 +281,7 @@ class DeepFlowMain:
             camera.stop()
         self.uploader.stop()
         self.poses_from_tracklets.stop()
+        self.pipeline.stop()
         self.recorder.stop()
 
         self.tracker.stop()

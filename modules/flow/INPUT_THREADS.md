@@ -21,7 +21,8 @@ Per thread, the callbacks in the order they are registered (`apps/deep_flow/main
 | the tracklets' (depthai)                          | queues them for the tracker, the board; `tracker.update`       | nothing                                    |
 | the tracker's                                     | associates the tracklets, to `PosesFromTracklets` and the board | nothing                                   |
 | the pose step's (`PosesFromTracklets`)            | a pose per player, the RAW box steps, the crops, the submit    | nothing                                    |
-| the pose model's (`pose.Predictor`)               | RTMPose on the crops, the CLEAN and SMOOTH stages, their users | its own model                              |
+| the pose model's (`pose.Predictor`)               | RTMPose on the crops, queues the poses for the pipeline        | its own model                              |
+| the pipeline's (`PosePipeline raw`)               | the RAW stage after the model, CLEAN, SMOOTH, their users      | nothing                                    |
 | the detector's (-sim)                             | YOLOv8n on the uploaded image, boxes to the replay camera      | its own model                              |
 | the capture sync's (`CaptureSync`)                | matches the image, depth and poses, hands the capture on       | the next part, or `pose_wait` (0 here)     |
 | the render                                        | every capture since the last tick, then the fluid              | the GPU, in a copy while its queue is full |
@@ -63,7 +64,7 @@ When an image is on the GPU, the uploader hands it to four others, each of which
 - the detector (-sim), which keeps the newest image for its own thread;
 - the pose step, which queues the frame bang with the uploader's images as they are now (`Uploader.snapshot`), two
   waiting at most (the oldest dropped, `dropped` on the panel). Its own thread holds those images for the crops
-  (`hold_images`), so the crops are cut from this very image and not a newer one; `PosesFromTracklets.process` makes
+  (`set_images`), so the crops are cut from this very image and not a newer one; `PosesFromTracklets.process` makes
   a pose per player from the tracker's newest boxes, the RAW stage's two box filters smooth them, and
   `PoseInference.submit` cuts the crops (`CropExtractor`), at the pose model's input size, queued on the GPU and not
   waited for; it records a "crops ready" event and hands crops, poses and event to the pose model, whose thread has
@@ -94,11 +95,12 @@ How long an item waits in a queue for its receiver, the `Wait …` timers in the
 
 | Queue                         | Mean     | p95      | Max      |
 |-------------------------------|----------|----------|----------|
-| the uploader's frames         | 4.3 ms   | 17.9 ms  | 26.3 ms  |
-| the uploader's tracklets      | 3.4 ms   | 17.3 ms  | 24.7 ms  |
-| the pose step's bangs         | 0.19 ms  | 0.47 ms  | 1.0 ms   |
-| the capture sync's parts      | 0.29 ms  | 0.81 ms  | 2.1 ms   |
-| a pose model's results        | 0.06 ms  | 0.13 ms  | 3.7 ms   |
+| the uploader's frames         | 4.2 ms   | 17.8 ms  | 23.7 ms  |
+| the uploader's tracklets      | 3.2 ms   | 15.6 ms  | 23.3 ms  |
+| the pose step's bangs         | 0.16 ms  | 0.47 ms  | 1.4 ms   |
+| the capture sync's parts      | 0.30 ms  | 0.80 ms  | 2.6 ms   |
+| a pose model's results        | 0.04 ms  | 0.08 ms  | 1.5 ms   |
+| the pipeline's poses          | 0.09 ms  | 0.17 ms  | 1.0 ms   |
 
 The uploader's wait is its own work on the frame before it, not the hand-over **(deduction)**: a color frame takes
 it 6.4 ms on average to upload.

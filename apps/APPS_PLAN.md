@@ -12,13 +12,8 @@ thread runs only the camera, and every drop is counted on the panel ([INPUT_THRE
 
 ## A. deep_flow's callbacks as hand-overs
 
-One place runs a receiver's work on another's thread (read on `deep-flow` at 5c74ad1b):
-
-| Thread                        | Work it runs that is not its own                                                                         |
-|-------------------------------|----------------------------------------------------------------------------------------------------------|
-| the pose runner's callback    | the RAW emit, CLEAN, SMOOTH, `CaptureSync.submit_poses`, LERP's crossing (-sim: `RecordedPoses`')        |
-
-A hand-over costs its receiver's wake-up, not more Python work: one thread runs Python at a time today too. The
+Every receiver in deep_flow runs on its own thread; what is left is the runners' callback threads and
+`CameraSync`. A hand-over costs its receiver's wake-up, not more Python work: one thread runs Python at a time today too. The
 receiver runs once it has the GIL, which the sender gives up at once when it blocks or enters a C call that
 releases it (a queue wait, CUDA, OpenGL, numpy, TensorRT), and only at the switch interval (5 ms by default) when it
 or another thread keeps running Python **(deduction)**; the camera's thread was seen waiting up to 5 ms for a busy
@@ -29,13 +24,10 @@ The steps left, each one commit, checked by its tests and, on your go, by one ru
 wait (a `Wait …` timer in the board's time series) beside `CAPTURE_LATENCY`, `POSE_LATENCY_RAW` and
 `POSE_LATENCY_SMOOTH`:
 
-4. The pose pipeline runs the steps after an async step on a thread of its own: the async step's results are
-   enqueued (4 waiting, the oldest dropped and counted, `PosePipeline.dropped`); its thread runs the RAW emit,
-   CLEAN, SMOOTH and the crossing. `RecordedPoses`' thread then only enqueues.
 5. The six runners (pose, optical flow, segmentation; ONNX and TRT) lose their callback thread, which only came
    because the pipeline ran on it: they call their callbacks from the inference thread, which now only enqueue. A
    batch replaced before it ran is counted (`dropped` on the model's settings) instead of lost silently when the
-   runner's `Queue(maxsize=2)` is full. After step 4, not before.
+   runner's `Queue(maxsize=2)` is full.
 6. `CameraSync` (the frames' and the tracklets' sync of white_space and hd_trio) gets its own thread, as the other
    syncs: its submits enqueue (16 per camera, the oldest dropped and counted), its thread decides the sync and
    calls its callbacks outside its lock. Checked by its tests; its run is B's.
@@ -114,9 +106,9 @@ RECORDING_PLAN.md), and its pose-following center layers, which stay. Planned wh
 
 ## Rules it touches
 
-- A callback stores or enqueues what it receives and returns: A's one place and B's wiring.
-- A receiver does its work on its own thread: the pipeline and `CameraSync` get one; a matcher stays inline only
-  if its wait says so, as a stated exception.
+- A callback stores or enqueues what it receives and returns: the runners' and B's wiring.
+- A receiver does its work on its own thread: `CameraSync` gets one; a matcher stays inline only if its wait says
+  so, as a stated exception.
 - A callback list has its own lock, copied under it and called outside it: the uploader's, `CameraSync`'s, the
   optical flow predictor's and the runners'.
 - The camera's thread runs only the camera: B1.

@@ -1,7 +1,7 @@
 """PoseInference — the async step of a pose pipeline's frame domain: the crops and the pose model.
 
 Reads the images the app's ``Uploader`` put on the GPU, and on ``submit`` cuts every pose's box out of the
-images held for the frame bang (``hold_images``), else the newest (``CropExtractor``), and hands the crops to the pose model
+images set for the frame bang (``set_images``), else the newest (``CropExtractor``), and hands the crops to the pose model
 (``pose.Predictor``), which emits the poses with their keypoints on its own thread, dropping a batch under
 load. The crops go to the other consumers of the same crops too (segmentation, optical flow, the board),
 each with the event that says they are written. ``cut_crops`` cuts the crops for them without the pose model.
@@ -35,7 +35,7 @@ class PoseInference(FrameDictCallbackMixin):
     def stop(self) -> None:
         self._predictor.stop()
 
-    def hold_images(self, snapshot: ImageSnapshot | None) -> None:
+    def set_images(self, snapshot: ImageSnapshot | None) -> None:
         """The images the next crops are cut from (`Uploader.snapshot` at the image a frame bang is for), set on
         the thread that then submits; None for the uploader's newest at the cut."""
         self._held = snapshot

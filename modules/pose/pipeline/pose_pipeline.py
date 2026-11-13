@@ -4,7 +4,9 @@ The builder resolves the spec at startup into direct callback chains, the same a
 walks the graph per frame. A stage runs its steps in order: the per-pose steps that follow each other in
 one ``FilterTracker`` sized from the ids that reach the stage, a group step on the whole frame between
 them (stamping the poses, writing the group record), and an async step splits the stage: the steps before it
-run on the caller's thread, the steps after it on the thread the node emits on. The stage's synchronous steps
+run on the caller's thread, the steps after it on the split's own thread once `start` has run (the node's results
+queued, at most `WAITING`, the oldest dropped and counted in `dropped`), else on the thread the node emits on. The
+stage's synchronous steps
 are timed as ``Pose <stage>``; the crossing's ``InterpolatorTracker`` as ``Pose interpolate``.
 
 The group record travels with the poses: a source's stage starts a fresh one on every push, a stage that reads
@@ -18,7 +20,9 @@ merged, and the stage's steps.
 from __future__ import annotations
 
 import logging
+from collections import deque
 from dataclasses import dataclass, field
+from threading import Condition, Thread
 from time import perf_counter
 from typing import Callable
 
@@ -31,6 +35,8 @@ from ..window import WindowTracker
 from .spec import AsyncStep, Domain, FrameSource, GroupStep, Merge, PipelineSpec, PoseStep, StageSpec, TickSource
 
 logger = logging.getLogger(__name__)
+
+WAITING: int = 4        # an async step's results waiting for the steps after it
 
 StageFunction = Callable[[FrameDict, GroupRecord], tuple[FrameDict, GroupRecord]]
 StageCallback = Callable[[FrameDict, GroupRecord], None]
@@ -65,20 +71,73 @@ class _Stage:
 
 
 class _AsyncSplit:
-    """The hand-over at an async step: the frames go through the node, the group record waits for them."""
+    """The hand-over at an async step: the frames go through the node, the group record waits for them. The node's
+    frames are queued for the split's own thread, which runs the steps after it; at most `WAITING` wait, beyond
+    that the oldest is dropped and counted. While the thread does not run, they run on the node's thread."""
 
-    def __init__(self, step: AsyncStep, then: StageCallback) -> None:
+    def __init__(self, step: AsyncStep, then: StageCallback, name: str) -> None:
         self._node = step.node
         self._then = then
+        self._name: str = name
         self._group = GroupRecord()
+        self._wake: Condition = Condition()
+        self._running: bool = False
+        self._waiting: deque[tuple[FrameDict, GroupRecord, float]] = deque()
+        self._thread: Thread | None = None
+        self._wait: PerformanceTimer = PerformanceTimer(name="Wait pose pipeline")
+        self.dropped: int = 0
         step.node.add_frames_callback(self._emitted)
+
+    def start(self) -> None:
+        with self._wake:
+            if self._running:
+                return
+            self._running = True
+        self._thread = Thread(target=self._run, daemon=True, name=f'PosePipeline {self._name}')
+        self._thread.start()
+
+    def stop(self) -> None:
+        """The thread ends; the frames still waiting are dropped and logged."""
+        with self._wake:
+            self._running = False
+            dropped: int = len(self._waiting)
+            self._waiting.clear()
+            self._wake.notify()
+        if dropped:
+            logger.info("PosePipeline %s: %d results dropped at stop", self._name, dropped)
+        if self._thread is not None:
+            self._thread.join(timeout=2.0)
+            self._thread = None
 
     def submit(self, frames: FrameDict, group: GroupRecord) -> None:
         self._group = group
         self._node.submit(frames)
 
     def _emitted(self, frames: FrameDict) -> None:
+        """The node's frames, on its thread: queued for the split's thread, the oldest dropped beyond `WAITING`."""
+        with self._wake:
+            if self._running:
+                if len(self._waiting) >= WAITING:
+                    self._waiting.popleft()
+                    self.dropped += 1
+                self._waiting.append((frames, self._group, perf_counter()))
+                self._wake.notify()
+                return
         self._then(frames, self._group)
+
+    def _run(self) -> None:
+        while True:
+            with self._wake:
+                while self._running and not self._waiting:
+                    self._wake.wait()
+                if not self._running:
+                    return
+                frames, group, queued = self._waiting.popleft()
+            self._wait.add_time((perf_counter() - queued) * 1000.0, report=False)
+            try:
+                self._then(frames, group)
+            except Exception:
+                logger.exception("PosePipeline %s: the steps after the async step failed", self._name)
 
 
 class PosePipeline:
@@ -88,10 +147,25 @@ class PosePipeline:
         self._stages: dict[int, _Stage] = {}
         self._ticked: dict[Domain, list[_Stage]] = {}
         self._trackers: dict[int, list[FilterTracker]] = {}      # the per-pose steps of each stage, for reset()
+        self._splits: list[_AsyncSplit] = []                     # the async steps' hand-overs, each with its thread
         for stage_spec in spec.stages:
             self._build(stage_spec)
 
     # -- The app's side -------------------------------------------------------------
+
+    def start(self) -> None:
+        """Each async step's hand-over thread: the steps after it run there."""
+        for split in self._splits:
+            split.start()
+
+    def stop(self) -> None:
+        for split in self._splits:
+            split.stop()
+
+    @property
+    def dropped(self) -> int:
+        """The async steps' results dropped while the steps after them fell behind."""
+        return sum(split.dropped for split in self._splits)
 
     @property
     def stages(self) -> list[int]:
@@ -310,7 +384,9 @@ class PosePipeline:
 
         then: StageCallback = segment(segments[-1], emit)
         for functions, step in zip(reversed(segments[:-1]), reversed(asyncs)):
-            then = segment(functions, _AsyncSplit(step, then).submit)
+            split = _AsyncSplit(step, then, stage.name)
+            self._splits.append(split)
+            then = segment(functions, split.submit)
         return then
 
 

@@ -293,6 +293,8 @@ class CadenceSettings(BaseSettings):
                                           description="Camera frames the uploader dropped, its queue full")
     capture_drops:   Field[int]   = Field(0, access=Field.READ, pinned=True, label="Capture drops",
                                           description="Captures dropped before the render took them")
+    pose_drops:      Field[int]   = Field(0, access=Field.READ, pinned=True, label="Pose drops",
+                                          description="Pose model results dropped before the stages after it took them")
 
 
 # ---------------------------------------------------------------------------
