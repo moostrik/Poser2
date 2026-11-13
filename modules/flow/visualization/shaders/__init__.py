@@ -8,11 +8,11 @@ from .colormap_key import ColormapKey
 from .strip_roll import StripRoll
 from .strip_summary import StripSummary
 from .glyph_field import GlyphField
-from .volume_cut import VolumeCutShader
+from .volume_cut_shader import VolumeCutShader
 from .cube_edges import CubeEdges
 from .cube_axes import CubeAxes
 from .glyph_arrows import GlyphArrows
 from .glyph_dots import GlyphDots
-from .volume_cube import VolumeCubeShader, CubeColor
+from .volume_cube_shader import VolumeCubeShader, CubeColor
 from .histogram_count_volume import HistogramCountVolume
 from .z_position_resolve import ZPositionResolve

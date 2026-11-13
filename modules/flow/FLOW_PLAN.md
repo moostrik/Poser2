@@ -51,7 +51,7 @@ arguments. The other findings are small by comparison.
 |------|----------------------------------------------------------------------------|--------------------------------------------------------------------------|
 | 1.1  | the reasons out of the docstrings into the stage documents, each fact once | a docstring says what the thing is; reasons in the package's document    |
 | 1.2  | "drag" alone renamed by what it acts on                                    | the glossary: "drag" pairs with what it acts on                          |
-| 1.6  | files named after what they hold                                           | a file holds one class or subject, named after it                        |
+| 1.6  | the depth read in a file of its own                                        | a file holds one class or subject, named after it                        |
 | 1.10 | every setting and its description gone through, last, after the refactor   | a `Field` description is one short line of panel text: what and its unit |
 
 What each takes:
@@ -60,8 +60,8 @@ What each takes:
   its test), `AddToFaces3D.drag` and its `DRAG` mode; "exponential drag" in the docstrings of `FlowUtil`'s
   dampen, `Fluid2D`'s and `Dampen`. A mouse drag in `orbit.py` and the monitor is the panel's word, not the
   fluid's, and stays.
-- 1.6: `log_axis.py` holds `AxisLine`, `volume_cut.py` `VolumeCutShader`, `volume_cube.py` `VolumeCubeShader`
-  and `CubeColor`, `view_window.py` `DepthRead` beside the window's geometry.
+- 1.6: `view_window.py` holds two subjects, the window's geometry and the depth read (`DepthRead`,
+  `edge_aware_depth`, `mask_sided_depth`, `joint_bilateral_depth`); the read to `depth_read.py`.
 
 Each step is one commit, built on your "go", its call sites and tests in the same change.
 
