@@ -13,7 +13,8 @@ the design and its reasons; how each part works is in its module's docstring:
 | the camera of a recording    | `replay/camera.py`, `replay/tracker.py`                              |
 | the poses of a recording     | `modules/inference/recorded_poses.py`                                |
 
-The threads a frame goes through after it are deep_flow's ([INPUT_THREADS.md](../flow/INPUT_THREADS.md)).
+The threads a frame goes through after it are deep_flow's ([INPUT_THREADS.md](../flow/INPUT_THREADS.md)). What is
+next is in [RECORDING_PLAN.md](RECORDING_PLAN.md).
 
 **(deduction)** marks what is inferred from the code, **(site fact)** what was told; the rest is in the code.
 
@@ -30,8 +31,18 @@ Every part carries its capture time (`timestamp`) and the moment the backend han
 `perf_counter`. Their difference, the latency, is stored with the part, so a playback hands each part as late after
 its capture as it came live.
 
-A recording is a folder named after its start time (and the panel's `name`), with one `<cam>_<chunk>.mkv` per
-camera and chunk, with depth or color only:
+A recording is a folder named after its start time (and the panel's `name`), with a counter (`-2`, `-3`) when a
+recording of that second has the name already. Its chunks are in the recorder's `container`:
+
+| `container` | Files per camera and chunk                        | Holds                                             |
+|-------------|---------------------------------------------------|---------------------------------------------------|
+| `MKV`       | `<cam>_<chunk>.mkv`                               | color, depth when recorded, the metadata attached |
+| `MP4`       | `<cam>_C_<chunk>.mp4` and `<cam>_M_<chunk>.jsonl` | color, and the metadata beside it; no depth       |
+
+An `MP4` chunk's clip plays in any player, h264 at a constant `fps`; a frame lost live is a frame missing from it, so
+another player shows the rest a frame early **(deduction)**, while ours plays the recorded times from the `.jsonl`.
+With depth asked for, `MP4` records color and warns once. A clip without its `.jsonl`, the layout of the older
+recordings, plays at `fps`, its frames as stored (`flip_h` False). An `MKV` chunk holds:
 
 | Stream / part | Holds                                                                                   |
 |---------------|-----------------------------------------------------------------------------------------|
@@ -39,6 +50,8 @@ camera and chunk, with depth or color only:
 | stream 1      | depth when recorded, uint16 mm, `DEPTH_ENCODER`, the same `keyframe_interval`           |
 | tags          | the info line's values                                                                  |
 | attachment    | the metadata, one JSON line each (`.jsonl`)                                             |
+
+The metadata, attached or beside, is the same lines:
 
 | Where      | What                                                                                     |
 |------------|------------------------------------------------------------------------------------------|
@@ -82,6 +95,7 @@ The rules the recorder keeps, each with its reason:
 | No wait is timed: a part of a later frame says this one's is missing | every stream comes in the order of capture, so the order settles it without a clock   |
 | At most `KEPT` captures wait per camera                              | the one case order cannot settle: a stream that stopped                               |
 | A part a camera never sent is not waited for                         | a camera without depth, tracklets or poses records beside one with them               |
+| A camera's first capture waits for the parts the app says it sends   | before its first tracklet nothing shows them coming (`Recorder.expect_parts`)         |
 | A frame nobody asked poses for does not wait for them                | the app says per image whether the pose model was asked (`Recorder.expect_poses`)     |
 | Each camera is synced under its own lock, in its own order           | the order between cameras is not kept live either                                     |
 | A capture is dropped whole, before any part of it is written         | a chunk's color, depth and metadata then count alike, so frame `n` is one capture     |
@@ -184,7 +198,7 @@ that feeds recorded clips through its device (`oak.ClipCamera`) takes them by th
 | `replay`    | the recording's camera | `camera`, `tracker`                                        |
 
 Each folder has its tests beside it; `tests` holds the tests through the real encoders (`test_round_trip`,
-`test_rig`) and what the recording tests share (`recordings.py`).
+`test_rig`, `test_mp4`) and what the recording tests share (`recordings.py`).
 
 ## Measured
 
@@ -204,99 +218,10 @@ By `scripts/pose_recording_probe.py`, on `20261112-124918_hands` (P800, one play
 | played with the pose model on, recorded again  | 594    | 488 (82%)            | 64.5 / 97.5 / 111                    |
 | that recording played with its recorded poses  | 463    | 463, all as recorded | 72.3 / 105 / 114                     |
 
-The frames without poses are batches the pose model dropped ([Open 3](#3-the-poses-the-pose-model-drops)), which
+The frames without poses are batches the pose model dropped
+([RECORDING_PLAN.md](RECORDING_PLAN.md#3-the-poses-the-pose-model-drops)), which
 the replay drops alike. In the replay every pose had its recorded box and points, and the poses came about 8 ms
 later after their capture than recorded: -sim's own delay on top of the recorded one. The recorded latencies hold
 the live host's own delay too (the callback waits for Python's lock, up to 5 ms under a busy render)
 **(deduction)**.
 
-## Open
-
-### 1. Checks waiting for the camera
-
-- A new recording with a player in view: its counts on the panel, its tracklets and latencies in the metadata.
-- -sim on it with the recorded tracklets against live on the same scene, by `scripts/cadence_probe.py`, and against
-  -sim with the detector. Whether the live 99.4% of [INPUT_THREADS.md](../flow/INPUT_THREADS.md#the-cadence) had a
-  player in view is not known, likely yes **(site fact)**, so the live number is taken anew.
-- The pose points and boxes over the image, live and in a replay, to see the tracklets straightened with their own
-  frame and the board's poses as live's.
-- The device's model looks at the frame unstraightened, which for a few degrees of tilt finds the same players
-  **(deduction)**.
-
-### 2. The recorder for every app
-
-The recorder made ready for the three apps before they move to it: deep_flow records as now, hd_trio's recordings
-stay files any player plays, white_space's show recordings keep playing. Built and tested here without the other
-apps; deep_flow live is the one app run. Form and settings only: deep_flow's recordings do not change.
-
-What the code shows, which the plan rests on:
-
-- An old recording is `<cam>_C_<chunk>.mp4` (white_space's: h264, 1280 x 720, 23 fps), without metadata. The player
-  finds it (`ChunkReaders`, the color-only clips) and plays it at `fps`; the replay camera reads `flip_h` False
-  without an info line, which shows the frames as stored, already mirrored, and makes no homography without
-  readings. So it plays right as it is, with no layout number.
-- The OAK-D straightens on the device (the warp), so its frames carry no homography; only the OAK4's do.
-- The OAK-D mirrors on the device (`flip_h` in the warp's mesh) and hands its frames over with `flip_h` False, its
-  detector's boxes found on the mirrored frame: hd_trio's and white_space's frames come as seen, and stored as
-  delivered they are stored as seen. Only the OAK4 delivers unmirrored, and deep_flow stores as delivered.
-- While a chunk is recorded, its color stream is `<cam>_C_<chunk>.mp4`, h264 at a constant `fps` (`StreamWriter`
-  pipes raw frames at `fps`): the old recordings' layout.
-
-The steps, a commit each:
-
-1. **The container**, a recorder setting (`container`): `MKV`, as now (color, depth, the metadata attached), or
-   `MP4`: the recorder keeps its stream files, `<cam>_C_<chunk>.mp4`, and writes the metadata beside them as
-   `<cam>_M_<chunk>.jsonl`, the same lines, instead of merging. `MP4` holds no depth: with depth asked for it records
-   color and warns once. The container decides the color file's extension; `video_format` is the codec alone. A frame
-   lost live is a frame missing from the mp4: another player shows the rest a frame early **(deduction)**, ours plays
-   the recorded times. "What is recorded" gains the `MP4` layout.
-2. **The reader**: the clip path reads the `.jsonl` beside a `<cam>_C_<chunk>.mp4` when there is one, so a new `MP4`
-   recording plays at its recorded times with its metadata, and an old one at `fps` as now.
-3. **The first frame's parts**: the recorder is told at its start which parts each camera sends
-   (`Recorder.expect_parts`, wired by the app), so a camera's first frame waits for its tracklets and poses as every
-   later one does.
-4. **The folder's name** takes a counter when the folder exists, so two recordings started in one second get two
-   folders.
-
-Checked by tests through the real encoders: an `MP4` recording with its `.jsonl` played back, the frames at their
-recorded times and the metadata whole, and its mp4 opened by ffprobe alone at a constant rate; an `MKV` recording
-as now; the first frame with its tracklets; two folders in one second. Checked once by hand: one of white_space's
-recordings in `apps/white_space/data/recordings` played through the reader. deep_flow live records and plays as
-before.
-
-Not in this plan:
-
-- The OAK-D's capture time: the oak backend (depthai 2) stamps a frame's arrival, so hd_trio and white_space record
-  USB's jitter in their times. Oak4's `capture_time` shows the way; it needs an OAK-D to test, and comes with the
-  apps' move ([the app refactor](../../apps/REFACTOR.md)).
-- hd_trio and white_space: their settings (`MP4` for hd_trio), their wiring (tracklets through the uploader,
-  `expect_poses` per camera and image), and hd_trio's pose `.h5` cut at the recorder's split, with their refactors.
-- The glossary's `Encoder` for `CoderFormat` and `CoderType`: a rename through `modules/video` and the three apps.
-
-The rules it touches:
-
-- A package is one thing, and its name is that thing: the container is the recorder's
-- Its `__init__.py` holds what other packages use: `Container` exported for the apps' settings
-- Keep presets and settings schemas in sync with code changes: one recorder setting, at its default in no preset
-- Name a concept after what it is in the domain: `container`; `video_format` the codec alone
-- Use the terms in glossary.md: `CoderFormat` and `CoderType` stay until their rename
-- A plan step that is checked by a run or a test is one commit: steps 1 to 4
-
-### 3. The poses the pose model drops
-
-In -sim, with the recorded tracklets and the pose model on, about one frame in six with a player gets no poses (107
-of 596 on `hands`): the pose model's TensorRT runner keeps one batch in flight and one waiting
-(`pose/runner_trt.py`), and a batch that comes while one waits replaces it. At 50 fps a frame comes every 20 ms, so
-the host's 34 ms keeps up only while batches overlap, and drops when one runs long. With the recorded tracklets
--sim loads the GPU as live does, its one addition, the decoding, on the iGPU and the CPU, so live drops about as
-many **(deduction)**; no live number exists.
-
-In order:
-
-1. Live, with a player in view: a new recording's `missed_poses` and its frames with poses, the live drop rate.
-2. In -sim on the same scene, the host's 34 ms split: RTMPose's own time (the predictor's inference timer), the
-   wait for the crops' event behind the GPU's queue, and the wait in the runner's waiting slot, each per frame.
-3. From that split, what stops the drops: RTMPose's own time over 20 ms means a faster model or input; a long wait
-   for the crops means the pose work queued behind the fluid's (its own stream's priority, or the order of the work
-   on the GPU); a long wait in the slot means the runner's hand-over. Each is weighed against the poses' precision
-   (RTMPose stays FP32).

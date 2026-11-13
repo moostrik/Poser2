@@ -15,8 +15,9 @@ inferred, **(site fact)** what the operator saw.
 | 4   | [The apps on deep_flow's input](#4-the-apps-on-deep_flows-input)          | its own plan                                                  | [REFACTOR.md](../../apps/REFACTOR.md)                        |
 | 5   | [The 2D flow follows the 3D](#5-the-2d-flow-follows-the-3d)               | not started                                                   | [FLOW.md](FLOW.md)                                           |
 | 6   | [A camera without depth](#6-a-camera-without-depth)                       | not started                                                   | [FLOW.md](FLOW.md), [VIEW.md](VIEW.md)                       |
-| 7   | [Recording and -sim](#7-recording-and--sim)                               | built; checks open                                            | [RECORDING.md](../recording/RECORDING.md), [INPUT_THREADS.md](INPUT_THREADS.md) |
-| 8   | [The camera package cleaned](#8-the-camera-package-cleaned)               | built; the apps' runs open                                    | [CAMERA.md](../camera/CAMERA.md)                             |
+
+Recording and -sim, deep_flow's live checks among them, have their own plan,
+[RECORDING_PLAN.md](../recording/RECORDING_PLAN.md).
 
 The 3D fluid's lines are weighed by [its goal](FLUID_3D.md#the-goal): sharp, translucent ink patterns, layers
 distinct.
@@ -138,20 +139,6 @@ Each 2D stage gets its document as it is rebuilt (`BRIDGE_2D.md`, `FLUID_2D.md`)
 - A depth for a 2D camera: the 3D fluid puts a pixel in at its z position and nothing where it has none
   ([FLUID_3D.md](FLUID_3D.md#the-bodys-depth)), so a 2D camera gives it nothing. A depth made from the image
   (a monocular depth model) on the view would give the motion its z and z position as a depth camera's does.
-
-## 7. Recording and -sim
-
-- deep_flow live: the cadence with the camera and a player in view; the view's outputs on the monitors; the
-  depth's edges on the measure recording (z's step inside the body, z's noise at the edge and inside); the dye
-  at drag 0.
-- The recorded tracklets' checks: [RECORDING.md's Open](../recording/RECORDING.md#open).
-
-## 8. The camera package cleaned
-
-Built: recording is `modules/recording`, the cameras' sync `modules/inference`'s `CameraSync`, the OAK4's two
-scripts in `scripts/`, one subject per file, `CameraHealth`, `KeypointJoin` and `oak.ClipCamera`, the public
-boundary cut to what other packages use, and the reasons in [CAMERA.md](../camera/CAMERA.md). Checked by the
-import and guard tests; the apps' runs and an OAK-D's clip path are the user's.
 
 ## The motion's details
 
