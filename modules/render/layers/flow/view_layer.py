@@ -37,8 +37,7 @@ class ViewLayerSettings(StageLayerSettings):
     far:           Field[float] = Field(4.0, min=0.1, max=12.0, step=0.05, description="Farthest depth that is the player (m)")
     guided_radius: Field[float] = Field(2.0, min=0.0, max=8.0, step=0.25, newline=True, description="How far the image moves the mask's edge to its own, in depth pixels; 0 = off")
     edge_contrast: Field[float] = Field(0.03, min=0.001, max=0.3, step=0.001, description="The image's brightness spread (0 to 1) above which the mask's edge follows the image's")
-    depth_read:    Field[DepthRead] = Field(DepthRead.SURFACE, newline=True, description="How the depth is read into the view: its pixels' edge, the mask's or the image's")
-    bilateral_contrast: Field[float] = Field(0.1, min=0.01, max=0.5, step=0.005, description="BILATERAL: the color distance (0 to 1) at which a depth pixel's weight falls to 0.6, σr")
+    depth_read:    Field[DepthRead] = Field(DepthRead.SURFACE, newline=True, description="How the depth is read into the view: its edge on its own pixels or on the mask's")
 
 
 @dataclass
@@ -170,7 +169,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
             return
         s: ViewLayerSettings = self.settings
         made: tuple = (input.timestamp, s.fixed_x, s.fixed_y, s.fixed_height, s.near, s.far, s.guided_radius, s.edge_contrast,
-                       s.depth_read, s.bilateral_contrast, self._depth_settings.tolerance, image.width, image.height, self._image.width, self._image.height)
+                       s.depth_read, self._depth_settings.tolerance, image.width, image.height, self._image.width, self._image.height)
         if made == self._made:
             return
         self._made = made
@@ -188,14 +187,14 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         self._roi_shader.use(image, roi)
         self._image.end()
 
-        # The depth read within a surface first (BILATERAL: guided by the camera image), cut by the player's range,
-        # the cut's edge moved onto the image's; with MASK the depth read again, an edge's side from that mask, and
-        # cut again, so the depth's edges lie on the mask's
+        # The depth read within a surface first, cut by the player's range, the cut's edge moved onto the image's;
+        # with MASK the depth read again, an edge's side from that mask, and cut again, so the depth's edges lie on
+        # the mask's
         read: DepthRead = DepthRead(s.depth_read)
-        self._read_depth(depth, roi, DepthRead.SURFACE if read == DepthRead.MASK else read, image, s)
+        self._read_depth(depth, roi, DepthRead.SURFACE, s)
         self._cut_and_guide(s)
         if read == DepthRead.MASK and depth is not None:
-            self._read_depth(depth, roi, read, image, s)
+            self._read_depth(depth, roi, read, s)
             self._depth_mask.begin()
             self._depth_mask_shader.use(self._depth, s.near, s.far)
             self._depth_mask.end()
@@ -208,14 +207,14 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
 
         self._pose_points = self._place_pose(input.pose)
 
-    def _read_depth(self, depth: Texture | None, roi: Rect, read: DepthRead, image: Texture, s: ViewLayerSettings) -> None:
+    def _read_depth(self, depth: Texture | None, roi: Rect, read: DepthRead, s: ViewLayerSettings) -> None:
         """The depth into the view the way `read` says; none without a depth."""
         self._depth.clear()             # without a depth: none, not the last capture's
         if depth is None:
             return
         self._depth.begin()
-        self._depth_shader.use(depth, roi, self._depth_settings.tolerance, read, mask=self._mask, image=image,
-                               near=s.near, far=s.far, reach=s.guided_radius, contrast=s.bilateral_contrast)
+        self._depth_shader.use(depth, roi, self._depth_settings.tolerance, read, mask=self._mask,
+                               near=s.near, far=s.far, reach=s.guided_radius)
         self._depth.end()
 
     def _cut_and_guide(self, s: ViewLayerSettings) -> None:

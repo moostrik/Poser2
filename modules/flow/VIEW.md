@@ -36,19 +36,17 @@ resample **(deduction)**, for keeping the camera's work and the flow's apart.
 | `guided_radius`                      | 2             | how far the image moves the mask's edge, in depth pixels; 0 off           |
 | `edge_contrast`                      | 0.03          | the image's brightness spread (0 to 1) above which the edge follows the image's |
 | `depth_read`                         | `SURFACE`     | how the depth is read into the view                                       |
-| `bilateral_contrast`                 | 0.1           | `BILATERAL`'s σr, a color distance on 0 to 1                              |
 
 ## The depth read
 
 The aligned depth is coarser than the view (`NEURAL_480`, 480 × 300 on the whole camera image), so each view
-pixel reads it between its pixels (`DepthUpscale`). `depth_read` chooses how; one of the three stays
-([FLOW_PLAN.md](FLOW_PLAN.md#2-the-3d-fluids-input)).
+pixel reads it between its pixels (`DepthUpscale`). `depth_read` chooses how; which of the two stays is in
+[FLOW_PLAN.md](FLOW_PLAN.md#2-the-3d-fluids-input).
 
-| `depth_read` | Within a surface                  | At an edge, a view pixel takes                              | Source                  |
-|--------------|-----------------------------------|-------------------------------------------------------------|-------------------------|
-| `SURFACE`    | the four depth pixels interpolated | the depth pixel it lies in: the edge on the depth's pixels | our own rule            |
-| `MASK`       | as `SURFACE`                      | the nearest depth pixel on the side the mask gives it       | our own rule            |
-| `BILATERAL`  | a weighted mean of the 5 × 5 around it | the same mean, weighed by the image                     | Kopf et al. 2007, eq. 3 |
+| `depth_read` | Within a surface                   | At an edge, a view pixel takes                             |
+|--------------|------------------------------------|------------------------------------------------------------|
+| `SURFACE`    | the four depth pixels interpolated | the depth pixel it lies in: the edge on the depth's pixels |
+| `MASK`       | as `SURFACE`                       | the nearest depth pixel on the side the mask gives it      |
 
 `SURFACE` (`depth_read.edge_aware_depth`): the four depth pixels around a view pixel, interpolated bilinearly
 where they lie within the motion's `z.tolerance` of each other, else the one it lies in, so an edge never reads
@@ -62,31 +60,20 @@ depth mask's then lie on the mask's. The mask is made from a depth read, so `MAS
 cut and the guided mask, then the read with that mask and the cut again. It carries the guided filter's edge
 into the depth without a setting of its own.
 
-`BILATERAL` (`joint_bilateral_depth`) is joint bilateral upsampling (Kopf, Cohen, Lischinski, Uyttendaele 2007,
-[the paper](https://johanneskopf.de/publications/jbu/paper/FinalPaper_0185.pdf)). Each view pixel takes the
-depth pixels of a 5 × 5 window around it, each weighed by two Gaussians: f, of its distance in depth pixels,
-σd = 0.5; and g, of the color distance between the camera image at the view pixel and at that depth pixel's
-place, on color 0 to 1, σr = `bilateral_contrast`. The window, σd and the range filter on the high-resolution
-image are the paper's. It differs in two places:
-
-| Deviation                                              | Why                                                                      |
-|--------------------------------------------------------|--------------------------------------------------------------------------|
-| a depth pixel without depth (0) is left out of the sum | the paper's solution is dense; a 0 averaged in pulls an edge toward 0 m  |
-| σr is a setting, the paper's 0.1 the default           | the paper sets it per application; 0.1 is its value for stereo depth     |
-
 What each read gives z **(deduction)**:
 
-| Read        | z's edge                | z inside             | Risks                                                              | Cost                                 |
-|-------------|-------------------------|----------------------|--------------------------------------------------------------------|--------------------------------------|
-| `SURFACE`   | the depth's pixels      | the depth's, interpolated | the depth mask a staircase of depth pixels                    | the read                             |
-| `MASK`      | the mask's, the image's | as `SURFACE`         | a depth pixel that straddles the edge is taken whole               | a second read and cut                |
-| `BILATERAL` | the image's edges       | close to `SURFACE`'s | the image's texture and noise in z; a depth in between where the image has no edge; the mask moves with the depth mask | 25 depth and 25 image reads a pixel |
+| Read      | z's edge                | z inside                  | Risks                                                | Cost                  |
+|-----------|-------------------------|---------------------------|------------------------------------------------------|-----------------------|
+| `SURFACE` | the depth's pixels      | the depth's, interpolated | the depth mask a staircase of depth pixels           | the read              |
+| `MASK`    | the mask's, the image's | as `SURFACE`              | a depth pixel that straddles the edge is taken whole | a second read and cut |
 
 z is the depth's change over time per pixel, so a pixel that changes side between two frames reads as z. With
-`MASK` no depth from behind the player lies inside the mask, and z's gate cuts where the edge is. With
-`BILATERAL` the camera image's noise moves the weights every frame, which moves the depth where nothing moved;
-inside the body it gains little, as at σd 0.5 a neighbour one depth pixel away weighs 0.135 of the pixel
-itself. No read adds depth detail inside the body: z takes x/y's resolution at the outline and stays the
+`MASK` no depth from behind the player lies inside the mask, and z's gate cuts where the edge is.
+
+Not a read: joint bilateral upsampling with the camera image (Kopf, Cohen, Lischinski, Uyttendaele 2007, a 5 × 5
+window, σd 0.5 depth pixel, σr 0.1 on color 0 to 1). It moves the mask with the depth, which costs x/y at the
+edge, lowers z's signal with its noise, and carries the image's noise and texture into the depth (the table's
+last row). No read adds depth detail inside the body: z takes x/y's resolution at the outline and stays the
 depth's, interpolated, inside it. A depth pixel's own flicker stays, as a soft bump of its size; removing it
 would filter the depth's noise.
 
@@ -97,11 +84,11 @@ inside the mask and within 6 px of its edge; slow and fast the mean inside; fit 
 along the depth mask's edge, higher the closer it sits on the image's; "no z position" the share of the mask
 where the motion's z position has no weight.
 
-| Read        | No z position | Fit    | z noise inside / edge | Slow  | Fast  | Fast ÷ noise | x/y at edge |
-|-------------|---------------|--------|-----------------------|-------|-------|--------------|-------------|
-| `SURFACE`   | 8.0%          | 0.0413 | 0.183 / 0.134         | 0.016 | 0.028 | 0.153        | 0.124       |
-| `MASK`      | 7.7%          | 0.0613 | 0.155 / 0.127         | 0.017 | 0.027 | 0.177        | 0.125       |
-| `BILATERAL` | 10.1%         | 0.0590 | 0.138 / 0.115         | 0.015 | 0.024 | 0.177        | 0.159       |
+| Read                     | No z position | Fit    | z noise inside / edge | Slow  | Fast  | Fast ÷ noise | x/y at edge |
+|--------------------------|---------------|--------|-----------------------|-------|-------|--------------|-------------|
+| `SURFACE`                | 8.0%          | 0.0413 | 0.183 / 0.134         | 0.016 | 0.028 | 0.153        | 0.124       |
+| `MASK`                   | 7.7%          | 0.0613 | 0.155 / 0.127         | 0.017 | 0.027 | 0.177        | 0.125       |
+| joint bilateral, not kept | 10.1%         | 0.0590 | 0.138 / 0.115         | 0.015 | 0.024 | 0.177        | 0.159       |
 
 A second `MASK` run gave noise 0.179 / 0.151: the noise differences lie within one run's swing. With `MASK`
 the view's depth and the depth mask cover the whole mask, and its share without a z position lies where the
@@ -148,14 +135,14 @@ fit along the mask's edge. One run's p99 swings by about ±0.02; fit holds to ±
 
 ## Checked
 
-`scripts/view_check.py [--read surface|mask|bilateral]` plays a recording's captures through the uploader and
-the view stage and holds each read to its numpy reference:
+`scripts/view_check.py [--read surface|mask]` plays a recording's captures through the uploader and the view
+stage and holds each read to its numpy reference:
 
-| Read        | Pixels off the reference, 40 captures of the measure recording                           |
-|-------------|-------------------------------------------------------------------------------------------|
-| `SURFACE`   | none by over 1 mm                                                                         |
-| `MASK`      | none; 0.02% a tie between two depth pixels on the mask's side equally near, either the rule's |
-| `BILATERAL` | none by over 2 cm, at most 1.2 cm: the GPU blends the image with coarser weights          |
+| Read                      | Pixels off the reference, 40 captures of the measure recording                                |
+|---------------------------|-----------------------------------------------------------------------------------------------|
+| `SURFACE`                 | none by over 1 mm                                                                             |
+| `MASK`                    | none; 0.02% a tie between two depth pixels on the mask's side equally near, either the rule's |
+| joint bilateral, not kept | none by over 2 cm, at most 1.2 cm: the GPU blends the image with coarser weights              |
 
 The mask overlaps the depth mask 98% with `SURFACE` and exactly with `MASK`. Without the app:
-`modules/flow/tests/test_view_window.py`, the window's geometry and the three reads.
+`modules/flow/tests/test_view_window.py`, the window's geometry and the two reads.

@@ -11,7 +11,6 @@ class DepthRead(IntEnum):
     """How the depth is read into the view, finer than its own pixels."""
     SURFACE = 0         # interpolated within a surface, the nearest across an edge: the edge in the depth's pixels
     MASK = 1            # as SURFACE, an edge's side taken from the mask: the edge on the mask's, the image's
-    BILATERAL = 2       # joint bilateral upsampling with the camera image (Kopf et al. 2007)
 
 
 def edge_aware_depth(depth: np.ndarray, u: np.ndarray, v: np.ndarray, tolerance: float) -> np.ndarray:
@@ -68,45 +67,3 @@ def mask_sided_depth(depth: np.ndarray, u: np.ndarray, v: np.ndarray, tolerance:
             picked = np.where(take, d, picked)
             best = np.where(take, distance, best)
     return picked
-
-
-def joint_bilateral_depth(depth: np.ndarray, image: np.ndarray, u: np.ndarray, v: np.ndarray, contrast: float,
-                          radius: int = 2) -> np.ndarray:
-    """Joint bilateral upsampling (Kopf et al. 2007) of the depth at uv, guided by `image` (h, w, 3, 0 to 1, rows
-    down, on the depth's view, read bilinearly at uv): the depth pixels within `radius` of the point, each weighed
-    by a gaussian of its distance (half a depth pixel, the paper's σd) and of the image's color distance at it and
-    at the point (`contrast`, σr); a 0 is left out. Mirrors DepthUpscale's BILATERAL."""
-    height, width = depth.shape
-
-    def color(uu: np.ndarray, vv: np.ndarray) -> np.ndarray:
-        ih, iw = image.shape[:2]
-        x = np.clip(uu * iw - 0.5, 0, iw - 1)
-        y = np.clip(vv * ih - 0.5, 0, ih - 1)
-        x0 = np.floor(x).astype(np.int64)
-        y0 = np.floor(y).astype(np.int64)
-        x1 = np.minimum(x0 + 1, iw - 1)
-        y1 = np.minimum(y0 + 1, ih - 1)
-        fx = (x - x0)[..., None]
-        fy = (y - y0)[..., None]
-        top = image[y0, x0] * (1 - fx) + image[y0, x1] * fx
-        bottom = image[y1, x0] * (1 - fx) + image[y1, x1] * fx
-        return top * (1 - fy) + bottom * fy
-
-    px: np.ndarray = u * width - 0.5
-    py: np.ndarray = v * height - 0.5
-    cx: np.ndarray = np.floor(px + 0.5).astype(np.int64)
-    cy: np.ndarray = np.floor(py + 0.5).astype(np.int64)
-    here: np.ndarray = color(u, v)
-    total: np.ndarray = np.zeros(np.shape(u))
-    weights: np.ndarray = np.zeros(np.shape(u))
-    for dy in range(-radius, radius + 1):
-        for dx in range(-radius, radius + 1):
-            ax, ay = cx + dx, cy + dy
-            inside: np.ndarray = (ax >= 0) & (ay >= 0) & (ax < width) & (ay < height)
-            d: np.ndarray = np.where(inside, depth[np.clip(ay, 0, height - 1), np.clip(ax, 0, width - 1)], 0.0)
-            there: np.ndarray = color((ax + 0.5) / width, (ay + 0.5) / height) - here
-            w: np.ndarray = np.exp(-((ax - px) ** 2 + (ay - py) ** 2) * 2.0 - np.sum(there ** 2, axis=-1) * 0.5 / max(contrast ** 2, 1e-8))
-            w = np.where(d > 0.0, w, 0.0)
-            total += w * d
-            weights += w
-    return np.where(weights > 1e-12, total / np.maximum(weights, 1e-12), 0.0)

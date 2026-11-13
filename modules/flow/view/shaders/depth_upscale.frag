@@ -1,32 +1,25 @@
 #version 460 core
 
-// The depth read into the view, one of three ways (`DepthRead`), metres in red; a 0, no depth, is never blended,
+// The depth read into the view, one of two ways (`DepthRead`), metres in red; a 0, no depth, is never blended,
 // and beyond the depth's grid is no depth.
 //   SURFACE    the four depth pixels around a view pixel interpolated bilinearly where they lie within `tolerance`
 //              (m) of each other, else the one it lies in, so an edge never reads as a depth in between.
 //   MASK       as SURFACE where that depth is on the side the mask gives the pixel: the player's (a depth from
 //              `near` to `far`) where the mask is, anything else (none included) where it is not; else the nearest
 //              depth pixel on that side within `reach`, else SURFACE's.
-//   BILATERAL  joint bilateral upsampling (Kopf et al. 2007, eq. 3): the 5 × 5 depth pixels around the point, each
-//              weighed by its distance (a gaussian of half a depth pixel) and by how alike the camera image is at it
-//              and at the view pixel (a gaussian of `contrast`, the color distance on 0 to 1); a 0 is left out.
 
 const int SURFACE = 0;
 const int MASK = 1;
-const int BILATERAL = 2;
-const int RADIUS = 2;           // BILATERAL: the depth pixels it reaches, each way
 const int MAX_REACH = 9;        // MASK: the most depth pixels it looks, each way (`guided_radius` at most 8, + 0.5)
 
 uniform sampler2D depth;        // metres on the camera image, 0 for none
 uniform sampler2D mask;         // MASK: the player's mask in the view (red, 0 to 1)
-uniform sampler2D image;        // BILATERAL: the camera image
 uniform vec4 roi;               // the view's window on the depth, x, y, width, height in texture coordinates
 uniform float tolerance;
 uniform int mode;
 uniform float near;             // MASK: the player's depth range (m)
 uniform float far;
 uniform float reach;            // MASK: how far it looks for a depth on the mask's side (depth pixels)
-uniform float contrast;         // BILATERAL: σr, the color distance (0 to 1) of the range gaussian
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -70,36 +63,9 @@ float mask_side(float metres, vec2 p, ivec2 size) {
     return found;
 }
 
-float bilateral(vec2 uv, ivec2 size) {
-    vec2 p = uv * vec2(size) - 0.5;
-    ivec2 center = ivec2(floor(p + 0.5));
-    vec3 here = texture(image, uv).rgb;
-    float inv_space = 2.0;                                      // 1 / (2 σ²), σ half a depth pixel (the paper's σd)
-    float inv_color = 0.5 / max(contrast * contrast, 1e-8);     // 1 / (2 σ²), σ the contrast
-    float sum = 0.0;
-    float weight = 0.0;
-    for (int y = -RADIUS; y <= RADIUS; y++) {
-        for (int x = -RADIUS; x <= RADIUS; x++) {
-            ivec2 at = center + ivec2(x, y);
-            float d = fetch(at, size);
-            if (d <= 0.0) continue;
-            vec2 offset = vec2(at) - p;
-            vec3 there = texture(image, (vec2(at) + 0.5) / vec2(size)).rgb - here;
-            float w = exp(-dot(offset, offset) * inv_space - dot(there, there) * inv_color);
-            sum += w * d;
-            weight += w;
-        }
-    }
-    return weight > 1e-12 ? sum / weight : 0.0;
-}
-
 void main() {
     ivec2 size = textureSize(depth, 0);
     vec2 uv = roi.xy + texCoord * roi.zw;
-    if (mode == BILATERAL) {
-        fragColor = vec4(bilateral(uv, size), 0.0, 0.0, 1.0);
-        return;
-    }
     vec2 p = uv * vec2(size) - 0.5;
     vec2 corner = floor(p);
     vec2 f = p - corner;
