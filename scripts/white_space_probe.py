@@ -33,7 +33,7 @@ import numpy as np  # noqa: E402
 
 from modules.log_config import setup_logging, install_excepthooks  # noqa: E402
 from modules.camera import CameraFrame, FrameType  # noqa: E402
-from modules.inference import ModelType, SyncMessage  # noqa: E402
+from modules.inference import SyncMessage  # noqa: E402
 from modules.pose import FrameDict  # noqa: E402
 from modules.settings import presets  # noqa: E402
 from modules.utils import PerformanceTimer  # noqa: E402
@@ -80,7 +80,6 @@ def main() -> int:
         loaded: bool = load(settings, path)
         settings.camera.simulator.replay = True
         settings.camera.yolo = True
-        settings.camera.person_detector.model_type = ModelType.TRT       # the app's engine (`engine_path`)
         return loaded
     presets.load = load_for_replay
     app = WhiteSpaceMain(simulation=True, interface=False)
