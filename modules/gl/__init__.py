@@ -18,6 +18,9 @@ from .tensor import Tensor
 # SHADERS (after the texture classes: they import `Texture` from this package)
 from . import shaders
 
+# SCREEN CAPTURE (after the shaders: it draws with `Nv12`)
+from .screen_capture import ScreenCapture, nv12_bytes
+
 # TEXT RENDERING
 from .text import Text
 
