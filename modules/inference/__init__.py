@@ -11,4 +11,4 @@ from .pose_inference import PoseInference, has_points
 from .recorded_poses import RecordedPoses, RecordedPosesSettings, frame_poses
 from .capture import Capture
 from .capture_sync import CaptureSync, CaptureSyncSettings
-from .camera_sync import CameraSync, CameraSyncSettings
+from .camera_sync import CameraSync, CameraSyncSettings, SyncMessage, SyncSetCallback

@@ -1,14 +1,15 @@
-"""The cameras' sync: one callback each time every camera's newest frame (or tracklet message) is in.
+"""The cameras' sync: a set each time every camera's newest frame (or tracklet message) is in.
 
-The submits only queue a message's camera and time, on the threads they come on, at most `WAITING` per camera;
-beyond that the oldest is dropped, counted in `dropped`. The sync's own thread decides the syncs in the order the
-messages came and calls the callbacks outside its lock. While the thread does not run, a message is decided on the
-thread it comes on."""
+The submits only queue a message, on the threads they come on, at most `WAITING` per camera; beyond that the oldest
+is dropped, counted in `dropped`. The sync's own thread decides the syncs in the order the messages came and hands
+the set, each camera's newest message by `cam_id`, to the set callbacks outside its lock; a camera whose newest
+message is more than a frame (`1 / fps`) older than the one that completed the set is left out of it. While the
+thread does not run, a message is decided on the thread it comes on."""
 
 import time
 from collections import deque
 from threading import Condition, Lock, Thread
-from typing import Any, Callable
+from typing import Callable
 
 from modules.camera import CameraFrame, CameraTracklets, FrameType
 from modules.settings import BaseSettings, Field
@@ -19,6 +20,9 @@ logger = logging.getLogger(__name__)
 
 WAITING: int = 16       # messages per camera waiting for the sync's thread
 
+SyncMessage = CameraFrame | CameraTracklets
+SyncSetCallback = Callable[[dict[int, SyncMessage]], None]
+
 
 class CameraSyncSettings(BaseSettings):
     num_cams:    Field[int]   = Field(1, access=Field.INIT, visible=False)
@@ -27,7 +31,7 @@ class CameraSyncSettings(BaseSettings):
 
 class CameraSync(Thread):
     """Syncs the cameras: when the camera with the largest gap to the next frame submits, every camera's newest
-    frame is as close together as it gets, and the sync fires with that moment. Frames and tracklet messages are
+    frame is as close together as it gets, and the sync hands on that set. Frames and tracklet messages are
     two separate instances with the same rule (`frame_sync`, `tracklet_sync`); see the module docstring for the
     thread."""
 
@@ -41,11 +45,12 @@ class CameraSync(Thread):
         self.last_sync_time_s: float = 0.0
 
         self._timestamp_history: deque[tuple[int, float]] = deque(maxlen=10 * num_cams)
+        self._newest: dict[int, SyncMessage] = {}           # each camera's newest message, on the deciding thread
         self._callback_lock: Lock = Lock()
-        self._callbacks: list[Callable[[float], Any]] = []  # run in registration order, with the sync's time
+        self._callbacks: list[SyncSetCallback] = []         # run in registration order, with the set
         self._wake: Condition = Condition()
         self._running: bool = False
-        self._inbox: deque[tuple[int, float, float]] = deque()     # (cam_id, timestamp, the moment it was queued)
+        self._inbox: deque[tuple[SyncMessage, float]] = deque()    # (message, the moment it was queued)
         self._queued: dict[int, int] = {}                           # what the inbox holds per camera
         self.dropped: int = 0
         self._inline_lock: Lock = Lock()            # messages decided on the callers' threads while the thread does not run
@@ -78,11 +83,11 @@ class CameraSync(Thread):
                     self._wake.wait()
                 if not self._running:
                     return
-                cam_id, timestamp, queued = self._inbox.popleft()
-                self._queued[cam_id] -= 1
+                message, queued = self._inbox.popleft()
+                self._queued[message.cam_id] -= 1
             self._wait.add_time((time.perf_counter() - queued) * 1000.0, report=False)
             try:
-                self._decide(cam_id, timestamp)
+                self._decide(message)
             except Exception:
                 logger.exception("%s: a sync failed", self.name)
 
@@ -91,31 +96,35 @@ class CameraSync(Thread):
     def submit_frame(self, frame: CameraFrame) -> None:
         """A camera's frame callback. Only VIDEO frames count: a sync is one frame per camera."""
         if frame.kind == FrameType.VIDEO:
-            self._submit(frame.cam_id, frame.timestamp)
+            self._submit(frame)
 
     def submit_tracklets(self, cam_tracklets: CameraTracklets) -> None:
-        self._submit(cam_tracklets.cam_id, cam_tracklets.timestamp)
+        self._submit(cam_tracklets)
 
-    def _submit(self, cam_id: int, timestamp: float) -> None:
-        """A message with its host time, queued for the thread, the camera's oldest dropped beyond `WAITING`."""
+    def _submit(self, message: SyncMessage) -> None:
+        """A message, queued for the thread, the camera's oldest dropped beyond `WAITING`."""
+        cam_id: int = message.cam_id
         with self._wake:
             if self._running:
                 if self._queued.get(cam_id, 0) >= WAITING:
-                    for index, (queued_cam, _, _) in enumerate(self._inbox):
-                        if queued_cam == cam_id:
+                    for index, (queued_message, _) in enumerate(self._inbox):
+                        if queued_message.cam_id == cam_id:
                             del self._inbox[index]
                             self.dropped += 1
                             break
                 else:
                     self._queued[cam_id] = self._queued.get(cam_id, 0) + 1
-                self._inbox.append((cam_id, timestamp, time.perf_counter()))
+                self._inbox.append((message, time.perf_counter()))
                 self._wake.notify()
                 return
         with self._inline_lock:
-            self._decide(cam_id, timestamp)
+            self._decide(message)
 
-    def _decide(self, cam_id: int, timestamp: float) -> None:
-        """Whether the message completes a sync; the sync carries the time of the message that completed it."""
+    def _decide(self, message: SyncMessage) -> None:
+        """Whether the message completes a sync; the set is each camera's newest message within a frame of it."""
+        cam_id: int = message.cam_id
+        timestamp: float = message.timestamp
+        self._newest[cam_id] = message
         self._timestamp_history.append((cam_id, timestamp))
         sync_cam_id: int = CameraSync._find_sync_camera(self._timestamp_history, self.max_gap_s)
 
@@ -124,7 +133,9 @@ class CameraSync(Thread):
             self.last_sync_time_s = timestamp
 
             if time_since_last_sync >= self.min_sync_interval_s:
-                self._notify_callbacks(timestamp)
+                items: dict[int, SyncMessage] = {cam: newest for cam, newest in self._newest.items()
+                                                 if timestamp - newest.timestamp <= self.max_gap_s}
+                self._notify_callbacks(items)
             elif self.verbose:
                 logger.info(f"{self.stream_name}Skipped sync (only {time_since_last_sync:.3f}s since last, from cam {cam_id})")
     @staticmethod
@@ -207,16 +218,17 @@ class CameraSync(Thread):
             cameras.add(cam_id)
         return cameras
 
-    def add_sync_callback(self, callback: Callable[[float], Any]) -> None:
+    def add_set_callback(self, callback: SyncSetCallback) -> None:
+        """Every set, each camera's newest message by `cam_id`, on the deciding thread."""
         with self._callback_lock:
             if callback not in self._callbacks:
                 self._callbacks.append(callback)
 
-    def _notify_callbacks(self, timestamp: float) -> None:
+    def _notify_callbacks(self, items: dict[int, SyncMessage]) -> None:
         with self._callback_lock:
-            callbacks: list[Callable[[float], Any]] = list(self._callbacks)
+            callbacks: list[SyncSetCallback] = list(self._callbacks)
         for callback in callbacks:
             try:
-                callback(timestamp)
+                callback(dict(items))
             except Exception:
                 logger.exception("%s: error in a sync callback", self.name)

@@ -36,14 +36,15 @@ The core is built (`ImageUpload`, for one frame or a stack of one size), deep_fl
 hands each color image on as an `ImageSnapshot` of one (`add_snapshot_callback`), and `PoseInference` takes no
 uploader. white_space's `BatchUploader` is built beside it: a set in (`submit_set`), queued whole, two at most, the
 oldest set dropped whole and counted; uploaded as one stack per frame size; each image to its image callbacks and
-the set as its `ImageSnapshot` to its snapshot callbacks.
+the set as its `ImageSnapshot` to its snapshot callbacks. `CameraSync` hands on a set
+(`add_set_callback(callback(items))`, each camera's newest message by `cam_id`, a camera more than a frame behind
+left out).
 
-3. **The sync before the upload.** Each camera hands its frames to the frames' `CameraSync` and the recorder, and
-   nothing else. `CameraSync`'s callback hands on a set: `add_set_callback(callback(items))`, `items` by `cam_id`,
-   each with its capture time. The frames' sync keeps each camera's newest video frame and hands the set to
-   the `BatchUploader`; the tracklets' sync hands its set of messages to `tracker.update`, which takes the
-   newest of their times, as its `(timestamp)` did.
-4. **The tracklets, as they come.** Each camera hands its tracklet messages straight to the tracker
+4. **white_space's wiring.** The frames: each camera hands its frames to the frames' `CameraSync` and the recorder,
+   and nothing else; the frames' sync hands its set to the `BatchUploader`, whose snapshot callback calls
+   `TrackerFrameSource.submit` with each camera's capture time; the tracklets' sync hands its set of messages to
+   `tracker.update`, which takes the newest of their times, as its `(timestamp)` did. The tracklets, as they
+   come: each camera hands its tracklet messages straight to the tracker
    (`submit_cam_tracklets`), the board, the tracker journal, the tracklets' `CameraSync` and the recorder, each a
    store or an enqueue (the journal's `submit_cam_tracklets` checked for it), never through an uploader: the `oak`
    backend's frames carry no homography and no mirror (the device warps and flips), so there is nothing to

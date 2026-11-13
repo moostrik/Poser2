@@ -1,4 +1,4 @@
-"""`CameraSync`: the sync reaches its callbacks in registration order."""
+"""`CameraSync`: the set reaches its callbacks in registration order, each camera's newest message in it."""
 
 import threading
 import time
@@ -8,7 +8,8 @@ from functools import partial
 import numpy as np
 
 from modules.camera import CameraFrame, FrameType
-from modules.inference import CameraSync, CameraSyncSettings
+
+from .. import CameraSync, CameraSyncSettings, SyncMessage
 
 
 class _Recorder:
@@ -18,9 +19,13 @@ class _Recorder:
         self._name = name
         self._calls = calls
 
-    def fire(self, timestamp: float) -> None:
+    def fire(self, items: dict[int, SyncMessage]) -> None:
         self._calls.append(self._name)
-        self.timestamp = timestamp
+        self.items = items
+
+
+def frame(cam_id: int, timestamp: float) -> CameraFrame:
+    return CameraFrame(cam_id, FrameType.VIDEO, np.zeros((2, 2), np.uint8), timestamp)
 
 
 class CameraSyncTest(unittest.TestCase):
@@ -29,22 +34,49 @@ class CameraSyncTest(unittest.TestCase):
         calls: list[int] = []
         recorders = [_Recorder(i, calls) for i in range(16)]
         for i, recorder in enumerate(recorders):
-            sync.add_sync_callback(recorder.fire if i % 2 else partial(_Recorder.fire, recorder))
-        sync.add_sync_callback(recorders[1].fire)                 # registered twice: called once, first position
-        sync.submit_frame(CameraFrame(0, FrameType.VIDEO, np.zeros((2, 2), np.uint8), 12.5))   # one camera: its first frame syncs
+            sync.add_set_callback(recorder.fire if i % 2 else partial(_Recorder.fire, recorder))
+        sync.add_set_callback(recorders[1].fire)                 # registered twice: called once, first position
+        first: CameraFrame = frame(0, 12.5)
+        sync.submit_frame(first)                                 # one camera: its first frame syncs
         self.assertEqual(calls, list(range(16)))
-        self.assertEqual(recorders[0].timestamp, 12.5)       # the sync carries the frame's time
+        self.assertEqual(recorders[0].items, {0: first})         # the set carries the frame itself
 
     def test_a_depth_frame_does_not_sync(self) -> None:
         sync = CameraSync(CameraSyncSettings())
         calls: list[int] = []
-        sync.add_sync_callback(_Recorder(0, calls).fire)
+        sync.add_set_callback(_Recorder(0, calls).fire)
         sync.submit_frame(CameraFrame(0, FrameType.DEPTH, np.zeros((2, 2), np.uint16), 12.5))
         self.assertEqual(calls, [])
 
+    def test_a_set_holds_each_cameras_newest_frame(self) -> None:
+        settings = CameraSyncSettings()
+        settings.num_cams = 3
+        settings.fps = 10.0
+        sync = CameraSync(settings)
+        sets: list[dict[int, SyncMessage]] = []
+        sync.add_set_callback(sets.append)
+        # Camera 2 comes last in each moment, so its frame completes the set
+        for moment in range(6):
+            t: float = 1.0 + moment * 0.1
+            for cam_id, offset in ((0, 0.0), (1, 0.01), (2, 0.05)):
+                sync.submit_frame(frame(cam_id, t + offset))
+        last: dict[int, SyncMessage] = sets[-1]
+        self.assertEqual(sorted(last), [0, 1, 2])
+        self.assertAlmostEqual(last[0].timestamp, 1.5)
+        self.assertAlmostEqual(last[1].timestamp, 1.51)
+        self.assertAlmostEqual(last[2].timestamp, 1.55)
 
-def frame(cam_id: int, timestamp: float) -> CameraFrame:
-    return CameraFrame(cam_id, FrameType.VIDEO, np.zeros((2, 2), np.uint8), timestamp)
+    def test_a_camera_more_than_a_frame_behind_is_left_out(self) -> None:
+        settings = CameraSyncSettings()
+        settings.num_cams = 2
+        settings.fps = 10.0
+        sync = CameraSync(settings)
+        sets: list[dict[int, SyncMessage]] = []
+        sync.add_set_callback(sets.append)
+        sync.submit_frame(frame(1, 0.9))                         # camera 1 sends once, then stops
+        for moment in range(25):                                 # until the sync's history has forgotten camera 1
+            sync.submit_frame(frame(0, 1.0 + moment * 0.1))
+        self.assertEqual(sorted(sets[-1]), [0])
 
 
 class CameraSyncThreadTest(unittest.TestCase):
@@ -55,7 +87,7 @@ class CameraSyncThreadTest(unittest.TestCase):
         settings.fps = 10.0
         self.sync = CameraSync(settings, stream_name='frame_sync')
         self.fired: list[tuple[float, str]] = []
-        self.sync.add_sync_callback(lambda timestamp: self.fired.append((timestamp, threading.current_thread().name)))
+        self.sync.add_set_callback(lambda items: self.fired.append((items[0].timestamp, threading.current_thread().name)))
         self.sync.start()
 
     def tearDown(self) -> None:
@@ -75,11 +107,11 @@ class CameraSyncThreadTest(unittest.TestCase):
         release: threading.Event = threading.Event()
         held: threading.Event = threading.Event()
 
-        def hold(timestamp: float) -> None:
+        def hold(items: dict[int, SyncMessage]) -> None:
             if not held.is_set():
                 held.set()
                 release.wait(2.0)
-        self.sync.add_sync_callback(hold)
+        self.sync.add_set_callback(hold)
         self.sync.submit_frame(frame(0, 1.0))
         self.assertTrue(held.wait(1.0))                     # the sync's thread is held: what comes now waits
         for i in range(1, 19):
