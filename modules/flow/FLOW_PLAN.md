@@ -50,15 +50,7 @@ arguments. The other findings are small by comparison.
 | #    | Step                                                                       | Rule                                                                     |
 |------|----------------------------------------------------------------------------|--------------------------------------------------------------------------|
 | 1.1  | the reasons out of the docstrings into the stage documents, each fact once | a docstring says what the thing is; reasons in the package's document    |
-| 1.2  | "drag" alone renamed by what it acts on                                    | the glossary: "drag" pairs with what it acts on                          |
 | 1.10 | every setting and its description gone through, last, after the refactor   | a `Field` description is one short line of panel text: what and its unit |
-
-What each takes:
-
-- 1.2: `DRAG_FLOOR`, `drag_share`, `drag_gate`, `drag_velocity_step` and the parameter `drag_time` (`fluid_3d.py`,
-  its test), `AddToFaces3D.drag` and its `DRAG` mode; "exponential drag" in the docstrings of `FlowUtil`'s
-  dampen, `Fluid2D`'s and `Dampen`. A mouse drag in `orbit.py` and the monitor is the panel's word, not the
-  fluid's, and stays.
 
 Each step is one commit, built on your "go", its call sites and tests in the same change.
 
@@ -229,7 +221,6 @@ Not worked on until asked for; each with what is known.
 ## Rules it touches
 
 - A docstring says what the thing is; reasons sit in the package's document: 1.1.
-- Use the terms in the glossary; one term per concept: 1.2.
 - A `Field` description is one short line of panel text: 1.10.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the two depth reads not chosen,
   `bilateral_contrast` and the preset's `view.depth_read`, line 2.
