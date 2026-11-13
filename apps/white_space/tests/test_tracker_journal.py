@@ -102,6 +102,20 @@ class TestJournalWriter(unittest.TestCase):
             self.assertEqual(lines[1]['cam'], 2)
             self.assertEqual(lines[1]['items'][0][0], 7)          # the device id
 
+    def test_times_are_the_tracklets_clock_and_the_meta_has_the_time_of_day(self) -> None:
+        settings = TrackerJournalSettings()
+        settings.enabled = True
+        with tempfile.TemporaryDirectory() as tmp:
+            journal = TrackerJournal(settings, data_path=tmp)
+            journal.start()
+            before: float = time.perf_counter()
+            journal.submit_cam_tracklets(CameraTracklets(cam_id=2, timestamp=1.5, tracklets=[]))
+            journal.stop()
+            lines = self.read_lines(self.capture_folders(tmp, settings)[0])
+            self.assertAlmostEqual(lines[0]['wall'], time.time(), delta=60.0)
+            self.assertGreaterEqual(lines[1]['t'], before)
+            self.assertLess(lines[1]['t'] - before, 1.0)          # perf_counter, not seconds since 1970
+
     def test_idle_journal_accepts_nothing_and_writes_nothing(self) -> None:
         settings = TrackerJournalSettings()                       # enabled stays False
         with tempfile.TemporaryDirectory() as tmp:

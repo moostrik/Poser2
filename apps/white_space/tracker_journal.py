@@ -163,7 +163,8 @@ class TrackerJournal:
     def _write(self) -> None:
         assert self.folder_path is not None
         with open(self.folder_path / JOURNAL_FILE, 'w', encoding='utf-8') as file:
-            meta: dict = {'k': 'meta', 't': time.time(), 'legend': LEGEND}
+            # Every 't' is `perf_counter`, the tracklets' clock; the meta line's 'wall' is the time of day at its 't'
+            meta: dict = {'k': 'meta', 't': time.perf_counter(), 'wall': time.time(), 'legend': LEGEND}
             if self._meta_provider is not None:
                 try:
                     meta.update(self._meta_provider())
@@ -175,12 +176,12 @@ class TrackerJournal:
             last_track: dict | None = None
             next_poll: float = 0.0                      # first poll initializes the baseline
             while self._capturing or not self._queue.empty():
-                if track_provider is not None and time.monotonic() >= next_poll:
-                    next_poll = time.monotonic() + self._poll_seconds
+                if track_provider is not None and time.perf_counter() >= next_poll:
+                    next_poll = time.perf_counter() + self._poll_seconds
                     try:
                         track: dict = track_provider()
                         if last_track is not None and track != last_track:
-                            file.write(json.dumps({'k': 'track', 't': time.time(), 'track': track}) + '\n')
+                            file.write(json.dumps({'k': 'track', 't': time.perf_counter(), 'track': track}) + '\n')
                         last_track = track
                     except Exception:
                         logger.exception("TrackerJournal track poll failed; polling stops")
@@ -194,7 +195,7 @@ class TrackerJournal:
                 except Exception:
                     logger.exception("TrackerJournal failed to write an entry")
 
-            file.write(json.dumps({'k': 'end', 't': time.time(),
+            file.write(json.dumps({'k': 'end', 't': time.perf_counter(),
                                    'dropped': self._dropped, 'marks': self._mark_count}) + '\n')
         if self._dropped:
             logger.warning("TrackerJournal dropped %d entries (queue full)", self._dropped)
@@ -228,19 +229,19 @@ class TrackerJournal:
         converts them."""
         if not self._capturing:
             return
-        self._put(('in', time.time(), cam_tracklets.cam_id, cam_tracklets.tracklets))
+        self._put(('in', time.perf_counter(), cam_tracklets.cam_id, cam_tracklets.tracklets))
 
     def submit_observations(self, observations: list[Tracklet]) -> None:
         """Every observation plus every rejected detection — once per tracker tick."""
         if not self._capturing:
             return
-        self._put(('obs', time.time(), observations))
+        self._put(('obs', time.perf_counter(), observations))
 
     def submit_tracklets(self, tracklets: TrackletDict) -> None:
         """The emitted primaries, keyed by player slot."""
         if not self._capturing:
             return
-        self._put(('emit', time.time(), tracklets))
+        self._put(('emit', time.perf_counter(), tracklets))
 
     def mark(self) -> None:
         """Flag an incident at this moment; callable from any thread."""
@@ -248,7 +249,7 @@ class TrackerJournal:
             logger.info("Mark pressed, but the journal is not capturing (session → journal → enabled)")
             return
         self._mark_count += 1
-        self._put(('mark', time.time(), self._mark_count))
+        self._put(('mark', time.perf_counter(), self._mark_count))
         self.settings.marks = self._mark_count
 
     def _on_enabled(self, value: object) -> None:

@@ -6,12 +6,6 @@ runs on the same code before the plan: white_space (`scripts/white_space_probe.p
 `20250514-130512_4_wide_mono` 18–30 s, run C1follow) and deep_flow, which step 2 touches
 (`scripts/cadence_probe.py`, `measure` 9–19 s, run C1fix).
 
-## 4. The tracker journal on `perf_counter()`
-
-The journal stamps its entries with `time.time()`, which cannot be lined up with the tracklets' times. Its entries
-take `perf_counter()`; the meta line keeps the wall clock once, to find a capture by the time of day.
-Checked by: `apps/white_space/tests/test_tracker_journal.py`.
-
 ## 5. Imports
 
 `render/` imports its own app absolutely (`from apps.white_space...`, `render.py` and four layer files), some from
@@ -30,7 +24,6 @@ Checked by: the guard tests and white_space's tests.
 
 ## Rules it touches
 
-- Read `time.perf_counter()` for every stamp and duration: 3, 4.
 - Inside a package, import relatively; one `from` line per package: 5.
 - Name public data-flow methods by execution timing: 6.
 - Use the terms in the glossary ("beam light"): 6.
