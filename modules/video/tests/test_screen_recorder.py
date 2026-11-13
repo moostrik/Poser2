@@ -10,7 +10,7 @@ import numpy as np
 from modules.video import (ScreenRecorder, ScreenRecorderSettings, ScreenRecorderState, ScreenSize, even,
                            frames_for, matching_preset, preset_size)
 
-FPS = 60.0
+FPS = 64.0      # ticks/s; 1/64 s and its multiples are exact in binary, so spans compare exactly
 TIMEOUT = 5.0   # s a test waits for the recorder's thread
 
 
@@ -30,6 +30,7 @@ class FakeRing:
         self._downloads: list[int] = []
         self.allocations = 0
         self.frees = 0
+        self.blocks: list[int] = []     # the slots of every block added
 
     @property
     def frame_bytes(self) -> int:
@@ -67,6 +68,7 @@ class FakeRing:
     def add_block(self, slots: int) -> None:
         with self._lock:
             self._slots.extend([-1] * slots)
+        self.blocks.append(slots)
 
     def free_blocks(self) -> None:
         with self._lock:
@@ -160,16 +162,25 @@ class StateTest(unittest.TestCase):
         self.recorder = ScreenRecorder(self.settings, self.ring, 'unused', FakeClip)
         self.recorder.start()
         self.tick_count = 0
+        self.interval = 1.0 / FPS       # s between ticks
+        self.now = 0.0
+        self.times: dict[int, float] = {}
 
     def tearDown(self) -> None:
         self.recorder.stop()
 
     def tick(self) -> None:
-        """One render tick at 60 ticks/s: the screen frame shows the tick's number when it is drawn."""
+        """One render tick, `interval` after the last: the screen frame shows the tick's number when it is drawn."""
         self.tick_count += 1
+        self.now += self.interval
+        self.times[self.tick_count] = self.now
         if self.recorder.capturing:
             self.ring.frame_on_screen = self.tick_count
-        self.recorder.update(self.tick_count / FPS)
+        self.recorder.update(self.now)
+
+    def span(self, frames: list[int]) -> float:
+        """Seconds from the first frame's tick to the last's."""
+        return self.times[frames[-1]] - self.times[frames[0]]
 
     def tick_until(self, done: Callable[[], bool]) -> None:
         deadline = time.perf_counter() + TIMEOUT
@@ -222,7 +233,21 @@ class StateTest(unittest.TestCase):
         self.settings.duration = 0.5
         ScreenRecorderSettings.start.fire(self.settings)
         self.tick_until(lambda: len(FakeClip.clips) == 1 and self.settings.state is ScreenRecorderState.IDLE)
-        self.assertEqual(len(FakeClip.clips[0].frames), frames_for(0.5, FPS, 1))
+        frames = FakeClip.clips[0].frames
+        self.assertEqual(self.span(frames), 0.5)
+        self.assertEqual(len(frames), frames_for(0.5, FPS, 1) + 1)
+
+    def test_a_take_slowing_down_still_spans_its_duration(self) -> None:
+        self.settings.duration = 0.5
+        ScreenRecorderSettings.start.fire(self.settings)
+        self.tick_until(lambda: self.ring.num_slots > 0)
+        self.ticks(4)
+        self.interval = 2.0 / FPS       # the ticks slow to half the rate measured at Start
+        self.tick_until(lambda: len(FakeClip.clips) == 1 and self.settings.state is ScreenRecorderState.IDLE)
+        frames = FakeClip.clips[0].frames
+        self.assertGreaterEqual(self.span(frames), 0.5)
+        self.assertLess(self.span(frames), 0.5 + self.interval)     # it stops at the first tick that reaches it
+        self.assertLess(len(frames), frames_for(0.5, FPS, 1))
 
     def test_frame_step_two_records_every_other_tick(self) -> None:
         self.settings.frame_step = 2
@@ -230,16 +255,18 @@ class StateTest(unittest.TestCase):
         ScreenRecorderSettings.start.fire(self.settings)
         self.tick_until(lambda: len(FakeClip.clips) == 1 and self.settings.state is ScreenRecorderState.IDLE)
         frames = FakeClip.clips[0].frames
-        self.assertEqual(len(frames), frames_for(0.5, FPS, 2))
+        self.assertEqual(self.span(frames), 0.5)
+        self.assertEqual(len(frames), frames_for(0.5, FPS, 2) + 1)
         self.assertEqual(set(np.diff(frames).tolist()), {2})
         self.assertAlmostEqual(FakeClip.clips[0].fps, FPS / 2, places=3)
 
     def test_memory_at_the_reserve_stops_the_recording(self) -> None:
         frame = 8 * 4 * 3 // 2
-        self.ring.free = int(self.settings.reserve * (1 << 30)) + 150 * frame     # room for two blocks of 60
+        self.ring.free = int(self.settings.reserve * (1 << 30)) + 150 * frame     # room for two blocks of 64
         ScreenRecorderSettings.start.fire(self.settings)
         self.tick_until(lambda: len(FakeClip.clips) == 1 and self.settings.state is ScreenRecorderState.IDLE)
-        self.assertEqual(len(FakeClip.clips[0].frames), 120)
+        self.assertEqual(len(self.ring.blocks), 2)
+        self.assertEqual(len(FakeClip.clips[0].frames), sum(self.ring.blocks))     # every slot of the two blocks
 
     def test_look_back_keeps_the_last_seconds_and_saves_them(self) -> None:
         self.settings.duration = 0.5
@@ -253,7 +280,8 @@ class StateTest(unittest.TestCase):
         saved_at = self.tick_count
         self.tick_until(lambda: len(FakeClip.clips) == 1 and self.settings.state is ScreenRecorderState.RECORDING)
         frames = FakeClip.clips[0].frames
-        self.assertEqual(len(frames), frames_for(0.5, FPS, 1))
+        self.assertGreater(self.ring.num_slots, len(frames))    # the ring holds more than `duration`
+        self.assertEqual(self.span(frames), 0.5)                # Save trims it to the last 0.5 s by time
         self.assertEqual(np.diff(frames).tolist(), [1] * (len(frames) - 1))
         self.assertEqual(frames[-1], saved_at)      # the Save tick's own frame, flushed out of the pixel buffer
         self.assertTrue(self.ring.allocated)

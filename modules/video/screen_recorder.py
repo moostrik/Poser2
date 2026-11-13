@@ -26,6 +26,7 @@ GB: int = 1 << 30
 DEFAULT_FPS: float = 60.0       # ticks/s assumed until the ticks are measured
 FPS_SMOOTH: float = 0.05        # share of a new tick interval in the measured rate
 BLOCK_AHEAD: float = 0.5        # share of a block left when the next one is added
+LOOK_BACK_MARGIN: float = 1.2   # the look-back ring's frames over `duration` at the rate measured, for faster ticks
 POLL: float = 0.05              # s between the thread's looks at the ring while it records
 ESTIMATE_INTERVAL: float = 1.0  # s between estimates of `max_duration`
 SHOW_INTERVAL: float = 0.25     # s between updates of `recorded`
@@ -178,6 +179,7 @@ class ScreenRecorder:
         self._look_back: bool = False       # the ring in use is a look-back ring
         self._size: tuple[int, int] = (0, 0)
         self._duration: float = 0.0         # the duration the look-back ring was made for
+        self._limit: float = 0.0            # s a take spans, by its frames' times; 0: until the memory stops it
         self._frame_step: int = 1
         self._ticks: int = 0
         self._stamps: list[float] = []      # tick time of each slot's frame
@@ -334,10 +336,11 @@ class ScreenRecorder:
         self._ticks = 0
         self._stamps = []
         self._pending = False
-        target = 0      # 0: as long as the memory holds
         maximum = self.settings.max_duration
-        if self._duration > 0.0 and (maximum <= 0.0 or self._duration <= maximum):
-            target = frames_for(self._duration, self._fps, self._frame_step)
+        self._limit = self._duration if self._duration > 0.0 and (maximum <= 0.0 or self._duration <= maximum) else 0.0
+        target = 0      # 0: the ring grows as long as the memory holds
+        if look_back and self._limit:
+            target = frames_for(self._limit * LOOK_BACK_MARGIN, self._fps, self._frame_step)
         with self._lock:
             self._target = target
             self._written = 0
@@ -359,7 +362,7 @@ class ScreenRecorder:
             slot = written
         elif complete or (target and written >= target):
             if not self._look_back:
-                self._encode(self._flush(), free_after=True)    # the memory or the duration is reached
+                self._encode(self._flush(), free_after=True)    # the memory is reached
             return
         else:
             return      # the next block is not there yet: this frame is left out
@@ -375,6 +378,8 @@ class ScreenRecorder:
         self._pending = True
         with self._lock:
             self._written = written + 1
+        if not self._look_back and self._limit and timestamp - self._stamps[0] >= self._limit:
+            self._encode(self._flush(), free_after=True)    # the take spans `duration` by its frames' times
 
     def _flush(self) -> int:
         """Copy the pending frame into the ring and stop filling it; the number of frames recorded."""
@@ -405,6 +410,11 @@ class ScreenRecorder:
         first = written - held
         order = [(first + n) % slots for n in range(held)] if self._look_back else list(range(held))
         stamps = [self._stamps[slot] for slot in order]
+        if self._look_back and self._limit:
+            # the frames of the last `duration` seconds, by their times
+            newest = stamps[-1]
+            kept = [n for n, t in enumerate(stamps) if newest - t <= self._limit]
+            order, stamps = [order[n] for n in kept], [stamps[n] for n in kept]
         stamp = datetime.now().strftime('%Y%m%d-%H%M%S')
         name = f'{stamp}_{self.settings.name}' if self.settings.name else stamp
         take = _Take(order, stamps, str(self._folder / f'{name}.mp4'), free_after)

@@ -63,6 +63,11 @@ the recording stops when it is full. The check runs once per recorded second, th
 `frame_step`), refreshed once a second. `duration` 0, or above `max_duration`, records until the memory
 stops it.
 
+`duration` is counted in time, by the frames' own tick times: a take ends at the first frame whose time is
+`duration` after the first frame's, so it spans `duration` whatever the tick rate does while it records. The
+blocks are sized by the rate measured at Start; they are only chunks of memory, and the ring grows by as many
+as the take needs.
+
 ### Capture, on the render thread
 
 - The Nv12 shader (`modules/gl/shaders/nv12.py`, `nv12.frag`) converts the screen frame in two passes: Y into
@@ -98,8 +103,10 @@ Files go to the folder the app gives, named `<date-time>_<name>.mp4`.
 
 ### Look back
 
-With `look_back` on the ring records all the time, the newest frame replacing the oldest, so it holds the
-last `duration` seconds (or what the memory holds). `save` encodes them, oldest first. The ring pauses while
+With `look_back` on the ring records all the time, the newest frame replacing the oldest. It holds 1.2 ×
+`duration` at the rate measured when it is made (`LOOK_BACK_MARGIN`), so ticks faster than that still leave
+it the last `duration` seconds; with `duration` 0 it holds what the memory holds. `save` encodes the frames
+whose times lie in the last `duration` seconds, oldest first. The ring pauses while
 the encode reads it and records on when the file is written; it is blind for that time, because recording on
 in a second ring would need the memory twice. It holds its video memory while the switch is on; a change of
 size or duration empties it and makes it again.
