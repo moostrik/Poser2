@@ -1,5 +1,6 @@
 """`CameraSync`: the set reaches its callbacks in registration order, each camera's newest message in it."""
 
+import random
 import threading
 import time
 import unittest
@@ -10,6 +11,7 @@ import numpy as np
 from modules.camera import CameraFrame, FrameType
 
 from .. import CameraSync, CameraSyncSettings, SyncMessage
+from ..camera_sync import PHASE_FRAMES
 
 
 class _Recorder:
@@ -26,6 +28,17 @@ class _Recorder:
 
 def frame(cam_id: int, timestamp: float) -> CameraFrame:
     return CameraFrame(cam_id, FrameType.VIDEO, np.zeros((2, 2), np.uint8), timestamp)
+
+
+def synced(num_cams: int, fps: float) -> tuple[CameraSync, list[dict[int, SyncMessage]]]:
+    """A sync, not started, and the sets it hands on."""
+    settings = CameraSyncSettings()
+    settings.num_cams = num_cams
+    settings.fps = fps
+    sync = CameraSync(settings)
+    sets: list[dict[int, SyncMessage]] = []
+    sync.add_set_callback(sets.append)
+    return sync, sets
 
 
 class CameraSyncTest(unittest.TestCase):
@@ -48,14 +61,8 @@ class CameraSyncTest(unittest.TestCase):
         sync.submit_frame(CameraFrame(0, FrameType.DEPTH, np.zeros((2, 2), np.uint16), 12.5))
         self.assertEqual(calls, [])
 
-    def test_a_set_holds_each_cameras_newest_frame(self) -> None:
-        settings = CameraSyncSettings()
-        settings.num_cams = 3
-        settings.fps = 10.0
-        sync = CameraSync(settings)
-        sets: list[dict[int, SyncMessage]] = []
-        sync.add_set_callback(sets.append)
-        # Camera 2 comes last in each moment, so its frame completes the set
+    def test_a_set_holds_one_frame_of_each_camera(self) -> None:
+        sync, sets = synced(3, 10.0)
         for moment in range(6):
             t: float = 1.0 + moment * 0.1
             for cam_id, offset in ((0, 0.0), (1, 0.01), (2, 0.05)):
@@ -66,17 +73,44 @@ class CameraSyncTest(unittest.TestCase):
         self.assertAlmostEqual(last[1].timestamp, 1.51)
         self.assertAlmostEqual(last[2].timestamp, 1.55)
 
-    def test_a_camera_more_than_a_frame_behind_is_left_out(self) -> None:
-        settings = CameraSyncSettings()
-        settings.num_cams = 2
-        settings.fps = 10.0
-        sync = CameraSync(settings)
-        sets: list[dict[int, SyncMessage]] = []
-        sync.add_set_callback(sets.append)
+    def test_a_camera_that_stops_is_left_out_after_two_frames(self) -> None:
+        sync, sets = synced(2, 10.0)
         sync.submit_frame(frame(1, 0.9))                         # camera 1 sends once, then stops
-        for moment in range(25):                                 # until the sync's history has forgotten camera 1
+        for moment in range(5):
             sync.submit_frame(frame(0, 1.0 + moment * 0.1))
         self.assertEqual(sorted(sets[-1]), [0])
+
+    def test_any_arrival_order_gives_one_set_per_moment_and_every_frame_once(self) -> None:
+        sync, sets = synced(4, 23.0)
+        rng = random.Random(1)
+        frames = [frame(cam_id, moment / 23.0 + rng.uniform(0.0, 0.030)) for moment in range(230) for cam_id in range(4)]
+        frames.sort(key=lambda f: f.timestamp)                  # each moment's four come in any order
+        for f in frames:
+            sync.submit_frame(f)
+        sent: list[SyncMessage] = [m for items in sets for m in items.values()]
+        self.assertEqual(len(sent), len(frames) - len(sync._open))          # every frame once, the open set aside
+        self.assertEqual(len({id(m) for m in sent}), len(sent))
+        self.assertAlmostEqual(len(sets) / 230, 1.0, delta=0.02)
+
+    def test_a_camera_a_frame_behind_joins_the_moment_it_is_closest_to(self) -> None:
+        sync, sets = synced(4, 23.0)
+        period: float = 1.0 / 23.0
+        for moment in range(40):                                # camera 3 runs 40 ms behind the others
+            for cam_id in range(4):
+                sync.submit_frame(frame(cam_id, moment * period + (0.040 if cam_id == 3 else 0.0)))
+        spreads: list[float] = [max(m.timestamp for m in s.values()) - min(m.timestamp for m in s.values())
+                                for s in sets[PHASE_FRAMES:] if len(s) == 4]
+        self.assertTrue(spreads)
+        self.assertLess(max(spreads), 0.005)                    # with the next moment's frames, 3.5 ms away
+
+    def test_a_lost_frame_closes_its_set_at_the_next_moment_without_it(self) -> None:
+        sync, sets = synced(4, 23.0)
+        for moment in range(30):
+            for cam_id in range(4):
+                if not (moment == 20 and cam_id == 2):
+                    sync.submit_frame(frame(cam_id, moment / 23.0 + cam_id * 0.002))
+        self.assertIn([0, 1, 3], [sorted(s) for s in sets])
+        self.assertEqual(sum(len(s) for s in sets) + len(sync._open), 30 * 4 - 1)
 
 
 class CameraSyncThreadTest(unittest.TestCase):

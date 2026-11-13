@@ -1,11 +1,17 @@
-"""The cameras' sync: a set each time every camera's newest frame (or tracklet message) is in.
+"""The cameras' sync: the cameras' messages of one moment, one per camera, as a set.
+
+The cameras run at one frame rate, so each keeps its phase, its place in the frame cycle (its capture time modulo
+`1 / fps`, averaged over `PHASE_FRAMES` frames). The rounds are cut in the middle of the largest gap between the
+phases of the live cameras (those with a message within `LIVE_FRAMES` frames), so a set holds the messages closest
+together in time. A set closes as soon as every live camera is in it, or when a message of a later round, or a
+camera's second message, comes; a camera that did not come is then left out. Every message is in one set.
 
 The submits only queue a message, on the threads they come on, at most `WAITING` per camera; beyond that the oldest
-is dropped, counted in `dropped`. The sync's own thread decides the syncs in the order the messages came and hands
-the set, each camera's newest message by `cam_id`, to the set callbacks outside its lock; a camera whose newest
-message is more than a frame (`1 / fps`) older than the one that completed the set is left out of it. While the
-thread does not run, a message is decided on the thread it comes on."""
+is dropped, counted in `dropped`. The sync's own thread decides the sets in the order the messages came and hands
+each, by `cam_id`, to the set callbacks outside its lock. While the thread does not run, a message is decided on
+the thread it comes on."""
 
+import math
 import time
 from collections import deque
 from threading import Condition, Lock, Thread
@@ -19,6 +25,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 WAITING: int = 16       # messages per camera waiting for the sync's thread
+PHASE_FRAMES: int = 10  # frames a camera's phase is averaged over
+LIVE_FRAMES: int = 2    # a camera without a message for this many frames is left out of the sets
 
 SyncMessage = CameraFrame | CameraTracklets
 SyncSetCallback = Callable[[dict[int, SyncMessage]], None]
@@ -30,22 +38,20 @@ class CameraSyncSettings(BaseSettings):
 
 
 class CameraSync(Thread):
-    """Syncs the cameras: when the camera with the largest gap to the next frame submits, every camera's newest
-    frame is as close together as it gets, and the sync hands on that set. Frames and tracklet messages are
-    two separate instances with the same rule (`frame_sync`, `tracklet_sync`); see the module docstring for the
-    thread."""
+    """The cameras' sync, see the module docstring. Frames and tracklet messages are two separate instances with the
+    same rule (`frame_sync`, `tracklet_sync`)."""
 
-    def __init__(self, settings: CameraSyncSettings, verbose: bool = False, stream_name: str = '') -> None:
+    def __init__(self, settings: CameraSyncSettings, stream_name: str = '') -> None:
         super().__init__(daemon=True, name=f'CameraSync {stream_name}'.strip())
-        num_cams: int = settings.num_cams
-        self.verbose: bool = verbose
         self.stream_name: str = stream_name
-        self.max_gap_s: float = 1.0 / settings.fps
-        self.min_sync_interval_s: float = 0.75 / settings.fps
-        self.last_sync_time_s: float = 0.0
+        self._period: float = 1.0 / settings.fps
 
-        self._timestamp_history: deque[tuple[int, float]] = deque(maxlen=10 * num_cams)
-        self._newest: dict[int, SyncMessage] = {}           # each camera's newest message, on the deciding thread
+        # On the deciding thread
+        self._phases: dict[int, tuple[float, float]] = {}  # each camera's phase, as an averaged unit vector
+        self._newest: dict[int, float] = {}                 # each camera's newest capture time
+        self._open: dict[int, SyncMessage] = {}             # the set being filled
+        self._open_round: int | None = None
+
         self._callback_lock: Lock = Lock()
         self._callbacks: list[SyncSetCallback] = []         # run in registration order, with the set
         self._wake: Condition = Condition()
@@ -121,105 +127,47 @@ class CameraSync(Thread):
             self._decide(message)
 
     def _decide(self, message: SyncMessage) -> None:
-        """Whether the message completes a sync; the set is each camera's newest message within a frame of it."""
+        """The message into its round's set; the set goes out once complete, or once a later round has begun."""
         cam_id: int = message.cam_id
         timestamp: float = message.timestamp
-        self._newest[cam_id] = message
-        self._timestamp_history.append((cam_id, timestamp))
-        sync_cam_id: int = CameraSync._find_sync_camera(self._timestamp_history, self.max_gap_s)
+        period: float = self._period
+        angle: float = 2.0 * math.pi * (timestamp % period) / period
+        x, y = self._phases.get(cam_id, (math.cos(angle), math.sin(angle)))
+        self._phases[cam_id] = (x + (math.cos(angle) - x) / PHASE_FRAMES, y + (math.sin(angle) - y) / PHASE_FRAMES)
+        self._newest[cam_id] = timestamp
+        live: set[int] = {cam for cam, newest in self._newest.items() if timestamp - newest <= LIVE_FRAMES * period}
 
-        if cam_id == sync_cam_id:
-            time_since_last_sync: float = timestamp - self.last_sync_time_s
-            self.last_sync_time_s = timestamp
+        # The round of the camera's own frame cycle the message is nearest to, so its jitter never moves it across the cut
+        x, y = self._phases[cam_id]
+        phase: float = (math.atan2(y, x) % (2.0 * math.pi)) / (2.0 * math.pi) * period
+        expected: float = phase + round((timestamp - phase) / period) * period
+        round_index: int = math.floor((expected - self._cut(live)) / period)
+        if self._open_round is not None and (round_index > self._open_round or cam_id in self._open):
+            self._close()
+        if self._open_round is None:
+            self._open_round = round_index
+        self._open[cam_id] = message
+        if live <= self._open.keys():
+            self._close()
 
-            if time_since_last_sync >= self.min_sync_interval_s:
-                items: dict[int, SyncMessage] = {cam: newest for cam, newest in self._newest.items()
-                                                 if timestamp - newest.timestamp <= self.max_gap_s}
-                self._notify_callbacks(items)
-            elif self.verbose:
-                logger.info(f"{self.stream_name}Skipped sync (only {time_since_last_sync:.3f}s since last, from cam {cam_id})")
-    @staticmethod
-    def _find_sync_camera(timestamp_history: deque[tuple[int, float]], max_gap_s: float) -> int:
-        """The camera whose frame completes a sync: the one with the largest average gap to the next frame, gaps
-        over `max_gap_s` (a dropped frame) left out."""
-        camera_ids: set[int] = CameraSync._get_unique_cameras_in_history(timestamp_history)
+    def _cut(self, live: set[int]) -> float:
+        """Where the rounds are cut in the frame cycle (s): the middle of the largest gap between the live cameras'
+        phases."""
+        period: float = self._period
+        phases: list[float] = sorted((math.atan2(self._phases[cam][1], self._phases[cam][0]) % (2.0 * math.pi))
+                                     / (2.0 * math.pi) * period for cam in live)
+        width, start = max(((phases[(i + 1) % len(phases)] - phase) % period or period, phase)
+                           for i, phase in enumerate(phases))
+        return (start + width / 2.0) % period
 
-        if len(timestamp_history) < 2:
-            return next(iter(camera_ids))
-
-        # Calculate average gap to next frame for each camera
-        cam_gaps: dict[int, list[float]] = {cam_id: [] for cam_id in camera_ids}
-
-        # Look through history and find gap from each cam_id to next timestamp
-        for i in range(len(timestamp_history) - 1):
-            cam_id, timestamp = timestamp_history[i]
-            next_timestamp: float = timestamp_history[i + 1][1]
-            gap: float = next_timestamp - timestamp
-
-            # Only include gaps within normal range
-            if gap <= max_gap_s:
-                cam_gaps[cam_id].append(gap)
-
-        # Find camera with largest average gap
-        max_avg_gap = 0.0
-        sync_cam: int = next(iter(camera_ids))
-        has_valid_gaps = False
-
-        for cam_id, gaps in cam_gaps.items():
-            if gaps:
-                has_valid_gaps = True
-                avg_gap: float = sum(gaps) / len(gaps)
-                if avg_gap > max_avg_gap:
-                    max_avg_gap: float = avg_gap
-                    sync_cam = cam_id
-
-        # Fallback: if all gaps filtered, use any camera
-        if not has_valid_gaps:
-            sync_cam = next(iter(camera_ids))
-
-        return sync_cam
-
-    @staticmethod
-    def _get_max_time_diff(timestamp_history: deque[tuple[int, float]]) -> float:
-        """
-        Find the maximum time difference between the latest frames of all cameras.
-
-        Returns:
-            Maximum time difference in seconds, or 0.0 if not all cameras have frames
-        """
-        if len(timestamp_history) == 0:
-            return 0.0
-
-        camera_ids: set[int] = CameraSync._get_unique_cameras_in_history(timestamp_history)
-
-        if not camera_ids:  # Extra safety
-            return 0.0
-
-        # Find the latest timestamp for each camera
-        latest_timestamps: dict[int, float] = {}
-
-        for cam_id, timestamp in reversed(timestamp_history):
-            if cam_id not in latest_timestamps:
-                latest_timestamps[cam_id] = timestamp
-            if len(latest_timestamps) == len(camera_ids):
-                break
-
-        # Need at least 2 cameras for meaningful diff
-        if len(latest_timestamps) < 2:
-            return 0.0
-
-        timestamps = list(latest_timestamps.values())
-        return max(timestamps) - min(timestamps)
-
-    @staticmethod
-    def _get_unique_cameras_in_history(timestamp_history: deque[tuple[int, float]]) -> set[int]:
-        cameras: set[int] = set()
-        for cam_id, _ in timestamp_history:
-            cameras.add(cam_id)
-        return cameras
+    def _close(self) -> None:
+        items: dict[int, SyncMessage] = self._open
+        self._open = {}
+        self._open_round = None
+        self._notify_callbacks(items)
 
     def add_set_callback(self, callback: SyncSetCallback) -> None:
-        """Every set, each camera's newest message by `cam_id`, on the deciding thread."""
+        """Every set, one message per camera by `cam_id`, on the deciding thread."""
         with self._callback_lock:
             if callback not in self._callbacks:
                 self._callbacks.append(callback)

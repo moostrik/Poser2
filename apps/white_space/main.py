@@ -97,10 +97,10 @@ class WhiteSpaceMain:
         else:
             for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
-        self.frame_sync = CameraSync(self.settings.camera.frame_sync, False, 'frame_sync')
+        self.frame_sync = CameraSync(self.settings.camera.frame_sync, 'frame_sync')
         self.uploader = BatchUploader()          # a synced set of the cameras' frames onto the GPU as one batch, on its own thread
         self.tracker = PanoramicTracker(self.settings.tracker, max_players, num_cams)
-        self.tracklet_sync = CameraSync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
+        self.tracklet_sync = CameraSync(self.settings.camera.tracklet_sync, 'tracklet_sync')
         self.pose_inference = PoseInference(ps.image_crop, ps.pose)      # the crop and the pose model, the frame domain's async step
 
         # The camera's thread only hands its frames and tracklets over: the frames to the recorder and the frames'
