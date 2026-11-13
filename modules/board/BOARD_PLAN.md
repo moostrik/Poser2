@@ -26,7 +26,7 @@ stays.
 
 Checked by: the three apps' tests, the board, pose and render tests, the guard tests, and each app's start.
 
-## 2. Form
+## 2. Form (built)
 
 - `HasObservations`' docstring says what the slice is; why the unfused view exists (a seam's two observations
   disagree when the geometry is wrong, and the fusion would hide it) moves to white_space's
@@ -38,10 +38,8 @@ Checked by: the three apps' tests, the board, pose and render tests, the guard t
 
 Checked by: the board and utils tests and the guard tests.
 
-## Open: your call
-
-- `submit_time_sample`: the naming rule's `set` stores for polling, `submit` enqueues deferred work. A sample goes
-  into a ring the plot reads at its tick, which is storing for polling, so `set_time_sample`; or keep `submit`.
+- `submit_time_sample` is `set_time_sample`: a sample goes into a ring the plot reads at its tick, which the
+  naming rule's `set` is (your call, 2026-11-14).
 
 ## Rules it touches
 

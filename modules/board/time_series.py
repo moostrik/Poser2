@@ -10,8 +10,8 @@ from modules.utils import SampleRing
 
 
 class HasTimeSeries(Protocol):
-    """Values over time, keyed by an app's IntEnum: any thread submits, the plot reads."""
-    def submit_time_sample(self, series: IntEnum, value: float, timestamp: float) -> None: ...
+    """Values over time, keyed by an app's IntEnum: any thread sets a sample, the plot reads."""
+    def set_time_sample(self, series: IntEnum, value: float, timestamp: float) -> None: ...
     def get_time_series(self, window: float) -> tuple[float, dict[IntEnum, tuple[np.ndarray, np.ndarray]]]: ...
 
 
@@ -23,7 +23,7 @@ class TimeSeriesStoreMixin:
         self._time_series: dict[IntEnum, SampleRing] = {}
         self._time_series_end: float = 0.0
 
-    def submit_time_sample(self, series: IntEnum, value: float, timestamp: float) -> None:
+    def set_time_sample(self, series: IntEnum, value: float, timestamp: float) -> None:
         with self._time_series_lock:
             ring: SampleRing | None = self._time_series.get(series)
             if ring is None:

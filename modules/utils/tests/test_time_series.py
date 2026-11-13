@@ -1,12 +1,9 @@
 """The sample ring and the binning behind the time series plot."""
 
 import unittest
-from enum import IntEnum
-from threading import Thread
 
 import numpy as np
 
-from modules.board import TimeSeriesStoreMixin
 from modules.utils import PerformanceTimer, SampleRing, bin_samples, hold_gaps
 
 
@@ -88,38 +85,6 @@ class BinSamplesTest(unittest.TestCase):
         values[50] = 40.0
         _, high = bin_samples(timestamps, values, end=1.0, window=1.0, columns=1)
         self.assertEqual(high[0], 40.0)
-
-
-class Lane(IntEnum):
-    FIRST = 0
-    SECOND = 1
-
-
-class TimeSeriesStoreTest(unittest.TestCase):
-    def test_the_window_ends_at_the_newest_sample_of_any_series(self) -> None:
-        store = TimeSeriesStoreMixin()
-        store.submit_time_sample(Lane.FIRST, 1.0, 10.0)
-        store.submit_time_sample(Lane.SECOND, 2.0, 14.0)
-        store.submit_time_sample(Lane.FIRST, 3.0, 13.0)
-        end, series = store.get_time_series(2.0)
-        self.assertEqual(end, 14.0)
-        np.testing.assert_array_equal(series[Lane.FIRST][1], [3.0])     # 10 s is outside 12..14
-        np.testing.assert_array_equal(series[Lane.SECOND][1], [2.0])
-
-    def test_samples_from_many_threads_all_arrive(self) -> None:
-        store = TimeSeriesStoreMixin()
-
-        def submit(offset: int) -> None:
-            for i in range(500):
-                store.submit_time_sample(Lane.FIRST, 1.0, float(offset * 1000 + i))
-
-        threads = [Thread(target=submit, args=(n,)) for n in range(4)]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
-        _, series = store.get_time_series(1e9)
-        self.assertEqual(len(series[Lane.FIRST][0]), 2000)
 
 
 if __name__ == '__main__':

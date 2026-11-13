@@ -209,7 +209,7 @@ class DeepFlowMain:
         last: float | None = self._last_camera_frame.get(image.cam_id)
         self._last_camera_frame[image.cam_id] = image.timestamp
         if last is not None:
-            self.board.submit_time_sample(Series.CAMERA_INTERVAL, (image.timestamp - last) * 1000.0, image.timestamp)
+            self.board.set_time_sample(Series.CAMERA_INTERVAL, (image.timestamp - last) * 1000.0, image.timestamp)
 
     def _on_asked(self, timestamp: float, cam_id: int, asked: FrameDict) -> None:
         """A frame bang's poses, on the frame source's thread: the recorder and the capture sync hear whether poses
@@ -233,9 +233,9 @@ class DeepFlowMain:
         self.capture_rate.processed()
         self.board.set_capture(capture)
         now: float = time.perf_counter()        # when the capture reaches the board: the end of the latency
-        self.board.submit_time_sample(Series.CAPTURE_LATENCY, (now - capture.timestamp) * 1000.0, now)
+        self.board.set_time_sample(Series.CAPTURE_LATENCY, (now - capture.timestamp) * 1000.0, now)
         if capture.poses:
-            self.board.submit_time_sample(Series.POSES_UNSYNCED, 0.0 if capture.poses_synced else 1.0, now)
+            self.board.set_time_sample(Series.POSES_UNSYNCED, 0.0 if capture.poses_synced else 1.0, now)
 
     def _on_pose_frames(self, series: Series, poses: FrameDict) -> None:
         """A stage's poses as they come out: how long after their capture."""
@@ -243,12 +243,12 @@ class DeepFlowMain:
             return
         now: float = time.perf_counter()        # when the poses come out of the stage: the end of the latency
         newest: float = max(frame.timestamp for frame in poses.values())
-        self.board.submit_time_sample(series, (now - newest) * 1000.0, now)
+        self.board.set_time_sample(series, (now - newest) * 1000.0, now)
 
     def _on_timer_sample(self, name: str, time_ms: float, timestamp: float) -> None:
         series: Series | None = TIMER_SERIES.get(name)
         if series is not None:
-            self.board.submit_time_sample(series, time_ms, timestamp)
+            self.board.set_time_sample(series, time_ms, timestamp)
 
     def _update_cadence(self, now: float) -> None:
         """The panel's cadence: the captures the sync hands on and the frames the motion measures, the slowest camera's, and the drops."""

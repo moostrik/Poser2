@@ -428,7 +428,10 @@ degree at the horizon is the same size either way; the grid's elevation lines sp
 (The strip is stitched from the frames through the tracker's published row model; `strip.strip_y`
 owns the strip's own rows.) The four images are drawn on top of each other at the azimuth each camera
 claims, and the tracker's own view of the same people is drawn over them on the same vertical scale:
-image right and marks wrong means the distance model, not the camera.
+image right and marks wrong means the distance model, not the camera. The marks are the unfused
+observations, one per camera that sees a player, not the fused tracklets the show reads: the fusion
+hides camera error, while a player on a seam has two observations whose world angles disagree when
+the geometry is wrong.
 
 `render.panorama.parts` is a checklist of the pieces, each independent:
 
