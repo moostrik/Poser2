@@ -1,7 +1,7 @@
 """white_space's input cadence and latency in -sim, over one stretch of a recording.
 
-Runs white_space -sim headless on `--folder` (replay on the host with the person detector, `simulator.replay` and
-`yolo` on in the startup preset, both read at start) and measures while the playhead is between `--start` and `--end`
+Runs white_space -sim headless on `--folder`, replayed on the host with the person detector (`simulator.replay` and
+`yolo` set on the loaded preset before the app reads them; no preset is written) and measures while the playhead is between `--start` and `--end`
 (seconds of the recording, a stretch found first from the recording's metadata):
 - the cameras' hand-over: each camera thread's time per frame (the frame's callbacks, which only queue);
 - the syncs: the sets each `CameraSync` hands on, as counts and gaps, against the cameras' frame rate;
@@ -35,6 +35,7 @@ from modules.log_config import setup_logging, install_excepthooks  # noqa: E402
 from modules.camera import CameraFrame, FrameType  # noqa: E402
 from modules.inference import SyncMessage  # noqa: E402
 from modules.pose import FrameDict  # noqa: E402
+from modules.settings import presets  # noqa: E402
 from modules.utils import PerformanceTimer  # noqa: E402
 from apps.white_space.main import WhiteSpaceMain  # noqa: E402
 from apps.white_space.settings import Stage  # noqa: E402
@@ -71,11 +72,18 @@ def main() -> int:
 
     setup_logging(verbose=False, name='white_space')
     install_excepthooks()
+    load = presets.load
+
+    def load_for_replay(settings, path) -> bool:
+        """The startup preset, then the replay with the detector: both are read when the app builds its cameras."""
+        loaded: bool = load(settings, path)
+        settings.camera.simulator.replay = True
+        settings.camera.yolo = True
+        return loaded
+    presets.load = load_for_replay
     app = WhiteSpaceMain(simulation=True, interface=False)
+    presets.load = load
     settings = app.settings
-    if not (settings.camera.simulator.replay and settings.camera.yolo):
-        print('the startup preset needs camera.simulator.replay and camera.yolo on (both are read at start)', flush=True)
-        return 1
     settings.camera.simulator.folder = args.folder
     settings.pose.pose.enabled = True
 

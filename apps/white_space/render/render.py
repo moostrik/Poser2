@@ -65,7 +65,6 @@ class WhiteSpaceRender(RenderBase):
         # Row 1 — per-camera: source layers + tracker compositor
         for i in range(self.num_cams):
             self.L[Layers.cam_image][i] = layers.ImageSourceLayer(i, board)
-            self.L[Layers.cam_crop][i]  = layers.CropSourceLayer(i, board)
             self.L[Layers.tracker][i]   = layers.TrackerCompositor(
                 i, board,
                 self.L[Layers.cam_image][i].texture,
@@ -74,13 +73,15 @@ class WhiteSpaceRender(RenderBase):
             )
             self.L[Layers.cam_readings][i] = layers.CameraReadingsLayer(cameras[i], camera_health)
 
-        # Row 5 — per-player: pose compositor + data overlays
+        # Row 5 — per-player: the player's crop, pose compositor + data overlays
         # cam_image[0] texture used as fallback for non-GPU crop path (GPU crop is default)
         fallback_cam_texture = self.L[Layers.cam_image][0].texture
         for i in range(self.max_players):
+            cam_crop = self.L[Layers.cam_crop][i] = layers.CropSourceLayer(i, board)
             self.L[Layers.pose][i]     = layers.PoseCompositor(
                 i, board,
                 fallback_cam_texture,
+                cam_crop,
                 settings.preview.pose,
                 settings.colors,
             )
