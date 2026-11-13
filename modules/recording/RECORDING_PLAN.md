@@ -25,9 +25,8 @@ deep_flow live, with the camera and a player in view:
 
 With the apps' refactors ([APPS_PLAN.md](../../apps/APPS_PLAN.md)), each tested with its refactored app:
 
-- hd_trio and white_space: their settings (`MP4` for hd_trio), their wiring (tracklets through the uploader,
-  `expect_parts` per camera, `expect_poses` per camera and image), and hd_trio's pose `.h5` cut at the recorder's
-  split.
+- hd_trio: its settings (`MP4`), its wiring (the tracklets from each camera as they come, `expect_parts` per camera,
+  `expect_poses` per camera and set), as white_space's is wired, and its pose `.h5` cut at the recorder's split.
 - The OAK-D's capture time: the oak backend (depthai 2) stamps a frame's arrival, so hd_trio and white_space record
   USB's jitter in their times. Oak4's `capture_time` shows the way; it needs an OAK-D to test.
 - A white_space recording of the new layout played by hand, beside the old ones, which play as they are.
