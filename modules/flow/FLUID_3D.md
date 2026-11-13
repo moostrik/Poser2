@@ -14,8 +14,8 @@ fluid is `Fluid3D` (`fluid_3d/fluid_3d.py`), its layer `Fluid3DLayer`
 ## The goal
 
 A visualization inspired by ink in water: high detail at 4K, sharp, translucent ink patterns; smoke
-patterns a second goal **(site fact)**. Two ways draw it, the particles and the fine density; the
-fine density is the one worked on now, the particles and probably a combination of both later. Its
+patterns a second goal **(site fact)**. Two ways draw it, the particles and the fine density; which of them,
+or a combination, is the plan's ([FLOW_PLAN.md](FLOW_PLAN.md#3-the-3d-fluids-look-at-4k)). Its
 way there: layers of water with sharp, well-defined motion of their own, that influence each other and
 stay distinct. Ink's thin sheets folding into tendrils are shear, water at one depth moving otherwise than
 the water beside it, their boundary rolling up **(deduction)**. The light is a means to it, not a goal of
@@ -262,15 +262,15 @@ velocity's divergence, central differences, a cell's share:
 
 The residual is worked out where the restriction reads it (`ResidualRestrict3D`), never written at the fine
 level, and the coarsest level's sweeps run in shared memory in one dispatch (`CoarsePressure3D`, up to 4096
-cells): a level of a few thousand cells cannot fill the GPU, so its 32 half-sweep dispatches were their
-latency. At the preset (288 × 512 × 64) a cycle alone 0.98 → 0.77 ms, the pressure in the app 1.61 →
-1.44 ms; the fused residual is the same to the bit, the coarse solve the same to a float's last bit (the
+cells): a level of a few thousand cells cannot fill the GPU, so 32 half-sweep dispatches would be only
+their latency. At the preset (288 × 512 × 64) a cycle alone takes 0.77 ms against 0.98 as dispatches, the
+pressure in the app 1.44 ms against 1.61; the fused residual is the same to the bit, the coarse solve the same to a float's last bit (the
 compiler orders its multiply-adds its own way).
 
 One V-cycle leaves a sixteenth of Jacobi's residual in less time; each further cycle divides it by
 about thirteen. SOR's sweeps cost 0.34 ms each, two dispatches from global memory, and over-relaxed it
-leaves the high frequencies, which the mean residual counts, worse than Jacobi does. These were measured
-on the centered velocity, whose central differences' Laplacian is not the 7-point one the solvers solve;
+leaves the high frequencies, which the mean residual counts, worse than Jacobi does. These are measured
+on a centered velocity, whose central differences' Laplacian is not the 7-point one the solvers solve;
 on the faces it is ([The staggered velocity](#the-staggered-velocity)), and the divergence the multigrid
 leaves is the half float's rounding. With the solve exact the water keeps more of its speed, 0.150
 widths/s in the mean against Jacobi's 0.134.
@@ -475,7 +475,8 @@ flattens only its top; it keeps more of what the step lost, energy in a velocity
 its own (a slight hue shift at an RGBA density's sharp edges). On standmoves at 4K, the luminance's gradient
 (mean / p99) over the lit pixels: revert 8.3 / 73, clamp 10.3 / 92, the plain step 5.1 / 45; the density pass
 4.1 ms for either limiter, 1.37 for the plain step. A blend of the plain step into the corrected value
-(Houdini's remedy for the revert's grid artifacts) took sharpness back for nothing else to gain, and went.
+(Houdini's remedy for the revert's grid artifacts) takes sharpness back for nothing else to gain, so the
+step has none.
 
 The fine density's color is the density's color over its amount, at the same place. The density is at the
 dye's size by the fine density's layers in deep_flow's preset (448 × 800 × 24, RGBA16F, as 8 bits would round at
@@ -753,9 +754,9 @@ Against the centered velocity, deep_flow's preset; what the faces cost is in
 The floor at the multigrid is the half float's rounding on both grids: 4 cycles leave the same 0.0001.
 Jacobi's 40 iterations leave 0.002 on both, and the density's total in the swirl grows by a third, the
 solve unconverged. On the swing at ε 1.93, closed, the water keeps more of its speed (inside at 12 s
-0.0103 against 0.0080, semi-Lagrangian), and at ε 5 MacCormack's inside holds at 0.033 where the centered
-held at 0.021; `slip_time` 2 decays as before. Through `fluid_compare.py` the water against the body is
+0.0103 against 0.0080, semi-Lagrangian), and at ε 5 MacCormack's inside holds at 0.033 against the
+centered 0.021; `slip_time` 2 decays alike on both. Through `fluid_compare.py` the water against the body is
 the same within 0.01 on stillslowfast and standmoves. An obstacle's cells read 0 (`--obstacle`). Open
-walls decay as the centered velocity's did (the swing at ε 1.93, the mean at 4 s and 6 s: 0.0073 and
+walls decay as the centered velocity's do (the swing at ε 1.93, the mean at 4 s and 6 s: 0.0073 and
 0.0032 against 0.0077 and 0.0031); the open swirl drains alike, its floor 0.0001 against the centered
 0.0005 to 0.0015.

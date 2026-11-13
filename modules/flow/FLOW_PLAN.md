@@ -52,7 +52,6 @@ arguments. The other findings are small by comparison.
 | 1.1  | the reasons out of the docstrings into the stage documents, each fact once | a docstring says what the thing is; reasons in the package's document    |
 | 1.2  | "drag" alone renamed by what it acts on                                    | the glossary: "drag" pairs with what it acts on                          |
 | 1.6  | files named after what they hold                                           | a file holds one class or subject, named after it                        |
-| 1.8  | FLUID_3D.md and TIMING.md read line by line for history stated as a story  | a document reads as if the current design had always been it             |
 | 1.10 | every setting and its description gone through, last, after the refactor   | a `Field` description is one short line of panel text: what and its unit |
 
 What each takes:
@@ -238,7 +237,6 @@ Not worked on until asked for; each with what is known.
 - Use the terms in the glossary; one term per concept: 1.2.
 - A file holds one class or subject, named after it: 1.6.
 - A `Field` description is one short line of panel text: 1.10.
-- A document reads as if the current design had always been it: 1.8.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the two depth reads not chosen,
   `bilateral_contrast` and the preset's `view.depth_read`, line 2.
 - Choose a data path by its latency: the chain before the fluid timed as one, line 2.

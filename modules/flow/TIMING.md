@@ -301,8 +301,8 @@ against the code before.
 | 13  | the surface's filter, a run of 256 pixels read once into shared memory                 | particles march, 100 k spheres                         | 0.70        | 0.89       | 0.70        | 0.00       | no: slower                              | 0.1 to 1.1 of 255 in the mean                                          | dropped              |
 | 14  | the ring sorted by Morton order                                                        |                                                        |             |            |             |            |                                         |                                                                        | not built            |
 
-The preset as it was before step 9 (`cac62f39`, Jacobi, the preset's 1 M streaks occluded) against the
-preset now (the multigrid, every kept change), three runs, before, now, before:
+The preset without the programme (`cac62f39`, Jacobi, the preset's 1 M streaks occluded) against the
+preset with it (the multigrid, every kept change), three runs, before, now, before:
 
 | Timer                        | Before                | Now                   | Before again          |
 |------------------------------|-----------------------|-----------------------|-----------------------|
@@ -329,52 +329,51 @@ The streaks' draw is their length, the water's speed × the step, so it moves wi
 6.2 ms over six runs, one with a p95 of 45 ms. Since the multigrid the water runs faster round the body,
 and the streaks are longer with it **(deduction)**.
 
-Item 2 was slower in both forms, one thread a block (3.84 ms) and one workgroup a block (3.49): on the
+Item 2 is slower in both forms, one thread a block (3.84 ms) and one workgroup a block (3.49): on the
 recording the density fills most blocks, so the skip saves little and its pass and branch cost more. The
 march stops where the transmittance is under 0.004 in every channel, the output's precision; what it saves
 follows how much of the view is opaque, and is not measured.
 
-Item 4 was not built: the correction reads the predictor at the forward-traced point, between other cells,
+Item 4 is not built: the correction reads the predictor at the forward-traced point, between other cells,
 so one dispatch would trace eight predictors a cell to get it, more than the scratch volume's write and read
 it saves.
 
-Item 5 changes the rounding, not the step: the force is added in float where the force volume held it as a
-half float. The fluid is chaotic on the recording, so any change at the rounding's size grows into a different
-picture: the code before against itself with `vorticity` 1.6901 for 1.69 differs as much (5 to 11 of 255 in
+Item 5 changes the rounding, not the step: the force is added in float, not held as a half float in a force
+volume. The fluid is chaotic on the recording, so any change at the rounding's size grows into a different
+picture: the unfused code against itself with `vorticity` 1.6901 for 1.69 differs as much (5 to 11 of 255 in
 the mean, half the pixels over 4) and its harness numbers as much (the water over the body 0.89 and 0.90, the
 stop 0.095 and 0.100). So the picture check holds a change to exactly the same arithmetic, and a change of
 rounding to these numbers within that spread. The memory a step, per cell: the confinement 32 bytes written
-and read where it was 48, with the dampen's 16 gone (the force volume's write 8, the add's 24 and the dampen's
-16, against the fused pass's 16): 0.47 GB a step less at 256 × 448 × 128, and the force volume's 0.12 GB freed.
-The monitor loses the `vorticity_force` port with it.
+and read against 48 unfused, with no dampen's 16 (a force volume's write 8, the add's 24 and the dampen's 16,
+against the fused pass's 16): 0.47 GB a step less at 256 × 448 × 128, and no force volume's 0.12 GB. The monitor
+has no `vorticity_force` port.
 
 Items 6 and 7 change the physics: a better solve leaves the water less compressible, so the body's push
 has to go round it, faster (1.23 and 1.36 of the body against Jacobi's 0.90), and the water stops with the
 body (the coast 0.10 s against 0.94). Jacobi's 40 iterations leave a residual of 0.37 of the divergence, so
-part of the push was compression the next steps relaxed. The solve's accuracy, the time each takes and why
+part of the push is compression the next steps relax. The solve's accuracy, the time each takes and why
 SOR is no faster are in [FLUID_3D.md](FLUID_3D.md#the-pressure).
 
-Item 9 misses the rule in the app, where the pose's load moved the befores by 0.24 and 0.77 ms over two
-sets of runs, but the change came in under all four befores both times (0.96 ms), and the harness, with no
-pose on the GPU, gives the step 16.1 → 13.0 ms (p95 29 → 21): the fill is 25 σ² a blob where it was 36.
-Kept as a replacement on that, and marked here as the exception.
+Item 9 misses the rule in the app, where the pose's load moves the befores by 0.24 and 0.77 ms over two
+sets of runs, but the change comes in under all four befores both times (0.96 ms), and the harness, with no
+pose on the GPU, gives the step 13.0 ms against 16.1 (p95 21 against 29): the fill is 25 σ² a blob against 36.
+A replacement on that, the exception to the rule.
 
 Item 11 draws into three 4K targets in one pass where `OCCLUDED` draws into 16 layered slices, clears them
 (1 GB) and marches them: the draw halves and the march halves. Its order is a weight by depth, not the
 slices', so where the density is thick and near density should hide far density it differs; on the recording's
-thin density it
-is 0.25 of 255 from the slices. An option, the preset keeps `OCCLUDED`.
+thin density it is 0.25 of 255 from the slices. An option, the preset keeps `OCCLUDED`.
 
-Item 12 was slower: the draw's time is not the rasterizer's setup of 2 M points but the 16 slices' clear
-and the sum into them, which the atomics make no cheaper; the streaks were not tried after it. `WEIGHTED`
+Item 12 is slower: the draw's time is not the rasterizer's setup of 2 M points but the 16 slices' clear
+and the sum into them, which the atomics make no cheaper, for the streaks as for the points. `WEIGHTED`
 (item 11) is what removes the slices.
 
-Item 13 was slower in its cheap form, the texture's cache already serving the filter's reads; the
-narrow-range filter and the narrow band were not built: the surface's whole filter and shade take 0.7 ms
+Item 13 is slower in its cheap form, the texture's cache already serving the filter's reads; the
+narrow-range filter and the narrow band are not built: the surface's whole filter and shade take 0.7 ms
 at its budget of 100 k, so the most either could give back is a fraction of that, and the narrow-range
 filter is a different look, a choice for the eye.
 
-Item 14 was not built: the advection it would speed takes 0.33 ms at 2 M points and 0.05 at the blobs'
+Item 14 is not built: the advection it would speed takes 0.33 ms at 2 M points and 0.05 at the blobs'
 and the surface's 100 k, under what a GPU sort of 2 M keys costs itself, and a sorted ring needs the fade
 by each particle's age, not its slot.
 
@@ -452,11 +451,12 @@ runs each:
 | the x/y solve: the current frame and the depth a 16 × 16 tile shares | 0.277 ms | 0.136 ms | read at the texels' exact centers |
 | the depth velocity: the track and its catch-up in one pass           | 0.058    | 0.042    | the same to the bit               |
 
-The motion whole 0.35 → 0.20 ms. The solve read each pixel's 7 × 7 window from the texture again, ten reads a
-sample; the fragment shader read at the rasterizer's interpolated coordinates, a little off the texel centers,
-so one solve differs on 30% of its values by up to 3e-4 uv, and with exact centers on both by 8e-5, the floats'
-last bits the solve amplifies. Not kept: the bandpass's four parts in one pass (0.140 → 0.117 ms), and the
-lowpass's advect fused into its trail, at most 0.005 ms of its 0.076 (its blur, 4 steps of 2 passes, is 0.064).
+The motion whole takes 0.20 ms against 0.35 with each pixel reading its 7 × 7 window from the texture, ten reads
+a sample. A fragment shader reads at the rasterizer's interpolated coordinates, a little off the texel centers,
+so against it one solve differs on 30% of its values by up to 3e-4 uv, and with exact centers on both by 8e-5,
+the floats' last bits the solve amplifies. Not worth a pass of their own: the bandpass's four parts in one pass
+(0.117 ms against 0.140), and the lowpass's advect fused into its trail, at most 0.005 ms of its 0.076 (its blur,
+4 steps of 2 passes, is 0.064).
 
 ### The body at its own depth
 
@@ -534,17 +534,17 @@ off (its share 0) so what shows is xy turned into z; `isotropy_check.py` for the
 
 | The box                                  | water z / xy | divergence after the projection, /s | the step, ms mean / p95 |
 |------------------------------------------|--------------|--------------------------------------|-------------------------|
-| 0.22 widths deep, cubic cells (before)   | 0.28         | 0.014                                | 7.30 / 8.91             |
+| 0.22 widths deep, cubic cells            | 0.28         | 0.014                                | 7.30 / 8.91             |
 | as deep as wide (`depth_ratio` 1)        | 0.43         | 0.0015                               | 7.26 / 8.92             |
 | as deep as wide, `spread` 0.2            | 0.46         | 0.009                                | 7.45 / 8.97             |
 
-The thin box's close walls held z back: with room the water turns more into z, at any `spread`, so the turn
+The thin box's close walls hold z back: with room the water turns more into z, at any `spread`, so the turn
 is the injection's, a flat sheet that the water flows around over its faces **(deduction)**, not the box's.
 At `depth_ratio` 1 a swirl in the depth plane, 0.1 widths in radius, stays round (its aspect 1.00 after 2 s)
 and keeps 0.88 of its speed, one in the image plane 0.84. The body's z from the bridge is 5.8 times its xy on
 this recording, where the player moves mostly sideways: depth noise **(deduction)**; the motion's `z_gain`
-sets its share. The pressure pass at the preset 1.22 ms, the
-multigrid's semi-coarsened levels, where it was 1.04.
+sets its share. The pressure pass at the preset 1.22 ms with the
+multigrid's semi-coarsened levels, against 1.04 in the thin box's cubic cells.
 
 ## The light and the composite
 
@@ -574,9 +574,9 @@ The sun's sweep against the march from every cell it replaces, on the same grid,
 alone: the march 1.1 to 2.7 ms, the sweep 0.13 to 0.16; the transmittance's mean the same to 0.001. A lamp
 stays marched: at `FULL` it costs 3.3 ms, so a lamp takes `HALF` or `QUARTER`.
 
-Tried and dropped: the rays' fog worked out as a power of one sub-step's instead of two `exp`s a sub-step,
-no faster (0.163 against 0.166 ms); written to the one cell a line passes the sweep took 0.17 ms and drew
-stripes across the lit density, mixing four lines through shared memory took 0.33 to 0.39.
+What the sweep and the rays do not do, and why: the rays' fog as a power of one sub-step's instead of two
+`exp`s a sub-step is no faster (0.163 against 0.166 ms); a sweep that writes the one cell a line passes takes
+0.17 ms and draws stripes across the lit density; mixing four lines through shared memory takes 0.33 to 0.39.
 
 ## The density at the output's 4K
 
@@ -600,6 +600,6 @@ at 3 widths/s:
 
 Within 60 fps: up to 32 fluid layers with the density at 32, 48 with it at 24 or 16, 64 at 32 or 16. From 48 fluid
 layers up the pressure solve is the largest pass (3.7–5.3 ms). The density's
-4K × 16 costs 1.3 ms to carry and 0.9 to march, the old 16-layer look's 2 GB a step now under a quarter of it.
-MacCormack, timed before the depth scale while the water still burst, took 9.1 ms a frame at 16 and 16 and was
-over the budget from 32 fluid layers up; its cost is in [FLOW_PLAN.md's Parked](FLOW_PLAN.md#parked).
+4K × 16 costs 1.3 ms to carry and 0.9 to march, under a quarter of a 16-layer look's 2 GB a step. MacCormack
+on the 4K density, timed without the depth scale, takes 9.1 ms a frame at 16 and 16 and is over the budget
+from 32 fluid layers up; its cost is in [FLOW_PLAN.md's Parked](FLOW_PLAN.md#parked).
