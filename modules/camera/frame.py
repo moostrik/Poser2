@@ -50,7 +50,7 @@ class CameraFrame:
 
 
 def mirrored_image(frame: CameraFrame) -> np.ndarray:
-    """The frame's image flipped left to right, in the frame's own layout. A new array: `Uploader`
+    """The frame's image flipped left to right, in the frame's own layout. A new array: an uploader
     flips on the GPU instead, so this is for a consumer that keeps the image on the host."""
     image: np.ndarray = frame.image
     if not frame.nv12:

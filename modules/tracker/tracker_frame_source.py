@@ -130,7 +130,7 @@ class TrackerFrameSource(Thread):
 
     def submit(self, cam_times: dict[int, float], images: Any) -> None:
         """A frame bang: each camera's capture time in the set, with the images of that moment the crop is to cut
-        (`Uploader.snapshot`), queued for the thread, the oldest dropped beyond `WAITING`."""
+        (an uploader's `ImageSnapshot`), queued for the thread, the oldest dropped beyond `WAITING`."""
         dropped: int | None = None
         with self._wake:
             running: bool = self._running

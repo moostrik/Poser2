@@ -25,7 +25,7 @@ plays. The camera cannot straighten its color frame itself (the oak4's `Warp` ta
 is aligned on the GPU, where it is straightened with the color), so straightening and mirroring are the uploader's,
 live and in -sim alike, and a recording made before them plays through the same path as the camera. The tracklets
 are stored as the camera gave them for the same reason: the uploader straightens them with the homography of the
-frame they were found in (`Uploader.submit_tracklets`).
+frame they were found in (`SerialUploader.submit_tracklets`).
 
 Every part carries its capture time (`timestamp`) and the moment the backend handed it over (`arrival`), on
 `perf_counter`. Their difference, the latency, is stored with the part, so a playback hands each part as late after

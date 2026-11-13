@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class CropExtractor:
     """Crops GPU images at pose bounding-box locations and emits CropImageDict.
 
-    Receives ImageDict and prev-images from Uploader, plus a FrameDict
+    Receives an uploader's images and previous images (its `ImageSnapshot`), plus a FrameDict
     with BBox features. For each pose, crops the current image and optionally
     the previous image at the same bbox for optical-flow use. The pose leaves
     with the crop as its box and the image's capture time as its stamp, so its
@@ -40,10 +40,10 @@ class CropExtractor:
 
         Args:
             poses:       FrameDict with BBox features, keyed by track_id
-            images:      Current GPU images (from Uploader.snapshot)
-            prev_images: Previous GPU images (from Uploader.snapshot)
-            timestamps:  The current images' capture times (from Uploader.snapshot)
-            ready:       Recorded after the images are written (from Uploader.snapshot); the crops wait on it
+            images:      The uploaded GPU images (an `ImageSnapshot`'s)
+            prev_images: Each camera's previous GPU image (the snapshot's)
+            timestamps:  The images' capture times (the snapshot's)
+            ready:       Recorded after the images are written (the snapshot's); the crops wait on it
                          on the crop stream. The crops are queued, not waited for: each carries the event
                          recorded after them, and their readers wait on that.
         """

@@ -1,6 +1,7 @@
-"""`nv12_to_rgb`: the colors the camera's NV12 frame stands for, on plain CPU tensors. The uploader's hand-off: the
-camera's thread only queues, the uploader's thread hands each frame on in order, and a full queue drops the oldest
-of its kind (on a CUDA install)."""
+"""`nv12_to_rgb`: the colors the camera's NV12 frame stands for, on plain CPU tensors. The serial uploader's hand-off:
+the camera's thread only queues, the uploader's thread hands each frame on in order, with its snapshot, and a full
+queue drops the oldest of its kind (on a CUDA install). `ImageUpload`: a stack uploaded at once gives each image as
+one by one does."""
 
 import threading
 import time
@@ -12,9 +13,11 @@ import torch
 import torch.nn.functional as F
 
 from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, FrameType, TrackingStatus
-from modules.inference import GpuDepth, GpuImage, Uploader, UploaderSettings
 from modules.utils import Rect
-from modules.inference.uploader import QUEUED, nv12_to_rgb, warp_grid
+
+from .. import GpuDepth, GpuImage, ImageSnapshot, ImageUpload, SerialUploader, SerialUploaderSettings
+from ..image_upload import nv12_to_rgb, warp_grid
+from ..serial_uploader import QUEUED
 
 
 def _plain(y: int, u: int, v: int) -> torch.Tensor:
@@ -76,7 +79,7 @@ def _tracklet(roi: Rect, timestamp: float) -> CameraTracklet:
 @unittest.skipUnless(torch.cuda.is_available(), 'needs CUDA')
 class HandOffTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.uploader = Uploader(UploaderSettings())
+        self.uploader = SerialUploader(SerialUploaderSettings())
         self.handed: list[tuple[str, float, str]] = []      # kind, time, the thread it came on
         self.uploader.add_gpu_image_callback(
             lambda image: self.handed.append(('image', image.timestamp, threading.current_thread().name)))
@@ -98,7 +101,7 @@ class HandOffTest(unittest.TestCase):
             self.uploader.submit_frame(_depth(t))
         self.wait_for(4)
         self.assertEqual([(kind, t) for kind, t, _ in self.handed], [('image', 1.0), ('depth', 1.0), ('image', 2.0), ('depth', 2.0)])
-        self.assertTrue(all(thread == 'Uploader' for _, _, thread in self.handed))
+        self.assertTrue(all(thread == 'SerialUploader' for _, _, thread in self.handed))
 
     def test_submit_only_queues(self) -> None:
         self.uploader.submit_frame(_color(1.0))         # not started: nothing is handed on, nothing waits
@@ -167,12 +170,46 @@ class HandOffTest(unittest.TestCase):
             time.sleep(0.005)
         self.assertIs(handed[0], message)
 
+    def test_each_image_is_handed_on_as_a_snapshot_with_its_previous_one(self) -> None:
+        snapshots: list[ImageSnapshot] = []
+        self.uploader.add_snapshot_callback(snapshots.append)
+        self.uploader.start()
+        self.uploader.submit_frame(_color(1.0))
+        self.uploader.submit_frame(_color(2.0))
+        self.wait_for(2)
+        end = time.perf_counter() + 5.0
+        while len(snapshots) < 2 and time.perf_counter() < end:
+            time.sleep(0.005)
+        first, second = snapshots
+        self.assertEqual((first[2], first[1]), ({0: 1.0}, {}))           # the first has no previous image
+        self.assertEqual(second[2], {0: 2.0})
+        self.assertIs(second[1][0], first[0][0])                         # the previous is the image before it
+
     def test_stop_ends_the_thread_with_frames_still_queued(self) -> None:
         self.uploader.start()
         for t in range(10):
             self.uploader.submit_frame(_color(float(t)))
         self.uploader.stop()
         self.assertFalse(self.uploader.is_alive())
+
+
+@unittest.skipUnless(torch.cuda.is_available(), 'needs CUDA')
+class ImageUploadTest(unittest.TestCase):
+    def test_a_stack_gives_each_image_as_one_by_one_does(self) -> None:
+        rng = np.random.default_rng(0)
+        shift = np.array([[1.0, 0.0, 0.1], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+        frames = [CameraFrame(0, FrameType.VIDEO, rng.integers(0, 255, (48, 64), np.uint8), 1.0),
+                  CameraFrame(1, FrameType.VIDEO, rng.integers(0, 255, (48, 64), np.uint8), 1.0, homography=shift),
+                  CameraFrame(2, FrameType.VIDEO, rng.integers(0, 255, (48, 64), np.uint8), 1.0, flip_h=True)]
+        stream = torch.cuda.Stream()
+        stacked, ready = ImageUpload().upload(frames, stream)
+        ready.synchronize()
+        single = ImageUpload()
+        for frame, image in zip(frames, stacked):
+            alone, alone_ready = single.upload([frame], stream)
+            alone_ready.synchronize()
+            self.assertEqual(tuple(image.shape), (3, 48, 64))
+            self.assertTrue(torch.allclose(image.float(), alone[0].float(), atol=1e-3))
 
 
 if __name__ == '__main__':

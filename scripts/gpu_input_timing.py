@@ -1,7 +1,7 @@
 """What the GPU spends per frame on the color upload and the pose crops, step by step, with the GPU otherwise idle.
 
 Takes a recording's color frame (and an NV12 frame of the same size, as the live camera delivers), runs each step of
-`Uploader._upload` and of the crop path (`CropExtractor._gpu_crop_resize`, then the pose runner's batch, resize and
+`SerialUploader._upload` and of the crop path (`CropExtractor._gpu_crop_resize`, then the pose runner's batch, resize and
 normalization) on one stream, and times each with CUDA events over many runs. Also counts the kernels each step
 launches (torch's profiler).
 

@@ -16,7 +16,7 @@ Per thread, the callbacks in the order they are registered (`apps/deep_flow/main
 | Thread                                            | Runs                                                           | Waits for                                  |
 |---------------------------------------------------|----------------------------------------------------------------|--------------------------------------------|
 | the camera's (depthai; -sim: the player's reader) | queues each frame for the recorder (live) and the uploader     | nothing                                    |
-| the uploader's (`Uploader`)                       | uploads each frame and hands it on ([below](#the-uploader))    | the GPU, in a copy while its queue is full |
+| the uploader's (`SerialUploader`)                 | uploads each frame and hands it on ([below](#the-uploader))    | the GPU, in a copy while its queue is full |
 | the recording sync's (`RecordingSync`)            | matches a capture's parts, hands the capture to the recorder   | nothing                                    |
 | the tracklets' (depthai)                          | queues them for the tracker, the board; `tracker.update`       | nothing                                    |
 | the tracker's                                     | associates the tracklets, to the frame source and the board    | nothing                                    |
@@ -29,13 +29,16 @@ Per thread, the callbacks in the order they are registered (`apps/deep_flow/main
 
 ### The uploader
 
-The camera's one hand-off (`modules/inference/uploader.py`). `submit_frame` queues the frame and returns: two
-frames of a kind per camera wait, and a third drops the oldest, counted (`dropped`). Its own thread makes the
-corrected camera frame, which every user of the camera needs:
+The camera's one hand-off, the `SerialUploader` (`modules/inference/serial_uploader.py`): each frame onto the GPU
+on its own, the moment it comes, so the color goes up at once to start the pose. `submit_frame` queues the frame
+and returns: two frames of a kind per camera wait, and a third drops the oldest, counted (`dropped`). Its own
+thread makes the corrected camera frame, which every user of the camera needs:
 
-- the color: copied from a pinned staging buffer (`STAGING_COUNT` 3 per camera and kind, reused once the copy
-  queued from it has run), converted (BGR or NV12) to RGB half, straightened by the tilt's homography and
-  mirrored, handed on as a `GpuImage` with the `ready` event its readers wait on;
+- the color: `ImageUpload` (`modules/inference/image_upload.py`, the GPU work white_space's `BatchUploader` shares)
+  copies it from a pinned staging buffer (`STAGING_COUNT` 3, reused once the copy queued from it has run),
+  converts it (BGR, NV12 or mono) to RGB half, straightens it by the tilt's homography and mirrors it; it is handed
+  on as a `GpuImage` with the `ready` event its readers wait on, and as an `ImageSnapshot` of one (the image, its
+  camera's previous one, its capture time, the event) to the snapshot callbacks;
 - the depth: copied the same way, turned into metres and moved onto the color's view at a grid as fine as the
   depth itself (`aligned_depth_size`), the nearest kept where two land on one cell and 0 where nothing lands,
   straightened and mirrored as the color, handed on as a `GpuDepth` (`modules/inference/depth_align.py`).
@@ -62,16 +65,16 @@ When an image is on the GPU, the uploader hands it to four others, each of which
 
 - the capture sync, which queues the image for its own thread;
 - the detector (-sim), which keeps the newest image for its own thread;
-- the frame source, which queues the frame bang with the uploader's images as they are now (`Uploader.snapshot`),
-  two waiting at most (the oldest dropped, `dropped` on the panel). On its own thread `TrackerFrameSource.process`
+- the camera-interval time sample;
+- through the snapshot callback, the frame source, which queues the frame bang with exactly that image and its
+  previous one, two waiting at most (the oldest dropped, `dropped` on the panel). On its own thread `TrackerFrameSource.process`
   makes a pose per player from the tracker's newest boxes and pushes them with those images; the RAW stage's two
   box filters smooth them, and the pipeline hands the images to `PoseInference.submit(frames, images)`, which cuts
   the crops from exactly those, this very image and not a newer one (`CropExtractor`), at the pose model's input
   size, queued on the GPU and not waited for; it records a "crops ready" event and hands crops, poses and event to
   the pose model, whose thread has RTMPose wait for that event on its own stream; with the pose model off
   (`pose.enabled`), the poses carrying the camera's own keypoints (an OAK4 pose chain) go on as they are. Then the
-  recorder hears whether poses come for the image. The `Uploader` knows nothing of poses;
-- the camera-interval time sample.
+  recorder hears whether poses come for the image. The uploader knows nothing of poses.
 
 The pose model stays FP32: it loses precision in FP16.
 

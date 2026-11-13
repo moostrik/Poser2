@@ -1,74 +1,40 @@
-"""The uploader: the camera's one hand-off. The camera's thread queues its frames here and returns; this thread
-puts each on the GPU and hands it on, in arrival order, so no GPU work and no consumer runs on the camera's thread."""
+"""The serial uploader: the camera's one hand-off in deep_flow, each frame onto the GPU on its own, the moment it
+comes. The camera's thread queues its frames here and returns; this thread puts each on the GPU and hands it on, in
+arrival order, so a color frame goes up at once to start the pose and no GPU work and no consumer runs on the
+camera's thread."""
 
 import time
 import logging
 from collections import deque
 from threading import Condition, Lock, Thread
-from typing import TypeAlias
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 
 from modules.camera import CAPTURE_TOLERANCE, CameraFrame, CameraTracklets, DepthAlignment, FrameType, TrackletCallback, \
     aligned_depth_size, depth_projection, straightened_tracklets
 from modules.settings import BaseSettings, Field
 from modules.utils import PerformanceTimer
 from .depth_align import DepthAligner
-from .source import GpuDepth, GpuDepthCallback, GpuImage, GpuImageCallback, ImageDict, TimestampDict
+from .image_upload import STAGING_COUNT, ImageUpload
+from .source import GpuDepth, GpuDepthCallback, GpuImage, GpuImageCallback, ImageSnapshot, ImageSnapshotCallback
 
 logger = logging.getLogger(__name__)
 
-STAGING_COUNT: int = 3      # pinned buffers per camera and kind: frames the GPU may be behind before the uploader's thread waits
 QUEUED: int = 2             # frames of a kind waiting per camera; beyond that the oldest is dropped and counted
 NOTED: int = 16             # color frames per camera whose straightening is kept for their tracklets, which come about 2 frames later
 
-# The GPU images at one moment (`Uploader.snapshot`): current and previous by cam_id, their capture times, and the
-# event recorded on the upload stream after them
-ImageSnapshot: TypeAlias = tuple[ImageDict, ImageDict, TimestampDict, torch.cuda.Event]
 
-
-def nv12_to_rgb(y: torch.Tensor, uv: torch.Tensor) -> torch.Tensor:
-    """RGB CHW float32 in [0, 1] from NV12's planes, uint8: Y (H, W) and interleaved UV (H / 2, W).
-
-    BT.601 limited range with the chroma repeated, which is how `getCvFrame` reads an OAK4's frame,
-    so the colors match the BGR it replaces.
-    """
-    # The chroma repeated by a broadcast view: `repeat_interleave` waits for the GPU to size its output
-    half: torch.Tensor = uv.reshape(uv.shape[0], -1, 2)
-    rows, columns = half.shape[0], half.shape[1]
-    chroma: torch.Tensor = half[:, None, :, None, :].expand(rows, 2, columns, 2, 2).reshape(rows * 2, columns * 2, 2).float() - 128.0
-    u, v = chroma[..., 0], chroma[..., 1]
-    luma: torch.Tensor = (y.float() - 16.0) * 1.164383
-    rgb: torch.Tensor = torch.stack((luma + 1.596027 * v, luma - 0.391762 * u - 0.812968 * v, luma + 2.017232 * u))
-    return rgb.clamp_(0.0, 255.0).div_(255.0)
-
-
-def warp_grid(homography: torch.Tensor, height: int, width: int) -> torch.Tensor:
-    """The `grid_sample` grid (1, height, width, 2) that draws a frame through `homography`, uv to
-    uv, on the homography's device: each output pixel looks up where it came from. A pixel from
-    behind the camera gets a place outside the frame, which samples to nothing."""
-    inverse: torch.Tensor = torch.linalg.inv(homography)
-    device: torch.device = homography.device
-    u: torch.Tensor = (torch.arange(width, device=device, dtype=torch.float32) + 0.5) / width
-    v: torch.Tensor = (torch.arange(height, device=device, dtype=torch.float32) + 0.5) / height
-    grid_v, grid_u = torch.meshgrid(v, u, indexing='ij')
-    source: torch.Tensor = inverse @ torch.stack((grid_u.ravel(), grid_v.ravel(), torch.ones_like(grid_u).ravel()))
-    uv: torch.Tensor = (source[:2] / source[2]).T.reshape(height, width, 2) * 2.0 - 1.0
-    uv[(source[2] <= 0.0).reshape(height, width)] = 2.0
-    return uv.unsqueeze(0)
-
-
-class UploaderSettings(BaseSettings):
-    """How the uploader does its GPU work."""
+class SerialUploaderSettings(BaseSettings):
+    """How the serial uploader does its GPU work."""
     depth_kernels: Field[bool] = Field(True, description="Align the depth with CUDA kernels compiled at runtime; off, with torch ops as a CUDA graph")
 
 
-class Uploader(Thread):
+class SerialUploader(Thread):
     """Takes the camera's frames on the camera's thread (`submit_frame`) and does all the rest on its own: the color
-    goes to the GPU through a pinned staging buffer, is converted, straightened and flipped there, and is handed on
-    as a `GpuImage` with the event that says it is written; the depth goes the same way, is turned into metres and
+    goes to the GPU (`ImageUpload`, one frame), converted, straightened and flipped there, and is handed on as a
+    `GpuImage` with the event that says it is written, and as an `ImageSnapshot` of one (the image, its camera's
+    previous one, the event) to the snapshot callbacks; the depth goes the same way, is turned into metres and
     moved onto the color's view (`DepthAligner`, by the camera's calibration, straightened and mirrored as the
     color), and is handed on as a `GpuDepth`. Neither the camera's
     thread nor this one waits for the GPU while the GPU has room. A frame waits for this thread in a queue of
@@ -80,34 +46,31 @@ class Uploader(Thread):
     notes by capture time (`NOTED` frames, a dropped one included), and hands them on, before any frame that waits.
     Tracklets whose frame is no longer noted take the newest frame's; tracklets `straightened` already pass as they are.
 
-    Maintains a previous-frame buffer per camera for use by downstream processors (e.g. optical flow). `snapshot()`
-    returns both with the current images' capture times.
+    Each camera's previous color image is kept for the next snapshot, for the optical flow's previous crop; this
+    thread alone keeps it.
 
     Input:  BGR uint8 (H, W, 3), grayscale uint8 (H, W) or packed NV12 uint8 (H * 3 / 2, W)
     Output: float16 RGB CHW [0, 1] tensors keyed by cam_id
     """
 
-    def __init__(self, settings: UploaderSettings) -> None:
-        super().__init__(daemon=True, name='Uploader')
-        self.settings: UploaderSettings = settings
-        self._gpu_images: dict[int, torch.Tensor] = {}
-        self._prev_gpu_images: dict[int, torch.Tensor] = {}
-        self._timestamps: TimestampDict = {}
-        self._lock: Lock = Lock()       # an image and its time are stored and read together
-        self._warp_grids: dict[int, tuple[np.ndarray, torch.Tensor]] = {}   # each camera's homography and its grid
+    def __init__(self, settings: SerialUploaderSettings) -> None:
+        super().__init__(daemon=True, name='SerialUploader')
+        self.settings: SerialUploaderSettings = settings
+        self._image_upload: ImageUpload = ImageUpload()
+        self._previous: dict[int, torch.Tensor] = {}       # each camera's previous color image, on this thread
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
-        # Each camera's and kind's pinned staging buffers, the events of the copies queued from them, the one used last
+        # Each camera's depth staging buffers, the events of the copies queued from them, the one used last
         self._staging: dict[tuple[int, FrameType], tuple[list[torch.Tensor], list[torch.cuda.Event | None], int]] = {}
         self._aligners: dict[int, DepthAligner] = {}
         # Each camera's depth alignment, the depth's size, and what they make: to_ray, to_uv, the aligned size
         self._projections: dict[int, tuple[DepthAlignment | None, tuple[int, int], np.ndarray, np.ndarray, tuple[int, int]]] = {}
-        self._accumulated_upload_ms: float = 0.0
         self._timer: PerformanceTimer = PerformanceTimer(
             name="GPU Image Upload  ", sample_count=200, report_interval=100,
             color="green", omit_init=25,
         )
-        self._callback_lock: Lock = Lock()                          # the three lists below
+        self._callback_lock: Lock = Lock()                          # the four lists below
         self._gpu_image_callbacks: list[GpuImageCallback] = []     # run in registration order, on this thread
+        self._snapshot_callbacks: list[ImageSnapshotCallback] = [] # run in registration order, on this thread
         self._gpu_depth_callbacks: list[GpuDepthCallback] = []     # run in registration order, on this thread
         self._tracklet_callbacks: list[TrackletCallback] = []      # run in registration order, on this thread
         self._queue: deque[tuple[CameraFrame, float]] = deque()            # each with the moment it was queued
@@ -187,7 +150,7 @@ class Uploader(Thread):
                 elif frame.kind == FrameType.DEPTH:
                     self._upload_depth(frame)
             except Exception:
-                logger.exception("Uploader: frame of camera %d failed", frame.cam_id)
+                logger.exception("SerialUploader: frame of camera %d failed", frame.cam_id)
 
     def _straightening_at(self, cam_tracklets: CameraTracklets) -> tuple[np.ndarray | None, bool]:
         """The homography and mirror of the frame the tracklets were found in, the newest frame's when it is no
@@ -217,6 +180,13 @@ class Uploader(Thread):
             if callback not in self._gpu_image_callbacks:
                 self._gpu_image_callbacks.append(callback)
 
+    def add_snapshot_callback(self, callback: ImageSnapshotCallback) -> None:
+        """Every uploaded color image as an `ImageSnapshot` of one: the image, its camera's previous one, its capture
+        time and the event that says it is written, on this thread, after the image callbacks."""
+        with self._callback_lock:
+            if callback not in self._snapshot_callbacks:
+                self._snapshot_callbacks.append(callback)
+
     def add_gpu_depth_callback(self, callback: GpuDepthCallback) -> None:
         """Every uploaded depth frame, in its place among the images, with the event that says it is written, on this thread."""
         with self._callback_lock:
@@ -224,56 +194,31 @@ class Uploader(Thread):
                 self._gpu_depth_callbacks.append(callback)
 
     def _upload(self, frame: CameraFrame) -> None:
-        """A color frame to the GPU: converted, straightened and flipped there, stored as the camera's current
-        image (the one before it as its previous) with its capture time, and handed on."""
+        """A color frame to the GPU (`ImageUpload`, one frame), handed on as a `GpuImage` and as an `ImageSnapshot`
+        of one with its camera's previous image."""
         cam_id: int = frame.cam_id
-        image: np.ndarray = frame.image
-
         start = time.perf_counter()
-
-        staging: torch.Tensor = self._staging_buffer((cam_id, FrameType.VIDEO), image)
-        staging.copy_(torch.from_numpy(image))
-        with torch.cuda.stream(self._stream):
-            gpu_img = staging.cuda(non_blocking=True)
-            if frame.nv12:
-                rows: int = image.shape[0] * 2 // 3
-                rgb: torch.Tensor = nv12_to_rgb(gpu_img[:rows], gpu_img[rows:]).to(dtype=torch.float16)
-            elif image.ndim == 2:
-                # Grayscale (H, W) -> normalize -> expand to (3, H, W)
-                rgb = (
-                    gpu_img.unsqueeze(0).to(dtype=torch.float16).mul_(1.0 / 255.0)
-                    .expand(3, -1, -1).contiguous()
-                )
-            else:
-                # Color HWC BGR -> CHW RGB, normalize to [0, 1]
-                rgb = (
-                    gpu_img.permute(2, 0, 1).flip(0)
-                    .to(dtype=torch.float16).mul_(1.0 / 255.0)
-                )
-            if frame.homography is not None:
-                rgb = self._straightened(cam_id, rgb, frame.homography)
-            if frame.flip_h:
-                rgb = rgb.flip(-1)
-            ready: torch.cuda.Event = torch.cuda.Event()
-            ready.record(self._stream)
-        _, events, index = self._staging[(cam_id, FrameType.VIDEO)]
-        events[index] = ready           # the buffer is free again once the copy queued from it has run
-        with self._lock:
-            if cam_id in self._gpu_images:
-                self._prev_gpu_images[cam_id] = self._gpu_images[cam_id]
-            self._gpu_images[cam_id] = rgb
-            self._timestamps[cam_id] = frame.timestamp
-
-        self._accumulated_upload_ms += (time.perf_counter() - start) * 1000.0
+        images, ready = self._image_upload.upload([frame], self._stream)
+        rgb: torch.Tensor = images[0]
+        previous: torch.Tensor | None = self._previous.get(cam_id)
+        self._previous[cam_id] = rgb
+        self._timer.add_time((time.perf_counter() - start) * 1000.0, report=False)
 
         gpu_image: GpuImage = GpuImage(cam_id, frame.timestamp, rgb, ready)
+        snapshot: ImageSnapshot = ({cam_id: rgb}, {cam_id: previous} if previous is not None else {}, {cam_id: frame.timestamp}, ready)
         with self._callback_lock:
             image_callbacks: list[GpuImageCallback] = list(self._gpu_image_callbacks)
+            snapshot_callbacks: list[ImageSnapshotCallback] = list(self._snapshot_callbacks)
         for callback in image_callbacks:
             try:
                 callback(gpu_image)
             except Exception:
                 logger.exception("Error in GPU image callback")
+        for snapshot_callback in snapshot_callbacks:
+            try:
+                snapshot_callback(snapshot)
+            except Exception:
+                logger.exception("Error in snapshot callback")
 
     def _upload_depth(self, frame: CameraFrame) -> None:
         """A depth frame to the GPU: metres, moved onto the color's view at its own grid, and handed on."""
@@ -321,41 +266,3 @@ class Uploader(Thread):
             event.synchronize()
         self._staging[key] = (buffers, events, index)
         return buffers[index]
-
-    def _straightened(self, cam_id: int, rgb: torch.Tensor, homography: np.ndarray) -> torch.Tensor:
-        """`rgb` drawn through the homography. The grid is made once per homography."""
-        cached: tuple[np.ndarray, torch.Tensor] | None = self._warp_grids.get(cam_id)
-        if cached is None or cached[0] is not homography:
-            matrix: torch.Tensor = torch.from_numpy(homography).to(rgb.device, torch.float32)
-            cached = (homography, warp_grid(matrix, rgb.shape[1], rgb.shape[2]))
-            self._warp_grids[cam_id] = cached
-        return F.grid_sample(rgb.unsqueeze(0).float(), cached[1], align_corners=False)[0].to(dtype=torch.float16)
-
-    def snapshot(self) -> ImageSnapshot:
-        """The current and previous GPU images, the current images' capture times, and an event recorded on the
-        upload stream after them: a reader on another stream waits on it (`stream.wait_event`) before it reads
-        them, and keeps them from being reused (`record_stream`) until its own work on them has run. Nothing
-        here waits for the GPU.
-
-        Returns:
-            (current, previous, timestamps, ready), the first three keyed by cam_id.
-        """
-        with self._lock:
-            images_snapshot: ImageDict = dict(self._gpu_images)
-            prev_snapshot: ImageDict = dict(self._prev_gpu_images)
-            timestamps_snapshot: TimestampDict = dict(self._timestamps)
-        ready: torch.cuda.Event = torch.cuda.Event()
-        ready.record(self._stream)
-
-        self._timer.add_time(self._accumulated_upload_ms, report=False)
-        self._accumulated_upload_ms = 0.0
-
-        return images_snapshot, prev_snapshot, timestamps_snapshot, ready
-
-    def reset(self) -> None:
-        """Clear all stored GPU images."""
-        with self._lock:
-            self._gpu_images.clear()
-            self._prev_gpu_images.clear()
-            self._timestamps.clear()
-        self._warp_grids.clear()

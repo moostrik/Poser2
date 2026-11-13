@@ -32,19 +32,10 @@ load about a quarter.
 The frame source's call already takes a set (`TrackerFrameSource.submit(cam_times, images)`, each player judged on
 its own camera's capture time, the poses asked told per camera).
 
-1. **`ImageUpload`, the core, and `SerialUploader`.** The GPU work on color frames moves out of deep_flow's
-   `Uploader` into `ImageUpload`, which both uploaders use: the pinned staging, the copy, the conversion (NV12, BGR
-   or mono to RGB), the straightening with the camera's grid, the flip, the ready event, for one frame or a stack of
-   frames of one size (one round of kernels over the stack, the grids stacked, one flip per mirrored camera).
-   `Uploader` becomes `SerialUploader` (its call sites, the probe, INPUT_THREADS.md) and keeps the rest as it is:
-   frame by frame, depth and its alignment, the tracklets' straightening; it calls `ImageUpload` with one frame, so
-   its upload does not change. Its `snapshot()` and the store behind it go: its per-image callbacks keep the
-   `GpuImage` (the capture sync, the board, the -sim detector), and a set callback carries each color image's
-   `ImageSnapshot`, a set of one (the image, its camera's previous one, the ready event); deep_flow's frame-source
-   call moves from `_on_image` to that callback. `test_crop_extractor` and `test_pose_inference`, which read
-   `snapshot()`, take the set callback's snapshot.
-   `PoseInference` loses its uploader: it took it only for `uploader.reset()`, of the store that goes, and has its
-   images with each call. `PoseInference(crop, pose)` in all three apps.
+The core is built (`ImageUpload`, for one frame or a stack of one size), deep_flow's `SerialUploader` uses it and
+hands each color image on as an `ImageSnapshot` of one (`add_snapshot_callback`), and `PoseInference` takes no
+uploader.
+
 2. **`BatchUploader`.** white_space's uploader, beside the `SerialUploader`, with its own thread: a synced set of the cameras'
    frames in (`submit_set`), queued whole, two sets at most, beyond that the oldest set dropped whole and counted
    (`dropped`), so a frame never leaves its set; the core uploads the set as one stack; out go each image to its

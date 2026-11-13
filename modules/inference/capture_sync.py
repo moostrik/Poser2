@@ -166,11 +166,11 @@ class CaptureSync(Thread):
     # ── Inputs: each queues and returns ────────────────────────────────
 
     def submit_image(self, image: GpuImage) -> None:
-        """An uploaded color image (`Uploader`'s callback, the uploader's thread)."""
+        """An uploaded color image (the `SerialUploader`'s callback, the uploader's thread)."""
         self._queue(_Part.IMAGE, image.cam_id, image)
 
     def submit_depth(self, depth: GpuDepth) -> None:
-        """An uploaded depth frame (`Uploader`'s GPU depth callback, the uploader's thread)."""
+        """An uploaded depth frame (the `SerialUploader`'s GPU depth callback, the uploader's thread)."""
         self._queue(_Part.DEPTH, depth.cam_id, depth)
 
     def submit_poses(self, poses: FrameDict) -> None:

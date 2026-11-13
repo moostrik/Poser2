@@ -1,7 +1,7 @@
 """PoseInference — the async step of a pose pipeline's frame domain: the crops and the pose model.
 
-On ``submit`` it is handed the poses with the images they are for (the frame source's ``Uploader.snapshot`` of
-that moment, carried by the pipeline), cuts every pose's box out of exactly those images (``CropExtractor``),
+On ``submit`` it is handed the poses with the images they are for (the `ImageSnapshot` an uploader handed on,
+carried by the frame source and the pipeline), cuts every pose's box out of exactly those images (``CropExtractor``),
 and hands the crops to the pose model (``pose.Predictor``), which emits the poses with their keypoints on its own
 thread, dropping a batch under load. The crops go to the other consumers of the same crops too (segmentation,
 optical flow, the board), each with the event that says they are written. ``cut_crops`` cuts the crops for them
@@ -21,7 +21,7 @@ from modules.pose import Frame, FrameDict, FrameDictCallbackMixin, Points2D
 
 from . import crop, pose
 from .crop_extractor import CropExtractor
-from .uploader import ImageSnapshot, Uploader
+from .source import ImageSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +34,8 @@ def has_points(frame: Frame) -> bool:
 class PoseInference(FrameDictCallbackMixin):
     """The crop and pose predictor as one async step; see the module docstring."""
 
-    def __init__(self, crop_settings: crop.Settings, pose_settings: pose.Settings, uploader: Uploader) -> None:
+    def __init__(self, crop_settings: crop.Settings, pose_settings: pose.Settings) -> None:
         super().__init__()
-        self._uploader: Uploader = uploader
         self._pose_settings: pose.Settings = pose_settings
         self._crop_extractor = CropExtractor(crop_settings)
         self._predictor = pose.Predictor(pose_settings)
@@ -64,7 +63,7 @@ class PoseInference(FrameDictCallbackMixin):
         """Crop the poses' boxes from `images` (an `ImageSnapshot`), for the crop callbacks, without the pose model:
         the poses with their crops as their boxes and the images' capture times as their stamps, and the crops."""
         if not isinstance(images, tuple) or len(images) != 4:
-            raise ValueError("PoseInference: poses came without the images they are for (an Uploader.snapshot)")
+            raise ValueError("PoseInference: poses came without the images they are for (an ImageSnapshot)")
         snapshot: ImageSnapshot = images
         current, previous, timestamps, ready = snapshot
         return self._crop_extractor.process(frames, current, previous, timestamps, ready)
@@ -75,4 +74,3 @@ class PoseInference(FrameDictCallbackMixin):
 
     def reset(self) -> None:
         self._predictor.reset()
-        self._uploader.reset()

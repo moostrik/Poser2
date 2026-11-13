@@ -1,6 +1,6 @@
 """Does the view stage (`ViewLayer`) make what it should from recorded captures?
 
-Plays a recording's color and depth frames through the `Uploader` (the color straightened, the depth aligned, as the
+Plays a recording's color and depth frames through the `SerialUploader` (the color straightened, the depth aligned, as the
 app does), takes them into GL and runs the view stage at the preset's settings. Checks, per frame:
 - the depth read into the view against its numpy reading (`edge_aware_depth`, `mask_sided_depth`,
   `joint_bilateral_depth`, as `--read` says): pixels off by over 1 mm, BILATERAL's by over 2 cm as the GPU blends
@@ -30,7 +30,7 @@ from modules.camera import CameraFrame, FrameType  # noqa: E402
 from modules.recording import read_metadata  # noqa: E402
 from modules.flow import DepthRead, DepthVelocitySettings, edge_aware_depth, joint_bilateral_depth, mask_sided_depth  # noqa: E402
 from modules.gl import Tensor, Texture  # noqa: E402
-from modules.inference import GpuDepth, GpuImage, Uploader, UploaderSettings  # noqa: E402
+from modules.inference import GpuDepth, GpuImage, SerialUploader, SerialUploaderSettings  # noqa: E402
 from modules.render.layers import ViewInput, ViewLayer, ViewLayerSettings  # noqa: E402
 from modules.video import StreamReader  # noqa: E402
 
@@ -93,7 +93,7 @@ def main() -> int:
     view = ViewLayer(settings, depth_settings, json.loads(PRESET.read_text(encoding='utf-8'))['camera']['fov'])
     view.allocate(preset['motion']['width'], preset['motion']['height'])
 
-    uploader = Uploader(UploaderSettings())
+    uploader = SerialUploader(SerialUploaderSettings())
     images: list[GpuImage] = []
     gpu_depths: list[GpuDepth] = []
     uploader.add_gpu_image_callback(images.append)

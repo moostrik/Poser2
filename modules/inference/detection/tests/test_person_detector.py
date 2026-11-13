@@ -48,7 +48,7 @@ def write_stub_model(path: str, symbolic: bool = False) -> None:
 
 
 def uploaded(cam_id: int, height: int, width: int, timestamp: float) -> GpuImage:
-    """An image as the `Uploader` hands it on: float16 RGB CHW on the GPU, with its written event."""
+    """An image as an uploader hands it on: float16 RGB CHW on the GPU, with its written event."""
     image: torch.Tensor = torch.zeros((3, height, width), dtype=torch.float16, device='cuda')
     ready = torch.cuda.Event()
     ready.record()

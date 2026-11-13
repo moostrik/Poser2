@@ -204,7 +204,7 @@ Published by Luxonis for RVC4, for comparison:
 
 ### Work on the PC
 
-The camera thread does no color work: `Uploader` converts and flips on the GPU. On an idle GPU:
+The camera thread does no color work: the `SerialUploader` converts and flips on the GPU. On an idle GPU:
 
 | Step        | On the GPU | On the CPU                        |
 |-------------|------------|-----------------------------------|
@@ -352,7 +352,7 @@ Depth pixels move by `H`, and their values change too. Depth is measured along t
 | Part  | Where it happens                          |
 |-------|-------------------------------------------|
 | `H`   | `TiltCorrection`, at the IMU's 5 Hz       |
-| Color | `Uploader`, `grid_sample`                 |
+| Color | `ImageUpload`, `grid_sample`              |
 | Depth | `DepthAlign` compute shader               |
 | Boxes | `corrected_roi` and `corrected_keypoints` |
 
@@ -410,7 +410,7 @@ The iGPU decodes both `P720` streams together at more than 670 fps color and 170
 
 ### Detector in replay
 
-Replay finds players on the PC with [`PersonDetector`](../../inference/detection/person_detector.py). Its `resolution` is set to match `PERSON_DETECTOR_ARCHIVE` on the camera, and its `model_type` picks ONNX Runtime or TensorRT. It takes the `Uploader`'s images, so a frame goes to the GPU once: both runtimes stretch it into the model on the GPU and hand back only the box and person rows. The uploaded image is straightened, so the boxes are found in the straightened frame and need no `corrected_roi`, where the camera's detector looks at the frame before the correction.
+Replay finds players on the PC with [`PersonDetector`](../../inference/detection/person_detector.py). Its `resolution` is set to match `PERSON_DETECTOR_ARCHIVE` on the camera, and its `model_type` picks ONNX Runtime or TensorRT. It takes the uploaded images (`GpuImage`), so a frame goes to the GPU once: both runtimes stretch it into the model on the GPU and hand back only the box and person rows. The uploaded image is straightened, so the boxes are found in the straightened frame and need no `corrected_roi`, where the camera's detector looks at the frame before the correction.
 
 Time per frame on an empty `P1080` frame, 500 runs each, batch 1, FP32, GPU otherwise idle, with the frame resized and converted on the CPU:
 

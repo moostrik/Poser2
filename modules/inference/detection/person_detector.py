@@ -1,7 +1,7 @@
 """A YOLO person detector on the host, for the replay backend: the uploaded images of every camera of a
 round in one batch, through ONNX Runtime or TensorRT, out as `Detection`s with boxes normalised to the frame.
 
-It takes the `Uploader`'s images (`GpuImage`), so a frame goes to the GPU once and nothing of it is worked
+It takes the uploaded images (`GpuImage`), so a frame goes to the GPU once and nothing of it is worked
 on the CPU: each image is stretched whole into the model's input on the GPU, as the device manip does
 (nothing cropped, nobody lost at the edges, boxes map 1:1 onto the frame), and only the person rows
 come back. The image is straightened and mirrored, so are its boxes. A newer image of a camera replaces
@@ -91,7 +91,7 @@ class PersonDetector(Thread):
         return self.settings.enabled
 
     def submit(self, image: GpuImage) -> None:
-        """An uploaded image to look at (`Uploader`'s callback, the camera's thread); the newest per camera is kept.
+        """An uploaded image to look at (an uploader's image callback, the uploader's thread); the newest per camera is kept.
         Disabled, it looks at nothing."""
         if not self.is_ready or not self.settings.enabled:
             return
