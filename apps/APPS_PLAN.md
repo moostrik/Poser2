@@ -34,13 +34,17 @@ camera's frame is a set of one, so no step has a path of its own for one camera.
    `add_set_callback(callback(items))`, `items` by `cam_id`, each with its capture time. The frames' sync keeps
    each camera's newest video frame and hands the set to the uploader (`Uploader.submit_set`); the tracklets' sync
    hands its set of messages to `tracker.update`, which takes the newest of their times, as its `(timestamp)` did.
-   deep_flow, one camera, needs no sync: its camera hands each frame to the uploader as a set of one.
+   What forms a set is what must travel together: white_space's four cameras' frames of a moment, cropped as one
+   batch, so `CameraSync` forms the set before the upload. In deep_flow nothing travels together: color goes up the
+   moment it comes, to start the pose, and `CaptureSync` pairs the depth with it after the upload, so its camera
+   hands each frame, color or depth, to the uploader as its own set of one.
 3. **The uploader uploads a set as one batch.** One pinned copy per frame, one round of kernels over the stacked
    images (mono to RGB, the straightening with the cameras' grids stacked) and one flip per mirrored camera. Sets
    wait whole, two at most; beyond that the oldest set is dropped whole and counted (`dropped`), so a frame never
    leaves its set. Then each image goes to its callbacks (the -sim detector, the board's `set_camera_image`) and the
    set to a set callback, whose receiver calls `TrackerFrameSource.submit` with each camera's time from the set.
-   Depth (deep_flow) is uploaded per frame, as now; its alignment does not batch.
+   One entry and one queue for every frame: a depth frame is a set of one, as a color frame is; each kind keeps its
+   own GPU work (depth's alignment does not batch).
 4. **The tracklets.** The uploader's tracklets go to the tracker (`submit_cam_tracklets`), the board, the tracker
    journal and the tracklets' `CameraSync`, each a store or an enqueue (the journal's `submit_cam_tracklets` checked
    for it); the sync's callback is `tracker.update`, which sets the tracker's event.
@@ -51,9 +55,10 @@ camera's frame is a set of one, so no step has a path of its own for one camera.
 6. **The calibration layer** (`test_calibration.py`) reads the uploaded image instead of the CPU frame the camera's
    thread puts on the board: it reduces its band of rows to one row on the GPU, queues the row's copy into pinned
    memory with an event, and uses on a later tick the newest row whose event has passed, so nothing waits.
-7. **The clip camera** (`oak.ClipCamera`, a recording played through an OAK) hands over as the camera does.
+7. **The clip camera** (`oak.ClipCamera`, a recording played through an OAK) hands over as the camera does;
+   checked only at the rig, as it needs an OAK.
 8. **The drops on the panel**, as deep_flow's: the uploader's, the sync's, the frame source's, the pipeline's, the
-   runners'.
+   runners'; the probe reads them in C's run.
 9. **A white_space probe** (`scripts/white_space_probe.py`), beside deep_flow's, which is built on deep_flow's
    classes: the camera's thread per frame, the syncs per second against the cameras' rate, the uploader's time per
    set, the pose rate per camera, the pose latency (RAW, SMOOTH), the drops.
@@ -76,7 +81,9 @@ uploader at the sync, up to half a frame later **(deduction: tracklets come abou
 
 Checked by: `CameraSync`'s tests (a set per sync, a camera's newest frame), the uploader's (a set uploaded as one
 batch gives each image as one by one does; a set of one is deep_flow's upload; the oldest whole set dropped), the
-frame source's (the asked callback per camera; a player judged on its camera's time), white_space's pipeline spec;
+frame source's (the asked callback per camera; a player judged on its camera's time), the calibration layer's (its
+row reduced on the GPU matches the CPU row of a recorded frame), white_space's pipeline spec; the recorder's wiring
+by a short -sim recording on the same recording, played back;
 a -sim run with the probe on `20250514-130512_4_wide_mono`, an old-layout recording without recorded tracklets, so
 in replay with the host detector (`simulator.replay`, `yolo`), not `ClipCamera`, which needs an OAK: the uploader's
 time per set, the pose latency.
