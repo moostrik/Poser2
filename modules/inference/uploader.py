@@ -104,8 +104,11 @@ class Uploader(Thread):
         self._gpu_image_callbacks: list[GpuImageCallback] = []     # run in registration order, on this thread
         self._gpu_depth_callbacks: list[GpuDepthCallback] = []     # run in registration order, on this thread
         self._tracklet_callbacks: list[TrackletCallback] = []      # run in registration order, on this thread
-        self._queue: deque[CameraFrame] = deque()
-        self._tracklets: deque[CameraTracklets] = deque()                   # never dropped: a tracker needs every message
+        self._queue: deque[tuple[CameraFrame, float]] = deque()            # each with the moment it was queued
+        self._tracklets: deque[tuple[CameraTracklets, float]] = deque()    # never dropped: a tracker needs every message
+        # How long a frame and a tracklet message wait in their queue for this thread (ms), as timer samples
+        self._frame_wait: PerformanceTimer = PerformanceTimer(name="Wait upload")
+        self._tracklet_wait: PerformanceTimer = PerformanceTimer(name="Wait upload tracklets")
         self._straightening: dict[int, deque[tuple[float, np.ndarray | None, bool]]] = {}  # per camera: (capture, homography, flip_h)
         self._wake: Condition = Condition()
         self._running: bool = False
@@ -133,17 +136,18 @@ class Uploader(Thread):
             if frame.kind == FrameType.VIDEO:
                 noted = self._straightening.setdefault(frame.cam_id, deque(maxlen=NOTED))
                 noted.append((frame.timestamp, frame.homography, frame.flip_h))
-            waiting: list[CameraFrame] = [f for f in self._queue if f.cam_id == frame.cam_id and f.kind == frame.kind]
+            waiting: list[tuple[CameraFrame, float]] = [item for item in self._queue
+                                                        if item[0].cam_id == frame.cam_id and item[0].kind == frame.kind]
             if len(waiting) >= QUEUED:
                 self._queue.remove(waiting[0])
                 self._dropped += 1
-            self._queue.append(frame)
+            self._queue.append((frame, time.perf_counter()))
             self._wake.notify()
 
     def submit_tracklets(self, cam_tracklets: CameraTracklets) -> None:
         """A camera's tracklet callback, on its thread: queues the message and returns."""
         with self._wake:
-            self._tracklets.append(cam_tracklets)
+            self._tracklets.append((cam_tracklets, time.perf_counter()))
             self._wake.notify()
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
@@ -159,11 +163,14 @@ class Uploader(Thread):
                 if not self._running:
                     return
                 if self._tracklets:
-                    cam_tracklets: CameraTracklets = self._tracklets.popleft()
+                    cam_tracklets, queued = self._tracklets.popleft()
                     straightening: tuple[np.ndarray | None, bool] = self._straightening_at(cam_tracklets)
                     frame: CameraFrame | None = None
+                    wait: PerformanceTimer = self._tracklet_wait
                 else:
-                    frame = self._queue.popleft()
+                    frame, queued = self._queue.popleft()
+                    wait = self._frame_wait
+            wait.add_time((time.perf_counter() - queued) * 1000.0, report=False)
             if frame is None:
                 self._hand_on_tracklets(cam_tracklets, *straightening)
                 continue

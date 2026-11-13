@@ -9,6 +9,7 @@ import torch
 import tensorrt as trt
 
 # Reuse dataclasses from MMDetection
+from modules.utils import PerformanceTimer
 from .io import PoseInput, PoseOutput, PoseOutputCallback
 
 from .settings import Settings
@@ -64,7 +65,8 @@ class RunnerTRT(Thread):
         # Callbacks
         self._callback_lock: Lock = Lock()
         self._callbacks: list[PoseOutputCallback] = []     # run in registration order
-        self._callback_queue: Queue[PoseOutput | None] = Queue(maxsize=2)
+        self._callback_queue: Queue[tuple[PoseOutput, float] | None] = Queue(maxsize=2)     # each with the moment it was queued
+        self._result_wait: PerformanceTimer = PerformanceTimer(name="Wait pose result")   # how long a result waits for the callback thread (ms)
         self._callback_thread: Thread = Thread(target=self._dispatch_callbacks, daemon=True)
 
         # TensorRT engine and context (initialized in run())
@@ -157,7 +159,7 @@ class RunnerTRT(Thread):
         if dropped_batch is not None:
             dropped_output = PoseOutput(batch_id=dropped_batch.batch_id, processed=False)
             try:
-                self._callback_queue.put_nowait(dropped_output)
+                self._callback_queue.put_nowait((dropped_output, time.perf_counter()))
             except:
                 pass
 
@@ -293,7 +295,7 @@ class RunnerTRT(Thread):
             )
 
         try:
-            self._callback_queue.put_nowait(output)
+            self._callback_queue.put_nowait((output, time.perf_counter()))
         except Exception:
             logger.warning("Pose Callback queue full, dropping results")
 
@@ -392,10 +394,12 @@ class RunnerTRT(Thread):
         """Dispatch results to callbacks."""
         while not self._shutdown_event.is_set():
             try:
-                output: PoseOutput | None = self._callback_queue.get(timeout=0.5)
+                item: tuple[PoseOutput, float] | None = self._callback_queue.get(timeout=0.5)
 
-                if output is None:
+                if item is None:
                     break
+                output, queued = item
+                self._result_wait.add_time((time.perf_counter() - queued) * 1000.0, report=False)
 
                 with self._callback_lock:
                     callbacks = list(self._callbacks)

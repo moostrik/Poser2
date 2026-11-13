@@ -12,11 +12,17 @@ class Series(IntEnum):
     RENDER_INTERVAL =       auto()  # ms between render ticks
     GPU_BRIDGE =            auto()  # ms of GPU in a flow layer's bridges, A and B alike
     GPU_FLUID =             auto()  # ms of GPU in a fluid's step
+    WAIT_UPLOAD =           auto()  # ms a camera frame waits in the uploader's queue
+    WAIT_UPLOAD_TRACKLETS = auto()  # ms a camera's tracklet message waits in the uploader's queue
+    WAIT_POSE_RESULT =      auto()  # ms a pose model's result waits for its callback thread
 
 
 # PerformanceTimer names, as each timer is called, to the series their samples feed
 TIMER_SERIES: dict[str, Series] = {
-    'Render interval':  Series.RENDER_INTERVAL,
-    'GPU bridge':       Series.GPU_BRIDGE,
-    'GPU fluid':        Series.GPU_FLUID,
+    'Render interval':          Series.RENDER_INTERVAL,
+    'GPU bridge':               Series.GPU_BRIDGE,
+    'GPU fluid':                Series.GPU_FLUID,
+    'Wait upload':              Series.WAIT_UPLOAD,
+    'Wait upload tracklets':    Series.WAIT_UPLOAD_TRACKLETS,
+    'Wait pose result':         Series.WAIT_POSE_RESULT,
 }
