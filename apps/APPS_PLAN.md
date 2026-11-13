@@ -57,7 +57,9 @@ The OAK-D's capture stamp, as the oak4's `capture_time`, needs an OAK-D to test;
 new ones are the new layout. hd_trio's `main.py` still uses `CameraSync`'s `add_sync_callback` and follows in E (it
 stops at start on this branch already).
 
-Checked at the rig: the clip camera, which needs an OAK.
+Checked at the rig: the clip camera, which needs an OAK; and the playhead's smoothing (`playhead.tracking`,
+`speed_smoothing`) against the motor's phase on `perf_counter`, whose error is 0.26° at p95 at 32 rpm against 4.3°
+on `monotonic` (simulated with the motor's own code, 2026-11-13), so the smoothing may be stronger than it needs.
 Done when white_space starts on this branch, its camera threads only hand over (under 1 ms per frame at p95), every
 sync runs the pose step, the pose latency and the light's tick are no worse than on `main`, live and back to back,
 with you at the rig, and its tests pass.
