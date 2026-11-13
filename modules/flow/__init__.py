@@ -26,7 +26,7 @@ from .bridge_3d import  DensityBridge, DensityBridgeSettings, Magnitude, Velocit
                         decay_weight, direction, advect, \
                         VelocityLowpass, VelocityLowpassSettings, velocity_trail, trail_acceleration, z_position_trail, \
                         gaussian_blur, gaussian_weights, blur_sigma, blur_dispatches, z_position_mix, ZPositionMix, \
-                        VelocityBandpass, VelocityBandpassSettings, Change, WeightedSum, velocity_change, step_peak, moving_mean, start_region_share, stop_region_share, change_velocity, band_width, change_acceleration_scale, whole_change, \
+                        VelocityBandpass, VelocityBandpassSettings, Change, WeightedSum, velocity_change, step_peak, moving_mean, start_region_share, stop_region_share, change_velocity, band_width, whole_change, \
                         TemperatureBridge, TemperatureBridgeSettings, CaptureMax
 
 # Visualization
@@ -36,11 +36,10 @@ from .visualization import Visualizer, histogram_grid, histogram_volume_grid, St
 
 # Shared by the 2D and 3D fluid
 from .time_step import TimeStep, TimeStepMode, hold_tick, viscosity_iterations, MAX_STEP, REFERENCE_STEP
-from .wall_mode import WallMode
-from .finite_guard import FiniteGuard, GuardSlot, guard_report
+from .finite_guard import guard_report
 
 # 2D fluid simulation
 from .fluid_2d import Fluid2D, Fluid2DSettings
 
 # 3D fluid simulation
-from .fluid_3d import Fluid3D, Fluid3DSettings, CompositeSettings, Advection, ParticleDraw, Overlap, DRAG_FLOOR, drag_share, drag_gate, drag_velocity_step, swirl_noise
+from .fluid_3d import Fluid3D, Fluid3DSettings, CompositeSettings, Advection, Overlap, DRAG_FLOOR, drag_share, drag_gate, drag_velocity_step, swirl_noise

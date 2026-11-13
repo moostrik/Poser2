@@ -51,7 +51,6 @@ arguments. The other findings are small by comparison.
 |-----|------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|
 | 1.1 | the reasons out of the docstrings into the stage documents, each fact once                           | a docstring says what the thing is; reasons in the package's document |
 | 1.2 | "drag" alone renamed by what it acts on                                                              | the glossary: "drag" pairs with what it acts on                     |
-| 1.5 | `__init__` exports only what other packages and the tests use                                        | `__init__.py` holds what other packages use                         |
 | 1.6 | files named after what they hold                                                                     | a file holds one class or subject, named after it                   |
 | 1.7 | seven `Field` descriptions to one short line                                                         | a `Field` description is one short line of panel text               |
 | 1.8 | FLUID_3D.md and TIMING.md read line by line for history stated as a story                            | a document reads as if the current design had always been it        |
@@ -63,9 +62,6 @@ What each takes:
   its test), `AddToFaces3D.drag` and its `DRAG` mode; "exponential drag" in the docstrings of `FlowUtil`'s
   dampen, `Fluid2D`'s and `Dampen`. A mouse drag in `orbit.py` and the monitor is the panel's word, not the
   fluid's, and stays.
-- 1.5: 5 names used by nothing outside the package (`change_acceleration_scale`, `WallMode`, `FiniteGuard`,
-  `GuardSlot`, `ParticleDraw`), whose own users import them from their files already. The 14 the flow's tests
-  use stay, as a test may import absolutely.
 - 1.6: `log_axis.py` holds `AxisLine`, `volume_cut.py` `VolumeCutShader`, `volume_cube.py` `VolumeCubeShader`
   and `CubeColor`, `view_window.py` `DepthRead` beside the window's geometry.
 - 1.7: `limiter` (three fields), `overlap`, `fog_scattering`, the monitor's `view`, `depth_read`: 116 to 130
@@ -245,7 +241,6 @@ Not worked on until asked for; each with what is known.
 
 - A docstring says what the thing is; reasons sit in the package's document: 1.1.
 - Use the terms in the glossary; one term per concept: 1.2.
-- `__init__.py` holds what other packages use: 1.5.
 - A file holds one class or subject, named after it: 1.6.
 - A `Field` description is one short line of panel text: 1.7.
 - A document reads as if the current design had always been it: 1.8.
