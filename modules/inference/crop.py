@@ -41,4 +41,4 @@ class Settings(BaseSettings):
     output_width:     Field[int]   = Field(384, access=Field.INIT)
     output_height:    Field[int]   = Field(512, access=Field.INIT)
     max_players:        Field[int]   = Field(4, min=1, max=16, access=Field.INIT)
-    enable_prev_crop: Field[bool]  = Field(True, access=Field.INIT)
+    enable_prev_crop: Field[bool]  = Field(False, access=Field.INIT, description="Cut the previous frame at the box too, for the optical-flow model")

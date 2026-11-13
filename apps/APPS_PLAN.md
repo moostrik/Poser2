@@ -92,9 +92,23 @@ no drop; a recording of it plays back the same, its poses on the players).
 Checked at the rig: a live recording with `mirrored` on (a live frame comes with `flip_h` on, which a -sim clip
 does not, so the run stored the clips as they came; the recorder's test covers the mirroring); the fluid's look.
 
-5. **The app held up to the rules**, as white_space and smile were: its threads, clocks, imports, names, logging
-   and settings. Reported; what does not meet them becomes steps here, built on your go.
-6. **The inline paths go.** Once every app starts its threads, `CameraSync`, `CaptureSync`, `RecordingSync`,
+Reported: 5, hd_trio held up to the rules; its findings are 7 to 9. Built: 6, the previous crop is off by default
+(`crop.Settings.enable_prev_crop`): only the optical-flow model reads it, and no app turns it on.
+
+7. **The sequencer's threads.** hd_trio's `Sequencer` holds its state under one lock, changed by the panel's
+   start, stop and skip and by the render's `update`; its callback list has its own lock, copied under it, called
+   outside it; a failing callback is logged with its traceback. `Sequencer`, `IntroSequencePlayer` and `main`
+   unbind on stop what they bind. Checked by: a sequencer test (start from another thread while updating, the
+   states in order) and hd_trio's tests.
+8. **The render's inputs, not its settings.** The fluid's fade and the similarity scale reach the fluid through
+   its input each tick (`FluidInput`), as `dt` does, instead of the render and the show stages writing
+   `fluid.density.fade_time` and `similarity_scale`; the render's three `data.b` values go into the presets; the
+   intro player takes the tick's time. Checked by: the render and flow tests, hd_trio's tests and its -sim run
+   (20 s, the fluid drawing, no error).
+9. **Its document and names.** `HD_TRIO.md` holds the app's reasons, now in its comments and the settings'
+   docstring, which say what each thing is; the render's names say what they hold (`lut`, `cmt`, `seq`); its
+   imports in order. Checked by: hd_trio's tests and the guard tests.
+10. **The inline paths go.** Once every app starts its threads, `CameraSync`, `CaptureSync`, `RecordingSync`,
    `TrackerFrameSource` and `PosePipeline` lose the path that matches a part on the caller's thread while their own
    does not run, and a submit before `start` is an error. Checked by: the apps' tests and the inference, tracker,
    pose and recording tests, and each app's start for 10 s: deep_flow, white_space and hd_trio in -sim, smile on
