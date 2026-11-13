@@ -65,13 +65,6 @@ its readings' depth ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)).
 
 ## 3. The 3D fluid's look at 4K
 
-### The velocity for the fine density
-
-The 4K amount is carried by the 288 × 512 velocity read straight between its cells, 7.5× coarser, whose
-kinks show as the cells in a sharp density. A tricubic read where the amount is carried: 8 trilinear reads
-for 1 at each of 199 M texels a step, twice that with MacCormack **(deduction)**; kept if the look gains
-for its cost.
-
 ### The fade and the evaporation
 
 Each field's `fade_time` (seconds to 1%, a share at a time) and `evaporation_time` (seconds a full value takes
@@ -212,7 +205,6 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, line 2.
 - Choose a data path by its latency: the chain before the fluid timed as one, line 2.
-- A setting's default is the textbook value: the tricubic read, line 3.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 Not designed yet, so their rules are not named: the dye's brightness and no captures (line 2); the fade and the
