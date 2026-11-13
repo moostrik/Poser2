@@ -8,6 +8,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Add a short reason only when it marks the rule's boundary or the rule isn't obvious
 - No incident history, no examples unless the rule is ambiguous without one
 - A rule describes the codebase as it should look
+- Consider a rule's unwanted side effects before adding it
 - Put a rule where it loads when the code it governs is written: here, or a `.claude/rules/` file whose `paths` match that code
 
 ## Project shape
@@ -100,7 +101,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 
 ## Imports
 
-- From outside a package, import from its `__init__.py`, never from its internal files
+- Apps and modules import another package from its `__init__.py`, never from its internal files
 - Import the package as a namespace (`from modules import X`, then `X.Y`) when the qualifier adds clarity; import names directly otherwise
 - Put all imports from one package on a single `from` line
 - `__init__.py` defines no `__all__`
