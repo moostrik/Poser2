@@ -61,10 +61,15 @@ modules/recording/
     replay/         camera.py        the camera of a recording
 ```
 
-- `oak.Simulator` is given its player by the app already; it takes it by a small protocol in the contract
-  (`ClipSource`: `add_frame_callback`), so `modules/camera` does not import `modules/recording`.
+- `oak.Simulator` takes its clips by a protocol in the contract (`ClipSource`: `add_frame_callback`, its callback
+  typing the metadata as `object`, as it does now), and its two options become its own settings:
+  `PlayerSettings.sim_passthrough` and `apply_warp` move to `OakCameraSettings`, in every preset that has them
+  (deep_flow ×2, hd_trio ×2, white_space ×2). So `modules/camera` does not import `modules/recording`.
 - `capture_match.py` (`CaptureStream`, `MissedParts`) stays in the camera, at its root: it matches a camera's parts
   by capture time, for the recorder and for `modules/inference`.
+- In the same commit: `replay` and the recording names in the three apps' imports; `FrameMetadata`, `FramePoses`
+  and `PoseArrays` in `modules/inference/recorded_poses.py`; the links to RECORDING.md; and OAK4.md's section
+  "Recording and replay", cut to what is the OAK4's and a link to RECORDING.md.
 - The guard test's list of camera backends loses `replay`; `CLAUDE.md`'s project-shape and test lines follow, on the
   user's word.
 
@@ -72,9 +77,9 @@ modules/recording/
 
 | What                         | From                              | To                                                    |
 |------------------------------|-----------------------------------|-------------------------------------------------------|
-| the software tracker         | `camera/replay/tracker.py`        | `modules/tracker`, as `BoxTracker`; the apps pass it to the replay camera as they do now |
-| `FrameTrigger`               | `camera/sync/frame_trigger.py`    | `modules/inference`, beside `CaptureSync`: both decide when the pose step runs |
-| the OAK4 bring-up and model fetch | `camera/oak4/probe.py`, `models.py` | `scripts/oak4_probe.py`, `scripts/oak4_models.py`  |
+| the software tracker         | `camera/replay/tracker.py`        | `modules/tracker`, as `SortTracker` (a Kalman filter and overlap assignment, SORT's shape); the replay camera's `BoxTracker` protocol keeps its name |
+| `FrameTrigger`               | `camera/sync/frame_trigger.py`    | open: its home and its name are decided with the user |
+| the OAK4 bring-up and model fetch | `camera/oak4/probe.py`, `models.py` | `scripts/oak4_probe.py`, `scripts/oak4_models.py`; OAK4.md's commands follow |
 | `FramePoses`, `PoseArrays`   | the recorder's files              | they move with recording in step 1; the camera then holds no pose |
 
 The `sync` folder is gone with it.
@@ -85,7 +90,7 @@ The `sync` folder is gone with it.
 |----------------------------|-------------------------------------------------------------------------------------------------|
 | `geometry/geometry.py`     | `sensor_modes.py` (resolutions, frame sizes), `lens.py` (the lens, the warp mesh), `coverage.py` (the frame's window and coverage, for the tracker and the render), `orientation.py` (gravity to tilt and roll), `straighten.py` (the tilt's homography, boxes and keypoints through it, `TiltCorrection`), `mirror.py`, `depth_projection.py` |
 | `oak/definitions.py`, `oak4/definitions.py` | in each backend: `sensor.py` (modes, control ranges), `device.py` (finding it, its link, its calibration), `imu.py`, `models.py` (the model chain, the tracker's constants) |
-| `settings.py`              | `CameraSettings`, `RigCameraSettings` and their readings stay; `TiltCorrectionSettings` goes beside `TiltCorrection`, the check's settings beside the check |
+| `settings.py`              | `CameraSettings`, `RigCameraSettings` and their readings stay; `TiltCorrectionSettings` goes beside `TiltCorrection`, the health's settings beside the health |
 
 ### 4. Names
 
@@ -96,14 +101,19 @@ The `sync` folder is gone with it.
 | `oak.Simulator`                       | `oak.ClipCamera`                          | a camera fed clips; "simulator" says nothing of what is simulated |
 | `FrameReadings`                       | stays                                     | per frame; the panel's are `CameraReadings`            |
 
+The `camera_check` group is renamed in the five presets that have it (deep_flow ×2, hd_trio ×2, white_space ×1),
+with deep_flow's `_CameraCheckSettings` and `modules/render`'s `CameraReadingsLayer`. `Simulator` is renamed in
+hd_trio's and white_space's imports.
+
 ### 5. The public boundary
 
-`modules/camera/__init__.py` exports only what another package imports: about 48 of the 94 names. The backends
-take the rest from the package's own files (`from ..geometry.lens import ...`), which is inside the package.
+`modules/camera/__init__.py` exports what another package imports, counted after steps 1 to 3. A backend imports
+from the camera package's `__init__.py` and from its subpackages' (`from ..geometry import ...`), never from their
+files, so `geometry/__init__.py` exports what the backends use.
 
 ### 6. Docstrings and comments
 
-A docstring says what the thing is, its unit and its thread, in three lines at most. The reasons move here, into
+A docstring says what the thing is. The reasons move here, into
 this document's design sections (the lens model, the warp, the frame's contract), and the history is dropped: it is
 in the commits. `geometry.py`'s 330 lines of prose and `CameraFrame`'s 20 are the first to go.
 
@@ -137,18 +147,15 @@ modules/camera/
     vimba/  webcam/
 ```
 
-## Proposed rules
+## The rules it touches
 
-For `CLAUDE.md`, under a new "Modules" heading; none is written there yet.
-
-- A package does one thing, and its name is that thing; what serves another package lives in that package
-- A file holds one subject and is named after it; never `definitions`, `utils`, `helpers`, `common`, `misc`
-- A file that needs section banners is several files
-- A class is named so that its name alone says what it does; a name that needs its docstring is renamed
-- Before adding a file or a class, say in one sentence what it is and why no existing one can hold it
-- A settings class sits in the file of the class it configures
-- `__init__.py` exports only what another package imports
-- A docstring is three lines at most: what it is, its unit, its thread; reasons go in the package's document, history in the commit
-- A command-line script lives in `scripts/`, never in a package
-- A package's document opens with a table of its parts: the name, what it is, who uses it; a change that adds a part adds its line
-- Asked about a module, read every file of it before answering
+- A package is one thing, and its name is that thing: steps 1 and 2
+- Its `__init__.py` holds what other packages use: step 5
+- Its files each hold one class or one subject, named after it: step 3
+- Its tests sit in its `tests/` folder: the tests move with their files
+- Command-line scripts sit in the repo's `scripts/` folder: step 2
+- Similar things share the noun and differ by a qualifier: step 2, `SortTracker`
+- A docstring says what the thing is; reasons sit in the package's document, history in the commit: step 6
+- Import from a package's `__init__.py`, never from its internal files: step 5
+- Keep presets and settings schemas in sync with code changes: steps 1 and 4
+- `modules/camera/` is the camera contract: its backends lose `replay` (project shape, on the user's word)
