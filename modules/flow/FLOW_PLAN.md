@@ -36,6 +36,9 @@ its readings' depth ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)).
   what it gives the fluid.
 - The dye's amount weighed by the image's brightness, and z's share in the dye's amount: discussed, not
   designed.
+- No captures: while no capture comes (the camera stalls, -sim is paused) the bridge keeps its last output and
+  the fluid keeps taking it, where the motion holds its last velocity. What the flow should do then is not
+  decided.
 
 ## 2. The 3D fluid's look at 4K
 
