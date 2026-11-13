@@ -73,7 +73,7 @@ class ChunkReaders:
                     self.metadata[c] = beside
         ranges: dict[int, tuple[int, int | None]] = {c: self._range(c, lo, hi) for c in range(num_cams)}
         frames: dict[int, Sequence[FrameMetadata]] = {c: metadata.frames for c, metadata in self.metadata.items()}
-        self.clock: PlayClock = PlayClock(frames, {c: first for c, (first, _) in ranges.items()})
+        self.clock: PlayClock = PlayClock(frames, {c: first for c, (first, _) in ranges.items()}, decoding.fps)
         self._readers: list[StreamReader] = []
         for c in range(num_cams):
             first, end = ranges[c]
@@ -88,7 +88,7 @@ class ChunkReaders:
             for t in types:
                 path = folder.path / make_file_name(c, t, chunk, decoding.suffix)
                 if path.is_file():
-                    self._load(c, t, path, 0, first, end, frame_callback, decoding, self.clock if c in self.metadata else None)
+                    self._load(c, t, path, 0, first, end, frame_callback, decoding, self.clock)
                 elif t == FrameType.VIDEO:
                     logger.warning(f"File {path} not found")
 

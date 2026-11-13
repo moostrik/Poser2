@@ -22,13 +22,16 @@ class PlayClock:
     (`moment`), so a frame comes as late after its capture as it came live, and a frame lost live leaves its gap. A
     reader that falls behind moves the origin for every reader, as far as its frame is still behind (`catch_up`).
     The chunk after it in the recording carries its origin and base on (`carry_on`): the two clocks share the
-    origin, so the recorded time runs on across the two while both play. Frames the chunk has no time for are not on
-    it: their readers pace at `fps`."""
+    origin, so the recorded time runs on across the two while both play. A camera without recorded times (an old
+    clip) is paced on the same origin at `fps`: frame `n` captured, and due, at the origin plus `n` from its first
+    over `fps`, so the cameras of such a recording come as a synced rig's do."""
 
-    def __init__(self, frames: dict[int, Sequence[FrameMetadata]], firsts: dict[int, int]) -> None:
+    def __init__(self, frames: dict[int, Sequence[FrameMetadata]], firsts: dict[int, int], fps: float = 0.0) -> None:
         """`frames`: each camera's metadata by frame number; `firsts`: each camera's frame number the play starts
-        at."""
+        at; `fps`: the pace of a camera without recorded times, 0 for none."""
         self._frames: dict[int, Sequence[FrameMetadata]] = frames
+        self._firsts: dict[int, int] = firsts
+        self._fps: float = fps
         starts: list[float] = [cam_frames[firsts.get(c, 0)].timestamp for c, cam_frames in frames.items()
                                if 0 <= firsts.get(c, 0) < len(cam_frames)]
         self._base: float | None = min(starts) if starts else None
@@ -77,6 +80,8 @@ class PlayClock:
             return self._moment(cam_id, frame_id, origin.origin)
 
     def _capture(self, cam_id: int, frame_id: int, origin: float) -> float | None:
+        if cam_id not in self._frames:
+            return origin + (frame_id - self._firsts.get(cam_id, 0)) / self._fps if self._fps > 0.0 else None
         frame: FrameMetadata | None = self._frame(cam_id, frame_id)
         if frame is None or self._base is None:
             return None

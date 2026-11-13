@@ -52,10 +52,6 @@ as the camera's do, and through the same callbacks without one (`clip_passthroug
 The -sim runs are done (white_space on `20250514-130512_4_wide_mono` 23–31 s in replay with its detector engine,
 and a recording of it played back; deep_flow on `measure` 9–19 s). Open from them:
 
-- The replay stamps a frame without a recorded capture time (an old-layout clip) on its arrival on the host, so the
-  four cameras' stamps jitter by their readers' pacing; `CameraSync` then splits some sets (26.8 sets per second
-  from 23 fps cameras, measured). Such a frame is stamped on the play's clock instead (frame n at the start plus
-  n / `fps`).
 - deep_flow's color upload went from 6.1 to 9.0 ms mean, its latencies 2–4 ms with it, one run each (measured);
   the cause, the shared `ImageUpload`'s stack per single frame or the snapshot callback inside the timed span, is
   inferred.

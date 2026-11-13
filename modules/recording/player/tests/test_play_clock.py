@@ -54,6 +54,13 @@ class PlayClockTest(unittest.TestCase):
         second.catch_up(0, 0, 100.17)          # due at 100.07, 0.1 s late
         self.assertAlmostEqual(first.capture(0, 1) or 0.0, 100.12)
 
+    def test_cameras_without_times_are_paced_together_at_fps(self) -> None:
+        clock = PlayClock({}, {0: 0, 1: 5}, fps=20.0)
+        clock.start(100.0)
+        self.assertAlmostEqual(clock.capture(0, 3) or 0.0, 100.15)
+        self.assertAlmostEqual(clock.capture(1, 8) or 0.0, 100.15)      # three frames from its first, as camera 0's third
+        self.assertAlmostEqual(clock.moment(0, 3) or 0.0, 100.15)
+
 
 if __name__ == '__main__':
     unittest.main()
