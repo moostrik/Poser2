@@ -17,10 +17,10 @@ import math
 
 import numpy as np
 
-from apps.white_space.board import Flash
+from ...board import Flash
 
-from apps.white_space.light import BeamLightId, BEAM_LIGHT_CHANNEL, BEAM_LIGHT_HEADINGS
-from apps.white_space.light.layers import BlendType, normalize_azimuth, apply_circular
+from ...light import BeamLightId, BEAM_LIGHT_CHANNEL, BEAM_LIGHT_HEADINGS
+from ...light.layers import BlendType, normalize_azimuth, apply_circular
 
 
 def beam_profile(width: float, blur: float, resolution: int) -> np.ndarray:

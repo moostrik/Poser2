@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from modules.pose import Frame, Azimuth, BBoxAzimuth
 
-from apps.white_space.light.layers import normalize_azimuth
+from ...light.layers import normalize_azimuth
 
 
 @dataclass(frozen=True)

@@ -14,10 +14,9 @@ from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, TrackerFrameSource
-from modules.pose import features
+from modules.pose import FrameDict, features
 from modules.pose.pipeline import Domain, PosePipeline
 from modules.inference import detection, BatchUploader, CameraSync, ImageSnapshot, PoseInference, SyncMessage, frame_poses, has_points
-from modules.pose import FrameDict
 from modules.session import Session
 
 from .board import RenderBoard

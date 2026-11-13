@@ -3,7 +3,7 @@ from OpenGL.GL import GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, glBlendFunc
 from modules.gl import Fbo, Texture, Image
 from modules.render import layers
 
-from apps.white_space.render.shaders.light_simulation import LightSimulation
+from ..shaders.light_simulation import LightSimulation
 
 from ...board import HasLightFrame
 

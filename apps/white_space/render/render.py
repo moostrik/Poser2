@@ -9,18 +9,15 @@ from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 from modules.gl import RenderBase, clear_color, Style
 from modules.camera import RigCameraSettings, CameraHealthSettings, mono_frame_size, delivered_height
 from modules.tracker import PanoramicTrackerSettings
-from apps.white_space.render.layers.light_simulation_layer import LightSimulationLayer
-from apps.white_space.render.layers.beam_light_simulation_layer import BeamLightSimulationLayer
-from apps.white_space.render.layers.azimuth_overlay_layer import AzimuthOverlayLayer
-from apps.white_space.render.layers.pose_figure_layer import PoseFigureLayer
-from apps.white_space.light import FIXTURE_PROJECTION_RPM
 from modules.pose import BaseScalarFeature, nodes
 from modules.utils import Color, Rect, Point2f
 from modules.render import layers, make_subdivision, SubdivisionRow, Subdivision
 
 from ..board import RenderBoard
+from ..light import FIXTURE_PROJECTION_RPM
 from ..pose import PlayheadOffset, dummy_id
 from ..settings import Layers, RenderSettings, PlayheadFeatureSelect, CameraView, Layout, Stage
+from .layers import AzimuthOverlayLayer, BeamLightSimulationLayer, LightSimulationLayer, PoseFigureLayer
 from .pose_slots import POSE_SLOTS, pose_slots
 
 # Maps the app-local feature enum to the concrete app feature. Kept here (not in settings,
