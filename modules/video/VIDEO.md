@@ -36,7 +36,7 @@ NV12 needs. The size is read at Start and holds for that recording.
 | HD     | 1920 × 1080 | 1080 × 1920 |
 | QHD    | 2560 × 1440 | 1440 × 2560 |
 | UHD    | 3840 × 2160 | 2160 × 3840 |
-| CUSTOM | the width and height set by hand or by snap |
+| CUSTOM | as set      | as set      |
 
 ### How many seconds fit
 

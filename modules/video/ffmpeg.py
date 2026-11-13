@@ -86,10 +86,13 @@ def _stderr(output: bytes | None) -> str:
 
 # ENCODING
 
+TRIAL_SIZE: int = 256      # px, the trial frame's side; NVENC refuses frames 128 wide and less
+
+
 def encoder_works(encoder: Encoder) -> bool:
     """A one-frame trial encode: the encoder list alone does not prove the driver works."""
     codec, quality, pix_fmt = _CODECS[encoder]
-    args = ['-nostdin', '-f', 'lavfi', '-i', 'color=c=gray:size=128x128:rate=15', '-frames:v', '1',
+    args = ['-nostdin', '-f', 'lavfi', '-i', f'color=c=gray:size={TRIAL_SIZE}x{TRIAL_SIZE}:rate=15', '-frames:v', '1',
             '-c:v', codec, *quality, '-pix_fmt', pix_fmt, '-f', 'null', '-']
     try:
         process = popen(args, subprocess.DEVNULL, subprocess.DEVNULL)

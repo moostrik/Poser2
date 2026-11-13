@@ -68,6 +68,9 @@ class TestClipHevc(unittest.TestCase):
                 expected = (luma_of(i) - 16) * 255.0 / 219.0     # video-range gray to full range
                 np.testing.assert_allclose(decoded[i].mean(axis=(0, 1)), [expected] * 3, atol=4)
 
+    def test_the_nvenc_trial_passes(self) -> None:
+        self.assertTrue(video.encoder_works(video.Encoder.NVENC))
+
     def test_nv12_shape_must_be_even_and_three_halves(self) -> None:
         writer = video.ClipWriter('unused.mp4', FPS, video.Encoder.NVENC, video.ClipInput.NV12, video.ClipCodec.HEVC)
         with self.assertRaises(ValueError):
