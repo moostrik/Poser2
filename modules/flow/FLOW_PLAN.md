@@ -9,7 +9,7 @@ inferred, **(site fact)** what the operator saw.
 
 | #   | Line                                                                      | State                                                         | Documents                                                    |
 |-----|---------------------------------------------------------------------------|---------------------------------------------------------------|--------------------------------------------------------------|
-| 1   | [The flow held up to the rules](#1-the-flow-held-up-to-the-rules)         | started; three findings so far                                | `CLAUDE.md`, `.claude/rules`                                 |
+| 1   | [The flow held up to the rules](#1-the-flow-held-up-to-the-rules)         | analysed: nine steps, two decisions                           | `CLAUDE.md`, `.claude/rules`                                 |
 | 2   | [The 3D fluid's input](#2-the-3d-fluids-input)                            | built; the depth read to choose                               | [VIEW.md](VIEW.md), [BRIDGE_3D.md](BRIDGE_3D.md)             |
 | 3   | [The 3D fluid's look at 4K](#3-the-3d-fluids-look-at-4k)                  | next                                                          | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md)           |
 | 4   | [One unit across the stages](#4-one-unit-across-the-stages)               | not started                                                   | [FLOW.md](FLOW.md)                                           |
@@ -26,22 +26,70 @@ distinct.
 ## 1. The flow held up to the rules
 
 The flow's packages (`modules/flow`: `motion`, `view`, `bridge_2d`, `bridge_3d`, `fluid_2d`, `fluid_3d`,
-`visualization`, `shaders` and its files) and its layers (`modules/render/layers/flow`) against `CLAUDE.md` and
-`.claude/rules`: reported per package, then a step for each finding that does not meet them. Form only: a name,
-a file, a docstring, an import; nothing changes what the flow does for a rule's sake.
+`visualization`, `shaders` and its files) and its layers (`modules/render/layers/flow`), 210 Python files, held
+against `CLAUDE.md` and `.claude/rules` by a scan of every file and by reading what a scan cannot judge. Form
+only: a name, a file, a docstring, an import; nothing changes what the flow does for a rule's sake.
 
-Found so far, by the apps' plan's module pass ([APPS_PLAN.md](../../apps/APPS_PLAN.md)), which stopped partway:
-the code reads time from `perf_counter`, prints nothing, has no `# type: ignore`, and imports other packages from
-their `__init__`. Open:
+Met throughout: other packages imported from their `__init__`, one `from` line a package, no `__all__`, no
+`import *`; time from `perf_counter`; loggers by `getLogger(__name__)`, no `print`; no `# type: ignore`; every
+public function with a return hint; OpenGL imported by name, no `GL_TIMEOUT_IGNORED`.
 
-| Finding                                                                                                 | Rule                                                        |
-|---------------------------------------------------------------------------------------------------------|-------------------------------------------------------------|
-| `drag_share`, `drag_gate`, `drag_velocity_step`, `DRAG_FLOOR`, `drag_time` in `fluid_3d` say "drag" alone | the glossary: "drag" pairs with what it acts on            |
-| "ink" in the particles' comments, a docstring and a parameter description (`particle_density.py`, `particle_emit.py`) | one term per concept: the fluid carries density; no rule names "ink" yet |
-| "centre" and "colour" in five docstrings in `motion` and `view`                                          | the glossary: American spelling                             |
-| 17 test files import the flow absolutely                                                                | inside a package, its tests included, import relatively    |
+### The main thing: reasons in docstrings
 
-The rest of the packages are not yet read.
+The flow's design reasoning sits in its code. 55 docstrings run past ten lines, 930 lines together; the largest
+are module docstrings that are design essays: `velocity_bandpass.py` (53 lines), `depth_velocity.py` (47),
+`fluid_3d.py` (33), `velocity_lowpass.py` (32), `lucas_kanade_flow_3d.py` (29), `finite_guard.py` (22),
+`lucas_kanade_flow.py` and `fluid_2d.py` (21). `FaceVelocity`'s docstring holds a timing. The rule: a docstring
+says what the thing is; reasons sit in the package's document. Each reason either is in MOTION.md, BRIDGE_3D.md
+or FLUID_3D.md already, and goes from the code, or moves there; the docstring keeps what the thing is and its
+arguments. The other findings are small by comparison.
+
+### Steps
+
+| #   | Step                                                                                                 | Rule                                                                |
+|-----|------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|
+| 1.1 | the reasons out of the docstrings into the stage documents, each fact once                           | a docstring says what the thing is; reasons in the package's document |
+| 1.2 | "drag" alone renamed by what it acts on                                                              | the glossary: "drag" pairs with what it acts on                     |
+| 1.3 | "centre" and "colour" in American spelling                                                           | the glossary: American spelling                                     |
+| 1.4 | "ink" said as density                                                                                | one term per concept                                                |
+| 1.5 | the 17 test files import the flow relatively                                                         | inside a package, its tests included, import relatively             |
+| 1.6 | `__init__` exports only what other packages use                                                      | `__init__.py` holds what other packages use                         |
+| 1.7 | files named after what they hold                                                                     | a file holds one class or subject, named after it                   |
+| 1.8 | seven `Field` descriptions to one short line                                                         | a `Field` description is one short line of panel text               |
+| 1.9 | FLUID_3D.md and TIMING.md read line by line for history stated as a story                            | a document reads as if the current design had always been it        |
+
+What each takes:
+
+- 1.2: `DRAG_FLOOR`, `drag_share`, `drag_gate`, `drag_velocity_step` and the parameter `drag_time` (`fluid_3d.py`,
+  its test), `AddToFaces3D.drag` and its `DRAG` mode; "exponential drag" in the docstrings of `FlowUtil`'s
+  dampen, `Fluid2D`'s and `Dampen`. A mouse drag in `orbit.py` and the monitor is the panel's word, not the
+  fluid's, and stays.
+- 1.3: "centre" four times in `lucas_kanade_flow.py` and once in `lucas_kanade_tile.py`; "colour" in
+  `view_window.py`.
+- 1.4: `particle_density.py`, `particle_emit.py`.
+- 1.6: 14 names used by the flow's tests alone (`DRAG_FLOOR`, `drag_share`, `drag_gate`, `drag_velocity_step`,
+  `blur_sigma`, `band_width`, `velocity_change`, `change_velocity`, `whole_change`, `viscosity_iterations`,
+  `MAX_STEP`, `guard_report`, `swirl_noise`, `LightPlace`), which the tests take from their files once 1.5 makes
+  them relative; 5 used by nothing outside the package (`change_acceleration_scale`, `WallMode`, `FiniteGuard`,
+  `GuardSlot`, `ParticleDraw`), whose own users import them from their files already.
+- 1.7: `log_axis.py` holds `AxisLine`, `volume_cut.py` `VolumeCutShader`, `volume_cube.py` `VolumeCubeShader`
+  and `CubeColor`, `view_window.py` `DepthRead` beside the window's geometry.
+- 1.8: `limiter` (three fields), `overlap`, `fog_scattering`, the monitor's `view`, `depth_read`: 116 to 130
+  characters each.
+
+Each step is one commit, built on your "go", its call sites and tests in the same change.
+
+### Not form: your decisions
+
+Two findings change what the flow does, so they are not steps until you decide:
+
+| Finding                                                                                                        | Rule                                      |
+|----------------------------------------------------------------------------------------------------------------|-------------------------------------------|
+| the body's velocity has two gains: the motion's `x_gain`, `y_gain`, `z_gain` and the fluid's `input.boundary.velocity_gain` | one quantity has one gain     |
+| `velocity.fade_time` defaults to 60 s and `temperature.fade_time` to 3 s; the textbook's water keeps both (0, off) | a setting's default is the textbook value |
+
+Not judged by a scan: whether every unit means something on its own, beyond the names above. The flow runs on the
+render thread, so the concurrency rules touch none of it.
 
 ## 2. The 3D fluid's input
 
@@ -206,9 +254,13 @@ Not worked on until asked for; each with what is known.
 
 ## Rules it touches
 
-- Every rule in `CLAUDE.md` and `.claude/rules`, the flow's code against each: line 1.
-- Inside a package, its tests included, import relatively: the 17 test files, line 1.
-- Use the terms in the glossary: "drag" alone and the spelling, line 1.
+- A docstring says what the thing is; reasons sit in the package's document: 1.1.
+- Use the terms in the glossary; one term per concept: 1.2, 1.3, 1.4.
+- Inside a package, its tests included, import relatively: 1.5.
+- `__init__.py` holds what other packages use: 1.6.
+- A file holds one class or subject, named after it: 1.7.
+- A `Field` description is one short line of panel text: 1.8.
+- A document reads as if the current design had always been it: 1.9.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the two depth reads not chosen,
   `bilateral_contrast` and the preset's `view.depth_read`, line 2.
 - Choose a data path by its latency: the chain before the fluid timed as one, line 2.
