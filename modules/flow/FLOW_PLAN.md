@@ -53,9 +53,8 @@ The input as good as it gets, before the 4K density's heavy side. Built: every c
 ([VIEW.md](VIEW.md)), one density and its fine density ([FLUID_3D.md](FLUID_3D.md#the-density)), each output at
 its readings' depth ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)).
 
-- The depth read: `view.depth_read` holds three, `SURFACE`, `MASK` and `BILATERAL`
-  ([VIEW.md](VIEW.md#the-depth-read)). One stays, chosen by eye on the edges recording, and the other two go
-  with `bilateral_contrast`.
+- The depth read: `view.depth_read` holds `SURFACE` and `MASK` ([VIEW.md](VIEW.md#the-depth-read)). One stays,
+  chosen together by eye on the edges recording; the other goes.
 - The whole chain before the fluid, camera to bridge, timed as one at the preset: what each pass costs against
   what it gives the fluid.
 - The dye's amount weighed by the image's brightness, and z's share in the dye's amount: discussed, not
@@ -210,8 +209,8 @@ Not worked on until asked for; each with what is known.
 ## Rules it touches
 
 - A `Field` description is one short line of panel text: 1.10.
-- Remove obsolete pathways; keep presets and settings schemas in sync: the two depth reads not chosen,
-  `bilateral_contrast` and the preset's `view.depth_read`, line 2.
+- Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
+  preset's `view.depth_read`, line 2.
 - Choose a data path by its latency: the chain before the fluid timed as one, line 2.
 - A setting's default is the textbook value: the tricubic read, line 3.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
