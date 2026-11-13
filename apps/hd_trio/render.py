@@ -175,6 +175,7 @@ class HDTrioRender(RenderBase):
             for layer in cam_dict.values():
                 layer.deallocate()
         self._border.deallocate()
+        self._intro_player.close()
 
     def _measure_tick(self, now: float) -> None:
         if self._last_tick > 0.0:
@@ -265,8 +266,8 @@ class HDTrioRender(RenderBase):
         _INTRO_STAGES = (ShowStage.WHITE_POSE, ShowStage.FLUID, ShowStage.PRACTICE, ShowStage.ENJOY_IN)
         if stage in _INTRO_STAGES:
             if prev_stage not in _INTRO_STAGES:  # first frame of intro sequence
-                self._intro_player.start()
-            frames = self._intro_player.update()
+                self._intro_player.start(self._last_tick)
+            frames = self._intro_player.update(self._last_tick)
             self._intro_proxy.set_frames(frames)
             for i in range(self.num_cams):
                 self._intro_geometries[i].update()

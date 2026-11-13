@@ -6,7 +6,6 @@ through a lightweight :class:`SequenceDataProxy` that can be passed to
 """
 from __future__ import annotations
 
-import time
 import logging
 from pathlib import Path
 from typing import Any
@@ -86,6 +85,12 @@ class IntroSequencePlayer:
         settings.bind(IntroSequenceSettings.refresh_path, self._on_refresh_path)
         settings.bind(IntroSequenceSettings.intro_path, self._on_refresh_path)
 
+    def close(self) -> None:
+        """Teardown: the settings bindings go."""
+        self._settings.unbind(IntroSequenceSettings.folder, self._on_folder_changed)
+        self._settings.unbind(IntroSequenceSettings.refresh_path, self._on_refresh_path)
+        self._settings.unbind(IntroSequenceSettings.intro_path, self._on_refresh_path)
+
     def _base_path(self) -> Path:
         return Path(self._data_path) / self._settings.intro_path
 
@@ -149,12 +154,12 @@ class IntroSequencePlayer:
     def duration(self) -> float:
         return self._duration
 
-    def start(self) -> None:
-        """Begin playback from the start of the recording."""
+    def start(self, now: float) -> None:
+        """Begin playback from the start of the recording at the tick's time `now`."""
         if self._duration <= 0.0:
             return
         self._active = True
-        self._start_time = time.perf_counter()
+        self._start_time = now
         if self._settings.verbose:
             logger.info("IntroSequencePlayer started")
 
@@ -164,19 +169,19 @@ class IntroSequencePlayer:
             logger.info("IntroSequencePlayer stopped")
         self._active = False
 
-    def update(self) -> FrameDict:
-        """Return current frame dict, mapped to all camera slots.
+    def update(self, now: float) -> FrameDict:
+        """Return the frame dict at the tick's time `now`, mapped to all camera slots.
 
         Returns an empty dict when inactive or past the recording end.
         """
         if not self._active:
             if self._settings.loop and self._duration > 0.0:
-                self._start_time = time.perf_counter()
+                self._start_time = now
                 self._active = True
             else:
                 return {}
 
-        elapsed = time.perf_counter() - self._start_time
+        elapsed = now - self._start_time
         if elapsed >= self._duration:
             if self._settings.loop:
                 self._start_time += self._duration

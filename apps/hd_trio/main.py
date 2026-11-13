@@ -257,6 +257,9 @@ class HDTrioMain:
         self.is_running = False
 
         self.panel_server.stop()
+        self.settings.render.intro_sequence.unbind(IntroSequenceSettings.arm_record, self._on_arm_record)
+        self.settings.render.window.unbind(WindowSettings.avg_fps, self._on_render_fps)
+        self.sequencer.stop()
 
         self.render.stop()
 

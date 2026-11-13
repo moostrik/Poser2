@@ -93,17 +93,15 @@ Checked at the rig: a live recording with `mirrored` on (a live frame comes with
 does not, so the run stored the clips as they came; the recorder's test covers the mirroring); the fluid's look.
 
 Reported: 5, hd_trio held up to the rules; its findings are 7 to 9. Built: 6, the previous crop is off by default
-(`crop.Settings.enable_prev_crop`): only the optical-flow model reads it, and no app turns it on.
+(`crop.Settings.enable_prev_crop`): only the optical-flow model reads it, and no app turns it on; 7, the show's
+sequencer takes the panel's start, stop, skip and playlist changes as requests carried out at the next tick, its
+callbacks under their own lock and logged with their traceback, and the intro player plays on the tick's time;
+both, and `main`, unbind on stop what they bind.
 
-7. **The sequencer's threads.** hd_trio's `Sequencer` holds its state under one lock, changed by the panel's
-   start, stop and skip and by the render's `update`; its callback list has its own lock, copied under it, called
-   outside it; a failing callback is logged with its traceback. `Sequencer`, `IntroSequencePlayer` and `main`
-   unbind on stop what they bind. Checked by: a sequencer test (start from another thread while updating, the
-   states in order) and hd_trio's tests.
 8. **The render's inputs, not its settings.** The fluid's fade and the similarity scale reach the fluid through
    its input each tick (`FluidInput`), as `dt` does, instead of the render and the show stages writing
-   `fluid.density.fade_time` and `similarity_scale`; the render's three `data.b` values go into the presets; the
-   intro player takes the tick's time. Checked by: the render and flow tests, hd_trio's tests and its -sim run
+   `fluid.density.fade_time` and `similarity_scale`; the render's three `data.b` values go into the presets.
+   Checked by: the render and flow tests, hd_trio's tests and its -sim run
    (20 s, the fluid drawing, no error).
 9. **Its document and names.** `HD_TRIO.md` holds the app's reasons, now in its comments and the settings'
    docstring, which say what each thing is; the render's names say what they hold (`lut`, `cmt`, `seq`); its

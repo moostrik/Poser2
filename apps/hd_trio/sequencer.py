@@ -1,6 +1,6 @@
 """Sequencer — HD Trio's stage-based show sequencer with settings-driven control, ticked by the render loop."""
 
-import time
+from threading import Lock
 from typing import Callable
 
 from modules.settings import BaseSettings, Field, Widget
@@ -42,7 +42,9 @@ class Sequencer:
 
     The ``stages`` list defines which stages to play and in what order.
     Each entry indexes into ``durations`` for that stage's length.
-    Call ``update(now)`` every frame (the renderer's update callback hands it the frame time).
+    Call ``update(now)`` every frame (the renderer's update callback hands it the frame time). The panel's start,
+    stop, skip and playlist changes are requests, taken and carried out at the next tick, so the show changes on
+    the tick's thread only and its stages start at the tick's time; the state callbacks run there.
 
     Example::
 
@@ -65,6 +67,14 @@ class Sequencer:
             raise ValueError("settings.durations must contain at least one entry")
 
         self._state_callbacks: list[Callable[[SequencerState], None]] = []      # run in registration order
+        self._callback_lock: Lock = Lock()
+
+        # The panel's requests, set on its thread, taken at the next tick
+        self._request_lock: Lock = Lock()
+        self._start_requested: bool = False
+        self._stop_requested: bool = False
+        self._skip_requested: bool = False
+        self._playlist_requested: bool = False
 
         self._active = False
         self._pos: int = 0
@@ -83,27 +93,50 @@ class Sequencer:
         settings.bind(SequencerSettings.stages, self._on_playlist_changed)
         self._set_idle_state()
 
-    # -- Settings callbacks --------------------------------------------------
+    def stop(self) -> None:
+        """Teardown: the settings bindings go."""
+        self.settings.unbind(SequencerSettings.start, self._on_start)
+        self.settings.unbind(SequencerSettings.stop, self._on_stop)
+        self.settings.unbind(SequencerSettings.skip, self._on_skip)
+        self.settings.unbind(SequencerSettings.durations, self._on_playlist_changed)
+        self.settings.unbind(SequencerSettings.stages, self._on_playlist_changed)
+
+    # -- Settings callbacks: requests for the next tick ----------------------
 
     def _on_start(self, _=None) -> None:
-        if not self._active:
-            self._start_show()
+        with self._request_lock:
+            self._start_requested = True
 
     def _on_stop(self, _=None) -> None:
-        if self._active:
-            self._stop_show()
+        with self._request_lock:
+            self._stop_requested = True
 
     def _on_skip(self, value: bool) -> None:
-        if value and self._active:
-            self._advance_stage()
+        if value:
+            with self._request_lock:
+                self._skip_requested = True
 
     def _on_playlist_changed(self, _=None) -> None:
-        """Rebuild playlist cache immediately when stages or durations change."""
-        if not self._active:
-            return
-        self._build_playlist()
-        if self._pos >= len(self._playlist):
-            self._pos = max(0, len(self._playlist) - 1)
+        with self._request_lock:
+            self._playlist_requested = True
+
+    def _take_requests(self, now: float) -> None:
+        """The panel's requests since the last tick, carried out at `now`: a stop before a start, then a skip, then a
+        playlist change."""
+        with self._request_lock:
+            start, stop, skip, playlist = (self._start_requested, self._stop_requested, self._skip_requested,
+                                           self._playlist_requested)
+            self._start_requested = self._stop_requested = self._skip_requested = self._playlist_requested = False
+        if stop and self._active:
+            self._stop_show()
+        if start and not self._active:
+            self._start_show(now)
+        if skip and self._active:
+            self._advance_stage(now)
+        if playlist and self._active:
+            self._build_playlist()
+            if self._pos >= len(self._playlist):
+                self._pos = max(0, len(self._playlist) - 1)
 
     # -- Playlist cache ------------------------------------------------------
 
@@ -133,7 +166,7 @@ class Sequencer:
         self.settings.stage_progress = 1.0
         self.settings.progress = 1.0
 
-    def _start_show(self) -> None:
+    def _start_show(self, now: float) -> None:
         self._build_playlist()
         if not self._playlist:
             logger.warning("empty stages playlist, not starting")
@@ -141,7 +174,7 @@ class Sequencer:
         self._active = True
         self.settings.running = True
         self._pos = 0
-        self._enter_stage()
+        self._enter_stage(now)
 
     def _stop_show(self) -> None:
         self._active = False
@@ -149,29 +182,30 @@ class Sequencer:
         self._set_idle_state()
         self._notify_state(0.0)
 
-    def _enter_stage(self) -> None:
-        self._stage_start = time.perf_counter()
+    def _enter_stage(self, now: float) -> None:
+        self._stage_start = now
         self.settings.stage_progress = 0.0
         stage = self._playlist[self._pos]
         self.settings.stage = stage
         self._notify_state(0.0)
 
-    def _advance_stage(self) -> None:
+    def _advance_stage(self, now: float) -> None:
         next_pos = self._pos + 1
         if next_pos < len(self._playlist):
             self._pos = next_pos
-            self._enter_stage()
+            self._enter_stage(now)
         elif self.settings.loop:
             self._pos = 0
-            self._enter_stage()
+            self._enter_stage(now)
         else:
-            SequencerSettings.stop.fire(self.settings)
+            SequencerSettings.stop.fire(self.settings)      # the shared stop: the session's recorders stop with the show
 
     # -- Callbacks -----------------------------------------------------------
 
     def add_state_callback(self, callback: Callable[[SequencerState], None]) -> None:
-        if callback not in self._state_callbacks:
-            self._state_callbacks.append(callback)
+        with self._callback_lock:
+            if callback not in self._state_callbacks:
+                self._state_callbacks.append(callback)
         callback(SequencerState(
             stage=self.settings.stage,
             stage_progress=self.settings.stage_progress,
@@ -181,8 +215,9 @@ class Sequencer:
         ))
 
     def remove_state_callback(self, callback: Callable[[SequencerState], None]) -> None:
-        if callback in self._state_callbacks:
-            self._state_callbacks.remove(callback)
+        with self._callback_lock:
+            if callback in self._state_callbacks:
+                self._state_callbacks.remove(callback)
 
     def _notify_state(self, elapsed: float) -> None:
         state = SequencerState(
@@ -192,16 +227,19 @@ class Sequencer:
             elapsed=elapsed,
             active=self._active,
         )
-        for cb in self._state_callbacks:
+        with self._callback_lock:
+            callbacks = list(self._state_callbacks)
+        for callback in callbacks:
             try:
-                cb(state)
-            except Exception as e:
-                logger.error(f"Sequencer state callback error: {e}")
+                callback(state)
+            except Exception:
+                logger.exception("Sequencer state callback error")
 
     # -- Tick (called every render frame) ------------------------------------
 
     def update(self, now: float) -> None:
         """Advance sequencer state. Call once per frame with the frame's time (perf_counter)."""
+        self._take_requests(now)
         if not self._active:
             return
 
@@ -224,4 +262,4 @@ class Sequencer:
 
         # Auto-advance
         if duration > 0 and elapsed >= duration:
-            self._advance_stage()
+            self._advance_stage(now)
