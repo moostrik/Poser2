@@ -55,7 +55,9 @@ def recorder(types: list[FrameType], temp: str = 'temp', output: str = 'out', da
     settings.output_path = output
     settings.fps = 60.0
     settings.keyframe_interval = keyframe_interval
-    return Recorder(settings, as_recorded, data_path)
+    rec = Recorder(settings, as_recorded, data_path)
+    rec.sync._queue = rec.sync._take        # the tests match the parts on their own thread, the sync's work as it is
+    return rec
 
 
 def stream_frames(path: Path, stream: int) -> int:

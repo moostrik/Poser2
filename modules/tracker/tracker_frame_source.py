@@ -9,8 +9,8 @@ capture time. It hands them with the images to the frames callbacks (the pipelin
 to the crop), then, per camera in the set, that camera's time and poses to the asked callbacks. With
 `pose_interval` above 1 only every so many bangs are posed; the others reach the asked callbacks with no poses
 and the pipeline not at all. The images are
-carried, never read: the tracker does not know the GPU's. While the thread does not run, a bang is processed on the
-thread it comes on."""
+carried, never read: the tracker does not know the GPU's. A bang before `start` is an error; one after `stop` is
+dropped."""
 
 import logging
 import math
@@ -82,7 +82,7 @@ class TrackerFrameSource(Thread):
         self._bangs: deque[tuple[dict[int, float], Any, float]] = deque()
         self._dropped: int = 0
         self._wait: PerformanceTimer = PerformanceTimer(name="Wait pose step")
-        self._inline_lock: Lock = Lock()            # bangs processed on the callers' threads while the thread does not run
+        self._stopped: bool = False
         self._callback_lock: Lock = Lock()
         self._frames_callbacks: list[SourceFramesCallback] = []     # run in registration order
         self._asked_callbacks: list[AskedCallback] = []
@@ -110,6 +110,7 @@ class TrackerFrameSource(Thread):
         """The thread ends; the bangs still waiting are dropped and logged."""
         with self._wake:
             self._running = False
+            self._stopped = True
             dropped: int = len(self._bangs)
             self._bangs.clear()
             self._wake.notify()
@@ -137,20 +138,18 @@ class TrackerFrameSource(Thread):
         (an uploader's `ImageSnapshot`), queued for the thread, the oldest dropped beyond `WAITING`."""
         dropped: int | None = None
         with self._wake:
-            running: bool = self._running
-            if running:
-                if len(self._bangs) >= WAITING:
-                    self._bangs.popleft()
-                    self._dropped += 1
-                    dropped = self._dropped
-                self._bangs.append((dict(cam_times), images, time.perf_counter()))
-                self._wake.notify()
+            if not self._running:
+                if self._stopped:
+                    return
+                raise RuntimeError("TrackerFrameSource: a frame bang before start")
+            if len(self._bangs) >= WAITING:
+                self._bangs.popleft()
+                self._dropped += 1
+                dropped = self._dropped
+            self._bangs.append((dict(cam_times), images, time.perf_counter()))
+            self._wake.notify()
         if dropped is not None:
             self.settings.dropped = dropped
-        if running:
-            return
-        with self._inline_lock:
-            self._bang(cam_times, images)
 
     def _bang(self, cam_times: dict[int, float], images: Any) -> None:
         """A bang posed, or, between two posed ones (`pose_interval`), passed: nothing goes to the pipeline, which

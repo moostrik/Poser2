@@ -30,11 +30,16 @@ class PosePackingTest(unittest.TestCase):
         sync.expect_parts(0, tracklets=False, poses=True)
         captures = []
         sync.add_capture_callback(captures.append)
-        sync.submit_frame(cam_frame(0, 0, 1.0))
-        sync.expect_poses(0, 1.0, True)
-        sync.submit_poses({}, 1.05)
-        self.assertEqual(len(captures), 1)
-        self.assertIsNotNone(captures[0].poses)
+        sync.start()
+        try:
+            sync.submit_frame(cam_frame(0, 0, 1.0))
+            sync.expect_poses(0, 1.0, True)
+            sync.submit_poses({}, 1.05)
+            sync.settle()
+            self.assertEqual(len(captures), 1)
+            self.assertIsNotNone(captures[0].poses)
+        finally:
+            sync.stop()
 
 
 if __name__ == '__main__':

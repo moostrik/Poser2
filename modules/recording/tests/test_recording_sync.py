@@ -82,13 +82,18 @@ class RecordingSyncThreadTest(unittest.TestCase):
         self.assertEqual(self.sync.waiting, 0)
 
 
-class RecordingSyncInlineTest(unittest.TestCase):
-    def test_without_its_thread_a_part_is_matched_on_the_caller(self) -> None:
+class RecordingSyncLifecycleTest(unittest.TestCase):
+    def test_a_part_before_start_is_an_error_and_one_after_stop_is_dropped(self) -> None:
         sync = RecordingSync(with_depth=False, pack_poses=as_recorded)
         captures: list[RecordedCapture] = []
         sync.add_capture_callback(captures.append)
+        with self.assertRaises(RuntimeError):
+            sync.submit_frame(cam_frame(0, 0, 0.0))
+        sync.start()
+        sync.stop()
         sync.submit_frame(cam_frame(0, 0, 0.0))
-        self.assertEqual(len(captures), 1)
+        sync.flush()                                    # returns at once
+        self.assertEqual(captures, [])
 
 
 if __name__ == '__main__':

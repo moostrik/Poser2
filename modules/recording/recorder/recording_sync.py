@@ -14,8 +14,8 @@ still waiting holds the newer ones behind it, at most `KEPT` of them, beyond whi
 waits for, for a stream that stopped.
 
 The submits only queue what they take, on the threads they come on, in one inbox that is not bounded: a recording
-needs every part. The sync's own thread matches the parts in the order they came and hands the captures on; while
-the thread does not run, a part is matched on the thread it comes on."""
+needs every part. The sync's own thread matches the parts in the order they came and hands the captures on. A part
+before `start` is an error; one after `stop` is dropped."""
 
 import logging
 from collections import deque
@@ -122,7 +122,7 @@ class RecordingSync(Thread):
         self._inbox: deque[tuple[_Part, Any]] = deque()
         self._wake: Condition = Condition()
         self._running: bool = False
-        self._inline_lock: Lock = Lock()        # parts taken on the callers' threads while the thread does not run
+        self._stopped: bool = False
 
     def add_capture_callback(self, callback: RecordedCaptureCallback) -> None:
         with self._callback_lock:
@@ -140,6 +140,7 @@ class RecordingSync(Thread):
         """The thread ends; what still waits in the inbox is dropped and logged."""
         with self._wake:
             self._running = False
+            self._stopped = True
             dropped: list[tuple[_Part, Any]] = list(self._inbox)
             self._inbox.clear()
             self._wake.notify()
@@ -167,14 +168,16 @@ class RecordingSync(Thread):
                     value.set()
 
     def _queue(self, part: _Part, value: Any) -> None:
-        """Into the inbox; taken on the caller's thread, one at a time, when the sync's thread does not run."""
+        """Into the inbox. Before `start` an error; after `stop` dropped (a wait on it returns at once)."""
         with self._wake:
-            if self._running:
-                self._inbox.append((part, value))
-                self._wake.notify()
-                return
-        with self._inline_lock:
-            self._take(part, value)
+            if not self._running:
+                if self._stopped:
+                    if part in (_Part.FLUSH, _Part.RESET, _Part.SETTLE):
+                        value.set()
+                    return
+                raise RuntimeError("RecordingSync: a part before start")
+            self._inbox.append((part, value))
+            self._wake.notify()
 
     def _done(self, part: _Part) -> None:
         """Queue `part` and return once it is taken."""

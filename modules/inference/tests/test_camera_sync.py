@@ -31,7 +31,7 @@ def frame(cam_id: int, timestamp: float) -> CameraFrame:
 
 
 def synced(num_cams: int, fps: float) -> tuple[CameraSync, list[dict[int, SyncMessage]]]:
-    """A sync, not started, and the sets it hands on."""
+    """A sync, not started, and the sets it hands on: the tests decide its messages on their own thread (`_decide`)."""
     settings = CameraSyncSettings()
     settings.num_cams = num_cams
     settings.fps = fps
@@ -50,7 +50,7 @@ class CameraSyncTest(unittest.TestCase):
             sync.add_set_callback(recorder.fire if i % 2 else partial(_Recorder.fire, recorder))
         sync.add_set_callback(recorders[1].fire)                 # registered twice: called once, first position
         first: CameraFrame = frame(0, 12.5)
-        sync.submit_frame(first)                                 # one camera: its first frame syncs
+        sync._decide(first)                                      # one camera: its first frame syncs
         self.assertEqual(calls, list(range(16)))
         self.assertEqual(recorders[0].items, {0: first})         # the set carries the frame itself
 
@@ -66,7 +66,7 @@ class CameraSyncTest(unittest.TestCase):
         for moment in range(6):
             t: float = 1.0 + moment * 0.1
             for cam_id, offset in ((0, 0.0), (1, 0.01), (2, 0.05)):
-                sync.submit_frame(frame(cam_id, t + offset))
+                sync._decide(frame(cam_id, t + offset))
         last: dict[int, SyncMessage] = sets[-1]
         self.assertEqual(sorted(last), [0, 1, 2])
         self.assertAlmostEqual(last[0].timestamp, 1.5)
@@ -75,9 +75,9 @@ class CameraSyncTest(unittest.TestCase):
 
     def test_a_camera_that_stops_is_left_out_after_two_frames(self) -> None:
         sync, sets = synced(2, 10.0)
-        sync.submit_frame(frame(1, 0.9))                         # camera 1 sends once, then stops
+        sync._decide(frame(1, 0.9))                              # camera 1 sends once, then stops
         for moment in range(5):
-            sync.submit_frame(frame(0, 1.0 + moment * 0.1))
+            sync._decide(frame(0, 1.0 + moment * 0.1))
         self.assertEqual(sorted(sets[-1]), [0])
 
     def test_any_arrival_order_gives_one_set_per_moment_and_every_frame_once(self) -> None:
@@ -86,7 +86,7 @@ class CameraSyncTest(unittest.TestCase):
         frames = [frame(cam_id, moment / 23.0 + rng.uniform(0.0, 0.030)) for moment in range(230) for cam_id in range(4)]
         frames.sort(key=lambda f: f.timestamp)                  # each moment's four come in any order
         for f in frames:
-            sync.submit_frame(f)
+            sync._decide(f)
         sent: list[SyncMessage] = [m for items in sets for m in items.values()]
         self.assertEqual(len(sent), len(frames) - len(sync._open))          # every frame once, the open set aside
         self.assertEqual(len({id(m) for m in sent}), len(sent))
@@ -97,7 +97,7 @@ class CameraSyncTest(unittest.TestCase):
         period: float = 1.0 / 23.0
         for moment in range(40):                                # camera 3 runs 40 ms behind the others
             for cam_id in range(4):
-                sync.submit_frame(frame(cam_id, moment * period + (0.040 if cam_id == 3 else 0.0)))
+                sync._decide(frame(cam_id, moment * period + (0.040 if cam_id == 3 else 0.0)))
         spreads: list[float] = [max(m.timestamp for m in s.values()) - min(m.timestamp for m in s.values())
                                 for s in sets[PHASE_FRAMES:] if len(s) == 4]
         self.assertTrue(spreads)
@@ -108,9 +108,18 @@ class CameraSyncTest(unittest.TestCase):
         for moment in range(30):
             for cam_id in range(4):
                 if not (moment == 20 and cam_id == 2):
-                    sync.submit_frame(frame(cam_id, moment / 23.0 + cam_id * 0.002))
+                    sync._decide(frame(cam_id, moment / 23.0 + cam_id * 0.002))
         self.assertIn([0, 1, 3], [sorted(s) for s in sets])
         self.assertEqual(sum(len(s) for s in sets) + len(sync._open), 30 * 4 - 1)
+
+    def test_a_message_before_start_is_an_error_and_one_after_stop_is_dropped(self) -> None:
+        sync, sets = synced(1, 10.0)
+        with self.assertRaises(RuntimeError):
+            sync.submit_frame(frame(0, 1.0))
+        sync.start()
+        sync.stop()
+        sync.submit_frame(frame(0, 1.1))
+        self.assertEqual(sets, [])
 
 
 class CameraSyncThreadTest(unittest.TestCase):

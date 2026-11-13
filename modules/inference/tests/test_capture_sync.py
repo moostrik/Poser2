@@ -250,16 +250,20 @@ class CaptureSyncTest(unittest.TestCase):
         self.assertEqual(self.settings.dropped, 2)
 
 
-class CaptureSyncInlineTest(unittest.TestCase):
-    def test_without_its_thread_a_part_is_matched_on_the_caller(self) -> None:
+class CaptureSyncLifecycleTest(unittest.TestCase):
+    def test_a_part_before_start_is_an_error_and_one_after_stop_is_dropped(self) -> None:
         settings = CaptureSyncSettings()
         settings.initialize()
         sync = CaptureSync(settings)
         captures: list[Capture] = []
         sync.add_capture_callback(captures.append)
+        with self.assertRaises(RuntimeError):
+            sync.submit_image(image(1.0))
+        sync.start()
+        sync.stop()
         sync.submit_image(image(1.0))
         sync.submit_depth(depth(1.0))
-        self.assertEqual(len(captures), 1)
+        self.assertEqual(captures, [])
 
 
 if __name__ == '__main__':

@@ -4,9 +4,9 @@ The builder resolves the spec at startup into direct callback chains, the same a
 walks the graph per frame. A stage runs its steps in order: the per-pose steps that follow each other in
 one ``FilterTracker`` sized from the ids that reach the stage, a group step on the whole frame between
 them (stamping the poses, writing the group record), and an async step splits the stage: the steps before it
-run on the caller's thread, the steps after it on the split's own thread once `start` has run (the node's results
-queued, at most `WAITING`, the oldest dropped and counted in `dropped`), else on the thread the node emits on. The
-stage's synchronous steps
+run on the caller's thread, the steps after it on the split's own thread (the node's results queued, at most
+`WAITING`, the oldest dropped and counted in `dropped`); a result before `start` is an error, one after `stop` is
+dropped. The stage's synchronous steps
 are timed as ``Pose <stage>``; the crossing's ``InterpolatorTracker`` as ``Pose interpolate``.
 
 A frame source pushes its poses with the images they are for; the stage's chain carries them, unread, to its
@@ -75,7 +75,7 @@ class _Stage:
 class _AsyncSplit:
     """The hand-over at an async step: the frames go through the node, the group record waits for them. The node's
     frames are queued for the split's own thread, which runs the steps after it; at most `WAITING` wait, beyond
-    that the oldest is dropped and counted. While the thread does not run, they run on the node's thread."""
+    that the oldest is dropped and counted. A result before `start` is an error, one after `stop` dropped."""
 
     def __init__(self, step: AsyncStep, then: StageCallback, name: str) -> None:
         self._node = step.node
@@ -84,6 +84,7 @@ class _AsyncSplit:
         self._group = GroupRecord()
         self._wake: Condition = Condition()
         self._running: bool = False
+        self._stopped: bool = False
         self._waiting: deque[tuple[FrameDict, GroupRecord, float]] = deque()
         self._thread: Thread | None = None
         self._wait: PerformanceTimer = PerformanceTimer(name="Wait pose pipeline")
@@ -102,6 +103,7 @@ class _AsyncSplit:
         """The thread ends; the frames still waiting are dropped and logged."""
         with self._wake:
             self._running = False
+            self._stopped = True
             dropped: int = len(self._waiting)
             self._waiting.clear()
             self._wake.notify()
@@ -118,14 +120,15 @@ class _AsyncSplit:
     def _emitted(self, frames: FrameDict) -> None:
         """The node's frames, on its thread: queued for the split's thread, the oldest dropped beyond `WAITING`."""
         with self._wake:
-            if self._running:
-                if len(self._waiting) >= WAITING:
-                    self._waiting.popleft()
-                    self.dropped += 1
-                self._waiting.append((frames, self._group, perf_counter()))
-                self._wake.notify()
-                return
-        self._then(frames, self._group)
+            if not self._running:
+                if self._stopped:
+                    return
+                raise RuntimeError(f"PosePipeline {self._name}: a result before start")
+            if len(self._waiting) >= WAITING:
+                self._waiting.popleft()
+                self.dropped += 1
+            self._waiting.append((frames, self._group, perf_counter()))
+            self._wake.notify()
 
     def _run(self) -> None:
         while True:

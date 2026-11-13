@@ -50,6 +50,13 @@ class _TickSource:
         return {tid: frame(track_id=tid, t=now) for tid in self.track_ids}
 
 
+def _wait_until(done) -> None:
+    """Until `done()` holds, a second at most: the steps after an async step run on the split's thread."""
+    end: float = time.perf_counter() + 1.0
+    while not done() and time.perf_counter() < end:
+        time.sleep(0.001)
+
+
 class _Async:
     """An async node that holds what it gets until ``release``."""
 
@@ -214,14 +221,19 @@ class BuildTest(unittest.TestCase):
         ]))
         out = _Collect()
         pipeline.add_frames_callback(S.RAW, partial(out, 'raw'))
-        source.emit(_frames(0))
-        self.assertEqual([tag for tag, _, _ in log], ['before'])
-        self.assertEqual(len(node.submitted), 1)
-        self.assertIn(Age, node.submitted[0][0])          # the steps before it ran on what it got
-        self.assertEqual(out.events, [])
-        node.release()
-        self.assertEqual([tag for tag, _, _ in log], ['before', 'after'])
-        self.assertEqual(out.events, [('raw', {0})])
+        pipeline.start()
+        try:
+            source.emit(_frames(0))
+            self.assertEqual([tag for tag, _, _ in log], ['before'])
+            self.assertEqual(len(node.submitted), 1)
+            self.assertIn(Age, node.submitted[0][0])          # the steps before it ran on what it got
+            self.assertEqual(out.events, [])
+            node.release()
+            _wait_until(lambda: out.events)
+            self.assertEqual([tag for tag, _, _ in log], ['before', 'after'])
+            self.assertEqual(out.events, [('raw', {0})])
+        finally:
+            pipeline.stop()
 
     def test_the_images_a_source_pushes_reach_the_async_step_with_their_poses(self) -> None:
         source = _Source([0])
@@ -370,11 +382,30 @@ class GroupRecordTest(unittest.TestCase):
         ]))
         groups: list[GroupRecord] = []
         pipeline.add_group_callback(S.RAW, groups.append)
-        source.emit(_frames(0, t=4.0))
-        self.assertEqual(groups, [])
+        pipeline.start()
+        try:
+            source.emit(_frames(0, t=4.0))
+            self.assertEqual(groups, [])
+            node.release()
+            _wait_until(lambda: groups)
+            self.assertEqual(groups[-1][Age].value, 1.0)
+            self.assertEqual(groups[-1].timestamp, 4.0)
+        finally:
+            pipeline.stop()
+
+    def test_a_result_before_start_is_an_error_and_one_after_stop_is_dropped(self) -> None:
+        source = _Source([0])
+        node = _Async()
+        pipeline = PosePipeline(PipelineSpec([StageSpec(S.RAW, source, [AsyncStep(node)])]))
+        out = _Collect()
+        pipeline.add_frames_callback(S.RAW, partial(out, 'raw'))
+        source.emit(_frames(0))
+        with self.assertRaises(RuntimeError):
+            node.release()
+        pipeline.start()
+        pipeline.stop()
         node.release()
-        self.assertEqual(groups[-1][Age].value, 1.0)
-        self.assertEqual(groups[-1].timestamp, 4.0)
+        self.assertEqual(out.events, [])
 
     def test_reset_reaches_the_group_steps_and_forgets_the_held_record(self) -> None:
         source = _Source([0])

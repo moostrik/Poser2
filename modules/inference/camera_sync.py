@@ -8,8 +8,8 @@ camera's second message, comes; a camera that did not come is then left out. Eve
 
 The submits only queue a message, on the threads they come on, at most `WAITING` per camera; beyond that the oldest
 is dropped, counted in `dropped`. The sync's own thread decides the sets in the order the messages came and hands
-each, by `cam_id`, to the set callbacks outside its lock. While the thread does not run, a message is decided on
-the thread it comes on."""
+each, by `cam_id`, to the set callbacks outside its lock. A submit before `start` is an error; one after `stop` is
+dropped."""
 
 import math
 import time
@@ -59,7 +59,7 @@ class CameraSync(Thread):
         self._inbox: deque[tuple[SyncMessage, float]] = deque()    # (message, the moment it was queued)
         self._queued: dict[int, int] = {}                           # what the inbox holds per camera
         self.dropped: int = 0
-        self._inline_lock: Lock = Lock()            # messages decided on the callers' threads while the thread does not run
+        self._stopped: bool = False
         self._wait: PerformanceTimer = PerformanceTimer(name=f"Wait camera sync {stream_name}".strip())
 
     # ── Lifecycle ─────────────────────────────────────────────────────
@@ -73,6 +73,7 @@ class CameraSync(Thread):
         """The thread ends; the messages still waiting are dropped and logged."""
         with self._wake:
             self._running = False
+            self._stopped = True
             dropped: int = len(self._inbox)
             self._inbox.clear()
             self._queued.clear()
@@ -111,20 +112,20 @@ class CameraSync(Thread):
         """A message, queued for the thread, the camera's oldest dropped beyond `WAITING`."""
         cam_id: int = message.cam_id
         with self._wake:
-            if self._running:
-                if self._queued.get(cam_id, 0) >= WAITING:
-                    for index, (queued_message, _) in enumerate(self._inbox):
-                        if queued_message.cam_id == cam_id:
-                            del self._inbox[index]
-                            self.dropped += 1
-                            break
-                else:
-                    self._queued[cam_id] = self._queued.get(cam_id, 0) + 1
-                self._inbox.append((message, time.perf_counter()))
-                self._wake.notify()
-                return
-        with self._inline_lock:
-            self._decide(message)
+            if not self._running:
+                if self._stopped:
+                    return
+                raise RuntimeError(f"{self.name}: a message before start")
+            if self._queued.get(cam_id, 0) >= WAITING:
+                for index, (queued_message, _) in enumerate(self._inbox):
+                    if queued_message.cam_id == cam_id:
+                        del self._inbox[index]
+                        self.dropped += 1
+                        break
+            else:
+                self._queued[cam_id] = self._queued.get(cam_id, 0) + 1
+            self._inbox.append((message, time.perf_counter()))
+            self._wake.notify()
 
     def _decide(self, message: SyncMessage) -> None:
         """The message into its round's set; the set goes out once complete, or once a later round has begun."""

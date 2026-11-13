@@ -14,8 +14,8 @@ complete, so a late part never costs a capture.
 
 The submits only queue what they take, on the threads they come on, at most `KEPT` of a stream per camera; beyond
 that the oldest is dropped, counted as `dropped`. The sync's own thread matches the parts in the order they came,
-waits for the next deadline in the same wait, and hands the captures on. While the thread does not run, a part is
-matched on the thread it comes on. The parts are kept and found by capture time in `modules.camera.CaptureStream`s;
+waits for the next deadline in the same wait, and hands the captures on. A part before `start` is an error; one
+after `stop` is dropped. The parts are kept and found by capture time in `modules.camera.CaptureStream`s;
 an image or a depth no capture took is counted and warned of (`MissedParts`), the depths without an image as
 `misses`.
 """
@@ -87,7 +87,7 @@ class CaptureSync(Thread):
         self._wait: PerformanceTimer = PerformanceTimer(name="Wait capture sync")
         self._queued: dict[tuple[_Part, int], int] = defaultdict(int)     # what the inbox holds per stream and camera
         self._dropped: int = 0
-        self._inline_lock: Lock = Lock()                # parts matched on the callers' threads while the thread does not run
+        self._stopped: bool = False
         # The sync's own, touched by one thread at a time
         self._images: dict[int, CaptureStream[GpuImage]] = defaultdict(lambda: CaptureStream(KEPT))
         self._depths: dict[int, CaptureStream[GpuDepth]] = defaultdict(lambda: CaptureStream(KEPT))
@@ -116,6 +116,7 @@ class CaptureSync(Thread):
         """The thread ends; what still waits in the inbox is dropped and logged."""
         with self._lock:
             self._running = False
+            self._stopped = True
             dropped: list[tuple[_Part, int, Any, float]] = list(self._inbox)
             self._inbox.clear()
             self._queued.clear()
@@ -204,24 +205,26 @@ class CaptureSync(Thread):
             self._queue(_Part.MASKS, cam_id, (times[cam_id], cam_masks))
 
     def _queue(self, part: _Part, cam_id: int, value: Any) -> None:
-        """Into the inbox, the stream's oldest dropped beyond `KEPT`; matched on this thread when the sync's does not run."""
+        """Into the inbox, the stream's oldest dropped beyond `KEPT`. Before `start` an error; after `stop` dropped (a
+        settle returns at once)."""
         with self._wake:
-            if self._running:
-                key: tuple[_Part, int] = (part, cam_id)
-                if part != _Part.SETTLE and self._queued[key] >= KEPT:
-                    for index, (queued, queued_cam, _, _) in enumerate(self._inbox):
-                        if queued == part and queued_cam == cam_id:
-                            del self._inbox[index]
-                            self._dropped += 1
-                            break
-                else:
-                    self._queued[key] += 1
-                self._inbox.append((part, cam_id, value, time.perf_counter()))
-                self._wake.notify()
-                return
-        with self._inline_lock:
-            captures: list[Capture] = self._take(part, cam_id, value)
-            self._emit(captures)
+            if not self._running:
+                if self._stopped:
+                    if part == _Part.SETTLE:
+                        value.set()
+                    return
+                raise RuntimeError("CaptureSync: a part before start")
+            key: tuple[_Part, int] = (part, cam_id)
+            if part != _Part.SETTLE and self._queued[key] >= KEPT:
+                for index, (queued, queued_cam, _, _) in enumerate(self._inbox):
+                    if queued == part and queued_cam == cam_id:
+                        del self._inbox[index]
+                        self._dropped += 1
+                        break
+            else:
+                self._queued[key] += 1
+            self._inbox.append((part, cam_id, value, time.perf_counter()))
+            self._wake.notify()
 
     # ── Matching, on the sync's thread ─────────────────────────────────
 

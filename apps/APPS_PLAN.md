@@ -97,13 +97,10 @@ Reported: 5, hd_trio held up to the rules; its findings are 7 to 9. Built: 6, th
 sequencer takes the panel's start, stop, skip and playlist changes as requests carried out at the next tick, its
 callbacks under their own lock and logged with their traceback, and the intro player plays on the tick's time;
 both, and `main`, unbind on stop what they bind; 8, the render's constructor writes no settings (its `data.b`
-values are the presets'); 9, `HD_TRIO.md` holds the app's reasons, its render's names say what they hold.
-
-10. **The inline paths go.** Once every app starts its threads, `CameraSync`, `CaptureSync`, `RecordingSync`,
-   `TrackerFrameSource` and `PosePipeline` lose the path that matches a part on the caller's thread while their own
-   does not run, and a submit before `start` is an error. Checked by: the apps' tests and the inference, tracker,
-   pose and recording tests, and each app's start for 10 s: deep_flow, white_space and hd_trio in -sim, smile on
-   its image input.
+values are the presets'); 9, `HD_TRIO.md` holds the app's reasons, its render's names say what they hold; 10,
+`CameraSync`, `CaptureSync`, `RecordingSync`, `TrackerFrameSource` and `PosePipeline` work on their own thread only:
+a part before `start` is an error, one after `stop` dropped (deep_flow starts its capture sync before its uploader
+and cameras); every app starts and runs without an error.
 
 Parked for [the flow's line 6](../modules/flow/FLOW_PLAN.md#6-the-2d-flow-follows-the-3d), which rebuilds the 2D
 fluid and its input: hd_trio's render writes `fluid.density.fade_time` every tick from the player's motion, and its

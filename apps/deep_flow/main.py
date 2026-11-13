@@ -177,6 +177,7 @@ class DeepFlowMain:
             self.person_detector.start()
         self.pipeline.start()
         self.frame_source.start()
+        self.capture_sync.start()
         self.uploader.start()
         for camera in self.cameras:
             camera.start()
@@ -186,7 +187,6 @@ class DeepFlowMain:
             self.recorded_poses.start()         # starts the pose model with it
         else:
             self.pose_inference.start()
-        self.capture_sync.start()
         self.optical_flow_predictor.start()
 
         self.osc_sound.start()
