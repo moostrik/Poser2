@@ -77,10 +77,21 @@ modules/recording/
 
 | What                         | From                              | To                                                    |
 |------------------------------|-----------------------------------|-------------------------------------------------------|
-| the software tracker         | `camera/replay/tracker.py`        | `modules/tracker`, as `SortTracker` (a Kalman filter and overlap assignment, SORT's shape); the replay camera's `BoxTracker` protocol keeps its name |
-| `FrameTrigger`               | `camera/sync/frame_trigger.py`    | open: its home and its name are decided with the user |
-| the OAK4 bring-up and model fetch | `camera/oak4/probe.py`, `models.py` | `scripts/oak4_probe.py`, `scripts/oak4_models.py`; OAK4.md's commands follow |
-| `FramePoses`, `PoseArrays`   | the recorder's files              | they move with recording in step 1; the camera then holds no pose |
+| What                  | From                           | To                                                |
+|-----------------------|--------------------------------|---------------------------------------------------|
+| the software tracker  | `camera/replay/tracker.py`     | `modules/tracker`, as `SortTracker`               |
+| `FrameTrigger`        | `camera/sync/frame_trigger.py` | `modules/inference`, as `CameraSync`              |
+| the OAK4's two scripts | `camera/oak4/probe.py`, `models.py` | `scripts/oak4_probe.py`, `scripts/oak4_models.py` |
+| `FramePoses`, `PoseArrays` | the recorder's files      | `modules/recording`, with step 1                  |
+
+- `SortTracker` is a Kalman filter and overlap assignment, SORT's shape. The replay camera's `BoxTracker` protocol
+  keeps its name.
+- `CameraSync` decides when a round is complete: one frame (or tracklet message) of every camera, the closest
+  together they come. It asks of the cameras what `CaptureSync` asks of one capture's parts, and both streams it
+  watches pass the input stage, so it sits beside `CaptureSync`. Its two instances keep their stream as qualifier,
+  `frame_sync` and `tracklet_sync`, in hd_trio's and white_space's settings and presets; its callback is
+  `add_round_callback`; "round" goes into the glossary, on the user's word.
+- OAK4.md's commands follow the scripts.
 
 The `sync` folder is gone with it.
 
@@ -154,7 +165,8 @@ modules/camera/
 - Its files each hold one class or one subject, named after it: step 3
 - Its tests sit in its `tests/` folder: the tests move with their files
 - Command-line scripts sit in the repo's `scripts/` folder: step 2
-- Similar things share the noun and differ by a qualifier: step 2, `SortTracker`
+- Similar things share the noun and differ by a qualifier: step 2, `SortTracker` and `CameraSync`
+- Use the terms in `.claude/rules/glossary.md`: step 2 adds "round"
 - A docstring says what the thing is; reasons sit in the package's document, history in the commit: step 6
 - Import from a package's `__init__.py`, never from its internal files: step 5
 - Keep presets and settings schemas in sync with code changes: steps 1 and 4
