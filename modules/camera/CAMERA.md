@@ -71,8 +71,7 @@ modules/recording/
   and `PoseArrays` in `modules/inference/recorded_poses.py`; the links to RECORDING.md; and OAK4.md's section
   "Recording and replay", cut to what is the OAK4's and a link to RECORDING.md.
 - The guard test's list of camera backends loses `replay`. `CLAUDE.md` names no camera file, so it stays as it is.
-- RECORDING.md loses its two file tables (the player's parts, the camera module's layout); the modules' docstrings
-  say what each file is.
+- RECORDING.md's tables of the player's parts and of the layout follow the move.
 
 ### 2. What is not a camera goes where it belongs
 
