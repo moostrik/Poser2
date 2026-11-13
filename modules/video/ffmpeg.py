@@ -121,31 +121,75 @@ def pick_encoder(preference: Encoder = Encoder.AUTO) -> Encoder:
 MAX_COMMENT: int = 30000    # characters; a Windows command line holds 32767
 
 
-class ClipWriter:
-    """Writes bgr24 frames of one size to an h264 mp4; the process starts with the first frame.
-    comment, set before that frame, goes into the file's comment tag."""
+class ClipInput(Enum):
+    """The pixel format of the frames a ClipWriter is given."""
+    BGR24 = 'bgr24'     # (height, width, 3) uint8
+    NV12  = 'nv12'      # (height × 3/2, width) uint8: Y, then Cb Cr at half size; BT.709 video range
 
-    def __init__(self, path: str, fps: float, encoder: Encoder) -> None:
+
+class ClipCodec(Enum):
+    H264 = 'h264'
+    HEVC = 'hevc'
+
+
+HEVC_QUALITY: int = 18      # NVENC constant quality, lower is better
+
+
+def _hevc_args(quality: int) -> list[str]:
+    """hevc_nvenc at constant quality, tagged hvc1 so Windows and QuickTime play it."""
+    return ['-c:v', 'hevc_nvenc', '-preset', 'p5', '-tune', 'hq', '-rc', 'vbr', '-cq', str(quality), '-b:v', '0',
+            '-tag:v', 'hvc1']
+
+
+# what NV12 input is, told to the file: BT.709 in video range
+_BT709_TAGS: list[str] = ['-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709',
+                          '-color_range', 'tv']
+
+
+class ClipWriter:
+    """Writes frames of one size to an mp4: bgr24 or NV12 in, h264 on `encoder` or HEVC on NVENC out; the process
+    starts with the first frame. comment, set before that frame, goes into the file's comment tag."""
+
+    def __init__(self, path: str, fps: float, encoder: Encoder, clip_input: ClipInput = ClipInput.BGR24,
+                 codec: ClipCodec = ClipCodec.H264, quality: int = HEVC_QUALITY) -> None:
+        """`quality` is the HEVC constant quality; the h264 encoders keep their own."""
+        if codec == ClipCodec.HEVC and encoder != Encoder.NVENC:
+            raise ValueError(f'HEVC is written with NVENC only, not {encoder.value}')
         self.path: str = path
         self.fps: float = fps
         self.encoder: Encoder = encoder
+        self.clip_input: ClipInput = clip_input
+        self.codec: ClipCodec = codec
+        self.quality: int = quality
         self.comment: str = ''
         self.frames: int = 0
         self.failed: bool = False
         self._size: tuple[int, int] = (0, 0)
         self._process: subprocess.Popen | None = None
 
+    def _frame_size(self, image: np.ndarray) -> tuple[int, int]:
+        """(width, height) of the picture in `image`; bgr24 is cropped to even, NV12 must be even already."""
+        if self.clip_input == ClipInput.NV12:
+            width, height = image.shape[1], image.shape[0] * 2 // 3
+            if image.ndim != 2 or width % 2 or height % 2 or height * 3 // 2 != image.shape[0]:
+                raise ValueError(f'NV12 frame of shape {image.shape} is not (even height × 3/2, even width)')
+            return width, height
+        return image.shape[1] - image.shape[1] % 2, image.shape[0] - image.shape[0] % 2
+
     def add(self, image: np.ndarray) -> None:
         if self.failed:
             return
-        height, width = image.shape[0] - image.shape[0] % 2, image.shape[1] - image.shape[1] % 2
+        width, height = self._frame_size(image)
         if self._process is None:
             self._size = (width, height)
             self._start()
         elif (width, height) != self._size:
             raise ValueError(f'frame {width}x{height} does not match the clip {self._size[0]}x{self._size[1]}')
         assert self._process is not None and self._process.stdin is not None
-        data = np.ascontiguousarray(image[:height, :width]).tobytes()
+        if self.clip_input == ClipInput.NV12:
+            data = memoryview(np.ascontiguousarray(image)).cast('B')
+        else:
+            data = memoryview(np.ascontiguousarray(image[:height, :width])).cast('B')
         try:
             self._process.stdin.write(data)
         except (BrokenPipeError, OSError) as e:
@@ -156,15 +200,20 @@ class ClipWriter:
         self.frames += 1
 
     def _start(self) -> None:
-        codec, quality, pix_fmt = _CODECS[self.encoder]
         width, height = self._size
         metadata: list[str] = []
         if len(self.comment) > MAX_COMMENT:
             logger.warning('Comment of %s is too long (%d characters), left out', self.path, len(self.comment))
         elif self.comment:
             metadata = ['-metadata', f'comment={self.comment}']
-        args = ['-y', '-f', 'rawvideo', '-pix_fmt', 'bgr24', '-s', f'{width}x{height}', '-r', f'{self.fps:g}',
-                '-i', 'pipe:0', '-c:v', codec, *quality, '-pix_fmt', pix_fmt, *metadata, self.path]
+        if self.codec == ClipCodec.HEVC:
+            output = [*_hevc_args(self.quality), '-pix_fmt', 'nv12']
+        else:
+            codec, quality, pix_fmt = _CODECS[self.encoder]
+            output = ['-c:v', codec, *quality, '-pix_fmt', pix_fmt]
+        tags = _BT709_TAGS if self.clip_input == ClipInput.NV12 else []
+        args = ['-y', '-f', 'rawvideo', '-pix_fmt', self.clip_input.value, '-s', f'{width}x{height}',
+                '-r', f'{self.fps:g}', '-i', 'pipe:0', *output, *tags, *metadata, self.path]
         self._process = popen(args, subprocess.PIPE, subprocess.DEVNULL)
 
     def close(self) -> bool:
