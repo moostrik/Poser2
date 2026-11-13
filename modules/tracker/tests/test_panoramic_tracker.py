@@ -7,7 +7,7 @@ import time
 import unittest
 from dataclasses import replace
 
-from modules.camera import CameraResolution, TrackingStatus, delivered_height, frame_coverage, frame_window
+from modules.camera import CameraResolution, CameraTracklet, CameraTracklets, TrackingStatus, delivered_height, frame_coverage, frame_window
 from modules.tracker import (
     PanoramicTracker, PanoramicTrackerSettings, PanoramicAnnotation, Rejection,
     Tracklet, TrackletDict, camera_bearing, camera_local_to_azimuth, focus_distance,
@@ -1461,6 +1461,12 @@ class TestLifecycle(unittest.TestCase):
 
     def test_stop_before_start_does_not_raise(self) -> None:
         PanoramicTracker(PanoramicTrackerSettings(fov=FOV), max_players=1, num_cams=4).stop()
+
+    def test_a_camera_message_is_queued_as_it_came(self) -> None:
+        tracker = PanoramicTracker(PanoramicTrackerSettings(fov=FOV), max_players=1, num_cams=4)
+        message = CameraTracklets(0, 1.0, [CameraTracklet(0, 7, TrackingStatus.TRACKED, Rect(0.4, 0.2, 0.1, 0.5), 3, 1.0)])
+        tracker.submit_cam_tracklets(message)
+        self.assertIs(tracker._input_queue.get_nowait(), message)      # converted on the tracker's thread, not the camera's
 
 
 class TestRigHeight(unittest.TestCase):

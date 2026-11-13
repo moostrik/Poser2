@@ -6,12 +6,6 @@ runs on the same code before the plan: white_space (`scripts/white_space_probe.p
 `20250514-130512_4_wide_mono` 18–30 s, run C1follow) and deep_flow, which step 2 touches
 (`scripts/cadence_probe.py`, `measure` 9–19 s, run C1fix).
 
-## 1. The tracker converts on its own thread
-
-`PanoramicTracker.submit_cam_tracklets` runs `Tracklet.from_camera` per tracklet on the camera's thread before it
-queues them. It queues the `CameraTracklets` as they came and converts them on the tracker's thread.
-Checked by: `modules/tracker/tests/test_panoramic_tracker.py`.
-
 ## 2. The recorder packs the poses on its own thread
 
 `_record_poses` packs the RAW stage's frames into arrays (`frame_poses`) on the pose model's thread, in white_space
@@ -52,8 +46,7 @@ Checked by: the guard tests and white_space's tests.
 
 ## Rules it touches
 
-- A callback only hands the item over and returns: 1, 2.
-- The camera's thread runs only the camera: 1.
+- A callback only hands the item over and returns: 2.
 - Read `time.perf_counter()` for every stamp and duration: 3, 4.
 - Inside a package, import relatively; one `from` line per package: 5.
 - Name public data-flow methods by execution timing: 6.

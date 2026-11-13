@@ -55,7 +55,7 @@ class Tracker(Thread, BaseTracker):
         self._update_event: Event = Event()
         self._update_time: float = 0.0     # the time of the bang that asked for the tick
 
-        self._input_queue: Queue[Tracklet] = Queue()
+        self._input_queue: Queue[CameraTracklets] = Queue()     # each camera's messages as they came, converted on this thread
         # One tick: the intake, the expiry and the emission (its callbacks only store)
         self._timer: PerformanceTimer = PerformanceTimer(name="Tracker", sample_count=200)
 
@@ -134,10 +134,11 @@ class Tracker(Thread, BaseTracker):
 
                 while True:
                     try:
-                        tracklet: Tracklet = self._input_queue.get(block=False)
-                        self._add_tracklet(tracklet)
+                        cam_tracklets: CameraTracklets = self._input_queue.get(block=False)
                     except Empty:
                         break
+                    for t in cam_tracklets.tracklets:
+                        self._add_tracklet(Tracklet.from_camera(t))
 
                 self._update_and_notify(self._update_time)
             except Exception:
@@ -387,5 +388,5 @@ class Tracker(Thread, BaseTracker):
                 self._observation_callbacks.append(callback)
 
     def submit_cam_tracklets(self, cam_tracklets: CameraTracklets) -> None:
-        for t in cam_tracklets.tracklets:
-            self._input_queue.put(Tracklet.from_camera(t))
+        """A camera's tracklet message, queued as it came; the tracker's thread converts it."""
+        self._input_queue.put(cam_tracklets)
