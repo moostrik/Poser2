@@ -394,7 +394,7 @@
     "frame_source": {
       "detection_timeout": 1.0
     },
-    "image_crop": {
+    "pose_crop": {
       "padding": 0.25,
       "output_width": 192,
       "output_height": 256,

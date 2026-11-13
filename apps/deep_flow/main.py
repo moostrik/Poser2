@@ -49,7 +49,7 @@ class DeepFlowMain:
         # The crop is the pose model's input, so it is cut at that size: one antialiased resample
         # from the camera frame, rather than a larger crop the runner scales down again. Derived
         # from the model so a change of pose resolution cannot silently reintroduce the second one.
-        crop_settings = self.settings.pose.image_crop
+        crop_settings = self.settings.pose.pose_crop
         crop_settings.output_width = self.settings.pose.pose.width
         crop_settings.output_height = self.settings.pose.pose.height
         self.settings.initialize()
@@ -85,7 +85,7 @@ class DeepFlowMain:
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
         self.uploader = SerialUploader(self.settings.camera.uploader)    # the camera's hand-off: each frame onto the GPU as it comes, on its own thread
-        self.pose_inference = PoseInference(p.image_crop, p.pose)       # the crop and the pose model, the frame domain's async step
+        self.pose_inference = PoseInference(p.pose_crop, p.pose)       # the crop and the pose model, the frame domain's async step
         # -sim plays the recording's poses in place of the pose model, around it (`recorded_poses.enabled`)
         self.recorded_poses: RecordedPoses | None = None
         if self.player is not None:

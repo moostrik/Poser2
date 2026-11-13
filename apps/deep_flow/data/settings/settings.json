@@ -138,7 +138,7 @@
       "crop_padding": 0.0,
       "pose_interval": 2
     },
-    "image_crop": {
+    "pose_crop": {
       "padding": 0.1,
       "output_width": 192,
       "output_height": 256,

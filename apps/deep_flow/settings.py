@@ -207,7 +207,7 @@ class PoseGroup(BaseSettings):
     pose           : Group[inference.pose.Settings]          = Group(inference.pose.Settings, share=_batch_share)
     optical_flow   : Group[inference.optical_flow.Settings]  = Group(inference.optical_flow.Settings, share=_batch_share)
     frame_source   : Group[TrackerFrameSourceSettings]       = Group(TrackerFrameSourceSettings)
-    image_crop     : Group[inference.crop.Settings]          = Group(inference.crop.Settings, share=[max_players])
+    pose_crop      : Group[inference.crop.Settings]          = Group(inference.crop.Settings, share=[max_players])
     capture_sync   : Group[inference.CaptureSyncSettings]    = Group(inference.CaptureSyncSettings)
     angle_extractor: Group[nodes.AngleExtractorSettings]     = Group(nodes.AngleExtractorSettings)
     bbox           : Group[BboxFeature]                      = Group(BboxFeature, share=_feature_share)

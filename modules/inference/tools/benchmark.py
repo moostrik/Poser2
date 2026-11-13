@@ -83,8 +83,8 @@ def load_app_settings(app: str) -> BaseSettings:
     if not presets.load(settings, presets.startup_path()):
         raise FileNotFoundError(f"No startup preset for '{app}' at {presets.startup_path()}")
     if app == 'white_space':   # White Space cuts its crops at the pose model's size (apps/white_space/main.py)
-        settings.pose.image_crop.output_width = settings.pose.pose.width
-        settings.pose.image_crop.output_height = settings.pose.pose.height
+        settings.pose.pose_crop.output_width = settings.pose.pose.width
+        settings.pose.pose_crop.output_height = settings.pose.pose.height
     settings.initialize()
     return settings
 
@@ -211,7 +211,7 @@ def main() -> None:
 
     model_type = ModelType.ONNX if args.model_type == 'onnx' else ModelType.TRT
     app_settings = load_app_settings(args.app)
-    crop = app_settings.pose.image_crop
+    crop = app_settings.pose.pose_crop
     stats: dict[str, dict[str, float]] = {}
     memory: dict[str, float] = {}
     outputs: dict[str, np.ndarray] = {}

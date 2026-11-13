@@ -102,7 +102,7 @@ class HDTrioMain:
         self.frame_sync = CameraSync(self.settings.camera.frame_sync, 'frame_sync')
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
         self.tracklet_sync = CameraSync(self.settings.camera.tracklet_sync, 'tracklet_sync')
-        self.pose_inference = PoseInference(ps.image_crop, ps.pose)      # the crop and the pose model, the frame domain's async step
+        self.pose_inference = PoseInference(ps.pose_crop, ps.pose)      # the crop and the pose model, the frame domain's async step
         if self.person_detector is not None:
             self.pose_inference.add_gpu_image_callback(self.person_detector.submit)     # it looks at the uploaded images
 

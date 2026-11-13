@@ -53,7 +53,7 @@ class WhiteSpaceMain:
         # The crop is the pose model's input, so it is cut at that size: one antialiased resample
         # from the camera frame, rather than a larger crop the runner scales down again. Derived
         # from the model so a change of pose resolution cannot silently reintroduce the second one.
-        crop_settings = self.settings.pose.image_crop
+        crop_settings = self.settings.pose.pose_crop
         crop_settings.output_width = self.settings.pose.pose.width
         crop_settings.output_height = self.settings.pose.pose.height
         self.settings.initialize()
@@ -100,7 +100,7 @@ class WhiteSpaceMain:
         self.uploader = BatchUploader()          # a synced set of the cameras' frames onto the GPU as one batch, on its own thread
         self.tracker = PanoramicTracker(self.settings.tracker, max_players, num_cams)
         self.tracklet_sync = CameraSync(self.settings.camera.tracklet_sync, 'tracklet_sync')
-        self.pose_inference = PoseInference(ps.image_crop, ps.pose)      # the crop and the pose model, the frame domain's async step
+        self.pose_inference = PoseInference(ps.pose_crop, ps.pose)      # the crop and the pose model, the frame domain's async step
 
         # The camera's thread only hands its frames and tracklets over: the frames to the recorder and the frames'
         # sync, the tracklets as they come to the tracker, the board and the tracklets' sync (the journal's below)

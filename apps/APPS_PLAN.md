@@ -5,8 +5,8 @@ the input works is in [INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md); the 
 [RECORDING_PLAN.md](../modules/recording/RECORDING_PLAN.md#2-the-recorder-in-the-other-apps). **(deduction)** marks what is inferred.
 
 
-In this order: C white_space comes back on deep_flow's input;
-F every module is held up to the rules; G hd_trio comes back after the 2D fluid ([the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2d-flow-follows-the-3d)). The rules they keep:
+In this order: C white_space comes back on deep_flow's input; G hd_trio comes back on it, with today's 2D fluid;
+F every module is held up to the rules, once every app runs on this branch. The rules they keep:
 a callback only hands the item over and returns, the part that works on it does all its work on its own thread, a
 queue that can't keep up drops its oldest and counts it, the camera's thread runs only the camera, and every drop is
 counted on the panel ([INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md)).
@@ -72,16 +72,57 @@ Every package in `modules/`, one at a time in alphabetical order (`board`, `came
 `log_config.py`), against `CLAUDE.md` and `.claude/rules`: reported per package, a plan
 for what does not meet them.
 
-## G. hd_trio back, after the 2D fluid
+## G. hd_trio back
 
-hd_trio comes back once [the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2d-flow-follows-the-3d) has rebuilt the 2D fluid, on C's wiring. Known
-now: its crops (the pose model's at its input size, RVM's at 768 × 1024 from the same region, both by
-`CropExtractor`), its recordings as before (mp4 chunks any player plays, stored mirrored, a pose file per chunk,
-RECORDING_PLAN.md), and its pose-following center layers, which stay. Planned when it starts.
+hd_trio (three color OAK-Ds, one player per camera, RVM's masks, the 2D fluid per screen) stops at its start on
+this branch: its `main.py` still calls what C removed (`PoseInference.set_camera_frame`,
+`add_gpu_image_callback`, `add_camera_images_callback`, `CameraSync.add_sync_callback`,
+`TrackerFrameSource.process`). Its input is white_space's model, three cameras' frames of a moment as one set, so it
+takes C's wiring. The 2D fluid stays as it is (`Motion2DLayer`, `Bridge2DLayer`, `Fluid2DLayer`, which the render
+already uses); [the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2d-flow-follows-the-3d) rebuilds it later.
+Its recordings stay as they are (mp4 chunks any player plays, stored mirrored, a pose file per chunk), and so do its
+pose-following center layers. One step per commit.
 
-Its last step: once every app starts its threads, the inline path goes from `RecordingSync`, `CaptureSync`,
-`TrackerFrameSource`, `PosePipeline` and `CameraSync` (a part matched on the thread it comes on while the thread
-does not run), and a submit before `start` is an error.
+Built: 1, the pose model's crop settings are `pose_crop` in every app.
+
+2. **The segmentation's crop.** `PoseInference` takes a second `crop.Settings` (optional) and cuts it from the
+   same snapshot and boxes as the pose model's, handed on through its own callback (`add_segmentation_crop_callback`),
+   so the pose model gets its crop at its own input size and the segmentation and the board theirs at their size.
+   Both are 3:4 in hd_trio (192 × 256 and 768 × 1024), so one region. Checked by: an inference test (both crops
+   from one snapshot, one region, each at its size) and the inference tests.
+3. **The recorder's `mirrored`.** A recorder setting, off by default: on, it stores each frame mirrored (one flip
+   and copy a frame on the recorder's thread) with its tracklets' boxes mirrored to match (the camera gives them
+   unmirrored), its poses as they come (the pipeline's are found on the uploaded image, mirrored already), and
+   writes `flip_h` off, so a playback hands the frames on as stored; off, a recording holds what the camera
+   delivered, as now. RECORDING.md says both. Checked by: a recording test (a stored frame and a tracklet's box
+   flipped, `flip_h` off; with it off, unchanged) and the recording tests.
+4. **hd_trio on C's wiring.** The frames' sync hands its set to a `BatchUploader`; the uploader's images go to the
+   board (and the detector in -sim replay) and its snapshot to `TrackerFrameSource.submit`; the tracklets' sync's
+   set to the tracker's update; the frame source and the pipeline start their threads before the cameras. The pose
+   model gets `pose_crop` at its input size (as white_space's), the segmentation and the board `segmentation_crop`
+   at 768 × 1024 (a new group in its settings and both presets). hd_trio's recordings hold no tracklets, so its
+   -sim runs in replay with the person detector, as white_space's: its two presets set `simulator.replay` and
+   `yolo` on and the detector's `model_type` to TRT (`yolov8n_coco_512x448.trt` in `apps/hd_trio/data/models`).
+   The recorder takes frames and tracklets per camera with `expect_parts`, `expect_poses` from the frame source's
+   asked callback, and the RAW stage's poses, with `mirrored` on in both presets, so its clips stay mirrored as all
+   its recordings are (with its tilt at 0 nothing is straightened, so mirroring before the straightening changes
+   nothing **(deduction)**). The drops are pinned on the panel, in a `cadence` group of hd_trio's own, as deep_flow
+   and white_space each have (in its settings and both presets). The stop in `__init__` goes, and so do the
+   optical-flow model's settings group and `enable_prev_crop` in its settings and presets: hd_trio builds no
+   optical-flow predictor, its motion is the 2D flow on the centered mask. Its old recordings are stored mirrored
+   and carry no chunk info, so the replay hands their frames on with `flip_h` off, as they are: already mirrored,
+   as a live frame is once the uploader mirrors it, and the detector's boxes are found on them **(deduction from
+   `replay/camera.py`)**. Checked by: hd_trio's tests, and a -sim run on `intro_1` (the studio preset's recording,
+   on this PC; `umu`'s is not), 20 s, recording 10 s of it, then that recording played back 10 s; reported in
+   numbers: sets uploaded a second, poses per set, masks drawn per player, the panel's drops (frame sync, tracklet
+   sync, upload, pose), which stay 0; and in both runs the boxes and poses on the players.
+5. **The app held up to the rules**, as white_space and smile were: its threads, clocks, imports, names, logging
+   and settings. Reported; what does not meet them becomes steps here, built on your go.
+6. **The inline paths go.** Once every app starts its threads, `CameraSync`, `CaptureSync`, `RecordingSync`,
+   `TrackerFrameSource` and `PosePipeline` lose the path that matches a part on the caller's thread while their own
+   does not run, and a submit before `start` is an error. Checked by: the apps' tests and the inference, tracker,
+   pose and recording tests, and each app's start for 10 s: deep_flow, white_space and hd_trio in -sim, smile on
+   its image input.
 
 ## Details
 
@@ -109,4 +150,10 @@ does not run), and a submit before `start` is an error.
 - Treat latency as a first-order concern: C's run compares with `main`.
 - Update all call sites, remove obsolete pathways: white_space's video images go.
 - Plans and commits: one commit per checked step, built on your go.
+- A callback only hands the item over; the part that works on it has its own thread: G4, G6.
+- Remove obsolete pathways: hd_trio's calls into what C removed, G4; the inline paths, G6.
+- Name a concept after what it is; rename it everywhere in the same change: `segmentation_crop`, G4.
+- Keep presets and settings schemas in sync: `mirrored`, G3; the crops, `cadence`, the replay and
+  detector, G4.
+- A plan step checked by a run or a test is one commit: G2–G4 each.
 
