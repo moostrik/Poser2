@@ -256,7 +256,7 @@ volumes (24 bytes a cell) exist only between passes. A winning solver becomes th
 
 What each came to is under [Measured](#measured): kept as replacements 1, 3, 5,
 9 and 10; options 6 (`SOR`), 7 (`MULTIGRID`, the preset's) and 11 (`WEIGHTED`); dropped 2, 12 and 13,
-slower; not built 4 and 14, for the reasons there; 8 parked ([PLAN.md](PLAN.md#parked)).
+slower; not built 4 and 14, for the reasons there; 8 parked ([FLOW_PLAN.md](FLOW_PLAN.md#parked)).
 
 The panel gains at most three options from it: `pressure.solver`, `overlap`'s `WEIGHTED`, and the
 surface's filter if it comes. Everything else is the same picture faster, and leaves no trace but
@@ -601,4 +601,4 @@ Within 60 fps: up to 32 fluid layers with the density at 32, 48 with it at 24 or
 layers up the pressure solve is the largest pass (3.7–5.3 ms). The density's
 4K × 16 costs 1.3 ms to carry and 0.9 to march, the old 16-layer look's 2 GB a step now under a quarter of it.
 MacCormack, timed before the depth scale while the water still burst, took 9.1 ms a frame at 16 and 16 and was
-over the budget from 32 fluid layers up; its cost is in [PLAN.md's Parked](PLAN.md#parked).
+over the budget from 32 fluid layers up; its cost is in [FLOW_PLAN.md's Parked](FLOW_PLAN.md#parked).

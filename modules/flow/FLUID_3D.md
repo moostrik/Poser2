@@ -4,7 +4,7 @@ Every quantity and setting here is in a meaningful unit ([FLOW.md](FLOW.md#the-2
 
 The 3D fluid's document, as [FLOW.md](FLOW.md) is the flow's: what the fluid is, how it takes what
 the bridge gives it ([BRIDGE_3D.md](BRIDGE_3D.md)), its density and its look, and how it is measured; what
-is next is in [PLAN.md](PLAN.md). "Code" is what the files show;
+is next is in [FLOW_PLAN.md](FLOW_PLAN.md). "Code" is what the files show;
 **(deduction)** marks what is inferred from them, **(site fact)** what the operator saw.
 
 The 2D fluid (`fluid_2d/`, `Fluid2DLayer`, hd_trio) is apart: nothing here changes it. The 3D
@@ -618,7 +618,7 @@ What a 4K volume cannot do, and so where the detail comes from:
   it for a smoother upscale.
 - A march at the grid's 256 × 448 (0.11 M pixels instead of 8.3 M, about 70 times cheaper
   **(deduction)**) with an edge-aware upscale of the flat result is parked
-  ([PLAN.md](PLAN.md#parked)).
+  ([FLOW_PLAN.md](FLOW_PLAN.md#parked)).
 
 The grid's depth: 256 × 448 × 128, half a width deep, so the body's z motion has room before a wall.
 A coarser grid across buys the depth: the detail it gives up in x and y is what the fine density

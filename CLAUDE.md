@@ -146,6 +146,10 @@ python -m unittest discover -s modules/<pkg>/tests -t .    # camera/oak4 in .ven
 
 ## Plans and commits
 
+- A plan is a file named after what it plans (`FLOW_PLAN.md`, `APPS_PLAN.md`), in the package or app it changes
+- A plan that crosses packages is in the app it serves
+- A document describes what is built; what is not built is in the plan
+- A built step leaves the plan
 - A plan ends with the rules it touches, one line each
 - A plan is built on the user's literal "go"
 - Separate what the code or a measurement shows from what is inferred, and say which is which

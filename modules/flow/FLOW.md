@@ -18,7 +18,7 @@ next is in the one plan:
 
 | Document                             | Holds                                                                                       |
 |--------------------------------------|---------------------------------------------------------------------------------------------|
-| [PLAN.md](PLAN.md)                   | what is next: the main lines in order, their items, the details, what is parked             |
+| [FLOW_PLAN.md](FLOW_PLAN.md)         | what is next: the main lines in order, their items, the details, what is parked             |
 | [INPUT_THREADS.md](INPUT_THREADS.md) | the threads a frame passes from the camera to the render, and the cadence                   |
 | [VIEW.md](VIEW.md)                   | the view stage: the window, the depth read, the mask and the depth mask                     |
 | [MOTION.md](MOTION.md)               | the motion: when it measures, the Lucas–Kanade solve and the depth velocity, their settings |
@@ -30,7 +30,7 @@ next is in the one plan:
 
 The 2D bridge and the 2D fluid have no document yet; what holds for them is under
 [Constraints](#constraints), and they get theirs when they are rebuilt
-([PLAN.md](PLAN.md#5-the-2d-flow-follows-the-3d)).
+([FLOW_PLAN.md](FLOW_PLAN.md#5-the-2d-flow-follows-the-3d)).
 
 ## The two systems
 
@@ -44,7 +44,7 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 
 | Camera | 2D flow                 | 3D flow                              |
 |--------|-------------------------|--------------------------------------|
-| 2D     | image, mask             | no z position, so nothing goes in ([PLAN.md](PLAN.md#6-a-camera-without-depth)) |
+| 2D     | image, mask             | no z position, so nothing goes in ([FLOW_PLAN.md](FLOW_PLAN.md#6-a-camera-without-depth)) |
 | 3D     | image, mask; depth idle | image, mask, depth; z and w measured |
 
 ## Terms

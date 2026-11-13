@@ -2,7 +2,7 @@
 
 The sizes the flow's picture and motion pass through, from the camera to the 4K output, and why each is what
 it is. **(deduction)** marks what is inferred, **(site fact)** what the operator saw. All numbers are
-deep_flow's preset. What is next is in [PLAN.md](PLAN.md).
+deep_flow's preset. What is next is in [FLOW_PLAN.md](FLOW_PLAN.md).
 
 ## The rules
 

@@ -15,7 +15,7 @@ paths:
 - Leave out how a conclusion was reached, what the code used to do, and what changed; that belongs in commit messages
 - Keep a rejected alternative only when its reason still constrains the design, and state it as a constraint, not a story
 - Mark anything not verified in code: **(site fact)** when told by the operator, **(deduction)** when inferred
-- Collect open questions in one "Open" section per document
+- Put open questions and unbuilt work in the package's or app's plan, not in the document
 
 ## Structure
 

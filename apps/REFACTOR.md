@@ -6,7 +6,7 @@ the input works is in [INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md); the 
 
 
 Four parts, in this order: A deep_flow's callbacks become hand-overs; B white_space comes back on that input; C smile
-is checked; D hd_trio comes back after the 2D fluid ([the flow's line 5](../modules/flow/PLAN.md#5-the-2d-flow-follows-the-3d)). The rules they keep:
+is checked; D hd_trio comes back after the 2D fluid ([the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2d-flow-follows-the-3d)). The rules they keep:
 a callback stores or enqueues what it receives and returns, a receiver does its work on its own thread, the camera's
 thread runs only the camera, and every drop is counted on the panel ([INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md)).
 
@@ -93,7 +93,7 @@ and what moving it onto the rules would take; reported, nothing changed.
 
 ## D. hd_trio back, after the 2D fluid
 
-hd_trio comes back once [the flow's line 5](../modules/flow/PLAN.md#5-the-2d-flow-follows-the-3d) has rebuilt the 2D fluid, on B's wiring. Known
+hd_trio comes back once [the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2d-flow-follows-the-3d) has rebuilt the 2D fluid, on B's wiring. Known
 now: its crops (the pose model's at its input size, RVM's at 768 × 1024 from the same region, both by
 `CropExtractor`), its recordings as before (mp4 chunks any player plays, stored mirrored, a pose file per chunk,
 RECORDING.md's plan), and its pose-following center layers, which stay. Planned when it starts.
@@ -109,7 +109,7 @@ RECORDING.md's plan), and its pose-following center layers, which stay. Planned 
   same two numbers; a frame-time line beside it only if asked.
 - The color in one kernel: the color's conversion, straightening and mirroring as one CUDA kernel: from the
   camera's NV12 23 GPU ops become 2, about 0.4 ms less GPU a frame **(deduction)**. After the live run of
-  [the flow's line 7](../modules/flow/PLAN.md#7-recording-and--sim), which measures it on the camera.
+  [the flow's line 7](../modules/flow/FLOW_PLAN.md#7-recording-and--sim), which measures it on the camera.
 - The previous crop: the optical flow on the crops (`enable_prev_crop`, off in deep_flow, so it runs nothing)
   does not wait for the crops' event, and its pairing of the current and the previous image is to be checked
   when it is used.
