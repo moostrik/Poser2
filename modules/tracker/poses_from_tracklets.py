@@ -1,16 +1,32 @@
+"""PosesFromTracklets: a pose per player from the tracker's newest boxes, at each frame bang.
+
+`process(now)` makes them on the caller's thread. `submit(now, payload)` queues the bang for this one's own thread
+and returns: at most `WAITING` wait, beyond that the oldest is dropped, counted as `dropped`. The thread hands each
+bang's time and payload to the bang callbacks, makes the poses (`process`, whose frames callbacks run the stage
+after it), then hands the poses asked to the asked callbacks with the same time and payload. While the thread does
+not run, a bang is processed on the thread it comes on."""
+
 import logging
 import math
-from threading import Lock
+import time
+from collections import deque
+from threading import Condition, Lock, Thread
+from typing import Any, Callable, TypeAlias
 
 import numpy as np
 
 from modules.pose import Frame, FrameDict, FrameDictCallbackMixin, BBox, BBoxAzimuth, Distance, Points2D
 from modules.settings import BaseSettings, Field
-from modules.utils import Rect
+from modules.utils import PerformanceTimer, Rect
 from .tracklet import Tracklet
 from .panoramic.annotation import Annotation as PanoramicAnnotation
 
 logger = logging.getLogger(__name__)
+
+WAITING: int = 2        # bangs waiting for the thread; a newer image makes an older one's poses late
+
+BangCallback: TypeAlias = Callable[[float, Any], None]                  # (now, payload), before the poses
+AskedCallback: TypeAlias = Callable[[float, Any, FrameDict], None]      # (now, payload, the poses asked)
 
 
 class PosesFromTrackletsSettings(BaseSettings):
@@ -28,15 +44,17 @@ class PosesFromTrackletsSettings(BaseSettings):
                                             description="Width over height of the window the camera's keypoints are normalised to (the host crop's 384/512)")
     crop_padding:      Field[float] = Field(0.0, min=0.0, max=1.0, step=0.05,
                                             description="Margin around the box before the window is fitted (fraction; the host crop's padding)")
+    dropped:           Field[int]   = Field(0, access=Field.READ, description="Frame bangs dropped while the pose step fell behind")
 
 
-class PosesFromTracklets(FrameDictCallbackMixin):
-    """Generates poses from tracklets, maintaining state per track."""
+class PosesFromTracklets(FrameDictCallbackMixin, Thread):
+    """Generates poses from tracklets, maintaining state per track; see the module docstring."""
 
     def __init__(self, settings: PosesFromTrackletsSettings, max_players: int, frame_aspect: float = 1.0) -> None:
         """`frame_aspect` is the delivered frame's width over its height, the one thing the keypoint
         window needs to know about the image; it is 1.0 for the square frames of the rigs."""
-        super().__init__()
+        FrameDictCallbackMixin.__init__(self)
+        Thread.__init__(self, daemon=True, name='PosesFromTracklets')
         self.settings: PosesFromTrackletsSettings = settings
         self.frame_aspect: float = frame_aspect
         # The incoming dict keys are used directly as slot indices below, so the feeding tracker
@@ -52,6 +70,97 @@ class PosesFromTracklets(FrameDictCallbackMixin):
         }
         self._lock = Lock()
         self._batch_id_counter = 0
+        # The bangs waiting for the thread, each with its payload and the moment it was queued
+        self._wake: Condition = Condition()
+        self._running: bool = False
+        self._bangs: deque[tuple[float, Any, float]] = deque()
+        self._dropped: int = 0
+        self._wait: PerformanceTimer = PerformanceTimer(name="Wait pose step")
+        self._inline_lock: Lock = Lock()            # bangs processed on the callers' threads while the thread does not run
+        self._callback_lock: Lock = Lock()
+        self._bang_callbacks: list[BangCallback] = []
+        self._asked_callbacks: list[AskedCallback] = []
+
+    def add_bang_callback(self, callback: BangCallback) -> None:
+        """Each bang's time and payload, on the thread that processes it, before its poses are made."""
+        with self._callback_lock:
+            if callback not in self._bang_callbacks:
+                self._bang_callbacks.append(callback)
+
+    def add_asked_callback(self, callback: AskedCallback) -> None:
+        """Each bang's time and payload with the poses asked, once the stage after has taken them."""
+        with self._callback_lock:
+            if callback not in self._asked_callbacks:
+                self._asked_callbacks.append(callback)
+
+    # ── Lifecycle ─────────────────────────────────────────────────────
+
+    def start(self) -> None:
+        with self._wake:
+            self._running = True
+        super().start()
+
+    def stop(self) -> None:
+        """The thread ends; the bangs still waiting are dropped and logged."""
+        with self._wake:
+            self._running = False
+            dropped: int = len(self._bangs)
+            self._bangs.clear()
+            self._wake.notify()
+        if dropped:
+            logger.info("PosesFromTracklets: %d frame bangs dropped at stop", dropped)
+        if self.is_alive():
+            self.join(timeout=2.0)
+
+    def run(self) -> None:
+        while True:
+            with self._wake:
+                while self._running and not self._bangs:
+                    self._wake.wait()
+                if not self._running:
+                    return
+                now, payload, queued = self._bangs.popleft()
+            self._wait.add_time((time.perf_counter() - queued) * 1000.0, report=False)
+            try:
+                self._bang(now, payload)
+            except Exception:
+                logger.exception("PosesFromTracklets: a frame bang failed")
+
+    def submit(self, now: float, payload: Any = None) -> None:
+        """A frame bang at `now` (the image's capture time), with what the callbacks need of it: queued for the
+        thread, the oldest dropped beyond `WAITING`."""
+        dropped: int | None = None
+        with self._wake:
+            running: bool = self._running
+            if running:
+                if len(self._bangs) >= WAITING:
+                    self._bangs.popleft()
+                    self._dropped += 1
+                    dropped = self._dropped
+                self._bangs.append((now, payload, time.perf_counter()))
+                self._wake.notify()
+        if dropped is not None:
+            self.settings.dropped = dropped
+        if running:
+            return
+        with self._inline_lock:
+            self._bang(now, payload)
+
+    def _bang(self, now: float, payload: Any) -> None:
+        with self._callback_lock:
+            bang_callbacks: list[BangCallback] = list(self._bang_callbacks)
+            asked_callbacks: list[AskedCallback] = list(self._asked_callbacks)
+        for bang_callback in bang_callbacks:
+            try:
+                bang_callback(now, payload)
+            except Exception:
+                logger.exception("PosesFromTracklets: a bang callback failed")
+        asked: FrameDict = self.process(now)
+        for asked_callback in asked_callbacks:
+            try:
+                asked_callback(now, payload, asked)
+            except Exception:
+                logger.exception("PosesFromTracklets: an asked callback failed")
 
     @property
     def track_ids(self) -> list[int]:

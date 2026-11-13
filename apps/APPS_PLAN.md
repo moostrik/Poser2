@@ -12,11 +12,10 @@ thread runs only the camera, and every drop is counted on the panel ([INPUT_THRE
 
 ## A. deep_flow's callbacks as hand-overs
 
-Two places run a receiver's work on another's thread (read on `deep-flow` at 5c74ad1b):
+One place runs a receiver's work on another's thread (read on `deep-flow` at 5c74ad1b):
 
 | Thread                        | Work it runs that is not its own                                                                         |
 |-------------------------------|----------------------------------------------------------------------------------------------------------|
-| the uploader's                | `_on_image`: `PosesFromTracklets.process`, the box steps, `PoseInference.submit`, `expect_poses`         |
 | the pose runner's callback    | the RAW emit, CLEAN, SMOOTH, `CaptureSync.submit_poses`, LERP's crossing (-sim: `RecordedPoses`')        |
 
 A hand-over costs its receiver's wake-up, not more Python work: one thread runs Python at a time today too. The
@@ -30,11 +29,6 @@ The steps left, each one commit, checked by its tests and, on your go, by one ru
 wait (a `Wait …` timer in the board's time series) beside `CAPTURE_LATENCY`, `POSE_LATENCY_RAW` and
 `POSE_LATENCY_SMOOTH`:
 
-3. `PosesFromTracklets` gets its own thread: `submit(timestamp)` enqueues the sync with the images it is for (2
-   waiting, the oldest dropped and counted); its thread runs `process`, so the RAW stage's box steps, the crops
-   and the model submit run there, on the sync's own images, not the uploader's newest by then. `_on_image` keeps
-   the submit and the camera interval; the recorder hears the poses asked from the new thread, by a callback named
-   with the step (`add_asked_callback`), with the sync's time and the poses asked per camera.
 4. The pose pipeline runs the steps after an async step on a thread of its own: the async step's results are
    enqueued (4 waiting, the oldest dropped and counted, `PosePipeline.dropped`); its thread runs the RAW emit,
    CLEAN, SMOOTH and the crossing. `RecordedPoses`' thread then only enqueues.
@@ -120,15 +114,14 @@ RECORDING_PLAN.md), and its pose-following center layers, which stay. Planned wh
 
 ## Rules it touches
 
-- A callback stores or enqueues what it receives and returns: A's two places and B's wiring.
-- A receiver does its work on its own thread: the pose step, pipeline and `CameraSync` get one; a matcher stays
-  inline only if its wait says so, as a stated exception.
+- A callback stores or enqueues what it receives and returns: A's one place and B's wiring.
+- A receiver does its work on its own thread: the pipeline and `CameraSync` get one; a matcher stays inline only
+  if its wait says so, as a stated exception.
 - A callback list has its own lock, copied under it and called outside it: the uploader's, `CameraSync`'s, the
   optical flow predictor's and the runners'.
 - The camera's thread runs only the camera: B1.
 - A consumer that needs every item gets a callback; one that needs the latest reads the board: B2, B3.
-- `submit` enqueues deferred work, `process` transforms and emits synchronously: `CameraSync`'s `submit_*`,
-  `PosesFromTracklets.submit`.
+- `submit` enqueues deferred work, `process` transforms and emits synchronously: `CameraSync`'s `submit_*`.
 - Log exceptions with context, never fail silently: drops counted on the panel.
 - Treat latency as a first-order concern: each step's run compares the latency series.
 - Update all call sites, remove obsolete pathways: the runners' dispatch thread goes, white_space's video images go.

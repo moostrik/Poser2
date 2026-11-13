@@ -1,6 +1,7 @@
 """Tests for PosesFromTracklets: which latched tracklets become pose frames, and what they carry."""
 
 import math
+import threading
 import time
 import unittest
 
@@ -105,6 +106,56 @@ class TestFrameContents(PosesFromTrackletsCase):
         with self.assertLogs('modules.tracker.poses_from_tracklets', level='WARNING'):
             self.poses.set_tracklets({5: tracklet(5)})
         self.assertEqual(self.poses.process(time.perf_counter()), {})
+
+
+class TestThread(PosesFromTrackletsCase):
+    """`submit` queues a frame bang for the thread: its payload first, then its poses, then the poses asked."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.order: list[tuple[str, str, object]] = []
+        self.poses.add_bang_callback(lambda now, payload: self.order.append(('bang', threading.current_thread().name, payload)))
+        self.poses.add_frames_callback(lambda frames: self.order.append(('poses', threading.current_thread().name, set(frames))))
+        self.poses.add_asked_callback(lambda now, payload, asked: self.order.append(('asked', threading.current_thread().name, set(asked))))
+        self.poses.set_tracklets({0: tracklet(0)})
+
+    def tearDown(self) -> None:
+        self.poses.stop()
+
+    def wait_for(self, count: int) -> None:
+        end: float = time.perf_counter() + 1.0
+        while len(self.order) < count and time.perf_counter() < end:
+            time.sleep(0.001)
+
+    def test_a_bang_runs_on_the_thread_in_order(self) -> None:
+        self.poses.start()
+        self.poses.submit(time.perf_counter(), 'image 1')
+        self.wait_for(3)
+        self.assertEqual(self.order, [('bang', 'PosesFromTracklets', 'image 1'), ('poses', 'PosesFromTracklets', {0}),
+                                      ('asked', 'PosesFromTracklets', {0})])
+
+    def test_beyond_two_waiting_the_oldest_is_dropped_and_counted(self) -> None:
+        release: threading.Event = threading.Event()
+        held: threading.Event = threading.Event()
+
+        def hold(now: float, payload: object) -> None:
+            if payload == 'first':
+                held.set()
+                release.wait(2.0)
+        self.poses.add_bang_callback(hold)
+        self.poses.start()
+        self.poses.submit(time.perf_counter(), 'first')
+        self.assertTrue(held.wait(1.0))                     # the thread is held: what comes now waits
+        for name in ('a', 'b', 'c'):
+            self.poses.submit(time.perf_counter(), name)
+        release.set()
+        self.wait_for(9)
+        self.assertEqual([payload for kind, _, payload in self.order if kind == 'bang'], ['first', 'b', 'c'])
+        self.assertEqual(self.settings.dropped, 1)
+
+    def test_without_its_thread_a_bang_runs_on_the_caller(self) -> None:
+        self.poses.submit(time.perf_counter(), 'inline')
+        self.assertEqual([thread for _, thread, _ in self.order], [threading.current_thread().name] * 3)
 
 
 if __name__ == '__main__':

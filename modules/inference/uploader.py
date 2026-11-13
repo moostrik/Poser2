@@ -5,6 +5,7 @@ import time
 import logging
 from collections import deque
 from threading import Condition, Lock, Thread
+from typing import TypeAlias
 
 import numpy as np
 import torch
@@ -22,6 +23,10 @@ logger = logging.getLogger(__name__)
 STAGING_COUNT: int = 3      # pinned buffers per camera and kind: frames the GPU may be behind before the uploader's thread waits
 QUEUED: int = 2             # frames of a kind waiting per camera; beyond that the oldest is dropped and counted
 NOTED: int = 16             # color frames per camera whose straightening is kept for their tracklets, which come about 2 frames later
+
+# The GPU images at one moment (`Uploader.snapshot`): current and previous by cam_id, their capture times, and the
+# event recorded on the upload stream after them
+ImageSnapshot: TypeAlias = tuple[ImageDict, ImageDict, TimestampDict, torch.cuda.Event]
 
 
 def nv12_to_rgb(y: torch.Tensor, uv: torch.Tensor) -> torch.Tensor:
@@ -316,7 +321,7 @@ class Uploader(Thread):
             self._warp_grids[cam_id] = cached
         return F.grid_sample(rgb.unsqueeze(0).float(), cached[1], align_corners=False)[0].to(dtype=torch.float16)
 
-    def snapshot(self) -> tuple[ImageDict, ImageDict, TimestampDict, torch.cuda.Event]:
+    def snapshot(self) -> ImageSnapshot:
         """The current and previous GPU images, the current images' capture times, and an event recorded on the
         upload stream after them: a reader on another stream waits on it (`stream.wait_event`) before it reads
         them, and keeps them from being reused (`record_stream`) until its own work on them has run. Nothing

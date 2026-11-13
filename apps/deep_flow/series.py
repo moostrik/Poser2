@@ -16,6 +16,7 @@ class Series(IntEnum):
     WAIT_UPLOAD_TRACKLETS = auto()  # ms a camera's tracklet message waits in the uploader's queue
     WAIT_POSE_RESULT =      auto()  # ms a pose model's result waits for its callback thread
     WAIT_CAPTURE_SYNC =     auto()  # ms an image, depth, poses or masks wait in the capture sync's inbox
+    WAIT_POSE_STEP =        auto()  # ms a frame bang waits for the pose step's thread
 
 
 # PerformanceTimer names, as each timer is called, to the series their samples feed
@@ -27,4 +28,5 @@ TIMER_SERIES: dict[str, Series] = {
     'Wait upload tracklets':    Series.WAIT_UPLOAD_TRACKLETS,
     'Wait pose result':         Series.WAIT_POSE_RESULT,
     'Wait capture sync':        Series.WAIT_CAPTURE_SYNC,
+    'Wait pose step':           Series.WAIT_POSE_STEP,
 }

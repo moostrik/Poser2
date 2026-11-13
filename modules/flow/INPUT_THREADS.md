@@ -20,6 +20,7 @@ Per thread, the callbacks in the order they are registered (`apps/deep_flow/main
 | the recording sync's (`RecordingSync`)            | matches a capture's parts, hands the capture to the recorder   | nothing                                    |
 | the tracklets' (depthai)                          | queues them for the tracker, the board; `tracker.update`       | nothing                                    |
 | the tracker's                                     | associates the tracklets, to `PosesFromTracklets` and the board | nothing                                   |
+| the pose step's (`PosesFromTracklets`)            | a pose per player, the RAW box steps, the crops, the submit    | nothing                                    |
 | the pose model's (`pose.Predictor`)               | RTMPose on the crops, the CLEAN and SMOOTH stages, their users | its own model                              |
 | the detector's (-sim)                             | YOLOv8n on the uploaded image, boxes to the replay camera      | its own model                              |
 | the capture sync's (`CaptureSync`)                | matches the image, depth and poses, hands the capture on       | the next part, or `pose_wait` (0 here)     |
@@ -60,11 +61,14 @@ When an image is on the GPU, the uploader hands it to four others, each of which
 
 - the capture sync, which queues the image for its own thread;
 - the detector (-sim), which keeps the newest image for its own thread;
-- the pose step: `PosesFromTracklets.process` makes a pose per player from the tracker's newest boxes, the RAW
-  stage's two box filters smooth them, and `PoseInference.submit` cuts the crops from this very image
-  (`CropExtractor`), at the pose model's input size, queued on the GPU and not waited for; it records a "crops
-  ready" event and hands crops, poses and event to the pose model, whose thread has RTMPose wait for that event on
-  its own stream. The `Uploader` knows nothing of poses;
+- the pose step, which queues the frame bang with the uploader's images as they are now (`Uploader.snapshot`), two
+  waiting at most (the oldest dropped, `dropped` on the panel). Its own thread holds those images for the crops
+  (`hold_images`), so the crops are cut from this very image and not a newer one; `PosesFromTracklets.process` makes
+  a pose per player from the tracker's newest boxes, the RAW stage's two box filters smooth them, and
+  `PoseInference.submit` cuts the crops (`CropExtractor`), at the pose model's input size, queued on the GPU and not
+  waited for; it records a "crops ready" event and hands crops, poses and event to the pose model, whose thread has
+  RTMPose wait for that event on its own stream. Then the recorder hears whether poses were asked for the image.
+  The `Uploader` knows nothing of poses;
 - the camera-interval time sample.
 
 The pose model stays FP32: it loses precision in FP16.
@@ -81,8 +85,23 @@ tracklet message; `CameraSync` is for the apps with several cameras.
 capture time. With `pose_wait` 0 a capture never waits for its poses: it carries the poses of the frame before,
 which with the view's window fixed only puts the pose's points drawn over the view a frame behind. Its submits
 queue the parts, at most 8 of a stream per camera (the oldest dropped, `dropped` on the panel), and its own thread
-matches them and hands every complete capture, in the order of capture, to the board. A part waits 0.38 ms on
-average in that queue (p95 0.8 ms; `measure` 9–19 s, -sim, `Wait capture sync`).
+matches them and hands every complete capture, in the order of capture, to the board.
+
+### The hand-overs' waits
+
+How long an item waits in a queue for its receiver, the `Wait …` timers in the time series (`measure` 9–19 s,
+-sim, the recorded tracklets, the pose model in the app, `scripts/cadence_probe.py`):
+
+| Queue                         | Mean     | p95      | Max      |
+|-------------------------------|----------|----------|----------|
+| the uploader's frames         | 4.3 ms   | 17.9 ms  | 26.3 ms  |
+| the uploader's tracklets      | 3.4 ms   | 17.3 ms  | 24.7 ms  |
+| the pose step's bangs         | 0.19 ms  | 0.47 ms  | 1.0 ms   |
+| the capture sync's parts      | 0.29 ms  | 0.81 ms  | 2.1 ms   |
+| a pose model's results        | 0.06 ms  | 0.13 ms  | 3.7 ms   |
+
+The uploader's wait is its own work on the frame before it, not the hand-over **(deduction)**: a color frame takes
+it 6.4 ms on average to upload.
 
 ### The render: every capture
 

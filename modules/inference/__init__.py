@@ -3,7 +3,7 @@ from .model_types import ModelType, Resolution, RESOLUTION_DIMS
 from . import crop, detection, optical_flow, pose, segmentation, source
 from .source import GpuDepth, GpuImage
 from .crop_extractor import CropExtractor
-from .uploader import Uploader, UploaderSettings
+from .uploader import ImageSnapshot, Uploader, UploaderSettings
 from .depth_align import DepthAligner, depth_metres
 from .pose_inference import PoseInference
 from .recorded_poses import RecordedPoses, RecordedPosesSettings, frame_poses

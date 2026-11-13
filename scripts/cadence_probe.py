@@ -175,7 +175,8 @@ def main() -> int:
                           camera_thread_ms=spread(camera_thread), latency_ms={k: spread(v) for k, v in latency.items()},
                           waits_ms={k: spread(v) for k, v in sorted(waits.items())}, uploads_ms={k: spread(v) for k, v in uploads.items()},
                           drops=dict(uploader=app.uploader.dropped, board=app.board.get_dropped_captures(),
-                                     depth_without_image=app.capture_sync.settings.misses, capture_sync=app.capture_sync.settings.dropped))
+                                     depth_without_image=app.capture_sync.settings.misses, capture_sync=app.capture_sync.settings.dropped,
+                                     pose_step=app.settings.pose.tracklets.dropped))
             if args.record:
                 recorder = settings.camera.recorder
                 report['recorded'] = dict(missed_depth=recorder.missed_depth, missed_color=recorder.missed_color,

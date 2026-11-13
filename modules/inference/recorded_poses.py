@@ -27,6 +27,7 @@ from modules.settings import BaseSettings, Field
 from modules.utils import Rect
 
 from .pose_inference import PoseInference
+from .uploader import ImageSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +125,10 @@ class RecordedPoses(FrameDictCallbackMixin):
             self._waiting.clear()
 
     # ── The async step ─────────────────────────────────────────────────
+
+    def hold_images(self, snapshot: ImageSnapshot | None) -> None:
+        """The images the next crops are cut from (`PoseInference.hold_images`)."""
+        self._inference.hold_images(snapshot)
 
     def submit(self, frames: FrameDict) -> None:
         """The stage's poses: with `enabled`, the crops cut without the pose model and the recorded poses played;
