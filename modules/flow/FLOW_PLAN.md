@@ -9,7 +9,7 @@ inferred, **(site fact)** what the operator saw.
 
 | #   | Line                                                                      | State                                                         | Documents                                                    |
 |-----|---------------------------------------------------------------------------|---------------------------------------------------------------|--------------------------------------------------------------|
-| 1   | [The flow held up to the rules](#1-the-flow-held-up-to-the-rules)         | built; the settings left, after the refactor                 | `CLAUDE.md`, `.claude/rules`                                 |
+| 1   | [The flow held up to the rules](#1-the-flow-held-up-to-the-rules)         | built; the settings left, after the refactor                  | `CLAUDE.md`, `.claude/rules`                                 |
 | 2   | [The 3D fluid's input](#2-the-3d-fluids-input)                            | built; the depth read to choose                               | [VIEW.md](VIEW.md), [BRIDGE_3D.md](BRIDGE_3D.md)             |
 | 3   | [The 3D fluid's look at 4K](#3-the-3d-fluids-look-at-4k)                  | next                                                          | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md)           |
 | 4   | [One unit across the stages](#4-one-unit-across-the-stages)               | not started                                                   | [FLOW.md](FLOW.md)                                           |
