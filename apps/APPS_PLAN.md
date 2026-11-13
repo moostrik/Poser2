@@ -18,7 +18,9 @@ deep_flow has reaches it only when they do. Every receiver works on its own thre
 ([INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md)), but its input is a different model: deep_flow uploads frame
 by frame, color first to start the pose and depth after it, paired by `CaptureSync`; white_space's four cameras'
 frames of a moment travel together, synced first and uploaded as one set, cropped as one batch. So white_space gets
-an uploader of its own, and the two share the core upload. An upload's cost is not its copy (about 0.1 ms) but its
+an uploader of its own, `BatchUploader`, which hd_trio takes too in E (its input is the same model), and the two
+uploaders share the core upload. Both hand on what they uploaded, each camera's image with its previous one and the
+ready event, as one `ImageSnapshot`, so a receiver gets exactly the images it is for. An upload's cost is not its copy (about 0.1 ms) but its
 CUDA launches, which block while the GPU's queue is full, and that grows with the launches, not the pixels
 **(deduction: 6–7 ms per color upload for a 0.1 ms copy)**: four frames one by one are four rounds of launches, a
 set is one, and both cost one round after the last camera's frame, so the latency is about equal and the upload's
@@ -31,18 +33,21 @@ its own camera's capture time, the poses asked told per camera).
    uploaders use: the pinned staging, the copy, the conversion (NV12, BGR or mono to RGB), the straightening with
    the camera's grid, the flip, the ready event, for one frame or a stack of frames of one size (one round of
    kernels over the stack, the grids stacked, one flip per mirrored camera). deep_flow's `Uploader` keeps the rest
-   as it is: frame by frame, depth and its alignment, the tracklets' straightening, `snapshot()`; it calls the core
-   with one frame, so its upload does not change.
-2. **white_space's uploader.** Its own class beside `Uploader`, with its own thread: a synced set of the cameras'
+   as it is: frame by frame, depth and its alignment, the tracklets' straightening; it calls the core with one frame,
+   so its upload does not change. Its `snapshot()` goes: each color image's callback carries that image's
+   `ImageSnapshot` (the image, its camera's previous one, the ready event), and deep_flow's `_on_image` hands it to
+   `TrackerFrameSource.submit` instead of reading the store after the upload.
+2. **`BatchUploader`.** white_space's uploader, beside deep_flow's, with its own thread: a synced set of the cameras'
    frames in (`submit_set`), queued whole, two sets at most, beyond that the oldest set dropped whole and counted
    (`dropped`), so a frame never leaves its set; the core uploads the set as one stack; out go each image to its
-   callbacks (the -sim detector, the board's `set_camera_image`) and the set to a set callback, whose receiver
-   calls `TrackerFrameSource.submit` with each camera's capture time; `snapshot()` as deep_flow's. No tracklets and
-   no depth.
+   callbacks (the -sim detector, the board's `set_camera_image`) and the set as its `ImageSnapshot` (the set's
+   images, the previous set's as the previous ones, the ready event) to a set callback, whose receiver calls
+   `TrackerFrameSource.submit` with each camera's capture time. No store of the newest images, no tracklets, no
+   depth.
 3. **The sync before the upload.** Each camera hands its frames to the frames' `CameraSync` and the recorder, and
    nothing else. `CameraSync`'s callback hands on a set: `add_set_callback(callback(items))`, `items` by `cam_id`,
    each with its capture time. The frames' sync keeps each camera's newest video frame and hands the set to
-   white_space's uploader; the tracklets' sync hands its set of messages to `tracker.update`, which takes the
+   the `BatchUploader`; the tracklets' sync hands its set of messages to `tracker.update`, which takes the
    newest of their times, as its `(timestamp)` did.
 4. **The tracklets, as they come.** Each camera hands its tracklet messages straight to the tracker
    (`submit_cam_tracklets`), the board, the tracker journal, the tracklets' `CameraSync` and the recorder, each a
@@ -69,7 +74,7 @@ What goes from white_space's wiring: `PoseInference(crop, pose)` without the upl
 frame sync's callback to `process`. `CameraSync`'s `add_sync_callback` goes for `add_set_callback`; hd_trio's
 `main.py` uses the old one and follows in E (it stops at start on this branch already).
 
-Each thread (white_space's uploader, the two `CameraSync`s, the frame source, the pipeline) is started by `main.start` after
+Each thread (the `BatchUploader`, the two `CameraSync`s, the frame source, the pipeline) is started by `main.start` after
 the wiring, before the cameras, and stopped by `main.stop` after the cameras and the uploader, before the pose
 model. If a sync's wait (`Wait camera sync …`) comes out in milliseconds: the switch interval is lowered
 (`sys.setswitchinterval`, 0.5 ms to start), and a sender that keeps running Python after it queues is changed to
@@ -80,14 +85,15 @@ Assumed, to confirm while building: the four cameras deliver one frame size (the
 size go up as their own stack).
 
 Checked by: `CameraSync`'s tests (a set per sync, a camera's newest frame), the core's (a stack uploaded at once
-gives each image as one by one does), deep_flow's uploader tests unchanged, white_space's uploader's (a set in, its
+gives each image as one by one does), deep_flow's uploader tests (each image's callback carries its snapshot), the `BatchUploader`'s (a set in, its
 images and the set out; the oldest whole set dropped), the
 frame source's (the asked callback per camera; a player judged on its camera's time), the calibration layer's (its
 row reduced on the GPU matches the CPU row of a recorded frame), white_space's pipeline spec; the recorder's wiring
 by a short -sim recording on the same recording, played back;
 a -sim run with the probe on `20250514-130512_4_wide_mono`, an old-layout recording without recorded tracklets, so
 in replay with the host detector (`simulator.replay`, `yolo`), not `ClipCamera`, which needs an OAK: the uploader's
-time per set, the pose latency and the tracker's update rate.
+time per set, the pose latency and the tracker's update rate; deep_flow's probe on `measure` 9–19 s against B's
+numbers, for its uploader's snapshot handed on.
 Done when white_space starts on this branch, its camera threads only hand over (under 1 ms per frame at p95), every
 sync runs the pose step, the pose latency and the light's tick are no worse than on `main`, live and back to back,
 with you at the rig, and its tests pass.
