@@ -1,48 +1,7 @@
-"""Depth Velocity.
-
-What the image cannot measure: the player's motion toward the camera, from the depth image. One
-depth sample is mostly noise from frame to frame, and the change between two frames doubles it, so
-z is tracked instead of differenced: each pixel holds a depth and its rate, carried along the motion
-from frame to frame, and each new depth only corrects them (an alpha–beta filter). Over `smooth` (ms)
-the corrections average out, so z is the rate of many frames rather than the step of two.
-
-The track is held in disparity (1 / depth), where stereo depth noise is about constant. `tolerance`
-is in metres, as it tells surfaces apart: a hand 10 cm before the chest is 10 cm at any distance;
-the depth noise grows with distance, so far away more of it reads as another surface. Each frame,
-the measurement is the mean disparity over a window of depth samples, of those within `tolerance`
-of the pixel's depth (not the background beside the player); it corrects the track by the share of the window it holds, so a
-thin window at a silhouette corrects little and the track coasts on. The track comes from where the
-pixel was a displacement back (in place without one), so a surface sliding sideways keeps its own
-depth, and only from the texels there of the same surface, within `tolerance` of the measurement:
-where the displacement is unsure, at an edge, a track is never carried over from the other side. Where the measurement is further than `tolerance` from the track's prediction, as a limb
-passing over the pixel, the track starts over with no rate. With `smooth` 0 and a full window it is
-the plain change between two frames.
-
-`tolerance` tells surfaces apart in space, within the window and against the carried track; it is no limit on
-speed: 0.2 m a frame is 5 m/s at 25 fps, and a fast hand's sloped edge sliding off a pixel steps its depth by
-less than that each frame while the track's rate adds up to 9–11 m/s, no motion of a body. With `max_speed`
-(m/s), a track whose depth would move faster than a body part does reads another surface and starts over.
-
-A surface's depth wanders by a few mm, and its steps are a mm; the track reads both as slow motion.
-With `dead_zone` (m), each pixel holds an anchor: while the track stays within the dead zone of it,
-z is 0; past it, z reads at its full speed and the anchor is dragged along behind, so a real motion
-loses only its first `dead_zone`.
-
-Averaged over `smooth`, the track lags a fast motion toward the camera; past `tolerance` it would start
-over and over. With `catch_up_smooth`, it catches up, as a tracker does a manoeuvring target: Emas of
-its miss of the prediction, signed and its size, tell a lag (it misses one way) from jitter (it
-misses both ways, and cancels out), and where the image moves too (`color_motion`: a still edge's
-jitter has none, a hand pushing forward moves its edges) the time it follows over blends toward
-`catch_up_smooth`. The carry then takes each texel's depth a frame on, where it lags to.
-
-z comes in view widths per frame, over the metres one view width spans at the depth (`view_span`
-per metre), and `threshold` comes off it. The 3D Lucas–Kanade flow owns one for its z, with its
-`depth_velocity` settings (`DepthVelocitySettings`), and turns it into view widths per second.
-
-At a silhouette, stereo depth jitters between the two surfaces by more than the dead zone, from
-frame to frame. So before the track, a depth sample whose 3×3 depth samples span a step beyond
-`tolerance` has no depth: the same test of "another surface" as the window's. Along each silhouette
-a band a depth sample wide reads no z; the player's mask cuts there anyway.
+"""Depth Velocity: the player's motion toward the camera, z, from the depth image, in view widths per frame:
+per pixel a disparity and its rate, carried along the x/y displacement and corrected by each measurement
+(an alpha–beta filter), with a dead zone, a catch-up and a step filter before it. How and why:
+modules/flow/MOTION.md, "z: the depth velocity".
 
 `filter_depth_steps`, `track_depth` and `depth_threshold` below are the numpy references of the shaders.
 """

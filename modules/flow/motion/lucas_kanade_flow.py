@@ -1,22 +1,6 @@
-"""Lucas–Kanade Flow: how far each pixel moved between two luminance frames, coarse to fine; the x/y solve.
-
-Where the gradient flow gives a motion strength per pixel (the brightness change along the gradient),
-this gives how far the image moved: a window of gradients per pixel, solved for the shift that carries
-the previous frame onto the current one, first on the coarsest mip level, then refined once per finer
-level with the previous frame warped by the estimate so far. Each level is solved at its own size, on
-its own texels, and starts from the coarser level's displacement read linear (Bouguet's pyramidal
-Lucas–Kanade); solving every full-size pixel at a coarse level instead puts each window a fraction of a
-texel off its neighbour's, and where a window is badly conditioned that flips the solve from pixel to
-pixel, in rows and columns.
-
-Out comes the displacement in uv per frame: `solved`, as solved, and `displacement`, with `threshold`
-(px per frame) taken off its length, as below it is the solve's jitter, not motion. With a depth and
-`same_surface`, only the window's samples within a tolerance of the center's depth count.
-`LucasKanadeFlow3D` composes this solve with the depth velocity into a 3D velocity.
-
-The settings in flow pixels go with the flow's resolution: `levels` (each level doubles the motion it
-follows, about 2 × 2^(levels − 1) px per frame at full size, so halving the resolution needs one level
-fewer for the same motion), `window` and `threshold`.
+"""Lucas–Kanade Flow, the x/y solve: how far each pixel moved between two luminance frames, coarse to fine
+(Bouguet's pyramidal Lucas–Kanade), in uv per frame: `solved` as solved, `displacement` with `threshold` (px per
+frame) taken off its length. How and why: modules/flow/MOTION.md, "x/y: the Lucas–Kanade solve".
 
 `lucas_kanade` and `threshold_displacement` below are the numpy references of the shaders.
 """

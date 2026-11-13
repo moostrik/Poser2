@@ -8,9 +8,56 @@ How the stages fit together is in [FLOW.md](FLOW.md); what is next, the motion's
 [FLOW_PLAN.md](FLOW_PLAN.md#the-motions-details). "Code" is what the files show; **(deduction)** marks what is inferred
 from them, **(site fact)** what the operator saw.
 
-How the flow works is in the module docstrings of `motion/lucas_kanade_flow_3d.py`,
-`motion/lucas_kanade_flow.py` (the x/y solve) and `motion/depth_velocity.py` (z); the layer is
-`MotionLayer` (`modules/render/layers/flow/motion_layer.py`) with `Motion3DLayer` and `Motion2DLayer`.
+The x/y solve is `LucasKanadeFlow` (`motion/lucas_kanade_flow.py`), z the depth velocity
+(`DepthVelocity`, `motion/depth_velocity.py`), and `LucasKanadeFlow3D` (`motion/lucas_kanade_flow_3d.py`)
+composes them; the layer is `MotionLayer` (`modules/render/layers/flow/motion_layer.py`) with `Motion3DLayer`
+and `Motion2DLayer`.
+
+## How it measures
+
+### x/y: the Lucas–Kanade solve
+
+Each pixel's shift between two luminance frames, from a window of gradients, coarse to fine (Bouguet's
+pyramidal Lucas–Kanade): each level is solved at its own size from the coarser level's estimate, read
+linearly, with the previous frame warped by it ([Constraints](#constraints) has why its own size). Out
+comes the displacement in uv per frame, `threshold` (px per frame) taken off its length, as below it is
+the solve's jitter. With a depth and `same_surface`, a window counts only its samples within `tolerance`
+of its center's depth. The settings in pixels go with the flow's resolution: a level doubles the motion
+it follows, about 2 × 2^(levels − 1) px per frame at full size.
+
+### z: the depth velocity
+
+One depth sample is mostly noise from frame to frame, and the change between two frames doubles it, so z
+is tracked, not differenced: each pixel holds a disparity and its rate, carried along the x/y
+displacement, and each measurement only corrects them (an alpha–beta filter) over `smooth`. The parts:
+
+| Part        | How                                                                           | Why                                                           |
+|-------------|-------------------------------------------------------------------------------|---------------------------------------------------------------|
+| disparity   | the track holds 1 / depth                                                     | stereo noise is about constant in disparity                   |
+| `tolerance` | metres: what tells two surfaces apart                                         | a hand 10 cm before the chest is 10 cm at any distance        |
+| measurement | the mean disparity of the window's samples within `tolerance`, by their share | a thin window at a silhouette corrects little                 |
+| carry       | from where the pixel was a displacement back, same surface only               | a sliding surface keeps its depth; nothing crosses an edge    |
+| restart     | a miss past `tolerance`, or faster than `max_speed`                           | a limb passing; a sloped edge sliding off adds up to 9–11 m/s |
+| `dead_zone` | an anchor: z is 0 within it, past it z is whole                               | a surface's depth wanders by a few mm                         |
+| `catch_up`  | the miss's Emas tell a lag from jitter; image motion speeds the follow        | a smoothed track lags a fast push; jitter has no image motion |
+| step filter | no depth where 3 × 3 samples span a step past `tolerance`                     | silhouette jitter; a band a depth sample wide reads no z      |
+
+The anchor follows z past the dead zone, so a motion loses only its first `dead_zone`. The catch-up's Emas are
+of the miss of the prediction, signed and its size: a lag misses one way, jitter both ways and cancels; where
+the image moves too (`color_motion`) the follow time blends toward `catch_up_smooth`, and the carry takes each
+texel's depth a frame on. The step filter is `DepthStepFilter`, the window's test of "another surface".
+`tolerance` is no limit on speed: 0.2 m a frame is 5 m/s at 25 fps. z comes in view widths per frame, over
+the metres one view width spans at the depth (`view_span` per metre), and `threshold` comes off it. With
+`smooth` 0 and a full window it is the plain change between two frames.
+
+### The 3D velocity
+
+`LucasKanadeFlow3D` turns the displacement and z, both view widths per frame, into one velocity in widths
+per second, times `x_gain`, `y_gain`, `z_gain`, gated as below. The tracks are carried by the displacement as
+solved, before `xy.threshold`: a slide too slow for the output still moves them, or on a slope it would read
+as z. With `xy_smooth`, x/y goes through z's filter over z's `smooth`, so both lag alike: a displacement is a step
+of position, so with a steady frame interval and a full z window x/y answers a change of speed exactly as z does. The settings in flow
+pixels go with the flow's resolution; those in metres and milliseconds do not.
 
 ## When it measures
 

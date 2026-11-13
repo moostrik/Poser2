@@ -1,30 +1,8 @@
-"""Lucas–Kanade Flow 3D: the x/y solve (`LucasKanadeFlow`) and the depth velocity (`DepthVelocity`)
-composed into one 3D velocity.
-
-The displacement (uv per frame) stays inside: `xy.threshold` (px per frame) comes off its length,
-as below it is the solve's jitter, not motion. z comes from its own `DepthVelocity`: a depth track carried
-along the displacement, so a surface sliding sideways over a slope reads no motion toward the camera,
-corrected each frame by the mean over `z.window` depth samples and smoothed over
-`z.smooth`; `z.threshold` comes off it. The depth change comes in view
-widths per frame like the displacement, so all three become view widths per second the same way. Out
-comes one 3D velocity in image widths per second times `x_gain`, `y_gain` and `z_gain` (1 = true speed,
-0 = that axis off, negative = inverted). With `use_mask`, the velocity is multiplied by the mask; z also,
-always, by the depth mask, where the depth is the player's (`set_depth_mask`).
-
-Beside it, `z_position`: where the body is now in the player's depth range (the depth source's near to
-far), (depth - near) / (far - near) held to 0..1, 0 front to 1 back, from the depth track, times its weight
-in red and the weight in green (RG16F): the depth mask's times the mask's with `use_mask` (each 1 without),
-0 without depth, no z position. z stays in view widths per second, as x/y.
-
-z lags its motion by the time it is smoothed over. With `z.xy_smooth`, x/y goes through the
-same filter over `z.smooth` before its threshold, carried along the displacement as z is, so
-both lag alike. A displacement is a step of position, so the filter is the same one: with a steady frame
-interval and a full z window, x/y answers a change of speed exactly as z does. The tracks are
-carried by the displacement as solved, before `xy.threshold`: a slide too slow for the output
-still moves the tracks with it, or on a slope it would read as z.
-
-The settings in flow pixels go with the flow's resolution: the solve's, and `z.threshold`.
-Those in metres and milliseconds do not.
+"""Lucas–Kanade Flow 3D: the x/y solve (`LucasKanadeFlow`) and the depth velocity (`DepthVelocity`) composed into
+one 3D velocity in image widths per second times `x_gain`, `y_gain`, `z_gain`, gated by the mask with `use_mask`
+and z by the depth mask; beside it `z_position`, where the body is now in the player's depth range, 0 front to 1
+back, times its weight in red and the weight in green (RG16F). How and why: modules/flow/MOTION.md, "The 3D
+velocity" and "depth_velocity (z)".
 
 `filter_displacement`, `displacement_velocity` and `z_position` below are the numpy references of the shaders.
 """
