@@ -17,7 +17,7 @@ from typing import Any, Callable, TypeAlias
 
 import numpy as np
 
-from modules.pose import Frame, FrameDict, BBox, BBoxAzimuth, Distance, Points2D
+from modules.pose import Frame, FrameDict, BBox, BBoxAzimuth, Distance, Points2D, SourceFramesCallback
 from modules.settings import BaseSettings, Field
 from modules.utils import PerformanceTimer, Rect
 from .tracklet import Tracklet
@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 
 WAITING: int = 2        # bangs waiting for the thread; a newer image makes an older one's poses late
 
-SourceFramesCallback: TypeAlias = Callable[[FrameDict, Any], None]      # (the poses, the images they are for), the pipeline's
 AskedCallback: TypeAlias = Callable[[float, int, FrameDict], None]      # (timestamp, cam_id, the poses asked)
 
 

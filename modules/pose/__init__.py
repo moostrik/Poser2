@@ -9,3 +9,4 @@ from .features import BaseFeature, BaseScalarFeature, BaseVectorFeature, Normali
                       LegDeviation, TorsoTilt, GroupSimilarity, GroupSync, FEATURES, Feature, FEATURE_CLASS, SCALAR_FEATURES, TRACK_FEATURES, \
                       configure_features
 from .recorder import Recorder, RecorderSettings, Player, write_chunk, read_chunk
+from .pipeline import SourceFramesCallback
