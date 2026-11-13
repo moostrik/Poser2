@@ -10,6 +10,15 @@ after the 2D fluid ([the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2d-fl
 a callback stores or enqueues what it receives and returns, a receiver does its work on its own thread, the camera's
 thread runs only the camera, and every drop is counted on the panel ([INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md)).
 
+## Before B: the pose step's images travel with its poses
+
+`PoseInference` crops from the images its caller set before (`set_images`, on the pose step's thread), not from
+images it is given: right only because both calls run on one thread in that order. The images travel with the poses
+instead: `PosesFromTracklets` emits the poses with the payload it was submitted with, the pipeline's `push` hands it
+to the stage, its segments pass it on untouched, `_AsyncSplit.submit` gives it to the async node, and
+`PoseInference.submit(frames, images)` crops what it is given (`RecordedPoses` passes it through); `set_images` and
+deep_flow's bang callback go. Checked by the pipeline's and the pose step's tests and one run on `measure` 9–19 s.
+
 ## B. white_space back
 
 white_space (four mono OAK-D cameras at 23 fps, the panoramic tracker, the light) runs on `.venv` (depthai 2, the
@@ -65,6 +74,10 @@ hd_trio comes back once [the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2
 now: its crops (the pose model's at its input size, RVM's at 768 × 1024 from the same region, both by
 `CropExtractor`), its recordings as before (mp4 chunks any player plays, stored mirrored, a pose file per chunk,
 RECORDING_PLAN.md), and its pose-following center layers, which stay. Planned when it starts.
+
+Its last step: once every app starts its threads, the inline path goes from `RecordingSync`, `CaptureSync`,
+`PosesFromTracklets`, `PosePipeline` and `CameraSync` (a part matched on the thread it comes on while the thread
+does not run), and a submit before `start` is an error.
 
 ## Details
 
