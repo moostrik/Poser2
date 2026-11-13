@@ -4,7 +4,7 @@ A frame goes from the camera to the screen through several threads. Each thread 
 on; a hand-off returns at once, so no thread waits for another's work, and a frame is dropped only where a
 stage cannot keep up, counted, never because a part of it is late. Nothing but the camera runs on a camera's
 thread, and no thread waits for the GPU while the GPU has room. deep_flow runs this way; the other apps follow
-([PLAN.md](PLAN.md#4-the-apps-on-deep_flows-input)).
+([apps/REFACTOR.md](../../apps/REFACTOR.md)).
 
 "Code" is what the files show; **(deduction)** marks what is inferred from them, **(site fact)** what the
 operator saw.
