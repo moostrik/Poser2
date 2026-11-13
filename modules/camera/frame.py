@@ -10,17 +10,14 @@ CAPTURE_TOLERANCE: float = 0.002   # s: frames of one capture carry timestamps t
 
 
 class FrameType(Enum):
-    """The kinds of frame a source delivers; a backend with more adds its own here, and the
-    recorder's labels with them. Every frame callback gets every kind, so a consumer of one kind
-    checks `kind`."""
+    """The kinds of frame a source delivers; every frame callback gets every kind."""
     VIDEO = 1
     DEPTH = 2
 
 
 @dataclass(frozen=True)
 class FrameReadings:
-    """What the camera reported for one frame, in degrees, microseconds and ISO: what a recording
-    keeps beside its images. Tilt and roll are NaN until the IMU has a reading."""
+    """What the camera reported for one frame: tilt and roll (°, NaN without an IMU reading), exposure (µs), ISO."""
     tilt: float
     roll: float
     exposure: int
@@ -29,47 +26,27 @@ class FrameReadings:
 
 @dataclass(frozen=True)
 class DepthAlignment:
-    """Where a depth frame's pixels land in the video frame: the depth camera's 3x3 lens in pixels,
-    the video's lens and size, and the move from the depth camera to the video camera (4x4,
-    metres). What `geometry.depth_projection` turns into the GPU's alignment."""
-    intrinsics: list[list[float]]
-    color_intrinsics: list[list[float]]
-    color_size: tuple[int, int]
-    to_color: list[list[float]]
+    """Where a depth frame's pixels land in the video frame."""
+    intrinsics: list[list[float]]           # the depth camera's 3x3 lens, px
+    color_intrinsics: list[list[float]]     # the video camera's 3x3 lens, px
+    color_size: tuple[int, int]             # the video frame's size
+    to_color: list[list[float]]             # the move from the depth camera to the video camera, 4x4, metres
 
 
 @dataclass(frozen=True)
 class CameraFrame:
-    """One frame from one camera.
-
-    `timestamp` is the moment of capture on the one clock, `time.perf_counter()`, stamped by the
-    backend at hand-over: the end of the exposure where the backend knows it (oak4), else the
-    arrival. `arrival` is the hand-over itself, stamped with it, None where `timestamp` is the
-    arrival already; the two give the frame's latency without a clock read downstream. A depth frame and the video frame captured with it carry timestamps within
-    `CAPTURE_TOLERANCE`, so time pairs them. Everything downstream takes its time from the frame
-    instead of reading a clock (the wall clock is for file names only).
-    `image` is BGR uint8 (H, W, 3) or gray uint8 (H, W), as the backend delivers it; with `nv12` it is
-    packed NV12 uint8 (H * 3 / 2, W): the Y rows, then the interleaved UV rows, which a consumer
-    converts where it is cheapest. A DEPTH frame's `image` is uint16 millimetres (H, W), 0 where
-    there is no depth: on its own camera's view with `alignment`, which the GPU puts on the VIDEO
-    frames' view, else already on that view. `flip_h` says the image still has to
-    be mirrored, because the device could not: the GPU upload does it, anything off the GPU takes
-    `mirrored_image`. `homography` (`geometry.tilt_homography`, uv to uv) says the image still has
-    to be straightened, before that mirror; one array stands for one correction, so a consumer
-    keeps what it derives from it until the array changes. `readings` and `intrinsics` (the
-    frame's 3x3 lens in pixels) are what a recording needs to redo that correction.
-    """
+    """One frame from one camera, as delivered: nothing straightened, nothing mirrored."""
     cam_id: int
     kind: FrameType
-    image: np.ndarray
-    timestamp: float
-    nv12: bool = False
-    flip_h: bool = False
-    homography: np.ndarray | None = None
+    image: np.ndarray                       # BGR uint8 (H, W, 3) or gray (H, W); NV12 (H * 3 / 2, W) with `nv12`; DEPTH: uint16 mm, 0 none
+    timestamp: float                        # its capture, s on `perf_counter`; its arrival where the backend cannot know it
+    nv12: bool = False                      # packed NV12: the Y rows, then the interleaved UV rows
+    flip_h: bool = False                    # still to be mirrored
+    homography: np.ndarray | None = None    # still to be straightened with, uv to uv, before the mirror
     readings: FrameReadings | None = None
-    intrinsics: list[list[float]] | None = None
-    alignment: DepthAlignment | None = None
-    arrival: float | None = None
+    intrinsics: list[list[float]] | None = None     # its 3x3 lens, px
+    alignment: DepthAlignment | None = None # a DEPTH frame on its own camera's view; None: on the video's already
+    arrival: float | None = None            # its hand-over, s on `perf_counter`; None where `timestamp` is it
 
 
 def mirrored_image(frame: CameraFrame) -> np.ndarray:

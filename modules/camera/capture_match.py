@@ -1,7 +1,5 @@
-"""What the syncs that bring the parts of one capture together share: a part's values of one camera kept by
-capture time and found within `CAPTURE_TOLERANCE` (`CaptureStream`), and the count of parts a capture was made
-without (`MissedParts`). The rules of when a capture goes out are each sync's own: the live one puts latency
-first (`modules.inference.CaptureSync`), the recorder's completeness (`RecordingSync`)."""
+"""Matching the parts of one capture by capture time: a part's values of one camera kept by time (`CaptureStream`),
+and the count of parts a capture was made without (`MissedParts`); when a capture goes out is each sync's own."""
 
 import logging
 import time
@@ -74,10 +72,8 @@ class CaptureStream[T]:
 
 
 class MissedParts:
-    """The parts a sync made a capture without, or dropped as no capture's, per camera and part. `count` only
-    counts; `warn`, on the owner's thread, logs the rise as a warning naming the sync, the camera and the part, at
-    most once in `WARN_INTERVAL`. What is counted before the sync's first capture is counted apart and not warned
-    of (`at_start`)."""
+    """The parts a sync made a capture without, or dropped as no capture's, per camera and part; `warn` logs the rise
+    at most once in `WARN_INTERVAL`, and what came before a camera's first capture is counted apart (`at_start`)."""
 
     def __init__(self, name: str) -> None:
         self.name: str = name

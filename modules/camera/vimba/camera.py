@@ -1,11 +1,5 @@
-"""The Vimba backend: one Allied Vision GigE camera (Mako G-125C) through Allied Vision's VimbaPython
-binding (vendored in `vimbapython/`, which needs the Vimba 6 SDK: `VIMBA_HOME`, VimbaC) on the
-camera contract. The thread keeps the camera: `start()` makes the first try, and the thread searches
-again every `RETRY_INTERVAL` while there is none and opens it again (user set, packet size, the
-panel's values) when no complete frame arrived for `FRAME_TIMEOUT`; `connected` follows it. The
-frames come on Vimba's own thread, are copied there and handed over, rotated and flipped, on this
-thread. Without the SDK the binding cannot load: `start()` is an error in the log and the camera
-stays unconnected, so an app that has the image source still runs."""
+"""One Allied Vision GigE camera (Mako G-125C) through the vendored VimbaPython binding, as a `CameraSource`
+(CAMERA.md, Vimba)."""
 
 import logging
 import time

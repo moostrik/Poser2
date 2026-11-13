@@ -1,5 +1,4 @@
-"""The sensor controls: the panel's sensor fields written to the device, and the device's auto
-values read back into them. The role SMILE's camera has under the same name."""
+"""The sensor controls: the panel's sensor fields written to the device, and its auto values read back."""
 
 import logging
 
@@ -11,13 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 class SensorControl:
-    """Binds one camera's sensor fields for as long as the device is open.
-
-    A colour camera takes `color_sensor` (exposure, white balance and the image controls); a mono
-    one takes `mono_sensor` (exposure and the IR lights, which are device calls rather than
-    controls). Bound on construction, when every current value is sent once; `close()` unbinds.
-    The callbacks run on the panel's thread and only send; the readback runs on the camera's.
-    """
+    """One camera's sensor fields bound to its open device: `color_sensor` on a color camera, `mono_sensor` and the
+    IR lights on a mono one; every value is sent once on construction, `close()` unbinds."""
 
     def __init__(self, settings: OakCameraSettings, device: dai.Device, control: dai.DataInputQueue, color: bool) -> None:
         self.settings: OakCameraSettings = settings

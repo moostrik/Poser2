@@ -267,6 +267,17 @@ Capture to PC in ms, 30 s each over USB, in a dark room with `flood_light` at fu
 
 The node logs a warning on every frame, because the detector's stretched frame and the depth have different transforms and it remaps points. Its `z` is along the tilted axis. Recordings hold no camera `z`, so `-sim` needs the PC's reading either way.
 
+## The backend
+
+Each camera opens its own device and builds its own pipeline on it, as a depthai 3 pipeline is bound to one device.
+It reads the frames, the tracklets and the IMU through queues on the node outputs, on depthai's callback thread,
+where they become the contract's and get their capture time. The device runs the chain `model_chain` names:
+`DETECTOR` gives boxes only; with a pose chain a tracklet carries its keypoints, from its own detection in the
+one-model chain, or in the two-model chain from its crop's pose, put on it per frame by `KeypointJoin`. With
+`depth_model` it delivers depth as DEPTH frames on the left camera's view, each with the `DepthAlignment` that puts
+it on the frames' view on the GPU. An NV12 frame goes on packed, so the callback thread does no color work; the
+boxes and keypoints go on as the model found them, and the uploader straightens and mirrors them with their frame.
+
 ## The frame
 
 The camera delivers one shape, 5:4 at the sensor mode's rows, so the depth model's 8:5 frame is used further across than a square would. There is no setting for it. The width is a multiple of 16 (`FRAME_WIDTH_ALIGNMENT`) because the iGPU's H.264 decoder hangs on any other width: 900 hangs, 896 and 720 play. A frame of another width cannot be replayed.

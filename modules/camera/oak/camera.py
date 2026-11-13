@@ -1,12 +1,4 @@
-"""The oak backend: one OAK camera on depthai 2, implementing `modules.camera.CameraSource`.
-
-The pipeline is built once (`build_pipeline`) and shared by every camera of the process; each
-camera opens its own device on it and reads the device's queues on depthai's callback thread,
-which is where the frames and tracklets become the contract's and get their host time. The
-sensor controls are `SensorControl`'s for as long as the device is open.
-
-Docs: https://oak-web.readthedocs.io/
-"""
+"""One OAK-D camera on depthai 2 (https://oak-web.readthedocs.io/), as a `CameraSource`."""
 
 import logging
 import time
@@ -201,11 +193,8 @@ class Camera(Thread):
             logger.debug(f'{self.device_id} no IMU stream: {exc}')
 
     def _log_frame_geometry(self) -> None:
-        """Once per pipeline: the window the warp delivers and where the sensor covers it.
-
-        Pure geometry from the preset — no device needed — logged so the rig check can read
-        the horizon row and the arch off the log rather than infer them from the picture.
-        Not meaningful on the keystone path, which keeps the raw frame."""
+        """Log once per pipeline the window the warp delivers and the rows the sensor covers; nothing on the
+        keystone path, which keeps the raw frame."""
         if self.mount.keystone != 0.0 and self.mount.tilt == 0.0:
             return
         src: tuple[int, int] = mode_size(self.color, self.resolution)

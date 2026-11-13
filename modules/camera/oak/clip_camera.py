@@ -89,19 +89,8 @@ class ClipCamera(Camera):
         self.clips.send(img)
 
     def _check_frame_size(self, width: int, height: int) -> None:
-        """Warn once per size when a clip's frames differ from what the pipeline was built for.
-
-        Nothing breaks mechanically: XLinkIn's max data size is a ceiling, the ImgFrame carries
-        the clip's own dimensions, and the detector resizes whatever arrives. But every
-        frame-relative setting is tuned for the configured size and is silently off by the
-        ratio — the tracker's vfov and height gates, and the pose distance thresholds.
-
-        The fix is in the preset, not here: set `camera.resolution` to the label the clip was
-        shot at and the whole chain derives correctly again.
-
-        A clip that is being warped (`clip_warp`) feeds the warp's INPUT, so it must be the
-        sensor's size; one that passes through must be the delivered size, its derived height and all.
-        """
+        """Warn once per size when a clip's frames are not the size the pipeline was built for: the sensor's with
+        `clip_warp`, else the delivered one."""
         expected: tuple[int, int] = (mode_size(self.color, self.resolution) if self.warp_clips
                                      else frame_size(self.color, self.resolution, self.square, self.frame_height))
         if (width, height) == expected or (width, height) == self._warned_frame_size:

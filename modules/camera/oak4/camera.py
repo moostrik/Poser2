@@ -1,25 +1,5 @@
-"""The oak4 backend: one OAK4 camera on depthai 3, implementing `modules.camera.CameraSource`.
-
-Each camera opens its own device and builds its own pipeline on it (`build_pipeline`; a depthai 3
-pipeline is bound to one device), reads the delivered frames, the tracklets and the IMU through
-queues on the node outputs, on depthai's callback thread, which is where the frames and tracklets
-become the contract's and get their host time. The device runs the chain `model_chain` names.
-DETECTOR gives boxes only; with a pose chain a tracklet carries its keypoints: from its own
-detection in the one-model chain, or, in the two-model chain, from the pose of its crop, joined to
-it by frame (`KeypointJoin`). With `depth_model` it also delivers depth, as DEPTH frames on the left
-camera's view, each with the `DepthAlignment` that puts it on the frames' view on the GPU. The
-sensor controls are `SensorControl`'s for as long as the device is open.
-
-The frame leaves here untouched where it can: an NV12 frame goes on packed, and the GPU upload
-converts, straightens and mirrors it, so this thread does no color work. The camera cannot do
-either to that frame itself, and its boxes and keypoints leave here as its model found them, in the
-frame as delivered: the uploader straightens and mirrors them with their frame. The IMU's tilt
-makes the homography every frame carries (`TiltCorrection`), on this one view for color and depth
-alike. `readings.video_latency`,
-`tracker_latency` and `depth_latency` say what each message took from capture to here.
-
-Docs: https://docs.luxonis.com/software-v3/depthai
-"""
+"""One OAK4 camera on depthai 3 (https://docs.luxonis.com/software-v3/depthai), as a `CameraSource`: its frames,
+its depth, its tracklets with the keypoints of its model chain, and its readings (OAK4.md)."""
 
 import logging
 import math

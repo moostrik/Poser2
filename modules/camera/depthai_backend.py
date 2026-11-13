@@ -1,7 +1,5 @@
-"""Which OAK backend the installed depthai supports: `oak` (depthai 2, the OAK-D) or `oak4`
-(depthai 3, the OAK4). The two are one package name, so a venv holds one of them: `.venv` has depthai 2
-(`scripts\\install.bat`) and `.venv-oak4` depthai 3 (`scripts\\install.bat oak4`), and the venv an app is
-started with is the choice; an app takes its camera classes from the backend named here and never imports both."""
+"""Which OAK backend the installed depthai supports: `oak` (depthai 2, the OAK-D, `.venv`) or `oak4` (depthai 3,
+the OAK4, `.venv-oak4`); one venv holds one of them."""
 
 from importlib.metadata import version, PackageNotFoundError
 

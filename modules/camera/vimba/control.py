@@ -1,12 +1,5 @@
-"""Writes the panel's camera settings (frame rate, exposure, gain, white balance, colour) to the
-features of a Vimba camera when they change, and reads back what the camera uses and the rate its
-frames arrive at. The panel is the source of truth: everything is sent once after the camera opens,
-over what its user set loaded. A feature the camera model does not have is a warning,
-once. A write the camera refuses (a value it does not take, a control channel that timed out) is a
-warning too, and is tried again: it does not switch the feature off. A failed read is the same kind
-of warning. Both are logged once per reason, not at every retry. Exposure and gain are the panel's
-value with auto off and the camera's with auto on; the values in use are read back for the panel.
-"Set WB" (white balance) lets the camera measure once and takes the ratios it found back into the panel."""
+"""The sensor controls of a Vimba camera: the panel's settings written to its features, and what it uses and the
+rate its frames arrive at read back."""
 
 import logging
 from threading import Event, Lock

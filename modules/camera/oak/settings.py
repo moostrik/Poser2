@@ -33,14 +33,8 @@ class MonoSensorSettings(BaseSettings):
 
 
 class OakCameraSettings(RigCameraSettings):
-    """One OAK camera: the contract's rate, mount and readings, plus what shapes its pipeline.
-
-    The tunables live in subgroups — `readings`, `color_sensor`, `mono_sensor` — because forty
-    flat fields in one panel is not something anyone reads. What stays at this level is what
-    shapes the pipeline (`color`, `square`, `yolo`, `resolution`) and the mount (`tilt` and `keystone`
-    here, the rest in `RigCameraSettings`), which are the fields a person actually sets. The preset keys are
-    flat: `cam_0.tilt`.
-    """
+    """One OAK-D camera: the rig camera's settings, what shapes its pipeline and its mount; the sensor controls in
+    their own groups."""
 
     # Initial settings
     device_id:      Field[str]   = Field("", access=Field.INIT, description="Camera device ID (MxID)")

@@ -49,12 +49,8 @@ class DepthSettings(BaseSettings):
 
 
 class Oak4CameraSettings(RigCameraSettings):
-    """One OAK4 camera: the contract's rate, mount and readings, plus what shapes its pipeline.
-
-    An app shares `fps`, `color`, `resolution`, `model_path` and `fov` from its camera group, and the
-    preset keys stay flat. `color` picks the delivered frame, color or grey, off the color sensor.
-    `fov` and the lens fields shape only the grey frame's warp; a color frame brings its own lens.
-    """
+    """One OAK4 camera: the rig camera's settings and what shapes its pipeline; `fov` and the lens shape only the
+    grey frame's warp, a color frame brings its own lens."""
     device_id:      Field[str]   = Field("", access=Field.INIT, description="Camera device ID (serial, or its IP; empty = the first OAK4 found)")
     link:           Field[CameraLink] = Field(CameraLink.USB, access=Field.INIT, description="Link to the PC; the other one is used when this one is missing")
     color:          Field[bool]  = Field(True, access=Field.INIT, newline=True, description="Color frames (False = grey off the same sensor)")

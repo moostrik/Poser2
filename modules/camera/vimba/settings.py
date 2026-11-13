@@ -6,14 +6,8 @@ from modules.settings import Field, Widget
 
 
 class VimbaCameraSettings(CameraSettings):
-    """The rate and the flips are live here: the camera takes a new frame rate at any time
-    (`AcquisitionFrameRateAbs`) and the flips are done on the host, per frame.
-
-    Exposure and gain each have auto, a manual value (sent while auto is off), a limit for auto
-    and a readout of what the camera uses now; both autos aim for `target_brightness`, the
-    exposure going up first and the gain after it. "Set WB" lets the camera measure its white
-    balance once and takes the ratios it found into the panel.
-    """
+    """One Vimba camera: the camera's settings, with its rate and flips live, and its exposure, gain, white
+    balance and color features."""
     flip_h:         Field[bool]  = Field(False, description="Mirror the camera image horizontally")
     flip_v:         Field[bool]  = Field(False, description="Flip the camera image vertically")
     fps:            Field[float] = Field(30.0, min=1.0, max=30.0, step=1.0, description="Frames per second asked of the camera; an exposure longer than a frame lowers it")

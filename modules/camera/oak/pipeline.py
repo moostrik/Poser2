@@ -1,13 +1,5 @@
-"""The depthai pipeline of one OAK camera, built in one pass.
-
-A source (the sensor, or an `XLinkIn` the clip camera feeds with clips), the warp that turns the
-sensor's frame into the contract's (`geometry.warp_mesh_points`, or the keystone of the older
-installations), the video output, and with `yolo` the detector branch: a manip that sizes the
-frame for the blob, the YOLO network, the device's object tracker and the tracklet output. A
-device also gets the IMU. Each part is one function; the clip camera differs in its source, and in
-whether the warp is applied (`warp_clips`: a raw clip goes through it, a recorded one is already
-warped). The warp mesh builders at the end are the geometry's adapters to depthai.
-"""
+"""The depthai pipeline of one OAK-D camera: its source (the sensor or clips), the warp, the video output, the
+detector and tracker, and the IMU."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,21 +30,13 @@ CLIPS_STREAM: str = 'clips'             # the clip camera's frames, in
 
 @dataclass
 class WarpConfig:
-    """How a camera is mounted and what its lens is, as the warp needs it.
-
-    `tilt` (degrees, positive = aimed up) re-aims the camera so a column reads as one azimuth,
-    at the cost of the frame edges. `keystone` (fraction of the frame) squares up a person seen
-    from a tilted camera while keeping the whole frame. They are exclusive per camera — see
-    `build_warp_mesh`. `fov_h` is the azimuth span of the delivered frame, quoted for the
-    un-cropped sensor width. `lens_fov`, `lens_center_x`, `lens_center_y` are the lens itself
-    (`geometry.source_lens`); at their defaults the lens is taken to be `fov_h`.
-    """
+    """How a camera is mounted and what its lens is, as the warp needs it."""
     flip_h: bool
     flip_v: bool
-    tilt: float
-    keystone: float
-    fov_h: float
-    lens_fov: float = 0.0
+    tilt: float                 # °, positive aimed up; exclusive with `keystone`
+    keystone: float             # fraction of the frame
+    fov_h: float                # ° the delivered frame spans, quoted for the un-cropped sensor width
+    lens_fov: float = 0.0       # the lens (`geometry.source_lens`); 0 takes `fov_h`
     lens_center_x: float = 0.0
     lens_center_y: float = 0.0
 
@@ -84,13 +68,8 @@ def build_pipeline(
     clips: bool = False,
     warp_clips: bool = False,
 ) -> None:
-    """Build the camera's pipeline into `pipeline`.
-
-    `clips` takes the frames from the host (the clip camera) instead of the sensor, at the delivered
-    size, or at the sensor's size with `warp_clips`, when they go through the warp like the
-    sensor's frames. `frame_height` is the delivered height the warp produces (`delivered_height`),
-    0 for the sensor mode's rows.
-    """
+    """Build the camera's pipeline into `pipeline`; `clips` takes the frames from the host, through the warp with
+    `warp_clips`; `frame_height` is the delivered height (`delivered_height`), 0 the mode's rows."""
     src_size: tuple[int, int] = mode_size(color, resolution)
     out_size: tuple[int, int] = frame_size(color, resolution, square, frame_height)
     logger.info("OAK pipeline: %s, %s, %s%s%s", 'square' if square else 'wide', 'color' if color else 'mono',
@@ -112,10 +91,8 @@ def build_pipeline(
 
 
 def add_sensor(pipeline: dai.Pipeline, color: bool, resolution: CameraResolution, fps: float) -> dai.Node.Output:
-    """The sensor at its mode, with its control stream; returns its frame output.
-
-    Colour comes off the `preview` output, planar BGR at the mode size; mono off the left camera's
-    `out`, the one sensor a mono installation uses."""
+    """The sensor at its mode, with its control stream: color off `preview` (planar BGR), mono off the left
+    camera; returns its frame output."""
     camera: dai.node.ColorCamera | dai.node.MonoCamera
     if color:
         camera = pipeline.create(dai.node.ColorCamera)
@@ -170,13 +147,8 @@ def add_video_output(pipeline: dai.Pipeline, frames: dai.Node.Output) -> None:
 
 
 def add_detector(pipeline: dai.Pipeline, frames: dai.Node.Output, square: bool, blob: Path) -> None:
-    """The detector branch: the frame sized for the blob, YOLO, the device's object tracker on
-    its detections, and the tracklet output.
-
-    The manip stretches a wide frame into the blob (`detector_input_size` explains why nothing is
-    cropped) and keeps the aspect of a square one, which is the blob's. The tracker takes the
-    network's passthrough as its frame, so it only ever sees frames that were inferred.
-    """
+    """The detector branch: the frame stretched into the blob (a square one kept), YOLO, the device's object
+    tracker on the network's passthrough, so only on inferred frames, and the tracklet output."""
     manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
     manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
     manip.initialConfig.setResize(*detector_input_size(blob))
@@ -207,17 +179,7 @@ def add_detector(pipeline: dai.Pipeline, frames: dai.Node.Output, square: bool, 
 
 
 def add_imu(pipeline: dai.Pipeline) -> None:
-    """A slow accelerometer feed, so the camera can report how it is actually mounted.
-
-    `ACCELEROMETER_RAW` rather than `GRAVITY`: gravity is a fused output that needs the IMU's own
-    DSP, which the BNO086 boards have and the raw BMI270 ones do not. A camera on a tripod is
-    static, so the raw accelerometer *is* the gravity vector once it is averaged, and this works
-    on every board.
-
-    A few hertz is plenty — nothing in the show reads this, it exists for whoever is aiming the
-    cameras. The node is created unconditionally; a board without an IMU simply never sends, and
-    `Camera._setup_imu_queue` only subscribes when `getConnectedIMU` names a sensor.
-    """
+    """The raw accelerometer at `IMU_RATE_HZ`, for the mount readout; a board without an IMU never sends."""
     imu: dai.node.IMU = pipeline.create(dai.node.IMU)
     imu.enableIMUSensor(dai.IMUSensor.ACCELEROMETER_RAW, IMU_RATE_HZ)
     imu.setBatchReportThreshold(1)
@@ -240,14 +202,7 @@ def find_warp(
     mesh_w: int = WARP_MESH,
     mesh_h: int = WARP_MESH,
 ) -> list[dai.Point2f]:
-    """The Warp node's mesh for the frame contract — column = azimuth, row = tangent of
-    elevation, tilt undone — as depthai points.
-
-    All of the geometry lives in `modules.camera.geometry` (`warp_mesh_points`), which has no depthai or
-    OpenCV dependency and carries the explanation of the lens model, the window and the mesh
-    density. This is only the adapter. For the *other* correction, `keystone`, see
-    `find_keystone_warp`.
-    """
+    """`warp_mesh_points` as the Warp node's depthai points."""
     return [dai.Point2f(float(x), float(y)) for x, y in warp_mesh_points(
         src_size, out_size, mode_width, mount.fov_h, mount.tilt,
         mount.flip_h, mount.flip_v, mesh_w, mesh_h, mount.lens_fov, mount.lens_center)]
@@ -259,27 +214,8 @@ def clip_warp_mesh(
     mode_width: int,
     mount: WarpConfig,
 ) -> tuple[list[dai.Point2f], int, int]:
-    """The warp mesh for a RECORDING rather than a sensor, ready to splat into `setWarpMesh`.
-
-    Recordings come off `output_video`, which is **after** the warp, so a clip already carries
-    the flips — and the square crop — that were applied when it was shot. Re-applying the live
-    mesh would do all of that a second time, un-mirroring the image and cropping an already
-    cropped frame. What is wanted is only the *difference*, which is the reprojection and the
-    tilt on their own:
-
-    - the flips come off, because they are already in the pixels;
-    - the clip is the source at its own (sensor) size, because the crop is already in the
-      pixels; the output is the delivered size, as tall as `delivered_height` makes it;
-    - the tilt's sign flips under `flip_v`, because a vertical mirror reverses a rotation about
-      the horizontal axis, while a horizontal mirror commutes with it and needs no correction;
-    - the lens centre offset mirrors with the pixels: `x` under `flip_h`, `y` under `flip_v`.
-
-    ASSUMES THE CLIP IS RAW: equidistant, shot at `tilt = 0`, before the warp reprojected its
-    output. That holds for every recording made before `tilt` existed, and those were shot on
-    the same units the shared lens describes. A clip recorded since is already reprojected and
-    would be reprojected twice; capture-time geometry is still not stored beside clips — see
-    the plan's "save the preset alongside each recording".
-    """
+    """The warp mesh for a raw clip (`clip_warp`): the reprojection and the tilt without the flips and the crop the
+    clip already carries; with its mesh size."""
     clip_mount = WarpConfig(flip_h=False, flip_v=False,
                             tilt=-mount.tilt if mount.flip_v else mount.tilt,
                             keystone=0.0,           # a recording is already post-keystone
@@ -292,16 +228,8 @@ def clip_warp_mesh(
 
 
 # ---------------------------------------------------------------------------
-#  Keystone — the pre-existing correction, kept verbatim
+#  Keystone (CAMERA.md, the OAK-D)
 # ---------------------------------------------------------------------------
-# These two builders are the original `find_perspective_warp` / `_square`, unchanged apart
-# from the name, at their original 2 x 64 mesh. They build a homography that pins all four
-# corners of the output to the frame corners: a rotation composed with a stretch-to-fit. That
-# is the wrong model for re-aiming a wide lens (see `geometry.warp_mesh_points`), but it is
-# exactly what hd_trio and deep_flow rely on — a person seen from a down-tilted camera gets
-# normal proportions while the whole frame is kept. Two columns suffice because the map is
-# affine in x per row; the vertical curvature is what the 64 rows are for. Nothing here may
-# change without those installations changing with it.
 
 KEYSTONE_MESH_W: int = 2
 KEYSTONE_MESH_H: int = 64
@@ -392,10 +320,8 @@ def find_keystone_warp_square(src_width, src_height, square_size, width_offset, 
 
 
 def _report_lens_reach(src_size: tuple[int, int], mode_width: int, mount: WarpConfig) -> None:
-    """`fov` is the frame's span, and the lens has to reach half of it on EACH side of its own
-    centre — which is not the frame centre. Where it falls short, the edge columns near the
-    horizon read past the sensor and go black. A shortfall of a pixel or two is the price of a
-    shared lens centre and is logged as information; more is a preset to fix, and warns."""
+    """Log where the lens reaches less than half of `fov` on a side of its center: the edge columns near the
+    horizon go black there; over 3 px it warns."""
     if mount.lens_fov <= 0.0:
         return
     focal, cx, _ = source_lens(src_size, mode_width, mount.fov_h, mount.lens_fov, mount.lens_center)
@@ -419,15 +345,8 @@ def build_warp_mesh(
     mode_width: int,
     mount: WarpConfig,
 ) -> tuple[list[dai.Point2f], int, int]:
-    """Pick the one correction a camera uses and return (mesh, mesh_w, mesh_h) for `setWarpMesh`.
-
-    `tilt` and `keystone` are exclusive: a keystone spreads columns by height, which is exactly
-    what tilt removes so a column can mean one azimuth, and tilt shifts the frame, which is what
-    keystone exists to avoid. Both non-zero is not a valid state for any camera, so it warns and
-    takes `tilt`. Both zero goes through the tilt path, which is NOT the identity: it is the
-    equidistant -> cylindrical reprojection that makes a column one azimuth (see
-    `geometry.warp_mesh_points`). Only a non-zero `keystone` reaches the old builder.
-    """
+    """The mesh of the one correction a camera uses, (mesh, mesh_w, mesh_h) for `setWarpMesh`: the keystone
+    only for a non-zero `keystone` alone, else the warp; both set warns and takes the tilt."""
     if mount.tilt != 0.0 and mount.keystone != 0.0:
         logger.warning("tilt (%.1f) and keystone (%.2f) are both set; they are exclusive — using tilt",
                        mount.tilt, mount.keystone)

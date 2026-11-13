@@ -1,6 +1,5 @@
-"""The camera's live controls: the panel's sensor fields written to the device with the device's auto
-values read back into them (the OAK-D backend's `SensorControl` for the OAK4's color sensor, and the
-two IR lights), and the depth fields written to Neural Depth."""
+"""The camera's live controls: the sensor fields and the IR lights written to the device, its auto values read
+back, and the depth fields written to Neural Depth."""
 
 import logging
 from typing import Callable
@@ -14,13 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 class SensorControl:
-    """Binds one camera's sensor fields for as long as the device is open.
-
-    Bound on construction, when every current value is sent once; `close()` unbinds and turns the
-    IR lights off, as they would stay lit. The callbacks run on the panel's thread and only send;
-    the readback runs on the camera's. The exposure region waits for the first frame, the only
-    place the sensor's pixels can be read from.
-    """
+    """One camera's sensor fields bound to its open device: every value sent once on construction, the exposure
+    region at the first frame; `close()` unbinds and turns the IR lights off, as they would stay lit."""
 
     def __init__(self, settings: Oak4CameraSettings, device: dai.Device, control: dai.InputQueue, flip_h: bool = False) -> None:
         self.settings: Oak4CameraSettings = settings

@@ -20,41 +20,24 @@ class TrackingStatus(Enum):
 
 @dataclass(frozen=True)
 class CameraTracklet:
-    """Device-neutral: what a camera's object tracker says about one track, in its own frame.
-
-    `id` is the device tracker's id for the track and `age` its age in frames; `roi` is normalised
-    to the frame; `timestamp` is the capture time of the frame the tracker looked at, the
-    frame's own `CameraFrame.timestamp` (oak4, replay), else the message's arrival; the same for
-    every tracklet of one message. `keypoints`
-    is None unless the camera runs a pose model (OAK4): then float32 (17, 3), the body landmarks in
-    the pose's order (`modules.pose.PointLandmark`, COCO), each x and y normalised to the frame
-    like `roi`, and its score.
-    """
+    """What a camera's own tracker says about one player in one frame."""
     cam_id: int
-    id: int
+    id: int                                 # the device tracker's id
     status: TrackingStatus
-    roi: Rect
-    age: int
-    timestamp: float
-    keypoints: np.ndarray | None = None
+    roi: Rect                               # normalised to the frame
+    age: int                                # frames
+    timestamp: float                        # its frame's capture, as `CameraFrame.timestamp`
+    keypoints: np.ndarray | None = None     # with a pose model on the camera: float32 (17, 3), COCO, x y normalised, score
 
 
 @dataclass(frozen=True)
 class CameraTracklets:
-    """A camera's tracklets of one frame, as one message: what a tracklet callback gets.
-
-    `timestamp` is the capture time of the frame the tracker looked at, the same as each
-    tracklet's; `arrival` the moment the backend handed the message over, on the same clock, None
-    where the backend stamps the arrival as the capture. `tracklets` may be empty: no player is a
-    message too. `straightened` says the boxes and keypoints are in the frame as the uploader makes
-    it, straightened and mirrored; a camera hands them as its model found them, in the frame as
-    delivered, and the uploader straightens them with their frame (`straightened_tracklets`).
-    """
+    """A camera's tracklets of one frame, as one message: what a tracklet callback gets."""
     cam_id: int
-    timestamp: float
-    tracklets: list[CameraTracklet]
-    arrival: float | None = None
-    straightened: bool = False
+    timestamp: float                        # its frame's capture, as each tracklet's
+    tracklets: list[CameraTracklet]         # may be empty: no player is a message too
+    arrival: float | None = None            # its hand-over; None where `timestamp` is it
+    straightened: bool = False              # in the frame as the uploader makes it, straightened and mirrored
 
 
 def straightened_tracklets(cam_tracklets: CameraTracklets, homography: np.ndarray | None, flip_h: bool) -> CameraTracklets:

@@ -16,6 +16,28 @@ One job: hand an app a camera. That is three things.
 
 Everything else in the package is there because it was made beside a camera, not because it is one.
 
+## The contract
+
+- A camera's callbacks are registered before `start()` and run on the backend's own thread in registration order.
+- A frame or tracklet message is stamped once, at hand-over, with its capture where the backend knows it (the end
+  of the exposure, oak4), else its arrival, on `perf_counter`; where the two differ it also carries its arrival, so
+  its latency needs no clock read downstream. A depth frame and the video frame of one capture carry timestamps
+  within `CAPTURE_TOLERANCE` (2 ms; on the OAK4 0.12 ms apart), so time pairs them.
+- A camera hands its frames and its model's boxes and keypoints as delivered: the uploader straightens them on the
+  GPU with the frame's `homography`, then mirrors them by `flip_h`; off the GPU `mirrored_image` mirrors. One
+  `homography` array stands for one correction, so a consumer keeps what it derives from it until the array
+  changes. A frame's `readings` and `intrinsics` are what a recording needs to redo the correction.
+- The tracklet callback gets every message, an empty one too: no player is a tick as well; a camera without a
+  detector never calls it.
+- `connected` says whether the device is open now: a backend that keeps looking for its device (Vimba) is started
+  without one and connects when it is there.
+- A backend's settings extend `CameraSettings` or `RigCameraSettings` with its device's fields, so the preset keys
+  stay flat: `cam_0.fov` and `cam_0.readings.roll_offset` are the same keys for every rig backend. A backend whose
+  device takes a field live redeclares it without `Field.INIT`; the panel shows the backend's fields first.
+- Nothing in the show reads a rig camera's readings: they are for setting the rig up. A backend fills what its
+  device measures and leaves the rest at its default, NaN for the angles. `roll_offset` sits with the readings,
+  beside the roll it corrects.
+
 ## The sensor mode and the frame's size
 
 One setting, the sensor mode (`resolution`, `CameraResolution`), sets every width, height, aspect and buffer size
@@ -152,6 +174,35 @@ Depth comes from a stereo camera a few centimetres beside the video camera, so a
 shifted by an amount that depends on its distance. The GPU moves each depth pixel there and keeps the nearest where
 two land on one pixel; the background a near object uncovers stays empty, because the depth camera never saw it.
 
+## The clip camera
+
+`oak.ClipCamera` sends recorded clips through the OAK-D's own pipeline, so the device's detector and tracker run on
+them as on the rig. A clip that is warped (`clip_warp`, for raw clips only, unwarped at tilt 0) feeds the warp's
+input and must be the sensor's size; one that passes through must be the delivered size, its derived height
+included. A clip of another size still runs (the XLinkIn's size is a ceiling, the frame carries its own size, the
+detector resizes what comes), but every frame-relative setting is off by the ratio: the tracker's vfov and height
+gates, the pose distance thresholds. The fix is in the preset, `camera.resolution` set to the clip's label; the
+clip camera warns once per size.
+
+## Vimba
+
+The Vimba backend runs one Allied Vision Mako G-125C over GigE through the VimbaPython binding, vendored in
+`vimba/vimbapython/`, which needs the Vimba 6 SDK (`VIMBA_HOME`, VimbaC). Its thread keeps the camera: `start()`
+makes the first try, the thread searches again every `RETRY_INTERVAL` while there is none, and opens it again (user
+set, packet size, the panel's values) when no complete frame came for `FRAME_TIMEOUT`; `connected` follows it. The
+frames come on Vimba's own thread, are copied there, and are handed over rotated and flipped on the camera's thread.
+Without the SDK the binding cannot load: `start()` logs an error and the camera stays unconnected, so an app with
+another image source still runs.
+
+The panel is the source of truth: every feature is sent once after the camera opens, over what its user set
+loaded. The rate and the flips are live: the camera takes a new frame rate at any time (`AcquisitionFrameRateAbs`)
+and the flips are done on the host. A feature the camera model does not have is a warning, once; a write the
+camera refuses (a value it does not take, a control channel that timed out) or a failed read is a warning once per
+reason, and is tried again, not switched off. Exposure and gain each have auto, a manual value sent while auto is
+off, a limit for auto and a readout of what the camera uses; both autos aim for `target_brightness`, exposure
+first and gain after it. "Set WB" lets the camera measure its white balance once and takes the ratios into the
+panel.
+
 ## The cameras' health
 
 `CameraHealth` turns the cameras' readings into verdicts pinned on the panel, because the readings themselves sit
@@ -190,6 +241,33 @@ coefficients); its `fx` is the scale at the optical axis, and on these lenses th
 angle to 0.5 % out to 75°, so `fx` is the equidistant focal and `(cx, cy)` the optical center. `getCameraIntrinsics`
 at the mode's size accounts for the 720-row center crop (it moves `cy` by 40). `lens_field` of `fx` tells the two
 sensor variants apart (129° against about 97°).
+
+**The IMU.** The pipeline reads `ACCELEROMETER_RAW` and not `GRAVITY`: gravity is a fused output that needs the
+IMU's own DSP, which the BNO086 boards have and the BMI270 ones do not; a camera on a tripod is still, so the
+averaged raw accelerometer is the gravity vector, on every board. A few hertz is enough, as nothing in the show
+reads it. The node is always created; a board without an IMU never sends, and the camera subscribes only when
+`getConnectedIMU` names a sensor.
+
+**Tilt or keystone.** A camera uses one correction. The warp ([the warp](#the-warp)) makes a column one azimuth,
+also at tilt 0, where it is the equidistant to cylindrical reprojection. The keystone (`keystone`, a fraction of the
+frame) is a homography that pins the output's four corners to the frame's: a rotation composed with a stretch to
+fit, the wrong model for re-aiming a wide lens but what hd_trio relies on, a player seen from a down-tilted camera
+in normal proportions with the whole frame kept. Its mesh is 2 x 64: two columns, since the map is affine in x per
+row, and 64 rows for the vertical curve; it does not change without the installations that use it. The two are
+exclusive, since a keystone spreads columns by height, which the tilt removes, and the tilt shifts the frame, which
+the keystone avoids; both set warns and takes the tilt.
+
+**Raw clips.** A clip comes off the video output, after the warp, so it carries the flips and the square crop it
+was shot with. A raw clip (`clip_warp`: equidistant, shot at tilt 0, before the warp reprojected) gets only the
+difference: no flips, the clip as the source at its own size and the delivered size out, the tilt's sign turned
+under `flip_v` (a vertical mirror reverses a rotation about the horizontal axis, a horizontal one commutes with
+it), and the lens center mirrored with the pixels. A clip recorded since the warp is reprojected already and would
+be reprojected twice; the geometry a clip was shot with is not stored with it.
+
+**The lens's reach.** `fov` is the frame's span, and the lens must reach half of it on each side of its own center,
+which is not the frame's; where it falls short, the edge columns near the horizon read past the sensor and go black.
+A pixel or two is the price of a shared lens center and is logged as information; more is a preset to fix, and
+warns.
 
 **The detector.** The wide blobs are built on tools.luxonis.com from the stock ultralytics yolov8n weights,
 OpenVINO 2022.1, at 512 x 448 for the tall cylindrical frame (1280 x 1152 at P800 is 1.111; 512 x 448 is 1.143; the

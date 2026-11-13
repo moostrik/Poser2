@@ -1,17 +1,6 @@
-"""The depthai 3 pipeline of one OAK4 camera, built in one pass on the camera's own device.
-
-The sensor at the requested size and type, and the IMU. A color frame takes no correction here at
-all: the Camera node crops it to 5:4, undistorts it and delivers NV12, the lowest latency by far,
-and the host converts, straightens and mirrors it. Undistorted because aligned depth always is: the
-depth misses a distorted frame by 4 % at its edges, and the extra 3 ms is the price of the two
-overlapping. A grey frame goes through the `Warp` node at the sensor mode's full width, for the
-cylindrical reprojection that makes a column one azimuth, with the mesh from
-`geometry.warp_mesh_points`, as this chip warps grey frames only. The detector branch is the model
-on the delivered frame, the device's object tracker on its detections, and the tracklets, with their
-keypoints when the model is a pose model. The depth branch is Neural Depth off the stereo pair,
-aligned on the camera to the delivered frame. Nothing here is an XLink stream: the host reads a
-node's output through the queue `Camera` creates on it.
-"""
+"""The depthai 3 pipeline of one OAK4 camera on its own device: the color frame (cropped, undistorted, NV12) or the
+grey one through the warp, the model chain and its tracker, Neural Depth aligned to the frame, and the IMU
+(OAK4.md, the frame)."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -33,12 +22,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class MountConfig:
-    """How a camera is mounted and what its lens is, as the correction needs it. `fov_h` is the
-    azimuth span of the delivered frame, quoted for the un-cropped sensor width; the lens fields are
-    `geometry.source_lens`'s."""
+    """How a camera is mounted and what its lens is, as the correction needs it."""
     flip_h: bool
     flip_v: bool
-    fov_h: float
+    fov_h: float                # ° the delivered frame spans, quoted for the un-cropped sensor width; the lens `source_lens`'s
     lens_fov: float = 0.0
     lens_center_x: float = 0.0
     lens_center_y: float = 0.0
@@ -50,10 +37,8 @@ class MountConfig:
 
 @dataclass
 class PipelineOutputs:
-    """What the host reads and writes: the delivered frames, the sensor's control input, the IMU,
-    the camera's load, with a model the tracklets, with the two-model chain the poses of the crops, and with a depth
-    model the aligned depth and its config input. `flip_on_host` says the camera did not mirror what
-    it delivers, frames and boxes alike, so the host must."""
+    """The pipeline's outputs and inputs the host reads and writes; `flip_on_host`: the host mirrors what the camera
+    delivers, frames and boxes alike."""
     video: dai.Node.Output
     control: dai.Node.Input
     imu: dai.Node.Output
@@ -81,13 +66,8 @@ def build_pipeline(
     detector_archive: Path | None = None,
     depth_model: DepthModel = DepthModel.OFF,
 ) -> PipelineOutputs:
-    """Build the camera's pipeline into `pipeline`, the one bound to its device.
-
-    `frame_height` is the delivered height the warp produces (`delivered_height`), 0 for the
-    sensor's rows. The archives are the models' NN archives: neither is frames only, `pose_archive`
-    alone the one-model chain, `detector_archive` alone boxes only, and both the detector plus the
-    pose model on each person's crop.
-    """
+    """Build the camera's pipeline into `pipeline`, the one bound to its device; the archives set the model chain
+    (`model_archives`), `frame_height` is the delivered height, 0 the sensor's rows."""
     src_size: tuple[int, int] = requested_size(color, resolution)
     out_size: tuple[int, int] = delivered_size(color, resolution, frame_height)
     model: Path | None = pose_archive or detector_archive
@@ -132,10 +112,8 @@ def add_warp(pipeline: dai.Pipeline, source: dai.Node.Output, src_size: tuple[in
 
 
 def add_one_model_chain(pipeline: dai.Pipeline, frames: dai.Node.Output, archive_path: Path) -> dai.Node.Output:
-    """The model on the delivered frame, the device's object tracker on its detections, and the
-    tracklets out. The archive's config tells the network how to decode them, so no decode of ours:
-    a pose model's boxes bring their 17 keypoints in each tracklet's source detection, a person
-    detector's only the box."""
+    """The model on the delivered frame, decoded by its archive's config, and the device's tracker on its detections;
+    returns the tracklets, with a pose model's keypoints in their source detections."""
     network = add_detector(pipeline, frames, dai.NNArchive(archive_path))
     return add_tracker(pipeline, network.passthrough, network.out)
 
@@ -177,16 +155,10 @@ def add_tracker(pipeline: dai.Pipeline, frames: dai.Node.Output, detections: dai
 
 def add_pose_chain(pipeline: dai.Pipeline, frames: dai.Node.Output, fps: float, detector_archive: Path,
                    pose_archive: Path) -> tuple[dai.Node.Output, dai.Node.Output]:
-    """The two-model chain, Luxonis's way (depthai-nodes): the detector on the stretched frame, its
-    detections filtered to the people, one letterboxed crop per person cut out of the delivered
-    frame on the device (`FrameCropper`), the top-down pose model on each crop with its parser
-    (`ParsingNeuralNetwork`), and the crops' keypoints gathered per frame beside the detections
-    they came from (`GatherData`). The tracker runs on the same people. Returns the tracklets and
-    the gathered poses; `Camera` joins the two by frame.
-
-    The parser's own score threshold is turned off: it would drop a keypoint below it from the
-    message and leave the rest unnumbered, while the contract carries all 17 with their scores.
-    """
+    """The two-model chain (depthai-nodes): the detector, a crop per player cut on the device, the top-down pose
+    model on each, and the crops' keypoints gathered per frame beside their detections; returns the tracklets and
+    the gathered keypoints, which `KeypointJoin` puts together. The parser's score threshold is off, as it would
+    drop keypoints and leave the rest unnumbered."""
     level: str | None = os.environ.pop('DEPTHAI_LEVEL', None)   # depthai_nodes rejects depthai's `error` at import
     try:
         from depthai_nodes.node import ImgDetectionsFilter, FrameCropper, ParsingNeuralNetwork, GatherData
@@ -214,10 +186,8 @@ def add_pose_chain(pipeline: dai.Pipeline, frames: dai.Node.Output, fps: float, 
 
 
 def add_depth(pipeline: dai.Pipeline, fps: float, model: DepthModel) -> tuple[dai.Node.Output, dai.Node.Input]:
-    """Neural Depth off the stereo pair, on the left camera's view at the model's size. The GPU puts
-    it on the delivered frame's view (`DepthAlignment`): `ImageAlign` fills the background a near
-    object uncovers with that object's depth, and costs time on the camera. Returns the depth and
-    Neural Depth's config input."""
+    """Neural Depth off the stereo pair, on the left camera's view, aligned on the GPU and not by `ImageAlign` (OAK4.md,
+    depth); returns the depth and its config input."""
     left, right = [pipeline.create(dai.node.Camera).build(socket, sensorFps=fps).requestOutput(STEREO_SIZE, fps=fps)
                    for socket in STEREO_SOCKETS]
     neural: dai.node.NeuralDepth = pipeline.create(dai.node.NeuralDepth).build(left, right, DEPTH_MODELS[model])
