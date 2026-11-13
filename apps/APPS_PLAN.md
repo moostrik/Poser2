@@ -24,11 +24,9 @@ round after the last camera's frame, so the latency is about equal and the uploa
 One shape for one camera and for several: a set, one item per camera, with each item's capture time. A single
 camera's frame is a set of one, so no step has a path of its own for one camera.
 
-1. **The frame source's call takes a set.** `TrackerFrameSource.submit(cam_times, images)`: each camera's capture
-   time in the set (`dict[int, float]`) with its images. Each player's `detection_timeout` is judged against its
-   own camera's capture time in the set (`cam_times[tracklet.cam_id]`), so no time of the source's own is made.
-   The asked callback reports per camera in the set, with that camera's time and its poses asked, so the recorder
-   hears each camera's image. deep_flow's `_on_image` passes `{cam_id: timestamp}`, in the same commit.
+The frame source's call already takes a set (`TrackerFrameSource.submit(cam_times, images)`, each player judged on
+its own camera's capture time, the poses asked told per camera).
+
 2. **The sync before the upload.** Each camera hands its frames to the frames' `CameraSync` and the recorder, its
    tracklets to the uploader and the recorder, and nothing else. `CameraSync`'s callback hands on a set:
    `add_set_callback(callback(items))`, `items` by `cam_id`, each with its capture time. The frames' sync keeps

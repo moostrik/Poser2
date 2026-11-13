@@ -1,12 +1,14 @@
 """TrackerFrameSource: the pose pipeline's frame source fed by the tracker, a pose per player from the tracker's
 newest boxes, at each frame bang.
 
-`submit(timestamp, cam_id, images)` queues a frame bang, with the images of that moment, for this one's own thread
-and returns: at most `WAITING` wait, beyond that the oldest is dropped, counted as `dropped`. The thread makes the
-poses (`process`), hands them with those images to the frames callbacks (the pipeline's push, which carries the
-images to the crop), then hands the poses asked to the asked callbacks with the bang's time and camera. The images
-are carried, never read: the tracker does not know the GPU's. While the thread does not run, a bang is processed on
-the thread it comes on."""
+A frame bang is a set: each camera's capture time in it (`cam_times`, one camera's for a set of one) with the
+images of that moment. `submit(cam_times, images)` queues it for this one's own thread and returns: at most
+`WAITING` wait, beyond that the oldest is dropped, counted as `dropped`. The thread makes the poses (`process`): a
+player is posed when its camera is in the set and its last detection is within `detection_timeout` of that camera's
+capture time. It hands them with the images to the frames callbacks (the pipeline's push, which carries the images
+to the crop), then, per camera in the set, that camera's time and poses to the asked callbacks. The images are
+carried, never read: the tracker does not know the GPU's. While the thread does not run, a bang is processed on the
+thread it comes on."""
 
 import logging
 import math
@@ -70,10 +72,10 @@ class TrackerFrameSource(Thread):
         }
         self._lock = Lock()
         self._batch_id_counter = 0
-        # The bangs waiting for the thread: (timestamp, cam_id, images, the moment it was queued)
+        # The bangs waiting for the thread: (cam_times, images, the moment it was queued)
         self._wake: Condition = Condition()
         self._running: bool = False
-        self._bangs: deque[tuple[float, int, Any, float]] = deque()
+        self._bangs: deque[tuple[dict[int, float], Any, float]] = deque()
         self._dropped: int = 0
         self._wait: PerformanceTimer = PerformanceTimer(name="Wait pose step")
         self._inline_lock: Lock = Lock()            # bangs processed on the callers' threads while the thread does not run
@@ -88,7 +90,7 @@ class TrackerFrameSource(Thread):
                 self._frames_callbacks.append(callback)
 
     def add_asked_callback(self, callback: AskedCallback) -> None:
-        """Each bang's time and camera with the poses asked, once the frames callbacks have taken them."""
+        """Per camera in each bang, its capture time and its poses asked, once the frames callbacks have taken them."""
         with self._callback_lock:
             if callback not in self._asked_callbacks:
                 self._asked_callbacks.append(callback)
@@ -119,16 +121,16 @@ class TrackerFrameSource(Thread):
                     self._wake.wait()
                 if not self._running:
                     return
-                timestamp, cam_id, images, queued = self._bangs.popleft()
+                cam_times, images, queued = self._bangs.popleft()
             self._wait.add_time((time.perf_counter() - queued) * 1000.0, report=False)
             try:
-                self._bang(timestamp, cam_id, images)
+                self._bang(cam_times, images)
             except Exception:
                 logger.exception("TrackerFrameSource: a frame bang failed")
 
-    def submit(self, timestamp: float, cam_id: int, images: Any) -> None:
-        """A frame bang: camera `cam_id`'s image captured at `timestamp`, with the images of that moment the crop is to
-        cut (`Uploader.snapshot`), queued for the thread, the oldest dropped beyond `WAITING`."""
+    def submit(self, cam_times: dict[int, float], images: Any) -> None:
+        """A frame bang: each camera's capture time in the set, with the images of that moment the crop is to cut
+        (`Uploader.snapshot`), queued for the thread, the oldest dropped beyond `WAITING`."""
         dropped: int | None = None
         with self._wake:
             running: bool = self._running
@@ -137,24 +139,26 @@ class TrackerFrameSource(Thread):
                     self._bangs.popleft()
                     self._dropped += 1
                     dropped = self._dropped
-                self._bangs.append((timestamp, cam_id, images, time.perf_counter()))
+                self._bangs.append((dict(cam_times), images, time.perf_counter()))
                 self._wake.notify()
         if dropped is not None:
             self.settings.dropped = dropped
         if running:
             return
         with self._inline_lock:
-            self._bang(timestamp, cam_id, images)
+            self._bang(cam_times, images)
 
-    def _bang(self, timestamp: float, cam_id: int, images: Any) -> None:
-        asked: FrameDict = self.process(timestamp, images)
+    def _bang(self, cam_times: dict[int, float], images: Any) -> None:
+        asked: FrameDict = self.process(cam_times, images)
         with self._callback_lock:
             asked_callbacks: list[AskedCallback] = list(self._asked_callbacks)
-        for asked_callback in asked_callbacks:
-            try:
-                asked_callback(timestamp, cam_id, asked)
-            except Exception:
-                logger.exception("TrackerFrameSource: an asked callback failed")
+        for cam_id, timestamp in cam_times.items():
+            cam_asked: FrameDict = {track_id: frame for track_id, frame in asked.items() if frame.cam_id == cam_id}
+            for asked_callback in asked_callbacks:
+                try:
+                    asked_callback(timestamp, cam_id, cam_asked)
+                except Exception:
+                    logger.exception("TrackerFrameSource: an asked callback failed")
 
     @property
     def track_ids(self) -> list[int]:
@@ -181,9 +185,9 @@ class TrackerFrameSource(Thread):
                 else:
                     self._tracklets[track_id] = None
 
-    def process(self, now: float, images: Any = None) -> FrameDict:
-        """Generate poses from all ready tracklets and hand them, with `images`, to the frames callbacks; `now` is
-        the time of the frame bang that asks, the clock a latched box's age is judged on.
+    def process(self, cam_times: dict[int, float], images: Any = None) -> FrameDict:
+        """Generate poses from all ready tracklets and hand them, with `images`, to the frames callbacks. A player is
+        posed when its camera is in `cam_times`, and its latched box's age is judged on that camera's capture time.
 
         Returns:
             Dictionary of track_id -> Frame for tracks with valid tracklets
@@ -199,7 +203,9 @@ class TrackerFrameSource(Thread):
         detection_timeout: float = self.settings.detection_timeout
 
         for track_id, tracklet in tracklets_snapshot.items():
-            if tracklet is None or tracklet.is_expired(now, detection_timeout):
+            if tracklet is None or tracklet.cam_id not in cam_times:
+                continue                    # its camera has no image in this set to crop it from
+            if tracklet.is_expired(cam_times[tracklet.cam_id], detection_timeout):
                 continue
 
             try:

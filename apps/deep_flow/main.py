@@ -200,7 +200,7 @@ class DeepFlowMain:
         """An uploaded image, on the uploader's thread: the frame source's bang for it, queued with the images as
         they are now, which the crop cuts, and the camera's interval. With one camera every image is a round, so the
         frame domain runs on each, at the image's capture time."""
-        self.frame_source.submit(image.timestamp, image.cam_id, self.uploader.snapshot())
+        self.frame_source.submit({image.cam_id: image.timestamp}, self.uploader.snapshot())
         last: float | None = self._last_camera_frame.get(image.cam_id)
         self._last_camera_frame[image.cam_id] = image.timestamp
         if last is not None:

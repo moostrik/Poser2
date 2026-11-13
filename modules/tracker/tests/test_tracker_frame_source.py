@@ -18,11 +18,16 @@ def stamps(seconds_ago: float = 0.0) -> dict[str, float]:
     return {'timestamp': t, 'created_at': t, 'last_active': t}
 
 
+def camera_0_now() -> dict[int, float]:
+    """A set of one: camera 0's image captured now."""
+    return {0: time.perf_counter()}
+
+
 def tracklet(world_id: int, seconds_ago: float = 0.0, world_angle: float | None = None,
-             zone_distance: float = math.nan) -> Tracklet:
+             zone_distance: float = math.nan, cam_id: int = 0) -> Tracklet:
     annotation = None if world_angle is None else PanoramicAnnotation(10.0, world_angle, False,
                                                                       zone_distance=zone_distance)
-    return Tracklet(cam_id=0, id=world_id, roi=Rect(x=0.4, y=0.2, width=0.1, height=0.6),
+    return Tracklet(cam_id=cam_id, id=world_id, roi=Rect(x=0.4, y=0.2, width=0.1, height=0.6),
                     annotation=annotation, **stamps(seconds_ago))
 
 
@@ -40,28 +45,38 @@ class TestDetectionTimeout(TrackerFrameSourceCase):
 
     def test_a_fresh_box_is_posed(self) -> None:
         self.poses.set_tracklets({0: tracklet(0)})
-        self.assertEqual(set(self.poses.process(time.perf_counter()).keys()), {0})
+        self.assertEqual(set(self.poses.process(camera_0_now()).keys()), {0})
         self.assertTrue(self.poses.is_ready(time.perf_counter()))
 
     def test_a_stale_box_is_not(self) -> None:
         self.poses.set_tracklets({0: tracklet(0, seconds_ago=1.5), 1: tracklet(1)})
-        self.assertEqual(set(self.poses.process(time.perf_counter()).keys()), {1})
+        self.assertEqual(set(self.poses.process(camera_0_now()).keys()), {1})
 
     def test_a_latched_box_goes_stale_between_tracker_updates(self) -> None:
         # One `set_tracklets`, two frame bangs. Lowering `detection_timeout` below the box's age stands in
         # for time passing with no new update from the tracker.
         self.poses.set_tracklets({0: tracklet(0, seconds_ago=0.5)})
-        self.assertEqual(set(self.poses.process(time.perf_counter()).keys()), {0})
+        self.assertEqual(set(self.poses.process(camera_0_now()).keys()), {0})
         self.settings.detection_timeout = 0.3
-        self.assertEqual(self.poses.process(time.perf_counter()), {})
+        self.assertEqual(self.poses.process(camera_0_now()), {})
         self.assertFalse(self.poses.is_ready(time.perf_counter()))
+
+    def test_a_player_is_judged_on_its_own_cameras_time(self) -> None:
+        now: float = time.perf_counter()
+        self.poses.set_tracklets({0: tracklet(0, seconds_ago=0.5, cam_id=0), 1: tracklet(1, seconds_ago=0.5, cam_id=1)})
+        # camera 1's image of the set was captured 0.6 s later than camera 0's: its player is 1.1 s old there
+        self.assertEqual(set(self.poses.process({0: now, 1: now + 0.6})), {0})
+
+    def test_a_player_whose_camera_is_not_in_the_set_is_not_posed(self) -> None:
+        self.poses.set_tracklets({0: tracklet(0, cam_id=0), 1: tracklet(1, cam_id=1)})
+        self.assertEqual(set(self.poses.process(camera_0_now())), {0})
 
 
 class TestFrameContents(TrackerFrameSourceCase):
 
     def test_the_box_and_the_world_azimuth_are_carried(self) -> None:
         self.poses.set_tracklets({2: tracklet(2, world_angle=90.0)})
-        frame = self.poses.process(time.perf_counter())[2]
+        frame = self.poses.process(camera_0_now())[2]
         rect = frame[BBox].to_rect()
         self.assertAlmostEqual(rect.bottom, 0.8, places=5)
         self.assertAlmostEqual(frame[BBoxAzimuth].value, math.pi / 2.0, places=5)
@@ -69,13 +84,13 @@ class TestFrameContents(TrackerFrameSourceCase):
 
     def test_the_distance_in_the_zone_is_carried(self) -> None:
         self.poses.set_tracklets({2: tracklet(2, world_angle=90.0, zone_distance=0.25)})
-        distance = self.poses.process(time.perf_counter())[2][Distance]
+        distance = self.poses.process(camera_0_now())[2][Distance]
         self.assertAlmostEqual(distance.value, 0.25, places=6)
         self.assertEqual(distance.score, 1.0)
 
     def test_without_a_reading_the_distance_is_absent(self) -> None:
         self.poses.set_tracklets({1: tracklet(1, world_angle=90.0), 2: tracklet(2)})
-        frames = self.poses.process(time.perf_counter())
+        frames = self.poses.process(camera_0_now())
         for id in (1, 2):                         # no reading; no panoramic annotation
             with self.subTest(id=id):
                 self.assertNotIn(Distance, frames[id])
@@ -93,7 +108,7 @@ class TestFrameContents(TrackerFrameSourceCase):
         keypoints[0, :2] = (0.25, 0.25)
         poses.set_tracklets({0: Tracklet(cam_id=0, id=0, roi=Rect(x=0.25, y=0.25, width=0.25, height=0.5),
                                          keypoints=keypoints, **stamps())})
-        frame = poses.process(time.perf_counter())[0]
+        frame = poses.process(camera_0_now())[0]
         box = frame[BBox].to_rect()
         for got, want in zip((box.x, box.y, box.width, box.height), (0.25, 0.0, 0.25, 1.0)):
             self.assertAlmostEqual(got, want, places=5)
@@ -105,7 +120,7 @@ class TestFrameContents(TrackerFrameSourceCase):
     def test_an_id_beyond_the_slots_warns_and_is_not_posed(self) -> None:
         with self.assertLogs('modules.tracker.tracker_frame_source', level='WARNING'):
             self.poses.set_tracklets({5: tracklet(5)})
-        self.assertEqual(self.poses.process(time.perf_counter()), {})
+        self.assertEqual(self.poses.process(camera_0_now()), {})
 
 
 class TestThread(TrackerFrameSourceCase):
@@ -128,7 +143,7 @@ class TestThread(TrackerFrameSourceCase):
 
     def test_a_bang_runs_on_the_thread_with_its_images(self) -> None:
         self.poses.start()
-        self.poses.submit(time.perf_counter(), 0, 'images 1')
+        self.poses.submit(camera_0_now(), 'images 1')
         self.wait_for(2)
         self.assertEqual(self.order, [('poses', 'TrackerFrameSource', 'images 1'), ('asked', 'TrackerFrameSource', (0, {0}))])
 
@@ -142,18 +157,26 @@ class TestThread(TrackerFrameSourceCase):
                 release.wait(2.0)
         self.poses.add_frames_callback(hold)
         self.poses.start()
-        self.poses.submit(time.perf_counter(), 0, 'first')
+        self.poses.submit(camera_0_now(), 'first')
         self.assertTrue(held.wait(1.0))                     # the thread is held: what comes now waits
         for name in ('a', 'b', 'c'):
-            self.poses.submit(time.perf_counter(), 0, name)
+            self.poses.submit(camera_0_now(), name)
         release.set()
         self.wait_for(6)
         self.assertEqual([images for kind, _, images in self.order if kind == 'poses'], ['first', 'b', 'c'])
         self.assertEqual(self.settings.dropped, 1)
 
     def test_without_its_thread_a_bang_runs_on_the_caller(self) -> None:
-        self.poses.submit(time.perf_counter(), 0, 'inline')
+        self.poses.submit(camera_0_now(), 'inline')
         self.assertEqual([thread for _, thread, _ in self.order], [threading.current_thread().name] * 2)
+
+    def test_the_poses_asked_are_told_per_camera_with_its_time(self) -> None:
+        now: float = time.perf_counter()
+        self.poses.set_tracklets({0: tracklet(0, cam_id=0), 1: tracklet(1, cam_id=1)})
+        times: list[tuple[int, float, set]] = []
+        self.poses.add_asked_callback(lambda timestamp, cam_id, asked: times.append((cam_id, timestamp, set(asked))))
+        self.poses.submit({0: now, 1: now + 0.01}, 'set')
+        self.assertEqual(times, [(0, now, {0}), (1, now + 0.01, {1})])
 
 
 if __name__ == '__main__':
