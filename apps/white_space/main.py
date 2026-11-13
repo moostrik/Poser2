@@ -1,6 +1,7 @@
 """White Space — 3-camera panoramic installation with circular LED light output."""
 
 import math
+import time
 from pathlib import Path
 from functools import partial
 
@@ -16,7 +17,8 @@ from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, TrackerFrameSource
 from modules.pose import features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import detection, BatchUploader, CameraSync, ImageSnapshot, PoseInference, SyncMessage
+from modules.inference import detection, BatchUploader, CameraSync, ImageSnapshot, PoseInference, SyncMessage, frame_poses, has_points
+from modules.pose import FrameDict
 from modules.session import Session
 
 from .board import RenderBoard
@@ -110,6 +112,13 @@ class WhiteSpaceMain:
             camera.add_tracklet_callback(self.tracker.submit_cam_tracklets)
             camera.add_tracklet_callback(self.board.set_camera_tracklets)
             camera.add_tracklet_callback(self.tracklet_sync.submit_tracklets)
+            camera.add_tracklet_callback(self.video_recorder.submit_tracklets)
+        # What each camera's captures wait for from the first: live and through the clip camera, the device sends
+        # tracklets (a replay's come or not with the recording); the frame source says per set whether it asked poses
+        # (`_on_asked`)
+        device_tracklets: bool = not (self.settings.camera.sim_enabled and self.settings.camera.simulator.replay)
+        for i in range(num_cams):
+            self.video_recorder.expect_parts(i, tracklets=device_tracklets, poses=True)
 
         # DETECTION
         features.configure_features(max_players)
@@ -121,6 +130,8 @@ class WhiteSpaceMain:
         # The unfused view, for the calibration display only — two observations of one person on
         # a seam, which the line above reduces to one.
         self.tracker.add_observation_callback(self.board.set_observations)
+        # The frame source's thread: each set's poses with its images to the pipeline, then the poses asked per camera
+        self.frame_source.add_asked_callback(self._on_asked)
 
         # THE SYNCS' HAND-OFFS, each on its own thread: the frames' set to the uploader, the tracklets' to the tracker
         self.frame_sync.add_set_callback(self.uploader.submit_set)
@@ -159,6 +170,7 @@ class WhiteSpaceMain:
             self.pipeline.add_group_callback(stage, partial(self.board.set_group, stage))
             self.board.set_window_source(stage, self.pipeline.window(stage))
         self.pipeline.add_frames_callback(Stage.LERP, partial(self.osc_sound_sender.submit_frames, int(Stage.LERP)))
+        self.pipeline.add_frames_callback(Stage.RAW, self._record_poses)     # the RAW stage's poses, with the video
 
         # WS PIPELINE — light output
         # The show reads LERP poses: the stable eye azimuth, and the only stage with PlayheadOffset.
@@ -253,6 +265,19 @@ class WhiteSpaceMain:
         """A set of the cameras' tracklet messages, on the tracklets' sync's thread: the tracker's update, at the newest
         of their capture times."""
         self.tracker.update(max(message.timestamp for message in items.values()))
+
+    def _on_asked(self, timestamp: float, cam_id: int, asked: FrameDict) -> None:
+        """A set's poses for one camera, on the frame source's thread: the recorder hears whether poses come for the
+        camera's image (the pose model asked, or the camera's own keypoints handed on), so a frame without a player
+        does not wait."""
+        posing: bool = self.settings.pose.pose.enabled or any(has_points(frame) for frame in asked.values())
+        self.video_recorder.expect_poses(cam_id, timestamp, bool(asked) and posing)
+
+    def _record_poses(self, frames: FrameDict) -> None:
+        """The RAW stage's poses, on the pose model's thread, to the recorder: their hand-over, stamped here."""
+        arrival: float = time.perf_counter()
+        for poses in frame_poses(frames, arrival):
+            self.video_recorder.submit_poses(poses)
 
     def _store_video_frame(self, frame: CameraFrame) -> None:
         """Camera frame callback — store raw VIDEO frames on the board for the light renderer."""

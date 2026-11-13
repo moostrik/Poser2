@@ -42,9 +42,8 @@ callback calls `TrackerFrameSource.submit`; the tracklets' sync hands its set to
 their times; the tracklets go as they come to the tracker, the board, the journal (which queues them raw) and the
 tracklets' sync; the threads start after the wiring, before the cameras.
 
-5. **The recorder.** Built for every app ([RECORDING_PLAN.md](../modules/recording/RECORDING_PLAN.md#2-the-recorder-in-the-other-apps)):
-   white_space's settings and wiring, `expect_parts` per camera, `expect_poses` per camera and image (the frame source's asked
-   callback), the tracklets handed to it by each camera as they come. The OAK-D's capture stamp, as the oak4's `capture_time`, needs an OAK-D to test. Old show recordings
+5. **The recorder.** Wired in white_space: the frames and tracklets from each camera as they come, `expect_parts`
+   per camera, `expect_poses` per camera and set (the frame source's asked callback), the RAW stage's poses. The OAK-D's capture stamp, as the oak4's `capture_time`, needs an OAK-D to test. Old show recordings
    keep playing; new ones are the new layout.
 6. **The calibration layer** (`test_calibration.py`) reads the uploaded image instead of the CPU frame the camera's
    thread puts on the board: it reduces its band of rows to one row on the GPU, queues the row's copy into pinned
