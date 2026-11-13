@@ -289,10 +289,12 @@ class Player(Thread):
     def _follows(self) -> bool:
         """The one loading is the next chunk in the recording after the one playing: it starts as soon as it is
         loaded, its readers holding each frame until its moment, so every camera's first frame of it is there on
-        time, whichever camera's chunk ends first."""
+        time, whichever camera's chunk ends first. Chunks without recorded times have no moment to hold a frame to:
+        the next one starts once the playing one has ended."""
         playing, loading = self.playing, self.loading
         return (playing is not None and loading is not None and self.ending is None and not playing.finished()
-                and loading.folder is playing.folder and loading.chunk == playing.chunk + 1)
+                and loading.folder is playing.folder and loading.chunk == playing.chunk + 1
+                and playing.clock.has_times and loading.clock.has_times)
 
     def _follow(self) -> None:
         """Play the loaded next chunk on the playing one's clock, carried on, beside the playing one's rest; the

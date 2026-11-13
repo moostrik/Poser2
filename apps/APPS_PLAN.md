@@ -51,10 +51,7 @@ as the camera's do, and through the same callbacks without one (`clip_passthroug
 `scripts/white_space_probe.py`.
 
 The -sim runs are done (white_space on `20250514-130512_4_wide_mono` 23–31 s in replay with its detector engine,
-and a recording of it played back; deep_flow on `measure` 9–19 s). Open from them:
-
-- The recording over 6.8 s of playhead holds 127 frames per camera, about 1.3 s fewer, none counted missed or
-  dropped (measured); the recorder's start is not yet traced.
+and a recording of it played back; deep_flow on `measure` 9–19 s); nothing is open from them.
 
 The OAK-D's capture stamp, as the oak4's `capture_time`, needs an OAK-D to test; old show recordings keep playing,
 new ones are the new layout. hd_trio's `main.py` still uses `CameraSync`'s `add_sync_callback` and follows in E (it

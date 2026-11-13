@@ -54,6 +54,10 @@ class PlayClockTest(unittest.TestCase):
         second.catch_up(0, 0, 100.17)          # due at 100.07, 0.1 s late
         self.assertAlmostEqual(first.capture(0, 1) or 0.0, 100.12)
 
+    def test_a_chunk_has_times_only_with_recorded_ones(self) -> None:
+        self.assertTrue(PlayClock({0: frames([10.0])}, {0: 0}).has_times)
+        self.assertFalse(PlayClock({}, {0: 0}, fps=20.0).has_times)
+
     def test_cameras_without_times_are_paced_together_at_fps(self) -> None:
         clock = PlayClock({}, {0: 0, 1: 5}, fps=20.0)
         clock.start(100.0)

@@ -37,6 +37,11 @@ class PlayClock:
         self._base: float | None = min(starts) if starts else None
         self._origin: _Origin | None = None
 
+    @property
+    def has_times(self) -> bool:
+        """Whether the chunk has recorded times: only then can the chunk after it run on from them."""
+        return self._base is not None
+
     def start(self, origin: float) -> None:
         self._origin = _Origin(origin)
 
