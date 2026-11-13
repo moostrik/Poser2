@@ -378,6 +378,18 @@ class RenderSettings(BaseSettings):
     window:      Group[WindowSettings]      = Group(WindowSettings)
 
 
+class CadenceSettings(BaseSettings):
+    """Pinned: the drops counted where they happen, on the way from the cameras to the poses."""
+    frame_sync_drops:    Field[int] = Field(0, access=Field.READ, pinned=True, label="Frame sync drops",
+                                            description="Camera frames the frames' sync dropped, its queue full")
+    tracklet_sync_drops: Field[int] = Field(0, access=Field.READ, pinned=True, label="Tracklet sync drops",
+                                            description="Tracklet messages the tracklets' sync dropped, its queue full")
+    upload_drops:        Field[int] = Field(0, access=Field.READ, pinned=True, label="Upload drops",
+                                            description="Camera sets the uploader dropped whole, its queue full")
+    pose_drops:          Field[int] = Field(0, access=Field.READ, pinned=True, label="Pose drops",
+                                            description="Pose model results dropped before the stages after it took them")
+
+
 # ---------------------------------------------------------------------------
 #  Root settings
 # ---------------------------------------------------------------------------
@@ -414,4 +426,5 @@ class Settings(BaseSettings):
     # The pose instrument's values: its own root group, not a layer group (POSE_INSTRUMENT.md, Settings).
     pose_instrument: Group[PoseInstrumentSettings] = Group(PoseInstrumentSettings)
     states : Group[StateMachineSettings] = Group(StateMachineSettings, share=[spin_down_seconds])
+    cadence: Group[CadenceSettings] = Group(CadenceSettings)
     panel : Group[PanelSettings]    = Group(PanelSettings)

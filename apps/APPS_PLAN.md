@@ -45,12 +45,11 @@ tracklets' sync; the threads start after the wiring, before the cameras.
 5. **The recorder.** Wired in white_space: the frames and tracklets from each camera as they come, `expect_parts`
    per camera, `expect_poses` per camera and set (the frame source's asked callback), the RAW stage's poses. The
    calibration layer reads the uploaded image (`CameraColumns`: its band reduced to one row on the GPU, read back a
-   tick later without waiting); the board's video images are gone. The OAK-D's capture stamp, as the oak4's `capture_time`, needs an OAK-D to test. Old show recordings
+   tick later without waiting); the board's video images are gone. The drops are pinned on the panel (`cadence`:
+   the two syncs', the uploader's sets, the pipeline's; the frame source's on its own panel). The clip camera
+   (`oak.ClipCamera`) needs no change: its frames come out of the device as the camera's do, and through the same
+   callbacks without one (`clip_passthrough`). The OAK-D's capture stamp, as the oak4's `capture_time`, needs an OAK-D to test. Old show recordings
    keep playing; new ones are the new layout.
-7. **The clip camera** (`oak.ClipCamera`, a recording played through an OAK) hands over as the camera does;
-   checked only at the rig, as it needs an OAK.
-8. **The drops on the panel**, as deep_flow's: the uploader's sets, the sync's, the frame source's, the pipeline's,
-   the runners'; the probe reads them in C's run.
 9. **A white_space probe** (`scripts/white_space_probe.py`), beside deep_flow's, which is built on deep_flow's
    classes: the camera's thread per frame, the syncs per second against the cameras' rate, the uploader's time per
    set, the pose rate per camera, the pose latency (RAW, SMOOTH), the tracker's update rate, the drops.

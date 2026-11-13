@@ -208,6 +208,7 @@ class WhiteSpaceMain:
         self.render = WhiteSpaceRender(self.board, self.settings.render, self.settings.tracker,
                                        self.settings.camera.cameras, self.settings.camera.camera_health, ps.angle_extractor)
         self.render.add_update_callback(self.camera_health.update)
+        self.render.add_update_callback(self._update_drops)
         # In order: LERP first, which stamps this tick's hit on the poses and writes the streak and the group
         # sync to the board; then the state machine reads them; then the layers draw on the same.
         self.conductor.add_update_callback(self._update_poses)
@@ -275,6 +276,14 @@ class WhiteSpaceMain:
         arrival: float = time.perf_counter()
         for poses in frame_poses(frames, arrival):
             self.video_recorder.submit_poses(poses)
+
+    def _update_drops(self, _now: float) -> None:
+        """The panel's drops, counted where they happen (the frame source's are on its own panel)."""
+        cadence = self.settings.cadence
+        cadence.frame_sync_drops = self.frame_sync.dropped
+        cadence.tracklet_sync_drops = self.tracklet_sync.dropped
+        cadence.upload_drops = self.uploader.dropped
+        cadence.pose_drops = self.pipeline.dropped
 
     def _column_to_azimuth(self, cam_id: int, x: float) -> float:
         """A camera column's world azimuth in radians, through the tracker's own geometry."""
