@@ -77,12 +77,12 @@ modules/recording/
 
 | What                         | From                              | To                                                    |
 |------------------------------|-----------------------------------|-------------------------------------------------------|
-| What                  | From                           | To                                                |
-|-----------------------|--------------------------------|---------------------------------------------------|
-| the software tracker  | `camera/replay/tracker.py`     | `modules/tracker`, as `SortTracker`               |
-| `FrameTrigger`        | `camera/sync/frame_trigger.py` | `modules/inference`, as `CameraSync`              |
-| the OAK4's two scripts | `camera/oak4/probe.py`, `models.py` | `scripts/oak4_probe.py`, `scripts/oak4_models.py` |
-| `FramePoses`, `PoseArrays` | the recorder's files      | `modules/recording`, with step 1                  |
+| What                       | From                                | To                                                |
+|----------------------------|-------------------------------------|---------------------------------------------------|
+| the software tracker       | `camera/replay/tracker.py`          | `modules/tracker`, as `SortTracker`               |
+| `FrameTrigger`             | `camera/sync/frame_trigger.py`      | `modules/inference`, as `CameraSync`              |
+| the OAK4's two scripts     | `camera/oak4/probe.py`, `models.py` | `scripts/oak4_probe.py`, `scripts/oak4_models.py` |
+| `FramePoses`, `PoseArrays` | the recorder's files                | `modules/recording`, with step 1                  |
 
 - `SortTracker` is a Kalman filter and overlap assignment, SORT's shape. The replay camera's `BoxTracker` protocol
   keeps its name.
