@@ -33,7 +33,7 @@ import numpy as np  # noqa: E402
 
 from modules.log_config import setup_logging, install_excepthooks  # noqa: E402
 from modules.camera import CameraFrame, FrameType  # noqa: E402
-from modules.inference import SyncMessage  # noqa: E402
+from modules.inference import ModelType, SyncMessage  # noqa: E402
 from modules.pose import FrameDict  # noqa: E402
 from modules.settings import presets  # noqa: E402
 from modules.utils import PerformanceTimer  # noqa: E402
@@ -79,6 +79,7 @@ def main() -> int:
         loaded: bool = load(settings, path)
         settings.camera.simulator.replay = True
         settings.camera.yolo = True
+        settings.camera.person_detector.model_type = ModelType.TRT       # the app's engine (`engine_path`)
         return loaded
     presets.load = load_for_replay
     app = WhiteSpaceMain(simulation=True, interface=False)
@@ -158,14 +159,22 @@ def main() -> int:
     def run() -> None:
         try:
             deadline: float = time.perf_counter() + 2.0 * (STARTUP + args.end)
+            # The app starts while the recording plays: once it is up, the playhead is set a second before the stretch
+            while float(settings.camera.simulator.playhead[1]) <= 0.0 and time.perf_counter() < deadline:
+                time.sleep(0.01)
+            settings.camera.simulator.seek = max(0.0, args.start - 1.0) / float(settings.camera.simulator.playhead[1])
+            while playhead() >= args.start and time.perf_counter() < deadline:
+                time.sleep(0.01)
             while playhead() < args.start and time.perf_counter() < deadline:
                 time.sleep(0.01)
+            print(f'measuring from playhead {list(settings.camera.simulator.playhead)} in {app.player.active_folder if app.player else None}', flush=True)
             on.set()
             began: float = time.perf_counter()
             while args.start <= playhead() < args.end and time.perf_counter() < deadline:
                 time.sleep(0.01)
             on.clear()
             ended: float = time.perf_counter()
+            print(f'measured until playhead {list(settings.camera.simulator.playhead)}', flush=True)
             if ended >= deadline:
                 print(f'given up at twice the time it should take ({2.0 * (STARTUP + args.end):.0f} s)', flush=True)
             report = dict(label=args.label, folder=args.folder, stretch=[args.start, args.end], seconds=round(ended - began, 2),
