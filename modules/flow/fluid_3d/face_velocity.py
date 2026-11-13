@@ -7,8 +7,7 @@ from modules.gl import Texture3D, SwapTexture3D
 
 class FaceVelocity:
     """The faces in one RGBA16F volume a face longer on every axis: a texel's x, y and z the faces on its cell's
-    left, bottom and front, w unused. Timed in the app against three R16F volumes, one a component, it was the
-    faster in every pass: one texel read gives a cell's three faces where a pass reads them together."""
+    left, bottom and front, w unused. Why one volume: modules/flow/FLUID_3D.md, "The staggered velocity"."""
 
     def __init__(self, swap: bool) -> None:
         self.volume: Texture3D = SwapTexture3D(wrap=GL_CLAMP_TO_EDGE) if swap else Texture3D(wrap=GL_CLAMP_TO_EDGE)

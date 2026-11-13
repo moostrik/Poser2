@@ -9,7 +9,7 @@ inferred, **(site fact)** what the operator saw.
 
 | #   | Line                                                                      | State                                                         | Documents                                                    |
 |-----|---------------------------------------------------------------------------|---------------------------------------------------------------|--------------------------------------------------------------|
-| 1   | [The flow held up to the rules](#1-the-flow-held-up-to-the-rules)         | analysed: nine steps                                          | `CLAUDE.md`, `.claude/rules`                                 |
+| 1   | [The flow held up to the rules](#1-the-flow-held-up-to-the-rules)         | built; the settings left, after the refactor                 | `CLAUDE.md`, `.claude/rules`                                 |
 | 2   | [The 3D fluid's input](#2-the-3d-fluids-input)                            | built; the depth read to choose                               | [VIEW.md](VIEW.md), [BRIDGE_3D.md](BRIDGE_3D.md)             |
 | 3   | [The 3D fluid's look at 4K](#3-the-3d-fluids-look-at-4k)                  | next                                                          | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md)           |
 | 4   | [One unit across the stages](#4-one-unit-across-the-stages)               | not started                                                   | [FLOW.md](FLOW.md)                                           |
@@ -34,25 +34,14 @@ Met throughout: other packages imported from their `__init__`, one `from` line a
 `import *`; time from `perf_counter`; loggers by `getLogger(__name__)`, no `print`; no `# type: ignore`; every
 public function with a return hint; OpenGL imported by name, no `GL_TIMEOUT_IGNORED`.
 
-### The largest finding: reasons in docstrings
-
-The findings are apart from each other; none causes another. The largest: the flow's design reasoning sits in
-its code. 55 docstrings run past ten lines, 930 lines together; the largest
-are module docstrings that are design essays: `velocity_bandpass.py` (53 lines), `depth_velocity.py` (47),
-`fluid_3d.py` (33), `velocity_lowpass.py` (32), `lucas_kanade_flow_3d.py` (29), `finite_guard.py` (22),
-`lucas_kanade_flow.py` and `fluid_2d.py` (21). `FaceVelocity`'s docstring holds a timing. The rule: a docstring
-says what the thing is; reasons sit in the package's document. Each reason either is in MOTION.md, BRIDGE_3D.md
-or FLUID_3D.md already, and goes from the code, or moves there; the docstring keeps what the thing is and its
-arguments. The other findings are small by comparison.
-
 ### Steps
 
 | #    | Step                                                                       | Rule                                                                     |
 |------|----------------------------------------------------------------------------|--------------------------------------------------------------------------|
-| 1.1  | the reasons out of the docstrings into the stage documents, each fact once | a docstring says what the thing is; reasons in the package's document    |
 | 1.10 | every setting and its description gone through, last, after the refactor   | a `Field` description is one short line of panel text: what and its unit |
 
-Each step is one commit, built on your "go", its call sites and tests in the same change.
+`fluid_2d.py`'s module docstring, a 21-line pipeline, goes with the 2D fluid's rebuild and its document
+([line 6](#6-the-2d-flow-follows-the-3d)).
 
 Not judged by a scan: whether every unit means something on its own, beyond the names above. The flow runs on the
 render thread, so the concurrency rules touch none of it.
@@ -220,7 +209,6 @@ Not worked on until asked for; each with what is known.
 
 ## Rules it touches
 
-- A docstring says what the thing is; reasons sit in the package's document: 1.1.
 - A `Field` description is one short line of panel text: 1.10.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the two depth reads not chosen,
   `bilateral_contrast` and the preset's `view.depth_read`, line 2.

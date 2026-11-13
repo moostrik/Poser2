@@ -90,7 +90,8 @@ class Fluid3D:
     """3D Navier-Stokes fluid simulation, every field a GL_TEXTURE_3D on one grid.
 
     Fields:
-        velocity:    SwapTexture3D  RGBA16F  (u, v, w, spare)
+        faces:       FaceVelocity   RGBA16F  the velocity on the cells' faces, a face longer on every axis
+        velocity:    SwapTexture3D  RGBA16F  (u, v, w, spare) the faces averaged to the cells' centers
         density:     Density, with FineDensity and ParticleDensity where enabled
         temperature: SwapTexture3D  R16F
         pressure:    SwapTexture3D  R32F
