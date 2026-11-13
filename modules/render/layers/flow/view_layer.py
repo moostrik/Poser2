@@ -37,7 +37,7 @@ class ViewLayerSettings(StageLayerSettings):
     far:           Field[float] = Field(4.0, min=0.1, max=12.0, step=0.05, description="Farthest depth that is the player (m)")
     guided_radius: Field[float] = Field(2.0, min=0.0, max=8.0, step=0.25, newline=True, description="How far the image moves the mask's edge to its own, in depth pixels; 0 = off")
     edge_contrast: Field[float] = Field(0.03, min=0.001, max=0.3, step=0.001, description="The image's brightness spread (0 to 1) above which the mask's edge follows the image's")
-    depth_read:    Field[DepthRead] = Field(DepthRead.SURFACE, newline=True, description="How the depth is read into the view: its edge on its pixels, the mask's, or the image's (joint bilateral)")
+    depth_read:    Field[DepthRead] = Field(DepthRead.SURFACE, newline=True, description="How the depth is read into the view: its pixels' edge, the mask's or the image's")
     bilateral_contrast: Field[float] = Field(0.1, min=0.01, max=0.5, step=0.005, description="BILATERAL: the color distance (0 to 1) at which a depth pixel's weight falls to 0.6, σr")
 
 

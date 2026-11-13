@@ -76,7 +76,7 @@ class ParticleSettings(BaseSettings):
     rate: Field[float]              = Field(20.0,   min=0.01,   max=50.0,                               description="Particles per texel per second where density is (fewer: heavier, bigger blobs)")
     ring_fade: Field[float]         = Field(0.1,    min=0.01,   max=1.0,                                description="The ring's last share the oldest fade over before they are overwritten")
     draw: Field[ParticleDraw]       = Field(ParticleDraw.POINTS,                                        description="Points, streaks, blobs or a surface")
-    overlap: Field[Overlap]         = Field(Overlap.OCCLUDED,                                           description="Occluded: near density covers far density. Additive: one sum. Weighted: near over far by a weight, one pass")
+    overlap: Field[Overlap]         = Field(Overlap.OCCLUDED,                                           description="How near density covers far: occluded, one sum, or weighted in one pass")
     slices: Field[int]              = Field(16,     min=2,      max=32,                                 description="Depth slices of the occluded look, at the output's size")
     size: Field[float]              = Field(1.0,    min=1.0,    max=8.0,                                description="A point's size in pixels")
     streak: Field[float]            = Field(1.0,    min=0.0,    max=4.0,                                description="A streak's length as a share of its step")
@@ -121,7 +121,7 @@ class InputSettings(BaseSettings):
 class VelocitySettings(BaseSettings):
     """The velocity: how it carries itself, fades, swirls and thickens."""
     advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the velocity carries itself: MacCormack keeps swirls, at about twice the reads")
-    limiter: Field[Limiter]         = Field(Limiter.CLAMP,                              description="MacCormack where its correction overshoots: clamp it to the step's bounds, or revert to the plain step")
+    limiter: Field[Limiter]         = Field(Limiter.CLAMP,                              description="Where MacCormack overshoots: clamped to the step's bounds, or the plain step")
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=1.0,    color="blue-grey",      description="How far the velocity carries itself per step; 1 = with the water, the physics")
     fade_time: Field[float]         = Field(60.0,   min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the velocity fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds 1 width/s takes to brake to rest, a fixed amount at a time; 0 = off")
@@ -146,7 +146,7 @@ class DensitySettings(BaseSettings):
     height: Field[int]              = Field(800,    min=32,     max=4096,   step=8,                 description="The density's height; the dye's is the bridge's height")
     depth: Field[int]               = Field(24,     min=4,      max=256,    step=4,                 description="The density's depth in z")
     advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,  newline=True,   description="How the density and the fine density are carried: MacCormack keeps their edges sharp")
-    limiter: Field[Limiter]         = Field(Limiter.CLAMP,                              description="MacCormack where its correction overshoots: clamp it to the step's bounds, or revert to the plain step")
+    limiter: Field[Limiter]         = Field(Limiter.CLAMP,                              description="Where MacCormack overshoots: clamped to the step's bounds, or the plain step")
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey",      description="How far the density is carried per step; 1 = with the water, above it runs ahead")
     fade_time: Field[float]         = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the density fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds fully dyed water takes to clear, faint first; 0 = off")
@@ -166,7 +166,7 @@ class FineDensitySettings(BaseSettings):
 class TemperatureSettings(BaseSettings):
     """The temperature: how it is carried, fades, and lifts or sinks the water."""
     advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the warmth is carried; only its buoyancy is seen")
-    limiter: Field[Limiter]         = Field(Limiter.CLAMP,                              description="MacCormack where its correction overshoots: clamp it to the step's bounds, or revert to the plain step")
+    limiter: Field[Limiter]         = Field(Limiter.CLAMP,                              description="Where MacCormack overshoots: clamped to the step's bounds, or the plain step")
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey",      description="How far the temperature is carried per step; 1 = with the water, above it runs ahead")
     fade_time: Field[float]         = Field(3.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the warmth fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds full warmth (±1) takes to reach 0, a fixed amount at a time; 0 = off")
@@ -196,7 +196,7 @@ class LightSettings(BaseSettings):
     z: Field[float]                 = Field(-0.3, min=-1.0, max=1.0,    color="amber",          description="z away from the viewer; -1 = from the front")
     grid: Field[LightGrid]          = Field(LightGrid.FULL,                                     description="The light's grid: a quarter, half or all of the simulation's cells each way; finer, sharper shadows")
     intensity: Field[float]         = Field(1.0,  min=0.0,  max=50.0,   step=0.1, color="amber", description="How bright the light shows fully dyed water filling the view, lit straight on: 1 = its color")
-    fog_scattering: Field[float]    = Field(0.0,  min=0.0,  max=1.0,    color="light-blue",     description="Share of the light the fog takes out that it sends on: the water glows, shafts in the shadows; 0 = off")
+    fog_scattering: Field[float]    = Field(0.0,  min=0.0,  max=1.0,    color="light-blue",     description="Share of the light the fog takes out that it scatters on; 0 = off")
     caustics: Field[float]          = Field(0.0,  min=0.0,  max=1.0,    color="amber",          description="Contrast of the caustic net, the light under a wavy surface, carried down as shafts; 0 = off")
     caustic_size: Field[float]      = Field(0.08, min=0.01, max=1.0,    widget=Widget.log_slider, color="amber", description="The caustic net's cell, widths")
     caustic_depth: Field[float]     = Field(0.5,  min=0.05, max=4.0,    widget=Widget.log_slider, color="amber", description="Widths down the light's way over which the caustic net fades to 37%")

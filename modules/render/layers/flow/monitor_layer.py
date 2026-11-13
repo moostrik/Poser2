@@ -89,7 +89,7 @@ class MonitorLayerSettings(BaseSettings):
     stage: Field[FlowStage] =       Field(FlowStage.BRIDGE, description="The stage whose texture is shown")
     names: Field[list[str]] =       Field([""], access=Field.READ, visible=False, description="The stage's textures")
     texture: Field[str] =           Field("output.boundary_velocity", widget=Widget.text_select, options=names, description="The texture shown")
-    view: Field[MonitorView] =      Field(MonitorView.COLORMAP, description="By its kind (in 3D the cube), as glyphs (arrows, or dots for a scalar), raw, as a histogram, or as a strip over time")
+    view: Field[MonitorView] =      Field(MonitorView.COLORMAP, description="How the port is drawn: by its kind, glyphs, raw, histogram or strip")
 
     advanced = Group(MonitorAdvancedSettings)
 
