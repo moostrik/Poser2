@@ -70,7 +70,9 @@ with you at the rig, and its tests pass.
 Every package in `modules/`, one at a time in alphabetical order (`board`, `camera`, `gl`, `inference`, `inout`,
 `oak`, `panel`, `pose`, `recording`, `render`, `session`, `settings`, `tracker`, `utils`, `video`, and
 `log_config.py`; `flow` is held up in [its own plan](../modules/flow/FLOW_PLAN.md), line 1), against `CLAUDE.md` and `.claude/rules`: reported per package, a plan
-for what does not meet them.
+for what does not meet them, built on your go. App-specific code in a module comes first: what only one app uses or
+decides moves to that app. Each module's rules file, where it has one, is checked with it: still true of the code,
+about this module, a rule rather than a description, and nothing missing; what to change goes to the rules thread.
 
 ## G. hd_trio back
 
