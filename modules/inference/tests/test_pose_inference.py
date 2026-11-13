@@ -33,6 +33,31 @@ class PoseInferenceImagesTest(unittest.TestCase):
         self.assertEqual(cropped[0].timestamp, 1.0)             # stamped with the given image's capture time
         self.assertIn(0, crops)
 
+    def test_the_segmentation_crop_is_cut_from_the_same_images_and_region_at_its_size(self) -> None:
+        pose_crop = crop.Settings()
+        pose_crop.output_width, pose_crop.output_height = 192, 256
+        pose_crop.initialize()
+        segmentation_crop = crop.Settings()
+        segmentation_crop.output_width, segmentation_crop.output_height = 768, 1024
+        segmentation_crop.initialize()
+        inference = PoseInference(pose_crop, self.pose_settings, segmentation_crop)
+        cut: list = []
+        inference.add_segmentation_crop_callback(lambda frames, crops: cut.append((frames, crops)))
+        self.uploader._upload(CameraFrame(0, FrameType.VIDEO, np.zeros((48, 64, 3), np.uint8), 1.0))
+        given = self.snapshots[-1]
+        self.uploader._upload(CameraFrame(0, FrameType.VIDEO, np.zeros((48, 64, 3), np.uint8), 2.0))    # a newer image
+        cropped, crops = inference.cut_crops({0: self.pose}, given)
+        self.assertEqual(len(cut), 1)
+        segmentation_frames, segmentation_crops = cut[0]
+        self.assertEqual(tuple(crops[0].crop.shape), (3, 256, 192))
+        self.assertEqual(tuple(segmentation_crops[0].crop.shape), (3, 1024, 768))
+        self.assertEqual(segmentation_frames[0].timestamp, 1.0)                     # the same images
+        self.assertEqual(segmentation_frames[0][BBox].to_rect(), cropped[0][BBox].to_rect())    # one region
+
+    def test_without_segmentation_crop_settings_its_callback_is_an_error(self) -> None:
+        with self.assertRaises(ValueError):
+            self.inference.add_segmentation_crop_callback(lambda frames, crops: None)
+
     def test_poses_without_images_are_an_error(self) -> None:
         with self.assertRaises(ValueError):
             self.inference.cut_crops({0: self.pose}, None)

@@ -83,13 +83,9 @@ already uses); [the flow's line 5](../modules/flow/FLOW_PLAN.md#5-the-2d-flow-fo
 Its recordings stay as they are (mp4 chunks any player plays, stored mirrored, a pose file per chunk), and so do its
 pose-following center layers. One step per commit.
 
-Built: 1, the pose model's crop settings are `pose_crop` in every app.
+Built: 1, the pose model's crop settings are `pose_crop` in every app; 2, `PoseInference` cuts the
+segmentation's crops beside the pose model's, given their settings (`add_segmentation_crop_callback`).
 
-2. **The segmentation's crop.** `PoseInference` takes a second `crop.Settings` (optional) and cuts it from the
-   same snapshot and boxes as the pose model's, handed on through its own callback (`add_segmentation_crop_callback`),
-   so the pose model gets its crop at its own input size and the segmentation and the board theirs at their size.
-   Both are 3:4 in hd_trio (192 × 256 and 768 × 1024), so one region. Checked by: an inference test (both crops
-   from one snapshot, one region, each at its size) and the inference tests.
 3. **The recorder's `mirrored`.** A recorder setting, off by default: on, it stores each frame mirrored (one flip
    and copy a frame on the recorder's thread) with its tracklets' boxes mirrored to match (the camera gives them
    unmirrored), its poses as they come (the pipeline's are found on the uploaded image, mirrored already), and
