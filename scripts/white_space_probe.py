@@ -68,6 +68,7 @@ def main() -> int:
     parser.add_argument('--start', type=float, required=True, help='the stretch to measure: its start in the recording (s)')
     parser.add_argument('--end', type=float, required=True, help='its end in the recording (s)')
     parser.add_argument('--out', default='.', help='the folder the report goes in')
+    parser.add_argument('--record', action='store_true', help='record over the stretch, as `probe_<label>` in the recordings')
     args = parser.parse_args()
 
     setup_logging(verbose=False, name='white_space')
@@ -168,6 +169,10 @@ def main() -> int:
             while playhead() < args.start and time.perf_counter() < deadline:
                 time.sleep(0.01)
             print(f'measuring from playhead {list(settings.camera.simulator.playhead)} in {app.player.active_folder if app.player else None}', flush=True)
+            recorder = settings.session.video
+            if args.record:
+                recorder.name = f'probe_{args.label}'
+                recorder.start = True
             on.set()
             began: float = time.perf_counter()
             while args.start <= playhead() < args.end and time.perf_counter() < deadline:
@@ -175,6 +180,10 @@ def main() -> int:
             on.clear()
             ended: float = time.perf_counter()
             print(f'measured until playhead {list(settings.camera.simulator.playhead)}', flush=True)
+            if args.record:
+                recorder.stop = True
+                while recorder.recording and time.perf_counter() < deadline:
+                    time.sleep(0.05)
             if ended >= deadline:
                 print(f'given up at twice the time it should take ({2.0 * (STARTUP + args.end):.0f} s)', flush=True)
             report = dict(label=args.label, folder=args.folder, stretch=[args.start, args.end], seconds=round(ended - began, 2),
@@ -187,6 +196,9 @@ def main() -> int:
                           drops=dict(frame_sync=app.frame_sync.dropped, tracklet_sync=app.tracklet_sync.dropped,
                                      uploader=app.uploader.dropped, pose_step=settings.pose.frame_source.dropped,
                                      pose_pipeline=app.pipeline.dropped, pose_model=settings.pose.pose.dropped))
+            if args.record:
+                report['recorded'] = dict(missed_tracklets=recorder.missed_tracklets, missed_poses=recorder.missed_poses,
+                                          dropped=recorder.dropped)
             out: Path = Path(args.out) / f'white_space_{args.label}.json'
             out.write_text(json.dumps(report, indent=2))
             print(json.dumps(report, indent=2), flush=True)
