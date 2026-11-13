@@ -106,6 +106,7 @@ class Uploader(Thread):
             name="GPU Image Upload  ", sample_count=200, report_interval=100,
             color="green", omit_init=25,
         )
+        self._callback_lock: Lock = Lock()                          # the three lists below
         self._gpu_image_callbacks: list[GpuImageCallback] = []     # run in registration order, on this thread
         self._gpu_depth_callbacks: list[GpuDepthCallback] = []     # run in registration order, on this thread
         self._tracklet_callbacks: list[TrackletCallback] = []      # run in registration order, on this thread
@@ -157,8 +158,9 @@ class Uploader(Thread):
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
         """The camera's tracklets, straightened and mirrored as the images are, on this thread."""
-        if callback not in self._tracklet_callbacks:
-            self._tracklet_callbacks.append(callback)
+        with self._callback_lock:
+            if callback not in self._tracklet_callbacks:
+                self._tracklet_callbacks.append(callback)
 
     def run(self) -> None:
         while True:
@@ -201,7 +203,9 @@ class Uploader(Thread):
     def _hand_on_tracklets(self, cam_tracklets: CameraTracklets, homography: np.ndarray | None, flip_h: bool) -> None:
         if not cam_tracklets.straightened:
             cam_tracklets = straightened_tracklets(cam_tracklets, homography, flip_h)
-        for callback in self._tracklet_callbacks:
+        with self._callback_lock:
+            tracklet_callbacks: list[TrackletCallback] = list(self._tracklet_callbacks)
+        for callback in tracklet_callbacks:
             try:
                 callback(cam_tracklets)
             except Exception:
@@ -209,13 +213,15 @@ class Uploader(Thread):
 
     def add_gpu_image_callback(self, callback: GpuImageCallback) -> None:
         """Every uploaded image, with its capture time and the event that says it is written, on this thread."""
-        if callback not in self._gpu_image_callbacks:
-            self._gpu_image_callbacks.append(callback)
+        with self._callback_lock:
+            if callback not in self._gpu_image_callbacks:
+                self._gpu_image_callbacks.append(callback)
 
     def add_gpu_depth_callback(self, callback: GpuDepthCallback) -> None:
         """Every uploaded depth frame, in its place among the images, with the event that says it is written, on this thread."""
-        if callback not in self._gpu_depth_callbacks:
-            self._gpu_depth_callbacks.append(callback)
+        with self._callback_lock:
+            if callback not in self._gpu_depth_callbacks:
+                self._gpu_depth_callbacks.append(callback)
 
     def _upload(self, frame: CameraFrame) -> None:
         """A color frame to the GPU: converted, straightened and flipped there, stored as the camera's current
@@ -261,7 +267,9 @@ class Uploader(Thread):
         self._accumulated_upload_ms += (time.perf_counter() - start) * 1000.0
 
         gpu_image: GpuImage = GpuImage(cam_id, frame.timestamp, rgb, ready)
-        for callback in self._gpu_image_callbacks:
+        with self._callback_lock:
+            image_callbacks: list[GpuImageCallback] = list(self._gpu_image_callbacks)
+        for callback in image_callbacks:
             try:
                 callback(gpu_image)
             except Exception:
@@ -290,7 +298,9 @@ class Uploader(Thread):
         events[index] = ready
 
         gpu_depth: GpuDepth = GpuDepth(cam_id, frame.timestamp, depth, ready)
-        for callback in self._gpu_depth_callbacks:
+        with self._callback_lock:
+            depth_callbacks: list[GpuDepthCallback] = list(self._gpu_depth_callbacks)
+        for callback in depth_callbacks:
             try:
                 callback(gpu_depth)
             except Exception:

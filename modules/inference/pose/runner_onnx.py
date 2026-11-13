@@ -1,5 +1,4 @@
 # Standard library imports
-from queue import Queue, Empty
 from threading import Thread, Lock, Event
 import time
 
@@ -10,7 +9,6 @@ import onnxruntime as ort
 
 from ..ort_runtime import preload_cuda
 
-from modules.utils import PerformanceTimer
 from .io import PoseInput, PoseOutput, PoseOutputCallback
 
 from .settings import Settings
@@ -30,10 +28,14 @@ class RunnerONNX(Thread):
 
     Faster alternative to MMDetection using exported ONNX models.
     Architecture identical to MMDetection for drop-in replacement.
+
+    A pending batch replaced by a newer one is counted in `settings.dropped` and its callbacks told on the
+    submitting thread (`processed=False`); results go to the callbacks from the inference thread, which only enqueue.
     """
 
     def __init__(self, settings: 'Settings') -> None:
         super().__init__()
+        self.settings: Settings = settings
 
         self.model_file: str = settings.model_path + '/' + settings.model
         self.model_width: int = settings.width
@@ -59,9 +61,6 @@ class RunnerONNX(Thread):
         # Callbacks
         self._callback_lock: Lock = Lock()
         self._callbacks: list[PoseOutputCallback] = []     # run in registration order
-        self._callback_queue: Queue[tuple[PoseOutput, float] | None] = Queue(maxsize=2)     # each with the moment it was queued
-        self._result_wait: PerformanceTimer = PerformanceTimer(name="Wait pose result")   # how long a result waits for the callback thread (ms)
-        self._callback_thread: Thread = Thread(target=self._dispatch_callbacks, daemon=True)
 
         # ONNX session (initialized in run thread)
         self._session: ort.InferenceSession | None = None
@@ -76,10 +75,6 @@ class RunnerONNX(Thread):
         """Check if model is loaded and ready"""
         return self._model_ready.is_set() and not self._shutdown_event.is_set() and self.is_alive()
 
-    def start(self) -> None:
-        self._callback_thread.start()
-        super().start()
-
     def stop(self) -> None:
         self._shutdown_event.set()
         self._notify_update_event.set()
@@ -87,15 +82,6 @@ class RunnerONNX(Thread):
 
         if self.is_alive():
             logger.warning("ONNX inference thread did not stop cleanly")
-
-        try:
-            self._callback_queue.put_nowait(None)
-        except:
-            pass
-
-        self._callback_thread.join(timeout=2.0)
-        if self._callback_thread.is_alive():
-            logger.warning("ONNX callback thread did not stop cleanly")
 
     def run(self) -> None:
         self._setup()
@@ -138,11 +124,8 @@ class RunnerONNX(Thread):
             self._input_timestamp = time.perf_counter()
 
         if dropped_batch is not None:
-            dropped_output = PoseOutput(batch_id=dropped_batch.batch_id, processed=False)
-            try:
-                self._callback_queue.put_nowait((dropped_output, time.perf_counter()))
-            except:
-                pass
+            self.settings.dropped += 1
+            self._dispatch(PoseOutput(batch_id=dropped_batch.batch_id, processed=False))
 
         self._notify_update_event.set()
 
@@ -273,10 +256,7 @@ class RunnerONNX(Thread):
                 inference_time_ms=inference_time_ms
             )
 
-        try:
-            self._callback_queue.put_nowait((output, time.perf_counter()))
-        except Exception:
-            logger.warning("Pose Callback queue full")
+        self._dispatch(output)
 
     def _infer(self, gpu_imgs: list[torch.Tensor]) -> tuple[np.ndarray, np.ndarray]:
         """Run inference on GPU images using IOBinding for zero-copy.
@@ -399,28 +379,15 @@ class RunnerONNX(Thread):
             if callback in self._callbacks:
                 self._callbacks.remove(callback)
 
-    def _dispatch_callbacks(self) -> None:
-        """Dispatch results to callbacks. Identical to MMDetection."""
-        while not self._shutdown_event.is_set():
+    def _dispatch(self, output: PoseOutput) -> None:
+        """A result to the callbacks, copied under their lock and called outside it."""
+        with self._callback_lock:
+            callbacks: list[PoseOutputCallback] = list(self._callbacks)
+        for callback in callbacks:
             try:
-                item: tuple[PoseOutput, float] | None = self._callback_queue.get(timeout=0.5)
-
-                if item is None:
-                    break
-                output, queued = item
-                self._result_wait.add_time((time.perf_counter() - queued) * 1000.0, report=False)
-
-                with self._callback_lock:
-                    callbacks = list(self._callbacks)
-
-                for callback in callbacks:
-                    try:
-                        callback(output)
-                    except Exception:
-                        logger.exception("Error in callback")
-                self._callback_queue.task_done()
-            except Empty:
-                continue
+                callback(output)
+            except Exception:
+                logger.exception("Pose: error in a result callback")
 
     # STATIC METHODS
     @staticmethod

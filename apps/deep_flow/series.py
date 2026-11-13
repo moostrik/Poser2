@@ -14,7 +14,6 @@ class Series(IntEnum):
     GPU_FLUID =             auto()  # ms of GPU in a fluid's step
     WAIT_UPLOAD =           auto()  # ms a camera frame waits in the uploader's queue
     WAIT_UPLOAD_TRACKLETS = auto()  # ms a camera's tracklet message waits in the uploader's queue
-    WAIT_POSE_RESULT =      auto()  # ms a pose model's result waits for its callback thread
     WAIT_CAPTURE_SYNC =     auto()  # ms an image, depth, poses or masks wait in the capture sync's inbox
     WAIT_POSE_STEP =        auto()  # ms a frame bang waits for the pose step's thread
     WAIT_POSE_PIPELINE =    auto()  # ms a pose model's result waits for the stages after it
@@ -27,7 +26,6 @@ TIMER_SERIES: dict[str, Series] = {
     'GPU fluid':                Series.GPU_FLUID,
     'Wait upload':              Series.WAIT_UPLOAD,
     'Wait upload tracklets':    Series.WAIT_UPLOAD_TRACKLETS,
-    'Wait pose result':         Series.WAIT_POSE_RESULT,
     'Wait capture sync':        Series.WAIT_CAPTURE_SYNC,
     'Wait pose step':           Series.WAIT_POSE_STEP,
     'Wait pose pipeline':       Series.WAIT_POSE_PIPELINE,

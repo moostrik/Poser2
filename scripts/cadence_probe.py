@@ -176,7 +176,8 @@ def main() -> int:
                           waits_ms={k: spread(v) for k, v in sorted(waits.items())}, uploads_ms={k: spread(v) for k, v in uploads.items()},
                           drops=dict(uploader=app.uploader.dropped, board=app.board.get_dropped_captures(),
                                      depth_without_image=app.capture_sync.settings.misses, capture_sync=app.capture_sync.settings.dropped,
-                                     pose_step=app.settings.pose.tracklets.dropped, pose_pipeline=app.pipeline.dropped))
+                                     pose_step=app.settings.pose.tracklets.dropped, pose_pipeline=app.pipeline.dropped,
+                                     pose_model=app.settings.pose.pose.dropped, optical_flow=app.settings.pose.optical_flow.dropped))
             if args.record:
                 recorder = settings.camera.recorder
                 report['recorded'] = dict(missed_depth=recorder.missed_depth, missed_color=recorder.missed_color,

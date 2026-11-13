@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     resolution: Field[Resolution] = Field(Resolution.STANDARD, access=Field.INIT)
     model_path: Field[str]        = Field("data/models", access=Field.INIT, visible=False)
     verbose:    Field[bool]       = Field(False, access=Field.INIT)
+    dropped:    Field[int]        = Field(0, access=Field.READ, description="Batches replaced by a newer one before the model ran them")
 
     @property
     def width(self) -> int:

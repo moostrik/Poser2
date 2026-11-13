@@ -156,11 +156,12 @@ class Predictor:
     def _notify_callbacks(self, poses: FrameDict, mask_frames: ImageDict) -> None:
         """Emit callbacks with poses and segmentation frames."""
         with self._callback_lock:
-            for callback in self._callbacks:
-                try:
-                    callback(poses, mask_frames)
-                except Exception:
-                    logger.exception("Error in callback")
+            callbacks: list[ImageCallback] = list(self._callbacks)
+        for callback in callbacks:
+            try:
+                callback(poses, mask_frames)
+            except Exception:
+                logger.exception("Segmentation: error in a mask callback")
     def add_segmentation_callback(self, callback: ImageCallback) -> None:
         """Register callback to receive poses and segmentation images."""
         with self._callback_lock:

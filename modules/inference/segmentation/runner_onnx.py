@@ -1,5 +1,4 @@
 # Standard library imports
-from queue import Queue, Empty
 from threading import Thread, Lock, Event
 import time
 
@@ -36,17 +35,17 @@ class RunnerONNX(Thread):
     ONNX Runtime implementation for testing/validation. Use PredictorTRT for production.
 
     Uses recurrent states for temporal coherence, eliminating flickering artifacts.
-    Single-slot queue: only the most recent batch waits processing; older pending batches dropped.
-    Batches already processing cannot be cancelled.
+    Single-slot queue: only the most recent batch waits processing; an older pending batch is dropped, counted in
+    `settings.dropped`, and its callbacks told on the submitting thread (`processed=False`). Batches already
+    processing cannot be cancelled.
 
     Maintains per-tracklet recurrent states (r1-r4) for temporal consistency.
-    All results delivered via callbacks in notification order.
+    Results go to the callbacks from the inference thread, which only enqueue.
     """
 
     def __init__(self, settings: 'Settings') -> None:
         super().__init__()
-
-
+        self.settings: 'Settings' = settings
 
         self.model_path: str = settings.model_path
         self.model_name: str = settings.model
@@ -70,8 +69,6 @@ class RunnerONNX(Thread):
         # Callbacks
         self._callback_lock: Lock = Lock()
         self._callbacks: list[SegmentationOutputCallback] = []      # run in registration order
-        self._callback_queue: Queue[SegmentationOutput | None] = Queue(maxsize=2)
-        self._callback_thread: Thread = Thread(target=self._dispatch_callbacks, daemon=True)
 
         # Per-tracklet recurrent states for temporal coherence
         self._recurrent_states: dict[int, RecurrentState] = {}
@@ -107,12 +104,8 @@ class RunnerONNX(Thread):
         """Check if model is loaded and system is ready to process segmentation"""
         return self._model_ready.is_set() and not self._shutdown_event.is_set() and self.is_alive()
 
-    def start(self) -> None:
-        self._callback_thread.start()
-        super().start()
-
     def stop(self) -> None:
-        """Stop both inference and callback threads gracefully."""
+        """Stop the inference thread gracefully."""
         self._shutdown_event.set()
 
         # Wake up inference thread
@@ -121,16 +114,6 @@ class RunnerONNX(Thread):
 
         if self.is_alive():
             logger.warning("Segmentation inference thread did not stop cleanly")
-
-        # Wake up callback thread with sentinel
-        try:
-            self._callback_queue.put_nowait(None)
-        except:
-            pass
-
-        self._callback_thread.join(timeout=2.0)
-        if self._callback_thread.is_alive():
-            logger.warning("Segmentation callback thread did not stop cleanly")
 
     def run(self) -> None:
         self._setup()
@@ -178,17 +161,8 @@ class RunnerONNX(Thread):
 
         # Notify about dropped batch
         if dropped_batch is not None:
-            dropped_output = SegmentationOutput(
-                batch_id=dropped_batch.batch_id,
-                track_ids=dropped_batch.track_ids,
-                processed=False  # Mark as not processed
-            )
-            try:
-                self._callback_queue.put_nowait(dropped_output)
-            except:
-                if self.verbose:
-                    logger.warning("Segmentation Callback queue full, not critical for dropped notifications")
-                pass  # Queue full, not critical for dropped notifications
+            self.settings.dropped += 1
+            self._dispatch(SegmentationOutput(batch_id=dropped_batch.batch_id, track_ids=dropped_batch.track_ids, processed=False))
 
         self._notify_update_event.set()
 
@@ -343,11 +317,7 @@ class RunnerONNX(Thread):
                 )
             except Exception as e:
                 logger.error(f"Segmentation: Batched inference failed: {str(e)}")
-        # Queue for callbacks
-        try:
-            self._callback_queue.put_nowait(output)
-        except Exception:
-            logger.warning("Segmentation Callback queue full, dropping inference results")
+        self._dispatch(output)
 
     def _infer(self, gpu_imgs: list[torch.Tensor], track_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float]:
         """Run batched ONNX inference with per-tracklet recurrent states using GPU images.
@@ -545,26 +515,12 @@ class RunnerONNX(Thread):
             if callback in self._callbacks:
                 self._callbacks.remove(callback)
 
-    def _dispatch_callbacks(self) -> None:
-        """Dispatch queued results to registered callbacks on dedicated thread."""
-        while not self._shutdown_event.is_set():
+    def _dispatch(self, output: SegmentationOutput) -> None:
+        """A result to the callbacks, copied under their lock and called outside it."""
+        with self._callback_lock:
+            callbacks: list[SegmentationOutputCallback] = list(self._callbacks)
+        for callback in callbacks:
             try:
-                if self._callback_queue.qsize() > 1:
-                    logger.warning("Segmentation Callback queue size > 1, consumers may be falling behind")
-
-                output: SegmentationOutput | None = self._callback_queue.get(timeout=0.5)
-
-                if output is None:
-                    break
-
-                with self._callback_lock:
-                    callbacks = list(self._callbacks)
-
-                for callback in callbacks:
-                    try:
-                        callback(output)
-                    except Exception:
-                        logger.exception("Error in callback")
-                self._callback_queue.task_done()
-            except Empty:
-                continue
+                callback(output)
+            except Exception:
+                logger.exception("Segmentation: error in a result callback")

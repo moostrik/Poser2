@@ -1,5 +1,4 @@
 # Standard library imports
-from queue import Queue, Empty
 from threading import Thread, Lock, Event
 import time
 
@@ -31,13 +30,15 @@ class RunnerTRT(Thread):
     All preprocessing and inference runs on the same dedicated stream to avoid sync overhead.
 
     Uses a single-slot queue: only the most recent submitted batch waits to be processed.
-    Older pending batches are dropped. Batches already processing on GPU cannot be cancelled.
+    An older pending batch is dropped, counted in `settings.dropped`, and its callbacks told on the submitting
+    thread (`processed=False`). Batches already processing on GPU cannot be cancelled.
 
-    All results (success and dropped) are delivered via callbacks in notification order.
+    Results go to the callbacks from the inference thread, which only enqueue.
     """
 
     def __init__(self, settings: 'Settings') -> None:
         super().__init__()
+        self.settings: 'Settings' = settings
 
         self.model_path: str = settings.model_path
         self.model_name: str = settings.model
@@ -61,8 +62,6 @@ class RunnerTRT(Thread):
         # Callbacks
         self._callback_lock: Lock = Lock()
         self._callbacks: list[OpticalFlowOutputCallback] = []       # run in registration order
-        self._callback_queue: Queue[OpticalFlowOutput | None] = Queue(maxsize=2)
-        self._callback_thread: Thread = Thread(target=self._dispatch_callbacks, daemon=True)
 
         # TensorRT engine and context (initialized in run())
         self.engine: trt.ICudaEngine
@@ -86,12 +85,8 @@ class RunnerTRT(Thread):
         """Check if model is loaded and system is ready to process optical flow"""
         return self._model_ready.is_set() and not self._shutdown_event.is_set() and self.is_alive()
 
-    def start(self) -> None:
-        self._callback_thread.start()
-        super().start()
-
     def stop(self) -> None:
-        """Stop both inference and callback threads gracefully."""
+        """Stop the inference thread gracefully."""
         self._shutdown_event.set()
 
         # Wake up inference thread
@@ -100,16 +95,6 @@ class RunnerTRT(Thread):
 
         if self.is_alive():
             logger.warning("Optical Flow inference thread did not stop cleanly")
-
-        # Wake up callback thread with sentinel
-        try:
-            self._callback_queue.put_nowait(None)
-        except:
-            pass
-
-        self._callback_thread.join(timeout=2.0)
-        if self._callback_thread.is_alive():
-            logger.warning("Optical Flow callback thread did not stop cleanly")
 
     def run(self) -> None:
         """Main inference thread loop. Initializes TensorRT engine and processes batches."""
@@ -159,15 +144,8 @@ class RunnerTRT(Thread):
 
         # Notify about dropped batch
         if dropped_batch is not None:
-            dropped_output = OpticalFlowOutput(
-                batch_id=dropped_batch.batch_id,
-                track_ids=dropped_batch.track_ids,
-                processed=False
-            )
-            try:
-                self._callback_queue.put_nowait(dropped_output)
-            except:
-                pass
+            self.settings.dropped += 1
+            self._dispatch(OpticalFlowOutput(batch_id=dropped_batch.batch_id, track_ids=dropped_batch.track_ids, processed=False))
 
         self._notify_update_event.set()
 
@@ -283,11 +261,7 @@ class RunnerTRT(Thread):
         else:
             output = OpticalFlowOutput(batch_id=batch.batch_id, track_ids=batch.track_ids, processed=True)
 
-        # Queue for callbacks
-        try:
-            self._callback_queue.put_nowait(output)
-        except Exception:
-            logger.warning("Optical Flow Callback queue full, dropping results")
+        self._dispatch(output)
 
     def _infer(self, gpu_pairs: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, float, float]:
         """Run TensorRT RAFT inference on batch of GPU frame pairs.
@@ -380,23 +354,12 @@ class RunnerTRT(Thread):
             if callback in self._callbacks:
                 self._callbacks.remove(callback)
 
-    def _dispatch_callbacks(self) -> None:
-        """Dispatch queued results to registered callbacks."""
-        while not self._shutdown_event.is_set():
+    def _dispatch(self, output: OpticalFlowOutput) -> None:
+        """A result to the callbacks, copied under their lock and called outside it."""
+        with self._callback_lock:
+            callbacks: list[OpticalFlowOutputCallback] = list(self._callbacks)
+        for callback in callbacks:
             try:
-                output: OpticalFlowOutput | None = self._callback_queue.get(timeout=0.5)
-
-                if output is None:
-                    break
-
-                with self._callback_lock:
-                    callbacks = list(self._callbacks)
-
-                for callback in callbacks:
-                    try:
-                        callback(output)
-                    except Exception:
-                        logger.exception("Error in callback")
-                self._callback_queue.task_done()
-            except Empty:
-                continue
+                callback(output)
+            except Exception:
+                logger.exception("Optical Flow: error in a result callback")

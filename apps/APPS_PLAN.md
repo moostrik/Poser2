@@ -12,8 +12,7 @@ thread runs only the camera, and every drop is counted on the panel ([INPUT_THRE
 
 ## A. deep_flow's callbacks as hand-overs
 
-Every receiver in deep_flow runs on its own thread; what is left is the runners' callback threads and
-`CameraSync`. A hand-over costs its receiver's wake-up, not more Python work: one thread runs Python at a time today too. The
+Every receiver in deep_flow runs on its own thread; what is left is `CameraSync`. A hand-over costs its receiver's wake-up, not more Python work: one thread runs Python at a time today too. The
 receiver runs once it has the GIL, which the sender gives up at once when it blocks or enters a C call that
 releases it (a queue wait, CUDA, OpenGL, numpy, TensorRT), and only at the switch interval (5 ms by default) when it
 or another thread keeps running Python **(deduction)**; the camera's thread was seen waiting up to 5 ms for a busy
@@ -24,18 +23,12 @@ The steps left, each one commit, checked by its tests and, on your go, by one ru
 wait (a `Wait …` timer in the board's time series) beside `CAPTURE_LATENCY`, `POSE_LATENCY_RAW` and
 `POSE_LATENCY_SMOOTH`:
 
-5. The six runners (pose, optical flow, segmentation; ONNX and TRT) lose their callback thread, which only came
-   because the pipeline ran on it: they call their callbacks from the inference thread, which now only enqueue. A
-   batch replaced before it ran is counted (`dropped` on the model's settings) instead of lost silently when the
-   runner's `Queue(maxsize=2)` is full.
 6. `CameraSync` (the frames' and the tracklets' sync of white_space and hd_trio) gets its own thread, as the other
    syncs: its submits enqueue (16 per camera, the oldest dropped and counted), its thread decides the sync and
    calls its callbacks outside its lock. Checked by its tests; its run is B's.
 
-The callback lists these steps touch each get their own lock, copied under it and called outside it: the
-uploader's (`add_gpu_image_callback`, `add_gpu_depth_callback`, `add_tracklet_callback`, which register without a
-lock today), `CameraSync`'s (called under its lock today), the optical flow predictor's
-(called under its lock today) and the runners'.
+`CameraSync`'s callback list gets its own lock, copied under it and called outside it (called under its lock
+today).
 
 Each new thread is started by `main.start` after the wiring, before the cameras, and stopped by `main.stop` after
 the cameras and the uploader, before the pose model, in the order the data flows; a stop wakes the thread, which
@@ -106,11 +99,10 @@ RECORDING_PLAN.md), and its pose-following center layers, which stay. Planned wh
 
 ## Rules it touches
 
-- A callback stores or enqueues what it receives and returns: the runners' and B's wiring.
+- A callback stores or enqueues what it receives and returns: B's wiring.
 - A receiver does its work on its own thread: `CameraSync` gets one; a matcher stays inline only if its wait says
   so, as a stated exception.
-- A callback list has its own lock, copied under it and called outside it: the uploader's, `CameraSync`'s, the
-  optical flow predictor's and the runners'.
+- A callback list has its own lock, copied under it and called outside it: `CameraSync`'s.
 - The camera's thread runs only the camera: B1.
 - A consumer that needs every item gets a callback; one that needs the latest reads the board: B2, B3.
 - `submit` enqueues deferred work, `process` transforms and emits synchronously: `CameraSync`'s `submit_*`.

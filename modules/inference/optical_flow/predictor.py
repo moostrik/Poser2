@@ -72,11 +72,12 @@ class Predictor:
 
     def _notify_callbacks(self, flow_dict: FlowDict) -> None:
         with self._callback_lock:
-            for callback in self._callbacks:
-                try:
-                    callback(flow_dict)
-                except Exception:
-                    logger.exception("Error in callback")
+            callbacks: list[FlowCallback] = list(self._callbacks)
+        for callback in callbacks:
+            try:
+                callback(flow_dict)
+            except Exception:
+                logger.exception("Optical flow: error in a flow callback")
 
     def start(self) -> None:
         """Start the optical flow processing thread."""
