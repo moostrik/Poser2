@@ -3,7 +3,7 @@
 import logging
 from functools import partial
 
-from modules.camera import CameraSource, CameraCheck, FrameTrigger
+from modules.camera import CameraSource, CameraCheck
 from modules.camera.oak import Camera, Simulator
 from modules.recording import Player, Recorder as VideoRecorder, replay
 from modules.settings import presets
@@ -12,7 +12,7 @@ from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
 from modules.pose import nodes, features, analytics, FrameDict, Recorder as PoseRecorder, RecorderSettings as PoseRecorderSettings
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import segmentation, detection, PoseInference
+from modules.inference import segmentation, detection, CameraSync, PoseInference
 from modules.session import Session, SessionSettings, SequencerState
 from modules.gl import WindowSettings
 
@@ -99,9 +99,9 @@ class HDTrioMain:
         else:
             for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
-        self.frame_trigger = FrameTrigger(self.settings.camera.frame_trigger, False, 'frame_trigger')
+        self.frame_sync = CameraSync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
-        self.tracklet_trigger = FrameTrigger(self.settings.camera.tracklet_trigger, False, 'tracklet_trigger')
+        self.tracklet_sync = CameraSync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
         self.pose_inference = PoseInference(ps.image_crop, ps.pose)      # the crop and the pose model, the frame domain's async step
         if self.person_detector is not None:
             self.pose_inference.add_gpu_image_callback(self.person_detector.submit)     # it looks at the uploaded images
@@ -109,10 +109,10 @@ class HDTrioMain:
         for camera in self.cameras:
             camera.add_frame_callback(self.video_recorder.submit_frame)
             camera.add_frame_callback(self.pose_inference.set_camera_frame)
-            camera.add_frame_callback(self.frame_trigger.submit_frame)
+            camera.add_frame_callback(self.frame_sync.submit_frame)
             camera.add_tracklet_callback(self.tracker.submit_cam_tracklets)
             camera.add_tracklet_callback(self.board.set_camera_tracklets)
-            camera.add_tracklet_callback(self.tracklet_trigger.submit_tracklets)
+            camera.add_tracklet_callback(self.tracklet_sync.submit_tracklets)
 
         # DETECTION
         features.configure_features(max_players)
@@ -121,8 +121,8 @@ class HDTrioMain:
         self.segmentation_predictor  = segmentation.Predictor(ps.segmentation)
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
-        self.tracklet_trigger.add_trigger_callback(self.tracker.update)
-        self.frame_trigger.add_trigger_callback(self.poses_from_tracklets.process)
+        self.tracklet_sync.add_sync_callback(self.tracker.update)
+        self.frame_sync.add_sync_callback(self.poses_from_tracklets.process)
 
         # The segmentation and the board read the same crops the pose model gets.
         self.pose_inference.add_camera_images_callback(self.board.set_camera_images)

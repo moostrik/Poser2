@@ -8,5 +8,6 @@ require_backend('oak4')
 
 from .camera import     Camera
 from .control import    SensorControl
-from .definitions import ModelChain, CameraLink, DepthModel
+from .definitions import ModelChain, CameraLink, DepthModel, get_device_list, \
+                        POSE_MODEL, POSE_ARCHIVE, DETECTOR_MODEL, DETECTOR_ARCHIVE, TOP_DOWN_MODEL, TOP_DOWN_ARCHIVE
 from .settings import   Oak4CameraSettings

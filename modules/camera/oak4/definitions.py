@@ -271,7 +271,7 @@ def imu_rotation_to_camera(device: dai.Device, socket: dai.CameraBoardSocket, de
 #  The pose model and the tracker
 # ---------------------------------------------------------------------------
 # The OAK4's chip takes a model compiled by Luxonis, fetched once from their zoo as an NN archive
-# (`python -m modules.camera.oak4.models`, local files in `data/models`, not in git). Two chains give
+# (`scripts/oak4_models.py`, local files in `data/models`, not in git). Two chains give
 # the 17 body landmarks (COCO, the order of `modules.pose.PointLandmark`), `ModelChain` picks:
 # ONE_MODEL finds the people and their landmarks in one pass, decoded by `DetectionNetwork` from the
 # archive's config; TWO_MODELS runs a detector, cuts one crop per person on the device and runs a

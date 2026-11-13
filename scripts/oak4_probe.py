@@ -1,6 +1,6 @@
 """The OAK4 bring-up: the real backend on one device for a few seconds, reporting what arrives.
 
-    python -m modules.camera.oak4.probe [device_id] [-s SECONDS] [--fps FPS] [--resolution P720|P800|P1080]
+    .venv-oak4/Scripts/python scripts/oak4_probe.py [device_id] [-s SECONDS] [--fps FPS] [--resolution P720|P800|P1080]
         [--link USB|ETHERNET] [--grey] [--flip-h] [--tilt-offset T]
         [--no-model | --one-model | --two-models] [--depth OFF|NEURAL_288|NEURAL_384|NEURAL_480]
         [--projector I] [--flood-light I]
@@ -17,11 +17,13 @@ import argparse
 import logging
 import sys
 import time
+from pathlib import Path
 
-from .. import CameraFrame, CameraResolution, CameraTracklet, FrameType
-from .camera import Camera
-from .definitions import get_device_list, CameraLink, DepthModel, ModelChain
-from .settings import Oak4CameraSettings
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from modules.camera import CameraFrame, CameraResolution, CameraTracklet, FrameType  # noqa: E402
+from modules.camera.oak4 import Camera, CameraLink, DepthModel, ModelChain, Oak4CameraSettings, get_device_list  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

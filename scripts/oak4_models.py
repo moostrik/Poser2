@@ -1,6 +1,6 @@
 """The OAK4's models, fetched once from Luxonis's zoo into `data/models`.
 
-    python -m modules.camera.oak4.models [--models data/models]
+    .venv-oak4/Scripts/python scripts/oak4_models.py [--models data/models]
 
 The chip takes a model compiled by Luxonis, which the zoo hands out as an NN archive (a `.tar.xz`
 with the compiled model and the config that says what its outputs mean). Public models need no
@@ -21,7 +21,10 @@ from pathlib import Path
 
 import depthai as dai
 
-from .definitions import POSE_MODEL, POSE_ARCHIVE, DETECTOR_MODEL, DETECTOR_ARCHIVE, TOP_DOWN_MODEL, TOP_DOWN_ARCHIVE
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from modules.camera.oak4 import POSE_MODEL, POSE_ARCHIVE, DETECTOR_MODEL, DETECTOR_ARCHIVE, TOP_DOWN_MODEL, TOP_DOWN_ARCHIVE  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

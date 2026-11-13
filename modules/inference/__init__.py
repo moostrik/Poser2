@@ -9,3 +9,4 @@ from .pose_inference import PoseInference
 from .recorded_poses import RecordedPoses, RecordedPosesSettings, frame_poses
 from .capture import Capture
 from .capture_sync import CaptureSync, CaptureSyncSettings
+from .camera_sync import CameraSync, CameraSyncSettings

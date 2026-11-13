@@ -1,42 +1,40 @@
-"""The frame trigger: one callback per round of frames (or tracklet messages) from all cameras."""
+"""The cameras' sync: one callback each time every camera's newest frame (or tracklet message) is in."""
 
 from collections import deque
 from threading import Lock
 from typing import Any, Callable
 
+from modules.camera import CameraFrame, CameraTracklets, FrameType
 from modules.settings import BaseSettings, Field
-
-from ..frame import CameraFrame, FrameType
-from ..tracklet import CameraTracklets
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-class FrameTriggerSettings(BaseSettings):
+class CameraSyncSettings(BaseSettings):
     num_cams:    Field[int]   = Field(1, access=Field.INIT, visible=False)
     fps:            Field[float] = Field(30.0, access=Field.INIT, visible=False)
 
 
-class FrameTrigger:
-    """Triggers once per round: when the camera with the largest gap to the next frame submits, every
-    camera's newest frame is as close together as it gets. It matches nothing and hands nothing on. Frames and
-    tracklet messages are two separate instances with the same rule (`frame_trigger`, `tracklet_trigger`)."""
+class CameraSync:
+    """Syncs the cameras: when the camera with the largest gap to the next frame submits, every camera's newest
+    frame is as close together as it gets, and the sync fires with that moment. Frames and tracklet messages are
+    two separate instances with the same rule (`frame_sync`, `tracklet_sync`)."""
 
-    def __init__(self, settings: FrameTriggerSettings, verbose: bool = False, stream_name: str = '') -> None:
+    def __init__(self, settings: CameraSyncSettings, verbose: bool = False, stream_name: str = '') -> None:
         num_cams: int = settings.num_cams
         self.verbose: bool = verbose
         self.stream_name: str = stream_name
         self.max_gap_s: float = 1.0 / settings.fps
-        self.min_trigger_interval_s: float = 0.75 / settings.fps
-        self.last_trigger_time_s: float = 0.0
+        self.min_sync_interval_s: float = 0.75 / settings.fps
+        self.last_sync_time_s: float = 0.0
 
         self._timestamp_history: deque[tuple[int, float]] = deque(maxlen=10 * num_cams)
-        self._callbacks: list[Callable[[float], Any]] = []  # run in registration order, with the trigger's time
+        self._callbacks: list[Callable[[float], Any]] = []  # run in registration order, with the sync's time
         self._lock = Lock()
 
     def submit_frame(self, frame: CameraFrame) -> None:
-        """A camera's frame callback. Only VIDEO frames count: a round is one frame per camera."""
+        """A camera's frame callback. Only VIDEO frames count: a sync is one frame per camera."""
         if frame.kind == FrameType.VIDEO:
             self._submit(frame.cam_id, frame.timestamp)
 
@@ -44,36 +42,25 @@ class FrameTrigger:
         self._submit(cam_tracklets.cam_id, cam_tracklets.timestamp)
 
     def _submit(self, cam_id: int, timestamp: float) -> None:
-        """A message with its host time; the trigger carries the time of the message that triggered it."""
+        """A message with its host time; the sync carries the time of the message that completed it."""
         with self._lock:
             self._timestamp_history.append((cam_id, timestamp))
-            trigger_cam_id: int = FrameTrigger._find_trigger_camera(self._timestamp_history, self.max_gap_s)
+            sync_cam_id: int = CameraSync._find_sync_camera(self._timestamp_history, self.max_gap_s)
 
-            if cam_id == trigger_cam_id:
-                time_since_last_trigger: float = timestamp - self.last_trigger_time_s
-                self.last_trigger_time_s = timestamp
+            if cam_id == sync_cam_id:
+                time_since_last_sync: float = timestamp - self.last_sync_time_s
+                self.last_sync_time_s = timestamp
 
-                if time_since_last_trigger >= self.min_trigger_interval_s:
+                if time_since_last_sync >= self.min_sync_interval_s:
                     self._notify_callbacks(timestamp)
                 else:
                     if self.verbose:
-                        logger.info(f"{self.stream_name}Skipped trigger (only {time_since_last_trigger:.3f}s since last, from cam {cam_id})")
+                        logger.info(f"{self.stream_name}Skipped sync (only {time_since_last_sync:.3f}s since last, from cam {cam_id})")
     @staticmethod
-    def _find_trigger_camera(timestamp_history: deque[tuple[int, float]], max_gap_s: float) -> int:
-        """
-        Find the camera that should trigger the round.
-        This is the camera with the largest gap to the next frame, ensuring
-        all cameras have their closest possible frame combination when triggered.
-
-        Args:
-            timestamp_history: History of (cam_id, timestamp) tuples
-            max_gap_s: Maximum gap in seconds to consider (filters out dropped frames)
-
-        Returns:
-            Camera ID that should trigger the callbacks
-        """
-
-        camera_ids: set[int] = FrameTrigger._get_unique_cameras_in_history(timestamp_history)
+    def _find_sync_camera(timestamp_history: deque[tuple[int, float]], max_gap_s: float) -> int:
+        """The camera whose frame completes a sync: the one with the largest average gap to the next frame, gaps
+        over `max_gap_s` (a dropped frame) left out."""
+        camera_ids: set[int] = CameraSync._get_unique_cameras_in_history(timestamp_history)
 
         if len(timestamp_history) < 2:
             return next(iter(camera_ids))
@@ -93,7 +80,7 @@ class FrameTrigger:
 
         # Find camera with largest average gap
         max_avg_gap = 0.0
-        trigger_cam: int = next(iter(camera_ids))
+        sync_cam: int = next(iter(camera_ids))
         has_valid_gaps = False
 
         for cam_id, gaps in cam_gaps.items():
@@ -102,14 +89,13 @@ class FrameTrigger:
                 avg_gap: float = sum(gaps) / len(gaps)
                 if avg_gap > max_avg_gap:
                     max_avg_gap: float = avg_gap
-                    trigger_cam = cam_id
+                    sync_cam = cam_id
 
         # Fallback: if all gaps filtered, use any camera
         if not has_valid_gaps:
-            # print(f"Warning: All frame gaps exceeded {max_gap_s:.3f}s threshold")
-            trigger_cam = next(iter(camera_ids))
+            sync_cam = next(iter(camera_ids))
 
-        return trigger_cam
+        return sync_cam
 
     @staticmethod
     def _get_max_time_diff(timestamp_history: deque[tuple[int, float]]) -> float:
@@ -122,7 +108,7 @@ class FrameTrigger:
         if len(timestamp_history) == 0:
             return 0.0
 
-        camera_ids: set[int] = FrameTrigger._get_unique_cameras_in_history(timestamp_history)
+        camera_ids: set[int] = CameraSync._get_unique_cameras_in_history(timestamp_history)
 
         if not camera_ids:  # Extra safety
             return 0.0
@@ -150,7 +136,7 @@ class FrameTrigger:
             cameras.add(cam_id)
         return cameras
 
-    def add_trigger_callback(self, callback: Callable[[float], Any]) -> None:
+    def add_sync_callback(self, callback: Callable[[float], Any]) -> None:
         with self._lock:
             if callback not in self._callbacks:
                 self._callbacks.append(callback)

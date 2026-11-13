@@ -68,11 +68,11 @@ When an image is on the GPU, the uploader hands it to four others, each of which
 
 The pose model stays FP32: it loses precision in FP16.
 
-### No frame trigger
+### No camera sync
 
-With one camera the frame and tracklet `FrameTrigger` only throttle: they skip a trigger within 0.75 of a frame of the last,
-an uncounted drop. deep_flow runs the pose step on every uploaded image and `tracker.update` on every tracklet
-message; `FrameTrigger` is for the apps with several cameras.
+With one camera the frames' and the tracklets' `CameraSync` only throttle: they skip a sync within 0.75 of a frame
+of the last, an uncounted drop. deep_flow runs the pose step on every uploaded image and `tracker.update` on every
+tracklet message; `CameraSync` is for the apps with several cameras.
 
 ### The capture sync
 

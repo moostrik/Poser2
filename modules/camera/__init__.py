@@ -11,5 +11,5 @@ from .geometry import       CameraResolution, RESOLUTION_SIZES, MONO_RESOLUTIONS
                             imu_to_camera, unroll_imu_frame, tilt_homography, homography_points, \
                             corrected_roi, corrected_keypoints, mirrored_roi, mirrored_keypoints, mirrored_intrinsics, depth_projection, \
                             mirrored_alignment, aligned_depth_size, TiltCorrection, TILT_STEP
-from .sync import           CaptureStream, MissedParts, FrameTrigger, FrameTriggerSettings
+from .capture_match import  CaptureStream, MissedParts
 from .depthai_backend import oak_backend, require_backend
