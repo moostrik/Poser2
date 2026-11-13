@@ -44,6 +44,7 @@
         "hooks": [
           {
             "type": "command",
+            "shell": "bash",
             "command": "python \"$CLAUDE_PROJECT_DIR/scripts/commit_rules.py\" --hook"
           }
         ]
