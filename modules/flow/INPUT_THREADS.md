@@ -17,6 +17,7 @@ Per thread, the callbacks in the order they are registered (`apps/deep_flow/main
 |---------------------------------------------------|----------------------------------------------------------------|--------------------------------------------|
 | the camera's (depthai; -sim: the player's reader) | queues each frame for the recorder (live) and the uploader     | nothing                                    |
 | the uploader's (`Uploader`)                       | uploads each frame and hands it on ([below](#the-uploader))    | the GPU, in a copy while its queue is full |
+| the recording sync's (`RecordingSync`)            | matches a capture's parts, hands the capture to the recorder   | nothing                                    |
 | the tracklets' (depthai)                          | queues them for the tracker, the board; `tracker.update`       | nothing                                    |
 | the tracker's                                     | associates the tracklets, to `PosesFromTracklets` and the board | nothing                                   |
 | the pose model's (`pose.Predictor`)               | RTMPose on the crops, the CLEAN and SMOOTH stages, their users | its own model                              |

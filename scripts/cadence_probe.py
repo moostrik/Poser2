@@ -14,7 +14,10 @@ recording's metadata, `scripts/recording_motion.py`):
 Writes the report as JSON in `--out` and prints it. The app is stopped in a `finally`, and the run is given up at
 twice the time it should take.
 
-    python scripts/cadence_probe.py LABEL --folder FOLDER --start S --end S [--out DIR]
+With `--record` it records over the stretch, as `probe_<LABEL>` in the app's recordings, and reports what the
+recording went without.
+
+    python scripts/cadence_probe.py LABEL --folder FOLDER --start S --end S [--out DIR] [--record]
 """
 import json
 import os
@@ -68,6 +71,7 @@ def main() -> int:
     parser.add_argument('--start', type=float, required=True, help='the stretch to measure: its start in the recording (s)')
     parser.add_argument('--end', type=float, required=True, help='its end in the recording (s)')
     parser.add_argument('--out', default='.', help='the folder the report goes in')
+    parser.add_argument('--record', action='store_true', help='record over the stretch, as `probe_<label>` in the recordings')
     args = parser.parse_args()
 
     setup_logging(verbose=False, name='deep_flow')
@@ -150,12 +154,19 @@ def main() -> int:
             deadline: float = time.perf_counter() + 2.0 * (STARTUP + args.end)
             while playhead() < args.start and time.perf_counter() < deadline:
                 time.sleep(0.01)
+            if args.record:
+                settings.camera.recorder.name = f'probe_{args.label}'
+                settings.camera.recorder.start = True
             on.set()
             began: float = time.perf_counter()
             while args.start <= playhead() < args.end and time.perf_counter() < deadline:
                 time.sleep(0.01)
             on.clear()
             ended: float = time.perf_counter()
+            if args.record:
+                settings.camera.recorder.stop = True
+                while settings.camera.recorder.recording and time.perf_counter() < deadline:
+                    time.sleep(0.05)
             if ended >= deadline:
                 print(f'given up at twice the time it should take ({2.0 * (STARTUP + args.end):.0f} s)', flush=True)
             report = dict(label=args.label, folder=args.folder, stretch=[args.start, args.end], seconds=round(ended - began, 2),
@@ -164,6 +175,11 @@ def main() -> int:
                           waits_ms={k: spread(v) for k, v in sorted(waits.items())}, uploads_ms={k: spread(v) for k, v in uploads.items()},
                           drops=dict(uploader=app.uploader.dropped, board=app.board.get_dropped_captures(),
                                      depth_without_image=app.capture_sync.settings.misses))
+            if args.record:
+                recorder = settings.camera.recorder
+                report['recorded'] = dict(missed_depth=recorder.missed_depth, missed_color=recorder.missed_color,
+                                          missed_tracklets=recorder.missed_tracklets, missed_poses=recorder.missed_poses,
+                                          dropped=recorder.dropped)
             out: Path = Path(args.out) / f'cadence_{args.label}.json'
             out.write_text(json.dumps(report, indent=2))
             print(json.dumps(report, indent=2), flush=True)

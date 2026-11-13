@@ -4,7 +4,8 @@ and, when a chunk ends, merged into one `<cam>_<chunk>.mkv` per camera with the 
 (`chunk.merge_chunk`), or with `Container.MP4` kept as `<cam>_C_<chunk>.mp4` beside `<cam>_M_<chunk>.jsonl`:
 the chunk's info line and one line per frame.
 
-The parts of one capture are brought together by a `RecordingSync`: the color frame, its depth when
+The parts of one capture are brought together by a `RecordingSync`, on its own thread, which this
+recorder's thread starts and stops: the color frame, its depth when
 DEPTH is in `video_frame_types` and the camera sends it, the camera's tracklets and the host's poses,
 each part settled by the order its stream comes in. A camera that sends no depth is recorded color
 only. What waits for the encoders, queued here and in the writers, is bounded in bytes (`HELD`); beyond
@@ -147,6 +148,7 @@ class Recorder(Thread):
 
     def run(self) -> None:
         self._set_state(RecState.IDLE)
+        self.sync.start()
 
         while not self.stop_event.is_set():
             try:
@@ -165,6 +167,7 @@ class Recorder(Thread):
         if self._get_state() in (RecState.REC, RecState.STOP):
             self._set_state(RecState.STOP)
             self._stop_recording()
+        self.sync.stop()
         self._set_state(RecState.IDLE)
 
     def _begin(self) -> None:

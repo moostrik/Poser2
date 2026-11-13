@@ -97,7 +97,9 @@ The rules the recorder keeps, each with its reason:
 | A part a camera never sent is not waited for                         | a camera without depth, tracklets or poses records beside one with them               |
 | A camera's first capture waits for the parts the app says it sends   | before its first tracklet nothing shows them coming (`Recorder.expect_parts`)         |
 | A frame nobody asked poses for does not wait for them                | the app says per image whether the pose model was asked (`Recorder.expect_poses`)     |
-| Each camera is synced under its own lock, in its own order           | the order between cameras is not kept live either                                     |
+| Each camera is synced in its own order                               | the order between cameras is not kept live either                                     |
+| The parts are matched on the sync's own thread, from one inbox       | the threads they come on only queue them, a camera's among them                       |
+| The sync's inbox is not bounded                                      | a recording needs every part; `HELD` bounds what waits after the match                |
 | A capture is dropped whole, before any part of it is written         | a chunk's color, depth and metadata then count alike, so frame `n` is one capture     |
 | One bound for what waits for the encoders, in bytes, for all cameras | a bound per queue grows with the cameras                                              |
 | A split cuts every camera at one capture time                        | the cameras' chunks start and end at one recorded moment, so a play runs through it   |

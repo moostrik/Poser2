@@ -2,8 +2,8 @@
 together for the recorder. Completeness first: every capture waits for its parts in the order of capture, and a
 newer capture never ends the wait; the live `CaptureSync` puts latency first instead.
 
-Each camera is matched apart, under its own lock, as live: one camera's parts never wait for another's. A capture is
-complete with its color frame and, when depth is recorded and the camera sends it, its depth, matched by capture time
+Each camera is matched apart, as live: one camera's parts never wait for another's. A capture is complete with its
+color frame and, when depth is recorded and the camera sends it, its depth, matched by capture time
 (`CaptureStream`); a camera that sent no depth while `KEPT` color frames came is a color-only camera, recorded without
 depth. Then a capture waits for its tracklets, once the camera has sent any, and for its poses, once the app says per
 frame whether the pose model was asked poses for it (`expect_poses`); a frame nobody asked poses for does not wait
@@ -11,16 +11,24 @@ for them. No wait is timed: each stream comes in the order of capture, so a part
 frame's part will not come. Then the capture goes out without it, counted and warned of (`MissedParts`: `tracklets`,
 `poses`; and a color frame or a depth no capture took: `depth`, `color`). A camera's captures go out in order: one
 still waiting holds the newer ones behind it, at most `KEPT` of them, beyond which the oldest goes out without what it
-waits for, for a stream that stopped. The submits only take note, on the threads they come on."""
+waits for, for a stream that stopped.
 
+The submits only queue what they take, on the threads they come on, in one inbox that is not bounded: a recording
+needs every part. The sync's own thread matches the parts in the order they came and hands the captures on; while
+the thread does not run, a part is matched on the thread it comes on."""
+
+import logging
 from collections import deque
 from dataclasses import dataclass, field
-from threading import Lock
-from typing import Callable, TypeAlias
+from enum import IntEnum, auto
+from threading import Condition, Event, Lock, Thread
+from typing import Any, Callable, TypeAlias
 
 from modules.camera import CAPTURE_TOLERANCE, CameraFrame, CameraTracklets, CaptureStream, FrameType, MissedParts
 
 from ..container import PoseArrays
+
+logger = logging.getLogger(__name__)
 
 KEPT: int = 16      # frames of each part kept, and captures waiting, per camera: 320 ms at 50 fps, three times the slowest pose
 
@@ -53,6 +61,17 @@ class RecordedCapture:
 RecordedCaptureCallback: TypeAlias = Callable[[RecordedCapture], None]
 
 
+class _Part(IntEnum):
+    """What waits in the sync's inbox."""
+    FRAME = 0
+    TRACKLETS = auto()
+    ASKED = auto()      # (cam_id, timestamp, asked): whether poses were asked for a frame
+    POSES = auto()
+    FLUSH = auto()      # an Event, set once every capture waiting has gone out
+    RESET = auto()      # an Event, set once nothing is kept
+    SETTLE = auto()     # an Event, set once every part queued before it is matched
+
+
 @dataclass
 class _Waiting:
     """A complete capture and the parts it got as they came, kept with it so newer parts cannot push them out."""
@@ -65,9 +84,8 @@ class _Waiting:
 
 @dataclass
 class _Camera:
-    """One camera's parts, waiting captures and what it has shown it sends, under its own locks."""
+    """One camera's parts, waiting captures and what it has shown it sends; its lock guards what `waiting` reads."""
     lock: Lock = field(default_factory=Lock)
-    emit_lock: Lock = field(default_factory=Lock)       # matching and sending as one step, so its captures leave in order
     videos: CaptureStream[CameraFrame] = field(default_factory=lambda: CaptureStream(KEPT))
     depths: CaptureStream[CameraFrame] = field(default_factory=lambda: CaptureStream(KEPT))
     tracklets: CaptureStream[CameraTracklets] = field(default_factory=lambda: CaptureStream(KEPT))
@@ -87,24 +105,86 @@ def _later(stream: CaptureStream, timestamp: float) -> bool:
     return newest is not None and newest > timestamp + CAPTURE_TOLERANCE
 
 
-class RecordingSync:
+class RecordingSync(Thread):
     def __init__(self, with_depth: bool) -> None:
+        super().__init__(daemon=True, name='RecordingSync')
         self.with_depth: bool = with_depth
         self._cameras_lock: Lock = Lock()
         self._cameras: dict[int, _Camera] = {}
         self._expected: dict[int, tuple[bool, bool]] = {}      # each camera's parts said ahead: (tracklets, poses)
         self.missed: MissedParts = MissedParts('Recorder')
+        self._callback_lock: Lock = Lock()
         self._callbacks: list[RecordedCaptureCallback] = []
+        self._inbox: deque[tuple[_Part, Any]] = deque()
+        self._wake: Condition = Condition()
+        self._running: bool = False
+        self._inline_lock: Lock = Lock()        # parts taken on the callers' threads while the thread does not run
 
     def add_capture_callback(self, callback: RecordedCaptureCallback) -> None:
-        if callback not in self._callbacks:
-            self._callbacks.append(callback)
+        with self._callback_lock:
+            if callback not in self._callbacks:
+                self._callbacks.append(callback)
+
+    # ── Lifecycle ─────────────────────────────────────────────────────
+
+    def start(self) -> None:
+        with self._wake:
+            self._running = True
+        super().start()
+
+    def stop(self) -> None:
+        """The thread ends; what still waits in the inbox is dropped and logged."""
+        with self._wake:
+            self._running = False
+            dropped: list[tuple[_Part, Any]] = list(self._inbox)
+            self._inbox.clear()
+            self._wake.notify()
+        for part, value in dropped:
+            if part in (_Part.FLUSH, _Part.RESET, _Part.SETTLE):
+                value.set()         # nobody waits forever on a sync that stopped
+        if dropped:
+            logger.info("RecordingSync: %d parts dropped at stop", len(dropped))
+        if self.is_alive():
+            self.join(timeout=2.0)
+
+    def run(self) -> None:
+        while True:
+            with self._wake:
+                while self._running and not self._inbox:
+                    self._wake.wait()
+                if not self._running:
+                    return
+                part, value = self._inbox.popleft()
+            try:
+                self._take(part, value)
+            except Exception:
+                logger.exception("RecordingSync: matching a %s failed", part.name.lower())
+                if part in (_Part.FLUSH, _Part.RESET, _Part.SETTLE):
+                    value.set()
+
+    def _queue(self, part: _Part, value: Any) -> None:
+        """Into the inbox; taken on the caller's thread, one at a time, when the sync's thread does not run."""
+        with self._wake:
+            if self._running:
+                self._inbox.append((part, value))
+                self._wake.notify()
+                return
+        with self._inline_lock:
+            self._take(part, value)
+
+    def _done(self, part: _Part) -> None:
+        """Queue `part` and return once it is taken."""
+        done: Event = Event()
+        self._queue(part, done)
+        done.wait()
 
     def reset(self) -> None:
         """A new recording: nothing kept, nothing waiting, the counts from zero."""
-        with self._cameras_lock:
-            self._cameras = {}
-        self.missed.reset()
+        self._done(_Part.RESET)
+
+    def settle(self) -> None:
+        """Return once every part submitted before is matched."""
+        self._done(_Part.SETTLE)
 
     def expect_parts(self, cam_id: int, tracklets: bool, poses: bool) -> None:
         """Whether a camera sends tracklets and the app says per image whether it asked poses, kept across
@@ -122,72 +202,84 @@ class RecordingSync:
 
     @property
     def waiting(self) -> int:
-        """The captures complete and waiting for their tracklets or poses, over every camera."""
+        """The parts queued and not matched yet, and the captures complete and waiting for their tracklets or
+        poses, over every camera."""
+        with self._wake:
+            total: int = len(self._inbox)
         with self._cameras_lock:
             cameras: list[_Camera] = list(self._cameras.values())
-        total: int = 0
         for camera in cameras:
             with camera.lock:
                 total += len(camera.waiting)
         return total
 
-    # ── Inputs ────────────────────────────────────────────────────────
+    # ── Inputs: each queues and returns ───────────────────────────────
 
     def submit_frame(self, frame: CameraFrame) -> None:
         if frame.kind == FrameType.DEPTH and not self.with_depth:
             return
-        camera: _Camera = self._camera(frame.cam_id)
-        with camera.emit_lock:
-            with camera.lock:
-                if frame.kind == FrameType.VIDEO:
-                    if camera.videos.add(frame.timestamp, frame):
-                        self.missed.count(frame.cam_id, 'depth')         # a color frame pushed out unmatched
-                else:
-                    camera.sends_depth = True
-                    if camera.depths.add(frame.timestamp, frame):
-                        self.missed.count(frame.cam_id, 'color')         # a depth pushed out unmatched
-                self._complete(frame.cam_id, camera)
-                captures: list[RecordedCapture] = self._release(frame.cam_id, camera, force=False)
-            self._emit(captures)
+        self._queue(_Part.FRAME, frame)
 
     def submit_tracklets(self, cam_tracklets: CameraTracklets) -> None:
-        camera: _Camera = self._camera(cam_tracklets.cam_id)
-        with camera.emit_lock:
-            with camera.lock:
-                camera.tracklets.add(cam_tracklets.timestamp, cam_tracklets)
-                camera.sends_tracklets = True
-                captures: list[RecordedCapture] = self._release(cam_tracklets.cam_id, camera, force=False)
-            self._emit(captures)
+        self._queue(_Part.TRACKLETS, cam_tracklets)
 
     def expect_poses(self, cam_id: int, timestamp: float, asked: bool) -> None:
         """Whether the pose model was asked poses for the camera's frame captured at `timestamp`."""
-        camera: _Camera = self._camera(cam_id)
-        with camera.emit_lock:
-            with camera.lock:
-                camera.asks.add(timestamp, asked)
-                camera.asks_poses = True
-                captures: list[RecordedCapture] = self._release(cam_id, camera, force=False)
-            self._emit(captures)
+        self._queue(_Part.ASKED, (cam_id, timestamp, asked))
 
     def submit_poses(self, frame_poses: FramePoses) -> None:
-        camera: _Camera = self._camera(frame_poses.cam_id)
-        with camera.emit_lock:
-            with camera.lock:
-                camera.poses.add(frame_poses.timestamp, frame_poses)
-                captures: list[RecordedCapture] = self._release(frame_poses.cam_id, camera, force=False)
-            self._emit(captures)
+        self._queue(_Part.POSES, frame_poses)
 
     def flush(self) -> None:
-        """Send out every capture waiting, without the parts that have not come: the recording ends."""
-        with self._cameras_lock:
-            cameras: dict[int, _Camera] = dict(self._cameras)
-        for cam_id, camera in cameras.items():
-            with camera.emit_lock:
-                with camera.lock:
-                    captures: list[RecordedCapture] = self._release(cam_id, camera, force=True)
-                self._emit(captures)
+        """Send out every capture waiting, without the parts that have not come: the recording ends. Returns once
+        they have gone out."""
+        self._done(_Part.FLUSH)
 
-    # ── Matching, under the camera's lock ─────────────────────────────
+    # ── Matching, on the sync's thread ────────────────────────────────
+
+    def _take(self, part: _Part, value: Any) -> None:
+        if part == _Part.RESET:
+            with self._cameras_lock:
+                self._cameras = {}
+            self.missed.reset()
+            value.set()
+            return
+        if part == _Part.SETTLE:
+            value.set()
+            return
+        if part == _Part.FLUSH:
+            with self._cameras_lock:
+                cameras: dict[int, _Camera] = dict(self._cameras)
+            for flushed_id, flushed in cameras.items():
+                with flushed.lock:
+                    released: list[RecordedCapture] = self._release(flushed_id, flushed, force=True)
+                self._emit(released)
+            value.set()
+            return
+        cam_id: int = value[0] if part == _Part.ASKED else value.cam_id
+        camera: _Camera = self._camera(cam_id)
+        with camera.lock:
+            if part == _Part.FRAME:
+                frame: CameraFrame = value
+                if frame.kind == FrameType.VIDEO:
+                    if camera.videos.add(frame.timestamp, frame):
+                        self.missed.count(cam_id, 'depth')          # a color frame pushed out unmatched
+                else:
+                    camera.sends_depth = True
+                    if camera.depths.add(frame.timestamp, frame):
+                        self.missed.count(cam_id, 'color')          # a depth pushed out unmatched
+                self._complete(cam_id, camera)
+            elif part == _Part.TRACKLETS:
+                camera.tracklets.add(value.timestamp, value)
+                camera.sends_tracklets = True
+            elif part == _Part.ASKED:
+                _, timestamp, asked = value
+                camera.asks.add(timestamp, asked)
+                camera.asks_poses = True
+            else:
+                camera.poses.add(value.timestamp, value)
+            captures: list[RecordedCapture] = self._release(cam_id, camera, force=False)
+        self._emit(captures)
 
     def _complete(self, cam_id: int, camera: _Camera) -> None:
         """The camera's complete captures newer than its last, oldest first, into its waiting line."""
@@ -250,6 +342,13 @@ class RecordingSync:
         return captures
 
     def _emit(self, captures: list[RecordedCapture]) -> None:
+        if not captures:
+            return
+        with self._callback_lock:
+            callbacks: list[RecordedCaptureCallback] = list(self._callbacks)
         for capture in captures:
-            for callback in self._callbacks:
-                callback(capture)
+            for callback in callbacks:
+                try:
+                    callback(capture)
+                except Exception:
+                    logger.exception("RecordingSync: a capture callback failed")
