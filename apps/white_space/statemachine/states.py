@@ -240,19 +240,19 @@ class IntroIdleState(StateBase):
 
     def __init__(self, *args) -> None:
         super().__init__(*args)
-        self._start_lamp: float = self._settings.dim_level
+        self._start_playhead: float = self._settings.dim_level
         self._start_sound: float = 0.0
 
     def enter(self, ctx: StateContext) -> None:
         # Ramp from where the show was: DIM line and no sound visuals from INTRO, both
         # already full on the IDLE_INTRO pass-through.
         from_intro = ctx.prev == StateId.INTRO
-        self._start_lamp = self._settings.dim_level if from_intro else 1.0
+        self._start_playhead = self._settings.dim_level if from_intro else 1.0
         self._start_sound = 0.0 if from_intro else 1.0
 
     def update(self, ctx: StateContext) -> Mix:
         e = _ease(self.progress(ctx))
-        return [(LayerId.beam_playhead, _lerp(self._start_lamp, 1.0, e)),
+        return [(LayerId.beam_playhead, _lerp(self._start_playhead, 1.0, e)),
                 (LayerId.beam_blue_sound, _lerp(self._start_sound, 1.0, e))]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:

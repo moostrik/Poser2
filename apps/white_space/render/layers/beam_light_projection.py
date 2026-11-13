@@ -69,7 +69,7 @@ def paint_flashes(flashes: list[Flash], now: float, seconds: float, width: float
                   out: np.ndarray) -> None:
     """MAX-blend the flashes younger than ``seconds`` into ``out``, each at its own heading and
     faded linearly by its age (full when new, gone at ``seconds``; ``seconds`` 0 draws none).
-    A flash's white is the front white lamp, its blue both blue lamps — as ``beam_flash`` lights
+    A flash's white is the front white beam light, its blue both blue beam lights — as ``beam_flash`` lights
     them. ``now`` is on the flashes' clock (``perf_counter``, the light tick's stamp); angles in radians.
     """
     if seconds <= 0.0:

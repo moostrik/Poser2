@@ -47,7 +47,7 @@ class FlashTest(unittest.TestCase):
         return f
 
     def _sweep(self, *hits: bool) -> list[float]:
-        """Run one pose through a sequence of ticks, hit or not; the front white lamp per tick."""
+        """Run one pose through a sequence of ticks, hit or not; the front white beam light per tick."""
         return [float(self._render(FlashPose(0, hit)).beam_lights[BeamLightId.FRONT_WHITE]) for hit in hits]
 
     def test_one_frame_is_the_hit_tick(self) -> None:

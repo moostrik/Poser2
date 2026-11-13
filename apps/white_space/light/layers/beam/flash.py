@@ -56,7 +56,7 @@ class BeamFlash(BeamLayer):
         if lit and not math.isnan(frame.playhead):
             self._board.add_flash(frame.playhead, flash_white, flash_blue, frame.tick.now)
 
-        # The flash is the front white lamp plus both blue lamps, on a constant base.
+        # The flash is the front white beam light plus both blue beam lights, on a constant base.
         self._add_beam_lights(beam_lights,
                              front_white=P.base_white + flash_white,
                              left_blue=P.base_blue + flash_blue,

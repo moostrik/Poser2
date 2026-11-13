@@ -162,14 +162,14 @@ class OscLightSender:
       the chunk size and the address spelling are load-bearing.
     * The firmware commits a frame when `/WS/blue2` arrives, so that message must be sent **last**.
     * Its readout mode follows the **commanded** rpm (`/WS/r/0`), not the bar's speed: below
-      `FIXTURE_PROJECTION_RPM` it drives the four lamps from four fixed pixel slots (pixel 0 and the
+      `FIXTURE_PROJECTION_RPM` it drives the four beam lights from four fixed pixel slots (pixel 0 and the
       middle pixel of each channel, `FIRMWARE_LIGHT_SLOT_AZIMUTHS`) and ignores every other pixel; at or
       above it paints the projection and ignores the slots. `_rebuild_fixture_pixels` writes the frame's
       explicit beam lights into those slots exactly when the fixture reads them, using the rpm
       this sender actually put on the wire.
     * This sender owns the fixture's two projection-mode alignments, so the frame on the board
       stays azimuth-true: `projection_offset` rotates the whole projection on its way out, and the
-      four `interlace` values shift each lamp's readout (`/WS/o/0..3`). Both are ignored by the
+      four `interlace` values shift each beam light's readout (`/WS/o/0..3`). Both are ignored by the
       firmware in beam mode, so `_rebuild_fixture_pixels` never rotates the four slots.
     * Its socket receive buffer is 8 KB against a 7.4 KB frame, and it drains while it fills, so
       the burst normally fits. Config messages are kept out of it anyway (they never change), and

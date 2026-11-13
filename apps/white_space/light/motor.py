@@ -7,7 +7,7 @@ Real mode (simulate=False):
     measured as the wall-clock time between consecutive falls; the phase is
     computed with sub-tick precision from perf_counter(). There is no stall
     detection: the last measurement persists until the next fall updates it
-    (see _measure). External callers use notify_fall(); while simulate=True it is a no-op.
+    (see _measure). External callers use set_fall(); while simulate=True it is a no-op.
 
 Simulate mode (simulate=True):
     A stand-in for the physical motor + fall sensor, never a decision-maker: an internal
@@ -49,7 +49,7 @@ _SIM_DECEL: float = _SIM_ACCEL * 3.0
 class MotorMode(IntEnum):
     """Commanded operating mode (the system sets it; target rpm is derived from it)."""
     STOPPED    = auto()  # not spinning
-    BEAM       = auto()  # the four lamps sweeping the room
+    BEAM       = auto()  # the four beam lights sweeping the room
     PROJECTION = auto()  # fast spin — the projection painted from the firmware's counter
 
 
@@ -91,7 +91,7 @@ class MotorController:
     falls, and holds the arbitrated command (debug > state machine > STOPPED).
 
     Call start() / stop() to manage the internal simulation thread.
-    Call notify_fall() from external hardware signals (OSC/UDP).
+    Call set_fall() from external hardware signals (OSC/UDP).
     Call tick() once per light tick for the measurement; read `command` whenever the command
     in force is needed — it is a pure read, so it can be taken more than once per tick.
     """
@@ -151,8 +151,8 @@ class MotorController:
         """The panel readback follows the command the moment it changes."""
         self._settings.active_mode = self._target_mode()
 
-    def notify_fall(self) -> None:
-        """External hardware fall signal. No-op while simulating."""
+    def set_fall(self) -> None:
+        """External hardware fall signal, stored at its moment. No-op while simulating."""
         if self._settings.simulate:
             return
         self._fire_fall()

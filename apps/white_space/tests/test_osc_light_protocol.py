@@ -188,7 +188,7 @@ class FixtureSlotTest(unittest.TestCase):
         np.testing.assert_array_equal(frame.light_img, before)
 
     def test_wire_is_identical_to_the_baked_in_pixel_model(self) -> None:
-        """Regression against the previous data model, where the beam layers wrote the lamp
+        """Regression against the previous data model, where the beam layers wrote the beam light
         levels straight into the slot pixels: the same look must produce the same bytes."""
         baked = _frame()
         baked.white[0], baked.white[self.HALF] = 0.9, 0.6
@@ -205,7 +205,7 @@ class FixtureSlotTest(unittest.TestCase):
 class ProjectionOffsetTest(unittest.TestCase):
     """The projection offset is the fixture's projection-image alignment, so it is applied here — on the
     way out — and never to the frame on the board. Beam mode is untouched by it: the firmware
-    indexes four fixed pixels there, so rotating them would move the lamps' levels."""
+    indexes four fixed pixels there, so rotating them would move the beam lights' levels."""
 
     HALF = RESOLUTION // 2
 

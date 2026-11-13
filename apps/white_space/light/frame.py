@@ -7,7 +7,7 @@ mix that state drew), the projection's pixels and the four beam lights. One obje
 flows into every layer's `_draw` and out to every consumer (board, the light/sound senders,
 render).
 
-The beam lights are the discrete lamps on the rotating bar that the fixture drives directly
+The beam lights are the four discrete lights on the rotating bar that the fixture drives directly
 while it is in beam mode (commanded below ``FIXTURE_PROJECTION_RPM``, see ``motor.py``): the beam
 layers write them by name, the light sender maps them to the firmware's pixel slots, the
 render simulates them as beams. This module describes them (id, output channel, beam
@@ -49,7 +49,7 @@ BEAM_LIGHT_HEADINGS: np.ndarray = np.array([0.0, math.pi, -math.pi / 2.0, math.p
 @dataclass
 class LightFrame:
     """Per-tick render context + light output. `white`/`blue` are views into `light_img`
-    (the projection); `beam_lights` holds the four lamp levels, indexed by `BeamLightId`."""
+    (the projection); `beam_lights` holds the four beam light levels, indexed by `BeamLightId`."""
     resolution:    int
     tick:          Tick
     motor:         MotorMeasurement     = field(default_factory=MotorMeasurement)   # what the playhead advanced under

@@ -110,10 +110,10 @@ class Conductor(Thread):
         if self.is_alive():
             self.join()
 
-    def notify_fall(self, *args: object) -> None:
-        """Signal a revolution fall edge; forwarded to the motor controller.
+    def set_fall(self, *args: object) -> None:
+        """A revolution's fall edge, stored by the motor controller at its moment.
         Accepts and ignores any receiver callback args (OSC address/values)."""
-        self._motor_controller.notify_fall()
+        self._motor_controller.set_fall()
 
     def run(self) -> None:
         # No thread priority boost: inside the process no thread outranks another — the GIL hands

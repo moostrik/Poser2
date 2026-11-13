@@ -228,7 +228,7 @@ class StateMachineTest(unittest.TestCase):
         self.tick()
         self.assertEqual(self.current, StateId.INTRO_PLAY)
         self.assertEqual(self.motors[-1], MotorMode.PROJECTION)
-        # Still physically lamps: the dim line holds unchanged from INTRO.
+        # Still physically beam lights: the dim line holds unchanged from INTRO.
         self.assertEqual(self.mixes[-1], [(LayerId.beam_playhead, 0.4)])
         # Projecting → hard mix: instrument (white full, blue easing) + playhead line.
         self.board.is_projecting = True

@@ -251,13 +251,13 @@ class SimTest(unittest.TestCase):
             rpm = r(rpm, 2000.0, accel * dt); t += dt
         self.assertAlmostEqual(t, 6.0, delta=0.3)
 
-    def test_notify_fall_gated_while_simulating(self) -> None:
+    def test_set_fall_gated_while_simulating(self) -> None:
         s = MotorSettings(); m = MotorController(s)
         s.simulate = True
-        m.notify_fall()
+        m.set_fall()
         self.assertIsNone(m._last_fall_time)        # real falls ignored while simulating
         s.simulate = False
-        m.notify_fall()
+        m.set_fall()
         self.assertIsNotNone(m._last_fall_time)
 
 

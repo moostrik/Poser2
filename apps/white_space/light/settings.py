@@ -18,19 +18,19 @@ from .layers import (
 class LayerId(IntEnum):
     """The unified layer pool: everything a state (or the debug select) can put in a mix.
 
-    One instance per layer; each layer's mode (beam = lamps, projection = pixels) lives in its
+    One instance per layer; each layer's mode (beam = beam lights, projection = pixels) lives in its
     class (`BeamLayer`/`ProjectionLayer`). Member order is the beam block then the projection
     block — it drives the `DebugLayer` dropdown order and mirrors the settings groups.
     Debug-only layers (never in a state's mix) state that role in their docstrings; the
     projection block's generic patterns keep the ``test_`` prefix.
     """
-    # beam mode — the lamps
-    beam_blue_sound     = auto()   # beam: soundscape levels on the left/right blue lamps
-    beam_playhead       = auto()   # beam: front white lamp (the searchlight line)
+    # beam mode — the beam lights
+    beam_blue_sound     = auto()   # beam: soundscape levels on the left/right blue beam lights
+    beam_playhead       = auto()   # beam: front white beam light (the searchlight line)
     beam_flash          = auto()   # beam: flash as the playhead crosses a player
-    beam_wind_down      = auto()   # beam: flood's ending — the two white lamps fading over the spin-down (the wall while fast)
+    beam_wind_down      = auto()   # beam: flood's ending — the two white beam lights fading over the spin-down (the wall while fast)
     beam_sync_wind_down = auto()   # beam: the sync end's wall — the dying wall under the sync strobe (S11)
-    beam_test           = auto()   # beam: direct levels for the four physical lamps (debug)
+    beam_test           = auto()   # beam: direct levels for the four physical beam lights (debug)
     # projection mode — the projection
     pose_instrument     = auto()   # projection: the pose instrument — each person's pose-patched line pattern (see LAYERS.md)
     projection_playhead = auto()   # projection: the content playhead's marker alone (debug; the show's is the instrument's)
@@ -55,7 +55,7 @@ class DebugLayer(IntEnum):
     `tests/test_debug_layer.py` fails if the two ever drift apart.
     """
     OFF                 = 0
-    # beam mode — the lamps
+    # beam mode — the beam lights
     beam_blue_sound     = auto()
     beam_playhead       = auto()
     beam_flash          = auto()

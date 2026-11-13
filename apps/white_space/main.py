@@ -61,7 +61,7 @@ class WhiteSpaceMain:
 
         max_players: int = self.settings.max_players
         num_cams: int = self.settings.camera.num_cams
-        logging.info("Settings loaded: %s players, %s cameras, simulation=%s", max_players, num_cams, simulation)
+        logger.info("Settings loaded: %s players, %s cameras, simulation=%s", max_players, num_cams, simulation)
         ps = self.settings.pose
 
         # BLACKBOARD
@@ -180,7 +180,7 @@ class WhiteSpaceMain:
         self.osc_light_sender   = OscLightSender(self.settings.inout.osc_light_sender, self.settings.light.motor)
         self.udp_light_receiver = UdpLightReceiver(self.settings.inout.udp_light_receiver)
         self.osc_sound_receiver = OscReceiver(self.settings.inout.osc_sound_receiver)
-        self.udp_light_receiver.bind("/WS/sensor/fall", self.conductor.notify_fall)
+        self.udp_light_receiver.bind("/WS/sensor/fall", self.conductor.set_fall)
         # Sound levels from Max (one 0..1 float each) → board → the beam_blue_sound layer.
         self.osc_sound_receiver.bind("/WS/idle/blue/left",  self._on_sound_level_left)
         self.osc_sound_receiver.bind("/WS/idle/blue/right", self._on_sound_level_right)

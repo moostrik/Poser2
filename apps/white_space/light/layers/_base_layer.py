@@ -3,8 +3,8 @@
 Two modes, two bases, one axis: a ``ProjectionLayer`` draws pixels — the persistence-of-vision
 projection — and a ``BeamLayer`` writes the four beam lights by name. The split is structural
 because it is the fixture's truth: in beam mode (commanded below ``FIXTURE_PROJECTION_RPM``) the
-firmware drives the lamps from four values and ignores the pixels, in projection mode it steps the
-pixels and ignores the lamps (see ``inout/osc_light_sender.py`` for the wire contract). A beam
+firmware drives the beam lights from four values and ignores the pixels, in projection mode it steps the
+pixels and ignores the beam lights (see ``inout/osc_light_sender.py`` for the wire contract). A beam
 layer therefore has no pixel buffers to write to at all.
 """
 

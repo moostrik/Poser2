@@ -2,7 +2,7 @@
 
 Writes the two white beam lights at a fading level; everything else is physics. The fixture
 is in beam mode from S9's or S11's first packet (its readout mode follows the commanded rpm, see
-``inout/osc_light_sender.py``), so the two lamps spin at whatever speed the bar still has:
+``inout/osc_light_sender.py``), so the two beam lights spin at whatever speed the bar still has:
 a wall of white while it is fast, thinning into two beams as it slows — and the fade rides
 through both. One mechanism, and the layer never needs to know when the bar is slow. The
 S8 → S9 hand-off is seamless at the DACs: the flood at 1.0 in projection mode drives the same two
@@ -19,9 +19,9 @@ states' exit and stage_progress (and S10's sound-visual reveal) ride.
 Two layers are instances of this class: ``beam_wind_down``, the plain wall of S9/S10, and
 ``beam_sync_wind_down``, the **strobing wall** of S11, built with the instrument's
 ``pose_instrument.sync_strobe`` settings. The sync end leaves PLAY at group sync, the patterns strobing at the
-top rung, and the wall keeps that strobe on the lamps: on the strobes' shared tick grid at the
+top rung, and the wall keeps that strobe on the beam lights: on the strobes' shared tick grid at the
 same rate (``Strobe.rate`` at 16 per second, ``Strobe.period``: every other tick at 32 fps), a
-strobe frame swaps the wall to the two blue lamps (``SyncStrobeMode.INVERT``, as the patterns
+strobe frame swaps the wall to the two blue beam lights (``SyncStrobeMode.INVERT``, as the patterns
 swap white and blue) or blanks it (``BLACK``). The first S11 frame continues the last PLAY
 frame's strobe; only the picture under it changes. The amplitude is the wall's fade, so the
 strobe dies with the wall into the dim line underneath. The wall carries no ``frame.sync``:

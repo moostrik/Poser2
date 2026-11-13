@@ -1,10 +1,10 @@
 """Beam-mode light layers (`BeamLayer`).
 
 Commanded below ``FIXTURE_PROJECTION_RPM`` the fixture is in beam mode: it drives its four
-discrete lamps (front/back white, left/right blue) directly and reads no projection. The
+discrete beam lights (front/back white, left/right blue) directly and reads no projection. The
 fixture's readout mode follows the *commanded* rpm, switching on receipt of the rpm regardless
 of the bar's actual speed (see ``inout/osc_light_sender.py`` for the wire contract) — so a
-spinning-down bar in beam mode shows its lamps smeared into a wall, not the projection.
+spinning-down bar in beam mode shows its beam lights smeared into a wall, not the projection.
 
 Layers in this package therefore write the four beam lights by name (``LightFrame.beam_lights``,
 indexed by ``BeamLightId``) and nothing else; the light sender maps them to the firmware's

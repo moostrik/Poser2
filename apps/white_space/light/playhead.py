@@ -31,7 +31,7 @@ pairs with that stale timestamp and so reads near zero rpm. Nothing else is requ
 need not have been seen fast first, so a bar that reaches beam speed by any route re-locks.
 
 The motor is offset-agnostic; the playhead owns the single beam-mode calibration,
-`pulse_offset` — the front lamp's azimuth at the sensor pulse, in degrees (constant → does
+`pulse_offset` — the front beam light's azimuth at the sensor pulse, in degrees (constant → does
 not break continuity). The projection offset that aligns the projection lives in the light sender.
 """
 

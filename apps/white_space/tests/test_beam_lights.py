@@ -172,7 +172,7 @@ class FlashPaintTest(unittest.TestCase):
         self._paint(Flash(math.radians(90.0), 1.0, 0.0, self.NOW - self.SECONDS))
         self.assertTrue(np.all(self.out == 0.0))
 
-    def test_blue_lights_both_blue_lamps(self) -> None:
+    def test_blue_lights_both_blue_beam_lights(self) -> None:
         self._paint(Flash(0.0, 0.0, 0.5, self.NOW))
         blue = self.out[0, :, 1]
         self.assertAlmostEqual(float(blue[R // 4]), 0.5, places=5)       # right, +90°

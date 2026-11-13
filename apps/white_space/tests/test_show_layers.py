@@ -1,4 +1,4 @@
-"""Tests for the beam show layers: beam_blue_sound (levels → blue lamps, jitter window, stale
+"""Tests for the beam show layers: beam_blue_sound (levels → blue beam lights, jitter window, stale
 fallback) and wind_down (the dying wall, plain and under the sync strobe). The pose instrument's
 are in test_pose_instrument.py."""
 
@@ -36,7 +36,7 @@ class BeamBlueSoundTest(unittest.TestCase):
     def _fresh(self, left: float, right: float) -> None:
         self.board.levels = SoundLevels(left=left, right=right, timestamp=self.NOW)
 
-    def test_levels_land_on_the_blue_lamps(self) -> None:
+    def test_levels_land_on_the_blue_beam_lights(self) -> None:
         self.settings.smoothing_frames = 0
         self._fresh(0.8, 0.3)
         f = frame(self.NOW)
@@ -84,7 +84,7 @@ class BeamBlueSoundTest(unittest.TestCase):
 # -- wind_down ---------------------------------------------------------------------
 
 class BeamWindDownTest(unittest.TestCase):
-    """The dying wall: both white lamps fading over spin_down_seconds, monotonic, no
+    """The dying wall: both white beam lights fading over spin_down_seconds, monotonic, no
     pixels; progress is the readout."""
 
     def setUp(self) -> None:
@@ -131,7 +131,7 @@ class BeamWindDownTest(unittest.TestCase):
 class BeamSyncWindDownTest(unittest.TestCase):
     """The strobing wall (S11): the same fade under the sync strobe — on the strobes' shared tick
     grid at the top rung (every other tick at 32 fps), a strobe frame swaps the wall to the blue
-    lamps (INVERT) or blanks it (BLACK); it carries no sync — /global/sync is the instrument's."""
+    beam lights (INVERT) or blanks it (BLACK); it carries no sync — /global/sync is the instrument's."""
 
     def setUp(self) -> None:
         from apps.white_space.light.layers.beam.wind_down import BeamWindDown, BeamWindDownSettings
@@ -149,7 +149,7 @@ class BeamSyncWindDownTest(unittest.TestCase):
         self.assertEqual(float(f.light_img.sum()), 0.0)                        # no pixels written
         return f
 
-    def test_invert_swaps_the_wall_to_the_blue_lamps_on_strobe_ticks(self) -> None:
+    def test_invert_swaps_the_wall_to_the_blue_beam_lights_on_strobe_ticks(self) -> None:
         f = self._next()                                                        # tick 0: a strobe frame
         self.assertEqual(float(f.beam_lights[BeamLightId.FRONT_WHITE]), 0.0)
         self.assertEqual(float(f.beam_lights[BeamLightId.BACK_WHITE]), 0.0)

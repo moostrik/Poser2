@@ -45,7 +45,7 @@ class BeamBlueSoundSettings(LayerSettings):
 
 
 class BeamBlueSound(BeamLayer):
-    """Left level → left blue lamp, right level → right blue lamp; see the module docstring."""
+    """Left level → left blue beam light, right level → right blue beam light; see the module docstring."""
 
     def __init__(self, resolution: int, settings: BeamBlueSoundSettings, board: RenderBoard) -> None:
         super().__init__(resolution, settings, board)
@@ -53,7 +53,7 @@ class BeamBlueSound(BeamLayer):
         self._window: deque[tuple[float, float]] = deque(maxlen=3)
 
     def reset(self) -> None:
-        """Clear the smoothing window — the lamps re-attack from the live levels."""
+        """Clear the smoothing window — the beam lights re-attack from the live levels."""
         self._window.clear()
 
     def _draw(self, frame: LightFrame, beam_lights: np.ndarray) -> None:
