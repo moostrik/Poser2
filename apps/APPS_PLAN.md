@@ -21,18 +21,26 @@ while the GPU's queue is full, and that grows with the launches, not the pixels 
 upload for a 0.1 ms copy)**: four frames one by one are four rounds of launches, a set is one, and both cost one
 round after the last camera's frame, so the latency is about equal and the uploader's load about a quarter.
 
-1. **The frame source's call for several cameras.** `TrackerFrameSource.submit(cam_times, images)`: each camera's
-   capture time of the set (`dict[int, float]`) with its images; the asked callback reports per camera in it, with
-   that camera's time and its poses asked, so the recorder hears each camera's image. deep_flow's `_on_image` passes
-   `{cam_id: timestamp}`, in the same commit.
+One shape for one camera and for several: a set, one item per camera, with each item's capture time. A single
+camera's frame is a set of one, so no step has a path of its own for one camera.
+
+1. **The frame source's call takes a set.** `TrackerFrameSource.submit(cam_times, images)`: each camera's capture
+   time in the set (`dict[int, float]`) with its images. Each player's `detection_timeout` is judged against its
+   own camera's capture time in the set (`cam_times[tracklet.cam_id]`), so no time of the source's own is made.
+   The asked callback reports per camera in the set, with that camera's time and its poses asked, so the recorder
+   hears each camera's image. deep_flow's `_on_image` passes `{cam_id: timestamp}`, in the same commit.
 2. **The sync before the upload.** Each camera hands its frames to the frames' `CameraSync` and the recorder, its
-   tracklets to the uploader and the recorder, and nothing else. `CameraSync` keeps each camera's newest video
-   frame and on a sync hands the set (one frame per camera) to the uploader (`Uploader.submit_set`), queued.
+   tracklets to the uploader and the recorder, and nothing else. `CameraSync`'s callback hands on a set:
+   `add_set_callback(callback(items))`, `items` by `cam_id`, each with its capture time. The frames' sync keeps
+   each camera's newest video frame and hands the set to the uploader (`Uploader.submit_set`); the tracklets' sync
+   hands its set of messages to `tracker.update`, which takes the newest of their times, as its `(timestamp)` did.
+   deep_flow, one camera, needs no sync: its camera hands each frame to the uploader as a set of one.
 3. **The uploader uploads a set as one batch.** One pinned copy per frame, one round of kernels over the stacked
-   images (mono to RGB), the straightening with the cameras' grids stacked, the flip per camera. Then each image to
-   its callbacks (the -sim detector, the board's `set_camera_image`) and the set to a set callback, whose receiver
-   in white_space calls `TrackerFrameSource.submit` with each camera's time from the snapshot. One path for both
-   apps: `submit_frame` is a set of one, so deep_flow's upload is the same code.
+   images (mono to RGB, the straightening with the cameras' grids stacked) and one flip per mirrored camera. Sets
+   wait whole, two at most; beyond that the oldest set is dropped whole and counted (`dropped`), so a frame never
+   leaves its set. Then each image goes to its callbacks (the -sim detector, the board's `set_camera_image`) and the
+   set to a set callback, whose receiver calls `TrackerFrameSource.submit` with each camera's time from the set.
+   Depth (deep_flow) is uploaded per frame, as now; its alignment does not batch.
 4. **The tracklets.** The uploader's tracklets go to the tracker (`submit_cam_tracklets`), the board, the tracker
    journal and the tracklets' `CameraSync`, each a store or an enqueue (the journal's `submit_cam_tracklets` checked
    for it); the sync's callback is `tracker.update`, which sets the tracker's event.
@@ -52,7 +60,8 @@ round after the last camera's frame, so the latency is about equal and the uploa
 
 What goes from white_space's wiring: `PoseInference(crop, pose)` without the uploader, `set_camera_frame`,
 `add_gpu_image_callback`, `add_camera_images_callback`, `_store_video_frame` and the board's video images, and the
-frame sync's callback to `process`.
+frame sync's callback to `process`. `CameraSync`'s `add_sync_callback` goes for `add_set_callback`; hd_trio's
+`main.py` uses the old one and follows in E (it stops at start on this branch already).
 
 Each thread (the uploader, the two `CameraSync`s, the frame source, the pipeline) is started by `main.start` after
 the wiring, before the cameras, and stopped by `main.stop` after the cameras and the uploader, before the pose
@@ -66,8 +75,11 @@ another size go as their own set); a tracklet message still finds its frame note
 uploader at the sync, up to half a frame later **(deduction: tracklets come about two frames after their frame)**.
 
 Checked by: `CameraSync`'s tests (a set per sync, a camera's newest frame), the uploader's (a set uploaded as one
-batch gives each image as one by one does), the frame source's (the asked callback per camera), white_space's
-pipeline spec; a -sim run on a white_space recording with the probe (the uploader's time per set, the pose latency).
+batch gives each image as one by one does; a set of one is deep_flow's upload; the oldest whole set dropped), the
+frame source's (the asked callback per camera; a player judged on its camera's time), white_space's pipeline spec;
+a -sim run with the probe on `20250514-130512_4_wide_mono`, an old-layout recording without recorded tracklets, so
+in replay with the host detector (`simulator.replay`, `yolo`), not `ClipCamera`, which needs an OAK: the uploader's
+time per set, the pose latency.
 Done when white_space starts on this branch, its camera threads only hand over (under 1 ms per frame at p95), every
 sync runs the pose step, the pose latency and the light's tick are no worse than on `main`, live and back to back,
 with you at the rig, and its tests pass.
