@@ -33,7 +33,9 @@ On Matthias's "go", in one commit, `rendering.md`'s section "What the render hol
 - A category holds packages, and a package is named after its subject: a module (`modules/pose/`), a kind of work (`general/mask/`), a shared thing
 - A package holds its layers, and its shaders in `shaders/`
 - A layer's class is named after what it draws, then its kind (`TrackletRenderer`, `PoseCompositor`)
-- A shader is named after the operation it does
+- A shader is named after the operation it does; the `shaders` package in front says what it is (`shaders.MaskBlur`)
+
+Naming, decided with Matthias: the render has no naming rule of its own beyond these two lines. CLAUDE.md's Naming decides the rest: a layer is named after what it draws, in its module's word and in full, and ends in its kind (`Layer`, `Renderer`, `Compositor`). A shader carries no `Shader` ending, because it is used through its `shaders` namespace; the three that have the ending today (`FeatureShader`, `WindowShader`, `TimeSeriesShader`) lose it. Open: whether the layer class line stays in `rendering.md` as emphasis, since it repeats CLAUDE.md.
 
 The apps thread's render plan (`modules/render/RENDER_PLAN.md`) orders the code by these lines; it is told when they are in.
 
