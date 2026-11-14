@@ -69,15 +69,19 @@ its readings' depth ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)).
 
 ### C1. The boundary velocity's peak
 
-What the body's speed reaches, to set the gains by, on the bridge's panel: in its `boundary.velocity` group a
-group `peak` with `enabled` (off by default) and `speed` (`Field.READ`, widths/s): the 99th percentile of the boundary velocity's speed over the last second, where the
-speed is above the drag's floor (`DRAG_FLOOR`, 0.02 widths/s), the pixels the water is dragged toward, a leaving
-limb's wake among them. Off, nothing runs.
+What the body's speed reaches, to set the gains by and to see how fast it gets, on the bridge's panel: the
+boundary velocity's group gets a class of its own (`BoundaryVelocitySettings`, the mix and `peak`), so the
+density's and the temperature's mixes do not show it. `peak` holds `enabled` (off by default) and `speed`
+(`Field.READ`, widths/s, "p99" in its description): the 99th percentile of the boundary velocity's speed over
+the last second, over the moving pixels (a leaving limb's wake among them). Off, nothing runs and `speed` is 0,
+and it stays 0 until the first read after it is turned on.
 
-- The bridge counts them (deep_flow's one camera): the monitor's counter, `HistogramCount`, its own instance and bins, on
-  the same grid of samples (at most 512 a side), gains a speed mode, the vector's length into bins from 0 to a top
-  speed (4 widths/s, 0.016 a bin at 256), the floor's bins left out. The bins add up over the second between two
-  reads, so what is read is that second's percentile, held by itself.
+- The bridge counts them (deep_flow's one camera): the monitor's counter, `HistogramCount`, its own instance and
+  bins, on the same grid of samples (at most 512 a side), gains a speed mode: the vector's length into log bins,
+  256 from 0.01 to 100 widths/s, each 3.7% wider than the one before, so a slow and a fast body read alike
+  closely. Below the first bin's edge is still, the bridge's own floor, not counted. Above 100 counts in the
+  last bin, and `speed` shows it as at least 100. The bins add up over the second between two reads, so what is
+  read is that second's percentile, held by itself.
 - The read: the bins copied into one of two pixel buffers behind a fence, read once the GPU has passed it, as
   `screen_capture.py` reads its frames; nothing waits. The percentile from the bins on the CPU, written to
   `speed` by the bridge.
