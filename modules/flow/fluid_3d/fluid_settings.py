@@ -116,6 +116,7 @@ class InputSettings(BaseSettings):
     spread: Field[float]            = Field(0.2,    min=0.0,    max=1.0,    step=0.001,             description="The body's thickness in z, widths, where it is at least half there; 0 = none")
     boundary: Group[BoundarySettings]       = Group(BoundarySettings)
     body_force: Group[BodyForceSettings]    = Group(BodyForceSettings)
+    expansion_rate: Field[float]    = Field(0.0,    min=-5.0,   max=5.0,    step=0.01, color="teal", newline=True, description="Volume the water gains per second where the body is (1/s); below 0 it shrinks; 0 = off")
 
 
 class VelocitySettings(BaseSettings):

@@ -58,7 +58,7 @@ that reads the velocity or the obstacle against the density samples by uv, so th
 read every field as it is. The GPU is a 24 GB RTX 4090, so nothing pages. Every pass's time is in
 [TIMING.md](TIMING.md).
 
-The layer injects the bridge's six outputs before the step (`Fluid3DLayer._inject`), each at the
+The layer injects the bridge's outputs before the step (`Fluid3DLayer._inject`), each at the
 injection's `weight`, into the gaussian slab at each pixel's z position ([The body's depth](#the-bodys-depth)),
 `input.spread` thick (0.2 widths, its width at half its height), each cell the body's share between its faces, each velocity's z as the
 volume's w = −z, in widths/s as x and y (the motion's `z_gain` its share); what the fluid does with each is
@@ -101,7 +101,7 @@ acceleration per unit mass; a body in the fluid is a boundary that moves.
 What the fluid does with each of the bridge's outputs; the readings they are mixed from, and what
 each output says of the body, are in [BRIDGE_3D.md](BRIDGE_3D.md#the-mix).
 
-The outputs, in two subpanels, one per system, each a mix of the six readings; the fluid's settings
+The outputs, in two subpanels, one per system, each a mix of the six readings, and the expansion in its own; the fluid's settings
 say how the water follows each; the densities and the temperatures go in by `inject_3d`, `FILL` for
 the boundary, `RATE` for the body force:
 
@@ -113,6 +113,7 @@ the boundary, `RATE` for the body force:
 | `body_force` | `acceleration` | widths/s²                         | adds it × dt (`add_to_faces_3d`)                                                                                               | `input.body_force.acceleration_gain` | a Δv added once                       |
 | `body_force` | `density`      | a push's dye, presence 0 to 1     | adds it at a rate × dt into the slab, capped at fully dyed: the pipette                                                        | `input.body_force.density_rate`      | fully dyed per second at a full push  |
 | `body_force` | `temperature`  | a push's warmth, -1 to 1          | adds it at a rate × dt into the slab, capped at ±1                                                                             | `input.body_force.temperature_rate`  | full warmth per second at a full push |
+| `expansion`  | `expansion`    | presence, 0 to 1                  | the projection makes the divergence the rate × it, not 0 ([The expansion](#the-expansion))                                     | `input.expansion_rate`               | its volume gained per second, 1/s     |
 
 The two subpanels are the two systems every solver distinguishes: a moving boundary, whose values
 the water takes, and the body force, which adds to it. The boundary's density and temperature are
@@ -274,6 +275,38 @@ on a centered velocity, whose central differences' Laplacian is not the 7-point 
 on the faces it is ([The staggered velocity](#the-staggered-velocity)), and the divergence the multigrid
 leaves is the half float's rounding. With the solve exact the water keeps more of its speed, 0.150
 widths/s in the mean against Jacobi's 0.134.
+
+### The expansion
+
+The water swelling where the body is (Nguyen, Fedkiw and Jensen 2002; Feldman et al. 2003): the projection
+makes the divergence φ, not 0, φ = `input.expansion_rate` × the expansion, in 1/s, signed. The expansion, a
+presence 0 to 1 from the bridge ([BRIDGE_3D.md](BRIDGE_3D.md#the-mix)), goes into its slab at its z position
+(`add_expansion`, `inject_3d`'s `ADD`), summed over a tick's injections into a volume at the cells (R16F), which
+the tick's first injection clears; the divergence pass takes φ off before the solve (`divergence_3d`), and the
+solvers and the gradient stay. A source of volume is neither a velocity nor a force: the water flows out of it
+by itself, or into it below 0. Rate 0, the default, is the textbook's ∇·u = 0, and nothing is injected.
+
+With every wall closed the water cannot swell, and the solve with closed walls needs the divergence to sum to 0
+(Neumann's compatibility): there the expansion's mean over the water's cells is taken off first
+(`ExpansionMean3D`, a sum per workgroup into a buffer, then one group over the partials; nothing read back), so a
+push in one place is a slight pull everywhere else. Without an expansion the faces' differences cancel cell to
+cell and a closed wall's face is 0, so the divergence sums to 0 already; through an open wall the water leaves.
+
+Measured with `scripts/expansion_check.py`: a disc of full presence at the box's middle depth, rate 0.5/s, one
+projection from rest, deep_flow's preset (288 × 512 × 64, multigrid); the error is the RMS of the divergence less
+φ over φ's, the floor the same box without a source, the swinging body's velocity projected once, the RMS after
+over before:
+
+| Walls  | Cycles | φ's sum | Divergence's mean | Error | Floor  |
+|--------|--------|---------|-------------------|-------|--------|
+| closed | 1      | 0       | 0                 | 0.143 | 0.051  |
+| open   | 1      | 4.7e4   | 4.7e-3            | 0.136 | 0.051  |
+| closed | 4      | 0       | 0                 | 0.007 | 0.0014 |
+| open   | 4      | 4.7e4   | 5.0e-3            | 0.007 | 0.0014 |
+
+The error falls with the cycles as the floor does: the projection makes φ, to the solve's convergence. A smooth
+source is the part one V-cycle leaves the most of; at one cycle a step the rest is taken by the next steps, each
+warm from the last pressure **(deduction)**.
 
 ### The guard
 

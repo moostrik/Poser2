@@ -15,12 +15,13 @@ class WeightedSum(Shader):
     """Writes the sum of each source times its weight to RGB, or with `lengths` the sum of their lengths to all
     three."""
 
-    def use(self, sources: list[tuple[Texture, float]], lengths: bool = False) -> None:
+    def use(self, sources: list[tuple[Texture, float]], lengths: bool = False, capped: bool = False) -> None:
         """Mix the sources.
 
         Args:
             sources: Up to seven (texture, weight) pairs; the RGB of each is taken times its weight
             lengths: Take each source's length of its RGB instead, for an amount
+            capped: Hold the sum at 1, a presence
         """
         if not self.allocated or not self.shader_program or not sources or len(sources) > MAX_SOURCES:
             return
@@ -38,5 +39,6 @@ class WeightedSum(Shader):
             glUniform1i(self.get_uniform_loc(f"tex{unit}"), unit)
         glUniform1fv(self.get_uniform_loc("weights"), MAX_SOURCES, weights)
         glUniform1i(self.get_uniform_loc("lengths"), int(lengths))
+        glUniform1i(self.get_uniform_loc("capped"), int(capped))
 
         draw_quad()

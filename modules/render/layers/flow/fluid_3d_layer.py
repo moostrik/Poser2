@@ -84,6 +84,8 @@ class Fluid3DLayer(FluidLayer):
         fluid.add_boundary_temperature(injection.boundary_temperature, injection.weight, injection.boundary_temperature_z_position)
         if injection.body_force_temperature is not None:
             fluid.add_body_force_temperature(injection.body_force_temperature, injection.weight, injection.body_force_temperature_z_position)
+        if injection.expansion is not None:
+            fluid.add_expansion(injection.expansion, injection.weight, injection.expansion_z_position)
 
     def _step(self, dt: float) -> None:
         self._fluid.update(dt)

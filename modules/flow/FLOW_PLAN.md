@@ -82,39 +82,11 @@ gravity) weighs dyed water wherever it is, with `buoyancy` 0, in the same pass, 
 `_y`, `_z`. It sits in the temperature's panel though it is the density's weight: if the temperature goes,
 `sink` and the gravity move to a panel of their own or the density's.
 
-### 3.2 Expansion
-
-The water swelling or shrinking where the body is (Nguyen, Fedkiw and Jensen 2002; Feldman et al. 2003): the
-projection makes ∇·u = φ instead of 0. A source of volume, not a velocity or a force: the water flows outward
-from the body by itself, a push from its presence, not its motion; negative, it draws the water in.
-
-- The bridge: an output of its own, `expansion`, its own subpanel beside `boundary` and `body_force`, a mix of the
-  six readings and the `depth_mask` share, a presence 0 to 1 as the density's amount is, with its z position mixed
-  from the same readings ([BRIDGE_3D.md's z positions](BRIDGE_3D.md#the-z-positions)). Default all shares 0: `None`.
-- The fluid: `input.expansion_rate`, 1/s at full presence, signed: the share of its volume a cell where the body is
-  fully there gains per second. `add_expansion` injects the output × weight × rate into a φ volume (R16F at the
-  cells, cleared each step) through `inject_3d`'s slab, so any number of injections add up. Default 0, off, the
-  textbook's ∇·u = 0.
-- The projection: the divergence pass takes φ off before the solve (`divergence_3d`), one read a cell; the solvers
-  and the gradient stay.
-- The closed box: with every wall closed the water cannot swell, so the solve needs φ to sum to 0. While φ is
-  nonzero and every wall closed, a GPU reduction sums φ (per workgroup into a buffer, one group over that) and the
-  divergence pass takes the mean off: a push in one place is a slight pull everywhere else **(deduction)**. Without
-  expansion no reduction runs: the faces' differences cancel cell to cell and a closed wall's face is 0, so the
-  divergence sums to 0 already **(code)**; with an open wall the water leaves through it and the solve needs
-  nothing. Its cost, the reduction over 288 × 512 × 64 cells, is measured as it lands.
-- No temperature: the expansion is the body's now, not a lingering warmth; the temperature keeps buoyancy alone.
-
-What changes with it: `BridgeOutput.expansion`, `expansion_z_position`, `Injection`, `Fluid3DLayer._inject_into`,
-deep_flow's injections, `InputSettings.expansion_rate`, the φ volume and the reduction in `Fluid3D`, the monitor's
-port for φ, BRIDGE_3D.md (the mix, the outputs), FLUID_3D.md (the inputs, the pressure), FLOW.md's Terms and its
-inputs and outputs table. Checked by a unit test of the mean's and the slab's numpy reference, and a harness in a
-hidden window (`scripts/expansion_check.py`): a source in a closed box and in an open one, after the projection
-∇·u against φ (minus its mean when closed), and the solve's residual against the same box without a source; one
-commit.
-
 ### Details
 
+- The expansion's cost: the mean's reduction over 288 × 512 × 64 cells in a closed box, and the divergence's one
+  more read ([FLUID_3D.md](FLUID_3D.md#the-expansion)): not timed yet, as no fluid cost is timed while it is
+  unstable.
 - The transfer curve in the particles' march: their slices hold a sum of the grid's layers, so the curve needs
   its point in that sum ([FLUID_3D.md](FLUID_3D.md#the-look)). Not designed yet.
 - The body force's acceleration: tested, tweaked and made useful.
@@ -231,11 +203,6 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, line 2.
 - Choose a data path by its latency: the chain before the fluid timed as one, line 2.
-- Prefer the flow's textbook units; a setting follows the quantity it controls: `expansion_rate` in 1/s, the
-  expansion as a presence 0 to 1, 3.2.
-- A setting's default is the textbook value: `expansion_rate` 0, the projection's ∇·u = 0, 3.2.
-- Name a value by its quantity; one term per concept: `expansion` in FLOW.md's Terms, 3.2.
-- Keep presets and settings schemas in sync: the expansion subpanel, 3.2.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 Not designed yet, so their rules are not named: the dye's brightness and no captures (line 2); the temperature

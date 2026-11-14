@@ -415,7 +415,8 @@ class DeepFlowRender(RenderBase):
                                                boundary_temperature_z_position=output.boundary_temperature_z_position,
                                                body_force_acceleration_z_position=output.body_force_acceleration_z_position,
                                                body_force_density_z_position=output.body_force_density_z_position,
-                                               body_force_temperature_z_position=output.body_force_temperature_z_position))
+                                               body_force_temperature_z_position=output.body_force_temperature_z_position,
+                                               expansion=output.expansion, expansion_z_position=output.expansion_z_position))
             fluid.set_input(ls.FluidInput(dt, injections))
 
     def _wire_monitors(self) -> None:

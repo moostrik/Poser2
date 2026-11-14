@@ -2,7 +2,8 @@
 readings, each as a velocity and as an acceleration; two mixes make what the fluid takes from them: the
 boundary (a velocity, density, temperature from the readings as velocities) and the body force (an
 acceleration from the readings as accelerations, its density and temperature a push's presence from the
-readings as velocities, the change of speed). Each density and temperature is 0 to 1 (±1 warm): a presence,
+readings as velocities, the change of speed); a third, the expansion, where the water swells, a presence from
+the readings as velocities and the depth mask. Each density and temperature is 0 to 1 (±1 warm): a presence,
 the readings' speed in widths/s, capped at 1, the dye the fluid fills the water toward or adds at a rate.
 
 Each trail holds where its motion was, a z position; every output mixes its readings' z positions by the
@@ -93,11 +94,17 @@ BANDPASS_READINGS: tuple[str, ...] = READINGS[1:]
 PARTS: dict[str, Change] = {'start': Change.START, 'bow': Change.BOW, 'stop': Change.STOP, 'wake': Change.WAKE}
 
 
+class ExpansionSettings(AmountMixSettings):
+    """The expansion: where the water swells, a presence 0 to 1 from the readings' speeds and the depth mask."""
+
+
 class Bridge3DLayerSettings(BridgeLayerSettings):
-    """Configuration for Bridge3DLayer: the readings, then the boundary and the body force with their mixes."""
+    """Configuration for Bridge3DLayer: the readings, then the boundary, the body force and the expansion with
+    their mixes."""
     readings   = Group(Bridge3DReadingsSettings)
     boundary   = Group(BoundarySettings)
     body_force = Group(BodyForceSettings)
+    expansion  = Group(ExpansionSettings)
 
 
 class Bridge3DLayer(BridgeLayer):
@@ -107,6 +114,8 @@ class Bridge3DLayer(BridgeLayer):
         boundary     the readings as velocities: `velocity`; `density` and `temperature` from their sizes
         body_force   the readings as accelerations: `acceleration`; `density` and `temperature` from the
                      readings as velocities, a push's change of speed; each None while its shares are all 0
+        expansion    the readings as velocities and the depth mask: a presence, capped at 1; None while its
+                     shares are all 0, and the newest capture's in a tick of several
     The density and the temperature are colored by a density and a temperature bridge per side, with the
     same color. The defaults are the boundary's trail alone.
 
@@ -137,6 +146,8 @@ class Bridge3DLayer(BridgeLayer):
         self._body_force_acceleration_z_position: Fbo = Fbo()
         self._body_force_density_z_position: Fbo = Fbo()
         self._body_force_temperature_z_position: Fbo = Fbo()
+        self._expansion: Fbo = Fbo()                    # a presence, 0 to 1
+        self._expansion_z_position: Fbo = Fbo()
         self._mix_shader: WeightedSum = WeightedSum()
         self._z_position_mix_shader: ZPositionMix = ZPositionMix()
         self._boundary_density: DensityBridge = DensityBridge(settings.boundary.density)
@@ -164,7 +175,9 @@ class Bridge3DLayer(BridgeLayer):
             self._boundary_velocity_z_position, self._boundary_density_z_position, self._boundary_temperature_z_position,
             self._body_force_acceleration_z_position if self._mixed(body_force.acceleration) else None,
             self._body_force_density_z_position if self._mixed(body_force.density) else None,
-            self._body_force_temperature_z_position if self._mixed(body_force.temperature) else None)
+            self._body_force_temperature_z_position if self._mixed(body_force.temperature) else None,
+            self._expansion if self._mixed(self.settings.expansion) else None,
+            self._expansion_z_position if self._mixed(self.settings.expansion) else None)
 
     def _outputs(self) -> dict[str, Texture]:
         """The densities and temperatures as the last step made them."""
@@ -195,7 +208,9 @@ class Bridge3DLayer(BridgeLayer):
                 'bandpass': self._shown_ports(self._bandpass.ports, self._show_bandpass),
                 'boundary': boundary, 'boundary_density': self._boundary_density, 'boundary_temperature': self._boundary_temperature,
                 'body_force': body_force, 'body_force_density': self._body_force_density,
-                'body_force_temperature': self._body_force_temperature}
+                'body_force_temperature': self._body_force_temperature,
+                'expansion': Ports({'expansion': Port(self._expansion, TextureKind.SCALAR),
+                                    'z_position': Port(self._expansion_z_position, TextureKind.Z_POSITION)})}
 
     @staticmethod
     def _shown_ports(ports: dict[str, Port], shown: Callable[[], None]) -> Ports:
@@ -243,12 +258,12 @@ class Bridge3DLayer(BridgeLayer):
         return ((self._boundary_velocity, GL_RGBA16F), (self._boundary_density_amount, GL_R32F),
                 (self._boundary_temperature_amount, GL_R32F), (self._body_force_acceleration, GL_RGBA16F),
                 (self._body_force_density_amount, GL_R32F), (self._body_force_temperature_amount, GL_R32F),
-                *((fbo, GL_RG16F) for fbo in self._z_position_fbos()))
+                (self._expansion, GL_R32F), *((fbo, GL_RG16F) for fbo in self._z_position_fbos()))
 
     def _z_position_fbos(self) -> tuple[Fbo, ...]:
         return (self._boundary_velocity_z_position, self._boundary_density_z_position, self._boundary_temperature_z_position,
                 self._body_force_acceleration_z_position, self._body_force_density_z_position,
-                self._body_force_temperature_z_position)
+                self._body_force_temperature_z_position, self._expansion_z_position)
 
     def _allocate_stages(self, width: int, height: int, output_width: int, output_height: int) -> None:
         self._lowpass.allocate(width, height, output_width, output_height)
@@ -284,7 +299,7 @@ class Bridge3DLayer(BridgeLayer):
                 self._capture_max[name].hold(texture)
         self._merging = input.same_tick
         body_force: tuple[MixSettings, ...] = self._body_force_mixes()
-        mixes: tuple[MixSettings, ...] = (*self._boundary_mixes(), *body_force)
+        mixes: tuple[MixSettings, ...] = (*self._boundary_mixes(), *body_force, self.settings.expansion)
 
         self._lowpass_timer.begin()
         self._lowpass.set_velocity(input.velocity)
@@ -316,6 +331,8 @@ class Bridge3DLayer(BridgeLayer):
         if self._mixed(side.temperature):
             self._mix_amount(self._body_force_temperature_amount, self._body_force_temperature_z_position, input, side.temperature)
             self._update_temperature(self._body_force_temperature, self._body_force_temperature_amount, color)
+        if self._mixed(self.settings.expansion):
+            self._mix_amount(self._expansion, self._expansion_z_position, input, self.settings.expansion, capped=True)
         if self._merging:
             for name, texture in self._outputs().items():
                 self._capture_max[name].take(texture)
@@ -349,9 +366,11 @@ class Bridge3DLayer(BridgeLayer):
                                         (lowpass.z_position, bandpass.fast_z_position, bandpass.slow_z_position), depth_mask)
         target.end()
 
-    def _mix_amount(self, amount: Fbo, z_position: Fbo, input: BridgeInput, mix: AmountMixSettings) -> None:
-        """An amount: the readings' speeds at its shares and the depth mask at its share, into `amount`, and its
-        z position, into `z_position`. Without a depth mask or the motion's z position the mask's share adds nothing."""
+    def _mix_amount(self, amount: Fbo, z_position: Fbo, input: BridgeInput, mix: AmountMixSettings,
+                    capped: bool = False) -> None:
+        """An amount: the readings' speeds at its shares and the depth mask at its share, into `amount`, with
+        `capped` held at 1, a presence, and its z position, into `z_position`. Without a depth mask or the
+        motion's z position the mask's share adds nothing."""
         readings: dict[str, Texture] = self._velocities()
         sources: list[tuple[Texture, float]] = [(readings[name], getattr(mix, name)) for name in READINGS]
         depth_mask: tuple[Texture, Texture, float] | None = None
@@ -359,7 +378,7 @@ class Bridge3DLayer(BridgeLayer):
             depth_mask = (input.depth_mask, input.z_position, mix.depth_mask)
             sources.append((input.depth_mask, mix.depth_mask))
         amount.begin()
-        self._mix_shader.use(sources, lengths=True)
+        self._mix_shader.use(sources, lengths=True, capped=capped)
         amount.end()
         self._mix_z_position(z_position, readings, mix, depth_mask)
 

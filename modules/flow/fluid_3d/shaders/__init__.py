@@ -3,6 +3,7 @@
 from .advect_3d import Advect3D
 from .maccormack_3d import MacCormack3D
 from .divergence_3d import Divergence3D
+from .expansion_mean_3d import ExpansionMean3D, PARTIAL_BYTES
 from .gradient_3d import Gradient3D
 from .jacobi_pressure_3d import JacobiPressure3D
 from .sor_pressure_3d import SorPressure3D

@@ -111,21 +111,23 @@ the frame's dt and the lowpass uses the Ema's real step, the same integral, exac
 
 ## The mix
 
-What the fluid takes is two systems, the two a solver tells apart, each mixing the six readings,
-each reading at a share, 0 to 1, as the light renderer mixes its layers (`Bridge3DLayer`,
-`WeightedSum`). The panel shows three subpanels: `readings` (`lowpass`, `bandpass`), `boundary` and
-`body_force`. Each output's group holds the six shares as knobs on the first row (`MixSettings`:
-`trail`, `change`, `start`, `bow`, `stop`, `wake`), an amount's (a density's, a temperature's) a seventh,
-`depth_mask` (`AmountMixSettings`), and a density's own settings on the second (`saturation`, `brightness`). The density and the temperature are colored by a density and a
-temperature bridge per side, with the same color.
+What the fluid takes is two systems, the two a solver tells apart, and the expansion, a source of volume,
+each mixing the six readings, each reading at a share, 0 to 1, as the light renderer mixes its layers
+(`Bridge3DLayer`, `WeightedSum`). The panel shows four subpanels: `readings` (`lowpass`, `bandpass`),
+`boundary`, `body_force` and `expansion`. Each output's group holds the six shares as knobs on the first row
+(`MixSettings`: `trail`, `change`, `start`, `bow`, `stop`, `wake`), an amount's (a density's, a temperature's,
+the expansion) a seventh, `depth_mask` (`AmountMixSettings`), and a density's own settings on the second
+(`saturation`, `brightness`). The density and the temperature are colored by a density and a temperature
+bridge per side, with the same color.
 
 | Subpanel     | Groups                                   | Readings enter as                                       | Is                                                   |
 |--------------|------------------------------------------|---------------------------------------------------------|------------------------------------------------------|
 | `readings`   | `lowpass`, `bandpass`                    |                                                         | the filters' settings                                |
 | `boundary`   | `velocity`, `density`, `temperature`     | velocities                                              | the body in the water: what the water is dragged toward |
 | `body_force` | `acceleration`, `density`, `temperature` | accelerations; the density and the temperature from velocities, a push's change of speed | the Navier–Stokes force term: what is added          |
+| `expansion`  | its mix                                  | velocities                                              | where the water swells: a source of volume           |
 
-The six outputs (`BridgeOutput`, `Injection`), each in a unit of the body:
+The seven outputs (`BridgeOutput`, `Injection`), each in a unit of the body:
 
 | Output                    | Unit                                                                                                     | Default       |
 |---------------------------|----------------------------------------------------------------------------------------------------------|---------------|
@@ -135,6 +137,7 @@ The six outputs (`BridgeOutput`, `Injection`), each in a unit of the body:
 | `body_force_acceleration` | widths/s², a Δv added once over a change                                                                 | all 0: `None` |
 | `body_force_density`      | a push's dye, its presence from the change of speed                                                       | all 0: `None` |
 | `body_force_temperature`  | a push's warmth, the same way                                                                             | all 0: `None` |
+| `expansion`               | where the water swells, a presence 0 to 1, capped there; the newest capture's in a tick of several       | all 0: `None` |
 
 The presence is the mix's speed in widths/s, the sum of its readings' sizes (the length of each, at
 its share), capped at 1: a part moving at 1 width/s or faster is fully there, a slower one partly,
@@ -145,9 +148,10 @@ The density's color is the picture's (`DensityColor`: the image, or white, times
 the mask) through `saturation` and `brightness`; the warmth is (warm − cold) × (1 − neutral × 0.5) ×
 the presence, from the same color's red, blue and green. The readings of one unit share the mix, so
 the mix has no gain: the motion's gains balance the axes and the fluid's gains set how the water
-follows; a weight is a share. A body force output is `None` while its shares are all 0. The mixes'
-ports are `boundary.velocity`, `boundary.density_amount`, `boundary.temperature_amount`,
-`body_force.acceleration`, `body_force.density_amount` and `body_force.temperature_amount`; the
+follows; a weight is a share. A body force output and the expansion are `None` while their shares are
+all 0. The mixes' ports are `boundary.velocity`, `boundary.density_amount`, `boundary.temperature_amount`,
+`body_force.acceleration`, `body_force.density_amount`, `body_force.temperature_amount` and
+`expansion.expansion`; the
 colored ones are the density and temperature bridges' own (`boundary_density.output`, ...).
 
 A wake may drag (its share in `boundary.velocity`: the water behind a leaving limb is pulled to the

@@ -1,0 +1,55 @@
+#version 460 core
+
+/*
+ * ExpansionMean3D - the expansion's mean over the water's cells, for a closed box, whose solve needs the
+ * divergence's target to sum to 0. Two passes, by uPass:
+ *   0  each workgroup sums its cells' expansion and counts its water cells (an obstacle's is none) into
+ *      uPartials[group]
+ *   1  one workgroup sums the partials and writes the mean, the sum over the count, to uMean
+ * The numpy reference is fluid_3d.expansion_mean.
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;    // 256 a group, pass 1 one group of 256
+
+layout(binding = 0) uniform sampler3D uExpansion;  // R16F at the cells, a presence summed over the injections
+layout(binding = 2) uniform sampler3D uObstacle;   // R8 at the cells
+layout(std430, binding = 0) buffer Partials { vec2 uPartials[]; };     // per group: the sum, the water cells
+layout(std430, binding = 1) buffer Mean { float uMean; };
+
+uniform int   uPass;
+uniform ivec3 uCells;
+uniform bool  uHasObstacles;
+uniform int   uGroups;          // pass 1: the partials' count
+
+const uint LANES = 256u;
+shared vec2 lane[LANES];
+
+void reduce(uint index) {
+    barrier();
+    for (uint stride = LANES / 2u; stride > 0u; stride >>= 1u) {
+        if (index < stride) lane[index] += lane[index + stride];
+        barrier();
+    }
+}
+
+void main() {
+    uint index = gl_LocalInvocationIndex;
+    vec2 sum = vec2(0.0);
+    if (uPass == 0) {
+        ivec3 i = ivec3(gl_GlobalInvocationID.xyz);
+        bool water = all(lessThan(i, uCells)) && !(uHasObstacles && texelFetch(uObstacle, i, 0).r > 0.5);
+        if (water) sum = vec2(texelFetch(uExpansion, i, 0).r, 1.0);
+    } else {
+        for (int g = int(index); g < uGroups; g += int(LANES)) sum += uPartials[g];
+    }
+    lane[index] = sum;
+    reduce(index);
+    if (index != 0u) return;
+    if (uPass == 0) {
+        uvec3 groups = gl_NumWorkGroups;
+        uint group = gl_WorkGroupID.x + groups.x * (gl_WorkGroupID.y + groups.y * gl_WorkGroupID.z);
+        uPartials[group] = lane[0];
+    } else {
+        uMean = lane[0].y > 0.0 ? lane[0].x / lane[0].y : 0.0;
+    }
+}
