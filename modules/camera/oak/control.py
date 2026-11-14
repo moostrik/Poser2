@@ -90,7 +90,7 @@ class SensorControl:
         ctrl.setManualExposure(self.sensor.exposure, self.sensor.iso)
         self._send(ctrl)
 
-    # ── Colour ─────────────────────────────────────────────────────────
+    # ── Color ─────────────────────────────────────────────────────────
 
     def _on_auto_balance(self, value=None) -> None:
         if self.settings.color_sensor.auto_balance:

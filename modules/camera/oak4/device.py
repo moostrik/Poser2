@@ -90,7 +90,7 @@ def read_lens_calibration(device: dai.Device, socket: dai.CameraBoardSocket, siz
         fx, fy = float(matrix[0][0]), float(matrix[1][1])
         cx, cy = float(matrix[0][2]), float(matrix[1][2])
         logger.debug(f'{device_id} calibration {socket.name}: model {model}, spec fov {spec_fov:.1f} deg, '
-                     f'fx {fx:.1f} fy {fy:.1f} px/rad, centre ({cx:.1f}, {cy:.1f}) at {size[0]}x{size[1]}')
+                     f'fx {fx:.1f} fy {fy:.1f} px/rad, center ({cx:.1f}, {cy:.1f}) at {size[0]}x{size[1]}')
         return fx, cx, cy
     except Exception as exc:                        # never let diagnostics break an open
         logger.debug(f'{device_id} could not read calibration: {exc}')

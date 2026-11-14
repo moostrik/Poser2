@@ -69,7 +69,7 @@ class ReplayCameraTest(unittest.TestCase):
         self.settings.initialize()
         self.player = FakePlayer()
         self.detector = FakePersonDetector()
-        self.camera = Camera(self.player, self.settings, self.detector, FakeTracker(), id=1)
+        self.camera = Camera(self.player, self.settings, self.detector, FakeTracker(), cam_id=1)
         self.frames = []
         self.messages = []
         self.camera.add_frame_callback(self.frames.append)
@@ -149,7 +149,7 @@ class RecordedTrackletsTest(unittest.TestCase):
         self.settings.initialize()
         self.player = FakePlayer()
         self.detector = FakePersonDetector(enabled=False)
-        self.camera = Camera(self.player, self.settings, self.detector, FakeTracker(), id=1)
+        self.camera = Camera(self.player, self.settings, self.detector, FakeTracker(), cam_id=1)
         self.messages = []
         self.camera.add_tracklet_callback(lambda message: self.messages.append((time.perf_counter(), message)))
         self.camera.start()
@@ -196,7 +196,7 @@ class WithoutDetectorTest(unittest.TestCase):
         settings = RigCameraSettings()
         settings.initialize()
         player = FakePlayer()
-        camera = Camera(player, settings, None, FakeTracker(), id=0)
+        camera = Camera(player, settings, None, FakeTracker(), cam_id=0)
         frames = []
         camera.add_frame_callback(frames.append)
         camera.start()

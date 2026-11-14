@@ -104,8 +104,8 @@ class StreamingCamera(FakeCamera):
 
 
 def wait_for(condition, timeout: float = 3.0) -> bool:
-    end = time.time() + timeout
-    while time.time() < end:
+    end = time.perf_counter() + timeout
+    while time.perf_counter() < end:
         if condition():
             return True
         time.sleep(0.01)
@@ -127,7 +127,7 @@ class TestVimbaCamReopen(unittest.TestCase):
         self.found: bool = True
         self.searches: int = 0
 
-        def get_camera(camera_id):
+        def get_camera(serial):
             self.searches += 1
             if not self.found:
                 raise NoCamera('no camera found')
@@ -187,8 +187,8 @@ class TestVimbaCamReopen(unittest.TestCase):
 
     def test_frames_that_keep_coming_keep_the_stream(self):
         self.cam.start()
-        end = time.time() + 0.4                                     # four times the frame timeout
-        while time.time() < end:
+        end = time.perf_counter() + 0.4                             # four times the frame timeout
+        while time.perf_counter() < end:
             self.push()
             time.sleep(0.01)
         self.assertEqual((self.searches, self.camera.streams), (1, 1))

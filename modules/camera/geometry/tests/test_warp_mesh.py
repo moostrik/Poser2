@@ -136,7 +136,7 @@ class SourceLensTest(unittest.TestCase):
         self.assertEqual((cx, cy), (CX - 10.5, CY + 10.5))
 
     def test_center_offset_survives_the_720_crop(self) -> None:
-        # The 720-row mode is a centre crop, so the offset from the frame centre is the same.
+        # The 720-row mode is a center crop, so the offset from the frame center is the same.
         _, cx8, cy8 = source_lens((1280, 800), 1280, MONO_FOV_H, LENS_FOV, LENS_CENTER)
         _, cx7, cy7 = source_lens((1280, 720), 1280, MONO_FOV_H, LENS_FOV, LENS_CENTER)
         self.assertEqual(cx8, cx7)
@@ -156,7 +156,7 @@ class SourceLensTest(unittest.TestCase):
         self.assertTrue(math.isnan(rectilinear_field(0.0, 447.5, 896)))
 
     def test_lens_deviation_names_the_outlier(self) -> None:
-        # Unit F124's optical centre sits 24 px left of the frame centre, 14 px from the shared
+        # Unit F124's optical center sits 24 px left of the frame center, 14 px from the shared
         # lens's — 1.4 deg of azimuth zero. The other three are within 0.6 deg.
         errors = {tail: lens_deviation(*calib, (MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTER)
                   for tail, calib in UNITS.items()}
@@ -193,7 +193,7 @@ class FrameWindowTest(unittest.TestCase):
 
     def test_the_numbers_of_the_rig(self) -> None:
         # The shared lens at tilt 16 on 800 rows: the feet rule's -23.7 deg at the bottom
-        # (-23.2 with the lens centre 10.5 px low), the tangent's 43.7 at the top.
+        # (-23.2 with the lens center 10.5 px low), the tangent's 43.7 at the top.
         win = window(16.0, lens_fov=LENS_FOV, lens_center=LENS_CENTER)
         self.assertAlmostEqual(win.elevation_bottom, -23.2, delta=0.05)
         self.assertAlmostEqual(win.elevation_top, 43.7, delta=0.05)
@@ -217,7 +217,7 @@ class FrameWindowTest(unittest.TestCase):
 
 class WarpMeshProjectionTest(unittest.TestCase):
     """At tilt 0 the mesh is the equidistant -> cylindrical reprojection, not the identity.
-    The safety property is what stays fixed: the lens centre and the centre column, and — the
+    The safety property is what stays fixed: the lens center and the center column, and — the
     point of it all — a vertical pole lands in ONE column at every height."""
 
     def test_the_lens_center_is_the_fixed_point(self) -> None:
@@ -230,7 +230,7 @@ class WarpMeshProjectionTest(unittest.TestCase):
     def test_the_center_column_is_straight(self) -> None:
         n = 9
         pts = mesh(0.0, mesh_w=n, mesh_h=n).reshape(n, n, 2)
-        np.testing.assert_allclose(pts[:, 4, 0], CX, atol=1e-6)      # centre column: x stays centre
+        np.testing.assert_allclose(pts[:, 4, 0], CX, atol=1e-6)      # center column: x stays center
         self.assertTrue(np.all(np.diff(pts[:, 4, 1]) > 0))            # and runs down the sensor
 
     def test_corners_are_not_the_identity(self) -> None:
@@ -278,8 +278,8 @@ class WarpMeshGeometryTest(unittest.TestCase):
     """What makes the degrees mean degrees, with the tilt and the real lens in."""
 
     def test_the_lens_center_is_the_fixed_point_at_any_tilt(self) -> None:
-        # The output's centre column at the row of elevation `tilt` looks along the optical axis,
-        # so it reads the lens centre — not the frame centre — whatever the tilt.
+        # The output's center column at the row of elevation `tilt` looks along the optical axis,
+        # so it reads the lens center — not the frame center — whatever the tilt.
         n = 129
         focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTER)
         for tilt in (0.0, 5.0, 16.0, -7.5):
@@ -293,7 +293,7 @@ class WarpMeshGeometryTest(unittest.TestCase):
                 self.assertAlmostEqual(sy, cy, delta=0.01)
 
     def test_the_bottom_row_reads_the_sensor_bottom_on_the_center_column(self) -> None:
-        # The window is pinned there: nothing is black at the bottom of the centre column, and
+        # The window is pinned there: nothing is black at the bottom of the center column, and
         # no sensor row below the axis is thrown away, at any tilt.
         n = 9
         focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTER)
@@ -305,7 +305,7 @@ class WarpMeshGeometryTest(unittest.TestCase):
 
     def test_the_horizon_row_reads_a_level_ray(self) -> None:
         # A level ray is `tilt` below the axis of a camera aimed up by `tilt`; the equidistant
-        # lens puts it `focal * tilt` px below its centre. That is what must be found on the row
+        # lens puts it `focal * tilt` px below its center. That is what must be found on the row
         # the window calls the horizon.
         n = 129
         focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTER)
@@ -318,7 +318,7 @@ class WarpMeshGeometryTest(unittest.TestCase):
                 self.assertAlmostEqual(sy, cy + focal * math.radians(tilt), delta=0.05)
 
     def test_rows_are_tangents_on_the_sensor_too(self) -> None:
-        # On the centre column the source row of elevation `e` is `cy + focal * (tilt - e)` in
+        # On the center column the source row of elevation `e` is `cy + focal * (tilt - e)` in
         # radians (equidistant), while the output row is `horizon - F * tan(e)`. The mesh must
         # join the two: a straight line in angle on one side, a tangent on the other.
         n = 129
@@ -378,7 +378,7 @@ class WarpMeshCropTest(unittest.TestCase):
     """The square crop is a window on the same lens, not a different one."""
 
     def test_square_crop_keeps_the_center_and_the_vertical_mapping(self) -> None:
-        # The crop removes columns only: its centre column is the full frame's, and its rows
+        # The crop removes columns only: its center column is the full frame's, and its rows
         # map exactly as the full frame's do, at any tilt.
         n = 9
         for tilt in (0.0, 8.0):
@@ -440,12 +440,12 @@ class FrameCoverageTest(unittest.TestCase):
         self.assertTrue(np.all(cov[:, 1] == MONO_H - 1))
 
     def test_tilt_0_has_the_arch_at_the_bottom(self) -> None:
-        # Pinned at the sensor's bottom reach on the centre column, -39 deg, which the edge
+        # Pinned at the sensor's bottom reach on the center column, -39 deg, which the edge
         # columns cannot follow (they reach -33): black at the bottom, growing toward the edges.
         cov = self._coverage(0.0)
         self.assertTrue(np.all(cov[:, 0] == 0))
         self.assertLess(cov[0, 1], MONO_H - 1 - 90)
-        self.assertTrue(np.all(np.diff(cov[: MONO_W // 2, 1]) >= 0))     # monotonic toward the centre
+        self.assertTrue(np.all(np.diff(cov[: MONO_W // 2, 1]) >= 0))     # monotonic toward the center
         for column in (0, 200, 400):
             with self.subTest(column=column):
                 bearing = (column - CX) * DPP
@@ -466,7 +466,7 @@ class FrameCoverageTest(unittest.TestCase):
     def test_the_summary_names_the_rows(self) -> None:
         cov = self._coverage(0.0)
         text = coverage_summary(cov, (MONO_W, MONO_H), MONO_W, MONO_FOV_H)
-        self.assertIn('centre 0-799', text)
+        self.assertIn('center 0-799', text)
         self.assertIn(f'edges 0-{int(cov[0, 1])}', text)
         self.assertIn('seams 0-', text)
 
@@ -508,8 +508,8 @@ class FrameSizeTest(unittest.TestCase):
         self.assertEqual(aligned_height(3), 16)
 
     def test_full_reach_height_is_what_the_doc_says(self) -> None:
-        # The rows the centre column needs to carry every sensor row: 1152 at P800 and tilt 16,
-        # 960 at P720 and tilt 15, with the shared lens (its centre 10.5 px low gives the sensor
+        # The rows the center column needs to carry every sensor row: 1152 at P800 and tilt 16,
+        # 960 at P720 and tilt 15, with the shared lens (its center 10.5 px low gives the sensor
         # 41.3 deg above the axis and 39.2 below). Both multiples of 16.
         self.assertEqual(full_frame_height((1280, 800), 1280, MONO_FOV_H, 16.0, LENS_FOV, LENS_CENTER), 1152)
         self.assertEqual(full_frame_height((1280, 720), 1280, MONO_FOV_H, 15.0, LENS_FOV, LENS_CENTER), 960)
@@ -529,7 +529,7 @@ class ResolutionTest(unittest.TestCase):
             self.assertEqual(resolve_resolution(color=False, resolution=label), label)
             self.assertEqual(resolve_resolution(color=True, resolution=label), label)
 
-    def test_mono_falls_back_from_a_colour_only_label(self) -> None:
+    def test_mono_falls_back_from_a_color_only_label(self) -> None:
         from modules.camera.geometry.sensor_modes import _warned_resolutions
         _warned_resolutions.discard((False, CameraResolution.P1080))
         with self.assertLogs('modules.camera.geometry.sensor_modes', level='WARNING') as captured:
@@ -547,14 +547,14 @@ class ResolutionTest(unittest.TestCase):
                 frame_size(False, CameraResolution.P1080)
         self.assertEqual(len(captured.output), 1)
 
-    def test_colour_keeps_its_own_label(self) -> None:
+    def test_color_keeps_its_own_label(self) -> None:
         self.assertEqual(
             resolve_resolution(color=True, resolution=CameraResolution.P1080),
             CameraResolution.P1080,
         )
 
     def test_the_bottom_reach_follows_the_label(self) -> None:
-        """The 720-row mode is a centre crop: 40 rows less below the axis, so the bottom of the
+        """The 720-row mode is a center crop: 40 rows less below the axis, so the bottom of the
         window is 4 deg higher and the feet run out of frame sooner."""
         w800 = frame_window((1280, 800), (1280, 800), 1280, MONO_FOV_H, 0.0)
         w720 = frame_window((1280, 720), (1280, 720), 1280, MONO_FOV_H, 0.0)

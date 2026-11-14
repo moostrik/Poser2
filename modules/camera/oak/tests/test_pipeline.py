@@ -71,7 +71,7 @@ class DevicePipelineTest(unittest.TestCase):
         })
 
     def test_color_takes_the_preview_through_the_same_graph(self) -> None:
-        # HD Trio and Deep Flow: colour, square, YOLO.
+        # HD Trio and Deep Flow: color, square, YOLO.
         p = build(color=True, resolution=CameraResolution.P1080)
         self.assertIn('ColorCamera', node_names(p))
         self.assertNotIn('MonoCamera', node_names(p))

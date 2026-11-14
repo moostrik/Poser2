@@ -37,7 +37,7 @@ FRAME_CHECK: float = 0.5        # s between two looks at the time of the last fr
 
 
 class Camera(Thread):
-    _id_counter = 0
+    _next_cam_id = 0
 
     def __init__(self, settings: Oak4CameraSettings) -> None:
         super().__init__()
@@ -47,8 +47,8 @@ class Camera(Thread):
         self._last_frame: float = 0.0
 
         # ID
-        self.id: int = Camera._id_counter
-        Camera._id_counter += 1
+        self.cam_id: int = Camera._next_cam_id
+        Camera._next_cam_id += 1
 
         # SETTINGS (reactive)
         self.settings: Oak4CameraSettings = settings
@@ -309,7 +309,7 @@ class Camera(Thread):
             self.settings.readings.fov_factory = field
             self.settings.readings.lens_error = error
             logger.info(f'{self.device_id} lens: field {field:.1f} deg across {src[0]} px, '
-                        f'centre offset ({cx - (src[0] - 1) / 2.0:+.1f}, {cy - (src[1] - 1) / 2.0:+.1f}) px; '
+                        f'center offset ({cx - (src[0] - 1) / 2.0:+.1f}, {cy - (src[1] - 1) / 2.0:+.1f}) px; '
                         f'{error:.2f} deg off the shared lens')
         self._imu_rotation = imu_rotation_to_camera(self.device, SENSOR_SOCKET, self.device_id)
 
@@ -376,7 +376,7 @@ class Camera(Thread):
         """One device tracklet as the contract's, in the frame as delivered: the uploader straightens
         and mirrors it with its frame."""
         roi = Rect(tracklet.roi.x, tracklet.roi.y, tracklet.roi.width, tracklet.roi.height)
-        return CameraTracklet(cam_id=self.id, id=tracklet.id, status=TRACKING_STATUS[tracklet.status], roi=roi,
+        return CameraTracklet(cam_id=self.cam_id, id=tracklet.id, status=TRACKING_STATUS[tracklet.status], roi=roi,
                               age=tracklet.age, timestamp=timestamp, keypoints=keypoints)
 
     def _tracker_callback(self, name: str, msg: dai.Tracklets) -> None:
@@ -449,7 +449,7 @@ class Camera(Thread):
     def _emit_frame(self, kind: FrameType, image: ndarray, timestamp: float, arrival: float, nv12: bool = False,
                     readings: FrameReadings | None = None, alignment: DepthAlignment | None = None) -> None:
         """The hand-over: the frame, with its capture time (`capture_time`) and its arrival, goes to every callback."""
-        frame = CameraFrame(cam_id=self.id, kind=kind, image=image, timestamp=timestamp,
+        frame = CameraFrame(cam_id=self.cam_id, kind=kind, image=image, timestamp=timestamp,
                             nv12=nv12, flip_h=self.flip_on_host, homography=self.tilt_correction.homography,
                             readings=readings, intrinsics=self._intrinsics, alignment=alignment, arrival=arrival)
         with self._callback_lock:
@@ -460,7 +460,7 @@ class Camera(Thread):
     def _emit_tracklets(self, tracklets: list[CameraTracklet], timestamp: float, arrival: float) -> None:
         if not self.running:
             return
-        message = CameraTracklets(cam_id=self.id, timestamp=timestamp, tracklets=tracklets, arrival=arrival)
+        message = CameraTracklets(cam_id=self.cam_id, timestamp=timestamp, tracklets=tracklets, arrival=arrival)
         with self._callback_lock:
             callbacks: list[TrackletCallback] = list(self.tracklet_callbacks)
         for c in callbacks:

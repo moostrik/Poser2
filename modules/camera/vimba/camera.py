@@ -49,19 +49,19 @@ class NoCamera(Exception):
     """The camera was not found or could not be set up; the message says why."""
 
 
-def get_camera(camera_id: str | None) -> Any:
-    """The Vimba camera with the id, or the first one found; raises NoCamera when there is none."""
+def get_camera(serial: str | None) -> Any:
+    """The Vimba camera with the serial, or the first one found; raises NoCamera when there is none."""
     with Vimba.get_instance() as vimba:
         cams = vimba.get_all_cameras()
         if not cams:
             raise NoCamera('no camera found')
 
-        if camera_id:
+        if serial:
             try:
-                return vimba.get_camera_by_id(camera_id)
+                return vimba.get_camera_by_id(serial)
 
             except VimbaCameraError:
-                logger.warning('Vimba camera %s not found, taking the first', camera_id)
+                logger.warning('Vimba camera %s not found, taking the first', serial)
 
         return cams[0]
 
@@ -111,12 +111,12 @@ class Camera(Thread):
     """A `CameraSource` on a Vimba camera. `rotate90` turns every frame (portrait mode, fixed at
     start); the flips come from the settings, per frame. No detector: no tracklets."""
 
-    def __init__(self, settings: VimbaCameraSettings, rotate90: bool = False, id: int = 0) -> None:
+    def __init__(self, settings: VimbaCameraSettings, rotate90: bool = False, cam_id: int = 0) -> None:
         super().__init__(name='VimbaCamera', daemon=True)
         self.settings: VimbaCameraSettings = settings
-        self.id: int = id
+        self.cam_id: int = cam_id
         self.rotate90: bool = rotate90
-        self.camera_id: str | None = None       # None: the first camera found
+        self.serial: str | None = None          # the camera's serial; None: the first camera found
 
         # the newest frame as Vimba's thread copied it, until this thread takes it
         self._frame: np.ndarray | None = None
@@ -225,7 +225,7 @@ class Camera(Thread):
         """Find the camera and set it up (user set, packet size); None when that does not work, with
         the reason in the log once."""
         try:
-            camera: Any = get_camera(self.camera_id)
+            camera: Any = get_camera(self.serial)
             setup: CameraSetup = setup_camera(camera, self.settings.user_set or None)
         except NoCamera as e:
             self._warn(str(e))
@@ -292,7 +292,7 @@ class Camera(Thread):
             image = cv2.flip(image, 0)
         if self.settings.flip_h:
             image = cv2.flip(image, 1)
-        frame = CameraFrame(cam_id=self.id, kind=FrameType.VIDEO, image=image, timestamp=time.perf_counter())
+        frame = CameraFrame(cam_id=self.cam_id, kind=FrameType.VIDEO, image=image, timestamp=time.perf_counter())
         with self._callback_lock:
             callbacks: list[CameraFrameCallback] = list(self.frame_callbacks)
         for callback in callbacks:

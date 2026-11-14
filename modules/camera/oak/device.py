@@ -44,7 +44,7 @@ def read_lens_calibration(device: Device, socket, mode_size: tuple[int, int],
         fx, fy = float(matrix[0][0]), float(matrix[1][1])
         cx, cy = float(matrix[0][2]), float(matrix[1][2])
         logger.debug(f'{device_id} calibration {socket.name}: model {model}, spec fov {spec_fov:.1f} deg, '
-                     f'fx {fx:.1f} fy {fy:.1f} px/rad, centre ({cx:.1f}, {cy:.1f}) '
+                     f'fx {fx:.1f} fy {fy:.1f} px/rad, center ({cx:.1f}, {cy:.1f}) '
                      f'at {mode_size[0]}x{mode_size[1]}')
         return fx, cx, cy
     except Exception as exc:                        # never let diagnostics break an open

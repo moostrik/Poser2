@@ -2,7 +2,7 @@
 
 Everything else in `modules/camera/geometry/tests` checks the mesh point by point. This one does what the
 rig does: renders a scene into a raw sensor frame with an INDEPENDENT forward model of the lens
-(equidistant, the shared focal and centre, the camera aimed up by the tilt), warps it with the
+(equidistant, the shared focal and center, the camera aimed up by the tilt), warps it with the
 32 x 32 mesh bilinearly densified — exactly how the Warp node reads a mesh — and measures the
 result the way a person with a tape would:
 
@@ -119,7 +119,7 @@ class Scene:
     @staticmethod
     def tick(bearing: float, distance: float, height_above_lens: float) -> list[tuple[float, float, float]]:
         """A short horizontal mark, 16 cm wide, at a height on a vertical through (bearing, distance).
-        Its middle point (index 2) is the mark's centre."""
+        Its middle point (index 2) is the mark's center."""
         b = math.radians(bearing)
         xc, zc = distance * math.sin(b), distance * math.cos(b)
         return [(xc + dx, height_above_lens, zc) for dx in np.linspace(-0.08, 0.08, 5)]
@@ -230,7 +230,7 @@ class LensImageTest(unittest.TestCase):
         for name in ('low', 'high'):
             rows = []
             for end in ('a', 'b'):
-                x, y = self._frame_points(f'tick_{name}_{end}')[2]        # the tick's centre
+                x, y = self._frame_points(f'tick_{name}_{end}')[2]        # the tick's center
                 found = brightest_row(self.warped['ticks'], int(round(x)), y, halfwidth=6)
                 self.assertIsNotNone(found, f'no tick {name} {end}')
                 rows.append(found)

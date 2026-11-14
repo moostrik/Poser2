@@ -30,7 +30,7 @@ def _project_grid(
     window: FrameWindow = frame_window(src_size, out_size, mode_width, fov_h, tilt, lens_fov, lens_center)
     X, Y = np.meshgrid(np.asarray(xs, dtype=np.float64), np.asarray(ys, dtype=np.float64))
     if window.focal <= 0.0 or lens_focal <= 0.0:
-        # No field to speak of: hand the frame through, the square crop cut from the centre.
+        # No field to speak of: hand the frame through, the square crop cut from the center.
         return np.stack([X + (src_w - out_w) / 2.0, Y + (src_h - out_h) / 2.0], axis=-1)
 
     ox: np.ndarray = (out_w - 1.0) - X if flip_h else X
@@ -123,6 +123,6 @@ def coverage_summary(coverage: np.ndarray, out_size: tuple[int, int], mode_width
             return 'none'
         return f'{int(rows[:, 0].max())}-{int(rows[:, 1].min())}'
 
-    return (f'rows covered of {out_h}: centre {span([column(0.0)])}, '
+    return (f'rows covered of {out_h}: center {span([column(0.0)])}, '
             f'seams {span([column(-45.0), column(45.0)])}, '
             f'edges {span([0, out_w - 1])}')

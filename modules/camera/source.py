@@ -21,9 +21,9 @@ class ClipSource(Protocol):
 
 
 class CameraSource(Protocol):
-    """One camera: a thread that delivers frames and, when it runs a detector, tracklets; `id` is its index in
-    the app, `cam_id` on all it emits, `connected` whether its device is open now."""
-    id: int
+    """One camera: a thread that delivers frames and, when it runs a detector, tracklets; `cam_id` is its index in
+    the app and on all it emits, `connected` whether its device is open now."""
+    cam_id: int
 
     @property
     def readings(self) -> CameraReadings: ...

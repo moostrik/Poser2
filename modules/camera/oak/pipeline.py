@@ -334,7 +334,7 @@ def _report_lens_reach(src_size: tuple[int, int], mode_width: int, mount: WarpCo
         return
     pixels: float = math.radians(shortfall) * mode_width / math.radians(mount.fov_h)
     message: str = (f"fov {mount.fov_h:.1f} exceeds the lens reach ({left:.2f} deg left, {right:.2f} deg right "
-                    f"of its centre): about {pixels:.1f} px black at the {'left' if left < right else 'right'} "
+                    f"of its center): about {pixels:.1f} px black at the {'left' if left < right else 'right'} "
                     f"edge near the horizon")
     (logger.warning if pixels > 3.0 else logger.info)(message)
 
@@ -360,7 +360,7 @@ def build_warp_mesh(
         width_offset: float = src_w * 0.5 * mount.keystone
         mesh = find_keystone_warp(src_w, src_h, width_offset, mount.flip_h, mount.flip_v,
                                   KEYSTONE_MESH_W, KEYSTONE_MESH_H)
-    else:                                                       # square: cut from the centre
+    else:                                                       # square: cut from the center
         width_offset = src_h * 0.5 * mount.keystone
         mesh = find_keystone_warp_square(src_w, src_h, out_h, width_offset, mount.flip_h, mount.flip_v,
                                          KEYSTONE_MESH_W, KEYSTONE_MESH_H)

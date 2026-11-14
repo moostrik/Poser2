@@ -35,7 +35,7 @@ The pinned readouts measure capture to arrival on the PC.
 | Video         | 60 fps      | The camera or the link is not keeping up      |
 | Video latency | 28 to 29 ms | Check the link: Ethernet adds about 6 ms      |
 | Depth latency | 42 to 52 ms | Moves between phases of a run; this is normal |
-| Link          | USB         | Fell back to Ethernet; see [Open](#open)      |
+| Link          | USB         | Fell back to Ethernet; see [Open](../CAMERA_PLAN.md#open) |
 
 The camera's `readings` show its own `cpu`, `memory` and `temperature` on the line under `video_latency`, once a second (see [camera load](#camera-load)).
 
@@ -69,7 +69,7 @@ Measured on the color sensor at P720 and 60 fps, by asking for manual values and
 | Auto exposure   |       | 16277 µs | At 60 fps                    |
 | Auto ISO, seen  | 65    | 5832     | Holds 5832 in a dark room    |
 
-Whether manual exposure really goes past the frame time is in [Open](#open).
+Whether manual exposure really goes past the frame time is in [the camera's plan](../CAMERA_PLAN.md#open).
 
 ### Auto exposure
 
@@ -82,7 +82,7 @@ Auto exposure is on by default, and these settings in `sensor` shape it, live. M
 | `exposure_compensation` -9  | 2183  | 15.4      |
 | `exposure_compensation` +9  | 16585 | 42.4      |
 
-`exposure_region` is in fractions of the picture as shown, mirrored or not. The other new settings in `sensor` are `auto_exposure_lock`, `auto_balance_lock`, `anti_banding` and `chroma_denoise`; what is known about them is in [Open](#open).
+`exposure_region` is in fractions of the picture as shown, mirrored or not. The other new settings in `sensor` are `auto_exposure_lock`, `auto_balance_lock`, `anti_banding` and `chroma_denoise`; what is known about them is in [the camera's plan](../CAMERA_PLAN.md#open).
 
 ### Tilt
 
@@ -421,25 +421,3 @@ Time per frame on an empty `P1080` frame, 500 runs each, batch 1, FP32, GPU othe
 | `R480X384`   | 4.3 ms             | 3.6 ms                 | 8.2 ms         | 7.4 ms             |
 
 The times cover the preprocessing, inference and decoding; with the preprocessing on the GPU they are not measured. At 60 Hz the GPU drops to idle clocks between runs, which nearly doubles them, and the slowest frame at `R640X512` was 20.1 ms on both runtimes. Back to back, the slowest frame at any size was about 8 ms. Both runtimes find the same players on a photo of people, with scores within 0.001 and boxes within 0.03 px. ONNX Runtime stays the default, as TensorRT saves about 1 ms and takes turns with the other TensorRT models on their shared execution lock.
-
-## Open
-
-- NPU load is not read. depthai does not report it, and `oakctl device stats` gives `dsp` null with a pipeline running. `sysMonApp` on the camera reads the NPU through `/dev/fastrpc-cdsp`, which only the `system` user can open, and the ADB shell runs as `adb`, so it fails with a FastRPC error. It needs a root shell through `oakctl device unlock`, which has not been tried.
-- depthai once stopped listing the camera on USB after an app closed, and kept listing it on Ethernet, while ADB and Windows still saw it on USB. Every open fell back to Ethernet until `oakctl device reboot` brought USB back. The cause is not known.
-- `SpatialDetectionNetwork` has not been measured with a real player, whose larger box holds more depth pixels, or with several players. Which depth frame its `z` comes from is not known: boxes reach the PC before that frame's depth does.
-- Video min sometimes reads about 30 fps **(site fact)**. The cause is not known.
-- `view_depth` has not been seen with a player in view live.
-- A standing player reading as one distance from head to feet has not been checked.
-- Depth has one outlier of about 153 mm near the top left on synthetic frames, at all widths. The cause is not known.
-- `StreamReader.frame_count` can read one short on an `.mkv`, as it estimates from the duration.
-- Ethernet stalled once in 130 s of streaming, with a gap of 4.8 s and latency up to 1.7 s. The cause is not known, and a USB run of that length has not been compared. That was at `P720`; `P800` loads Ethernet more and has only run for 10 s.
-- A player at show distance has not been compared across depth sizes or IR lights.
-- Detection at 640x512 has not been compared with 416x416 on a player, and its latency has not been measured with a player in view.
-- `P800` and `P1080` have not been run in the app, and `P800` has not been recorded and replayed.
-- `auto_exposure_lock` did not hold: with it on, `exposure_compensation` +9 still moved ISO to 16585. Whether it holds against a change of light has not been tested.
-- `exposure_region`, `auto_balance_lock` and `anti_banding` changed nothing in a dark room, where exposure was already at its ceiling and nothing flickered. They need a test with light. `chroma_denoise` 4 lowered mean luma from 24.0 to 22.1, so it does reach the sensor.
-- The temporal filter has only been measured on a still scene. How far depth trails a moving player has not been measured.
-- Why one run's capture times lay after now ([Capture time](#capture-time)): perhaps a camera reopened seconds after another process closed it.
-- A manual exposure past the frame time is reported as asked and the rate stays at 60 fps, up to 100000 µs, which cannot be real. In a dark room the picture's brightness did not follow exposure at all, so the real top needs a test with light.
-- `test_a_split_keeps_the_streams_in_step_across_chunks` fails about 2 runs in 5, because a split lands 1 to 3 frames early. No frames are lost: 50 of 50 in all three streams.
-- The camera is planned to run standalone, as an OAK App **(site fact)**. Depth alignment then needs a home: `ImageAlign` is the only alignment on the camera and fattens near objects ([Depth](#depth)), and its firmware cannot be changed. The options are to keep sending raw depth with its `DepthAlignment` to a PC that runs `DepthAlign`, or to run the same reprojection as a host node on the camera's CPU, whose speed for 144,000 points a frame has not been measured. A Script node is too slow for it **(deduction)**.

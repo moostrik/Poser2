@@ -57,9 +57,9 @@ class BoxTracker(Protocol):
 
 
 class Camera:
-    def __init__(self, player: Player, settings: RigCameraSettings, detector: PersonDetector | None, tracker: BoxTracker | None, id: int = 0,
+    def __init__(self, player: Player, settings: RigCameraSettings, detector: PersonDetector | None, tracker: BoxTracker | None, cam_id: int = 0,
                  tilt: TiltCorrectionSettings | None = None) -> None:
-        self.id: int = id
+        self.cam_id: int = cam_id
         self.settings: RigCameraSettings = settings
         self.player: Player = player
         self.detector: PersonDetector | None = detector
@@ -97,7 +97,7 @@ class Camera:
         if self.detector is not None:
             self.detector.add_detection_callback(self._on_detection)
         self.running = True
-        self._thread = Thread(target=self._send_recorded, daemon=True, name=f'ReplayTracklets{self.id}')
+        self._thread = Thread(target=self._send_recorded, daemon=True, name=f'ReplayTracklets{self.cam_id}')
         self._thread.start()
 
     def stop(self) -> None:
@@ -131,10 +131,10 @@ class Camera:
         """A clip frame, on the player's thread, to the callbacks: stamped with its capture on the play's clock,
         or its hand-over for a recording without metadata, and its hand-over as its arrival. The player hands
         a recorded frame's video first, so its depth takes the video's stamp: one capture, one time."""
-        if not self.running or cam_id != self.id:
+        if not self.running or cam_id != self.cam_id:
             return
         arrival: float = time.perf_counter()
-        info: ChunkInfo | None = self.player.get_chunk_info(self.id)
+        info: ChunkInfo | None = self.player.get_chunk_info(self.cam_id)
         if frame_type == FrameType.VIDEO:
             self._video_timestamp = captured if captured is not None else arrival
             self.video_fps.processed()
@@ -149,7 +149,7 @@ class Camera:
         readings: FrameReadings | None = metadata.readings if frame_type == FrameType.VIDEO and metadata is not None else None
         intrinsics: list[list[float]] | None = info.intrinsics if info is not None else None
         nv12: bool = frame_type == FrameType.VIDEO and self.player.nv12
-        frame = CameraFrame(cam_id=self.id, kind=frame_type, image=image, timestamp=timestamp, nv12=nv12, flip_h=flip_h,
+        frame = CameraFrame(cam_id=self.cam_id, kind=frame_type, image=image, timestamp=timestamp, nv12=nv12, flip_h=flip_h,
                             homography=homography, readings=readings, intrinsics=intrinsics, alignment=alignment, arrival=arrival)
         for c in self.frame_callbacks:
             c(frame)
@@ -180,9 +180,9 @@ class Camera:
         with self._wake:
             if metadata.tracklets is None or playing_detector:
                 return
-            tracklets: list[CameraTracklet] = [CameraTracklet(cam_id=self.id, id=t.id, status=t.status, roi=t.roi, age=t.age,
+            tracklets: list[CameraTracklet] = [CameraTracklet(cam_id=self.cam_id, id=t.id, status=t.status, roi=t.roi, age=t.age,
                                                               timestamp=timestamp, keypoints=t.keypoints) for t in metadata.tracklets]
-            message = CameraTracklets(cam_id=self.id, timestamp=timestamp, tracklets=tracklets)
+            message = CameraTracklets(cam_id=self.cam_id, timestamp=timestamp, tracklets=tracklets)
             due: float = timestamp + (metadata.tracklet_latency or 0.0)
             heapq.heappush(self._waiting, (due, self._order, message))
             self._order += 1
@@ -205,13 +205,13 @@ class Camera:
         """The detector's boxes for one frame, on its thread: through the tracker, out as the
         contract's tracklets with that frame's time, an empty list included. The boxes were found in the
         straightened frame, so they are straightened already."""
-        if not self.running or detection.cam_id != self.id or self.tracker is None:
+        if not self.running or detection.cam_id != self.cam_id or self.tracker is None:
             return
         timestamp: float = detection.timestamp
         tracklets: list[CameraTracklet] = [
-            CameraTracklet(cam_id=self.id, id=t.id, status=t.status, roi=t.roi, age=t.age, timestamp=timestamp)
+            CameraTracklet(cam_id=self.cam_id, id=t.id, status=t.status, roi=t.roi, age=t.age, timestamp=timestamp)
             for t in self.tracker.update(detection.boxes)]
-        self._emit_tracklets(CameraTracklets(cam_id=self.id, timestamp=timestamp, tracklets=tracklets, arrival=time.perf_counter(), straightened=True))
+        self._emit_tracklets(CameraTracklets(cam_id=self.cam_id, timestamp=timestamp, tracklets=tracklets, arrival=time.perf_counter(), straightened=True))
 
     def _emit_tracklets(self, message: CameraTracklets) -> None:
         self.tracklet_fps.processed()

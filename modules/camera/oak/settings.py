@@ -9,7 +9,7 @@ from .sensor import EXPOSURE_RANGE, ISO_RANGE, BALANCE_RANGE, CONTRAST_RANGE, BR
 
 
 class ColorSensorSettings(BaseSettings):
-    """The colour sensor's exposure, balance and image controls. Inert on a mono camera."""
+    """The color sensor's exposure, balance and image controls. Inert on a mono camera."""
     exposure:       Field[int]  = Field(EXPOSURE_RANGE[0], min=EXPOSURE_RANGE[0], max=EXPOSURE_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="Exposure (µs)", newline=True)
     iso:            Field[int]  = Field(ISO_RANGE[0], min=ISO_RANGE[0], max=ISO_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="ISO")
     auto_exposure:  Field[bool] = Field(True, widget=Widget.switch, description="Auto exposure")
@@ -24,7 +24,7 @@ class ColorSensorSettings(BaseSettings):
 
 class MonoSensorSettings(BaseSettings):
     """The mono sensor's exposure, and the IR illumination that goes with it — the flood lamp and
-    the dot projector are only ever used by a mono camera, and are ignored on a colour one."""
+    the dot projector are only ever used by a mono camera, and are ignored on a color one."""
     exposure:       Field[int]   = Field(EXPOSURE_RANGE[0], min=EXPOSURE_RANGE[0], max=EXPOSURE_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="Mono exposure (µs)", newline=True)
     iso:            Field[int]   = Field(ISO_RANGE[0], min=ISO_RANGE[0], max=ISO_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="Mono ISO")
     auto_exposure:  Field[bool]  = Field(True, widget=Widget.switch, description="Mono auto exposure")
@@ -41,7 +41,7 @@ class OakCameraSettings(RigCameraSettings):
     color:          Field[bool]  = Field(True, access=Field.INIT, newline=True, description="Color camera (False = mono)")
     square:         Field[bool]  = Field(True, access=Field.INIT)
     yolo:           Field[bool]  = Field(True, access=Field.INIT)
-    resolution:     Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode. P1080 is colour only; mono falls back to P800")
+    resolution:     Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode. P1080 is color only; mono falls back to P800")
     model_path:     Field[str]   = Field("data/models", access=Field.INIT)
     tilt:           Field[float] = Field(0.0, access=Field.INIT,
                                          description="Camera up-tilt (°), positive = aimed up. Exclusive with keystone")

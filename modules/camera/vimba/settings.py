@@ -36,6 +36,6 @@ class VimbaCameraSettings(CameraSettings):
     auto_WB:           Field[bool]  = Field(False, widget=Widget.switch, description="Continuous automatic white balance")
     set_WB:            Field[bool]  = Field(False, widget=Widget.button, description="Measure the white balance once and keep it (auto off)")
 
-    saturation:    Field[float]     = Field(1.0, min=0.0, max=2.0, step=0.01, newline=True, description="Colour saturation (1 = unchanged)")
+    saturation:    Field[float]     = Field(1.0, min=0.0, max=2.0, step=0.01, newline=True, description="Color saturation (1 = unchanged)")
     hue:           Field[float]     = Field(0.0, min=-40.0, max=40.0, step=0.5, description="Hue rotation in degrees")
     gamma:         Field[float]     = Field(1.0, min=0.25, max=4.0, step=0.01, description="Gamma (1 = linear)")

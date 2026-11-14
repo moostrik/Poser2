@@ -69,7 +69,7 @@ class ClipCamera(Camera):
 
     def _clip_callback(self, cam_id: int, frame_type: FrameType, frame: np.ndarray, metadata: object, captured: float | None) -> None:
         """A decoded clip frame, into the device as the sensor would have sent it."""
-        if not self.running or cam_id != self.id or frame_type != FrameType.VIDEO or self.clips is None:
+        if not self.running or cam_id != self.cam_id or frame_type != FrameType.VIDEO or self.clips is None:
             return
 
         height, width = frame.shape[:2]
@@ -99,12 +99,12 @@ class ClipCamera(Camera):
         logger.warning(
             "cam %d: clip frames are %dx%d, pipeline is built for %dx%d — frame-relative "
             "settings (vfov, tracker height gates, pose distance) are tuned for the latter",
-            self.id, width, height, expected[0], expected[1],
+            self.cam_id, width, height, expected[0], expected[1],
         )
 
     def _passthrough_callback(self, cam_id: int, frame_type: FrameType, frame: np.ndarray, metadata: object, captured: float | None) -> None:
         """Without a device: the clip frames go straight to the callbacks, no tracklets."""
-        if cam_id != self.id:
+        if cam_id != self.cam_id:
             return
         self._emit_frame(frame_type, frame)
 

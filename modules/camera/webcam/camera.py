@@ -19,10 +19,10 @@ class Camera(Thread):
     """A `CameraSource` on a webcam. `rotate90` turns every frame (portrait mode, fixed at start);
     the flips come from the settings, per frame. No detector: no tracklets."""
 
-    def __init__(self, settings: CameraSettings, rotate90: bool = False, id: int = 0, index: int = 0) -> None:
+    def __init__(self, settings: CameraSettings, rotate90: bool = False, cam_id: int = 0, index: int = 0) -> None:
         super().__init__(name='WebCamera', daemon=True)
         self.settings: CameraSettings = settings
-        self.id: int = id
+        self.cam_id: int = cam_id
         self.rotate90: bool = rotate90
         self.index: int = index                 # the device's index for OpenCV
 
@@ -95,7 +95,7 @@ class Camera(Thread):
         self.video_fps.processed()
         self.settings.readings.video_fps = self.video_fps.get_rate_average()
         self.settings.readings.video_min_fps = self.video_fps.get_rate_minimum()
-        frame = CameraFrame(cam_id=self.id, kind=FrameType.VIDEO, image=image, timestamp=time.perf_counter())
+        frame = CameraFrame(cam_id=self.cam_id, kind=FrameType.VIDEO, image=image, timestamp=time.perf_counter())
         with self._callback_lock:
             callbacks: list[CameraFrameCallback] = list(self.frame_callbacks)
         for callback in callbacks:

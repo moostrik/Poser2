@@ -91,7 +91,7 @@ class KeystoneIsTheOldBuilderTest(unittest.TestCase):
                 _assert_same(self, got, _ref32(want))
 
     def test_square_matches_reference_bit_for_bit(self) -> None:
-        # hd_trio studio (720p colour) and umu (1080p colour), and deep_flow, at their values.
+        # hd_trio studio (720p color) and umu (1080p color), and deep_flow, at their values.
         cases = [(1280, 720, 720, -0.22), (1920, 1072, 1072, -0.22), (1280, 720, 720, 0.22)]
         for src_w, src_h, square, keystone in cases:
             for flip_h, flip_v in FLIPS:
@@ -132,7 +132,7 @@ class BuildWarpMeshSelectsTest(unittest.TestCase):
     def test_both_zero_is_the_reprojection_not_identity(self) -> None:
         # No keystone and no tilt still goes through the tilt path, which reprojects the
         # equidistant frame to the cylindrical contract. The mesh is mirror-symmetric about the
-        # centre column (an even grid has no point ON it, so the two middle columns average to
+        # center column (an even grid has no point ON it, so the two middle columns average to
         # it); the corners are not the identity, because a fisheye's corners bow.
         mesh, mw, mh = build_warp_mesh((1280, 800), (1280, 800), 1280, self._mount(0.0, 0.0, flip_h=False))
         pts = _as_tuples(mesh).reshape(mh, mw, 2)

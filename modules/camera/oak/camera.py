@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class Camera(Thread):
-    _id_counter = 0
+    _next_cam_id = 0
     _pipeline: dai.Pipeline | None = None
 
     def __init__(self, settings: OakCameraSettings) -> None:
@@ -34,8 +34,8 @@ class Camera(Thread):
         self.running: bool = False
 
         # ID
-        self.id: int = Camera._id_counter
-        Camera._id_counter += 1
+        self.cam_id: int = Camera._next_cam_id
+        Camera._next_cam_id += 1
 
         # SETTINGS (reactive)
         self.settings: OakCameraSettings = settings
@@ -225,7 +225,7 @@ class Camera(Thread):
             self.settings.readings.fov_factory = field
             self.settings.readings.lens_error = error
             logger.debug(f'{self.device_id} lens: field {field:.1f} deg across {src[0]} px, '
-                         f'centre offset ({cx - (src[0] - 1) / 2.0:+.1f}, {cy - (src[1] - 1) / 2.0:+.1f}) px; '
+                         f'center offset ({cx - (src[0] - 1) / 2.0:+.1f}, {cy - (src[1] - 1) / 2.0:+.1f}) px; '
                          f'{error:.2f} deg off the shared lens')
         self._imu_rotation = imu_rotation_to_camera(self.device, socket, self.device_id)
 
@@ -246,7 +246,7 @@ class Camera(Thread):
         self.settings.readings.tracker_fps = self.tracklet_fps.get_rate_average()
         now: float = time.perf_counter()
         tracklets: list[CameraTracklet] = [
-            CameraTracklet(cam_id=self.id, id=t.id, status=TRACKING_STATUS[t.status],
+            CameraTracklet(cam_id=self.cam_id, id=t.id, status=TRACKING_STATUS[t.status],
                            roi=Rect(t.roi.x, t.roi.y, t.roi.width, t.roi.height), age=t.age, timestamp=now)
             for t in msg.tracklets]
         self.num_tracklets = len(tracklets)
@@ -276,7 +276,7 @@ class Camera(Thread):
 
     def _emit_frame(self, kind: FrameType, image: ndarray) -> None:
         """The hand-over: the frame gets its host time here and goes to every callback."""
-        frame = CameraFrame(cam_id=self.id, kind=kind, image=image, timestamp=time.perf_counter())
+        frame = CameraFrame(cam_id=self.cam_id, kind=kind, image=image, timestamp=time.perf_counter())
         with self._callback_lock:
             callbacks: list[CameraFrameCallback] = list(self.frame_callbacks)
         for c in callbacks:
@@ -285,7 +285,7 @@ class Camera(Thread):
     def _emit_tracklets(self, tracklets: list[CameraTracklet], timestamp: float) -> None:
         if not self.running:
             return
-        message = CameraTracklets(cam_id=self.id, timestamp=timestamp, tracklets=tracklets)
+        message = CameraTracklets(cam_id=self.cam_id, timestamp=timestamp, tracklets=tracklets)
         with self._callback_lock:
             callbacks: list[TrackletCallback] = list(self.tracklet_callbacks)
         for c in callbacks:
