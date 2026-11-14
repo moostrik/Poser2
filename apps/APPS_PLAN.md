@@ -69,7 +69,7 @@ with you at the rig, and its tests pass.
 
 Every package in `modules/`, one at a time in alphabetical order (`board`, `camera`, `gl`, `inference`, `inout`,
 `oak`, `panel`, `pose`, `recording`, `render`, `session`, `settings`, `tracker`, `utils`, `video`, and
-`log_config.py`; `flow` is held up in [its own plan](../modules/flow/FLOW_PLAN.md), line A), against `CLAUDE.md` and `.claude/rules`: reported per package, a plan
+`log_config.py`; `flow` is held up in [its own plan](../modules/flow/FLOW_PLAN.md), line I), against `CLAUDE.md` and `.claude/rules`: reported per package, a plan
 for what does not meet them, built on your go. App-specific code in a module comes first: what only one app uses or
 decides moves to that app. Each module's rules file, where it has one, is checked with it, line by line: still true
 of the code (its paths match files, the code names it uses exist); about this module, not general or another's; a
@@ -85,7 +85,7 @@ this branch: its `main.py` still calls what C removed (`PoseInference.set_camera
 `add_gpu_image_callback`, `add_camera_images_callback`, `CameraSync.add_sync_callback`,
 `TrackerFrameSource.process`). Its input is white_space's model, three cameras' frames of a moment as one set, so it
 takes C's wiring. The 2D fluid stays as it is (`Motion2DLayer`, `Bridge2DLayer`, `Fluid2DLayer`, which the render
-already uses); [the flow's line F](../modules/flow/FLOW_PLAN.md#f-the-2d-flow-follows-the-3d) rebuilds it later.
+already uses); [the flow's line H](../modules/flow/FLOW_PLAN.md#h-the-2d-flow-follows-the-3d) rebuilds it later.
 Its recordings stay as they are (mp4 chunks any player plays, stored mirrored, a pose file per chunk), and so do its
 pose-following center layers. One step per commit.
 
@@ -108,7 +108,7 @@ values are the presets'); 9, `HD_TRIO.md` holds the app's reasons, its render's 
 a part before `start` is an error, one after `stop` dropped (deep_flow starts its capture sync before its uploader
 and cameras); every app starts and runs without an error.
 
-Parked for [the flow's line F](../modules/flow/FLOW_PLAN.md#f-the-2d-flow-follows-the-3d), which rebuilds the 2D
+Parked for [the flow's line H](../modules/flow/FLOW_PLAN.md#h-the-2d-flow-follows-the-3d), which rebuilds the 2D
 fluid and its input: hd_trio's render writes `fluid.density.fade_time` every tick from the player's motion, and its
 show stages write `similarity_scale` (and the center geometry's `stage`), settings used to carry values while
 running; they reach the fluid and the color mask through their inputs once those are rebuilt, instead of changing

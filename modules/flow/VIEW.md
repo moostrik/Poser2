@@ -41,7 +41,7 @@ resample **(deduction)**, for keeping the camera's work and the flow's apart.
 
 The aligned depth is coarser than the view (`NEURAL_480`, 480 × 300 on the whole camera image), so each view
 pixel reads it between its pixels (`DepthUpscale`). `depth_read` chooses how; which of the two stays is in
-[FLOW_PLAN.md](FLOW_PLAN.md#b-the-3d-fluids-input).
+[FLOW_PLAN.md](FLOW_PLAN.md#a-the-camera-and-the-view).
 
 | `depth_read` | Within a surface                   | At an edge, a view pixel takes                             |
 |--------------|------------------------------------|------------------------------------------------------------|
