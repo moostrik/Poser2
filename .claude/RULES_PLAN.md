@@ -12,7 +12,7 @@ Decided with Matthias. `modules/render` holds three categories, each a folder:
 
 A layer that is not general and that one app uses stays in `apps/<app>/render/layers/`.
 
-All three have the same shape: a category holds packages, and a package is named after its subject. A package holds its layers and, in a `shaders/` folder, the shaders only they use. The separate `layers/` and `shaders/` trees go.
+All three have the same shape: a category holds packages, and a package is named after its subject. A package holds its layers and, in a `shaders/` folder, its shaders; a shader many packages use is the shader of its `general` package (a mask blur in `general/mask/shaders/`). The separate `layers/` and `shaders/` trees go.
 
 ```
 modules/render/
@@ -31,7 +31,7 @@ On Matthias's "go", in one commit, `rendering.md`'s section "What the render hol
 - `shared` holds the layers that are not general and that more than one app uses
 - A layer that is not general and that one app uses sits in `apps/<app>/render/layers/`
 - A category holds packages, and a package is named after its subject: a module (`modules/pose/`), a kind of work (`general/mask/`), a shared thing
-- A package holds its layers, and in `shaders/` the shaders only they use
+- A package holds its layers, and its shaders in `shaders/`
 - A layer's class is named after what it draws, then its kind (`TrackletRenderer`, `PoseCompositor`)
 - A shader is named after the operation it does
 
