@@ -168,6 +168,23 @@ concurrency rules touch none of it.
 - **I1.** Every setting and its description gone through, last, after the refactor, against the rule: a `Field`
   description is one short line of panel text, what and its unit; and whether every quantity is in the flow's
   textbook units, which a scan cannot judge.
+- **I2.** deep_flow's panels follow the modules beneath them: a panel's place and name are its module's, not a
+  grouping of the panels. What the code shows now:
+  - the render layers' packages do not each name one thing: `generic` holds the show's mix (`CompositeLayer`), a
+    player's colors styled (`ForegroundLookLayer`, the view's foreground blended, cel shaded, its hue moved toward
+    the track color) and the players' silhouettes by similarity (`MSColorMaskLayer`, named a mask); the same look
+    chain runs in `center` for hd_trio (`CenterForegroundLayer`). So the panels cannot follow them yet;
+  - the view reads its depth with the motion's `motion.z.tolerance`, a view setting in another stage's panel;
+  - `inputs` picks the pictures that feed the motion and the bridge and the fluid's weights: the app wiring its
+    modules, not a stage;
+  - the panels sit in one flat list in `RenderSettings`, `view_depth`, `view_pose`, `foreground_look`,
+    `color_mask` and `inputs` among the stages.
+
+  First the `render` package's own structure, its packages each one thing: the apps' line F reviews `render`
+  ([APPS_PLAN.md](../../apps/APPS_PLAN.md#f-the-modules-held-up-to-the-rules)), since hd_trio and white_space use
+  it too. Then deep_flow's panel tree mirrors the modules: the flow's stages in the chain's order, each stage's
+  settings its own (the view's `tolerance` in the view), the app's wiring and its display layers apart, and the
+  presets restructured with it.
 
 ## Parked
 
@@ -207,6 +224,8 @@ Not worked on until asked for; each with what is known.
   preset's `view.depth_read`, A1.
 - Treat latency as a first-order concern: the stages timed again in the app, F2.
 - A `Field` description is one short line of panel text: I1.
+- A package is one thing, and its name is that thing; keep presets and settings schemas in sync: the render
+  layers' packages and deep_flow's panel tree, I2.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 Not designed yet, so their rules are not named: A2, A3; B1 to B4; C1 to C4; D1, D2; E1 to E3; G1; H1 to H4.
