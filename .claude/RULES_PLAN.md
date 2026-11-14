@@ -1,18 +1,10 @@
 # The rules' plan
 
-What is still to do on the rules in `CLAUDE.md` and `.claude/rules/`. A built step leaves this plan.
+What is still to do on the rules in `CLAUDE.md` and `.claude/rules/`. A built step leaves this plan. Each step is one commit, built on Matthias's "go".
 
-## 1. What belongs in the render
+## 1. What the render holds
 
-Decided with Matthias. `modules/render` holds three categories, each a folder:
-
-- `modules`: the layers that draw a module's data
-- `general`: the layers that draw no module's data and are useful to any app
-- `shared`: the layers that are not general and that more than one app uses
-
-A layer that is not general and that one app uses stays in `apps/<app>/render/layers/`.
-
-All three have the same shape: a category holds packages, and a package is named after its subject. A package holds its layers and, in a `shaders/` folder, its shaders; a shader many packages use is the shader of its `general` package (a mask blur in `general/mask/shaders/`). The separate `layers/` and `shaders/` trees go.
+Decided with Matthias. `modules/render` holds three categories, each a folder, and all three have the same shape: a category holds packages, a package is named after its subject, and a package holds its layers and, in `shaders/`, its shaders. The separate `layers/` and `shaders/` trees go.
 
 ```
 modules/render/
@@ -21,9 +13,9 @@ modules/render/
   shared/    <thing>/
 ```
 
-The general packages are a first reading of the file names (`composite`: the compositor, the base layer, subdivision; `mask`: blur, dilate, erode, apply; `color`: tint, hue shift, blends; `draw`: circles, rectangles, the ROI); the apps thread's render plan settles them from the code.
+The general packages are a first reading of the file names; the apps thread's render plan (`modules/render/RENDER_PLAN.md`) settles them from the code and orders the code by the lines below. It is told when they are in.
 
-On Matthias's "go", in one commit, `rendering.md`'s section "What the render holds" becomes:
+`rendering.md`'s section "What the render holds" becomes:
 
 - `modules/render` holds three categories, each a folder: `modules`, `general` and `shared`
 - `modules` holds the layers that draw a module's data
@@ -35,19 +27,54 @@ On Matthias's "go", in one commit, `rendering.md`'s section "What the render hol
 - A layer's class is named after what it draws, then its kind (`TrackletRenderer`, `PoseCompositor`)
 - A shader is named after the operation it does; the `shaders` package in front says what it is (`shaders.MaskBlur`)
 
-Naming, decided with Matthias: the render has no naming rule of its own beyond these two lines. CLAUDE.md's Naming decides the rest: a layer is named after what it draws, in its module's word and in full, and ends in its kind (`Layer`, `Renderer`, `Compositor`). A shader carries no `Shader` ending, because it is used through its `shaders` namespace; the three that have the ending today (`FeatureShader`, `WindowShader`, `TimeSeriesShader`) lose it. Open: whether the layer class line stays in `rendering.md` as emphasis, since it repeats CLAUDE.md.
-
-The apps thread's render plan (`modules/render/RENDER_PLAN.md`) orders the code by these lines; it is told when they are in.
+The layer class line repeats CLAUDE.md's Naming and stays as emphasis. A shader carries no `Shader` ending; the three that have it today (`FeatureShader`, `WindowShader`, `TimeSeriesShader`) lose it in the render plan.
 
 ## 2. Split rendering.md
 
-After step 1. `rendering.md` mixes three subjects under one set of paths:
+`rendering.md` mixes OpenGL itself, the render package, and advice that cannot be checked. It stays the render package's file; a new `gl.md` takes OpenGL itself.
 
-- OpenGL itself (the render thread, resources, the `glWaitSync` line): its own file, loaded for any code that touches GL
-- the render package (what it holds, its order and names, `Layer`, `Renderer`, `Compositor`): its own file
-- advice that cannot be checked ("Keep layer interfaces narrow and explicit", "Batch work where possible"): each line looked at for what it is good for
+### gl.md
+
+Description "OpenGL: the render thread, resources, state, shaders". Paths as `rendering.md` has now: `modules/gl/**`, `modules/render/**`, `modules/flow/**`, `apps/*/render/**`.
+
+- All OpenGL calls execute on the render thread
+- Create a texture, FBO or shader once, not per frame
+- Pair every creation with its destruction
+- Set the GL state a draw needs where it draws (blend, depth, viewport)
+- Prefer not to read back from the GPU or wait on it inside a frame
+- Name a shader's `.frag`/`.vert`/`.comp` source after the `.py` file that holds its class, beside it; the loader resolves it by that module name
+- Import OpenGL names by name, never with `from OpenGL.GL import *`
+- Treat hot-reload as a development aid, not runtime control flow
+- The `glWaitSync` line, unchanged
+- The line on text drawn into a cached FBO, unchanged
+
+### rendering.md
+
+Description "The render package: what it holds, its layers and their names". Paths: `modules/render/**`, `apps/*/render/**`.
+
+- Section "What the render holds": the nine lines of step 1
+- Section "Layers": the `Layer`, `Renderer` and `Compositor` lines and the swap buffer's `back` line, unchanged; "A layer hands out its Fbo or SwapFbo, not the texture inside it"; "Prefer composition of layers over monolithic render passes"
+
+### Lines that leave, and what says it instead
+
+| Line now                                                                      | Said by                                                        |
+|-------------------------------------------------------------------------------|----------------------------------------------------------------|
+| Do not perform GL resource creation, binding, or draw calls from worker threads | "All OpenGL calls execute on the render thread"                |
+| Keep texture/FBO/shader lifecycle explicit                                    | "Pair every creation with its destruction"                     |
+| Avoid transient resource churn in per-frame hot paths                         | "Create a texture, FBO or shader once, not per frame"          |
+| Validate render-state assumptions locally (blend, depth, viewport)            | "Set the GL state a draw needs where it draws"                 |
+| Minimize CPU-GPU synchronization points                                       | "Prefer not to read back from the GPU or wait on it inside a frame" |
+| Avoid unnecessary memory transfers between CPU and GPU                        | CLAUDE.md "avoid unnecessary copies", and the read-back line   |
+| Keep shader contracts stable and documented by uniform/buffer naming          | CLAUDE.md's Naming                                             |
+| Preserve layer boundaries and data ownership                                  | the `Layer`, `Renderer`, `Compositor` lines (who owns what)    |
+| Keep layer interfaces narrow and explicit                                     | "A layer hands out its Fbo or SwapFbo, not the texture inside it" |
+| Batch work where possible                                                     | nothing; no case behind it is known                            |
+
+To check when building: the read-back line against the screen recorder and any other read-back in the code, so the line describes what the code should do.
 
 ## Rules it touches
 
 - `rendering.md`: 1, 2
+- `gl.md` (new): 2
 - `CLAUDE.md` "Put a rule where it loads when the code it governs is written": 2
+- `CLAUDE.md` "One rule per bullet" and "A rule describes the codebase as it should look": 2
