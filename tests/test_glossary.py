@@ -7,7 +7,9 @@ quote an old name. Tests are checked too; vendored code is skipped. Preset keys 
 every depth, and so are string values that are identifiers (the enum names a preset stores, such
 as a layer playlist's entries); files starting with '.' are not presets. Each entry is one
 finished concept; add an entry when a rename lands, and add an app to `APPS` when it follows.
-An app's own terms (a glossary section of its own) are banned in that app only (`APP_BANNED`).
+A package's own terms are banned in its code only: the flow's (its documents in `modules/flow`
+and `.claude/rules/flow.md`) in the flow's code (`FLOW_BANNED`), an app's (smile's in
+`.claude/rules/smile.md`) in that app (`APP_BANNED`).
 """
 
 import json
@@ -52,18 +54,21 @@ BANNED: list[tuple[str, str]] = [
     ('hwaccel, not hwdecode', r'hwdecode'),
     ('add/remove_<kind>_callback, not register/unregister_callback', r'^register_callback$|^unregister_callback$'),
     ('glyphs, not arrows (the monitor view)', r'arrow_spacing|ArrowSpacing|VelocityArrowField|process_arrows'),
-    ('change, not impulse or event (the 3D bridge)', r'[Ii]mpulse|IMPULSE|VelocityEvent|MotionEvent'),
     ('lowpass and bandpass, not the trail and change bridges', r'VelocityTrailBridge|VelocityChangeBridge'),
 ]
 
-# the glossary's Flow section: banned in the flow's code only, where the words are the fluid's
+# the flow's terms (modules/flow's documents, .claude/rules/flow.md): banned in the flow's code only,
+# where the words are the fluid's; the change also in deep_flow, the app that shows it
 FLOW_ROOTS: tuple[Path, ...] = (ROOT / 'modules' / 'flow', ROOT / 'modules' / 'render' / 'layers' / 'flow')
+FLOW_CHANGE: tuple[str, str] = ('change, not impulse or event (the 3D bridge)', r'[Ii]mpulse|IMPULSE|VelocityEvent|MotionEvent')
 FLOW_BANNED: list[tuple[str, str]] = [
     ('the quantity or boundary, not body alone (the flow)', r'^body$|^bodies$'),
+    FLOW_CHANGE,
 ]
 
-# the glossary's app sections: banned in that app's code and presets
+# an app's own terms (smile's in .claude/rules/smile.md): banned in that app's code and presets
 APP_BANNED: dict[str, list[tuple[str, str]]] = {
+    'deep_flow': [FLOW_CHANGE],
     'smile': [
         ('wall, not player (WallRender, WALLS)', r'PlayerRender|PLAYERS|PlayersSettings|credit_(qr_)?players'),
         ('generator, not diffuse / GenMessage / pipeline', r'diffuse|GenMessage|GenState|PipelineSettings|^pipeline$'),
