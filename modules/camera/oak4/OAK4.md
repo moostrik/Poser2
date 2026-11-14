@@ -35,7 +35,7 @@ The pinned readouts measure capture to arrival on the PC.
 | Video         | 60 fps      | The camera or the link is not keeping up      |
 | Video latency | 28 to 29 ms | Check the link: Ethernet adds about 6 ms      |
 | Depth latency | 42 to 52 ms | Moves between phases of a run; this is normal |
-| Link          | USB         | Fell back to Ethernet; see [Open](../CAMERA_PLAN.md#open) |
+| Link          | USB         | Fell back to Ethernet                         |
 
 The camera's `readings` show its own `cpu`, `memory` and `temperature` on the line under `video_latency`, once a second (see [camera load](#camera-load)).
 
@@ -69,8 +69,6 @@ Measured on the color sensor at P720 and 60 fps, by asking for manual values and
 | Auto exposure   |       | 16277 µs | At 60 fps                    |
 | Auto ISO, seen  | 65    | 5832     | Holds 5832 in a dark room    |
 
-Whether manual exposure really goes past the frame time is in [the camera's plan](../CAMERA_PLAN.md#open).
-
 ### Auto exposure
 
 Auto exposure is on by default, and these settings in `sensor` shape it, live. Measured in a dark room, where it sits at 16277 µs and ISO 5832:
@@ -82,7 +80,7 @@ Auto exposure is on by default, and these settings in `sensor` shape it, live. M
 | `exposure_compensation` -9  | 2183  | 15.4      |
 | `exposure_compensation` +9  | 16585 | 42.4      |
 
-`exposure_region` is in fractions of the picture as shown, mirrored or not. The other new settings in `sensor` are `auto_exposure_lock`, `auto_balance_lock`, `anti_banding` and `chroma_denoise`; what is known about them is in [the camera's plan](../CAMERA_PLAN.md#open).
+`exposure_region` is in fractions of the picture as shown, mirrored or not. The other new settings in `sensor` are `auto_exposure_lock`, `auto_balance_lock`, `anti_banding` and `chroma_denoise`.
 
 ### Tilt
 
