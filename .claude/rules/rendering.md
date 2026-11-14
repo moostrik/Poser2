@@ -1,32 +1,11 @@
 ---
-description: OpenGL, render layers, shaders, and flow rendering
+description: The render package: what it holds, its layers and their names
 paths:
-  - "modules/gl/**"
   - "modules/render/**"
-  - "modules/flow/**"
   - "apps/*/render/**"
+  - "apps/*/render.py"
 ---
-# GL & Rendering Guidelines
-
-## Threading rule
-
-- All OpenGL calls must execute on the render thread
-- Do not perform GL resource creation, binding, or draw calls from worker threads
-
-## Resource lifecycle
-
-- Keep texture/FBO/shader lifecycle explicit
-- Ensure creation and destruction paths are paired
-- Avoid transient resource churn in per-frame hot paths
-
-## Shader and pipeline behavior
-
-- Keep shader contracts stable and documented by uniform/buffer naming
-- Treat hot-reload as a development aid, not runtime control flow
-- Validate render-state assumptions locally (blend, depth, viewport)
-- Name a shader's `.frag`/`.vert`/`.comp` source after the `.py` file that holds its class, beside it; the loader resolves it by that module name
-- Import OpenGL names by name, never with `from OpenGL.GL import *`
-- Pass `0xFFFFFFFFFFFFFFFF` as `glWaitSync`'s timeout, never PyOpenGL's `GL_TIMEOUT_IGNORED`: in PyOpenGL 3.1.10 it is a signed value the driver rejects (GL_INVALID_VALUE), and with error checking off the error surfaces at a later `glGetError`, in unrelated code
+# Rendering
 
 ## What the render holds
 
@@ -42,20 +21,11 @@ paths:
 - A layer's class is named after what it draws, then its kind (`TrackletRenderer`, `PoseCompositor`)
 - A shader is named after the operation it does; the `shaders` package in front says what it is (`shaders.PosePointLines`)
 
-## Layered rendering
+## Layers
 
-- Preserve layer boundaries and data ownership
-- Keep layer interfaces narrow and explicit
-- Prefer composition of layers over monolithic render passes
-- A layer hands out its Fbo or SwapFbo, not the texture inside it
 - `Layer`: owns its FBO or texture
 - `Renderer`: draws into a target it is given and owns no texture
 - `Compositor`: owns an FBO and draws other layers into it
+- A layer hands out its Fbo or SwapFbo, not the texture inside it
+- Prefer composition of layers over monolithic render passes
 - A swap buffer's other buffer, the previous one: `back` (`SwapFbo.back`, `SwapTexture3D.back`, `SwapTexture2DArray.back`); not `back_texture`. A texture object is passed as itself, never as a `.texture` of it; a layer's `texture` is the layer's output
-
-## Performance focus
-
-- Minimize CPU-GPU synchronization points
-- Batch work where possible
-- Avoid unnecessary memory transfers between CPU and GPU
-- Draw text that changes less often than every frame into a cached FBO, redrawn only when its content changes; `Text` builds and uploads each string's glyphs on every draw
