@@ -68,7 +68,7 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 | monitor              | a layer that shows one port of one stage, picked on the panel, drawn only while it is shown; its views in [MONITOR.md](MONITOR.md)                                                                                  | `MonitorLayer`, `monitor_a`, `monitor_b`                                                      |
 
 "bridge" is ofxFlowTools' word (`ftVelocityBridge`, `ftDensityBridge`, `ftTemperatureBridge`);
-it says where the stage sits, and the glossary defines what it does.
+it says where the stage sits; the table says what it does.
 
 A thing that exists in 2D and 3D carries `2D` or `3D` in its class name, right after the noun it
 qualifies, and `_2d` or `_3d` in its package name; the packages lie flat in `modules/flow`, one

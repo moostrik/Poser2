@@ -20,3 +20,12 @@ paths:
 - Send OSC bools as ints
 - SMILE reaches its walls by a call, never by OSC
 - `cam` is the app's image source (a `modules/camera` backend, an image folder, a phone), not a camera backend
+
+## Names
+
+- One of the two secondary windows that drive 24 screens of the sphere: `wall` (`sphere.WALLS`, `WallRender`, `walls`, "On walls"); not `player`, `PLAYERS`, `PlayerRender`, "player walls"
+- The held grin player: `grin_player`; the clip player: `clip_player`
+- The image generator: `generator` (`GeneratorMessage`, `GeneratorState`, settings group `generator`); not `diffuse`, `diffusion_callback`, `pipeline`, `GenMessage`. `DIFFUSION` stays as a state name
+- The sequence's end effect: bloom / fade (`bloom_*`, `fade_*`, `BloomLayer`); not `destroy`, `destruct`
+- The music track: `music_id`; the visitor's style: `style_id`; not `audio_id`, `movement_id`
+- The laughter test: `LaughterTest`; not `ScreenTest`

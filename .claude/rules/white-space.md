@@ -6,3 +6,4 @@ paths:
 # White Space
 
 - Never change the White Space fixture firmware (`apps/white_space/data/firmware/`); solve everything on the app side of the wire
+- The beam fixtures: "beam light"; not "lamp"

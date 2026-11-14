@@ -313,8 +313,8 @@ module by what it does, everything else by its quantity.
 | the fluid's input methods | `drag_velocity`, `add_acceleration`, `add_boundary_density`, `add_body_force_density`, `add_boundary_temperature`, `add_body_force_temperature` |
 | the fluid's fields        | `velocity` (its own settings: fade, evaporation, top speed, vorticity, viscosity, self-advection), `density`, `temperature`, `pressure`         |
 
-The readings, the filters, the two systems, the input groups and the wall are the glossary's
-("Flow" and "Apps"). "Drag" is what the fluid does with `boundary.velocity`, seen as `velocity_drag`, not the name of a
+The readings, the filters, the two systems, the input groups and the wall are the flow
+documents' ([FLOW.md](FLOW.md#terms)). "Drag" is what the fluid does with `boundary.velocity`, seen as `velocity_drag`, not the name of a
 thing; "impulse", "body" alone, "force" alone, "model" and "delta" name nothing; "brush" and
 "pipette" are the physics of the two densities, not names. A reading is what a module of the
 bridge makes from the motion; not "signal", "band", "component", "event".
