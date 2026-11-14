@@ -67,29 +67,6 @@ its readings' depth ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)).
 
 ## C. The 3D fluid's look at 4K
 
-### C1. The boundary velocity's peak
-
-What the body's speed reaches, to set the gains by and to see how fast it gets, on the bridge's panel: the
-boundary velocity's group gets a class of its own (`BoundaryVelocitySettings`, the mix and `peak`), so the
-density's and the temperature's mixes do not show it. `peak` holds `enabled` (off by default) and `speed`
-(`Field.READ`, widths/s, "p99" in its description): the 99th percentile of the boundary velocity's speed over
-the last second, over the moving pixels (a leaving limb's wake among them). Off, nothing runs and `speed` is 0,
-and it stays 0 until the first read after it is turned on.
-
-- The bridge counts them (deep_flow's one camera): the monitor's counter, `HistogramCount`, its own instance and
-  bins, on the same grid of samples (at most 512 a side), gains a speed mode: the vector's length into log bins,
-  256 from 0.01 to 10 widths/s, each 2.7% wider than the one before, so a slow and a fast body read alike
-  closely; the fastest body measured is about 3 widths/s (the velocity's dampen). Below the first bin's edge is
-  still, the bridge's own floor, not counted. Above 10 counts in the last bin, and `speed` shows it as at least
-  10, a sign of something wrong (z noise, a bad frame). The bins add up over the second between two reads, so what is
-  read is that second's percentile, held by itself.
-- The read: the bins copied into one of two pixel buffers behind a fence, read once the GPU has passed it, as
-  `screen_capture.py` reads its frames; nothing waits. The percentile from the bins on the CPU, written to
-  `speed` by the bridge.
-
-Its cost measured as it lands. Checked by unit tests of the speed binning's numpy reference and of the percentile
-from the bins against numpy's on the same speeds; one commit.
-
 ### C2. The temperature
 
 Whether the temperature needs a field of its own. Buoyancy needs only a scalar the water is lighter or
@@ -227,9 +204,6 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, B1.
 - Choose a data path by its latency: the chain before the fluid timed as one, B2.
-- An on/off switch is `enabled`; `Field.READ` values are snapshots; name a value by its quantity, in the flow's
-  textbook units: the peak's `enabled` and `speed` in widths/s, C1.
-- Minimize CPU-GPU synchronization points: the peak's bins read from two pixel buffers behind a fence, C1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 Not designed yet, so their rules are not named: B3 and B4; C2 and line C's details; D1, F1 to F4, G1 and G2;

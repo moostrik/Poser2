@@ -22,7 +22,7 @@ from modules.flow import (
     VelocityLowpass, VelocityLowpassSettings,
     VelocityBandpass, VelocityBandpassSettings, Change, WeightedSum, ZPositionMix,
     TemperatureBridge, TemperatureBridgeSettings, CaptureMax,
-    DensityBridge, DensityBridgeSettings,
+    DensityBridge, DensityBridgeSettings, VelocityPeak, VelocityPeakSettings,
     HasPorts, Port, Ports, TextureKind,
 )
 from modules.settings import BaseSettings, Field, Group, Widget
@@ -42,6 +42,11 @@ class MixSettings(BaseSettings):
 class BoundaryMixSettings(MixSettings):
     """A boundary output's mix: the trail by default."""
     trail = Field(1.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the trail: the motion, held and smoothed")
+
+
+class BoundaryVelocitySettings(BoundaryMixSettings):
+    """The boundary's velocity: its mix, and the peak its speed reached."""
+    peak = Group(VelocityPeakSettings)
 
 
 class AmountMixSettings(MixSettings):
@@ -77,7 +82,7 @@ class Bridge3DReadingsSettings(BaseSettings):
 
 class BoundarySettings(BaseSettings):
     """The boundary: what the water is dragged toward, the readings mixed as velocities."""
-    velocity    = Group(BoundaryMixSettings)
+    velocity    = Group(BoundaryVelocitySettings)
     density     = Group(BoundaryDensitySettings)
     temperature = Group(BoundaryTemperatureSettings)
 
@@ -148,6 +153,7 @@ class Bridge3DLayer(BridgeLayer):
         self._body_force_temperature_z_position: Fbo = Fbo()
         self._expansion: Fbo = Fbo()                    # a presence, 0 to 1
         self._expansion_z_position: Fbo = Fbo()
+        self._peak: VelocityPeak = VelocityPeak(settings.boundary.velocity.peak)    # the boundary velocity's p99 speed
         self._mix_shader: WeightedSum = WeightedSum()
         self._z_position_mix_shader: ZPositionMix = ZPositionMix()
         self._boundary_density: DensityBridge = DensityBridge(settings.boundary.density)
@@ -244,9 +250,11 @@ class Bridge3DLayer(BridgeLayer):
         super().allocate(width, height, internal_format)
         self._mix_shader.allocate()
         self._z_position_mix_shader.allocate()
+        self._peak.allocate()
 
     def deallocate(self) -> None:
         super().deallocate()
+        self._peak.deallocate()
         self._mix_shader.deallocate()
         self._z_position_mix_shader.deallocate()
         for timer in (self._gpu_timer, self._lowpass_timer, self._bandpass_timer, self._mix_timer):
@@ -316,6 +324,7 @@ class Bridge3DLayer(BridgeLayer):
         boundary: BoundarySettings = self.settings.boundary
         self._mix(self._boundary_velocity, self._velocities(), boundary.velocity)
         self._mix_z_position(self._boundary_velocity_z_position, self._velocities(), boundary.velocity)
+        self._peak.update(self._boundary_velocity, input.dt)
         self._mix_amount(self._boundary_density_amount, self._boundary_density_z_position, input, boundary.density)
         self._mix_amount(self._boundary_temperature_amount, self._boundary_temperature_z_position, input, boundary.temperature)
         self._update_density(self._boundary_density, self._boundary_density_amount, color)

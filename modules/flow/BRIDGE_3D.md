@@ -197,6 +197,28 @@ stop and a wake the slow trail's, the change the fast trail's where it is the fa
 Each counts by its size at its share times the share of its trail's speed that came with a z position,
 so motion without depth does not pull an output's.
 
+## The peak
+
+How fast the body gets, to set the gains by: `boundary.velocity.peak` (`VelocityPeak`, `BoundaryVelocitySettings`),
+`enabled`, off by default, and `speed`, read only: the 99th percentile of the boundary velocity's speed over the
+moving pixels of the last second, in widths/s. The percentile, not the maximum, so a few wrong pixels do not set
+it; over the moving pixels, so a still body and the empty image do not pull it down, and a leaving limb's wake
+counts as the water is dragged toward it.
+
+Each velocity the bridge makes is counted by the monitor's histogram counter (`HistogramCount`, its speed mode)
+on the same grid of samples, at most 512 a side: each sample's speed into 256 log bins from 0.01 to 10 widths/s,
+each 2.7% wider than the one before, so a slow and a fast body read alike closely. Below 0.01 widths/s is still
+and not counted; above 10 counts in the last bin, and `speed` reads 10, at least 10: the fastest body measured is
+about 3 widths/s, so 10 says something is wrong (z noise, a bad frame). The bins add up over a second; then they
+are copied into one of two pixel buffers behind a fence and cleared, and the percentile is read from a copy the
+GPU has finished, log-interpolated within its bin; nothing waits. Off, nothing runs and `speed` is 0, and it stays
+0 until the first read after it is turned on.
+
+Measured with `scripts/velocity_peak_check.py` on an RTX 4090: on 448 × 512 speeds every sample is binned as
+`speed_counts` bins it but 2 in 183,500 at a bin's edge (the GPU's single-precision log), and `speed` reads the
+bins' percentile, 3.989 widths/s against numpy's 3.988 on the speeds. On deep_flow's 448 × 800 velocity
+(448 × 512 samples) the count takes 0.027 ms a velocity, the copy 0.018 ms once a second.
+
 ## Measured
 
 `scripts/bridge_compare.py` on the standmoves recording (`20261103-215324`: four whole-arm moves
