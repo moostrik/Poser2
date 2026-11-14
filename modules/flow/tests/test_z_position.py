@@ -86,6 +86,22 @@ class TestZPositionMix(unittest.TestCase):
         self.z = (np.array([[0.0, 0.0]]), *self.z[1:])
         self.assertAlmostEqual(self.mix([1, 0, 0, 0, 1, 0]), 0.9)
 
+    def test_a_still_body_takes_the_motions_place_now_by_the_depth_mask(self) -> None:
+        still = [np.zeros((1, 3))] * 6
+        now = np.array([[0.6 * 0.5, 0.5]])         # place 0.6 at weight 0.5
+        mixed = z_position_mix(still, [1, 0, 0, 0, 0, 0], self.trails, self.z, (np.array([[0.8]]), now, 0.5))
+        self.assertAlmostEqual(float(place(mixed)[0]), 0.6)
+        self.assertAlmostEqual(float(mixed[0, 1]), 0.5 * 0.8)
+
+    def test_the_depth_mask_weighs_against_the_readings_by_its_share(self) -> None:
+        now = np.array([[0.6, 1.0]])
+        mixed = z_position_mix([np.array([[1.0, 0.0, 0.0]])] * 6, [1, 0, 0, 0, 0, 0], self.trails, self.z, (np.array([[1.0]]), now, 1.0))
+        self.assertAlmostEqual(float(place(mixed)[0]), (0.2 + 0.6) / 2)
+
+    def test_the_depth_mask_without_a_z_position_now_adds_nothing(self) -> None:
+        mixed = z_position_mix([np.zeros((1, 3))] * 6, [1, 0, 0, 0, 0, 0], self.trails, self.z, (np.array([[1.0]]), np.zeros((1, 2)), 1.0))
+        np.testing.assert_allclose(mixed, 0.0)
+
 
 class TestBlur(unittest.TestCase):
 

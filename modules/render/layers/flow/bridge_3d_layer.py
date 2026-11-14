@@ -43,20 +43,29 @@ class BoundaryMixSettings(MixSettings):
     trail = Field(1.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the trail: the motion, held and smoothed")
 
 
-class BoundaryDensitySettings(DensityBridgeSettings, BoundaryMixSettings):
-    """The boundary's density: its amount's mix, the readings' speeds, then its color."""
+class AmountMixSettings(MixSettings):
+    """An amount's mix: the readings' speeds and the depth mask, a presence while still."""
+    depth_mask = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the depth mask: the player there, still or not")
 
 
-class BoundaryTemperatureSettings(TemperatureBridgeSettings, BoundaryMixSettings):
-    """The boundary's temperature: its mask's mix, the readings' speeds, then its warmth."""
+class BoundaryAmountMixSettings(AmountMixSettings, BoundaryMixSettings):
+    """A boundary amount's mix: the trail by default."""
 
 
-class BodyForceDensitySettings(DensityBridgeSettings, MixSettings):
-    """The body force's density: its amount's mix, the readings' speeds (a push's change of speed), then its color."""
+class BoundaryDensitySettings(DensityBridgeSettings, BoundaryAmountMixSettings):
+    """The boundary's density: its amount's mix, then its color."""
 
 
-class BodyForceTemperatureSettings(TemperatureBridgeSettings, MixSettings):
-    """The body force's temperature: its mask's mix, the readings' speeds (a push's change of speed), then its warmth."""
+class BoundaryTemperatureSettings(TemperatureBridgeSettings, BoundaryAmountMixSettings):
+    """The boundary's temperature: its mask's mix, then its warmth."""
+
+
+class BodyForceDensitySettings(DensityBridgeSettings, AmountMixSettings):
+    """The body force's density: its amount's mix (a push's change of speed), then its color."""
+
+
+class BodyForceTemperatureSettings(TemperatureBridgeSettings, AmountMixSettings):
+    """The body force's temperature: its mask's mix (a push's change of speed), then its warmth."""
 
 
 class Bridge3DReadingsSettings(BaseSettings):
@@ -200,8 +209,10 @@ class Bridge3DLayer(BridgeLayer):
         self._bandpass_shown = True
 
     @staticmethod
-    def _mixed(mix: MixSettings, names: tuple[str, ...] = READINGS) -> bool:
-        """Whether an output has a share above 0 among the readings `names`."""
+    def _mixed(mix: MixSettings, names: tuple[str, ...] | None = None) -> bool:
+        """Whether an output has a share above 0 among `names`: by default its readings, and an amount's depth mask."""
+        if names is None:
+            names = (*READINGS, 'depth_mask') if isinstance(mix, AmountMixSettings) else READINGS
         return any(getattr(mix, name) > 0.0 for name in names)
 
     def _boundary_mixes(self) -> tuple[MixSettings, ...]:
@@ -290,10 +301,8 @@ class Bridge3DLayer(BridgeLayer):
         boundary: BoundarySettings = self.settings.boundary
         self._mix(self._boundary_velocity, self._velocities(), boundary.velocity)
         self._mix_z_position(self._boundary_velocity_z_position, self._velocities(), boundary.velocity)
-        self._mix(self._boundary_density_amount, self._velocities(), boundary.density, lengths=True)
-        self._mix_z_position(self._boundary_density_z_position, self._velocities(), boundary.density)
-        self._mix(self._boundary_temperature_amount, self._velocities(), boundary.temperature, lengths=True)
-        self._mix_z_position(self._boundary_temperature_z_position, self._velocities(), boundary.temperature)
+        self._mix_amount(self._boundary_density_amount, self._boundary_density_z_position, input, boundary.density)
+        self._mix_amount(self._boundary_temperature_amount, self._boundary_temperature_z_position, input, boundary.temperature)
         self._update_density(self._boundary_density, self._boundary_density_amount, color)
         self._update_temperature(self._boundary_temperature, self._boundary_temperature_amount, color)
 
@@ -302,12 +311,10 @@ class Bridge3DLayer(BridgeLayer):
             self._mix(self._body_force_acceleration, self._accelerations(), side.acceleration)
             self._mix_z_position(self._body_force_acceleration_z_position, self._accelerations(), side.acceleration)
         if self._mixed(side.density):
-            self._mix(self._body_force_density_amount, self._velocities(), side.density, lengths=True)
-            self._mix_z_position(self._body_force_density_z_position, self._velocities(), side.density)
+            self._mix_amount(self._body_force_density_amount, self._body_force_density_z_position, input, side.density)
             self._update_density(self._body_force_density, self._body_force_density_amount, color)
         if self._mixed(side.temperature):
-            self._mix(self._body_force_temperature_amount, self._velocities(), side.temperature, lengths=True)
-            self._mix_z_position(self._body_force_temperature_z_position, self._velocities(), side.temperature)
+            self._mix_amount(self._body_force_temperature_amount, self._body_force_temperature_z_position, input, side.temperature)
             self._update_temperature(self._body_force_temperature, self._body_force_temperature_amount, color)
         if self._merging:
             for name, texture in self._outputs().items():
@@ -325,20 +332,36 @@ class Bridge3DLayer(BridgeLayer):
         return {'trail': self._lowpass.trail_acceleration, 'change': self._bandpass.change_acceleration,
                 **{name: self._bandpass.acceleration(part) for name, part in PARTS.items()}}
 
-    def _mix(self, target: Fbo, readings: dict[str, Texture], mix: MixSettings, lengths: bool = False) -> None:
-        """The readings at the output's shares, summed into `target`; with `lengths`, their sizes, for an amount."""
+    def _mix(self, target: Fbo, readings: dict[str, Texture], mix: MixSettings) -> None:
+        """The readings at the output's shares, summed into `target`."""
         target.begin()
-        self._mix_shader.use([(readings[name], getattr(mix, name)) for name in READINGS], lengths)
+        self._mix_shader.use([(readings[name], getattr(mix, name)) for name in READINGS])
         target.end()
 
-    def _mix_z_position(self, target: Fbo, readings: dict[str, Texture], mix: MixSettings) -> None:
-        """The z position of an output mixing `readings` at its shares, into `target`."""
+    def _mix_z_position(self, target: Fbo, readings: dict[str, Texture], mix: MixSettings,
+                        depth_mask: tuple[Texture, Texture, float] | None = None) -> None:
+        """The z position of an output mixing `readings` at its shares, and `depth_mask` (the mask, the motion's
+        z position now, its share), into `target`."""
         lowpass, bandpass = self._lowpass, self._bandpass
         target.begin()
         self._z_position_mix_shader.use([(readings[name], getattr(mix, name)) for name in READINGS],
                                         (lowpass.trail, bandpass.fast, bandpass.slow),
-                                        (lowpass.z_position, bandpass.fast_z_position, bandpass.slow_z_position))
+                                        (lowpass.z_position, bandpass.fast_z_position, bandpass.slow_z_position), depth_mask)
         target.end()
+
+    def _mix_amount(self, amount: Fbo, z_position: Fbo, input: BridgeInput, mix: AmountMixSettings) -> None:
+        """An amount: the readings' speeds at its shares and the depth mask at its share, into `amount`, and its
+        z position, into `z_position`. Without a depth mask or the motion's z position the mask's share adds nothing."""
+        readings: dict[str, Texture] = self._velocities()
+        sources: list[tuple[Texture, float]] = [(readings[name], getattr(mix, name)) for name in READINGS]
+        depth_mask: tuple[Texture, Texture, float] | None = None
+        if mix.depth_mask > 0.0 and input.depth_mask is not None and input.z_position is not None:
+            depth_mask = (input.depth_mask, input.z_position, mix.depth_mask)
+            sources.append((input.depth_mask, mix.depth_mask))
+        amount.begin()
+        self._mix_shader.use(sources, lengths=True)
+        amount.end()
+        self._mix_z_position(z_position, readings, mix, depth_mask)
 
     @staticmethod
     def _update_density(density: DensityBridge, amount: Texture, color: Texture) -> None:

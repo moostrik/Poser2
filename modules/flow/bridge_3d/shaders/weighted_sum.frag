@@ -1,9 +1,10 @@
 #version 460 core
 
 // Weighted Sum Shader
-// The bridge's mix: up to six sources, each times its weight, summed (RGB); a source at weight 0 adds
-// nothing. With `lengths`, the length of each source's xyz times its weight, summed, for an amount.
-// The sources share one unit, so the weights are shares, not gains
+// The bridge's mix: up to seven sources, each times its weight, summed (RGB); a source at weight 0 adds
+// nothing. With `lengths`, the length of each source's xyz times its weight, summed, for an amount; a scalar
+// source (red alone, the depth mask) gives its red. The sources share one unit, so the weights are shares,
+// not gains. The numpy reference is bridge_3d.weighted_sum
 
 uniform sampler2D tex0;
 uniform sampler2D tex1;
@@ -11,7 +12,8 @@ uniform sampler2D tex2;
 uniform sampler2D tex3;
 uniform sampler2D tex4;
 uniform sampler2D tex5;
-uniform float weights[6];
+uniform sampler2D tex6;
+uniform float weights[7];
 uniform bool lengths;
 
 in vec2 texCoord;
@@ -25,6 +27,7 @@ vec3 term(sampler2D tex, float weight) {
 
 void main() {
     vec3 sum = term(tex0, weights[0]) + term(tex1, weights[1]) + term(tex2, weights[2])
-             + term(tex3, weights[3]) + term(tex4, weights[4]) + term(tex5, weights[5]);
+             + term(tex3, weights[3]) + term(tex4, weights[4]) + term(tex5, weights[5])
+             + term(tex6, weights[6]);
     fragColor = vec4(sum, 0.0);   // w unused
 }

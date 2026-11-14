@@ -25,7 +25,7 @@ from . import bridge_2d
 from .bridge_3d import  DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
                         decay_weight, direction, advect, \
                         VelocityLowpass, VelocityLowpassSettings, velocity_trail, trail_acceleration, z_position_trail, \
-                        gaussian_blur, gaussian_weights, blur_sigma, blur_dispatches, z_position_mix, ZPositionMix, \
+                        gaussian_blur, gaussian_weights, blur_sigma, blur_dispatches, z_position_mix, weighted_sum, ZPositionMix, \
                         VelocityBandpass, VelocityBandpassSettings, Change, WeightedSum, velocity_change, step_peak, moving_mean, start_region_share, stop_region_share, change_velocity, band_width, whole_change, \
                         TemperatureBridge, TemperatureBridgeSettings, CaptureMax
 

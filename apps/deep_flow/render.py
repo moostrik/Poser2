@@ -394,7 +394,7 @@ class DeepFlowRender(RenderBase):
         motion.set_input(ls.MotionInput(motion_image.texture, capture.timestamp, interval, output.depth, output.mask, output.depth_mask))
         motion.update()
         bridge.set_input(ls.BridgeInput(motion.output.velocity, interval, color.texture if color is not None else None,
-                                        mask=output.mask, z_position=motion.output.z_position, same_tick=same_tick))
+                                        mask=output.mask, depth_mask=output.depth_mask, z_position=motion.output.z_position, same_tick=same_tick))
         bridge.update()
 
     def _wire_fluid(self) -> None:

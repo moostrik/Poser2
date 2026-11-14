@@ -1,14 +1,14 @@
 """Weighted Sum shader.
 
-The bridge's mix: up to six sources, each times its weight, summed; or, for an amount, the length of
+The bridge's mix: up to seven sources, each times its weight, summed; or, for an amount, the length of
 each source's xyz times its weight, summed.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4, GL_TEXTURE5, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1fv, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4, GL_TEXTURE5, GL_TEXTURE6, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1fv, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
-MAX_SOURCES: int = 6
-UNITS: tuple[int, ...] = (GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4, GL_TEXTURE5)
+MAX_SOURCES: int = 7
+UNITS: tuple[int, ...] = (GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4, GL_TEXTURE5, GL_TEXTURE6)
 
 
 class WeightedSum(Shader):
@@ -19,7 +19,7 @@ class WeightedSum(Shader):
         """Mix the sources.
 
         Args:
-            sources: Up to six (texture, weight) pairs; the RGB of each is taken times its weight
+            sources: Up to seven (texture, weight) pairs; the RGB of each is taken times its weight
             lengths: Take each source's length of its RGB instead, for an amount
         """
         if not self.allocated or not self.shader_program or not sources or len(sources) > MAX_SOURCES:

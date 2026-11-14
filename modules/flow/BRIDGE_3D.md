@@ -115,8 +115,8 @@ What the fluid takes is two systems, the two a solver tells apart, each mixing t
 each reading at a share, 0 to 1, as the light renderer mixes its layers (`Bridge3DLayer`,
 `WeightedSum`). The panel shows three subpanels: `readings` (`lowpass`, `bandpass`), `boundary` and
 `body_force`. Each output's group holds the six shares as knobs on the first row (`MixSettings`:
-`trail`, `change`, `start`, `bow`, `stop`, `wake`), and a density's own settings on the second
-(`saturation`, `brightness`). The density and the temperature are colored by a density and a
+`trail`, `change`, `start`, `bow`, `stop`, `wake`), an amount's (a density's, a temperature's) a seventh,
+`depth_mask` (`AmountMixSettings`), and a density's own settings on the second (`saturation`, `brightness`). The density and the temperature are colored by a density and a
 temperature bridge per side, with the same color.
 
 | Subpanel     | Groups                                   | Readings enter as                                       | Is                                                   |
@@ -138,7 +138,9 @@ The six outputs (`BridgeOutput`, `Injection`), each in a unit of the body:
 
 The presence is the mix's speed in widths/s, the sum of its readings' sizes (the length of each, at
 its share), capped at 1: a part moving at 1 width/s or faster is fully there, a slower one partly,
-and a still body leaves no dye. Widths/s is the velocity's own unit, so no reference speed is chosen.
+and a still body leaves no dye. The `depth_mask` share adds the view's depth mask (`BridgeInput.depth_mask`,
+0 to 1 where the depth is the player's) at the share, a presence 0 to 1 by being there: at share 1 a still
+body is fully there. Widths/s is the velocity's own unit, so no reference speed is chosen.
 The density's color is the picture's (`DensityColor`: the image, or white, times the tint, gated by
 the mask) through `saturation` and `brightness`; the warmth is (warm − cold) × (1 − neutral × 0.5) ×
 the presence, from the same color's red, blue and green. The readings of one unit share the mix, so
@@ -179,6 +181,7 @@ and blurs with its trail; the bandpass's fast and slow trail each hold one.
 | `boundary_velocity_z_position`       | its readings' z positions weighted by their sizes at their shares (`ZPositionMix`)                                  |
 | `body_force_acceleration_z_position` | the same, by the accelerations' sizes                                                                                |
 | each density's and temperature's     | the same, by its readings' sizes at its own shares: its amount and its place from the same trails                    |
+| their `depth_mask` share             | the motion's z position now, weighted by the depth mask at the share                                                 |
 
 A density's amount is mixed from the trails, which the lowpass advects and blurs past where the body has a
 depth now (the depth velocity gives none in a band a depth sample wide along every outline); its z position

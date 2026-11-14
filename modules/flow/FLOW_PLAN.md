@@ -82,21 +82,6 @@ gravity) weighs dyed water wherever it is, with `buoyancy` 0, in the same pass, 
 `_y`, `_z`. It sits in the temperature's panel though it is the density's weight: if the temperature goes,
 `sink` and the gravity move to a panel of their own or the density's.
 
-### 3.1 The depth mask in the mixes
-
-Every reading is a speed, so a still body brings nothing. A seventh share in every mix that makes an amount
-(`boundary.density`, `boundary.temperature`, the body force's, and the expansion of 3.2), `depth_mask`: the depth
-mask itself, 0 to 1 where the depth is the player's, at the body's z position now. It enters as the readings'
-capped speed does, a presence 0 to 1: at share 1 a still body is fully dyed. The warmth stays the color's
-((R − B) × (1 − G/2) × presence), so a neutral-colored body warms nothing **(code)**. The name is the view's and
-the motion's: the same mask, no second word. At the outline the band a depth sample wide without a z position
-stays empty ([VIEW.md](VIEW.md#the-depth-read)).
-
-What changes with it: `BridgeInput.depth_mask` beside `mask`, deep_flow's wiring from the view's `depth_mask`,
-`WeightedSum` taking the mask as one more share, `ZPositionMix` taking the motion's z position for it, the
-presets' new share keys only where a preset needs other than 0. Checked by a unit test of the mix's numpy reference
-with the share (a still body: presence = share × mask); one commit.
-
 ### 3.2 Expansion
 
 The water swelling or shrinking where the body is (Nguyen, Fedkiw and Jensen 2002; Feldman et al. 2003): the
@@ -247,11 +232,10 @@ Not worked on until asked for; each with what is known.
   preset's `view.depth_read`, line 2.
 - Choose a data path by its latency: the chain before the fluid timed as one, line 2.
 - Prefer the flow's textbook units; a setting follows the quantity it controls: `expansion_rate` in 1/s, the
-  `depth_mask` share as a presence 0 to 1, 3.1 and 3.2.
+  expansion as a presence 0 to 1, 3.2.
 - A setting's default is the textbook value: `expansion_rate` 0, the projection's ∇·u = 0, 3.2.
-- Name a value by its quantity; one term per concept: `expansion`, `depth_mask` in FLOW.md's Terms, not a second
-  "presence", 3.1 and 3.2.
-- Keep presets and settings schemas in sync: the new shares and the expansion subpanel, 3.1 and 3.2.
+- Name a value by its quantity; one term per concept: `expansion` in FLOW.md's Terms, 3.2.
+- Keep presets and settings schemas in sync: the expansion subpanel, 3.2.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 Not designed yet, so their rules are not named: the dye's brightness and no captures (line 2); the temperature
