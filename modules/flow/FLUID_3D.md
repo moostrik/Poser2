@@ -308,6 +308,18 @@ The error falls with the cycles as the floor does: the projection makes φ, to t
 source is the part one V-cycle leaves the most of; at one cycle a step the rest is taken by the next steps, each
 warm from the last pressure **(deduction)**.
 
+Its GPU time, `expansion_check.py --time`, the same box closed, the median of 40 runs each:
+
+| Pass                     | Without, ms | With, ms |
+|--------------------------|-------------|----------|
+| the injection, one       |             | 0.093    |
+| the mean                 |             | 0.073    |
+| the divergence pass      | 0.059       | 0.067    |
+| the projection, in all   | 1.132       | 1.299    |
+
+The expansion costs a tick about 0.26 ms in a closed box with one injection: 0.17 in the projection, the mean and
+the divergence's one more read among it, and 0.09 for each injection. With an open wall the mean does not run.
+
 ### The guard
 
 A guard on the advection of each field, at the step's first pass, so a bad value stops where it was made

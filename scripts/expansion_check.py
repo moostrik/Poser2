@@ -6,9 +6,14 @@ the mean taken off), the divergence's mean, and the error, the RMS of the diverg
 solve's own floor beside it: the same box, no source, the swinging body's velocity dragged in and projected
 once, the RMS of the divergence after over before. The error with a source should be of the floor's order.
 
-    python scripts/expansion_check.py [--rate 0.5] [--set path=value ...]
+`--time`: the expansion's GPU time in a closed box instead, the median of 40 runs each: the injection, the mean,
+the divergence pass and the projection, without and with it.
+
+    python scripts/expansion_check.py [--rate 0.5] [--time] [--set path=value ...]
 """
 
+import OpenGL
+OpenGL.ERROR_CHECKING = False  # as launcher.py runs the app; a glGetError per call otherwise makes the CPU the bottleneck
 import sys
 from argparse import ArgumentParser
 from pathlib import Path
@@ -100,12 +105,57 @@ def floor_without(wall: str, overrides: list[str]) -> None:
         fluid.deallocate()
 
 
+def timing(rate: float, overrides: list[str]) -> None:
+    """The expansion's GPU time in a closed box, each the median of 40 runs: the injection (the clear and the slab),
+    the mean, the divergence pass and the whole projection, each without and with the expansion."""
+    fluid = fluid_at('CLOSED', rate, overrides)
+    presence, place = disc()
+    presence_texture, place_texture = mh.texture_of(presence), mh.texture_of(place)
+
+    def inject() -> None:
+        fluid._expansion_fresh = False
+        fluid.add_expansion(presence_texture, 1.0, place_texture)
+
+    def divergence_pass(expansion: bool) -> None:
+        fluid._divergence_shader.use(fluid._faces.volume, fluid._obstacle, fluid._divergence_vol, fluid._cell,
+                                     has_obstacles=fluid._has_obstacles, closed=fluid._closed,
+                                     expansion=(fluid._expansion_vol, rate, fluid._expansion_mean) if expansion else None)
+
+    def projection(expansion: bool) -> None:
+        fluid._expansion_fresh = expansion
+        fluid._enforce_incompressibility()
+
+    try:
+        inject()
+        glFinish()
+        rows = [('injection', inject),
+                ('mean', lambda: fluid._expansion_mean_shader.use(fluid._expansion_vol, fluid._obstacle, fluid._has_obstacles,
+                                                                  fluid._expansion_partials, fluid._expansion_mean)),
+                ('divergence, without', lambda: divergence_pass(False)),
+                ('divergence, with', lambda: divergence_pass(True)),
+                ('projection, without', lambda: projection(False)),
+                ('projection, with', lambda: projection(True))]
+        for name, work in rows:
+            for _ in range(3):
+                work()
+            glFinish()
+            print(f'{name:<22} {mh.gpu_ms(work, 40):7.3f} ms', flush=True)
+    finally:
+        presence_texture.deallocate()
+        place_texture.deallocate()
+        fluid.deallocate()
+
+
 def main() -> None:
     parser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--rate', type=float, default=0.5)
+    parser.add_argument('--time', action='store_true', help="the expansion's GPU time instead")
     parser.add_argument('--set', action='append', default=[])
     args = parser.parse_args()
     mh.context()
+    if args.time:
+        timing(args.rate, args.set)
+        return
     for wall in ('CLOSED', 'OPEN'):
         with_source(wall, args.rate, args.set)
         floor_without(wall, args.set)

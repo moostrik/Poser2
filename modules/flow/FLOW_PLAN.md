@@ -84,8 +84,6 @@ gravity) weighs dyed water wherever it is, with `buoyancy` 0, in the same pass, 
 
 ### Details
 
-- The expansion's cost: the mean's reduction over 288 × 512 × 64 cells in a closed box, and the divergence's one
-  more read ([FLUID_3D.md](FLUID_3D.md#the-expansion)): not timed yet.
 - The transfer curve in the particles' march: their slices hold a sum of the grid's layers, so the curve needs
   its point in that sum ([FLUID_3D.md](FLUID_3D.md#the-look)). Not designed yet.
 - The body force's acceleration: tested, tweaked and made useful.
