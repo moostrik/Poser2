@@ -1,6 +1,6 @@
 # The rules' plan
 
-What is still to do on the rules in `CLAUDE.md` and `.claude/rules/`. A built step leaves this plan. Each step is one commit, built on Matthias's "go".
+What is still to do on the rules in `CLAUDE.md` and `.claude/rules/`. This plan changes rule files only; what it found for the code is handed on in steps 3 and 4. A built step leaves this plan. Each step is one commit, built on Matthias's "go".
 
 ## 1. What the render holds
 
@@ -16,8 +16,6 @@ modules/gl/
   shaders/   blit, contrast, hsv, ... and the render's shaders without a layer (mask, color, draw)
 ```
 
-The packages under `general` are a first reading of the file names; the apps thread's render plan (`modules/render/RENDER_PLAN.md`) settles them from the code.
-
 `rendering.md`'s section "What the render holds" becomes:
 
 - `modules/render` holds three categories, each a folder: `modules`, `general` and `shared`
@@ -30,21 +28,14 @@ The packages under `general` are a first reading of the file names; the apps thr
 - A package holds its layers, and the shaders of those layers in `shaders/`
 - A shader that no layer owns sits in `modules/gl/shaders/`
 - A layer's class is named after what it draws, then its kind (`TrackletRenderer`, `PoseCompositor`)
-- A shader is named after the operation it does; the `shaders` package in front says what it is (`shaders.MaskBlur`)
+- A shader is named after the operation it does; the `shaders` package in front says what it is (`shaders.PosePointLines`)
 
 Notes on these lines:
 
 - The layer class line repeats CLAUDE.md's Naming and stays as emphasis.
-- A shader carries no `Shader` ending; the three in the render that have it today (`FeatureShader`, `WindowShader`, `TimeSeriesShader`) lose it in the render plan.
-- A category is a folder, not a package: CLAUDE.md's package lines hold for each package under it.
+- A shader carries no `Shader` ending; the three in the render that have it today (`FeatureShader`, `WindowShader`, `TimeSeriesShader`) lose it when the code is moved.
+- `modules/render` is the package, and its `__init__.py` is what apps import from; the categories and their packages order it inside.
 - `shared` is decided by how many apps use a layer, so a layer moves from an app to `shared` when a second app takes it. Accepted.
-- A file sees at most two `shaders`: its own package's and the GL's. To check when building: how `modules/gl` hands out its shaders now, so the example in the last line is right for both.
-
-What follows outside the rule files, for the render plan's step that moves the code (same commit as the move, so no path goes stale):
-
-- `board.md` `paths`: `modules/render/layers/**` becomes the board's render package
-- `flow.md` `paths` and `tests/test_glossary.py` `FLOW_ROOTS`: `modules/render/layers/flow` becomes `modules/render/modules/flow`
-- The render plan's own five rules and naming scheme are replaced by the lines above; that plan is redone from them. The apps thread is told the final lines when step 1 is in.
 
 ## 2. Split rendering.md
 
@@ -52,7 +43,7 @@ What follows outside the rule files, for the render plan's step that moves the c
 
 ### gl.md
 
-Description "OpenGL: the render thread, resources, state, shaders". Paths as `rendering.md` has now: `modules/gl/**`, `modules/render/**`, `modules/flow/**`, `apps/*/render/**`.
+Description "OpenGL: the render thread, resources, state, shaders". Paths: `modules/gl/**`, `modules/render/**`, `modules/flow/**`, `apps/**`. The apps' part is wider than `rendering.md` has now (`apps/*/render/**`), because apps call OpenGL outside that folder (`apps/<app>/render.py`, smile's `player/`); to confirm on `deep-flow` when building, by a search for OpenGL imports.
 
 - All OpenGL calls execute on the render thread
 - Create textures, FBOs and shaders at setup or on a resize, not per frame
@@ -88,37 +79,35 @@ Description "The render package: what it holds, its layers and their names". Pat
 | Keep layer interfaces narrow and explicit                                     | "A layer hands out its Fbo or SwapFbo, not the texture inside it" |
 | Batch work where possible                                                     | nothing; no case behind it is known                            |
 
-To check when building:
+To check when building: the read-back line against the read-backs in the code (screen recorder, velocity peak, finite guard, smile's screen grab), so the line describes what the code should do.
 
-- The read-back line against the read-backs in the code (screen recorder, velocity peak, finite guard, smile's screen grab), so the line describes what the code should do
-- That `gl.md`'s paths cover all code that calls OpenGL: search for OpenGL imports outside them
+## 3. Park the GL's findings
 
-## 3. The packages' documents
+A new `modules/gl/GL_PLAN.md` holds what this work found for the GL. Nobody builds it until Matthias takes it up. Its content:
 
-The explanation in this plan is the documents' text; the rule files hold only the rule lines. Written from it, short:
-
-- `modules/render/RENDER.md`: the three categories, what a package holds, where shaders sit, the names
-- `modules/gl/GL.md`: what the GL holds, its shaders, the shaders without a layer
-
-A document describes what is built: the tree of step 1 is in `RENDER.md` only as far as the code has it; the rest stays in the render plan until the code is moved.
-
-## 4. The GL's plan
-
-`modules/gl/GL_PLAN.md` takes the open questions on `modules/gl/shaders`, which fills up when the render's shaders without a layer come in:
-
-- Its sub-folders: what `convenience/` is for, and whether the shaders are grouped by kind of work (mask, color, draw, blit)
+- Take in the render's shaders without a layer (now in `modules/render/shaders/`: the mask operations, blend, tint, hue shift, the draw shaders); which shaders have no layer is settled from the code
+- The order of `modules/gl/shaders` once they are in: what `convenience/` is for, and whether the shaders are grouped by kind of work (mask, color, draw, blit)
 - The names that carry the ending (`box_shader`, `text_shader`), against "a shader carries no `Shader` ending"
+- How the GL hands out its shaders: by bare name today (`from modules.gl import Blit`); whether that still reads well with many more
+
+## 4. Send the render's text to the apps thread
+
+After steps 1 and 2 are in. The apps thread's render plan (`modules/render/RENDER_PLAN.md`) is redone from the new rule lines. It gets:
+
+- The rule lines of step 1 as they stand in `rendering.md`, and the tree
+- The notes of step 1
+- What changes with the code move, in the same commit as the move: `board.md` `paths` (`modules/render/layers/**` becomes the board's render package); `flow.md` `paths` and `tests/test_glossary.py` `FLOW_ROOTS` (`modules/render/layers/flow` becomes `modules/render/modules/flow`)
+- That the shaders without a layer are not its work: they wait in the GL's plan
 
 ## 5. This plan is deleted
 
-On Matthias's word, when 1 to 4 are built.
+On Matthias's word, when 1 to 4 are done.
 
 ## Rules it touches
 
 - `rendering.md`: 1, 2
 - `gl.md` (new): 2
-- `board.md` and `flow.md` (`paths` only): 1, with the code move
-- `docs.md`: 3, 4
 - `CLAUDE.md` "Put a rule where it loads when the code it governs is written": 2
 - `CLAUDE.md` "One rule per bullet" and "A rule describes the codebase as it should look": 1, 2
-- `CLAUDE.md` "A plan is a file named after what it plans" and "A document describes what is built; what is not built is in the plan": 3, 4
+- `CLAUDE.md` "A plan is named after the package, app or folder it is for, and sits in it": 3
+- `CLAUDE.md` "A document describes what is built; what is not built is in the plan": 3, 4
