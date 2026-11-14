@@ -70,20 +70,17 @@ its readings' depth ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)).
 ### C1. The boundary velocity's peak
 
 What the body's speed reaches, to set the gains by, on the bridge's panel: in its `boundary.velocity` group a
-group `peak` with `enabled` (off by default), `cam_id` (−1 all cameras, else one; −1 by default) and `speed`
-(`Field.READ`, widths/s): the 99th percentile of the boundary velocity's speed over the last second, where the
+group `peak` with `enabled` (off by default) and `speed` (`Field.READ`, widths/s): the 99th percentile of the boundary velocity's speed over the last second, where the
 speed is above the drag's floor (`DRAG_FLOOR`, 0.02 widths/s), the pixels the water is dragged toward, a leaving
 limb's wake among them. Off, nothing runs.
 
-- Each camera's bridge counts its own: the monitor's counter, `HistogramCount`, its own instance and bins, on
+- The bridge counts them (deep_flow's one camera): the monitor's counter, `HistogramCount`, its own instance and bins, on
   the same grid of samples (at most 512 a side), gains a speed mode, the vector's length into bins from 0 to a top
   speed (4 widths/s, 0.016 a bin at 256), the floor's bins left out. The bins add up over the second between two
   reads, so what is read is that second's percentile, held by itself.
 - The read: the bins copied into one of two pixel buffers behind a fence, read once the GPU has passed it, as
-  `screen_capture.py` reads its frames; nothing waits. The percentile from the bins on the CPU; the bridge hands
-  it out (`Bridge3DLayer.peak_speed`, or None before the first read).
-- The panel: the bridges share one settings object, so deep_flow writes `speed` once a tick from the bridge
-  `cam_id` names, or the highest of them at −1; `cam_id` held to the cameras there are.
+  `screen_capture.py` reads its frames; nothing waits. The percentile from the bins on the CPU, written to
+  `speed` by the bridge.
 
 Its cost measured as it lands. Checked by unit tests of the speed binning's numpy reference and of the percentile
 from the bins against numpy's on the same speeds; one commit.
@@ -225,10 +222,9 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, B1.
 - Choose a data path by its latency: the chain before the fluid timed as one, B2.
-- An on/off switch is `enabled`; camera identifiers `cam_id`; `Field.READ` values are snapshots; name a value by
-  its quantity, in the flow's textbook units: the peak's `enabled`, `cam_id` and `speed` in widths/s, C1.
+- An on/off switch is `enabled`; `Field.READ` values are snapshots; name a value by its quantity, in the flow's
+  textbook units: the peak's `enabled` and `speed` in widths/s, C1.
 - Minimize CPU-GPU synchronization points: the peak's bins read from two pixel buffers behind a fence, C1.
-- App code wires the modules: deep_flow writes the peak from the bridge `cam_id` names, C1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 Not designed yet, so their rules are not named: B3 and B4; C2 and line C's details; D1, F1 to F4, G1 and G2;
