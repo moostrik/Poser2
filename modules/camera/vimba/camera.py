@@ -28,7 +28,6 @@ RETRY_INTERVAL: float = 5.0     # s between two tries to find and open the camer
 STREAM_PAUSE: float = 1.0       # s after a stream that ended, before the camera is opened again
 GRAB_LOG_INTERVAL: float = 10.0 # s between the log lines of a frame grab that keeps failing
 SMALL_PACKET: int = 1500        # bytes: the packet size without jumbo frames on the path
-USER_SET: str = 'UserSet2'      # the set in the camera's flash that holds the region of interest
 
 
 @dataclass
@@ -224,7 +223,7 @@ class Camera(Thread):
         the reason in the log once."""
         try:
             camera: Any = get_camera(self.camera_id)
-            setup: CameraSetup = setup_camera(camera, USER_SET)
+            setup: CameraSetup = setup_camera(camera, self.settings.user_set or None)
         except NoCamera as e:
             self._warn(str(e))
             return None
@@ -232,7 +231,8 @@ class Camera(Thread):
             self._warn(f'could not open the camera: {e}')
             return None
         if not self._problem:
-            logger.info('Vimba camera [%s]: loaded %s, %s, packet size %d', camera.get_id(), USER_SET, setup.region, setup.packet_size)
+            logger.info('Vimba camera [%s]: loaded %s, %s, packet size %d', camera.get_id(), self.settings.user_set or 'no user set',
+                        setup.region, setup.packet_size)
         if setup.packet_size <= SMALL_PACKET:
             logger.warning('Vimba camera packet size is %d: Jumbo Packet is off on the adapter or a switch (see the README), frames drop more easily',
                            setup.packet_size)

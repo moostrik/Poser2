@@ -116,9 +116,11 @@ def wait_for(condition, timeout: float = 3.0) -> bool:
 class TestVimbaCamReopen(unittest.TestCase):
     def setUp(self):
         self.settings = VimbaCameraSettings()
+        self.settings.user_set = 'UserSet2'
         self.settings.initialize()
         self.cam = Camera(self.settings)
         self.cam.control.update = lambda camera: None       # no features on the fake camera
+        self.user_sets: list[str | None] = []              # the user set each open loaded
         self.frames: list[CameraFrame] = []
         self.cam.add_frame_callback(self.frames.append)
         self.camera = StreamingCamera()
@@ -134,7 +136,11 @@ class TestVimbaCamReopen(unittest.TestCase):
         vimba = mock.Mock()
         vimba.get_instance.return_value = contextlib.nullcontext()
         setup = CameraSetup(1500, 1200, 960, 46, 2)
-        for name, value in (('Vimba', vimba), ('get_camera', get_camera), ('setup_camera', lambda camera, user_set: setup),
+
+        def setup_camera(camera, user_set):
+            self.user_sets.append(user_set)
+            return setup
+        for name, value in (('Vimba', vimba), ('get_camera', get_camera), ('setup_camera', setup_camera),
                             ('FRAME_TIMEOUT', 0.1), ('RETRY_INTERVAL', 0.02), ('STREAM_PAUSE', 0.02)):
             patcher = mock.patch(f'modules.camera.vimba.camera.{name}', value)
             patcher.start()
@@ -149,6 +155,11 @@ class TestVimbaCamReopen(unittest.TestCase):
         if handler is not None:
             handler(self.camera, FakeFrame(10))
         return bool(self.frames)
+
+    def test_the_user_set_loaded_is_the_settings(self):
+        self.cam.start()
+        self.assertTrue(self.cam.connected)
+        self.assertEqual(self.user_sets, ['UserSet2'])
 
     def test_a_camera_that_is_found_later_delivers(self):
         self.found = False

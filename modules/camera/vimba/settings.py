@@ -8,6 +8,7 @@ from modules.settings import Field, Widget
 class VimbaCameraSettings(CameraSettings):
     """One Vimba camera: the camera's settings, with its rate and flips live, and its exposure, gain, white
     balance and color features."""
+    user_set:       Field[str]   = Field('', access=Field.INIT, description="User set loaded from the camera's flash at open; empty loads none")
     flip_h:         Field[bool]  = Field(False, description="Mirror the camera image horizontally")
     flip_v:         Field[bool]  = Field(False, description="Flip the camera image vertically")
     fps:            Field[float] = Field(30.0, min=1.0, max=30.0, step=1.0, description="Frames per second asked of the camera; an exposure longer than a frame lowers it")
