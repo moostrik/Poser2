@@ -91,8 +91,22 @@ its motion; signed: cold (warmth below 0) or a negative `expansion` draws the wa
 φ off before the solve (`divergence_3d`), one temperature read a cell; the solvers and the gradient stay. In a
 closed box φ's mean is taken off, as the water cannot swell in it, so a push in one place is a slight pull
 everywhere else **(deduction)**; through an open wall the water leaves instead. It lasts while the warmth does:
-the body injects it (`boundary.temperature`), the fade cools it. Default 0, off; the temperature keeps its field
-for it.
+the body injects it (`boundary.temperature`), the fade cools it. Default 0, off.
+
+What φ reads, `temperature.expansion_source`: the temperature field (`FIELD`: the push lingers where the warm water
+goes and fades as it cools) or the bridge's temperature output (`OUTPUT`: the warmth injected this step, at the
+body's z positions in its slab, so the push is exactly where and while the body is). With `OUTPUT` and `buoyancy`
+0 the temperature field is not needed: no advection, no pass.
+
+### Presence in the mixes
+
+Every reading is a speed, so a still body brings nothing. A seventh share in the density's and the temperature's
+mixes (`boundary.density`, `boundary.temperature` and the body force's), `presence`: the depth mask itself, 0 to
+1 where the depth is the player's, at the body's z position now. A body that stands still seeps dye or warms the
+water; with expansion from the output, it pushes the water away by being there, or draws it in with a negative
+`expansion`. At the outline, the band a depth sample wide without a z position stays empty
+([VIEW.md](VIEW.md#the-depth-read)). The bridge takes the depth mask beside the mask (`BridgeInput`); BRIDGE_3D.md's
+mix gains the share.
 
 ### Details
 
