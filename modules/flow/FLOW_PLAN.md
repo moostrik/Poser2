@@ -211,6 +211,9 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, line 2.
 - Choose a data path by its latency: the chain before the fluid timed as one, line 2.
+- An on/off switch is `enabled`; `Field.READ` values are snapshots; the flow's textbook units: the peak's
+  `enabled` and `velocity` in widths/s, line 3.
+- Minimize CPU-GPU synchronization points: the peak's counts read from two buffers without waiting, line 3.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 Not designed yet, so their rules are not named: the dye's brightness and no captures (line 2); the temperature
