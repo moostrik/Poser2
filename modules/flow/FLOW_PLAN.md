@@ -82,38 +82,51 @@ gravity) weighs dyed water wherever it is, with `buoyancy` 0, in the same pass, 
 `_y`, `_z`. It sits in the temperature's panel though it is the density's weight: if the temperature goes,
 `sink` and the gravity move to a panel of their own or the density's.
 
-### Expansion from the warmth
+### 3.1 The depth mask in the mixes
 
-An option for the temperature (Nguyen, Fedkiw and Jensen 2002; Feldman et al. 2003): the projection makes
-∇·u = φ instead of 0, φ = `temperature.expansion` × the warmth, in 1/s, the share of volume a unit of warmth
-adds per second. The water flows outward from warm places by itself, a soft push from the body's presence, not
-its motion; signed: cold (warmth below 0) or a negative `expansion` draws the water in. The divergence pass takes
-φ off before the solve (`divergence_3d`), one temperature read a cell; the solvers and the gradient stay. In a
-closed box φ's mean is taken off, as the water cannot swell in it, so a push in one place is a slight pull
-everywhere else **(deduction)**; through an open wall the water leaves instead. It lasts while the warmth does:
-the body injects it (`boundary.temperature`), the fade cools it. Default 0, off.
+Every reading is a speed, so a still body brings nothing. A seventh share in every mix that makes an amount
+(`boundary.density`, `boundary.temperature`, the body force's, and the expansion of 3.2), `depth_mask`: the depth
+mask itself, 0 to 1 where the depth is the player's, at the body's z position now. It enters as the readings'
+capped speed does, a presence 0 to 1: at share 1 a still body is fully dyed. The warmth stays the color's
+((R − B) × (1 − G/2) × presence), so a neutral-colored body warms nothing **(code)**. The name is the view's and
+the motion's: the same mask, no second word. At the outline the band a depth sample wide without a z position
+stays empty ([VIEW.md](VIEW.md#the-depth-read)).
 
-What φ reads, `temperature.expansion_source`: the temperature field (`FIELD`: the push lingers where the warm water
-goes and fades as it cools) or the bridge's temperature output (`OUTPUT`: the body's warmth now, ±1, times its
-slab's share of each cell, so the push is exactly where and while the body is). Either way φ is in 1/s: a cell at
-full warmth swells by `expansion` of its volume per second. With `OUTPUT` and `buoyancy` 0 the temperature field
-is not needed: no advection, no pass.
+What changes with it: `BridgeInput.depth_mask` beside `mask`, deep_flow's wiring from the view's `depth_mask`,
+`WeightedSum` taking the mask as one more share, `ZPositionMix` taking the motion's z position for it, the
+presets' new share keys only where a preset needs other than 0. Checked by a unit test of the mix's numpy reference
+with the share (a still body: presence = share × mask); one commit.
 
-| Setting                          | Unit                              | Default | Is                                          |
-|----------------------------------|-----------------------------------|---------|---------------------------------------------|
-| `temperature.expansion`          | 1/s per unit of warmth, signed    | 0, off  | the volume full warmth adds per second       |
-| `temperature.expansion_source`   | `FIELD` or `OUTPUT`               | `FIELD` | the warmth φ reads                          |
+### 3.2 Expansion
 
-### The depth mask in the mixes
+The water swelling or shrinking where the body is (Nguyen, Fedkiw and Jensen 2002; Feldman et al. 2003): the
+projection makes ∇·u = φ instead of 0. A source of volume, not a velocity or a force: the water flows outward
+from the body by itself, a push from its presence, not its motion; negative, it draws the water in.
 
-Every reading is a speed, so a still body brings nothing. A seventh share in the density's and the temperature's
-mixes (`boundary.density`, `boundary.temperature` and the body force's), `depth_mask`: the depth mask itself, 0 to
-1 where the depth is the player's, at the body's z position now. It enters as the other readings' capped speed
-does, a presence 0 to 1: at share 1 a still body is fully dyed, or fully warm by its color. A body that stands still
-seeps dye or warms the water; with expansion from the output, it pushes the water away by being there, or draws
-it in with a negative `expansion`. The name is the view's and the motion's: the same mask, no second word. At the outline, the band a depth sample wide without a z position stays empty
-([VIEW.md](VIEW.md#the-depth-read)). The bridge takes the depth mask beside the mask (`BridgeInput`); BRIDGE_3D.md's
-mix gains the share.
+- The bridge: an output of its own, `expansion`, its own subpanel beside `boundary` and `body_force`, a mix of the
+  six readings and the `depth_mask` share, a presence 0 to 1 as the density's amount is, with its z position mixed
+  from the same readings ([BRIDGE_3D.md's z positions](BRIDGE_3D.md#the-z-positions)). Default all shares 0: `None`.
+- The fluid: `input.expansion_rate`, 1/s at full presence, signed: the share of its volume a cell where the body is
+  fully there gains per second. `add_expansion` injects the output × weight × rate into a φ volume (R16F at the
+  cells, cleared each step) through `inject_3d`'s slab, so any number of injections add up. Default 0, off, the
+  textbook's ∇·u = 0.
+- The projection: the divergence pass takes φ off before the solve (`divergence_3d`), one read a cell; the solvers
+  and the gradient stay.
+- The closed box: with every wall closed the water cannot swell, so the solve needs φ to sum to 0. While φ is
+  nonzero and every wall closed, a GPU reduction sums φ (per workgroup into a buffer, one group over that) and the
+  divergence pass takes the mean off: a push in one place is a slight pull everywhere else **(deduction)**. Without
+  expansion no reduction runs: the faces' differences cancel cell to cell and a closed wall's face is 0, so the
+  divergence sums to 0 already **(code)**; with an open wall the water leaves through it and the solve needs
+  nothing. Its cost, the reduction over 288 × 512 × 64 cells, is measured as it lands.
+- No temperature: the expansion is the body's now, not a lingering warmth; the temperature keeps buoyancy alone.
+
+What changes with it: `BridgeOutput.expansion`, `expansion_z_position`, `Injection`, `Fluid3DLayer._inject_into`,
+deep_flow's injections, `InputSettings.expansion_rate`, the φ volume and the reduction in `Fluid3D`, the monitor's
+port for φ, BRIDGE_3D.md (the mix, the outputs), FLUID_3D.md (the inputs, the pressure), FLOW.md's Terms and its
+inputs and outputs table. Checked by a unit test of the mean's and the slab's numpy reference, and a harness in a
+hidden window (`scripts/expansion_check.py`): a source in a closed box and in an open one, after the projection
+∇·u against φ (minus its mean when closed), and the solve's residual against the same box without a source; one
+commit.
 
 ### Details
 
@@ -233,10 +246,12 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, line 2.
 - Choose a data path by its latency: the chain before the fluid timed as one, line 2.
-- Prefer the flow's textbook units; a setting follows the quantity it controls: `expansion` in 1/s per unit of
-  warmth, the `depth_mask` share as a presence 0 to 1, line 3.
-- A setting's default is the textbook value: `expansion` 0, the projection's ∇·u = 0, line 3.
-- Use the terms in the glossary; one term per concept: `depth_mask`, not a second "presence", line 3.
+- Prefer the flow's textbook units; a setting follows the quantity it controls: `expansion_rate` in 1/s, the
+  `depth_mask` share as a presence 0 to 1, 3.1 and 3.2.
+- A setting's default is the textbook value: `expansion_rate` 0, the projection's ∇·u = 0, 3.2.
+- Name a value by its quantity; one term per concept: `expansion`, `depth_mask` in FLOW.md's Terms, not a second
+  "presence", 3.1 and 3.2.
+- Keep presets and settings schemas in sync: the new shares and the expansion subpanel, 3.1 and 3.2.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 Not designed yet, so their rules are not named: the dye's brightness and no captures (line 2); the temperature
