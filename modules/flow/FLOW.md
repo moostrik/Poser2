@@ -1,11 +1,7 @@
 # The 2D and 3D flow systems
 
-**Meaningful units.** Every quantity and every setting in the flow, the motion, the bridge and the
-fluid alike, is in a unit that means something on its own: widths/s, widths/s², seconds, ms, a dye
-from 0 (clear) to 1 (fully dyed), a warmth from −1 to 1, a share of the box's depth. A setting's
-value is chosen for what that unit says, never derived from an old look or from another setting by
-a factor; a value that would need such a factor means a unit is wrong, and the unit is fixed where
-the quantity is made.
+**Units.** The flow's quantities are in widths/s, widths/s², seconds, ms, a dye from 0 (clear) to
+1 (fully dyed), a warmth from −1 to 1, and a share of the box's depth.
 
 Two app-independent flow systems, each a pipeline of three stages, motion, bridge and fluid: the
 2D flow, a velocity on the image plane, and the 3D flow, a velocity with a component toward the
