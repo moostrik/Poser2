@@ -30,10 +30,17 @@ paths:
 
 ## What the render holds
 
-- A layer sits in `modules/render` when it draws a module's data and holds no choice of one show (a show stage, a look fixed in code), however many apps use it; otherwise it sits in `apps/<app>/render/layers/`
-- A layer's package is named after the module whose data it draws (`layers/pose/`, `layers/flow/`); a layer that only draws other layers sits at the root of `layers/`
-- A class is named after what it draws, then its kind (`TrackletRenderer`, `PoseCompositor`)
-- A shader is named after the operation it does, and its package after the kind of operation (`mask/`, `draw/`)
+- `modules/render` holds three categories, each a folder: `modules`, `general` and `shared`
+- `modules` holds the layers that draw a module's data
+- `general` holds the layers that draw no module's data and are useful to any app
+- `shared` holds the layers that are not general and that more than one app uses
+- A layer that is not general and that one app uses sits in `apps/<app>/render/layers/`
+- A category holds packages
+- A package is named after its subject: a module (`modules/pose/`), a kind of work (`general/composite/`), a shared thing
+- A package holds its layers, and the shaders of those layers in `shaders/`
+- A shader that no layer owns sits in `modules/gl/shaders/`
+- A layer's class is named after what it draws, then its kind (`TrackletRenderer`, `PoseCompositor`)
+- A shader is named after the operation it does; the `shaders` package in front says what it is (`shaders.PosePointLines`)
 
 ## Layered rendering
 
