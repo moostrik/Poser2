@@ -94,17 +94,24 @@ everywhere else **(deduction)**; through an open wall the water leaves instead. 
 the body injects it (`boundary.temperature`), the fade cools it. Default 0, off.
 
 What φ reads, `temperature.expansion_source`: the temperature field (`FIELD`: the push lingers where the warm water
-goes and fades as it cools) or the bridge's temperature output (`OUTPUT`: the warmth injected this step, at the
-body's z positions in its slab, so the push is exactly where and while the body is). With `OUTPUT` and `buoyancy`
-0 the temperature field is not needed: no advection, no pass.
+goes and fades as it cools) or the bridge's temperature output (`OUTPUT`: the body's warmth now, ±1, times its
+slab's share of each cell, so the push is exactly where and while the body is). Either way φ is in 1/s: a cell at
+full warmth swells by `expansion` of its volume per second. With `OUTPUT` and `buoyancy` 0 the temperature field
+is not needed: no advection, no pass.
 
-### Presence in the mixes
+| Setting                          | Unit                              | Default | Is                                          |
+|----------------------------------|-----------------------------------|---------|---------------------------------------------|
+| `temperature.expansion`          | 1/s per unit of warmth, signed    | 0, off  | the volume full warmth adds per second       |
+| `temperature.expansion_source`   | `FIELD` or `OUTPUT`               | `FIELD` | the warmth φ reads                          |
+
+### The depth mask in the mixes
 
 Every reading is a speed, so a still body brings nothing. A seventh share in the density's and the temperature's
-mixes (`boundary.density`, `boundary.temperature` and the body force's), `presence`: the depth mask itself, 0 to
-1 where the depth is the player's, at the body's z position now. A body that stands still seeps dye or warms the
-water; with expansion from the output, it pushes the water away by being there, or draws it in with a negative
-`expansion`. At the outline, the band a depth sample wide without a z position stays empty
+mixes (`boundary.density`, `boundary.temperature` and the body force's), `depth_mask`: the depth mask itself, 0 to
+1 where the depth is the player's, at the body's z position now. It enters as the other readings' capped speed
+does, a presence 0 to 1: at share 1 a still body is fully dyed, or fully warm by its color. A body that stands still
+seeps dye or warms the water; with expansion from the output, it pushes the water away by being there, or draws
+it in with a negative `expansion`. The name is the view's and the motion's: the same mask, no second word. At the outline, the band a depth sample wide without a z position stays empty
 ([VIEW.md](VIEW.md#the-depth-read)). The bridge takes the depth mask beside the mask (`BridgeInput`); BRIDGE_3D.md's
 mix gains the share.
 
@@ -226,6 +233,10 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, line 2.
 - Choose a data path by its latency: the chain before the fluid timed as one, line 2.
+- Give every quantity and setting a unit that means something: `expansion` in 1/s per unit of warmth, the
+  `depth_mask` share as a presence 0 to 1, line 3.
+- A setting's default is the textbook value: `expansion` 0, the projection's ∇·u = 0, line 3.
+- Use the terms in the glossary; one term per concept: `depth_mask`, not a second "presence", line 3.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 Not designed yet, so their rules are not named: the dye's brightness and no captures (line 2); the temperature
