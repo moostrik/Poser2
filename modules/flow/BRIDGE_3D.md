@@ -164,6 +164,10 @@ The bridge has no finite guard, unlike the motion and the fluid ([MOTION.md](MOT
 [FLUID_3D.md](FLUID_3D.md#the-guard)): it makes no non-finite value itself, every division in its
 shaders held above a small floor, and its input is the guarded motion.
 
+The bridge steps once per capture, after the motion, by the capture's interval: its filters see each sample
+once, at its own time. Without a capture (the camera stalls, -sim is paused) it does not step, and the fluid keeps
+taking its last outputs; a stalled camera is the camera's to fix, not the flow's.
+
 ## The z positions
 
 The camera sees the body's front surface, a plane of x, y and depth, so the fluid takes each pixel as a

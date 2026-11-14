@@ -62,9 +62,6 @@ its readings' depth ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)).
 - **B3.** The dye's amount weighed by the image's brightness: a dark pixel (a shadow, black clothes) brings its
   full amount in a dark color, nearly black dye at full strength; weighed, a dark part brings less dye instead.
   Not designed; judged together by eye.
-- **B4.** No captures: while no capture comes (the camera stalls, -sim is paused) the bridge keeps its last output
-  and the fluid keeps taking it, where the motion holds its last velocity. What the flow should do then is not
-  decided.
 - **B5.** z's share in the dye's amount: the amount is the length of x, y and z together, and z, the noisiest,
   adds dye where nothing moves sideways; a share for z in that length (0 sideways only, 1 as now). Not designed;
   judged together by eye.
@@ -210,5 +207,5 @@ Not worked on until asked for; each with what is known.
 - Choose a data path by its latency: the chain before the fluid timed as one, B2.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
-Not designed yet, so their rules are not named: B3, B4 and B5; C2 and line C's details; D1, F1 to F4, G1 and G2;
+Not designed yet, so their rules are not named: B3 and B5; C2 and line C's details; D1, F1 to F4, G1 and G2;
 the motion's details.
