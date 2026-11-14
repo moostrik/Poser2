@@ -61,6 +61,27 @@ and y.
 The motion measures once per camera frame, 44 a second on the recording; every other stage runs
 every frame.
 
+### The view
+
+The view stage is made once per capture, before the motion. Each pass alone on the edges recording's last of 40
+captures (`20261112-130012_edges`, the view 448 × 800, the preset's view settings), the GPU otherwise idle, the
+median of 40 runs (`scripts/view_check.py --time`), ms:
+
+| Pass                               | ms    |
+|------------------------------------|-------|
+| the image into the view            | 0.006 |
+| the depth read, `SURFACE`          | 0.011 |
+| the depth mask                     | 0.005 |
+| the guided filter                  | 0.054 |
+| the mask's threshold               | 0.005 |
+| the depth read again, `MASK`       | 0.028 |
+| the foreground                     | 0.006 |
+| the view, `SURFACE`                | 0.087 |
+| the view, `MASK`                   | 0.120 |
+
+The guided filter is seven passes of the view's size, its products and means 32-bit; the whole view is under 1% of
+a frame at 60 fps.
+
 ### The advection
 
 At 448 × 800 × 64, the density on the grid:
@@ -99,7 +120,9 @@ The same run, 448 × 800 × 64, with the pose on and off (`pose.pose.enabled`):
 
 Without the pose the step takes 8.2 ms: the 6.6 ms between the two is the TensorRT kernels the GPU
 runs between the fluid's passes, the person detection's 34 ms and the RTM pose's 14 ms of CPU-side
-inference a cycle **(deduction)**. The budget is the app's, so every other table is with the pose on.
+inference a cycle **(deduction)**. The budget is the app's, so every other table is with the pose on. The
+pose's load varies by 1 to 1.5 ms of the step between two runs of one configuration, as the person detection's
+rate is not fixed, so a change is judged by runs back to back.
 
 ## The particles
 

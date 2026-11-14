@@ -9,8 +9,12 @@ app does), takes them into GL and runs the view stage at the preset's settings. 
   only moves the edge, by a few view pixels, so near 1) and the share of the view that is the player.
 Saves the last frame's image, depth mask, mask and foreground side by side as a PNG.
 
-    python scripts/view_check.py [RECORDING] [--frames 40] [--png PATH] [--read surface|mask]
+With `--time`, then each of the view's passes on the last capture, the median of 40 runs, and the whole view.
+
+    python scripts/view_check.py [RECORDING] [--frames 40] [--png PATH] [--read surface|mask] [--time]
 """
+import OpenGL
+OpenGL.ERROR_CHECKING = False  # as launcher.py runs the app; a glGetError per call would time the CPU
 import argparse
 import json
 import sys
@@ -27,8 +31,8 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_FLOAT, GL_NEAREST, GL_RED, GL_RGBA,
 import monitor_harness as mh  # noqa: E402
 from modules.camera import CameraFrame, FrameType  # noqa: E402
 from modules.recording import read_metadata  # noqa: E402
-from modules.flow import DepthRead, DepthVelocitySettings, edge_aware_depth, mask_sided_depth  # noqa: E402
-from modules.gl import Tensor, Texture  # noqa: E402
+from modules.flow import DepthRead, DepthVelocitySettings, edge_aware_depth, mask_sided_depth, texture_roi  # noqa: E402
+from modules.gl import Style, Tensor, Texture  # noqa: E402
 from modules.inference import GpuDepth, GpuImage, SerialUploader, SerialUploaderSettings  # noqa: E402
 from modules.render.layers import ViewInput, ViewLayer, ViewLayerSettings  # noqa: E402
 from modules.video import StreamReader  # noqa: E402
@@ -63,12 +67,69 @@ def read(texture: Texture, channels: int = 1) -> np.ndarray:
     return np.frombuffer(data, np.float32).reshape(shape)[::-1]
 
 
+def time_view(view: ViewLayer, image: Texture, depth: Texture) -> None:
+    """Each of the view's passes on the last capture, the median of 40 runs (ms), as `ViewLayer._update` runs them;
+    then the whole view made again, and with MASK's second read."""
+    s = view.settings
+    roi = texture_roi(view._window)
+
+    def image_pass() -> None:
+        view._image.begin()
+        view._roi_shader.use(image, roi)
+        view._image.end()
+
+    def depth_mask_pass() -> None:
+        view._depth_mask.begin()
+        view._depth_mask_shader.use(view._depth, s.near, s.far)
+        view._depth_mask.end()
+
+    def threshold_pass() -> None:
+        view._mask.begin()
+        view._threshold_shader.use(view._guided)
+        view._mask.end()
+
+    def foreground_pass() -> None:
+        view._foreground.begin()
+        view._foreground_shader.use(view._image, view._mask)
+        view._foreground.end()
+
+    def whole(read: DepthRead) -> None:
+        settings_read = s.depth_read
+        s.depth_read = read
+        view._made = None
+        view.update()
+        s.depth_read = settings_read
+
+    Style.push_style()
+    Style.set_blend_mode(Style.BlendMode.DISABLED)
+    rows = [('image into the view', image_pass),
+            ('depth read, SURFACE', lambda: view._read_depth(depth, roi, DepthRead.SURFACE, s)),
+            ('depth mask', depth_mask_pass),
+            ('guided filter', lambda: view._guide_edge(s)),
+            ('mask threshold', threshold_pass),
+            ('depth read, MASK', lambda: view._read_depth(depth, roi, DepthRead.MASK, s)),
+            ('foreground', foreground_pass)]
+    for name, work in rows:
+        for _ in range(3):
+            work()
+        glFinish()
+        print(f'{name:<24} {mh.gpu_ms(work, 40):7.3f} ms', flush=True)
+    Style.pop_style()
+    for read_mode in (DepthRead.SURFACE, DepthRead.MASK):
+        work = lambda read_mode=read_mode: whole(read_mode)
+        for _ in range(3):
+            work()
+        glFinish()
+        print(f'{"the view, " + read_mode.name:<24} {mh.gpu_ms(work, 40):7.3f} ms', flush=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument('recording', nargs='?', default='20261111-123241')
     parser.add_argument('--frames', type=int, default=40)
     parser.add_argument('--png', default='')
     parser.add_argument('--read', default='', help='surface or mask; the preset\'s without')
+    parser.add_argument('--time', action='store_true', help='also time each pass on the last capture')
     args = parser.parse_args()
     chunk = RECORDINGS / args.recording / '0_000.mkv'
     info = read_metadata(chunk).info
@@ -156,6 +217,8 @@ def main() -> int:
                     'foreground': read(output.foreground, 4)}
 
     uploader.stop()
+    if args.time:
+        time_view(view, image_texture, depth_texture)
     print(f'depth in the view: {off_total} of {pixels} pixels off the reference'
           + (f', {ties} more a tie between two on the mask\'s side' if settings.depth_read == DepthRead.MASK else ''))
     if overlaps:

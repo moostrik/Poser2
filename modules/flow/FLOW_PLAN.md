@@ -116,10 +116,13 @@ transfer curve.
 
 ## F. The chain timed as one
 
-- **F1.** The whole chain before the fluid, camera to bridge, timed as one at the preset: what each pass costs
-  against what it gives the fluid.
-- **F2.** The run-to-run spread of the pose's load, 1 to 1.5 ms of the step between two runs of one
-  configuration: the person detection's rate is not fixed.
+The latency and the cadence, camera to render, and the input's GPU steps are measured
+([INPUT_THREADS.md](INPUT_THREADS.md#the-cadence)); the view stage's passes on their own
+([TIMING.md](TIMING.md#the-view)); each stage's GPU time in the app in [TIMING.md](TIMING.md#the-stages), from
+7 November, before the view stage and the bridge's work since.
+
+- **F2.** TIMING.md's stage table again from one run of the app at the preset, the view's row among them, the
+  old numbers kept beside it.
 
 ## G. One unit across the stages
 
@@ -202,8 +205,8 @@ Not worked on until asked for; each with what is known.
 
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, A1.
-- Choose a data path by its latency: the chain before the fluid timed as one, F1.
+- Treat latency as a first-order concern: the stages timed again in the app, F2.
 - A `Field` description is one short line of panel text: I1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
-Not designed yet, so their rules are not named: A2, A3; B1 to B4; C1 to C4; D1, D2; E1 to E3; F2; G1; H1 to H4.
+Not designed yet, so their rules are not named: A2, A3; B1 to B4; C1 to C4; D1, D2; E1 to E3; G1; H1 to H4.
