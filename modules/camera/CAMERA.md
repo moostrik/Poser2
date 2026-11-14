@@ -15,7 +15,8 @@ One job: hand an app a camera. That is three things.
 
 ## The contract
 
-- A camera's callbacks are registered before `start()` and run on the backend's own thread in registration order.
+- A camera's callbacks run on the backend's own thread in registration order; the list has its lock, so a callback
+  can be registered at any time.
 - A frame or tracklet message is stamped once, at hand-over, with its capture where the backend knows it (the end
   of the exposure, oak4), else its arrival, on `perf_counter`; where the two differ it also carries its arrival, so
   its latency needs no clock read downstream. A depth frame and the video frame of one capture carry timestamps

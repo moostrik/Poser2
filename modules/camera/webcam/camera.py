@@ -4,7 +4,7 @@ cannot be opened is a warning and the camera stays unconnected: a webcam is not 
 
 import logging
 import time
-from threading import Thread
+from threading import Lock, Thread
 
 import cv2
 import numpy as np
@@ -26,6 +26,7 @@ class Camera(Thread):
         self.rotate90: bool = rotate90
         self.index: int = index                 # the device's index for OpenCV
 
+        self._callback_lock: Lock = Lock()
         self.frame_callbacks: list[CameraFrameCallback] = []
         self.video_fps: FPS = FPS(120)
 
@@ -41,7 +42,9 @@ class Camera(Thread):
         return self._capture is not None
 
     def add_frame_callback(self, callback: CameraFrameCallback) -> None:
-        self.frame_callbacks.append(callback)
+        with self._callback_lock:
+            if callback not in self.frame_callbacks:
+                self.frame_callbacks.append(callback)
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
         pass    # no detector on this camera: nothing to deliver
@@ -93,5 +96,7 @@ class Camera(Thread):
         self.settings.readings.video_fps = self.video_fps.get_rate_average()
         self.settings.readings.video_min_fps = self.video_fps.get_rate_minimum()
         frame = CameraFrame(cam_id=self.id, kind=FrameType.VIDEO, image=image, timestamp=time.perf_counter())
-        for callback in self.frame_callbacks:
+        with self._callback_lock:
+            callbacks: list[CameraFrameCallback] = list(self.frame_callbacks)
+        for callback in callbacks:
             callback(frame)

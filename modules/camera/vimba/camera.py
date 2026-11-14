@@ -123,9 +123,10 @@ class Camera(Thread):
         self._frame_new: bool = False
         self._frame_mutex: Lock = Lock()
 
+        self._callback_lock: Lock = Lock()
         self.frame_callbacks: list[CameraFrameCallback] = []
 
-        # frame rate, exposure, white balance and colour: sent to the camera when the settings change, checked every frame
+        # frame rate, exposure, white balance and color: sent to the camera when the settings change, checked every frame
         self.control: SensorControl = SensorControl(settings)
 
         self.camera: Any | None = None          # the Vimba camera; None while it is not found: the thread keeps looking
@@ -145,7 +146,9 @@ class Camera(Thread):
         return self.camera is not None
 
     def add_frame_callback(self, callback: CameraFrameCallback) -> None:
-        self.frame_callbacks.append(callback)
+        with self._callback_lock:
+            if callback not in self.frame_callbacks:
+                self.frame_callbacks.append(callback)
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
         pass    # no detector on this camera: nothing to deliver
@@ -290,5 +293,7 @@ class Camera(Thread):
         if self.settings.flip_h:
             image = cv2.flip(image, 1)
         frame = CameraFrame(cam_id=self.id, kind=FrameType.VIDEO, image=image, timestamp=time.perf_counter())
-        for callback in self.frame_callbacks:
+        with self._callback_lock:
+            callbacks: list[CameraFrameCallback] = list(self.frame_callbacks)
+        for callback in callbacks:
             callback(frame)

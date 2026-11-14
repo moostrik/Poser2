@@ -5,7 +5,7 @@ import logging
 import math
 import time
 from pathlib import Path
-from threading import Thread, Event
+from threading import Thread, Event, Lock
 from typing import cast
 
 import depthai as dai
@@ -96,6 +96,7 @@ class Camera(Thread):
         self.depth_fps: FPS = FPS(120)
 
         # CALLBACKS (run in registration order)
+        self._callback_lock: Lock = Lock()
         self.frame_callbacks: list[CameraFrameCallback] = []
         self.tracklet_callbacks: list[TrackletCallback] = []
 
@@ -135,8 +136,9 @@ class Camera(Thread):
             except Exception as e:
                 self._warn(f'camera error: {e}')
             self.stop_event.wait(RETRY_INTERVAL)
-        self.frame_callbacks.clear()
-        self.tracklet_callbacks.clear()
+        with self._callback_lock:
+            self.frame_callbacks.clear()
+            self.tracklet_callbacks.clear()
 
     def _watch_frames(self) -> None:
         """Until told to stop, or until the frames have stopped: a cable, its power, a crashed device."""
@@ -450,28 +452,28 @@ class Camera(Thread):
         frame = CameraFrame(cam_id=self.id, kind=kind, image=image, timestamp=timestamp,
                             nv12=nv12, flip_h=self.flip_on_host, homography=self.tilt_correction.homography,
                             readings=readings, intrinsics=self._intrinsics, alignment=alignment, arrival=arrival)
-        for c in self.frame_callbacks:
+        with self._callback_lock:
+            callbacks: list[CameraFrameCallback] = list(self.frame_callbacks)
+        for c in callbacks:
             c(frame)
 
     def _emit_tracklets(self, tracklets: list[CameraTracklet], timestamp: float, arrival: float) -> None:
         if not self.running:
             return
         message = CameraTracklets(cam_id=self.id, timestamp=timestamp, tracklets=tracklets, arrival=arrival)
-        for c in self.tracklet_callbacks:
+        with self._callback_lock:
+            callbacks: list[TrackletCallback] = list(self.tracklet_callbacks)
+        for c in callbacks:
             c(message)
 
     # ── CameraSource ───────────────────────────────────────────────────
 
     def add_frame_callback(self, callback: CameraFrameCallback) -> None:
-        if self.running:
-            logger.warning('cannot add callback while camera is running')
-            return
-        if callback not in self.frame_callbacks:
-            self.frame_callbacks.append(callback)
+        with self._callback_lock:
+            if callback not in self.frame_callbacks:
+                self.frame_callbacks.append(callback)
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
-        if self.running:
-            logger.warning('cannot add callback while camera is running')
-            return
-        if callback not in self.tracklet_callbacks:
-            self.tracklet_callbacks.append(callback)
+        with self._callback_lock:
+            if callback not in self.tracklet_callbacks:
+                self.tracklet_callbacks.append(callback)

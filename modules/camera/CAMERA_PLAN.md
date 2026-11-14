@@ -8,15 +8,8 @@ general code with one user, which stays. One thing in a backend is one app's: th
 per commit, each checked by the tests named and every app's start (-sim, smile on its image input, 10 s).
 
 Built: 1, Vimba's user set is a setting, `VimbaCameraSettings.user_set` (empty loads none), `UserSet2` in smile's
-four presets.
-
-## 2. The backends' callback lists under a lock
-
-`oak/camera.py`, `oak4/camera.py`, `vimba/camera.py` and `webcam/camera.py` append to and walk their frame and
-tracklet callback lists without a lock; CAMERA.md's contract says they are registered before `start()`. CLAUDE.md:
-a callback list has its own lock, registered under it, copied under it, called outside it. Each list gets its lock,
-and the contract line goes; the hand-over costs a list copy a frame **(deduction: well under a microsecond)**.
-Checked by: the camera tests in both venvs and every app's start.
+four presets; 2, the four backends' callback lists have their lock, registered under it, copied under it, called
+outside it.
 
 ## 3. Names and form
 
