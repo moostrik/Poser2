@@ -82,6 +82,18 @@ gravity) weighs dyed water wherever it is, with `buoyancy` 0, in the same pass, 
 `_y`, `_z`. It sits in the temperature's panel though it is the density's weight: if the temperature goes,
 `sink` and the gravity move to a panel of their own or the density's.
 
+### Expansion from the warmth
+
+An option for the temperature (Nguyen, Fedkiw and Jensen 2002; Feldman et al. 2003): the projection makes
+∇·u = φ instead of 0, φ = `temperature.expansion` × the warmth, in 1/s, the share of volume a unit of warmth
+adds per second. The water flows outward from warm places by itself, a soft push from the body's presence, not
+its motion; signed: cold (warmth below 0) or a negative `expansion` draws the water in. The divergence pass takes
+φ off before the solve (`divergence_3d`), one temperature read a cell; the solvers and the gradient stay. In a
+closed box φ's mean is taken off, as the water cannot swell in it, so a push in one place is a slight pull
+everywhere else **(deduction)**; through an open wall the water leaves instead. It lasts while the warmth does:
+the body injects it (`boundary.temperature`), the fade cools it. Default 0, off; the temperature keeps its field
+for it.
+
 ### Details
 
 - The transfer curve in the particles' march: their slices hold a sum of the grid's layers, so the curve needs
