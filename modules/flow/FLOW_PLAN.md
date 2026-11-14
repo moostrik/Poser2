@@ -43,7 +43,7 @@ public function with a return hint; OpenGL imported by name, no `GL_TIMEOUT_IGNO
 `fluid_2d.py`'s module docstring, a 21-line pipeline, goes with the 2D fluid's rebuild and its document
 ([line 6](#6-the-2d-flow-follows-the-3d)).
 
-Not judged by a scan: whether every unit means something on its own, beyond the names above. The flow runs on the
+Not judged by a scan: whether every quantity is in the flow's textbook units, beyond the names above. The flow runs on the
 render thread, so the concurrency rules touch none of it.
 
 ## 2. The 3D fluid's input
@@ -233,8 +233,8 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, line 2.
 - Choose a data path by its latency: the chain before the fluid timed as one, line 2.
-- Give every quantity and setting a unit that means something: `expansion` in 1/s per unit of warmth, the
-  `depth_mask` share as a presence 0 to 1, line 3.
+- Prefer the flow's textbook units; a setting follows the quantity it controls: `expansion` in 1/s per unit of
+  warmth, the `depth_mask` share as a presence 0 to 1, line 3.
 - A setting's default is the textbook value: `expansion` 0, the projection's ∇·u = 0, line 3.
 - Use the terms in the glossary; one term per concept: `depth_mask`, not a second "presence", line 3.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
