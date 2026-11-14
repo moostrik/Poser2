@@ -147,6 +147,11 @@ Each 2D stage gets its document as it is rebuilt (`BRIDGE_2D.md`, `FLUID_2D.md`)
 - **G2.** A depth for a 2D camera: the 3D fluid puts a pixel in at its z position and nothing where it has none
   ([FLUID_3D.md](FLUID_3D.md#the-bodys-depth)), so a 2D camera gives it nothing. A depth made from the image
   (a monocular depth model) on the view would give the motion its z and z position as a depth camera's does.
+  A single-frame model (Depth Anything V2) is good on a frame but flickers frame to frame, which the depth
+  velocity would read as z; video models keep it consistent and stream: Video Depth Anything (its smallest
+  model about 30 fps), Online Video Depth Anything (42 fps on an A100), FlashDepth (24 fps at 2K) **(site fact,
+  from their papers, not measured here)**. Which one, its latency against the camera's, and whether its depth
+  holds the depth velocity's needs is the item's first question.
 
 ## The motion's details
 
