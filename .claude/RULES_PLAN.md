@@ -93,17 +93,32 @@ To check when building:
 - The read-back line against the read-backs in the code (screen recorder, velocity peak, finite guard, smile's screen grab), so the line describes what the code should do
 - That `gl.md`'s paths cover all code that calls OpenGL: search for OpenGL imports outside them
 
-## 3. The order of `modules/gl/shaders`
+## 3. The packages' documents
 
-Open, not yet discussed. With the render's layerless shaders coming in, the folder needs an order of its own. To decide:
+The explanation in this plan is the documents' text; the rule files hold only the rule lines. Written from it, short:
+
+- `modules/render/RENDER.md`: the three categories, what a package holds, where shaders sit, the names
+- `modules/gl/GL.md`: what the GL holds, its shaders, the shaders without a layer
+
+A document describes what is built: the tree of step 1 is in `RENDER.md` only as far as the code has it; the rest stays in the render plan until the code is moved.
+
+## 4. The GL's plan
+
+`modules/gl/GL_PLAN.md` takes the open questions on `modules/gl/shaders`, which fills up when the render's shaders without a layer come in:
 
 - Its sub-folders: what `convenience/` is for, and whether the shaders are grouped by kind of work (mask, color, draw, blit)
 - The names that carry the ending (`box_shader`, `text_shader`), against "a shader carries no `Shader` ending"
 
+## 5. This plan is deleted
+
+On Matthias's word, when 1 to 4 are built.
+
 ## Rules it touches
 
 - `rendering.md`: 1, 2
-- `gl.md` (new): 2, 3
+- `gl.md` (new): 2
 - `board.md` and `flow.md` (`paths` only): 1, with the code move
+- `docs.md`: 3, 4
 - `CLAUDE.md` "Put a rule where it loads when the code it governs is written": 2
 - `CLAUDE.md` "One rule per bullet" and "A rule describes the codebase as it should look": 1, 2
+- `CLAUDE.md` "A plan is a file named after what it plans" and "A document describes what is built; what is not built is in the plan": 3, 4
