@@ -36,6 +36,7 @@ Notes on these lines:
 - A shader carries no `Shader` ending; the three in the render that have it today (`FeatureShader`, `WindowShader`, `TimeSeriesShader`) lose it when the code is moved.
 - `modules/render` is the package, and its `__init__.py` is what apps import from; the categories and their packages order it inside.
 - `shared` is decided by how many apps use a layer, so a layer moves from an app to `shared` when a second app takes it. Accepted.
+- The render's shaders without a layer move into `modules/gl/shaders/` as they are, with the render's code move; the folder's order comes later, in the GL's plan.
 
 ## 2. Split rendering.md
 
@@ -43,7 +44,7 @@ Notes on these lines:
 
 ### gl.md
 
-Description "OpenGL: the render thread, resources, state, shaders". Paths: `modules/gl/**`, `modules/render/**`, `modules/flow/**`, `apps/**`. The apps' part is wider than `rendering.md` has now (`apps/*/render/**`), because apps call OpenGL outside that folder (`apps/<app>/render.py`, smile's `player/`); to confirm on `deep-flow` when building, by a search for OpenGL imports.
+Description "OpenGL: the render thread, resources, state, shaders". Paths: `modules/gl/**`, `modules/render/**`, `modules/flow/**`, `apps/*/render/**`, `apps/*/render.py`, and what else a search for OpenGL imports on `deep-flow` finds when building (smile's `player/`).
 
 - All OpenGL calls execute on the render thread
 - Create textures, FBOs and shaders at setup or on a resize, not per frame
@@ -58,7 +59,7 @@ Description "OpenGL: the render thread, resources, state, shaders". Paths: `modu
 
 ### rendering.md
 
-Description "The render package: what it holds, its layers and their names". Paths: `modules/render/**`, `apps/*/render/**`.
+Description "The render package: what it holds, its layers and their names". Paths: `modules/render/**`, `apps/*/render/**`, `apps/*/render.py`.
 
 - Section "What the render holds": the lines of step 1
 - Section "Layers": the `Layer`, `Renderer` and `Compositor` lines and the swap buffer's `back` line, unchanged; "A layer hands out its Fbo or SwapFbo, not the texture inside it"; "Prefer composition of layers over monolithic render passes"
@@ -85,10 +86,11 @@ To check when building: the read-back line against the read-backs in the code (s
 
 A new `modules/gl/GL_PLAN.md` holds what this work found for the GL. Nobody builds it until Matthias takes it up. Its content:
 
-- Take in the render's shaders without a layer (now in `modules/render/shaders/`: the mask operations, blend, tint, hue shift, the draw shaders); which shaders have no layer is settled from the code
-- The order of `modules/gl/shaders` once they are in: what `convenience/` is for, and whether the shaders are grouped by kind of work (mask, color, draw, blit)
+- The order of `modules/gl/shaders`, fuller once the render's shaders without a layer are in: what `convenience/` is for, and whether the shaders are grouped by kind of work (mask, color, draw, blit)
 - The names that carry the ending (`box_shader`, `text_shader`), against "a shader carries no `Shader` ending"
 - How the GL hands out its shaders: by bare name today (`from modules.gl import Blit`); whether that still reads well with many more
+
+It ends with the rules it touches: `gl.md`, CLAUDE.md's Naming and Imports.
 
 ## 4. Send the render's text to the apps thread
 
@@ -97,7 +99,8 @@ After steps 1 and 2 are in. The apps thread's render plan (`modules/render/RENDE
 - The rule lines of step 1 as they stand in `rendering.md`, and the tree
 - The notes of step 1
 - What changes with the code move, in the same commit as the move: `board.md` `paths` (`modules/render/layers/**` becomes the board's render package); `flow.md` `paths` and `tests/test_glossary.py` `FLOW_ROOTS` (`modules/render/layers/flow` becomes `modules/render/modules/flow`)
-- That the shaders without a layer are not its work: they wait in the GL's plan
+- The shaders without a layer move into `modules/gl/shaders/` as they are, in the same move; which shaders have no layer is settled from the code, and the folder's order is not its work
+- Until the move, the commit check reports the old `layers/` and `shaders/` trees against the new lines; that is expected
 
 ## 5. This plan is deleted
 
