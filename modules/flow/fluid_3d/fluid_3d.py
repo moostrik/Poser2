@@ -485,12 +485,14 @@ class Fluid3D:
 
     def _advect_field(self, field: SwapTexture3D, scratch: Texture3D, velocity: Texture3D, advection: Advection,
                       step: float, dissipation: float, internal_format: int,
-                      evaporation: float = 0.0, measure: int = 0, guard: str = '', limiter: Limiter = Limiter.CLAMP) -> None:
-        """Carry `field` one step along `velocity` by `advection`; its size taken down by `evaporation`,
-        read by `measure` (0 a density's alpha, 1 a vector's length, 2 |r|); `guard` the field's name in the guard."""
+                      evaporation: float = 0.0, evaporation_knee: float = 0.1, measure: int = 0, guard: str = '',
+                      limiter: Limiter = Limiter.CLAMP) -> None:
+        """Carry `field` one step along `velocity` by `advection`; its size taken down by the saturating loss
+        `evaporation` with its knee, read by `measure` (0 a density's alpha, 1 a vector's length, 2 |r|); `guard` the
+        field's name in the guard."""
         if self._advection.carry(advection, field, scratch, velocity, self._obstacle, self._aspect,
                                  self._z_extent, step, dissipation, internal_format, self._has_obstacles,
-                                 evaporation=evaporation, measure=measure,
+                                 evaporation=evaporation, evaporation_knee=evaporation_knee, measure=measure,
                                  guard=self._guard_slot(guard), closed=self._closed, faces=self._faces.volume, limiter=limiter):
             self._apply_wall_modes()
 
@@ -514,6 +516,7 @@ class Fluid3D:
                       closed=self._closed, has_obstacles=self._has_obstacles)
         finish = dict(dissipation=self._calculate_dissipation(self._dt, velocity.fade_time),
                       evaporation=self._evaporation(self._dt, velocity.evaporation_time),
+                      evaporation_knee=velocity.evaporation_knee,
                       guard=self._guard_slot('velocity'), wall_keep=self._wall_keep)
         self._faces.swap()
         source = self._faces.back
@@ -591,7 +594,8 @@ class Fluid3D:
         advect_step = self._dt * self.settings.temperature.advection_scale
         dissipation = self._calculate_dissipation(self._dt, self.settings.temperature.fade_time)
         self._advect_field(self._temperature, self._temperature_scratch, self._velocity, self.settings.temperature.advection, advect_step, dissipation, GL_R16F,
-                           evaporation=self._evaporation(self._dt, self.settings.temperature.evaporation_time), measure=2,
+                           evaporation=self._evaporation(self._dt, self.settings.temperature.evaporation_time),
+                           evaporation_knee=self.settings.temperature.evaporation_knee, measure=2,
                            guard='temperature', limiter=self.settings.temperature.limiter)
 
     def _apply_buoyancy(self) -> None:
@@ -670,7 +674,8 @@ class Fluid3D:
             velocity=self._velocity, obstacle=self._obstacle, has_obstacles=self._has_obstacles,
             aspect=self._aspect, z_extent=self._z_extent, dt=self._dt, step=self._dt * self.settings.density.advection_scale,
             dissipation=self._calculate_dissipation(self._dt, self.settings.density.fade_time),
-            evaporation=self._evaporation(self._dt, self.settings.density.evaporation_time), advection=self.settings.density.advection,
+            evaporation=self._evaporation(self._dt, self.settings.density.evaporation_time),
+            evaporation_knee=self.settings.density.evaporation_knee, advection=self.settings.density.advection,
             curl=self._curl_vol if self._needs_curl else None, cell=self._cell[0], guard=self._guard_slot('density'),
             limiter=self.settings.density.limiter)
         for carrier in self._densities:
@@ -931,7 +936,8 @@ class Fluid3D:
 
     @staticmethod
     def _evaporation(delta_time: float, evaporation_time: float) -> float:
-        """The share of a field's full value taken off this step, so it is gone in evaporation_time; 0 off."""
+        """The saturating loss's share this step, dt / evaporation_time: a full value well above the knee is gone in
+        evaporation_time; 0 off."""
         return delta_time / evaporation_time if evaporation_time > 0.0 else 0.0
 
     # ========== Input Methods (2D -> 3D injection) ==========

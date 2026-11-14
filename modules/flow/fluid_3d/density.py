@@ -67,7 +67,8 @@ class Density(DensityCarrier):
             return
         if self._advection.carry(step.advection, self._density, self._scratch, step.velocity, step.obstacle,
                                  step.aspect, step.z_extent, step.step, step.dissipation, GL_RGBA16F,
-                                 step.has_obstacles, evaporation=step.evaporation, guard=step.guard,
+                                 step.has_obstacles, evaporation=step.evaporation,
+                                 evaporation_knee=step.evaporation_knee, guard=step.guard,
                                  limiter=step.limiter):
             self._apply_walls()
 

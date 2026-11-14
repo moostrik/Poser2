@@ -113,7 +113,8 @@ class FineDensity(DensityCarrier):
             self._turbulent_step(step, velocity, turbulence)
         elif self._advection.carry(step.advection, self._amount, self._scratch, velocity, step.obstacle,
                                    step.aspect, step.z_extent, step.step, step.dissipation, GL_R16F,
-                                   step.has_obstacles, evaporation=step.evaporation, measure=2,
+                                   step.has_obstacles, evaporation=step.evaporation,
+                                   evaporation_knee=step.evaporation_knee, measure=2,
                                    limiter=step.limiter):
             self._apply_walls()
 
@@ -137,7 +138,8 @@ class FineDensity(DensityCarrier):
         self._turbulent_shader.use(self._amount.back, self._amount, velocity, step.obstacle, step.curl, self._noise,
                                    self._displacements[0], self._displacements[1], timestep=step.step, rdx=rdx,
                                    extent=(1.0, 1.0 / step.aspect, step.z_extent), dissipation=step.dissipation,
-                                   evaporation=step.evaporation, turbulence=turbulence, cell=step.cell,
+                                   evaporation=step.evaporation, evaporation_knee=step.evaporation_knee,
+                                   turbulence=turbulence, cell=step.cell,
                                    tiles=1.0 / max(NOISE_CELLS * step.cell, 1e-6), weights=(weights[0], weights[1]),
                                    has_obstacles=step.has_obstacles)
         glMemoryBarrier(_BARRIER)

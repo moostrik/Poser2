@@ -16,7 +16,7 @@ class TurbulentAdvect3D(ComputeShader):
     def use(self, source: Texture3D, result: Texture3D, velocity: Texture3D, obstacle: Texture3D, curl: Texture3D,
             noise: Texture3D, displacement_a: Texture3D, displacement_b: Texture3D, *, timestep: float,
             rdx: tuple[float, float, float], extent: tuple[float, float, float], dissipation: float, evaporation: float,
-            turbulence: float, cell: float, tiles: float, weights: tuple[float, float], has_obstacles: bool) -> None:
+            evaporation_knee: float, turbulence: float, cell: float, tiles: float, weights: tuple[float, float], has_obstacles: bool) -> None:
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
@@ -33,6 +33,7 @@ class TurbulentAdvect3D(ComputeShader):
         glUniform3f(self.get_uniform_loc("uExtent"), *extent)
         glUniform1f(self.get_uniform_loc("uDissipation"), dissipation)
         glUniform1f(self.get_uniform_loc("uEvaporation"), evaporation)
+        glUniform1f(self.get_uniform_loc("uEvaporationKnee"), evaporation_knee)
         glUniform1f(self.get_uniform_loc("uTurbulence"), turbulence)
         glUniform1f(self.get_uniform_loc("uCell"), cell)
         glUniform1f(self.get_uniform_loc("uTiles"), tiles)

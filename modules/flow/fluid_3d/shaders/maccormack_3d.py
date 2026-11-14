@@ -21,7 +21,8 @@ class MacCormack3D(ComputeShader):
     def use(self, source: Texture3D, forward: Texture3D, result: Texture3D,
             velocity: Texture3D, obstacle: Texture3D,
             aspect: float, z_extent: float, timestep: float, dissipation: float,
-            internal_format: int = GL_RGBA16F, has_obstacles: bool = True, evaporation: float = 0.0, measure: int = 0,
+            internal_format: int = GL_RGBA16F, has_obstacles: bool = True, evaporation: float = 0.0,
+            evaporation_knee: float = 0.1, measure: int = 0,
             guard: GuardSlot | None = None,
             closed: tuple[bool, bool, bool] = (True, True, True), faces: Texture3D | None = None,
             clamp: bool = True) -> None:
@@ -39,7 +40,9 @@ class MacCormack3D(ComputeShader):
             dissipation: Decay multiplier
             internal_format: Image format for output
             has_obstacles: Whether obstacle logic is active
-            evaporation: The size taken off this step, every channel scaled with it
+            evaporation: dt / evaporation_time: a full value's share lost this step well above the knee, a
+                saturating loss, every channel scaled with the size; 0 off
+            evaporation_knee: The size below which the loss turns from a fixed amount to a share
             measure: How the size is read: 0 a premultiplied density's alpha, 1 a vector's length, 2 |r|
             guard: The field's slot in its stage's FiniteGuard: a non-finite value 0 and counted; None no guard
             closed: Per axis, whether the box's walls are closed (walls.glsl)
@@ -64,6 +67,7 @@ class MacCormack3D(ComputeShader):
         glUniform3f(self.get_uniform_loc("uRdx"), 1.0, rdx_y, rdx_z)
         glUniform1f(self.get_uniform_loc("uDissipation"), dissipation)
         glUniform1f(self.get_uniform_loc("uEvaporation"), evaporation)
+        glUniform1f(self.get_uniform_loc("uEvaporationKnee"), evaporation_knee)
         glUniform1i(self.get_uniform_loc("uMeasure"), measure)
         glUniform3i(self.get_uniform_loc("uClosed"), *(int(c) for c in closed))
         glUniform1i(self.get_uniform_loc("uFromFaces"), int(faces is not None))

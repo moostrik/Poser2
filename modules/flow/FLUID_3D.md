@@ -570,7 +570,7 @@ and a streak's alpha is its mass.
 |------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | emission   | each tick, at the bridge's size, the boundary's density and the body force's, each by its setting in `input`: a texel spawns `rate × amount × dt` particles, rounded by a hash so faint dye still spawns now and then; each takes an even share of the texel's amount as its mass, the density's color, a random place in the texel and a z drawn from the injection slab's gaussian; no velocity of its own, the grid carries it and the drag gave the grid the body's |
 | one knob   | a high `rate` many light particles, the points' and the streaks' look; a low `rate` few heavy ones, the blobs'; the mass and the size follow                                                                                                                                                                                                                                                                                                                            |
-| duration   | three things end a particle, the first that comes: `density.fade_time`, the mass's exponential decay, as the grid density's; `evaporation_time`, a fixed amount taken off, which takes faint ones to 0; the ring, once more are alive than `count`, the oldest fading over `ring_fade` before they are overwritten                                                                                                                                                      |
+| duration   | three things end a particle, the first that comes: `density.fade_time`, the mass's exponential decay, as the grid density's; `evaporation_time`, the saturating loss, as the grid density's; the ring, once more are alive than `count`, the oldest fading over `ring_fade` before they are overwritten                                                                                                                                                                 |
 | the budget | in a steady state about `rate` × the emission × the lifetime are alive; while that stays under `count` the fade decides how long dye lasts and the ring is only the cap; the panel shows the seconds the ring takes to wrap, one counter read asynchronously, no particle                                                                                                                                                                                               |
 
 `BLOBS` is the slice target with a bigger, softer point; `SURFACE` is its own pass, a depth and a
@@ -634,14 +634,19 @@ measured, and why this one, are in [TIMING.md](TIMING.md#the-grid).
 ## The fade and the evaporation
 
 Every field (velocity, density, temperature) has a `fade_time` and an `evaporation_time`, both seconds,
-0 to 300 in steps of 1, 0 off. The fade is the seconds to 1%, a share at a time
-(0.01^(dt / `fade_time`)), so it never reaches zero. The evaporation is the seconds a full value
-takes to reach 0, a fixed amount at a time (dt / `evaporation_time` of it), so faint values go first:
-fully dyed, ±1 warm, 1 width/s; on the velocity a constant braking that stops slow water. It takes a
-field's size down, the alpha of a density, the length of a velocity, |r| of the temperature, and
-scales every channel with it, so a color keeps its hue, a velocity its direction and a warmth its
-sign (`evaporate` in `advect_3d.comp` and `maccormack_3d.comp`). `temperature.buoyancy` is per unit
-of warmth.
+0 to 300 in steps of 1, 0 off, and an `evaporation_knee` in the field's own unit. The fade is the seconds to
+1%, a share at a time (0.01^(dt / `fade_time`)), so it never reaches zero; everything thins together. The
+evaporation is a saturating loss (Michaelis–Menten kinetics) on the field's size ρ:
+
+dρ/dt = −ρ / (`evaporation_time` × (ρ + `evaporation_knee`))
+
+Well above the knee it loses a full value (fully dyed, ±1 warm, 1 width/s) per `evaporation_time`, a fixed
+amount at a time, so faint values go first; below it, a share at a time, so a field thins out and never cuts
+off at a moving edge as a fixed amount does. Each step takes ρ × exp(−dt / (`evaporation_time` × (ρ +
+`evaporation_knee`))), never below 0 at any step. It takes the alpha of a density, the length of a velocity, |r|
+of the temperature, and scales every channel with it, so a color keeps its hue, a velocity its direction and a
+warmth its sign (`evaporate` in `advect_3d.comp` and `maccormack_3d.comp`; the faces', the fine density's and the
+particles' mass the same). `temperature.buoyancy` is per unit of warmth.
 
 ## The look
 

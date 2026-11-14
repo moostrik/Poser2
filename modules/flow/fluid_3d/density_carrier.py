@@ -26,7 +26,8 @@ class CarrierStep:
     dt: float               # s
     step: float             # dt × speed, the advection's distance per unit of velocity
     dissipation: float      # the fade's multiplier this step
-    evaporation: float      # subtracted this step
+    evaporation: float      # dt / evaporation_time, a saturating loss's share this step; 0 off
+    evaporation_knee: float # the amount below which the loss turns from a fixed amount to a share
     advection: Advection
     curl: Texture3D | None = None   # the velocity's curl (1/s), while the turbulence needs it
     cell: float = 0.0               # the grid's cell across, in x and y (widths)

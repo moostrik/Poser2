@@ -29,7 +29,8 @@ uniform int   uMode;          // 0 semi-Lagrangian, 1 the MacCormack predictor, 
 uniform ivec3 uCells;         // the cell counts
 uniform float uTimestep;      // dt * advection_scale
 uniform float uDissipation;   // the fade's multiplier this step
-uniform float uEvaporation;   // widths/s taken off the speed this step
+uniform float uEvaporation;   // dt / evaporation_time: 1 width/s's share lost this step well above the knee; 0 off
+uniform float uEvaporationKnee; // widths/s: the speed below which the loss turns from a fixed amount to a share
 uniform int   uGuardSlot;     // the velocity's slot in the stage's FiniteGuard; -1 no guard
 uniform ivec3 uClosed;        // per axis, 1 where the walls are closed
 uniform bool  uHasObstacles;
@@ -61,10 +62,10 @@ float fetch_pred(int c, ivec3 i) {
     return texelFetch(uPred, i, 0)[c];
 }
 
-// The evaporation on the face's full vector `v`: the factor its length is scaled by
+// The evaporation on the face's full vector `v`, a saturating loss: the factor its length is scaled by
 float speed_factor(vec3 v) {
     float speed = length(v);
-    if (uEvaporation > 0.0 && speed > 0.0) return max(speed - uEvaporation, 0.0) / speed;
+    if (uEvaporation > 0.0 && speed > 0.0) return exp(-uEvaporation / (speed + uEvaporationKnee));
     return 1.0;
 }
 

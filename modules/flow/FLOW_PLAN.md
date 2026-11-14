@@ -65,29 +65,6 @@ its readings' depth ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)).
 
 ## 3. The 3D fluid's look at 4K
 
-### The evaporation as a saturating loss
-
-The fade (a share at a time) is dull: everything thins together and nothing ends. The evaporation (a fixed
-amount at a time) is livelier but leaves artifacts as a field runs out **(site fact)**: thin values reach 0 in
-one step wherever they are under the step's amount, so a blob ends at a moving cut-off with speckles
-**(deduction)**. A dye's age would be livelier still, but costs a field ([FLUID_3D.md](FLUID_3D.md#the-fade-and-the-evaporation)).
-
-The evaporation becomes a saturating loss (Michaelis–Menten kinetics), for the velocity, the density and the
-temperature: dρ/dt = −ρ / (`evaporation_time` × (ρ + `evaporation_knee`)) on a field's size ρ (fully dyed,
-widths/s, ±1 warm). Well above the knee it loses a full value per `evaporation_time`, as now; below it, a share
-at a time, so it thins out and never cuts off. Each step takes ρ × exp(−dt / (`evaporation_time` × (ρ +
-`evaporation_knee`))): never below 0 at any dt. Every channel is scaled with the size, as now (`evaporate` in
-`advect_3d.comp`, `maccormack_3d.comp` and the other advections that call it; the particles' mass the
-density's).
-
-| Setting            | Unit                         | Default | Is                                                 |
-|--------------------|------------------------------|---------|----------------------------------------------------|
-| `evaporation_time` | s                            | 0, off  | the seconds a full value takes at the thick rate   |
-| `evaporation_knee` | the field's: dyed, widths/s, warmth | 0.1 | the size below which it turns from a fixed amount to a share |
-
-The fade stays beside it. A transfer curve in the look, low density mapped softly to clear, is the other half
-and comes after (the details below).
-
 ### The temperature
 
 Whether the temperature needs a field of its own. Buoyancy needs only a scalar the water is lighter or
@@ -108,7 +85,8 @@ gravity) weighs dyed water wherever it is, with `buoyancy` 0, in the same pass, 
 ### Details
 
 - A transfer curve in the composite: low density mapped softly to clear, so thinning dye fades out of sight; with
-  the saturating loss, the way the dye leaves. Not designed yet.
+  the evaporation's saturating loss ([FLUID_3D.md](FLUID_3D.md#the-fade-and-the-evaporation)), the way the dye
+  leaves. Not designed yet.
 - The body force's acceleration: tested, tweaked and made useful.
 - The velocity loses its energy faster than expected **(site fact)**, with the plain step on the velocity: the
   plain step's own loss (a swirl keeps 52% of its speed in 2 s, MacCormack 62%), the drag now over the body's
@@ -223,9 +201,6 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, line 2.
 - Choose a data path by its latency: the chain before the fluid timed as one, line 2.
-- Give every quantity and setting a unit that means something; a setting's default is the textbook value:
-  `evaporation_knee` in the field's own unit, line 3.
-- Keep presets and settings schemas in sync: `evaporation_knee` added where a preset needs other than 0.1, line 3.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 Not designed yet, so their rules are not named: the dye's brightness and no captures (line 2); the temperature

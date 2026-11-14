@@ -18,7 +18,7 @@ class ParticleAdvect(ComputeShader):
         super().__init__()
 
     def use(self, particles: StorageBuffer, ring: StorageBuffer, count: int, velocity: Texture3D, *, aspect: float, z_extent: float,
-            timestep: float, dt: float, dissipation: float, evaporation: float, closed_xy: bool, closed_z: bool) -> None:
+            timestep: float, dt: float, dissipation: float, evaporation: float, evaporation_knee: float, closed_xy: bool, closed_z: bool) -> None:
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
@@ -30,6 +30,7 @@ class ParticleAdvect(ComputeShader):
         glUniform1f(self.get_uniform_loc("uDt"), dt)
         glUniform1f(self.get_uniform_loc("uDissipation"), dissipation)
         glUniform1f(self.get_uniform_loc("uEvaporation"), evaporation)
+        glUniform1f(self.get_uniform_loc("uEvaporationKnee"), evaporation_knee)
         glUniform1i(self.get_uniform_loc("uClosedXY"), int(closed_xy))
         glUniform1i(self.get_uniform_loc("uClosedZ"), int(closed_z))
         glUniform1ui(self.get_uniform_loc("uCount"), count)

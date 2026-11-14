@@ -20,7 +20,7 @@ class AdvectFaces3D(ComputeShader):
 
     def use(self, mode: int, source: Texture3D, result: Texture3D, obstacle: Texture3D,
             cells: tuple[int, int, int], cell: Cell, step: float, dissipation: float = 1.0, evaporation: float = 0.0,
-            guard: GuardSlot | None = None, closed: tuple[bool, bool, bool] = (True, True, True),
+            evaporation_knee: float = 0.1, guard: GuardSlot | None = None, closed: tuple[bool, bool, bool] = (True, True, True),
             wall_keep: float = 1.0, has_obstacles: bool = True, predictor: Texture3D | None = None, clamp: bool = True) -> None:
         """Advect `source` into `result`.
 
@@ -32,7 +32,9 @@ class AdvectFaces3D(ComputeShader):
             cell: A cell's sides in widths, x, y and z
             step: dt × advection_scale
             dissipation: The fade's multiplier this step
-            evaporation: Widths/s taken off the speed this step
+            evaporation: dt / evaporation_time: 1 width/s's share lost this step well above the knee, a
+                saturating loss on the speed; 0 off
+            evaporation_knee: Widths/s: the speed below which the loss turns from a fixed amount to a share
             guard: The velocity's slot in the stage's FiniteGuard; None no guard
             closed: Per axis, whether the walls are closed
             wall_keep: The share along a closed wall kept this step (slip_time's); 1 free-slip
@@ -50,6 +52,7 @@ class AdvectFaces3D(ComputeShader):
         glUniform1f(self.get_uniform_loc('uTimestep'), step)
         glUniform1f(self.get_uniform_loc('uDissipation'), dissipation)
         glUniform1f(self.get_uniform_loc('uEvaporation'), evaporation)
+        glUniform1f(self.get_uniform_loc('uEvaporationKnee'), evaporation_knee)
         glUniform1f(self.get_uniform_loc('uWallKeep'), wall_keep)
         if guard is not None:
             guard.use(self.get_uniform_loc('uGuardSlot'))

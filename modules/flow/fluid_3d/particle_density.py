@@ -166,6 +166,7 @@ class ParticleDensity(DensityCarrier):
         self._advect_shader.use(self._particles, self._ring, self._count, step.velocity, aspect=step.aspect, z_extent=step.z_extent,
                                 timestep=step.step, dt=step.dt, dissipation=step.dissipation,
                                 evaporation=step.evaporation * self._reference_mass(),
+                                evaporation_knee=step.evaporation_knee * self._reference_mass(),
                                 closed_xy=self.settings.wall == WallMode.CLOSED,
                                 closed_z=self.settings.wall == WallMode.CLOSED)
         self._advect_timer.end()

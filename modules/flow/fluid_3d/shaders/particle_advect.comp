@@ -17,7 +17,8 @@ uniform float uTimestep;      // dt × speed
 uniform vec3  uRdx;           // (1, width/height, 1/z_extent): the uv a width of each axis crosses
 uniform float uDt;            // s
 uniform float uDissipation;   // the fade's multiplier this step
-uniform float uEvaporation;   // mass subtracted this step
+uniform float uEvaporation;   // a full texel's mass lost this step well above the knee (a saturating loss); 0 off
+uniform float uEvaporationKnee; // the mass below which the loss turns from a fixed amount to a share
 uniform bool  uClosedXY;      // the density's walls
 uniform bool  uClosedZ;       // the volume's z walls
 uniform uint  uCount;
@@ -36,7 +37,8 @@ void main() {
     vec3 v2 = texture(uVelocity, middle).xyz;
     vec3 moved = p + uTimestep * uRdx * v2;
 
-    float mass = mass_age.x * uDissipation - uEvaporation;
+    float mass = mass_age.x * uDissipation;
+    if (uEvaporation > 0.0) mass *= exp(-uEvaporation / (mass + uEvaporationKnee));
     bool outside_xy = any(lessThan(moved.xy, vec2(0.0))) || any(greaterThan(moved.xy, vec2(1.0)));
     bool outside_z = moved.z < 0.0 || moved.z > 1.0;
     if ((outside_xy && !uClosedXY) || (outside_z && !uClosedZ)) {

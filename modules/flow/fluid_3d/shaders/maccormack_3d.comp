@@ -30,7 +30,8 @@ layout(rgba16f, binding = 0) writeonly uniform image3D uResult;
 uniform float uTimestep;      // dt * speed
 uniform vec3  uRdx;           // (1, width/height, 1/z_extent): the uv a width of each axis crosses
 uniform float uDissipation;   // Exponential decay multiplier
-uniform float uEvaporation;   // Subtracted this step; 0 for a signed field
+uniform float uEvaporation;   // dt / evaporation_time: a full value's share lost this step well above the knee; 0 off
+uniform float uEvaporationKnee; // the size below which the loss turns from a fixed amount to a share
 uniform int   uMeasure;       // how the evaporation reads a field's size: 0 its alpha, 1 its vector's length, 2 |r|
 uniform ivec3 uSize;          // Volume dimensions
 uniform bool  uHasObstacles;
@@ -46,13 +47,13 @@ uniform bool  uClamp;         // where the correction overshoots: cut to the bou
 // The stage's non-finite counts (FiniteGuard, GUARD_BINDING)
 layout(std430, binding = 7) buffer FiniteGuard { uint uNonFinite[]; };
 
-// The evaporation: the field's size taken down by uEvaporation, every channel scaled with it, so a
-// color keeps its hue, a velocity its direction and a signed value its sign; its size the alpha of a
-// premultiplied density (0), the length of a vector (1), or the first channel's magnitude (2)
+// The evaporation, a saturating loss: the field's size ρ times exp(−uEvaporation / (ρ + knee)), every channel
+// scaled with it, so a color keeps its hue, a velocity its direction and a signed value its sign; its size the
+// alpha of a premultiplied density (0), the length of a vector (1), or the first channel's magnitude (2)
 vec4 evaporate(vec4 value) {
     float size = uMeasure == 0 ? value.a : (uMeasure == 1 ? length(value.xyz) : abs(value.r));
     if (size <= 0.0) return value;
-    return value * (max(size - uEvaporation, 0.0) / size);
+    return value * exp(-uEvaporation / (size + uEvaporationKnee));
 }
 
 // The guard: a value whose exponent bits are all ones is an infinity or a NaN; it becomes 0 and is counted.

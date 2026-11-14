@@ -33,7 +33,7 @@ class FieldAdvection:
     def carry(self, advection: Advection, field: SwapTexture3D, scratch: Texture3D, velocity: Texture3D,
               obstacle: Texture3D, aspect: float, z_extent: float, step: float, dissipation: float,
               internal_format: int, has_obstacles: bool, evaporation: float = 0.0,
-              measure: int = 0, guard: GuardSlot | None = None,
+              evaporation_knee: float = 0.1, measure: int = 0, guard: GuardSlot | None = None,
               closed: tuple[bool, bool, bool] = (True, True, True), faces: Texture3D | None = None,
               limiter: Limiter = Limiter.CLAMP) -> bool:
         """Carry `field` one step along `velocity`, or along `faces` (`FaceVelocity`) for a field on the simulation's grid. Semi-Lagrangian into the field; or its step into `scratch` as
@@ -44,7 +44,8 @@ class FieldAdvection:
         if advection != Advection.MACCORMACK:
             self._advect_shader.advect(source, field, velocity, obstacle, aspect, z_extent, step, dissipation,
                                        internal_format=internal_format, has_obstacles=has_obstacles,
-                                       evaporation=evaporation, measure=measure, guard=guard, closed=closed, faces=faces)
+                                       evaporation=evaporation, evaporation_knee=evaporation_knee, measure=measure,
+                                       guard=guard, closed=closed, faces=faces)
             glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
             return False
         allocated: bool = False
@@ -57,7 +58,7 @@ class FieldAdvection:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._maccormack_shader.use(source, scratch, field, velocity, obstacle, aspect, z_extent, step, dissipation,
                                     internal_format=internal_format, has_obstacles=has_obstacles,
-                                    evaporation=evaporation, measure=measure, guard=guard, closed=closed, faces=faces,
-                                    clamp=limiter == Limiter.CLAMP)
+                                    evaporation=evaporation, evaporation_knee=evaporation_knee, measure=measure,
+                                    guard=guard, closed=closed, faces=faces, clamp=limiter == Limiter.CLAMP)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         return allocated

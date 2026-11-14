@@ -23,7 +23,8 @@ uniform float uTimestep;      // dt × speed
 uniform vec3  uRdx;           // the uv a width of each axis crosses
 uniform vec3  uExtent;        // the box in widths: 1, height over width, depth over width
 uniform float uDissipation;
-uniform float uEvaporation;
+uniform float uEvaporation;   // dt / evaporation_time, a saturating loss (advect_3d.comp's evaporate)
+uniform float uEvaporationKnee;
 uniform float uTurbulence;    // the swirls' strength, 0 the grid's velocity alone
 uniform float uCell;          // the grid's cell (widths)
 uniform float uTiles;         // noise tiles a width
@@ -52,8 +53,8 @@ void main() {
         st_back = st;
     }
     float result = uDissipation * texture(uSource, st_back).r;
-    if (uEvaporation > 0.0) {
-        result = max(result - uEvaporation, 0.0);
+    if (uEvaporation > 0.0 && result > 0.0) {
+        result *= exp(-uEvaporation / (result + uEvaporationKnee));
     }
     imageStore(uResult, gid, vec4(result, 0.0, 0.0, 0.0));
 }
