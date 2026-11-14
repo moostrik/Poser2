@@ -84,9 +84,8 @@ gravity) weighs dyed water wherever it is, with `buoyancy` 0, in the same pass, 
 
 ### Details
 
-- A transfer curve in the composite: low density mapped softly to clear, so thinning dye fades out of sight; with
-  the evaporation's saturating loss ([FLUID_3D.md](FLUID_3D.md#the-fade-and-the-evaporation)), the way the dye
-  leaves. Not designed yet.
+- The transfer curve in the particles' march: their slices hold a sum of the grid's layers, so the curve needs
+  its point in that sum ([FLUID_3D.md](FLUID_3D.md#the-look)). Not designed yet.
 - The body force's acceleration: tested, tweaked and made useful.
 - The velocity loses its energy faster than expected **(site fact)**, with the plain step on the velocity: the
   plain step's own loss (a swirl keeps 52% of its speed in 2 s, MacCormack 62%), the drag now over the body's

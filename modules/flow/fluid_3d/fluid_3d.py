@@ -726,7 +726,8 @@ class Fluid3D:
         """The composite's terms over the view, the box's depth in widths, from the panel's."""
         composite = self.settings.composite
         tint = composite.tint
-        return march_look(composite.emission, composite.opacity, composite.fog, (tint.r, tint.g, tint.b), self._z_extent)
+        return march_look(composite.emission, composite.opacity, composite.fog, (tint.r, tint.g, tint.b), self._z_extent,
+                          composite.clear_below)
 
     def _update_light(self) -> None:
         """The light this step, for the composite: the light grid, the caustic net and the light per layer."""

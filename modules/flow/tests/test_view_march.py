@@ -5,7 +5,7 @@ color times `emission`, whatever the layers and the box's depth."""
 import math
 import unittest
 
-from modules.flow.fluid_3d.shaders import LUMINANCE, fog_extinction, march_look
+from modules.flow.fluid_3d.shaders import LUMINANCE, fog_extinction, march_look, transfer
 
 
 def through_slab(absorption: float, emission: float, thickness: float, depth: float, layers: int) -> tuple[float, float]:
@@ -44,6 +44,19 @@ class MarchLookTest(unittest.TestCase):
         self.assertAlmostEqual(sum(w * k for w, k in zip(LUMINANCE, kept)), 0.5)      # half as bright
         self.assertLess(kept[0], kept[1])                                               # red taken out first
         self.assertLess(kept[1], kept[2])
+
+
+class TransferTest(unittest.TestCase):
+    def test_thin_dye_fades_softly_thick_dye_stays(self) -> None:
+        self.assertEqual(transfer(0.0, 0.1), 0.0)
+        self.assertEqual(transfer(0.1, 0.1), 1.0)
+        self.assertEqual(transfer(0.5, 0.1), 1.0)
+        self.assertAlmostEqual(transfer(0.05, 0.1), 0.5)
+        shares = [transfer(a / 100.0, 0.1) for a in range(11)]
+        self.assertEqual(shares, sorted(shares))
+
+    def test_off_shows_all(self) -> None:
+        self.assertEqual(transfer(0.001, 0.0), 1.0)
 
 
 if __name__ == '__main__':

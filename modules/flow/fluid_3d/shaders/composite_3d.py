@@ -49,14 +49,26 @@ class MarchLook:
     emission: float                                 # the glow of thick density, 1 = its own color
     absorption: float                               # the density's extinction of an amount of 1 over the view
     fog: tuple[float, float, float]                 # the water's extinction over the view, per channel
+    clear_below: float = 0.0                        # the dye below which a sample fades softly to clear; 0 off
 
 
-def march_look(emission: float, opacity: float, fog: float, tint: tuple[float, float, float], depth: float) -> MarchLook:
+def march_look(emission: float, opacity: float, fog: float, tint: tuple[float, float, float], depth: float,
+               clear_below: float = 0.0) -> MarchLook:
     """The march's terms from the panel's, the box `depth` widths deep: thick density glows at its color times
-    `emission`, `opacity` its half-thickness and `fog` the water's half-distance, both in widths."""
+    `emission`, `opacity` its half-thickness and `fog` the water's half-distance, both in widths; dye under
+    `clear_below` (0 to 1) shows less, by `transfer`."""
     absorption: float = half_extinction(opacity) * depth
     water = fog_extinction(fog, tint)
-    return MarchLook(emission, absorption, (water[0] * depth, water[1] * depth, water[2] * depth))
+    return MarchLook(emission, absorption, (water[0] * depth, water[1] * depth, water[2] * depth), clear_below)
+
+
+def transfer(amount: float, clear_below: float) -> float:
+    """The share of a sample's dye the march shows, the transfer curve: smoothstep(0, `clear_below`, amount), 1 at
+    and above it, 1 everywhere with 0 off. Mirrors composite_3d.comp's."""
+    if clear_below <= 0.0:
+        return 1.0
+    x: float = min(max(amount / clear_below, 0.0), 1.0)
+    return x * x * (3.0 - 2.0 * x)
 
 
 @dataclass
@@ -147,6 +159,7 @@ class Composite3D(ComputeShader):
         glUniform1f(self.get_uniform_loc("uEmission"), look.emission)
         glUniform1f(self.get_uniform_loc("uAbsorption"), look.absorption)
         glUniform3f(self.get_uniform_loc("uFog"), *look.fog)
+        glUniform1f(self.get_uniform_loc("uClearBelow"), look.clear_below)
         glUniform1i(self.get_uniform_loc("uSplit"), int(color is not None))
         if color is not None:
             self.bind_texture_3d(1, color, "uColor")

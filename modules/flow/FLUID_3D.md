@@ -654,6 +654,14 @@ How the density is drawn, using the depth the coarse fluid already simulates (it
 is set in widths: `composite.opacity` and `fog` are the distances that hide half and dim half, and the
 monitor's `scale` 1 shows a full value for the density and the temperature as for a velocity of 1 width/s.
 
+The transfer curve, `composite.clear_below` (dye 0 to 1, 0 off): each sample of the march shows its dye and
+its amount times smoothstep(0, `clear_below`, amount) (`composite_3d.comp`, `transfer` in `composite_3d.py`),
+so dye thinning under it fades softly out of sight, with the evaporation's saturating loss
+([The fade and the evaporation](#the-fade-and-the-evaporation)) the way the dye leaves. It works per sample,
+not on the composited image, so thin dye fades wherever it lies in depth while thick dye in front still covers;
+the fluid's own amount is untouched, so the buoyancy reads the real one. The particles' march does not take
+it.
+
 A sun in water, dye in it lit from above: a sun a little right and behind (`light.x` 0.2, `light.y` −1,
 `light.z` 0.3) at `light.intensity` 18, nearly opaque dye (`opacity` 0.029 widths)
 with a faint glow (`emission` 0.1), the water turning blue with depth and dark below (`tint` 0.58, 0.84, 1,

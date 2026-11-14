@@ -5,6 +5,8 @@
  * volume into a 2D image, one step per layer.
  *
  * Per ray step (front -> back, trilinear reads):
+ *   transfer     with uClearBelow, a sample's dye and amount × smoothstep(0, uClearBelow, amount): thin dye
+ *                fades softly to clear in the look alone
  *   occlusion    Beer-Lambert extinction; near density covers far density
  *   fog          the water's extinction per channel: far density fades, toward the water's color
  *   glow         each layer's own light, its color × uEmission × the share of the layer's light that is the
@@ -45,6 +47,7 @@ uniform bool  uSplit;        // the amount from uDensity, its color from uColor 
 uniform bool  uLit;          // the density lit by uDirect
 uniform bool  uHasRays;      // the water's light added from uRays
 uniform float uIntensity;    // the light on thick density at full light, 1 = its own color
+uniform float uClearBelow;   // the dye below which a sample fades softly to clear, the transfer curve; 0 off
 
 void main() {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
@@ -72,6 +75,11 @@ void main() {
 
         vec3 dye = max(s.rgb, vec3(0.0));
         float d = max(s.a, 0.0);          // the amount: the same amount covers the same, whatever its color
+        if (uClearBelow > 0.0) {          // the transfer curve: thin dye shown less, the fluid's own amount untouched
+            float shown = smoothstep(0.0, uClearBelow, d);
+            dye *= shown;
+            d *= shown;
+        }
         vec3 taken = sigma * d + fog_s;
         vec3 through = exp(-taken);
         // the density's light per unit of its amount: its share of what the layer takes out, over the amount
