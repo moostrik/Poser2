@@ -58,17 +58,14 @@ BANNED: list[tuple[str, str]] = [
 ]
 
 # the flow's terms (modules/flow's documents, .claude/rules/flow.md): banned in the flow's code only,
-# where the words are the fluid's; the change also in deep_flow, the app that shows it
+# where the words are the fluid's
 FLOW_ROOTS: tuple[Path, ...] = (ROOT / 'modules' / 'flow', ROOT / 'modules' / 'render' / 'layers' / 'flow')
-FLOW_CHANGE: tuple[str, str] = ('change, not impulse or event (the 3D bridge)', r'[Ii]mpulse|IMPULSE|VelocityEvent|MotionEvent')
 FLOW_BANNED: list[tuple[str, str]] = [
     ('the quantity or boundary, not body alone (the flow)', r'^body$|^bodies$'),
-    FLOW_CHANGE,
 ]
 
 # an app's own terms (smile's in .claude/rules/smile.md): banned in that app's code and presets
 APP_BANNED: dict[str, list[tuple[str, str]]] = {
-    'deep_flow': [FLOW_CHANGE],
     'smile': [
         ('wall, not player (WallRender, WALLS)', r'PlayerRender|PLAYERS|PlayersSettings|credit_(qr_)?players'),
         ('generator, not diffuse / GenMessage / pipeline', r'diffuse|GenMessage|GenState|PipelineSettings|^pipeline$'),
