@@ -78,9 +78,10 @@ and it stays 0 until the first read after it is turned on.
 
 - The bridge counts them (deep_flow's one camera): the monitor's counter, `HistogramCount`, its own instance and
   bins, on the same grid of samples (at most 512 a side), gains a speed mode: the vector's length into log bins,
-  256 from 0.01 to 100 widths/s, each 3.7% wider than the one before, so a slow and a fast body read alike
-  closely. Below the first bin's edge is still, the bridge's own floor, not counted. Above 100 counts in the
-  last bin, and `speed` shows it as at least 100. The bins add up over the second between two reads, so what is
+  256 from 0.01 to 10 widths/s, each 2.7% wider than the one before, so a slow and a fast body read alike
+  closely; the fastest body measured is about 3 widths/s (the velocity's dampen). Below the first bin's edge is
+  still, the bridge's own floor, not counted. Above 10 counts in the last bin, and `speed` shows it as at least
+  10, a sign of something wrong (z noise, a bad frame). The bins add up over the second between two reads, so what is
   read is that second's percentile, held by itself.
 - The read: the bins copied into one of two pixel buffers behind a fence, read once the GPU has passed it, as
   `screen_capture.py` reads its frames; nothing waits. The percentile from the bins on the CPU, written to
