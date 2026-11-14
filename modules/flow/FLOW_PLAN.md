@@ -87,11 +87,12 @@ gravity) weighs dyed water wherever it is, with `buoyancy` 0, in the same pass, 
 What the body's speed reaches, to set the gains by: in the bridge's `boundary.velocity` group a group `peak`,
 `enabled` (off by default) and `velocity` (`Field.READ`, widths/s), the 99th percentile of the boundary
 velocity's speed over the pixels where the player is (the mask), held at its highest over the last second; with
-several cameras on one panel, the highest of them. Off, nothing runs. On, one pass over the output bins the
-speeds into a histogram in a buffer (atomic counts, a log scale of bins); the counts come back about once a
-second from two buffers without waiting, as the finite guard's do, and the 99th percentile is read from them on
-the CPU. Its cost, about 0.05 ms **(deduction)**, measured as it lands. Checked by a unit test of the percentile
-from the bins against numpy's on the same speeds; one commit.
+several cameras on one panel, the highest of them. Off, nothing runs. On, the bridge counts the speeds with the
+monitor's counter, `HistogramCount`, its own instance and bins, on the same grid of samples (at most 512 a side),
+the counter gaining the speed (the vector's length) and an optional mask; the bins come back about once a second
+from two buffers without waiting, as the finite guard's do, and the 99th percentile is read from them on the CPU.
+One count pass, no draw; its cost measured as it lands. Checked by a unit test of the percentile from the bins
+against numpy's on the same speeds; one commit.
 
 ### Details
 
