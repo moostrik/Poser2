@@ -2,6 +2,6 @@
 
 from .tracker_compositor import TrackerCompositor, TrackerCompositorSettings
 from .tracklet_renderer import  TrackletRenderer
-from .panoramic import          Compositor, PanoramaLayerSettings, PanoramaBlend, Part, \
+from .panoramic import          PanoramaCompositor,PanoramaLayerSettings, PanoramaBlend, Part, \
                                 GridRenderer, LabelRenderer, MarkRenderer, SeamRenderer, \
                                 StitchRenderer, Mark, MarkContext, build_marks, strip_spans

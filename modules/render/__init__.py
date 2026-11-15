@@ -11,7 +11,7 @@ from .modules.pose import       DataLayerSettings, ScalarFeatureSelect, LayerMod
                                 SimilaritySilhouetteLayer, SimilaritySilhouetteLayerSettings, PosePointLines
 from .modules.camera import     CameraImageLayer, CameraReadingsLayer
 from .modules.tracker import    TrackerCompositor, TrackerCompositorSettings, TrackletRenderer, \
-                                Compositor, PanoramaLayerSettings, PanoramaBlend, Part, \
+                                PanoramaCompositor, PanoramaLayerSettings, PanoramaBlend, Part, \
                                 GridRenderer, LabelRenderer, MarkRenderer, SeamRenderer, \
                                 StitchRenderer, Mark, MarkContext, build_marks, strip_spans
 from .modules.inference import  CropLayer, CropLayerSettings, CropImageLayer, SegmentationMaskLayer, SegmentationForegroundLayer, \

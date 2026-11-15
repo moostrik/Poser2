@@ -26,7 +26,7 @@ class PanoramaBoard(HasTracklets, HasObservations, Protocol):
     """The slice of the board this needs: the fused primaries and the raw observations."""
 
 
-class Compositor(LayerBase):
+class PanoramaCompositor(LayerBase):
     """The 360-degree calibration display: one strip, one FBO, five renderers in a fixed order.
 
     x is centre azimuth, linear in degrees, 0 at the left edge; y is the tangent of centre elevation

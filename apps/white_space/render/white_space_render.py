@@ -107,7 +107,7 @@ class WhiteSpaceRender(RenderBase):
         # Rows 2–4 — shared panoramic layers; constructed after cam layers so textures are ready.
         # The calibration strip owns row 2 by itself: it consumes all four camera images at once and
         # draws the tracker's own view of the same people over them, on one vertical scale.
-        self.L[Layers.cam_panorama][0] = render.Compositor(
+        self.L[Layers.cam_panorama][0] = render.PanoramaCompositor(
             board,
             [self.L[Layers.cam_image][i].texture for i in range(self.num_cams)],
             self.num_cams, settings.colors, tracker, settings.panorama,
@@ -184,7 +184,7 @@ class WhiteSpaceRender(RenderBase):
         actually fill, both measured at the rig center. It is not a preference: `tilt`, `fov` and
         `focus_radius` all move it, and the compositor is the only thing that knows how.
         """
-        panorama: render.Compositor = cast(render.Compositor, self.L[Layers.cam_panorama][0])
+        panorama: render.PanoramaCompositor = cast(render.PanoramaCompositor,self.L[Layers.cam_panorama][0])
         return render.SubdivisionRow(name='panoramic', columns=1, rows=1,
                               src_aspect_ratio=panorama.aspect_ratio,
                               padding=Point2f(0.0, 1.0))

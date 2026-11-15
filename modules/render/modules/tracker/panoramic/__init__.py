@@ -1,5 +1,5 @@
 from .settings import            PanoramaLayerSettings, PanoramaBlend, Part
-from .compositor import          Compositor
+from .panorama_compositor import PanoramaCompositor
 from .grid_renderer import       GridRenderer
 from .label_renderer import      LabelRenderer
 from .mark_renderer import       MarkRenderer
