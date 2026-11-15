@@ -12,7 +12,7 @@ paths:
 - All OpenGL calls execute on the render thread
 - Create textures, FBOs and shaders at setup or on a resize, not per frame
 - Pair every creation with its destruction
-- Set the GL state a draw needs where it draws (blend, depth, viewport)
+- Set the GL state a draw needs where it draws, through `gl.Context`; it skips what is already set
 - Prefer not to read back from the GPU or wait on it inside a frame
 - Prefer as few GL calls and state switches as possible
 - Name a shader's `.frag`/`.vert`/`.comp` source after the `.py` file that holds its class, beside it; the loader resolves it by that module name

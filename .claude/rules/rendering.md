@@ -16,7 +16,6 @@ paths:
 - A category holds packages
 - A package is named after its subject: a module (`modules/pose/`), a kind of work (`general/composite/`), a shared thing
 - A package holds its layers, and the shaders of those layers in `shaders/`
-- A shader that no layer owns sits in `modules/gl/shaders/`
 - A layer's class is named after what it draws, then its kind (`TrackletRenderer`, `PoseCompositor`)
 
 ## Layers
