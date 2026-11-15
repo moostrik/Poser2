@@ -33,8 +33,8 @@ distinct.
 ## A. deep_flow's chain, panels and display
 
 deep_flow's chain, its panels and what it shows made simple: the stages capture, view, motion, bridge and fluid,
-each one panel and one monitor; what is shown is a stage's monitor, the fluid's look, the composite, the camera
-previews or the data. What the code shows now (`apps/deep_flow/render/deep_flow_render.py`,
+each one panel and one monitor, and the pose beside them with a monitor of its own; what is shown is a monitor,
+the fluid's look or the composite. What the code shows now (`apps/deep_flow/render/deep_flow_render.py`,
 `apps/deep_flow/settings.py`):
 - the chain is declared four times, each list with its own order and members: `UPDATE_LAYERS` (the update's
   order, `color_mask`, the show's, between the foreground look and the motion), `CAPTURE_LAYERS` (run once per
@@ -70,12 +70,19 @@ without unknown keys. The stages may later move into `modules/flow` (Parked); th
   `render/shared/foreground_look/`, the rule's place for what two apps use.
 - **A3.** A monitor per stage: each stage holds its monitor, its port and draw mode in the stage's panel;
   `monitor_a` and `monitor_b`, the wrapper layers and `view_depth` go, the monitor drawing a depth by
-  `view_depth`'s colormaps; `color_mask` leaves deep_flow (it stays in `render` for the other apps). `Layers`
-  holds the stages' monitors, the fluid's look, the composite, the camera previews (`tracker`, `pose`), the pose
-  overlay and the data plots. The motion reads the view's `image`; `inputs.motion_image` goes.
-- **A4.** The panel tree in the chain's order: `capture`, `view` (the color and the pose overlay in it), `motion`,
-  `bridge`, `fluid`, `composite`; the app's wiring (`inputs`, `stage`) and the display (`layer`, `data`,
-  `preview`, `time_series`, `colors`) apart. The settings two stages read declared once on their parent and
+  `view_depth`'s colormaps; `color_mask` leaves deep_flow (it stays in `render` for the other apps). Each stage's
+  monitor shows all its FBOs, as the motion's, the bridge's and the fluid's do now; the capture's are its image
+  and depth. The motion reads the view's `image`; `inputs.motion_image` goes, and with it `inputs` and `stage`:
+  `scale_by_motion` goes, every injection at full weight (the pose is linked to the fluid later, another way).
+- **A4.** The pose monitor: the pose is a branch beside the chain (a `Frame` per player, made by the pose
+  pipeline, handed on with the capture; the view only places its points), so its monitor draws data, not FBOs,
+  in the stage monitors' shape: the pose stage it reads (raw, clean, smooth, lerp), what it draws (the skeleton
+  on the view, on the crop, or on the camera image with its boxes; the features as a window or a frame; the time
+  series) and its draw settings. It replaces `tracker`, `pose`, `view_pose`, `data_A_W`, `data_A_F`,
+  `data_B_W`, `data_B_F`, `data_time` and `time_series`. `Layers` then holds the stages' monitors, the pose
+  monitor, the fluid's look and the composite.
+- **A5.** The panel tree in the chain's order: `capture`, `view` (the color in it), `pose`, `motion`, `bridge`,
+  `fluid`, `composite`; the display (`layer`, `colors`) apart. The settings two stages read declared once on their parent and
   shared to both: the depth tolerance (the view's read, the motion's z) and the view's size (the motion's).
 
 ## B. The camera and the view
@@ -260,10 +267,11 @@ Not worked on until asked for; each with what is known.
 
 ## Rules it touches
 
-- Keep presets and settings schemas in sync: the view's color, the stages' monitors, the panel tree, A2 to A4.
-- Remove obsolete pathways: the four lists, the wrapper layers, `view_depth`, `monitor_a` and `monitor_b`, A1, A3.
+- Keep presets and settings schemas in sync: the view's color, the monitors, the panel tree, A2 to A5.
+- Remove obsolete pathways: the four lists, the wrapper layers, `view_depth`, `monitor_a`, `monitor_b`,
+  `inputs`, `stage` and the pose's layers, A1, A3, A4.
 - `shared` holds the layers that are not general and that more than one app uses: `ForegroundLook`, A2.
-- Settings connect the user and a component, not two components: the view's tolerance and size, A4.
+- Settings connect the user and a component, not two components: the view's tolerance and size, A5.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, B1.
 - A `Field` description is one short line of panel text: J1.
