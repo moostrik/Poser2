@@ -32,63 +32,35 @@ distinct.
 
 ## A. deep_flow's chain, panels and display
 
-deep_flow's chain, its panels and what it shows made simple: the stages capture, view, motion, bridge and fluid,
-each one panel and one monitor, and the pose beside them with a monitor of its own; what is shown is a monitor,
-the time series or the fluid's look. What the code shows now (`apps/deep_flow/render/deep_flow_render.py`,
-`apps/deep_flow/settings.py`):
-- the chain is declared four times, each list with its own order and members: `UPDATE_LAYERS` (the update's
-  order, `color_mask`, the show's, between the foreground look and the motion), `CAPTURE_LAYERS` (run once per
-  capture), `VIEW_LAYERS` (allocated at the view's size) and `SHAPE_LAYERS` (each panel's shape);
-- `Layers` is one flat enum of sources (`cam_image`, `capture_image`, `capture_depth`), stages (`view`,
-  `motion`), a stage's outputs (`view_image`, `view_foreground`, `view_mask`, `view_depth_mask`) and display
-  layers (`view_depth`, `view_pose`, `tracker`, `pose`);
-- the panels are one flat list in `RenderSettings`, not in the chain's order;
-- the view reads the motion's `motion.z.tolerance`, and its size is the motion's `width` and `height`;
-- `inputs` (the motion's picture, the bridge's color, the injections' weight) and `stage` (the pose stage the
-  weight reads) are the app's wiring, among the stages;
-- `ForegroundLookLayer` sits in `render/modules/inference`, but styles the view's foreground, a stage of its own
-  between the view and the bridge; hd_trio's `CenterForegroundLayer` runs the same `ForegroundLook`, so it is
-  not general and two apps use it;
-- a stage's data is shown three ways: as layers (`view_image`, `view_foreground`, `view_mask`,
-  `view_depth_mask` wrap the view's outputs; `motion`, `bridge` and `fluid` draw their own), as display layers
-  with settings of their own (`view_depth`, its colormap), and through `monitor_a` and `monitor_b`, which show
-  any stage's port; the view's depth is drawn both by `view_depth` and by a monitor, each with its own colormap;
-- a monitor holds a stage and a port's name, so switching its stage loses the port;
-- `color_mask` (`SimilaritySilhouetteLayer`) weighs the players' silhouettes by their similarity across
-  cameras; deep_flow has one camera and one player, and its preset's output does not take it.
+**What:** five stages, capture, view, motion, bridge and fluid, each one panel and one monitor; the pose beside
+them with a monitor of its own. What is shown is a monitor, the time series or the fluid's look.
 
-Each item is one commit, the preset restructured with the item that moves a setting, checked by the guard
-tests, the render's tests and one -sim start of deep_flow: the panels in their new place, the preset loaded
-without unknown keys. The stages may later move into `modules/flow` (Parked); the panels then follow them.
+**Why:** in `apps/deep_flow/render/deep_flow_render.py` the chain is declared four times (`UPDATE_LAYERS`,
+`CAPTURE_LAYERS`, `VIEW_LAYERS`, `SHAPE_LAYERS`); `Layers` mixes sources, stages, a stage's outputs and display
+layers; a stage's data is shown three ways (wrapper layers, display layers such as `view_depth`, and
+`monitor_a`/`monitor_b`, which lose their port when their stage changes); the panels are one flat list.
 
-- **A1.** One declaration of the chain in the renderer: the stages capture, view, motion, bridge, fluid, each with
-  its layer, the outputs it hands on and its monitor, in the chain's order; the update order, the per-capture
-  run, the view-sized allocation and the panels' shapes read it, in place of the four lists.
-- **A2.** The color in the view: `ForegroundLook` runs as the view's last pass, its result the view's `color`, a
-  port and the bridge's color; its settings in the view's panel, with `enabled`: off, `color` is the foreground
-  as it is, the choice `inputs.bridge_image` makes now, which goes. `ForegroundLook` and its layer go to
-  `render/shared/foreground_look/`, the rule's place for what two apps use.
-- **A3.** A monitor per stage: each stage holds its monitor, its port and draw mode in the stage's panel;
-  `monitor_a` and `monitor_b`, the wrapper layers and `view_depth` go, the monitor drawing a depth by
-  `view_depth`'s colormaps; `color_mask` leaves deep_flow (it stays in `render` for the other apps). Each stage's
-  monitor shows all its FBOs, as the motion's, the bridge's and the fluid's do now; the capture's are its image
-  and depth. The motion reads the view's `image`; `inputs.motion_image` goes, and with it `inputs` and `stage`:
-  `scale_by_motion` goes, every injection at full weight (the pose is linked to the fluid later, another way).
-- **A4.** The pose monitor: the pose is a branch beside the chain (a `Frame` per player, made by the pose
-  pipeline, handed on with the capture; the view only places its points), so its monitor draws data, not FBOs,
-  in the stage monitors' shape: the pose stage it reads (raw, clean, smooth, lerp), where it draws the pose (on
-  the crop, with the crop's image; on the camera's frame, with its boxes and no image; on the view, no image),
-  an optional overlay of the features (the current frame's or the window's) and its draw settings. Without an
-  image it lies over any layer of its frame. It replaces `tracker`, `pose`, `view_pose`, `data_A_W`,
-  `data_A_F`, `data_B_W`, `data_B_F` and `data_time`. `time_series` stays a layer of its own: it draws the
-  board's timings (camera interval, latencies, GPU times, waits), not the pose. `Layers` then holds the stages'
-  monitors, the pose monitor, the time series and the fluid's look. The composite goes from deep_flow: it mixes
-  the `output` layers and grades them with a LUT, and in deep_flow it is the LUT over the fluid; the LUT becomes
-  an option of the fluid's look, and the show draws the `output` layers in order, as a panel does.
-  `LayerCompositor` stays in `render/general` for hd_trio.
-- **A5.** The panel tree in the chain's order: `capture`, `view` (the color in it), `pose`, `motion`, `bridge`,
-  `fluid` (its LUT in it); the display (`layer`, `colors`) apart. The settings two stages read declared once on their parent and
-  shared to both: the depth tolerance (the view's read, the motion's z) and the view's size (the motion's).
+**How:** one commit per step, the preset with it, checked by the guard tests, the render's tests and one -sim
+start (the panels in place, the preset loaded without unknown keys).
+
+- **A1.** One declaration of the chain in the renderer, in place of the four lists: each stage with its layer,
+  its outputs and its monitor, in order.
+- **A2.** The color into the view: `ForegroundLook` as the view's last pass, its output `color`, which the bridge
+  reads; `enabled` off passes the foreground as it is. `inputs.bridge_image` goes. `ForegroundLook` moves to
+  `render/shared/foreground_look/`, since hd_trio uses it too.
+- **A3.** A monitor per stage, in the stage's panel, showing all its FBOs (the capture's: image and depth).
+  `monitor_a`, `monitor_b`, the view's wrapper layers and `view_depth` go; the monitor gets `view_depth`'s depth
+  colormaps. `color_mask`, `inputs` and `stage` leave deep_flow: the motion reads the view's `image`, and every
+  injection is at full weight.
+- **A4.** A pose monitor: the pose stage it reads (raw, clean, smooth, lerp); the pose drawn on the crop with its
+  image, on the camera's frame with its boxes, or on the view, the last two without an image so they lie over
+  any layer of that frame; the features of the frame or the window as an optional overlay. It replaces
+  `tracker`, `pose`, `view_pose` and the four `data_*` layers; `data_time` goes; `time_series` stays a layer.
+- **A5.** The composite leaves deep_flow: the LUT becomes an option of the fluid's look, and the show draws the
+  `output` layers in order. `LayerCompositor` stays in `render/general` for hd_trio.
+- **A6.** The panel tree in the chain's order: `capture`, `view`, `pose`, `motion`, `bridge`, `fluid`; the display
+  (`layer`, `colors`) apart. The depth tolerance and the view's size declared once, shared to the view and the
+  motion.
 
 ## B. The camera and the view
 
@@ -240,7 +212,7 @@ Not worked on until asked for; each with what is known.
   ports, is the render's. Each stage subclasses the render's `LayerBase` to sit in its update loop, and modules
   may not import the render, so the stages could not live in the flow **(deduction)**. The textbook split: each
   stage a plain flow class as `Fluid3D` is, with its settings, ports, inputs and outputs, and a thin render layer
-  per stage that calls it, beside the monitor. A2's panels follow wherever the stages end up.
+  per stage that calls it, beside the monitor. A6's panels follow wherever the stages end up.
 
 - The 4K upscale: depth in 3D at the grid and detail in 2D at 4K, a march at the grid's size, one
   edge-aware upscale of the flat result and a 4K detail layer advected by the grid's velocity; what
@@ -272,11 +244,11 @@ Not worked on until asked for; each with what is known.
 
 ## Rules it touches
 
-- Keep presets and settings schemas in sync: the view's color, the monitors, the panel tree, A2 to A5.
+- Keep presets and settings schemas in sync: the view's color, the monitors, the panel tree, A2 to A6.
 - Remove obsolete pathways: the four lists, the wrapper layers, `view_depth`, `monitor_a`, `monitor_b`,
-  `inputs`, `stage`, the pose's layers and deep_flow's composite, A1, A3, A4.
+  `inputs`, `stage`, the pose's layers and deep_flow's composite, A1, A3 to A5.
 - `shared` holds the layers that are not general and that more than one app uses: `ForegroundLook`, A2.
-- Settings connect the user and a component, not two components: the view's tolerance and size, A5.
+- Settings connect the user and a component, not two components: the view's tolerance and size, A6.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, B1.
 - A `Field` description is one short line of panel text: J1.
