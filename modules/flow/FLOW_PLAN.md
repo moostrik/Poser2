@@ -34,7 +34,7 @@ distinct.
 
 deep_flow's chain, its panels and what it shows made simple: the stages capture, view, motion, bridge and fluid,
 each one panel and one monitor, and the pose beside them with a monitor of its own; what is shown is a monitor,
-the fluid's look or the composite. What the code shows now (`apps/deep_flow/render/deep_flow_render.py`,
+the time series or the fluid's look. What the code shows now (`apps/deep_flow/render/deep_flow_render.py`,
 `apps/deep_flow/settings.py`):
 - the chain is declared four times, each list with its own order and members: `UPDATE_LAYERS` (the update's
   order, `color_mask`, the show's, between the foreground look and the motion), `CAPTURE_LAYERS` (run once per
@@ -82,9 +82,12 @@ without unknown keys. The stages may later move into `modules/flow` (Parked); th
   image it lies over any layer of its frame. It replaces `tracker`, `pose`, `view_pose`, `data_A_W`,
   `data_A_F`, `data_B_W`, `data_B_F` and `data_time`. `time_series` stays a layer of its own: it draws the
   board's timings (camera interval, latencies, GPU times, waits), not the pose. `Layers` then holds the stages'
-  monitors, the pose monitor, the time series, the fluid's look and the composite.
+  monitors, the pose monitor, the time series and the fluid's look. The composite goes from deep_flow: it mixes
+  the `output` layers and grades them with a LUT, and in deep_flow it is the LUT over the fluid; the LUT becomes
+  an option of the fluid's look, and the show draws the `output` layers in order, as a panel does.
+  `LayerCompositor` stays in `render/general` for hd_trio.
 - **A5.** The panel tree in the chain's order: `capture`, `view` (the color in it), `pose`, `motion`, `bridge`,
-  `fluid`, `composite`; the display (`layer`, `colors`) apart. The settings two stages read declared once on their parent and
+  `fluid` (its LUT in it); the display (`layer`, `colors`) apart. The settings two stages read declared once on their parent and
   shared to both: the depth tolerance (the view's read, the motion's z) and the view's size (the motion's).
 
 ## B. The camera and the view
@@ -271,7 +274,7 @@ Not worked on until asked for; each with what is known.
 
 - Keep presets and settings schemas in sync: the view's color, the monitors, the panel tree, A2 to A5.
 - Remove obsolete pathways: the four lists, the wrapper layers, `view_depth`, `monitor_a`, `monitor_b`,
-  `inputs`, `stage` and the pose's layers, A1, A3, A4.
+  `inputs`, `stage`, the pose's layers and deep_flow's composite, A1, A3, A4.
 - `shared` holds the layers that are not general and that more than one app uses: `ForegroundLook`, A2.
 - Settings connect the user and a component, not two components: the view's tolerance and size, A5.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
