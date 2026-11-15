@@ -5,7 +5,7 @@ Every quantity and setting here is in a meaningful unit ([FLOW.md](FLOW.md#the-2
 The motion stage measures a velocity field from two camera frames, the optical flow: x and y on the
 image plane by a Lucas–Kanade solve, and in the 3D flow z toward the camera by the depth velocity.
 How the stages fit together is in [FLOW.md](FLOW.md); what is next, the motion's included, in
-[FLOW_PLAN.md](FLOW_PLAN.md#b-the-motion). "Code" is what the files show; **(deduction)** marks what is inferred
+[FLOW_PLAN.md](FLOW_PLAN.md#c-the-motion). "Code" is what the files show; **(deduction)** marks what is inferred
 from them, **(site fact)** what the operator saw.
 
 The x/y solve is `LucasKanadeFlow` (`motion/lucas_kanade_flow.py`), z the depth velocity
@@ -125,7 +125,7 @@ knob on z's size; the depth velocity's settings set z's noise and lag, not its s
 - same_surface works only where a no-depth band separates the hand from what is behind it, as with a
   hand held far out. Where a limb is about 20 cm before the body, Neural Depth ramps over about 30 px
   instead of stepping, and the patch's samples stay within the tolerance; see
-  [FLOW_PLAN.md](FLOW_PLAN.md#b-the-motion). It costs +0.05 ms.
+  [FLOW_PLAN.md](FLOW_PLAN.md#c-the-motion). It costs +0.05 ms.
 
 ### depth_velocity (z)
 

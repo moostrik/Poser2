@@ -1,26 +1,28 @@
 # The flow's plan
 
-What is next for the flow, the one place that says it: the main lines (A to I), first along the flow's chain
-(camera and view, motion, bridge, the fluid's physics, its look), then those across the stages; each line's items
-in the order they are worked (A1, A2, ...); what is parked. A built item leaves the plan; the others keep their
-numbers. How each stage works is in its own document ([FLOW.md](FLOW.md) lists them); an item links to the
-section it changes. **(deduction)** marks what is inferred, **(site fact)** what the operator saw.
+What is next for the flow, the one place that says it: the main lines (A to J), first deep_flow's render up to
+the motion, then along the flow's chain (camera and view, motion, bridge, the fluid's physics, its look), then
+those across the stages; each line's items in the order they are worked (A1, A2, ...); what is parked. A built
+item leaves the plan; the others keep their numbers. How each stage works is in its own document
+([FLOW.md](FLOW.md) lists them); an item links to the section it changes. **(deduction)** marks what is
+inferred, **(site fact)** what the operator saw.
 
 ## Main lines
 
-| #   | Line                                                                      | State                                                         | Documents                                                    |
-|-----|---------------------------------------------------------------------------|---------------------------------------------------------------|--------------------------------------------------------------|
-| A   | [The camera and the view](#a-the-camera-and-the-view)                     | next: the render up to the motion; the depth read to choose   | [VIEW.md](VIEW.md)                                           |
-| B   | [The motion](#b-the-motion)                                               | built; its details open                                       | [MOTION.md](MOTION.md)                                       |
-| C   | [The bridge](#c-the-bridge)                                               | built; the dye's amount to judge                              | [BRIDGE_3D.md](BRIDGE_3D.md)                                 |
-| D   | [The 3D fluid's physics](#d-the-3d-fluids-physics)                        | open                                                          | [FLUID_3D.md](FLUID_3D.md)                                   |
-| E   | [The 3D fluid's look at 4K](#e-the-3d-fluids-look-at-4k)                  | open                                                          | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md)           |
-| F   | [The chain timed as one](#f-the-chain-timed-as-one)                       | built                                                         | [TIMING.md](TIMING.md)                                       |
-| G   | [One unit across the stages](#g-one-unit-across-the-stages)               | not started                                                   | [FLOW.md](FLOW.md)                                           |
-| H   | [The 2D flow follows the 3D](#h-the-2d-flow-follows-the-3d)               | not started                                                   | [FLOW.md](FLOW.md)                                           |
-| I   | [Every setting and its description](#i-every-setting-and-its-description) | last, after the refactor                                      | `CLAUDE.md`, `.claude/rules`                                 |
+| #   | Line                                                                         | State                            | Documents                                          |
+|-----|------------------------------------------------------------------------------|----------------------------------|----------------------------------------------------|
+| A   | [deep_flow's render up to the motion](#a-deep_flows-render-up-to-the-motion) | next                             | `apps/deep_flow`                                   |
+| B   | [The camera and the view](#b-the-camera-and-the-view)                        | built; the depth read to choose  | [VIEW.md](VIEW.md)                                 |
+| C   | [The motion](#c-the-motion)                                                  | built; its details open          | [MOTION.md](MOTION.md)                             |
+| D   | [The bridge](#d-the-bridge)                                                  | built; the dye's amount to judge | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
+| E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | open                             | [FLUID_3D.md](FLUID_3D.md)                         |
+| F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | open                             | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
+| G   | [The chain timed as one](#g-the-chain-timed-as-one)                          | built                            | [TIMING.md](TIMING.md)                             |
+| H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                      | [FLOW.md](FLOW.md)                                 |
+| I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | not started                      | [FLOW.md](FLOW.md)                                 |
+| J   | [Every setting and its description](#j-every-setting-and-its-description)    | last, after the refactor         | `CLAUDE.md`, `.claude/rules`                       |
 
-A5, C1 and C2 need the operator at the screen; the other lines go on meanwhile.
+B1, D1 and D2 need the operator at the screen; the other lines go on meanwhile.
 
 The apps on deep_flow's input have their own plan, [apps/APPS_PLAN.md](../../apps/APPS_PLAN.md); recording and
 -sim, deep_flow's live checks among them, theirs, [RECORDING_PLAN.md](../recording/RECORDING_PLAN.md).
@@ -28,13 +30,10 @@ The apps on deep_flow's input have their own plan, [apps/APPS_PLAN.md](../../app
 The 3D fluid's lines are weighed by [its goal](FLUID_3D.md#the-goal): sharp, translucent ink patterns, layers
 distinct.
 
-## A. The camera and the view
+## A. deep_flow's render up to the motion
 
-Built: every capture reaches the motion ([INPUT_THREADS.md](INPUT_THREADS.md)), the mask's edge on the image's
-and the depth read across a surface ([VIEW.md](VIEW.md)).
-
-First, deep_flow's render and panels up to the motion follow the chain: capture, view, foreground look, motion.
-What the code shows now (`apps/deep_flow/render/deep_flow_render.py`, `apps/deep_flow/settings.py`):
+deep_flow's render and panels up to the motion follow the chain: capture, view, foreground look, motion. What
+the code shows now (`apps/deep_flow/render/deep_flow_render.py`, `apps/deep_flow/settings.py`):
 - the chain is declared four times, each list with its own order and members: `UPDATE_LAYERS` (the update's
   order, `color_mask`, the show's, between the foreground look and the motion), `CAPTURE_LAYERS` (run once per
   capture), `VIEW_LAYERS` (allocated at the view's size) and `SHAPE_LAYERS` (each panel's shape);
@@ -48,10 +47,9 @@ What the code shows now (`apps/deep_flow/render/deep_flow_render.py`, `apps/deep
 - `ForegroundLookLayer` sits in `render/modules/inference`, but styles the view's foreground; hd_trio's
   `CenterForegroundLayer` runs the same `ForegroundLook`, so it is not general and two apps use it.
 
-Each of A1 to A4 is one commit, the preset restructured with the item that moves a setting, checked by the
-guard tests, the render's tests and one -sim start of deep_flow: the panels in their new place, the preset
-loaded without unknown keys. The stages may later move into `modules/flow` (Parked); the panels then follow
-them.
+Each item is one commit, the preset restructured with the item that moves a setting, checked by the guard
+tests, the render's tests and one -sim start of deep_flow: the panels in their new place, the preset loaded
+without unknown keys. The stages may later move into `modules/flow` (Parked); the panels then follow them.
 
 - **A1.** One declaration of the chain in the renderer: each stage with its layers, the outputs it hands on and
   its display layers, in the chain's order; the update order, the per-capture run, the view-sized allocation and
@@ -64,13 +62,19 @@ them.
   (the view's read, the motion's z) and the view's size (the motion's).
 - **A4.** `ForegroundLook` and its layer to `render/shared/foreground_look/`, the rule's place for a layer that is
   not general and that two apps use.
-- **A5.** The depth read: `view.depth_read` holds `SURFACE` and `MASK` ([VIEW.md](VIEW.md#the-depth-read)). One
+
+## B. The camera and the view
+
+Built: every capture reaches the motion ([INPUT_THREADS.md](INPUT_THREADS.md)), the mask's edge on the image's
+and the depth read across a surface ([VIEW.md](VIEW.md)).
+
+- **B1.** The depth read: `view.depth_read` holds `SURFACE` and `MASK` ([VIEW.md](VIEW.md#the-depth-read)). One
   stays, chosen together by eye on the edges recording; the other goes.
-- **A6.** A camera without depth, its mask from another source: deep_flow's mask is the depth's
+- **B2.** A camera without depth, its mask from another source: deep_flow's mask is the depth's
   ([VIEW.md](VIEW.md#the-mask-and-the-depth-mask)); a mask from RVM, for a camera without depth, would come back
   from hd_trio. With it the motion's `depth_mask`, the depth's own cut that gates z, is still the view stage's,
   and RVM's mask, on the crop, would have to be cut into the view's window.
-- **A7.** A depth for a 2D camera: the 3D fluid puts a pixel in at its z position and nothing where it has none
+- **B3.** A depth for a 2D camera: the 3D fluid puts a pixel in at its z position and nothing where it has none
   ([FLUID_3D.md](FLUID_3D.md#the-bodys-depth)), so a 2D camera gives it nothing. A depth made from the image
   (a monocular depth model) on the view would give the motion its z and z position as a depth camera's does.
   A single-frame model (Depth Anything V2) is good on a frame but flickers frame to frame, which the depth
@@ -82,41 +86,41 @@ them.
 A finer depth would give the mask and z a finer edge at the source; the camera's sizes are a given
 ([RESOLUTION.md](RESOLUTION.md#the-rules)).
 
-## B. The motion
+## C. The motion
 
-- **B1.** The false z at a limb's edge: a limb moving sideways before the body reads false z at its edges: the
+- **C1.** The false z at a limb's edge: a limb moving sideways before the body reads false z at its edges: the
   leading edge carries 43% of a sweep's z, the trailing edge 12%. The cause is the depth's ramp at the limb's
   edge. The camera's temporal filter is off and its confidence does not sharpen the ramp. Accepted for now; the
   cue not yet tried is a forward-splat count of the x/y motion (0 = uncovered, above 1 = covered).
-- **B2.** The range: `edge`, `tolerance` and `dead_zone` are in metres and tuned at 0.65–1.5 m. Stereo noise
+- **C2.** The range: `edge`, `tolerance` and `dead_zone` are in metres and tuned at 0.65–1.5 m. Stereo noise
   grows with the square of the distance, so at 2–3.5 m they may need to be in disparity **(deduction)**. This
   needs a recording at that distance.
-- **B3.** The depth velocity's `track`: its memory is named `track` in the code (`DepthVelocity._track`, the
+- **C3.** The depth velocity's `track`: its memory is named `track` in the code (`DepthVelocity._track`, the
   monitor's `z.track`), a word that says nothing on its own; it holds the followed disparity, its rate and its
   anchor. To be renamed by what it holds, with the monitor's port.
-- **B4.** A soft limit on the z speed: a guard to try on the motion beside its finite guard
+- **C4.** A soft limit on the z speed: a guard to try on the motion beside its finite guard
   ([MOTION.md](MOTION.md#the-guard)): z as measured up to a knee (about 1.5 m/s), compressed above it toward a
   maximum (about 3 m/s), the speed gate (6 m/s) behind it; a curve per reading, no time filter, checked first
   against the spread of z speeds on a recording.
 
-## C. The bridge
+## D. The bridge
 
 Built: each output at its readings' depth ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)), the depth mask's
 share, the expansion, the boundary velocity's peak.
 
-- **C1.** The dye's amount weighed by the image's brightness: a dark pixel (a shadow, black clothes) brings its
+- **D1.** The dye's amount weighed by the image's brightness: a dark pixel (a shadow, black clothes) brings its
   full amount in a dark color, nearly black dye at full strength; weighed, a dark part brings less dye instead.
   Not designed; judged together by eye.
-- **C2.** z's share in the dye's amount: the amount is the length of x, y and z together, and z, the noisiest,
+- **D2.** z's share in the dye's amount: the amount is the length of x, y and z together, and z, the noisiest,
   adds dye where nothing moves sideways; a share for z in that length (0 sideways only, 1 as now). Not designed;
   judged together by eye.
-- **C3.** The body force's acceleration: tested, tweaked and made useful.
-- **C4.** The masking in the bridge: the mask gates the velocity in the motion (`use_mask`) and the density's
+- **D3.** The body force's acceleration: tested, tweaked and made useful.
+- **D4.** The masking in the bridge: the mask gates the velocity in the motion (`use_mask`) and the density's
   color in the bridge; in the bridge alone it is one gate in one stage.
 
-## D. The 3D fluid's physics
+## E. The 3D fluid's physics
 
-- **D1.** The temperature: whether it needs a field of its own. Buoyancy needs only a scalar the water is lighter
+- **E1.** The temperature: whether it needs a field of its own. Buoyancy needs only a scalar the water is lighter
   or heavier by: the density alone can be it (dyed water sinks), and the temperature adds currents apart from the
   dye (warm clear water rising), the textbook smoke's soot and heat. Off in the preset (`buoyancy` 0), and nothing
   is injected into it then.
@@ -129,61 +133,61 @@ share, the expansion, the boundary velocity's peak.
   gravity) weighs dyed water wherever it is, with `buoyancy` 0, in the same pass, its direction `gravity_x`,
   `_y`, `_z`. It sits in the temperature's panel though it is the density's weight: if the temperature goes,
   `sink` and the gravity move to a panel of their own or the density's.
-- **D2.** The velocity loses its energy faster than expected **(site fact)**, with the plain step on the velocity:
+- **E2.** The velocity loses its energy faster than expected **(site fact)**, with the plain step on the velocity:
   the plain step's own loss (a swirl keeps 52% of its speed in 2 s, MacCormack 62%), the drag now over the body's
   whole depth, or another cause; MacCormack with the clamp on the velocity is the first thing to try.
 
-## E. The 3D fluid's look at 4K
+## F. The 3D fluid's look at 4K
 
 Built: one density and its fine density ([FLUID_3D.md](FLUID_3D.md#the-density)), the saturating loss, the
 transfer curve.
 
-- **E1.** The transfer curve in the particles' march: their slices hold a sum of the grid's layers, so the curve
+- **F1.** The transfer curve in the particles' march: their slices hold a sum of the grid's layers, so the curve
   needs its point in that sum ([FLUID_3D.md](FLUID_3D.md#the-look)). Not designed yet.
-- **E2.** The particles: worked on, and how they combine with the fine density.
-- **E3.** The blobs' and the surface's p95: a sprite that grows to twice `radius` on a strong drop fills four
+- **F2.** The particles: worked on, and how they combine with the fine density.
+- **F3.** The blobs' and the surface's p95: a sprite that grows to twice `radius` on a strong drop fills four
   times the pixels. The cut at 2 sigma and the lower cap ([TIMING.md](TIMING.md#the-particles-1)) are the fix,
   judged on the look.
 
-## F. The chain timed as one
+## G. The chain timed as one
 
 The latency and the cadence, camera to render, and the input's GPU steps are measured
 ([INPUT_THREADS.md](INPUT_THREADS.md#the-cadence)); the view stage's passes on their own
 ([TIMING.md](TIMING.md#the-view)); each stage's GPU time in the app in [TIMING.md](TIMING.md#the-stages), on
 15 November, after the render and GL refactors, beside 7 November's.
 
-## G. One unit across the stages
+## H. One unit across the stages
 
-- **G1.** Every length in the flow is in widths: the motion's velocity (widths/s of the camera's image), the
+- **H1.** Every length in the flow is in widths: the motion's velocity (widths/s of the camera's image), the
   bridge's readings, the fluid's inputs (`spread`), its look (`opacity`, `fog`), the box's depth, the monitor's
   scale. In portrait the width is the smaller side; in landscape it is the longer, and the same settings would
   then mean less against what is seen. One unit across the stages, the smaller side, keeps a preset's look and
   feel when the box turns: in portrait nothing changes. It reaches past the fluid (the motion, the bridge, the
   monitor), so it is one rule for all of them, made where each length is made.
 
-## H. The 2D flow follows the 3D
+## I. The 2D flow follows the 3D
 
 The 2D system (`GradientFlow`, `bridge_2d`, `Fluid2D`, hd_trio) runs as on `main`
 ([FLOW.md's constraints](FLOW.md#constraints)). It follows the 3D's principles once the 3D is finished:
 
-- **H1.** The 2D fluid: it adds the injected velocity times dt (`Fluid2D.add_velocity`), as Stam's Stable Fluids
+- **I1.** The 2D fluid: it adds the injected velocity times dt (`Fluid2D.add_velocity`), as Stam's Stable Fluids
   adds a source; but the bridge's velocity is a velocity, in view widths per second like the
   fluid's, so it is taken as an acceleration, `velocity.gain` acts as a rate, and the fluid stays
   near 0.05 to 0.1 of the motion's speed **(deduction)**, a monitor needing a scale of 20 to 30 to
   show it. The 3D fluid takes the boundary by a drag and the body force's acceleration times dt
   ([FLUID_3D.md](FLUID_3D.md#the-inputs)); the 2D fluid is to follow it: the drag, the two systems,
   the one grid.
-- **H2.** The 2D motion on the Lucas–Kanade solve, in widths/s with its velocity gate, in place of `GradientFlow`.
-- **H3.** The 2D bridge rebuilt on the 3D bridge's filters, the three copied classes (`DensityBridge`,
+- **I2.** The 2D motion on the Lucas–Kanade solve, in widths/s with its velocity gate, in place of `GradientFlow`.
+- **I3.** The 2D bridge rebuilt on the 3D bridge's filters, the three copied classes (`DensityBridge`,
   `TemperatureBridge`, `VelocityMagnitude`) shared again.
-- **H4.** hd_trio's density fade from motion: its wiring pass writes `density.fade_time` every tick from the
+- **I4.** hd_trio's density fade from motion: its wiring pass writes `density.fade_time` every tick from the
   pose's motion, a settings field written per tick. A per-tick value on the fluid layer would take it off the
   settings.
 
 Each 2D stage gets its document as it is rebuilt (`BRIDGE_2D.md`, `FLUID_2D.md`); `fluid_2d.py`'s module
 docstring, a 21-line pipeline, goes with it.
 
-## I. Every setting and its description
+## J. Every setting and its description
 
 The flow's packages (`modules/flow`: `motion`, `view`, `bridge_2d`, `bridge_3d`, `fluid_2d`, `fluid_3d`,
 `visualization`, `shaders` and its files) and its layers (`modules/render/modules/flow`), 210 Python files, are
@@ -193,7 +197,7 @@ packages imported from their `__init__`, one `from` line a package, no `__all__`
 return hint; OpenGL imported by name, no `GL_TIMEOUT_IGNORED`. The flow runs on the render thread, so the
 concurrency rules touch none of it.
 
-- **I1.** Every setting and its description gone through, last, after the refactor, against the rule: a `Field`
+- **J1.** Every setting and its description gone through, last, after the refactor, against the rule: a `Field`
   description is one short line of panel text, what and its unit; and whether every quantity is in the flow's
   textbook units, which a scan cannot judge.
 
@@ -241,12 +245,12 @@ Not worked on until asked for; each with what is known.
 
 ## Rules it touches
 
-- Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
-  preset's `view.depth_read`, A5.
-- A `Field` description is one short line of panel text: I1.
 - Keep presets and settings schemas in sync: deep_flow's panel tree and its shared settings, A2, A3.
 - Settings connect the user and a component, not two components: the view's tolerance and size, A3.
 - `shared` holds the layers that are not general and that more than one app uses: `ForegroundLook`, A4.
+- Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
+  preset's `view.depth_read`, B1.
+- A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
-Not designed yet, so their rules are not named: A6, A7; B1 to B4; C1 to C4; D1, D2; E1 to E3; G1; H1 to H4.
+Not designed yet, so their rules are not named: B2, B3; C1 to C4; D1 to D4; E1, E2; F1 to F3; H1; I1 to I4.

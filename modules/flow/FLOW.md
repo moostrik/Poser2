@@ -26,7 +26,7 @@ next is in the one plan:
 
 The 2D bridge and the 2D fluid have no document yet; what holds for them is under
 [Constraints](#constraints), and they get theirs when they are rebuilt
-([FLOW_PLAN.md](FLOW_PLAN.md#h-the-2d-flow-follows-the-3d)).
+([FLOW_PLAN.md](FLOW_PLAN.md#i-the-2d-flow-follows-the-3d)).
 
 ## The two systems
 
@@ -40,7 +40,7 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 
 | Camera | 2D flow                 | 3D flow                              |
 |--------|-------------------------|--------------------------------------|
-| 2D     | image, mask             | no z position, so nothing goes in ([FLOW_PLAN.md](FLOW_PLAN.md#a-the-camera-and-the-view)) |
+| 2D     | image, mask             | no z position, so nothing goes in ([FLOW_PLAN.md](FLOW_PLAN.md#b-the-camera-and-the-view)) |
 | 3D     | image, mask; depth idle | image, mask, depth; z and w measured |
 
 ## Terms

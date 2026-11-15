@@ -15,7 +15,7 @@ fluid is `Fluid3D` (`fluid_3d/fluid_3d.py`), its layer `Fluid3DLayer`
 
 A visualization inspired by ink in water: high detail at 4K, sharp, translucent ink patterns; smoke
 patterns a second goal **(site fact)**. Two ways draw it, the particles and the fine density; which of them,
-or a combination, is the plan's ([FLOW_PLAN.md](FLOW_PLAN.md#e-the-3d-fluids-look-at-4k)). Its
+or a combination, is the plan's ([FLOW_PLAN.md](FLOW_PLAN.md#f-the-3d-fluids-look-at-4k)). Its
 way there: layers of water with sharp, well-defined motion of their own, that influence each other and
 stay distinct. Ink's thin sheets folding into tendrils are shear, water at one depth moving otherwise than
 the water beside it, their boundary rolling up **(deduction)**. The light is a means to it, not a goal of
