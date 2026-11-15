@@ -46,9 +46,8 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 
 - `BaseSettings` subclasses are pure data containers with no runtime side effects
 - Use `BaseSettings` for reactive configuration and `@dataclass` for plain value objects
-- Components take their settings object (or a `Group` of it) in the constructor, never as a global, and read fields when they use them
-- Never unpack setting values into constructor parameters; a copied value goes stale when the panel changes it
-- Cache only `Field.INIT` values, since they cannot change after `initialize()`
+- Components take their settings object (or a `Group` of it) in the constructor, never as a global
+- Read a field when it is used; keep a copy only of a `Field.INIT` value, which cannot change after `initialize()`
 - Settings connect the user and a component, not two components
 - Keep bound callbacks thread-safe, and never write the field that triggered the callback
 - Components that `bind()` must `unbind()` the same callbacks on teardown
