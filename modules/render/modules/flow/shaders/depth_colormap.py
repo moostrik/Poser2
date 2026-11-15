@@ -1,8 +1,10 @@
+"""DepthColormap: a depth in metres as a picture, through a colormap or grey."""
+
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Colormap, Shader, draw_quad, Texture
 
 
-class DepthView(Shader):
+class DepthColormap(Shader):
     def use(self, depth: Texture, image: Texture, near: float, far: float, mode: int, colormap: Colormap = Colormap.JET) -> None:
         """Depth in metres as a picture, `mode` one of `DepthDrawMode`, colored by `colormap`; `image` is drawn under
         it in OVER_IMAGE. Waits for both textures: the depth can arrive before the first image."""

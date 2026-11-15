@@ -36,7 +36,7 @@ from modules.inference.shaders import DepthAlign  # noqa: E402
 from modules.render import PosePointLines  # noqa: E402
 from modules.render.modules.board.shaders import TimeSeries  # noqa: E402
 from modules.render.modules.pose.shaders import AddMix, Feature, LayerComposite, Window  # noqa: E402
-from modules.render.modules.flow.shaders import DensityColorize, DepthView  # noqa: E402
+from modules.render.modules.flow.shaders import DensityColorize, DepthColormap  # noqa: E402
 from modules.render.modules.inference.shaders import CelShade  # noqa: E402
 from modules.utils import Color, Point2f, Quad, Rect  # noqa: E402
 
@@ -279,7 +279,7 @@ def cases() -> dict[str, tuple[object, Case | None, Case | None]]:
     colorize = DensityColorize()
     add('density_colorize', colorize, lambda t: colorize.use(
         t['gradient'], [(1.0, 0.2, 0.1, 1.0), (0.1, 0.8, 0.3, 1.0), (0.2, 0.3, 1.0, 1.0), (0.9, 0.9, 0.2, 1.0)]))
-    depth_view = DepthView()
+    depth_view = DepthColormap()
     for mode in range(3):
         add(f'depth_view_{mode}', depth_view, lambda t, m=mode: depth_view.use(t['depth'], t['gradient'], 0.3, 0.8, m))
     for colormap in (Colormap.TURBO, Colormap.VIRIDIS):

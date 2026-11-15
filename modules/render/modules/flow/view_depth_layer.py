@@ -11,7 +11,7 @@ from modules.gl import Colormap, Fbo, Style, Texture, shaders
 from modules.settings import BaseSettings, Field
 from ...layer_base import LayerBase
 from .view_layer import ViewLayer
-from .shaders import DepthView
+from .shaders import DepthColormap
 
 
 class DepthDrawMode(IntEnum):
@@ -30,7 +30,7 @@ class ViewDepthLayerSettings(BaseSettings):
 
 
 class ViewDepthLayer(LayerBase):
-    """The view's depth as a picture (`DepthView`), over the view's image in `DepthDrawMode.OVER_IMAGE`, the mask as
+    """The view's depth as a picture (`DepthColormap`), over the view's image in `DepthDrawMode.OVER_IMAGE`, the mask as
     alpha; drawn again with each new view."""
 
     def __init__(self, view: ViewLayer, settings: ViewDepthLayerSettings) -> None:
@@ -38,7 +38,7 @@ class ViewDepthLayer(LayerBase):
         self.settings: ViewDepthLayerSettings = settings
         self._picture: Fbo = Fbo()
         self._masked: Fbo = Fbo()
-        self._picture_shader: DepthView = DepthView()
+        self._picture_shader: DepthColormap = DepthColormap()
         self._mask_shader: shaders.MaskApply = shaders.MaskApply()
         self._output: Fbo = self._picture
         self._drawn: tuple | None = None
