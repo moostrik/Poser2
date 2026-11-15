@@ -18,7 +18,7 @@ The plan changes the GL's form, not what it draws: every app looks as it does no
 
 ## H. Shader coordinates
 
-Two kinds of vertex stage, each in its textbook form:
+Two kinds of shader, each in its textbook form:
 
 - A pass fills its whole target and places nothing (the blurs, the blends, every flow step): the quad in GL's own
   −1..1, through `_generic.vert`, which stays as it is. Clip space fits a target of any size without a uniform or the
@@ -36,16 +36,22 @@ Every shader that takes a position **(seen: their uniforms)**:
 | gl      | `Blit`, `DrawColoredRectangle`, `DrawRectangleOutline`    | a rectangle, vertex stage    | 0..1 top-left                |
 | gl      | `DrawBox`, `Glyphs`                                       | a rectangle, vertex stage    | pixels                       |
 | gl      | `DrawCircles`                                             | points, fragment stage       | GL's −1..1                   |
-| gl      | `DrawRoi`                                                 | a region, fragment stage     | texture coordinates          |
+| gl      | `DrawRoi`                                                 | the part of the input it samples | 0..1 bottom-left         |
 | render  | `PosePointLines`                                          | points and a rectangle       | 0..1 top-left, flipped inside |
 | smile   | `FaceColor`                                               | the face's box               | 0..1 top-left                |
-| flow    | `SetRegion`, `AddRegion`, `ChannelSetRegion`, `ChannelAddRegion` | a region             | "UV coordinates"             |
-| flow    | `DepthUpscale`                                            | the view's window (`roi`)    | texture coordinates          |
+| flow    | `SetRegion`, `AddRegion`, `ChannelSetRegion`, `ChannelAddRegion` | a region of the target | 0..1 bottom-left         |
+| flow    | `DepthUpscale`                                            | the part of the depth it samples (`roi`) | 0..1 bottom-left |
 | flow    | `ColormapKey`                                             | a box                        | pixels from the bottom left  |
 
 Afterwards each takes 0..1 top-left and none flips or converts on its own: today `ViewPoseLayer` flips its points
 before `DrawCircles` because "`PosePointLines` flips Y internally" and "`DrawCircles` takes GL coords" **(seen)**.
-Where "texture coordinates" or "UV" means bottom-left is read from each shader before it changes.
+`DrawRoi`'s and `DepthUpscale`'s `roi` is the part of the input they sample, as `texture.draw`'s `src`; their
+callers turn a top-left rectangle into bottom-left today, each on its own **(seen)**: `crop_layer` with
+`Rect.flip_y(0.5)`, hd_trio's `CenterGeometry` with `1.0 - y`, the view's `texture_roi`. Those turns go and the
+callers pass the top-left rectangle they already have. The four region shaders compare their region with the
+bottom-left `texCoord` **(seen)**; their only callers are `fluid_2d`'s set and add functions, which nothing calls
+today **(seen)**, so only the shaders change. `ColormapKey`'s box is laid out by the legend on the CPU in pixels
+**(seen)**; the legend turns it into 0..1 there, as `Text` does.
 
 The flow's volume views (`cube_axes`, `cube_edges`, `glyph_arrows`, `glyph_dots`) and its particles are 3D inside
 their own pass and take a `view_projection` of their own **(seen)**; they stay as they are.
@@ -59,9 +65,11 @@ test holds it; the harness's text case holds the drawing.
 repeat by it, then calls `glViewport` again regardless **(seen)**; the global goes.
 
 Callers that change with it **(seen)**: `ViewPoseLayer`'s flip, the only caller of `DrawCircles`; `PosePointLines`'
-three callers (`pose_line_layer`, `pose_renderer`, white_space's `pose_figure_layer`); the callers of `DrawRoi`,
-`FaceColor`, the four region shaders, `DepthUpscale` and `ColormapKey`. The rectangles' and the blit's callers already
-pass 0..1 top-left and stay; so do the 25 text calls.
+three callers (`pose_line_layer`, `pose_renderer`, white_space's `pose_figure_layer`); `DrawRoi`'s six (`crop_layer`,
+`view_layer`, hd_trio's three center layers through `CenterGeometry`) and `DepthUpscale`'s one (`view_layer`, through
+`texture_roi`); the legend for `ColormapKey`. The rectangles', the blit's and `FaceColor`'s callers already pass 0..1
+top-left and stay; so do the 25 text calls. Once H is built and checked, the fluid thread hears what changed in
+`modules/flow`.
 
 Checked by:
 - the harness: it already holds the gl shaders and `PosePointLines` to references from before the plan **(seen)**;
@@ -100,5 +108,5 @@ shader, a direction) against `BlurH` and `BlurV`; `Blend`, `MaskBlend` and `Curt
 - `gl.md` set the GL state a draw needs where it draws (blend, depth, viewport): H
 - `gl.md` prefer as few GL calls and state switches as possible: H, I
 - `gl.md` simple geometry, as from poses, is worked out on the CPU, in plain modules: H
-- `gl.md` all shaders take positions from 0 to 1, with (0, 0) at the top left: H
+- `gl.md` all shaders take 2D positions from 0 to 1, with (0, 0) at the top left: H
 - `gl.md` the conversion to OpenGL's own coordinates is written once, and every shader uses it: H
