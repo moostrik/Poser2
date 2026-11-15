@@ -12,8 +12,8 @@ The plan changes the GL's form, not what it draws: every app looks as it does no
 | Step                      | When                                     | Checked by                              |
 |---------------------------|------------------------------------------|-----------------------------------------|
 | H. Shader coordinates     | on Matthias's "go"                       | the harness, text's unit test, each app before and after |
-| I. Capture asks GL nothing | after H                                 | a screen recording                      |
-| J. Inputs by type         | after H                                  | the harness                             |
+| I. Capture asks GL nothing | after H, on the same "go"               | a screen recording                      |
+| J. Inputs by type         | after I, on the same "go"                | the harness, each app with `-sim`       |
 | K. Duplicate shaders      | decided together, once the rest is built | the harness, then Matthias's look       |
 
 ## H. Shader coordinates
@@ -91,7 +91,11 @@ and `profiler.py` ask GL by purpose, as debug tools, and stay.
 `modules/gl`'s shaders take a color as four floats or a tuple and a rectangle as four floats or a `Rect`, and work
 out the texel size themselves, take it given (`texel_size`) or as a `resolution` **(seen)**. Afterwards a color is a
 `Color`, a rectangle a `Rect`, and the texel size is taken from the input texture; no caller passes `texel_size`
-today **(seen)**. The harness holds each shader to its reference.
+today **(seen)**. The callers that change **(seen)**: `DrawColoredRectangle`'s and `DrawRectangleOutline`'s, which
+pass `x, y, w, h, r, g, b, a` (11 calls in 9 files), `Tint`'s one, `DrawCircles`' colors from `ViewPoseLayer`, and
+`DrawBox` and `Glyphs` through `Text`, whose 25 callers pass a `Color` for the text and the box.
+The harness holds each shader to its reference, its cases rewritten to the new types; each app runs with `-sim`
+before and after, its screens compared.
 
 ## K. Duplicate shaders
 
