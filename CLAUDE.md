@@ -49,7 +49,6 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Components take their settings object (or a `Group` of it) in the constructor, never as a global
 - Read a field when it is used; keep a copy only of a `Field.INIT` value, which cannot change after `initialize()`
 - Settings connect the user and a component, not two components
-- Keep bound callbacks thread-safe, and never write the field that triggered the callback
 - Components that `bind()` must `unbind()` the same callbacks on teardown
 - Treat `Field.READ` values as snapshots; copy arrays before handing them to another thread
 - Keep `Field` descriptions to one short line of panel text: what the value is and its unit
@@ -85,7 +84,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 ## Time
 
 - Read `time.perf_counter()` for every stamp and duration; `time.time()` and `monotonic()` step 15.6 ms on Windows, coarser than a frame
-- Stamp a frame once, where the backend hands it over, with its moment of capture where the device reports one, else its arrival; downstream, take time from the frame or the tick instead of reading a clock
+- Downstream of the camera, take time from the frame or the tick instead of reading a clock
 - Use the wall clock only for file names and log lines
 
 ## Performance
