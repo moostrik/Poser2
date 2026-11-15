@@ -11,7 +11,7 @@ from modules.utils import Color, Rect
 
 
 class PoseLineLayerSettings(BaseSettings):
-    stage:      Field[int] = Field(0, access=Field.INIT, description="Pipeline stage for pose data")
+    stage:      Field[int] = Field(0, description="Pipeline stage for pose data")
     line_width: Field[float] = Field(4.0, min=0.5, max=20.0, description="Line width in pixels")
     line_smooth:Field[float] = Field(2.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
     use_scores: Field[bool]  = Field(True, description="Use confidence scores for line opacity")

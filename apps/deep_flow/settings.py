@@ -231,9 +231,13 @@ class _DataLayerSettings(render.DataLayerSettings):
 
 class _TrackerCompositorSettings(render.TrackerCompositorSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
+    box_stage: Field[Stage] = Field(Stage.RAW, description="Pipeline stage of the bounding boxes")
 
 class _PoseCompositorSettings(render.PoseCompositorSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for camera crop")
+    back_stage: Field[Stage] = Field(Stage.CLEAN, description="Pipeline stage of the back line (black, 3x wide)")
+    middle_stage: Field[Stage] = Field(Stage.SMOOTH, description="Pipeline stage of the middle line (white, 2x wide)")
+    front_stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage of the front line (track color)")
 
 class FlowInputSettings(BaseSettings):
     """Which layers feed the flow, chosen live, and how the fluid weights its injections."""

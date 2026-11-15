@@ -15,8 +15,11 @@ from modules.utils import Color
 
 class PoseCompositorSettings(BaseSettings):
     stage:      Field[int] = Field(0, description="Pipeline stage for camera crop")
-    line_width: Field[float] = Field(2.0, min=0.5, max=20.0, description="Base line width (multiplied per stage)")
-    line_smooth:Field[float] = Field(0.0, min=0.0, max=10.0, description="Base line smoothing (multiplied per stage)")
+    back_stage: Field[int] = Field(1, description="Pipeline stage of the back line (black, 3x wide)")
+    middle_stage:Field[int] = Field(2, description="Pipeline stage of the middle line (white, 2x wide)")
+    front_stage:Field[int] = Field(3, description="Pipeline stage of the front line (track color)")
+    line_width: Field[float] = Field(2.0, min=0.5, max=20.0, description="Base line width (multiplied per line)")
+    line_smooth:Field[float] = Field(0.0, min=0.0, max=10.0, description="Base line smoothing (multiplied per line)")
     use_gpu_crop:Field[bool] = Field(True, description="Use GPU crop source (model input) instead of camera crop")
 
 
@@ -31,43 +34,18 @@ class PoseCompositor(LayerBase):
         self._fbo: Fbo = Fbo()
 
         # Camera crop layers (one of these will be used based on settings)
-        crop_settings: CropLayerSettings = CropLayerSettings(stage=self.settings.stage)
-        self._cam_crop_layer: CropLayer = CropLayer(track_id, board, cam_texture, crop_settings)
+        self._cam_crop_layer: CropLayer = CropLayer(track_id, board, cam_texture, CropLayerSettings())
         self._gpu_crop_layer: CropImageLayer = gpu_crop
 
-        # Pose line layers - RAW (black, thickest), SMOOTH (white, medium), LERP (color, thin)
-        # RAW = 3x thickness, drawn first (back layer)
-        pose_raw_settings: PoseLineLayerSettings = PoseLineLayerSettings(
-            stage=1,
-            line_width=self.settings.line_width * 3.0,
-            line_smooth=self.settings.line_smooth * 3.0,
-            use_scores=True,
-            use_bbox=False,
-            color=Color(0.0, 0.0, 0.0)
-        )
-        self._pose_raw_layer: PoseLineLayer = PoseLineLayer(track_id, board, pose_raw_settings)
-
-        # SMOOTH = 2x thickness, drawn second (middle layer)
-        pose_smooth_settings: PoseLineLayerSettings = PoseLineLayerSettings(
-            stage=2,
-            line_width=self.settings.line_width * 2.0,
-            line_smooth=self.settings.line_smooth * 2.0,
-            use_scores=True,
-            use_bbox=False,
-            color=Color(1.0, 1.0, 1.0)
-        )
-        self._pose_smooth_layer: PoseLineLayer = PoseLineLayer(track_id, board, pose_smooth_settings)
-
-        # LERP = 1x thickness, drawn last (top layer)
-        pose_lerp_settings: PoseLineLayerSettings = PoseLineLayerSettings(
-            stage=3,
-            line_width=self.settings.line_width,
-            line_smooth=self.settings.line_smooth,
-            use_scores=True,
-            use_bbox=False,
-            color=color_settings.track_colors[track_id]
-        )
-        self._pose_lerp_layer: PoseLineLayer = PoseLineLayer(track_id, board, pose_lerp_settings)
+        # Pose lines, back to front: black 3x wide, white 2x, the track color 1x. Their stages and widths come
+        # from `settings` each update (`_follow_settings`).
+        self._pose_back_layer: PoseLineLayer = PoseLineLayer(track_id, board, PoseLineLayerSettings(
+            use_scores=True, use_bbox=False, color=Color(0.0, 0.0, 0.0)))
+        self._pose_middle_layer: PoseLineLayer = PoseLineLayer(track_id, board, PoseLineLayerSettings(
+            use_scores=True, use_bbox=False, color=Color(1.0, 1.0, 1.0)))
+        self._pose_front_layer: PoseLineLayer = PoseLineLayer(track_id, board, PoseLineLayerSettings(
+            use_scores=True, use_bbox=False, color=color_settings.track_colors[track_id]))
+        self._follow_settings()
 
     @property
     def texture(self) -> Texture:
@@ -76,30 +54,41 @@ class PoseCompositor(LayerBase):
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
         self._cam_crop_layer.allocate(width, height, internal_format)
-        self._pose_raw_layer.allocate(width, height, internal_format)
-        self._pose_smooth_layer.allocate(width, height, internal_format)
-        self._pose_lerp_layer.allocate(width, height, internal_format)
+        self._pose_back_layer.allocate(width, height, internal_format)
+        self._pose_middle_layer.allocate(width, height, internal_format)
+        self._pose_front_layer.allocate(width, height, internal_format)
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._cam_crop_layer.deallocate()
-        self._pose_raw_layer.deallocate()
-        self._pose_smooth_layer.deallocate()
-        self._pose_lerp_layer.deallocate()
+        self._pose_back_layer.deallocate()
+        self._pose_middle_layer.deallocate()
+        self._pose_front_layer.deallocate()
+
+    def _follow_settings(self) -> None:
+        """The crop's and the lines' stages and widths from `settings`, as the panel has them now."""
+        s: PoseCompositorSettings = self.settings
+        self._cam_crop_layer.settings.stage = s.stage
+        for layer, stage, scale in ((self._pose_back_layer, s.back_stage, 3.0),
+                                    (self._pose_middle_layer, s.middle_stage, 2.0),
+                                    (self._pose_front_layer, s.front_stage, 1.0)):
+            layer.settings.stage = stage
+            layer.settings.line_width = s.line_width * scale
+            layer.settings.line_smooth = s.line_smooth * scale
 
     def update(self) -> None:
-        # Update all layers
+        self._follow_settings()
         crop_layer = self._gpu_crop_layer if self.settings.use_gpu_crop else self._cam_crop_layer
         if crop_layer is self._cam_crop_layer:
             crop_layer.update()     # its own; the shared GPU crop is updated by the app
-        self._pose_raw_layer.update()
-        self._pose_smooth_layer.update()
-        self._pose_lerp_layer.update()
+        self._pose_back_layer.update()
+        self._pose_middle_layer.update()
+        self._pose_front_layer.update()
 
-        # Composite: crop background + pose overlays (RAW → SMOOTH → LERP)
+        # Composite: crop background, then the lines back to front
         self._fbo.begin()
         Blit.use(crop_layer.texture)
-        Blit.use(self._pose_raw_layer.texture)
-        Blit.use(self._pose_smooth_layer.texture)
-        Blit.use(self._pose_lerp_layer.texture)
+        Blit.use(self._pose_back_layer.texture)
+        Blit.use(self._pose_middle_layer.texture)
+        Blit.use(self._pose_front_layer.texture)
         self._fbo.end()
