@@ -15,7 +15,7 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER,
                        GL_PACK_ALIGNMENT, GL_PIXEL_PACK_BUFFER, GL_R8, GL_READ_FRAMEBUFFER, GL_RED, GL_RG, GL_RG8,
                        GL_RGBA8, GL_STREAM_COPY, GL_UNSIGNED_BYTE, glBindBuffer, glBindFramebuffer, glBlitFramebuffer,
                        glBufferData, glClear, glClearColor, glDeleteBuffers, glGenBuffers,
-                       glGetIntegerv, glPixelStorei, glReadPixels)
+                       glPixelStorei, glReadPixels)
 
 try:
     from . import cudart   # binds torch's CUDA runtime; fails without a CUDA torch
@@ -30,6 +30,7 @@ from .utils import fill, fit
 logger = logging.getLogger(__name__)
 
 PIXEL_BUFFERS: int = 2      # one written by GL this tick, one copied by CUDA from last tick
+_PACK_ALIGNMENT: int = 4    # GL's default, which nothing else in the apps changes: set back after the capture's reads
 
 
 def nv12_bytes(width: int, height: int) -> int:
@@ -149,7 +150,6 @@ class ScreenCapture:
         self._uv.begin()
         self._shader.use(self.frame, Nv12Plane.UV)
         style.pop_style()
-        alignment = int(glGetIntegerv(GL_PACK_ALIGNMENT))
         glPixelStorei(GL_PACK_ALIGNMENT, 1)     # rows of any even width, unpadded
         glBindBuffer(GL_PIXEL_PACK_BUFFER, buffer)
         glBindFramebuffer(GL_READ_FRAMEBUFFER, self._y.fbo_id)
@@ -157,7 +157,7 @@ class ScreenCapture:
         glBindFramebuffer(GL_READ_FRAMEBUFFER, self._uv.fbo_id)
         glReadPixels(0, 0, self.width // 2, self.height // 2, GL_RG, GL_UNSIGNED_BYTE, self.width * self.height)
         glBindBuffer(GL_PIXEL_PACK_BUFFER, 0)
-        glPixelStorei(GL_PACK_ALIGNMENT, alignment)
+        glPixelStorei(GL_PACK_ALIGNMENT, _PACK_ALIGNMENT)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         self._pending = slot
         self._turn = 1 - self._turn
