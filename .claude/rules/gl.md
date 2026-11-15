@@ -17,7 +17,7 @@ paths:
 - Prefer as few GL calls and state switches as possible
 - A texture is held in GL's row order
 - A CPU image is flipped once, at its upload
-- All shaders take positions from 0 to 1, with (0, 0) at the top left
+- All shaders take 2D positions from 0 to 1, with (0, 0) at the top left
 - The conversion to OpenGL's own coordinates is written once, and every shader uses it
 
 ## Working with OpenGL
