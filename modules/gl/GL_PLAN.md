@@ -73,9 +73,12 @@ top-left and stay; so do the 25 text calls. Once H is built and checked, the flu
 
 Checked by:
 - the harness: it already holds the gl shaders and `PosePointLines` to references from before the plan **(seen)**;
-  before H it gets `FaceColor` and the flow's six, references from today's code; after H each matches within 1/255
+  before H it gets `FaceColor` and the flow's six, references from today's code; after H each matches within 1/255.
+  A case whose shader now takes top-left positions is rewritten to pass the same thing top-left, not rerun as it is;
+  `draw_roi_turned` holds the rotation, whose direction turns with y **(inferred)**
 - the text layout's unit test
-- each app run before and after H, its screens compared by me; Matthias gets only what I cannot judge
+- each app run before and after H (deep_flow, hd_trio, smile, white_space), its screens compared by me, on
+  Matthias's permission for every app (2026-11-15); he gets only what I cannot judge
 
 ## I. Capture asks GL nothing
 
