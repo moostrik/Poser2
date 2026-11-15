@@ -65,13 +65,14 @@ without unknown keys. The stages may later move into `modules/flow` (Parked); th
   its layer, the outputs it hands on and its monitor, in the chain's order; the update order, the per-capture
   run, the view-sized allocation and the panels' shapes read it, in place of the four lists.
 - **A2.** The color in the view: `ForegroundLook` runs as the view's last pass, its result the view's `color`, a
-  port and the bridge's color; its settings in the view's panel. `ForegroundLook` and its layer go to
+  port and the bridge's color; its settings in the view's panel, with `enabled`: off, `color` is the foreground
+  as it is, the choice `inputs.bridge_image` makes now, which goes. `ForegroundLook` and its layer go to
   `render/shared/foreground_look/`, the rule's place for what two apps use.
 - **A3.** A monitor per stage: each stage holds its monitor, its port and draw mode in the stage's panel;
   `monitor_a` and `monitor_b`, the wrapper layers and `view_depth` go, the monitor drawing a depth by
   `view_depth`'s colormaps; `color_mask` leaves deep_flow (it stays in `render` for the other apps). `Layers`
   holds the stages' monitors, the fluid's look, the composite, the camera previews (`tracker`, `pose`), the pose
-  overlay and the data plots; `inputs` picks a stage's port, not a layer.
+  overlay and the data plots. The motion reads the view's `image`; `inputs.motion_image` goes.
 - **A4.** The panel tree in the chain's order: `capture`, `view` (the color and the pose overlay in it), `motion`,
   `bridge`, `fluid`, `composite`; the app's wiring (`inputs`, `stage`) and the display (`layer`, `data`,
   `preview`, `time_series`, `colors`) apart. The settings two stages read declared once on their parent and
