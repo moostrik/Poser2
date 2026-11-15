@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from modules.board import HasFrames
 from modules.flow import fixed_window
 from modules.pose import Frame, Points2D, PointLandmark, BBox
-from modules.render.layers import LayerBase, DataCache
+from modules.render import LayerBase, DataCache
 from modules.utils import Rect, Point2f
 from modules.gl import Texture
 from ....settings import CenterGeometrySettings, SnapPoint

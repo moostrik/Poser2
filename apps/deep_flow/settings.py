@@ -17,7 +17,7 @@ from modules.camera import CameraHealthSettings, CameraResolution
 from modules.camera.oak4 import Oak4CameraSettings
 from modules.recording import PlayerSettings, RecorderSettings
 from modules.session import SessionSettings
-from modules.render import layers, ColorSettings
+from modules import render
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import OnePerCamTrackerSettings, TrackerFrameSourceSettings
 from modules.pose import nodes, trackers, window
@@ -226,13 +226,13 @@ class PoseGroup(BaseSettings):
 # ---------------------------------------------------------------------------
 
 # Stage-aware subclasses — override Field[int] with Field[Stage] for dropdown UI
-class _DataLayerSettings(layers.DataLayerSettings):
+class _DataLayerSettings(render.DataLayerSettings):
     stage: Field[Stage] = Field(Stage.SMOOTH)
 
-class _TrackerCompositorSettings(layers.TrackerCompositorSettings):
+class _TrackerCompositorSettings(render.TrackerCompositorSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
 
-class _PoseCompositorSettings(layers.PoseCompositorSettings):
+class _PoseCompositorSettings(render.PoseCompositorSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for camera crop")
 
 class FlowInputSettings(BaseSettings):
@@ -244,7 +244,7 @@ class FlowInputSettings(BaseSettings):
 
 class LayerGroup(BaseSettings):
     select   : Group[LayerSettings]                 = Group(LayerSettings)
-    composite: Group[layers.CompositeLayerSettings] = Group(layers.CompositeLayerSettings)
+    composite: Group[render.LayerCompositorSettings] = Group(render.LayerCompositorSettings)
 
 class DataGroup(BaseSettings):
     a: Group[_DataLayerSettings] = Group(_DataLayerSettings)
@@ -261,19 +261,19 @@ class RenderSettings(BaseSettings):
     layer  : Group[LayerGroup]                   = Group(LayerGroup)
     data   : Group[DataGroup]                    = Group(DataGroup)
     preview: Group[PreviewGroup]                 = Group(PreviewGroup)
-    view_depth: Group[layers.ViewDepthLayerSettings] = Group(layers.ViewDepthLayerSettings)
-    view_pose: Group[layers.ViewPoseLayerSettings] = Group(layers.ViewPoseLayerSettings)
-    foreground_look: Group[layers.ForegroundLookSettings] = Group(layers.ForegroundLookSettings)
-    color_mask: Group[layers.MSColorMaskLayerSettings] = Group(layers.MSColorMaskLayerSettings)
+    view_depth: Group[render.ViewDepthLayerSettings] = Group(render.ViewDepthLayerSettings)
+    view_pose: Group[render.ViewPoseLayerSettings] = Group(render.ViewPoseLayerSettings)
+    foreground_look: Group[render.ForegroundLookSettings] = Group(render.ForegroundLookSettings)
+    color_mask: Group[render.SimilaritySilhouetteLayerSettings] = Group(render.SimilaritySilhouetteLayerSettings)
     inputs : Group[FlowInputSettings]            = Group(FlowInputSettings)
-    view   : Group[layers.ViewLayerSettings]     = Group(layers.ViewLayerSettings)
-    motion : Group[layers.Motion3DLayerSettings] = Group(layers.Motion3DLayerSettings, share=[input_fps.as_('fps')])
-    bridge : Group[layers.Bridge3DLayerSettings] = Group(layers.Bridge3DLayerSettings)
-    fluid  : Group[layers.Fluid3DLayerSettings]  = Group(layers.Fluid3DLayerSettings)
-    monitor_a: Group[layers.MonitorLayerSettings] = Group(layers.MonitorLayerSettings)
-    monitor_b: Group[layers.MonitorLayerSettings] = Group(layers.MonitorLayerSettings)
-    time_series: Group[layers.TimeSeriesLayerSettings] = Group(layers.TimeSeriesLayerSettings)
-    colors : Group[ColorSettings]                = Group(ColorSettings)
+    view   : Group[render.ViewLayerSettings]     = Group(render.ViewLayerSettings)
+    motion : Group[render.Motion3DLayerSettings] = Group(render.Motion3DLayerSettings, share=[input_fps.as_('fps')])
+    bridge : Group[render.Bridge3DLayerSettings] = Group(render.Bridge3DLayerSettings)
+    fluid  : Group[render.Fluid3DLayerSettings]  = Group(render.Fluid3DLayerSettings)
+    monitor_a: Group[render.MonitorLayerSettings] = Group(render.MonitorLayerSettings)
+    monitor_b: Group[render.MonitorLayerSettings] = Group(render.MonitorLayerSettings)
+    time_series: Group[render.TimeSeriesLayerSettings] = Group(render.TimeSeriesLayerSettings)
+    colors : Group[render.ColorSettings]         = Group(render.ColorSettings)
     window : Group[WindowSettings]               = Group(WindowSettings)
     screen_recorder: Group[ScreenRecorderSettings] = Group(ScreenRecorderSettings)
 

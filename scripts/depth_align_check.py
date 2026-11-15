@@ -23,7 +23,7 @@ from modules.camera import (DepthAlignment, FrameType, TiltCorrection, TiltCorre
 from modules.recording import read_metadata  # noqa: E402
 from modules.gl import Image, Texture  # noqa: E402
 from modules.inference.depth_align import DepthAligner, depth_metres  # noqa: E402
-from modules.render.shaders import DepthAlign  # noqa: E402
+from modules.gl.shaders import DepthAlign  # noqa: E402
 from modules.video import StreamReader  # noqa: E402
 
 RECORDINGS = Path('apps/deep_flow/data/recordings')

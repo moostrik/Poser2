@@ -1,5 +1,5 @@
 """Guard test for the import rules of `modules/`: no app code, no camera backend outside the
-camera package, and no reaching past another package's `__init__.py`.
+camera package, no module importing the render, and no reaching past another package's `__init__.py`.
 
 Reads the source with `ast`, so annotation-only imports under TYPE_CHECKING count too.
 Package tests may import their own package's internal files; vendored code is skipped.
@@ -58,6 +58,10 @@ class TestLayering(unittest.TestCase):
         found = violations(lambda own, path, parts: own != 'camera' and parts[:2] == ['modules', 'camera']
                            and len(parts) > 2 and parts[2] in CAMERA_BACKENDS)
         self.assertEqual(found, [], "a camera backend is imported outside modules/camera:\n" + '\n'.join(found))
+
+    def test_modules_never_import_the_render(self) -> None:
+        found = violations(lambda own, path, parts: own != 'render' and parts[:2] == ['modules', 'render'])
+        self.assertEqual(found, [], "a module imports modules/render, which draws the modules:\n" + '\n'.join(found))
 
     def test_other_packages_are_imported_through_their_init(self) -> None:
         found = violations(lambda own, path, parts: parts[0] == 'modules' and len(parts) > 2 and parts[1] != own)

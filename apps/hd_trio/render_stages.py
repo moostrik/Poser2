@@ -8,7 +8,7 @@ from pytweening import easeInOutSine, easeInQuint, easeOutQuad, easeOutSine, lin
 
 from modules.board import HasFrames
 from modules.pose import MotionTime
-from modules.render import layers as ls
+from modules import render
 
 from .settings import Layers, RenderSettings, ShowStage, Stage
 
@@ -50,7 +50,7 @@ class StageLayer:
     """Base for per-stage orchestration — settings control + composition."""
 
     def __init__(self, cam_id: int, board: HasFrames, settings: RenderSettings,
-                 layers: dict[Layers, ls.LayerBase]) -> None:
+                 layers: dict[Layers, render.LayerBase]) -> None:
         self.cam_id = cam_id
         self.board: HasFrames = board
         self.settings = settings
@@ -69,12 +69,12 @@ class StageLayer:
     # -- convenience ----------------------------------------------------------
 
     def compose(self, entries: list[tuple[Layers, float]]) -> None:
-        """Compose layers into this camera's CompositeLayer.
+        """Compose layers into this camera's LayerCompositor.
 
         Args:
             entries: List of (layer_enum, opacity) pairs.
         """
-        composite = cast(ls.CompositeLayer, self.layers[Layers.composite])
+        composite = cast(render.LayerCompositor, self.layers[Layers.composite])
         composite.compose([
             (self.layers[layer].texture, alpha)
             for layer, alpha in entries
@@ -156,7 +156,7 @@ class MovementStage(StageLayer):
         # "visitor has moved enough" threshold, so the fade completes on whichever
         # comes first: the stage running out or the visitor moving.
         #
-        # Opening on progress alone reveals nothing: MSColorMaskLayer already weights
+        # Opening on progress alone reveals nothing: SimilaritySilhouetteLayer already weights
         # the own-camera slot by AngleMotion, so a motionless visitor stays dark at
         # any alpha. The max() only guarantees no pop into WHITE_POSE.
         motion_time_duration = 6.0
@@ -169,7 +169,7 @@ class MovementStage(StageLayer):
 
 
 class WhitePoseStage(StageLayer):
-    """Brings in the white example figure. Intro playback starts here (see render.py)."""
+    """Brings in the white example figure. Intro playback starts here (see hd_trio_render.py)."""
 
     def enter(self) -> None:
         self.set_geometry_stage(Stage.LERP)
@@ -189,7 +189,7 @@ class FluidStage(StageLayer):
     def enter(self) -> None:
         self.set_geometry_stage(Stage.LERP)
         self.set_similarity_scale(0.0)
-        cast(ls.Fluid2DLayer, self.layers[Layers.fluid]).reset()
+        cast(render.Fluid2DLayer, self.layers[Layers.fluid]).reset()
 
     def update(self, progress: float) -> None:
         self.compose([

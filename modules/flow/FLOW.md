@@ -215,7 +215,7 @@ subpanels: `readings`, `lowpass` and `bandpass`; `boundary`, `velocity`, `densit
 `dt` from their input.
 
 The apps' render is a layer graph of `LayerBase` layers updated by one loop calling `update()`
-on each (`apps/deep_flow/render.py`, `apps/hd_trio/render/hd_trio_render.py`). hd_trio builds a motion and a
+on each (`apps/deep_flow/render/deep_flow_render.py`, `apps/hd_trio/render/hd_trio_render.py`). hd_trio builds a motion and a
 bridge input per camera and a fluid input per fluid layer in a wiring pass before the loop
 (`_wire_flow`), which `UPDATE_LAYERS` orders motion, bridge, fluid. deep_flow runs its stages per
 capture: each tick it takes the captures that came since the last (`take_captures`) and runs each,
@@ -247,7 +247,7 @@ any layer, and two show A beside B.
 | `modules/flow/time_step.py`, `modules/flow/wall_mode.py` | shared                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `modules/flow/port.py`                                   | `Port`, `Ports`, `TextureKind`, `HasPorts`, `OnDemand`, `prefixed`, `ports_of`                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `modules/flow/visualization/`                            | the monitors' drawing: `Visualizer` (image, colormap, glyphs and histogram into one FBO), `Strip`, `Legend` with `log_axis.py`, `DrawnSize`, `ALL_CHANNELS`; a volume's `VolumeCube` with `CubeColor`, `VolumeGlyphs` and their `Orbit`, and `Cut`, `VolumeCut` for the strip and the scripts                                                                                                                                                                                                                                    |
-| `modules/render/layers/flow/`                            | `motion_layer.py` (`MotionInput`, `MotionOutput`, `MotionLayer`, `frame_interval`), `motion_2d_layer.py`, `motion_3d_layer.py`; `bridge_layer.py` (`BridgeInput`, `BridgeOutput`, `BridgeLayer`), `bridge_2d_layer.py`, `bridge_3d_layer.py`; `fluid_layer.py` (`Injection`, `FluidInput`, `FluidOutput`, `FluidLayer`), `fluid_2d_layer.py`, `fluid_3d_layer.py`; `monitor_layer.py` (`MonitorInput`, `MonitorLayer`, `MonitorLayerSettings`, `MonitorAdvancedSettings`, `FlowStage`, `MonitorView`, `Channel`, `GlyphSpacing`) |
+| `modules/render/modules/flow/`                           | `motion_layer.py` (`MotionInput`, `MotionOutput`, `MotionLayer`, `frame_interval`), `motion_2d_layer.py`, `motion_3d_layer.py`; `bridge_layer.py` (`BridgeInput`, `BridgeOutput`, `BridgeLayer`), `bridge_2d_layer.py`, `bridge_3d_layer.py`; `fluid_layer.py` (`Injection`, `FluidInput`, `FluidOutput`, `FluidLayer`), `fluid_2d_layer.py`, `fluid_3d_layer.py`; `monitor_layer.py` (`MonitorInput`, `MonitorLayer`, `MonitorLayerSettings`, `MonitorAdvancedSettings`, `FlowStage`, `MonitorView`, `Channel`, `GlyphSpacing`) |
 
 Neither `fluid_2d` nor `fluid_3d` imports the other. The settings group of each fluid is `fluid`.
 `motion/` has no `_2d` and `_3d` packages because its 3D flow is its 2D flow plus z:
@@ -319,8 +319,8 @@ frame. How a frame gets there, thread by thread, and what costs frames are in
   `x_gain`, `y_gain`, `z_gain` say how much of each axis is the body's motion, the fluid's how strongly the
   water takes it; the bridge has none **(site fact)**, it translates and holds; the density's sinking along gravity
   in the buoyancy is `temperature.sink`, which both fluids read (`Fluid2D._apply_buoyancy`).
-- `modules/render/tests/test_flow_systems.py` loads each app preset into its system's stage
+- `modules/render/modules/flow/tests/test_flow_systems.py` loads each app preset into its system's stage
   settings and fails on an unknown key, and fails on a field of the flow's settings that no code
-  in `modules/flow` or `modules/render/layers/flow` names: such a field is dead **(deduction)**.
-- `modules/render/tests/test_stage_layer.py` checks, without GL, that a reset button asks and the
+  in `modules/flow` or `modules/render/modules/flow` names: such a field is dead **(deduction)**.
+- `modules/render/modules/flow/tests/test_stage_layer.py` checks, without GL, that a reset button asks and the
   stage's next update resets once before it runs, and asks nothing after `deallocate`.

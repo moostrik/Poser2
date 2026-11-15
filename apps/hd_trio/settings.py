@@ -8,7 +8,7 @@ from modules.panel import PanelSettings
 from modules.camera import CameraHealthSettings, CameraResolution
 from modules.camera.oak import OakCameraSettings
 from modules.recording import PlayerSettings, RecorderSettings
-from modules.render import layers, ColorSettings
+from modules import render
 from modules.inout import OscSoundSettings, ArtNetBarsSettings, OscReceiverSettings
 from modules.utils import Color
 from modules.tracker import OnePerCamTrackerSettings, TrackerFrameSourceSettings
@@ -312,13 +312,13 @@ class SessionGroup(BaseSettings):
 # ---------------------------------------------------------------------------
 
 # Stage-aware subclasses — override Field[int] with Field[Stage] for dropdown UI
-class _DataLayerSettings(layers.DataLayerSettings):
+class _DataLayerSettings(render.DataLayerSettings):
     stage: Field[Stage] = Field(Stage.SMOOTH)
 
-class _TrackerCompositorSettings(layers.TrackerCompositorSettings):
+class _TrackerCompositorSettings(render.TrackerCompositorSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
 
-class _PoseCompositorSettings(layers.PoseCompositorSettings):
+class _PoseCompositorSettings(render.PoseCompositorSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for camera crop")
 
 class SnapPoint(IntEnum):
@@ -360,13 +360,13 @@ class CenterCamLayerSettings(BaseSettings):
     use_mask:       Field[bool]  = Field(True, description="Apply mask to camera output")
 
 
-class CenterForegroundLayerSettings(layers.ForegroundLookSettings):
+class CenterForegroundLayerSettings(render.ForegroundLookSettings):
     """Configuration for CenterForegroundLayer: the foreground's look."""
 
 
 class LayerGroup(BaseSettings):
     select: Group[LayerSettings]                 = Group(LayerSettings)
-    composite: Group[layers.CompositeLayerSettings] = Group(layers.CompositeLayerSettings)
+    composite: Group[render.LayerCompositorSettings] = Group(render.LayerCompositorSettings)
 
 class DataGroup(BaseSettings):
     a: Group[_DataLayerSettings] = Group(_DataLayerSettings)
@@ -384,8 +384,8 @@ class CenterGroup(BaseSettings):
     mask    : Group[CenterMaskLayerSettings]                = Group(CenterMaskLayerSettings)
     cam     : Group[CenterCamLayerSettings]                 = Group(CenterCamLayerSettings)
     foreground: Group[CenterForegroundLayerSettings]        = Group(CenterForegroundLayerSettings)
-    pose    : Group[layers.ViewPoseLayerSettings]           = Group(layers.ViewPoseLayerSettings)
-    color   : Group[layers.MSColorMaskLayerSettings]        = Group(layers.MSColorMaskLayerSettings, share=[similarity_scale])
+    pose    : Group[render.ViewPoseLayerSettings]           = Group(render.ViewPoseLayerSettings)
+    color   : Group[render.SimilaritySilhouetteLayerSettings]        = Group(render.SimilaritySilhouetteLayerSettings, share=[similarity_scale])
 
 class IntroSequenceSettings(BaseSettings):
     """Settings for prerecorded pose overlay during INTRO stages."""
@@ -405,7 +405,7 @@ class IntroSequenceSettings(BaseSettings):
     recorder:          Group[_IntroRecorderSettings]     = Group(_IntroRecorderSettings)
 
     color:             Field[Color]     = Field(Color(1.0, 1.0, 1.0), description="Skeleton color for intro overlay")
-    pose:              Group[layers.ViewPoseLayerSettings]  = Group(layers.ViewPoseLayerSettings)
+    pose:              Group[render.ViewPoseLayerSettings]  = Group(render.ViewPoseLayerSettings)
 
 
 class RenderSettings(BaseSettings):
@@ -419,12 +419,12 @@ class RenderSettings(BaseSettings):
     preview: Group[PreviewGroup]              = Group(PreviewGroup)
     center : Group[CenterGroup]               = Group(CenterGroup, share=[similarity_scale])
     intro_sequence: Group[IntroSequenceSettings] = Group(IntroSequenceSettings)
-    motion : Group[layers.Motion2DLayerSettings] = Group(layers.Motion2DLayerSettings, share=[input_fps.as_('fps')])
-    bridge : Group[layers.Bridge2DLayerSettings] = Group(layers.Bridge2DLayerSettings)
-    fluid  : Group[layers.Fluid2DLayerSettings]  = Group(layers.Fluid2DLayerSettings)
-    monitor_a: Group[layers.MonitorLayerSettings] = Group(layers.MonitorLayerSettings)
-    monitor_b: Group[layers.MonitorLayerSettings] = Group(layers.MonitorLayerSettings)
-    colors : Group[ColorSettings]             = Group(ColorSettings)
+    motion : Group[render.Motion2DLayerSettings] = Group(render.Motion2DLayerSettings, share=[input_fps.as_('fps')])
+    bridge : Group[render.Bridge2DLayerSettings] = Group(render.Bridge2DLayerSettings)
+    fluid  : Group[render.Fluid2DLayerSettings]  = Group(render.Fluid2DLayerSettings)
+    monitor_a: Group[render.MonitorLayerSettings] = Group(render.MonitorLayerSettings)
+    monitor_b: Group[render.MonitorLayerSettings] = Group(render.MonitorLayerSettings)
+    colors : Group[render.ColorSettings]      = Group(render.ColorSettings)
     window : Group[WindowSettings]            = Group(WindowSettings)
 
 

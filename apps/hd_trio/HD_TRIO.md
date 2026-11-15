@@ -39,7 +39,7 @@ start and stop are shared with the session's, so the session's recorders run wit
 
 Each stage composes the layers and sets the cross-camera response (`similarity_scale`): none while the player
 learns the movement, rising in ENJOY, full in PLAY (`render_stages.py`). The density fades faster the more the
-player moves (`FADE_TIME_STILL`, `FADE_TIME_RANGE` in `render.py`).
+player moves (`FADE_TIME_STILL`, `FADE_TIME_RANGE` in `render/hd_trio_render.py`).
 
 ## The intro figure
 

@@ -5,7 +5,7 @@ window at the motion's size, the depth read into it, and the player's two masks.
 uploader's corrected camera frame, is in [INPUT_THREADS.md](INPUT_THREADS.md#the-uploader); the sizes it works
 at and why are in [RESOLUTION.md](RESOLUTION.md). **(deduction)** marks what is inferred.
 
-The stage is `ViewLayer` (settings `view`, `modules/render/layers/flow/view_layer.py`); its geometry and the
+The stage is `ViewLayer` (settings `view`, `modules/render/modules/flow/view_layer.py`); its geometry and the
 depth's read are plain modules in `modules/flow/view` (`view_window.py`, `depth_read.py`, `DepthUpscale`).
 
 ## The stage

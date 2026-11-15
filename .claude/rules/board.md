@@ -3,7 +3,7 @@ description: Board protocols, mixins, and app render board composition
 paths:
   - "modules/board/**"
   - "apps/*/board/**"
-  - "modules/render/layers/**"
+  - "modules/render/**"
 ---
 # Board
 

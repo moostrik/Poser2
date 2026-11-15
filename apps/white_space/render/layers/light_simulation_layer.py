@@ -1,14 +1,14 @@
 from OpenGL.GL import GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, glBlendFunc
 
 from modules.gl import Fbo, Texture, Image
-from modules.render import layers
+from modules import render
 
 from ..shaders.light_simulation import LightSimulation
 
 from ...board import HasLightFrame
 
 
-class LightSimulationLayer(layers.LayerBase):
+class LightSimulationLayer(render.LayerBase):
 
     def __init__(self, board: HasLightFrame) -> None:
         self.board: HasLightFrame = board

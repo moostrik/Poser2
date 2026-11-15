@@ -28,7 +28,7 @@ from OpenGL.GL import (GL_ARRAY_BUFFER, GL_FALSE, GL_FLOAT, GL_FRAMEBUFFER, GL_Q
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from modules.flow import REFERENCE_STEP, Cut, OnDemand, Port, TextureKind, VolumeCut  # noqa: E402
 from modules.gl import Fbo, MouseButton, Style, Texture, Texture3D  # noqa: E402
-from modules.render.layers import Channel, FlowStage, MonitorInput, MonitorLayer, MonitorLayerSettings, MonitorView  # noqa: E402
+from modules.render import Channel, FlowStage, MonitorInput, MonitorLayer, MonitorLayerSettings, MonitorView  # noqa: E402
 
 OUT: str = os.path.join('temp', 'monitor_harness')
 PANEL: tuple[int, int] = (540, 960)         # a panel's size, about what a main-window panel gives

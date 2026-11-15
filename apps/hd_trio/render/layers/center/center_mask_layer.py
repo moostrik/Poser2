@@ -4,10 +4,9 @@
 from OpenGL.GL import GL_R16F, GL_RG32F, GL_RGBA16F, GL_RGBA32F
 
 # Local application imports
-from modules.render.layers import LayerBase, HasCaptureTime
+from modules.render import LayerBase, HasCaptureTime, GuidedFilter, MaskAA
+from modules.gl import Fbo, SwapFbo, Texture, Style, shaders
 from .center_geometry import CenterGeometry, SourceSpace
-from modules.render.shaders import DrawRoi, GuidedFilter, MaskAA, MaskBlend, MaskBlur, MaskDilate, MaskErode
-from modules.gl import Fbo, SwapFbo, Texture, Style
 from modules.utils import Rect
 from ....settings import CenterMaskLayerSettings
 
@@ -46,12 +45,12 @@ class CenterMaskLayer(LayerBase):
         self._coefficients_fbo: SwapFbo = SwapFbo()     # its coefficients a, b and their means
 
         # Shaders
-        self._roi_shader = DrawRoi()
-        self._mask_blend_shader = MaskBlend()
+        self._roi_shader = shaders.DrawRoi()
+        self._mask_blend_shader = shaders.MaskBlend()
         self._mask_AA_shader = MaskAA()
-        self._mask_dilate_shader = MaskDilate()
-        self._mask_erode_shader = MaskErode()
-        self._mask_blur_shader = MaskBlur()
+        self._mask_dilate_shader = shaders.MaskDilate()
+        self._mask_erode_shader = shaders.MaskErode()
+        self._mask_blur_shader = shaders.MaskBlur()
         self._guided_shader = GuidedFilter()
 
     @property

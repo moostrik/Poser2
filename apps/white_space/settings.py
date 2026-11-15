@@ -16,7 +16,7 @@ from modules.panel import PanelSettings
 from modules.camera import CameraHealthSettings, CameraResolution
 from modules.camera.oak import OakCameraSettings
 from modules.recording import PlayerSettings, RecorderSettings
-from modules.render import layers, ColorSettings
+from modules import render
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import PanoramicTrackerSettings, TrackerFrameSourceSettings
 from modules.pose import nodes, trackers, window, analytics
@@ -306,16 +306,16 @@ class SessionGroup(BaseSettings):
 #  Render settings
 # ---------------------------------------------------------------------------
 
-class _TrackerCompositorSettings(layers.TrackerCompositorSettings):
+class _TrackerCompositorSettings(render.TrackerCompositorSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
 
-class _PoseCompositorSettings(layers.PoseCompositorSettings):
+class _PoseCompositorSettings(render.PoseCompositorSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for camera crop")
 
-class _MotionTimeRendererSettings(layers.MotionTimeRendererSettings):
+class _MotionTimeRendererSettings(render.MotionTimeRendererSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
 
-class _DataLayerSettings(layers.DataLayerSettings):
+class _DataLayerSettings(render.DataLayerSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
 
 
@@ -338,14 +338,14 @@ class PlayheadDataLayerSettings(BaseSettings):
     Set the generic ``data.mode`` to NONE when enabling this to avoid two graphs overlapping.
     """
     stage:             Field[Stage]               = Field(Stage.LERP)
-    mode:              Field[layers.LayerMode]            = Field(layers.LayerMode.NONE)
+    mode:              Field[render.LayerMode]            = Field(render.LayerMode.NONE)
     feature_field:     Field[PlayheadFeatureSelect] = Field(PlayheadFeatureSelect.PlayheadOffset, visible=False)
     line_width:        Field[float]               = Field(3.0)
     line_smooth:       Field[float]               = Field(1.0)
     use_scores:        Field[bool]                = Field(False)
     render_labels:     Field[bool]                = Field(True)
     use_history_color: Field[bool]                = Field(False)
-    angle_offset:      Field[layers.AngleOffset]         = Field(layers.AngleOffset.NONE, description="Shift ±π angles before drawing: HALF_PI puts the seam at -π/2, PI at 0")
+    angle_offset:      Field[render.AngleOffset]         = Field(render.AngleOffset.NONE, description="Shift ±π angles before drawing: HALF_PI puts the seam at -π/2, PI at 0")
 
 
 class BeamLightSimSettings(BaseSettings):
@@ -373,8 +373,8 @@ class RenderSettings(BaseSettings):
     beam_light_sim: Group[BeamLightSimSettings] = Group(BeamLightSimSettings)
     # Shared down from the root so the panorama can size itself to the picture the mount
     # actually delivers; it moves nothing, the warp has already levelled the frame.
-    panorama:    Group[layers.PanoramaLayerSettings] = Group(layers.PanoramaLayerSettings, share=[tilt])
-    colors:      Group[ColorSettings]       = Group(ColorSettings)
+    panorama:    Group[render.PanoramaLayerSettings] = Group(render.PanoramaLayerSettings, share=[tilt])
+    colors:      Group[render.ColorSettings] = Group(render.ColorSettings)
     window:      Group[WindowSettings]      = Group(WindowSettings)
 
 

@@ -9,7 +9,7 @@ is next is in [FLOW_PLAN.md](FLOW_PLAN.md). "Code" is what the files show;
 
 The 2D fluid (`fluid_2d/`, `Fluid2DLayer`, hd_trio) is apart: nothing here changes it. The 3D
 fluid is `Fluid3D` (`fluid_3d/fluid_3d.py`), its layer `Fluid3DLayer`
-(`modules/render/layers/flow/fluid_3d_layer.py`), run by deep_flow alone.
+(`modules/render/modules/flow/fluid_3d_layer.py`), run by deep_flow alone.
 
 ## The goal
 

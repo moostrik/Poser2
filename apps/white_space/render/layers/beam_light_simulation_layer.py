@@ -19,7 +19,7 @@ import numpy as np
 from OpenGL.GL import GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, glBlendFunc
 
 from modules.gl import Fbo, Texture, Image
-from modules.render import layers
+from modules import render
 
 from .beam_light_projection import project_beam_lights, paint_flashes
 from ..shaders.light_simulation import LightSimulation
@@ -32,7 +32,7 @@ class BeamLightSimulationBoard(HasLightFrame, HasFlashes, Protocol):
     ...
 
 
-class BeamLightSimulationLayer(layers.LayerBase):
+class BeamLightSimulationLayer(render.LayerBase):
 
     def __init__(self, board: BeamLightSimulationBoard, settings: BeamLightSimSettings) -> None:
         self.board: BeamLightSimulationBoard = board

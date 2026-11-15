@@ -1,0 +1,60 @@
+# Standard library imports
+import torch
+from typing import TYPE_CHECKING
+
+# Third-party imports
+from OpenGL.GL import GL_CLAMP_TO_BORDER
+
+# Local application imports
+from modules.board import HasSegmentationImages
+from modules.gl import Tensor, Texture
+from ...layer_base import LayerBase, DataCache
+
+if TYPE_CHECKING:
+    from modules.inference import segmentation
+
+
+class SegmentationMaskLayer(LayerBase):
+    """Pure source layer for mask retrieval from DataHub.
+
+    Retrieves mask tensor from GPUFrame and uploads to GPU texture.
+    No processing - dilation now handled by CenterMaskLayer.
+    """
+
+    def __init__(self, track_id: int, board: HasSegmentationImages) -> None:
+        self._track_id: int = track_id
+        self._board: HasSegmentationImages = board
+        self._cuda_image: Tensor = Tensor(wrap=GL_CLAMP_TO_BORDER)
+        self._data_cache: DataCache[torch.Tensor] = DataCache[torch.Tensor]()
+        self._timestamp: float | None = None    # the capture time of the frame the mask was made from
+
+    @property
+    def texture(self) -> Texture:
+        return self._cuda_image
+
+    @property
+    def timestamp(self) -> float | None:
+        """The capture time of the camera frame the mask it holds was made from (`segmentation.Image.timestamp`), None before the first."""
+        return self._timestamp
+
+    def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
+        pass  # Lazy allocation on first update
+
+    def deallocate(self) -> None:
+        self._cuda_image.deallocate()
+
+    def update(self) -> None:
+        seg_image: segmentation.Image | None = self._board.get_segmentation_image(self._track_id)
+        mask_tensor: torch.Tensor | None = seg_image.mask if seg_image else None
+        self._data_cache.set(mask_tensor)
+
+        if self._data_cache.lost:
+            self._cuda_image.clear()
+            self._timestamp = None
+
+        if self._data_cache.idle or mask_tensor is None or seg_image is None:
+            return
+
+        self._cuda_image.set_tensor(mask_tensor)
+        self._cuda_image.update()
+        self._timestamp = seg_image.timestamp

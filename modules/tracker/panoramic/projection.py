@@ -18,7 +18,7 @@ comparable if they were computed at the same depth, and that is the caller's job
 
 **Everything is a radius from the fixture axis**, the same number the settings, the shader, the
 panorama's `R` label and a tape on the floor carry. The strip's own rows and extent live with the
-display (`modules/render/layers/panorama/strip.py`).
+display (`modules/render/modules/tracker/panoramic/strip.py`).
 """
 
 import math

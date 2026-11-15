@@ -39,7 +39,7 @@ import numpy as np  # noqa: E402
 from modules.log_config import setup_logging, install_excepthooks  # noqa: E402
 from modules.camera import CameraFrame, FrameType  # noqa: E402
 from modules.pose import FrameDict  # noqa: E402
-from modules.render.layers import Motion3DLayer  # noqa: E402
+from modules.render import Motion3DLayer  # noqa: E402
 from modules.utils import PerformanceTimer  # noqa: E402
 from apps.deep_flow.main import DeepFlowMain  # noqa: E402
 from apps.deep_flow.settings import Stage  # noqa: E402

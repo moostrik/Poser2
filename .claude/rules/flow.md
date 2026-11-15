@@ -2,7 +2,7 @@
 description: Naming in the flow: the fluid's things by the textbook word, readings and modules
 paths:
   - "modules/flow/**"
-  - "modules/render/layers/flow/**"
+  - "modules/render/modules/flow/**"
 ---
 # Flow naming
 

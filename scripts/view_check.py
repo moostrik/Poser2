@@ -34,7 +34,7 @@ from modules.recording import read_metadata  # noqa: E402
 from modules.flow import DepthRead, DepthVelocitySettings, edge_aware_depth, mask_sided_depth, texture_roi  # noqa: E402
 from modules.gl import Style, Tensor, Texture  # noqa: E402
 from modules.inference import GpuDepth, GpuImage, SerialUploader, SerialUploaderSettings  # noqa: E402
-from modules.render.layers import ViewInput, ViewLayer, ViewLayerSettings  # noqa: E402
+from modules.render import ViewInput, ViewLayer, ViewLayerSettings  # noqa: E402
 from modules.video import StreamReader  # noqa: E402
 
 RECORDINGS = Path('apps/deep_flow/data/recordings')

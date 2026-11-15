@@ -10,7 +10,7 @@ from them, **(site fact)** what the operator saw.
 
 The x/y solve is `LucasKanadeFlow` (`motion/lucas_kanade_flow.py`), z the depth velocity
 (`DepthVelocity`, `motion/depth_velocity.py`), and `LucasKanadeFlow3D` (`motion/lucas_kanade_flow_3d.py`)
-composes them; the layer is `MotionLayer` (`modules/render/layers/flow/motion_layer.py`) with `Motion3DLayer`
+composes them; the layer is `MotionLayer` (`modules/render/modules/flow/motion_layer.py`) with `Motion3DLayer`
 and `Motion2DLayer`.
 
 ## How it measures
@@ -70,10 +70,10 @@ than the expected frame interval is a dropped frame. A camera frame has
 no other identity: `CameraFrame` and `Capture` carry a timestamp and no sequence number, because the
 device's sequence numbers skip on the depth while every frame arrives (`modules/camera/oak4/OAK4.md`).
 A source layer keeps the capture time of the frame it holds (`CaptureImageLayer`, `CaptureDepthLayer`,
-`MaskSourceLayer` and `ForegroundSourceLayer` from `segmentation.Image.timestamp`), and a view (the
+`SegmentationMaskLayer` and `SegmentationForegroundLayer` from `segmentation.Image.timestamp`), and a view (the
 view stage, `ViewLayer`; hd_trio's `CenterCamLayer`, `CenterMaskLayer`, `CenterForegroundLayer`) forwards
 the stamp of the frame it drew, so the app reads it off the layer it takes the texture from
-(`HasCaptureTime`, `modules/render/layers/layer_base.py`); deep_flow hands the motion its capture's own. The interval a measurement divides by is in
+(`HasCaptureTime`, `modules/render/layer_base.py`); deep_flow hands the motion its capture's own. The interval a measurement divides by is in
 [FLOW.md's two clocks](FLOW.md#inputs-and-outputs).
 
 `DepthView(texture, view_span, depth_step)` (`modules/flow/motion/depth_view.py`) is the depth on

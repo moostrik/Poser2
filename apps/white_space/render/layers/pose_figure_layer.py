@@ -14,7 +14,7 @@ import numpy as np
 
 from modules.board import HasFrames
 from modules.pose import Azimuth, Points2D, PointLandmark, nodes
-from modules.render import ColorSettings, layers, shaders
+from modules import render
 
 from ...light.layers import normalize_azimuth
 from ...settings import Stage
@@ -49,18 +49,18 @@ class PoseFigureBoard(HasFrames, Protocol):
     ...
 
 
-class PoseFigureLayer(layers.LayerBase):
+class PoseFigureLayer(render.LayerBase):
     """The poses' figures over the projection row; see the module docstring.
 
     Owns no FBO: it draws into whatever viewport is current when `draw()` is called, which must be
     the projection row's, sized by the last `allocate`.
     """
 
-    def __init__(self, board: PoseFigureBoard, colors: ColorSettings, angle_extractor: nodes.AngleExtractorSettings) -> None:
+    def __init__(self, board: PoseFigureBoard, colors: render.ColorSettings, angle_extractor: nodes.AngleExtractorSettings) -> None:
         self._board: PoseFigureBoard = board
-        self._colors: ColorSettings = colors
+        self._colors: render.ColorSettings = colors
         self._angle_extractor: nodes.AngleExtractorSettings = angle_extractor   # its aspect_ratio is the crop's
-        self._shader: shaders.PosePointLines = shaders.PosePointLines()
+        self._shader: render.PosePointLines = render.PosePointLines()
         self._width: int = 1
         self._height: int = 1
 

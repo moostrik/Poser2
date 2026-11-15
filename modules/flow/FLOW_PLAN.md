@@ -158,7 +158,7 @@ docstring, a 21-line pipeline, goes with it.
 ## I. Every setting and its description
 
 The flow's packages (`modules/flow`: `motion`, `view`, `bridge_2d`, `bridge_3d`, `fluid_2d`, `fluid_3d`,
-`visualization`, `shaders` and its files) and its layers (`modules/render/layers/flow`), 210 Python files, are
+`visualization`, `shaders` and its files) and its layers (`modules/render/modules/flow`), 210 Python files, are
 held to `CLAUDE.md` and `.claude/rules` in form: a name, a file, a docstring, an import. Met throughout: other
 packages imported from their `__init__`, one `from` line a package, no `__all__`, no `import *`; time from
 `perf_counter`; loggers by `getLogger(__name__)`, no `print`; no `# type: ignore`; every public function with a

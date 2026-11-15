@@ -1,13 +1,10 @@
 """Renders centered and rotated camera view based on pose anchor points with optional mask."""
 
 # Local application imports
-from modules.render.layers import LayerBase, HasCaptureTime
+from modules.render import LayerBase, HasCaptureTime
+from modules.gl import Fbo, SwapFbo, Texture, shaders
 from .center_geometry import CenterGeometry
-from modules.render.shaders import Blend, DrawRoi, MaskApply
 from ....settings import CenterCamLayerSettings
-
-# GL
-from modules.gl import Fbo, SwapFbo, Texture
 
 
 class CenterCamLayer(LayerBase):
@@ -35,9 +32,9 @@ class CenterCamLayer(LayerBase):
         self._output_fbo: Fbo | SwapFbo = self._masked_fbo if self._mask_texture else self._cam_blend_fbo
 
         # Shaders
-        self._roi_shader = DrawRoi()
-        self._blend_shader = Blend()
-        self._mask_shader = MaskApply()
+        self._roi_shader = shaders.DrawRoi()
+        self._blend_shader = shaders.Blend()
+        self._mask_shader = shaders.MaskApply()
 
     @property
     def texture(self) -> Texture:

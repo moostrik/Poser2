@@ -25,7 +25,7 @@ from OpenGL.raw.GL.VERSION.GL_3_3 import glGetQueryObjectui64v as raw_get_query 
 
 from modules.gl import Texture  # noqa: E402
 from modules.flow import LucasKanadeFlow3D, LucasKanadeFlow3DSettings  # noqa: E402
-from modules.render.layers import Bridge3DLayer, Bridge3DLayerSettings, BridgeInput  # noqa: E402
+from modules.render import Bridge3DLayer, Bridge3DLayerSettings, BridgeInput  # noqa: E402
 from bridge_compare import PRESET, depth_range  # noqa: E402
 from depth_velocity_compare import Frames, context, recorded_settings, upload  # noqa: E402
 

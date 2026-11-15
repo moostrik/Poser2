@@ -46,7 +46,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from modules.gl import Texture, Texture3D  # noqa: E402
 from modules.flow import Cut, LucasKanadeFlow3D, LucasKanadeFlow3DSettings, TextureKind, VolumeCut  # noqa: E402
-from modules.render.layers import (Bridge3DLayer, Bridge3DLayerSettings, BridgeInput, Fluid3DLayer, Fluid3DLayerSettings,  # noqa: E402
+from modules.render import (Bridge3DLayer, Bridge3DLayerSettings, BridgeInput, Fluid3DLayer, Fluid3DLayerSettings,  # noqa: E402
                                    FluidInput, Injection)
 from bridge_compare import COAST_SHARE, PRESET, SETTLE, coast_s, depth_range, events_max, set_path, windows  # noqa: E402
 from depth_velocity_compare import Frames, context, overrides, read_back, recorded_settings, setting_owner, upload  # noqa: E402

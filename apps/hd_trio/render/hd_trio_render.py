@@ -6,12 +6,12 @@ from typing import cast
 import numpy as np
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId
+from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId, shaders
 from modules.board import HasFrames
 from modules.camera import RigCameraSettings, CameraHealthSettings
 from modules.flow import Port, hold_tick
 from modules.pose import Frame, Similarity, AngleMotion
-from modules.render import ColorSettings, layers as ls, shaders, make_subdivision, SubdivisionRow, Subdivision
+from modules import render
 from modules.utils import Rect, Point2f, Color
 
 from ..board import RenderBoard
@@ -77,7 +77,7 @@ class HDTrioRender(RenderBase):
         self._preview_layers: list[Layers] = settings.layer.select.preview
         self._draw_layers: list[Layers] = settings.layer.select.final
 
-        self.L: dict[Layers, dict[int, ls.LayerBase]] = {layer: {} for layer in Layers}
+        self.L: dict[Layers, dict[int, render.LayerBase]] = {layer: {} for layer in Layers}
         self._stages: dict[ShowStage, list[StageLayer]] = {stage: [] for stage in STAGES}
 
         # intro sequence overlay — shared objects must exist before the per-camera loop
@@ -88,50 +88,50 @@ class HDTrioRender(RenderBase):
 
         center_masks: dict[int, Texture] = {}
         for i in range(self.num_cams):
-            cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.board)
-            cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.board)
-            cam_foreground = self.L[Layers.cam_foreground][i] = ls.ForegroundSourceLayer(i, self.board)
-            cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.board)
+            cam_image =     self.L[Layers.cam_image][i] =   render.CameraImageLayer(    i, self.board)
+            cam_mask =      self.L[Layers.cam_mask][i] =    render.SegmentationMaskLayer(i, self.board)
+            cam_foreground = self.L[Layers.cam_foreground][i] = render.SegmentationForegroundLayer(i, self.board)
+            cam_crop =      self.L[Layers.cam_crop][i] =    render.CropImageLayer(      i, self.board)
 
-            tracker_compositor = self.L[Layers.tracker][i] = ls.TrackerCompositor(  i, self.board,      cam_image.texture,          settings.preview.tracker,   settings.colors)
-            pose_compositor = self.L[Layers.pose][i] =      ls.PoseCompositor(      i, self.board,      cam_image.texture, cam_crop, settings.preview.pose,      settings.colors)
-            self.L[Layers.cam_readings][i] =                 ls.CameraReadingsLayer( cameras[i], camera_health)
+            tracker_compositor = self.L[Layers.tracker][i] = render.TrackerCompositor(  i, self.board,      cam_image.texture,          settings.preview.tracker,   settings.colors)
+            pose_compositor = self.L[Layers.pose][i] =      render.PoseCompositor(      i, self.board,      cam_image.texture, cam_crop, settings.preview.pose,      settings.colors)
+            self.L[Layers.cam_readings][i] =                 render.CameraReadingsLayer( cameras[i], camera_health)
 
             center_geometry = self.L[Layers.center_geometry][i] = CenterGeometry(    i, self.board,     cam_image.texture,          settings.center.geometry)
             center_mask =   self.L[Layers.center_mask][i] = CenterMaskLayer(        i, center_geometry, cam_mask,               SourceSpace.CROP, settings.center.mask)
             center_masks[i] = center_mask.texture
             center_cam =    self.L[Layers.center_cam][i] =  CenterCamLayer(         i, center_geometry, cam_image,          center_masks[i], settings.center.cam)
             center_foreground = self.L[Layers.center_foreground][i] = CenterForegroundLayer(i, center_geometry, cam_foreground, center_masks[i], SourceSpace.CROP, False, settings.center.foreground, settings.colors)
-            center_pose =   self.L[Layers.center_pose][i] = ls.ViewPoseLayer(     i, center_geometry,                             settings.center.pose,       settings.colors)
+            center_pose =   self.L[Layers.center_pose][i] = render.ViewPoseLayer(     i, center_geometry,                             settings.center.pose,       settings.colors)
 
             intro_geometry = self._intro_geometries[i] =     CenterGeometry(         i, cast(HasFrames, self._intro_proxy), cam_image.texture, settings.center.geometry)
-            self.L[Layers.intro_pose][i] =                   ls.ViewPoseLayer(     i, intro_geometry,                             settings.intro_sequence.pose, cast(ColorSettings, self._intro_color_proxy))
+            self.L[Layers.intro_pose][i] =                   render.ViewPoseLayer(     i, intro_geometry,                             settings.intro_sequence.pose, cast(render.ColorSettings, self._intro_color_proxy))
 
-            ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,      center_foreground.texture, center_masks, settings.center.color,  settings.colors)
-            self.L[Layers.motion][i] =                      ls.Motion2DLayer(       settings.motion)
-            self.L[Layers.bridge][i] =                      ls.Bridge2DLayer(       settings.bridge)
-            fluid =         self.L[Layers.fluid][i] =       ls.Fluid2DLayer(        settings.fluid)
-            self.L[Layers.monitor_a][i] =                   ls.MonitorLayer(        settings.monitor_a)
-            self.L[Layers.monitor_b][i] =                   ls.MonitorLayer(        settings.monitor_b)
+            ms_mask =       self.L[Layers.color_mask][i] =  render.SimilaritySilhouetteLayer(i, self.board,      center_foreground.texture, center_masks, settings.center.color,  settings.colors)
+            self.L[Layers.motion][i] =                      render.Motion2DLayer(       settings.motion)
+            self.L[Layers.bridge][i] =                      render.Bridge2DLayer(       settings.bridge)
+            fluid =         self.L[Layers.fluid][i] =       render.Fluid2DLayer(        settings.fluid)
+            self.L[Layers.monitor_a][i] =                   render.MonitorLayer(        settings.monitor_a)
+            self.L[Layers.monitor_b][i] =                   render.MonitorLayer(        settings.monitor_b)
 
-            self.L[Layers.composite][i] =                   ls.CompositeLayer(                          [fluid, ms_mask],           settings.layer.composite)
+            self.L[Layers.composite][i] =                   render.LayerCompositor(                          [fluid, ms_mask],           settings.layer.composite)
 
-            self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.board, settings.data.a, settings.colors)
-            self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.board, settings.data.a, settings.colors)
-            self.L[Layers.data_B_W][i]  = ls.FeatureWindowLayer(i, self.board, settings.data.b, settings.colors)
-            self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.board, settings.data.b, settings.colors)
-            self.L[Layers.data_time][i] = ls.MotionTimeRenderer(i, self.board)
+            self.L[Layers.data_A_W][i]  = render.FeatureWindowLayer(i, self.board, settings.data.a, settings.colors)
+            self.L[Layers.data_A_F][i]  = render.FeatureFrameLayer( i, self.board, settings.data.a, settings.colors)
+            self.L[Layers.data_B_W][i]  = render.FeatureWindowLayer(i, self.board, settings.data.b, settings.colors)
+            self.L[Layers.data_B_F][i]  = render.FeatureFrameLayer( i, self.board, settings.data.b, settings.colors)
+            self.L[Layers.data_time][i] = render.MotionTimeRenderer(i, self.board)
 
             cam_layers = {layer: cam_dict[i] for layer, cam_dict in self.L.items() if i in cam_dict}
             for stage, cls in STAGES.items():
                 self._stages[stage].append(cls(i, board, settings, cam_layers))
 
         # composition
-        self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name='track',        columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name='preview',      columns=self.max_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
+        self.subdivision_rows: list[render.SubdivisionRow] = [
+            render.SubdivisionRow(name='track',        columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
+            render.SubdivisionRow(name='preview',      columns=self.max_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
         ]
-        self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.window.width, settings.window.height, False)
+        self.subdivision: render.Subdivision = render.make_subdivision(self.subdivision_rows, settings.window.width, settings.window.height, False)
 
         # The length of each tick, the flow's dt, held to twice the mean tick (`hold_tick`)
         self._last_tick: float = 0.0
@@ -146,7 +146,7 @@ class HDTrioRender(RenderBase):
         self._active_stages: list[StageLayer] = []
 
     def on_main_window_resize(self, width: int, height: int) -> None:
-        self.subdivision = make_subdivision(self.subdivision_rows, width, height, True)
+        self.subdivision = render.make_subdivision(self.subdivision_rows, width, height, True)
         self.allocate_window_renders()
 
     def allocate(self) -> None:
@@ -188,43 +188,43 @@ class HDTrioRender(RenderBase):
         another's at the cross-camera similarity times `similarity_scale`."""
         dt: float = self._dt
         colors: list[Color] = self.settings.colors.track_colors
-        bridges: dict[int, ls.Bridge2DLayer] = {i: cast(ls.Bridge2DLayer, layer) for i, layer in self.L[Layers.bridge].items()}
+        bridges: dict[int, render.Bridge2DLayer] = {i: cast(render.Bridge2DLayer, layer) for i, layer in self.L[Layers.bridge].items()}
 
         for i, _motion in self.L[Layers.motion].items():
-            motion = cast(ls.Motion2DLayer, _motion)
+            motion = cast(render.Motion2DLayer, _motion)
             if i not in bridges:
                 continue
-            mask_view: ls.LayerBase = self.L[Layers.center_mask][i]
-            motion.set_input(ls.MotionInput(mask_view.texture, mask_view.timestamp if isinstance(mask_view, ls.HasCaptureTime) else None, dt))
-            bridges[i].set_input(ls.BridgeInput(motion.output.velocity, dt, self.L[Layers.center_foreground][i].texture))
+            mask_view: render.LayerBase = self.L[Layers.center_mask][i]
+            motion.set_input(render.MotionInput(mask_view.texture, mask_view.timestamp if isinstance(mask_view, render.HasCaptureTime) else None, dt))
+            bridges[i].set_input(render.BridgeInput(motion.output.velocity, dt, self.L[Layers.center_foreground][i].texture))
 
         for i, _fluid in self.L[Layers.fluid].items():
-            fluid = cast(ls.Fluid2DLayer, _fluid)
+            fluid = cast(render.Fluid2DLayer, _fluid)
             pose: Frame | None = self.board.get_frame(self.settings.stage, i)
             motion_value: float = float(pose[AngleMotion].value) if pose is not None and AngleMotion in pose else 0.0
             similarities: np.ndarray = (np.nan_to_num(pose[Similarity].values) if pose is not None and Similarity in pose
                                         else np.zeros(self.max_players)) * self.settings.similarity_scale
             # More motion, a faster fade
             self.settings.fluid.density.fade_time = FADE_TIME_STILL - motion_value ** 2 * FADE_TIME_RANGE
-            injections: list[ls.Injection] = []
+            injections: list[render.Injection] = []
             for j, bridge in bridges.items():
-                output: ls.BridgeOutput = bridge.output
+                output: render.BridgeOutput = bridge.output
                 weight: float = motion_value if j == i else (float(similarities[j]) if j < len(similarities) else 0.0)
                 color: Color = colors[j % len(colors)]
-                injections.append(ls.Injection(output.boundary_velocity, output.boundary_density, output.boundary_temperature, weight=weight, color=(color.r, color.g, color.b)))
-            fluid.set_input(ls.FluidInput(dt, injections))
+                injections.append(render.Injection(output.boundary_velocity, output.boundary_density, output.boundary_temperature, weight=weight, color=(color.r, color.g, color.b)))
+            fluid.set_input(render.FluidInput(dt, injections))
 
         for i, _motion in self.L[Layers.motion].items():
             if i not in bridges or i not in self.L[Layers.fluid]:
                 continue
-            ports: dict[ls.FlowStage, dict[str, Port]] = {
-                ls.FlowStage.MOTION: cast(ls.Motion2DLayer, _motion).ports,
-                ls.FlowStage.BRIDGE: bridges[i].ports,
-                ls.FlowStage.FLUID: cast(ls.Fluid2DLayer, self.L[Layers.fluid][i]).ports,
+            ports: dict[render.FlowStage, dict[str, Port]] = {
+                render.FlowStage.MOTION: cast(render.Motion2DLayer, _motion).ports,
+                render.FlowStage.BRIDGE: bridges[i].ports,
+                render.FlowStage.FLUID: cast(render.Fluid2DLayer, self.L[Layers.fluid][i]).ports,
             }
             for key in (Layers.monitor_a, Layers.monitor_b):
                 if i in self.L[key]:
-                    cast(ls.MonitorLayer, self.L[key][i]).set_input(ls.MonitorInput(ports))
+                    cast(render.MonitorLayer, self.L[key][i]).set_input(render.MonitorInput(ports))
 
     def update(self) -> None:
         self._notify_update()

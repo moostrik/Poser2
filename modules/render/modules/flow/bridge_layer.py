@@ -1,0 +1,165 @@
+"""The bridge stage: the layer that turns the measured velocity into what the fluid injects.
+
+`BridgeInput` is what the app hands it each tick, `BridgeOutput` what it hands out. Both hold values
+only: a texture field holds the `Fbo`, `SwapFbo` or `Tensor` object itself, never a buffer taken
+from it.
+
+`BridgeLayer` is the shape the 2D and the 3D bridge layer share: it steps its bridges on each update
+by the input's `dt` (they are filters in time) and makes the density's color from the image, the tint
+and the mask. The app updates it once per camera capture, `dt` the interval between captures, or
+once per render tick, `dt` the tick's. It draws nothing; the monitors
+draw its output's `textures`."""
+
+from abc import abstractmethod
+from dataclasses import dataclass
+from typing import Annotated
+
+from OpenGL.GL import GL_RGBA16F
+
+from modules.gl import Fbo, Texture, Style
+from modules.flow import HasPorts, Port, Ports, TextureKind
+from modules.settings import Field
+from .shaders import DensityColor
+from .stage_layer import StageLayer, StageLayerSettings, StageOutput
+
+
+@dataclass
+class BridgeInput:
+    """One camera's velocity for the bridge stage, built by the app for each step. `velocity` is the
+    motion output; `dt` the time the step covers (s); `image`, or None, the picture whose RGB colors the
+    density; `color` an RGB tint on it, white by default, the color alone without an image; `mask`
+    the player's mask on the view, or None, which gates the image; `depth_mask` where the depth is the
+    player's on the view, or None, a share of the 3D bridge's amounts; `z_position` the motion's, or None.
+    `same_tick`: this step is another capture in the render tick of the step before, so the fluid, which
+    steps once a tick, takes per pixel the density and the temperature of the step whose amount is larger
+    (the 3D bridge's), and the velocity of this one."""
+    velocity: Annotated[Texture, TextureKind.VELOCITY]
+    dt: float
+    image: Annotated[Texture | None, TextureKind.IMAGE] = None
+    color: tuple[float, float, float] = (1.0, 1.0, 1.0)
+    mask: Annotated[Texture | None, TextureKind.SCALAR] = None
+    depth_mask: Annotated[Texture | None, TextureKind.SCALAR] = None
+    z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
+    same_tick: bool = False
+
+
+@dataclass
+class BridgeOutput(StageOutput):
+    """The bridge stage's textures, what the fluid injects, in two systems. The boundary, what the water is
+    dragged toward: `boundary_velocity`, widths/s; `boundary_density`, in 2D the amount alone, in 3D RGBA,
+    the amount times the color, with the amount as alpha; `boundary_temperature`. The body force, what is
+    added × dt, the 3D bridge's only: `body_force_acceleration`, widths/s², `body_force_density`,
+    `body_force_temperature`, each None while the bridge gives none. The 3D bridge's `expansion`, where the water
+    swells, a presence 0 to 1, or None. Where each goes in depth, the 3D bridge's only: each output's
+    `_z_position`, its readings' z positions; None without."""
+    boundary_velocity: Annotated[Texture, TextureKind.VELOCITY]
+    boundary_density: Annotated[Texture, TextureKind.IMAGE]
+    boundary_temperature: Annotated[Texture, TextureKind.SCALAR]
+    body_force_acceleration: Annotated[Texture | None, TextureKind.ACCELERATION] = None
+    body_force_density: Annotated[Texture | None, TextureKind.IMAGE] = None
+    body_force_temperature: Annotated[Texture | None, TextureKind.SCALAR] = None
+    boundary_velocity_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
+    boundary_density_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
+    boundary_temperature_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
+    body_force_acceleration_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
+    body_force_density_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
+    body_force_temperature_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
+    expansion: Annotated[Texture | None, TextureKind.SCALAR] = None
+    expansion_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
+
+
+class BridgeLayerSettings(StageLayerSettings):
+    """What the 2D and the 3D bridge layer share; each adds its bridges' groups."""
+    width: Field[int] =     Field(2160, min=32, max=4096, step=32, description="Width the bridge writes its outputs at")
+    height: Field[int] =    Field(3840, min=32, max=4096, step=32, description="Height the bridge writes its outputs at")
+
+
+class BridgeLayer(StageLayer[BridgeInput, BridgeOutput]):
+    """The bridge stage's layer. `update` makes the density's color and runs the bridges (`_bridge`).
+    The bridges' filters run at the velocity's size, which the layer follows; the outputs are written
+    at `settings.width` by `settings.height`, which it follows too. The layer draws nothing."""
+
+    def __init__(self, settings: BridgeLayerSettings) -> None:
+        super().__init__(settings)
+        self.settings: BridgeLayerSettings = settings
+        self._color: Fbo = Fbo()                        # the density's color: the image's RGB, or white, times the tint and the mask
+        self._color_shader: DensityColor = DensityColor()
+        self._flow_size: tuple[int, int] = (0, 0)       # the size the filters run at: the velocity's
+        self._output_size: tuple[int, int] = (0, 0)     # the size the outputs are written at: settings.width/height
+
+    # ========== Lifecycle ==========
+
+    def allocate(self, width: int, height: int, internal_format: int | None = None) -> None:
+        """The size the app gives is not the bridge's: it writes at `settings.width` by `settings.height`."""
+        self._color_shader.allocate()
+
+    def deallocate(self) -> None:
+        self._deallocate_sizes()
+        self._color_shader.deallocate()
+        super().deallocate()
+
+    def reset(self) -> None:
+        """Start the bridges from rest."""
+        self._reset_stages()
+
+    def _follow_sizes(self, velocity: Texture) -> None:
+        """Allocate the bridges at the velocity's size and the output size, and again when either changes."""
+        flow_size: tuple[int, int] = (velocity.width, velocity.height)
+        output_size: tuple[int, int] = (self.settings.width, self.settings.height)
+        if (flow_size, output_size) == (self._flow_size, self._output_size):
+            return
+        self._deallocate_sizes()
+        self._flow_size, self._output_size = flow_size, output_size
+        self._color.allocate(*output_size, GL_RGBA16F)
+        self._allocate_stages(*flow_size, *output_size)
+        self._reset_stages()
+
+    def _deallocate_sizes(self) -> None:
+        if self._flow_size == (0, 0):
+            return
+        self._deallocate_stages()
+        self._color.deallocate()
+        self._flow_size = self._output_size = (0, 0)
+
+    @abstractmethod
+    def _allocate_stages(self, width: int, height: int, output_width: int, output_height: int) -> None:
+        """Allocate the bridges' filters at the velocity's size and their outputs at `output_width` by `output_height`."""
+
+    @abstractmethod
+    def _deallocate_stages(self) -> None: ...
+
+    @abstractmethod
+    def _reset_stages(self) -> None: ...
+
+    @abstractmethod
+    def _bridge(self, input: BridgeInput, color: Texture) -> None:
+        """Run the bridges on `input.velocity`, stepping `input.dt`; `color` is the density's color."""
+
+    @abstractmethod
+    def _bridges(self) -> dict[str, HasPorts]:
+        """The bridges it runs, by their settings group's name, in the order it runs them."""
+
+    def _components(self) -> dict[str, HasPorts]:
+        """The density's color, made first, then the bridges."""
+        return {'': Ports({'color': Port(self._color, TextureKind.IMAGE)}), **self._bridges()}
+
+    # ========== Processing ==========
+
+    def _update(self) -> None:
+        input: BridgeInput | None = self._input
+        if input is None or not input.velocity.allocated:
+            return
+        self._follow_sizes(input.velocity)
+
+        Style.push_style()
+        Style.set_blend_mode(Style.BlendMode.DISABLED)
+
+        self._color.begin()
+        self._color_shader.use(input.image, input.color, input.mask)
+        self._color.end()
+        self._bridge(input, self._color)
+
+        Style.pop_style()
+
+    def draw(self) -> None:
+        """A stage draws nothing; a monitor draws its textures."""

@@ -112,7 +112,7 @@ it 6.4 ms on average to upload.
 
 The board keeps each camera's captures until the render takes them (`CaptureStoreMixin.take_captures`, at most
 4; beyond that the oldest is dropped and counted). Each tick the render runs every capture since the last, in
-order (`_run_capture` in `apps/deep_flow/render.py`): its image and depth into GL, the view stage, the foreground's
+order (`_run_capture` in `apps/deep_flow/render/deep_flow_render.py`): its image and depth into GL, the view stage, the foreground's
 look, the motion, and the bridge stepping over the time since the capture before. A tick without a capture runs
 none of them, so no stage works on a frame twice; the fluid runs every tick on the tick's `dt`.
 

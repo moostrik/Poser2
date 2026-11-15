@@ -625,7 +625,7 @@ the line: both gates have the form `|Δ| ≤ angle`, so two fields each `angle` 
 difference the gate allows. Two fields of one color that overlap are two observations the tracker
 will join; two colors that overlap are two people it might confuse. Fields of ±`angle` would overlap
 out to twice the gate and claim links that never happen — at `link_angle` 15 they would show a link
-for two views 30° apart. `modules/render/tests/test_marks.py` asserts that drawn overlap and
+for two views 30° apart. `modules/render/modules/tracker/panoramic/tests/test_marks.py` asserts that drawn overlap and
 `Seams._observations_match` agree case for case.
 
 Two things the field does not say:
@@ -728,7 +728,7 @@ must land on that edge of the yellow zone band, to the pixel (*Two axes, and the
 `R` on the label reads the taped distance at the same time — the same number as `rig.zone_max_radius`
 and the footer's `zone`, with nothing to convert — and the azimuth does not move through any of it.
 
-Judge the feet on the panorama, not on the camera row. `BBoxRenderer` there reads stage frames, whose
+Judge the feet on the panorama, not on the camera row. `PoseBoxRenderer` there reads stage frames, whose
 `BBox` the crop extractor has overwritten with the crop ROI — zoomed 1.1× and aspect-filled to 3:4 —
 so its bottom sits 10–27 px below the tracker's real ROI bottom, by a distance-dependent amount. The
 crop box is the right thing to draw for a crop, and the pose skeleton draws the ankles where pixel
