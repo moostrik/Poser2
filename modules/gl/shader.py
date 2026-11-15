@@ -252,7 +252,7 @@ class Shader():
         """Read shader source code from file; a line `#include "name.glsl"` is replaced by that file, beside
         the including one, so passes can share one rule (each file included once per shader)."""
         try:
-            with open(filename, 'r') as file:
+            with open(filename, 'r', encoding='utf-8') as file:
                 source = file.read()
         except FileNotFoundError:
             return ''
