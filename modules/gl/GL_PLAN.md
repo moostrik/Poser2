@@ -78,7 +78,9 @@ Checked by:
   `draw_roi_turned` holds the rotation, whose direction turns with y **(inferred)**
 - the text layout's unit test
 - each app run before and after H (deep_flow, hd_trio, smile, white_space), its screens compared by me, on
-  Matthias's permission for every app (2026-11-15); he gets only what I cannot judge
+  Matthias's permission for every app (2026-11-15); he gets only what I cannot judge. white_space's `-sim` video
+  is old and holds no tracklets or poses (site fact), so its pose figure is held by the harness's `PosePointLines`
+  case alone
 
 ## I. Capture asks GL nothing
 
