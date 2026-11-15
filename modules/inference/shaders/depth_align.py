@@ -1,7 +1,10 @@
+"""DepthAlign: the depth alignment in GL, the reference `scripts/depth_align_check.py` holds the CUDA kernels of
+`depth_align.py` to."""
+
 import numpy as np
 from OpenGL.GL import GL_R32F, GL_R32UI, GL_RED_INTEGER, GL_TRUE, GL_UNSIGNED_INT, glClearTexImage, glUniform1i, glUniform2i, glUniformMatrix3fv, \
     glUniformMatrix4x3fv, glUseProgram
-from .. import ComputeShader, Texture
+from modules.gl import ComputeShader, Texture
 
 IDENTITY: np.ndarray = np.eye(3, dtype=np.float32)
 EMPTY: np.ndarray = np.array([0xFFFFFFFF], dtype=np.uint32)

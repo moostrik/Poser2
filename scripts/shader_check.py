@@ -32,6 +32,7 @@ from modules.flow.visualization.shaders import ColormapKey  # noqa: E402
 from modules.gl import Colormap, Context, Fbo, Style, Text, Texture, shaders  # noqa: E402
 from modules.gl.shaders.filter import KERNEL_SIGMA  # noqa: E402
 from modules.pose import PointLandmark, Points2D  # noqa: E402
+from modules.inference.shaders import DepthAlign  # noqa: E402
 from modules.render import PosePointLines  # noqa: E402
 from modules.render.modules.flow.shaders import DensityColorize, DepthView  # noqa: E402
 from modules.render.modules.inference.shaders import CelShade  # noqa: E402
@@ -258,7 +259,7 @@ def cases() -> dict[str, tuple[object, Case]]:
     quarter_turn = Quad(Point2f(1.0, 0.0), Point2f(1.0, 1.0), Point2f(0.0, 1.0), Point2f(0.0, 0.0))
     add('quarter_turn', None, lambda t: t['gradient'].draw(src=quarter_turn))
 
-    add('depth_align', s.DepthAlign(), None)        # a compute shader: compiled only
+    add('depth_align', DepthAlign(), None)          # a compute shader: compiled only
     return c
 
 

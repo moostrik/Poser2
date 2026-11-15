@@ -16,7 +16,8 @@ HSV as the GL's; the 2D trail on the GL's `Blur` at σ 1.7, measured nearest the
 4-channel since), the shared GLSL (O1 to O3: `color.glsl` with Rec. 709 `luminance` and the HSV conversions in seven
 shaders, `blend_modes.glsl` with the textbook set), the general shaders into the GL (P: `GuidedFilter`,
 `MaskMultiply`, `MaskAntialias`, `Colorize`, and `WeightedSum` for the flow's `Add`, `Set` and `Trail`; the bridge's
-own `WeightedSum` stays the bridge's).
+own `WeightedSum` stays the bridge's), `DepthAlign` out of the GL (Q: beside its CUDA twin in
+`modules/inference/shaders`, the reference `scripts/depth_align_check.py` holds it to).
 
 The lines below come from the review of every shader in `modules/gl`, `modules/render`, the apps and the flow's
 general ones, decided with Matthias item by item (2026-11-15). Names are textbook names he understands at once. The
@@ -28,7 +29,6 @@ inferred **(inferred)**.
 | Line                     | What                                                              | Changes a look              |
 |--------------------------|-------------------------------------------------------------------|-----------------------------|
 | O4. The `Blend` shader   | one enum or two: Matthias's choice                                | no                          |
-| Q. Out of the GL         | `DepthAlign` beside its CUDA twin                                 | no                          |
 | R. New                   | the standard shaders the pipeline lacks                           | new                         |
 
 
@@ -42,11 +42,6 @@ do GL's 8 there; or `Style.BlendMode` for GL's 8 and a `BlendShaderMode` for the
 Kept where they are, as domain shaders: render's `TimeSeries`, `Feature`, `Window`, `PosePointLines`,
 `PanoramicStitch`, `DensityColor`, `DensityColorize`, `DepthMask`, `DepthView`, `CelShade`; smile's `FaceColor`,
 `FlashIn`, `FlashOut`, `Omission`; white_space's `LightSimulation`; the motion's `Luminance`.
-
-## Q. Out of the GL
-
-- Q1. `DepthAlign` moves beside its CUDA twin, `modules/inference/depth_align.py`, as its reference: no app calls it,
-  `scripts/depth_align_check.py` compares the two **(seen)**
 
 ## R. New
 
