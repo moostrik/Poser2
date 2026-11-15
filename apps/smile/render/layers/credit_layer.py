@@ -3,10 +3,9 @@ from enum import IntEnum
 from OpenGL.GL import glViewport
 
 from ...credit import FONT, TITLE_FONT, CreditLines, qr_image, title_image, wrap_balanced
-from modules.gl import Blit, Fbo, Image, Style, Text, Texture
+from modules.gl import Blit, Fbo, Image, Style, Text, Texture, shaders
 from ..sequencer import SequenceType
 from ..settings import RenderSettings
-from ..shaders import Blend
 
 from .layer_base import LayerBase
 from .passes import copy
@@ -71,7 +70,7 @@ class CreditLayer(LayerBase):
         self._cell: Fbo = Fbo()             # the same without the QR code: the online cell's copy
         self._clean: Fbo = Fbo()            # and without the title: the phone's copy
         self._targets: dict[CreditView, Fbo] = {CreditView.ROOM: self._fbo, CreditView.CELL: self._cell, CreditView.PHONE: self._clean}
-        self._blend: Blend = Blend()
+        self._blend: shaders.Blend = shaders.Blend()
         self._text: Text = Text()
         self._title: Image = Image('BGR')
         self._qr: Image = Image('BGR')

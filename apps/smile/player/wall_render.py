@@ -11,8 +11,7 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA8, GL_RGBA16F, GL_SCISSOR_TES
 
 from ..credit import FONT, TITLE_FONT, qr_image, quiet_px, title_image, wrap_balanced
 from ..credit_scroll import TIMEOUT as SCROLL_TIMEOUT, name_strip, scroll_copies, scroll_gone
-from modules.gl import Blit, Fbo, Image, Shader, Style, SwapFbo, Text, Texture
-from ..render.shaders import Blend
+from modules.gl import Blit, Fbo, Image, Shader, Style, SwapFbo, Text, Texture, shaders
 from .settings import WallsSettings
 from .shaders import BlitRotated
 
@@ -137,7 +136,7 @@ class WallRender:
 
         self._image_fbo: Fbo = Fbo()
         self._trail_fbo: SwapFbo = SwapFbo()
-        self._blend: Blend = Blend()
+        self._blend: shaders.Blend = shaders.Blend()
         self._rotated: BlitRotated = BlitRotated()
         # the lit cell's number: drawn upright into a portrait texture like a clip, blitted turned like one
         self._number_fbo: Fbo = Fbo()

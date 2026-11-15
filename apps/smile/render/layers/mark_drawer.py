@@ -1,4 +1,4 @@
-from ..shaders import DrawColoredRectangle, DrawRectangleOutline
+from modules.gl import shaders
 
 from .face_marks import Mark
 
@@ -10,8 +10,8 @@ class MarkDrawer:
     `alpha` fades them as a whole; without `outline` only the dots."""
 
     def __init__(self) -> None:
-        self._outline: DrawRectangleOutline = DrawRectangleOutline()
-        self._rect: DrawColoredRectangle = DrawColoredRectangle()
+        self._outline: shaders.DrawRectangleOutline = shaders.DrawRectangleOutline()
+        self._rect: shaders.DrawColoredRectangle = shaders.DrawColoredRectangle()
 
     def allocate(self) -> None:
         self._outline.allocate()

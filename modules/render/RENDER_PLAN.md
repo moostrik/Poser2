@@ -6,8 +6,6 @@ document is [RENDER.md](RENDER.md). Its steps are built; what is left is open.
 
 ## Open
 
-- smile keeps a copy of `Blend` (`apps/smile/render/shaders/blend.py`, the same `mix`); now that render's is in
-  `modules/gl`, smile can use that one. For smile's turn, not this plan.
 - hd_trio's center onto the flow's `ViewLayer`: one system for a view placed at the player; a change of behavior,
   after this plan.
 - `PoseCompositor`'s and `TrackerCompositor`'s stages and widths per stage are set in their constructors (stage 1, 2,

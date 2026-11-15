@@ -1,6 +1,5 @@
 from modules.gl import Image, SwapFbo, Texture, shaders
 
-from ..shaders import Blend
 from .layer_base import LayerBase
 from .passes import blur, copy
 
@@ -11,7 +10,7 @@ class DiffusionLayer(LayerBase):
     def __init__(self, image: Image) -> None:
         self._image: Image = image
         self._fbo: SwapFbo = SwapFbo()
-        self._blend: Blend = Blend()
+        self._blend: shaders.Blend = shaders.Blend()
         self._blur_h: shaders.BlurH = shaders.BlurH()
         self._blur_v: shaders.BlurV = shaders.BlurV()
 
