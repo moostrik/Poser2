@@ -2,7 +2,7 @@
 
 The GL held up to the rules (2026-11-15, the apps' plan F). Built: the shader check (0), smile's shaders out of the GL
 (A), one shaders folder (B), a texture that draws itself and `gl.Context` (C, described in [GL.md](GL.md)), time from
-`perf_counter` (D), the names (E). Each step is built on Matthias's "go", which covers the harness runs the steps name.
+`perf_counter` (D), `FPS` over a window in seconds (D2), `Text` asking GL nothing (F), the names (E). Each step is built on Matthias's "go", which covers the harness runs the steps name.
 What the code shows is marked **(seen)**.
 
 The plan changes the GL's form, not what it draws: every app looks as it does now. The harness
@@ -10,28 +10,9 @@ The plan changes the GL's form, not what it draws: every app looks as it does no
 
 | Commit                  | Checked by                                  |
 |-------------------------|---------------------------------------------|
-| D2                      | `modules/utils`' tests                      |
-| F                       | the harness                                 |
 | G1                      | the harness                                 |
 | G2, its own step        | the harness, then Matthias's look           |
 | G3, decided together    | the harness, then Matthias's look           |
-
-## D2. A rate over a time window
-
-`FPS` averages over a window in seconds, not a number of frames: `FPS(120)` covers 2 s at 60 fps and 4 s at 30
-**(seen: all 12 users pass 120)**, so a rate's span moves with the rate. It keeps the gaps of the last `window`
-seconds (2 s, 120 frames at 60 fps, as now), and its users drop their 120. When it is built, what white_space's light
-rate is and over how long it averages goes into white_space's document or plan.
-
-## F. `Text` asks GL nothing
-
-`Text.draw_text` lays the string out glyph by glyph, uploads its vertices and asks GL for the bound vertex array
-(`glGetIntegerv`) to bind it again after, on every draw **(seen)**. As Cinder's context keeps the bound vertex array
-and a draw binds its own scoped (`ScopedVao`), `gl.Context` keeps which vertex array is bound
-(`bind_vertex_array`), and `Text` binds its own through it and gives the one before back, asking GL nothing. The
-layout stays per draw: static text is a layer's to keep (`rendering.md`, redraw a layer only when what it draws has
-changed; the panorama's seams and grid, the flow's `Legend` **(seen)**), and the text drawn every frame mostly changes
-every frame (camera readings, fps, tracklet and pose labels **(seen)**), so a cache of strings would miss.
 
 ## G. The shaders on one scheme
 
@@ -65,7 +46,5 @@ built. To look at: `MaskBlur` (one shader, a direction) against `BlurH` and `Blu
 
 - `CLAUDE.md` Naming, one term per concept: G1
 - `CLAUDE.md` API evolution, remove obsolete pathways instead of leaving parallel ones: G3
-- `CLAUDE.md` Time, a quantity in its textbook unit: D2
-- `CLAUDE.md` Running code, run a GPU harness only on the user's go, and only what the plan names: F, G
+- `CLAUDE.md` Running code, run a GPU harness only on the user's go, and only what the plan names: G
 - `gl.md`, a shader is named after the operation it does: G1
-- `rendering.md`, prefer to redraw a layer only when what it draws has changed: F

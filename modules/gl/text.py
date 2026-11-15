@@ -8,9 +8,10 @@ import ctypes
 from pathlib import Path
 
 import numpy as np
-from OpenGL.GL import GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW, GL_FALSE, GL_FLOAT, GL_VERTEX_ARRAY_BINDING, glBindBuffer, glBindVertexArray, glBufferData, glDeleteBuffers, glDeleteVertexArrays, glEnableVertexAttribArray, glGenBuffers, glGenVertexArrays, glGetIntegerv, glVertexAttribPointer
+from OpenGL.GL import GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW, GL_FALSE, GL_FLOAT, glBindBuffer, glBufferData, glDeleteBuffers, glDeleteVertexArrays, glEnableVertexAttribArray, glGenBuffers, glGenVertexArrays, glVertexAttribPointer
 
 from . import style
+from .context import context
 from .font_atlas import FontAtlas
 from .shaders.glyphs import Glyphs
 from .shaders.box_shader import BoxShader
@@ -80,10 +81,9 @@ class Text:
             return False
 
         # The batch buffer: one VAO + dynamic VBO holding a whole string's glyph quads.
-        previous_vao = glGetIntegerv(GL_VERTEX_ARRAY_BINDING)
         self._vao = glGenVertexArrays(1)
         self._vbo = glGenBuffers(1)
-        glBindVertexArray(self._vao)
+        previous_vao: int = context().bind_vertex_array(self._vao)
         glBindBuffer(GL_ARRAY_BUFFER, self._vbo)
         stride = 4 * 4                                   # x, y, u, v float32
         glEnableVertexAttribArray(0)
@@ -91,7 +91,7 @@ class Text:
         glEnableVertexAttribArray(1)
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(2 * 4))
         glBindBuffer(GL_ARRAY_BUFFER, 0)
-        glBindVertexArray(previous_vao)
+        context().bind_vertex_array(previous_vao)
 
         self._allocated = True
         return True
@@ -169,14 +169,13 @@ class Text:
 
         style.set_blend_mode(style.BlendMode.ALPHA)
 
-        previous_vao = glGetIntegerv(GL_VERTEX_ARRAY_BINDING)
-        glBindVertexArray(self._vao)
+        previous_vao: int = context().bind_vertex_array(self._vao)
         glBindBuffer(GL_ARRAY_BUFFER, self._vbo)
         glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_DYNAMIC_DRAW)
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         self._glyphs.use(len(g) * 6, color, (float(screen_width), float(screen_height)),
                               self._atlas.texture_id)
-        glBindVertexArray(previous_vao)
+        context().bind_vertex_array(previous_vao)
 
     def draw_box_text(self, x: float, y: float, text: str,
                       color: tuple[float, float, float, float],
