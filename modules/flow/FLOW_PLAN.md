@@ -40,18 +40,23 @@ them with a monitor of its own. What is shown is a monitor, the time series or t
 layers; a stage's data is shown three ways (wrapper layers, display layers such as `view_depth`, and
 `monitor_a`/`monitor_b`, which lose their port when their stage changes); the panels are one flat list.
 
-**How:** deep_flow is worked on freely; hd_trio follows it later, in its own refactor. A1 takes hd_trio's flow
-layers out of `render/modules/flow`, which is then deep_flow's; a layer both apps still use (the pose's, the look
-class, `LayerCompositor`) keeps its API, what deep_flow needs of it added. One commit
+**How:** deep_flow and the flow (its 2D and 3D fluid among it) are worked on freely; hd_trio keeps working on its
+own copy of the flow it runs today, and follows later, in its own refactor. A1 makes that copy; a layer both
+apps still use (the pose's, the look class, `LayerCompositor`) keeps its API, what deep_flow needs of it added.
+One commit
 per step, both presets (`settings.json`, `very nice.json`) and the documents it changes with it, checked by the
 guard tests, the render's tests and one -sim start (the panels in place, the presets loaded without unknown
 keys).
 
-- **A1.** hd_trio's flow layers into hd_trio: `Motion2DLayer`, `Bridge2DLayer` and `Fluid2DLayer` to
-  `apps/hd_trio/render/layers/flow/`, with a copy, as it is, of what they share with the 3D layers (`StageLayer`,
-  `MotionLayer`, `BridgeLayer`, `FluidLayer`, `MotionInput`, `BridgeInput`, `BridgeOutput`, `Injection`,
-  `FluidInput`); hd_trio's `monitor_a` and `monitor_b` go (it does not need them). The copy lives until hd_trio's
-  refactor brings it onto deep_flow's. The 2D simulation in `modules/flow` stays.
+- **A1.** hd_trio's flow, copied into hd_trio as it is: its layers (`Motion2DLayer`, `Bridge2DLayer`,
+  `Fluid2DLayer`, with what they share with the 3D layers: `StageLayer`, `MotionLayer`, `BridgeLayer`,
+  `FluidLayer`, their inputs and outputs, `Injection`, the shaders `DensityColor` and `DensityColorize`) to
+  `apps/hd_trio/render/layers/flow/`, and the 2D system they run (`GradientFlow`, `bridge_2d`, `fluid_2d`, their
+  shaders) to `apps/hd_trio/flow/`. The flow's own utilities (`Port`, `FlowUtil`, `FlowBase`) stay shared and keep
+  their API. hd_trio's settings and presets take the copy; its `monitor_a` and `monitor_b` go (it does not need
+  them). The 2D parts of `test_layer_names.py` and `test_flow_systems.py` go with the copy; `FLOW_ROOTS` and
+  `flow.md`'s paths cover it; FLOW.md says where hd_trio's 2D lives. Checked by hd_trio's tests and one -sim start
+  of hd_trio in its venv (depthai 2). The copy lives until hd_trio's refactor brings it onto deep_flow's.
 - **A2.** The view into deep_flow, for now: `ViewLayer`, `ViewOutputLayer` and `ViewDepthLayer` (both import it)
   and their shaders from `render/modules/flow` to `apps/deep_flow/render/layers/view/`, with their tests;
   `scripts/view_check.py` to `apps/deep_flow/scripts/`; the app's view folder added to `FLOW_ROOTS`
