@@ -15,11 +15,10 @@ aspect ratio; the texel size worked out by the shader, given (`texel_size`) or a
 
 | Step                      | When                                     | Checked by                              |
 |---------------------------|------------------------------------------|-----------------------------------------|
-| H. Shader coordinates     | on Matthias's "go"                       | the harness, then Matthias's look       |
-| I. Bindings kept          | after H                                  | the harness, the render's CPU time      |
-| J. Capture asks GL nothing | after H                                 | a screen recording                      |
-| K. Text layout on its own | after H                                  | its unit test, the harness              |
-| L. Duplicate shaders      | decided together, once the rest is built | the harness, then Matthias's look       |
+| H. Shader coordinates     | on Matthias's "go", after the placement rule | the harness, text's unit test, then Matthias's look |
+| I. Capture asks GL nothing | after H                                 | a screen recording                      |
+| J. Inputs by type         | after H                                  | the harness                             |
+| K. Duplicate shaders      | decided together, once the rest is built | the harness, then Matthias's look       |
 
 ## H. Shader coordinates
 
@@ -42,49 +41,38 @@ Two kinds of vertex stage, each in its textbook form:
 The flow's volume views (`cube_axes`, `cube_edges`, `glyph_arrows`, `glyph_dots`) and its particles are 3D inside
 their own pass and take a `view_projection` of their own **(seen)**; they stay as they are.
 
-`Text` builds its glyph quads on the CPU in pixels **(seen)**; it turns them into 0..1 there, from the size of the
-bound target it reads on the CPU, so its callers no longer pass a width and height (about 30 `draw_text` and
-`draw_box_text` calls). `DrawBox` takes its rectangle in 0..1 the same way.
+`Text` builds its glyph quads on the CPU in pixels and lays them out in the same method that draws them **(seen)**.
+The layout goes into a plain module beside it, which turns a string into glyph quads in 0..1 for a target size;
+`Text` draws what it returns, and its callers no longer pass a width and height (about 30 `draw_text` and
+`draw_box_text` calls). `DrawBox` takes its rectangle in 0..1 the same way. The layout's unit test holds it; the
+harness's text case holds the drawing.
 
-The bound target is kept in `gl.Context`, as its blend state is: `Fbo.begin()` and the window's draw tell the
-context which target and viewport they bind, and the context calls `glViewport` only when the viewport changes.
-Today `Fbo.begin()` keeps the viewport in one global for the whole program, skips a repeat by it, then calls
-`glViewport` again regardless; the window manager, `Texture2DArray` and smile's renders call `glViewport` past it
-**(seen)**, so the global cannot be trusted. They all go through the context, so `Text` reads the target's size there.
+The target's size: `Fbo.begin()` and the window's draw note in `gl.Context` the size of what they bind, a value
+`Text` reads; nothing is skipped by it. `Fbo.begin()` calls `glViewport` once: today it keeps the viewport in one
+global for the whole program, skips a repeat by it, then calls `glViewport` again regardless **(seen)**; the global
+goes.
 
 Callers that change with it: `ViewPoseLayer`'s flip, `PosePointLines`' three callers (`pose_line_layer`,
 `pose_renderer`, white_space's `pose_figure_layer`), `DrawCircles`' callers, and every text call. The harness
 checks the shaders, not these layers; for them it is Matthias's look.
 
-Besides the coordinates: colors as `Color`, rectangles as `Rect`, the texel size from the input texture. A texture is
-held in GL's own row order, a CPU image flipped once at its upload (`Image`).
-
 Checked by the harness: before H, `scripts/shader_check.py` gets every shader H changes, the render's and smile's
 included, its references made from today's code; after H each matches them within 1/255, then Matthias looks.
 
-## I. Bindings kept
-
-Every shader's `use()` calls `glUseProgram`, binds each texture and sets every uniform at each draw, also when
-nothing changed since the last **(seen)**. The context keeps the bound program and the texture bound to each unit,
-as Cinder's `gl::Context` does, and skips a call that binds what is already bound; a draw still states everything it
-needs (gl.md: the state a draw needs is set where it draws, the context skips what is already set). What it saves is
-not measured: the render's update and draw CPU time (the window manager's timers) on the same scene before and after
-says, and the step stays only if the saving follows from the calls it skips.
-
-## J. Capture asks GL nothing
+## I. Capture asks GL nothing
 
 `ScreenCapture` asks GL its pack alignment at every capture (`glGetIntegerv(GL_PACK_ALIGNMENT)`) to restore it
 after its reads **(seen)**. The alignment is set to 1 once for the capture's reads and never asked. `gl_state.py`
 and `profiler.py` ask GL by purpose, as debug tools, and stay.
 
-## K. Text layout on its own
+## J. Inputs by type
 
-`Text.draw_text` lays out its glyphs (positions, atlas coordinates) and draws them in one method **(seen)**, so the
-layout cannot be tested without a GL context. The layout goes into a plain module beside it, which turns a string
-into glyph quads in 0..1; `Text` draws what it returns. Its unit test holds the layout; the harness's text case
-holds the drawing.
+`modules/gl`'s shaders take a color as four floats or a tuple and a rectangle as four floats or a `Rect`, and work
+out the texel size themselves, take it given (`texel_size`) or as a `resolution` **(seen)**. Afterwards a color is a
+`Color`, a rectangle a `Rect`, and the texel size is taken from the input texture. The harness holds each shader to
+its reference.
 
-## L. Duplicate shaders
+## K. Duplicate shaders
 
 What stays and what goes is decided with Matthias once the rest of the plan is built. To look at: `MaskBlur` (one
 shader, a direction) against `BlurH` and `BlurV`; `Blend`, `MaskBlend` and `Curtain`, all `(src, dst, fade)`;
@@ -95,10 +83,11 @@ shader, a direction) against `BlurH` and `BlurV`; `Blend`, `MaskBlend` and `Curt
 
 ## Rules it touches
 
-- `CLAUDE.md` API evolution, remove obsolete pathways instead of leaving parallel ones: L
-- `CLAUDE.md` Running code, run a GPU harness only on the user's go, and only what the plan names: H, I, J, K, L
-- `CLAUDE.md` Performance, prefer the design with the lower latency: H, I, J
-- `CLAUDE.md` API evolution, update all affected call sites in the same change: H
-- `gl.md` set the GL state a draw needs where it draws, through `gl.Context`; it skips what is already set: H, I
-- `gl.md` prefer as few GL calls and state switches as possible: H, I, J
-- `gl.md` simple geometry, as from poses, is worked out on the CPU, in plain modules: H, K
+- `CLAUDE.md` API evolution, remove obsolete pathways instead of leaving parallel ones: K
+- `CLAUDE.md` Running code, run a GPU harness only on the user's go, and only what the plan names: H, I, J, K
+- `CLAUDE.md` Performance, prefer the design with the lower latency: H, I
+- `CLAUDE.md` API evolution, update all affected call sites in the same change: H, J
+- `gl.md` set the GL state a draw needs where it draws: H
+- `gl.md` prefer as few GL calls and state switches as possible: H, I
+- `gl.md` simple geometry, as from poses, is worked out on the CPU, in plain modules: H
+- `gl.md` the placement rule, waiting in the rules thread: H
