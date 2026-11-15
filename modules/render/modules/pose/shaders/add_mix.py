@@ -1,21 +1,12 @@
-"""AddDodgeBlend shader - Two-phase blend from additive to color dodge with foreground reveal."""
+"""AddMix: the foreground added to the base, then mixed toward the foreground, both by one blend."""
 
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
-class AddDodgeBlend(Shader):
-    """Two-phase blend transitioning from additive to color dodge.
-
-    Phase 1 (Additive): Brightens base by adding foreground. Fades as strength increases.
-    Phase 2 (Color Dodge): Vibrant highlights. Kicks in later, ramps up with strength.
-    Foreground Reveal: At full strength, foreground layer visible on top (masked by alpha).
-
-    Phases overlap for smooth crossfade, avoiding sudden transitions.
-    """
-
-    def __init__(self) -> None:
-        super().__init__()
+class AddMix(Shader):
+    """`foreground` added to `base` at `blend` to the power 0.3, the sum mixed toward `foreground` at `blend` to the
+    power 1.5: the add comes early, the foreground late; the base's alpha is kept."""
 
     def use(self, base: Texture, foreground: Texture, blend: float) -> None:
         glUseProgram(self.shader_program)

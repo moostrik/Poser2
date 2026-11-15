@@ -71,7 +71,7 @@ class CreditLayer(LayerBase):
         self._cell: Fbo = Fbo()             # the same without the QR code: the online cell's copy
         self._clean: Fbo = Fbo()            # and without the title: the phone's copy
         self._targets: dict[CreditView, Fbo] = {CreditView.ROOM: self._fbo, CreditView.CELL: self._cell, CreditView.PHONE: self._clean}
-        self._blend: shaders.Blend = shaders.Blend()
+        self._mix: shaders.Mix = shaders.Mix()
         self._text: Text = Text()
         self._title: Image = Image('BGR')
         self._qr: Image = Image('BGR')
@@ -87,7 +87,7 @@ class CreditLayer(LayerBase):
         self._fbo.allocate(width, height, internal_format)
         self._cell.allocate(width, height, internal_format)
         self._clean.allocate(width, height, internal_format)
-        self._blend.allocate()
+        self._mix.allocate()
         if self._text.allocate(FONT, FONT_SIZE):
             self._title.set_image(title_image('', TITLE_PX, outline_ratio=OUTLINE_PX / TITLE_PX))
 
@@ -97,13 +97,13 @@ class CreditLayer(LayerBase):
         self._fbo.deallocate()
         self._cell.deallocate()
         self._clean.deallocate()
-        self._blend.deallocate()
+        self._mix.deallocate()
         self._text.deallocate()
         self._title.deallocate()
         self._qr.deallocate()
 
     def update(self) -> None:
-        self._blend.reload()
+        self._mix.reload()
         self._title.update()
         key: tuple[str, int] = (self.settings.credit_url, self.settings.credit_size)
         if key != self._qr_key:
@@ -149,7 +149,7 @@ class CreditLayer(LayerBase):
         self._draw_caption(view != CreditView.PHONE)
         self._card.end()
         target.begin()
-        self._blend.use(self._base, self._card, alpha)
+        self._mix.use(self._base, self._card, alpha)
         target.end()
 
     def new_visitor(self) -> None:

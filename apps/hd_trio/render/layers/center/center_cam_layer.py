@@ -33,7 +33,7 @@ class CenterCamLayer(LayerBase):
 
         # Shaders
         self._roi_shader = shaders.DrawRoi()
-        self._blend_shader = shaders.Blend()
+        self._mix_shader = shaders.Mix()
         self._mask_shader = shaders.MaskApply()
 
     @property
@@ -52,7 +52,7 @@ class CenterCamLayer(LayerBase):
         if self._mask_texture:
             self._masked_fbo.allocate(width, height, internal_format)
         self._roi_shader.allocate()
-        self._blend_shader.allocate()
+        self._mix_shader.allocate()
         self._mask_shader.allocate()
 
     def deallocate(self) -> None:
@@ -60,7 +60,7 @@ class CenterCamLayer(LayerBase):
         self._cam_blend_fbo.deallocate()
         self._masked_fbo.deallocate()
         self._roi_shader.deallocate()
-        self._blend_shader.deallocate()
+        self._mix_shader.deallocate()
         self._mask_shader.deallocate()
 
     def update(self) -> None:
@@ -97,7 +97,7 @@ class CenterCamLayer(LayerBase):
         self._cam_blend_fbo.swap()
         self._cam_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._cam_blend_fbo.begin()
-        self._blend_shader.use(
+        self._mix_shader.use(
             self._cam_blend_fbo.back,
             self._cam_fbo,
             self.settings.blend_factor

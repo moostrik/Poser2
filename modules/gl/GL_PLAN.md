@@ -7,7 +7,9 @@ camelCase uniforms, no dead code), the shaders' coordinates (H: every 2D positio
 conversion in `position.glsl`), the capture asking GL nothing (I), the inputs by type (J: `Color`, `Rect`, the texel
 size from the texture), the duplicate shaders merged (K: `FillRect`, `StrokeRect`, `FillCircles`, `BarnDoorWipe`, one
 `Blur` with `sigma` in pixels, `Blend` for the mask, `texture.draw` for every copy and every part without a turn, one
-window manager test).
+window manager test), the shaders by kind in subpackages with harness references for the twelve outside the GL the
+plan changes (L), the textbook names (M: `BrightnessContrast`, `Threshold`, `Sobel`, `AdaptiveThreshold`, one
+`GradientWipe`, `WhiteNoise`, `SimplexNoise`, `ColorFill`, `Mix`, `AddMix`, `LayerComposite`, `Dilate`, `Erode`).
 
 The lines below come from the review of every shader in `modules/gl`, `modules/render`, the apps and the flow's
 general ones, decided with Matthias item by item (2026-11-15). Names are textbook names he understands at once. The
@@ -18,50 +20,12 @@ inferred **(inferred)**.
 
 | Line                     | What                                                              | Changes a look              |
 |--------------------------|-------------------------------------------------------------------|-----------------------------|
-| L. Subfolders            | the shaders by kind, first, so every later shader lands in place  | no                          |
-| M. Textbook names        | the renames below                                                 | no                          |
 | N. Textbook algorithms   | the LUT, corners on the CPU, `MaskAA`, colormaps, HSV, the blur   | the LUT, hd_trio's trail    |
 | O. Shared GLSL           | `color.glsl`, `blend_modes.glsl`, one `Blend` shader              | hd_trio's foreground, a bit |
 | P. Into the GL           | general shaders out of render and the flow                        | no                          |
 | Q. Out of the GL         | `DepthAlign` beside its CUDA twin                                 | no                          |
 | R. New                   | the standard shaders the pipeline lacks                           | new                         |
 
-## L. Subfolders
-
-- L1. `modules/gl/shaders/` gets one subpackage per kind, as the visual libraries group theirs: `draw`, `color`,
-  `filter`, `mask`, `composite`, `transition`, `generate`, `video`. Each shader moves in with its `.frag`/`.vert`;
-  the shared includes (`position.glsl` and those of O) stay at the top, where the loader finds them
-- L2. `shaders/__init__.py` exports every subpackage's classes, so callers keep `shaders.FillRect`: gl.md's rule names
-  a shader `shaders.<Operation>`, CLAUDE.md's has other packages import from a package's `__init__.py`, and the kind
-  adds nothing the operation's name does not already say. No caller changes but the two that import a shader's file
-  inside the GL: `text.py` (`.shaders.fill_rect`, `.shaders.glyphs`) and the harness (`modules.gl.shaders.blur`)
-  **(seen)**; the harness holds every shader at max 0
-- L3. The harness gets a case, its reference taken before anything changes, for every shader the plan touches that
-  it lacks **(seen)**: the flow's `HSV`, `GaussianBlur`, `Add`, `Set` and `Trail`; `GuidedFilter`, `MaskMultiply`,
-  `MaskAA`, `HueShift`, `CelShade`, `DensityColorize` and `DepthView`. Each later line shows max 0 against them, or
-  what changed where a look changes (`CelShade`, the trail)
-
-## M. Textbook names
-
-| Now                              | Becomes                                                       |
-|----------------------------------|---------------------------------------------------------------|
-| `Contrast`                       | `BrightnessContrast`                                          |
-| `MaskHardStep`                   | `Threshold`                                                   |
-| `EdgeSketch`                     | `Sobel`                                                       |
-| `DetailThreshold`                | `AdaptiveThreshold`                                           |
-| `NoiseBlend`, `NoiseSimplexBlend`| one `GradientWipe(src, dst, gradient, progress, softness)`; the per-channel variant goes |
-| `Noise`, `NoiseSimplex`          | `WhiteNoise`, `SimplexNoise`                                  |
-| `Tint`                           | `ColorFill`                                                   |
-| `Blend(src, dst, fade)`          | `Mix(src, dst, amount)`                                       |
-| `AddDodgeBlend`                  | `AddMix`                                                      |
-| `MSColorMask`                    | `LayerComposite`                                              |
-| `MaskDilate`, `MaskErode`        | `Dilate`, `Erode`, in `filter`                                |
-
-`Exposure` (its uniforms are already `exposure`, `offset`, `gamma` **(seen)**), `Lut` and `BarnDoorWipe` keep their
-names. The noise blends make no noise: they take it as a texture **(seen)**. The settings `blend_factor` (hd_trio's
-mask, the foreground look) name a smoothing factor, not the shader, and keep their name. `AddMix` and
-`LayerComposite` stay in `render/modules/pose`: their one caller is the similarity silhouette, `AddMix`'s curves are
-tuned for it.
 
 ## N. Textbook algorithms
 

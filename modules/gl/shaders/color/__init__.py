@@ -1,6 +1,6 @@
 """Shaders that change an image's colors."""
 
-from .contrast import Contrast
+from .brightness_contrast import BrightnessContrast
 from .exposure import Exposure
 from .hsl import Hsl
 from .hsv import Hsv

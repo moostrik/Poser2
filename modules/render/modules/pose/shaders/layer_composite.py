@@ -1,11 +1,11 @@
-"""MSColorMask shader - Composite pre-styled RGBA textures."""
+"""LayerComposite: up to three styled layers, added or each over the next."""
 
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
-class MSColorMask(Shader):
-    """Composite up to 3 pre-styled RGBA textures with weights."""
+class LayerComposite(Shader):
+    """Up to 3 styled RGBA layers with weights: added, or the first over the others (Porter–Duff over)."""
 
     def __init__(self) -> None:
         super().__init__()

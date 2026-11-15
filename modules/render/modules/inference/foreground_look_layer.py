@@ -40,7 +40,7 @@ class ForegroundLook:
         self._blend_fbo: SwapFbo = SwapFbo()
         self._effect_fbo: SwapFbo = SwapFbo()
 
-        self._blend_shader = shaders.Blend()
+        self._mix_shader = shaders.Mix()
         self._cel_shade_shader = CelShade()
         self._hue_shift_shader = HueShift()
         self._sharpen_shader = shaders.Sharpen()
@@ -53,7 +53,7 @@ class ForegroundLook:
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._blend_fbo.allocate(width, height, internal_format)
         self._effect_fbo.allocate(width, height, internal_format)
-        self._blend_shader.allocate()
+        self._mix_shader.allocate()
         self._cel_shade_shader.allocate()
         self._hue_shift_shader.allocate()
         self._sharpen_shader.allocate()
@@ -62,7 +62,7 @@ class ForegroundLook:
     def deallocate(self) -> None:
         self._blend_fbo.deallocate()
         self._effect_fbo.deallocate()
-        self._blend_shader.deallocate()
+        self._mix_shader.deallocate()
         self._cel_shade_shader.deallocate()
         self._hue_shift_shader.deallocate()
         self._sharpen_shader.deallocate()
@@ -81,7 +81,7 @@ class ForegroundLook:
 
         self._blend_fbo.swap()
         self._blend_fbo.begin()
-        self._blend_shader.use(self._blend_fbo.back, source, s.blend_factor)
+        self._mix_shader.use(self._blend_fbo.back, source, s.blend_factor)
         self._blend_fbo.end()
 
         self._cel_shade_shader.reload()

@@ -10,22 +10,22 @@ class DiffusionLayer(LayerBase):
     def __init__(self, image: Image) -> None:
         self._image: Image = image
         self._fbo: SwapFbo = SwapFbo()
-        self._blend: shaders.Blend = shaders.Blend()
+        self._mix: shaders.Mix = shaders.Mix()
         self._blur: shaders.Blur = shaders.Blur()
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         assert width and height and internal_format
         self._fbo.allocate(width, height, internal_format)
-        self._blend.allocate()
+        self._mix.allocate()
         self._blur.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
-        self._blend.deallocate()
+        self._mix.deallocate()
         self._blur.deallocate()
 
     def update(self) -> None:
-        self._blend.reload()
+        self._mix.reload()
         self._blur.reload()
 
     @property
@@ -44,7 +44,7 @@ class DiffusionLayer(LayerBase):
             return
         self._fbo.swap()
         self._fbo.begin()
-        self._blend.use(self._image, self._fbo.back, trail)
+        self._mix.use(self._image, self._fbo.back, trail)
         self._fbo.end()
 
     def blur(self, sigma: float) -> None:

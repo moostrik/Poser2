@@ -137,7 +137,7 @@ class WallRender:
 
         self._image_fbo: Fbo = Fbo()
         self._trail_fbo: SwapFbo = SwapFbo()
-        self._blend: shaders.Blend = shaders.Blend()
+        self._mix: shaders.Mix = shaders.Mix()
         self._rotated: BlitRotated = BlitRotated()
         # the lit cell's number: drawn upright into a portrait texture like a clip, blitted turned like one
         self._number_fbo: Fbo = Fbo()
@@ -180,7 +180,7 @@ class WallRender:
     def allocate(self) -> None:
         self._image_fbo.allocate(self.width, self.height, GL_RGBA16F)
         self._trail_fbo.allocate(self.width, self.height, GL_RGBA16F)
-        self._blend.allocate()
+        self._mix.allocate()
         self._rotated.allocate()
         self._number_fbo.allocate(self.CELL_HEIGHT, self.CELL_WIDTH, GL_RGBA8)
         if not self._text.allocate(font_size=NUMBER_FONT_PX):
@@ -202,7 +202,7 @@ class WallRender:
     def deallocate(self) -> None:
         self._image_fbo.deallocate()
         self._trail_fbo.deallocate()
-        self._blend.deallocate()
+        self._mix.deallocate()
         self._rotated.deallocate()
         self._number_fbo.deallocate()
         self._text.deallocate()
@@ -233,7 +233,7 @@ class WallRender:
         self._online_page = page
 
     def update(self) -> None:
-        self._blend.reload()
+        self._mix.reload()
         self._rotated.reload()
         settings = self.settings
         credit: bool = bool(settings.credit_qr_walls)
@@ -291,7 +291,7 @@ class WallRender:
 
         self._trail_fbo.swap()
         self._trail_fbo.begin()
-        self._blend.use(self._image_fbo, self._trail_fbo.back, trail)
+        self._mix.use(self._image_fbo, self._trail_fbo.back, trail)
         # a new sequence skips the trail: one white frame, then its first image
         for id in starts:
             glViewport(*self._rects[id])

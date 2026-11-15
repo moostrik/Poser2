@@ -16,7 +16,7 @@ from modules.utils import Color
 
 from ...layer_base import LayerBase
 from ...color_settings import ColorSettings
-from .shaders import MSColorMask, AddDodgeBlend
+from .shaders import LayerComposite, AddMix
 
 
 class SimilaritySilhouetteLayerSettings(BaseSettings):
@@ -28,7 +28,7 @@ class SimilaritySilhouetteLayerSettings(BaseSettings):
     motion_exponent:        Field[float] = Field(1.0, min=0.0, max=5.0, description="Similarity response curve")
     similarity_scale:       Field[float] = Field(1.0, min=0.0, max=1.0, description="0 = own silhouette only, 1 = full cross-camera response")
     foreground_threshold:   Field[float] = Field(0.2, min=0.0, max=0.95, description="The players' lowest similarity below which the foreground does not show")
-    # MSColorMask parameters
+    # LayerComposite parameters
     layered:                Field[float] = Field(0.8, min=0.0, max=1.0, description="0 = additive, 1 = own in front")
 
 
@@ -37,8 +37,8 @@ class SimilaritySilhouetteLayer(LayerBase):
 
     Pipeline:
         1. Tint own camera's mask with track color → _fbo
-        2. AddDodgeBlend foreground onto tinted mask → _blend_fbo
-        3. MSColorMask composites own styled result with other cameras → _fbo
+        2. AddMix foreground onto tinted mask → _blend_fbo
+        3. LayerComposite composites own styled result with other cameras → _fbo
 
     Each camera's contribution is colored exactly once.
     """
@@ -56,9 +56,9 @@ class SimilaritySilhouetteLayer(LayerBase):
         self._output_fbo: Fbo = Fbo()
 
         # Shaders
-        self._tint: shaders.Tint = shaders.Tint()
-        self._add_dodge: AddDodgeBlend = AddDodgeBlend()
-        self._shader: MSColorMask = MSColorMask()
+        self._color_fill: shaders.ColorFill = shaders.ColorFill()
+        self._add_mix: AddMix = AddMix()
+        self._shader: LayerComposite = LayerComposite()
 
     # ========== Output Access ==========
 
@@ -75,8 +75,8 @@ class SimilaritySilhouetteLayer(LayerBase):
         self._blend_fbo.allocate(width, height, fmt)
         for fbo in self._tint_fbos:
             fbo.allocate(width, height, fmt)
-        self._tint.allocate()
-        self._add_dodge.allocate()
+        self._color_fill.allocate()
+        self._add_mix.allocate()
         self._shader.allocate()
 
     def deallocate(self) -> None:
@@ -84,8 +84,8 @@ class SimilaritySilhouetteLayer(LayerBase):
         self._blend_fbo.deallocate()
         for fbo in self._tint_fbos:
             fbo.deallocate()
-        self._tint.deallocate()
-        self._add_dodge.deallocate()
+        self._color_fill.deallocate()
+        self._add_mix.deallocate()
         self._shader.deallocate()
 
     def reset(self) -> None:
@@ -98,8 +98,8 @@ class SimilaritySilhouetteLayer(LayerBase):
 
         Pipeline:
             Step 1: Tint own mask with track color → _fbo
-            Step 2: AddDodgeBlend(tinted mask, foreground) → _blend_fbo
-            Step 3: MSColorMask(own styled, other masks, colors, weights) → _fbo
+            Step 2: AddMix(tinted mask, foreground) → _blend_fbo
+            Step 3: LayerComposite(own styled, other masks, colors, weights) → _fbo
         """
         # Get pose data for this camera
         pose: Frame | None = self._board.get_frame(self.settings.stage, self._cam_id)
@@ -142,8 +142,8 @@ class SimilaritySilhouetteLayer(LayerBase):
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
-        self._tint.reload()
-        self._add_dodge.reload()
+        self._color_fill.reload()
+        self._add_mix.reload()
         self._shader.reload()
 
         # Step 1: Tint all cameras' masks
@@ -151,13 +151,13 @@ class SimilaritySilhouetteLayer(LayerBase):
         for cam_id, mask_tex in self._mask_textures.items():
             color = colors[cam_id % len(colors)]
             self._tint_fbos[cam_id].begin()
-            self._tint.use(mask_tex, Color(color.r, color.g, color.b))
+            self._color_fill.use(mask_tex, Color(color.r, color.g, color.b))
             self._tint_fbos[cam_id].end()
 
-        # Step 2: AddDodgeBlend own camera's tinted mask with foreground
+        # Step 2: AddMix own camera's tinted mask with foreground
         self._blend_fbo.swap()
         self._blend_fbo.begin()
-        self._add_dodge.use(
+        self._add_mix.use(
             self._tint_fbos[self._cam_id],
             self._foreground_texture,
             foreground_blend,

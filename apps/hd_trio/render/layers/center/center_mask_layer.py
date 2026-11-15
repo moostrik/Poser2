@@ -44,10 +44,10 @@ class CenterMaskLayer(LayerBase):
 
         # Shaders
         self._roi_shader = shaders.DrawRoi()
-        self._blend_shader = shaders.Blend()
+        self._mix_shader = shaders.Mix()
         self._mask_AA_shader = MaskAA()
-        self._mask_dilate_shader = shaders.MaskDilate()
-        self._mask_erode_shader = shaders.MaskErode()
+        self._dilate_shader = shaders.Dilate()
+        self._erode_shader = shaders.Erode()
         self._blur_shader = shaders.Blur()
         self._guided_shader = GuidedFilter()
 
@@ -78,10 +78,10 @@ class CenterMaskLayer(LayerBase):
             self._coefficients_fbo.allocate(width, height, GL_RG32F)
 
         self._roi_shader.allocate()
-        self._blend_shader.allocate()
+        self._mix_shader.allocate()
         self._mask_AA_shader.allocate()
-        self._mask_dilate_shader.allocate()
-        self._mask_erode_shader.allocate()
+        self._dilate_shader.allocate()
+        self._erode_shader.allocate()
         self._blur_shader.allocate()
         self._guided_shader.allocate()
 
@@ -96,10 +96,10 @@ class CenterMaskLayer(LayerBase):
         self._coefficients_fbo.deallocate()
 
         self._roi_shader.deallocate()
-        self._blend_shader.deallocate()
+        self._mix_shader.deallocate()
         self._mask_AA_shader.deallocate()
-        self._mask_dilate_shader.deallocate()
-        self._mask_erode_shader.deallocate()
+        self._dilate_shader.deallocate()
+        self._erode_shader.deallocate()
         self._blur_shader.deallocate()
         self._guided_shader.deallocate()
 
@@ -134,7 +134,7 @@ class CenterMaskLayer(LayerBase):
         # Temporal blending
         self._blend_fbo.swap()
         self._blend_fbo.begin()
-        self._blend_shader.use(
+        self._mix_shader.use(
             self._blend_fbo.back,
             self._roi_fbo,
             self.settings.blend_factor
@@ -152,13 +152,13 @@ class CenterMaskLayer(LayerBase):
             for _ in range(steps):
                 self._mask_blur_fbo.swap()
                 self._mask_blur_fbo.begin()
-                self._mask_dilate_shader.use(self._mask_blur_fbo.back, 1.0)
+                self._dilate_shader.use(self._mask_blur_fbo.back, 1.0)
                 self._mask_blur_fbo.end()
         elif steps < 0:
             for _ in range(-steps):
                 self._mask_blur_fbo.swap()
                 self._mask_blur_fbo.begin()
-                self._mask_erode_shader.use(self._mask_blur_fbo.back, 1.0)
+                self._erode_shader.use(self._mask_blur_fbo.back, 1.0)
                 self._mask_blur_fbo.end()
 
         # Multi-pass blur

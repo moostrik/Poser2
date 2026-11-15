@@ -1,3 +1,3 @@
 """Shaders that combine images."""
 
-from .blend import Blend
+from .mix import Mix
