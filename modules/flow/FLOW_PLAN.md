@@ -165,23 +165,37 @@ concurrency rules touch none of it.
 - **I1.** Every setting and its description gone through, last, after the refactor, against the rule: a `Field`
   description is one short line of panel text, what and its unit; and whether every quantity is in the flow's
   textbook units, which a scan cannot judge.
-- **I2.** deep_flow's panels follow the modules beneath them: a panel's place and name are its module's, not a
-  grouping of the panels. What the code shows now:
-  - the render layers' packages do not each name one thing: `generic` holds the show's mix (`CompositeLayer`), a
-    player's colors styled (`ForegroundLookLayer`, the view's foreground blended, cel shaded, its hue moved toward
-    the track color) and the players' silhouettes by similarity (`MSColorMaskLayer`, named a mask); the same look
-    chain runs in `center` for hd_trio (`CenterForegroundLayer`). So the panels cannot follow them yet;
-  - the view reads its depth with the motion's `motion.z.tolerance`, a view setting in another stage's panel;
-  - `inputs` picks the pictures that feed the motion and the bridge and the fluid's weights: the app wiring its
-    modules, not a stage;
-  - the panels sit in one flat list in `RenderSettings`, `view_depth`, `view_pose`, `foreground_look`,
-    `color_mask` and `inputs` among the stages.
+- **I2.** deep_flow's render and panels up to the motion follow the chain: capture, view, foreground look,
+  motion. What the code shows now (`apps/deep_flow/render/deep_flow_render.py`, `apps/deep_flow/settings.py`):
+  - the chain is declared four times, each list with its own order and members: `UPDATE_LAYERS` (the update's
+    order, `color_mask`, the show's, between the foreground look and the motion), `CAPTURE_LAYERS` (run once per
+    capture), `VIEW_LAYERS` (allocated at the view's size) and `SHAPE_LAYERS` (each panel's shape);
+  - `Layers` is one flat enum of sources (`cam_image`, `capture_image`, `capture_depth`), stages (`view`,
+    `motion`), a stage's outputs (`view_image`, `view_foreground`, `view_mask`, `view_depth_mask`) and display
+    layers (`view_depth`, `view_pose`, `tracker`, `pose`);
+  - the panels are one flat list in `RenderSettings`, not in the chain's order;
+  - the view reads the motion's `motion.z.tolerance`, and its size is the motion's `width` and `height`;
+  - `inputs` (the motion's picture, the bridge's color, the injections' weight) and `stage` (the pose stage the
+    weight reads) are the app's wiring, among the stages;
+  - `ForegroundLookLayer` sits in `render/modules/inference`, but styles the view's foreground; hd_trio's
+    `CenterForegroundLayer` runs the same `ForegroundLook`, so it is not general and two apps use it.
 
-  First the `render` package's own structure, its packages each one thing: the apps' line F reviews `render`
-  ([APPS_PLAN.md](../../apps/APPS_PLAN.md#f-the-modules-held-up-to-the-rules)), since hd_trio and white_space use
-  it too. Then deep_flow's panel tree mirrors the modules: the flow's stages in the chain's order, each stage's
-  settings its own (the view's `tolerance` in the view), the app's wiring and its display layers apart, and the
-  presets restructured with it.
+  The steps, one commit each, the preset restructured with the step that moves a setting:
+  - **I2a.** One declaration of the chain in the renderer: each stage with its layers, the outputs it hands on and
+    its display layers, in the chain's order; the update order, the per-capture run, the view-sized allocation
+    and the panels' shapes read it.
+  - **I2b.** The panel tree in the chain's order: `capture`, `view` (its depth display and pose overlay under it),
+    `foreground_look`, `motion`; then the bridge, the fluid, the show (`color_mask`, the composite); the app's
+    wiring (`inputs`, `stage`) and the display (`layer`, `monitor_a`, `monitor_b`, `data`, `preview`,
+    `time_series`, `colors`) apart.
+  - **I2c.** The settings two stages read, declared once on their parent and shared to both: the depth tolerance
+    (the view's read, the motion's z) and the view's size (the motion's).
+  - **I2d.** `ForegroundLook` and its layer to `render/shared/foreground_look/`, the rule's place for a layer that
+    is not general and that two apps use.
+
+  Checked by the guard tests, the render's tests and one -sim start of deep_flow: the panels in their new place,
+  the preset loaded without unknown keys. The stages may later move into `modules/flow` (Parked); the panels
+  then follow them.
 
 ## Parked
 
@@ -230,8 +244,9 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, A1.
 - A `Field` description is one short line of panel text: I1.
-- A package is one thing, and its name is that thing; keep presets and settings schemas in sync: the render
-  layers' packages and deep_flow's panel tree, I2.
+- Keep presets and settings schemas in sync: deep_flow's panel tree and its shared settings, I2b, I2c.
+- Settings connect the user and a component, not two components: the view's tolerance and size, I2c.
+- `shared` holds the layers that are not general and that more than one app uses: `ForegroundLook`, I2d.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 Not designed yet, so their rules are not named: A2, A3; B1 to B4; C1 to C4; D1, D2; E1 to E3; G1; H1 to H4.
