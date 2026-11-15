@@ -40,31 +40,40 @@ them with a monitor of its own. What is shown is a monitor, the time series or t
 layers; a stage's data is shown three ways (wrapper layers, display layers such as `view_depth`, and
 `monitor_a`/`monitor_b`, which lose their port when their stage changes); the panels are one flat list.
 
-**How:** one commit per step, the preset with it, checked by the guard tests, the render's tests and one -sim
-start (the panels in place, the preset loaded without unknown keys).
+**How:** deep_flow is worked on freely; hd_trio follows it later, in its own refactor. A step changes no shared
+layer's API: what deep_flow needs of one is added, and a layer only deep_flow drops stays for hd_trio. One commit
+per step, both presets (`settings.json`, `very nice.json`) and the documents it changes with it, checked by the
+guard tests, the render's tests and one -sim start (the panels in place, the presets loaded without unknown
+keys).
 
 - **A1.** One declaration of the chain in the renderer, in place of the four lists: each stage with its layer,
   its outputs and its monitor, in order.
-- **A2.** The color into the view: `ForegroundLook` as the view's last pass, its output `color`, which the bridge
-  reads; `enabled` off passes the foreground as it is. `inputs.bridge_image` goes. `ForegroundLook` moves to
-  `render/shared/foreground_look/`, since hd_trio uses it too.
-- **A3.** A monitor per stage, in the stage's panel, showing all its FBOs (the capture's: image and depth).
-  `monitor_a`, `monitor_b`, the view's wrapper layers and `view_depth` go; the monitor gets `view_depth`'s depth
-  colormaps. `color_mask`, `inputs` and `stage` leave deep_flow: the motion reads the view's `image`, and every
-  injection is at full weight.
+- **A2.** The color with the view: `ForegroundLook` runs as its own pass right after the view in A1's chain (not
+  inside `ViewLayer`, which the parked move takes into `modules/flow`), its output read by the bridge and shown
+  under the view, its settings in the view's panel; `enabled` off passes the foreground as it is.
+  `inputs.bridge_image` goes. `ForegroundLook` moves to `render/shared/foreground_look/`, since hd_trio uses it
+  too. VIEW.md says it.
+- **A3.** A monitor per stage, in the stage's panel, showing all its FBOs: deep_flow's own wiring, a
+  `MonitorLayer` per stage with its stage fixed. The capture's image and depth layers declare their ports;
+  `MonitorLayer` gets `view_depth`'s depth colormaps. `monitor_a`, `monitor_b`, the view's wrapper layers and
+  `view_depth` leave deep_flow. `color_mask`, `inputs` and `stage` leave deep_flow: the motion reads the view's
+  `image`, and every injection is at full weight. FLOW.md and RENDER.md say it.
 - **A4.** A pose monitor: the pose stage it reads (raw, clean, smooth, lerp); the pose drawn on the crop with its
   image, on the camera's frame with its boxes, or on the view, the last two without an image so they lie over
   any layer of that frame; the features of the frame or the window as an optional overlay. It replaces
   `tracker`, `pose`, `view_pose` and the four `data_*` layers; `data_time` goes; `time_series` stays a layer.
-- **A5.** The composite leaves deep_flow: the LUT becomes an option of the fluid's look, and the show draws its
-  layers in order. `LayerCompositor` stays in `render/general` for hd_trio.
+- **A5.** The composite leaves deep_flow: the LUT becomes an option of the fluid's look, on the same
+  `LutSettings` the compositor uses, and the show draws its layers in order.
 - **A6.** The panel tree in the chain's order: `capture`, `view`, `motion`, `bridge`, `fluid`, then `pose`; the
   display (`layer`, `colors`) apart. `Layers` in the same order, the pose's monitor last. The depth tolerance
   and the view's size declared once, shared to the view and the motion.
 - **A7.** The layer select cut to two panels, `a` and `b`, in place of `left`, `right`, `output` and `record`; the
-  show draws `a`, the recording records the window. A layer taken out of a list goes back to its place among
+  show draws `a`, and the recording records `a` or the window. A layer taken out of a list goes back to its place among
   the unselected, in `Layers`' order: the panel's playlist (`modules/panel/controls.py`) keeps the order it was
   dragged into, for every app.
+
+Question: the color's one name, for the class, its output and its panel: `ForegroundLook` and "the foreground's
+look" now, the view's `color` in A2 as discussed.
 
 ## B. The camera and the view
 
