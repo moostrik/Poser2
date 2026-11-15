@@ -1,7 +1,7 @@
 # The flow's plan
 
-What is next for the flow, the one place that says it: the main lines (A to J), first deep_flow's render up to
-the motion, then along the flow's chain (camera and view, motion, bridge, the fluid's physics, its look), then
+What is next for the flow, the one place that says it: the main lines (A to J), first deep_flow's chain, panels
+and display, then along the flow's chain (camera and view, motion, bridge, the fluid's physics, its look), then
 those across the stages; each line's items in the order they are worked (A1, A2, ...); what is parked. A built
 item leaves the plan; the others keep their numbers. How each stage works is in its own document
 ([FLOW.md](FLOW.md) lists them); an item links to the section it changes. **(deduction)** marks what is
@@ -11,7 +11,7 @@ inferred, **(site fact)** what the operator saw.
 
 | #   | Line                                                                         | State                            | Documents                                          |
 |-----|------------------------------------------------------------------------------|----------------------------------|----------------------------------------------------|
-| A   | [deep_flow's render up to the motion](#a-deep_flows-render-up-to-the-motion) | next                             | `apps/deep_flow`                                   |
+| A   | [deep_flow's chain](#a-deep_flows-chain-panels-and-display)                  | next                             | `apps/deep_flow`                                   |
 | B   | [The camera and the view](#b-the-camera-and-the-view)                        | built; the depth read to choose  | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; its details open          | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; the dye's amount to judge | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
@@ -30,10 +30,12 @@ The apps on deep_flow's input have their own plan, [apps/APPS_PLAN.md](../../app
 The 3D fluid's lines are weighed by [its goal](FLUID_3D.md#the-goal): sharp, translucent ink patterns, layers
 distinct.
 
-## A. deep_flow's render up to the motion
+## A. deep_flow's chain, panels and display
 
-deep_flow's render and panels up to the motion follow the chain: capture, view, foreground look, motion. What
-the code shows now (`apps/deep_flow/render/deep_flow_render.py`, `apps/deep_flow/settings.py`):
+deep_flow's chain, its panels and what it shows made simple: the stages capture, view, motion, bridge and fluid,
+each one panel and one monitor; what is shown is a stage's monitor, the fluid's look, the composite, the camera
+previews or the data. What the code shows now (`apps/deep_flow/render/deep_flow_render.py`,
+`apps/deep_flow/settings.py`):
 - the chain is declared four times, each list with its own order and members: `UPDATE_LAYERS` (the update's
   order, `color_mask`, the show's, between the foreground look and the motion), `CAPTURE_LAYERS` (run once per
   capture), `VIEW_LAYERS` (allocated at the view's size) and `SHAPE_LAYERS` (each panel's shape);
@@ -44,24 +46,36 @@ the code shows now (`apps/deep_flow/render/deep_flow_render.py`, `apps/deep_flow
 - the view reads the motion's `motion.z.tolerance`, and its size is the motion's `width` and `height`;
 - `inputs` (the motion's picture, the bridge's color, the injections' weight) and `stage` (the pose stage the
   weight reads) are the app's wiring, among the stages;
-- `ForegroundLookLayer` sits in `render/modules/inference`, but styles the view's foreground; hd_trio's
-  `CenterForegroundLayer` runs the same `ForegroundLook`, so it is not general and two apps use it.
+- `ForegroundLookLayer` sits in `render/modules/inference`, but styles the view's foreground, a stage of its own
+  between the view and the bridge; hd_trio's `CenterForegroundLayer` runs the same `ForegroundLook`, so it is
+  not general and two apps use it;
+- a stage's data is shown three ways: as layers (`view_image`, `view_foreground`, `view_mask`,
+  `view_depth_mask` wrap the view's outputs; `motion`, `bridge` and `fluid` draw their own), as display layers
+  with settings of their own (`view_depth`, its colormap), and through `monitor_a` and `monitor_b`, which show
+  any stage's port; the view's depth is drawn both by `view_depth` and by a monitor, each with its own colormap;
+- a monitor holds a stage and a port's name, so switching its stage loses the port;
+- `color_mask` (`SimilaritySilhouetteLayer`) weighs the players' silhouettes by their similarity across
+  cameras; deep_flow has one camera and one player, and its preset's output does not take it.
 
 Each item is one commit, the preset restructured with the item that moves a setting, checked by the guard
 tests, the render's tests and one -sim start of deep_flow: the panels in their new place, the preset loaded
 without unknown keys. The stages may later move into `modules/flow` (Parked); the panels then follow them.
 
-- **A1.** One declaration of the chain in the renderer: each stage with its layers, the outputs it hands on and
-  its display layers, in the chain's order; the update order, the per-capture run, the view-sized allocation and
-  the panels' shapes read it.
-- **A2.** The panel tree in the chain's order: `capture`, `view` (its depth display and pose overlay under it),
-  `foreground_look`, `motion`; then the bridge, the fluid, the show (`color_mask`, the composite); the app's
-  wiring (`inputs`, `stage`) and the display (`layer`, `monitor_a`, `monitor_b`, `data`, `preview`,
-  `time_series`, `colors`) apart.
-- **A3.** The settings two stages read, declared once on their parent and shared to both: the depth tolerance
-  (the view's read, the motion's z) and the view's size (the motion's).
-- **A4.** `ForegroundLook` and its layer to `render/shared/foreground_look/`, the rule's place for a layer that is
-  not general and that two apps use.
+- **A1.** One declaration of the chain in the renderer: the stages capture, view, motion, bridge, fluid, each with
+  its layer, the outputs it hands on and its monitor, in the chain's order; the update order, the per-capture
+  run, the view-sized allocation and the panels' shapes read it, in place of the four lists.
+- **A2.** The color in the view: `ForegroundLook` runs as the view's last pass, its result the view's `color`, a
+  port and the bridge's color; its settings in the view's panel. `ForegroundLook` and its layer go to
+  `render/shared/foreground_look/`, the rule's place for what two apps use.
+- **A3.** A monitor per stage: each stage holds its monitor, its port and draw mode in the stage's panel;
+  `monitor_a` and `monitor_b`, the wrapper layers and `view_depth` go, the monitor drawing a depth by
+  `view_depth`'s colormaps; `color_mask` leaves deep_flow (it stays in `render` for the other apps). `Layers`
+  holds the stages' monitors, the fluid's look, the composite, the camera previews (`tracker`, `pose`), the pose
+  overlay and the data plots; `inputs` picks a stage's port, not a layer.
+- **A4.** The panel tree in the chain's order: `capture`, `view` (the color and the pose overlay in it), `motion`,
+  `bridge`, `fluid`, `composite`; the app's wiring (`inputs`, `stage`) and the display (`layer`, `data`,
+  `preview`, `time_series`, `colors`) apart. The settings two stages read declared once on their parent and
+  shared to both: the depth tolerance (the view's read, the motion's z) and the view's size (the motion's).
 
 ## B. The camera and the view
 
@@ -245,9 +259,10 @@ Not worked on until asked for; each with what is known.
 
 ## Rules it touches
 
-- Keep presets and settings schemas in sync: deep_flow's panel tree and its shared settings, A2, A3.
-- Settings connect the user and a component, not two components: the view's tolerance and size, A3.
-- `shared` holds the layers that are not general and that more than one app uses: `ForegroundLook`, A4.
+- Keep presets and settings schemas in sync: the view's color, the stages' monitors, the panel tree, A2 to A4.
+- Remove obsolete pathways: the four lists, the wrapper layers, `view_depth`, `monitor_a` and `monitor_b`, A1, A3.
+- `shared` holds the layers that are not general and that more than one app uses: `ForegroundLook`, A2.
+- Settings connect the user and a component, not two components: the view's tolerance and size, A4.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, B1.
 - A `Field` description is one short line of panel text: J1.
