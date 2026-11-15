@@ -9,39 +9,17 @@ from dataclasses import dataclass
 # Local application imports
 from modules.board import HasFrames
 from modules.flow import fixed_window
-from modules.settings import Field, BaseSettings
 from modules.pose import Frame, Points2D, PointLandmark, BBox
-from ..layer_base import LayerBase, DataCache
+from modules.render.layers import LayerBase, DataCache
 from modules.utils import Rect, Point2f
 from modules.gl import Texture
+from ....settings import CenterGeometrySettings, SnapPoint
 
 
 class SourceSpace(IntEnum):
     """The space a centered layer's source texture is in."""
     CROP  = 0   # the pose's crop (a model's output on it, as RVM's mask): `bbox_geometry`
     IMAGE = 1   # the camera image (the image itself, depth on its view): `image_geometry`
-
-
-class SnapPoint(IntEnum):
-    """Body landmark that stays pinned in the output frame."""
-    SHOULDERS = 0
-    HIPS      = 1
-    FEET      = 2
-
-
-class CenterGeometrySettings(BaseSettings):
-    """Configuration for CenterGeometry anchor point positioning."""
-    stage:              Field[int] = Field(0, description="Pose data pipeline stage")
-    target_x:           Field[float] = Field(0.5, min=0.0, max=1.0, description="Horizontal position of the pinned point in the output")
-    target_y:           Field[float] = Field(0.33, min=0.0, max=1.0, description="Vertical position of the pinned point in the output")
-    target_size:        Field[float] = Field(0.27, min=0.01, max=1.0, description="Torso height as a fraction of output height (zoom)")
-    dst_aspectratio:    Field[float] = Field(0.5625, min=0.5, max=2.0, description="Output aspect ratio (9/16 = 0.5625)")
-    torso_upright:      Field[bool] = Field(True, description="Straighten the torso to vertical; off, it tilts with the body", newline=True)
-    snap_point:         Field[SnapPoint] = Field(SnapPoint.SHOULDERS, description="Body point pinned in the frame; scale and rotation from the torso")
-    follow_pose:        Field[bool] = Field(True, description="The view follows the pose; off, it is a fixed window of the camera image", newline=True)
-    fixed_x:            Field[float] = Field(0.5, min=0.0, max=1.0, description="Fixed window's center across the camera image")
-    fixed_y:            Field[float] = Field(0.5, min=0.0, max=1.0, description="Fixed window's center down the camera image")
-    fixed_height:       Field[float] = Field(1.0, min=0.05, max=2.0, description="Fixed window's height, as a fraction of the camera image's")
 
 
 @dataclass
@@ -65,7 +43,7 @@ class CenterGeometry(LayerBase):
     """Calculates anchor points (shoulder/hip midpoints) and derived geometry.
 
     This layer performs no rendering but computes shared geometry used by
-    CenterCamLayer, CenterMaskLayer, and CenterPoseLayer. Also transforms
+    CenterCamLayer, CenterMaskLayer, and ViewPoseLayer. Also transforms
     pose points to crop space. Image coordinates are normalized per axis, so `cam_texture`'s aspect
     is what turns them into true proportions.
     """

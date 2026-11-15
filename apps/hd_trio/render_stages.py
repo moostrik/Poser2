@@ -2,7 +2,7 @@
 
 import math
 from collections.abc import Callable
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from pytweening import easeInOutSine, easeInQuint, easeOutQuad, easeOutSine, linear
 
@@ -11,6 +11,9 @@ from modules.pose import MotionTime
 from modules.render import layers as ls
 
 from .settings import Layers, RenderSettings, ShowStage, Stage
+
+if TYPE_CHECKING:
+    from .render.layers import CenterGeometry
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +83,7 @@ class StageLayer:
 
     def set_geometry_stage(self, stage: Stage) -> None:
         """Select which pipeline stage the center geometry reads poses from."""
-        cast(ls.CenterGeometry, self.layers[Layers.center_geometry]).settings.stage = stage
+        cast('CenterGeometry',self.layers[Layers.center_geometry]).settings.stage = stage
 
     def set_similarity_scale(self, value: float) -> None:
         """Set how strongly other cameras contribute to the fluid and the color mask.

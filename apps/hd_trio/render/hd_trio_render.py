@@ -14,10 +14,11 @@ from modules.pose import Frame, Similarity, AngleMotion
 from modules.render import ColorSettings, layers as ls, shaders, make_subdivision, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, Color
 
-from .board import RenderBoard
-from .settings import Layers, RenderSettings, ShowStage
-from .render_stages import STAGES, StageLayer
-from .intro_sequence import IntroSequencePlayer, SequenceDataProxy, FixedColorProxy
+from ..board import RenderBoard
+from ..settings import Layers, RenderSettings, ShowStage
+from ..render_stages import STAGES, StageLayer
+from ..intro_sequence import IntroSequencePlayer, SequenceDataProxy, FixedColorProxy
+from .layers import CenterGeometry, CenterCamLayer, CenterMaskLayer, CenterForegroundLayer, SourceSpace
 
 
 UPDATE_LAYERS: list[Layers] = [
@@ -83,7 +84,7 @@ class HDTrioRender(RenderBase):
         self._intro_proxy = SequenceDataProxy()
         self._intro_player = IntroSequencePlayer(settings.intro_sequence, self.num_cams, data_path=data_path)
         self._intro_color_proxy = FixedColorProxy(settings.intro_sequence)
-        self._intro_geometries: dict[int, ls.CenterGeometry] = {}
+        self._intro_geometries: dict[int, CenterGeometry] = {}
 
         center_masks: dict[int, Texture] = {}
         for i in range(self.num_cams):
@@ -96,15 +97,15 @@ class HDTrioRender(RenderBase):
             pose_compositor = self.L[Layers.pose][i] =      ls.PoseCompositor(      i, self.board,      cam_image.texture, cam_crop, settings.preview.pose,      settings.colors)
             self.L[Layers.cam_readings][i] =                 ls.CameraReadingsLayer( cameras[i], camera_health)
 
-            center_geometry = self.L[Layers.center_geometry][i] = ls.CenterGeometry( i, self.board,      cam_image.texture,          settings.center.geometry)
-            center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask,               ls.SourceSpace.CROP, settings.center.mask)
+            center_geometry = self.L[Layers.center_geometry][i] = CenterGeometry(    i, self.board,     cam_image.texture,          settings.center.geometry)
+            center_mask =   self.L[Layers.center_mask][i] = CenterMaskLayer(        i, center_geometry, cam_mask,               SourceSpace.CROP, settings.center.mask)
             center_masks[i] = center_mask.texture
-            center_cam =    self.L[Layers.center_cam][i] =  ls.CenterCamLayer(      i, center_geometry, cam_image,          center_masks[i], settings.center.cam)
-            center_foreground = self.L[Layers.center_foreground][i] = ls.CenterForegroundLayer(i, center_geometry, cam_foreground, center_masks[i], ls.SourceSpace.CROP, False, settings.center.foreground, settings.colors)
-            center_pose =   self.L[Layers.center_pose][i] = ls.CenterPoseLayer(     i, center_geometry,                             settings.center.pose,       settings.colors)
+            center_cam =    self.L[Layers.center_cam][i] =  CenterCamLayer(         i, center_geometry, cam_image,          center_masks[i], settings.center.cam)
+            center_foreground = self.L[Layers.center_foreground][i] = CenterForegroundLayer(i, center_geometry, cam_foreground, center_masks[i], SourceSpace.CROP, False, settings.center.foreground, settings.colors)
+            center_pose =   self.L[Layers.center_pose][i] = ls.ViewPoseLayer(     i, center_geometry,                             settings.center.pose,       settings.colors)
 
-            intro_geometry = self._intro_geometries[i] =     ls.CenterGeometry(      i, cast(HasFrames, self._intro_proxy), cam_image.texture, settings.center.geometry)
-            self.L[Layers.intro_pose][i] =                   ls.CenterPoseLayer(     i, intro_geometry,                             settings.intro_sequence.pose, cast(ColorSettings, self._intro_color_proxy))
+            intro_geometry = self._intro_geometries[i] =     CenterGeometry(         i, cast(HasFrames, self._intro_proxy), cam_image.texture, settings.center.geometry)
+            self.L[Layers.intro_pose][i] =                   ls.ViewPoseLayer(     i, intro_geometry,                             settings.intro_sequence.pose, cast(ColorSettings, self._intro_color_proxy))
 
             ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,      center_foreground.texture, center_masks, settings.center.color,  settings.colors)
             self.L[Layers.motion][i] =                      ls.Motion2DLayer(       settings.motion)

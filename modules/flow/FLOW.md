@@ -215,7 +215,7 @@ subpanels: `readings`, `lowpass` and `bandpass`; `boundary`, `velocity`, `densit
 `dt` from their input.
 
 The apps' render is a layer graph of `LayerBase` layers updated by one loop calling `update()`
-on each (`apps/deep_flow/render.py`, `apps/hd_trio/render.py`). hd_trio builds a motion and a
+on each (`apps/deep_flow/render.py`, `apps/hd_trio/render/hd_trio_render.py`). hd_trio builds a motion and a
 bridge input per camera and a fluid input per fluid layer in a wiring pass before the loop
 (`_wire_flow`), which `UPDATE_LAYERS` orders motion, bridge, fluid. deep_flow runs its stages per
 capture: each tick it takes the captures that came since the last (`take_captures`) and runs each,
@@ -270,7 +270,7 @@ frame. How a frame gets there, thread by thread, and what costs frames are in
   side inside the package. Nothing is grouped by app or by camera.
 - The 2D system's measurement stays as on `main` (`GradientFlow`, `bridge_2d`, `Fluid2D`) until
   the 2D optical flow moves to the Lucas–Kanade solve: its velocity is per frame and it has no
-  velocity gate. hd_trio measures on the mask itself (`apps/hd_trio/render.py`), so a gate would
+  velocity gate. hd_trio measures on the mask itself (`apps/hd_trio/render/hd_trio_render.py`), so a gate would
   change nothing there **(deduction)**.
 - The fluid knows injections, not cameras. The 2D fluid keeps its injections apart until its
   output, one density channel each, so a 2D fluid takes four injections at most, and colors them

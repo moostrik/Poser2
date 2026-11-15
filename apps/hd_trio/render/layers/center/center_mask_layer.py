@@ -4,24 +4,14 @@
 from OpenGL.GL import GL_R16F, GL_RG32F, GL_RGBA16F, GL_RGBA32F
 
 # Local application imports
-from modules.settings import Field, BaseSettings
-from ..layer_base import LayerBase, HasCaptureTime
+from modules.render.layers import LayerBase, HasCaptureTime
 from .center_geometry import CenterGeometry, SourceSpace
-from ...shaders import DrawRoi, GuidedFilter, MaskAA, MaskBlend, MaskBlur, MaskDilate, MaskErode
+from modules.render.shaders import DrawRoi, GuidedFilter, MaskAA, MaskBlend, MaskBlur, MaskDilate, MaskErode
 from modules.gl import Fbo, SwapFbo, Texture, Style
 from modules.utils import Rect
+from ....settings import CenterMaskLayerSettings
 
 _FULL_ROI: Rect = Rect(0.0, 0.0, 1.0, 1.0)
-
-
-class CenterMaskLayerSettings(BaseSettings):
-    """Configuration for CenterMaskLayer temporal blending and blur."""
-    blend_factor:   Field[float] = Field(0.2, min=0.0, max=1.0, description="Temporal blending strength (0=static, 1=instant)")
-    dilation_steps: Field[int]   = Field(0, min=-10, max=10, description="Mask dilation iterations (positive=expand, negative=shrink)")
-    blur_steps:     Field[int]   = Field(0, min=0, max=10, description="Number of blur iterations")
-    blur_radius:    Field[float] = Field(1.0, min=0.0, max=20.0, description="Blur kernel radius in pixels")
-    guided_radius:  Field[float] = Field(0.0, min=0.0, max=8.0, step=0.25, newline=True, description="How far the image moves the mask's edge to its own, in the source mask's pixels; 0 = off")
-    edge_contrast:  Field[float] = Field(0.03, min=0.001, max=0.3, step=0.001, description="The image's brightness spread (0 to 1) above which the mask's edge follows the image's")
 
 
 class CenterMaskLayer(LayerBase):

@@ -8,7 +8,8 @@ from modules.board import HasFrames
 from modules.gl import Texture
 from modules.pose import BBox, Frame
 from modules.flow import fixed_window
-from modules.render.layers.center.center_geometry import CenterGeometry, CenterGeometrySettings
+from apps.hd_trio.render.layers import CenterGeometry
+from apps.hd_trio.settings import CenterGeometrySettings
 from modules.utils import Point2f, Rect
 
 

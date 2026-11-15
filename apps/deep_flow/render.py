@@ -137,7 +137,7 @@ class DeepFlowRender(RenderBase):
             self.L[Layers.view_mask][i] =                   ls.ViewOutputLayer(     view, output.mask)
             self.L[Layers.view_depth_mask][i] =             ls.ViewOutputLayer(     view, output.depth_mask)
             self.L[Layers.view_depth][i] =                  ls.ViewDepthLayer(      view, settings.view_depth)
-            self.L[Layers.view_pose][i] =                   ls.CenterPoseLayer(     i, view,                                     settings.view_pose,         settings.colors)
+            self.L[Layers.view_pose][i] =                   ls.ViewPoseLayer(       i, view,                                    settings.view_pose,         settings.colors)
             view_foreground: ls.LayerBase = self.L[Layers.view_foreground][i]
             foreground_look = self.L[Layers.foreground_look][i] = ls.ForegroundLookLayer(i, view_foreground, output.mask,           settings.foreground_look, settings.colors)
 

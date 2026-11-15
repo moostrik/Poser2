@@ -1,20 +1,14 @@
 """Renders centered and rotated camera view based on pose anchor points with optional mask."""
 
 # Local application imports
-from modules.settings import Field, BaseSettings
-from ..layer_base import LayerBase, HasCaptureTime
+from modules.render.layers import LayerBase, HasCaptureTime
 from .center_geometry import CenterGeometry
-from ...shaders import Blend, DrawRoi, MaskApply
+from modules.render.shaders import Blend, DrawRoi, MaskApply
+from ....settings import CenterCamLayerSettings
 
 # GL
 from modules.gl import Fbo, SwapFbo, Texture
 
-
-class CenterCamLayerSettings(BaseSettings):
-    """Configuration for CenterCamLayer camera rendering."""
-    blend_factor:   Field[float] = Field(0.2, min=0.0, max=1.0, description="Camera frame temporal blending")
-    mask_opacity:   Field[float] = Field(1.0, min=0.0, max=1.0, description="Mask alpha strength")
-    use_mask:       Field[bool]  = Field(True, description="Apply mask to camera output")
 
 class CenterCamLayer(LayerBase):
     """Renders camera image cropped and rotated around pose anchor points.

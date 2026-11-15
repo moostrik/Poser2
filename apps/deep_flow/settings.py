@@ -262,7 +262,7 @@ class RenderSettings(BaseSettings):
     data   : Group[DataGroup]                    = Group(DataGroup)
     preview: Group[PreviewGroup]                 = Group(PreviewGroup)
     view_depth: Group[layers.ViewDepthLayerSettings] = Group(layers.ViewDepthLayerSettings)
-    view_pose: Group[layers.CenterPoseLayerSettings] = Group(layers.CenterPoseLayerSettings)
+    view_pose: Group[layers.ViewPoseLayerSettings] = Group(layers.ViewPoseLayerSettings)
     foreground_look: Group[layers.ForegroundLookSettings] = Group(layers.ForegroundLookSettings)
     color_mask: Group[layers.MSColorMaskLayerSettings] = Group(layers.MSColorMaskLayerSettings)
     inputs : Group[FlowInputSettings]            = Group(FlowInputSettings)

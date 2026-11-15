@@ -1,16 +1,12 @@
 """Renders centered and rotated foreground with the foreground's look (`ForegroundLook`) and optional mask."""
 
 # Local application imports
-from ..layer_base import LayerBase, HasCaptureTime
-from ..generic import ForegroundLook, ForegroundLookSettings
+from modules.render.layers import LayerBase, HasCaptureTime, ForegroundLook
 from .center_geometry import CenterGeometry, SourceSpace
-from ...shaders import DrawRoi, MaskMultiply
+from modules.render.shaders import DrawRoi, MaskMultiply
 from modules.gl import Fbo, Texture, Style
-from ...color_settings import ColorSettings
-
-
-class CenterForegroundLayerSettings(ForegroundLookSettings):
-    """Configuration for CenterForegroundLayer: the foreground's look."""
+from modules.render import ColorSettings
+from ....settings import CenterForegroundLayerSettings
 
 
 class CenterForegroundLayer(LayerBase):

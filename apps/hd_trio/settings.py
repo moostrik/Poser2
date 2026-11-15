@@ -321,8 +321,47 @@ class _TrackerCompositorSettings(layers.TrackerCompositorSettings):
 class _PoseCompositorSettings(layers.PoseCompositorSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for camera crop")
 
-class _CenterGeometrySettings(layers.CenterGeometrySettings):
-    stage: Field[Stage] = Field(Stage.SMOOTH, description="Pose data pipeline stage")
+class SnapPoint(IntEnum):
+    """Body landmark that stays pinned in the output frame."""
+    SHOULDERS = 0
+    HIPS      = 1
+    FEET      = 2
+
+
+class CenterGeometrySettings(BaseSettings):
+    """Configuration for CenterGeometry anchor point positioning."""
+    stage:              Field[Stage] = Field(Stage.SMOOTH, description="Pose data pipeline stage")
+    target_x:           Field[float] = Field(0.5, min=0.0, max=1.0, description="Horizontal position of the pinned point in the output")
+    target_y:           Field[float] = Field(0.33, min=0.0, max=1.0, description="Vertical position of the pinned point in the output")
+    target_size:        Field[float] = Field(0.27, min=0.01, max=1.0, description="Torso height as a fraction of output height (zoom)")
+    dst_aspectratio:    Field[float] = Field(0.5625, min=0.5, max=2.0, description="Output aspect ratio (9/16 = 0.5625)")
+    torso_upright:      Field[bool] = Field(True, description="Straighten the torso to vertical; off, it tilts with the body", newline=True)
+    snap_point:         Field[SnapPoint] = Field(SnapPoint.SHOULDERS, description="Body point pinned in the frame; scale and rotation from the torso")
+    follow_pose:        Field[bool] = Field(True, description="The view follows the pose; off, it is a fixed window of the camera image", newline=True)
+    fixed_x:            Field[float] = Field(0.5, min=0.0, max=1.0, description="Fixed window's center across the camera image")
+    fixed_y:            Field[float] = Field(0.5, min=0.0, max=1.0, description="Fixed window's center down the camera image")
+    fixed_height:       Field[float] = Field(1.0, min=0.05, max=2.0, description="Fixed window's height, as a fraction of the camera image's")
+
+
+class CenterMaskLayerSettings(BaseSettings):
+    """Configuration for CenterMaskLayer temporal blending and blur."""
+    blend_factor:   Field[float] = Field(0.2, min=0.0, max=1.0, description="Temporal blending strength (0=static, 1=instant)")
+    dilation_steps: Field[int]   = Field(0, min=-10, max=10, description="Mask dilation iterations (positive=expand, negative=shrink)")
+    blur_steps:     Field[int]   = Field(0, min=0, max=10, description="Number of blur iterations")
+    blur_radius:    Field[float] = Field(1.0, min=0.0, max=20.0, description="Blur kernel radius in pixels")
+    guided_radius:  Field[float] = Field(0.0, min=0.0, max=8.0, step=0.25, newline=True, description="How far the image moves the mask's edge to its own, in the source mask's pixels; 0 = off")
+    edge_contrast:  Field[float] = Field(0.03, min=0.001, max=0.3, step=0.001, description="The image's brightness spread (0 to 1) above which the mask's edge follows the image's")
+
+
+class CenterCamLayerSettings(BaseSettings):
+    """Configuration for CenterCamLayer camera rendering."""
+    blend_factor:   Field[float] = Field(0.2, min=0.0, max=1.0, description="Camera frame temporal blending")
+    mask_opacity:   Field[float] = Field(1.0, min=0.0, max=1.0, description="Mask alpha strength")
+    use_mask:       Field[bool]  = Field(True, description="Apply mask to camera output")
+
+
+class CenterForegroundLayerSettings(layers.ForegroundLookSettings):
+    """Configuration for CenterForegroundLayer: the foreground's look."""
 
 
 class LayerGroup(BaseSettings):
@@ -341,11 +380,11 @@ class CenterGroup(BaseSettings):
     # Received from RenderSettings and passed on to the color mask.
     similarity_scale: Field[float] = Field(1.0, min=0.0, max=1.0, visible=False, description="Cross-camera response")
 
-    geometry: Group[_CenterGeometrySettings]                = Group(_CenterGeometrySettings)
-    mask    : Group[layers.CenterMaskLayerSettings]         = Group(layers.CenterMaskLayerSettings)
-    cam     : Group[layers.CenterCamLayerSettings]          = Group(layers.CenterCamLayerSettings)
-    foreground: Group[layers.CenterForegroundLayerSettings] = Group(layers.CenterForegroundLayerSettings)
-    pose    : Group[layers.CenterPoseLayerSettings]         = Group(layers.CenterPoseLayerSettings)
+    geometry: Group[CenterGeometrySettings]                 = Group(CenterGeometrySettings)
+    mask    : Group[CenterMaskLayerSettings]                = Group(CenterMaskLayerSettings)
+    cam     : Group[CenterCamLayerSettings]                 = Group(CenterCamLayerSettings)
+    foreground: Group[CenterForegroundLayerSettings]        = Group(CenterForegroundLayerSettings)
+    pose    : Group[layers.ViewPoseLayerSettings]           = Group(layers.ViewPoseLayerSettings)
     color   : Group[layers.MSColorMaskLayerSettings]        = Group(layers.MSColorMaskLayerSettings, share=[similarity_scale])
 
 class IntroSequenceSettings(BaseSettings):
@@ -366,7 +405,7 @@ class IntroSequenceSettings(BaseSettings):
     recorder:          Group[_IntroRecorderSettings]     = Group(_IntroRecorderSettings)
 
     color:             Field[Color]     = Field(Color(1.0, 1.0, 1.0), description="Skeleton color for intro overlay")
-    pose:              Group[layers.CenterPoseLayerSettings]  = Group(layers.CenterPoseLayerSettings)
+    pose:              Group[layers.ViewPoseLayerSettings]  = Group(layers.ViewPoseLayerSettings)
 
 
 class RenderSettings(BaseSettings):

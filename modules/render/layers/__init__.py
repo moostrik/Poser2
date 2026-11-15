@@ -3,14 +3,11 @@ from .layer_base import LayerBase, DataCache, HasCaptureTime
 from .cam import      BBoxRenderer, BBoxRendererSettings, CameraReadingsLayer, CropLayer, CropLayerSettings, \
                       PoseRenderer, PoseRendererSettings, PoseCompositor, PoseCompositorSettings, \
                       TrackerCompositor, TrackerCompositorSettings, TrackletRenderer
-from .center import   CenterGeometry, CenterGeometrySettings, SnapPoint, SourceSpace, \
-                      CenterCamLayer, CenterCamLayerSettings, \
-                      CenterMaskLayer, CenterMaskLayerSettings, CenterForegroundLayer, CenterForegroundLayerSettings, \
-                      CenterPoseLayer, CenterPoseLayerSettings, PosePlacement
 from .data import     DataLayerSettings, ScalarFeatureSelect, LayerMode, AngleOffset, FEATURE_MAP, TRACK_COLOR_FEATURES, \
                       TimeSeriesLayer, TimeSeriesLayerSettings, \
                       FeatureFrameLayer, FeatureWindowLayer, MotionTimeRenderer, MotionTimeRendererSettings, \
-                      PoseLineLayer, PoseLineLayerSettings
+                      PoseLineLayer, PoseLineLayerSettings, \
+                      ViewPoseLayer, ViewPoseLayerSettings, PosePlacement, landmark_midpoint
 from .flow import     StageLayer, StageLayerSettings, StageOutput, \
                       ViewInput, ViewOutput, ViewLayer, ViewLayerSettings, ViewOutputLayer, ViewDepthLayer, ViewDepthLayerSettings, DepthDrawMode, \
                       MotionInput, MotionOutput, MotionLayer, MotionLayerSettings, frame_interval, \
