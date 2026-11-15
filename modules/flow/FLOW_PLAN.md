@@ -190,6 +190,16 @@ concurrency rules touch none of it.
 
 Not worked on until asked for; each with what is known.
 
+- The flow's stages in `modules/flow`, the render only drawing them: the flow sits in two packages now, so a
+  stage is changed in both and FLOW.md describes both. `Fluid3DLayer` (91 lines) is a thin layer over the flow's
+  `Fluid3D`; `Bridge3DLayer` (417 lines) is the bridge itself (it wires `VelocityLowpass`, `VelocityBandpass`,
+  `ZPositionMix` and the density and temperature bridges, holds `Bridge3DLayerSettings`, declares the ports), and
+  `ViewLayer` (263 lines) the view (the depth mask, the guided filter, the cut); `MonitorLayer`, which draws the
+  ports, is the render's. Each stage subclasses the render's `LayerBase` to sit in its update loop, and modules
+  may not import the render, so the stages could not live in the flow **(deduction)**. The textbook split: each
+  stage a plain flow class as `Fluid3D` is, with its settings, ports, inputs and outputs, and a thin render layer
+  per stage that calls it, beside the monitor. I2's panels follow wherever the stages end up.
+
 - The 4K upscale: depth in 3D at the grid and detail in 2D at 4K, a march at the grid's size, one
   edge-aware upscale of the flat result and a 4K detail layer advected by the grid's velocity; what
   was found is in [FLUID_3D.md](FLUID_3D.md#the-densitys-detail).
