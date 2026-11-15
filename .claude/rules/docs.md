@@ -6,7 +6,7 @@ paths:
 ---
 # Documents
 
-These rules hold for documents, not for plans.
+These rules hold for documents, not for plans. A plan follows `.claude/rules/plans.md`.
 
 ## Content
 
