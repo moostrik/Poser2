@@ -165,37 +165,36 @@ concurrency rules touch none of it.
 - **I1.** Every setting and its description gone through, last, after the refactor, against the rule: a `Field`
   description is one short line of panel text, what and its unit; and whether every quantity is in the flow's
   textbook units, which a scan cannot judge.
-- **I2.** deep_flow's render and panels up to the motion follow the chain: capture, view, foreground look,
-  motion. What the code shows now (`apps/deep_flow/render/deep_flow_render.py`, `apps/deep_flow/settings.py`):
-  - the chain is declared four times, each list with its own order and members: `UPDATE_LAYERS` (the update's
-    order, `color_mask`, the show's, between the foreground look and the motion), `CAPTURE_LAYERS` (run once per
-    capture), `VIEW_LAYERS` (allocated at the view's size) and `SHAPE_LAYERS` (each panel's shape);
-  - `Layers` is one flat enum of sources (`cam_image`, `capture_image`, `capture_depth`), stages (`view`,
-    `motion`), a stage's outputs (`view_image`, `view_foreground`, `view_mask`, `view_depth_mask`) and display
-    layers (`view_depth`, `view_pose`, `tracker`, `pose`);
-  - the panels are one flat list in `RenderSettings`, not in the chain's order;
-  - the view reads the motion's `motion.z.tolerance`, and its size is the motion's `width` and `height`;
-  - `inputs` (the motion's picture, the bridge's color, the injections' weight) and `stage` (the pose stage the
-    weight reads) are the app's wiring, among the stages;
-  - `ForegroundLookLayer` sits in `render/modules/inference`, but styles the view's foreground; hd_trio's
-    `CenterForegroundLayer` runs the same `ForegroundLook`, so it is not general and two apps use it.
+deep_flow's render and panels up to the motion follow the chain: capture, view, foreground look, motion. What
+the code shows now (`apps/deep_flow/render/deep_flow_render.py`, `apps/deep_flow/settings.py`):
+- the chain is declared four times, each list with its own order and members: `UPDATE_LAYERS` (the update's
+  order, `color_mask`, the show's, between the foreground look and the motion), `CAPTURE_LAYERS` (run once per
+  capture), `VIEW_LAYERS` (allocated at the view's size) and `SHAPE_LAYERS` (each panel's shape);
+- `Layers` is one flat enum of sources (`cam_image`, `capture_image`, `capture_depth`), stages (`view`,
+  `motion`), a stage's outputs (`view_image`, `view_foreground`, `view_mask`, `view_depth_mask`) and display
+  layers (`view_depth`, `view_pose`, `tracker`, `pose`);
+- the panels are one flat list in `RenderSettings`, not in the chain's order;
+- the view reads the motion's `motion.z.tolerance`, and its size is the motion's `width` and `height`;
+- `inputs` (the motion's picture, the bridge's color, the injections' weight) and `stage` (the pose stage the
+  weight reads) are the app's wiring, among the stages;
+- `ForegroundLookLayer` sits in `render/modules/inference`, but styles the view's foreground; hd_trio's
+  `CenterForegroundLayer` runs the same `ForegroundLook`, so it is not general and two apps use it.
 
-  The steps, one commit each, the preset restructured with the step that moves a setting:
-  - **I2a.** One declaration of the chain in the renderer: each stage with its layers, the outputs it hands on and
-    its display layers, in the chain's order; the update order, the per-capture run, the view-sized allocation
-    and the panels' shapes read it.
-  - **I2b.** The panel tree in the chain's order: `capture`, `view` (its depth display and pose overlay under it),
-    `foreground_look`, `motion`; then the bridge, the fluid, the show (`color_mask`, the composite); the app's
-    wiring (`inputs`, `stage`) and the display (`layer`, `monitor_a`, `monitor_b`, `data`, `preview`,
-    `time_series`, `colors`) apart.
-  - **I2c.** The settings two stages read, declared once on their parent and shared to both: the depth tolerance
-    (the view's read, the motion's z) and the view's size (the motion's).
-  - **I2d.** `ForegroundLook` and its layer to `render/shared/foreground_look/`, the rule's place for a layer that
-    is not general and that two apps use.
+Each item is one commit, the preset restructured with the item that moves a setting, checked by the guard
+tests, the render's tests and one -sim start of deep_flow: the panels in their new place, the preset loaded
+without unknown keys. The stages may later move into `modules/flow` (Parked); the panels then follow them.
 
-  Checked by the guard tests, the render's tests and one -sim start of deep_flow: the panels in their new place,
-  the preset loaded without unknown keys. The stages may later move into `modules/flow` (Parked); the panels
-  then follow them.
+- **I2.** One declaration of the chain in the renderer: each stage with its layers, the outputs it hands on and
+  its display layers, in the chain's order; the update order, the per-capture run, the view-sized allocation and
+  the panels' shapes read it.
+- **I3.** The panel tree in the chain's order: `capture`, `view` (its depth display and pose overlay under it),
+  `foreground_look`, `motion`; then the bridge, the fluid, the show (`color_mask`, the composite); the app's
+  wiring (`inputs`, `stage`) and the display (`layer`, `monitor_a`, `monitor_b`, `data`, `preview`,
+  `time_series`, `colors`) apart.
+- **I4.** The settings two stages read, declared once on their parent and shared to both: the depth tolerance
+  (the view's read, the motion's z) and the view's size (the motion's).
+- **I5.** `ForegroundLook` and its layer to `render/shared/foreground_look/`, the rule's place for a layer that is
+  not general and that two apps use.
 
 ## Parked
 
@@ -209,7 +208,7 @@ Not worked on until asked for; each with what is known.
   ports, is the render's. Each stage subclasses the render's `LayerBase` to sit in its update loop, and modules
   may not import the render, so the stages could not live in the flow **(deduction)**. The textbook split: each
   stage a plain flow class as `Fluid3D` is, with its settings, ports, inputs and outputs, and a thin render layer
-  per stage that calls it, beside the monitor. I2's panels follow wherever the stages end up.
+  per stage that calls it, beside the monitor. I3's panels follow wherever the stages end up.
 
 - The 4K upscale: depth in 3D at the grid and detail in 2D at 4K, a march at the grid's size, one
   edge-aware upscale of the flat result and a 4K detail layer advected by the grid's velocity; what
@@ -244,9 +243,9 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, A1.
 - A `Field` description is one short line of panel text: I1.
-- Keep presets and settings schemas in sync: deep_flow's panel tree and its shared settings, I2b, I2c.
-- Settings connect the user and a component, not two components: the view's tolerance and size, I2c.
-- `shared` holds the layers that are not general and that more than one app uses: `ForegroundLook`, I2d.
+- Keep presets and settings schemas in sync: deep_flow's panel tree and its shared settings, I3, I4.
+- Settings connect the user and a component, not two components: the view's tolerance and size, I4.
+- `shared` holds the layers that are not general and that more than one app uses: `ForegroundLook`, I5.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 Not designed yet, so their rules are not named: A2, A3; B1 to B4; C1 to C4; D1, D2; E1 to E3; G1; H1 to H4.
