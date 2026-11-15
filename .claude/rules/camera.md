@@ -2,6 +2,7 @@
 description: The camera package: its thread and what it hands over
 paths:
   - "modules/camera/**"
+  - "modules/recording/replay/**"
 ---
 # Camera
 
