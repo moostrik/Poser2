@@ -5,7 +5,7 @@ from enum import IntEnum
 
 # Third-party imports
 import numpy as np
-from OpenGL.GL import GL_RGBA8, GL_VIEWPORT, glGetIntegerv
+from OpenGL.GL import GL_RGBA8
 
 # Local application imports
 from modules.board import HasTimeSeries
@@ -100,16 +100,14 @@ class TimeSeriesLayer(LayerBase):
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         if self._fbo.allocated:
             self._fbo.draw()
-        if self._labels and self._text.allocated:
+        if self._labels and self._text.allocated and self._fbo.allocated:
             self._draw_labels()
         Style.pop_style()
 
     def _draw_labels(self) -> None:
-        """Each lane's name, last value and scale, at its top left."""
-        viewport = glGetIntegerv(GL_VIEWPORT)
-        width, height = int(viewport[2]), int(viewport[3])
-        if width <= 0 or height <= 0:
-            return
+        """Each lane's name, last value and scale, at its top left, in the layer's pixels: the labels scale with
+        the layer as its lines do."""
+        width, height = self._fbo.width, self._fbo.height
         step: float = height / len(self._labels)
         for index, label in enumerate(self._labels):
             color: Color = Color(*LANE_COLORS[index % len(LANE_COLORS)])
