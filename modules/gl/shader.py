@@ -20,12 +20,12 @@ def draw_quad() -> None:
 class FileModifiedHandler(FileSystemEventHandler):
     def __init__(self, callback):
         self.callback = callback
-        self.last_modified: float = time.time()
+        self.last_modified: float = time.perf_counter()
 
     def on_modified(self, event) -> None:
-        if time.time() - self.last_modified < 0.5:
+        if time.perf_counter() - self.last_modified < 0.5:
             return
-        self.last_modified = time.time()
+        self.last_modified = time.perf_counter()
         if not event.is_directory:
             self.callback(event.src_path)
 

@@ -1,5 +1,6 @@
 from modules.gl import Fbo, Image, SwapFbo, Texture, shaders
 
+from ..shaders import Omission
 from .layer_base import LayerBase
 from .passes import blur, copy
 
@@ -11,7 +12,7 @@ class BloomLayer(LayerBase):
         self._depth: Image = depth
         self._fbo: Fbo = Fbo()
         self._mask: SwapFbo = SwapFbo()
-        self._omission: shaders.Omission = shaders.Omission()
+        self._omission: Omission = Omission()
         self._blur_h: shaders.BlurH = shaders.BlurH()
         self._blur_v: shaders.BlurV = shaders.BlurV()
 

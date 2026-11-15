@@ -1,16 +1,16 @@
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
-from ... import Shader, draw_quad, Texture
+from modules.gl import Shader, draw_quad, Texture
 
 import logging
 logger = logging.getLogger(__name__)
 
-class NoiseBlend(Shader):
-    def use(self, tex0: Texture, tex1: Texture, mask: Texture, blend: float) -> None:
+class FlashOut(Shader):
+    def use(self, tex0: Texture, tex1: Texture, tex2: Texture, flash: float) -> None:
         if not self.allocated or not self.shader_program:
-            logger.warning("NoiseBlend shader not allocated or shader program missing.")
+            logger.warning("FlashOut shader not allocated or shader program missing.")
             return
-        if not tex0.allocated or not tex1.allocated or not mask.allocated:
-            logger.warning("NoiseBlend shader: input textures not allocated.")
+        if not tex0.allocated or not tex1.allocated or not tex2.allocated:
+            logger.warning("FlashOut shader: input textures not allocated.")
             return
 
         # Activate shader program
@@ -22,13 +22,13 @@ class NoiseBlend(Shader):
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, tex1.tex_id)
         glActiveTexture(GL_TEXTURE2)
-        glBindTexture(GL_TEXTURE_2D, mask.tex_id)
+        glBindTexture(GL_TEXTURE_2D, tex2.tex_id)
 
         # Configure shader uniforms (using cached locations)
-        glUniform1i(self.get_uniform_loc("src"), 0)
-        glUniform1i(self.get_uniform_loc("dst"), 1)
-        glUniform1i(self.get_uniform_loc("mask"), 2)
-        glUniform1f(self.get_uniform_loc("blend"), blend)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform1i(self.get_uniform_loc("tex1"), 1)
+        glUniform1i(self.get_uniform_loc("tex2"), 2)
+        glUniform1f(self.get_uniform_loc("flash"), flash)
 
         # Render
         draw_quad()

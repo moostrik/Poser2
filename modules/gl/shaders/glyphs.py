@@ -10,7 +10,7 @@ from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, GL_TRIANGLES, glActiveTexture,
 from ..shader import Shader
 
 
-class TextShader(Shader):
+class Glyphs(Shader):
     """Shader for rendering a batch of text glyphs from a font atlas."""
 
     def use(self, vertex_count: int,

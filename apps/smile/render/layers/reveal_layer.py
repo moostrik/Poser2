@@ -1,5 +1,6 @@
 from modules.gl import Fbo, Image, SwapFbo, Texture, shaders
 
+from ..shaders import FlashOut
 from .layer_base import LayerBase
 from .passes import blur, copy
 
@@ -12,7 +13,7 @@ class RevealLayer(LayerBase):
         self._white: Image = white
         self._fbo: Fbo = Fbo()
         self._mask: SwapFbo = SwapFbo()
-        self._flash_out: shaders.FlashOut = shaders.FlashOut()
+        self._flash_out: FlashOut = FlashOut()
         self._blur_h: shaders.BlurH = shaders.BlurH()
         self._blur_v: shaders.BlurV = shaders.BlurV()
 

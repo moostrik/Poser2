@@ -24,9 +24,8 @@ import ctypes
 # Local application imports
 if TYPE_CHECKING:
     from .render_base import RenderBase
-from .utils import FpsCounter
 from modules.settings import Field, BaseSettings, Widget
-from modules.utils import PerformanceTimer
+from modules.utils import FPS, PerformanceTimer
 
 
 class MonitorId(IntEnum):
@@ -44,7 +43,7 @@ class FullscreenMode(IntEnum):
 
 
 class WindowSettings(BaseSettings):
-    """Window / init configuration — set once before RenderManager starts."""
+    """Window / init configuration — set once before WindowManager starts."""
     title: Field[str] =           Field("Poser", access=Field.INIT, visible=False)
     avg_fps: Field[int] =         Field(60, access=Field.READ, pinned=True, label="Render", unit="fps", description="Average render frame rate")
     min_fps: Field[int] =         Field(60, access=Field.READ, pinned=True, label="Render min", unit="fps", description="Minimum render frame rate")
@@ -98,7 +97,7 @@ class WindowManager():
         self.frame_interval: int | None = None
         self._current_vsync: bool | None = None
         logger.info("Initialized with width=%s, height=%s, fullscreen_mode=%s, v_sync=%s, fps=%s", settings.width, settings.height, settings.fullscreen_mode, settings.v_sync, settings.avg_fps)
-        self._fps = FpsCounter()
+        self._fps = FPS(120)
         # CPU time of the renderer's calls; the GPU work they queue is not waited for
         self._update_timer = PerformanceTimer(name="Render update", sample_count=200)
         self._draw_timer = PerformanceTimer(name="Render draw", sample_count=200)
@@ -361,8 +360,8 @@ class WindowManager():
 
     def _update(self) -> None:
         """Update renderer state. Called once per frame; ``frame_time`` is the frame's stamp."""
-        self._fps.tick()
-        self._push_fps(self._fps.get_fps())
+        self._fps.processed()
+        self._push_fps(int(self._fps.get_rate_average()))
         start = perf_counter()
         if self._last_update:
             self._interval_timer.add_time((start - self._last_update) * 1000.0, report=False)
@@ -376,7 +375,7 @@ class WindowManager():
 
     def _push_fps(self, fps: int) -> None:
         self.settings.avg_fps = fps
-        self.settings.min_fps = self._fps.get_min_fps()
+        self.settings.min_fps = int(self._fps.get_rate_minimum())
 
     def _cleanup(self) -> None:
         """Clean up resources"""

@@ -1,18 +1,17 @@
 from OpenGL.GL import glUniform1f, glUseProgram
 from .. import Shader, draw_quad
- # ...existing code...
-from time import time
 
 import logging
 logger = logging.getLogger(__name__)
 
 class NoiseSimplex(Shader):
-    def use(self, speed: float, blend: float) -> None:
+    def use(self, frame_time: float, speed: float, blend: float) -> None:
+        """Animated simplex noise at `frame_time` (the tick's time, s) times `speed`."""
         if not self.allocated or not self.shader_program:
             logger.warning("NoiseSimplex shader not allocated or shader program missing.")
             return
 
-        t: float = (time() * speed % (3600.0))
+        t: float = (frame_time * speed % (3600.0))
 
         # Activate shader program
         glUseProgram(self.shader_program)
@@ -23,4 +22,3 @@ class NoiseSimplex(Shader):
 
         # Render
         draw_quad()
-

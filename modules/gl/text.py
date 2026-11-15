@@ -11,7 +11,7 @@ import numpy as np
 from OpenGL.GL import GL_ARRAY_BUFFER, GL_BLEND, GL_DYNAMIC_DRAW, GL_FALSE, GL_FLOAT, GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, GL_VERTEX_ARRAY_BINDING, glBindBuffer, glBindVertexArray, glBlendFunc, glBufferData, glDeleteBuffers, glDeleteVertexArrays, glEnable, glEnableVertexAttribArray, glGenBuffers, glGenVertexArrays, glGetIntegerv, glVertexAttribPointer
 
 from .font_atlas import FontAtlas
-from .shaders.text_shader import TextShader
+from .shaders.glyphs import Glyphs
 from .shaders.box_shader import BoxShader
 
 
@@ -39,7 +39,7 @@ class Text:
 
     def __init__(self) -> None:
         self._atlas: FontAtlas = FontAtlas()
-        self._text_shader: TextShader = TextShader()
+        self._glyphs: Glyphs = Glyphs()
         self._box_shader: BoxShader = BoxShader()
         self._allocated: bool = False
         self._vao: int = 0      # the string batch: interleaved (x, y, u, v), 6 vertices per glyph
@@ -71,10 +71,10 @@ class Text:
             return False
 
         # Allocate shaders
-        self._text_shader.allocate()
+        self._glyphs.allocate()
         self._box_shader.allocate()
 
-        if not self._text_shader.allocated or not self._box_shader.allocated:
+        if not self._glyphs.allocated or not self._box_shader.allocated:
             self.deallocate()
             return False
 
@@ -104,7 +104,7 @@ class Text:
             glDeleteBuffers(1, [self._vbo])
             self._vbo = 0
         self._atlas.deallocate()
-        self._text_shader.deallocate()
+        self._glyphs.deallocate()
         self._box_shader.deallocate()
         self._allocated = False
 
@@ -175,7 +175,7 @@ class Text:
         glBindBuffer(GL_ARRAY_BUFFER, self._vbo)
         glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_DYNAMIC_DRAW)
         glBindBuffer(GL_ARRAY_BUFFER, 0)
-        self._text_shader.use(len(g) * 6, color, (float(screen_width), float(screen_height)),
+        self._glyphs.use(len(g) * 6, color, (float(screen_width), float(screen_height)),
                               self._atlas.texture_id)
         glBindVertexArray(previous_vao)
 

@@ -1,4 +1,4 @@
-from time import time
+from time import perf_counter
 import math
 
 from OpenGL.GL import glDrawArrays, GL_TRIANGLE_FAN, glClearColor, glClear, GL_COLOR_BUFFER_BIT, glClearDepth, GL_DEPTH_BUFFER_BIT
@@ -14,40 +14,8 @@ def clear_depth(depth: float = 1.0) -> None:
     glClearDepth(depth)
     glClear(GL_DEPTH_BUFFER_BIT)
 
-# -----------------------------------------------------------------------------
-# FPS utilities
-# -----------------------------------------------------------------------------
-
-
-class FpsCounter:
-    def __init__(self, numSamples = 120) -> None:
-        self._times: list[float] = []
-        self.numSamples: int = numSamples
-
-    def tick(self) -> None:
-        now: float = time()
-        self._times.append(now)
-        if len(self._times) > self.numSamples:
-            self._times.pop(0)
-
-    def get_fps(self) -> int:
-        if len(self._times) < 2:
-            return 0
-        diff: float = self._times[-1] - self._times[0]
-        if diff == 0:
-            return 0
-        return int(math.floor(len(self._times) / diff))
-
-    def get_min_fps(self) -> int:
-        if len(self._times) < 2:
-            return 0
-        max_diff: float = max(self._times[i+1] - self._times[i] for i in range(len(self._times) - 1))
-        if max_diff == 0:
-            return 0
-        return int(math.floor(1.0 / max_diff))
-
 def lfo(frequency, phase=0) -> float:
-    elapsed_time: float = time()
+    elapsed_time: float = perf_counter()
     lfo_value: float = 0.5 + 0.5 * math.sin(2 * math.pi * frequency * elapsed_time + phase)
     return lfo_value
 

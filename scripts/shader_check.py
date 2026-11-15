@@ -28,8 +28,8 @@ from OpenGL.GL import (GL_ARRAY_BUFFER, GL_FALSE, GL_FLOAT, GL_R8, GL_RED, GL_RG
                        glGenVertexArrays, glPixelStorei, glTexSubImage2D, glVertexAttribPointer, glViewport)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from apps.smile.render.shaders import FlashIn, FlashOut, Omission  # noqa: E402
 from modules.gl import Fbo, Style, Text, Texture, shaders  # noqa: E402
-from modules.gl.shaders import noise_simplex  # noqa: E402
 from modules.gl.shaders.box_shader import BoxShader  # noqa: E402
 from modules.pose import PointLandmark, Points2D  # noqa: E402
 from modules.render import PosePointLines  # noqa: E402
@@ -142,10 +142,7 @@ def cases() -> dict[str, tuple[object, Case]]:
     add('noise', noise, draw_noise)
     simplex = s.NoiseSimplex()
 
-    def draw_simplex(_: dict[str, Texture]) -> None:
-        noise_simplex.time = lambda: 12.5       # the animation's clock held still
-        simplex.use(1.0, 0.5)
-    add('noise_simplex', simplex, draw_simplex)
+    add('noise_simplex', simplex, lambda t: simplex.use(12.5, 1.0, 0.5))
     nv12 = s.Nv12()
     add('nv12_y', nv12, lambda t: nv12.use(t['gradient'], s.Nv12Plane.Y))
     add('nv12_uv', nv12, lambda t: nv12.use(t['gradient'], s.Nv12Plane.UV))
@@ -157,16 +154,16 @@ def cases() -> dict[str, tuple[object, Case]]:
     add('blur_v', blur_v, lambda t: blur_v.use(t['second'], 3.0))
     curtain = s.Curtain()
     add('curtain', curtain, lambda t: curtain.use(t['gradient'], t['second'], 0.4))
-    flash_in = s.FlashIn()
+    flash_in = FlashIn()
     add('flash_in', flash_in, lambda t: flash_in.use(t['gradient'], t['second'], 0.7))
-    flash_out = s.FlashOut()
+    flash_out = FlashOut()
     add('flash_out', flash_out, lambda t: flash_out.use(t['gradient'], t['second'], t['soft'], 0.6))
     noise_blend = s.NoiseBlend()
     add('noise_blend', noise_blend, lambda t: noise_blend.use(t['gradient'], t['second'], t['soft'], 0.5))
     simplex_blend = s.NoiseSimplexBlend()
     add('noise_simplex_blend', simplex_blend,
         lambda t: simplex_blend.use(t['gradient'], t['second'], t['soft'], 0.5))
-    omission = s.Omission()
+    omission = Omission()
     add('omission', omission, lambda t: omission.use(t['gradient'], t['second'], t['soft'], 0.3, 0.6))
 
     blend = s.Blend()

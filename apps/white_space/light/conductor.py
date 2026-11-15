@@ -10,7 +10,7 @@ forwards the finished LightFrame to the board and the output callbacks (UDP send
 from threading import Event, Thread
 from typing import Any, Callable
 
-from modules.gl import FpsCounter
+from modules.utils import FPS
 
 from .clock import Clock, Tick
 from .frame import LightFrame, LightFrameCallback
@@ -91,7 +91,7 @@ class Conductor(Thread):
             logger.warning("Starting with debug layer %s selected: the fixture spins up to PROJECTION at once",
                            DebugLayer(int(settings.debug)).name)
 
-        self.fps_counter = FpsCounter()
+        self.fps_counter = FPS(120)
         self._update_callbacks: list[Callable[[Tick], Any]] = []
         self._light_frame_callbacks: list[LightFrameCallback] = []
 
@@ -185,7 +185,7 @@ class Conductor(Thread):
 
         self._board.set_light_frame(frame)
         self._notify_light_frame(frame)
-        self.fps_counter.tick()
+        self.fps_counter.processed()
 
     # ------------------------------------------------------------------
     # Callbacks
@@ -223,4 +223,4 @@ class Conductor(Thread):
 
     @property
     def fps(self) -> float:
-        return self.fps_counter.get_fps()
+        return self.fps_counter.get_rate_average()

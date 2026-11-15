@@ -1,5 +1,5 @@
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
-from ... import Shader, draw_quad, Texture
+from .. import Shader, draw_quad, Texture
 
 import logging
 logger = logging.getLogger(__name__)
