@@ -348,7 +348,7 @@
         "VIDEO"
       ],
       "folder": "20261023-163234_ICK",
-      "replay": false
+      "replay": true
     },
     "person_detector": {
       "model_type": "TRT",
