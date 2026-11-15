@@ -20,3 +20,4 @@ paths:
 - Draw text that changes less often than every frame into a cached FBO, redrawn only when its content changes; `Text` builds and uploads each string's glyphs on every draw
 - `modules/gl/shaders` holds the shaders that are useful to any app
 - An app's own shader sits in that app
+- Keep geometry in plain modules and drawing in renderers, so geometry is testable without a GL context

@@ -66,7 +66,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Pass collaborators and fixed structure (counts known at startup) through constructors; tunable values come from settings
 - Name public data-flow methods by execution timing: `set` stores for polling, `submit` enqueues deferred work, `process` transforms and emits synchronously, `update` advances on a tick
 - Name output channels verb + domain noun (`submit_frames`, `add_similarity_callback`)
-- Share runtime data through `modules/board/` protocol + mixin pairs; each app composes its own `RenderBoard` from the mixins it needs, and keeps a slice only it reads in `apps/<app>/board/`
+- Share runtime data through `modules/board/` protocol + mixin pairs
 - A value derived from pose data, a threshold on it included (a gate, a dead zone), is the pipeline's and so are its settings; the show owns only what it does with it: timings, looks, sound
 - Fix a problem where it is made, not where it shows
 
@@ -123,7 +123,6 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 ## Testing
 
 - Rely on running the real-time system for integration; unit-test infrastructure (settings, frame/features, serialization, utility primitives, geometry)
-- Keep geometry in plain modules and drawing in renderers, so geometry is testable without a GL context
 
 ## Running code
 
