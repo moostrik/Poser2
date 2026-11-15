@@ -5,7 +5,6 @@ paths:
   - "modules/render/**"
   - "modules/flow/**"
   - "apps/*/render/**"
-  - "apps/*/render.py"
   - "apps/smile/player/**"
 ---
 # OpenGL

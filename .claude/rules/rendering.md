@@ -3,7 +3,6 @@ description: The render package: what it holds, its layers and their names
 paths:
   - "modules/render/**"
   - "apps/*/render/**"
-  - "apps/*/render.py"
 ---
 # Rendering
 
