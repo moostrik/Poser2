@@ -131,7 +131,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Change files with Edit/Write, not scripts
 - Run a test of the app or a GPU harness only on the user's go, and only what the plan names
 - Before each run, say in one line what it measures and how long it takes
-- Run a recording only over the moments the test needs, found first from the video file without the app; never a whole loop or a warm-up loop
+- A run lasts only as long as the test needs
 - Stop a run at twice the time you stated, and say so
 - Diagnose a failed or hung run from its log and the code before running it again
 - Stop the app in a `finally` in any probe that runs it, so a crash cannot leave it running
