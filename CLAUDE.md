@@ -75,6 +75,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Use `Lock` and `Event` for shared mutable state and lifecycle signals
 - A producer calls its callbacks itself, from the thread that made the item. It has no thread for dispatching
 - A callback only hands the item over and returns
+- An item handed to a callback is not changed afterwards
 - The part that works on the item has its own thread and does all its work there, its inner steps included
 - When that part can't keep up, its queue drops the oldest item and counts it
 - A part that only needs the latest value, like the render, reads it at its own tick
