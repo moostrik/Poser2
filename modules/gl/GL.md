@@ -52,6 +52,10 @@ out in pixels on the CPU (`text_layout`), from the size its caller gives, and ha
 
 ## Shaders
 
+`shaders/` groups its shaders by kind, one subpackage each: `draw`, `color`, `filter`, `mask`, `composite`,
+`transition`, `generate`, `video`. The package exports every one, so a caller writes `shaders.FillRect`; the kind
+orders the files, the operation names the shader. The shared GLSL includes sit at the top of `shaders/`.
+
 A shader's `.frag`, `.vert` or `.comp` source sits beside the `.py` that holds its class, named after it; the loader
 resolves it by that module name and falls back to `_generic.vert` for the vertex stage. A shader takes a color as a
 `Color` and a rectangle as a `Rect`; a pass reads its input's texel size from the texture itself (`textureSize`). `scripts/shader_check.py`

@@ -20,7 +20,7 @@ from . import style
 from .style import StyleStack
 
 if TYPE_CHECKING:
-    from .shaders.blit import Blit
+    from .shaders import Blit
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ class Context:
 
     def allocate(self) -> None:
         """The quad, the `Blit` and GL's default blend state, in the context current now; and this made current."""
-        from .shaders.blit import Blit         # the shaders import the textures this module is imported with
+        from .shaders import Blit              # the shaders import the textures this module is imported with
         # Two attributes per corner: the position (-1..1) and the texture coordinate (0..1), bottom-left first
         vertices = np.array([-1.0, -1.0, 0.0, 0.0,
                              1.0, -1.0, 1.0, 0.0,

@@ -1,0 +1,34 @@
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUniform4f, glUseProgram
+from ... import Shader, draw_quad, Texture
+from modules.utils import Rect, Point2f
+
+import logging
+logger = logging.getLogger(__name__)
+
+class DrawRoi(Shader):
+    """The part `roi` of a texture over the whole target, turned by `rotation_radians` about
+    `rotation_center_texture_space`; both in 0..1 of the texture, origin top-left."""
+
+    def use(self, src: Texture, roi: Rect, rotation_radians: float = 0.0, rotation_center_texture_space: Point2f = Point2f(0.5, 0.5), texture_aspect: float = 1.0) -> None:
+        if not self.allocated or not self.shader_program:
+            logger.warning("DrawRoi shader not allocated or shader program missing.")
+            return
+        if not src.allocated:
+            return
+
+        # Activate shader program
+        glUseProgram(self.shader_program)
+
+        # Bind input texture
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, src.tex_id)
+
+        # Configure shader uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("src"), 0)
+        glUniform4f(self.get_uniform_loc("roi"), roi.x, roi.y, roi.width, roi.height)
+        glUniform1f(self.get_uniform_loc("rotation"), rotation_radians)
+        glUniform2f(self.get_uniform_loc("rotationCenter"), *rotation_center_texture_space)
+        glUniform1f(self.get_uniform_loc("aspectRatio"), texture_aspect)
+
+        # Render
+        draw_quad()

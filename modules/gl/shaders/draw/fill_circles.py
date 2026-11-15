@@ -1,0 +1,49 @@
+"""FillCircles: up to 8 filled circles, antialiased."""
+
+from OpenGL.GL import glUniform1f, glUniform1i, glUniform4fv, glUseProgram
+from modules.utils import Color
+from ... import Shader, draw_quad
+
+import logging
+logger = logging.getLogger(__name__)
+
+
+class FillCircles(Shader):
+    """Draw up to 8 circles with individual positions, sizes, and colors."""
+
+    def use(self, positions: list[tuple[float, float]], size: float, smooth: float,
+            color: Color, aspect_ratio: float = 1.0) -> None:
+        """Draw circles.
+
+        Args:
+            positions: List of (x, y) tuples in 0..1 of the target, origin top-left
+            size: Circle radius in normalized coordinates (shared by all circles)
+            smooth: Antialiasing smoothness in normalized coordinates (shared by all circles)
+            color: shared by all circles
+            aspect_ratio: Width / height of rendering target for correct circle shape.
+            Maximum 8 circles supported.
+        """
+        if not self.allocated or not self.shader_program:
+            logger.warning("FillCircles shader not allocated or shader program missing.")
+            return
+
+        num_circles = min(len(positions), 8)
+        if num_circles == 0:
+            return
+
+        glUseProgram(self.shader_program)
+        glUniform1i(self.get_uniform_loc("numCircles"), num_circles)
+        glUniform1f(self.get_uniform_loc("aspectRatio"), aspect_ratio)
+
+        # Pack circle data into vec4 arrays
+        circle_data = []
+        color_data = []
+        for i in range(num_circles):
+            x, y = positions[i]
+            circle_data.extend([x, y, size, smooth])
+            color_data.extend(color)
+
+        glUniform4fv(self.get_uniform_loc("circles"), num_circles, circle_data)
+        glUniform4fv(self.get_uniform_loc("colors"), num_circles, color_data)
+
+        draw_quad()

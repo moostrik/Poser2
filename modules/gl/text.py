@@ -14,8 +14,7 @@ from OpenGL.GL import GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW, GL_FALSE, GL_FLOAT, glBi
 from . import style
 from .context import context
 from .font_atlas import FontAtlas
-from .shaders.glyphs import Glyphs
-from .shaders.fill_rect import FillRect
+from .shaders.draw import FillRect, Glyphs
 from .text_layout import text_layout
 
 

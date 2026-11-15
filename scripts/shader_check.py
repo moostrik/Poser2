@@ -27,12 +27,14 @@ from OpenGL.GL import (GL_FLOAT, GL_R8, GL_R32F, GL_RED, GL_RGBA, GL_RGBA8, GL_T
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from apps.smile.render.shaders import FaceColor, FlashIn, FlashOut, Omission  # noqa: E402
 from modules.flow import DepthRead, DepthUpscale  # noqa: E402
-from modules.flow.shaders import AddRegion, ChannelAddRegion, ChannelSetRegion, SetRegion  # noqa: E402
+from modules.flow.shaders import Add, AddRegion, ChannelAddRegion, ChannelSetRegion, GaussianBlur, HSV, Set, SetRegion, Trail  # noqa: E402
 from modules.flow.visualization.shaders import ColormapKey  # noqa: E402
 from modules.gl import Context, Fbo, Style, Text, Texture, shaders  # noqa: E402
-from modules.gl.shaders.blur import KERNEL_SIGMA  # noqa: E402
+from modules.gl.shaders.filter import KERNEL_SIGMA  # noqa: E402
 from modules.pose import PointLandmark, Points2D  # noqa: E402
-from modules.render import PosePointLines  # noqa: E402
+from modules.render import GuidedFilter, MaskAA, MaskMultiply, PosePointLines  # noqa: E402
+from modules.render.modules.flow.shaders import DensityColorize, DepthView  # noqa: E402
+from modules.render.modules.inference.shaders import CelShade, HueShift  # noqa: E402
 from modules.utils import Color, Point2f, Rect  # noqa: E402
 
 OUT: str = os.path.join('temp', 'shader_check')
@@ -224,6 +226,36 @@ def cases() -> dict[str, tuple[object, Case]]:
     key = ColormapKey()
     add('colormap_key', key, lambda t: key.use((10.0 / SIZE, 38.0 / SIZE, 100.0 / SIZE, 70.0 / SIZE), 4, 3,
                                                12.0 / SIZE, 6.0 / SIZE))
+
+    # The shaders outside the GL that the GL plan's lines M to P change (L3)
+    flow_hsv = HSV()
+    add('flow_hsv', flow_hsv, lambda t: flow_hsv.use(t['gradient'], 0.2, 1.3, 1.1))
+    flow_blur = GaussianBlur()
+    add('flow_blur_h', flow_blur, lambda t: flow_blur.use(t['second'], 8.0, True))
+    add('flow_blur_v', flow_blur, lambda t: flow_blur.use(t['second'], 8.0, False))
+    flow_add, flow_set, flow_trail = Add(), Set(), Trail()
+    add('flow_add', flow_add, lambda t: flow_add.use(t['gradient'], t['second'], 0.6, 0.3))
+    add('flow_set', flow_set, lambda t: flow_set.use(t['gradient'], 0.7))
+    add('flow_trail', flow_trail, lambda t: flow_trail.use(t['gradient'], t['second'], 0.6, 0.3))
+    guided = GuidedFilter()
+    add('guided_products', guided, lambda t: guided.products(t['gradient'], t['hard']))
+    add('guided_box', guided, lambda t: guided.box(t['gradient'], True, 3))
+    add('guided_coefficients', guided, lambda t: guided.coefficients(t['gradient'], 0.01))
+    add('guided_output', guided, lambda t: guided.output(t['gradient'], t['second']))
+    mask_multiply = MaskMultiply()
+    add('mask_multiply', mask_multiply, lambda t: mask_multiply.use(t['gradient'], t['soft']))
+    mask_aa = MaskAA()
+    add('mask_aa', mask_aa, lambda t: mask_aa.use(t['soft']))
+    hue_shift = HueShift()
+    add('hue_shift', hue_shift, lambda t: hue_shift.use(t['gradient'], 0.9, 0.3, 0.1, 0.6))
+    cel = CelShade()
+    add('cel_shade', cel, lambda t: cel.use(t['gradient'], 1.2, 1.0, 0.0, 1.1, 5, 0.2, 1.5))
+    colorize = DensityColorize()
+    add('density_colorize', colorize, lambda t: colorize.use(
+        t['gradient'], [(1.0, 0.2, 0.1, 1.0), (0.1, 0.8, 0.3, 1.0), (0.2, 0.3, 1.0, 1.0), (0.9, 0.9, 0.2, 1.0)]))
+    depth_view = DepthView()
+    for mode in range(3):
+        add(f'depth_view_{mode}', depth_view, lambda t, m=mode: depth_view.use(t['depth'], t['gradient'], 0.3, 0.8, m))
 
     add('depth_align', s.DepthAlign(), None)        # a compute shader: compiled only
     return c
