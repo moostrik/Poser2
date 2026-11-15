@@ -20,17 +20,7 @@ own `WeightedSum` stays the bridge's), `DepthAlign` out of the GL (Q: beside its
 `modules/inference/shaders`), the standard shaders the pipeline lacked (R: `ToneMap`, `Levels`, `ColorMatrix`,
 `Posterize`, `Dither` with an ordered and a blue-noise map, `Vignette`, `Mosaic`, `Displace`, `Median`, `Bilateral`,
 `ChromaKey`, `LumaKey`, `DualFilter`, and the effects `Bloom` and `DistanceField`, the last held to the exact
-distance).
+distance), the `Blend` shader (O4: `blend_modes.glsl`'s 26 modes by `BlendShaderMode`, its numbers held to the
+GLSL's by a test; `Style.BlendMode` keeps GL's own, so a layer's dropdown offers what it can do).
 
-## O4. The `Blend` shader
-
-A `Blend(src, dst, mode, amount)` shader draws `blend_modes.glsl`'s modes in a pass of its own. Open: one
-`Style.BlendMode` enum for all 30, which puts every mode in the layers' `blend_mode` dropdowns though `Style` can only
-do GL's 8 there; or `Style.BlendMode` for GL's 8 and a `BlendShaderMode` for the shader's 30, numbered in
-`blend_modes.glsl` (recommended: a dropdown offers what its layer can do). Asked 2026-11-15. Built on Matthias's
-answer and "go", checked by the harness (one case per mode) and its images.
-
-## Rules it touches
-
-- `CLAUDE.md` Types, prefer `IntEnum` for identifiers: O4
-- `CLAUDE.md` Running code, run a GPU harness only on the user's go: O4
+No step is left.

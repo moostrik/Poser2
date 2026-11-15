@@ -306,6 +306,10 @@ def cases() -> dict[str, tuple[object, Case | None, Case | None]]:
     add('dual_filter_down', dual, lambda t: dual.down(t['second']))
     add('dual_filter_up', dual, lambda t: dual.up(t['second']))
 
+    blend = s.Blend()       # O4: every mode of blend_modes.glsl, the gradient over the checker
+    for mode in s.BlendShaderMode:
+        add(f'blend_{mode.name.lower()}', blend, lambda t, m=mode: blend.use(t['gradient'], t['second'], m, 1.0))
+
     bloom = Bloom(3)
     def bloom_process(t: dict[str, Texture]) -> None:
         if not bloom.allocated:

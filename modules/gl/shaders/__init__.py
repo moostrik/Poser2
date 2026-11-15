@@ -6,7 +6,7 @@ from .color import BrightnessContrast, Exposure, Hsl, Hsv, Lut, Colorize, ToneMa
 from .filter import Blur, Sharpen, Sobel, Dilate, Erode, GuidedFilter, Mosaic, Displace, Median, Bilateral, DualFilter
 from .mask import MaskApply, Threshold, AdaptiveThreshold, ColorFill, MaskMultiply, MaskAntialias, ChromaKey, LumaKey, \
     JumpFlood
-from .composite import Mix, WeightedSum
+from .composite import Mix, WeightedSum, Blend, BlendShaderMode
 from .transition import BarnDoorWipe, GradientWipe
 from .generate import WhiteNoise, SimplexNoise
 from .video import Nv12, Nv12Plane, bt709_video_range

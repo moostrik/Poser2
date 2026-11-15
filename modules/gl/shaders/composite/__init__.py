@@ -2,3 +2,4 @@
 
 from .mix import Mix
 from .weighted_sum import WeightedSum
+from .blend import Blend, BlendShaderMode

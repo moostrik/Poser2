@@ -57,7 +57,8 @@ out in pixels on the CPU (`text_layout`), from the size its caller gives, and ha
 `transition`, `generate`, `video`. The package exports every one, so a caller writes `shaders.FillRect`; the kind
 orders the files, the operation names the shader. The shared GLSL includes sit at the top of `shaders/`:
 `position.glsl` (below), `color.glsl` (Rec. 709 luminance, the HSV conversions), `blend_modes.glsl` (the textbook
-blend modes) and `colormap.glsl`, turbo, viridis and jet by the number `gl.Colormap` gives them. An effect that runs
+blend modes, which the `Blend` shader draws by `BlendShaderMode`; GL's own blending, `Style.BlendMode`, does normal,
+add, multiply and screen in the draw itself, without a pass) and `colormap.glsl`, turbo, viridis and jet by the number `gl.Colormap` gives them. An effect that runs
 over a chain of passes owns its targets beside the shaders: `Bloom` (a dual-filter chain) and `DistanceField` (jump
 flooding).
 
