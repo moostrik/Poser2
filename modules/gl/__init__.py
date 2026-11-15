@@ -6,6 +6,7 @@ from .window_manager import WindowManager, WindowSettings, MonitorId, Fullscreen
 from . import style as Style
 from .context import Context, context
 from .utils import clear_color, fill, fit
+from .colormap import Colormap
 
 # TEXTURE CLASSES
 from .texture import Texture

@@ -6,17 +6,17 @@ for any field type (velocity, density, etc).
 
 from OpenGL.GL import GL_RG16F, GL_RGBA16F
 
-from modules.gl import Texture
+from modules.gl import Texture, shaders
 from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil, TextureKind
-from ..shaders import Trail, GaussianBlur
+from ..shaders import Trail
 
 
 class SmoothTrailSettings(BaseSettings):
     """Configuration for trail smoothing."""
     scale = Field(1.0, min=-10.0, max=10.0, description="Converts optical flow to simulation velocity")
     trail_weight = Field(0.9, min=0.0, max=0.99, description="Temporal smoothing (0=no trail, 0.99=long trail)")
-    blur_radius = Field(8.0, min=0.0, max=10.0, description="Gaussian blur radius in pixels")
+    blur_sigma = Field(1.7, min=0.0, max=10.0, description="Gaussian blur per pass (pixels)")
     blur_steps = Field(4, min=0, max=8, description="Number of Gaussian blur passes")
 
 
@@ -50,7 +50,7 @@ class SmoothTrail(FlowBase):
 
         # Shaders
         self._trail_shader: Trail = Trail()
-        self._blur_shader: GaussianBlur = GaussianBlur()
+        self._blur_shader: shaders.Blur = shaders.Blur()
 
     def set_input(self, input_field: Texture) -> None:
         """Set input field with optional scaling."""
@@ -102,28 +102,14 @@ class SmoothTrail(FlowBase):
         self._output_fbo.end()
 
         # Stage 2: Spatial smoothing (Gaussian blur)
-        if self.settings.blur_steps > 0 and self.settings.blur_radius > 0:
-            # In-place blur using swap operations
+        sigma: float = self.settings.blur_sigma
+        if self.settings.blur_steps > 0 and sigma > 0:
             for _ in range(self.settings.blur_steps):
-                # Horizontal pass
-                self._output_fbo.swap()
-                self._output_fbo.begin()
-                self._blur_shader.use(
-                    self._output_fbo.back,
-                    self.settings.blur_radius,
-                    horizontal=True
-                )
-                self._output_fbo.end()
-
-                # Vertical pass
-                self._output_fbo.swap()
-                self._output_fbo.begin()
-                self._blur_shader.use(
-                    self._output_fbo.back,
-                    self.settings.blur_radius,
-                    horizontal=False
-                )
-                self._output_fbo.end()
+                for horizontal in (True, False):
+                    self._output_fbo.swap()
+                    self._output_fbo.begin()
+                    self._blur_shader.use(self._output_fbo.back, horizontal, sigma)
+                    self._output_fbo.end()
 
 
 class VelocitySmoothTrail(SmoothTrail):

@@ -2,7 +2,7 @@
 
 # Local application imports
 from modules.render import LayerBase, HasCaptureTime, ForegroundLook, ColorSettings, MaskMultiply
-from modules.gl import Fbo, Texture, Style, shaders
+from modules.gl import Fbo, Texture, Style
 from .center_geometry import CenterGeometry, SourceSpace
 from ....settings import CenterForegroundLayerSettings
 
@@ -36,7 +36,6 @@ class CenterForegroundLayer(LayerBase):
         self._look: ForegroundLook = ForegroundLook(cam_id, settings, color_settings)
 
         # Shaders
-        self._roi_shader = shaders.DrawRoi()
         self._premultiply_shader = MaskMultiply()
 
     @property
@@ -55,14 +54,12 @@ class CenterForegroundLayer(LayerBase):
             self._premultiplied_fbo.allocate(width, height, internal_format)
             self._premultiply_shader.allocate()
         self._look.allocate(width, height, internal_format)
-        self._roi_shader.allocate()
 
     def deallocate(self) -> None:
         self._roi_fbo.deallocate()
         self._premultiplied_fbo.deallocate()
         self._premultiply_shader.deallocate()
         self._look.deallocate()
-        self._roi_shader.deallocate()
 
     def update(self) -> None:
         """Render the foreground centered by CenterGeometry in its space, with the foreground's look."""
@@ -80,7 +77,7 @@ class CenterForegroundLayer(LayerBase):
 
         # Render foreground with its ROI
         self._roi_fbo.begin()
-        self._roi_shader.use(source, *self._geometry.source_roi(self._space, source))
+        source.draw(src=self._geometry.source_quad(self._space, source))
         self._roi_fbo.end()
 
         # A whole image: the player's colors on black, as a masked source arrives

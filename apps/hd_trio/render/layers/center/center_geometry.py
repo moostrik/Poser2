@@ -11,7 +11,7 @@ from modules.board import HasFrames
 from modules.flow import fixed_window
 from modules.pose import Frame, Points2D, PointLandmark, BBox
 from modules.render import LayerBase, DataCache
-from modules.utils import Rect, Point2f
+from modules.utils import Rect, Point2f, Quad
 from modules.gl import Texture
 from ....settings import CenterGeometrySettings, SnapPoint
 
@@ -114,15 +114,15 @@ class CenterGeometry(LayerBase):
             return (0.0, 0.0)
         return (sample_size[0] / crop.width, sample_size[1] / crop.height)
 
-    def source_roi(self, space: SourceSpace, source: Texture) -> tuple[Rect, float, Point2f, float]:
-        """What `DrawRoi` takes to center a texture in `space`: its ROI, rotation, rotation center and
-        aspect. The camera image's aspect is the source texture's own."""
+    def source_quad(self, space: SourceSpace, source: Texture) -> Quad:
+        """The part of a texture in `space` that centers it, as `texture.draw`'s `src`: its ROI turned about the
+        rotation center, round in the source's pixels. The camera image's aspect is the source texture's own."""
         if space == SourceSpace.CROP:
             bbox: BboxGeometry = self._bbox_geometry
-            return bbox.crop_roi, bbox.rotation, bbox.rotation_center, bbox.aspect
+            return bbox.crop_roi.turned(bbox.rotation, bbox.rotation_center, bbox.aspect)
         image: CamGeometry = self._cam_geometry
         aspect: float = source.width / source.height if source.height > 0 else 1.0
-        return image.crop_roi, image.rotation, image.rotation_center, aspect
+        return image.crop_roi.turned(image.rotation, image.rotation_center, aspect)
 
     @property
     def crop_pose_points(self) -> Points2D | None:

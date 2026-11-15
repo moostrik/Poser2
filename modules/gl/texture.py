@@ -2,7 +2,7 @@ from OpenGL.GL import Constant, GL_BGR, GL_BGRA, GL_CLAMP_TO_EDGE, GL_FLOAT, GL_
 import logging
 import numpy as np
 
-from modules.utils import Rect
+from modules.utils import Quad, Rect
 from .context import context
 
 logger = logging.getLogger(__name__)
@@ -250,10 +250,11 @@ class Texture():
             pixels = np.flipud(pixels)
         return pixels
 
-    def draw(self, dst: Rect | None = None, src: Rect | None = None, opacity: float = 1.0) -> None:
+    def draw(self, dst: Rect | None = None, src: Rect | Quad | None = None, opacity: float = 1.0) -> None:
         """This texture's `src` drawn at `dst` in the bound target, both 0..1 with the origin top-left (all of it
-        over all of the target without them); a `src` with a negative width or height draws it mirrored on that
-        axis. Through the current context's `Blit`, with the blend state as set."""
+        over all of the target without them); a `src` `Rect` with a negative width or height draws it mirrored on
+        that axis, a `src` `Quad` of four corners draws that part turned. Through the current context's `Blit`, with
+        the blend state as set."""
         context().blit.use(self, dst, src, opacity)
 
     def clear(self, r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 0.0) -> None:

@@ -1,5 +1,8 @@
 """Renders centered and rotated mask with temporal blending and blur, its edge guided by the camera image."""
 
+# Standard library imports
+import math
+
 # Third-party imports
 from OpenGL.GL import GL_R16F, GL_RG32F, GL_RGBA16F, GL_RGBA32F
 
@@ -7,7 +10,7 @@ from OpenGL.GL import GL_R16F, GL_RG32F, GL_RGBA16F, GL_RGBA32F
 from modules.render import LayerBase, HasCaptureTime, GuidedFilter, MaskAA
 from modules.gl import Fbo, SwapFbo, Texture, Style, shaders
 from .center_geometry import CenterGeometry, SourceSpace
-from modules.utils import Rect
+from modules.utils import Quad
 from ....settings import CenterMaskLayerSettings
 
 
@@ -43,7 +46,6 @@ class CenterMaskLayer(LayerBase):
         self._coefficients_fbo: SwapFbo = SwapFbo()     # its coefficients a, b and their means
 
         # Shaders
-        self._roi_shader = shaders.DrawRoi()
         self._mix_shader = shaders.Mix()
         self._mask_AA_shader = MaskAA()
         self._dilate_shader = shaders.Dilate()
@@ -77,7 +79,6 @@ class CenterMaskLayer(LayerBase):
             self._products_fbo.allocate(width, height, GL_RGBA32F)
             self._coefficients_fbo.allocate(width, height, GL_RG32F)
 
-        self._roi_shader.allocate()
         self._mix_shader.allocate()
         self._mask_AA_shader.allocate()
         self._dilate_shader.allocate()
@@ -95,7 +96,6 @@ class CenterMaskLayer(LayerBase):
         self._products_fbo.deallocate()
         self._coefficients_fbo.deallocate()
 
-        self._roi_shader.deallocate()
         self._mix_shader.deallocate()
         self._mask_AA_shader.deallocate()
         self._dilate_shader.deallocate()
@@ -122,14 +122,14 @@ class CenterMaskLayer(LayerBase):
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         # The source on the view, kept as it comes, and the ROI buffer the steps refine
-        roi = self._geometry.source_roi(self._space, source)
+        part: Quad = self._geometry.source_quad(self._space, source)
         self._unrefined_fbo.begin()
-        self._roi_shader.use(source, *roi)
+        source.draw(src=part)
         self._unrefined_fbo.end()
         self._roi_fbo.begin()
         self._unrefined_fbo.draw()
         self._roi_fbo.end()
-        self._guide_edge(self._view_per_source_pixel(roi[0], source))
+        self._guide_edge(self._view_per_source_pixel(part, source))
 
         # Temporal blending
         self._blend_fbo.swap()
@@ -180,9 +180,11 @@ class CenterMaskLayer(LayerBase):
 
         Style.pop_style()
 
-    def _view_per_source_pixel(self, roi: Rect, source: Texture) -> float:
-        """The view's pixels one pixel of the source spans: the view's height over the ROI's height in the source's pixels."""
-        source_rows: float = roi.height * source.height
+    def _view_per_source_pixel(self, part: Quad, source: Texture) -> float:
+        """The view's pixels one pixel of the source spans: the view's height over the part's height in the source's
+        pixels, its left edge's length."""
+        source_rows: float = math.hypot((part.bottom_left.x - part.top_left.x) * source.width,
+                                        (part.bottom_left.y - part.top_left.y) * source.height)
         return self._roi_fbo.height / source_rows if source_rows > 0.0 else 1.0
 
     def _guide_edge(self, view_per_source_pixel: float) -> None:
@@ -195,7 +197,7 @@ class CenterMaskLayer(LayerBase):
             return
         image: Texture = guide.texture
         self._guide_fbo.begin()
-        self._roi_shader.use(image, *self._geometry.source_roi(self._space, image))
+        image.draw(src=self._geometry.source_quad(self._space, image))
         self._guide_fbo.end()
 
         products, coefficients = self._products_fbo, self._coefficients_fbo

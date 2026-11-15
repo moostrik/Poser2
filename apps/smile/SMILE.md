@@ -278,7 +278,7 @@ speaker (three `expr`s: speakers at -60, 60 and 180 degrees from the camera, eac
 constant power). The gains travel with the note into the `poly~` voice (`SmileSamplepoly.maxpat`), which
 applies them only on a note-on, so the note-off from `makenote` does not move a fading laugh. The panel's
 `laughter_test` (`audio/laughter_test.py`, stepped from `Main.sequence_callback`) lights the cell on its wall
-(`Player.light`, a call: no OSC between SMILE and its walls): the wall shows the cell white with the screen's number (`Text` into a portrait FBO, blitted with `BlitRotated`
+(`Player.light`, a call: no OSC between SMILE and its walls): the wall shows the cell white with the screen's number (`Text` into a portrait FBO, drawn a quarter turned (`QUARTER_TURN`)
 like a clip, so it stands upright on the turned screen). SMILE bangs Max itself with `/test_bang <index> <sample>`
 (`Sender` sends a tuple as separate arguments), which `p laughterSampler` takes past the gates (`r testBang`) with
 the panel's `laughter_test_sample` (a file of the laughter folder; `laughter_test.list_samples` numbers the folder as

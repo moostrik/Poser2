@@ -27,15 +27,15 @@ from OpenGL.GL import (GL_FLOAT, GL_R8, GL_R32F, GL_RED, GL_RGBA, GL_RGBA8, GL_T
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from apps.smile.render.shaders import FaceColor, FlashIn, FlashOut, Omission  # noqa: E402
 from modules.flow import DepthRead, DepthUpscale  # noqa: E402
-from modules.flow.shaders import Add, AddRegion, ChannelAddRegion, ChannelSetRegion, GaussianBlur, HSV, Set, SetRegion, Trail  # noqa: E402
+from modules.flow.shaders import Add, AddRegion, ChannelAddRegion, ChannelSetRegion, Set, SetRegion, Trail  # noqa: E402
 from modules.flow.visualization.shaders import ColormapKey  # noqa: E402
-from modules.gl import Context, Fbo, Style, Text, Texture, shaders  # noqa: E402
+from modules.gl import Colormap, Context, Fbo, Style, Text, Texture, shaders  # noqa: E402
 from modules.gl.shaders.filter import KERNEL_SIGMA  # noqa: E402
 from modules.pose import PointLandmark, Points2D  # noqa: E402
 from modules.render import GuidedFilter, MaskAA, MaskMultiply, PosePointLines  # noqa: E402
 from modules.render.modules.flow.shaders import DensityColorize, DepthView  # noqa: E402
 from modules.render.modules.inference.shaders import CelShade, HueShift  # noqa: E402
-from modules.utils import Color, Point2f, Rect  # noqa: E402
+from modules.utils import Color, Point2f, Quad, Rect  # noqa: E402
 
 OUT: str = os.path.join('temp', 'shader_check')
 SIZE: int = 128
@@ -171,9 +171,10 @@ def cases() -> dict[str, tuple[object, Case]]:
     add('mix', mix, lambda t: mix.use(t['gradient'], t['second'], 0.3))
     color_fill = s.ColorFill()
     add('color_fill', color_fill, lambda t: color_fill.use(t['soft'], Color(0.9, 0.4, 0.1, 1.0)))
-    draw_roi = s.DrawRoi()
-    add('draw_roi_turned', draw_roi,
-        lambda t: draw_roi.use(t['gradient'], Rect(0.2, 0.3, 0.5, 0.6), -0.4, Point2f(0.45, 0.6), 1.0))
+    add('draw_roi_turned_wide', None,
+        lambda t: t['gradient'].draw(src=Rect(0.2, 0.3, 0.5, 0.6).turned(0.7, Point2f(0.4, 0.55), 1.6)))
+    add('draw_roi_turned', None,
+        lambda t: t['gradient'].draw(src=Rect(0.2, 0.3, 0.5, 0.6).turned(-0.4, Point2f(0.45, 0.6), 1.0)))
     circles = s.FillCircles()
     add('fill_circles', circles,
         lambda t: circles.use([(0.25, 0.75), (0.6, 0.3), (0.8, 0.7)], 0.08, 0.01, Color(1.0, 0.5, 0.2, 1.0), 1.0))
@@ -226,11 +227,7 @@ def cases() -> dict[str, tuple[object, Case]]:
                                                12.0 / SIZE, 6.0 / SIZE))
 
     # The shaders outside the GL that the GL plan's lines M to P change (L3)
-    flow_hsv = HSV()
-    add('flow_hsv', flow_hsv, lambda t: flow_hsv.use(t['gradient'], 0.2, 1.3, 1.1))
-    flow_blur = GaussianBlur()
-    add('flow_blur_h', flow_blur, lambda t: flow_blur.use(t['second'], 8.0, True))
-    add('flow_blur_v', flow_blur, lambda t: flow_blur.use(t['second'], 8.0, False))
+    add('trail_blur', blur, lambda t: blur.use(t['second'], True, 1.7))       # the 2D trail's blur (N6)
     flow_add, flow_set, flow_trail = Add(), Set(), Trail()
     add('flow_add', flow_add, lambda t: flow_add.use(t['gradient'], t['second'], 0.6, 0.3))
     add('flow_set', flow_set, lambda t: flow_set.use(t['gradient'], 0.7))
@@ -254,6 +251,12 @@ def cases() -> dict[str, tuple[object, Case]]:
     depth_view = DepthView()
     for mode in range(3):
         add(f'depth_view_{mode}', depth_view, lambda t, m=mode: depth_view.use(t['depth'], t['gradient'], 0.3, 0.8, m))
+    for colormap in (Colormap.TURBO, Colormap.VIRIDIS):
+        add(f'depth_view_{colormap.name.lower()}', depth_view,
+            lambda t, c=colormap: depth_view.use(t['depth'], t['gradient'], 0.3, 0.8, 1, c))
+
+    quarter_turn = Quad(Point2f(1.0, 0.0), Point2f(1.0, 1.0), Point2f(0.0, 1.0), Point2f(0.0, 0.0))
+    add('quarter_turn', None, lambda t: t['gradient'].draw(src=quarter_turn))
 
     add('depth_align', s.DepthAlign(), None)        # a compute shader: compiled only
     return c

@@ -9,8 +9,6 @@ from .channel_copy import ChannelCopy
 from .channel_set_region import ChannelSetRegion
 from .clamp import Clamp
 from .dampen import Dampen
-from .gaussian_blur import GaussianBlur
-from .hsv import HSV
 from .magnitude_shader import MagnitudeShader
 from .normalize import Normalize
 from .set import Set

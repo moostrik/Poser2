@@ -35,13 +35,14 @@ one GL has; `set_buffer_blend_mode` sets one draw buffer's blend alone.
 `texture.draw(dst, src, opacity)` draws a texture, an `Fbo`, a `SwapFbo` or an `Image` into the bound target, as
 openFrameworks' `ofTexture::draw` and Cinder's `gl::draw(texture, srcArea, dstRect)`: `dst` is where it lands in the
 target, `src` the part of the texture drawn, both 0..1 with the origin top-left, all of it over all of the target
-without them. A `src` with a negative width or height draws it mirrored on that axis (`Image` flips its upload this
-way). It draws with the blend state as set.
+without them. A `src` `Rect` with a negative width or height draws it mirrored on that axis (`Image` flips its upload
+this way); a `src` `Quad`, four corners worked out on the CPU (`Rect.turned`), draws a turned part. It draws with the
+blend state as set.
 
 ## Coordinates
 
 Every 2D position a shader takes is in 0..1 of the viewport with (0, 0) at the top left: a rectangle, a point, a
-texture's `dst` and `src`, a region, a part of an input sampled (`DrawRoi`'s and `DepthUpscale`'s `roi`). The turn
+texture's `dst` and `src`, a region, a part of an input sampled (`DepthUpscale`'s `roi`). The turn
 into OpenGL's own coordinates (clip space −1..1 and texture coordinates, both from the bottom left) is written once,
 in `shaders/position.glsl`: `clipPosition` for a vertex, `topLeft` for a texture coordinate. A shader includes it
 (`#include "position.glsl"`; the loader finds it in `shaders/` from any package). A pass that fills its target
@@ -54,7 +55,8 @@ out in pixels on the CPU (`text_layout`), from the size its caller gives, and ha
 
 `shaders/` groups its shaders by kind, one subpackage each: `draw`, `color`, `filter`, `mask`, `composite`,
 `transition`, `generate`, `video`. The package exports every one, so a caller writes `shaders.FillRect`; the kind
-orders the files, the operation names the shader. The shared GLSL includes sit at the top of `shaders/`.
+orders the files, the operation names the shader. The shared GLSL includes sit at the top of `shaders/`:
+`position.glsl` (below) and `colormap.glsl`, turbo, viridis and jet by the number `gl.Colormap` gives them.
 
 A shader's `.frag`, `.vert` or `.comp` source sits beside the `.py` that holds its class, named after it; the loader
 resolves it by that module name and falls back to `_generic.vert` for the vertex stage. A shader takes a color as a

@@ -3,15 +3,14 @@
 # Local application imports
 from modules.render import LayerBase, HasCaptureTime
 from modules.gl import Fbo, SwapFbo, Texture, shaders
-from .center_geometry import CenterGeometry
+from .center_geometry import CenterGeometry, SourceSpace
 from ....settings import CenterCamLayerSettings
 
 
 class CenterCamLayer(LayerBase):
     """Renders camera image cropped and rotated around pose anchor points.
 
-    Reads anchor geometry from CenterGeometry and applies DrawRoi shader
-    followed by temporal blending. Optionally applies mask texture for compositing.
+    Reads anchor geometry from CenterGeometry, draws the camera image's turned part, then blends over time. Optionally applies mask texture for compositing.
     `source` is the layer whose texture it draws; `timestamp` is that frame's capture time, forwarded.
     """
 
@@ -32,7 +31,6 @@ class CenterCamLayer(LayerBase):
         self._output_fbo: Fbo | SwapFbo = self._masked_fbo if self._mask_texture else self._cam_blend_fbo
 
         # Shaders
-        self._roi_shader = shaders.DrawRoi()
         self._mix_shader = shaders.Mix()
         self._mask_shader = shaders.MaskApply()
 
@@ -51,7 +49,6 @@ class CenterCamLayer(LayerBase):
         self._cam_blend_fbo.allocate(width, height, internal_format)
         if self._mask_texture:
             self._masked_fbo.allocate(width, height, internal_format)
-        self._roi_shader.allocate()
         self._mix_shader.allocate()
         self._mask_shader.allocate()
 
@@ -59,7 +56,6 @@ class CenterCamLayer(LayerBase):
         self._cam_fbo.deallocate()
         self._cam_blend_fbo.deallocate()
         self._masked_fbo.deallocate()
-        self._roi_shader.deallocate()
         self._mix_shader.deallocate()
         self._mask_shader.deallocate()
 
@@ -81,16 +77,9 @@ class CenterCamLayer(LayerBase):
 
         # Render camera image with ROI from anchor calculator. Cleared first: a source with
         # transparent pixels (depth) must not leave the last frame showing through them.
-        cam_aspect: float = source.width / source.height
         self._cam_fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._cam_fbo.begin()
-        self._roi_shader.use(
-            source,
-            self._geometry.image_geometry.crop_roi,
-            self._geometry.image_geometry.rotation,
-            self._geometry.image_geometry.rotation_center,
-            cam_aspect,
-        )
+        source.draw(src=self._geometry.source_quad(SourceSpace.IMAGE, source))
         self._cam_fbo.end()
 
         # Temporal blending

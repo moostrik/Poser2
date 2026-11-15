@@ -1,6 +1,6 @@
 """OpenGL shaders useful to any app, grouped by kind in subpackages; every one is used as `shaders.<Operation>`."""
 
-from .draw import Blit, DrawRoi, FillCircles, FillRect, StrokeRect
+from .draw import Blit, FillCircles, FillRect, StrokeRect
 from .color import BrightnessContrast, Exposure, Hsl, Hsv, Lut
 from .filter import Blur, Sharpen, Sobel, Dilate, Erode
 from .mask import MaskApply, Threshold, AdaptiveThreshold, ColorFill

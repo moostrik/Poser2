@@ -1,11 +1,14 @@
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging
 logger = logging.getLogger(__name__)
 
+
 class MaskAA(Shader):
-    def use(self, tex0: Texture, texel_size: tuple | None = None, blur_radius: float = 1.0, aa_mode: int = 1) -> None:
+    """A mask's red thresholded at 0.5, its edge antialiased over one pixel."""
+
+    def use(self, tex0: Texture) -> None:
         if not self.allocated or not self.shader_program:
             logger.warning("MaskAA shader not allocated or shader program missing.")
             return
@@ -13,22 +16,8 @@ class MaskAA(Shader):
             logger.warning("MaskAA shader: input texture not allocated.")
             return
 
-        if texel_size is None:
-            texel_size = (1.0 / tex0.width, 1.0 / tex0.height)
-
-        # Activate shader program
         glUseProgram(self.shader_program)
-
-        # Bind input texture
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
-
-        # Configure shader uniforms (using cached locations)
         glUniform1i(self.get_uniform_loc("tex0"), 0)
-        glUniform1i(self.get_uniform_loc("aaMode"), aa_mode)
-        glUniform1f(self.get_uniform_loc("blurRadius"), blur_radius)
-        glUniform2f(self.get_uniform_loc("texelSize"), texel_size[0], texel_size[1])
-
-        # Render
         draw_quad()
-

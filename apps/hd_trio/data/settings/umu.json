@@ -559,7 +559,7 @@
       "trail": {
         "scale": 1.54,
         "trail_weight": 0.9,
-        "blur_radius": 8.0,
+        "blur_sigma": 1.7,
         "blur_steps": 4
       },
       "density": {

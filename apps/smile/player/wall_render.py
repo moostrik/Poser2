@@ -12,9 +12,11 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA8, GL_RGBA16F, GL_SCISSOR_TES
 from ..credit import FONT, TITLE_FONT, qr_image, quiet_px, title_image, wrap_balanced
 from ..credit_scroll import TIMEOUT as SCROLL_TIMEOUT, name_strip, scroll_copies, scroll_gone
 from modules.gl import Fbo, Image, Shader, Style, SwapFbo, Text, Texture, shaders
-from modules.utils import Color
+from modules.utils import Color, Point2f, Quad
 from .settings import WallsSettings
-from .shaders import BlitRotated
+
+# A texture turned a quarter counterclockwise, its top along the cell's left edge: the cell's corners in the texture
+QUARTER_TURN: Quad = Quad(Point2f(1.0, 0.0), Point2f(1.0, 1.0), Point2f(0.0, 1.0), Point2f(0.0, 0.0))
 
 if TYPE_CHECKING:
     from ..render import RenderSettings
@@ -138,7 +140,6 @@ class WallRender:
         self._image_fbo: Fbo = Fbo()
         self._trail_fbo: SwapFbo = SwapFbo()
         self._mix: shaders.Mix = shaders.Mix()
-        self._rotated: BlitRotated = BlitRotated()
         # the lit cell's number: drawn upright into a portrait texture like a clip, blitted turned like one
         self._number_fbo: Fbo = Fbo()
         self._text: Text = Text()
@@ -181,7 +182,6 @@ class WallRender:
         self._image_fbo.allocate(self.width, self.height, GL_RGBA16F)
         self._trail_fbo.allocate(self.width, self.height, GL_RGBA16F)
         self._mix.allocate()
-        self._rotated.allocate()
         self._number_fbo.allocate(self.CELL_HEIGHT, self.CELL_WIDTH, GL_RGBA8)
         if not self._text.allocate(font_size=NUMBER_FONT_PX):
             logger.warning('No font for the screen numbers: a lit cell is plain white')
@@ -203,7 +203,6 @@ class WallRender:
         self._image_fbo.deallocate()
         self._trail_fbo.deallocate()
         self._mix.deallocate()
-        self._rotated.deallocate()
         self._number_fbo.deallocate()
         self._text.deallocate()
         self._credit_fbo.deallocate()
@@ -234,7 +233,6 @@ class WallRender:
 
     def update(self) -> None:
         self._mix.reload()
-        self._rotated.reload()
         settings = self.settings
         credit: bool = bool(settings.credit_qr_walls)
         caption: bool = bool(settings.credit_walls)
@@ -272,7 +270,7 @@ class WallRender:
         self._image_fbo.begin()
         for id in self._ids:
             glViewport(*self._rects[id])
-            self._rotated.use(self._images[id])
+            self._images[id].draw(src=QUARTER_TURN)
         self._image_fbo.end()
 
         # the number of the lit cell, rendered before the trail pass and blitted during it (the test lights
@@ -295,37 +293,37 @@ class WallRender:
         # a new sequence skips the trail: one white frame, then its first image
         for id in starts:
             glViewport(*self._rects[id])
-            self._rotated.use(self._images[id])
+            self._images[id].draw(src=QUARTER_TURN)
         # the clips' captions, over each cell's clip
         if captions:
             Style.set_blend_mode(Style.BlendMode.ALPHA)
             for id, line in captions.items():
                 if line:
                     glViewport(*self._rects[id])
-                    self._rotated.use(self._caption_fbos[id])
+                    self._caption_fbos[id].draw(src=QUARTER_TURN)
             Style.set_blend_mode(Style.BlendMode.DISABLED)
         # the credit, over its cell's clip
         if self._credit_cell is not None:
             glViewport(*self._rects[self._credit_cell])
-            self._rotated.use(self._credit_fbo)
+            self._credit_fbo.draw(src=QUARTER_TURN)
         # the online cell: the card, or the main screen turned like a clip
         if online is not None:
             glViewport(*self._rects[online])
             if self._online_mode == 'qr':
-                self._rotated.use(self._online_fbo)
+                self._online_fbo.draw(src=QUARTER_TURN)
             elif self._online_view is not None and self._online_view.allocated:
-                self._rotated.use(self._online_view)
+                self._online_view.draw(src=QUARTER_TURN)
         # the scrolling name, over the cells it is on now
         if scrolling:
             Style.set_blend_mode(Style.BlendMode.ALPHA)
             for id in scrolling:
                 glViewport(*self._rects[id])
-                self._rotated.use(self._scroll_fbos[id])
+                self._scroll_fbos[id].draw(src=QUARTER_TURN)
             Style.set_blend_mode(Style.BlendMode.DISABLED)
         # the cells the laughter test lights: white with the number, over everything, every frame
         for id in lit:
             glViewport(*self._rects[id])
-            self._rotated.use(self._number_fbo)
+            self._number_fbo.draw(src=QUARTER_TURN)
         # the flash of a new sequence: one white frame
         glEnable(GL_SCISSOR_TEST)
         glClearColor(1.0, 1.0, 1.0, 1.0)

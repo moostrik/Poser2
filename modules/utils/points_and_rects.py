@@ -493,3 +493,33 @@ class Rect:
     def from_dict(cls, data: dict) -> "Rect":
         """Create a Rect from a dict."""
         return cls(data["x"], data["y"], data["width"], data["height"])
+
+    def corners(self) -> "Quad":
+        """The rectangle's four corners, as a `Quad`; a negative width or height gives them mirrored."""
+        right: float = self.x + self.width
+        bottom: float = self.y + self.height
+        return Quad(Point2f(self.x, self.y), Point2f(right, self.y), Point2f(right, bottom), Point2f(self.x, bottom))
+
+    def turned(self, angle: float, center: Point2f, aspect: float = 1.0) -> "Quad":
+        """The rectangle's corners turned by `angle` (radians, the image's top-left frame) about `center`, the turn
+        round in pixels of an image `aspect` wide per unit high; all in 0..1 with the origin top-left."""
+        cos_a: float = float(np.cos(angle))
+        sin_a: float = float(np.sin(angle))
+
+        def turn(point: Point2f) -> Point2f:
+            x: float = (point.x - center.x) * aspect
+            y: float = point.y - center.y
+            return Point2f((cos_a * x + sin_a * y) / aspect + center.x, -sin_a * x + cos_a * y + center.y)
+
+        quad: Quad = self.corners()
+        return Quad(turn(quad.top_left), turn(quad.top_right), turn(quad.bottom_right), turn(quad.bottom_left))
+
+
+@dataclass
+class Quad:
+    """Four corners in 0..1 with the origin top-left: where a rectangle's top left, top right, bottom right and bottom
+    left land, as a turned or mirrored rectangle."""
+    top_left: Point2f
+    top_right: Point2f
+    bottom_right: Point2f
+    bottom_left: Point2f

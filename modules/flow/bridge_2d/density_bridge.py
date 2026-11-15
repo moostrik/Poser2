@@ -6,11 +6,10 @@ Ported from ofxFlowTools ftDensityBridgeFlow.h
 """
 from OpenGL.GL import GL_RG32F, GL_RGBA16F
 
-from modules.gl import Texture, SwapFbo
+from modules.gl import Texture, SwapFbo, shaders
 from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil, Port, TextureKind
 from .shaders import DensityBridgeShader
-from ..shaders.hsv import HSV
 
 
 class DensityBridgeSettings(BaseSettings):
@@ -52,7 +51,7 @@ class DensityBridge(FlowBase):
 
         # Shaders
         self._density_bridge_shader: DensityBridgeShader = DensityBridgeShader()
-        self._hsv_shader: HSV = HSV()
+        self._hsv_shader: shaders.Hsv = shaders.Hsv()
 
     @property
     def density(self) -> Texture:

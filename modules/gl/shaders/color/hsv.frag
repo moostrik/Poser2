@@ -27,9 +27,9 @@ vec3 hsv2rgb(vec3 c) {
 void main() {
     vec4 color = texture(src, texCoord);
     vec3 hsv = rgb2hsv(color.rgb);
-    hsv.x += hue;
-    hsv.y *= saturation;
-    hsv.z *= value;
+    hsv.x = fract(hsv.x + hue);                     // the hue wraps
+    hsv.y = clamp(hsv.y * saturation, 0.0, 1.0);    // above 1 a saturation gives negative colors
+    hsv.z = clamp(hsv.z * value, 0.0, 1.0);
     vec3 result = hsv2rgb(hsv);
     fragColor = vec4(result, color.a);
 }

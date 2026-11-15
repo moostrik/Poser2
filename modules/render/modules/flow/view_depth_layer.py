@@ -7,7 +7,7 @@ from enum import IntEnum
 from OpenGL.GL import GL_RGBA16F
 
 # Local application imports
-from modules.gl import Fbo, Style, Texture, shaders
+from modules.gl import Colormap, Fbo, Style, Texture, shaders
 from modules.settings import BaseSettings, Field
 from ...layer_base import LayerBase
 from .view_layer import ViewLayer
@@ -21,8 +21,10 @@ class DepthDrawMode(IntEnum):
 
 
 class ViewDepthLayerSettings(BaseSettings):
-    """How the view's depth is drawn; the color map is depthai's `colorizeDepthFrame`, spanning the view's near to far."""
+    """How the view's depth is drawn: a log scale from the view's near to far, as depthai's `colorizeDepthFrame`, in
+    a colormap (jet is depthai's)."""
     draw_mode:    Field[DepthDrawMode] = Field(DepthDrawMode.COLOR, description="How depth is drawn")
+    colormap:     Field[Colormap]      = Field(Colormap.JET, description="The colors depth is drawn in")
     use_mask:     Field[bool]          = Field(True, description="The mask as the picture's alpha")
     mask_opacity: Field[float]         = Field(1.0, min=0.0, max=1.0, description="Mask alpha strength")
 
@@ -65,7 +67,8 @@ class ViewDepthLayer(LayerBase):
     def update(self) -> None:
         s: ViewDepthLayerSettings = self.settings
         output = self._view.output
-        drawn: tuple = (self._view.timestamp, output.depth.near, output.depth.far, s.draw_mode, s.use_mask, s.mask_opacity)
+        drawn: tuple = (self._view.timestamp, output.depth.near, output.depth.far, s.draw_mode, s.colormap, s.use_mask,
+                        s.mask_opacity)
         if drawn == self._drawn:
             return
         self._drawn = drawn
@@ -73,7 +76,8 @@ class ViewDepthLayer(LayerBase):
         Style.set_blend_mode(Style.BlendMode.DISABLED)
         self._picture.clear()
         self._picture.begin()
-        self._picture_shader.use(output.depth.texture, output.image, output.depth.near, output.depth.far, s.draw_mode)
+        self._picture_shader.use(output.depth.texture, output.image, output.depth.near, output.depth.far, s.draw_mode,
+                                 s.colormap)
         self._picture.end()
         self._output = self._picture
         if s.use_mask:

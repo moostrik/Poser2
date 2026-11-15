@@ -15,11 +15,11 @@ const float weights[10] = float[](0.081149, 0.076883, 0.070266, 0.061948, 0.0526
 
 void main(void) {
     vec2 step = direction * texelSize * spacing;
-    vec3 sum = 0.041312 * texture(src, texCoord).rgb;
+    vec4 sum = 0.041312 * texture(src, texCoord);
     for (int i = 0; i < 10; i++) {
         vec2 offset = step * (float(i) * 2.0 + 1.5);
-        sum += weights[i] * texture(src, texCoord + offset).rgb;
-        sum += weights[i] * texture(src, texCoord - offset).rgb;
+        sum += weights[i] * texture(src, texCoord + offset);
+        sum += weights[i] * texture(src, texCoord - offset);
     }
-    fragColor = vec4(sum, 1.0);
+    fragColor = sum;
 }

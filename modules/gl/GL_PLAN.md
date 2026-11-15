@@ -9,7 +9,11 @@ size from the texture), the duplicate shaders merged (K: `FillRect`, `StrokeRect
 `Blur` with `sigma` in pixels, `Blend` for the mask, `texture.draw` for every copy and every part without a turn, one
 window manager test), the shaders by kind in subpackages with harness references for the twelve outside the GL the
 plan changes (L), the textbook names (M: `BrightnessContrast`, `Threshold`, `Sobel`, `AdaptiveThreshold`, one
-`GradientWipe`, `WhiteNoise`, `SimplexNoise`, `ColorFill`, `Mix`, `AddMix`, `LayerComposite`, `Dilate`, `Erode`).
+`GradientWipe`, `WhiteNoise`, `SimplexNoise`, `ColorFill`, `Mix`, `AddMix`, `LayerComposite`, `Dilate`, `Erode`),
+the textbook algorithms (N: the LUT at its texel centers, within 0.8/255 of a numpy lookup; `texture.draw` of a
+`Quad`, `DrawRoi` and smile's `BlitRotated` gone; `MaskAA` one mode; `colormap.glsl` with `gl.Colormap`; the flow's
+HSV as the GL's; the 2D trail on the GL's `Blur` at σ 1.7, measured nearest the old blur, 5/255 apart on average and
+4-channel since).
 
 The lines below come from the review of every shader in `modules/gl`, `modules/render`, the apps and the flow's
 general ones, decided with Matthias item by item (2026-11-15). Names are textbook names he understands at once. The
@@ -20,30 +24,11 @@ inferred **(inferred)**.
 
 | Line                     | What                                                              | Changes a look              |
 |--------------------------|-------------------------------------------------------------------|-----------------------------|
-| N. Textbook algorithms   | the LUT, corners on the CPU, `MaskAA`, colormaps, HSV, the blur   | the LUT, hd_trio's trail    |
 | O. Shared GLSL           | `color.glsl`, `blend_modes.glsl`, one `Blend` shader              | hd_trio's foreground, a bit |
 | P. Into the GL           | general shaders out of render and the flow                        | no                          |
 | Q. Out of the GL         | `DepthAlign` beside its CUDA twin                                 | no                          |
 | R. New                   | the standard shaders the pipeline lacks                           | new                         |
 
-
-## N. Textbook algorithms
-
-- N1. `Lut` samples at the LUT's texel centers, `(c * (N - 1) + 0.5) / N` **(seen: it samples at `c` now)**; the
-  layer compositor's look shifts slightly toward the LUT's intent
-- N2. `texture.draw` takes `src` as a `Rect` or a `Quad` (four `Point2f`, top left, top right, bottom right, bottom
-  left, in 0..1 from the top left) worked out on the CPU; a `Rect`, a flipped one included, is the `Quad` of its
-  corners, so every caller of today stays. `DrawRoi` and smile's `BlitRotated` go **(seen)**; hd_trio's turned
-  centering builds its `Quad` in `CenterGeometry`
-- N3. `MaskAA` keeps its one used mode (`adaptiveSmooth`, a 0.5 threshold antialiased by `fwidth`); the five others go
-  and its texel uniform goes for `textureSize` **(seen)**
-- N4. `colormap.glsl` with `Turbo`, `Viridis` and `Jet`, chosen by an `IntEnum`; `DepthView` takes it as a setting,
-  `Jet` its default so it looks as now
-- N5. The flow's `HSV` is the textbook one (the hue wraps, saturation and value clamp to 0..1) **(seen)**: it replaces
-  the GL's `Hsv`, which no app calls; the bridges draw exactly as now
-- N6. The flow's `GaussianBlur` is no Gaussian: hand weights, 40% on the center, at most 6.33 pixels **(seen)**.
-  `SmoothTrail` takes the GL's `Blur` at the σ nearest its look, 0.236 × `blur_radius` pixels (1.9 at hd_trio's 8)
-  **(deduction from its weights)**; its setting becomes `blur_sigma`, the presets with it; the flow's goes
 
 ## O. Shared GLSL
 

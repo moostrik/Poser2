@@ -18,7 +18,7 @@ from .interpolation import \
     VectorPredictiveHermite, \
     ScalarPredictiveAngleHermite, \
     VectorPredictiveAngleHermite
-from .points_and_rects import Point2f, Rect
+from .points_and_rects import Point2f, Rect, Quad
 from .color import Color
 from .object_pool import ObjectPool
 from .thread_priority import ThreadPriority, set_current_thread_priority, get_current_thread_priority
