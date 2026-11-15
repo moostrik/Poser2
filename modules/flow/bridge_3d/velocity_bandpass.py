@@ -12,10 +12,9 @@ import math
 import numpy as np
 from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R16F, GL_RG16F, GL_RG32F, GL_RGBA16F, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, glBindTexture, glGenerateMipmap, glTexParameteri
 
-from modules.gl import Fbo, SwapFbo, Texture
+from modules.gl import Fbo, SwapFbo, Texture, shaders
 from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil, Port, TextureKind
-from ..shaders import Trail
 from .trails import EPSILON, decay_weight, direction
 from .shaders import BandpassAccelerations, BandpassChanges, BandpassTrails, Change, VelocityBandpassRegion, VelocityBandpassRegionMean, VelocityBandpassRegionSpeed
 
@@ -116,7 +115,7 @@ class VelocityBandpass(FlowBase):
         self._size: tuple[int, int] = (0, 0)
         self._warned_peak: bool = False     # slow_smooth not slower than fast_smooth was logged
 
-        self._trail_shader: Trail = Trail()
+        self._trail_shader: shaders.WeightedSum = shaders.WeightedSum()
         self._trails_shader: BandpassTrails = BandpassTrails()
         self._changes_shader: BandpassChanges = BandpassChanges()
         self._accelerations_shader: BandpassAccelerations = BandpassAccelerations()
@@ -344,7 +343,7 @@ class VelocityBandpass(FlowBase):
         """One unit-gain Ema step: weight * previous + (1 - weight) * input."""
         trail.swap()
         trail.begin()
-        self._trail_shader.use(trail.back, input, weight, 1.0 - weight)
+        self._trail_shader.use(trail.back, weight, input, 1.0 - weight)
         trail.end()
 
 

@@ -20,12 +20,12 @@ from OpenGL.GL import GL_NEAREST, GL_R16F, GL_R32F, GL_RG32F, GL_RGBA16F, GL_RGB
 # Local application imports
 from modules.flow import DepthRead, DepthView, DepthUpscale, DepthVelocitySettings, TextureKind, \
                          depth_step, fixed_window, place_points, view_per_depth_pixel, view_span
-from modules.gl import Fbo, SwapFbo, Style, Texture
+from modules.gl import Fbo, SwapFbo, Style, Texture, shaders
 from modules.pose import BBox, Frame, Points2D
 from modules.settings import Field
 from modules.utils import Rect
 from .stage_layer import StageLayer, StageLayerSettings, StageOutput
-from .shaders import DepthMask, GuidedFilter, MaskAA, MaskMultiply
+from .shaders import DepthMask
 
 
 class ViewLayerSettings(StageLayerSettings):
@@ -85,9 +85,9 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
 
         self._depth_shader: DepthUpscale = DepthUpscale()
         self._depth_mask_shader: DepthMask = DepthMask()
-        self._guided_shader: GuidedFilter = GuidedFilter()
-        self._threshold_shader: MaskAA = MaskAA()
-        self._foreground_shader: MaskMultiply = MaskMultiply()
+        self._guided_shader: shaders.GuidedFilter = shaders.GuidedFilter()
+        self._threshold_shader: shaders.MaskAntialias = shaders.MaskAntialias()
+        self._foreground_shader: shaders.MaskMultiply = shaders.MaskMultiply()
 
         self._window: Rect = Rect(0.0, 0.0, 1.0, 1.0)  # uv on the camera image, rows down
         self._grid_size: tuple[int, int] = (0, 0)       # the depth's grid, its samples on the camera image

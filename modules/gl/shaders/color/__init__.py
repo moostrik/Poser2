@@ -5,3 +5,4 @@ from .exposure import Exposure
 from .hsl import Hsl
 from .hsv import Hsv
 from .lut import Lut
+from .colorize import Colorize

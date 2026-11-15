@@ -9,7 +9,6 @@ from OpenGL.GL import GL_RG16F, GL_RGBA16F
 from modules.gl import Texture, shaders
 from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil, TextureKind
-from ..shaders import Trail
 
 
 class SmoothTrailSettings(BaseSettings):
@@ -49,7 +48,7 @@ class SmoothTrail(FlowBase):
         self.settings: SmoothTrailSettings = settings or SmoothTrailSettings()
 
         # Shaders
-        self._trail_shader: Trail = Trail()
+        self._trail_shader: shaders.WeightedSum = shaders.WeightedSum()
         self._blur_shader: shaders.Blur = shaders.Blur()
 
     def set_input(self, input_field: Texture) -> None:
@@ -93,12 +92,8 @@ class SmoothTrail(FlowBase):
         # Stage 1: Temporal smoothing (trail blend)
         self._output_fbo.swap()
         self._output_fbo.begin()
-        self._trail_shader.use(
-            self._output_fbo.back,  # Previous trail
-            self._input_fbo,        # New input
-            self.settings.trail_weight,
-            self.settings.scale                # Apply scaling on new input
-        )
+        self._trail_shader.use(self._output_fbo.back, self.settings.trail_weight,    # the previous trail
+                               self._input_fbo, self.settings.scale)                 # the new input, scaled
         self._output_fbo.end()
 
         # Stage 2: Spatial smoothing (Gaussian blur)

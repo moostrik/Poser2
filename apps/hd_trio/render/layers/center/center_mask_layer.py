@@ -7,7 +7,7 @@ import math
 from OpenGL.GL import GL_R16F, GL_RG32F, GL_RGBA16F, GL_RGBA32F
 
 # Local application imports
-from modules.render import LayerBase, HasCaptureTime, GuidedFilter, MaskAA
+from modules.render import LayerBase, HasCaptureTime
 from modules.gl import Fbo, SwapFbo, Texture, Style, shaders
 from .center_geometry import CenterGeometry, SourceSpace
 from modules.utils import Quad
@@ -47,11 +47,11 @@ class CenterMaskLayer(LayerBase):
 
         # Shaders
         self._mix_shader = shaders.Mix()
-        self._mask_AA_shader = MaskAA()
+        self._antialias_shader = shaders.MaskAntialias()
         self._dilate_shader = shaders.Dilate()
         self._erode_shader = shaders.Erode()
         self._blur_shader = shaders.Blur()
-        self._guided_shader = GuidedFilter()
+        self._guided_shader = shaders.GuidedFilter()
 
     @property
     def texture(self) -> Texture:
@@ -80,7 +80,7 @@ class CenterMaskLayer(LayerBase):
             self._coefficients_fbo.allocate(width, height, GL_RG32F)
 
         self._mix_shader.allocate()
-        self._mask_AA_shader.allocate()
+        self._antialias_shader.allocate()
         self._dilate_shader.allocate()
         self._erode_shader.allocate()
         self._blur_shader.allocate()
@@ -97,7 +97,7 @@ class CenterMaskLayer(LayerBase):
         self._coefficients_fbo.deallocate()
 
         self._mix_shader.deallocate()
-        self._mask_AA_shader.deallocate()
+        self._antialias_shader.deallocate()
         self._dilate_shader.deallocate()
         self._erode_shader.deallocate()
         self._blur_shader.deallocate()
@@ -143,7 +143,7 @@ class CenterMaskLayer(LayerBase):
 
         # AA directly to blur buffer
         self._mask_blur_fbo.begin()
-        self._mask_AA_shader.use(self._blend_fbo)
+        self._antialias_shader.use(self._blend_fbo)
         self._mask_blur_fbo.end()
 
         # Multi-pass dilation or erosion

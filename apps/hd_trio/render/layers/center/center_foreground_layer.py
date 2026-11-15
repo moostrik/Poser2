@@ -1,8 +1,8 @@
 """Renders centered and rotated foreground with the foreground's look (`ForegroundLook`) and optional mask."""
 
 # Local application imports
-from modules.render import LayerBase, HasCaptureTime, ForegroundLook, ColorSettings, MaskMultiply
-from modules.gl import Fbo, Texture, Style
+from modules.render import LayerBase, HasCaptureTime, ForegroundLook, ColorSettings
+from modules.gl import Fbo, Texture, Style, shaders
 from .center_geometry import CenterGeometry, SourceSpace
 from ....settings import CenterForegroundLayerSettings
 
@@ -36,7 +36,7 @@ class CenterForegroundLayer(LayerBase):
         self._look: ForegroundLook = ForegroundLook(cam_id, settings, color_settings)
 
         # Shaders
-        self._premultiply_shader = MaskMultiply()
+        self._premultiply_shader = shaders.MaskMultiply()
 
     @property
     def texture(self) -> Texture:

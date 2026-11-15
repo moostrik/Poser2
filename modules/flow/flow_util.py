@@ -4,7 +4,7 @@ Ported from ofxFlowTools ftUtil.h/cpp
 """
 
 from OpenGL.GL import GL_R16, GL_R16F, GL_R32F, GL_R8, GL_RG16, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB16, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA16, GL_RGBA16F, GL_RGBA32F, GL_RGBA8
-from modules.gl import Fbo, SwapFbo, Texture
+from modules.gl import Fbo, SwapFbo, Texture, shaders
 
 
 class FlowUtil:
@@ -69,16 +69,10 @@ class FlowUtil:
             src_texture: Source texture to add
             strength: Multiplier for source texture (default 1.0)
         """
-        # Lazy init shader
-        if not hasattr(FlowUtil, '_add_shader'):
-            from .shaders import Add
-            FlowUtil._add_shader = Add()
-            FlowUtil._add_shader.allocate()
-
         # Swap and add: curr = prev + (src * strength)
         dst_fbo.swap()
         dst_fbo.begin()
-        FlowUtil._add_shader.use(dst_fbo.back, src_texture, 1.0, strength)
+        FlowUtil._weighted_sum().use(dst_fbo.back, 1.0, src_texture, strength)
         dst_fbo.end()
 
     @staticmethod
@@ -90,16 +84,18 @@ class FlowUtil:
             src: Source texture
             strength: Attenuation factor (1.0 = full copy, 0.0 = clear)
         """
-        # Lazy init shader
-        if not hasattr(FlowUtil, '_set_shader'):
-            from .shaders import Set
-            FlowUtil._set_shader = Set()
-            FlowUtil._set_shader.allocate()
-
         dst_fbo.swap()
         dst_fbo.begin()
-        FlowUtil._set_shader.use(src, strength)
+        FlowUtil._weighted_sum().use(src, strength)
         dst_fbo.end()
+
+    @staticmethod
+    def _weighted_sum() -> shaders.WeightedSum:
+        """The GL's `WeightedSum` `add` and `set` draw with, made on first use."""
+        if not hasattr(FlowUtil, '_weighted_sum_shader'):
+            FlowUtil._weighted_sum_shader = shaders.WeightedSum()
+            FlowUtil._weighted_sum_shader.allocate()
+        return FlowUtil._weighted_sum_shader
 
     @staticmethod
     def magnitude(dst_fbo: Fbo, src: Texture) -> None:

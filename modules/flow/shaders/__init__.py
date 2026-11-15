@@ -1,6 +1,5 @@
 """Shared flow shaders — used across bridge, fluid, and visualization layers."""
 
-from .add import Add
 from .add_boolean import AddBoolean
 from .add_region import AddRegion
 from .channel_add import ChannelAdd
@@ -11,6 +10,4 @@ from .clamp import Clamp
 from .dampen import Dampen
 from .magnitude_shader import MagnitudeShader
 from .normalize import Normalize
-from .set import Set
 from .set_region import SetRegion
-from .trail import Trail

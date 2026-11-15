@@ -26,26 +26,6 @@ vec4 BlurColor (in vec2 Coord, in sampler2D Tex, in float MipBias)
 
     return Color/9.0;
 }
-vec3 blendExclusion(vec3 base, vec3 blend) { return base+blend-2.0*base*blend; }
-vec3 blendExclusion(vec3 base, vec3 blend, float opacity) { return (blendExclusion(base, blend) * opacity + base * (1.0 - opacity));}
-
-float blendReflect(float base, float blend) { return (blend==1.0)?blend:min(base*base/(1.0-blend),1.0); }
-vec3 blendReflect(vec3 base, vec3 blend) { return vec3(blendReflect(base.r,blend.r),blendReflect(base.g,blend.g),blendReflect(base.b,blend.b)); }
-vec3 blendReflect(vec3 base, vec3 blend, float opacity) { return (blendReflect(base, blend) * opacity + base * (1.0 - opacity)); }
-
-vec3 blendGlow(vec3 base, vec3 blend) { return blendReflect(blend,base); }
-vec3 blendGlow(vec3 base, vec3 blend, float opacity) { return (blendGlow(base, blend) * opacity + base * (1.0 - opacity));}
-
-vec3 blendDifference(vec3 base, vec3 blend) { return abs(base-blend); }
-vec3 blendDifference(vec3 base, vec3 blend, float opacity) { return (blendDifference(base, blend) * opacity + base * (1.0 - opacity));}
-
-float blendOverlay(float base, float blend) { return base<0.5?(2.0*base*blend):(1.0-2.0*(1.0-base)*(1.0-blend)); }
-vec3 blendOverlay(vec3 base, vec3 blend) { return vec3(blendOverlay(base.r,blend.r),blendOverlay(base.g,blend.g),blendOverlay(base.b,blend.b));}
-vec3 blendOverlay(vec3 base, vec3 blend, float opacity) { return (blendOverlay(base, blend) * opacity + base * (1.0 - opacity));}
-
-float blendLinearBurn(float base, float blend) { return max(base+blend-1.0,0.0); }
-vec3 blendLinearBurn(vec3 base, vec3 blend) { return max(base+blend-vec3(1.0),vec3(0.0));}
-vec3 blendLinearBurn(vec3 base, vec3 blend, float opacity) { return (blendLinearBurn(base, blend) * opacity + base * (1.0 - opacity));}
 
 void main() {
     vec4 src_color = texture(src, texCoord);

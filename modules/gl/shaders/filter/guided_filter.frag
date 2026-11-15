@@ -19,9 +19,7 @@ uniform float epsilon;      // stage 2: the guide's variance below which the mas
 in vec2 texCoord;
 out vec4 fragColor;
 
-float luminance(vec3 rgb) {
-    return dot(rgb, vec3(0.2126, 0.7152, 0.0722));
-}
+#include "color.glsl"
 
 void main() {
     if (stage == 0) {

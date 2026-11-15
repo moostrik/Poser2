@@ -5,9 +5,10 @@ its cut-out; `ForegroundLookLayer` runs it on a foreground another layer made.""
 # Local application imports
 from modules.gl import Fbo, SwapFbo, Texture, Style, shaders
 from modules.settings import Field, BaseSettings
+from modules.utils import Color
 from ...layer_base import LayerBase, HasCaptureTime
 from ...color_settings import ColorSettings
-from .shaders import CelShade, HueShift
+from .shaders import CelShade
 
 
 class ForegroundLookSettings(BaseSettings):
@@ -21,8 +22,8 @@ class ForegroundLookSettings(BaseSettings):
     # Cel shade
     levels:         Field[int]   = Field(9, min=0, max=12, description="Number of color bands (0 = off: no bands)")
     smoothness:     Field[float] = Field(0.33, min=0.0, max=0.5, description="Gradient between bands")
-    # Hue shift
-    colorize:       Field[float] = Field(0.96, min=0.0, max=1.0, description="Hue shift toward track color (0.0 = off)")
+    # Colorize
+    colorize:       Field[float] = Field(0.96, min=0.0, max=1.0, description="Colorize toward the track color (0.0 = off)")
     # Post
     sharpen:        Field[float] = Field(0.0, min=0.0, max=2.0, description="Sharpen result (0.0 = off)")
     use_mask:       Field[bool]  = Field(True, description="Apply mask to foreground")
@@ -42,7 +43,7 @@ class ForegroundLook:
 
         self._mix_shader = shaders.Mix()
         self._cel_shade_shader = CelShade()
-        self._hue_shift_shader = HueShift()
+        self._colorize_shader = shaders.Colorize()
         self._sharpen_shader = shaders.Sharpen()
         self._mask_shader = shaders.MaskApply()
 
@@ -55,7 +56,7 @@ class ForegroundLook:
         self._effect_fbo.allocate(width, height, internal_format)
         self._mix_shader.allocate()
         self._cel_shade_shader.allocate()
-        self._hue_shift_shader.allocate()
+        self._colorize_shader.allocate()
         self._sharpen_shader.allocate()
         self._mask_shader.allocate()
 
@@ -64,7 +65,7 @@ class ForegroundLook:
         self._effect_fbo.deallocate()
         self._mix_shader.deallocate()
         self._cel_shade_shader.deallocate()
-        self._hue_shift_shader.deallocate()
+        self._colorize_shader.deallocate()
         self._sharpen_shader.deallocate()
         self._mask_shader.deallocate()
 
@@ -93,8 +94,8 @@ class ForegroundLook:
         if s.colorize > 0.0 and self._color_settings is not None:
             self._effect_fbo.swap()
             self._effect_fbo.begin()
-            r, g, b = self._color_settings.track_colors[self._cam_id % len(self._color_settings.track_colors)].rgb
-            self._hue_shift_shader.use(self._effect_fbo.back, r, g, b, s.colorize)
+            color: Color = self._color_settings.track_colors[self._cam_id % len(self._color_settings.track_colors)]
+            self._colorize_shader.use(self._effect_fbo.back, color, s.colorize)
             self._effect_fbo.end()
 
         if s.sharpen > 0.0:

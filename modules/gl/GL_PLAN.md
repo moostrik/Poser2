@@ -13,7 +13,10 @@ plan changes (L), the textbook names (M: `BrightnessContrast`, `Threshold`, `Sob
 the textbook algorithms (N: the LUT at its texel centers, within 0.8/255 of a numpy lookup; `texture.draw` of a
 `Quad`, `DrawRoi` and smile's `BlitRotated` gone; `MaskAA` one mode; `colormap.glsl` with `gl.Colormap`; the flow's
 HSV as the GL's; the 2D trail on the GL's `Blur` at σ 1.7, measured nearest the old blur, 5/255 apart on average and
-4-channel since).
+4-channel since), the shared GLSL (O1 to O3: `color.glsl` with Rec. 709 `luminance` and the HSV conversions in seven
+shaders, `blend_modes.glsl` with the textbook set), the general shaders into the GL (P: `GuidedFilter`,
+`MaskMultiply`, `MaskAntialias`, `Colorize`, and `WeightedSum` for the flow's `Add`, `Set` and `Trail`; the bridge's
+own `WeightedSum` stays the bridge's).
 
 The lines below come from the review of every shader in `modules/gl`, `modules/render`, the apps and the flow's
 general ones, decided with Matthias item by item (2026-11-15). Names are textbook names he understands at once. The
@@ -24,39 +27,17 @@ inferred **(inferred)**.
 
 | Line                     | What                                                              | Changes a look              |
 |--------------------------|-------------------------------------------------------------------|-----------------------------|
-| O. Shared GLSL           | `color.glsl`, `blend_modes.glsl`, one `Blend` shader              | hd_trio's foreground, a bit |
-| P. Into the GL           | general shaders out of render and the flow                        | no                          |
+| O4. The `Blend` shader   | one enum or two: Matthias's choice                                | no                          |
 | Q. Out of the GL         | `DepthAlign` beside its CUDA twin                                 | no                          |
 | R. New                   | the standard shaders the pipeline lacks                           | new                         |
 
 
-## O. Shared GLSL
+## O4. The `Blend` shader
 
-After N, so the flow's `HSV` is gone and the name `Blend` is free.
-
-- O1. `color.glsl` holds `rgb2hsv` and `hsv2rgb`, now copied in gl `Hsv`, `DensityColorize`, `CelShade` and
-  `HueShift` **(seen)**; they include it
-- O2. `color.glsl` holds `luminance`, Rec. 709 (0.2126, 0.7152, 0.0722), for every shader that weighs brightness:
-  `GuidedFilter`, the motion's `Luminance`, `CelShade`, `Sobel`, `AdaptiveThreshold` (the last three on Rec. 601 now
-  **(seen)**). `CelShade`'s bands and blur, hd_trio's foreground look, shift slightly
-- O3. `blend_modes.glsl` holds the blend modes, the full textbook set (darken, multiply, color burn, linear burn,
-  lighten, screen, color dodge, add, overlay, soft light, hard light, vivid light, linear light, pin light, hard mix,
-  difference, exclusion, subtract, divide, hue, saturation, color, luminosity), and smile's `Omission`'s own (reflect,
-  glow) **(seen)**; `Omission` includes it and draws as now
-- O4. One blend mode enum, `Style.BlendMode`, lists every mode of O3. `Style` sets the ones GL's blending does in the
-  draw itself (normal, add, multiply, screen, and the existing premultiplied, sum, revealage); a `Blend(src, dst, mode,
-  amount)` shader does the rest in a pass of its own into a target of its own **(seen: `Style.BlendMode` exists)**.
-  One system: a mode is named once, and where it runs follows from what GL can do
-
-## P. Into the GL
-
-- P1. `GuidedFilter` from `render/modules/flow` (hd_trio's mask, the flow's view) **(seen)**
-- P2. `MaskMultiply` from `render/modules/flow`, beside `MaskApply` **(seen)**
-- P3. `MaskAA`, after N3, from `render/modules/flow`, as `MaskAntialias`
-- P4. `HueShift` from `render/modules/inference`, as `Colorize` **(seen)**
-- P5. One `WeightedSum` (`a * x + b * y`) replaces the flow's `Add`, `Set` and `Trail` **(seen)**. The bridge's own
-  `WeightedSum` stays the bridge's: it sums up to seven sources, or their vectors' lengths for an amount, capped, into
-  RGB alone **(seen)**
+A `Blend(src, dst, mode, amount)` shader draws `blend_modes.glsl`'s modes in a pass of its own. Open: one
+`Style.BlendMode` enum for all 30, which puts every mode in the layers' `blend_mode` dropdowns though `Style` can only
+do GL's 8 there; or `Style.BlendMode` for GL's 8 and a `BlendShaderMode` for the shader's 30, numbered in
+`blend_modes.glsl` (recommended: a dropdown offers what its layer can do). Asked 2026-11-15.
 
 Kept where they are, as domain shaders: render's `TimeSeries`, `Feature`, `Window`, `PosePointLines`,
 `PanoramicStitch`, `DensityColor`, `DensityColorize`, `DepthMask`, `DepthView`, `CelShade`; smile's `FaceColor`,

@@ -7,13 +7,15 @@ uniform float radius;
 uniform bool invert;
 #define texelSize (1.0 / vec2(textureSize(src, 0)))
 
+#include "color.glsl"
+
 in vec2 texCoord;
 out vec4 fragColor;
 
 void main() {
     // Sample center pixel luminance
     vec3 centerColor = texture(src, texCoord).rgb;
-    float centerLum = dot(centerColor, vec3(0.299, 0.587, 0.114));
+    float centerLum = luminance(centerColor);
 
     // Compute local mean and variance in a neighborhood
     float sum = 0.0;
@@ -25,7 +27,7 @@ void main() {
         for (float x = -1.0; x <= 1.0; x += 1.0) {
             vec2 offset = vec2(x, y) * texelSize * radius;
             vec3 sampleColor = texture(src, texCoord + offset).rgb;
-            float sampleLum = dot(sampleColor, vec3(0.299, 0.587, 0.114));
+            float sampleLum = luminance(sampleColor);
             sum += sampleLum;
             sumSq += sampleLum * sampleLum;
             count += 1.0;

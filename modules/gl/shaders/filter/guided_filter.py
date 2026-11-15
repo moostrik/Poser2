@@ -1,7 +1,7 @@
 """Guided Filter shader: a mask's edge moved to where a guide image's edges run (He, Sun and Tang 2010)."""
 
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
-from modules.gl import Shader, draw_quad, Texture
+from ... import Shader, draw_quad, Texture
 
 PRODUCTS: int = 0
 BOX: int = 1

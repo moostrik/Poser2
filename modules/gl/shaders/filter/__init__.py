@@ -5,3 +5,4 @@ from .sharpen import Sharpen
 from .sobel import Sobel
 from .dilate import Dilate
 from .erode import Erode
+from .guided_filter import GuidedFilter

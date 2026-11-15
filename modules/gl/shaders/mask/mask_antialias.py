@@ -1,19 +1,21 @@
+"""MaskAntialias: a mask thresholded at 0.5, its edge antialiased over one pixel."""
+
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUseProgram
-from modules.gl import Shader, draw_quad, Texture
+from ... import Shader, draw_quad, Texture
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-class MaskAA(Shader):
-    """A mask's red thresholded at 0.5, its edge antialiased over one pixel."""
+class MaskAntialias(Shader):
+    """`tex0`'s red thresholded at 0.5, smoothed over the pixel the threshold crosses (`fwidth`), written to RGB."""
 
     def use(self, tex0: Texture) -> None:
         if not self.allocated or not self.shader_program:
-            logger.warning("MaskAA shader not allocated or shader program missing.")
+            logger.warning("MaskAntialias shader not allocated or shader program missing.")
             return
         if not tex0.allocated:
-            logger.warning("MaskAA shader: input texture not allocated.")
+            logger.warning("MaskAntialias shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)
