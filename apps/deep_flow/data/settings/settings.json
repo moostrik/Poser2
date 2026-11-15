@@ -6,7 +6,7 @@
     "keyframe_interval": 50,
     "color": true,
     "resolution": "P800",
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
     "fov": 80.0,
     "split_seconds": 60,
@@ -91,6 +91,9 @@
       "overlap": 0.5,
       "verbose": false
     },
+    "recorded_poses": {
+      "enabled": false
+    },
     "control": {
       "output_path": "recordings",
       "name": ""
@@ -99,11 +102,13 @@
       "temp_path": "temp",
       "video_encoder": "iGPU",
       "video_format": "H264",
+      "container": "MKV",
       "video_quality": 24,
       "video_frame_types": [
         "VIDEO",
         "DEPTH"
       ],
+      "mirrored": false,
       "enabled": true,
       "output_path": "recordings",
       "name": ""
@@ -278,6 +283,9 @@
         "output": [
           "cam_image",
           "view_depth"
+        ],
+        "record": [
+          "composite"
         ]
       },
       "composite": {
@@ -323,11 +331,15 @@
     "preview": {
       "tracker": {
         "stage": "LERP",
+        "box_stage": "RAW",
         "pose_line_width": 2.0,
         "bbox_line_width": 2
       },
       "pose": {
         "stage": "LERP",
+        "back_stage": "CLEAN",
+        "middle_stage": "SMOOTH",
+        "front_stage": "LERP",
         "line_width": 2.0,
         "line_smooth": 0.0,
         "use_gpu_crop": true
@@ -364,12 +376,13 @@
       "similarity_threshold": 0.1,
       "motion_exponent": 1.0,
       "similarity_scale": 1.0,
+      "foreground_threshold": 0.2,
       "layered": 0.8
     },
     "inputs": {
       "motion_image": "view_image",
       "bridge_image": "foreground_look",
-      "scale_by_motion": true
+      "scale_by_motion": false
     },
     "view": {
       "fixed_x": 0.5,
@@ -434,7 +447,10 @@
           "start": 0.0,
           "bow": 0.0,
           "stop": 1.0,
-          "wake": 0.0
+          "wake": 0.0,
+          "peak": {
+            "enabled": true
+          }
         },
         "density": {
           "trail": 1.0,
@@ -443,6 +459,7 @@
           "bow": 0.0,
           "stop": 1.0,
           "wake": 0.0,
+          "depth_mask": 0.0,
           "saturation": 1.18,
           "brightness": 1.0
         },
@@ -452,7 +469,8 @@
           "start": 0.0,
           "bow": 0.0,
           "stop": 0.0,
-          "wake": 0.0
+          "wake": 0.0,
+          "depth_mask": 0.0
         }
       },
       "body_force": {
@@ -471,6 +489,7 @@
           "bow": 0.0,
           "stop": 0.0,
           "wake": 0.0,
+          "depth_mask": 0.0,
           "saturation": 1.0,
           "brightness": 1.0
         },
@@ -480,8 +499,18 @@
           "start": 0.0,
           "bow": 0.0,
           "stop": 0.0,
-          "wake": 0.0
+          "wake": 0.0,
+          "depth_mask": 0.0
         }
+      },
+      "expansion": {
+        "trail": 0.0,
+        "change": 0.0,
+        "start": 0.0,
+        "bow": 0.0,
+        "stop": 0.0,
+        "wake": 0.0,
+        "depth_mask": 0.0
       }
     },
     "fluid": {
@@ -500,6 +529,7 @@
       },
       "input": {
         "spread": 0.237,
+        "expansion_rate": 0.0,
         "boundary": {
           "velocity_drag": 75.0,
           "velocity_gain": 3.0,
@@ -520,6 +550,7 @@
         "advection_scale": 1.0,
         "fade_time": 0.0,
         "evaporation_time": 0.0,
+        "evaporation_knee": 0.1,
         "viscosity": 0.0,
         "viscosity_iter": 20
       },
@@ -537,6 +568,7 @@
         "advection_scale": 1.0,
         "fade_time": 12.0,
         "evaporation_time": 0.0,
+        "evaporation_knee": 0.1,
         "buoyancy": 0.0,
         "sink": 0.0,
         "gravity_x": 0.0,
@@ -558,7 +590,8 @@
         "limiter": "CLAMP",
         "advection_scale": 0.88,
         "fade_time": 0.0,
-        "evaporation_time": 60.0
+        "evaporation_time": 60.0,
+        "evaporation_knee": 0.1
       },
       "fine_density": {
         "enabled": true,
@@ -593,6 +626,7 @@
           "b": 1.0,
           "a": 1.0
         },
+        "clear_below": 0.0,
         "blend_mode": "ADD",
         "light": {
           "enabled": false,
@@ -640,7 +674,7 @@
     },
     "monitor_b": {
       "stage": "FLUID",
-      "texture": "density",
+      "texture": "velocity",
       "view": "COLORMAP",
       "advanced": {
         "channel": "ALL",
@@ -753,6 +787,20 @@
       "secondary_fullscreen": false,
       "fullscreen_mode": "WINDOWED",
       "fullscreen_mouse": false
+    },
+    "screen_recorder": {
+      "look_back": false,
+      "name": "",
+      "main_window": false,
+      "fill": false,
+      "size": "UHD",
+      "portrait": true,
+      "width": 2160,
+      "height": 3840,
+      "frame_step": 1,
+      "duration": 0.0,
+      "reserve": 1.0,
+      "quality": 18
     }
   },
   "inout": {
