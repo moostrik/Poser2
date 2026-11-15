@@ -18,7 +18,6 @@ paths:
 - A package holds its layers, and the shaders of those layers in `shaders/`
 - A shader that no layer owns sits in `modules/gl/shaders/`
 - A layer's class is named after what it draws, then its kind (`TrackletRenderer`, `PoseCompositor`)
-- A shader is named after the operation it does; the `shaders` package in front says what it is (`shaders.PosePointLines`)
 
 ## Layers
 
