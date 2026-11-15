@@ -36,7 +36,7 @@ KEPT: int = 32          # recorded frames kept per camera: the stage asks for a 
 
 
 class RecordedPosesSettings(BaseSettings):
-    enabled: Field[bool] = Field(True, description="Play the recording's poses in place of the pose model")
+    enabled: Field[bool] = Field(False, description="Play the recording's poses in place of the pose model")
 
 
 def pose_arrays(frames: FrameDict) -> dict[int, tuple[float, PoseArrays]]:

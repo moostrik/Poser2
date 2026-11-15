@@ -69,6 +69,7 @@ class RecordedPosesTest(unittest.TestCase):
     def setUp(self) -> None:
         self.settings = RecordedPosesSettings()
         self.settings.initialize()
+        self.settings.enabled = True
         self.inference = FakeInference()
         self.node = RecordedPoses(self.settings, self.inference)   # pyright: ignore[reportArgumentType]
         self.played: list[tuple[float, FrameDict]] = []
