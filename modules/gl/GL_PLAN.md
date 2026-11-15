@@ -99,6 +99,6 @@ shader, a direction) against `BlurH` and `BlurV`; `Blend`, `MaskBlend` and `Curt
 - `CLAUDE.md` Running code, run a GPU harness only on the user's go, and only what the plan names: H, I, J, K, L
 - `CLAUDE.md` Performance, prefer the design with the lower latency: H, I, J
 - `CLAUDE.md` API evolution, update all affected call sites in the same change: H
-- `gl.md` set the GL state a draw needs where it draws: H, I
+- `gl.md` set the GL state a draw needs where it draws, through `gl.Context`; it skips what is already set: H, I
 - `gl.md` prefer as few GL calls and state switches as possible: H, I, J
-- `gl.md` keep geometry in plain modules and drawing in shaders: K
+- `gl.md` simple geometry, as from poses, is worked out on the CPU, in plain modules: H, K
