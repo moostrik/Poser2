@@ -15,6 +15,8 @@ paths:
 - Simple geometry, as from poses, is worked out on the CPU, in plain modules
 - Volumetrics and any other 3D are done inside a shader
 - Prefer as few GL calls and state switches as possible
+- A texture is held in GL's row order
+- A CPU image is flipped once, at its upload
 
 ## Working with OpenGL
 
