@@ -46,20 +46,24 @@ per step, both presets (`settings.json`, `very nice.json`) and the documents it 
 guard tests, the render's tests and one -sim start (the panels in place, the presets loaded without unknown
 keys).
 
-- **A1.** The view into deep_flow, for now: `ViewLayer`, its outputs and its shaders from `render/modules/flow` to
-  `apps/deep_flow/render/layers/view/`, its tests with it. The motion, bridge and fluid layers stay in
-  `render/modules/flow`: they are layers (the render's loop and settings), and `modules/flow`, which may not import
-  the render, holds what they run.
-- **A2.** One declaration of the chain in the renderer, in place of the four lists: each stage with its layer,
-  its outputs and its monitor, in order.
-- **A3.** The color in the view: the view's last pass, `color`, its output read by the bridge, its settings
-  `view.color`; `enabled` off passes the foreground as it is. `inputs.bridge_image` and deep_flow's
-  `foreground_look` layer and panel go; hd_trio keeps its own until its refactor. VIEW.md says it.
+- **A1.** The view into deep_flow, for now: `ViewLayer`, `ViewOutputLayer` and `ViewDepthLayer` (both import it)
+  and their shaders from `render/modules/flow` to `apps/deep_flow/render/layers/view/`, with their tests;
+  `scripts/view_check.py` to `apps/deep_flow/scripts/`; the app's view folder added to `FLOW_ROOTS`
+  (`tests/test_glossary.py`) and to `.claude/rules/flow.md`'s paths; VIEW.md's and FLOW.md's paths. The motion,
+  bridge and fluid layers stay in `render/modules/flow`: they are layers (the render's loop and settings), and
+  `modules/flow`, which may not import the render, holds what they run.
+- **A2.** One declaration of the chain in the renderer, in place of the four lists: each stage with its layer and
+  its outputs, in order (A4 adds the monitors).
+- **A3.** The color in the view: the view's last pass, `color`, run by the render's look class that hd_trio's
+  centered foreground also runs, its output read by the bridge, its settings `view.color`; `enabled` off passes
+  the foreground as it is. `inputs.bridge_image` and deep_flow's `foreground_look` layer and panel go. VIEW.md
+  says it.
 - **A4.** A monitor per stage, in the stage's panel, showing all its FBOs: deep_flow's own wiring, a
   `MonitorLayer` per stage with its stage fixed. The capture's image and depth layers declare their ports;
   `MonitorLayer` gets `view_depth`'s depth colormaps. `monitor_a`, `monitor_b`, the view's wrapper layers and
   `view_depth` leave deep_flow. `color_mask`, `inputs` and `stage` leave deep_flow: the motion reads the view's
-  `image`, and every injection is at full weight. FLOW.md and RENDER.md say it.
+  `image`, and every injection is at full weight, stronger than the preset's motion-weighted fluid (judged in
+  the app). FLOW.md and RENDER.md say it.
 - **A5.** A pose monitor: the pose stage it reads (raw, clean, smooth, lerp); the pose drawn on the crop with its
   image, on the camera's frame with its boxes, or on the view, the last two without an image so they lie over
   any layer of that frame; the features of the frame or the window as an optional overlay. It replaces
@@ -261,6 +265,7 @@ Not worked on until asked for; each with what is known.
   `inputs`, `stage`, the pose's layers and deep_flow's composite, A2, A4 to A6.
 - Settings connect the user and a component, not two components: the view's tolerance and size, A7.
 - A layer that is not general and that one app uses sits in `apps/<app>/render/layers/`: the view, A1.
+- A script sits in its app's `scripts/` folder when only that app uses it: `view_check.py`, A1.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, B1.
 - A `Field` description is one short line of panel text: J1.
