@@ -12,7 +12,7 @@ from the numbers.
 | GPU               | GeForce RTX 4090, 24 GB                                                                 |
 | Target            | 60 fps, 16.7 ms a frame                                                                 |
 | App               | deep_flow, `launcher.py -app deep_flow -sim -ni -timing 60 -warmup 10`                  |
-| Input             | the standmoves recording (`-sim`), one camera, 50 fps; it and stillslowfast are no longer kept |
+| Input             | a recording (`-sim`), 1 camera, 50 fps: hands from 15 Nov, standmoves before (not kept) |
 | Preset            | `apps/deep_flow/data/settings/settings.json`, one setting changed per run               |
 | Pose              | on: the person detection and RTM pose on TensorRT, on the same GPU                      |
 | Segmentation      | off: the mask is the depth's, the RVM model not run                                     |
@@ -29,37 +29,47 @@ two render ticks; its fps is 1000 over its mean.
 
 ## The stages
 
-At the preset as saved, the grid 448 × 800 × 64, MacCormack, the density on the grid, and at the
-default this document sets, 256 × 448 × 128:
+On 15 November, at the preset as saved (commit 802de71c, the hands recording `20261112-124918_hands`,
+the pose model running): the velocity's grid 288 × 512 × 64, the density 448 × 800 × 64 with the fine
+density at 2160 × 3840 × 24, MacCormack. Beside it, from 7 November, the preset then, its grid
+448 × 800 × 64 with the density on the grid, and the default this document set, 256 × 448 × 128:
 
-| Stage                     | Timer                          | 448 × 800 × 64        | 256 × 448 × 128       |
-|---------------------------|--------------------------------|-----------------------|-----------------------|
-| motion                    | `GPU motion`                   | 0.40 / 0.63           | 0.43 / 0.65           |
-| bridge, lowpass           | `GPU bridge lowpass`           | 0.08 / 0.08           | 0.09 / 0.08           |
-| bridge, bandpass          | `GPU bridge bandpass`          | 0.39 / 0.71           |                       |
-| bridge, the mixes         | `GPU bridge mix`               | 0.07 / 0.06           | 0.07 / 0.06           |
-| fluid, inject             | `GPU fluid inject`             | 0.96 / 1.34           | 0.30 / 0.55           |
-| fluid, dampen             | `GPU fluid dampen`             | 0.52 / 0.83           | 0.35 / 0.60           |
-| fluid, advect velocity    | `GPU fluid advect velocity`    | 1.90 / 5.79           | 0.86 / 1.21           |
-| fluid, viscosity          | `GPU fluid viscosity`          | 0                     | 0                     |
-| fluid, vorticity          | `GPU fluid vorticity`          | 2.00 / 2.64           | 1.28 / 1.59           |
-| fluid, advect temperature | `GPU fluid advect temperature` | 0.45 / 0.86           | 0.23 / 0.23           |
-| fluid, buoyancy           | `GPU fluid buoyancy`           | 0                     | 0                     |
-| fluid, pressure           | `GPU fluid pressure`           | 6.74 / 8.09           | 4.40 / 5.91           |
-| fluid, density            | `GPU fluid density`            | 2.04 / 5.29           | 1.10 / 1.76           |
-| fluid, composite          | `GPU fluid composite`          | 1.16 / 1.45           | 2.44 / 3.53           |
-| fluid, the step           | `GPU fluid`                    | 14.86 / 21.64         | 10.68 / 12.09         |
-| the frame                 | `Render interval`              | 17.93 / 25.34, 56 fps | 13.29 / 18.50, 75 fps |
+| Stage                     | Timer                          | 15 Nov                | 7 Nov, 448 × 800 × 64 | 7 Nov, 256 × 448 × 128 |
+|---------------------------|--------------------------------|-----------------------|-----------------------|------------------------|
+| image upload              | `GPU Image Upload`             | 4.62 / 18.52          |                       |                        |
+| view                      | `GPU view`                     | 0.09 / 0.09           |                       |                        |
+| motion                    | `GPU motion`                   | 0.30 / 0.19           | 0.40 / 0.63           | 0.43 / 0.65            |
+| bridge, lowpass           | `GPU bridge lowpass`           | 0.05 / 0.05           | 0.08 / 0.08           | 0.09 / 0.08            |
+| bridge, bandpass          | `GPU bridge bandpass`          | 0.12 / 0.12           | 0.39 / 0.71           |                        |
+| bridge, the mixes         | `GPU bridge mix`               | 0.09 / 0.11           | 0.07 / 0.06           | 0.07 / 0.06            |
+| bridge                    | `GPU bridge`                   | 0.29 / 0.31           |                       |                        |
+| fluid, inject             | `GPU fluid inject`             | 0.71 / 1.05           | 0.96 / 1.34           | 0.30 / 0.55            |
+| fluid, dampen             | `GPU fluid dampen`             |                       | 0.52 / 0.83           | 0.35 / 0.60            |
+| fluid, advect velocity    | `GPU fluid advect velocity`    | 0.29 / 0.47           | 1.90 / 5.79           | 0.86 / 1.21            |
+| fluid, viscosity          | `GPU fluid viscosity`          | 0                     | 0                     | 0                      |
+| fluid, vorticity          | `GPU fluid vorticity`          | 0.86 / 1.30           | 2.00 / 2.64           | 1.28 / 1.59            |
+| fluid, advect temperature | `GPU fluid advect temperature` | 0                     | 0.45 / 0.86           | 0.23 / 0.23            |
+| fluid, buoyancy           | `GPU fluid buoyancy`           | 0                     | 0                     | 0                      |
+| fluid, pressure           | `GPU fluid pressure`           | 1.49 / 2.17           | 6.74 / 8.09           | 4.40 / 5.91            |
+| fluid, faces to centers   | `GPU fluid faces to centers`   | 0.13 / 0.14           |                       |                        |
+| fluid, density            | `GPU fluid density`            | 5.67 / 7.59           | 2.04 / 5.29           | 1.10 / 1.76            |
+| fluid, light              | `GPU fluid light`              | 0                     |                       |                        |
+| fluid, composite          | `GPU fluid composite`          | 1.19 / 1.60           | 1.16 / 1.45           | 2.44 / 3.53            |
+| fluid, the step           | `GPU fluid`                    | 9.67 / 12.07          | 14.86 / 21.64         | 10.68 / 12.09          |
+| the frame                 | `Render interval`              | 12.22 / 22.91, 82 fps | 17.93 / 25.34, 56 fps | 13.29 / 18.50, 75 fps  |
 
-The bandpass runs only while a mix takes one of its readings; the preset takes the trail alone, so
-its row is from a run with `body_force.acceleration` taking `change`, `start`, `bow`, `stop` and
-`wake` at 1. The viscosity is 0 and the buoyancy has no gravity in the preset, so both skip their
-dispatches. The pressure is the step's largest pass, its 40 Jacobi iterations; the composite marches
-one step per layer over the 2160 × 3840 output, so it grows with `layers`, not with the grid's x
-and y.
+On 15 November the bandpass runs at the preset; on 7 November it ran only while a mix took one of its
+readings, so its row then is from a run with `body_force.acceleration` taking `change`, `start`, `bow`,
+`stop` and `wake` at 1. The image upload's timer spans the CUDA work between its timestamps, so its p95
+holds the pose model's; the motion's p95 under its mean is a mean pulled up by a few long frames (max
+10 ms). The viscosity is 0, and the buoyancy and the light are off in the preset, so they skip their
+dispatches. On 15 November the density is the step's largest pass, the fine density's 2160 × 3840 × 24
+among it; the pressure, multigrid since, is a quarter of what its 40 Jacobi iterations took on
+7 November. The composite marches one step per layer over the 2160 × 3840 output, so it grows with
+`layers`, not with the grid's x and y.
 
-The motion measures once per camera frame, 44 a second on the recording; every other stage runs
-every frame.
+The view and the motion run once per capture, 50 a second on the hands recording (44 on the standmoves
+recording on 7 November); every other stage runs every frame.
 
 ### The view
 

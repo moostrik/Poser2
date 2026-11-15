@@ -15,7 +15,7 @@ section it changes. **(deduction)** marks what is inferred, **(site fact)** what
 | C   | [The bridge](#c-the-bridge)                                               | built; the dye's amount to judge                              | [BRIDGE_3D.md](BRIDGE_3D.md)                                 |
 | D   | [The 3D fluid's physics](#d-the-3d-fluids-physics)                        | next                                                          | [FLUID_3D.md](FLUID_3D.md)                                   |
 | E   | [The 3D fluid's look at 4K](#e-the-3d-fluids-look-at-4k)                  | open                                                          | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md)           |
-| F   | [The chain timed as one](#f-the-chain-timed-as-one)                       | not started                                                   | [TIMING.md](TIMING.md)                                       |
+| F   | [The chain timed as one](#f-the-chain-timed-as-one)                       | built                                                         | [TIMING.md](TIMING.md)                                       |
 | G   | [One unit across the stages](#g-one-unit-across-the-stages)               | not started                                                   | [FLOW.md](FLOW.md)                                           |
 | H   | [The 2D flow follows the 3D](#h-the-2d-flow-follows-the-3d)               | not started                                                   | [FLOW.md](FLOW.md)                                           |
 | I   | [Every setting and its description](#i-every-setting-and-its-description) | last, after the refactor                                      | `CLAUDE.md`, `.claude/rules`                                 |
@@ -118,11 +118,8 @@ transfer curve.
 
 The latency and the cadence, camera to render, and the input's GPU steps are measured
 ([INPUT_THREADS.md](INPUT_THREADS.md#the-cadence)); the view stage's passes on their own
-([TIMING.md](TIMING.md#the-view)); each stage's GPU time in the app in [TIMING.md](TIMING.md#the-stages), from
-7 November, before the view stage and the bridge's work since.
-
-- **F2.** TIMING.md's stage table again from one run of the app at the preset, the view's row among them, the
-  old numbers kept beside it.
+([TIMING.md](TIMING.md#the-view)); each stage's GPU time in the app in [TIMING.md](TIMING.md#the-stages), on
+15 November, after the render and GL refactors, beside 7 November's.
 
 ## G. One unit across the stages
 
@@ -232,7 +229,6 @@ Not worked on until asked for; each with what is known.
 
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, A1.
-- Treat latency as a first-order concern: the stages timed again in the app, F2.
 - A `Field` description is one short line of panel text: I1.
 - A package is one thing, and its name is that thing; keep presets and settings schemas in sync: the render
   layers' packages and deep_flow's panel tree, I2.
