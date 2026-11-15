@@ -118,7 +118,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Define module loggers as `logger = logging.getLogger(__name__)`
 - Prefer `logging` over `print`
 - Log exceptions with context; never fail silently
-- When a part fails while running (a camera, a model), log it and keep the app running
+- A thread's loop catches an exception per item, logs it and goes on with the next
 
 ## Testing
 
