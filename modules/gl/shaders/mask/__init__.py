@@ -6,3 +6,6 @@ from .adaptive_threshold import AdaptiveThreshold
 from .color_fill import ColorFill
 from .mask_multiply import MaskMultiply
 from .mask_antialias import MaskAntialias
+from .chroma_key import ChromaKey
+from .luma_key import LumaKey
+from .jump_flood import JumpFlood

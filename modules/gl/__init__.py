@@ -23,6 +23,10 @@ from . import shaders
 # SCREEN CAPTURE (after the shaders: it draws with `Nv12`)
 from .screen_capture import ScreenCapture, nv12_bytes
 
+# EFFECTS OVER A CHAIN OF PASSES (after the shaders)
+from .bloom import Bloom
+from .distance_field import DistanceField
+
 # TEXT RENDERING
 from .text import Text
 

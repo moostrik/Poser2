@@ -17,61 +17,20 @@ HSV as the GL's; the 2D trail on the GL's `Blur` at σ 1.7, measured nearest the
 shaders, `blend_modes.glsl` with the textbook set), the general shaders into the GL (P: `GuidedFilter`,
 `MaskMultiply`, `MaskAntialias`, `Colorize`, and `WeightedSum` for the flow's `Add`, `Set` and `Trail`; the bridge's
 own `WeightedSum` stays the bridge's), `DepthAlign` out of the GL (Q: beside its CUDA twin in
-`modules/inference/shaders`, the reference `scripts/depth_align_check.py` holds it to).
-
-The lines below come from the review of every shader in `modules/gl`, `modules/render`, the apps and the flow's
-general ones, decided with Matthias item by item (2026-11-15). Names are textbook names he understands at once. The
-fluid's own simulation shaders are domain shaders and stay out. Each line is built on Matthias's "go", which covers
-the harness runs and the `-sim` runs it names; a line that keeps every look is checked by the harness at max 0, a line
-that changes a look by the harness's new reference and the app. What the code shows is marked **(seen)**, what is
-inferred **(inferred)**.
-
-| Line                     | What                                                              | Changes a look              |
-|--------------------------|-------------------------------------------------------------------|-----------------------------|
-| O4. The `Blend` shader   | one enum or two: Matthias's choice                                | no                          |
-| R. New                   | the standard shaders the pipeline lacks                           | new                         |
-
+`modules/inference/shaders`), the standard shaders the pipeline lacked (R: `ToneMap`, `Levels`, `ColorMatrix`,
+`Posterize`, `Dither` with an ordered and a blue-noise map, `Vignette`, `Mosaic`, `Displace`, `Median`, `Bilateral`,
+`ChromaKey`, `LumaKey`, `DualFilter`, and the effects `Bloom` and `DistanceField`, the last held to the exact
+distance).
 
 ## O4. The `Blend` shader
 
 A `Blend(src, dst, mode, amount)` shader draws `blend_modes.glsl`'s modes in a pass of its own. Open: one
 `Style.BlendMode` enum for all 30, which puts every mode in the layers' `blend_mode` dropdowns though `Style` can only
 do GL's 8 there; or `Style.BlendMode` for GL's 8 and a `BlendShaderMode` for the shader's 30, numbered in
-`blend_modes.glsl` (recommended: a dropdown offers what its layer can do). Asked 2026-11-15.
-
-Kept where they are, as domain shaders: render's `TimeSeries`, `Feature`, `Window`, `PosePointLines`,
-`PanoramicStitch`, `DensityColor`, `DensityColorize`, `DepthMask`, `DepthView`, `CelShade`; smile's `FaceColor`,
-`FlashIn`, `FlashOut`, `Omission`; white_space's `LightSimulation`; the motion's `Luminance`.
-
-## R. New
-
-Standard shaders of the visual libraries, all decided yes:
-
-- R1. Tone mapping, ACES and Reinhard by an `IntEnum`: the fluid renders in RGBA16F **(inferred)**, its display is 8-bit
-- R2. Dither, ordered and blue noise: 16-bit gradients band at 8 bits, at 4K most
-- R3. Bloom on a dual-filter (Kawase) blur: a wide glow in few passes
-- R4. Jump flooding: a mask's distance field, for outlines and glows of any width
-- R5. Levels (black, white and gamma, in and out) and a color matrix (saturation that keeps luminance)
-- R6. Bilateral and median filters
-- R7. Displace, posterize, mosaic, chroma and luma key, vignette
-
-Each new shader gets a harness case and its reference on the first run, which I look at before it is kept. Jump
-flooding alone is also held to the exact distance, worked out in numpy: it is an approximation whose known misses a
-look does not show.
-
-## Documents and commits
-
-- `GL.md` (the subfolders, the includes, the blend modes), `RENDER.md` (the shaders that leave render) and the flow's
-  documents that name a moved shader follow in the line that moves it
-- The flow's shaders are changed here; the flow's threads hear of N5, N6 and P5 once each works
-- Each line, L to R, is one commit
+`blend_modes.glsl` (recommended: a dropdown offers what its layer can do). Asked 2026-11-15. Built on Matthias's
+answer and "go", checked by the harness (one case per mode) and its images.
 
 ## Rules it touches
 
-- `CLAUDE.md` Packages, a package is one thing; Imports, import another package from its `__init__.py`: L
-- `gl.md`, a shader is named after the operation it does, the `shaders` package in front: L, N
-- `gl.md`, simple geometry is worked out on the CPU: N2
-- `gl.md`, `modules/gl/shaders` holds the shaders useful to any app; an app's own shader sits in that app: P, Q
-- `CLAUDE.md` API evolution, remove obsolete pathways; keep presets in sync: N, O, P5
-- `CLAUDE.md` Types, prefer `IntEnum` for identifiers: N4, O4, R1
-- `CLAUDE.md` Running code, run a GPU harness only on the user's go: every line
+- `CLAUDE.md` Types, prefer `IntEnum` for identifiers: O4
+- `CLAUDE.md` Running code, run a GPU harness only on the user's go: O4

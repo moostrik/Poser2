@@ -1,9 +1,11 @@
 """OpenGL shaders useful to any app, grouped by kind in subpackages; every one is used as `shaders.<Operation>`."""
 
 from .draw import Blit, FillCircles, FillRect, StrokeRect
-from .color import BrightnessContrast, Exposure, Hsl, Hsv, Lut, Colorize
-from .filter import Blur, Sharpen, Sobel, Dilate, Erode, GuidedFilter
-from .mask import MaskApply, Threshold, AdaptiveThreshold, ColorFill, MaskMultiply, MaskAntialias
+from .color import BrightnessContrast, Exposure, Hsl, Hsv, Lut, Colorize, ToneMap, ToneMapOperator, Levels, \
+    ColorMatrix, saturation_matrix, Posterize, Dither, DitherPattern, Vignette
+from .filter import Blur, Sharpen, Sobel, Dilate, Erode, GuidedFilter, Mosaic, Displace, Median, Bilateral, DualFilter
+from .mask import MaskApply, Threshold, AdaptiveThreshold, ColorFill, MaskMultiply, MaskAntialias, ChromaKey, LumaKey, \
+    JumpFlood
 from .composite import Mix, WeightedSum
 from .transition import BarnDoorWipe, GradientWipe
 from .generate import WhiteNoise, SimplexNoise

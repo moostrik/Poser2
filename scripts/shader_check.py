@@ -29,7 +29,7 @@ from apps.smile.render.shaders import FaceColor, FlashIn, FlashOut, Omission  # 
 from modules.flow import DepthRead, DepthUpscale  # noqa: E402
 from modules.flow.shaders import AddRegion, ChannelAddRegion, ChannelSetRegion, SetRegion  # noqa: E402
 from modules.flow.visualization.shaders import ColormapKey  # noqa: E402
-from modules.gl import Colormap, Context, Fbo, Style, Text, Texture, shaders  # noqa: E402
+from modules.gl import Bloom, Colormap, Context, DistanceField, Fbo, Style, Text, Texture, shaders  # noqa: E402
 from modules.gl.shaders.filter import KERNEL_SIGMA  # noqa: E402
 from modules.pose import PointLandmark, Points2D  # noqa: E402
 from modules.inference.shaders import DepthAlign  # noqa: E402
@@ -111,13 +111,29 @@ def pose() -> Points2D:
 Case = Callable[[dict[str, Texture]], None]
 
 
-def cases() -> dict[str, tuple[object, Case]]:
-    """Each case: the shader it allocates (None for one that is not a shader) and its draw."""
-    s = shaders
-    c: dict[str, tuple[object, Case]] = {}
+def exact_distance(field: DistanceField) -> None:
+    """Jump flooding held to the exact distance: every pixel's distance to the nearest mask pixel, by brute force."""
+    y, x = np.mgrid[0:SIZE, 0:SIZE].astype(np.float32) / (SIZE - 1)
+    mask = (np.hypot(x - 0.5, y - 0.5) < 0.3)                         # the 'hard' input, as `inputs` makes it
+    seeds = np.argwhere(mask).astype(np.float32)
+    pixels = np.indices((SIZE, SIZE)).reshape(2, -1).T.astype(np.float32)
+    exact = np.sqrt(((pixels[:, None, :] - seeds[None, :, :]) ** 2).sum(-1).min(1)).reshape(SIZE, SIZE)
+    measured = field.texture.read_to_numpy()
+    assert measured is not None
+    measured = np.asarray(measured, dtype=np.float32).reshape(SIZE, SIZE, -1)[..., 0]
+    error = np.abs(measured - exact)
+    print(f'{"distance_field exact":24s} {"ok" if error.max() <= 1.0 else "DIFFERS"}  max {error.max():.3f} px, '
+          f'{(error > 1e-3).mean() * 100:.2f}% of pixels off')
 
-    def add(name: str, shader: object, draw: Case) -> None:
-        c[name] = (shader, draw)
+
+def cases() -> dict[str, tuple[object, Case | None, Case | None]]:
+    """Each case: the shader it allocates (None for one that is not a shader), its draw, and what it draws into its
+    own targets before (an effect over a chain of passes)."""
+    s = shaders
+    c: dict[str, tuple[object, Case | None, Case | None]] = {}
+
+    def add(name: str, shader: object, draw: Case | None, prepare: Case | None = None) -> None:
+        c[name] = (shader, draw, prepare)
 
     # The texture's draws, through the context's Blit (no shader of their own to allocate)
     add('blit', None, lambda t: t['gradient'].draw())
@@ -259,6 +275,51 @@ def cases() -> dict[str, tuple[object, Case]]:
     quarter_turn = Quad(Point2f(1.0, 0.0), Point2f(1.0, 1.0), Point2f(0.0, 1.0), Point2f(0.0, 0.0))
     add('quarter_turn', None, lambda t: t['gradient'].draw(src=quarter_turn))
 
+    # The standard shaders the GL plan's line R adds
+    tone_map = s.ToneMap()
+    for operator in s.ToneMapOperator:
+        add(f'tone_map_{operator.name.lower()}', tone_map, lambda t, o=operator: tone_map.use(t['gradient'], o, 3.0))
+    levels = s.Levels()
+    add('levels', levels, lambda t: levels.use(t['gradient'], 0.1, 0.8, 1.4, 0.05, 0.95))
+    color_matrix = s.ColorMatrix()
+    add('color_matrix', color_matrix, lambda t: color_matrix.use(t['gradient'], s.saturation_matrix(0.3)))
+    posterize = s.Posterize()
+    add('posterize', posterize, lambda t: posterize.use(t['gradient'], 4))
+    dither = s.Dither()
+    for pattern in s.DitherPattern:
+        add(f'dither_{pattern.name.lower()}', dither, lambda t, p=pattern: dither.use(t['gradient'], 3, p))
+    vignette = s.Vignette()
+    add('vignette', vignette, lambda t: vignette.use(t['gradient'], 0.8, 0.4, 0.5))
+    mosaic = s.Mosaic()
+    add('mosaic', mosaic, lambda t: mosaic.use(t['gradient'], 16.0))
+    displace = s.Displace()
+    add('displace', displace, lambda t: displace.use(t['second'], t['gradient'], 0.05))
+    median = s.Median()
+    add('median', median, lambda t: median.use(t['second']))
+    bilateral = s.Bilateral()
+    add('bilateral', bilateral, lambda t: bilateral.use(t['second'], 3, 2.0, 0.1))
+    chroma_key = s.ChromaKey()
+    add('chroma_key', chroma_key, lambda t: chroma_key.use(t['second'], Color(1.0, 0.75, 0.0), 0.1, 0.1))
+    luma_key = s.LumaKey()
+    add('luma_key', luma_key, lambda t: luma_key.use(t['gradient'], 0.4, 0.2))
+    dual = s.DualFilter()
+    add('dual_filter_down', dual, lambda t: dual.down(t['second']))
+    add('dual_filter_up', dual, lambda t: dual.up(t['second']))
+
+    bloom = Bloom(3)
+    def bloom_process(t: dict[str, Texture]) -> None:
+        if not bloom.allocated:
+            bloom.allocate(SIZE, SIZE)
+        bloom.process(t['second'], 0.5)
+    add('bloom', None, lambda t: bloom.texture.draw(), bloom_process)
+    field = DistanceField()
+    def field_process(t: dict[str, Texture]) -> None:
+        if not field.allocated:
+            field.allocate(SIZE, SIZE)
+        field.process(t['hard'])
+        exact_distance(field)
+    add('distance_field', None, lambda t: field.texture.draw(), field_process)
+
     add('depth_align', DepthAlign(), None)          # a compute shader: compiled only
     return c
 
@@ -273,7 +334,7 @@ def run(reference: bool) -> int:
         target.allocate(SIZE, SIZE, GL_RGBA8)
         table = cases()
         allocated: set[int] = set()
-        for name, (shader, draw) in table.items():
+        for name, (shader, draw, prepare) in table.items():
             if shader is not None and id(shader) not in allocated:
                 if isinstance(shader, shaders.Lut):
                     shader.allocate()
@@ -287,6 +348,8 @@ def run(reference: bool) -> int:
                 if not ok:
                     failed.append(name)
                 continue
+            if prepare is not None:
+                prepare(source)
             target.begin()
             glViewport(0, 0, SIZE, SIZE)
             Style.push_style()
