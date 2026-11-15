@@ -23,12 +23,12 @@ class DensityColorize(Shader):
         # Bind density texture
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, density.tex_id)
-        glUniform1i(self.get_uniform_loc("uDensity"), 0)
+        glUniform1i(self.get_uniform_loc("density"), 0)
 
         # Set color uniforms (pad to 4 if fewer provided)
         padded_colors = list(colors) + [(0.0, 0.0, 0.0, 0.0)] * (4 - len(colors))
         for i, color in enumerate(padded_colors[:4]):
-            glUniform4f(self.get_uniform_loc(f"uColors[{i}]"), *color)
+            glUniform4f(self.get_uniform_loc(f"colors[{i}]"), *color)
 
         # Draw fullscreen quad
         draw_quad()

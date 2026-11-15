@@ -2,10 +2,10 @@
 
 #include "position.glsl"
 
-uniform float line_width = 0.01;
-uniform float line_smooth = 0.01;
-uniform float aspect_ratio = 1.0;
-uniform vec4 line_color = vec4(-1.0, -1.0, -1.0, -1.0);
+uniform float lineWidth = 0.01;
+uniform float lineSmooth = 0.01;
+uniform float aspectRatio = 1.0;
+uniform vec4 lineColor = vec4(-1.0, -1.0, -1.0, -1.0);
 uniform vec4 points[17];        // x, y in 0..1 of the rect, origin top-left; score; found
 
 const int NUM_SEGMENTS = 16;
@@ -44,18 +44,18 @@ void processSegment(int idx_a, int idx_b, vec2 pos, inout vec3 colorAccum, inout
 
     if (pa.w < 0.5 || pb.w < 0.5) return;
 
-    vec2 a = vec2(pa.x * aspect_ratio, pa.y);
-    vec2 b = vec2(pb.x * aspect_ratio, pb.y);
+    vec2 a = vec2(pa.x * aspectRatio, pa.y);
+    vec2 b = vec2(pb.x * aspectRatio, pb.y);
 
     float t;
     float dist = distanceToSegment(pos, a, b, t);
-    float alpha = 1.0 - smoothstep(line_width - line_smooth, line_width + line_smooth, dist);
+    float alpha = 1.0 - smoothstep(lineWidth - lineSmooth, lineWidth + lineSmooth, dist);
     alpha *= mix(pa.z, pb.z, t) * 0.5 + 0.5;
 
     vec3 color = mix(joint_colors[idx_a], joint_colors[idx_b], t);
-    if (line_color.a >= 0.0) {
-        color = line_color.rgb;
-        alpha *= line_color.a;
+    if (lineColor.a >= 0.0) {
+        color = lineColor.rgb;
+        alpha *= lineColor.a;
     }
 
     colorAccum += color * alpha;
@@ -63,7 +63,7 @@ void processSegment(int idx_a, int idx_b, vec2 pos, inout vec3 colorAccum, inout
 }
 
 void main() {
-    vec2 pos = topLeft(texCoord) * vec2(aspect_ratio, 1.0);
+    vec2 pos = topLeft(texCoord) * vec2(aspectRatio, 1.0);
     vec3 colorAccum = vec3(0.0);
     float alphaAccum = 0.0;
 

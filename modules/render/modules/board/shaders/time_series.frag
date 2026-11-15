@@ -4,30 +4,30 @@
 // One lane per series, newest on the right: each column holds the lowest and highest sample of its
 // slice of time, normalized to the lane, so a band covers what happened and a spike stays visible
 
-uniform sampler2D   tex0;           // RG: lowest, highest per column (x) and lane (y); negative = no sample
-uniform int         num_lanes;
-uniform int         num_columns;
-uniform float       line_width;     // in lane heights
+uniform sampler2D   ranges;           // RG: lowest, highest per column (x) and lane (y); negative = no sample
+uniform int         numLanes;
+uniform int         numColumns;
+uniform float       lineWidth;     // in lane heights
 uniform vec4        colors[8];
 
 in vec2     texCoord;
 out vec4    fragColor;
 
 vec2 column_range(int column, float texture_v) {
-    return texture(tex0, vec2((float(column) + 0.5) / float(num_columns), texture_v)).rg;
+    return texture(ranges, vec2((float(column) + 0.5) / float(numColumns), texture_v)).rg;
 }
 
 void main() {
     // Top of the screen is 0, as in the window shader
     float flipped_y = 1.0 - texCoord.y;
-    float lanes = flipped_y * float(num_lanes);
-    int lane = clamp(int(floor(lanes)), 0, num_lanes - 1);
+    float lanes = flipped_y * float(numLanes);
+    int lane = clamp(int(floor(lanes)), 0, numLanes - 1);
     float height = 1.0 - fract(lanes);                 // 0 at the bottom of the lane, 1 at its top
     vec4 color = colors[lane % 8];
 
     // The first lane is the texture's top row, as the window shader reads it
-    float texture_v = (float(num_lanes - lane) - 0.5) / float(num_lanes);
-    int column = clamp(int(texCoord.x * float(num_columns)), 0, num_columns - 1);
+    float texture_v = (float(numLanes - lane) - 0.5) / float(numLanes);
+    int column = clamp(int(texCoord.x * float(numColumns)), 0, numColumns - 1);
     vec2 range = column_range(column, texture_v);
 
     // Join to the column on the left, so a line has no gaps between columns
@@ -37,11 +37,11 @@ void main() {
     }
 
     float lane_edge = fract(lanes);
-    if (lane_edge < line_width * 0.5) {
+    if (lane_edge < lineWidth * 0.5) {
         fragColor = vec4(0.35, 0.35, 0.35, 1.0);        // separator between lanes
         return;
     }
-    if (range.x >= 0.0 && height >= range.x - line_width && height <= range.y + line_width) {
+    if (range.x >= 0.0 && height >= range.x - lineWidth && height <= range.y + lineWidth) {
         fragColor = color;
         return;
     }

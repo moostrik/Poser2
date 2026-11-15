@@ -1,6 +1,6 @@
 #version 460 core
 
-uniform sampler2D tex;
+uniform sampler2D src;
 // Color correction
 uniform float exposure;
 uniform float gamma;
@@ -17,8 +17,8 @@ out vec4 fragColor;
 #include "color.glsl"
 
 void main() {
-    vec4 color = texture(tex, texCoord);
-    vec2 texelSize = 1.0 / vec2(textureSize(tex, 0));
+    vec4 color = texture(src, texCoord);
+    vec2 texelSize = 1.0 / vec2(textureSize(src, 0));
 
     // Check if we're in a dark area - if so, blur first (only with the bands, levels > 0)
     float lum = luminance(color.rgb);
@@ -33,7 +33,7 @@ void main() {
         for (int y = -1; y <= 1; y++) {
             for (int x = -1; x <= 1; x++) {
                 vec2 offset_uv = texCoord + vec2(x, y) * texelSize * 2.0;
-                blurred += texture(tex, offset_uv).rgb * weights[idx];
+                blurred += texture(src, offset_uv).rgb * weights[idx];
                 idx++;
             }
         }

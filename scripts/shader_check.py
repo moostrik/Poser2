@@ -34,6 +34,8 @@ from modules.gl.shaders.filter import KERNEL_SIGMA  # noqa: E402
 from modules.pose import PointLandmark, Points2D  # noqa: E402
 from modules.inference.shaders import DepthAlign  # noqa: E402
 from modules.render import PosePointLines  # noqa: E402
+from modules.render.modules.board.shaders import TimeSeries  # noqa: E402
+from modules.render.modules.pose.shaders import AddMix, Feature, LayerComposite, Window  # noqa: E402
 from modules.render.modules.flow.shaders import DensityColorize, DepthView  # noqa: E402
 from modules.render.modules.inference.shaders import CelShade  # noqa: E402
 from modules.utils import Color, Point2f, Quad, Rect  # noqa: E402
@@ -109,6 +111,18 @@ def pose() -> Points2D:
 
 
 Case = Callable[[dict[str, Texture]], None]
+
+
+class HarnessFeature:
+    """A feature of eight known values and scores, as `Feature` reads one."""
+    values: np.ndarray = np.linspace(-0.8, 0.9, 8).astype(np.float32)
+    scores: np.ndarray = np.linspace(0.2, 1.0, 8).astype(np.float32)
+
+    def __len__(self) -> int:
+        return len(self.values)
+
+    def display_range(self) -> tuple[float, float]:
+        return (-1.0, 1.0)
 
 
 def exact_distance(field: DistanceField) -> None:
@@ -305,6 +319,20 @@ def cases() -> dict[str, tuple[object, Case | None, Case | None]]:
     dual = s.DualFilter()
     add('dual_filter_down', dual, lambda t: dual.down(t['second']))
     add('dual_filter_up', dual, lambda t: dual.up(t['second']))
+
+    # The render's shaders the GL plan's line S renames inputs of (references before)
+    lanes = TimeSeries()
+    colors = [(1.0, 0.45, 0.1, 1.0), (0.1, 0.5, 1.0, 1.0), (0.4, 1.0, 0.5, 1.0)]
+    add('time_series', lanes, lambda t: lanes.use(t['gradient'], 3, 64, 0.04, colors))
+    window = Window()
+    add('feature_window', window, lambda t: window.use(t['gradient'], 128, 4, 0.25, 0.01, 0.005, 1.0, (0.0, 1.0), colors))
+    feature = Feature()
+    sample = HarnessFeature()
+    add('feature', feature, lambda t: feature.use(sample, colors, 0.02, 0.01, True))
+    add_mix = AddMix()
+    add('add_mix', add_mix, lambda t: add_mix.use(t['gradient'], t['second'], 0.6))
+    composite = LayerComposite()
+    add('layer_composite', composite, lambda t: composite.use([t['gradient'], t['second'], t['soft']], [1.0, 0.6, 0.4], 1.0))
 
     blend = s.Blend()       # O4: every mode of blend_modes.glsl, the gradient over the checker
     for mode in s.BlendShaderMode:

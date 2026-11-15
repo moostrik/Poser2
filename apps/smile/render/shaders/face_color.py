@@ -15,13 +15,13 @@ Field = tuple[float, float, float, float, float]    # x, y, w, h, distance from 
 
 
 class FaceColor(Shader):
-    def use(self, tex0: Texture, width: int, height: int, fields: Sequence[Field], effect: int, amount: float,
+    def use(self, src: Texture, width: int, height: int, fields: Sequence[Field], effect: int, amount: float,
             rect: Field, charge: float, fill: int, color: tuple[float, float, float, float], blurred: Texture | None = None,
             mosaic: float = 1.0) -> None:
-        """Draw tex0 in black and white into a width x height buffer.
+        """Draw src in black and white into a width x height buffer.
 
         fields: the faces' boxes with their distance from good, shown by `effect` (index in FaceEffect)
-        at strength `amount`; `blurred` is a blurred tex0 for the blur effect.
+        at strength `amount`; `blurred` is a blurred src for the blur effect.
         rect: the chosen face's box, turned to color by `charge` (0..1) as `fill` (index in FaceFill)
         says; `color` is the traced outline's. A rect of width or height 0 is no rect.
         Boxes are normalised 0..1, top left origin (as StrokeRect).
@@ -30,30 +30,30 @@ class FaceColor(Shader):
         if not self.allocated or not self.shader_program:
             logger.warning("FaceColor shader not allocated or shader program missing.")
             return
-        if not tex0.allocated:
+        if not src.allocated:
             return
 
         fields = fields[:MAX_FIELDS]
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, blurred.tex_id if blurred is not None and blurred.allocated else tex0.tex_id)
-        glUniform1i(self.get_uniform_loc("tex_blur"), 1)
+        glBindTexture(GL_TEXTURE_2D, blurred.tex_id if blurred is not None and blurred.allocated else src.tex_id)
+        glUniform1i(self.get_uniform_loc("blurred"), 1)
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glBindTexture(GL_TEXTURE_2D, src.tex_id)
+        glUniform1i(self.get_uniform_loc("src"), 0)
         glUniform2f(self.get_uniform_loc("resolution"), float(width), float(height))
 
         if fields:
             glUniform4fv(self.get_uniform_loc("fields"), len(fields), [value for field in fields for value in field[:4]])
-            glUniform1fv(self.get_uniform_loc("field_far"), len(fields), [field[4] for field in fields])
-        glUniform1i(self.get_uniform_loc("field_count"), len(fields))
+            glUniform1fv(self.get_uniform_loc("fieldFar"), len(fields), [field[4] for field in fields])
+        glUniform1i(self.get_uniform_loc("fieldCount"), len(fields))
         glUniform1i(self.get_uniform_loc("effect"), effect)
         glUniform1f(self.get_uniform_loc("amount"), amount)
 
         glUniform4f(self.get_uniform_loc("rect"), *rect[:4])
-        glUniform1f(self.get_uniform_loc("rect_far"), rect[4])
+        glUniform1f(self.get_uniform_loc("rectFar"), rect[4])
         glUniform1f(self.get_uniform_loc("charge"), charge)
         glUniform1i(self.get_uniform_loc("fill"), fill)
-        glUniform4f(self.get_uniform_loc("face_color"), *color)
+        glUniform4f(self.get_uniform_loc("faceColor"), *color)
         glUniform1f(self.get_uniform_loc("mosaic"), mosaic)
         draw_quad()

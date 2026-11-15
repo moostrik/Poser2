@@ -25,13 +25,13 @@ class LayerComposite(Shader):
             glActiveTexture(int(GL_TEXTURE0) + i)
             if i < len(textures):
                 glBindTexture(GL_TEXTURE_2D, textures[i].tex_id)
-            glUniform1i(self.get_uniform_loc(f"uTex{i}"), i)
+            glUniform1i(self.get_uniform_loc(f"layers[{i}]"), i)
 
         # Weights
         for i in range(3):
             w = weights[i] if i < len(weights) else 0.0
-            glUniform1f(self.get_uniform_loc(f"uWeights[{i}]"), w)
+            glUniform1f(self.get_uniform_loc(f"weights[{i}]"), w)
 
-        glUniform1f(self.get_uniform_loc("uLayered"), layered)
+        glUniform1f(self.get_uniform_loc("layered"), layered)
 
         draw_quad()

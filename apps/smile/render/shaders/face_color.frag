@@ -17,21 +17,21 @@ const int IRIS = 2;
 const int TRACE = 3;
 const int SCAN = 4;
 
-uniform sampler2D tex0;
-uniform sampler2D tex_blur;         // a blurred tex0, for the blur effect
+uniform sampler2D src;
+uniform sampler2D blurred;         // a blurred src, for the blur effect
 uniform vec2 resolution;            // of the output, in pixels
 
 uniform vec4 fields[MAX_FIELDS];    // the boxes of the detected faces: x, y, width, height (normalized, top-left origin, Y-down)
-uniform float field_far[MAX_FIELDS];    // each face's distance from good: 0 good .. 1 far
-uniform int field_count;
+uniform float fieldFar[MAX_FIELDS];    // each face's distance from good: 0 good .. 1 far
+uniform int fieldCount;
 uniform int effect;
 uniform float amount;               // strength of the effect at distance 1
 
 uniform vec4 rect;                  // the chosen face's box, as a field
-uniform float rect_far;             // its distance from good
+uniform float rectFar;             // its distance from good
 uniform float charge;               // 0..1 toward the flash
 uniform int fill;
-uniform vec4 face_color;            // of the traced outline
+uniform vec4 faceColor;            // of the traced outline
 uniform float mosaic;               // pixels: block size of the whole image (the warm-up); 1 or less is none
 
 in vec2 texCoord;
@@ -57,16 +57,16 @@ void main() {
     float in_rect = inside(rect, p);
 
     // how far from good the face of this pixel is: the worst of the boxes it lies in
-    float far = in_rect * rect_far;
-    for (int i = 0; i < min(field_count, MAX_FIELDS); i++) {
-        far = max(far, inside(fields[i], p) * field_far[i]);
+    float far = in_rect * rectFar;
+    for (int i = 0; i < min(fieldCount, MAX_FIELDS); i++) {
+        far = max(far, inside(fields[i], p) * fieldFar[i]);
     }
 
     vec2 coord = texCoord;
     if (mosaic > 1.0) {
         coord = (floor(texCoord * resolution / mosaic) + 0.5) * mosaic / resolution;
     }
-    vec4 color = texture(tex0, coord);
+    vec4 color = texture(src, coord);
     float gray = gray_of(color.rgb);
     if (effect == DARK) {
         gray *= mix(1.0, 1.0 - amount, far);
@@ -74,10 +74,10 @@ void main() {
         float block = mix(1.0, max(amount * MAX_BLOCK, 1.0), far);
         if (block > 1.0) {
             vec2 uv = (floor(texCoord * resolution / block) + 0.5) * block / resolution;
-            gray = gray_of(texture(tex0, uv).rgb);
+            gray = gray_of(texture(src, uv).rgb);
         }
     } else if (effect == BLUR) {
-        gray = mix(gray, gray_of(texture(tex_blur, texCoord).rgb), far);
+        gray = mix(gray, gray_of(texture(blurred, texCoord).rgb), far);
     } else if (effect == FOG) {
         gray = mix(gray, 0.5, far * amount);
     }
@@ -121,7 +121,7 @@ void main() {
             along = size.x * 1.5 + size.y + (size.y - q.y);
         }
         float traced = step(nearest, TRACE_PX) * step(along / (2.0 * (size.x + size.y)), charge) * step(0.001, charge);
-        result = mix(result, face_color.rgb, traced * face_color.a);
+        result = mix(result, faceColor.rgb, traced * faceColor.a);
     }
 
     fragColor = vec4(result, color.a);

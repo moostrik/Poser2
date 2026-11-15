@@ -13,12 +13,12 @@ class AddMix(Shader):
 
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, base.tex_id)
-        glUniform1i(self.get_uniform_loc("uTex0"), 0)
+        glUniform1i(self.get_uniform_loc("dst"), 0)
 
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, foreground.tex_id)
-        glUniform1i(self.get_uniform_loc("uTex1"), 1)
+        glUniform1i(self.get_uniform_loc("src"), 1)
 
-        glUniform1f(self.get_uniform_loc("uBlend"), blend)
+        glUniform1f(self.get_uniform_loc("blend"), blend)
 
         draw_quad()

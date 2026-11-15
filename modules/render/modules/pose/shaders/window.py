@@ -62,17 +62,17 @@ class Window(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
 
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
-        glUniform1i(self.get_uniform_loc("num_streams"), num_streams)
-        glUniform1f(self.get_uniform_loc("stream_step"), stream_step)
-        glUniform1f(self.get_uniform_loc("line_width"), line_width)
-        glUniform1f(self.get_uniform_loc("line_smooth"), line_smooth)
-        glUniform1f(self.get_uniform_loc("output_aspect_ratio"), output_aspect_ratio)
-        glUniform2f(self.get_uniform_loc("display_range"), display_range[0], display_range[1])
+        glUniform1i(self.get_uniform_loc("src"), 0)
+        glUniform1i(self.get_uniform_loc("numStreams"), num_streams)
+        glUniform1f(self.get_uniform_loc("streamStep"), stream_step)
+        glUniform1f(self.get_uniform_loc("lineWidth"), line_width)
+        glUniform1f(self.get_uniform_loc("lineSmooth"), line_smooth)
+        glUniform1f(self.get_uniform_loc("outputAspectRatio"), output_aspect_ratio)
+        glUniform2f(self.get_uniform_loc("displayRange"), display_range[0], display_range[1])
 
         # Upload colors array
         colors_array = np.array(colors, dtype=np.float32).flatten()
         glUniform4fv(self.get_uniform_loc("colors"), len(colors), colors_array)
-        glUniform1i(self.get_uniform_loc("num_colors"), len(colors))
+        glUniform1i(self.get_uniform_loc("numColors"), len(colors))
 
         draw_quad()

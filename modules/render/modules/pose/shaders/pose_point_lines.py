@@ -34,13 +34,13 @@ class PosePointLines(Shader):
 
         # Configure shader uniforms
         glUniform4f(self.get_uniform_loc("rect"), *rect)
-        glUniform1f(self.get_uniform_loc("aspect_ratio"), aspect_ratio)
-        glUniform1f(self.get_uniform_loc("line_width"), line_width)
-        glUniform1f(self.get_uniform_loc("line_smooth"), line_smooth)
+        glUniform1f(self.get_uniform_loc("aspectRatio"), aspect_ratio)
+        glUniform1f(self.get_uniform_loc("lineWidth"), line_width)
+        glUniform1f(self.get_uniform_loc("lineSmooth"), line_smooth)
         if color is not None:
-            glUniform4f(self.get_uniform_loc("line_color"), *color)
+            glUniform4f(self.get_uniform_loc("lineColor"), *color)
         else:
-            glUniform4f(self.get_uniform_loc("line_color"), -1.0, -1.0, -1.0, -1.0)
+            glUniform4f(self.get_uniform_loc("lineColor"), -1.0, -1.0, -1.0, -1.0)
         glUniform4fv(self.get_uniform_loc("points"), n_points, packed_data.flatten())
 
         # Render

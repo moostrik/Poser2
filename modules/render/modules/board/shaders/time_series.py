@@ -32,10 +32,10 @@ class TimeSeries(Shader):
         glBindTexture(GL_TEXTURE_2D, ranges.tex_id)
 
         padded: list[float] = [component for color in (colors * 8)[:8] for component in color]
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
-        glUniform1i(self.get_uniform_loc("num_lanes"), num_lanes)
-        glUniform1i(self.get_uniform_loc("num_columns"), num_columns)
-        glUniform1f(self.get_uniform_loc("line_width"), line_width)
+        glUniform1i(self.get_uniform_loc("ranges"), 0)
+        glUniform1i(self.get_uniform_loc("numLanes"), num_lanes)
+        glUniform1i(self.get_uniform_loc("numColumns"), num_columns)
+        glUniform1f(self.get_uniform_loc("lineWidth"), line_width)
         glUniform4fv(self.get_uniform_loc("colors"), 8, padded)
 
         draw_quad()
