@@ -82,14 +82,13 @@ class ViewPoseLayer(LayerBase):
         anchor_color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
 
         # Candidate snap-point dots: shoulder / hip / feet midpoints, computed from
-        # the transformed pose points (same space as the skeleton). PosePointLines
-        # flips Y internally, so pre-flip here to match (DrawCircles takes GL coords).
+        # the transformed pose points (same space as the skeleton).
         mids = [
             landmark_midpoint(transformed_points, PointLandmark.left_shoulder, PointLandmark.right_shoulder),
             landmark_midpoint(transformed_points, PointLandmark.left_hip, PointLandmark.right_hip),
             landmark_midpoint(transformed_points, PointLandmark.left_ankle, PointLandmark.right_ankle),
         ]
-        positions = [(m.x, 1.0 - m.y) for m in mids if m is not None]
+        positions = [(m.x, m.y) for m in mids if m is not None]
 
         aspect_ratio = self._fbo.width / self._fbo.height if self._fbo.height > 0 else 1.0
 

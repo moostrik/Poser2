@@ -259,7 +259,7 @@ class FlowUtil:
             dst_fbo: Destination SwapFbo (will be swapped)
             src_texture: Source texture (stretched to fill region)
             x: X position in UV coordinates [0, 1]
-            y: Y position in UV coordinates [0, 1]
+            y: Y position in UV coordinates [0, 1], origin top-left
             w: Width in UV coordinates
             h: Height in UV coordinates
             strength: Multiplier for source texture
@@ -286,7 +286,7 @@ class FlowUtil:
             src_texture: Source texture (uses R channel)
             channel: Target channel (0=R, 1=G, 2=B, 3=A)
             x: X position in UV coordinates [0, 1]
-            y: Y position in UV coordinates [0, 1]
+            y: Y position in UV coordinates [0, 1], origin top-left
             w: Width in UV coordinates
             h: Height in UV coordinates
             strength: Multiplier for source value
@@ -312,7 +312,7 @@ class FlowUtil:
             dst_fbo: Destination SwapFbo (will be swapped)
             src_texture: Source texture to add (stretched to fill region)
             x: X position in UV coordinates [0, 1]
-            y: Y position in UV coordinates [0, 1]
+            y: Y position in UV coordinates [0, 1], origin top-left
             w: Width in UV coordinates
             h: Height in UV coordinates
             strength: Multiplier for source texture
@@ -339,7 +339,7 @@ class FlowUtil:
             src_texture: Source texture (uses R channel)
             channel: Target channel (0=R, 1=G, 2=B, 3=A)
             x: X position in UV coordinates [0, 1]
-            y: Y position in UV coordinates [0, 1]
+            y: Y position in UV coordinates [0, 1], origin top-left
             w: Width in UV coordinates
             h: Height in UV coordinates
             strength: Multiplier for the addition

@@ -24,7 +24,7 @@ class ChannelSetRegion(Shader):
             src: Source texture (R channel used)
             channel: Target channel (0=R, 1=G, 2=B, 3=A)
             x: Region X position in UV coordinates [0, 1]
-            y: Region Y position in UV coordinates [0, 1]
+            y: Region Y position in UV coordinates [0, 1], origin top-left
             w: Region width in UV coordinates
             h: Region height in UV coordinates
             strength: Multiplier for source value

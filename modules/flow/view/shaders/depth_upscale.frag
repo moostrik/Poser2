@@ -8,13 +8,15 @@
 //              `near` to `far`) where the mask is, anything else (none included) where it is not; else the nearest
 //              depth pixel on that side within `reach`, else SURFACE's.
 
+#include "position.glsl"
+
 const int SURFACE = 0;
 const int MASK = 1;
 const int MAX_REACH = 9;        // MASK: the most depth pixels it looks, each way (`guided_radius` at most 8, + 0.5)
 
 uniform sampler2D depth;        // metres on the camera image, 0 for none
 uniform sampler2D mask;         // MASK: the player's mask in the view (red, 0 to 1)
-uniform vec4 roi;               // the view's window on the depth, x, y, width, height in texture coordinates
+uniform vec4 roi;               // the view's window on the depth, x, y, width, height in 0..1, origin top-left
 uniform float tolerance;
 uniform int mode;
 uniform float near;             // MASK: the player's depth range (m)
@@ -65,7 +67,7 @@ float mask_side(float metres, vec2 p, ivec2 size) {
 
 void main() {
     ivec2 size = textureSize(depth, 0);
-    vec2 uv = roi.xy + texCoord * roi.zw;
+    vec2 uv = topLeft(roi.xy + topLeft(texCoord) * roi.zw);
     vec2 p = uv * vec2(size) - 0.5;
     vec2 corner = floor(p);
     vec2 f = p - corner;

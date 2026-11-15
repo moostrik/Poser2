@@ -250,7 +250,8 @@ class Shader():
     @staticmethod
     def read_shader_source(filename: str, _included: frozenset[str] = frozenset()) -> str:
         """Read shader source code from file; a line `#include "name.glsl"` is replaced by that file, beside
-        the including one, so passes can share one rule (each file included once per shader)."""
+        the including one or else in `modules/gl/shaders` (as `position.glsl`), so passes can share one rule (each
+        file included once per shader)."""
         try:
             with open(filename, 'r', encoding='utf-8') as file:
                 source = file.read()
@@ -265,6 +266,8 @@ class Shader():
             if stripped.startswith('#include "') and stripped.endswith('"'):
                 name: str = stripped[len('#include "'):-1]
                 path = str(folder / name)
+                if not Path(path).exists():
+                    path = str(Path(__file__).parent / "shaders" / name)
                 if path in _included:
                     continue
                 included = Shader.read_shader_source(path, _included | {path})

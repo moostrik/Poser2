@@ -23,7 +23,7 @@ class AddRegion(Shader):
             dst: Destination texture (passed through, added in region)
             src: Source texture (stretched to fill region)
             x: Region X position in UV coordinates [0, 1]
-            y: Region Y position in UV coordinates [0, 1]
+            y: Region Y position in UV coordinates [0, 1], origin top-left
             w: Region width in UV coordinates
             h: Region height in UV coordinates
             src_strength: Multiplier for source texture

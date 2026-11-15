@@ -202,9 +202,6 @@ class CenterGeometry(LayerBase):
         anchor_bot_img = hip_mid * bbox.size + bbox.position
         pin_img = pin_mid * bbox.size + bbox.position
 
-        # Convert pinned point to texture space (bottom-left origin)
-        pin_tex = CenterGeometry._image_to_texture_point(pin_img)
-
         # Calculate camera-space geometry. Guard against a degenerate size
         # which would otherwise divide by zero when scaling.
         target_distance: float = self.settings.target_size
@@ -219,22 +216,12 @@ class CenterGeometry(LayerBase):
         if not self.settings.torso_upright:
             cam_rotation_img = 0.0
 
-        # Store camera geometry (texture space)
-        self._cam_geometry = CamGeometry(
-            crop_roi=Rect(
-                cam_crop_roi_img.x,
-                CenterGeometry._image_to_texture_y(cam_crop_roi_img.y + cam_crop_roi_img.height),
-                cam_crop_roi_img.width,
-                cam_crop_roi_img.height
-            ),
-            rotation=CenterGeometry._image_to_texture_rotation(cam_rotation_img),
-            rotation_center=pin_tex
-        )
+        self._cam_geometry = CamGeometry(crop_roi=cam_crop_roi_img, rotation=cam_rotation_img, rotation_center=pin_img)
 
         # Calculate bbox-space geometry (aspect-corrected for mask)
         bbox_aspect = bbox.width * cam_aspect / bbox.height if bbox.height > 0 else 1.0
         mask_delta = hip_mid - shoulder_mid
-        mask_rotation = -math.atan2(mask_delta.x * bbox_aspect, mask_delta.y) if self.settings.torso_upright else 0.0
+        mask_rotation = math.atan2(mask_delta.x * bbox_aspect, mask_delta.y) if self.settings.torso_upright else 0.0
         mask_distance = math.hypot(mask_delta.x * bbox_aspect, mask_delta.y)
 
         mask_height = mask_distance / target_distance
@@ -244,12 +231,12 @@ class CenterGeometry(LayerBase):
         self._bbox_geometry = BboxGeometry(
             crop_roi=Rect(
                 x=pin_mid.x - mask_width * target.x,
-                y=1.0 - pin_mid.y - mask_height * (1.0 - target.y),
+                y=pin_mid.y - mask_height * target.y,
                 width=mask_width,
                 height=mask_height
             ),
             rotation=mask_rotation,
-            rotation_center=Point2f(pin_mid.x, 1.0 - pin_mid.y),
+            rotation_center=pin_mid,
             aspect=bbox_aspect
         )
 
@@ -269,11 +256,7 @@ class CenterGeometry(LayerBase):
         window: Rect = fixed_window(s.fixed_x, s.fixed_y, s.fixed_height, s.dst_aspectratio, cam_aspect)
         center: Point2f = Point2f(s.fixed_x, s.fixed_y)
 
-        self._cam_geometry = CamGeometry(
-            crop_roi=Rect(window.x, CenterGeometry._image_to_texture_y(window.y + window.height), window.width, window.height),
-            rotation=0.0,
-            rotation_center=CenterGeometry._image_to_texture_point(center)
-        )
+        self._cam_geometry = CamGeometry(crop_roi=window, rotation=0.0, rotation_center=center)
 
         if pose is None:
             self._transformed_points = None
@@ -286,9 +269,9 @@ class CenterGeometry(LayerBase):
             width: float = window.width / bbox.width
             height: float = window.height / bbox.height
             self._bbox_geometry = BboxGeometry(
-                crop_roi=Rect(x, 1.0 - y - height, width, height),
+                crop_roi=Rect(x, y, width, height),
                 rotation=0.0,
-                rotation_center=Point2f(x + width / 2.0, 1.0 - y - height / 2.0),
+                rotation_center=Point2f(x + width / 2.0, y + height / 2.0),
                 aspect=bbox.width * cam_aspect / bbox.height
             )
         self._transformed_points = CenterGeometry._transform_points(pose[Points2D], bbox, center, cam_aspect, 0.0, window)
@@ -332,21 +315,6 @@ class CenterGeometry(LayerBase):
         )
 
         return rotation, distance, roi
-
-    @staticmethod
-    def _image_to_texture_y(y: float) -> float:
-        """Convert Y coordinate from image space (top-left) to texture space (bottom-left)."""
-        return 1.0 - y
-
-    @staticmethod
-    def _image_to_texture_point(point: Point2f) -> Point2f:
-        """Convert point from image space to texture space."""
-        return Point2f(point.x, 1.0 - point.y)
-
-    @staticmethod
-    def _image_to_texture_rotation(rotation: float) -> float:
-        """Convert rotation from image space to texture space (negate)."""
-        return -rotation
 
     @staticmethod
     def _transform_points(points: Points2D, bbox: Rect, top: Point2f,

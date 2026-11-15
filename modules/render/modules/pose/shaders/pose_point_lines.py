@@ -11,10 +11,10 @@ class PosePointLines(Shader):
     def use(self, points: Points2D, line_width: float = 0.01, line_smooth: float = 0.01,
             color: tuple[float, float, float, float] | None = None, use_scores: bool = True,
             rect: tuple[float, float, float, float] = (0.0, 0.0, 1.0, 1.0), aspect_ratio: float = 1.0) -> None:
-        """Draw the skeleton into ``rect`` (normalised, origin bottom-left as GL's; the whole
-        target by default, exactly as without a rect), ``aspect_ratio`` the rect's width over
-        height in pixels so line widths are round; ``line_width`` and ``line_smooth`` are
-        fractions of the rect's height."""
+        """Draw the skeleton into ``rect`` (x, y, width, height in 0..1 of the target, origin
+        top-left; the whole target by default), its points in 0..1 of the rect, origin top-left;
+        ``aspect_ratio`` the rect's width over height in pixels so line widths are round;
+        ``line_width`` and ``line_smooth`` are fractions of the rect's height."""
         if not self.allocated or not self.shader_program:
             logger.warning("PosePointLines shader not allocated or shader program missing.")
             return
@@ -26,7 +26,6 @@ class PosePointLines(Shader):
         n_points: int = len(points.values)
         packed_data: np.ndarray = np.zeros((n_points, 4), dtype=np.float32)
         packed_data[:, 0:2] = np.nan_to_num(points.values, nan=-1.0)
-        packed_data[:, 1] = 1.0 - np.nan_to_num(points.values[:, 1], nan=-1.0)  # Flip Y
         packed_data[:, 2] = points.scores if use_scores else np.ones(n_points, dtype=np.float32)
         packed_data[:, 3] = (~np.isnan(points.values[:, 0])).astype(np.float32)
 

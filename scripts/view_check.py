@@ -31,7 +31,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_FLOAT, GL_NEAREST, GL_RED, GL_RGBA,
 import monitor_harness as mh  # noqa: E402
 from modules.camera import CameraFrame, FrameType  # noqa: E402
 from modules.recording import read_metadata  # noqa: E402
-from modules.flow import DepthRead, DepthVelocitySettings, edge_aware_depth, mask_sided_depth, texture_roi  # noqa: E402
+from modules.flow import DepthRead, DepthVelocitySettings, edge_aware_depth, mask_sided_depth  # noqa: E402
 from modules.gl import Style, Tensor, Texture  # noqa: E402
 from modules.inference import GpuDepth, GpuImage, SerialUploader, SerialUploaderSettings  # noqa: E402
 from modules.render import ViewInput, ViewLayer, ViewLayerSettings  # noqa: E402
@@ -71,7 +71,7 @@ def time_view(view: ViewLayer, image: Texture, depth: Texture) -> None:
     """Each of the view's passes on the last capture, the median of 40 runs (ms), as `ViewLayer._update` runs them;
     then the whole view made again, and with MASK's second read."""
     s = view.settings
-    roi = texture_roi(view._window)
+    roi = view._window
 
     def image_pass() -> None:
         view._image.begin()

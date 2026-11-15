@@ -153,7 +153,8 @@ class Legend:
         top: float = h - MARGIN - 4 - below                         # from the bottom, room for the name boxes' padding
         bottom: float = top - bars * KEY_BAR - (bars - 1) * KEY_GAP
         self._key.reload()
-        self._key.use((x0, bottom, x1, top), channel, channels, KEY_BAR, KEY_GAP)
+        self._key.use((x0 / w, (h - top) / h, (x1 - x0) / w, (top - bottom) / h), channel, channels, KEY_BAR / h,
+                      KEY_GAP / h)
         if not self._text.allocated:
             return
         Style.set_blend_mode(Style.BlendMode.ALPHA)

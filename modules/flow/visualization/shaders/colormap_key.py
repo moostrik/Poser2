@@ -14,11 +14,11 @@ class ColormapKey(Shader):
         """Draw the key.
 
         Args:
-            box: x0, y0, x1, y1 in pixels from the bottom left
+            box: x, y, width, height in 0..1 of the target, origin top-left
             channel: 0 to 3 for that channel's bar, 4 for each of x, y and z the texture holds
             channels: The channels the texture holds, x first, 1 to 4
-            bar_height: A bar's height in pixels
-            bar_gap: The gap between bars in pixels
+            bar_height: A bar's height in 0..1 of the target's height
+            bar_gap: The gap between bars in 0..1 of the target's height
         """
         if not self.allocated or not self.shader_program:
             return

@@ -1,8 +1,7 @@
 """The view's window on the camera image, as plain geometry.
 
 The window is uv on the camera image with rows down (`Rect`, x and y its top left corner), as the image and the
-aligned depth are both on the image's view. `texture_roi` gives it with rows up, as `DrawRoi` and the shaders
-read a texture.
+aligned depth are both on the image's view, and as `DrawRoi` and `DepthUpscale` take it.
 """
 
 import math
@@ -17,11 +16,6 @@ def fixed_window(center_x: float, center_y: float, height: float, output_aspect:
     image's height tall, `output_aspect` wide over tall in pixels; `cam_aspect` is the image's width over its height."""
     width: float = height * output_aspect / cam_aspect
     return Rect(center_x - width / 2.0, center_y - height / 2.0, width, height)
-
-
-def texture_roi(window: Rect) -> Rect:
-    """The window with rows up, as a texture is read (`DrawRoi`'s roi)."""
-    return Rect(window.x, 1.0 - window.y - window.height, window.width, window.height)
 
 
 def view_span(window: Rect, fov: float) -> float:

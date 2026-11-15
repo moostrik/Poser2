@@ -3,82 +3,19 @@
 The GL held up to the rules (2026-11-15, the apps' plan F). Built: the shader check, smile's shaders out of the GL,
 one shaders folder, a texture that draws itself and `gl.Context` (described in [GL.md](GL.md)), time from
 `perf_counter`, `FPS` over a window in seconds, `Text` asking GL nothing, the shaders' names (G: inputs by role,
-camelCase uniforms, `DrawBox`, no dead code). Each step is built on Matthias's "go", which covers the harness runs
-the steps name. What the code shows is marked **(seen)**.
+camelCase uniforms, `DrawBox`, no dead code), the shaders' coordinates (H: every 2D position 0..1 from the top left,
+one conversion in `position.glsl`). Each step is built on Matthias's "go", which covers the harness runs the steps
+name. What the code shows is marked **(seen)**.
 
 The plan changes the GL's form, not what it draws: every app looks as it does now. The harness
-(`scripts/shader_check.py`) holds every gl shader, the texture's draws and the text to its reference within 1/255.
+(`scripts/shader_check.py`) holds every gl shader, the shaders outside the GL that take a position, the texture's
+draws and the text to its reference within 1/255.
 
 | Step                      | When                                     | Checked by                              |
 |---------------------------|------------------------------------------|-----------------------------------------|
-| H. Shader coordinates     | on Matthias's "go"                       | the harness, text's unit test, each app before and after |
-| I. Capture asks GL nothing | after H, on the same "go"               | a screen recording                      |
+| I. Capture asks GL nothing | on the "go" of 2026-11-15               | a screen recording                      |
 | J. Inputs by type         | after I, on the same "go"                | the harness, each app with `-sim`       |
 | K. Duplicate shaders      | decided together, once the rest is built | the harness, then Matthias's look       |
-
-## H. Shader coordinates
-
-Two kinds of shader, each in its textbook form:
-
-- A pass fills its whole target and places nothing (the blurs, the blends, every flow step): the quad in GL's own
-  −1..1, through `_generic.vert`, which stays as it is. Clip space fits a target of any size without a uniform or the
-  context's state, as post-processing chains have it.
-- A draw places something in the target: in 0..1 with the origin top-left, as our `Rect`, `texture.draw` and the
-  pose points have it, turned into GL's −1..1 by one fixed line from one shared include. No matrix and no size uniform:
-  the geometry is worked out on the CPU (poses, rectangles), and 0..1 holds for a target of any size, so a draw or an
-  FBO switch sets no state and makes no GL call for its coordinates. 0..1 counts in the viewport: smile's wall and
-  credits place by setting `glViewport` to a part of the target **(seen)**.
-
-Every shader that takes a position **(seen: their uniforms)**:
-
-| Package | Shader                                                    | Takes                        | Today                        |
-|---------|-----------------------------------------------------------|------------------------------|------------------------------|
-| gl      | `Blit`, `DrawColoredRectangle`, `DrawRectangleOutline`    | a rectangle, vertex stage    | 0..1 top-left                |
-| gl      | `DrawBox`, `Glyphs`                                       | a rectangle, vertex stage    | pixels                       |
-| gl      | `DrawCircles`                                             | points, fragment stage       | GL's −1..1                   |
-| gl      | `DrawRoi`                                                 | the part of the input it samples | 0..1 bottom-left         |
-| render  | `PosePointLines`                                          | points and a rectangle       | 0..1 top-left, flipped inside |
-| smile   | `FaceColor`                                               | the face's box               | 0..1 top-left                |
-| flow    | `SetRegion`, `AddRegion`, `ChannelSetRegion`, `ChannelAddRegion` | a region of the target | 0..1 bottom-left         |
-| flow    | `DepthUpscale`                                            | the part of the depth it samples (`roi`) | 0..1 bottom-left |
-| flow    | `ColormapKey`                                             | a box                        | pixels from the bottom left  |
-
-Afterwards each takes 0..1 top-left and none flips or converts on its own: today `ViewPoseLayer` flips its points
-before `DrawCircles` because "`PosePointLines` flips Y internally" and "`DrawCircles` takes GL coords" **(seen)**.
-`DrawRoi`'s and `DepthUpscale`'s `roi` is the part of the input they sample, as `texture.draw`'s `src`; their
-callers turn a top-left rectangle into bottom-left today, each on its own **(seen)**: `crop_layer` with
-`Rect.flip_y(0.5)`, hd_trio's `CenterGeometry` with `1.0 - y`, the view's `texture_roi`. Those turns go and the
-callers pass the top-left rectangle they already have. The four region shaders compare their region with the
-bottom-left `texCoord` **(seen)**; their only callers are `fluid_2d`'s set and add functions, which nothing calls
-today **(seen)**, so only the shaders change. `ColormapKey`'s box is laid out by the legend on the CPU in pixels
-**(seen)**; the legend turns it into 0..1 there, as `Text` does.
-
-The flow's volume views (`cube_axes`, `cube_edges`, `glyph_arrows`, `glyph_dots`) and its particles are 3D inside
-their own pass and take a `view_projection` of their own **(seen)**; they stay as they are.
-
-`Text` builds its glyph quads on the CPU in pixels and lays them out in the same method that draws them **(seen)**.
-The layout goes into a plain module beside it, which turns a string into glyph quads in 0..1 for the size its caller
-gives, as today; `Text` draws what it returns. `DrawBox` takes its rectangle in 0..1 the same way. The layout's unit
-test holds it; the harness's text case holds the drawing.
-
-`Fbo.begin()` calls `glViewport` once: today it keeps the viewport in one global for the whole program, skips a
-repeat by it, then calls `glViewport` again regardless **(seen)**; the global goes.
-
-Callers that change with it **(seen)**: `ViewPoseLayer`'s flip, the only caller of `DrawCircles`; `PosePointLines`'
-three callers (`pose_line_layer`, `pose_renderer`, white_space's `pose_figure_layer`); `DrawRoi`'s six (`crop_layer`,
-`view_layer`, hd_trio's three center layers through `CenterGeometry`) and `DepthUpscale`'s one (`view_layer`, through
-`texture_roi`); the legend for `ColormapKey`. The rectangles', the blit's and `FaceColor`'s callers already pass 0..1
-top-left and stay; so do the 25 text calls. Once H is built and checked, the fluid thread hears what changed in
-`modules/flow`.
-
-Checked by:
-- the harness: it already holds the gl shaders and `PosePointLines` to references from before the plan **(seen)**;
-  before H it gets `FaceColor` and the flow's six, references from today's code; after H each matches within 1/255.
-  A case whose shader now takes top-left positions is rewritten to pass the same thing top-left, not rerun as it is;
-  `draw_roi_turned` holds the rotation, whose direction turns with y **(inferred)**
-- the text layout's unit test
-- each app run before and after H (deep_flow, hd_trio, smile, white_space), its screens compared by me, on
-  Matthias's permission for every app (2026-11-15); he gets only what I cannot judge
 
 ## I. Capture asks GL nothing
 
@@ -102,18 +39,15 @@ before and after, its screens compared.
 What stays and what goes is decided with Matthias once the rest of the plan is built. To look at: `MaskBlur` (one
 shader, a direction) against `BlurH` and `BlurV`; `Blend`, `MaskBlend` and `Curtain`, all `(src, dst, fade)`;
 `Hsl` against `Hsv`; `Noise` against `NoiseSimplex`; `NoiseBlend` against `NoiseSimplexBlend`; `DrawBox` against
-`DrawColoredRectangle`; the flow's own `Blit` (`modules/flow/shaders/blit.py`, `FlowUtil`'s stretch and the bridge's
-`CaptureMax`) against the GL's **(seen)**; the window manager's test, which `modules/render/tests/test_window.py` and
-`apps/smile/render/tests/test_window.py` hold near line for line **(seen)**.
+`DrawColoredRectangle`; `DrawRoi` (without a turn) against `texture.draw(src=…)` **(inferred)**; the flow's own `Blit`
+(`modules/flow/shaders/blit.py`, `FlowUtil`'s stretch and the bridge's `CaptureMax`) against the GL's **(seen)**; the
+window manager's test, which `modules/render/tests/test_window.py` and `apps/smile/render/tests/test_window.py` hold
+near line for line **(seen)**.
 
 ## Rules it touches
 
 - `CLAUDE.md` API evolution, remove obsolete pathways instead of leaving parallel ones: K
-- `CLAUDE.md` Running code, run a GPU harness only on the user's go, and only what the plan names: H, I, J, K
-- `CLAUDE.md` Performance, prefer the design with the lower latency: H, I
-- `CLAUDE.md` API evolution, update all affected call sites in the same change: H, J
-- `gl.md` set the GL state a draw needs where it draws (blend, depth, viewport): H
-- `gl.md` prefer as few GL calls and state switches as possible: H, I
-- `gl.md` simple geometry, as from poses, is worked out on the CPU, in plain modules: H
-- `gl.md` all shaders take 2D positions from 0 to 1, with (0, 0) at the top left: H
-- `gl.md` the conversion to OpenGL's own coordinates is written once, and every shader uses it: H
+- `CLAUDE.md` Running code, run a GPU harness only on the user's go, and only what the plan names: I, J, K
+- `CLAUDE.md` Performance, prefer the design with the lower latency: I
+- `CLAUDE.md` API evolution, update all affected call sites in the same change: J
+- `gl.md` prefer as few GL calls and state switches as possible: I

@@ -1,5 +1,7 @@
 #version 460 core
 
+#include "position.glsl"
+
 const int MAX_FIELDS = 16;
 
 // effect: how a box shows its face's distance from good
@@ -51,7 +53,7 @@ float gray_of(vec3 color) {
 }
 
 void main() {
-    vec2 p = vec2(texCoord.x, 1.0 - texCoord.y);
+    vec2 p = topLeft(texCoord);
     float in_rect = inside(rect, p);
 
     // how far from good the face of this pixel is: the worst of the boxes it lies in

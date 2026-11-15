@@ -15,6 +15,7 @@ from .context import context
 from .font_atlas import FontAtlas
 from .shaders.glyphs import Glyphs
 from .shaders.draw_box import DrawBox
+from .text_layout import text_layout
 
 
 # Default font path
@@ -136,36 +137,11 @@ class Text:
         if not self._allocated or not text:
             return
 
-        # Collect the glyph quads (no GL yet): x, y, width, height, u0, v0, u1, v1 per glyph.
-        # Glyphs are positioned from the top edge (y) down by (ascent - bearing_y), so text
-        # places consistently regardless of which characters are used.
-        quads: list[tuple[float, float, float, float, float, float, float, float]] = []
-        cursor_x = x
-        ascent = self._atlas.ascent
-        for char in text:
-            glyph = self._atlas.get_glyph(char)
-            if glyph is None:
-                continue
-            quads.append((cursor_x + glyph.bearing_x, y + (ascent - glyph.bearing_y),
-                          float(glyph.width), float(glyph.height),
-                          glyph.u0, glyph.v0, glyph.u1, glyph.v1))
-            cursor_x += glyph.advance
-        if not quads:
+        # The whole string in one upload and one draw, so the GL call count stays flat in the text length
+        vertices: np.ndarray = text_layout(text, x, y, self._atlas.ascent, self._atlas.get_glyph,
+                                           float(screen_width), float(screen_height))
+        if not len(vertices):
             return
-
-        # Two triangles per glyph, interleaved (x, y, u, v) — the whole string in one upload
-        # and one draw, so the GL call count stays flat in the text length.
-        g = np.array(quads, dtype=np.float32)
-        x0, y0 = g[:, 0], g[:, 1]
-        x1, y1 = x0 + g[:, 2], y0 + g[:, 3]
-        u0, v0, u1, v1 = g[:, 4], g[:, 5], g[:, 6], g[:, 7]
-        vertices = np.empty((len(g), 6, 4), dtype=np.float32)
-        vertices[:, 0] = np.stack([x0, y0, u0, v0], axis=1)
-        vertices[:, 1] = np.stack([x1, y0, u1, v0], axis=1)
-        vertices[:, 2] = np.stack([x1, y1, u1, v1], axis=1)
-        vertices[:, 3] = np.stack([x0, y0, u0, v0], axis=1)
-        vertices[:, 4] = np.stack([x1, y1, u1, v1], axis=1)
-        vertices[:, 5] = np.stack([x0, y1, u0, v1], axis=1)
 
         style.set_blend_mode(style.BlendMode.ALPHA)
 
@@ -173,8 +149,7 @@ class Text:
         glBindBuffer(GL_ARRAY_BUFFER, self._vbo)
         glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_DYNAMIC_DRAW)
         glBindBuffer(GL_ARRAY_BUFFER, 0)
-        self._glyphs.use(len(g) * 6, color, (float(screen_width), float(screen_height)),
-                              self._atlas.texture_id)
+        self._glyphs.use(len(vertices), color, self._atlas.texture_id)
         context().bind_vertex_array(previous_vao)
 
     def draw_box_text(self, x: float, y: float, text: str,
@@ -207,13 +182,9 @@ class Text:
 
         style.set_blend_mode(style.BlendMode.ALPHA)
 
-        screen_size = (float(screen_width), float(screen_height))
-
-        # Draw background box first
-        self._box.use(
-            (box_x, box_y, box_width, box_height),
-            bg_color, screen_size
-        )
+        # Draw background box first, in 0..1 of the area
+        self._box.use((box_x / screen_width, box_y / screen_height, box_width / screen_width, box_height / screen_height),
+                      bg_color)
 
         # Draw text with slight vertical offset for better centering
         text_y = y + pad * 0.5

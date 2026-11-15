@@ -6,6 +6,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 class DrawRoi(Shader):
+    """The part `roi` of a texture over the whole target, turned by `rotation_radians` about
+    `rotation_center_texture_space`; both in 0..1 of the texture, origin top-left."""
+
     def use(self, src: Texture, roi: Rect, rotation_radians: float = 0.0, rotation_center_texture_space: Point2f = Point2f(0.5, 0.5), texture_aspect: float = 1.0) -> None:
         if not self.allocated or not self.shader_program:
             logger.warning("DrawRoi shader not allocated or shader program missing.")

@@ -5,8 +5,6 @@ from OpenGL.GL import (Constant, GL_CLAMP_TO_EDGE, GL_COLOR_ATTACHMENT0, GL_COLO
                        glRenderbufferStorage, glViewport)
 from .texture import Texture
 
-_current_viewport: tuple[int, int, int, int] = (0, 0, 0, 0)
-
 class Fbo(Texture):
     def __init__(self,
                  interpolation: int = GL_LINEAR,
@@ -49,16 +47,9 @@ class Fbo(Texture):
         super().deallocate()
 
     def begin(self)  -> None:
-        """Begin rendering to FBO. Uses top-left origin (see COORDINATE_SYSTEM.md)."""
-        global _current_viewport
-
+        """Draw into this FBO, its whole size the viewport."""
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
-        new_vp = (0, 0, self.width, self.height)
-        if _current_viewport != new_vp:
-            glViewport(*new_vp)
-            _current_viewport = new_vp
-
-        glViewport(*new_vp)
+        glViewport(0, 0, self.width, self.height)
 
     def end(self)  -> None:
         """End rendering to FBO and restore previous state."""
@@ -134,7 +125,7 @@ class SwapFbo(Fbo):
         self._swap_state = 1 - self._swap_state
 
     def begin(self) -> None:
-        """Begin rendering to current buffer. Uses top-left origin."""
+        """Draw into the current buffer, its whole size the viewport."""
         self._fbos[self._swap_state].begin()
 
     def end(self) -> None:

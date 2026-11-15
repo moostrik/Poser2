@@ -15,7 +15,7 @@ class DrawCircles(Shader):
         """Draw circles.
 
         Args:
-            positions: List of (x, y) tuples in normalized coordinates [0, 1]
+            positions: List of (x, y) tuples in 0..1 of the target, origin top-left
             size: Circle radius in normalized coordinates (shared by all circles)
             smooth: Antialiasing smoothness in normalized coordinates (shared by all circles)
             color: (r, g, b, a) color tuple [0.0, 1.0] (shared by all circles)

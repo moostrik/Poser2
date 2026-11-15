@@ -21,11 +21,14 @@ from collections.abc import Callable
 import cv2
 import glfw
 import numpy as np
-from OpenGL.GL import (GL_R8, GL_RED, GL_RGBA, GL_RGBA8, GL_TEXTURE_2D, GL_UNPACK_ALIGNMENT, GL_UNSIGNED_BYTE,
-                       glBindTexture, glFinish, glPixelStorei, glTexSubImage2D, glViewport)
+from OpenGL.GL import (GL_FLOAT, GL_R8, GL_R32F, GL_RED, GL_RGBA, GL_RGBA8, GL_TEXTURE_2D, GL_UNPACK_ALIGNMENT,
+                       GL_UNSIGNED_BYTE, glBindTexture, glFinish, glPixelStorei, glTexSubImage2D, glViewport)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from apps.smile.render.shaders import FlashIn, FlashOut, Omission  # noqa: E402
+from apps.smile.render.shaders import FaceColor, FlashIn, FlashOut, Omission  # noqa: E402
+from modules.flow import DepthRead, DepthUpscale  # noqa: E402
+from modules.flow.shaders import AddRegion, ChannelAddRegion, ChannelSetRegion, SetRegion  # noqa: E402
+from modules.flow.visualization.shaders import ColormapKey  # noqa: E402
 from modules.gl import Context, Fbo, Style, Text, Texture, shaders  # noqa: E402
 from modules.gl.shaders.draw_box import DrawBox  # noqa: E402
 from modules.pose import PointLandmark, Points2D  # noqa: E402
@@ -67,8 +70,20 @@ def texture(pixels: np.ndarray) -> Texture:
     return tex
 
 
+def depth_texture(metres: np.ndarray) -> Texture:
+    """A one-channel float texture holding `metres`, row 0 at GL's bottom."""
+    tex = Texture()
+    tex.allocate(metres.shape[1], metres.shape[0], GL_R32F)
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+    glBindTexture(GL_TEXTURE_2D, tex.tex_id)
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, metres.shape[1], metres.shape[0], GL_RED, GL_FLOAT,
+                    np.ascontiguousarray(metres, dtype=np.float32))
+    glBindTexture(GL_TEXTURE_2D, 0)
+    return tex
+
+
 def inputs() -> dict[str, Texture]:
-    """The known inputs: a color gradient, a second image, a soft round mask, and a hard-edged one."""
+    """The known inputs: a color gradient, a second image, a soft round mask, a hard-edged one, and a depth."""
     y, x = np.mgrid[0:SIZE, 0:SIZE].astype(np.float32) / (SIZE - 1)
     gradient = np.dstack([x, y, 1.0 - x, 0.5 + 0.5 * x]) * 255
     checker = ((np.floor(x * 8) + np.floor(y * 8)) % 2).astype(np.float32)
@@ -76,8 +91,10 @@ def inputs() -> dict[str, Texture]:
     radius = np.hypot(x - 0.5, y - 0.5)
     soft = np.clip(1.0 - radius * 2.5, 0.0, 1.0) * 255
     hard = (radius < 0.3).astype(np.float32) * 255
+    depth = 0.2 + 0.5 * x + 0.2 * (radius < 0.25)      # a slope with a step, under 1 so the RGBA8 target holds it
     return {'gradient': texture(gradient.astype(np.uint8)), 'second': texture(second.astype(np.uint8)),
-            'soft': texture(soft.astype(np.uint8)), 'hard': texture(hard.astype(np.uint8))}
+            'soft': texture(soft.astype(np.uint8)), 'hard': texture(hard.astype(np.uint8)),
+            'depth': depth_texture(depth)}
 
 
 def pose() -> Points2D:
@@ -155,12 +172,12 @@ def cases() -> dict[str, tuple[object, Case]]:
     tint = s.Tint()
     add('tint', tint, lambda t: tint.use(t['soft'], 0.9, 0.4, 0.1, 1.0))
     draw_roi = s.DrawRoi()
-    add('draw_roi', draw_roi, lambda t: draw_roi.use(t['gradient'], Rect(0.2, 0.1, 0.5, 0.6)))
+    add('draw_roi', draw_roi, lambda t: draw_roi.use(t['gradient'], Rect(0.2, 0.3, 0.5, 0.6)))
     add('draw_roi_turned', draw_roi,
-        lambda t: draw_roi.use(t['gradient'], Rect(0.2, 0.1, 0.5, 0.6), 0.4, Point2f(0.45, 0.4), 1.0))
+        lambda t: draw_roi.use(t['gradient'], Rect(0.2, 0.3, 0.5, 0.6), -0.4, Point2f(0.45, 0.6), 1.0))
     circles = s.DrawCircles()
     add('draw_circles', circles,
-        lambda t: circles.use([(0.25, 0.25), (0.6, 0.7), (0.8, 0.3)], 0.08, 0.01, (1.0, 0.5, 0.2, 1.0), 1.0))
+        lambda t: circles.use([(0.25, 0.75), (0.6, 0.3), (0.8, 0.7)], 0.08, 0.01, (1.0, 0.5, 0.2, 1.0), 1.0))
     rect = s.DrawColoredRectangle()
     add('draw_colored_rectangle', rect, lambda t: rect.use(0.1, 0.2, 0.5, 0.3, 0.2, 0.8, 0.4, 0.9))
     outline = s.DrawRectangleOutline()
@@ -184,7 +201,7 @@ def cases() -> dict[str, tuple[object, Case]]:
     add('detail_threshold', detail, lambda t: detail.use(t['second'], 0.5, 1.0, 3.0, False))
 
     box = DrawBox()
-    add('box', box, lambda t: box.use((10.0, 20.0, 60.0, 30.0), (0.2, 0.4, 0.9, 0.8), (float(SIZE), float(SIZE))))
+    add('box', box, lambda t: box.use((10.0 / SIZE, 20.0 / SIZE, 60.0 / SIZE, 30.0 / SIZE), (0.2, 0.4, 0.9, 0.8)))
     lines = PosePointLines()
     figure = pose()
     add('pose_point_lines', lines, lambda t: lines.use(figure, 0.02, 0.005, (1.0, 0.8, 0.2, 1.0), True))
@@ -195,6 +212,25 @@ def cases() -> dict[str, tuple[object, Case]]:
         text.draw_text(4, 8, 'Poser 0123', (1.0, 1.0, 1.0, 1.0), SIZE, SIZE)
         text.draw_box_text(4, 60, 'box 45', (1.0, 0.9, 0.2, 1.0), (0.0, 0.0, 0.3, 0.7), SIZE, SIZE)
     add('text', text, draw_text)
+
+    # The shaders outside the GL that take a position (the GL plan's H)
+    face = FaceColor()
+    fields = [(0.1, 0.1, 0.3, 0.3, 0.8), (0.55, 0.5, 0.3, 0.35, 0.4)]
+    add('face_color', face, lambda t: face.use(t['gradient'], SIZE, SIZE, fields, 0, 0.8, (0.2, 0.15, 0.5, 0.6, 0.3),
+                                               0.5, 1, (1.0, 0.6, 0.1, 1.0)))
+    set_region, add_region = SetRegion(), AddRegion()
+    add('set_region', set_region, lambda t: set_region.use(t['gradient'], t['second'], 0.2, 0.5, 0.5, 0.4, 0.8))
+    add('add_region', add_region, lambda t: add_region.use(t['gradient'], t['second'], 0.2, 0.5, 0.5, 0.4, 0.5))
+    channel_set, channel_add = ChannelSetRegion(), ChannelAddRegion()
+    add('channel_set_region', channel_set,
+        lambda t: channel_set.use(t['gradient'], t['soft'], 1, 0.2, 0.5, 0.5, 0.4, 0.8))
+    add('channel_add_region', channel_add,
+        lambda t: channel_add.use(t['gradient'], t['soft'], 2, 0.2, 0.5, 0.5, 0.4, 0.5))
+    upscale = DepthUpscale()
+    add('depth_upscale', upscale, lambda t: upscale.use(t['depth'], Rect(0.2, 0.3, 0.5, 0.6), 0.1, DepthRead.SURFACE))
+    key = ColormapKey()
+    add('colormap_key', key, lambda t: key.use((10.0 / SIZE, 38.0 / SIZE, 100.0 / SIZE, 70.0 / SIZE), 4, 3,
+                                               12.0 / SIZE, 6.0 / SIZE))
 
     add('depth_align', s.DepthAlign(), None)        # a compute shader: compiled only
     return c

@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import (depth_step, edge_aware_depth, fixed_window, mask_sided_depth, place_points, texture_roi,
+from modules.flow import (depth_step, edge_aware_depth, fixed_window, mask_sided_depth, place_points,
                           view_per_depth_pixel, view_span)
 from modules.utils import Rect
 
@@ -68,10 +68,6 @@ class ViewWindowTest(unittest.TestCase):
         window = fixed_window(0.5, 0.5, 1.0, 448 / 800, 992 / 800)
         self.assertAlmostEqual(window.width * 992 / (window.height * 800), 448 / 800)
         self.assertAlmostEqual(window.x + window.width / 2.0, 0.5)
-
-    def test_the_texture_roi_runs_rows_up(self) -> None:
-        roi = texture_roi(Rect(0.1, 0.2, 0.3, 0.4))
-        self.assertAlmostEqual(roi.y, 0.4)
 
     def test_spans_and_steps(self) -> None:
         window = Rect(0.25, 0.0, 0.5, 1.0)

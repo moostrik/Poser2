@@ -12,7 +12,7 @@ class DepthUpscale(Shader):
 
     def use(self, depth: Texture, roi: Rect, tolerance: float, read: DepthRead = DepthRead.SURFACE, mask: Texture | None = None,
             near: float = 0.0, far: float = 0.0, reach: float = 0.0) -> None:
-        """`depth` metres (0 for none) on the camera image, `roi` the view's window on it with rows up, `tolerance`
+        """`depth` metres (0 for none) on the camera image, `roi` the view's window on it (0..1, origin top-left), `tolerance`
         (m) the spread of four depth pixels below which they are one surface. MASK: `mask` the player's in the view,
         `near`, `far` (m) the player's depth range and `reach` how far (depth pixels) a depth on the mask's side is
         looked for; without a mask, SURFACE."""

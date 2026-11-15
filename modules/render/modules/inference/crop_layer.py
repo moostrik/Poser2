@@ -48,8 +48,6 @@ class CropLayer(LayerBase):
             return
 
         pose_rect: Rect = pose[BBox].to_rect()
-        # convert to texture space
-        pose_rect = pose_rect.flip_y(0.5)
 
         self._fbo.begin()
         clear_color()

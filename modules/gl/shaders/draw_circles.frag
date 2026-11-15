@@ -1,7 +1,9 @@
 #version 460 core
 
+#include "position.glsl"
+
 uniform int numCircles;
-uniform vec4 circles[8];  // [x, y, size, smooth]
+uniform vec4 circles[8];  // [x, y, size, smooth], x and y in 0..1 of the target, origin top-left
 uniform vec4 colors[8];   // [r, g, b, a]
 uniform float aspectRatio = 1.0;  // width / height
 
@@ -19,7 +21,7 @@ void main() {
         vec4 circleColor = colors[i];
 
         // Calculate distance with aspect ratio correction
-        vec2 delta = texCoord - pos;
+        vec2 delta = topLeft(texCoord) - pos;
         delta.x *= aspectRatio;
         float dist = length(delta);
 

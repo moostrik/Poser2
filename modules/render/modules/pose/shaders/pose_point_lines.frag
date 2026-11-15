@@ -1,10 +1,12 @@
 #version 460 core
 
+#include "position.glsl"
+
 uniform float line_width = 0.01;
 uniform float line_smooth = 0.01;
 uniform float aspect_ratio = 1.0;
 uniform vec4 line_color = vec4(-1.0, -1.0, -1.0, -1.0);
-uniform vec4 points[17];
+uniform vec4 points[17];        // x, y in 0..1 of the rect, origin top-left; score; found
 
 const int NUM_SEGMENTS = 16;
 const ivec2 segments[NUM_SEGMENTS] = ivec2[NUM_SEGMENTS](
@@ -61,7 +63,7 @@ void processSegment(int idx_a, int idx_b, vec2 pos, inout vec3 colorAccum, inout
 }
 
 void main() {
-    vec2 pos = texCoord * vec2(aspect_ratio, 1.0);
+    vec2 pos = topLeft(texCoord) * vec2(aspect_ratio, 1.0);
     vec3 colorAccum = vec3(0.0);
     float alphaAccum = 0.0;
 

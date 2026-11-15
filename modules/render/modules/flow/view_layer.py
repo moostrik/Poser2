@@ -19,7 +19,7 @@ from OpenGL.GL import GL_NEAREST, GL_R16F, GL_R32F, GL_RG32F, GL_RGBA16F, GL_RGB
 
 # Local application imports
 from modules.flow import DepthRead, DepthView, DepthUpscale, DepthVelocitySettings, TextureKind, \
-                         depth_step, fixed_window, place_points, texture_roi, view_per_depth_pixel, view_span
+                         depth_step, fixed_window, place_points, view_per_depth_pixel, view_span
 from modules.gl import Fbo, SwapFbo, Style, Texture, shaders
 from modules.pose import BBox, Frame, Points2D
 from modules.settings import Field
@@ -176,7 +176,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         self._timestamp = input.timestamp
 
         self._window = fixed_window(s.fixed_x, s.fixed_y, s.fixed_height, self._image.width / self._image.height, image.width / image.height)
-        roi: Rect = texture_roi(self._window)
+        roi: Rect = self._window
         depth: Texture | None = input.depth if input.depth is not None and input.depth.allocated else None
         self._grid_size = (depth.width, depth.height) if depth is not None else (0, 0)
 

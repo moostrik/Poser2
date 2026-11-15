@@ -38,6 +38,18 @@ target, `src` the part of the texture drawn, both 0..1 with the origin top-left,
 without them. A `src` with a negative width or height draws it mirrored on that axis (`Image` flips its upload this
 way). It draws with the blend state as set.
 
+## Coordinates
+
+Every 2D position a shader takes is in 0..1 of the viewport with (0, 0) at the top left: a rectangle, a point, a
+texture's `dst` and `src`, a region, a part of an input sampled (`DrawRoi`'s and `DepthUpscale`'s `roi`). The turn
+into OpenGL's own coordinates (clip space −1..1 and texture coordinates, both from the bottom left) is written once,
+in `shaders/position.glsl`: `clipPosition` for a vertex, `topLeft` for a texture coordinate. A shader includes it
+(`#include "position.glsl"`; the loader finds it in `shaders/` from any package). A pass that fills its target
+places nothing and draws the quad in −1..1 through `_generic.vert`.
+
+A texture is held in GL's row order; a CPU image is flipped once, at its upload (`Image`, `Tensor`). Text is laid
+out in pixels on the CPU (`text_layout`), from the size its caller gives, and handed to the shader in 0..1.
+
 ## Shaders
 
 A shader's `.frag`, `.vert` or `.comp` source sits beside the `.py` that holds its class, named after it; the loader

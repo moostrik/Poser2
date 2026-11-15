@@ -1,36 +1,26 @@
 #version 460 core
 
+#include "position.glsl"
+
 uniform sampler2D src;
-uniform vec4 roi; // x, y, width, height in texture coordinates [0,1]
-uniform float rotation; // rotation angle in radians
-uniform vec2 rotationCenter; // rotation center in texture coordinates [0,1]
-uniform float aspectRatio; // width / height of the texture
+uniform vec4 roi;               // the part of src drawn: x, y, width, height in 0..1, origin top-left
+uniform float rotation;         // radians, about rotationCenter
+uniform vec2 rotationCenter;    // in 0..1 of src, origin top-left
+uniform float aspectRatio;      // width / height of src
 
 in vec2 texCoord;
 out vec4 fragColor;
 
 void main() {
-    // Map from quad space [0,1] to ROI bounds in texture space
-    vec2 roiCoord = roi.xy + texCoord * roi.zw;
+    // The target's point in src, from the top left
+    vec2 offset = roi.xy + topLeft(texCoord) * roi.zw - rotationCenter;
+    offset.x *= aspectRatio;            // round turns in pixels
 
-    // Translate to rotation center
-    vec2 offsetFromCenter = roiCoord - rotationCenter;
-
-    // Apply aspect ratio correction for uniform rotation
-    offsetFromCenter.x *= aspectRatio;
-
-    // Rotate around center
+    // Turned about the center, the angle in the same top-left frame as the image's points
     float cosA = cos(rotation);
     float sinA = sin(rotation);
-    mat2 rotMatrix = mat2(cosA, -sinA, sinA, cosA);
-    vec2 rotatedOffset = rotMatrix * offsetFromCenter;
+    vec2 turned = mat2(cosA, -sinA, sinA, cosA) * offset;
+    turned.x /= aspectRatio;
 
-    // Remove aspect ratio correction
-    rotatedOffset.x /= aspectRatio;
-
-    // Translate back from rotation center
-    vec2 textureCoord = rotatedOffset + rotationCenter;
-
-    // Sample texture
-    fragColor = texture(src, textureCoord);
+    fragColor = texture(src, topLeft(turned + rotationCenter));
 }
