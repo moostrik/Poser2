@@ -17,13 +17,15 @@ paths:
 - Prefer as few GL calls and state switches as possible
 - A texture is held in GL's row order
 - A CPU image is flipped once, at its upload
+- All shaders take positions from 0 to 1, with (0, 0) at the top left
+- The conversion to OpenGL's own coordinates is written once, and every shader uses it
 
 ## Working with OpenGL
 
 - All OpenGL calls execute on the render thread
 - Create textures, FBOs and shaders at setup or on a resize, not per frame
 - Pair every creation with its destruction
-- Set the GL state a draw needs where it draws, through `gl.Context`; it skips what is already set
+- Set the GL state a draw needs where it draws (blend, depth, viewport)
 - Prefer not to read back from the GPU or wait on it inside a frame
 - Name a shader's `.frag`/`.vert`/`.comp` source after the `.py` file that holds its class, beside it; the loader resolves it by that module name
 - A shader is named after the operation it does; the `shaders` package in front says what it is (`shaders.PosePointLines`)
