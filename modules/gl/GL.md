@@ -4,6 +4,14 @@
 the blend state, and the shaders that are useful to any app. A layer that draws a module's data sits in
 `modules/render`, an app's own shader in that app.
 
+## What it serves
+
+The GL serves a pipeline of 2D shader steps; a volumetric step is 3D only within its own pass. Geometry, such as
+the poses and the rectangles, is worked out on the CPU and handed to a shader ready to place, so a draw needs no
+matrix and no state per target. The pipeline's latency counts, and each GL call and state switch costs CPU time on
+the render thread, so the GL keeps their number low: it holds GL's state on the application side and asks no
+`glGet*`.
+
 ## The context
 
 Each GL context has one `gl.Context`, as Cinder's `gl::Context`: the window manager makes one per window when the

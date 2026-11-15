@@ -15,20 +15,43 @@ aspect ratio; the texel size worked out by the shader, given (`texel_size`) or a
 
 | Step                 | When                                 | Checked by                              |
 |----------------------|--------------------------------------|-----------------------------------------|
-| H. Shader coordinates | a step of its own, planned with Matthias | the harness, then Matthias's look  |
+| H. Shader coordinates | on Matthias's "go"                   | the harness, then Matthias's look       |
 | I. Duplicate shaders | decided together, once the rest is built | the harness, then Matthias's look   |
 
 ## H. Shader coordinates
 
-Colors as `Color` and rectangles as `Rect`; texture coordinates 0..1 with the origin top-left wherever a `Rect` is
-passed, as the frameworks' 2D drawing, our `Rect` and images have it (the grid: "Rect y is top-down" **(seen)**), and
-GL's bottom-left only inside the shaders; the texel size from the input. The origin is turned in one place: a texture
-is held in GL's own row order, a CPU image flipped once at its upload (`Image`); one 2D projection the context holds
-turns the top-left API into GL's coordinates, as Cinder's `setMatricesWindow(w, h, originUpperLeft = true)` and
-openFrameworks' screen setup do, applied by every vertex stage (`_generic.vert`, the rectangles, the circles, the
-glyphs, and the render's `PosePointLines`, with its callers). No shader flips on its own: today `ViewPoseLayer` flips
-its points before `DrawCircles` because "`PosePointLines` flips Y internally" and "`DrawCircles` takes GL coords"
-**(seen)**. Not built until planned on its own with Matthias.
+Two kinds of vertex stage, each in its textbook form:
+
+- A pass fills its whole target and places nothing (the blurs, the blends, every flow step): the quad in GL's own
+  −1..1, through `_generic.vert`, which stays as it is. Clip space fits a target of any size without a uniform or the
+  context's state, as post-processing chains have it.
+- A draw places something in the target: in 0..1 with the origin top-left, as our `Rect`, `texture.draw` and the
+  pose points have it, turned into GL's −1..1 by one fixed line from one shared include. No matrix and no size uniform:
+  the geometry is worked out on the CPU (poses, rectangles), and 0..1 holds for a target of any size, so a draw or an
+  FBO switch sets no state and makes no GL call for its coordinates. The placing stages: `blit.vert`,
+  `draw_box.vert`, `draw_colored_rectangle.vert`, `draw_rectangle_outline.vert` and `glyphs.vert` in the vertex
+  stage; `DrawCircles` and the render's `PosePointLines` in the fragment stage, whose points sit in `texCoord` with
+  an aspect ratio **(seen)**. Today they come in three units: pixels (`draw_box`, `glyphs`), 0..1 top-left (the
+  rectangles, the blit, `PosePointLines`) and GL's −1..1 (`DrawCircles`) **(seen)**. Afterwards none flips or
+  converts on its own: today `ViewPoseLayer` flips its points before `DrawCircles` because "`PosePointLines` flips
+  Y internally" and "`DrawCircles` takes GL coords" **(seen)**.
+
+The flow's volume views (`cube_axes`, `cube_edges`, `glyph_arrows`, `glyph_dots`) and its particles are 3D inside
+their own pass and take a `view_projection` of their own **(seen)**; they stay as they are.
+
+`Text` builds its glyph quads on the CPU in pixels **(seen)**; it turns them into 0..1 there, from the size of the
+bound target it reads on the CPU, so its callers no longer pass a width and height (about 30 `draw_text` and
+`draw_box_text` calls). `DrawBox` takes its rectangle in 0..1 the same way.
+
+Callers that change with it: `ViewPoseLayer`'s flip, `PosePointLines`' three callers (`pose_line_layer`,
+`pose_renderer`, white_space's `pose_figure_layer`), `DrawCircles`' callers, and every text call. The harness
+checks the shaders, not these layers; for them it is Matthias's look.
+
+Besides the coordinates: colors as `Color`, rectangles as `Rect`, the texel size from the input texture. A texture is
+held in GL's own row order, a CPU image flipped once at its upload (`Image`).
+
+Checked by the harness: before H, `scripts/shader_check.py` gets every shader H changes, the render's and smile's
+included, its references made from today's code; after H each matches them within 1/255, then Matthias looks.
 
 ## I. Duplicate shaders
 
@@ -43,3 +66,6 @@ shader, a direction) against `BlurH` and `BlurV`; `Blend`, `MaskBlend` and `Curt
 
 - `CLAUDE.md` API evolution, remove obsolete pathways instead of leaving parallel ones: I
 - `CLAUDE.md` Running code, run a GPU harness only on the user's go, and only what the plan names: H, I
+- `CLAUDE.md` Performance, prefer the design with the lower latency: H
+- `CLAUDE.md` API evolution, update all affected call sites in the same change: H
+- `gl.md` set the GL state a draw needs where it draws: H
