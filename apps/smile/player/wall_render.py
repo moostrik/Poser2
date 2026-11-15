@@ -12,6 +12,7 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA8, GL_RGBA16F, GL_SCISSOR_TES
 from ..credit import FONT, TITLE_FONT, qr_image, quiet_px, title_image, wrap_balanced
 from ..credit_scroll import TIMEOUT as SCROLL_TIMEOUT, name_strip, scroll_copies, scroll_gone
 from modules.gl import Fbo, Image, Shader, Style, SwapFbo, Text, Texture, shaders
+from modules.utils import Color
 from .settings import WallsSettings
 from .shaders import BlitRotated
 
@@ -21,13 +22,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 NUMBER_FONT_PX: int = 320       # the screen's number in a lit cell (the laughter test), in the clip's 512 x 640
-NUMBER_COLOR: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
+NUMBER_COLOR: Color = Color(0.0, 0.0, 0.0)
 
 # the credit cell, in the clip's upright 512 x 640: the QR code and the name under it, as wide as the code
 CREDIT_QR_PX: int = 500         # with its white border, which the white cell hides
 CREDIT_GAP_PX: int = 64         # between the code and the name
 CREDIT_PROBE_PX: int = 100      # the font size the name is measured at, to scale it to the code's width
-CREDIT_NAME_COLOR: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
+CREDIT_NAME_COLOR: Color = Color(0.0, 0.0, 0.0)
 
 # the online cell: the same card with the QR code to the phone page and this line under it
 ONLINE_LINE: str = 'SMILE from your phone'
@@ -37,8 +38,8 @@ CAPTION_PX: int = 44
 CAPTION_TITLE_PX: int = round(CAPTION_PX / TITLE_FONT)
 CAPTION_MARGIN_PX: int = 20
 CAPTION_OUTLINE_PX: int = 3
-CAPTION_COLOR: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
-CAPTION_OUTLINE_COLOR: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
+CAPTION_COLOR: Color = Color(1.0, 1.0, 1.0)
+CAPTION_OUTLINE_COLOR: Color = Color(0.0, 0.0, 0.0)
 CAPTION_OUTLINE: list[tuple[int, int]] = [(x, y) for x in (-CAPTION_OUTLINE_PX, 0, CAPTION_OUTLINE_PX)
                                           for y in (-CAPTION_OUTLINE_PX, 0, CAPTION_OUTLINE_PX) if x or y]
 

@@ -1,5 +1,6 @@
 # Local application imports
 from modules.gl import Text
+from modules.utils import Color
 
 from ....layer_base import LayerBase
 from .marks import Mark
@@ -91,7 +92,7 @@ class LabelRenderer(LayerBase):
                 if y + height > self._height:
                     continue
 
-                self._text.draw_box_text(x, y, mark.label, mark.color, LABEL_BG,
+                self._text.draw_box_text(x, y, mark.label, Color(*mark.color), LABEL_BG,
                                          self._width, self._height)
 
     def _draw_line_label(self, mark: Mark) -> None:
@@ -110,7 +111,7 @@ class LabelRenderer(LayerBase):
             x = mark_px - _MARK_GAP_PX - width
         x = min(max(x, 0.0), max(0.0, self._width - width))
         y: float = max(0.0, min(mark.top_y * self._height, self._height - height))
-        self._text.draw_box_text(x, y, mark.label, mark.color, LABEL_BG, self._width, self._height)
+        self._text.draw_box_text(x, y, mark.label, Color(*mark.color), LABEL_BG, self._width, self._height)
 
     def _by_world(self) -> dict[int, list[Mark]]:
         """One slotted person's marks together, ordered left to right — the order the side rule

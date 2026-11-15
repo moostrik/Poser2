@@ -58,7 +58,7 @@ LARGE_LAYERS: list[Layers] = [
 INTRO_STAGES: tuple[ShowStage, ...] = (ShowStage.WHITE_POSE, ShowStage.FLUID, ShowStage.PRACTICE, ShowStage.ENJOY_IN)    # the white example figure plays
 FADE_TIME_STILL: float = 18.0   # s: the density's fade while the player stands still
 FADE_TIME_RANGE: float = 14.0   # s: how much faster it fades at full motion
-BORDER: tuple[float, float, float, float] = (0.4, 0.4, 0.4, 1.0)    # the border around each panel in the main window, so a black layer shows
+BORDER: Color = Color(0.4, 0.4, 0.4)    # the border around each panel in the main window, so a black layer shows
 BORDER_WIDTH: float = 2.0       # px
 
 
@@ -300,7 +300,7 @@ class HDTrioRender(RenderBase):
             return
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
-        self._border.use(0.0, 0.0, 1.0, 1.0, *BORDER, BORDER_WIDTH / width, BORDER_WIDTH / height)
+        self._border.use(Rect(0.0, 0.0, 1.0, 1.0), BORDER, BORDER_WIDTH / width, BORDER_WIDTH / height)
         Style.pop_style()
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:

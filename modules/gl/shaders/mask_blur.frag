@@ -2,7 +2,7 @@
 
 uniform sampler2D src;      // Input texture
 uniform vec2 direction;      // Blur direction: (1,0) for horizontal, (0,1) for vertical
-uniform vec2 texelSize;      // 1.0 / texture_dimensions
+#define texelSize (1.0 / vec2(textureSize(src, 0)))
 uniform float radius;    // Blur radius multiplier
 
 in vec2 texCoord;

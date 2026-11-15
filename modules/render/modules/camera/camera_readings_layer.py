@@ -8,16 +8,17 @@ import math
 
 from modules.gl import Text
 from modules.camera import RigCameraSettings, CameraHealthSettings, FPS_TOLERANCE, fps_deviation, mount_deviation
+from modules.utils import Color
 
 from ...layer_base import LayerBase
 
 _MARGIN_PX: float = 6.0
 _GAP_PX: float = 8.0
 
-_OK_COLOR:         tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
-_OFF_COLOR:        tuple[float, float, float, float] = (1.0, 0.25, 0.25, 1.0)
-_UNMEASURED_COLOR: tuple[float, float, float, float] = (0.6, 0.6, 0.6, 1.0)
-_BACKGROUND:       tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.6)
+_OK_COLOR:         Color = Color(1.0, 1.0, 1.0)
+_OFF_COLOR:        Color = Color(1.0, 0.25, 0.25)
+_UNMEASURED_COLOR: Color = Color(0.6, 0.6, 0.6)
+_BACKGROUND:       Color = Color(0.0, 0.0, 0.0, 0.6)
 
 
 class CameraReadingsLayer(LayerBase):
@@ -64,12 +65,12 @@ class CameraReadingsLayer(LayerBase):
     def _reading(axis: str, value: float) -> str:
         return f'{axis} --' if math.isnan(value) else f'{axis} {value:+.1f}°'
 
-    def _mount_color(self, value: float) -> tuple[float, float, float, float]:
+    def _mount_color(self, value: float) -> Color:
         if math.isnan(value):
             return _UNMEASURED_COLOR
         return _OFF_COLOR if abs(value) > self._health.mount_tolerance else _OK_COLOR
 
-    def _label(self, x: float, text: str, color: tuple[float, float, float, float]) -> float:
+    def _label(self, x: float, text: str, color: Color) -> float:
         """Draw one boxed label with its left edge at ``x``; return its right edge."""
         width, _ = self._text.measure_text(text)
         self._text.draw_box_text(x, _MARGIN_PX, text, color, _BACKGROUND, self._width, self._height)

@@ -53,5 +53,6 @@ out in pixels on the CPU (`text_layout`), from the size its caller gives, and ha
 ## Shaders
 
 A shader's `.frag`, `.vert` or `.comp` source sits beside the `.py` that holds its class, named after it; the loader
-resolves it by that module name and falls back to `_generic.vert` for the vertex stage. `scripts/shader_check.py`
+resolves it by that module name and falls back to `_generic.vert` for the vertex stage. A shader takes a color as a
+`Color` and a rectangle as a `Rect`; a pass reads its input's texel size from the texture itself (`textureSize`). `scripts/shader_check.py`
 draws every shader of `modules/gl` once on known input and holds it to a reference image, within 1/255 per channel.

@@ -1,7 +1,7 @@
 #version 460 core
 
 uniform sampler2D src;
-uniform vec2 resolution;
+#define resolution vec2(textureSize(src, 0))
 uniform float radius;
 
 in vec2 texCoord;

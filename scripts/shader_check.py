@@ -33,7 +33,7 @@ from modules.gl import Context, Fbo, Style, Text, Texture, shaders  # noqa: E402
 from modules.gl.shaders.draw_box import DrawBox  # noqa: E402
 from modules.pose import PointLandmark, Points2D  # noqa: E402
 from modules.render import PosePointLines  # noqa: E402
-from modules.utils import Point2f, Rect  # noqa: E402
+from modules.utils import Color, Point2f, Rect  # noqa: E402
 
 OUT: str = os.path.join('temp', 'shader_check')
 SIZE: int = 128
@@ -170,18 +170,19 @@ def cases() -> dict[str, tuple[object, Case]]:
     blend = s.Blend()
     add('blend', blend, lambda t: blend.use(t['gradient'], t['second'], 0.3))
     tint = s.Tint()
-    add('tint', tint, lambda t: tint.use(t['soft'], 0.9, 0.4, 0.1, 1.0))
+    add('tint', tint, lambda t: tint.use(t['soft'], Color(0.9, 0.4, 0.1, 1.0)))
     draw_roi = s.DrawRoi()
     add('draw_roi', draw_roi, lambda t: draw_roi.use(t['gradient'], Rect(0.2, 0.3, 0.5, 0.6)))
     add('draw_roi_turned', draw_roi,
         lambda t: draw_roi.use(t['gradient'], Rect(0.2, 0.3, 0.5, 0.6), -0.4, Point2f(0.45, 0.6), 1.0))
     circles = s.DrawCircles()
     add('draw_circles', circles,
-        lambda t: circles.use([(0.25, 0.75), (0.6, 0.3), (0.8, 0.7)], 0.08, 0.01, (1.0, 0.5, 0.2, 1.0), 1.0))
+        lambda t: circles.use([(0.25, 0.75), (0.6, 0.3), (0.8, 0.7)], 0.08, 0.01, Color(1.0, 0.5, 0.2, 1.0), 1.0))
     rect = s.DrawColoredRectangle()
-    add('draw_colored_rectangle', rect, lambda t: rect.use(0.1, 0.2, 0.5, 0.3, 0.2, 0.8, 0.4, 0.9))
+    add('draw_colored_rectangle', rect, lambda t: rect.use(Rect(0.1, 0.2, 0.5, 0.3), Color(0.2, 0.8, 0.4, 0.9)))
     outline = s.DrawRectangleOutline()
-    add('draw_rectangle_outline', outline, lambda t: outline.use(0.1, 0.2, 0.5, 0.3, 1.0, 1.0, 1.0, 1.0, 0.02, 0.03))
+    add('draw_rectangle_outline', outline,
+        lambda t: outline.use(Rect(0.1, 0.2, 0.5, 0.3), Color(1.0, 1.0, 1.0, 1.0), 0.02, 0.03))
 
     mask_apply = s.MaskApply()
     add('mask_apply', mask_apply, lambda t: mask_apply.use(t['gradient'], t['soft'], 1.0))
@@ -201,7 +202,7 @@ def cases() -> dict[str, tuple[object, Case]]:
     add('detail_threshold', detail, lambda t: detail.use(t['second'], 0.5, 1.0, 3.0, False))
 
     box = DrawBox()
-    add('box', box, lambda t: box.use((10.0 / SIZE, 20.0 / SIZE, 60.0 / SIZE, 30.0 / SIZE), (0.2, 0.4, 0.9, 0.8)))
+    add('box', box, lambda t: box.use(Rect(10.0 / SIZE, 20.0 / SIZE, 60.0 / SIZE, 30.0 / SIZE), Color(0.2, 0.4, 0.9, 0.8)))
     lines = PosePointLines()
     figure = pose()
     add('pose_point_lines', lines, lambda t: lines.use(figure, 0.02, 0.005, (1.0, 0.8, 0.2, 1.0), True))
@@ -209,8 +210,8 @@ def cases() -> dict[str, tuple[object, Case]]:
     text = Text()
 
     def draw_text(_: dict[str, Texture]) -> None:
-        text.draw_text(4, 8, 'Poser 0123', (1.0, 1.0, 1.0, 1.0), SIZE, SIZE)
-        text.draw_box_text(4, 60, 'box 45', (1.0, 0.9, 0.2, 1.0), (0.0, 0.0, 0.3, 0.7), SIZE, SIZE)
+        text.draw_text(4, 8, 'Poser 0123', Color(1.0, 1.0, 1.0, 1.0), SIZE, SIZE)
+        text.draw_box_text(4, 60, 'box 45', Color(1.0, 0.9, 0.2, 1.0), Color(0.0, 0.0, 0.3, 0.7), SIZE, SIZE)
     add('text', text, draw_text)
 
     # The shaders outside the GL that take a position (the GL plan's H)

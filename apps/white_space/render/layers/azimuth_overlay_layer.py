@@ -12,6 +12,7 @@ from typing import Protocol
 from modules.board import HasFrames
 from modules import render
 from modules.gl import shaders
+from modules.utils import Color, Rect
 
 from .azimuth_marks import AzimuthMark, build_azimuth_marks, signed_azimuth_gap
 from ...settings import Stage
@@ -68,20 +69,19 @@ class AzimuthOverlayLayer(render.LayerBase):
         for mark in marks:
             r, g, b, a = colors[mark.track_id % len(colors)]
             if not math.isnan(mark.bbox_x):
-                self._line(mark.bbox_x, _BBOX_PX * px_x, (r, g, b, a * _BBOX_ALPHA))
+                self._line(mark.bbox_x, _BBOX_PX * px_x, Color(r, g, b, a * _BBOX_ALPHA))
             if not math.isnan(mark.eye_x):
-                self._line(mark.eye_x, _EYE_PX * px_x, (r, g, b, a))
+                self._line(mark.eye_x, _EYE_PX * px_x, Color(r, g, b, a))
             if not math.isnan(mark.eye_x) and not math.isnan(mark.bbox_x):
                 gap: float = signed_azimuth_gap(mark.bbox_x, mark.eye_x)
                 height: float = _CONNECTOR_PX * px_y
                 self._spans(min(mark.bbox_x, mark.bbox_x + gap), abs(gap), 0.5 - height / 2.0, height,
-                            (r, g, b, a))
+                            Color(r, g, b, a))
 
-    def _line(self, x: float, width: float, color: tuple[float, float, float, float]) -> None:
+    def _line(self, x: float, width: float, color: Color) -> None:
         self._spans(x - width / 2.0, width, 0.0, 1.0, color)
 
-    def _spans(self, x: float, width: float, y: float, height: float,
-               color: tuple[float, float, float, float]) -> None:
+    def _spans(self, x: float, width: float, y: float, height: float, color: Color) -> None:
         """One quad, or two when it runs off the row's 0/360 join (`render.strip_spans`)."""
         for span_x, span_w in render.strip_spans(x, width):
-            self._rect.use(span_x, y, span_w, height, *color)
+            self._rect.use(Rect(span_x, y, span_w, height), color)

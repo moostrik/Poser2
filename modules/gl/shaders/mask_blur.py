@@ -5,16 +5,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 class MaskBlur(Shader):
-    def use(self, src: Texture, horizontal: bool = True, radius: float = 1.0, texel_size: tuple[float, float] | None = None) -> None:
+    def use(self, src: Texture, horizontal: bool = True, radius: float = 1.0) -> None:
         if not self.allocated or not self.shader_program:
             logger.warning("MaskBlur shader not allocated or shader program missing.")
             return
         if not src.allocated:
             logger.warning("MaskBlur shader: input texture not allocated.")
             return
-
-        if texel_size is None:
-            texel_size = (1.0 / src.width, 1.0 / src.height)
 
         # Set direction based on horizontal flag
         direction = (1.0, 0.0) if horizontal else (0.0, 1.0)
@@ -29,7 +26,6 @@ class MaskBlur(Shader):
         # Configure shader uniforms (using cached locations)
         glUniform1i(self.get_uniform_loc("src"), 0)
         glUniform2f(self.get_uniform_loc("direction"), direction[0], direction[1])
-        glUniform2f(self.get_uniform_loc("texelSize"), texel_size[0], texel_size[1])
         glUniform1f(self.get_uniform_loc("radius"), radius)
 
         # Render

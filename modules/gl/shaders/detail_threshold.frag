@@ -5,7 +5,7 @@ uniform float threshold;
 uniform float detailBoost;
 uniform float radius;
 uniform bool invert;
-uniform vec2 texelSize;
+#define texelSize (1.0 / vec2(textureSize(src, 0)))
 
 in vec2 texCoord;
 out vec4 fragColor;

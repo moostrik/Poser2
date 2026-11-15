@@ -11,7 +11,7 @@ from OpenGL.GL import GL_RGBA8, GL_VIEWPORT, glGetIntegerv
 from modules.board import HasTimeSeries
 from modules.gl import Fbo, Image, Style, Text, Texture, clear_color
 from modules.settings import BaseSettings, Field
-from modules.utils import bin_samples, hold_gaps
+from modules.utils import Color, bin_samples, hold_gaps
 from ...layer_base import LayerBase
 from .shaders import TimeSeries
 
@@ -21,6 +21,7 @@ LANE_COLORS: list[tuple[float, float, float, float]] = [
     (1.0, 1.0, 1.0, 1.0), (1.0, 0.45, 0.1, 1.0), (0.1, 0.5, 1.0, 1.0), (1.0, 0.85, 0.3, 1.0),
     (0.4, 1.0, 0.5, 1.0), (1.0, 0.3, 0.6, 1.0), (0.6, 0.6, 1.0, 1.0), (0.3, 0.9, 0.9, 1.0),
 ]
+LABEL_BOX: Color = Color(0.0, 0.0, 0.0, 0.66)
 
 
 class TimeSeriesLayerSettings(BaseSettings):
@@ -111,5 +112,5 @@ class TimeSeriesLayer(LayerBase):
             return
         step: float = height / len(self._labels)
         for index, label in enumerate(self._labels):
-            color: tuple[float, float, float, float] = LANE_COLORS[index % len(LANE_COLORS)]
-            self._text.draw_box_text(8, int(index * step) + 6, label, color, (0.0, 0.0, 0.0, 0.66), width, height)
+            color: Color = Color(*LANE_COLORS[index % len(LANE_COLORS)])
+            self._text.draw_box_text(8, int(index * step) + 6, label, color, LABEL_BOX, width, height)

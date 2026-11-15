@@ -1,4 +1,5 @@
 from modules.gl import shaders
+from modules.utils import Color, Rect
 
 from .face_marks import Mark
 
@@ -30,9 +31,11 @@ class MarkDrawer:
         r, g, b, a = mark.color
         a *= alpha
         if outline:
-            self._outline.use(mark.x, mark.y, mark.w, mark.h, r, g, b, a, mark.line / w / max(1e-6, mark.w), mark.line / h / max(1e-6, mark.h))
+            self._outline.use(Rect(mark.x, mark.y, mark.w, mark.h), Color(r, g, b, a),
+                              mark.line / w / max(1e-6, mark.w), mark.line / h / max(1e-6, mark.h))
         if mark.dots is not None:
             r, g, b, a = mark.dots
             a *= alpha
+        dot: Color = Color(r, g, b, a)
         for kx, ky in mark.kps:
-            self._rect.use(kx - KEYPOINT_PX / w, ky - KEYPOINT_PX / h, 2.0 * KEYPOINT_PX / w, 2.0 * KEYPOINT_PX / h, r, g, b, a)
+            self._rect.use(Rect(kx - KEYPOINT_PX / w, ky - KEYPOINT_PX / h, 2.0 * KEYPOINT_PX / w, 2.0 * KEYPOINT_PX / h), dot)

@@ -8,6 +8,7 @@ One draw per string instead of one per glyph keeps the render thread's Python/GL
 """
 
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, GL_TRIANGLES, glActiveTexture, glBindTexture, glDrawArrays, glUniform1i, glUniform4f, glUseProgram
+from modules.utils import Color
 from ..shader import Shader
 
 
@@ -15,13 +16,13 @@ class Glyphs(Shader):
     """Shader for rendering a batch of text glyphs from a font atlas."""
 
     def use(self, vertex_count: int,
-            color: tuple[float, float, float, float],
+            color: Color,
             atlas_texture_id: int) -> None:
         """Draw ``vertex_count`` vertices of pre-uploaded glyph quads.
 
         Args:
             vertex_count: Number of vertices in the bound VAO (6 per glyph)
-            color: (r, g, b, a) text color
+            color: the text's color
             atlas_texture_id: OpenGL texture ID of font atlas
         """
         if not self.allocated or not self.shader_program or vertex_count <= 0:

@@ -8,6 +8,7 @@ import ctypes
 from pathlib import Path
 
 import numpy as np
+from modules.utils import Color, Rect
 from OpenGL.GL import GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW, GL_FALSE, GL_FLOAT, glBindBuffer, glBufferData, glDeleteBuffers, glDeleteVertexArrays, glEnableVertexAttribArray, glGenBuffers, glGenVertexArrays, glVertexAttribPointer
 
 from . import style
@@ -29,10 +30,10 @@ class Text:
     Supports colored text with optional background boxes.
 
     Example:
-        renderer = TextRenderer()
+        renderer = Text()
         renderer.allocate("path/to/font.ttf", 16)
         renderer.draw_box_text(10, 10, "Hello World",
-                               (1, 1, 1, 1), (0, 0, 0, 0.6),
+                               Color(1, 1, 1), Color(0, 0, 0, 0.6),
                                screen_width, screen_height)
         renderer.deallocate()
     """
@@ -122,7 +123,7 @@ class Text:
         return self._atlas.measure_text(text)
 
     def draw_text(self, x: float, y: float, text: str,
-                  color: tuple[float, float, float, float],
+                  color: Color,
                   screen_width: int, screen_height: int) -> None:
         """Render text at screen position.
 
@@ -130,7 +131,7 @@ class Text:
             x: X position in pixels (left edge)
             y: Y position in pixels (top edge of text box)
             text: Text string to render
-            color: (r, g, b, a) text color
+            color: text color
             screen_width: Width of render target in pixels
             screen_height: Height of render target in pixels
         """
@@ -153,8 +154,8 @@ class Text:
         context().bind_vertex_array(previous_vao)
 
     def draw_box_text(self, x: float, y: float, text: str,
-                      color: tuple[float, float, float, float],
-                      bg_color: tuple[float, float, float, float],
+                      color: Color,
+                      bg_color: Color,
                       screen_width: int, screen_height: int) -> None:
         """Render text with a background box.
 
@@ -162,8 +163,8 @@ class Text:
             x: X position in pixels (left edge)
             y: Y position in pixels (top edge)
             text: Text string to render
-            color: (r, g, b, a) text color
-            bg_color: (r, g, b, a) background box color
+            color: text color
+            bg_color: background box color
             screen_width: Width of render target in pixels
             screen_height: Height of render target in pixels
         """
@@ -183,7 +184,7 @@ class Text:
         style.set_blend_mode(style.BlendMode.ALPHA)
 
         # Draw background box first, in 0..1 of the area
-        self._box.use((box_x / screen_width, box_y / screen_height, box_width / screen_width, box_height / screen_height),
+        self._box.use(Rect(box_x / screen_width, box_y / screen_height, box_width / screen_width, box_height / screen_height),
                       bg_color)
 
         # Draw text with slight vertical offset for better centering

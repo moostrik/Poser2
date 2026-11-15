@@ -12,7 +12,7 @@ from modules.flow import Port, hold_tick
 from modules.inference import Capture
 from modules.pose import Frame, Similarity, AngleMotion
 from modules import render
-from modules.utils import FPS, Rect, Point2f
+from modules.utils import FPS, Color, Rect, Point2f
 
 from ..board import RenderBoard
 from ..settings import Layers, MainView, RenderSettings, FlowInputSettings
@@ -78,7 +78,7 @@ VIEW_LAYERS: list[Layers] = [
 OUTPUT_WIDTH: int = 1080
 OUTPUT_HEIGHT: int = 1920
 
-BORDER: tuple[float, float, float, float] = (0.4, 0.4, 0.4, 1.0)    # the border around each layer in the main window, so a black layer shows
+BORDER: Color = Color(0.4, 0.4, 0.4)    # the border around each layer in the main window, so a black layer shows
 BORDER_WIDTH: float = 2.0       # px
 
 # The layers that are not output-shaped, each with the layer whose texture holds its shape
@@ -542,7 +542,7 @@ class DeepFlowRender(RenderBase):
             return
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
-        self._border.use(0.0, 0.0, 1.0, 1.0, *BORDER, BORDER_WIDTH / width, BORDER_WIDTH / height)
+        self._border.use(Rect(0.0, 0.0, 1.0, 1.0), BORDER, BORDER_WIDTH / width, BORDER_WIDTH / height)
         Style.pop_style()
 
     def _layer_size(self, layer_type: Layers) -> tuple[int, int]:

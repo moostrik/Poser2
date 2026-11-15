@@ -1,5 +1,6 @@
 # Local application imports
 from modules.gl import shaders
+from modules.utils import Color, Rect
 from ....layer_base import LayerBase
 from .marks import Mark
 from .strip import strip_spans
@@ -127,5 +128,6 @@ class MarkRenderer(LayerBase):
     def _spans(self, x: float, width: float, y: float, height: float,
                color: tuple[float, float, float, float]) -> None:
         """One quad, or two when it runs off the strip's 0/360 join (`strip_spans`)."""
+        fill: Color = Color(*color)
         for span_x, span_w in strip_spans(x, width):
-            self._rect.use(span_x, y, span_w, height, *color)
+            self._rect.use(Rect(span_x, y, span_w, height), fill)

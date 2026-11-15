@@ -1,4 +1,4 @@
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
 from .. import Shader, draw_quad, Texture
 
 import logging
@@ -27,6 +27,5 @@ class DetailThreshold(Shader):
         glUniform1f(self.get_uniform_loc("detailBoost"), detail_boost)
         glUniform1f(self.get_uniform_loc("radius"), radius)
         glUniform1i(self.get_uniform_loc("invert"), 1 if invert else 0)
-        glUniform2f(self.get_uniform_loc("texelSize"), 1.0 / src.width, 1.0 / src.height)
 
         draw_quad()

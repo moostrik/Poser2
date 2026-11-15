@@ -2,7 +2,7 @@
 
 uniform sampler2D src;      // Input mask texture (red channel)
 uniform float radius;        // Dilation radius (typically 1.0 for multi-pass)
-uniform vec2 texelSize;      // 1.0 / texture_dimensions
+#define texelSize (1.0 / vec2(textureSize(src, 0)))
 
 in vec2 texCoord;
 out vec4 fragColor;

@@ -7,7 +7,7 @@ from typing import Protocol
 from modules.settings import Field, BaseSettings
 from modules.gl import Fbo, Texture, clear_color, shaders
 from modules.pose import PointLandmark, Points2D
-from modules.utils import Point2f
+from modules.utils import Color, Point2f
 from ...layer_base import LayerBase
 from .shaders import PosePointLines
 from ...color_settings import ColorSettings
@@ -79,7 +79,7 @@ class ViewPoseLayer(LayerBase):
         line_smooth: float = 1.0 / self._fbo.height * self.settings.line_smooth
         anchor_size: float = line_width * 4.0
         anchor_smooth: float = line_smooth
-        anchor_color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
+        anchor_color: Color = Color(1.0, 1.0, 1.0)
 
         # Candidate snap-point dots: shoulder / hip / feet midpoints, computed from
         # the transformed pose points (same space as the skeleton).

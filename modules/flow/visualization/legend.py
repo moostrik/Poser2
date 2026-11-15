@@ -8,12 +8,13 @@ from enum import IntEnum, auto
 from OpenGL.GL import GL_RGBA8
 
 from modules.gl import Fbo, Style, Text, Texture
+from modules.utils import Color
 from .log_axis import histogram_lines, strip_lines, value_limit, AxisLine
 from .shaders import LogGrid, ColormapKey
 from .strip import ALL_CHANNELS, LANES
 
-TEXT: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
-BOX: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.6)
+TEXT: Color = Color(1.0, 1.0, 1.0)
+BOX: Color = Color(0.0, 0.0, 0.0, 0.6)
 MARGIN: int = 8
 KEY_WIDTH: int = 180            # the colormap key's bars (pixels)
 KEY_BAR: int = 12               # a bar's height (pixels)

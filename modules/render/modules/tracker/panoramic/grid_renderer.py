@@ -3,6 +3,7 @@ import math
 
 # Local application imports
 from modules.gl import Text, shaders
+from modules.utils import Color, Rect
 from modules.tracker import PanoramicTrackerSettings, camera_azimuth
 
 from ....layer_base import LayerBase
@@ -139,18 +140,16 @@ class GridRenderer(LayerBase):
         y_near: float = row(rig.zone_min_radius)
         if y_near - y_far <= 0.0:
             return
-        self._rect.use(0.0, y_far, 1.0, y_near - y_far, *ZONE_COLOR)
+        self._rect.use(Rect(0.0, y_far, 1.0, y_near - y_far), ZONE_COLOR)
 
-    def _vertical(self, azimuth: float, width: float,
-                  color: tuple[float, float, float, float]) -> None:
-        self._rect.use((azimuth % 360.0) / 360.0, 0.0, width, 1.0, *color)
+    def _vertical(self, azimuth: float, width: float, color: Color) -> None:
+        self._rect.use(Rect((azimuth % 360.0) / 360.0, 0.0, width, 1.0), color)
 
-    def _horizontal(self, elevation: float, height: float,
-                    color: tuple[float, float, float, float]) -> None:
+    def _horizontal(self, elevation: float, height: float, color: Color) -> None:
         # Rect y is top-down, and the window's top elevation is the strip's top row. The horizon is
         # only at mid-height when the window is symmetric, which a tilted camera's is not. Centred
         # on the elevation, so a thicker line does not drift below the row it marks.
-        self._rect.use(0.0, self._elevation_y(elevation) - height / 2.0, 1.0, height, *color)
+        self._rect.use(Rect(0.0, self._elevation_y(elevation) - height / 2.0, 1.0, height), color)
 
     def _elevation_y(self, elevation: float) -> float:
         return strip_y(elevation, self._elevation_window)

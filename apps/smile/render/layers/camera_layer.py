@@ -3,6 +3,7 @@ import time
 
 from ...face import FaceObservations
 from modules.gl import Fbo, Image, Style, SwapFbo, Text, Texture, shaders
+from modules.utils import Color
 from ..inputs import Faces
 from ..settings import FaceEffect, FaceFill, RenderSettings
 from ..shaders import FaceColor
@@ -149,4 +150,5 @@ class CameraLayer(LayerBase):
         x = max(LABEL_PAD_PX, min(x, self._width - text_width - LABEL_PAD_PX))
         y = max(LABEL_PAD_PX, min(y, self._height - text_height - LABEL_PAD_PX))
         r, g, b, a = REJECTED_COLOR
-        self._text.draw_box_text(x, y, mark.label, (r, g, b, a * alpha), (*LABEL_BG[:3], LABEL_BG[3] * alpha), self._width, self._height)
+        br, bg, bb, ba = LABEL_BG
+        self._text.draw_box_text(x, y, mark.label, Color(r, g, b, a * alpha), Color(br, bg, bb, ba * alpha), self._width, self._height)

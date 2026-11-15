@@ -1,6 +1,7 @@
 """Draw rectangle outline shader - draws rectangle border with specified line width."""
 
 from OpenGL.GL import glUniform2f, glUniform4f, glUseProgram
+from modules.utils import Color, Rect
 from .. import Shader, draw_quad
 
 import logging
@@ -8,26 +9,16 @@ logger = logging.getLogger(__name__)
 
 
 class DrawRectangleOutline(Shader):
-    """Draw a rectangle outline with specified color, position, and line width."""
+    """A rectangle's outline: `rect` in 0..1 of the target, origin top-left, in `color`; the line widths are parts of
+    the rectangle's width (the vertical lines) and height (the horizontal ones)."""
 
-    def use(self, x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float, line_width_x: float = 0.01, line_width_y: float = 0.01) -> None:
-        """Draw a rectangle outline at specified position.
-
-        Args:
-            x: X position (normalized 0..1, left edge)
-            y: Y position (normalized 0..1, top edge)
-            w: Width (normalized 0..1)
-            h: Height (normalized 0..1)
-            r, g, b, a: Color components (0.0-1.0)
-            line_width_x: Line width for vertical lines in normalized coordinates
-            line_width_y: Line width for horizontal lines in normalized coordinates
-        """
+    def use(self, rect: Rect, color: Color, line_width_x: float = 0.01, line_width_y: float = 0.01) -> None:
         if not self.allocated or not self.shader_program:
             logger.warning("DrawRectangleOutline shader not allocated or shader program missing.")
             return
 
         glUseProgram(self.shader_program)
-        glUniform4f(self.get_uniform_loc("rect"), x, y, w, h)
-        glUniform4f(self.get_uniform_loc("color"), r, g, b, a)
+        glUniform4f(self.get_uniform_loc("rect"), rect.x, rect.y, rect.width, rect.height)
+        glUniform4f(self.get_uniform_loc("color"), *color)
         glUniform2f(self.get_uniform_loc("lineWidth"), line_width_x, line_width_y)
         draw_quad()

@@ -9,7 +9,7 @@ import numpy as np
 # Local application imports
 from modules.board import HasWindows
 from modules.gl import Fbo, Texture, Image, clear_color, Text
-from modules.utils import Rect
+from modules.utils import Color, Rect
 from modules.pose import FeatureWindow, BaseScalarFeature
 from modules.settings import BaseSettings
 from ...layer_base import LayerBase, DataCache
@@ -177,7 +177,7 @@ class FeatureWindowLayer(LayerBase):
             clr: int = i % len(colors)
 
             self._text_renderer.draw_box_text(
-                x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.66),
+                x, y, string, Color(*colors[clr]), Color(0.0, 0.0, 0.0, 0.66),
                 screen_width=fbo.width, screen_height=fbo.height
             )
 

@@ -1,11 +1,12 @@
 from modules.gl import Fbo, Style, Text, Texture
+from modules.utils import Color
 
 from .layer_base import LayerBase
 
 FONT_SIZE: int = 18
 MARGIN_PX: float = 16.0
-TEXT_COLOR: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
-BOX_COLOR: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.6)
+TEXT_COLOR: Color = Color(1.0, 1.0, 1.0)
+BOX_COLOR: Color = Color(0.0, 0.0, 0.0, 0.6)
 
 
 class StatusLayer(LayerBase):

@@ -3,6 +3,7 @@ import numpy as np
 
 # Local application imports
 from modules.gl import Text, shaders
+from modules.utils import Color
 
 from modules.camera import CameraTracklet, TrackingStatus
 from modules.board import HasCameraTracklets
@@ -46,8 +47,6 @@ class TrackletRenderer(LayerBase):
 
         t_x: float = tracklet.roi.x
         t_y: float = tracklet.roi.y
-        t_w: float = tracklet.roi.width
-        t_h: float = tracklet.roi.height
 
         r: float = 1.0
         g: float = 1.0
@@ -62,7 +61,7 @@ class TrackletRenderer(LayerBase):
         if tracklet.status == TrackingStatus.REMOVED:
             r, g, b, a = (1.0, 0.0, 0.0, 1.0)
 
-        shader.use(t_x, t_y, t_w, t_h, r, g, b, a)
+        shader.use(tracklet.roi, Color(r, g, b, a))
 
         # Convert tracklet coordinates to pixel space if needed
         # Tracklet ROI is typically in normalized coordinates (0-1)
@@ -82,8 +81,8 @@ class TrackletRenderer(LayerBase):
         final_x: float = max(0, min(text_x, width - text_width - padding))
         final_y: float = max(0, min(text_y, height - text_height - padding))
 
-        text_renderer.draw_box_text(final_x, final_y, text_string, (1.0, 1.0, 1.0, 1.0),
-                                   (0.0, 0.0, 0.0, 0.6), width, height)
+        text_renderer.draw_box_text(final_x, final_y, text_string, Color(1.0, 1.0, 1.0),
+                                   Color(0.0, 0.0, 0.0, 0.6), width, height)
 
 
 

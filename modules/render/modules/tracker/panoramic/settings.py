@@ -3,6 +3,7 @@ from enum import IntEnum, auto
 
 # Local application imports
 from modules.settings import BaseSettings, Field, Widget
+from modules.utils import Color
 
 
 class PanoramaBlend(IntEnum):
@@ -61,20 +62,20 @@ class PanoramaLayerSettings(BaseSettings):
 
 # Fixed meanings, so not in ColorSettings: those are per-player track colours a user may tune, and
 # a reader has to be able to tell a seam from an axis from the horizon.
-GRID_COLOR:    tuple[float, float, float, float] = (1.0, 1.0, 1.0, 0.18)
-HORIZON_COLOR: tuple[float, float, float, float] = (0.3, 1.0, 0.3, 1.0)    # its own hue, opaque
+GRID_COLOR:    Color = Color(1.0, 1.0, 1.0, 0.18)
+HORIZON_COLOR: Color = Color(0.3, 1.0, 0.3, 1.0)    # its own hue, opaque
 HORIZON_PX:    float = 1.0                        # the colour sets it apart, not the width
-SEAM_COLOR:    tuple[float, float, float, float] = (1.0, 0.35, 0.0, 0.75)  # sector boundary
-AXIS_COLOR:    tuple[float, float, float, float] = (0.0, 0.7, 1.0, 0.6)    # camera optical axis
+SEAM_COLOR:    Color = Color(1.0, 0.35, 0.0, 0.75)  # sector boundary
+AXIS_COLOR:    Color = Color(0.0, 0.7, 1.0, 0.6)    # camera optical axis
 # Yellow is permissive (a second camera sees here), red prohibitive (no new person is born here).
 # Shape and home differ too: yellow is a pair of lines in `GridRenderer`, because the overlap is a
 # statement about azimuth; red is a band in `SeamRenderer`, because the dead zone is a band of one
 # camera's image columns and only the picture can be read against it.
-OVERLAP_COLOR:  tuple[float, float, float, float] = (1.0, 0.85, 0.0, 0.65)  # two cameras see it
-DEAD_ZONE_COLOR: tuple[float, float, float, float] = (1.0, 0.15, 0.1, 0.10)  # no births here
+OVERLAP_COLOR:  Color = Color(1.0, 0.85, 0.0, 0.65)  # two cameras see it
+DEAD_ZONE_COLOR: Color = Color(1.0, 0.15, 0.1, 0.10)  # no births here
 # The tracked floor as a band between the two radii, in the overlap's yellow: together they say
 # where the tracker works — the overlap bounds it in azimuth, the zone in distance.
-ZONE_COLOR:     tuple[float, float, float, float] = (1.0, 0.85, 0.0, 0.10)
+ZONE_COLOR:     Color = Color(1.0, 0.85, 0.0, 0.10)
 # A rejected detection — too young, too small, a new one in the dead zone, past the far edge.
 # Grey because it belongs to nobody: every track colour means a person. Also the colour a LOST mark's
 # line fades toward, so a person walking out ends where their grey line begins.
@@ -82,5 +83,5 @@ REJECTED_COLOR: tuple[float, float, float, float] = (0.6, 0.6, 0.6, 0.8)
 # A person tracked but waiting for a free player slot: a real identity, belonging to no slot yet, so
 # neither a track colour nor the rejection grey. White, at the passive line's alpha.
 WAITING_COLOR: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 0.8)
-LABEL_FG:      tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
-LABEL_BG:      tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.6)
+LABEL_FG:      Color = Color(1.0, 1.0, 1.0, 1.0)
+LABEL_BG:      Color = Color(0.0, 0.0, 0.0, 0.6)

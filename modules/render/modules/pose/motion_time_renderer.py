@@ -5,6 +5,7 @@ from modules.board import HasFrames
 from modules.pose import Frame, MotionTime
 from ...layer_base import LayerBase
 from modules.gl import Text
+from modules.utils import Color
 
 
 class MotionTimeRendererSettings(BaseSettings):
@@ -43,8 +44,8 @@ class MotionTimeRenderer(LayerBase):
 
         self._text_renderer.draw_box_text(
             x, y, self._motion_time,
-            color=(1.0, 1.0, 1.0, 1.0),
-            bg_color=(0.0, 0.0, 0.0, 0.8),
+            color=Color(1.0, 1.0, 1.0),
+            bg_color=Color(0.0, 0.0, 0.0, 0.8),
             screen_width=self._width,
             screen_height=self._height
         )

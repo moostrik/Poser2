@@ -4,6 +4,7 @@ from OpenGL.GL import glViewport
 
 from ...credit import FONT, TITLE_FONT, CreditLines, qr_image, title_image, wrap_balanced
 from modules.gl import Fbo, Image, Style, Text, Texture, shaders
+from modules.utils import Color
 from ..sequencer import SequenceType
 from ..settings import RenderSettings
 
@@ -15,8 +16,8 @@ TITLE_PX: int = round(FONT_SIZE / TITLE_FONT)      # the title's capitals as tal
 MARGIN_PX: int = 40             # from the image's edges
 LINE_SPACING: float = 1.0       # of the text's height
 OUTLINE_PX: int = 5             # the black edge round the letters, as on a meme
-TEXT_COLOR: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
-OUTLINE_COLOR: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
+TEXT_COLOR: Color = Color(1.0, 1.0, 1.0)
+OUTLINE_COLOR: Color = Color(0.0, 0.0, 0.0)
 OUTLINE: list[tuple[int, int]] = [(x, y) for x in (-OUTLINE_PX, 0, OUTLINE_PX) for y in (-OUTLINE_PX, 0, OUTLINE_PX) if x or y]
 FADE_S: float = 0.5             # the caption fades in and out over this time
 

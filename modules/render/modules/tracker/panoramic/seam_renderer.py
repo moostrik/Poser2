@@ -2,6 +2,7 @@
 from modules.tracker import PanoramicTrackerSettings, camera_local_to_azimuth, wrap180
 
 from modules.gl import shaders
+from modules.utils import Color, Rect
 from ....layer_base import LayerBase
 from .settings import PanoramaLayerSettings, DEAD_ZONE_COLOR
 from .strip import strip_spans
@@ -60,7 +61,7 @@ class SeamRenderer(LayerBase):
             self._band(self._azimuth(cam_id, fov - width), self._azimuth(cam_id, fov),
                        DEAD_ZONE_COLOR)
 
-    def _band(self, left: float, right: float, fill: tuple[float, float, float, float]) -> None:
+    def _band(self, left: float, right: float, fill: Color) -> None:
         """An azimuth range as a faint full-height fill.
 
         The width is folded into ±180 rather than taken modulo 360 so that a degenerate range draws
@@ -72,7 +73,7 @@ class SeamRenderer(LayerBase):
         if span <= 0.0:
             return
         for x, w in strip_spans(left / 360.0, span / 360.0):
-            self._rect.use(x, 0.0, w, 1.0, *fill)
+            self._rect.use(Rect(x, 0.0, w, 1.0), fill)
 
     def _azimuth(self, cam_id: int, local: float) -> float:
         """A camera's own local angle to the strip x its pixels land on, at the focus depth — the

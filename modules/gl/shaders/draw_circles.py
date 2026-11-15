@@ -1,6 +1,7 @@
 """Draw multiple circles with antialiasing."""
 
 from OpenGL.GL import glUniform1f, glUniform1i, glUniform4fv, glUseProgram
+from modules.utils import Color
 from .. import Shader, draw_quad
 
 import logging
@@ -11,14 +12,14 @@ class DrawCircles(Shader):
     """Draw up to 8 circles with individual positions, sizes, and colors."""
 
     def use(self, positions: list[tuple[float, float]], size: float, smooth: float,
-            color: tuple[float, float, float, float], aspect_ratio: float = 1.0) -> None:
+            color: Color, aspect_ratio: float = 1.0) -> None:
         """Draw circles.
 
         Args:
             positions: List of (x, y) tuples in 0..1 of the target, origin top-left
             size: Circle radius in normalized coordinates (shared by all circles)
             smooth: Antialiasing smoothness in normalized coordinates (shared by all circles)
-            color: (r, g, b, a) color tuple [0.0, 1.0] (shared by all circles)
+            color: shared by all circles
             aspect_ratio: Width / height of rendering target for correct circle shape.
             Maximum 8 circles supported.
         """

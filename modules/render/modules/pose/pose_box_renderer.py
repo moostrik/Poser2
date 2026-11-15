@@ -37,20 +37,16 @@ class PoseBoxRenderer(LayerBase):
         self._shader.deallocate()
 
     def draw(self) -> None:
-        track_colors = self._color_settings.track_color_tuples if self._color_settings else None
+        track_colors = self._color_settings.track_colors if self._color_settings else None
         for bbox_rect, track_id in self._cam_bbox_rects:
-            color = track_colors[track_id % len(track_colors)] if track_colors else self.settings.color.to_tuple()
+            color: Color = track_colors[track_id % len(track_colors)] if track_colors else self.settings.color
             # Convert pixel line width to normalized coordinates relative to the rectangle
             rect_w_pixels = bbox_rect.width * self._width
             rect_h_pixels = bbox_rect.height * self._height
             line_width_x = self.settings.line_width / rect_w_pixels
             line_width_y = self.settings.line_width / rect_h_pixels
 
-            self._shader.use(
-                bbox_rect.x, bbox_rect.y, bbox_rect.width, bbox_rect.height,
-                *color,
-                line_width_x, line_width_y
-            )
+            self._shader.use(bbox_rect, color, line_width_x, line_width_y)
 
     def update(self) -> None:
         self._cam_bbox_rects = []

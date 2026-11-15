@@ -1,4 +1,4 @@
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
 from ..shader import Shader, draw_quad
 from .. import Texture
 
@@ -24,7 +24,6 @@ class Sharpen(Shader):
         # Configure shader uniforms (using cached locations)
         glUniform1i(self.get_uniform_loc("src"), 0)
         glUniform1f(self.get_uniform_loc("amount"), amount)
-        glUniform2f(self.get_uniform_loc("texelSize"), 1.0 / src.width, 1.0 / src.height)
 
         # Render
         draw_quad()

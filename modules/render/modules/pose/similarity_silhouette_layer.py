@@ -12,6 +12,7 @@ from modules.gl import Fbo, SwapFbo, Texture, Style, shaders
 from modules.board import HasFrames
 from modules.pose import Similarity, MotionGate, AngleMotion, Frame
 from modules.settings import Field, BaseSettings
+from modules.utils import Color
 
 from ...layer_base import LayerBase
 from ...color_settings import ColorSettings
@@ -146,11 +147,11 @@ class SimilaritySilhouetteLayer(LayerBase):
         self._shader.reload()
 
         # Step 1: Tint all cameras' masks
-        colors = self._color_settings.track_color_tuples
+        colors = self._color_settings.track_colors
         for cam_id, mask_tex in self._mask_textures.items():
             color = colors[cam_id % len(colors)]
             self._tint_fbos[cam_id].begin()
-            self._tint.use(mask_tex, color[0], color[1], color[2], 1.0)
+            self._tint.use(mask_tex, Color(color.r, color.g, color.b))
             self._tint_fbos[cam_id].end()
 
         # Step 2: AddDodgeBlend own camera's tinted mask with foreground
