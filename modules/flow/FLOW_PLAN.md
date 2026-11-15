@@ -52,8 +52,8 @@ keys).
   `Fluid2DLayer`, with what they share with the 3D layers: `StageLayer`, `MotionLayer`, `BridgeLayer`,
   `FluidLayer`, their inputs and outputs, `Injection`, the shaders `DensityColor` and `DensityColorize`) to
   `apps/hd_trio/render/layers/flow/`, and the 2D system they run (`GradientFlow`, `bridge_2d`, `fluid_2d`, their
-  shaders) to `apps/hd_trio/flow/`. The flow's own utilities (`Port`, `FlowUtil`, `FlowBase`) stay shared and keep
-  their API. hd_trio's settings and presets take the copy; its `monitor_a` and `monitor_b` go (it does not need
+  shaders, and what they share with the 3D: `time_step`, `wall_mode`, `AddBoolean`, `MagnitudeShader`) to
+  `apps/hd_trio/flow/`. Only `Port`, `FlowUtil` and `FlowBase` stay shared, exported, and keep their API. hd_trio's settings and presets take the copy; its `monitor_a` and `monitor_b` go (it does not need
   them). The 2D parts of `test_layer_names.py` and `test_flow_systems.py` go with the copy; `FLOW_ROOTS` and
   `flow.md`'s paths cover it; FLOW.md says where hd_trio's 2D lives. Checked by hd_trio's tests and one -sim start
   of hd_trio in its venv (depthai 2). The copy lives until hd_trio's refactor brings it onto deep_flow's.
