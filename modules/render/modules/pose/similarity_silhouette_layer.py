@@ -26,6 +26,7 @@ class SimilaritySilhouetteLayerSettings(BaseSettings):
     similarity_threshold:   Field[float] = Field(0.1, min=0.0, max=1.0, description="Similarity below this contributes nothing")
     motion_exponent:        Field[float] = Field(1.0, min=0.0, max=5.0, description="Similarity response curve")
     similarity_scale:       Field[float] = Field(1.0, min=0.0, max=1.0, description="0 = own silhouette only, 1 = full cross-camera response")
+    foreground_threshold:   Field[float] = Field(0.2, min=0.0, max=0.95, description="The players' lowest similarity below which the foreground does not show")
     # MSColorMask parameters
     layered:                Field[float] = Field(0.8, min=0.0, max=1.0, description="0 = additive, 1 = own in front")
 
@@ -126,7 +127,7 @@ class SimilaritySilhouetteLayer(LayerBase):
 
         # foreground_blend: float = (lowest_similarity - 0.25) * 2.0
         # foreground_blend = max(0.0, min(1.0, foreground_blend))
-        foreground_threshold = 0.2
+        foreground_threshold = self.settings.foreground_threshold
         foreground_blend: float = (lowest_similarity - foreground_threshold) / (1.0 - foreground_threshold)
         foreground_blend = max(0.0, min(1.0, foreground_blend))
         foreground_blend = easeInSine(foreground_blend)
