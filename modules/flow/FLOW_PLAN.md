@@ -56,11 +56,15 @@ start (the panels in place, the preset loaded without unknown keys).
   image, on the camera's frame with its boxes, or on the view, the last two without an image so they lie over
   any layer of that frame; the features of the frame or the window as an optional overlay. It replaces
   `tracker`, `pose`, `view_pose` and the four `data_*` layers; `data_time` goes; `time_series` stays a layer.
-- **A5.** The composite leaves deep_flow: the LUT becomes an option of the fluid's look, and the show draws the
-  `output` layers in order. `LayerCompositor` stays in `render/general` for hd_trio.
-- **A6.** The panel tree in the chain's order: `capture`, `view`, `pose`, `motion`, `bridge`, `fluid`; the display
-  (`layer`, `colors`) apart. The depth tolerance and the view's size declared once, shared to the view and the
-  motion.
+- **A5.** The composite leaves deep_flow: the LUT becomes an option of the fluid's look, and the show draws its
+  layers in order. `LayerCompositor` stays in `render/general` for hd_trio.
+- **A6.** The panel tree in the chain's order: `capture`, `view`, `motion`, `bridge`, `fluid`, then `pose`; the
+  display (`layer`, `colors`) apart. `Layers` in the same order, the pose's monitor last. The depth tolerance
+  and the view's size declared once, shared to the view and the motion.
+- **A7.** The layer select cut to two panels, `a` and `b`, in place of `left`, `right`, `output` and `record`; the
+  show draws `a`, the recording records the window. A layer taken out of a list goes back to its place among
+  the unselected, in `Layers`' order: the panel's playlist (`modules/panel/controls.py`) keeps the order it was
+  dragged into, for every app.
 
 ## B. The camera and the view
 
@@ -244,7 +248,7 @@ Not worked on until asked for; each with what is known.
 
 ## Rules it touches
 
-- Keep presets and settings schemas in sync: the view's color, the monitors, the panel tree, A2 to A6.
+- Keep presets and settings schemas in sync: the view's color, the monitors, the panel tree, the layer select, A2 to A7.
 - Remove obsolete pathways: the four lists, the wrapper layers, `view_depth`, `monitor_a`, `monitor_b`,
   `inputs`, `stage`, the pose's layers and deep_flow's composite, A1, A3 to A5.
 - `shared` holds the layers that are not general and that more than one app uses: `ForegroundLook`, A2.
