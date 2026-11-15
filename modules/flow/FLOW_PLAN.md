@@ -76,11 +76,13 @@ without unknown keys. The stages may later move into `modules/flow` (Parked); th
   `scale_by_motion` goes, every injection at full weight (the pose is linked to the fluid later, another way).
 - **A4.** The pose monitor: the pose is a branch beside the chain (a `Frame` per player, made by the pose
   pipeline, handed on with the capture; the view only places its points), so its monitor draws data, not FBOs,
-  in the stage monitors' shape: the pose stage it reads (raw, clean, smooth, lerp), what it draws (the skeleton
-  on the view, on the crop, or on the camera image with its boxes; the features as a window or a frame; the time
-  series) and its draw settings. It replaces `tracker`, `pose`, `view_pose`, `data_A_W`, `data_A_F`,
-  `data_B_W`, `data_B_F`, `data_time` and `time_series`. `Layers` then holds the stages' monitors, the pose
-  monitor, the fluid's look and the composite.
+  in the stage monitors' shape: the pose stage it reads (raw, clean, smooth, lerp), where it draws the pose (on
+  the crop, with the crop's image; on the camera's frame, with its boxes and no image; on the view, no image),
+  an optional overlay of the features (the current frame's or the window's) and its draw settings. Without an
+  image it lies over any layer of its frame. It replaces `tracker`, `pose`, `view_pose`, `data_A_W`,
+  `data_A_F`, `data_B_W`, `data_B_F` and `data_time`. `time_series` stays a layer of its own: it draws the
+  board's timings (camera interval, latencies, GPU times, waits), not the pose. `Layers` then holds the stages'
+  monitors, the pose monitor, the time series, the fluid's look and the composite.
 - **A5.** The panel tree in the chain's order: `capture`, `view` (the color in it), `pose`, `motion`, `bridge`,
   `fluid`, `composite`; the display (`layer`, `colors`) apart. The settings two stages read declared once on their parent and
   shared to both: the depth tolerance (the view's read, the motion's z) and the view's size (the motion's).
