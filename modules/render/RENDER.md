@@ -29,7 +29,8 @@ modules/render/
   general/   composite/
 ```
 
-A shader that no layer owns (a mask operation, a blend, a tint) is a GL tool and sits in `modules/gl/shaders/`.
+A shader useful to any app (a mask operation, a blend, a tint) sits in `modules/gl/shaders/` ([GL.md](../gl/GL.md));
+an app's own shader sits in that app.
 
 `modules/render` is the package: apps import it (`from modules import render`) and use its `__init__.py`'s names
 (`render.PoseCompositor`); the categories order it inside. No other module imports it (`tests/test_layering.py`).
