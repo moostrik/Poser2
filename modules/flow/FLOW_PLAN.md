@@ -10,17 +10,17 @@ section it changes. **(deduction)** marks what is inferred, **(site fact)** what
 
 | #   | Line                                                                      | State                                                         | Documents                                                    |
 |-----|---------------------------------------------------------------------------|---------------------------------------------------------------|--------------------------------------------------------------|
-| A   | [The camera and the view](#a-the-camera-and-the-view)                     | built; the depth read to choose                               | [VIEW.md](VIEW.md)                                           |
+| A   | [The camera and the view](#a-the-camera-and-the-view)                     | next: the render up to the motion; the depth read to choose   | [VIEW.md](VIEW.md)                                           |
 | B   | [The motion](#b-the-motion)                                               | built; its details open                                       | [MOTION.md](MOTION.md)                                       |
 | C   | [The bridge](#c-the-bridge)                                               | built; the dye's amount to judge                              | [BRIDGE_3D.md](BRIDGE_3D.md)                                 |
-| D   | [The 3D fluid's physics](#d-the-3d-fluids-physics)                        | next                                                          | [FLUID_3D.md](FLUID_3D.md)                                   |
+| D   | [The 3D fluid's physics](#d-the-3d-fluids-physics)                        | open                                                          | [FLUID_3D.md](FLUID_3D.md)                                   |
 | E   | [The 3D fluid's look at 4K](#e-the-3d-fluids-look-at-4k)                  | open                                                          | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md)           |
 | F   | [The chain timed as one](#f-the-chain-timed-as-one)                       | built                                                         | [TIMING.md](TIMING.md)                                       |
 | G   | [One unit across the stages](#g-one-unit-across-the-stages)               | not started                                                   | [FLOW.md](FLOW.md)                                           |
 | H   | [The 2D flow follows the 3D](#h-the-2d-flow-follows-the-3d)               | not started                                                   | [FLOW.md](FLOW.md)                                           |
 | I   | [Every setting and its description](#i-every-setting-and-its-description) | last, after the refactor                                      | `CLAUDE.md`, `.claude/rules`                                 |
 
-A1, C1 and C2 need the operator at the screen; the other lines go on meanwhile.
+A5, C1 and C2 need the operator at the screen; the other lines go on meanwhile.
 
 The apps on deep_flow's input have their own plan, [apps/APPS_PLAN.md](../../apps/APPS_PLAN.md); recording and
 -sim, deep_flow's live checks among them, theirs, [RECORDING_PLAN.md](../recording/RECORDING_PLAN.md).
@@ -33,13 +33,44 @@ distinct.
 Built: every capture reaches the motion ([INPUT_THREADS.md](INPUT_THREADS.md)), the mask's edge on the image's
 and the depth read across a surface ([VIEW.md](VIEW.md)).
 
-- **A1.** The depth read: `view.depth_read` holds `SURFACE` and `MASK` ([VIEW.md](VIEW.md#the-depth-read)). One
+First, deep_flow's render and panels up to the motion follow the chain: capture, view, foreground look, motion.
+What the code shows now (`apps/deep_flow/render/deep_flow_render.py`, `apps/deep_flow/settings.py`):
+- the chain is declared four times, each list with its own order and members: `UPDATE_LAYERS` (the update's
+  order, `color_mask`, the show's, between the foreground look and the motion), `CAPTURE_LAYERS` (run once per
+  capture), `VIEW_LAYERS` (allocated at the view's size) and `SHAPE_LAYERS` (each panel's shape);
+- `Layers` is one flat enum of sources (`cam_image`, `capture_image`, `capture_depth`), stages (`view`,
+  `motion`), a stage's outputs (`view_image`, `view_foreground`, `view_mask`, `view_depth_mask`) and display
+  layers (`view_depth`, `view_pose`, `tracker`, `pose`);
+- the panels are one flat list in `RenderSettings`, not in the chain's order;
+- the view reads the motion's `motion.z.tolerance`, and its size is the motion's `width` and `height`;
+- `inputs` (the motion's picture, the bridge's color, the injections' weight) and `stage` (the pose stage the
+  weight reads) are the app's wiring, among the stages;
+- `ForegroundLookLayer` sits in `render/modules/inference`, but styles the view's foreground; hd_trio's
+  `CenterForegroundLayer` runs the same `ForegroundLook`, so it is not general and two apps use it.
+
+Each of A1 to A4 is one commit, the preset restructured with the item that moves a setting, checked by the
+guard tests, the render's tests and one -sim start of deep_flow: the panels in their new place, the preset
+loaded without unknown keys. The stages may later move into `modules/flow` (Parked); the panels then follow
+them.
+
+- **A1.** One declaration of the chain in the renderer: each stage with its layers, the outputs it hands on and
+  its display layers, in the chain's order; the update order, the per-capture run, the view-sized allocation and
+  the panels' shapes read it.
+- **A2.** The panel tree in the chain's order: `capture`, `view` (its depth display and pose overlay under it),
+  `foreground_look`, `motion`; then the bridge, the fluid, the show (`color_mask`, the composite); the app's
+  wiring (`inputs`, `stage`) and the display (`layer`, `monitor_a`, `monitor_b`, `data`, `preview`,
+  `time_series`, `colors`) apart.
+- **A3.** The settings two stages read, declared once on their parent and shared to both: the depth tolerance
+  (the view's read, the motion's z) and the view's size (the motion's).
+- **A4.** `ForegroundLook` and its layer to `render/shared/foreground_look/`, the rule's place for a layer that is
+  not general and that two apps use.
+- **A5.** The depth read: `view.depth_read` holds `SURFACE` and `MASK` ([VIEW.md](VIEW.md#the-depth-read)). One
   stays, chosen together by eye on the edges recording; the other goes.
-- **A2.** A camera without depth, its mask from another source: deep_flow's mask is the depth's
+- **A6.** A camera without depth, its mask from another source: deep_flow's mask is the depth's
   ([VIEW.md](VIEW.md#the-mask-and-the-depth-mask)); a mask from RVM, for a camera without depth, would come back
   from hd_trio. With it the motion's `depth_mask`, the depth's own cut that gates z, is still the view stage's,
   and RVM's mask, on the crop, would have to be cut into the view's window.
-- **A3.** A depth for a 2D camera: the 3D fluid puts a pixel in at its z position and nothing where it has none
+- **A7.** A depth for a 2D camera: the 3D fluid puts a pixel in at its z position and nothing where it has none
   ([FLUID_3D.md](FLUID_3D.md#the-bodys-depth)), so a 2D camera gives it nothing. A depth made from the image
   (a monocular depth model) on the view would give the motion its z and z position as a depth camera's does.
   A single-frame model (Depth Anything V2) is good on a frame but flickers frame to frame, which the depth
@@ -165,36 +196,6 @@ concurrency rules touch none of it.
 - **I1.** Every setting and its description gone through, last, after the refactor, against the rule: a `Field`
   description is one short line of panel text, what and its unit; and whether every quantity is in the flow's
   textbook units, which a scan cannot judge.
-deep_flow's render and panels up to the motion follow the chain: capture, view, foreground look, motion. What
-the code shows now (`apps/deep_flow/render/deep_flow_render.py`, `apps/deep_flow/settings.py`):
-- the chain is declared four times, each list with its own order and members: `UPDATE_LAYERS` (the update's
-  order, `color_mask`, the show's, between the foreground look and the motion), `CAPTURE_LAYERS` (run once per
-  capture), `VIEW_LAYERS` (allocated at the view's size) and `SHAPE_LAYERS` (each panel's shape);
-- `Layers` is one flat enum of sources (`cam_image`, `capture_image`, `capture_depth`), stages (`view`,
-  `motion`), a stage's outputs (`view_image`, `view_foreground`, `view_mask`, `view_depth_mask`) and display
-  layers (`view_depth`, `view_pose`, `tracker`, `pose`);
-- the panels are one flat list in `RenderSettings`, not in the chain's order;
-- the view reads the motion's `motion.z.tolerance`, and its size is the motion's `width` and `height`;
-- `inputs` (the motion's picture, the bridge's color, the injections' weight) and `stage` (the pose stage the
-  weight reads) are the app's wiring, among the stages;
-- `ForegroundLookLayer` sits in `render/modules/inference`, but styles the view's foreground; hd_trio's
-  `CenterForegroundLayer` runs the same `ForegroundLook`, so it is not general and two apps use it.
-
-Each item is one commit, the preset restructured with the item that moves a setting, checked by the guard
-tests, the render's tests and one -sim start of deep_flow: the panels in their new place, the preset loaded
-without unknown keys. The stages may later move into `modules/flow` (Parked); the panels then follow them.
-
-- **I2.** One declaration of the chain in the renderer: each stage with its layers, the outputs it hands on and
-  its display layers, in the chain's order; the update order, the per-capture run, the view-sized allocation and
-  the panels' shapes read it.
-- **I3.** The panel tree in the chain's order: `capture`, `view` (its depth display and pose overlay under it),
-  `foreground_look`, `motion`; then the bridge, the fluid, the show (`color_mask`, the composite); the app's
-  wiring (`inputs`, `stage`) and the display (`layer`, `monitor_a`, `monitor_b`, `data`, `preview`,
-  `time_series`, `colors`) apart.
-- **I4.** The settings two stages read, declared once on their parent and shared to both: the depth tolerance
-  (the view's read, the motion's z) and the view's size (the motion's).
-- **I5.** `ForegroundLook` and its layer to `render/shared/foreground_look/`, the rule's place for a layer that is
-  not general and that two apps use.
 
 ## Parked
 
@@ -208,7 +209,7 @@ Not worked on until asked for; each with what is known.
   ports, is the render's. Each stage subclasses the render's `LayerBase` to sit in its update loop, and modules
   may not import the render, so the stages could not live in the flow **(deduction)**. The textbook split: each
   stage a plain flow class as `Fluid3D` is, with its settings, ports, inputs and outputs, and a thin render layer
-  per stage that calls it, beside the monitor. I3's panels follow wherever the stages end up.
+  per stage that calls it, beside the monitor. A2's panels follow wherever the stages end up.
 
 - The 4K upscale: depth in 3D at the grid and detail in 2D at 4K, a march at the grid's size, one
   edge-aware upscale of the flat result and a 4K detail layer advected by the grid's velocity; what
@@ -241,11 +242,11 @@ Not worked on until asked for; each with what is known.
 ## Rules it touches
 
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
-  preset's `view.depth_read`, A1.
+  preset's `view.depth_read`, A5.
 - A `Field` description is one short line of panel text: I1.
-- Keep presets and settings schemas in sync: deep_flow's panel tree and its shared settings, I3, I4.
-- Settings connect the user and a component, not two components: the view's tolerance and size, I4.
-- `shared` holds the layers that are not general and that more than one app uses: `ForegroundLook`, I5.
+- Keep presets and settings schemas in sync: deep_flow's panel tree and its shared settings, A2, A3.
+- Settings connect the user and a component, not two components: the view's tolerance and size, A3.
+- `shared` holds the layers that are not general and that more than one app uses: `ForegroundLook`, A4.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
-Not designed yet, so their rules are not named: A2, A3; B1 to B4; C1 to C4; D1, D2; E1 to E3; G1; H1 to H4.
+Not designed yet, so their rules are not named: A6, A7; B1 to B4; C1 to C4; D1, D2; E1 to E3; G1; H1 to H4.
