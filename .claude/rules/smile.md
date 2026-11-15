@@ -12,7 +12,6 @@ paths:
 - The panel is the source of truth; the workflow only provides the structure
 - Keep one workflow per visitor
 - Regenerate `data/comfy/smile_test.json` with `testflow`; never edit it by hand
-- A shader is a `.frag` file named after its `.py`, beside it
 - `sphere.py` is the one place that knows the sphere and its wiring
 - Start `ffmpeg` and `ffprobe` only through `modules/video`
 - Build an output file in `output/temp/` and rename it into place when complete
