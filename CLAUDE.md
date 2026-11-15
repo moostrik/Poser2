@@ -2,9 +2,12 @@
 
 Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`, reusable infrastructure in `modules/`.
 
-## Writing rules in this file
+## Writing rules
 
 - One rule per bullet
+- Keep a rule short and concrete
+- A rule is general: it holds beyond the case that prompted it
+- Word a rule as a preference ("prefer"), unless it has no exceptions
 - Add a short reason only when it marks the rule's boundary or the rule isn't obvious
 - No incident history, no examples unless the rule is ambiguous without one
 - A rule describes the codebase as it should look
