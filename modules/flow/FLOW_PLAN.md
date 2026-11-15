@@ -48,11 +48,9 @@ keys).
 
 - **A1.** One declaration of the chain in the renderer, in place of the four lists: each stage with its layer,
   its outputs and its monitor, in order.
-- **A2.** The color with the view: `ForegroundLook` runs as its own pass right after the view in A1's chain (not
-  inside `ViewLayer`, which the parked move takes into `modules/flow`), its output read by the bridge and shown
-  under the view, its settings in the view's panel; `enabled` off passes the foreground as it is.
-  `inputs.bridge_image` goes. `ForegroundLook` moves to `render/shared/foreground_look/`, since hd_trio uses it
-  too. VIEW.md says it.
+- **A2.** The color in the view: the view's last pass, `color`, its output read by the bridge, its settings
+  `view.color`; `enabled` off passes the foreground as it is. `inputs.bridge_image` and deep_flow's
+  `foreground_look` layer and panel go; hd_trio keeps its own until its refactor. VIEW.md says it.
 - **A3.** A monitor per stage, in the stage's panel, showing all its FBOs: deep_flow's own wiring, a
   `MonitorLayer` per stage with its stage fixed. The capture's image and depth layers declare their ports;
   `MonitorLayer` gets `view_depth`'s depth colormaps. `monitor_a`, `monitor_b`, the view's wrapper layers and
@@ -71,9 +69,6 @@ keys).
   show draws `a`, and the recording records `a` or the window. A layer taken out of a list goes back to its place among
   the unselected, in `Layers`' order: the panel's playlist (`modules/panel/controls.py`) keeps the order it was
   dragged into, for every app.
-
-Question: the color's one name, for the class, its output and its panel: `ForegroundLook` and "the foreground's
-look" now, the view's `color` in A2 as discussed.
 
 ## B. The camera and the view
 
@@ -260,7 +255,6 @@ Not worked on until asked for; each with what is known.
 - Keep presets and settings schemas in sync: the view's color, the monitors, the panel tree, the layer select, A2 to A7.
 - Remove obsolete pathways: the four lists, the wrapper layers, `view_depth`, `monitor_a`, `monitor_b`,
   `inputs`, `stage`, the pose's layers and deep_flow's composite, A1, A3 to A5.
-- `shared` holds the layers that are not general and that more than one app uses: `ForegroundLook`, A2.
 - Settings connect the user and a component, not two components: the view's tolerance and size, A6.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, B1.
