@@ -1,13 +1,13 @@
 #version 460 core
 
-in vec2 tex_coord;
+in vec2 texCoord;
 
 uniform sampler2D atlas;
-uniform vec4 text_color;
+uniform vec4 color;
 
-out vec4 frag_color;
+out vec4 fragColor;
 
 void main() {
-    float alpha = texture(atlas, tex_coord).r;
-    frag_color = vec4(text_color.rgb, text_color.a * alpha);
+    float alpha = texture(atlas, texCoord).r;
+    fragColor = vec4(color.rgb, color.a * alpha);
 }

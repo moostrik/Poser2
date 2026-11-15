@@ -295,7 +295,6 @@ class Shader():
         if shader_dir not in cls._directory_observers:
             observer = monitor_path(str(shader_dir), cls._on_any_file_changed)
             cls._directory_observers[shader_dir] = observer
-            # logger.info(f"Watching shader directory: {shader_dir}")
 
     @classmethod
     def disable_hot_reload(cls) -> None:

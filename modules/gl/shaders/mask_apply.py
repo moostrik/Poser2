@@ -5,11 +5,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 class MaskApply(Shader):
-    def use(self, color: Texture, mask: Texture, multiply: float = 1.0) -> None:
+    def use(self, src: Texture, mask: Texture, multiply: float = 1.0) -> None:
         if not self.allocated or not self.shader_program:
             logger.warning("MaskApply shader not allocated or shader program missing.")
             return
-        if not color.allocated or not mask.allocated:
+        if not src.allocated or not mask.allocated:
             logger.warning("MaskApply shader: input textures not allocated.")
             return
 
@@ -18,12 +18,12 @@ class MaskApply(Shader):
 
         # Bind input textures
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, color.tex_id)
+        glBindTexture(GL_TEXTURE_2D, src.tex_id)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, mask.tex_id)
 
         # Configure shader uniforms (using cached locations)
-        glUniform1i(self.get_uniform_loc("color"), 0)
+        glUniform1i(self.get_uniform_loc("src"), 0)
         glUniform1i(self.get_uniform_loc("mask"), 1)
         glUniform1f(self.get_uniform_loc("multiply"), multiply)
 

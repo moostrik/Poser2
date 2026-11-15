@@ -1,6 +1,6 @@
 #version 460 core
 
-uniform sampler2D tex;
+uniform sampler2D src;
 uniform float threshold;
 uniform float detailBoost;
 uniform float radius;
@@ -12,7 +12,7 @@ out vec4 fragColor;
 
 void main() {
     // Sample center pixel luminance
-    vec3 centerColor = texture(tex, texCoord).rgb;
+    vec3 centerColor = texture(src, texCoord).rgb;
     float centerLum = dot(centerColor, vec3(0.299, 0.587, 0.114));
 
     // Compute local mean and variance in a neighborhood
@@ -24,7 +24,7 @@ void main() {
     for (float y = -1.0; y <= 1.0; y += 1.0) {
         for (float x = -1.0; x <= 1.0; x += 1.0) {
             vec2 offset = vec2(x, y) * texelSize * radius;
-            vec3 sampleColor = texture(tex, texCoord + offset).rgb;
+            vec3 sampleColor = texture(src, texCoord + offset).rgb;
             float sampleLum = dot(sampleColor, vec3(0.299, 0.587, 0.114));
             sum += sampleLum;
             sumSq += sampleLum * sampleLum;

@@ -1,6 +1,6 @@
 #version 460 core
 
-uniform sampler2D tex0;
+uniform sampler2D src;
 uniform float hue;
 uniform float saturation;
 uniform float value;
@@ -25,7 +25,7 @@ vec3 hsv2rgb(vec3 c) {
 }
 
 void main() {
-    vec4 color = texture(tex0, texCoord);
+    vec4 color = texture(src, texCoord);
     vec3 hsv = rgb2hsv(color.rgb);
     hsv.x += hue;
     hsv.y *= saturation;

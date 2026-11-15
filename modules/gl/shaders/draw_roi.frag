@@ -1,6 +1,6 @@
 #version 460 core
 
-uniform sampler2D tex0;
+uniform sampler2D src;
 uniform vec4 roi; // x, y, width, height in texture coordinates [0,1]
 uniform float rotation; // rotation angle in radians
 uniform vec2 rotationCenter; // rotation center in texture coordinates [0,1]
@@ -32,5 +32,5 @@ void main() {
     vec2 textureCoord = rotatedOffset + rotationCenter;
 
     // Sample texture
-    fragColor = texture(tex0, textureCoord);
+    fragColor = texture(src, textureCoord);
 }

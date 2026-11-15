@@ -5,11 +5,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 class NoiseBlend(Shader):
-    def use(self, tex0: Texture, tex1: Texture, mask: Texture, blend: float) -> None:
+    def use(self, src: Texture, dst: Texture, mask: Texture, blend: float) -> None:
         if not self.allocated or not self.shader_program:
             logger.warning("NoiseBlend shader not allocated or shader program missing.")
             return
-        if not tex0.allocated or not tex1.allocated or not mask.allocated:
+        if not src.allocated or not dst.allocated or not mask.allocated:
             logger.warning("NoiseBlend shader: input textures not allocated.")
             return
 
@@ -18,9 +18,9 @@ class NoiseBlend(Shader):
 
         # Bind input textures
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
+        glBindTexture(GL_TEXTURE_2D, src.tex_id)
         glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, tex1.tex_id)
+        glBindTexture(GL_TEXTURE_2D, dst.tex_id)
         glActiveTexture(GL_TEXTURE2)
         glBindTexture(GL_TEXTURE_2D, mask.tex_id)
 

@@ -205,18 +205,18 @@ class Lut(Shader):
         self._deallocate_lut_texture()
         super().deallocate()
 
-    def use(self, tex0: Texture, strength: float = 1.0) -> None:
+    def use(self, src: Texture, strength: float = 1.0) -> None:
         """
         Apply the loaded LUT to an input texture.
 
         Args:
-            tex0: Input texture to apply the LUT to
+            src: Input texture to apply the LUT to
             strength: Blend strength between original (0.0) and LUT result (1.0)
         """
         if not self.allocated or not self.shader_program:
             logger.warning("Lut shader not allocated or shader program missing.")
             return
-        if not tex0.allocated:
+        if not src.allocated:
             logger.warning("Lut shader: input texture not allocated.")
             return
         if not self._lut_loaded:
@@ -228,15 +228,15 @@ class Lut(Shader):
 
         # Bind input texture to unit 0
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
+        glBindTexture(GL_TEXTURE_2D, src.tex_id)
 
         # Bind LUT 3D texture to unit 1
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_3D, self._lut_tex_id)
 
         # Configure shader uniforms
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
-        glUniform1i(self.get_uniform_loc("lutTex"), 1)
+        glUniform1i(self.get_uniform_loc("src"), 0)
+        glUniform1i(self.get_uniform_loc("lut"), 1)
         glUniform1f(self.get_uniform_loc("strength"), strength)
         glUniform3f(self.get_uniform_loc("domainMin"), *self._domain_min)
         glUniform3f(self.get_uniform_loc("domainMax"), *self._domain_max)

@@ -31,8 +31,8 @@ class DrawCircles(Shader):
             return
 
         glUseProgram(self.shader_program)
-        glUniform1i(self.get_uniform_loc("num_circles"), num_circles)
-        glUniform1f(self.get_uniform_loc("aspect_ratio"), aspect_ratio)
+        glUniform1i(self.get_uniform_loc("numCircles"), num_circles)
+        glUniform1f(self.get_uniform_loc("aspectRatio"), aspect_ratio)
 
         # Pack circle data into vec4 arrays
         circle_data = []

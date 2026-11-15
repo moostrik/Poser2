@@ -14,7 +14,7 @@ from . import style
 from .context import context
 from .font_atlas import FontAtlas
 from .shaders.glyphs import Glyphs
-from .shaders.box_shader import BoxShader
+from .shaders.draw_box import DrawBox
 
 
 # Default font path
@@ -42,7 +42,7 @@ class Text:
     def __init__(self) -> None:
         self._atlas: FontAtlas = FontAtlas()
         self._glyphs: Glyphs = Glyphs()
-        self._box_shader: BoxShader = BoxShader()
+        self._box: DrawBox = DrawBox()
         self._allocated: bool = False
         self._vao: int = 0      # the string batch: interleaved (x, y, u, v), 6 vertices per glyph
         self._vbo: int = 0
@@ -74,9 +74,9 @@ class Text:
 
         # Allocate shaders
         self._glyphs.allocate()
-        self._box_shader.allocate()
+        self._box.allocate()
 
-        if not self._glyphs.allocated or not self._box_shader.allocated:
+        if not self._glyphs.allocated or not self._box.allocated:
             self.deallocate()
             return False
 
@@ -106,7 +106,7 @@ class Text:
             self._vbo = 0
         self._atlas.deallocate()
         self._glyphs.deallocate()
-        self._box_shader.deallocate()
+        self._box.deallocate()
         self._allocated = False
 
     def measure_text(self, text: str) -> tuple[int, int]:
@@ -210,7 +210,7 @@ class Text:
         screen_size = (float(screen_width), float(screen_height))
 
         # Draw background box first
-        self._box_shader.use(
+        self._box.use(
             (box_x, box_y, box_width, box_height),
             bg_color, screen_size
         )

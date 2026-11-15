@@ -37,21 +37,21 @@ class Nv12Plane(IntEnum):
 
 
 class Nv12(Shader):
-    """Draws one NV12 plane of `tex` into the bound target: Y at the texture's size, UV at half its width and
+    """Draws one NV12 plane of `src` into the bound target: Y at the texture's size, UV at half its width and
     height; the target's first row is the picture's top row."""
 
-    def use(self, tex: Texture, plane: Nv12Plane) -> None:
+    def use(self, src: Texture, plane: Nv12Plane) -> None:
         if not self.allocated or not self.shader_program:
             logger.warning("Nv12 shader not allocated or shader program missing.")
             return
-        if not tex.allocated:
+        if not src.allocated:
             logger.warning("Nv12 shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, tex.tex_id)
-        glUniform1i(self.get_uniform_loc("tex"), 0)
+        glBindTexture(GL_TEXTURE_2D, src.tex_id)
+        glUniform1i(self.get_uniform_loc("src"), 0)
         glUniform1i(self.get_uniform_loc("plane"), int(plane))
         # Row-major rows read as GLSL columns, so `matrix[i]` in the shader is row i (Y, Cb, Cr)
         glUniformMatrix3fv(self.get_uniform_loc("matrix"), 1, GL_FALSE, MATRIX)

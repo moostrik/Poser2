@@ -27,7 +27,7 @@ from OpenGL.GL import (GL_R8, GL_RED, GL_RGBA, GL_RGBA8, GL_TEXTURE_2D, GL_UNPAC
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from apps.smile.render.shaders import FlashIn, FlashOut, Omission  # noqa: E402
 from modules.gl import Context, Fbo, Style, Text, Texture, shaders  # noqa: E402
-from modules.gl.shaders.box_shader import BoxShader  # noqa: E402
+from modules.gl.shaders.draw_box import DrawBox  # noqa: E402
 from modules.pose import PointLandmark, Points2D  # noqa: E402
 from modules.render import PosePointLines  # noqa: E402
 from modules.utils import Point2f, Rect  # noqa: E402
@@ -183,7 +183,7 @@ def cases() -> dict[str, tuple[object, Case]]:
     detail = s.DetailThreshold()
     add('detail_threshold', detail, lambda t: detail.use(t['second'], 0.5, 1.0, 3.0, False))
 
-    box = BoxShader()
+    box = DrawBox()
     add('box', box, lambda t: box.use((10.0, 20.0, 60.0, 30.0), (0.2, 0.4, 0.9, 0.8), (float(SIZE), float(SIZE))))
     lines = PosePointLines()
     figure = pose()

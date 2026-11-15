@@ -5,11 +5,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Contrast(Shader):
-    def use(self, tex0: Texture, brightness: float, contrast: float) -> None:
+    def use(self, src: Texture, brightness: float, contrast: float) -> None:
         if not self.allocated or not self.shader_program:
             logger.warning("Contrast shader not allocated or shader program missing.")
             return
-        if not tex0.allocated:
+        if not src.allocated:
             logger.warning("Contrast shader: input texture not allocated.")
             return
 
@@ -18,10 +18,10 @@ class Contrast(Shader):
 
         # Bind input texture
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
+        glBindTexture(GL_TEXTURE_2D, src.tex_id)
 
         # Configure shader uniforms (using cached locations)
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform1i(self.get_uniform_loc("src"), 0)
         glUniform1f(self.get_uniform_loc("brightness"), brightness)
         glUniform1f(self.get_uniform_loc("contrast"), contrast)
 
