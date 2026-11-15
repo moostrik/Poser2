@@ -11,7 +11,6 @@ and timed on the GPU. It runs on the GPU like the apps: run it only while no app
 from __future__ import annotations
 
 import argparse
-import ctypes
 import os
 import sys
 from typing import Callable
@@ -19,15 +18,15 @@ from typing import Callable
 import cv2
 import glfw
 import numpy as np
-from OpenGL.GL import (GL_ARRAY_BUFFER, GL_FALSE, GL_FLOAT, GL_FRAMEBUFFER, GL_QUERY_RESULT, GL_R32F, GL_RED, GL_RGBA, GL_RGBA32F,
-                       GL_STATIC_DRAW, GL_TEXTURE_2D, GL_TEXTURE_3D, GL_TIME_ELAPSED, glBeginQuery,
-                       glBindBuffer, glBindFramebuffer, glBindTexture, glBindVertexArray, glBufferData,
-                       glEnableVertexAttribArray, glEndQuery, glFinish, glGenBuffers, glGenQueries, glGenVertexArrays,
-                       glGetQueryObjectuiv, glTexImage2D, glTexSubImage3D, glVertexAttribPointer, glViewport)
+from OpenGL.GL import (GL_FLOAT, GL_FRAMEBUFFER, GL_QUERY_RESULT, GL_R32F, GL_RED, GL_RGBA, GL_RGBA32F,
+                       GL_TEXTURE_2D, GL_TEXTURE_3D, GL_TIME_ELAPSED, glBeginQuery,
+                       glBindFramebuffer, glBindTexture,
+                       glEndQuery, glFinish, glGenQueries,
+                       glGetQueryObjectuiv, glTexImage2D, glTexSubImage3D, glViewport)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from modules.flow import REFERENCE_STEP, Cut, OnDemand, Port, TextureKind, VolumeCut  # noqa: E402
-from modules.gl import Fbo, MouseButton, Style, Texture, Texture3D  # noqa: E402
+from modules.gl import Context, Fbo, MouseButton, Texture, Texture3D  # noqa: E402
 from modules.render import Channel, FlowStage, MonitorInput, MonitorLayer, MonitorLayerSettings, MonitorView  # noqa: E402
 
 OUT: str = os.path.join('temp', 'monitor_harness')
@@ -47,15 +46,7 @@ def context() -> object:
     if not window:
         raise RuntimeError('no GL window')
     glfw.make_context_current(window)
-    vertices = np.array([-1, -1, 0, 0, 1, -1, 1, 0, 1, 1, 1, 1, -1, 1, 0, 1], dtype=np.float32)
-    glBindBuffer(GL_ARRAY_BUFFER, glGenBuffers(1))
-    glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
-    glBindVertexArray(glGenVertexArrays(1))
-    glEnableVertexAttribArray(0)
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, ctypes.c_void_p(0))
-    glEnableVertexAttribArray(1)
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, ctypes.c_void_p(8))
-    Style.reset_state()
+    Context().allocate()
     return window
 
 

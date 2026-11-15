@@ -1,8 +1,6 @@
 """OpenGL shaders for various rendering operations."""
 
 from .blit import Blit
-from .blit_rect import BlitRect
-from .blit_region import BlitRegion
 from .contrast import Contrast
 from .exposure import Exposure
 from .hsl import Hsl

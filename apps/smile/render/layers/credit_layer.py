@@ -3,7 +3,7 @@ from enum import IntEnum
 from OpenGL.GL import glViewport
 
 from ...credit import FONT, TITLE_FONT, CreditLines, qr_image, title_image, wrap_balanced
-from modules.gl import Blit, Fbo, Image, Style, Text, Texture, shaders
+from modules.gl import Fbo, Image, Style, Text, Texture, shaders
 from ..sequencer import SequenceType
 from ..settings import RenderSettings
 
@@ -132,19 +132,19 @@ class CreditLayer(LayerBase):
             return
         target: Fbo = self._targets[view]
         self._base.begin()
-        Blit.use(source)
+        source.draw()
         qr: int = self._qr.width if self._qr.allocated and view == CreditView.ROOM else 0
         if qr:
             # the viewport's origin is the bottom left
             glViewport(self._width - MARGIN_PX - qr, MARGIN_PX, qr, qr)
-            Blit.use(self._qr)
+            self._qr.draw()
             glViewport(0, 0, self._width, self._height)
         self._base.end()
         if alpha <= 0.0:
             copy(self._base, target)
             return
         self._card.begin()
-        Blit.use(self._base)
+        self._base.draw()
         self._draw_caption(view != CreditView.PHONE)
         self._card.end()
         target.begin()
@@ -166,7 +166,7 @@ class CreditLayer(LayerBase):
         if title and self._title.allocated:
             # the viewport's origin is the bottom left
             glViewport((self._width - self._title.width) // 2, self._height - top - self._title.height, self._title.width, self._title.height)
-            Blit.use(self._title)
+            self._title.draw()
             glViewport(0, 0, self._width, self._height)
             top += self._title.height
         for i, line in enumerate(lines):

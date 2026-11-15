@@ -334,7 +334,6 @@ class DeepFlowRender(RenderBase):
                 if key is not Layers.composite and key in self.L and i in self.L[key]   # it cannot draw into itself
             ])
 
-        Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         seen: set[Layers] = set()
         for layer_type in self._update_layers + self._interface_layers + self._left_layers + self._right_layers + self._output_layers:
@@ -470,7 +469,7 @@ class DeepFlowRender(RenderBase):
                 place = fill if recorder_settings.fill else fit
                 capture.frame.begin()
                 clear_color()
-                Style.reset_state()
+                Style.set_blend_mode(Style.BlendMode.DISABLED)
                 Style.push_style()
                 Style.set_blend_mode(Style.BlendMode.ADD)
                 for layer_type in self.settings.layer.select.record:
@@ -500,7 +499,6 @@ class DeepFlowRender(RenderBase):
         """The debug panels: the left and the right layers, side by side or stacked."""
         clear_color()
 
-        Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
         # Left panel
@@ -518,7 +516,7 @@ class DeepFlowRender(RenderBase):
         """The show: the composite alone, fit to `width` × `height`."""
         clear_color()
 
-        Style.reset_state()
+        Style.set_blend_mode(Style.BlendMode.DISABLED)
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.ADD)
 

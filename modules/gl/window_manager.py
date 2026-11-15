@@ -11,14 +11,8 @@ from typing import Callable, TYPE_CHECKING
 logger = logging.getLogger(__name__)
 
 # Third-party imports
-from OpenGL.GL import (
-    glGetString, GL_VERSION, glBindFramebuffer, GL_FRAMEBUFFER, glViewport,
-    glGenBuffers, glBindBuffer, GL_ARRAY_BUFFER, glBufferData, GL_STATIC_DRAW,
-    glGenVertexArrays, glBindVertexArray, glEnableVertexAttribArray,
-    glVertexAttribPointer, GL_FLOAT, GL_FALSE, glDeleteVertexArrays, glDeleteBuffers
-)
+from OpenGL.GL import glGetString, GL_VERSION, glBindFramebuffer, GL_FRAMEBUFFER, glViewport
 import glfw
-import numpy as np
 import ctypes
 
 # Local application imports
@@ -26,6 +20,7 @@ if TYPE_CHECKING:
     from .render_base import RenderBase
 from modules.settings import Field, BaseSettings, Widget
 from modules.utils import FPS, PerformanceTimer
+from .context import Context
 
 
 class MonitorId(IntEnum):
@@ -125,7 +120,7 @@ class WindowManager():
         self._secondary_windows: dict[int, glfw._GLFWwindowPointerT] = {}
         self._secondary_fallback: set[int] = set()
         self._monitor_cb = None  # strong ref to monitor callback (prevents GC)
-        self._quad_buffers: dict[int, tuple[int, int]] = {}  # id(window) -> (vao, vbo)
+        self._contexts: dict[int, Context] = {}  # id(window) -> its gl.Context, made at its first use
 
         # Deferred call queue: settings callbacks enqueue GLFW calls here;
         # the render loop drains it on its own thread (GLFW requires render-thread calls).
@@ -280,44 +275,27 @@ class WindowManager():
         if self.settings.fullscreen_mode != FullscreenMode.WINDOWED:
             self.set_fullscreen_mode(self.settings.fullscreen_mode)
 
-    def _create_quad_vao(self) -> tuple[int, int]:
-        """Create VAO/VBO for fullscreen quad. Returns (vao, vbo). Call once after context is current."""
-        vertices = np.array([
-            # x     y     u    v
-            -1.0, -1.0,  0.0, 0.0,
-             1.0, -1.0,  1.0, 0.0,
-             1.0,  1.0,  1.0, 1.0,
-            -1.0,  1.0,  0.0, 1.0,
-        ], dtype=np.float32)
+    def _make_current(self, window: glfw._GLFWwindowPointerT) -> None:
+        """`window`'s GL context made current, and its `gl.Context` with it, made at its first use."""
+        glfw.make_context_current(window)
+        context: Context | None = self._contexts.get(id(window))
+        if context is None:
+            context = self._contexts[id(window)] = Context()
+            context.allocate()
+        else:
+            context.make_current()
 
-        vbo = glGenBuffers(1)
-        glBindBuffer(GL_ARRAY_BUFFER, vbo)
-        glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
-
-        vao = glGenVertexArrays(1)
-        glBindVertexArray(vao)
-
-        glEnableVertexAttribArray(0)
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * 4, ctypes.c_void_p(0))
-
-        glEnableVertexAttribArray(1)
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * 4, ctypes.c_void_p(2 * 4))
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0)
-        glBindVertexArray(0)
-        return vao, vbo
-
-    def _bind_quad_vao(self, window: glfw._GLFWwindowPointerT) -> None:
-        """Bind quad VAO for the given window, creating it if needed."""
-        key = id(window)
-        if key not in self._quad_buffers:
-            self._quad_buffers[key] = self._create_quad_vao()
-        glBindVertexArray(self._quad_buffers[key][0])
+    def _free_context(self, window: glfw._GLFWwindowPointerT) -> None:
+        """`window`'s `gl.Context` freed in its own GL context, before the window goes."""
+        context: Context | None = self._contexts.pop(id(window), None)
+        if context is not None:
+            glfw.make_context_current(window)
+            context.deallocate()
 
     def _render_loop(self) -> None:
         """Main rendering loop"""
         assert self._main_window is not None
-        self._bind_quad_vao(self._main_window)  # Bind VAO before allocate (shaders may use draw_quad)
+        self._make_current(self._main_window)  # its context before allocate (shaders may use draw_quad)
         self.renderer.allocate()
 
         next_frame_time: int = time_ns()
@@ -325,7 +303,7 @@ class WindowManager():
             while not glfw.window_should_close(self._main_window):
                 # the renderer's objects (FBOs, VAOs) live in the main context: drawing a secondary window
                 # leaves its context current, so every frame starts by making the main one current again
-                glfw.make_context_current(self._main_window)
+                self._make_current(self._main_window)
                 while not self._deferred.empty():
                     try:
                         self._deferred.get_nowait()()
@@ -355,7 +333,7 @@ class WindowManager():
                     elif -remaining > self.frame_interval:
                         next_frame_time = time_ns()  # reset on spiral of death
         finally:
-            glfw.make_context_current(self._main_window)
+            self._make_current(self._main_window)
             self.renderer.deallocate()
 
     def _update(self) -> None:
@@ -392,13 +370,8 @@ class WindowManager():
             glfw.set_monitor_callback(None)  # pyright: ignore[reportArgumentType]
             self._monitor_cb = None
             self._destroy_secondary_windows()
-            if self._main_window and self._quad_buffers:
-                glfw.make_context_current(self._main_window)
-                for vao, vbo in self._quad_buffers.values():
-                    glDeleteVertexArrays(1, [vao])
-                    glDeleteBuffers(1, [vbo])
-                self._quad_buffers.clear()
             if self._main_window:
+                self._free_context(self._main_window)
                 glfw.destroy_window(self._main_window)
                 self._main_window = None
             glfw.terminate()
@@ -449,13 +422,12 @@ class WindowManager():
     def _draw_main_window(self) -> None:
         assert self._main_window is not None
 
-        glfw.make_context_current(self._main_window)
+        self._make_current(self._main_window)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         v_sync = self.settings.v_sync
         if v_sync != self._current_vsync:
             self._current_vsync = v_sync
             glfw.swap_interval(1 if v_sync else 0)
-        self._bind_quad_vao(self._main_window)
 
         glViewport(0, 0, self._actual_width, self._actual_height)  # Set viewport here
         start = perf_counter()
@@ -480,19 +452,14 @@ class WindowManager():
 
         glfw.make_context_current(win)
         glfw.swap_interval(0)
-        glfw.make_context_current(self._main_window)
+        self._make_current(self._main_window)
         glfw.set_window_close_callback(win, self._secondary_close_callback)
         glfw.set_key_callback(win, self._notify_key_callback)
         return win
 
     def _destroy_secondary_windows(self) -> None:
         for win in self._secondary_windows.values():
-            # a window's quad VAO belongs to its own context: deleted there, before the window goes
-            buffers: tuple[int, int] | None = self._quad_buffers.pop(id(win), None)
-            if buffers:
-                glfw.make_context_current(win)
-                glDeleteVertexArrays(1, [buffers[0]])
-                glDeleteBuffers(1, [buffers[1]])
+            self._free_context(win)
             glfw.destroy_window(win)
         self._secondary_windows.clear()
 
@@ -567,9 +534,8 @@ class WindowManager():
         glfw.post_empty_event()
 
     def _draw_secondary_window(self, logical_id: int, window: glfw._GLFWwindowPointerT) -> None:
-        glfw.make_context_current(window)
+        self._make_current(window)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
-        self._bind_quad_vao(window)
         width, height = glfw.get_framebuffer_size(window)
         glViewport(0, 0, width, height)
 

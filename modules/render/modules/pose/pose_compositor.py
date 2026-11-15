@@ -4,7 +4,7 @@ from typing import Any
 
 # Local application imports
 from modules.settings import Field, BaseSettings
-from modules.gl import Fbo, Texture, Blit
+from modules.gl import Fbo, Texture
 from ...layer_base import LayerBase
 
 from ..inference import CropLayer, CropLayerSettings, CropImageLayer
@@ -87,8 +87,8 @@ class PoseCompositor(LayerBase):
 
         # Composite: crop background, then the lines back to front
         self._fbo.begin()
-        Blit.use(crop_layer.texture)
-        Blit.use(self._pose_back_layer.texture)
-        Blit.use(self._pose_middle_layer.texture)
-        Blit.use(self._pose_front_layer.texture)
+        crop_layer.texture.draw()
+        self._pose_back_layer.texture.draw()
+        self._pose_middle_layer.texture.draw()
+        self._pose_front_layer.texture.draw()
         self._fbo.end()

@@ -14,7 +14,7 @@ from enum import IntEnum, auto
 
 from OpenGL.GL import GL_VIEWPORT, glGetIntegerv, glViewport
 
-from modules.gl import Texture, Texture3D, Style, Blit, MouseButton
+from modules.gl import Texture, Texture3D, Style, MouseButton
 from modules.flow import Visualizer, Strip, ALL_CHANNELS, Legend, LegendKind, DrawnSize, Port, TextureKind, VolumeCut, VolumeCube, CubeColor, VolumeGlyphs, Cut, Orbit, PITCH_LIMIT, ZOOM_LIMITS, box_size, axis_labels, REFERENCE_STEP, ZPositionView
 from modules.settings import Field, BaseSettings, Group, Widget
 from ...layer_base import LayerBase
@@ -361,8 +361,8 @@ class MonitorLayer(LayerBase):
         Style.push_style()
         Style.set_blend_mode(self.settings.advanced.blend_mode.premultiplied)     # every view draws its color times its coverage
         if self.texture.allocated:
-            Blit.use(self.texture)
+            self.texture.draw()
         if self.settings.advanced.legend and self._legend.texture.allocated:
             Style.set_blend_mode(Style.BlendMode.ALPHA)
-            Blit.use(self._legend.texture)
+            self._legend.texture.draw()
         Style.pop_style()

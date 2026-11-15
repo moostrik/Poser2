@@ -2,6 +2,9 @@ from OpenGL.GL import Constant, GL_BGR, GL_BGRA, GL_CLAMP_TO_EDGE, GL_FLOAT, GL_
 import logging
 import numpy as np
 
+from modules.utils import Rect
+from .context import context
+
 logger = logging.getLogger(__name__)
 
 
@@ -246,6 +249,12 @@ class Texture():
         if flip:
             pixels = np.flipud(pixels)
         return pixels
+
+    def draw(self, dst: Rect | None = None, src: Rect | None = None, opacity: float = 1.0) -> None:
+        """This texture's `src` drawn at `dst` in the bound target, both 0..1 with the origin top-left (all of it
+        over all of the target without them); a `src` with a negative width or height draws it mirrored on that
+        axis. Through the current context's `Blit`, with the blend state as set."""
+        context().blit.use(self, dst, src, opacity)
 
     def clear(self, r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 0.0) -> None:
         """Clear texture to specified color using glClearTexImage (OpenGL 4.4+).

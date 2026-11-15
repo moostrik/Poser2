@@ -4,7 +4,7 @@ from typing import TypeVar, Generic
 
 # Local application imports
 from modules.utils import Rect
-from modules.gl import Texture, Blit
+from modules.gl import Texture
 
 
 class LayerBase(ABC):
@@ -31,7 +31,7 @@ class LayerBase(ABC):
     def draw(self) -> None:
         """Default implementation: draw texture to rect."""
         if self.texture.allocated:
-            Blit.use(self.texture)
+            self.texture.draw()
 
 T = TypeVar('T')
 

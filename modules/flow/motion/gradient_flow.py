@@ -5,7 +5,7 @@ Ported from ofxFlowTools ftOpticalFlow.h
 """
 from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R8, GL_RED, GL_RG16F, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, glBindTexture, glGenerateMipmap, glTexParameteri
 
-from modules.gl import Fbo, Texture, Blit
+from modules.gl import Fbo, Texture
 
 from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil, TextureKind
@@ -130,7 +130,7 @@ class GradientFlow(FlowBase):
         if texture.format == GL_RED:
             # Input is already single-channel luminance
             self._input_fbo.begin()
-            Blit.use(texture)
+            texture.draw()
             self._input_fbo.end()
 
         else:

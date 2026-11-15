@@ -1,12 +1,12 @@
 """Render passes shared by the layers."""
 
-from modules.gl import Blit, Fbo, SwapFbo, Texture, shaders
+from modules.gl import Fbo, SwapFbo, Texture, shaders
 
 
 def copy(src: Texture, dst: Fbo) -> None:
     """Draw src stretched over dst (the current buffer of a SwapFbo)."""
     dst.begin()
-    Blit.use(src)
+    src.draw()
     dst.end()
 
 

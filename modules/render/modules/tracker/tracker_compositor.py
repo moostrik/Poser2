@@ -4,7 +4,7 @@
 from typing import Any
 
 from modules.settings import Field, BaseSettings
-from modules.gl import Fbo, Texture, Blit
+from modules.gl import Fbo, Texture
 from modules.utils import Rect
 from ...layer_base import LayerBase
 
@@ -76,7 +76,7 @@ class TrackerCompositor(LayerBase):
 
         # Composite: camera + tracklets + bboxes + all pose lines
         self._fbo.begin()
-        Blit.use(self._cam_texture)
+        self._cam_texture.draw()
         self._depth_track_renderer.draw()
         self._bbox_renderer_A.settings.color = self._color_settings.history
         self._bbox_renderer_A.draw()

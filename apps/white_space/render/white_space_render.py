@@ -257,7 +257,6 @@ class WhiteSpaceRender(RenderBase):
             self._layout_dirty = False
             self._rebuild_layout()
 
-        Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
         hidden: set[Layers] = self._hidden_layers()
@@ -277,7 +276,6 @@ class WhiteSpaceRender(RenderBase):
 
     def draw_main(self, width: int, height: int) -> None:
         clear_color(*_BACKGROUND)
-        Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
         # Every row is drawn if the layout holds it, so one pass serves both layouts.

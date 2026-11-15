@@ -1,6 +1,5 @@
-from OpenGL.GL import GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, glBlendFunc
 
-from modules.gl import Fbo, Texture, Image
+from modules.gl import Fbo, Texture, Image, Style
 from modules import render
 
 from ..shaders.light_simulation import LightSimulation
@@ -37,7 +36,7 @@ class LightSimulationLayer(render.LayerBase):
         self.image.set_image(frame.light_img)
         self.image.update()
 
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        Style.set_blend_mode(Style.BlendMode.ALPHA)
 
         self.fbo_angles.begin()
         self._shader.use(self.fbo_angles, self.image, self.fbo_angles.width)

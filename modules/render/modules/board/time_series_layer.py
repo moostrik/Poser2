@@ -9,7 +9,7 @@ from OpenGL.GL import GL_RGBA8, GL_VIEWPORT, glGetIntegerv
 
 # Local application imports
 from modules.board import HasTimeSeries
-from modules.gl import Blit, Fbo, Image, Style, Text, Texture, clear_color
+from modules.gl import Fbo, Image, Style, Text, Texture, clear_color
 from modules.settings import BaseSettings, Field
 from modules.utils import bin_samples, hold_gaps
 from ...layer_base import LayerBase
@@ -98,7 +98,7 @@ class TimeSeriesLayer(LayerBase):
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         if self._fbo.allocated:
-            Blit.use(self._fbo)
+            self._fbo.draw()
         if self._labels and self._text.allocated:
             self._draw_labels()
         Style.pop_style()

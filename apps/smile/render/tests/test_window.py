@@ -27,7 +27,7 @@ class TestWindowManager(unittest.TestCase):
         """The render loop for that many frames, without a window: update and draw do nothing."""
         self.manager._main_window = object()
         self.glfw.window_should_close.side_effect = [False] * frames + [True]
-        with mock.patch.object(self.manager, '_bind_quad_vao'), mock.patch.object(self.manager, '_update'), \
+        with mock.patch.object(MODULE, 'Context'), mock.patch.object(self.manager, '_update'), \
                 mock.patch.object(self.manager, '_draw_main_window'):
             self.manager._render_loop()
 
@@ -59,7 +59,7 @@ class TestWindowManager(unittest.TestCase):
         self.glfw.make_context_current.side_effect = current.append
         self.renderer.update.side_effect = lambda: current.append(('update', current[-1]))
         self.renderer.deallocate.side_effect = lambda: current.append(('deallocate', current[-1]))
-        with mock.patch.object(self.manager, '_bind_quad_vao'), mock.patch.object(MODULE, 'glBindFramebuffer'),                 mock.patch.object(MODULE, 'glViewport'), mock.patch.object(MODULE, 'glGetString', return_value=b'4.6'):
+        with mock.patch.object(MODULE, 'Context'), mock.patch.object(MODULE, 'glBindFramebuffer'),                 mock.patch.object(MODULE, 'glViewport'), mock.patch.object(MODULE, 'glGetString', return_value=b'4.6'):
             self.manager._render_loop()
         self.assertEqual([c for c in current if isinstance(c, tuple)], [('update', main), ('update', main), ('deallocate', main)])
         self.assertIn(secondary, current)

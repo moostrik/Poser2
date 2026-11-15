@@ -7,8 +7,8 @@ import math
 
 from OpenGL.GL import (GL_COLOR, GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_BUFFER_BIT,
                        GL_FRAMEBUFFER, GL_FUNC_ADD, GL_MIN, GL_POINT_SIZE_RANGE, GL_PROGRAM_POINT_SIZE, GL_R32F,
-                       GL_ONE_MINUS_SRC_COLOR, GL_RGBA16F, GL_RGBA32F, GL_TEXTURE_2D, GL_ZERO, GL_TEXTURE_FETCH_BARRIER_BIT, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT,
-                       glBindFramebuffer, glBlendEquationi, glBlendFunci, glClear, glClearBufferfv, glClearColor,
+                       GL_RGBA16F, GL_RGBA32F, GL_TEXTURE_2D, GL_TEXTURE_FETCH_BARRIER_BIT, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT,
+                       glBindFramebuffer, glBlendEquationi, glClear, glClearBufferfv, glClearColor,
                        glDeleteFramebuffers, glDrawBuffers, glEnable, glFramebufferTexture2D, glGenFramebuffers,
                        glGetFloatv, glMemoryBarrier, glViewport)
 
@@ -236,7 +236,7 @@ class ParticleDensity(DensityCarrier):
         glClearBufferfv(GL_COLOR, 1, (1.0, 1.0, 1.0, 1.0))
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.SUM)
-        glBlendFunci(1, GL_ZERO, GL_ONE_MINUS_SRC_COLOR)        # the revealage: × (1 - alpha) per channel
+        Style.set_buffer_blend_mode(1, Style.BlendMode.REVEALAGE)   # the revealage: × (1 - alpha) per channel
         self._sprites_shader.use(self._particles, self._ring, self._count, _SPRITES[particles.draw], slices=1,
                                  scale=self._scale, ring_fade=particles.ring_fade, output_size=self._output,
                                  size=particles.size, streak=particles.streak, radius=particles.radius,

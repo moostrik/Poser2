@@ -5,7 +5,7 @@ from typing import cast
 
 # Local application imports
 from modules.board import HasFrames
-from modules.gl import Fbo, Texture, Blit, clear_color, Text
+from modules.gl import Fbo, Texture, clear_color, Text
 from modules.utils import Rect
 from modules.pose import AngleVelocity, Angles, BaseScalarFeature, Frame
 from modules.settings import BaseSettings
@@ -71,9 +71,9 @@ class FeatureFrameLayer(LayerBase):
         if not self._is_active:
             return
         if self._fbo.allocated:
-            Blit.use(self._fbo)
+            self._fbo.draw()
             if self.draw_labels and self.settings.render_labels:
-                Blit.use(self._label_fbo)
+                self._label_fbo.draw()
 
     def update(self) -> None:
         """Update visualization from DataHub Frame."""

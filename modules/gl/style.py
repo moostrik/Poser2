@@ -1,11 +1,11 @@
-"""OpenGL state management utilities (OpenFrameworks-inspired).
+"""The blend state of the GL context made current, kept on the application side (as openFrameworks' style).
 
-Application-side state tracking to avoid expensive glGet* calls that cause CPU-GPU sync stalls.
-All state changes go through this module to keep shadow state in sync with actual GL state.
+Each GL context holds its own `StyleStack` (`gl.Context`); this module's functions work on the current one's, so the
+state it holds is that context's and no `glGet*` is asked. Every blend change goes through this module.
 """
-from OpenGL.GL import GL_BLEND, GL_DST_COLOR, GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_SRC_COLOR, GL_SRC_ALPHA, GL_ZERO, glBlendFunc, glDisable, glEnable
+from OpenGL.GL import GL_BLEND, GL_DST_COLOR, GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_SRC_COLOR, GL_SRC_ALPHA, GL_ZERO, glBlendFunc, glBlendFunci, glDisable, glEnable
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -21,6 +21,7 @@ class BlendMode(Enum):
     SUM = (GL_ONE, GL_ONE)  # Plain sum of every channel, alpha included (accumulation targets)
     DISABLED = (GL_ONE, GL_ZERO)  # No blending (replaces destination)
     PREMULTIPLIED = (GL_ONE, GL_ONE_MINUS_SRC_ALPHA)  # Transparency of a color already times its alpha
+    REVEALAGE = (GL_ZERO, GL_ONE_MINUS_SRC_COLOR)  # The destination times one minus the source, per channel
 
     @property
     def premultiplied(self) -> 'BlendMode':
@@ -39,82 +40,97 @@ class BlendMode(Enum):
 
 
 @dataclass
-class _StyleState:
-    """Current OpenGL rendering style state."""
+class StyleState:
+    """A blend state: on or off, the mode of every draw buffer, and the buffers set to another mode."""
     blend_enabled: bool = False
     blend_mode: BlendMode = BlendMode.ALPHA
+    buffer_modes: dict[int, BlendMode] = field(default_factory=dict)
+
+    def copy(self) -> 'StyleState':
+        return StyleState(self.blend_enabled, self.blend_mode, dict(self.buffer_modes))
 
 
-# Application-side shadow state (avoids glGet* queries)
-_current_state = _StyleState(blend_enabled=False, blend_mode=BlendMode.ALPHA)
-_style_stack: list[_StyleState] = []
 _MAX_STYLE_HISTORY: int = 32
 
 
-def reset_state() -> None:
-    """Reset shadow state to match OpenGL defaults. Call at start of frame or after context switch."""
-    global _current_state
-    _current_state = _StyleState(blend_enabled=False, blend_mode=BlendMode.ALPHA)
-    _style_stack.clear()
-    # Sync GL state to match
-    glDisable(GL_BLEND)
-    glBlendFunc(BlendMode.ALPHA.src_factor, BlendMode.ALPHA.dst_factor)
+class StyleStack:
+    """One GL context's blend state and the states saved by `push_style`."""
+
+    def __init__(self) -> None:
+        self.current: StyleState = StyleState()
+        self.saved: list[StyleState] = []
+
+    def reset(self) -> None:
+        """GL's defaults, blending off and the alpha blend set, in the context made current for this stack."""
+        self.current = StyleState()
+        self.saved.clear()
+        glDisable(GL_BLEND)
+        glBlendFunc(BlendMode.ALPHA.src_factor, BlendMode.ALPHA.dst_factor)
+
+
+_stack: StyleStack = StyleStack()       # until a context is made current
+
+
+def use(stack: StyleStack) -> None:
+    """Work on `stack` from now on: the context it belongs to is made current (`gl.Context.make_current`)."""
+    global _stack
+    _stack = stack
 
 
 def push_style() -> None:
     """Save current rendering state (from shadow state, no GPU query)."""
-    global _current_state
-
-    # Copy current shadow state to stack
-    state = _StyleState(
-        blend_enabled=_current_state.blend_enabled,
-        blend_mode=_current_state.blend_mode,
-    )
-    _style_stack.append(state)
-
-    if len(_style_stack) > _MAX_STYLE_HISTORY:
-        _style_stack.pop(0)
+    _stack.saved.append(_stack.current.copy())
+    if len(_stack.saved) > _MAX_STYLE_HISTORY:
+        _stack.saved.pop(0)
         logger.warning("push_style(): maximum style stack depth %s reached", _MAX_STYLE_HISTORY)
 
 
 def pop_style() -> None:
     """Restore previously saved rendering state."""
-    global _current_state
-
-    if not _style_stack:
+    if not _stack.saved:
         logger.warning("pop_style() called without matching push_style()")
         return
 
-    state = _style_stack.pop()
+    state: StyleState = _stack.saved.pop()
+    current: StyleState = _stack.current
 
     # Only issue GL calls if state actually changed
-    if state.blend_enabled != _current_state.blend_enabled:
+    if state.blend_enabled != current.blend_enabled:
         if state.blend_enabled:
             glEnable(GL_BLEND)
         else:
             glDisable(GL_BLEND)
 
-    if state.blend_mode != _current_state.blend_mode:
+    if state.blend_mode != current.blend_mode or state.buffer_modes != current.buffer_modes:
         glBlendFunc(state.blend_mode.src_factor, state.blend_mode.dst_factor)
+        for buffer, mode in state.buffer_modes.items():
+            glBlendFunci(buffer, mode.src_factor, mode.dst_factor)
 
-    _current_state = state
+    _stack.current = state
 
 
 def set_blend_mode(mode: BlendMode) -> None:
-    """Set the blend mode (with redundant state change elimination)."""
-    global _current_state
-
+    """Set the blend mode of every draw buffer (with redundant state change elimination)."""
+    current: StyleState = _stack.current
     new_enabled = (mode != BlendMode.DISABLED)
 
     # Only issue GL calls if state actually changes
-    if new_enabled != _current_state.blend_enabled:
+    if new_enabled != current.blend_enabled:
         if new_enabled:
             glEnable(GL_BLEND)
         else:
             glDisable(GL_BLEND)
-        _current_state.blend_enabled = new_enabled
+        current.blend_enabled = new_enabled
 
-    if mode != _current_state.blend_mode:
+    if mode != current.blend_mode or current.buffer_modes:
         glBlendFunc(mode.src_factor, mode.dst_factor)
-        _current_state.blend_mode = mode
+        current.blend_mode = mode
+        current.buffer_modes = {}
 
+
+def set_buffer_blend_mode(buffer: int, mode: BlendMode) -> None:
+    """Set the blend mode of draw buffer `buffer` alone; `set_blend_mode` sets every buffer again."""
+    current: StyleState = _stack.current
+    if current.buffer_modes.get(buffer, current.blend_mode) != mode:
+        glBlendFunci(buffer, mode.src_factor, mode.dst_factor)
+        current.buffer_modes[buffer] = mode

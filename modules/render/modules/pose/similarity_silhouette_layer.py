@@ -8,7 +8,7 @@ from time import time
 import math
 
 # Local application imports
-from modules.gl import Fbo, SwapFbo, Texture, Style, Blit, shaders
+from modules.gl import Fbo, SwapFbo, Texture, Style, shaders
 from modules.board import HasFrames
 from modules.pose import Similarity, MotionGate, AngleMotion, Frame
 from modules.settings import Field, BaseSettings
@@ -176,7 +176,6 @@ class SimilaritySilhouetteLayer(LayerBase):
             # weights.append(0.0)
 
         self._output_fbo.begin()
-        # Blit.use(self._blend_fbo)
         self._shader.use(styled_textures, weights, self.settings.layered)
         self._output_fbo.end()
 
@@ -188,5 +187,5 @@ class SimilaritySilhouetteLayer(LayerBase):
         """Draw with configured blend mode."""
         Style.push_style()
         Style.set_blend_mode(self.settings.blend_mode)
-        Blit.use(self._output_fbo)
+        self._output_fbo.draw()
         Style.pop_style()

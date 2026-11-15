@@ -1,4 +1,4 @@
-from modules.gl import Blit, Fbo, Style, Text, Texture
+from modules.gl import Fbo, Style, Text, Texture
 
 from .layer_base import LayerBase
 
@@ -40,7 +40,7 @@ class StatusLayer(LayerBase):
             return
         _, text_height = self._text.measure_text(text)
         self._fbo.begin()
-        Blit.use(source)
+        source.draw()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         self._text.draw_box_text(MARGIN_PX, self._height - text_height - MARGIN_PX, text, TEXT_COLOR, BOX_COLOR,
                                  self._width, self._height)

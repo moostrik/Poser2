@@ -9,7 +9,7 @@ from .screen_grab import ScreenGrab
 from ..comfy.messages import GeneratorMessage, GeneratorState
 from ..face import FaceObservations
 from .. import sphere
-from modules.gl import Blit, Fbo, MonitorId, RenderBase, Shader, Style, Texture, clear_color, fit
+from modules.gl import Fbo, MonitorId, RenderBase, Shader, Style, Texture, clear_color, fit
 from ..player import WallRender, WallsSettings
 from .inputs import Inputs
 from .layers import (BloomLayer, CameraLayer, CreditLayer, CreditView, DiffusionLayer, FlashLayer, LayerBase, RevealLayer,
@@ -102,7 +102,6 @@ class SmileRender(RenderBase):
         self._notify_update()
         self.inputs.update()
 
-        Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
         for layer in self._all_layers:
             layer.update()
@@ -180,7 +179,7 @@ class SmileRender(RenderBase):
 
     def draw_main(self, width: int, height: int) -> None:
         clear_color(0, 0, 0, 1)
-        Style.reset_state()
+        Style.set_blend_mode(Style.BlendMode.DISABLED)
         self._draw_fit(self._output, width, height)
         if self.settings.show_camera and self.inputs.camera.allocated:
             self._draw_fit(self.inputs.camera, width, height)
@@ -188,7 +187,7 @@ class SmileRender(RenderBase):
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         """The wall of this monitor: the i-th entry of `secondary_list` is wall i (poser2's pattern)."""
         clear_color(0, 0, 0, 1)
-        Style.reset_state()
+        Style.set_blend_mode(Style.BlendMode.DISABLED)
         try:
             index: int = list(self.settings.window.secondary_list).index(MonitorId(monitor_id))
         except ValueError:
@@ -205,7 +204,7 @@ class SmileRender(RenderBase):
             return
         x, y, w, h = fit(texture.width, texture.height, width, height)
         glViewport(int(x), int(y), int(w), int(h))
-        Blit.use(texture)
+        texture.draw()
 
     def _on_key(self, key: int, action: int, mods: int) -> None:
         if action == glfw.PRESS and key in (glfw.KEY_ENTER, glfw.KEY_KP_ENTER):

@@ -5,7 +5,7 @@ pyramid both flows read at coarser scales.
 """
 from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R8, GL_RED, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, glBindTexture, glGenerateMipmap, glTexParameteri
 
-from modules.gl import Blit, SwapFbo, Texture
+from modules.gl import SwapFbo, Texture
 from .. import FlowUtil
 from .shaders import Luminance
 
@@ -65,7 +65,7 @@ class LuminanceFrames:
         self._frames.swap()
         self._frames.begin()
         if texture.format == GL_RED:
-            Blit.use(texture)               # already one channel
+            texture.draw()                  # already one channel
         else:
             self._shader.use(texture)
         self._frames.end()

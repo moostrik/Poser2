@@ -16,9 +16,8 @@ from time import perf_counter
 from typing import Protocol
 
 import numpy as np
-from OpenGL.GL import GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, glBlendFunc
 
-from modules.gl import Fbo, Texture, Image
+from modules.gl import Fbo, Texture, Image, Style
 from modules import render
 
 from .beam_light_projection import project_beam_lights, paint_flashes
@@ -75,7 +74,7 @@ class BeamLightSimulationLayer(render.LayerBase):
         self.image.set_image(self._projection)
         self.image.update()
 
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        Style.set_blend_mode(Style.BlendMode.ALPHA)
 
         self.fbo_angles.begin()
         self._shader.use(self.fbo_angles, self.image, self.fbo_angles.width)

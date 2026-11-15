@@ -2,12 +2,14 @@ from OpenGL.GL import Constant, GL_BGR, GL_BGRA, GL_CLAMP_TO_EDGE, GL_LINEAR, GL
 import logging
 from .fbo import Fbo
 from .texture import Texture, get_data_type
-from .utils import BlitFlip
+from modules.utils import Rect
 import numpy as np
 from threading import Lock
 from typing import Literal
 
 logger = logging.getLogger(__name__)
+
+_FLIPPED: Rect = Rect(0.0, 1.0, 1.0, -1.0)     # the whole texture, its rows drawn bottom to top
 
 
 def _get_format_bgr(internal_format, channel_order: Literal['BGR', 'RGB']) -> Constant:
@@ -230,7 +232,7 @@ class Image(Fbo):
 
         # Render flipped to FBO using modern shader
         self.begin()
-        BlitFlip.use(self._source, flip_y=True)
+        self._source.draw(src=_FLIPPED)
         self.end()
 
 

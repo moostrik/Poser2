@@ -4,7 +4,8 @@ from .shader import Shader, draw_quad
 from .compute_shader import ComputeShader
 from .window_manager import WindowManager, WindowSettings, MonitorId, FullscreenMode, MouseButton
 from . import style as Style
-from .utils import Blit, clear_color, fill, fit
+from .context import Context, context
+from .utils import clear_color, fill, fit
 
 # TEXTURE CLASSES
 from .texture import Texture

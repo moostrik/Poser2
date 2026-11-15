@@ -249,7 +249,6 @@ class HDTrioRender(RenderBase):
         self._wire_flow()
 
         # Layer updates
-        Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         seen: set[Layers] = set()
         for layer_type in self._update_layers + self._interface_layers + self._draw_layers + self._preview_layers:
@@ -279,7 +278,6 @@ class HDTrioRender(RenderBase):
     def draw_main(self, width: int, height: int) -> None:
         clear_color()
 
-        Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
         for i in range(self.num_cams):
@@ -316,7 +314,7 @@ class HDTrioRender(RenderBase):
         if cam_id >= self.num_cams:
             return
 
-        Style.reset_state()
+        Style.set_blend_mode(Style.BlendMode.DISABLED)
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.ADD)
 

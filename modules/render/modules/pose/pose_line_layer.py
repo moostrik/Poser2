@@ -3,7 +3,7 @@
 # Local application imports
 from modules.settings import Field, BaseSettings
 from modules.board import HasFrames
-from modules.gl import Fbo, Texture, Blit, clear_color
+from modules.gl import Fbo, Texture, clear_color
 from modules.pose import Frame, Points2D, BBox
 from ...layer_base import LayerBase, DataCache
 from .shaders import PosePointLines as shader
@@ -44,7 +44,7 @@ class PoseLineLayer(LayerBase):
 
     def draw(self) -> None:
         if self._fbo.allocated:
-            Blit.use(self._fbo)
+            self._fbo.draw()
 
     def update(self) -> None:
         pose: Frame | None = self._board.get_frame(self.settings.stage, self._track_id)

@@ -27,7 +27,6 @@ flow's time on the GPU per frame. `--fast` runs one loop without the window, as 
 `--verify` compares A's first frames with the numpy references instead.
 """
 
-import ctypes
 import json
 import sys
 import time
@@ -37,13 +36,12 @@ from pathlib import Path
 import cv2
 import glfw
 import numpy as np
-from OpenGL.GL import (GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT, GL_FALSE, GL_FLOAT, GL_FRAMEBUFFER, GL_R32F, GL_RED, GL_RGB, GL_RGBA32F,
-                       GL_STATIC_DRAW, GL_TEXTURE_2D, GL_UNSIGNED_BYTE, glBindBuffer, glBindFramebuffer, glBindTexture, glBindVertexArray,
-                       glBufferData, glClear, glClearColor, glEnableVertexAttribArray, glFinish, glGenBuffers, glGenVertexArrays,
-                       glReadPixels, glTexImage2D, glVertexAttribPointer, glViewport)
+from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_FLOAT, GL_FRAMEBUFFER, GL_R32F, GL_RED, GL_RGB, GL_RGBA32F,
+                       GL_TEXTURE_2D, GL_UNSIGNED_BYTE, glBindFramebuffer, glBindTexture,
+                       glClear, glClearColor, glFinish, glReadPixels, glTexImage2D, glViewport)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from modules.gl import Blit, Fbo, Texture  # noqa: E402
+from modules.gl import Context, Fbo, Texture  # noqa: E402
 from modules.flow import (FlowUtil, LucasKanadeFlow3D, LucasKanadeFlow3DSettings, Patch, Visualizer,  # noqa: E402
                           filter_depth_steps, lucas_kanade, track_depth)
 
@@ -77,14 +75,7 @@ def context(visible: bool, width: int, height: int):
         raise RuntimeError('no GL window')
     glfw.make_context_current(window)
     glfw.swap_interval(1)
-    vertices = np.array([-1, -1, 0, 0, 1, -1, 1, 0, 1, 1, 1, 1, -1, 1, 0, 1], dtype=np.float32)
-    glBindBuffer(GL_ARRAY_BUFFER, glGenBuffers(1))
-    glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
-    glBindVertexArray(glGenVertexArrays(1))
-    glEnableVertexAttribArray(0)
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, ctypes.c_void_p(0))
-    glEnableVertexAttribArray(1)
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, ctypes.c_void_p(8))
+    Context().allocate()
     return window
 
 
@@ -525,7 +516,7 @@ def main() -> int:
             for i, texture in enumerate(shown):
                 if texture is not None:
                     glViewport(i * panel_w, 0, panel_w, panel_h)
-                    Blit.use(texture)
+                    texture.draw()
             if args.snapshot is not None and k == len(frames) // 2:
                 pixels = np.frombuffer(glReadPixels(0, 0, panel_w * 2, panel_h, GL_RGB, GL_UNSIGNED_BYTE), np.uint8).reshape(panel_h, panel_w * 2, 3)
                 cv2.imwrite(str(args.snapshot), np.flipud(pixels)[..., ::-1])

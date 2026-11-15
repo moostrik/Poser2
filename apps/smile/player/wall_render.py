@@ -11,7 +11,7 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA8, GL_RGBA16F, GL_SCISSOR_TES
 
 from ..credit import FONT, TITLE_FONT, qr_image, quiet_px, title_image, wrap_balanced
 from ..credit_scroll import TIMEOUT as SCROLL_TIMEOUT, name_strip, scroll_copies, scroll_gone
-from modules.gl import Blit, Fbo, Image, Shader, Style, SwapFbo, Text, Texture, shaders
+from modules.gl import Fbo, Image, Shader, Style, SwapFbo, Text, Texture, shaders
 from .settings import WallsSettings
 from .shaders import BlitRotated
 
@@ -266,7 +266,6 @@ class WallRender:
         else:
             self._credit_cell = None     # switched off: the card leaves at once, the clip under it goes on
 
-        Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         self._image_fbo.begin()
@@ -368,7 +367,7 @@ class WallRender:
             if title.allocated:
                 # the viewport's origin is the bottom left
                 glViewport((width - title.width) // 2, height - CAPTION_MARGIN_PX - title.height, title.width, title.height)
-                Blit.use(title)
+                title.draw()
                 glViewport(0, 0, width, height)
             for i, part in enumerate(bottom):
                 x: float = (width - measure(part)) / 2
@@ -417,7 +416,7 @@ class WallRender:
                 # the first pass straight into the cleared texture, another over it
                 Style.set_blend_mode(Style.BlendMode.ALPHA if index else Style.BlendMode.DISABLED)
                 glViewport(-round(offset), 0, strip.width, height)
-                Blit.use(strip)
+                strip.draw()
             Style.set_blend_mode(Style.BlendMode.DISABLED)
             glViewport(0, 0, width, height)
             fbo.end()
@@ -462,7 +461,7 @@ class WallRender:
         if size:
             # the viewport's origin is the bottom left
             glViewport((width - size) // 2, round(height - top + quiet - size), size, size)
-            Blit.use(qr)
+            qr.draw()
             glViewport(0, 0, width, height)
         if name_width:
             Style.set_blend_mode(Style.BlendMode.ALPHA)

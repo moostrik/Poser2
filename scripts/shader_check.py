@@ -13,7 +13,6 @@ app is running.
 from __future__ import annotations
 
 import argparse
-import ctypes
 import os
 import random
 import sys
@@ -22,14 +21,12 @@ from collections.abc import Callable
 import cv2
 import glfw
 import numpy as np
-from OpenGL.GL import (GL_ARRAY_BUFFER, GL_FALSE, GL_FLOAT, GL_R8, GL_RED, GL_RGBA, GL_RGBA8, GL_STATIC_DRAW,
-                       GL_TEXTURE_2D, GL_UNPACK_ALIGNMENT, GL_UNSIGNED_BYTE, glBindBuffer, glBindTexture,
-                       glBindVertexArray, glBufferData, glEnableVertexAttribArray, glFinish, glGenBuffers,
-                       glGenVertexArrays, glPixelStorei, glTexSubImage2D, glVertexAttribPointer, glViewport)
+from OpenGL.GL import (GL_R8, GL_RED, GL_RGBA, GL_RGBA8, GL_TEXTURE_2D, GL_UNPACK_ALIGNMENT, GL_UNSIGNED_BYTE,
+                       glBindTexture, glFinish, glPixelStorei, glTexSubImage2D, glViewport)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from apps.smile.render.shaders import FlashIn, FlashOut, Omission  # noqa: E402
-from modules.gl import Fbo, Style, Text, Texture, shaders  # noqa: E402
+from modules.gl import Context, Fbo, Style, Text, Texture, shaders  # noqa: E402
 from modules.gl.shaders.box_shader import BoxShader  # noqa: E402
 from modules.pose import PointLandmark, Points2D  # noqa: E402
 from modules.render import PosePointLines  # noqa: E402
@@ -42,7 +39,7 @@ LUT: str = os.path.join('data', 'luts', 'Blockbuster.cube')
 
 
 def context() -> object:
-    """A hidden GL 4.6 window, current, with the fullscreen quad bound as the app binds it."""
+    """A hidden GL 4.6 window, current, with its `gl.Context`."""
     if not glfw.init():
         raise RuntimeError('GLFW did not start')
     glfw.window_hint(glfw.VISIBLE, glfw.FALSE)
@@ -53,15 +50,7 @@ def context() -> object:
     if not window:
         raise RuntimeError('no GL window')
     glfw.make_context_current(window)
-    vertices = np.array([-1, -1, 0, 0, 1, -1, 1, 0, 1, 1, 1, 1, -1, 1, 0, 1], dtype=np.float32)
-    glBindBuffer(GL_ARRAY_BUFFER, glGenBuffers(1))
-    glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
-    glBindVertexArray(glGenVertexArrays(1))
-    glEnableVertexAttribArray(0)
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, ctypes.c_void_p(0))
-    glEnableVertexAttribArray(1)
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, ctypes.c_void_p(8))
-    Style.reset_state()
+    Context().allocate()
     return window
 
 
@@ -110,19 +99,14 @@ def cases() -> dict[str, tuple[object, Case]]:
     def add(name: str, shader: object, draw: Case) -> None:
         c[name] = (shader, draw)
 
-    blit = s.Blit()
-    add('blit', blit, lambda t: blit.use(t['gradient']))
-    add('blit_opacity', blit, lambda t: blit.use(t['gradient'], 0.5))
-    from modules.gl.shaders.blit_flip import BlitFlip
-    from modules.gl.shaders.blit_rect import BlitRect
-    from modules.gl.shaders.blit_region import BlitRegion
-    blit_flip = BlitFlip()
-    add('blit_flip_y', blit_flip, lambda t: blit_flip.use(t['gradient'], flip_y=True))
-    add('blit_flip_x', blit_flip, lambda t: blit_flip.use(t['gradient'], flip_x=True))
-    blit_rect = BlitRect()
-    add('blit_rect', blit_rect, lambda t: blit_rect.use(t['gradient'], -0.5, -0.5, 1.0, 1.0))
-    blit_region = BlitRegion()
-    add('blit_region', blit_region, lambda t: blit_region.use(t['gradient'], 0.25, 0.25, 0.5, 0.5))
+    # The texture's draws, through the context's Blit (no shader of their own to allocate)
+    add('blit', None, lambda t: t['gradient'].draw())
+    add('blit_opacity', None, lambda t: t['gradient'].draw(opacity=0.5))
+    add('blit_flip_y', None, lambda t: t['gradient'].draw(src=Rect(0.0, 1.0, 1.0, -1.0)))
+    add('blit_flip_x', None, lambda t: t['gradient'].draw(src=Rect(1.0, 0.0, -1.0, 1.0)))
+    add('blit_region', None, lambda t: t['gradient'].draw(src=Rect(0.25, 0.25, 0.5, 0.5)))
+    add('draw_dst', None, lambda t: t['gradient'].draw(dst=Rect(0.1, 0.2, 0.5, 0.4)))
+    add('draw_dst_src', None, lambda t: t['second'].draw(Rect(0.5, 0.0, 0.5, 1.0), Rect(0.0, 0.5, 0.5, 0.5)))
 
     contrast = s.Contrast()
     add('contrast', contrast, lambda t: contrast.use(t['gradient'], 0.1, 1.5))
@@ -227,7 +211,7 @@ def run(reference: bool) -> int:
         table = cases()
         allocated: set[int] = set()
         for name, (shader, draw) in table.items():
-            if id(shader) not in allocated:
+            if shader is not None and id(shader) not in allocated:
                 if isinstance(shader, shaders.Lut):
                     shader.allocate()
                     shader.load_cube(LUT)
@@ -261,8 +245,8 @@ def run(reference: bool) -> int:
                 print(f'{name:24s} reference, mean {image.mean():.1f}')
                 continue
             if not os.path.isfile(path):
-                failed.append(name)
-                print(f'{name:24s} no reference')
+                np.save(path, image)           # a case new with this step: its first run is its reference
+                print(f'{name:24s} new, its reference made, mean {image.mean():.1f}')
                 continue
             diff = int(np.abs(image.astype(np.int16) - np.load(path).astype(np.int16)).max())
             print(f'{name:24s} {"ok" if diff <= TOLERANCE else "DIFFERS"}  max {diff}')

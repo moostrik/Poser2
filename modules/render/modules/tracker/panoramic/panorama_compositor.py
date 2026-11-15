@@ -2,12 +2,9 @@
 import time
 from typing import Protocol
 
-# Third-party imports
-from OpenGL.GL import GL_BLEND, GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, glBlendFunc, glEnable
-
 # Local application imports
 from modules.board import HasObservations, HasTracklets
-from modules.gl import Blit, Fbo, Texture, clear_color
+from modules.gl import Fbo, Style, Texture, clear_color
 from modules.tracker import PanoramicTrackerSettings, Tracklet, row_model
 
 from ....layer_base import LayerBase
@@ -205,12 +202,11 @@ class PanoramaCompositor(LayerBase):
     def _blit_static(self) -> None:
         # The cache holds straight-alpha content blended onto transparent black, so its RGB is
         # already weighted by alpha: composite with ONE / ONE_MINUS_SRC_ALPHA, not SRC_ALPHA.
-        # Leave GL_BLEND enabled with the standard func: the mark and label draws that follow
-        # count on it, as they did when seams and grid drew here directly.
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
-        Blit.use(self._static_fbo)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        # Leave the alpha blend on: the mark and label draws that follow count on it, as they did
+        # when seams and grid drew here directly.
+        Style.set_blend_mode(Style.BlendMode.PREMULTIPLIED)
+        self._static_fbo.draw()
+        Style.set_blend_mode(Style.BlendMode.ALPHA)
 
     def _static_inputs(self, parts: list[Part], window: tuple[float, float]) -> tuple:
         """Everything the seam and grid renderers read, so a change redraws the cache."""

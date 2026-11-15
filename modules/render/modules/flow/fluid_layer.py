@@ -13,7 +13,7 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import Annotated
 
-from modules.gl import Texture, Style, Blit
+from modules.gl import Texture, Style
 from modules.flow import TextureKind
 from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 
@@ -110,5 +110,5 @@ class FluidLayer(StageLayer[FluidInput, FluidOutput]):
         Style.push_style()
         Style.set_blend_mode(self.blend_mode)
         if self.texture.allocated:
-            Blit.use(self.texture)
+            self.texture.draw()
         Style.pop_style()

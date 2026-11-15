@@ -11,17 +11,18 @@ from collections import deque
 from threading import Lock
 
 import numpy as np
-from OpenGL.GL import (GL_BLEND, GL_COLOR_BUFFER_BIT, GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER, GL_LINEAR, GL_NEAREST,
+from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER, GL_LINEAR, GL_NEAREST,
                        GL_PACK_ALIGNMENT, GL_PIXEL_PACK_BUFFER, GL_R8, GL_READ_FRAMEBUFFER, GL_RED, GL_RG, GL_RG8,
                        GL_RGBA8, GL_STREAM_COPY, GL_UNSIGNED_BYTE, glBindBuffer, glBindFramebuffer, glBlitFramebuffer,
-                       glBufferData, glClear, glClearColor, glDeleteBuffers, glDisable, glEnable, glGenBuffers,
-                       glGetIntegerv, glIsEnabled, glPixelStorei, glReadPixels)
+                       glBufferData, glClear, glClearColor, glDeleteBuffers, glGenBuffers,
+                       glGetIntegerv, glPixelStorei, glReadPixels)
 
 try:
     from . import cudart   # binds torch's CUDA runtime; fails without a CUDA torch
     _CUDA_OK = True
 except (ImportError, OSError):
     _CUDA_OK = False
+from . import style
 from .fbo import Fbo
 from .shaders import Nv12, Nv12Plane
 from .utils import fill, fit
@@ -141,14 +142,13 @@ class ScreenCapture:
         `slot` on the next `capture` or `flush`."""
         self.flush()
         buffer = self._pixel_buffers[self._turn]
-        blend = glIsEnabled(GL_BLEND)
-        glDisable(GL_BLEND)
+        style.push_style()
+        style.set_blend_mode(style.BlendMode.DISABLED)
         self._y.begin()
         self._shader.use(self.frame, Nv12Plane.Y)
         self._uv.begin()
         self._shader.use(self.frame, Nv12Plane.UV)
-        if blend:
-            glEnable(GL_BLEND)
+        style.pop_style()
         alignment = int(glGetIntegerv(GL_PACK_ALIGNMENT))
         glPixelStorei(GL_PACK_ALIGNMENT, 1)     # rows of any even width, unpadded
         glBindBuffer(GL_PIXEL_PACK_BUFFER, buffer)

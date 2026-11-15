@@ -8,8 +8,9 @@ import ctypes
 from pathlib import Path
 
 import numpy as np
-from OpenGL.GL import GL_ARRAY_BUFFER, GL_BLEND, GL_DYNAMIC_DRAW, GL_FALSE, GL_FLOAT, GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, GL_VERTEX_ARRAY_BINDING, glBindBuffer, glBindVertexArray, glBlendFunc, glBufferData, glDeleteBuffers, glDeleteVertexArrays, glEnable, glEnableVertexAttribArray, glGenBuffers, glGenVertexArrays, glGetIntegerv, glVertexAttribPointer
+from OpenGL.GL import GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW, GL_FALSE, GL_FLOAT, GL_VERTEX_ARRAY_BINDING, glBindBuffer, glBindVertexArray, glBufferData, glDeleteBuffers, glDeleteVertexArrays, glEnableVertexAttribArray, glGenBuffers, glGenVertexArrays, glGetIntegerv, glVertexAttribPointer
 
+from . import style
 from .font_atlas import FontAtlas
 from .shaders.glyphs import Glyphs
 from .shaders.box_shader import BoxShader
@@ -166,9 +167,7 @@ class Text:
         vertices[:, 4] = np.stack([x1, y1, u1, v1], axis=1)
         vertices[:, 5] = np.stack([x0, y1, u0, v1], axis=1)
 
-        # Enable blending for text transparency
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        style.set_blend_mode(style.BlendMode.ALPHA)
 
         previous_vao = glGetIntegerv(GL_VERTEX_ARRAY_BINDING)
         glBindVertexArray(self._vao)
@@ -207,9 +206,7 @@ class Text:
         box_width = text_width + pad * 2
         box_height = text_height + pad * 2
 
-        # Enable blending
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        style.set_blend_mode(style.BlendMode.ALPHA)
 
         screen_size = (float(screen_width), float(screen_height))
 

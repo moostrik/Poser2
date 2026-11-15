@@ -73,9 +73,6 @@ class LayerCompositor(LayerBase):
         self._lut_shader: shaders.Lut = shaders.Lut()
         self._current_lut: str = ""
 
-        # Blit shader for passthrough when no LUT
-        self._blit: shaders.Blit = shaders.Blit()
-
         # Scan LUTs now and whenever folder changes or rescan is pressed
         self._scan_luts()
         self.settings.lut.bind(LutSettings.folder, lambda _: self._scan_luts())
@@ -94,7 +91,6 @@ class LayerCompositor(LayerBase):
 
         self._composite_fbo.allocate(w, h, fmt)
         self._lut_shader.allocate()
-        self._blit.allocate()
 
         # Load initial LUT if configured
         self._load_lut_if_changed()
@@ -103,7 +99,6 @@ class LayerCompositor(LayerBase):
         """Clean up resources."""
         self._composite_fbo.deallocate()
         self._lut_shader.deallocate()
-        self._blit.deallocate()
 
     def _scan_luts(self) -> None:
         """Scan lut folder for .cube files and update files list. Resets selection if no longer valid."""
@@ -147,7 +142,7 @@ class LayerCompositor(LayerBase):
 
         for tex, opacity in entries:
             if tex.allocated and opacity > 0:
-                self._blit.use(tex, opacity)
+                tex.draw(opacity=opacity)
 
         self._composite_fbo.end()
         Style.pop_style()
@@ -169,4 +164,4 @@ class LayerCompositor(LayerBase):
         if self._lut_shader.lut_loaded and self.settings.lut.file and self.settings.lut.strength > 0:
             self._lut_shader.use(self._composite_fbo, self.settings.lut.strength)
         else:
-            self._blit.use(self._composite_fbo)
+            self._composite_fbo.draw()
