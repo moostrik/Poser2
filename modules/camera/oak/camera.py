@@ -69,8 +69,8 @@ class Camera(Thread):
         self.num_tracklets: int = 0
 
         # FPS
-        self.video_fps: FPS = FPS(120)
-        self.tracklet_fps: FPS = FPS(120)
+        self.video_fps: FPS = FPS()
+        self.tracklet_fps: FPS = FPS()
 
         # CALLBACKS (run in registration order)
         self._callback_lock: Lock = Lock()

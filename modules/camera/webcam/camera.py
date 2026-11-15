@@ -28,7 +28,7 @@ class Camera(Thread):
 
         self._callback_lock: Lock = Lock()
         self.frame_callbacks: list[CameraFrameCallback] = []
-        self.video_fps: FPS = FPS(120)
+        self.video_fps: FPS = FPS()
 
         self.running: bool = False
         self._capture: cv2.VideoCapture | None = None

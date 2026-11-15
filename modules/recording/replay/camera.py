@@ -74,8 +74,8 @@ class Camera:
         self._wake: Condition = Condition()
         self._thread: Thread | None = None
 
-        self.video_fps: FPS = FPS(120)
-        self.tracklet_fps: FPS = FPS(120)
+        self.video_fps: FPS = FPS()
+        self.tracklet_fps: FPS = FPS()
         self.frame_callbacks: list[CameraFrameCallback] = []
         self.tracklet_callbacks: list[TrackletCallback] = []
 

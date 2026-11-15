@@ -386,7 +386,7 @@ class DeepFlowRender(RenderBase):
 
         interval: float = render.frame_interval(capture.timestamp, self._capture_timestamps.get(i), self.settings.motion.fps, self._dt, self._dt)
         self._capture_timestamps[i] = capture.timestamp
-        self.motion_rates.setdefault(i, FPS(120)).processed()
+        self.motion_rates.setdefault(i, FPS()).processed()
         motion_image: render.LayerBase = self._layer(inputs.motion_image, i) or self.L[Layers.view_image][i]
         color: render.LayerBase | None = self._layer(inputs.bridge_image, i)
         output: render.ViewOutput = view.output

@@ -91,9 +91,9 @@ class Camera(Thread):
         self._frame_transformation: dai.ImgTransformation | None = None     # the delivered frame's, for the crops' keypoints
 
         # FPS
-        self.video_fps: FPS = FPS(120)
-        self.tracklet_fps: FPS = FPS(120)
-        self.depth_fps: FPS = FPS(120)
+        self.video_fps: FPS = FPS()
+        self.tracklet_fps: FPS = FPS()
+        self.depth_fps: FPS = FPS()
 
         # CALLBACKS (run in registration order)
         self._callback_lock: Lock = Lock()

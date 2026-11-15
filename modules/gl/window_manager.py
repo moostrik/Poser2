@@ -92,7 +92,7 @@ class WindowManager():
         self.frame_interval: int | None = None
         self._current_vsync: bool | None = None
         logger.info("Initialized with width=%s, height=%s, fullscreen_mode=%s, v_sync=%s, fps=%s", settings.width, settings.height, settings.fullscreen_mode, settings.v_sync, settings.avg_fps)
-        self._fps = FPS(120)
+        self._fps = FPS()
         # CPU time of the renderer's calls; the GPU work they queue is not waited for
         self._update_timer = PerformanceTimer(name="Render update", sample_count=200)
         self._draw_timer = PerformanceTimer(name="Render draw", sample_count=200)

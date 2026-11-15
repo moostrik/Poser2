@@ -94,7 +94,7 @@ class DeepFlowMain:
             self.player.add_jump_callback(self.recorded_poses.clear_waiting)
         pose_step: PoseInference | RecordedPoses = self.recorded_poses if self.recorded_poses is not None else self.pose_inference
         self.capture_sync = CaptureSync(p.capture_sync)                  # the color, depth and poses of one moment, for the render
-        self.capture_rate: FPS = FPS(120)                                # the captures it hands on, for the panel's cadence
+        self.capture_rate: FPS = FPS()                                # the captures it hands on, for the panel's cadence
 
         # The camera's thread only hands its frames and tracklets over: to the recorder as they came, to the uploader
         # for the rest, which straightens the tracklets with their frame and hands them to the tracker and the board

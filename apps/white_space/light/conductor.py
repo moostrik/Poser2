@@ -91,7 +91,7 @@ class Conductor(Thread):
             logger.warning("Starting with debug layer %s selected: the fixture spins up to PROJECTION at once",
                            DebugLayer(int(settings.debug)).name)
 
-        self.fps_counter = FPS(120)
+        self.fps_counter = FPS()
         self._update_callbacks: list[Callable[[Tick], Any]] = []
         self._light_frame_callbacks: list[LightFrameCallback] = []
 
