@@ -46,26 +46,30 @@ per step, both presets (`settings.json`, `very nice.json`) and the documents it 
 guard tests, the render's tests and one -sim start (the panels in place, the presets loaded without unknown
 keys).
 
-- **A1.** One declaration of the chain in the renderer, in place of the four lists: each stage with its layer,
+- **A1.** The view into deep_flow, for now: `ViewLayer`, its outputs and its shaders from `render/modules/flow` to
+  `apps/deep_flow/render/layers/view/`, its tests with it. The motion, bridge and fluid layers stay in
+  `render/modules/flow`: they are layers (the render's loop and settings), and `modules/flow`, which may not import
+  the render, holds what they run.
+- **A2.** One declaration of the chain in the renderer, in place of the four lists: each stage with its layer,
   its outputs and its monitor, in order.
-- **A2.** The color in the view: the view's last pass, `color`, its output read by the bridge, its settings
+- **A3.** The color in the view: the view's last pass, `color`, its output read by the bridge, its settings
   `view.color`; `enabled` off passes the foreground as it is. `inputs.bridge_image` and deep_flow's
   `foreground_look` layer and panel go; hd_trio keeps its own until its refactor. VIEW.md says it.
-- **A3.** A monitor per stage, in the stage's panel, showing all its FBOs: deep_flow's own wiring, a
+- **A4.** A monitor per stage, in the stage's panel, showing all its FBOs: deep_flow's own wiring, a
   `MonitorLayer` per stage with its stage fixed. The capture's image and depth layers declare their ports;
   `MonitorLayer` gets `view_depth`'s depth colormaps. `monitor_a`, `monitor_b`, the view's wrapper layers and
   `view_depth` leave deep_flow. `color_mask`, `inputs` and `stage` leave deep_flow: the motion reads the view's
   `image`, and every injection is at full weight. FLOW.md and RENDER.md say it.
-- **A4.** A pose monitor: the pose stage it reads (raw, clean, smooth, lerp); the pose drawn on the crop with its
+- **A5.** A pose monitor: the pose stage it reads (raw, clean, smooth, lerp); the pose drawn on the crop with its
   image, on the camera's frame with its boxes, or on the view, the last two without an image so they lie over
   any layer of that frame; the features of the frame or the window as an optional overlay. It replaces
   `tracker`, `pose`, `view_pose` and the four `data_*` layers; `data_time` goes; `time_series` stays a layer.
-- **A5.** The composite leaves deep_flow: the LUT becomes an option of the fluid's look, on the same
+- **A6.** The composite leaves deep_flow: the LUT becomes an option of the fluid's look, on the same
   `LutSettings` the compositor uses, and the show draws its layers in order.
-- **A6.** The panel tree in the chain's order: `capture`, `view`, `motion`, `bridge`, `fluid`, then `pose`; the
+- **A7.** The panel tree in the chain's order: `capture`, `view`, `motion`, `bridge`, `fluid`, then `pose`; the
   display (`layer`, `colors`) apart. `Layers` in the same order, the pose's monitor last. The depth tolerance
   and the view's size declared once, shared to the view and the motion.
-- **A7.** The layer select cut to two panels, `a` and `b`, in place of `left`, `right`, `output` and `record`; the
+- **A8.** The layer select cut to two panels, `a` and `b`, in place of `left`, `right`, `output` and `record`; the
   show draws `a`, and the recording records `a` or the window. A layer taken out of a list goes back to its place among
   the unselected, in `Layers`' order: the panel's playlist (`modules/panel/controls.py`) keeps the order it was
   dragged into, for every app.
@@ -220,7 +224,7 @@ Not worked on until asked for; each with what is known.
   ports, is the render's. Each stage subclasses the render's `LayerBase` to sit in its update loop, and modules
   may not import the render, so the stages could not live in the flow **(deduction)**. The textbook split: each
   stage a plain flow class as `Fluid3D` is, with its settings, ports, inputs and outputs, and a thin render layer
-  per stage that calls it, beside the monitor. A6's panels follow wherever the stages end up.
+  per stage that calls it, beside the monitor. A7's panels follow wherever the stages end up.
 
 - The 4K upscale: depth in 3D at the grid and detail in 2D at 4K, a march at the grid's size, one
   edge-aware upscale of the flat result and a 4K detail layer advected by the grid's velocity; what
@@ -252,10 +256,11 @@ Not worked on until asked for; each with what is known.
 
 ## Rules it touches
 
-- Keep presets and settings schemas in sync: the view's color, the monitors, the panel tree, the layer select, A2 to A7.
+- Keep presets and settings schemas in sync: the view's color, the monitors, the panel tree, the layer select, A3 to A8.
 - Remove obsolete pathways: the four lists, the wrapper layers, `view_depth`, `monitor_a`, `monitor_b`,
-  `inputs`, `stage`, the pose's layers and deep_flow's composite, A1, A3 to A5.
-- Settings connect the user and a component, not two components: the view's tolerance and size, A6.
+  `inputs`, `stage`, the pose's layers and deep_flow's composite, A2, A4 to A6.
+- Settings connect the user and a component, not two components: the view's tolerance and size, A7.
+- A layer that is not general and that one app uses sits in `apps/<app>/render/layers/`: the view, A1.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, B1.
 - A `Field` description is one short line of panel text: J1.
