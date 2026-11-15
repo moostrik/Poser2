@@ -3,7 +3,7 @@
 # Local application imports
 from modules.settings import Field, BaseSettings
 from modules.board import HasFrames
-from modules.gl import Fbo, Texture, clear_color, shaders
+from modules.gl import Fbo, Texture, clear_color
 from modules.utils import Rect
 from modules.pose import Frame, BBox
 from ...layer_base import LayerBase, DataCache
@@ -22,20 +22,15 @@ class CropLayer(LayerBase):
         self._cam_texture: Texture = cam_texture
         self._data_cache: DataCache[Frame]= DataCache[Frame]()
 
-        # Add DrawRoi shader
-        self._roi_shader = shaders.DrawRoi()
-
     @property
     def texture(self) -> Texture:
         return self._fbo
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
-        self._roi_shader.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
-        self._roi_shader.deallocate()
 
     def update(self) -> None:
         pose: Frame | None = self._board.get_frame(self.settings.stage, self._track_id)
@@ -51,5 +46,5 @@ class CropLayer(LayerBase):
 
         self._fbo.begin()
         clear_color()
-        self._roi_shader.use(self._cam_texture, pose_rect)
+        self._cam_texture.draw(src=pose_rect)
         self._fbo.end()

@@ -1,4 +1,4 @@
-"""Draw multiple circles with antialiasing."""
+"""FillCircles: up to 8 filled circles, antialiased."""
 
 from OpenGL.GL import glUniform1f, glUniform1i, glUniform4fv, glUseProgram
 from modules.utils import Color
@@ -8,7 +8,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class DrawCircles(Shader):
+class FillCircles(Shader):
     """Draw up to 8 circles with individual positions, sizes, and colors."""
 
     def use(self, positions: list[tuple[float, float]], size: float, smooth: float,
@@ -24,7 +24,7 @@ class DrawCircles(Shader):
             Maximum 8 circles supported.
         """
         if not self.allocated or not self.shader_program:
-            logger.warning("DrawCircles shader not allocated or shader program missing.")
+            logger.warning("FillCircles shader not allocated or shader program missing.")
             return
 
         num_circles = min(len(positions), 8)

@@ -20,7 +20,7 @@ from OpenGL.GL import GL_NEAREST, GL_R16F, GL_R32F, GL_RG32F, GL_RGBA16F, GL_RGB
 # Local application imports
 from modules.flow import DepthRead, DepthView, DepthUpscale, DepthVelocitySettings, TextureKind, \
                          depth_step, fixed_window, place_points, view_per_depth_pixel, view_span
-from modules.gl import Fbo, SwapFbo, Style, Texture, shaders
+from modules.gl import Fbo, SwapFbo, Style, Texture
 from modules.pose import BBox, Frame, Points2D
 from modules.settings import Field
 from modules.utils import Rect
@@ -83,7 +83,6 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         self._products: SwapFbo = SwapFbo()             # the guided filter's products and their means (32-bit: a variance)
         self._coefficients: SwapFbo = SwapFbo()         # its coefficients a, b and their means
 
-        self._roi_shader: shaders.DrawRoi = shaders.DrawRoi()
         self._depth_shader: DepthUpscale = DepthUpscale()
         self._depth_mask_shader: DepthMask = DepthMask()
         self._guided_shader: GuidedFilter = GuidedFilter()
@@ -142,7 +141,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         super().deallocate()
 
     def _shaders(self) -> tuple:
-        return (self._roi_shader, self._depth_shader, self._depth_mask_shader, self._guided_shader, self._threshold_shader, self._foreground_shader)
+        return (self._depth_shader, self._depth_mask_shader, self._guided_shader, self._threshold_shader, self._foreground_shader)
 
     def reset(self) -> None:
         for fbo in (self._image, self._depth, self._depth_mask, self._mask, self._foreground):
@@ -184,7 +183,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         self._image.begin()
-        self._roi_shader.use(image, roi)
+        image.draw(src=roi)
         self._image.end()
 
         # The depth read within a surface first, cut by the player's range, the cut's edge moved onto the image's;

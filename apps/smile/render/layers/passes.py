@@ -10,13 +10,13 @@ def copy(src: Texture, dst: Fbo) -> None:
     dst.end()
 
 
-def blur(swap: SwapFbo, blur_h: shaders.BlurH, blur_v: shaders.BlurV, radius: float) -> None:
-    """Separable blur of the current buffer, in place."""
+def blur(swap: SwapFbo, shader: shaders.Blur, sigma: float) -> None:
+    """Gaussian blur of the current buffer, in place: `sigma` in pixels."""
     swap.swap()
     swap.begin()
-    blur_h.use(swap.back, radius)
+    shader.use(swap.back, True, sigma)
     swap.end()
     swap.swap()
     swap.begin()
-    blur_v.use(swap.back, radius)
+    shader.use(swap.back, False, sigma)
     swap.end()

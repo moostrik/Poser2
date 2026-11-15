@@ -148,7 +148,7 @@ the moment of that peak within midpoint ± deviation, sent to Grin Frames as `<n
 
 OpenGL engine: Poser2's `modules/gl/` (glfw, GL 4.6 core, render thread owned by `WindowManager`). The render loop goes on when `update`, `draw`, an event callback (key, mouse, window, monitor) or
 a deferred settings call raises: it is logged, and a monitor that is unplugged does not close the app
-(`modules/render/tests/test_window.py`). The render is the display's 1024 x 1280 (`main.py` defaults, swapped by the
+(`modules/gl/tests/test_window_manager.py`). The render is the display's 1024 x 1280 (`main.py` defaults, swapped by the
 default portrait mode): the same 4:5 as the workflow's 896 x 1120 portrait, which stays at the size SDXL is best at and fills
 the render as a texture. `render/smile_render.py` runs the `Sequencer` once per frame (it is the app clock:
 Art-Net, OSC and saving hang off its messages), then the stage for the current `SequenceType`

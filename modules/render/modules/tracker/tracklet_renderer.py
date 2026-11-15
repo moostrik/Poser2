@@ -16,7 +16,7 @@ class TrackletRenderer(LayerBase):
         self._board: HasCameraTracklets = board
         self._cam_id: int = cam_id
         self._tracklets: list[CameraTracklet] = []
-        self._shader: shaders.DrawColoredRectangle = shaders.DrawColoredRectangle()
+        self._shader: shaders.FillRect = shaders.FillRect()
         self._text_renderer: Text = Text()
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
@@ -40,7 +40,7 @@ class TrackletRenderer(LayerBase):
         else:
             self._tracklets = tracklets
 
-    def draw_tracklet(self, tracklet: CameraTracklet, shader: shaders.DrawColoredRectangle,
+    def draw_tracklet(self, tracklet: CameraTracklet, shader: shaders.FillRect,
                       text_renderer: Text, width: int, height: int) -> None:
         if tracklet.status == TrackingStatus.REMOVED:
             return

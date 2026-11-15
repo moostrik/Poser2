@@ -1,7 +1,7 @@
 """The view's window on the camera image, as plain geometry.
 
 The window is uv on the camera image with rows down (`Rect`, x and y its top left corner), as the image and the
-aligned depth are both on the image's view, and as `DrawRoi` and `DepthUpscale` take it.
+aligned depth are both on the image's view, and as a texture's `draw(src=…)` and `DepthUpscale` take it.
 """
 
 import math

@@ -24,7 +24,7 @@ class FaceColor(Shader):
         at strength `amount`; `blurred` is a blurred tex0 for the blur effect.
         rect: the chosen face's box, turned to color by `charge` (0..1) as `fill` (index in FaceFill)
         says; `color` is the traced outline's. A rect of width or height 0 is no rect.
-        Boxes are normalised 0..1, top left origin (as DrawRectangleOutline).
+        Boxes are normalised 0..1, top left origin (as StrokeRect).
         mosaic: block size in pixels of the whole image; 1 or less is none.
         """
         if not self.allocated or not self.shader_program:

@@ -24,7 +24,7 @@ class PoseBoxRenderer(LayerBase):
         self._width: int = 0
         self._height: int = 0
 
-        self._shader: shaders.DrawRectangleOutline = shaders.DrawRectangleOutline()
+        self._shader: shaders.StrokeRect = shaders.StrokeRect()
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         self._shader.allocate()

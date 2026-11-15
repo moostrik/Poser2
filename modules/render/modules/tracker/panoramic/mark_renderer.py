@@ -38,7 +38,7 @@ class MarkRenderer(LayerBase):
     """
 
     def __init__(self) -> None:
-        self._rect: shaders.DrawColoredRectangle = shaders.DrawColoredRectangle()
+        self._rect: shaders.FillRect = shaders.FillRect()
         self._marks: list[Mark] = []
         self._width: int = 1
         self._height: int = 1

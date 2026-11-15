@@ -140,7 +140,7 @@ class HDTrioRender(RenderBase):
         self.add_update_callback(self._measure_tick)
 
         # The border around each panel in the main window
-        self._border: shaders.DrawRectangleOutline = shaders.DrawRectangleOutline()
+        self._border: shaders.StrokeRect = shaders.StrokeRect()
 
         self._prev_stage: ShowStage | None = None
         self._active_stages: list[StageLayer] = []

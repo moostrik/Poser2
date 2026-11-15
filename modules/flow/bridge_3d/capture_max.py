@@ -6,7 +6,6 @@ color or warmth, so a capture's dye is not lost to the next one's; a velocity is
 """
 
 from modules.gl import Style, SwapFbo, Texture
-from ..shaders import Blit
 from .shaders import LargerAmount
 
 
@@ -17,7 +16,6 @@ class CaptureMax:
     def __init__(self, by_alpha: bool) -> None:
         self._by_alpha: bool = by_alpha
         self._held: SwapFbo = SwapFbo()
-        self._copy_shader: Blit = Blit()
         self._larger_shader: LargerAmount = LargerAmount()
 
     @property
@@ -26,12 +24,10 @@ class CaptureMax:
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._held.allocate(width, height, internal_format)
-        self._copy_shader.allocate()
         self._larger_shader.allocate()
 
     def deallocate(self) -> None:
         self._held.deallocate()
-        self._copy_shader.deallocate()
         self._larger_shader.deallocate()
 
     def follow(self, source: Texture) -> None:
@@ -48,7 +44,7 @@ class CaptureMax:
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
         self._held.begin()
-        self._copy_shader.use(source)
+        source.draw()
         self._held.end()
         Style.pop_style()
 

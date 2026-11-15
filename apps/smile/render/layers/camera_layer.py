@@ -15,7 +15,7 @@ from .passes import blur, copy
 
 FONT_SIZE: int = 18
 LABEL_PAD_PX: float = 4.0
-BLUR_RADIUS: float = 2.0    # of the blur effect at amount 1 (1 is about 20 pixels each way)
+BLUR_SIGMA: float = 18.0    # the blur effect's Gaussian at amount 1 (pixels)
 NO_RECT: tuple[float, float, float, float, float] = (0.0, 0.0, 0.0, 0.0, 0.0)
 
 # the shader's numbers for the settings' choices: their order in the enum
@@ -56,8 +56,7 @@ class CameraLayer(LayerBase):
         self._text: Text = Text()
         # a blurred camera frame, only made for the blur effect
         self._blurred: SwapFbo = SwapFbo()
-        self._blur_h: shaders.BlurH = shaders.BlurH()
-        self._blur_v: shaders.BlurV = shaders.BlurV()
+        self._blur: shaders.Blur = shaders.Blur()
         self._width: int = 1
         self._height: int = 1
 
@@ -69,8 +68,7 @@ class CameraLayer(LayerBase):
         self._drawer.allocate()
         self._text.allocate(font_size=FONT_SIZE)
         self._blurred.allocate(width, height, internal_format)
-        self._blur_h.allocate()
-        self._blur_v.allocate()
+        self._blur.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
@@ -78,14 +76,12 @@ class CameraLayer(LayerBase):
         self._drawer.deallocate()
         self._text.deallocate()
         self._blurred.deallocate()
-        self._blur_h.deallocate()
-        self._blur_v.deallocate()
+        self._blur.deallocate()
 
     def update(self) -> None:
         self._face_color.reload()
         self._drawer.reload()
-        self._blur_h.reload()
-        self._blur_v.reload()
+        self._blur.reload()
 
     @property
     def texture(self) -> Texture:
@@ -121,7 +117,7 @@ class CameraLayer(LayerBase):
         blurred: Texture | None = None
         if effect is FaceEffect.BLUR and (fields or subject is not None):
             copy(self._camera, self._blurred)
-            blur(self._blurred, self._blur_h, self._blur_v, amount * BLUR_RADIUS)
+            blur(self._blurred, self._blur, amount * BLUR_SIGMA)
             blurred = self._blurred
         self._fbo.begin()
         self._face_color.use(self._camera, self._width, self._height, fields, EFFECTS.index(effect), amount,

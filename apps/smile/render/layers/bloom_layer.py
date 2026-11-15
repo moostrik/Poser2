@@ -4,6 +4,8 @@ from ..shaders import Omission
 from .layer_base import LayerBase
 from .passes import blur, copy
 
+MASK_SIGMA: float = 9.0     # the mask's softening (pixels)
+
 
 class BloomLayer(LayerBase):
     """The last image blooms and dissolves into the camera, masked by the depth of that image."""
@@ -13,28 +15,24 @@ class BloomLayer(LayerBase):
         self._fbo: Fbo = Fbo()
         self._mask: SwapFbo = SwapFbo()
         self._omission: Omission = Omission()
-        self._blur_h: shaders.BlurH = shaders.BlurH()
-        self._blur_v: shaders.BlurV = shaders.BlurV()
+        self._blur: shaders.Blur = shaders.Blur()
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         assert width and height and internal_format
         self._fbo.allocate(width, height, internal_format)
         self._mask.allocate(width, height, internal_format)
         self._omission.allocate()
-        self._blur_h.allocate()
-        self._blur_v.allocate()
+        self._blur.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._mask.deallocate()
         self._omission.deallocate()
-        self._blur_h.deallocate()
-        self._blur_v.deallocate()
+        self._blur.deallocate()
 
     def update(self) -> None:
         self._omission.reload()
-        self._blur_h.reload()
-        self._blur_v.reload()
+        self._blur.reload()
 
     @property
     def texture(self) -> Texture:
@@ -45,7 +43,7 @@ class BloomLayer(LayerBase):
         if not self._depth.allocated:
             return
         copy(self._depth, self._mask)
-        blur(self._mask, self._blur_h, self._blur_v, 1.0)
+        blur(self._mask, self._blur, MASK_SIGMA)
 
     def render(self, image: Texture, camera: Texture, bloom: float, omission: float) -> None:
         """bloom brightens the image, omission 0..1 dissolves it into the camera."""

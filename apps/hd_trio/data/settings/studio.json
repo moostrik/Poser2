@@ -457,7 +457,7 @@
         "blend_factor": 0.2,
         "dilation_steps": 0,
         "blur_steps": 0,
-        "blur_radius": 1.0
+        "blur_sigma": 1.7
       },
       "cam": {
         "blend_factor": 0.2,

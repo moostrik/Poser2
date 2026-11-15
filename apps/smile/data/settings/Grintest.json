@@ -148,7 +148,7 @@
     "trail_active": true,
     "trail": 0.99,
     "loop_trail": 0.8,
-    "fade_blur": 0.1,
+    "fade_blur": 0.9,
     "bloom_amount": 0.6,
     "window": {
       "title": "SMILE",

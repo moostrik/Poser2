@@ -10,8 +10,6 @@ from .center_geometry import CenterGeometry, SourceSpace
 from modules.utils import Rect
 from ....settings import CenterMaskLayerSettings
 
-_FULL_ROI: Rect = Rect(0.0, 0.0, 1.0, 1.0)
-
 
 class CenterMaskLayer(LayerBase):
     """Renders mask image cropped and rotated with temporal blending and blur. `space` says whether
@@ -46,11 +44,11 @@ class CenterMaskLayer(LayerBase):
 
         # Shaders
         self._roi_shader = shaders.DrawRoi()
-        self._mask_blend_shader = shaders.MaskBlend()
+        self._blend_shader = shaders.Blend()
         self._mask_AA_shader = MaskAA()
         self._mask_dilate_shader = shaders.MaskDilate()
         self._mask_erode_shader = shaders.MaskErode()
-        self._mask_blur_shader = shaders.MaskBlur()
+        self._blur_shader = shaders.Blur()
         self._guided_shader = GuidedFilter()
 
     @property
@@ -80,11 +78,11 @@ class CenterMaskLayer(LayerBase):
             self._coefficients_fbo.allocate(width, height, GL_RG32F)
 
         self._roi_shader.allocate()
-        self._mask_blend_shader.allocate()
+        self._blend_shader.allocate()
         self._mask_AA_shader.allocate()
         self._mask_dilate_shader.allocate()
         self._mask_erode_shader.allocate()
-        self._mask_blur_shader.allocate()
+        self._blur_shader.allocate()
         self._guided_shader.allocate()
 
     def deallocate(self) -> None:
@@ -98,11 +96,11 @@ class CenterMaskLayer(LayerBase):
         self._coefficients_fbo.deallocate()
 
         self._roi_shader.deallocate()
-        self._mask_blend_shader.deallocate()
+        self._blend_shader.deallocate()
         self._mask_AA_shader.deallocate()
         self._mask_dilate_shader.deallocate()
         self._mask_erode_shader.deallocate()
-        self._mask_blur_shader.deallocate()
+        self._blur_shader.deallocate()
         self._guided_shader.deallocate()
 
     def update(self) -> None:
@@ -129,14 +127,14 @@ class CenterMaskLayer(LayerBase):
         self._roi_shader.use(source, *roi)
         self._unrefined_fbo.end()
         self._roi_fbo.begin()
-        self._roi_shader.use(self._unrefined_fbo, _FULL_ROI)
+        self._unrefined_fbo.draw()
         self._roi_fbo.end()
         self._guide_edge(self._view_per_source_pixel(roi[0], source))
 
         # Temporal blending
         self._blend_fbo.swap()
         self._blend_fbo.begin()
-        self._mask_blend_shader.use(
+        self._blend_shader.use(
             self._blend_fbo.back,
             self._roi_fbo,
             self.settings.blend_factor
@@ -167,25 +165,17 @@ class CenterMaskLayer(LayerBase):
         for i in range(self.settings.blur_steps):
             self._mask_blur_fbo.swap()
             self._mask_blur_fbo.begin()
-            self._mask_blur_shader.use(
-                self._mask_blur_fbo.back,
-                True,
-                self.settings.blur_radius
-            )
+            self._blur_shader.use(self._mask_blur_fbo.back, True, self.settings.blur_sigma)
             self._mask_blur_fbo.end()
 
             self._mask_blur_fbo.swap()
             self._mask_blur_fbo.begin()
-            self._mask_blur_shader.use(
-                self._mask_blur_fbo.back,
-                False,
-                self.settings.blur_radius
-            )
+            self._blur_shader.use(self._mask_blur_fbo.back, False, self.settings.blur_sigma)
             self._mask_blur_fbo.end()
 
         # Copy to the output, so readers holding `texture` see this frame's result
         self._mask_fbo.begin()
-        self._roi_shader.use(self._mask_blur_fbo, _FULL_ROI)
+        self._mask_blur_fbo.draw()
         self._mask_fbo.end()
 
         Style.pop_style()

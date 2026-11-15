@@ -15,7 +15,7 @@ from . import style
 from .context import context
 from .font_atlas import FontAtlas
 from .shaders.glyphs import Glyphs
-from .shaders.draw_box import DrawBox
+from .shaders.fill_rect import FillRect
 from .text_layout import text_layout
 
 
@@ -44,7 +44,7 @@ class Text:
     def __init__(self) -> None:
         self._atlas: FontAtlas = FontAtlas()
         self._glyphs: Glyphs = Glyphs()
-        self._box: DrawBox = DrawBox()
+        self._box: FillRect = FillRect()
         self._allocated: bool = False
         self._vao: int = 0      # the string batch: interleaved (x, y, u, v), 6 vertices per glyph
         self._vbo: int = 0

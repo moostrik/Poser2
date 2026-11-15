@@ -185,7 +185,7 @@ class DeepFlowRender(RenderBase):
         self._capture_timestamps: dict[int, float] = {}     # each camera's capture run last
 
         # The border around each layer in the main window
-        self._border: shaders.DrawRectangleOutline = shaders.DrawRectangleOutline()
+        self._border: shaders.StrokeRect = shaders.StrokeRect()
 
         # The mouse in the main window drives the monitors' volume views: a drag that starts anywhere goes to
         # every monitor, so A and B keep one angle and one layer (nothing else in the main window takes it)

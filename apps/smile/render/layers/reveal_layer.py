@@ -4,6 +4,8 @@ from ..shaders import FlashOut
 from .layer_base import LayerBase
 from .passes import blur, copy
 
+MASK_SIGMA: float = 9.0     # the mask's softening (pixels)
+
 
 class RevealLayer(LayerBase):
     """The flash out: an image appears from white, masked by the depth of the capture."""
@@ -14,28 +16,24 @@ class RevealLayer(LayerBase):
         self._fbo: Fbo = Fbo()
         self._mask: SwapFbo = SwapFbo()
         self._flash_out: FlashOut = FlashOut()
-        self._blur_h: shaders.BlurH = shaders.BlurH()
-        self._blur_v: shaders.BlurV = shaders.BlurV()
+        self._blur: shaders.Blur = shaders.Blur()
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         assert width and height and internal_format
         self._fbo.allocate(width, height, internal_format)
         self._mask.allocate(width, height, internal_format)
         self._flash_out.allocate()
-        self._blur_h.allocate()
-        self._blur_v.allocate()
+        self._blur.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._mask.deallocate()
         self._flash_out.deallocate()
-        self._blur_h.deallocate()
-        self._blur_v.deallocate()
+        self._blur.deallocate()
 
     def update(self) -> None:
         self._flash_out.reload()
-        self._blur_h.reload()
-        self._blur_v.reload()
+        self._blur.reload()
 
     @property
     def texture(self) -> Texture:
@@ -46,7 +44,7 @@ class RevealLayer(LayerBase):
         if not self._depth.allocated:
             return
         copy(self._depth, self._mask)
-        blur(self._mask, self._blur_h, self._blur_v, 1.0)
+        blur(self._mask, self._blur, MASK_SIGMA)
 
     def render(self, image: Texture, flash: float) -> None:
         """flash 1 is all white, 0 is all image."""

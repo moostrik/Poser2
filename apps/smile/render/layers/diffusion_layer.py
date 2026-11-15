@@ -11,26 +11,22 @@ class DiffusionLayer(LayerBase):
         self._image: Image = image
         self._fbo: SwapFbo = SwapFbo()
         self._blend: shaders.Blend = shaders.Blend()
-        self._blur_h: shaders.BlurH = shaders.BlurH()
-        self._blur_v: shaders.BlurV = shaders.BlurV()
+        self._blur: shaders.Blur = shaders.Blur()
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         assert width and height and internal_format
         self._fbo.allocate(width, height, internal_format)
         self._blend.allocate()
-        self._blur_h.allocate()
-        self._blur_v.allocate()
+        self._blur.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._blend.deallocate()
-        self._blur_h.deallocate()
-        self._blur_v.deallocate()
+        self._blur.deallocate()
 
     def update(self) -> None:
         self._blend.reload()
-        self._blur_h.reload()
-        self._blur_v.reload()
+        self._blur.reload()
 
     @property
     def texture(self) -> Texture:
@@ -51,6 +47,6 @@ class DiffusionLayer(LayerBase):
         self._blend.use(self._image, self._fbo.back, trail)
         self._fbo.end()
 
-    def blur(self, radius: float) -> None:
-        """Blur the result in place; called every frame it adds up."""
-        blur(self._fbo, self._blur_h, self._blur_v, radius)
+    def blur(self, sigma: float) -> None:
+        """Blur the result in place by `sigma` pixels; called every frame it adds up."""
+        blur(self._fbo, self._blur, sigma)

@@ -38,7 +38,7 @@ class AzimuthOverlayLayer(render.LayerBase):
     def __init__(self, board: AzimuthOverlayBoard, colors: render.ColorSettings) -> None:
         self._board: AzimuthOverlayBoard = board
         self._colors: render.ColorSettings = colors
-        self._rect: shaders.DrawColoredRectangle = shaders.DrawColoredRectangle()
+        self._rect: shaders.FillRect = shaders.FillRect()
         self._width: int = 1
         self._height: int = 1
 

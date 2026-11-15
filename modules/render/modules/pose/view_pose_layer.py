@@ -45,7 +45,7 @@ class ViewPoseLayer(LayerBase):
         self._geometry: PosePlacement = geometry
         self._fbo: Fbo = Fbo()
         self._shader: PosePointLines = PosePointLines()
-        self._circle_shader: shaders.DrawCircles = shaders.DrawCircles()
+        self._circle_shader: shaders.FillCircles = shaders.FillCircles()
 
         # Configuration
         self.settings: ViewPoseLayerSettings = settings or ViewPoseLayerSettings()

@@ -79,7 +79,7 @@ class RenderSettings(BaseSettings):
     trail_active:  Field[bool]  = Field(True, description="Blend new diffusion images over the previous ones")
     trail:         Field[float] = Field(0.995, min=0.98, max=1.0, step=0.001, description="Trail amount")
     loop_trail:    Field[float] = Field(0.5, min=0.0, max=0.99, step=0.01, description="Trail while the grin animation plays (0 = none)")
-    fade_blur:     Field[float] = Field(0.1, min=0.0, max=1.0, step=0.01, description="Blur while fading the last image out")
+    fade_blur:     Field[float] = Field(0.9, min=0.0, max=9.0, step=0.1, description="Blur per frame while fading the last image out (pixels)")
     bloom_amount:  Field[float] = Field(0.6, min=0.0, max=1.0, step=0.1, description="Bloom while fading the last image out")
     credit:        Field[bool]  = Field(True, newline=True, row_label="Credit", label="Show", description="QR code in the corner, the caption with the grin and the result")
     credit_name:   Field[str]   = Field(CREDIT_NAME, label="Name", description="The artist's name: scrolling, on the QR cell and the watermark")

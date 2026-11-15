@@ -181,7 +181,7 @@
     "trail_active": true,
     "trail": 0.99,
     "loop_trail": 0.33,
-    "fade_blur": 0.1,
+    "fade_blur": 0.9,
     "bloom_amount": 0.6,
     "credit": true,
     "credit_name": "Matthias Oostrik",

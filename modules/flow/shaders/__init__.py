@@ -3,7 +3,6 @@
 from .add import Add
 from .add_boolean import AddBoolean
 from .add_region import AddRegion
-from .blit import Blit
 from .channel_add import ChannelAdd
 from .channel_add_region import ChannelAddRegion
 from .channel_copy import ChannelCopy

@@ -27,7 +27,7 @@ class SeamRenderer(LayerBase):
         self._num_cams: int = max(1, num_cams)
         self._tracker: PanoramicTrackerSettings = tracker
         self._settings: PanoramaLayerSettings = settings
-        self._rect: shaders.DrawColoredRectangle = shaders.DrawColoredRectangle()
+        self._rect: shaders.FillRect = shaders.FillRect()
         self._height: int = 1
         self._width: int = 1
 

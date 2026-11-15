@@ -42,17 +42,10 @@ class FlowUtil:
             dst_fbo: Destination FBO
             src_texture: Source texture
         """
-        if not dst_fbo.allocated:
+        if not dst_fbo.allocated or not src_texture.allocated:
             return
-
-        # Lazy init shader
-        if not hasattr(FlowUtil, '_stretch_shader'):
-            from .shaders import Blit
-            FlowUtil._stretch_shader = Blit()
-            FlowUtil._stretch_shader.allocate()
-
         dst_fbo.begin()
-        FlowUtil._stretch_shader.use(src_texture)
+        src_texture.draw()
         dst_fbo.end()
 
     @staticmethod

@@ -30,7 +30,7 @@ from modules.flow import DepthRead, DepthUpscale  # noqa: E402
 from modules.flow.shaders import AddRegion, ChannelAddRegion, ChannelSetRegion, SetRegion  # noqa: E402
 from modules.flow.visualization.shaders import ColormapKey  # noqa: E402
 from modules.gl import Context, Fbo, Style, Text, Texture, shaders  # noqa: E402
-from modules.gl.shaders.draw_box import DrawBox  # noqa: E402
+from modules.gl.shaders.blur import KERNEL_SIGMA  # noqa: E402
 from modules.pose import PointLandmark, Points2D  # noqa: E402
 from modules.render import PosePointLines  # noqa: E402
 from modules.utils import Color, Point2f, Rect  # noqa: E402
@@ -150,11 +150,11 @@ def cases() -> dict[str, tuple[object, Case]]:
     sharpen = s.Sharpen()
     add('sharpen', sharpen, lambda t: sharpen.use(t['second'], 1.5))
 
-    blur_h, blur_v = s.BlurH(), s.BlurV()
-    add('blur_h', blur_h, lambda t: blur_h.use(t['second'], 3.0))
-    add('blur_v', blur_v, lambda t: blur_v.use(t['second'], 3.0))
-    curtain = s.Curtain()
-    add('curtain', curtain, lambda t: curtain.use(t['gradient'], t['second'], 0.4))
+    blur = s.Blur()
+    add('blur_across', blur, lambda t: blur.use(t['second'], True, 3.0 * KERNEL_SIGMA))
+    add('blur_down', blur, lambda t: blur.use(t['second'], False, 3.0 * KERNEL_SIGMA))
+    wipe = s.BarnDoorWipe()
+    add('barn_door_wipe', wipe, lambda t: wipe.use(t['gradient'], t['second'], 0.4))
     flash_in = FlashIn()
     add('flash_in', flash_in, lambda t: flash_in.use(t['gradient'], t['second'], 0.7))
     flash_out = FlashOut()
@@ -172,25 +172,19 @@ def cases() -> dict[str, tuple[object, Case]]:
     tint = s.Tint()
     add('tint', tint, lambda t: tint.use(t['soft'], Color(0.9, 0.4, 0.1, 1.0)))
     draw_roi = s.DrawRoi()
-    add('draw_roi', draw_roi, lambda t: draw_roi.use(t['gradient'], Rect(0.2, 0.3, 0.5, 0.6)))
     add('draw_roi_turned', draw_roi,
         lambda t: draw_roi.use(t['gradient'], Rect(0.2, 0.3, 0.5, 0.6), -0.4, Point2f(0.45, 0.6), 1.0))
-    circles = s.DrawCircles()
-    add('draw_circles', circles,
+    circles = s.FillCircles()
+    add('fill_circles', circles,
         lambda t: circles.use([(0.25, 0.75), (0.6, 0.3), (0.8, 0.7)], 0.08, 0.01, Color(1.0, 0.5, 0.2, 1.0), 1.0))
-    rect = s.DrawColoredRectangle()
-    add('draw_colored_rectangle', rect, lambda t: rect.use(Rect(0.1, 0.2, 0.5, 0.3), Color(0.2, 0.8, 0.4, 0.9)))
-    outline = s.DrawRectangleOutline()
-    add('draw_rectangle_outline', outline,
+    rect = s.FillRect()
+    add('fill_rect', rect, lambda t: rect.use(Rect(0.1, 0.2, 0.5, 0.3), Color(0.2, 0.8, 0.4, 0.9)))
+    outline = s.StrokeRect()
+    add('stroke_rect', outline,
         lambda t: outline.use(Rect(0.1, 0.2, 0.5, 0.3), Color(1.0, 1.0, 1.0, 1.0), 0.02, 0.03))
 
     mask_apply = s.MaskApply()
     add('mask_apply', mask_apply, lambda t: mask_apply.use(t['gradient'], t['soft'], 1.0))
-    mask_blend = s.MaskBlend()
-    add('mask_blend', mask_blend, lambda t: mask_blend.use(t['soft'], t['hard'], 0.4))
-    mask_blur = s.MaskBlur()
-    add('mask_blur_h', mask_blur, lambda t: mask_blur.use(t['hard'], True, 3.0))
-    add('mask_blur_v', mask_blur, lambda t: mask_blur.use(t['hard'], False, 3.0))
     dilate, erode = s.MaskDilate(), s.MaskErode()
     add('mask_dilate', dilate, lambda t: dilate.use(t['hard'], 3.0))
     add('mask_erode', erode, lambda t: erode.use(t['hard'], 3.0))
@@ -201,8 +195,6 @@ def cases() -> dict[str, tuple[object, Case]]:
     detail = s.DetailThreshold()
     add('detail_threshold', detail, lambda t: detail.use(t['second'], 0.5, 1.0, 3.0, False))
 
-    box = DrawBox()
-    add('box', box, lambda t: box.use(Rect(10.0 / SIZE, 20.0 / SIZE, 60.0 / SIZE, 30.0 / SIZE), Color(0.2, 0.4, 0.9, 0.8)))
     lines = PosePointLines()
     figure = pose()
     add('pose_point_lines', lines, lambda t: lines.use(figure, 0.02, 0.005, (1.0, 0.8, 0.2, 1.0), True))
