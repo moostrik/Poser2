@@ -22,7 +22,7 @@ from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import OnePerCamTrackerSettings, TrackerFrameSourceSettings
 from modules.pose import nodes, trackers, window
 from modules import inference
-from modules.gl import Colormap, WindowSettings
+from modules.gl import WindowSettings
 from modules.flow import DepthRead
 from modules.video import ScreenRecorderSettings
 
@@ -51,15 +51,12 @@ class Layers(IntEnum):
     # composite layers
     tracker =       auto()
     pose =          auto()
-    # the view stage and its outputs
+    # the stages
     view =          auto()
-    view_image =    auto()
-    view_foreground = auto()
-    view_depth =    auto()
-    view_mask =     auto()
-    view_depth_mask = auto()
     view_pose =     auto()
-    view_color =    auto()
+    motion =        auto()
+    bridge =        auto()
+    fluid =         auto()
     # data layers
     time_series =   auto()
     data_B_W =      auto()
@@ -67,13 +64,12 @@ class Layers(IntEnum):
     data_A_W =      auto()
     data_A_F =      auto()
     data_time =     auto()
-    # composition layers
-    color_mask =    auto()
-    motion =        auto()
-    bridge =        auto()
-    fluid =         auto()
-    monitor_a =     auto()
-    monitor_b =     auto()
+    # the stages' monitors, and the show
+    capture_monitor = auto()
+    view_monitor =  auto()
+    motion_monitor = auto()
+    bridge_monitor = auto()
+    fluid_monitor = auto()
     composite =     auto()
 
 
@@ -90,7 +86,7 @@ class MainView(IntEnum):
 class LayerSettings(BaseSettings):
     left:   Field[list[Layers]] = Field([Layers.composite],                  description="Layers drawn in the left viewport",  widget=Widget.playlist)
     right:  Field[list[Layers]] = Field([Layers.pose],                       description="Layers drawn in the right viewport", widget=Widget.playlist)
-    output: Field[list[Layers]] = Field([Layers.fluid, Layers.color_mask], description="Layers mixed into the show texture", widget=Widget.playlist)
+    output: Field[list[Layers]] = Field([Layers.fluid],                      description="Layers mixed into the show texture", widget=Widget.playlist)
     record: Field[list[Layers]] = Field([Layers.composite],                  description="Layers drawn into the screen recording", widget=Widget.playlist)
 
 
@@ -254,25 +250,9 @@ class ViewLayerSettings(render.StageLayerSettings):
     color:         Group[render.ForegroundLookSettings] = Group(render.ForegroundLookSettings)
 
 
-class DepthDrawMode(IntEnum):
-    GREY = 0            # near white, far black
-    COLOR = 1           # the OAK's color map
-    OVER_IMAGE = 2      # the color map over the camera image
-
-
-class ViewDepthLayerSettings(BaseSettings):
-    """How the view's depth is drawn: a log scale from the view's near to far, as depthai's `colorizeDepthFrame`, in
-    a colormap (jet is depthai's)."""
-    draw_mode:    Field[DepthDrawMode] = Field(DepthDrawMode.COLOR, description="How depth is drawn")
-    colormap:     Field[Colormap]      = Field(Colormap.JET, description="The colors depth is drawn in")
-    use_mask:     Field[bool]          = Field(True, description="The mask as the picture's alpha")
-    mask_opacity: Field[float]         = Field(1.0, min=0.0, max=1.0, description="Mask alpha strength")
-
-
-class FlowInputSettings(BaseSettings):
-    """Which layers feed the flow, chosen live, and how the fluid weights its injections."""
-    motion_image:    Field[Layers] = Field(Layers.view_image,      description="The picture the motion is measured on")
-    scale_by_motion: Field[bool]   = Field(True, description="Weight each injection by the player's motion; off is full weight")
+class CaptureSettings(BaseSettings):
+    """The capture: its monitor, on the capture's image and depth."""
+    monitor: Group[render.MonitorLayerSettings] = Group(render.MonitorLayerSettings)
 
 
 class LayerGroup(BaseSettings):
@@ -289,21 +269,16 @@ class PreviewGroup(BaseSettings):
 
 class RenderSettings(BaseSettings):
     main_view: Field[MainView]                   = Field(MainView.DEBUG, description="The main window: the debug panels, or the show alone")
-    stage  : Field[Stage]                        = Field(Stage.LERP, description="Pipeline stage for flow/fluid/color layers")
     input_fps: Field[float]                      = Field(60.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
     layer  : Group[LayerGroup]                   = Group(LayerGroup)
     data   : Group[DataGroup]                    = Group(DataGroup)
     preview: Group[PreviewGroup]                 = Group(PreviewGroup)
-    view_depth: Group[ViewDepthLayerSettings]    = Group(ViewDepthLayerSettings)
     view_pose: Group[render.ViewPoseLayerSettings] = Group(render.ViewPoseLayerSettings)
-    color_mask: Group[render.SimilaritySilhouetteLayerSettings] = Group(render.SimilaritySilhouetteLayerSettings)
-    inputs : Group[FlowInputSettings]            = Group(FlowInputSettings)
+    capture: Group[CaptureSettings]              = Group(CaptureSettings)
     view   : Group[ViewLayerSettings]            = Group(ViewLayerSettings)
     motion : Group[render.Motion3DLayerSettings] = Group(render.Motion3DLayerSettings, share=[input_fps.as_('fps')])
     bridge : Group[render.Bridge3DLayerSettings] = Group(render.Bridge3DLayerSettings)
     fluid  : Group[render.Fluid3DLayerSettings]  = Group(render.Fluid3DLayerSettings)
-    monitor_a: Group[render.MonitorLayerSettings] = Group(render.MonitorLayerSettings)
-    monitor_b: Group[render.MonitorLayerSettings] = Group(render.MonitorLayerSettings)
     time_series: Group[render.TimeSeriesLayerSettings] = Group(render.TimeSeriesLayerSettings)
     colors : Group[render.ColorSettings]         = Group(render.ColorSettings)
     window : Group[WindowSettings]               = Group(WindowSettings)

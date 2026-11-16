@@ -35,9 +35,8 @@ distinct.
 **What:** five stages, capture, view, motion, bridge and fluid, each one panel and one monitor; the pose beside
 them with a monitor of its own. What is shown is a monitor, the time series or the fluid's look.
 
-**Why:** in `apps/deep_flow/render/deep_flow_render.py` `Layers` mixes sources, stages, a stage's outputs and
-display layers; a stage's data is shown three ways (wrapper layers, display layers such as `view_depth`, and
-`monitor_a`/`monitor_b`, which lose their port when their stage changes); the panels are one flat list.
+**Why:** in deep_flow the pose is drawn by eight layers of its own, the composite only grades the fluid, the
+panels are one flat list, and the layer select holds four lists.
 
 **How:** deep_flow and the flow (its 2D and 3D fluid among it) are worked on freely; hd_trio runs its own copy
 of the 2D flow ([FLOW.md](FLOW.md)) and follows in line I. A layer both apps still use (the pose's, the look
@@ -46,12 +45,6 @@ added. One commit per step, both presets (`settings.json`, `very nice.json`) and
 guard tests, the render's tests and one -sim start (the panels in place, the presets loaded without unknown
 keys).
 
-- **A5.** A monitor per stage, in the stage's panel, showing all its FBOs: deep_flow's own wiring, a
-  `MonitorLayer` per stage with its stage fixed. The capture's image and depth layers declare their ports;
-  `MonitorLayer` gets `view_depth`'s depth colormaps. `monitor_a`, `monitor_b`, the view's wrapper layers and
-  `view_depth` leave deep_flow. `color_mask`, `inputs` and `stage` leave deep_flow: the motion reads the view's
-  `image`, and every injection is at full weight, stronger than the preset's motion-weighted fluid (judged in
-  the app). FLOW.md and RENDER.md say it.
 - **A6.** A pose monitor: the pose stage it reads (raw, clean, smooth, lerp); the pose drawn on the crop with its
   image, on the camera's frame with its boxes, or on the view, the last two without an image so they lie over
   any layer of that frame; the features of the frame or the window as an optional overlay. It replaces
@@ -249,9 +242,8 @@ Not worked on until asked for; each with what is known.
 
 ## Rules it touches
 
-- Keep presets and settings schemas in sync: the monitors, the panel tree, the layer select, A5 to A9.
-- Remove obsolete pathways: the wrapper layers, `view_depth`, `monitor_a`, `monitor_b`, `inputs`, `stage`, the
-  pose's layers and deep_flow's composite, A5 to A7.
+- Keep presets and settings schemas in sync: the pose monitor, the panel tree, the layer select, A6 to A9.
+- Remove obsolete pathways: the pose's layers and deep_flow's composite, A6, A7.
 - Settings connect the user and a component, not two components: the view's tolerance and size, A8.
 - Remove obsolete pathways instead of leaving parallel legacy ones: hd_trio's copy, deleted in line I.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the

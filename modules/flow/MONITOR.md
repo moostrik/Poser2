@@ -1,7 +1,8 @@
 # The monitor
 
 The flow's monitor (`MonitorLayer`, `modules/flow/visualization/`): a layer that shows one port of
-one stage, picked on the panel, drawn only while it is shown. The stages and their ports are in
+its stage, picked on the panel, drawn only while it is shown. Each stage has its own (`FlowStage`: `CAPTURE`,
+`VIEW`, `MOTION`, `BRIDGE`, `FLUID`), its settings in the stage's panel (`<stage>.monitor`). The stages and their ports are in
 [FLOW.md](FLOW.md#the-stages-and-their-layers). "Code" is what the files show; **(deduction)**
 marks what is inferred from them.
 
@@ -18,7 +19,6 @@ The monitor's panel group (`MonitorLayerSettings`) says what is drawn; its `adva
 
 | Setting                  | Values                                                      | Means                                       |
 |--------------------------|-------------------------------------------------------------|---------------------------------------------|
-| `stage`                  | `MOTION`, `BRIDGE`, `FLUID`                                 | the stage whose port is shown               |
 | `texture`                | the stage's port names                                      | the port shown; a name the stage no longer has shows its first output |
 | `view`                   | `COLORMAP` (default), `GLYPHS`, `IMAGE`, `HISTOGRAM`, `STRIP` | how the channels are drawn, the most used first |
 | `advanced.channel`       | `X`, `Y`, `Z`, `W`, `ALL` (default)                         | which of the texture's channels are drawn   |
@@ -30,6 +30,7 @@ The monitor's panel group (`MonitorLayerSettings`) says what is drawn; its `adva
 | `advanced.slice_focus`   | 0 to 1, 0.5 (default)                                       | opacity moved from the rest to the slice: 0 none, 1 only the slice |
 | `advanced.orbit`         | `yaw`, `pitch` (degrees), `zoom` (1 frames the box)        | the 3D camera; the mouse turns and zooms it |
 | `advanced.glyph_spacing` | 4, 8, 16, 32, 64, 128 (`GlyphSpacing`)                      | distance between glyphs (pixels)            |
+| `advanced.colormap`      | `Colormap`, `JET` (default)                                 | a depth's colors, from its near to its far  |
 | `advanced.legend`        | on (default), off                                           | the log axis, or the colormap's key         |
 | `advanced.blend_mode`    | a `Style.BlendMode`                                         | how the monitor is drawn over the panel     |
 
@@ -44,7 +45,7 @@ The strip starts over when `stage`, `texture` or `channel` changes, or when `vie
 
 | View     | `ALL`                                                              | one channel                                   |
 |----------|--------------------------------------------------------------------|-----------------------------------------------|
-| `COLORMAP` | by the port's kind: a velocity by its direction, 0.5 + 0.5 × the unit vector, as bright as its size capped at 1, black at 0; an image as stored; a scalar's x, y, z as red, green, blue around mid grey, grey 0 | a velocity's channel by its sign along its axis; a scalar's with the other channels 0: x from grey toward red above 0 and toward cyan below, y green, z blue; w as grey |
+| `COLORMAP` | by the port's kind: a velocity by its direction, 0.5 + 0.5 × the unit vector, as bright as its size capped at 1, black at 0; an image as stored; a depth in `advanced.colormap` on a log scale from its near to its far (`DepthColormap`); a scalar's x, y, z as red, green, blue around mid grey, grey 0 | a velocity's channel by its sign along its axis; a scalar's with the other channels 0: x from grey toward red above 0 and toward cyan below, y green, z blue; w as grey |
 | `GLYPHS` | a velocity's arrow of x and y, with the ring for z on a 3- or 4-channel texture (channel not read); an acceleration's push, a filled arrowhead; a scalar's dot of x, and so any one-channel texture's, which has no direction | a scalar's dot of that channel |
 | `IMAGE`  | the raw values as stored, times `scale`, for debugging             | that channel as grey, times `scale`           |
 | `HISTOGRAM` | a lane for each channel the port holds, x on top: how many values fall where from −1 to 1 after `scale`, 0 in the middle, outside in the end bins | one lane, full height |

@@ -5,12 +5,12 @@ settings, so the panel shows them and a preset keeps them."""
 import unittest
 
 from modules.gl import MouseButton
-from modules.render import MonitorLayer, MonitorLayerSettings
+from modules.render import FlowStage, MonitorLayer, MonitorLayerSettings
 
 
 class MonitorMouseTest(unittest.TestCase):
     def test_a_scroll_steps_one_layer_and_stays_inside(self) -> None:
-        monitor = MonitorLayer(MonitorLayerSettings())
+        monitor = MonitorLayer(FlowStage.FLUID, MonitorLayerSettings())
         advanced = monitor.settings.advanced
         monitor.scroll(1, 16)
         self.assertAlmostEqual(advanced.slice_position, 9.5 / 16)
@@ -20,7 +20,7 @@ class MonitorMouseTest(unittest.TestCase):
         self.assertAlmostEqual(advanced.slice_position, 0.5 / 16)
 
     def test_a_drag_turns_and_a_reset_brings_the_front_view_back(self) -> None:
-        monitor = MonitorLayer(MonitorLayerSettings())
+        monitor = MonitorLayer(FlowStage.FLUID, MonitorLayerSettings())
         orbit = monitor.settings.advanced.orbit
         monitor.drag(0.2, 0.1, MouseButton.LEFT)
         monitor.drag(0.0, -0.2, MouseButton.RIGHT)

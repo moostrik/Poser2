@@ -24,6 +24,7 @@ class TextureKind(IntEnum):
     SCALAR = auto()
     ACCELERATION = auto()
     Z_POSITION = auto()     # a z position, 0 front to 1 back, times its weight in red, the weight in green
+    DEPTH = auto()          # metres in red, 0 where there is none, drawn in a colormap from its port's near to far
 
     @property
     def vector(self) -> bool:
@@ -53,6 +54,7 @@ class Port:
     prepare: Callable[[], None] | None = None
     held: int = 0           # the channels holding its values, x first; 0 from its kind and format (`channels`)
     light: LightPlace | None = None
+    depth_range: tuple[float, float] | None = None     # a depth's near and far (m), the span its colormap covers
 
     @property
     def volume(self) -> bool:
@@ -121,12 +123,16 @@ def _kinds(cls: type) -> tuple[tuple[str, TextureKind], ...]:
 
 def ports_of(values: object) -> dict[str, Port]:
     """The ports the dataclass `values` declares: each field with a kind whose value is set, by its
-    name; a value that is no texture is a view holding one as `texture` (a `DepthView`)."""
+    name; a value that is no texture is a view holding one as `texture` (a `DepthView`), a depth's with its
+    `near` and `far`."""
     ports: dict[str, Port] = {}
     for name, kind in _kinds(type(values)):
         value = getattr(values, name)
+        depth_range: tuple[float, float] | None = None
         if value is not None and not isinstance(value, (Texture, Texture3D)):
+            if kind == TextureKind.DEPTH:
+                depth_range = (value.near, value.far)
             value = value.texture
         if value is not None:
-            ports[name] = Port(value, kind)
+            ports[name] = Port(value, kind, depth_range=depth_range)
     return ports

@@ -33,28 +33,26 @@ CHAIN: tuple[ChainLayer, ...] = (
     ChainLayer(Layers.cam_crop,        shape=Layers.cam_crop, tick=True),
     ChainLayer(Layers.capture_image,   shape=Layers.capture_image, tick=True, capture=True),
     ChainLayer(Layers.capture_depth,   shape=Layers.capture_image, tick=True, capture=True),   # on the image's view, at the depth's own grid
-    # the view: the window cut, the depth read, the masks, the foreground
-    ChainLayer(Layers.view,            Size.VIEW, Layers.view_image, tick=True, capture=True),
-    ChainLayer(Layers.view_image,      Size.VIEW, Layers.view_image),
-    ChainLayer(Layers.view_foreground, Size.VIEW, Layers.view_image),
-    ChainLayer(Layers.view_mask,       Size.VIEW, Layers.view_image),
-    ChainLayer(Layers.view_depth_mask, Size.VIEW, Layers.view_image),
-    ChainLayer(Layers.view_depth,      Size.VIEW, Layers.view_image, tick=True),
-    ChainLayer(Layers.view_pose,       Size.VIEW, Layers.view_image, tick=True),
-    ChainLayer(Layers.view_color,      Size.VIEW, Layers.view_image),   # the density's color, the view's last pass
-    ChainLayer(Layers.color_mask,      Size.VIEW, Layers.view_image, tick=True),
+    ChainLayer(Layers.capture_monitor, shape=Layers.capture_image, tick=True),
+    # the view: the window cut, the depth read, the masks, the foreground, the color
+    ChainLayer(Layers.view,            Size.VIEW, Layers.view, tick=True, capture=True),
+    ChainLayer(Layers.view_pose,       Size.VIEW, Layers.view, tick=True),
+    ChainLayer(Layers.view_monitor,    Size.VIEW, Layers.view, tick=True),
     # the motion, the bridge, the fluid
     ChainLayer(Layers.motion,          Size.LARGE, tick=True, capture=True),
+    ChainLayer(Layers.motion_monitor,  Size.LARGE, tick=True),
     ChainLayer(Layers.bridge,          Size.LARGE, tick=True, capture=True),
+    ChainLayer(Layers.bridge_monitor,  Size.LARGE, tick=True),
     ChainLayer(Layers.fluid,           Size.LARGE, tick=True),
+    ChainLayer(Layers.fluid_monitor,   Size.LARGE, tick=True),
     # the display
-    ChainLayer(Layers.monitor_a,       Size.LARGE, tick=True),
-    ChainLayer(Layers.monitor_b,       Size.LARGE, tick=True),
     ChainLayer(Layers.composite,       Size.LARGE, tick=True),
     ChainLayer(Layers.tracker,         Size.PANEL, Layers.cam_image, tick=True),   # camera stretched into a panel-sized FBO
     ChainLayer(Layers.pose,            Size.PANEL, Layers.cam_crop, tick=True),    # crop stretched into a panel-sized FBO
 )
 LAYERS: dict[Layers, ChainLayer] = {chain_layer.layer: chain_layer for chain_layer in CHAIN}
+MONITORS: tuple[Layers, ...] = (Layers.capture_monitor, Layers.view_monitor, Layers.motion_monitor, Layers.bridge_monitor,
+                                Layers.fluid_monitor)
 TICK_LAYERS: list[Layers] = [chain_layer.layer for chain_layer in CHAIN if chain_layer.tick]
 CAPTURE_LAYERS: list[Layers] = [chain_layer.layer for chain_layer in CHAIN if chain_layer.capture]
 

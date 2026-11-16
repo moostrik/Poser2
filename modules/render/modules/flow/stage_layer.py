@@ -13,8 +13,9 @@ from dataclasses import dataclass
 from threading import Event
 
 from modules.flow import HasPorts, Port, ports_of, prefixed
-from modules.settings import Field, BaseSettings, Widget
+from modules.settings import Field, BaseSettings, Group, Widget
 from ...layer_base import LayerBase
+from .monitor_layer import MonitorLayerSettings
 
 
 @dataclass
@@ -28,9 +29,11 @@ class StageOutput:
 
 
 class StageLayerSettings(BaseSettings):
-    """What every stage layer's settings hold, first on its panel: the reset. Each stage declares its
-    working size itself (`width`, `height`, the 3D fluid's `depth`), after the switches it puts first."""
+    """What every stage layer's settings hold, first on its panel: the reset; and its monitor's. Each stage declares
+    its working size itself (`width`, `height`, the 3D fluid's `depth`), after the switches it puts first."""
     reset: Field[bool] =    Field(False, widget=Widget.button, description="Start the stage from rest")
+
+    monitor = Group(MonitorLayerSettings)
 
 
 class StageLayer[I, O: StageOutput](LayerBase, ABC):

@@ -1,8 +1,8 @@
 """The monitor: a layer that shows one texture of one stage, picked on the panel, drawn only while
 it is shown.
 
-`MonitorInput` is what the app hands it each tick: every stage's ports. The monitor picks the stage
-and the texture by its own settings, and draws their channels, all or one, by the view asked: as a
+`MonitorInput` is what the app hands it each tick: every stage's ports. The monitor shows its own stage's, the
+texture picked by its settings, and draws their channels, all or one, by the view asked: as a
 colormap by the port's kind (a volume as the cube), as glyphs, raw as an image, as a histogram of their
 values, or as a strip of the channels' amounts over time, the last two under their log axis, the
 colormap under its key (`Legend`). It renders in `draw`, once per tick however many panels show it, and nothing in
@@ -14,10 +14,15 @@ from enum import IntEnum, auto
 
 from OpenGL.GL import GL_VIEWPORT, glGetIntegerv, glViewport
 
-from modules.gl import Texture, Texture3D, Style, MouseButton
+from OpenGL.GL import GL_RGBA16F
+
+from modules.gl import Colormap, Fbo, Texture, Texture3D, Style, MouseButton
 from modules.flow import Visualizer, Strip, ALL_CHANNELS, Legend, LegendKind, DrawnSize, Port, TextureKind, VolumeCut, VolumeCube, CubeColor, VolumeGlyphs, Cut, Orbit, PITCH_LIMIT, ZOOM_LIMITS, box_size, axis_labels, REFERENCE_STEP, ZPositionView
 from modules.settings import Field, BaseSettings, Group, Widget
 from ...layer_base import LayerBase
+from .shaders import DepthColormap
+
+DEPTH_COLOR: int = 1        # DepthColormap's mode: the depth in the colormap alone
 
 
 class FlowStage(IntEnum):
@@ -26,6 +31,7 @@ class FlowStage(IntEnum):
     MOTION = auto()
     BRIDGE = auto()
     FLUID = auto()
+    CAPTURE = auto()
 
 
 class MonitorView(IntEnum):
@@ -78,6 +84,7 @@ class MonitorAdvancedSettings(BaseSettings):
     slice_position: Field[float] =  Field(0.5, min=0.0, max=1.0, description="The slice's place through the volume: 0 the front, 1 the back; the wheel steps it")
     slice_focus: Field[float] =     Field(0.5, min=0.0, max=1.0, description="Opacity moved from the rest to the slice: 0 none, 1 only the slice at its amount")
     glyph_spacing: Field[GlyphSpacing] = Field(GlyphSpacing.SPACING_32, width=24, description="Distance between glyphs (pixels)")
+    colormap: Field[Colormap] =     Field(Colormap.JET, width=24, description="A depth's colors, from its near to its far")
     legend: Field[bool] =           Field(True, description="The overlay: titles, log axes, the color key, and in 3D the box, its axes and the slice's frame")
     blend_mode: Field[Style.BlendMode] = Field(Style.BlendMode.ADD, width=32, description="How the monitor is drawn over the panel")
 
@@ -85,8 +92,7 @@ class MonitorAdvancedSettings(BaseSettings):
 
 
 class MonitorLayerSettings(BaseSettings):
-    """Configuration for MonitorLayer: what it shows, and in `advanced` how."""
-    stage: Field[FlowStage] =       Field(FlowStage.BRIDGE, description="The stage whose texture is shown")
+    """Configuration for MonitorLayer: what it shows of its stage, and in `advanced` how."""
     names: Field[list[str]] =       Field([""], access=Field.READ, visible=False, description="The stage's textures")
     texture: Field[str] =           Field("output.boundary_velocity", widget=Widget.text_select, options=names, description="The texture shown")
     view: Field[MonitorView] =      Field(MonitorView.COLORMAP, description="How the port is drawn: by its kind, glyphs, raw, histogram or strip")
@@ -112,15 +118,19 @@ _CUBE_COLORS: dict[TextureKind, CubeColor] = {
     TextureKind.SCALAR: CubeColor.CENTERED,
     TextureKind.ACCELERATION: CubeColor.DIRECTION,
     TextureKind.Z_POSITION: CubeColor.CENTERED,
+    TextureKind.DEPTH: CubeColor.CENTERED,
 }
 
 
 class MonitorLayer(LayerBase):
-    """Shows one port of one stage. `set_input` before the render loop; `update` keeps the panel's list
-    of names; `draw` renders the port once per tick and draws it."""
+    """Shows one port of its stage. `set_input` before the render loop; `update` keeps the panel's list of names;
+    `draw` renders the port once per tick and draws it."""
 
-    def __init__(self, settings: MonitorLayerSettings) -> None:
+    def __init__(self, stage: FlowStage, settings: MonitorLayerSettings) -> None:
+        self.stage: FlowStage = stage
         self.settings: MonitorLayerSettings = settings
+        self._depth_picture: Fbo = Fbo()                # a depth in its colormap
+        self._depth_colormap: DepthColormap = DepthColormap()
         self._input: MonitorInput | None = None
         self._visualizer: Visualizer = Visualizer()
         self._strip: Strip = Strip()
@@ -137,7 +147,7 @@ class MonitorLayer(LayerBase):
         self._volume_cube: VolumeCube = VolumeCube()    # a volume in 3D, for the colormap and image views
         self._volume_glyphs: VolumeGlyphs = VolumeGlyphs()  # a volume in 3D, for the glyphs
         self._z_position_view: ZPositionView = ZPositionView()  # a z position drawn as itself and its weight
-        self._shown_3d: Texture | None = None       # what it rendered last, when it is one of the 3D views
+        self._shown_3d: Texture | None = None       # what it rendered last, when it is one of the 3D views or a depth
         self._axes: list[tuple[str, float, float]] = []     # a 3D view's axis letters and their places, for the legend
         self._orbit: Orbit = Orbit()                # the 3D views' camera, set from `advanced.orbit` at each draw
         self._allocated: bool = False
@@ -195,6 +205,7 @@ class MonitorLayer(LayerBase):
         self._volume_cube.allocate()
         self._volume_glyphs.allocate()
         self._z_position_view.allocate()
+        self._depth_colormap.allocate()
         self._allocated = True
 
     def deallocate(self) -> None:
@@ -202,6 +213,8 @@ class MonitorLayer(LayerBase):
         self._volume_cube.deallocate()
         self._volume_glyphs.deallocate()
         self._z_position_view.deallocate()
+        self._depth_colormap.deallocate()
+        self._depth_picture.deallocate()
         self._visualizer.deallocate()
         self._strip.deallocate()
         self._legend.deallocate()
@@ -217,7 +230,7 @@ class MonitorLayer(LayerBase):
     # ========== Processing ==========
 
     def _ports(self) -> dict[str, Port]:
-        return self._input.ports.get(self.settings.stage, {}) if self._input is not None else {}
+        return self._input.ports.get(self.stage, {}) if self._input is not None else {}
 
     def _pick(self) -> Port | None:
         """The port the settings name, else the stage's first output, else its first port."""
@@ -269,9 +282,12 @@ class MonitorLayer(LayerBase):
                 self._legend.update(self._legend_kind, int(channel), channels, scale, self._visualizer.histogram_total, self._axes, self._title(port))
             return
         texture: Texture = self._flat(port, view)
+        if view == MonitorView.COLORMAP and port.kind == TextureKind.DEPTH and port.depth_range is not None:
+            self._render_depth(texture, port.depth_range, title=self._title(port))
+            return
         self._visualizer.resize(*self._rendered_size)
         if view == MonitorView.STRIP:
-            shown: tuple[FlowStage, str, Channel] = (self.settings.stage, self.settings.texture, channel)
+            shown: tuple[FlowStage, str, Channel] = (self.stage, self.settings.texture, channel)
             if shown != self._strip_of:
                 self._strip.reset()
                 self._strip_of = shown
@@ -298,7 +314,7 @@ class MonitorLayer(LayerBase):
         acceleration drawn per step says so."""
         name: str = next((key for key, value in self._ports().items() if value is port), self.settings.texture)
         per_step: str = " per step" if port.kind == TextureKind.ACCELERATION else ""
-        return f"{self.settings.stage.name.lower()} / {name}{per_step}"
+        return f"{self.stage.name.lower()} / {name}{per_step}"
 
     def _render_3d(self, port: Port, view: MonitorView, scale: float, channel: int) -> None:
         """A volume in its box from the orbit camera: for the colormap the cube colored by the port's kind,
@@ -324,6 +340,20 @@ class MonitorLayer(LayerBase):
                                                        advanced.opacity, advanced.depth_fade,
                                                        advanced.slice_position if advanced.slice else None, advanced.legend,
                                                        advanced.slice_focus, port.light)
+
+    def _render_depth(self, depth: Texture, depth_range: tuple[float, float], title: str) -> None:
+        """A depth in `advanced.colormap`, on a log scale from its near to its far."""
+        width, height = self._rendered_size
+        if (self._depth_picture.width, self._depth_picture.height) != (width, height):
+            self._depth_picture.deallocate()
+            self._depth_picture.allocate(width, height, GL_RGBA16F)
+        near, far = depth_range
+        self._depth_picture.begin()
+        self._depth_colormap.use(depth, depth, near, far, DEPTH_COLOR, self.settings.advanced.colormap)
+        self._depth_picture.end()
+        self._shown_3d = self._depth_picture
+        if self.settings.advanced.legend:
+            self._legend.update(None, 0, 1, 1.0, 0, title=title)
 
     def _flat(self, port: Port, view: MonitorView) -> Texture:
         """The 2D texture a view draws: the port's own, or for a volume its front, whose mean the strip

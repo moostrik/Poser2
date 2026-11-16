@@ -47,7 +47,7 @@ class ViewOutput(StageOutput):
     image: Annotated[Texture, TextureKind.IMAGE]
     foreground: Annotated[Texture, TextureKind.IMAGE]
     color: Annotated[Texture, TextureKind.IMAGE]
-    depth: Annotated[DepthView, TextureKind.SCALAR]
+    depth: Annotated[DepthView, TextureKind.DEPTH]
     mask: Annotated[Texture, TextureKind.SCALAR]
     depth_mask: Annotated[Texture, TextureKind.SCALAR]
 
@@ -94,6 +94,11 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         s: ViewLayerSettings = self.settings
         depth: DepthView = DepthView(self._depth, view_span(self._window, self._fov), depth_step(self._window, self._grid_size), s.near, s.far)
         return ViewOutput(self._image, self._foreground, self._color.texture, depth, self._mask, self._depth_mask)
+
+    @property
+    def texture(self) -> Texture:
+        """The view's image, the shape the view's monitor is drawn in."""
+        return self._image
 
     @property
     def timestamp(self) -> float | None:

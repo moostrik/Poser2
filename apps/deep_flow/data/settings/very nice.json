@@ -265,14 +265,13 @@
   },
   "render": {
     "main_view": "SHOW",
-    "stage": "LERP",
     "layer": {
       "select": {
         "left": [
           "fluid"
         ],
         "right": [
-          "monitor_b"
+          "fluid_monitor"
         ],
         "output": [
           "fluid"
@@ -331,31 +330,23 @@
         "use_gpu_crop": true
       }
     },
-    "view_depth": {
-      "draw_mode": "OVER_IMAGE",
-      "use_mask": true,
-      "mask_opacity": 1.0
-    },
     "view_pose": {
       "line_width": 3.0,
       "line_smooth": 0.0,
       "use_scores": false,
       "draw_anchors": false
     },
-    "color_mask": {
-      "stage": 3,
-      "max_players": 1,
-      "blend_mode": "ALPHA",
-      "similarity_threshold": 0.1,
-      "motion_exponent": 1.0,
-      "similarity_scale": 1.0,
-      "layered": 0.8
-    },
-    "inputs": {
-      "motion_image": "view_image",
-      "scale_by_motion": true
+    "capture": {
+      "monitor": {
+        "texture": "image",
+        "view": "COLORMAP"
+      }
     },
     "view": {
+      "monitor": {
+        "texture": "output.depth",
+        "view": "COLORMAP"
+      },
       "fixed_x": 0.5,
       "fixed_y": 0.5,
       "fixed_height": 1.0,
@@ -380,6 +371,27 @@
       }
     },
     "motion": {
+      "monitor": {
+        "texture": "output.velocity",
+        "view": "GLYPHS",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "opacity": 6.0,
+          "depth_fade": 0.0,
+          "slice": true,
+          "slice_position": 0.5859375,
+          "slice_focus": 0.5,
+          "glyph_spacing": "SPACING_16",
+          "legend": true,
+          "blend_mode": "ADD",
+          "orbit": {
+            "yaw": 98.2195514253695,
+            "pitch": 0.5412382166660393,
+            "zoom": 0.7184107424569811
+          }
+        }
+      },
       "guard": true,
       "width": 448,
       "height": 800,
@@ -483,6 +495,27 @@
       }
     },
     "fluid": {
+      "monitor": {
+        "texture": "density",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 2.0,
+          "opacity": 3.0,
+          "depth_fade": 0.0,
+          "slice": true,
+          "slice_position": 0.48,
+          "slice_focus": 0.36,
+          "glyph_spacing": "SPACING_32",
+          "legend": true,
+          "blend_mode": "ADD",
+          "orbit": {
+            "yaw": 98.2195514253695,
+            "pitch": 0.5412382166660393,
+            "zoom": 0.7184107424569811
+          }
+        }
+      },
       "guard": true,
       "wall": "OPEN",
       "slip_time": 60.0,
@@ -611,50 +644,6 @@
           "sky_fill": 1.0,
           "anisotropy": 0.41,
           "back_scattering": 0.0
-        }
-      }
-    },
-    "monitor_a": {
-      "stage": "MOTION",
-      "texture": "output.velocity",
-      "view": "GLYPHS",
-      "advanced": {
-        "channel": "ALL",
-        "scale": 1.0,
-        "opacity": 6.0,
-        "depth_fade": 0.0,
-        "slice": true,
-        "slice_position": 0.5859375,
-        "slice_focus": 0.5,
-        "glyph_spacing": "SPACING_16",
-        "legend": true,
-        "blend_mode": "ADD",
-        "orbit": {
-          "yaw": 98.2195514253695,
-          "pitch": 0.5412382166660393,
-          "zoom": 0.7184107424569811
-        }
-      }
-    },
-    "monitor_b": {
-      "stage": "FLUID",
-      "texture": "density",
-      "view": "COLORMAP",
-      "advanced": {
-        "channel": "ALL",
-        "scale": 2.0,
-        "opacity": 3.0,
-        "depth_fade": 0.0,
-        "slice": true,
-        "slice_position": 0.48,
-        "slice_focus": 0.36,
-        "glyph_spacing": "SPACING_32",
-        "legend": true,
-        "blend_mode": "ADD",
-        "orbit": {
-          "yaw": 98.2195514253695,
-          "pitch": 0.5412382166660393,
-          "zoom": 0.7184107424569811
         }
       }
     },

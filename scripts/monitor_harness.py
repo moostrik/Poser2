@@ -75,10 +75,9 @@ class Monitor:
 
     def __init__(self, port: Port, view: MonitorView) -> None:
         self.settings = MonitorLayerSettings()
-        self.settings.stage = FlowStage.MOTION
         self.settings.texture = 'output.velocity'
         self.settings.view = view
-        self.layer = MonitorLayer(self.settings)
+        self.layer = MonitorLayer(FlowStage.MOTION, self.settings)
         self.layer.allocate(*OUTPUT)
         self.layer.set_input(MonitorInput({FlowStage.MOTION: {'output.velocity': port}}))
 

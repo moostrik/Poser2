@@ -68,7 +68,7 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 | 2D flow, 3D flow     | a system: a motion layer and a bridge layer per camera, a fluid layer per show output                                                                                                                               | `Motion2DLayer` + `Bridge2DLayer` + `Fluid2DLayer`; `…3D…`                                    |
 | 2D camera, 3D camera | an image and a mask; those and a depth image on the same view                                                                                                                                                       | `MotionInput` without / with `depth`                                                          |
 | port                 | a stage's named texture with its kind (image, velocity, acceleration, scalar, z position) and the channels that hold its values; its input and output fields declare theirs, every component its own ([MONITOR.md](MONITOR.md)) | `Port`, `TextureKind`, `HasPorts`, `ports_of`, in `modules/flow`                              |
-| monitor              | a layer that shows one port of one stage, picked on the panel, drawn only while it is shown; its views in [MONITOR.md](MONITOR.md)                                                                                  | `MonitorLayer`, `monitor_a`, `monitor_b`                                                      |
+| monitor              | a layer that shows one port of its stage, picked on the panel, drawn only while it is shown; its views in [MONITOR.md](MONITOR.md)                                                                                  | `MonitorLayer`, `<stage>.monitor`                                                             |
 
 "bridge" is ofxFlowTools' word (`ftVelocityBridge`, `ftDensityBridge`, `ftTemperatureBridge`);
 it says where the stage sits; the table says what it does.
@@ -229,11 +229,11 @@ temperature of the capture with the larger amount (`CaptureMax`), the rest the n
 layers feed the inputs is app policy: hd_trio wires fixed layers, measures on its centered mask,
 gives each bridge the centered foreground as the picture behind its density and temperature, each
 injection the camera's track color, and weights the own camera's injection by the player's motion
-and another's by the cross-camera similarity times `similarity_scale`; deep_flow picks the motion's
-picture on its panel, live, among the view's outputs (`inputs.motion_image`, with `scale_by_motion`,
-`apps/deep_flow/settings.py`), gives the bridge the view's color, and takes the mask from the view stage, its own layer (`apps/deep_flow/render/layers/view/`). deep_flow
-gives each camera two monitors, `monitor_a` and `monitor_b`, each handed every stage's `ports`; they go
-into the panel's select lists like any layer, and two show A beside B.
+and another's by the cross-camera similarity times `similarity_scale`; deep_flow measures on the
+view's image, gives the bridge the view's color and takes the mask from the view stage, its own layer
+(`apps/deep_flow/render/layers/view/`), every injection at full weight. Each of its stages (capture, view,
+motion, bridge, fluid) has its own monitor, its settings in the stage's panel (`<stage>.monitor`), shown in the
+panel's select lists as `<stage>_monitor`; a view's depth is drawn in its colormap from its near to its far.
 
 ## Packages
 

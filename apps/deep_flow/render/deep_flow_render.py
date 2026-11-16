@@ -3,21 +3,20 @@
 from threading import Event
 from typing import Callable, cast
 
-import numpy as np
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import GpuTimer, RenderBase, ScreenCapture, Shader, Style, clear_color, fill, fit, Texture, MonitorId, MouseButton, shaders
 from modules.video import ScreenRecorder, ScreenRecorderSettings
 from modules.flow import Port, hold_tick
 from modules.inference import Capture
-from modules.pose import Frame, Similarity, AngleMotion
+from modules.pose import Frame
 from modules import render
 from modules.utils import FPS, Color, Rect, Point2f
 
 from ..board import RenderBoard
-from ..settings import Layers, MainView, RenderSettings, FlowInputSettings
-from .layers import ViewInput, ViewOutput, ViewLayer, ViewOutputLayer, ViewDepthLayer
-from .chain import Size, TICK_LAYERS, CAPTURE_LAYERS, size_of, layers_of, shape_of
+from ..settings import Layers, MainView, RenderSettings
+from .layers import ViewInput, ViewOutput, ViewLayer
+from .chain import Size, TICK_LAYERS, CAPTURE_LAYERS, MONITORS, size_of, layers_of, shape_of
 
 
 OUTPUT_WIDTH: int = 1080
@@ -50,7 +49,6 @@ class DeepFlowRender(RenderBase):
         settings.data.b.line_smooth = 6.0
         settings.data.b.use_history_color = True
 
-        masks: dict[int, Texture] = {}     # the view's masks, for the color mask
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   render.CameraImageLayer(    i, self.board)
             cam_crop =      self.L[Layers.cam_crop][i] =    render.CropImageLayer(      i, self.board)
@@ -60,26 +58,20 @@ class DeepFlowRender(RenderBase):
             tracker_compositor = self.L[Layers.tracker][i] = render.TrackerCompositor(  i, self.board,   cam_image.texture,          settings.preview.tracker,   settings.colors)
             pose_compositor = self.L[Layers.pose][i] =      render.PoseCompositor(      i, self.board,   cam_image.texture, cam_crop, settings.preview.pose,      settings.colors)
 
-            # The flow's view of the capture, and what is drawn from it
+            # The stages, each with its monitor
             view =          self.L[Layers.view][i] =        ViewLayer(           i, settings.view, settings.motion.z, fov, settings.colors)
-            output: ViewOutput = view.output
-            masks[i] = output.mask
-            self.L[Layers.view_image][i] =                  ViewOutputLayer(     view, output.image)
-            self.L[Layers.view_foreground][i] =             ViewOutputLayer(     view, output.foreground)
-            self.L[Layers.view_mask][i] =                   ViewOutputLayer(     view, output.mask)
-            self.L[Layers.view_depth_mask][i] =             ViewOutputLayer(     view, output.depth_mask)
-            self.L[Layers.view_depth][i] =                  ViewDepthLayer(      view, settings.view_depth)
             self.L[Layers.view_pose][i] =                   render.ViewPoseLayer(       i, view,                                    settings.view_pose,         settings.colors)
-            self.L[Layers.view_color][i] =                  ViewOutputLayer(     view, output.color)
-
-            ms_mask =       self.L[Layers.color_mask][i] =  render.SimilaritySilhouetteLayer(i, self.board,   output.color,   masks, settings.color_mask, settings.colors)
             self.L[Layers.motion][i] =                      render.Motion3DLayer(       i, settings.motion)
             self.L[Layers.bridge][i] =                      render.Bridge3DLayer(       settings.bridge)
             fluid =         self.L[Layers.fluid][i] =       render.Fluid3DLayer(        settings.fluid)
-            self.L[Layers.monitor_a][i] =                   render.MonitorLayer(        settings.monitor_a)
-            self.L[Layers.monitor_b][i] =                   render.MonitorLayer(        settings.monitor_b)
+            for key, stage, monitor_settings in ((Layers.capture_monitor, render.FlowStage.CAPTURE, settings.capture.monitor),
+                                                 (Layers.view_monitor, render.FlowStage.VIEW, settings.view.monitor),
+                                                 (Layers.motion_monitor, render.FlowStage.MOTION, settings.motion.monitor),
+                                                 (Layers.bridge_monitor, render.FlowStage.BRIDGE, settings.bridge.monitor),
+                                                 (Layers.fluid_monitor, render.FlowStage.FLUID, settings.fluid.monitor)):
+                self.L[key][i] = render.MonitorLayer(stage, monitor_settings)
 
-            composite =    self.L[Layers.composite][i] =   render.LayerCompositor(                          [fluid, ms_mask],         settings.layer.composite)
+            self.L[Layers.composite][i] =                   render.LayerCompositor(                          [fluid],                  settings.layer.composite)
 
             self.L[Layers.data_A_W][i]  = render.FeatureWindowLayer(i, self.board, settings.data.a, settings.colors)
             self.L[Layers.data_A_F][i]  = render.FeatureFrameLayer( i, self.board, settings.data.a, settings.colors)
@@ -108,7 +100,7 @@ class DeepFlowRender(RenderBase):
         # The fluid's and the monitors' input, built right before they run, from what ran before them this tick
         self._wirings: dict[Layers, Callable[[], None]] = {
             Layers.fluid: self._wire_fluid,
-            Layers.monitor_a: self._wire_monitors,
+            Layers.capture_monitor: self._wire_monitors,
         }
 
         # Each camera's captures the motion measures, for the panel's cadence (read on any thread)
@@ -214,7 +206,7 @@ class DeepFlowRender(RenderBase):
     # ========== The mouse: the monitors' volume views ==========
 
     def _monitors(self) -> list[render.MonitorLayer]:
-        return [cast(render.MonitorLayer, layer) for key in (Layers.monitor_a, Layers.monitor_b) for layer in self.L[key].values()]
+        return [cast(render.MonitorLayer, layer) for key in MONITORS for layer in self.L[key].values()]
 
     def _on_mouse_button(self, x: float, y: float, button: MouseButton, pressed: bool) -> None:
         """A press starts a drag; a middle click that did not move resets the views."""
@@ -284,8 +276,6 @@ class DeepFlowRender(RenderBase):
 
     # ========== The flow's wiring ==========
 
-    def _layer(self, key: Layers, cam_id: int) -> render.LayerBase | None:
-        return self.L[key][cam_id] if key in self.L and cam_id in self.L[key] else None
 
     def _run_captures(self) -> None:
         """Every capture since the last tick, each camera's in order, through the capture layers (`_run_capture`).
@@ -296,8 +286,9 @@ class DeepFlowRender(RenderBase):
 
     def _run_capture(self, i: int, capture: Capture, same_tick: bool) -> None:
         """One capture: its image and depth into GL, the view of it with its player's pose and its color, the
-        motion, and the bridge stepping over the time since the capture before, the density's color the view's. `same_tick`: another capture in this tick, whose bridge outputs the fluid takes with the last's."""
-        inputs: FlowInputSettings = self.settings.inputs
+        motion on the view's image, and the bridge stepping over the time since the capture before, the density's
+        color the view's. `same_tick`: another capture in this tick, whose bridge outputs the fluid takes with the
+        last's."""
         image = cast(render.CaptureImageLayer, self.L[Layers.capture_image][i])
         depth = cast(render.CaptureDepthLayer, self.L[Layers.capture_depth][i])
         view = cast(ViewLayer, self.L[Layers.view][i])
@@ -317,27 +308,25 @@ class DeepFlowRender(RenderBase):
         interval: float = render.frame_interval(capture.timestamp, self._capture_timestamps.get(i), self.settings.motion.fps, self._dt, self._dt)
         self._capture_timestamps[i] = capture.timestamp
         self.motion_rates.setdefault(i, FPS()).processed()
-        motion_image: render.LayerBase = self._layer(inputs.motion_image, i) or self.L[Layers.view_image][i]
         output: ViewOutput = view.output
-        motion.set_input(render.MotionInput(motion_image.texture, capture.timestamp, interval, output.depth, output.mask, output.depth_mask))
+        motion.set_input(render.MotionInput(output.image, capture.timestamp, interval, output.depth, output.mask, output.depth_mask))
         motion.update()
         bridge.set_input(render.BridgeInput(motion.output.velocity, interval, output.color,
                                         mask=output.mask, depth_mask=output.depth_mask, z_position=motion.output.z_position, same_tick=same_tick))
         bridge.update()
 
     def _wire_fluid(self) -> None:
-        """Each fluid's input, one injection per bridge, at its weight."""
+        """Each fluid's input, one injection per bridge, at full weight."""
         dt: float = self._dt
         bridges: dict[int, render.Bridge3DLayer] = {i: cast(render.Bridge3DLayer, layer) for i, layer in self.L[Layers.bridge].items()}
         for i, _fluid in self.L[Layers.fluid].items():
             fluid = cast(render.Fluid3DLayer, _fluid)
-            pose: Frame | None = self.board.get_frame(self.settings.stage, i)
             injections: list[render.Injection] = []
-            for j, bridge in bridges.items():
+            for bridge in bridges.values():
                 output: render.BridgeOutput = bridge.output
                 injections.append(render.Injection(output.boundary_velocity, output.boundary_density, output.boundary_temperature,
                                                output.body_force_acceleration, output.body_force_density,
-                                               output.body_force_temperature, weight=self._weight(pose, i, j),
+                                               output.body_force_temperature,
                                                boundary_velocity_z_position=output.boundary_velocity_z_position,
                                                boundary_density_z_position=output.boundary_density_z_position,
                                                boundary_temperature_z_position=output.boundary_temperature_z_position,
@@ -348,33 +337,22 @@ class DeepFlowRender(RenderBase):
             fluid.set_input(render.FluidInput(dt, injections))
 
     def _wire_monitors(self) -> None:
-        """The monitors' input, every stage's ports."""
+        """The monitors' input, every stage's ports; each monitor shows its own stage's."""
         for i, _motion in self.L[Layers.motion].items():
             if i not in self.L[Layers.bridge] or i not in self.L[Layers.fluid] or i not in self.L[Layers.view]:
                 continue
+            capture_ports: dict[str, Port] = {**cast(render.CaptureImageLayer, self.L[Layers.capture_image][i]).ports,
+                                              **cast(render.CaptureDepthLayer, self.L[Layers.capture_depth][i]).ports}
             ports: dict[render.FlowStage, dict[str, Port]] = {
+                render.FlowStage.CAPTURE: capture_ports,
                 render.FlowStage.VIEW: cast(ViewLayer, self.L[Layers.view][i]).ports,
                 render.FlowStage.MOTION: cast(render.Motion3DLayer, _motion).ports,
                 render.FlowStage.BRIDGE: cast(render.Bridge3DLayer, self.L[Layers.bridge][i]).ports,
                 render.FlowStage.FLUID: cast(render.Fluid3DLayer, self.L[Layers.fluid][i]).ports,
             }
-            for key in (Layers.monitor_a, Layers.monitor_b):
+            for key in MONITORS:
                 if i in self.L[key]:
                     cast(render.MonitorLayer, self.L[key][i]).set_input(render.MonitorInput(ports))
-
-    def _weight(self, pose: Frame | None, own_cam: int, cam_id: int) -> float:
-        """The share of camera `cam_id`'s bridge in camera `own_cam`'s fluid: its player's motion for the
-        fluid's own camera, the cross-camera similarity for another; 1 without `scale_by_motion`."""
-        if not self.settings.inputs.scale_by_motion:
-            return 1.0
-        if pose is None:
-            return 0.0
-        if cam_id == own_cam:
-            return float(pose[AngleMotion].value) if AngleMotion in pose else 0.0
-        if Similarity in pose:
-            similarities: np.ndarray = np.nan_to_num(pose[Similarity].values)
-            return float(similarities[cam_id]) if cam_id < len(similarities) else 0.0
-        return 0.0
 
     # ========== Drawing ==========
 
