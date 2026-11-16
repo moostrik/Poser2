@@ -222,15 +222,10 @@ class ViewMaskSettings(BaseSettings):
     edge_contrast: Field[float] = Field(0.03, min=0.001, max=0.3, step=0.001, description="The image's brightness spread (0 to 1) above which the mask's edge follows the image's")
 
 
-class DepthFillSettings(BaseSettings):
-    """The depth's fill: push-pull, the read's holes in the mask filled from the depth around them."""
-    enabled: Field[bool] = Field(True, description="The mask filled with the player's depth; off, the read as it is")
-
-
 class ViewDepthSettings(BaseSettings):
     """ViewDepth, how far: the depth read into the view where it is the player's and the mask is, then filled."""
     tolerance: Field[float] = Field(0.2, min=0.05, max=0.5, step=0.01, description="Depth jump beyond which the read blends no two depth pixels, m")
-    fill:      Group[DepthFillSettings] = Group(DepthFillSettings)
+    fill_enabled: Field[bool] = Field(True, description="The mask filled with the player's depth (push-pull); off, the read as it is")
 
 
 class ColorGradeSettings(BaseSettings):

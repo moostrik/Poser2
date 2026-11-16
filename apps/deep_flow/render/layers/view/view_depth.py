@@ -16,7 +16,7 @@ class ViewDepth:
     """`read` brings a depth into the view across the crop: within a surface, the depth pixels within `tolerance` of
     each other blended; kept where it lies inside the box (the crop's near and far) and the mask is above 0. `fill`
     fills the mask where the read has none (the band between the depth's coarse edge and the mask's, the camera's
-    holes), with `fill.enabled`; off, the depth is the read."""
+    holes), with `fill_enabled`; off, the depth is the read."""
 
     def __init__(self, settings: ViewDepthSettings, box: ViewCropSettings) -> None:
         self.settings: ViewDepthSettings = settings
@@ -29,7 +29,7 @@ class ViewDepth:
     @property
     def depth(self) -> Texture:
         """The depth the view hands on: the filled one, or the read with the fill off."""
-        return self._depth if self.settings.fill.enabled else self._read
+        return self._depth if self.settings.fill_enabled else self._read
 
     @property
     def ports(self) -> dict[str, Port]:
@@ -40,7 +40,7 @@ class ViewDepth:
     @property
     def made_with(self) -> tuple:
         """The settings its textures are made with, so its owner makes them again when one changes."""
-        return (self.settings.tolerance, self.settings.fill.enabled)
+        return (self.settings.tolerance, self.settings.fill_enabled)
 
     def allocate(self, width: int, height: int) -> None:
         self._read.allocate(width, height, GL_R32F)
@@ -67,5 +67,5 @@ class ViewDepth:
         self._read.begin()
         self._read_shader.use(depth, crop, self.settings.tolerance, mask, self._box.near, self._box.far)
         self._read.end()
-        if self.settings.fill.enabled:
+        if self.settings.fill_enabled:
             self._fill.use(self._read, mask, self._depth)

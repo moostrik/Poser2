@@ -328,9 +328,7 @@
       },
       "depth": {
         "tolerance": 0.2,
-        "fill": {
-          "enabled": true
-        }
+        "fill_enabled": true
       },
       "color_grade": {
         "enabled": true,

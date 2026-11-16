@@ -77,7 +77,7 @@ resample **(deduction)**, for keeping the camera's work and the flow's apart.
 | `mask.guided_radius`                 | 2             | how far the image moves the mask's edge, in depth pixels; 0 off           |
 | `mask.edge_contrast`                 | 0.03          | the image's brightness spread (0 to 1) above which the edge follows the image's |
 | `depth.tolerance`                    | 0.2 m         | the depth jump beyond which the read blends no two depth pixels           |
-| `depth.fill.enabled`                 | on            | the read filled across the mask; off, the depth is the read               |
+| `depth.fill_enabled`                 | on            | the read filled across the mask; off, the depth is the read               |
 
 ## The depth
 
@@ -173,7 +173,7 @@ about ±0.4 inside and ±0.3 at the edge.
 |---------------------------------------|---------------|-------|-----------------------|-------|-------|--------------|-------------|-----------|
 | `MASK`, gated by its depth mask       | 3.7%          | 0.493 | 12.32 / 5.93          | 0.567 | 0.828 | 0.067        | 1.87        |           |
 | the one path, gated by its depth mask | 3.7%          | 0.491 | 12.28 / 5.90          | 0.540 | 0.855 | 0.070        | 1.84        |           |
-| the read, `depth.fill.enabled` off    | 4.4%          | 0.491 | 11.97 / 5.94          | 0.559 | 0.843 | 0.071        | 1.75        |           |
+| the read, `depth.fill_enabled` off    | 4.4%          | 0.491 | 11.97 / 5.94          | 0.559 | 0.843 | 0.071        | 1.75        |           |
 | the read and the fill, the preset     | 3.9%          | 0.492 | 11.84 / 6.07          | 0.542 | 0.831 | 0.070        | 1.82        | 0.20 ms   |
 | the same, tolerance 10 m (bilinear)   | 6.0%          | 0.492 | 12.37 / 5.15          | 0.560 | 0.821 | 0.067        | 1.82        |           |
 

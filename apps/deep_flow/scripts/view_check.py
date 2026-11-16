@@ -131,7 +131,7 @@ def main() -> int:
     depth_texture = Tensor(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
 
     print(f'{args.recording}: {count} captures, view {view.output.image.width} x {view.output.image.height}, '
-          f'tolerance {d.tolerance} m, near {band.near} far {band.far}, fill {d.fill.enabled}')
+          f'tolerance {d.tolerance} m, near {band.near} far {band.far}, fill {d.fill_enabled}')
     crop_off, read_off, fill_off, pixels = 0, 0, 0, 0
     unread, unfilled, shares = [], [], []
     last: dict[str, np.ndarray] = {}
@@ -164,7 +164,7 @@ def main() -> int:
         crop_off += int((np.abs(cropped - depth_crop(grid, uu, vv, band.near, band.far)) > 0.001).sum())
         read_off += int((np.abs(got_read - masked_depth(grid, uu, vv, d.tolerance, mask, band.near, band.far)) > 0.001).sum())
         got = read(output.depth.texture)
-        if d.fill.enabled:
+        if d.fill_enabled:
             fill_off += int((np.abs(got - push_pull(got_read.astype(np.float64), mask)) > 0.001).sum())
         pixels += got.size
 
@@ -184,7 +184,7 @@ def main() -> int:
         time_view(view, image_texture, depth_texture)
     print(f'the crop\'s depth: {crop_off} of {pixels} pixels off the reference')
     print(f'the read: {read_off} of {pixels} pixels off the reference')
-    if d.fill.enabled:
+    if d.fill_enabled:
         print(f'the fill: {fill_off} of {pixels} pixels off the reference')
     if unread:
         print(f'the mask without depth: {np.mean(unread) * 100:.2f}% in the read, {np.mean(unfilled) * 100:.2f}% in the depth; '

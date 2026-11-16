@@ -274,10 +274,10 @@
     "pause": false,
     "layer": {
       "main": [
-        "motion"
+        "view"
       ],
       "debug": [
-        "show"
+        "view"
       ]
     },
     "capture": {
@@ -295,14 +295,12 @@
         "far": 1.7
       },
       "mask": {
-        "guided_radius": 2.0,
+        "guided_radius": 3.0,
         "edge_contrast": 0.03
       },
       "depth": {
         "tolerance": 0.2,
-        "fill": {
-          "enabled": true
-        }
+        "fill_enabled": true
       },
       "color_grade": {
         "enabled": true,
@@ -327,7 +325,7 @@
         }
       },
       "monitor_debug": {
-        "texture": "output.boundary_velocity",
+        "texture": "depth.depth",
         "view": "COLORMAP",
         "advanced": {
           "channel": "ALL",
@@ -482,7 +480,7 @@
         "mask": 0.0
       },
       "monitor_main": {
-        "texture": "output.boundary_velocity",
+        "texture": "output.expansion",
         "view": "COLORMAP",
         "advanced": {
           "channel": "ALL",
