@@ -53,16 +53,10 @@ class Layers(IntEnum):
     time_series =   auto()     # the app's timings, over time
     pose =          auto()
 
-class MainView(IntEnum):
-    """What the main window shows: the debug panels, or the show alone."""
-    DEBUG = 0       # panel a and panel b, as `a` and `b` pick them
-    SHOW = auto()   # panel a's layers alone, fit to the whole window, as a secondary window shows it
-
-
 class LayerSettings(BaseSettings):
-    """The two panels' layers, each drawn in order: `a` is the show and what the screen recording records."""
-    a: Field[list[Layers]] = Field([Layers.show], description="Layers drawn in panel a, the show", widget=Widget.playlist)
-    b: Field[list[Layers]] = Field([Layers.pose], description="Layers drawn in panel b", widget=Widget.playlist)
+    """The two panels' layers, each drawn in order: `main` is the show and what the screen recording records."""
+    main:  Field[list[Layers]] = Field([Layers.show], description="Layers drawn in the main panel, the show", widget=Widget.playlist)
+    debug: Field[list[Layers]] = Field([Layers.pose], description="Layers drawn in the debug panel", widget=Widget.playlist)
 
 
 # ---------------------------------------------------------------------------
@@ -296,7 +290,7 @@ class PoseMonitorSettings(BaseSettings):
     data    : Group[_DataLayerSettings]         = Group(_DataLayerSettings, share=[stage])
 
 class RenderSettings(BaseSettings):
-    main_view: Field[MainView]                   = Field(MainView.DEBUG, description="The main window: the debug panels, or the show alone")
+    debug: Field[bool]                           = Field(True, description="The main and the debug panel; off, the main panel alone, as on a second screen")
     input_fps: Field[float]                      = Field(60.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
     layer  : Group[LayerSettings]                = Group(LayerSettings)
     # the chain, in its order, then the pose beside it

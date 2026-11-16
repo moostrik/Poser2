@@ -14,7 +14,7 @@ from modules import render
 from modules.utils import FPS, Color, Rect, Point2f
 
 from ..board import RenderBoard
-from ..settings import MainView, PoseFrame, RenderSettings
+from ..settings import PoseFrame, RenderSettings
 from .layers import CaptureMonitorLayer, ViewInput, ViewOutput, ViewLayer, PoseMonitorCompositor
 from .chain import ChainLayers, Size, TICK_LAYERS, CAPTURE_LAYERS, MONITORS, POSE_SHAPES, shown, size_of, layers_of, shape_of
 
@@ -38,11 +38,11 @@ class DeepFlowRender(RenderBase):
 
         self.board: RenderBoard = board
 
-        self._a_layers: list[ChainLayers] = shown(settings.layer.a)      # panel a, the show and the recording
-        self._b_layers: list[ChainLayers] = shown(settings.layer.b)
+        self._main_layers: list[ChainLayers] = shown(settings.layer.main)      # the main panel, the show and the recording
+        self._debug_layers: list[ChainLayers] = shown(settings.layer.debug)
 
         self.L: dict[ChainLayers, dict[int, render.LayerBase]] = {layer: {} for layer in ChainLayers}
-        self._monitors_b: dict[ChainLayers, dict[int, render.MonitorLayer]] = {}     # each stage's monitor B, panel b's
+        self._debug_monitors: dict[ChainLayers, dict[int, render.MonitorLayer]] = {}     # each stage's debug monitor
 
         for i in range(self.num_cams):
             cam_image =     self.L[ChainLayers.cam_image][i] =   render.CameraImageLayer(    i, self.board)
@@ -59,13 +59,14 @@ class DeepFlowRender(RenderBase):
             self.L[ChainLayers.capture_monitor][i] = CaptureMonitorLayer(cast(render.CaptureImageLayer, self.L[ChainLayers.capture_image][i]),
                                                                     cast(render.CaptureDepthLayer, self.L[ChainLayers.capture_depth][i]),
                                                                     settings.capture, settings.view.depth_mask)
-            # each stage's monitor A in self.L, shown in panel a; its monitor B in self._monitors_b, shown in panel b
+            # each stage's main monitor in self.L, shown in the main panel; its debug monitor in self._debug_monitors,
+            # shown in the debug panel
             for key, stage, stage_settings in ((ChainLayers.view_monitor, render.FlowStage.VIEW, settings.view),
                                                (ChainLayers.motion_monitor, render.FlowStage.MOTION, settings.motion),
                                                (ChainLayers.bridge_monitor, render.FlowStage.BRIDGE, settings.bridge),
                                                (ChainLayers.fluid_monitor, render.FlowStage.FLUID, settings.fluid)):
-                self.L[key][i] = render.MonitorLayer(stage, stage_settings.monitor_a)
-                self._monitors_b.setdefault(key, {})[i] = render.MonitorLayer(stage, stage_settings.monitor_b)
+                self.L[key][i] = render.MonitorLayer(stage, stage_settings.monitor_main)
+                self._debug_monitors.setdefault(key, {})[i] = render.MonitorLayer(stage, stage_settings.monitor_debug)
         self.L[ChainLayers.time_series][0] = render.TimeSeriesLayer(self.board, settings.time_series)      # the board's series, one for all cameras
 
         # Split view: the left and right panels side by side or stacked, whichever shows what they hold larger
@@ -106,7 +107,7 @@ class DeepFlowRender(RenderBase):
         self.window_manager.add_mouse_move_callback(self._on_mouse_move)
         self.window_manager.add_mouse_scroll_callback(self._on_mouse_scroll)
 
-        # The screen recording: panel a's layers, or the main window, drawn into the capture's screen frame
+        # The screen recording: the main panel's layers, or the main window, drawn into the capture's screen frame
         self._screen_capture: ScreenCapture = ScreenCapture()
         self.screen_recorder: ScreenRecorder = ScreenRecorder(settings.screen_recorder, self._screen_capture, screen_recordings)
         settings.screen_recorder.bind(ScreenRecorderSettings.snap, self._on_snap)
@@ -122,7 +123,7 @@ class DeepFlowRender(RenderBase):
     def _read_panel_aspect_ratios(self) -> list[float]:
         """The shape of each panel, the shape of its first layer."""
         aspect_ratios: list[float] = []
-        for layer_types in (self._a_layers, self._b_layers):
+        for layer_types in (self._main_layers, self._debug_layers):
             width, height = self._layer_size(layer_types[0]) if layer_types else (OUTPUT_WIDTH, OUTPUT_HEIGHT)
             aspect_ratios.append(width / height)
         return aspect_ratios
@@ -151,7 +152,7 @@ class DeepFlowRender(RenderBase):
                     layer.allocate(*self._view_size, GL_RGBA16F)
                 elif size == Size.OUTPUT:
                     layer.allocate(OUTPUT_WIDTH, OUTPUT_HEIGHT, GL_RGBA16F)
-        for monitors in self._monitors_b.values():
+        for monitors in self._debug_monitors.values():
             for monitor in monitors.values():
                 monitor.allocate(OUTPUT_WIDTH * 2, OUTPUT_HEIGHT * 2, GL_RGBA16F)     # a monitor renders at the size it is drawn at
         self.allocate_window_renders()
@@ -185,7 +186,7 @@ class DeepFlowRender(RenderBase):
         for cam_dict in self.L.values():
             for layer in cam_dict.values():
                 layer.deallocate()
-        for monitors in self._monitors_b.values():
+        for monitors in self._debug_monitors.values():
             for monitor in monitors.values():
                 monitor.deallocate()
         self._border.deallocate()
@@ -200,7 +201,7 @@ class DeepFlowRender(RenderBase):
 
     def _monitors(self) -> list[render.MonitorLayer]:
         return [cast(render.MonitorLayer, layer) for key in MONITORS
-                for layer in (*self.L[key].values(), *self._monitors_b.get(key, {}).values())]
+                for layer in (*self.L[key].values(), *self._debug_monitors.get(key, {}).values())]
 
     def _on_mouse_button(self, x: float, y: float, button: MouseButton, pressed: bool) -> None:
         """A press starts a drag; a middle click that did not move resets the views."""
@@ -238,14 +239,14 @@ class DeepFlowRender(RenderBase):
                 for layer in self.L[layer_type].values():
                     cast(render.StageLayer, layer).reset()
 
-        self._a_layers = shown(self.settings.layer.a)
-        self._b_layers = shown(self.settings.layer.b)
+        self._main_layers = shown(self.settings.layer.main)
+        self._debug_layers = shown(self.settings.layer.debug)
         self._update_layout()
         self._follow_view_size()
 
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         seen: set[ChainLayers] = set()
-        for layer_type in TICK_LAYERS + self._a_layers + self._b_layers:
+        for layer_type in TICK_LAYERS + self._main_layers + self._debug_layers:
             if layer_type in seen:
                 continue
             if layer_type in CAPTURE_LAYERS:
@@ -258,7 +259,7 @@ class DeepFlowRender(RenderBase):
                 wiring()
             for layer in self.L[layer_type].values():
                 layer.update()
-            for monitor in self._monitors_b.get(layer_type, {}).values():
+            for monitor in self._debug_monitors.get(layer_type, {}).values():
                 monitor.update()
 
     # ========== The flow's wiring ==========
@@ -340,14 +341,14 @@ class DeepFlowRender(RenderBase):
     # ========== Drawing ==========
 
     def draw_main(self, width: int, height: int) -> None:
-        if self.settings.main_view == MainView.SHOW:
-            self._draw_show(width, height)      # the show alone, on one screen
-        else:
+        if self.settings.debug:
             self._draw_panels(width, height)
+        else:
+            self._draw_show(width, height)      # the main panel alone, as on a second screen
         self._draw_screen_recording(width, height)
 
     def _draw_screen_recording(self, width: int, height: int) -> None:
-        """The screen frame, when the recorder records this tick: panel a's layers, each fit and centered at its
+        """The screen frame, when the recorder records this tick: the main panel's layers, each fit and centered at its
         own shape and added on black as the show draws them, or the main window just drawn; then the recorder's
         tick, which copies it."""
         recorder_settings: ScreenRecorderSettings = self.settings.screen_recorder
@@ -362,7 +363,7 @@ class DeepFlowRender(RenderBase):
                 Style.set_blend_mode(Style.BlendMode.DISABLED)
                 Style.push_style()
                 Style.set_blend_mode(Style.BlendMode.ADD)
-                for layer_type in self._a_layers:
+                for layer_type in self._main_layers:
                     if 0 in self.L[layer_type]:
                         x, y, w, h = place(*self._layer_size(layer_type), capture.width, capture.height)
                         glViewport(round(x), round(y), round(w), round(h))
@@ -373,9 +374,9 @@ class DeepFlowRender(RenderBase):
         self.screen_recorder.update(self.window_manager.frame_time)
 
     def _on_snap(self, _: bool) -> None:
-        """The recording's size: panel a's first layer's, or the main window's when it is recorded."""
+        """The recording's size: the main panel's first layer's, or the main window's when it is recorded."""
         recorder_settings: ScreenRecorderSettings = self.settings.screen_recorder
-        record: list[ChainLayers] = self._a_layers
+        record: list[ChainLayers] = self._main_layers
         if recorder_settings.main_window:
             width, height = self._window_size
         elif record:
@@ -386,42 +387,43 @@ class DeepFlowRender(RenderBase):
         recorder_settings.height = height
 
     def _draw_panels(self, width: int, height: int) -> None:
-        """The debug panels: panel a's and panel b's layers, side by side or stacked."""
+        """The main and the debug panel's layers, side by side or stacked."""
         clear_color()
 
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
-        a_rect: Rect = self.subdivision.get_rect('panels', 0)
-        self._draw_fit(self._a_layers, a_rect.x, height - a_rect.y - a_rect.height, a_rect.width, a_rect.height, True)
+        main_rect: Rect = self.subdivision.get_rect('panels', 0)
+        self._draw_fit(self._main_layers, main_rect.x, height - main_rect.y - main_rect.height, main_rect.width, main_rect.height, True)
 
-        b_rect: Rect = self.subdivision.get_rect('panels', 1)
-        self._draw_fit(self._b_layers, b_rect.x, height - b_rect.y - b_rect.height, b_rect.width, b_rect.height, True, panel_b=True)
+        debug_rect: Rect = self.subdivision.get_rect('panels', 1)
+        self._draw_fit(self._debug_layers, debug_rect.x, height - debug_rect.y - debug_rect.height, debug_rect.width, debug_rect.height,
+                       True, debug=True)
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         self._draw_show(width, height)
 
     def _draw_show(self, width: int, height: int) -> None:
-        """The show: panel a's layers in order, each fit to `width` × `height` at its own shape."""
+        """The show: the main panel's layers in order, each fit to `width` × `height` at its own shape."""
         clear_color()
 
         Style.set_blend_mode(Style.BlendMode.DISABLED)
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.ADD)
 
-        self._draw_fit(self._a_layers, 0, 0, width, height)
+        self._draw_fit(self._main_layers, 0, 0, width, height)
 
         Style.pop_style()
 
     def _draw_fit(self, layer_types: list[ChainLayers], x: float, y: float, width: float, height: float, border: bool = False,
-                  panel_b: bool = False) -> None:
+                  debug: bool = False) -> None:
         """Draw each layer into a GL rect (origin bottom left) at its own shape, centered; with `border`, a border around
-        each; in `panel_b` a stage's monitor B, else its monitor A."""
+        each; in the debug panel (`debug`) a stage's debug monitor, else its main monitor."""
         if width <= 0 or height <= 0:
             return
         for layer_type in layer_types:
             layers: dict[int, render.LayerBase] = self.L[layer_type]
-            if panel_b and layer_type in self._monitors_b:
-                layers = dict(self._monitors_b[layer_type])
+            if debug and layer_type in self._debug_monitors:
+                layers = dict(self._debug_monitors[layer_type])
             if 0 in layers:
                 fit_x, fit_y, fit_width, fit_height = fit(*self._layer_size(layer_type), width, height)
                 glViewport(int(x + fit_x), int(y + fit_y), int(fit_width), int(fit_height))

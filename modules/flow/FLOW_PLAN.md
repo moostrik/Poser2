@@ -37,16 +37,12 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
 - **B1.** The depth read: `view.depth.depth_read` holds `SURFACE` and `MASK` ([VIEW.md](VIEW.md#the-depth-read)). One
   stays, chosen together by eye on the edges recording; the other goes. In the same sitting, the color's edge
   now that the color grade works on the straight image and takes the mask last.
-- **B6.** A flat monitor and a 3D monitor, after B7. One monitor (`MonitorLayer`, 395 lines) does both, so its 3D
+- **B6.** A flat monitor and a 3D monitor. One monitor (`MonitorLayer`, 395 lines) does both, so its 3D
   settings (slice, orbit, depth fade) show on the flat stages, where they do nothing. `Monitor2DLayer` draws flat
   textures; `Monitor3DLayer` adds the volume views and the mouse (drag to turn and zoom, wheel for the slice,
   click to reset). The monitors leave the stage base: each stage declares its own two, last: the view, the
   motion and the bridge 2D, the fluid 3D. Only the 3D monitors get the mouse. MONITOR.md,
   `test_monitor_mouse.py` and `test_layer_names.py` follow.
-- **B7.** Names by use, before B6, so the monitors are renamed once. Panel `a` becomes `main`, panel `b` `debug`,
-  and each stage's two monitors `monitor_main` and `monitor_debug`. The `main_view` choice becomes one switch,
-  `debug`: on, both panels; off, the main panel alone, as on a second screen. The renderer's names, the
-  recording's panel, presets, FLOW.md, INPUT_THREADS.md and MONITOR.md follow.
 
 Question, for B: the view's depth settings gone through together; among them MASK's read takes the mask's
 `guided_radius` as its reach.
@@ -239,7 +235,6 @@ Not worked on until asked for; each with what is known.
   preset's `view.depth.depth_read`, B1.
 - Panels: a component's monitors last in its settings: B6.
 - Prefer composition over inheritance, an `ABC` for a family that shares code: the 2D and 3D monitor, B6.
-- Name a concept after what it is, one term everywhere: main and debug, B7.
 - A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 

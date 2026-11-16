@@ -68,7 +68,7 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 | 2D flow, 3D flow     | a system: a motion layer and a bridge layer per camera, a fluid layer per show output                                                                                                                               | `Motion2DLayer` + `Bridge2DLayer` + `Fluid2DLayer`; `…3D…`                                    |
 | 2D camera, 3D camera | an image and a mask; those and a depth image on the same view                                                                                                                                                       | `MotionInput` without / with `depth`                                                          |
 | port                 | a stage's named texture with its kind (image, velocity, acceleration, scalar, z position) and the channels that hold its values; its input and output fields declare theirs, every component its own ([MONITOR.md](MONITOR.md)) | `Port`, `TextureKind`, `HasPorts`, `ports_of`, in `modules/flow`                              |
-| monitor              | a layer that shows one port of its stage, picked on the panel, drawn only while it is shown; its views in [MONITOR.md](MONITOR.md)                                                                                  | `MonitorLayer`, `<stage>.monitor_a`, `monitor_b`                                              |
+| monitor              | a layer that shows one port of its stage, picked on the panel, drawn only while it is shown; its views in [MONITOR.md](MONITOR.md)                                                                                  | `MonitorLayer`, `<stage>.monitor_main`, `monitor_debug`                                       |
 
 "bridge" is ofxFlowTools' word (`ftVelocityBridge`, `ftDensityBridge`, `ftTemperatureBridge`);
 it says where the stage sits; the table says what it does.
@@ -232,8 +232,10 @@ injection the camera's track color, and weights the own camera's injection by th
 and another's by the cross-camera similarity times `similarity_scale`; deep_flow measures on the
 view's image, gives the bridge the view's color and takes the mask from the view stage, its own layer
 (`apps/deep_flow/render/layers/view/`), every injection at full weight. Each of its stages (capture, view,
-motion, bridge, fluid) has two monitors, A and B, their settings in the stage's panel (`<stage>.monitor_a`,
-`monitor_b`), one entry in the panels' lists, `<stage>_monitor`: panel a shows the stage's monitor A, panel b its B; a view's depth is drawn in its colormap from its near to its far.
+motion, bridge, fluid) has two monitors, their settings last in the stage's panel (`<stage>.monitor_main`,
+`monitor_debug`), one entry in the panels' lists, the stage's name: the main panel shows the stage's main monitor,
+the debug panel its debug monitor; a view's depth is drawn in its colormap from its near to its far. The render's
+`debug` switch shows both panels, or, off, the main panel alone, as a second screen shows it.
 The capture's monitor is a simple one: the color, the depth or both.
 
 ## Packages

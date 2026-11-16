@@ -29,13 +29,13 @@ class StageOutput:
 
 
 class StageLayerSettings(BaseSettings):
-    """What every stage layer's settings hold, first on its panel: the reset; and its two monitors', A and B. Each
+    """What every stage layer's settings hold, first on its panel: the reset; and its two monitors', the main and the debug panel's, last. Each
     stage declares its working size itself (`width`, `height`, the 3D fluid's `depth`), after the switches it puts
     first."""
     reset: Field[bool] =    Field(False, widget=Widget.button, description="Start the stage from rest")
 
-    monitor_a = Group(MonitorLayerSettings, last=True)     # a stage's own panels first, its monitors at the end
-    monitor_b = Group(MonitorLayerSettings, last=True)
+    monitor_main  = Group(MonitorLayerSettings, last=True)     # a stage's own panels first, its monitors at the end
+    monitor_debug = Group(MonitorLayerSettings, last=True)
 
 
 class StageLayer[I, O: StageOutput](LayerBase, ABC):

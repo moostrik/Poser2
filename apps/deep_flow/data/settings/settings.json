@@ -270,13 +270,13 @@
     }
   },
   "render": {
-    "main_view": "DEBUG",
+    "debug": true,
     "layer": {
-      "a": [
+      "main": [
         "show",
         "view"
       ],
-      "b": [
+      "debug": [
         "fluid"
       ]
     },
@@ -312,7 +312,7 @@
         "saturation": 1.01,
         "sharpen": 0.82
       },
-      "monitor_a": {
+      "monitor_main": {
         "texture": "depth_mask.mask",
         "view": "COLORMAP",
         "advanced": {
@@ -334,7 +334,7 @@
           }
         }
       },
-      "monitor_b": {
+      "monitor_debug": {
         "texture": "output.boundary_velocity",
         "view": "COLORMAP",
         "advanced": {
@@ -365,7 +365,7 @@
       "x_gain": 1.0,
       "y_gain": 1.0,
       "z_gain": 0.4,
-      "monitor_a": {
+      "monitor_main": {
         "texture": "output.velocity",
         "view": "GLYPHS",
         "advanced": {
@@ -387,7 +387,7 @@
           }
         }
       },
-      "monitor_b": {
+      "monitor_debug": {
         "texture": "output.boundary_velocity",
         "view": "COLORMAP",
         "advanced": {
@@ -431,7 +431,7 @@
     "bridge": {
       "width": 448,
       "height": 800,
-      "monitor_a": {
+      "monitor_main": {
         "texture": "output.boundary_velocity",
         "view": "COLORMAP",
         "advanced": {
@@ -453,7 +453,7 @@
           }
         }
       },
-      "monitor_b": {
+      "monitor_debug": {
         "texture": "output.boundary_velocity",
         "view": "COLORMAP",
         "advanced": {
@@ -572,7 +572,7 @@
       "height": 512,
       "depth": 64,
       "depth_ratio": 1.0,
-      "monitor_a": {
+      "monitor_main": {
         "texture": "output.boundary_velocity",
         "view": "COLORMAP",
         "advanced": {
@@ -594,7 +594,7 @@
           }
         }
       },
-      "monitor_b": {
+      "monitor_debug": {
         "texture": "velocity",
         "view": "COLORMAP",
         "advanced": {

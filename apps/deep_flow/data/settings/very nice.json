@@ -264,12 +264,12 @@
     }
   },
   "render": {
-    "main_view": "SHOW",
+    "debug": false,
     "layer": {
-      "a": [
+      "main": [
         "show"
       ],
-      "b": [
+      "debug": [
         "fluid"
       ]
     },
@@ -309,7 +309,7 @@
       "colormap": "JET"
     },
     "view": {
-      "monitor_a": {
+      "monitor_main": {
         "texture": "depth.depth",
         "view": "COLORMAP"
       },
@@ -342,7 +342,7 @@
       }
     },
     "motion": {
-      "monitor_a": {
+      "monitor_main": {
         "texture": "output.velocity",
         "view": "GLYPHS",
         "advanced": {
@@ -466,7 +466,7 @@
       }
     },
     "fluid": {
-      "monitor_b": {
+      "monitor_debug": {
         "texture": "density",
         "view": "COLORMAP",
         "advanced": {

@@ -2,8 +2,8 @@
 
 The flow's monitor (`MonitorLayer`, `modules/flow/visualization/`): a layer that shows one port of
 its stage, picked on the panel, drawn only while it is shown. Each of the flow's stages has its own (`FlowStage`:
-`VIEW`, `MOTION`, `BRIDGE`, `FLUID`), two in deep_flow, A for panel a and B for panel b, their settings in the
-stage's panel (`<stage>.monitor_a`, `monitor_b`); deep_flow's capture has
+`VIEW`, `MOTION`, `BRIDGE`, `FLUID`), two in deep_flow, one for the main panel and one for the debug panel, their
+settings last in the stage's panel (`<stage>.monitor_main`, `monitor_debug`); deep_flow's capture has
 a simple one of its own (`CaptureMonitorLayer`: the color, the depth or both). The stages and their ports are in
 [FLOW.md](FLOW.md#the-stages-and-their-layers). "Code" is what the files show; **(deduction)**
 marks what is inferred from them.
@@ -145,7 +145,7 @@ as it is.
   velocity or a scalar, whose signs would cancel in a max.
 - The orbit is `advanced.orbit` (`yaw`, `pitch`, `zoom`) and the slice's place `slice_position`,
   settings the mouse writes, so the panel shows and sets them and a preset keeps them. In deep_flow a drag that starts anywhere in the main window goes to every monitor, so
-  A and B stay on one view: the left button turns (a drag across the window 180°), the right
+  the main and the debug monitor stay on one view: the left button turns (a drag across the window 180°), the right
   zooms, scroll steps one of the fluid's `depth` layers (away from the user is further back,
   a volume with fewer layers showing its nearest), a middle click without a move resets to the
   front view at the middle layer. `Orbit` frames the box by the narrower field of view, so it
