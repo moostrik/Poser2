@@ -25,11 +25,20 @@ class TiltHomographyTest(unittest.TestCase):
     def test_level_is_the_identity(self) -> None:
         np.testing.assert_array_almost_equal(tilt_homography(LENS, SIZE, 0.0), np.eye(3))
 
-    def test_the_whole_picture_stays_in_the_frame(self) -> None:
-        for tilt in (-45.0, -30.0, -5.0, 5.0, 30.0):
+    def test_the_picture_spans_every_row(self) -> None:
+        for tilt in (-45.0, -30.0, -5.0, 5.0, 30.0, 45.0):
             corners = homography_points(tilt_homography(LENS, SIZE, tilt), np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]))
-            self.assertGreaterEqual(corners.min(), -1e-9, msg=f'tilt {tilt}')
-            self.assertLessEqual(corners.max(), 1.0 + 1e-9, msg=f'tilt {tilt}')
+            self.assertAlmostEqual(float(corners[:, 1].min()), 0.0, places=9, msg=f'tilt {tilt}')
+            self.assertAlmostEqual(float(corners[:, 1].max()), 1.0, places=9, msg=f'tilt {tilt}')
+
+    def test_the_narrow_end_lies_inside_the_frame(self) -> None:
+        for tilt in (-45.0, -30.0, -5.0, 5.0, 30.0, 45.0):
+            homography = tilt_homography(LENS, SIZE, tilt)
+            top = homography_points(homography, np.array([[0.0, 0.0], [1.0, 0.0]]))
+            bottom = homography_points(homography, np.array([[0.0, 1.0], [1.0, 1.0]]))
+            narrow = top if np.ptp(top[:, 0]) < np.ptp(bottom[:, 0]) else bottom
+            self.assertGreaterEqual(float(narrow[:, 0].min()), 0.0, msg=f'tilt {tilt}')
+            self.assertLessEqual(float(narrow[:, 0].max()), 1.0, msg=f'tilt {tilt}')
 
     def test_a_vertical_line_comes_out_vertical(self) -> None:
         homography = tilt_homography(LENS, SIZE, -30.0)

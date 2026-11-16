@@ -161,10 +161,10 @@ the angle).
 
 A tilt is a rotation about the camera, so where a pixel lands does not depend on its distance: one homography
 straightens a frame and the depth aligned to it. It holds for a rectilinear frame only, so an undistorted one. The
-picture is scaled and moved so all of it stays in the frame, tilt 0 is the identity, and the third coordinate the
-homography gives a pixel is its depth scale: a distance along the tilted axis times it is the distance along the
-level one. The tilt must move `TILT_STEP` (0.25°) before the frames are straightened anew: the reading is noisy, and
-a picture that followed it would shimmer. How the OAK4 uses it is in [OAK4.md](oak4/OAK4.md#tilt-correction).
+picture is scaled so its height fills the frame's and centered across it, tilt 0 is the identity, and the third
+coordinate the homography gives a pixel is its depth scale: a distance along the tilted axis times it is the distance
+along the level one. The tilt must move `TILT_STEP` (0.25°) before the frames are straightened anew: the reading is
+noisy, and a picture that followed it would shimmer. How the OAK4 uses it is in [OAK4.md](oak4/OAK4.md#tilt-correction).
 
 ## The depth's alignment
 

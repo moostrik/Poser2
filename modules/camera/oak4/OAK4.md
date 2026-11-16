@@ -356,7 +356,7 @@ Depth pixels move by `H`, and their values change too. Depth is measured along t
 
 `H` is rebuilt only when the angle moves by 0.25° or more (`TILT_STEP`), since a picture that followed the noisy IMU would shimmer. The correction runs on the PC for two reasons: the chip warps grey frames only (Luxonis docs), and `ImageManip`'s four-point transform needs the BGR path (see [color path](#color-path)).
 
-The whole picture stays in the frame, which leaves wedges without picture at the top corners. The feet end is enlarged most, so it loses the most detail **(deduction)**. The camera's height above the screen is not corrected in the image, since that would need reprojection and leave holes.
+The picture's height fills the frame's, so every row has picture: the wide end is cropped at the sides and the narrow end leaves wedges without picture beside it. On the 992x800 frame at 30° the narrow end is 518 px wide, so the flow's centered 448x800 window has no black; from about 34° the wedges reach it, and past about 56° a frame corner passes the horizon (`MIN_CORNER_SCALE`) **(deduction, from the lens)**. The angle is not capped, so a mount that is too steep shows as wedges. The feet end is enlarged most and the far end squeezed most, so the far end loses the most detail **(deduction)**. The camera's height above the screen is not corrected in the image, since that would need reprojection and leave holes.
 
 ## Recording and replay
 

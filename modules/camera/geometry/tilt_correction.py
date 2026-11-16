@@ -22,7 +22,8 @@ class TiltCorrectionSettings(BaseSettings):
 
 def tilt_homography(intrinsics: list[list[float]], size: tuple[int, int], tilt: float) -> np.ndarray:
     """uv of a frame `size` to uv of the same frame from a level camera, for a camera `tilt` (°) up, its 3x3
-    lens `intrinsics` in px; its third row is a pixel's depth scale."""
+    lens `intrinsics` in px, the level picture's height fitted to the frame's and centered across it; its third
+    row is a pixel's depth scale."""
     width, height = size
     lens: np.ndarray = np.array(intrinsics, dtype=np.float64)
     lens /= lens[2, 2]
@@ -33,9 +34,9 @@ def tilt_homography(intrinsics: list[list[float]], size: tuple[int, int], tilt: 
     corners: np.ndarray = level @ np.array([[0.0, 0.0, 1.0], [width, 0.0, 1.0], [width, height, 1.0], [0.0, height, 1.0]]).T
     x, y = corners[:2] / np.maximum(corners[2], MIN_CORNER_SCALE)
     span_x, span_y = float(x.max() - x.min()), float(y.max() - y.min())
-    scale: float = min(width / span_x, height / span_y)
+    scale: float = height / span_y
     fit: np.ndarray = np.array([[scale, 0.0, (width - scale * span_x) / 2.0 - scale * float(x.min())],
-                                [0.0, scale, (height - scale * span_y) / 2.0 - scale * float(y.min())],
+                                [0.0, scale, -scale * float(y.min())],
                                 [0.0, 0.0, 1.0]])
     to_uv: np.ndarray = np.diag([1.0 / width, 1.0 / height, 1.0])
     return to_uv @ fit @ level @ np.diag([float(width), float(height), 1.0])

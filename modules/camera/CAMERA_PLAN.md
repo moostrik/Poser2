@@ -9,7 +9,8 @@ general code with one user, which stays.
 Built: 1, Vimba's user set is a setting, `VimbaCameraSettings.user_set` (empty loads none), `UserSet2` in smile's
 four presets; 2, the four backends' callback lists have their lock, registered under it, copied under it, called
 outside it; 3, a camera's number is `cam_id` on the contract and every backend (the replay camera's too), Vimba's
-serial is `serial`, the package spells American, its tests time with `perf_counter`.
+serial is `serial`, the package spells American, its tests time with `perf_counter`; 4, the tilt correction
+fits the picture's height to the frame's, with the angle not capped.
 
 ## Open
 
@@ -36,3 +37,4 @@ serial is `serial`, the package spells American, its tests time with `perf_count
 - Use the glossary's terms (`cam_id`, no `camera_id`, American spelling): 3.
 - Read `perf_counter` for every stamp and duration: 3.
 - Open questions and unbuilt work sit in the plan, not the document: 3.
+- A document describes what is built: 4 (CAMERA.md's and OAK4.md's tilt correction).
