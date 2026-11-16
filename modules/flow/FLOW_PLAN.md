@@ -48,11 +48,10 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
     texture is picked. A filter left without a pick snaps back to the shown texture's step. The widget, a path
     select, is the panel's (`modules/panel`), for any dotted path field.
   - The monitors stay two per stage, each with its tuned settings; comparing two textures is main against debug.
-  - The view's outputs in the order it makes them: image, depth, depth mask, mask, color.
+  - The view's outputs in the order it makes them: image, depth, depth mask, mask, graded image; `color`
+    becomes `graded_image` (both a color picture of the player at the view's size, as cut and as graded; the
+    bridge keeps `color` for its input, the density's color in its domain).
   - Every stage follows, `test_stage_layer.py`, MONITOR.md and FLOW.md; the presets' picks keep their paths.
-
-Question, for B8: the view's outputs `image` (the cropped camera image the motion measures on) and `color` (the
-density's color) read badly side by side; their names (`camera`, `density_color`?).
 
 Question, for B: the view's depth settings gone through together; among them MASK's read takes the mask's
 `guided_radius` as its reach.
