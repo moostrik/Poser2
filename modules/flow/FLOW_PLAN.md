@@ -35,10 +35,8 @@ The goal: a clear path from the camera's depth and image to the motion, each ste
 as little noise as possible in the motion while it keeps as much real z motion as possible. The motion is taken
 as it is here; what is inconsistent in it is listed below and is line C's.
 
-Measuring: a change to the view is measured on the motion's raw output, its filters after the view neutral
-(`z.smooth`, `z.catch_up`, `xy.threshold`, `z.threshold` all 0), so the view's effect is not hidden by them; the
-smoothing is judged on its own in line C. The rows measured before with `z.smooth` 100 ms and `z.catch_up` 8 ms
-say so in VIEW.md.
+Each stage's goal and how it is judged are in [FLOW.md](FLOW.md#the-goals); the smoothing is judged on its own
+in line C.
 
 Built: every capture reaches the motion ([INPUT_THREADS.md](INPUT_THREADS.md)); one path for the depth and the
 mask, who, where and how far, each once, measured against the two reads before it, and its tolerance at 0.2, 0.1

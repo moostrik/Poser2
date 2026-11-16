@@ -9,6 +9,12 @@ The stage is `ViewLayer` (settings `view`, deep_flow's own, `apps/deep_flow/rend
 depth's read and fill are plain modules in `modules/flow/view` (`view_window.py`, `depth_read.py`, `DepthCrop`,
 `DepthUpscale`, `DepthFill`).
 
+## The goal
+
+Who, where and how far, from one frame: the player's image, mask and depth, agreeing pixel for pixel at the
+motion's size, adding no noise of its own. What needs two frames is the motion's. It is judged on the motion's
+raw output ([FLOW.md](FLOW.md#the-goals)).
+
 ## The stage
 
 The image has 800 rows and the depth 300, and only the image knows the player's outline sharply. So the depth

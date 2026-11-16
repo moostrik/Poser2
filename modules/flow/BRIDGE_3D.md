@@ -9,6 +9,11 @@ the fluid does with each output in [FLUID_3D.md](FLUID_3D.md#the-inputs), what i
 inferred from them, **(site fact)** what the operator saw. The 2D bridge (`bridge_2d/`) gives the
 boundary only and stays as on `main` until it is rebuilt on the Lucas–Kanade flow.
 
+## The goal
+
+The motion translated into what the fluid takes, and held between the camera's frames
+([FLOW.md](FLOW.md#the-goals)).
+
 ## The filters
 
 The bridge reads two things from a movement: the motion itself, a velocity in its direction that

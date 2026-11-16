@@ -30,6 +30,21 @@ The 2D bridge and the 2D fluid have no document yet; what holds for them is unde
 (`apps/hd_trio/flow/`) and of its layers (`apps/hd_trio/render/layers/flow/`), taken as they were; the 2D in
 `modules/flow` and `render/modules/flow` is no app's until that rebuild.
 
+## The goals
+
+The flow's goal: the player's motion into the fluid, shown as sharp, translucent patterns at 4K
+([FLUID_3D.md](FLUID_3D.md#the-goal)). Each stage's goal, stated in its own document:
+
+| Stage                                 | Goal                                                                                         |
+|---------------------------------------|----------------------------------------------------------------------------------------------|
+| [the view](VIEW.md#the-goal), one frame  | who, where and how far: the player's image, mask and depth, agreeing pixel for pixel at the motion's size, adding no noise of its own |
+| [the motion](MOTION.md#the-goal), two frames | the player's velocity per pixel, x, y and z in widths/s, with as little noise as possible while it keeps as much of the real motion as possible, z most of all |
+| [the bridge](BRIDGE_3D.md#the-goal)   | the motion translated into what the fluid takes, and held between the camera's frames        |
+
+A stage is judged against its goal on its own output, the stages after it neutral: a change to the view on the
+motion's raw output, its smoothing and thresholds at 0 (`z.smooth`, `z.catch_up`, `xy.threshold`,
+`z.threshold`), so a later stage's filters do not hide it.
+
 ## The two systems
 
 | System  | Velocity | Motion                                          | Bridge      | Fluid            | Without depth                   | With depth                                         |

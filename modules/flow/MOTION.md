@@ -13,6 +13,12 @@ The x/y solve is `LucasKanadeFlow` (`motion/lucas_kanade_flow.py`), z the depth 
 composes them; the layer is `MotionLayer` (`modules/render/modules/flow/motion_layer.py`) with `Motion3DLayer`
 and `Motion2DLayer`.
 
+## The goal
+
+The player's velocity per pixel, from two frames: x, y and z in widths/s, with as little noise as possible
+while it keeps as much of the real motion as possible, z most of all. What one frame shows is the view's; what
+to trust over time is the motion's ([FLOW.md](FLOW.md#the-goals)).
+
 ## How it measures
 
 ### x/y: the Lucas–Kanade solve
