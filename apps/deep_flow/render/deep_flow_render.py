@@ -273,9 +273,14 @@ class DeepFlowRender(RenderBase):
 
     def _run_captures(self) -> None:
         """Every capture since the last tick, each camera's in order, through the capture layers (`_run_capture`).
-        A tick without a capture runs none of them, so no stage works on a frame twice."""
+        A tick without a capture runs none of them, so no stage works on a frame twice. Paused, the captures are
+        taken and dropped and only the view runs, on the last capture, made again when one of its settings changes."""
         for i in self.L[ChainLayers.view]:
-            for index, capture in enumerate(self.board.take_captures(i)):
+            captures: list[Capture] = self.board.take_captures(i)
+            if self.settings.pause:
+                self.L[ChainLayers.view][i].update()
+                continue
+            for index, capture in enumerate(captures):
                 self._run_capture(i, capture, same_tick=index > 0)
 
     def _run_capture(self, i: int, capture: Capture, same_tick: bool) -> None:

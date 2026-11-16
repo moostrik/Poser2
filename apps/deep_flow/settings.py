@@ -293,6 +293,7 @@ class PoseMonitorSettings(BaseSettings):
 
 class RenderSettings(BaseSettings):
     debug: Field[bool]                           = Field(True, description="The main and the debug panel; off, the main panel alone, as on a second screen")
+    pause: Field[bool]                           = Field(False, description="Hold the last capture; the view is made again on it when a setting changes")
     input_fps: Field[float]                      = Field(60.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
     layer  : Group[LayerSettings]                = Group(LayerSettings)
     # the chain, in its order, then the pose beside it
