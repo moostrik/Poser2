@@ -105,7 +105,11 @@ flowchart TB
     go; `view.depth.tolerance` goes, as the view upscales no depth.
   - The motion:
     1. x/y at the motion's size from the image, as now; its `same_surface` reads the depth at the depth's
-       size, sampled at its own uv.
+       size by uv, as it already does (`lucas_kanade_tile.comp`). Today every mask pixel has a depth, the view
+       filling it; with the depth unfilled, the band between the depth's edge and the mask's has none, and a
+       window whose center has no depth would count no sample and give no x/y there. So a window whose center
+       has no depth counts all its samples, as with `same_surface` off; inside the body and past the mask x/y
+       is as today. In the shader and its numpy reference (`lucas_kanade_flow`), with a test.
     2. x/y's displacement averaged down to the depth's size (a box over the view pixels each depth pixel
        covers), for the depth velocity's carry.
     3. The depth velocity (`DepthVelocity`, its track, step filter and windows) and the z position at the
@@ -113,12 +117,18 @@ flowchart TB
        view's pixels: each is in pixels of the texture it runs on today (the threshold over the depth
        velocity's width, `moving()` in `depth_velocity_shader.frag` over the displacement's size), so both are
        turned into the depth's pixels by the view's pixels per depth pixel, the presets keeping their meaning.
-       A crop change resizes the depth, reallocates the depth velocity and starts its track over.
+       A crop change resizes the depth, reallocates the depth velocity and starts its track over. The z
+       position is made there without the mask, which is at the motion's size; the catch-up's 3 × 3 of
+       displacement texels now spans 3 × 3 depth pixels, about 8 view pixels, accepted, as the displacement
+       is smooth over about 7 px **(deduction)**.
     4. z and the z position upscaled to the motion's size as pairs (value × weight, weight), the weight 1
        where the crop's depth has a value, the step filter's strip included (its z 0 is a value, kept as
        today): read bilinearly, then filled where the weight is 0 inside the mask, the band between the
        depth's edge and the mask's, by push-pull (`DepthFill` taking a weight, no longer a depth's presence),
-       0 outside the mask; then composed with x/y as now, weighted by the mask.
+       0 outside the mask; then composed with x/y as now, weighted by the mask, and the z position's weight
+       times the mask.
+  - What reads the depth, each named here: the x/y solve (`same_surface`), the depth velocity, the z position,
+    the solve's capture for debugging (`SolveCapture`, any size), the view's monitor.
   - Blending two z velocities at an edge mixes two real motions, where blending two depths made a surface in
     between, so the upsampling has no tolerance **(deduction)**; whether it needs one is shown by the
     measurement.
