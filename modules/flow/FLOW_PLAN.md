@@ -39,21 +39,28 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
 - **B4.** The view's panels: its crop of the camera image (`fixed_x`, `fixed_y`, `fixed_height`) a panel of its
   own, `crop`, its fields `center_x`, `center_y`, `height`. The view's panels in the order the view runs: crop,
   depth, mask, color grade, then the monitors. Presets, VIEW.md and `view_check.py` follow.
-- **B5.** The view's color as compositing does it (Porter and Duff; Brinkmann): `ColorGrade` grades and sharpens
-  the straight image, and the mask is its alpha last. Grading the cut foreground changes the half-masked edge
-  pixels apart from the rest and the sharpen pulls the cut's black into a bright rim inside the edge. The
-  foreground step and `output.foreground` go, read by nothing downstream: the outputs are image, depth, mask,
-  depth mask and color. The ports follow the view's parts in the order it runs (crop, depth, mask, color grade),
-  and the input depth is a depth (kind DEPTH, the depth band's near and far), so its monitor draws its colormap.
-  The look at the edge changes: judged by eye.
-- **B6.** A 2D and a 3D monitor: `MonitorLayer` (395 lines) draws both, and its volume settings (`slice`,
-  `slice_position`, `slice_focus`, `depth_fade`, `orbit`) sit on every stage's panel, doing nothing on a 2D one.
-  `Monitor2DLayer` holds the 2D views; `Monitor3DLayer` extends it with the volume views (the cube, the glyphs,
-  the cut, the orbit, the slice) and their settings. A stage takes the one its ports need: the view and the
-  motion 2D, the fluid 3D, the bridge by its ports.
-- **B7.** The panels by their use: panels `a` and `b` become `main` and `debug`, each stage's monitors
+- **B5.** The view's parts: the view's ports and panels are named by its structure, so the structure is made of
+  parts, each a class with its textures, ports and settings, as `ColorGrade` is: `depth` reads the depth into the
+  view (`SURFACE` or `MASK`), `mask` cuts the depth to the band and moves its edge onto the image's (the guided
+  filter), `color_grade` grades. The view runs them in order (depth, mask, with `MASK` depth again on the mask,
+  then the color grade) and lists them as its components, so the ports come out as `depth.*`, `mask.*`,
+  `color_grade.*`. The color as compositing does it (Porter and Duff; Brinkmann): `ColorGrade` grades and sharpens
+  the straight image, the mask its alpha last; the foreground step and `output.foreground`, read by nothing
+  downstream, go. The outputs are image, depth, mask, depth mask and color. The input depth is a depth (kind
+  DEPTH, the band's near and far), so its monitor draws its colormap. `view_check.py` (its foreground pass and
+  image) and VIEW.md follow. The look at the edge changes: judged by eye.
+- **B6.** A 2D and a 3D monitor, after B7: `MonitorLayer` (395 lines) draws both, and its volume settings
+  (`slice`, `slice_position`, `slice_focus`, `depth_fade`, `orbit`) sit on every stage's panel, doing nothing on a
+  2D one. `Monitor2DLayer` holds the 2D views; `Monitor3DLayer` extends it with the volume views (the cube, the
+  glyphs, the cut) and the mouse (the drag's orbit, the wheel's slice, the reset), with their settings. The
+  monitors leave `StageLayerSettings`: each stage declares its own two, last, of the type its ports need: the
+  view, the motion and the bridge 2D (no volume among their ports), the fluid 3D. The renderer sends the mouse to
+  the 3D monitors only. MONITOR.md, `test_monitor_mouse.py` and `test_layer_names.py` follow.
+- **B7.** The panels by their use, before B6: panels `a` and `b` become `main` and `debug`, each stage's monitors
   `monitor_main` and `monitor_debug`, and the `main_view` select (`DEBUG`, `SHOW`) a toggle, `debug`: on, the main
-  and the debug panel; off, the main panel alone, as a secondary window shows it. Presets follow.
+  and the debug panel; off, the main panel alone, as a secondary window shows it. The renderer's names
+  (`_a_layers`, `_b_layers`, `_monitors_b`, `panel_b`), the recording's panel, presets, FLOW.md, INPUT_THREADS.md
+  and MONITOR.md follow.
 
 Question, for B: the view's depth settings gone through together; among them MASK's read takes the mask's
 `guided_radius` as its reach.
