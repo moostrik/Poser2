@@ -326,7 +326,7 @@
       }
     },
     "view": {
-      "monitor": {
+      "monitor_a": {
         "texture": "output.depth",
         "view": "COLORMAP"
       },
@@ -354,7 +354,7 @@
       }
     },
     "motion": {
-      "monitor": {
+      "monitor_a": {
         "texture": "output.velocity",
         "view": "GLYPHS",
         "advanced": {
@@ -491,7 +491,7 @@
       }
     },
     "fluid": {
-      "monitor": {
+      "monitor_b": {
         "texture": "velocity",
         "view": "COLORMAP",
         "advanced": {

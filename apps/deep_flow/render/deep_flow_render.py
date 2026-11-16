@@ -42,6 +42,7 @@ class DeepFlowRender(RenderBase):
         self._b_layers: list[Layers] = settings.layer.select.b
 
         self.L: dict[Layers, dict[int, render.LayerBase]] = {layer: {} for layer in Layers}
+        self._monitors_b: dict[Layers, dict[int, render.MonitorLayer]] = {}     # each stage's monitor B, panel b's
 
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   render.CameraImageLayer(    i, self.board)
@@ -58,11 +59,13 @@ class DeepFlowRender(RenderBase):
             self.L[Layers.capture_monitor][i] = CaptureMonitorLayer(cast(render.CaptureImageLayer, self.L[Layers.capture_image][i]),
                                                                     cast(render.CaptureDepthLayer, self.L[Layers.capture_depth][i]),
                                                                     settings.capture.monitor, settings.view)
-            for key, stage, monitor_settings in ((Layers.view_monitor, render.FlowStage.VIEW, settings.view.monitor),
-                                                 (Layers.motion_monitor, render.FlowStage.MOTION, settings.motion.monitor),
-                                                 (Layers.bridge_monitor, render.FlowStage.BRIDGE, settings.bridge.monitor),
-                                                 (Layers.fluid_monitor, render.FlowStage.FLUID, settings.fluid.monitor)):
-                self.L[key][i] = render.MonitorLayer(stage, monitor_settings)
+            # each stage's monitor A in self.L, shown in panel a; its monitor B in self._monitors_b, shown in panel b
+            for key, stage, stage_settings in ((Layers.view_monitor, render.FlowStage.VIEW, settings.view),
+                                               (Layers.motion_monitor, render.FlowStage.MOTION, settings.motion),
+                                               (Layers.bridge_monitor, render.FlowStage.BRIDGE, settings.bridge),
+                                               (Layers.fluid_monitor, render.FlowStage.FLUID, settings.fluid)):
+                self.L[key][i] = render.MonitorLayer(stage, stage_settings.monitor_a)
+                self._monitors_b.setdefault(key, {})[i] = render.MonitorLayer(stage, stage_settings.monitor_b)
         self.L[Layers.time_series][0] = render.TimeSeriesLayer(self.board, settings.time_series)      # the board's series, one for all cameras
 
         # Split view: the left and right panels side by side or stacked, whichever shows what they hold larger
@@ -148,6 +151,9 @@ class DeepFlowRender(RenderBase):
                     layer.allocate(*self._view_size, GL_RGBA16F)
                 elif size == Size.OUTPUT:
                     layer.allocate(OUTPUT_WIDTH, OUTPUT_HEIGHT, GL_RGBA16F)
+        for monitors in self._monitors_b.values():
+            for monitor in monitors.values():
+                monitor.allocate(OUTPUT_WIDTH * 2, OUTPUT_HEIGHT * 2, GL_RGBA16F)     # a monitor renders at the size it is drawn at
         self.allocate_window_renders()
         self._border.allocate()
         self.screen_recorder.start()
@@ -180,6 +186,9 @@ class DeepFlowRender(RenderBase):
         for cam_dict in self.L.values():
             for layer in cam_dict.values():
                 layer.deallocate()
+        for monitors in self._monitors_b.values():
+            for monitor in monitors.values():
+                monitor.deallocate()
         self._border.deallocate()
         self._view_timer.deallocate()
 
@@ -191,7 +200,8 @@ class DeepFlowRender(RenderBase):
     # ========== The mouse: the monitors' volume views ==========
 
     def _monitors(self) -> list[render.MonitorLayer]:
-        return [cast(render.MonitorLayer, layer) for key in MONITORS for layer in self.L[key].values()]
+        return [cast(render.MonitorLayer, layer) for key in MONITORS
+                for layer in (*self.L[key].values(), *self._monitors_b.get(key, {}).values())]
 
     def _on_mouse_button(self, x: float, y: float, button: MouseButton, pressed: bool) -> None:
         """A press starts a drag; a middle click that did not move resets the views."""
@@ -250,6 +260,8 @@ class DeepFlowRender(RenderBase):
                 wiring()
             for layer in self.L[layer_type].values():
                 layer.update()
+            for monitor in self._monitors_b.get(layer_type, {}).values():
+                monitor.update()
 
     # ========== The flow's wiring ==========
 
@@ -324,9 +336,8 @@ class DeepFlowRender(RenderBase):
                 render.FlowStage.BRIDGE: cast(render.Bridge3DLayer, self.L[Layers.bridge][i]).ports,
                 render.FlowStage.FLUID: cast(render.Fluid3DLayer, self.L[Layers.fluid][i]).ports,
             }
-            for key in MONITORS:
-                if i in self.L[key]:
-                    cast(render.MonitorLayer, self.L[key][i]).set_input(render.MonitorInput(ports))
+            for monitor in self._monitors():
+                monitor.set_input(render.MonitorInput(ports))
 
     # ========== Drawing ==========
 
@@ -386,7 +397,7 @@ class DeepFlowRender(RenderBase):
         self._draw_fit(self._a_layers, a_rect.x, height - a_rect.y - a_rect.height, a_rect.width, a_rect.height, True)
 
         b_rect: Rect = self.subdivision.get_rect('panels', 1)
-        self._draw_fit(self._b_layers, b_rect.x, height - b_rect.y - b_rect.height, b_rect.width, b_rect.height, True)
+        self._draw_fit(self._b_layers, b_rect.x, height - b_rect.y - b_rect.height, b_rect.width, b_rect.height, True, panel_b=True)
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         self._draw_show(width, height)
@@ -403,15 +414,20 @@ class DeepFlowRender(RenderBase):
 
         Style.pop_style()
 
-    def _draw_fit(self, layer_types: list[Layers], x: float, y: float, width: float, height: float, border: bool = False) -> None:
-        """Draw each layer into a GL rect (origin bottom left) at its own shape, centered; with `border`, a border around each."""
+    def _draw_fit(self, layer_types: list[Layers], x: float, y: float, width: float, height: float, border: bool = False,
+                  panel_b: bool = False) -> None:
+        """Draw each layer into a GL rect (origin bottom left) at its own shape, centered; with `border`, a border around
+        each; in `panel_b` a stage's monitor B, else its monitor A."""
         if width <= 0 or height <= 0:
             return
         for layer_type in layer_types:
-            if 0 in self.L[layer_type]:
+            layers: dict[int, render.LayerBase] = self.L[layer_type]
+            if panel_b and layer_type in self._monitors_b:
+                layers = dict(self._monitors_b[layer_type])
+            if 0 in layers:
                 fit_x, fit_y, fit_width, fit_height = fit(*self._layer_size(layer_type), width, height)
                 glViewport(int(x + fit_x), int(y + fit_y), int(fit_width), int(fit_height))
-                self.L[layer_type][0].draw()
+                layers[0].draw()
                 if border:
                     self._draw_border(fit_width, fit_height)
 

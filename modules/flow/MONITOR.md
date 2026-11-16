@@ -2,7 +2,8 @@
 
 The flow's monitor (`MonitorLayer`, `modules/flow/visualization/`): a layer that shows one port of
 its stage, picked on the panel, drawn only while it is shown. Each of the flow's stages has its own (`FlowStage`:
-`VIEW`, `MOTION`, `BRIDGE`, `FLUID`), its settings in the stage's panel (`<stage>.monitor`); deep_flow's capture has
+`VIEW`, `MOTION`, `BRIDGE`, `FLUID`), two in deep_flow, A for panel a and B for panel b, their settings in the
+stage's panel (`<stage>.monitor_a`, `monitor_b`); deep_flow's capture has
 a simple one of its own (`CaptureMonitorLayer`: the color, the depth or both). The stages and their ports are in
 [FLOW.md](FLOW.md#the-stages-and-their-layers). "Code" is what the files show; **(deduction)**
 marks what is inferred from them.
