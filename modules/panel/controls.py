@@ -292,8 +292,7 @@ class Toggle(Control):
 
     def build(self) -> None:
         self.button = self.tooltip(ui.button(self.label).props("dense" + self.lock(readonly=False)))
-        if self.field.width is not None:
-            self.button.classes(f"w-{self.field.width} max-w-full")
+        self.button.classes(f"w-{self.field.width if self.field.width is not None else SLIDER_WIDTH} max-w-full")   # a slider's width
         self.show(self.shown)
         if not self.locked:
             self.button.on_click(lambda: self.commit(not self.value()))
