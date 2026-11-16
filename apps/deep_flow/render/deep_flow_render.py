@@ -58,7 +58,7 @@ class DeepFlowRender(RenderBase):
             fluid =         self.L[ChainLayers.fluid][i] =       render.Fluid3DLayer(        settings.fluid)
             self.L[ChainLayers.capture_monitor][i] = CaptureMonitorLayer(cast(render.CaptureImageLayer, self.L[ChainLayers.capture_image][i]),
                                                                     cast(render.CaptureDepthLayer, self.L[ChainLayers.capture_depth][i]),
-                                                                    settings.capture, settings.view.depth_mask)
+                                                                    settings.capture, settings.view.crop)
             # each stage's main monitor in self.L, shown in the main panel; its debug monitor in self._debug_monitors,
             # shown in the debug panel; the flat stages' flat, the fluid's 3D
             for key, stage, flat in ((ChainLayers.view_monitor, render.FlowStage.VIEW, settings.view),
@@ -308,10 +308,10 @@ class DeepFlowRender(RenderBase):
         self._capture_timestamps[i] = capture.timestamp
         self.motion_rates.setdefault(i, FPS()).processed()
         output: ViewOutput = view.output
-        motion.set_input(render.MotionInput(output.image, capture.timestamp, interval, output.depth, output.mask, output.depth_mask))
+        motion.set_input(render.MotionInput(output.image, capture.timestamp, interval, output.depth, output.mask))
         motion.update()
         bridge.set_input(render.BridgeInput(motion.output.velocity, interval, output.graded_image,
-                                        mask=output.mask, depth_mask=output.depth_mask, z_position=motion.output.z_position, same_tick=same_tick))
+                                        mask=output.mask, z_position=motion.output.z_position, same_tick=same_tick))
         bridge.update()
 
     def _wire_fluid(self) -> None:

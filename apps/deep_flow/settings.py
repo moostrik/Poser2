@@ -207,24 +207,30 @@ class _PoseCompositorSettings(render.PoseCompositorSettings):
 
 # The view's layer's settings (render/layers/view)
 class ViewCropSettings(BaseSettings):
-    """The view's crop: the part of the camera image the view shows, its center and its height."""
+    """ViewCrop, the box the view crops in 3D: its sides on the camera image, its center and its height; its front
+    and back, the player's depth range."""
     center_x: Field[float] = Field(0.5, min=0.0, max=1.0, description="The crop's center across the camera image, a share of its width")
     center_y: Field[float] = Field(0.5, min=0.0, max=1.0, description="The crop's center down the camera image, a share of its height")
     height:   Field[float] = Field(1.0, min=0.05, max=2.0, description="The crop's height, a share of the camera image's")
+    near:     Field[float] = Field(0.5, min=0.1, max=12.0, step=0.05, newline=True, description="The box's front, the nearest depth that is the player (m)")
+    far:      Field[float] = Field(4.0, min=0.1, max=12.0, step=0.05, description="The box's back, the farthest depth that is the player (m)")
 
 
-class ViewDepthMaskSettings(BaseSettings):
-    """ViewDepthMask, who and where: the player's depth band, the cut; the guided filter that moves the cut's edge
-    onto the image's, and how far the depth's read looks for the mask's side."""
-    near:          Field[float] = Field(0.5, min=0.1, max=12.0, step=0.05, description="Nearest depth that is the player (m)")
-    far:           Field[float] = Field(4.0, min=0.1, max=12.0, step=0.05, description="Farthest depth that is the player (m)")
-    guided_radius: Field[float] = Field(2.0, min=0.0, max=8.0, step=0.25, newline=True, description="How far the image moves the mask's edge to its own, in depth pixels; 0 = off")
+class ViewMaskSettings(BaseSettings):
+    """ViewMask, where: the guided filter that moves the crop's depth's edge onto the image's."""
+    guided_radius: Field[float] = Field(2.0, min=0.0, max=8.0, step=0.25, description="How far the image moves the mask's edge to its own, in depth pixels; 0 = off")
     edge_contrast: Field[float] = Field(0.03, min=0.001, max=0.3, step=0.001, description="The image's brightness spread (0 to 1) above which the mask's edge follows the image's")
 
 
+class DepthFillSettings(BaseSettings):
+    """The depth's fill: push-pull, the read's holes in the mask filled from the depth around them."""
+    enabled: Field[bool] = Field(True, description="The mask filled with the player's depth; off, the read as it is")
+
+
 class ViewDepthSettings(BaseSettings):
-    """ViewDepth, how far: the depth read into the view, blended within a surface, at the outline from the mask's side."""
-    tolerance:  Field[float] = Field(0.2, min=0.05, max=0.5, step=0.01, description="Depth jump beyond which the read blends no two depth pixels, m")
+    """ViewDepth, how far: the depth read into the view where it is the player's and the mask is, then filled."""
+    tolerance: Field[float] = Field(0.2, min=0.05, max=0.5, step=0.01, description="Depth jump beyond which the read blends no two depth pixels, m")
+    fill:      Group[DepthFillSettings] = Group(DepthFillSettings)
 
 
 class ColorGradeSettings(BaseSettings):
@@ -240,11 +246,11 @@ class ColorGradeSettings(BaseSettings):
 
 
 class ViewLayerSettings(render.StageLayerSettings):
-    """The view's size; its crop, depth mask, depth and color grade in their panels, in the order the view runs them."""
+    """The view's size; its crop, mask, depth and color grade in their panels, in the order the view runs them."""
     width:         Field[int]   = Field(448, min=32, max=4096, step=32, description="The view's width (pixels)")
     height:        Field[int]   = Field(800, min=32, max=4096, step=32, description="The view's height (pixels)")
     crop:        Group[ViewCropSettings]      = Group(ViewCropSettings)
-    depth_mask:  Group[ViewDepthMaskSettings] = Group(ViewDepthMaskSettings)
+    mask:        Group[ViewMaskSettings]      = Group(ViewMaskSettings)
     depth:       Group[ViewDepthSettings]     = Group(ViewDepthSettings)
     color_grade: Group[ColorGradeSettings]    = Group(ColorGradeSettings)
 

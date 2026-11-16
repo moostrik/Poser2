@@ -1,15 +1,11 @@
 #version 460 core
 
-// The depth read into the view, metres in red, from the mask's side at the outline: the four depth pixels around a
-// view pixel interpolated bilinearly where they lie within `tolerance` (m) of each other, else the one it lies in,
-// so an edge never reads as a depth in between; where that depth is not on the side the mask gives the pixel (the
-// player's, a depth from `near` to `far`, where the mask is; anything else, none included, where it is not), the
-// nearest depth pixel on that side within `reach`, else the read. A 0, no depth, is never blended, and beyond the
-// depth's grid is no depth.
+// The depth read into the view, metres in red, where it is the player's and the mask is: the four depth pixels
+// around a view pixel interpolated bilinearly where they lie within `tolerance` (m) of each other, else the one it
+// lies in, so an edge never reads as a depth in between; kept where it is from `near` to `far` and the mask is
+// above 0, else 0. A 0, no depth, is never blended, and beyond the depth's grid is no depth.
 
 #include "position.glsl"
-
-const int MAX_REACH = 9;        // the most depth pixels it looks, each way (`guided_radius` at most 8, + 0.5)
 
 uniform sampler2D depth;        // metres on the camera image, 0 for none
 uniform sampler2D mask;         // the player's mask in the view (red, 0 to 1)
@@ -17,7 +13,6 @@ uniform vec4 roi;               // the view's window on the depth, x, y, width, 
 uniform float tolerance;
 uniform float near;             // the player's depth range (m)
 uniform float far;
-uniform float reach;            // how far it looks for a depth on the mask's side (depth pixels)
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -27,38 +22,6 @@ float fetch(ivec2 p, ivec2 size) {
         return 0.0;
     }
     return texelFetch(depth, p, 0).r;
-}
-
-bool player(float d) {
-    return d > 0.0 && d >= near && d <= far;
-}
-
-// The read where it is on the mask's side, else the nearest depth pixel within `reach` that is, else the read
-float mask_side(float metres, vec2 p, ivec2 size) {
-    bool inside = texture(mask, texCoord).r > 0.5;
-    if (player(metres) == inside) {
-        return metres;
-    }
-    int r = min(int(ceil(reach + 0.5)), MAX_REACH);
-    ivec2 center = ivec2(floor(p + 0.5));
-    float best = reach * reach;
-    float found = metres;
-    for (int y = -MAX_REACH; y <= MAX_REACH; y++) {
-        if (abs(y) > r) continue;
-        for (int x = -MAX_REACH; x <= MAX_REACH; x++) {
-            if (abs(x) > r) continue;
-            ivec2 at = center + ivec2(x, y);
-            float d = fetch(at, size);
-            if (player(d) != inside) continue;
-            vec2 offset = vec2(at) - p;
-            float distance = dot(offset, offset);
-            if (distance <= best) {
-                best = distance;
-                found = d;
-            }
-        }
-    }
-    return found;
 }
 
 void main() {
@@ -80,5 +43,6 @@ void main() {
     } else {
         metres = fetch(ivec2(floor(uv * vec2(size))), size);
     }
-    fragColor = vec4(mask_side(metres, p, size), 0.0, 0.0, 1.0);
+    bool kept = metres > 0.0 && metres >= near && metres <= far && texture(mask, texCoord).r > 0.0;
+    fragColor = vec4(kept ? metres : 0.0, 0.0, 0.0, 1.0);
 }

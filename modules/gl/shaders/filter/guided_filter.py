@@ -13,9 +13,10 @@ class GuidedFilter(Shader):
     """The guided filter's passes, which the caller chains: `products`, `box` (twice, then again on the
     coefficients), `coefficients`, `output`."""
 
-    def products(self, guide: Texture, mask: Texture) -> None:
-        """(I, p, I·I, I·p): the guide's luminance and the mask."""
-        self.use(PRODUCTS, guide, mask)
+    def products(self, guide: Texture, mask: Texture, presence: bool = False) -> None:
+        """(I, p, I·I, I·p): the guide's luminance and the mask; with `presence`, the mask is 1 where `mask`'s red
+        is above 0, else 0 (a depth's presence)."""
+        self.use(PRODUCTS, guide, mask, presence=presence)
 
     def box(self, field: Texture, horizontal: bool, radius: int) -> None:
         """Every channel's mean over `radius` pixels each side, along one axis."""
@@ -30,7 +31,7 @@ class GuidedFilter(Shader):
         self.use(OUTPUT, coefficients, guide)
 
     def use(self, stage: int, tex0: Texture, tex1: Texture | None = None, horizontal: bool = True, radius: int = 1,
-            epsilon: float = 1e-3) -> None:
+            epsilon: float = 1e-3, presence: bool = False) -> None:
         if not self.allocated or not self.shader_program or not tex0.allocated:
             return
         glUseProgram(self.shader_program)
@@ -45,4 +46,5 @@ class GuidedFilter(Shader):
         glUniform2f(self.get_uniform_loc("direction"), *((1.0, 0.0) if horizontal else (0.0, 1.0)))
         glUniform1i(self.get_uniform_loc("radius"), radius)
         glUniform1f(self.get_uniform_loc("epsilon"), epsilon)
+        glUniform1i(self.get_uniform_loc("presence"), int(presence))
         draw_quad()

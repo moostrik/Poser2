@@ -318,16 +318,19 @@
       "crop": {
         "center_x": 0.5,
         "center_y": 0.5,
-        "height": 1.0
-      },
-      "depth_mask": {
+        "height": 1.0,
         "near": 0.1,
-        "far": 1.7,
+        "far": 1.7
+      },
+      "mask": {
         "guided_radius": 2.0,
         "edge_contrast": 0.03
       },
       "depth": {
-        "tolerance": 0.2
+        "tolerance": 0.2,
+        "fill": {
+          "enabled": true
+        }
       },
       "color_grade": {
         "enabled": true,

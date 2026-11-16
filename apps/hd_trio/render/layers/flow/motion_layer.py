@@ -49,14 +49,12 @@ class MotionInput:
     the velocity is measured on by its brightness; `timestamp` the capture time of the camera frame it
     holds, the frame's identity: the stage measures when it differs from the one it measured last
     (None: no camera frame yet, nothing to measure); `dt` the render tick's; `depth` the camera's depth on the same view, or None;
-    `mask` the player's mask on the view, or None; `depth_mask` where the depth is the player's on the view
-    (the depth's own cut, unrefined), which gates z, or None."""
+    `mask` the player's mask on the view, or None, the weight of each pixel's velocity and z position."""
     image: Annotated[Texture, TextureKind.IMAGE]
     timestamp: float | None
     dt: float
     depth: Annotated[DepthView | None, TextureKind.SCALAR] = None
     mask: Annotated[Texture | None, TextureKind.SCALAR] = None
-    depth_mask: Annotated[Texture | None, TextureKind.SCALAR] = None
 
 
 @dataclass

@@ -1,16 +1,17 @@
-"""Depth Cut shader: the player cut on the depth's own pixels (`depth_read.depth_cut`)."""
+"""Depth Crop shader: the camera's depth inside the view's box on its own pixels (`depth_read.depth_crop`)."""
 
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform4f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 from modules.utils import Rect
 
 
-class DepthCut(Shader):
-    """Writes the player in the view's window, 1 in red where the depth pixel each view pixel lies in is in the band."""
+class DepthCrop(Shader):
+    """Writes the depth inside the box, metres in red: the depth pixel each view pixel lies in where it is from
+    `near` to `far`, else 0."""
 
     def use(self, depth: Texture, roi: Rect, near: float, far: float) -> None:
-        """`depth` metres (0 for none) on the camera image, `roi` the view's window on it (0..1, origin top-left),
-        `near`, `far` (m) the player's depth range."""
+        """`depth` metres (0 for none) on the camera image, `roi` the box's sides on it (0..1, origin top-left),
+        `near`, `far` (m) its front and back."""
         if not self.allocated or not self.shader_program or not depth.allocated:
             return
 

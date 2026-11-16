@@ -35,114 +35,34 @@ The goal: a clear path from the camera's depth and image to the motion, each ste
 as little noise as possible in the motion while it keeps as much real z motion as possible. The motion is taken
 as it is here; what is inconsistent in it is listed below and is line C's.
 
+Measuring: a change to the view is measured on the motion's raw output, its filters after the view neutral
+(`z.smooth`, `z.catch_up`, `xy.threshold`, `z.threshold` all 0), so the view's effect is not hidden by them; the
+smoothing is judged on its own in line C. The rows measured before with `z.smooth` 100 ms and `z.catch_up` 8 ms
+say so in VIEW.md.
+
 Built: every capture reaches the motion ([INPUT_THREADS.md](INPUT_THREADS.md)); one path for the depth and the
 mask, who, where and how far, each once, measured against the two reads before it, and its tolerance at 0.2, 0.1
-and 0.05 m ([VIEW.md](VIEW.md#the-stage)).
+and 0.05 m; the view's two outputs that agree, the mask and the player's depth wherever it is, the crop in 3D and
+the depth filled by push-pull, measured on the motion's raw output ([VIEW.md](VIEW.md#the-stage)).
 
 - **B1.** The one path's look, by eye on the edges recording: the outline and the color's edge, now that the
   color grade works on the straight image and premultiplies by the mask last. Needs the operator at the screen.
-- **B2.** The view gives two things that agree, the mask and the depth; the depth mask goes. The mask is the
-  guided filter's outline thresholded at 0.5, its edge antialiased over one pixel (`MaskAntialias`); the depth
-  is the player's wherever the mask is above 0, as in the matting model: the foreground layer, its color and
-  its depth, is defined wherever alpha is, its edge filled from inside (Zitnick et al. 2004 store color, depth
-  and alpha per layer). The split: what one frame shows is the view's (who, where, how far), what needs two
-  frames is the motion's (what moved, how far to trust it).
-  - What it solves: the depth's edge is coarse (480 × 300), the mask's follows the image; between them lies a
-    band about `guided_radius` wide (2 depth pixels, about 5 view pixels) where the mask is but the player's
-    depth is not. Today the read fills it from the nearest pixel within `reach` but takes its side at mask
-    > 0.5, and the depth mask hides what is left. The camera's holes in the body are few; the fill takes them
-    on the way.
+  B1 also asks whether the mask should be the guided filter's own alpha rather than its one-pixel threshold, as
+  that changes the look.
 
-```mermaid
-flowchart TB
-  I["Camera image<br/>992 × 800"]
-  D["Camera depth<br/>480 × 300, metres"]
-  C["crop → image: the box's window<br/>center_x, center_y, height; 448 × 800"]
-  K["crop → depth: who, the box's front and back<br/>near, far; the depth's own pixels, 0 outside; 448 × 800"]
-  M["mask → mask: where<br/>guided filter; soft alpha, 448 × 800"]
-  R["depth → read: how far<br/>tolerance; the player's depth where mask > 0, else 0"]
-  F["depth → depth: the fill<br/>push-pull inside the mask; 448 × 800"]
-  G["color_grade → graded image<br/>graded, then premultiplied by the mask"]
-  MO["Motion, two frames, 448 × 800<br/>xy from the image, z from the depth,<br/>each pixel weighted by the mask"]
-  B["Bridge<br/>velocity from the motion, color from the graded image,<br/>the mask for the player being there"]
-  I --> C
-  D --> K
-  C --> M
-  K --> M
-  D --> R
-  M --> R --> F
-  C --> G
-  M --> G
-  C --> MO
-  F --> MO
-  M --> MO
-  MO --> B
-  G --> B
-  M --> B
-```
-  - Why the depth mask goes: the read takes its side at mask > 0.5, so a pixel with a mask of 0.3 carries the
-    background's depth, and the motion weighs that z by 0.3; the depth mask's hard cut hides it. With the side
-    at mask > 0, every pixel the motion weighs carries the player's depth, and the depth mask adds nothing: a
-    pixel without depth already gets no z velocity (`depth_velocity_shader.frag`) and no z position
-    (`z_position.frag`). Weighing each pixel by its alpha is the textbook form, a hard gate its coarse version
-    **(deduction)**.
-  - The depth in two passes, one hole filling for the edge and the body alike:
-    1. The read (`DepthUpscale`) keeps a depth only where it is the player's (near to far) and the mask is above
-       0; everything else is 0. Its search for the nearest pixel on the mask's side within `reach` goes, and
-       with it `guided_radius`'s second job as that reach.
-    2. The fill (`DepthFill`, new, in `modules/flow/view`): push-pull (Gortler et al. 1996) over the read. Push:
-       each level down halves the size (448 × 800 to about 7 × 13, seven levels), a pixel the weighted mean of
-       its four, weight 1 where there is a depth, 0 where not, the weight carried down. Pull: from the coarsest
-       up, a pixel keeps its depth by its weight and takes the rest from the coarser level, read bilinearly.
-       Every pixel where the mask is above 0 then holds the player's depth, the band between the depth's edge
-       and the mask's foremost, the camera's few holes in the body alike; where the mask is 0 it is 0. The
-       band needs only the first two or three levels; the rest cost little at their sizes, so the pyramid is
-       the textbook's whole one. Its textures are made with the view's, not per frame. A filled pixel moves with its surroundings
-       instead of reading as no z. Filled from the mean around it, not the nearest pixel or a plane: a plane
-       fitted at the outline extends the edge's slope, where the stereo is noisiest **(deduction)**. Push-pull
-       has no settings of its own; `depth.fill.enabled`, on, turns it off to compare: off, the read as it is.
-  - A numpy reference beside each pass (`depth_read.py`), unit-tested on a body with holes and an outline;
-    the shader checked against it in `view_check`, with its GPU time.
-  - The crop is a crop of the box in 3D: its sides (center_x, center_y, height) take the image's window, its
-    front and back (near, far, moved from `depth_mask`) the depth inside it. The cut goes into it: `crop.depth`
-    is the camera's depth inside the box on its own pixels (unblended), 0 outside, at the view's size.
-  - Three parts after the crop, one per step: `crop` (center_x, center_y, height, near, far; ports `image`,
-    `depth`), `mask` (guided_radius, edge_contrast; port `mask`, guided from where `crop.depth` is above 0, its
-    products pass taking `depth > 0` as the 0/1 it filters), `depth` (tolerance, the group `fill`; ports
-    `read`, then `depth`). `ViewDepthMask` becomes the mask alone, the crop gets
-    a class of its own (its two textures), `ViewDepth` holds the read and the fill, their settings follow;
-    `ViewOutput.depth_mask` goes. The read samples the camera's depth, not `crop.depth`, as it blends the four
-    depth pixels around a view pixel. `depth.tolerance` stays: it keeps edges inside the mask (an arm before
-    the body) from reading as a depth in between.
-  - The motion weighs z by the mask alone (`compose_velocity.frag`, `z_position.frag`, `MotionInput.depth_mask`
-    gone); the bridge's z position takes the mask for "the player is there" (`z_position_mix`, its share
-    `depth_mask` becomes `mask`); `BridgeInput.depth_mask` goes, and its field in hd_trio's copies of the two
-    inputs (`apps/hd_trio/render/layers/flow/motion_layer.py`, `bridge_layer.py`).
-  - The tests and checks that use the depth mask follow: `test_view_window`, `test_z_position`,
-    `test_weighted_sum`, `bridge_shader_check`, `shader_check`.
-  - The preset, VIEW.md (its diagram: the camera image is 992 × 800, the view 448 × 800), RESOLUTION.md,
-    MOTION.md, BRIDGE_3D.md and the capture and compare scripts (the saved depth mask, the z position's weight)
-    follow.
-  - Order: the references and their tests; the two passes; the parts and their names; the motion and the
-    bridge; the documents, the preset and the scripts; `view_check`; the three captures. One commit.
-  - Checked: `view_check`, the passes 0 pixels off their references; three captures on the measure recording
-    with the fill and three without, against the one path's 0.2 m row in VIEW.md, with the share of the mask
-    without depth, 0 with the fill. The color grade is untouched, it premultiplies by the mask as before.
-  - The share without z position measures the band: today's 7.2% is mostly it, hidden by the depth mask
-    **(deduction)**; with the fill it is 0.
-  - Left as it is: the mask's one-pixel edge, not the guided filter's own alpha, which would change the look
-    (B1's question); the color at the edge is not un-mixed, as matting would find the foreground's own color; the
-    motion's xy there sees mixed color, weighed down by the mask.
+Left as it is: the color at the edge is not un-mixed, as matting would find the foreground's own color; the
+motion's xy there sees mixed color, weighed down by the mask.
 
-Question, for B after B2: the edge's depth averaged by the fill, the edge pixels given a weight below 1 (by
-their distance to `crop.depth`'s outline) so they blend toward the depth inside them. The edge's z noise is mostly
-the body moving between frames, which one frame's average does not reach, and it would soften the edge's real
-z with it **(deduction)**; measured, a weight against none, three captures each, kept only past the runs'
-spread.
+Question, for B: the edge's depth averaged by the fill, the edge pixels given a weight below 1 (by
+their distance to `crop.depth`'s outline) so they blend toward the depth inside them. On the motion's raw output
+the edge's z noise is already below the inside's (6.1 against 11.8, [VIEW.md](VIEW.md#the-depth)), and a weight
+would soften the edge's real z with it **(deduction)**; measured, a weight against none, three captures each,
+kept only past the runs' spread.
 
-Question, for B: the one path's fast z at the view's tolerance 0.2 m is higher than in every other row of
-VIEW.md's table, by more than the runs' spread, with no mechanism found in the code; whether it holds on
-another recording.
+Question, for B: the one path's fast z at the view's tolerance 0.2 m was higher than in every other row of
+VIEW.md's smoothed table, by more than the runs' spread, with no mechanism found in the code. On the raw output
+it is still the highest (0.90 against 0.83 and 0.84), the runs overlapping in part; whether it holds on another
+recording.
 
 Known in the motion, left as it is: two numbers say "another surface" in space beside the view's
 (`motion.z.tolerance`, also its restart in time, and `motion.z.edge`, which goes in C5).
@@ -166,22 +86,24 @@ A finer depth would give the mask and z a finer edge at the source; the camera's
   ([MOTION.md](MOTION.md#the-guard)): z as measured up to a knee (about 1.5 m/s), compressed above it toward a
   maximum (about 3 m/s), the speed gate (6 m/s) behind it; a curve per reading, no time filter, checked first
   against the spread of z speeds on a recording.
-- **C5.** The step filter goes, after B2. It zeroes the depth where its neighbours jump by more than `z.edge`
-  (`depth_step_filter.frag`), within one frame: by B2's split that is the view's, and the view's read from the
-  mask's side already keeps the outline on one surface, so it only drops a band one depth sample wide along
-  every outline whatever the read. `z.edge` goes with it; the edge's z noise, the body moving between frames,
-  stays the motion's through `z.tolerance` in time. Checked: three captures, against B2's row.
+- **C5.** The step filter goes. It zeroes the depth where its neighbours jump by more than `z.edge`
+  (`depth_step_filter.frag`), within one frame: by the view's split (one frame the view's, two frames the
+  motion's) that is the view's, and the view already keeps the player's depth on one surface wherever the mask
+  is, so the filter only drops a band one depth sample wide along every outline, the 3.9% of the mask without a
+  z position ([VIEW.md](VIEW.md#the-depth)). `z.edge` goes with it; the edge's z noise, the body moving between
+  frames, stays the motion's through `z.tolerance` in time. Checked: three captures, against the view's preset
+  row, on the motion's raw output.
 
 Question, for C: the motion's `z.tolerance` reviewed. One number, 0.2 m, does two jobs: in space, which depth
 samples a window averages as one surface (beside `z.edge`, 0.1 m, the step filter's, gone in C5); in time, how far a new
 depth may lie from the track before it counts as another surface and the track starts over. 0.2 m is large on a
 body, set by the job in time; whether the two jobs want two numbers, and what each should be. The view's own,
-measured at 0.2, 0.1 and 0.05 m, moved nothing past the runs' spread ([VIEW.md](VIEW.md#the-depth-read)).
+measured at 0.2, 0.1 and 0.05 m, moved nothing past the runs' spread ([VIEW.md](VIEW.md#the-depth)).
 
 ## D. The bridge
 
-Built: each output at its readings' depth ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)), the depth mask's
-share, the expansion, the boundary velocity's peak.
+Built: each output at its readings' depth ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)), the mask's share, the
+expansion, the boundary velocity's peak.
 
 - **D1.** The dye's amount weighed by the image's brightness: a dark pixel (a shadow, black clothes) brings its
   full amount in a dark color, nearly black dye at full strength; weighed, a dark part brings less dye instead.
@@ -322,9 +244,8 @@ Not worked on until asked for; each with what is known.
   dropped as in `input`.
 - The camera as a standalone OAK app: the depth's alignment, the PC's now, then needs a home.
 - A camera without depth, its mask from another source: deep_flow's mask is the depth's
-  ([VIEW.md](VIEW.md#the-mask-and-the-depth-mask)); a mask from RVM, for a camera without depth, would come back
-  from hd_trio. With it the motion's `depth_mask`, the depth's own cut that gates z, is still the view stage's,
-  and RVM's mask, on the crop, would have to be cut into the view's window.
+  ([VIEW.md](VIEW.md#the-mask)); a mask from RVM, for a camera without depth, would come back from hd_trio, on
+  the crop, cut into the view's window.
 - A depth for a 2D camera: the 3D fluid puts a pixel in at its z position and nothing where it has none
   ([FLUID_3D.md](FLUID_3D.md#the-bodys-depth)), so a 2D camera gives it nothing. A depth made from the image
   (a monocular depth model) on the view would give the motion its z and z position as a depth camera's does.
@@ -339,10 +260,7 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways instead of leaving parallel legacy ones: hd_trio's copy, deleted in line I.
 - A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
-- Name a concept after what it is and rename it everywhere in the same change: B2, the view's parts and ports.
-- Keep presets and settings schemas in sync; remove obsolete pathways: B2 (`view.depth_mask`, the bridge's
-  share), C5 (`z.edge`).
-- When a settings path or a port name reads wrong, fix the structure it comes from: B2.
-- Fix a problem where it is made: B2 and C5, each job in the stage that makes it.
+- Keep presets and settings schemas in sync; remove obsolete pathways: C5 (`z.edge`).
+- Fix a problem where it is made: C5, each job in the stage that makes it.
 
 Not designed yet, so their rules are not named: C1 to C4; D1 to D4; E1, E2; F1 to F3; H1; I1 to I4.

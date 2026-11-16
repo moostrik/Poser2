@@ -2,13 +2,14 @@
 
 Plays a recording's color and depth frames through the `SerialUploader` (the color straightened, the depth aligned, as the
 app does), takes them into GL and runs the view stage at the preset's settings. Checks, per frame:
-- the cut against its numpy reading (`depth_cut`): pixels that differ (expected: none);
-- the depth read into the view against its numpy reading (`mask_sided_depth`): pixels off by over 1 mm (expected:
-  none, a float rounding at the tolerance's edge at most); ties, two depth pixels on the mask's side equally near,
-  counted apart;
-- the mask against the depth mask: their overlap (intersection over union; both lie on the one outline, so near 1)
-  and the share of the view that is the player.
-Saves the last frame's image, cut, depth mask, mask and graded image side by side as a PNG.
+- the crop's depth against its numpy reading (`depth_crop`): pixels off by over 1 mm (expected: none);
+- the read against its numpy reading (`masked_depth`) on the GPU's mask: pixels off by over 1 mm (expected: none,
+  a float rounding at the tolerance's edge at most);
+- the fill against its numpy reading (`push_pull`) on the GPU's read and mask: pixels off by over 1 mm;
+- the share of the mask without depth, in the read and in the depth (0 with the fill), and the share of the view
+  that is the player.
+Saves the last frame's image, the crop's depth, the mask, the read, the depth and the graded image side by side as a
+PNG, the depths from the box's front (white) to its back (black).
 
 With `--time`, then each of the view's passes on the last capture, the median of 40 runs, and the whole view.
 
@@ -32,7 +33,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_FLOAT, GL_NEAREST, GL_RED, GL_RGBA,
 import monitor_harness as mh  # noqa: E402
 from modules.camera import CameraFrame, FrameType  # noqa: E402
 from modules.recording import read_metadata  # noqa: E402
-from modules.flow import depth_cut, mask_sided_depth  # noqa: E402
+from modules.flow import depth_crop, masked_depth, push_pull  # noqa: E402
 from modules.gl import Style, Tensor, Texture  # noqa: E402
 from modules.inference import GpuDepth, GpuImage, SerialUploader, SerialUploaderSettings  # noqa: E402
 from apps.deep_flow.render.layers import ViewInput, ViewLayer  # noqa: E402
@@ -72,12 +73,8 @@ def read(texture: Texture, channels: int = 1) -> np.ndarray:
 def time_view(view: ViewLayer, image: Texture, depth: Texture) -> None:
     """Each of the view's passes on the last capture, the median of 40 runs (ms), as `ViewLayer._update` runs them;
     then the whole view made again."""
-    roi = view._crop
-
-    def image_pass() -> None:
-        view._image.begin()
-        image.draw(src=roi)
-        view._image.end()
+    roi = view._window
+    crop, mask, view_depth = view._crop, view._mask, view._depth
 
     def whole() -> None:
         view._made = None
@@ -85,11 +82,11 @@ def time_view(view: ViewLayer, image: Texture, depth: Texture) -> None:
 
     Style.push_style()
     Style.set_blend_mode(Style.BlendMode.DISABLED)
-    rows = [('crop', image_pass),
-            ('depth mask, the cut', lambda: view._depth_mask.cut(depth, roi)),
-            ('depth mask, the guide', lambda: view._depth_mask.guide(view._image, roi, view._grid_size[1])),
-            ('depth, read and cut', lambda: view._depth.read(depth, roi)),
-            ('color grade', lambda: view._color_grade.process(view._image, view._depth_mask.mask)),
+    rows = [('crop, image and depth', lambda: crop.crop(image, depth, roi)),
+            ('mask, the guide', lambda: mask.guide(crop.image, crop.depth, roi, view._grid_size[1])),
+            ('depth, read and fill', lambda: view_depth.read(depth, roi, mask.mask)),
+            ('depth, the fill', lambda: view_depth._fill.use(view_depth._read, mask.mask, view_depth._depth)),
+            ('color grade', lambda: view._color_grade.process(crop.image, mask.mask)),
             ('the view', whole)]
     for name, work in rows:
         for _ in range(3):
@@ -120,7 +117,7 @@ def main() -> int:
     settings.initialize()
     settings.update_from_dict(preset['view'])
     d = settings.depth
-    band = settings.depth_mask
+    band = settings.crop
     view = ViewLayer(settings, json.loads(PRESET.read_text(encoding='utf-8'))['camera']['fov'])
     view.allocate(preset['view']['width'], preset['view']['height'])
 
@@ -134,8 +131,9 @@ def main() -> int:
     depth_texture = Tensor(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
 
     print(f'{args.recording}: {count} captures, view {view.output.image.width} x {view.output.image.height}, '
-          f'tolerance {d.tolerance} m, near {band.near} far {band.far}')
-    off_total, ties, pixels, cut_off, overlaps, shares = 0, 0, 0, 0, [], []
+          f'tolerance {d.tolerance} m, near {band.near} far {band.far}, fill {d.fill.enabled}')
+    crop_off, read_off, fill_off, pixels = 0, 0, 0, 0
+    unread, unfilled, shares = [], [], []
     last: dict[str, np.ndarray] = {}
     for i in range(count):
         t = float(i)
@@ -154,52 +152,51 @@ def main() -> int:
         view.update()
         output = view.output
 
-        got = read(output.depth.texture)
-        height, width = got.shape
-        w = view._crop          # the crop the view was cut with, uv rows down
+        cropped = read(view._crop.depth)
+        mask = read(output.mask)
+        got_read = read(view._depth._read)
+        height, width = got_read.shape
+        w = view._window        # the box's sides the view was cut with, uv rows down
         u = w.x + (np.arange(width) + 0.5) / width * w.width
         v = w.y + (np.arange(height) + 0.5) / height * w.height
         uu, vv = np.meshgrid(u, v)
         grid = depth.depth.cpu().numpy()
-        cut_off += int(((read(view._depth_mask._cut) > 0.5) != depth_cut(grid, uu, vv, band.near, band.far)).sum())
-        want = mask_sided_depth(grid, uu, vv, d.tolerance, read(output.mask) > 0.5, band.near, band.far, band.guided_radius)
-        off = np.abs(got - want) > 0.001
-
-        # two depth pixels on the pixel's side as near as each other: either is the rule's, float decides
-        def sided(values: np.ndarray) -> np.ndarray:
-            return ((values > 0.0) & (values >= band.near) & (values <= band.far)) == (read(output.mask) > 0.5)
-        tie = off & sided(got) & sided(want)
-        ties += int(tie.sum())
-        off &= ~tie
-        off_total += int(off.sum())
+        crop_off += int((np.abs(cropped - depth_crop(grid, uu, vv, band.near, band.far)) > 0.001).sum())
+        read_off += int((np.abs(got_read - masked_depth(grid, uu, vv, d.tolerance, mask, band.near, band.far)) > 0.001).sum())
+        got = read(output.depth.texture)
+        if d.fill.enabled:
+            fill_off += int((np.abs(got - push_pull(got_read.astype(np.float64), mask)) > 0.001).sum())
         pixels += got.size
 
-        mask = read(output.mask) > 0.5
-        depth_mask = read(output.depth_mask) > 0.5
-        union = int((mask | depth_mask).sum())
-        if union:
-            overlaps.append(int((mask & depth_mask).sum()) / union)
-        shares.append(float(mask.mean()))
+        inside = mask > 0.0
+        if inside.any():
+            unread.append(float((inside & (got_read <= 0.0)).sum()) / float(inside.sum()))
+            unfilled.append(float((inside & (got <= 0.0)).sum()) / float(inside.sum()))
+        shares.append(float((mask > 0.5).mean()))
         if i == count - 1:
-            last = {'image': read(output.image, 4), 'cut': read(view._depth_mask._cut), 'depth_mask': read(output.depth_mask),
-                    'mask': read(output.mask), 'graded_image': read(output.graded_image, 4)}
+            def near_white(metres: np.ndarray) -> np.ndarray:
+                return np.where(metres > 0.0, 1.0 - (metres - band.near) / max(band.far - band.near, 1e-6), 0.0)
+            last = {'image': read(output.image, 4), 'crop depth': near_white(cropped), 'mask': mask,
+                    'read': near_white(got_read), 'depth': near_white(got), 'graded_image': read(output.graded_image, 4)}
 
     uploader.stop()
     if args.time:
         time_view(view, image_texture, depth_texture)
-    print(f'the cut: {cut_off} of {pixels} pixels differ from the reference')
-    print(f'depth in the view: {off_total} of {pixels} pixels off the reference, {ties} more a tie between two on the mask\'s side')
-    if overlaps:
-        print(f'mask vs depth mask: overlap mean {np.mean(overlaps):.3f}, min {np.min(overlaps):.3f}; '
+    print(f'the crop\'s depth: {crop_off} of {pixels} pixels off the reference')
+    print(f'the read: {read_off} of {pixels} pixels off the reference')
+    if d.fill.enabled:
+        print(f'the fill: {fill_off} of {pixels} pixels off the reference')
+    if unread:
+        print(f'the mask without depth: {np.mean(unread) * 100:.2f}% in the read, {np.mean(unfilled) * 100:.2f}% in the depth; '
               f'the player {np.mean(shares) * 100:.1f}% of the view')
     if args.png and last:
         def bgr(picture: np.ndarray) -> np.ndarray:
             if picture.ndim == 2:
                 picture = np.repeat(picture[..., None], 3, axis=2)
             return (np.clip(picture[..., :3][..., ::-1], 0.0, 1.0) * 255.0).astype(np.uint8)
-        cv2.imwrite(args.png, np.hstack([bgr(last[k]) for k in ('image', 'cut', 'depth_mask', 'mask', 'graded_image')]))
+        cv2.imwrite(args.png, np.hstack([bgr(last[k]) for k in ('image', 'crop depth', 'mask', 'read', 'depth', 'graded_image')]))
         print(f'saved {args.png}')
-    return 1 if off_total > pixels * 1e-4 or cut_off > pixels * 1e-4 else 0
+    return 1 if max(crop_off, read_off, fill_off) > pixels * 1e-4 else 0
 
 
 if __name__ == '__main__':

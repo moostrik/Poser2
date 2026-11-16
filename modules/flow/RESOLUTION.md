@@ -21,10 +21,9 @@ help, more color would not.
 | camera color                 | `P800` cut to 5:4 (`direct_size`)           | 992 × 800, 50 fps          | the crop around the player, at most 800 rows               |
 | camera depth                 | Neural Depth `NEURAL_480`                   | 480 × 300                  | one depth pixel about 2.7 view rows at the whole image's height |
 | the image (the view)         | the view's crop, drawn once                 | 448 × 800, the motion's    | the window's rows, one to one at most                      |
-| the cut                      | the camera depth's own pixels, near to far  | 448 × 800, unblended       | a staircase of depth pixels at the edges                   |
-| the mask                     | the cut, guided onto the image              | 448 × 800                  | edges the image's                                          |
-| the depth on the view        | the aligned depth, read once from the mask's side | 448 × 800            | smooth within a surface, its edges the mask's              |
-| `depth_mask`                 | the view's depth cut by near and far        | 448 × 800                  | edges the mask's                                           |
+| the crop's depth             | the camera depth's own pixels, near to far  | 448 × 800, unblended       | a staircase of depth pixels at the edges                   |
+| the mask                     | the crop's depth, guided onto the image     | 448 × 800                  | edges the image's                                          |
+| the depth on the view        | the aligned depth, read once where the mask is, filled across it | 448 × 800 | smooth within a surface, its edges the mask's   |
 | x/y                          | the image (Lucas–Kanade, 7 × 7 window)      | 448 × 800                  | smooth over ~7 px                                          |
 | z, the z position            | the depth (the depth velocity, its track)   | 448 × 800                  | the depth's                                                |
 | the bridge's readings, dye   | x/y, z, the image × the mask                | 448 × 800, per capture     | held between the camera's frames                           |

@@ -4,8 +4,8 @@ import unittest
 
 import numpy as np
 
-from modules.flow import (depth_cut, depth_step, edge_aware_depth, fixed_window, mask_sided_depth, place_points,
-                          view_per_depth_pixel, view_span)
+from modules.flow import (depth_crop, depth_step, edge_aware_depth, fixed_window, masked_depth, place_points,
+                          push_pull, pyramid_sizes, view_per_depth_pixel, view_span)
 from modules.utils import Rect
 
 
@@ -38,45 +38,60 @@ class EdgeAwareDepthTest(unittest.TestCase):
         self.assertEqual(at(depth, -0.5, 1.0), 0.0)
 
 
-class DepthCutTest(unittest.TestCase):
-    def cut(self, depth: np.ndarray, x: float, y: float) -> bool:
+class DepthCropTest(unittest.TestCase):
+    def crop(self, depth: np.ndarray, x: float, y: float) -> float:
         height, width = depth.shape
-        return bool(depth_cut(depth, np.array([x / width]), np.array([y / height]), 1.0, 2.0)[0])
+        return float(depth_crop(depth, np.array([x / width]), np.array([y / height]), 1.0, 2.0)[0])
 
     def test_the_depth_pixel_a_point_lies_in_decides_unblended(self) -> None:
         depth = np.array([[1.5, 3.0], [1.5, 3.0]])                 # the player at 1.5 m, the room behind at 3 m
-        self.assertTrue(self.cut(depth, 0.9, 1.0))                 # in the player's pixel, near the room's
-        self.assertFalse(self.cut(depth, 1.1, 1.0))                # in the room's pixel, near the player's
+        self.assertEqual(self.crop(depth, 0.9, 1.0), 1.5)          # in the player's pixel, near the room's
+        self.assertEqual(self.crop(depth, 1.1, 1.0), 0.0)          # in the room's pixel, behind the box
 
-    def test_no_depth_and_beyond_the_grid_are_not_the_player(self) -> None:
+    def test_no_depth_and_beyond_the_grid_are_0(self) -> None:
         depth = np.array([[1.5, 0.0], [1.5, 0.0]])
-        self.assertFalse(self.cut(depth, 1.5, 1.0))
-        self.assertFalse(self.cut(depth, -0.5, 1.0))
+        self.assertEqual(self.crop(depth, 1.5, 1.0), 0.0)
+        self.assertEqual(self.crop(depth, -0.5, 1.0), 0.0)
 
 
-class MaskSidedDepthTest(unittest.TestCase):
-    def read(self, depth: np.ndarray, x: float, y: float, inside: bool, reach: float = 2.0) -> float:
+class MaskedDepthTest(unittest.TestCase):
+    def read(self, depth: np.ndarray, x: float, y: float, mask: float) -> float:
         height, width = depth.shape
-        return float(mask_sided_depth(depth, np.array([x / width]), np.array([y / height]), 0.2, np.array([inside]),
-                                      1.0, 2.0, reach)[0])
+        return float(masked_depth(depth, np.array([x / width]), np.array([y / height]), 0.2, np.array([mask]),
+                                  1.0, 2.0)[0])
 
-    def test_at_an_edge_the_mask_gives_the_side(self) -> None:
-        depth = np.array([[1.5, 3.0], [1.5, 3.0]])                 # the player at 1.5 m, the room behind at 3 m
-        self.assertEqual(self.read(depth, 1.2, 1.0, inside=True), 1.5)     # nearer the room, the mask the player's
-        self.assertEqual(self.read(depth, 0.8, 1.0, inside=False), 3.0)    # nearer the player, the mask the room's
-
-    def test_on_its_side_as_surface(self) -> None:
+    def test_the_player_s_depth_where_the_mask_is(self) -> None:
         depth = np.array([[1.5, 1.6], [1.5, 1.6]])
-        self.assertAlmostEqual(self.read(depth, 1.0, 1.0, inside=True), 1.55)
+        self.assertAlmostEqual(self.read(depth, 1.0, 1.0, mask=0.3), 1.55)     # any mask above 0
 
-    def test_outside_no_depth_is_the_other_side(self) -> None:
-        depth = np.array([[1.5, 0.0], [1.5, 0.0]])
-        self.assertEqual(self.read(depth, 0.8, 1.0, inside=False), 0.0)
+    def test_no_mask_or_not_the_player_is_0(self) -> None:
+        depth = np.array([[1.5, 3.0], [1.5, 3.0]])                 # the player at 1.5 m, the room behind at 3 m
+        self.assertEqual(self.read(depth, 0.8, 1.0, mask=0.0), 0.0)
+        self.assertEqual(self.read(depth, 1.2, 1.0, mask=1.0), 0.0)            # the room's, under the mask
 
-    def test_beyond_reach_as_surface(self) -> None:
-        depth = np.array([[1.5, 3.0, 3.0, 3.0, 3.0]] * 2)          # the player's pixel 3 depth pixels off
-        self.assertEqual(self.read(depth, 3.5, 1.0, inside=True), 3.0)
-        self.assertEqual(self.read(depth, 3.5, 1.0, inside=True, reach=4.0), 1.5)
+
+class PushPullTest(unittest.TestCase):
+    def test_a_depth_is_kept(self) -> None:
+        read = np.array([[1.5, 1.6], [1.7, 1.8]])
+        np.testing.assert_allclose(push_pull(read, np.ones_like(read)), read)
+
+    def test_a_hole_takes_the_depth_around_it(self) -> None:
+        read = np.full((5, 5), 1.5)
+        read[2, 2] = 0.0
+        self.assertAlmostEqual(float(push_pull(read, np.ones_like(read))[2, 2]), 1.5)
+
+    def test_the_band_takes_the_player_s_depth(self) -> None:
+        read = np.zeros((8, 8))
+        read[:, :4] = 1.5                                           # the player's depth up to the depth's edge
+        mask = np.zeros((8, 8))
+        mask[:, :6] = 0.5                                           # the mask two pixels further
+        filled = push_pull(read, mask)
+        np.testing.assert_allclose(filled[:, 4:6], 1.5)
+        self.assertTrue((filled[:, 6:] == 0.0).all())               # none beyond the mask
+
+    def test_sizes_down_to_one(self) -> None:
+        self.assertEqual(pyramid_sizes(800, 448)[-1], (1, 1))
+        self.assertEqual(pyramid_sizes(5, 3), [(3, 2), (2, 1), (1, 1)])
 
 
 class ViewWindowTest(unittest.TestCase):

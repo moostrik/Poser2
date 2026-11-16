@@ -15,6 +15,7 @@ uniform int stage;
 uniform vec2 direction;     // stage 1: (1, 0) or (0, 1)
 uniform int radius;         // stage 1: pixels each side
 uniform float epsilon;      // stage 2: the guide's variance below which the mask is only averaged
+uniform bool presence;      // stage 0: the mask is 1 where tex1's red is above 0 (a depth's presence), else 0
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -25,6 +26,7 @@ void main() {
     if (stage == 0) {
         float I = luminance(texture(tex0, texCoord).rgb);
         float p = texture(tex1, texCoord).r;
+        if (presence) p = p > 0.0 ? 1.0 : 0.0;
         fragColor = vec4(I, p, I * I, I * p);
     } else if (stage == 1) {
         ivec2 size = textureSize(tex0, 0);

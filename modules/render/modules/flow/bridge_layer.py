@@ -29,8 +29,8 @@ class BridgeInput:
     """One camera's velocity for the bridge stage, built by the app for each step. `velocity` is the
     motion output; `dt` the time the step covers (s); `image`, or None, the picture whose RGB colors the
     density; `color` an RGB tint on it, white by default, the color alone without an image; `mask`
-    the player's mask on the view, or None, which gates the image; `depth_mask` where the depth is the
-    player's on the view, or None, a share of the 3D bridge's amounts; `z_position` the motion's, or None.
+    the player's mask on the view, or None, which gates the image and is a share of the 3D bridge's amounts;
+    `z_position` the motion's, or None.
     `same_tick`: this step is another capture in the render tick of the step before, so the fluid, which
     steps once a tick, takes per pixel the density and the temperature of the step whose amount is larger
     (the 3D bridge's), and the velocity of this one."""
@@ -39,7 +39,6 @@ class BridgeInput:
     image: Annotated[Texture | None, TextureKind.IMAGE] = None
     color: tuple[float, float, float] = (1.0, 1.0, 1.0)
     mask: Annotated[Texture | None, TextureKind.SCALAR] = None
-    depth_mask: Annotated[Texture | None, TextureKind.SCALAR] = None
     z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
     same_tick: bool = False
 

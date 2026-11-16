@@ -5,7 +5,7 @@
 // the share of its trail's speed that came with a z position (the trail's z position weight over its speed),
 // so motion without depth does not pull it. The trail reads the lowpass's z position, a start and a bow the
 // fast trail's, a stop and a wake the slow trail's, the change the fast trail's where it is the faster, else
-// the slow's. The depth mask's share, its value at the share, reads the motion's z position now. Out: red the
+// the slow's. The mask's share, its value at the share, reads the motion's z position now. Out: red the
 // z position times its weight, green the weight. The numpy reference is bridge_3d.z_position_mix
 
 uniform sampler2D tex0;     // the readings: trail, change, start, bow, stop, wake (xyz)
@@ -21,8 +21,8 @@ uniform sampler2D slow;             // its slow trail
 uniform sampler2D trail_z_position; // their z positions (red over green)
 uniform sampler2D fast_z_position;
 uniform sampler2D slow_z_position;
-uniform sampler2D depth_mask;       // where the depth is the player's (red, 0 to 1)
-uniform float depth_mask_share;     // its share; 0 reads neither it nor the z position
+uniform sampler2D mask;             // the player's mask (red, 0 to 1)
+uniform float mask_share;           // its share; 0 reads neither it nor the z position
 uniform sampler2D z_position;       // the motion's z position now (red over green)
 
 in vec2 texCoord;
@@ -51,9 +51,9 @@ void main() {
              + size(tex1, shares[1]) * (fast_speed > slow_speed ? at_fast : at_slow)
              + (size(tex2, shares[2]) + size(tex3, shares[3])) * at_fast
              + (size(tex4, shares[4]) + size(tex5, shares[5])) * at_slow;
-    if (depth_mask_share > 0.0) {
+    if (mask_share > 0.0) {
         vec2 now = texture(z_position, texCoord).rg;
-        if (now.g > EPSILON) sum += depth_mask_share * texture(depth_mask, texCoord).r * vec2(now.r / now.g, 1.0);
+        if (now.g > EPSILON) sum += mask_share * texture(mask, texCoord).r * vec2(now.r / now.g, 1.0);
     }
     fragColor = vec4(sum, 0.0, 0.0);
 }

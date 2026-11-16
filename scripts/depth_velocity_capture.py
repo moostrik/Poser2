@@ -7,7 +7,7 @@ Runs deep_flow on the recording (as -sim, without the panel), from the start of 
 for its first `--seconds`, with the preset's settings and the Lucas–Kanade flow. Each measure of the flow is
 saved to OUT/NAME (the recording's name without `--name`): `luminance_NNNN.npy` (the newest luminance frame,
 0 to 1), `depth_NNNN.npy` (the depth it got, m, at the flow's size, before the step filter), `mask_NNNN.npy`
-(the player's mask), `depth_mask_NNNN.npy` (where the depth is the player's), and `calls.json`: each
+(the player's mask, 0 to 1, the weight of each pixel), and `calls.json`: each
 measure's arguments and its moment, `t`, in seconds, and the flow's settings. The compare replays them from
 no motion. About 3 GB for 15 seconds at the flow's 448×800: delete it when done with it. This is the one
 step that runs the app.
@@ -95,12 +95,10 @@ def main() -> int:
             w, h = luminance.width, luminance.height
             index = len(calls)
             mask = self._mask if self._mask is not None and self._mask.allocated else None
-            depth_mask = self._depth_mask if self._depth_mask is not None and self._depth_mask.allocated else None
             np.save(out_dir / f'luminance_{index:04d}.npy', read('luminance', luminance, w, h)[..., 0])
             np.save(out_dir / f'depth_{index:04d}.npy', read('depth', depth, w, h)[..., 0])
-            np.save(out_dir / f'mask_{index:04d}.npy', (read('mask', mask, w, h)[..., 0] > 0.5) if mask is not None else np.ones((h, w), bool))
-            np.save(out_dir / f'depth_mask_{index:04d}.npy',
-                    (read('depth_mask', depth_mask, w, h)[..., 0] > 0.5) if depth_mask is not None else np.ones((h, w), bool))
+            np.save(out_dir / f'mask_{index:04d}.npy',
+                    read('mask', mask, w, h)[..., 0].astype(np.float16) if mask is not None else np.ones((h, w), np.float16))
             calls.append(dict(t=time.perf_counter(), delta_time=delta_time, view_span=view_span, depth_step=list(depth_step),
                               depth_range=list(flags.get('depth_range', (0.0, 0.0))), width=w, height=h,
                               settings=self.settings.to_dict()))

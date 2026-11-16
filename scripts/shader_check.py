@@ -26,7 +26,7 @@ from OpenGL.GL import (GL_FLOAT, GL_R8, GL_R32F, GL_RED, GL_RGBA, GL_RGBA8, GL_T
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from apps.smile.render.shaders import FaceColor, FlashIn, FlashOut, Omission  # noqa: E402
-from modules.flow import DepthCut, DepthUpscale  # noqa: E402
+from modules.flow import DepthCrop, DepthUpscale  # noqa: E402
 from modules.flow.shaders import AddRegion, ChannelAddRegion, ChannelSetRegion, SetRegion  # noqa: E402
 from modules.flow.visualization.shaders import ColormapKey  # noqa: E402
 from modules.gl import Bloom, Colormap, Context, DistanceField, Fbo, Style, Text, Texture, shaders  # noqa: E402
@@ -252,9 +252,9 @@ def cases() -> dict[str, tuple[object, Case | None, Case | None]]:
     add('channel_add_region', channel_add,
         lambda t: channel_add.use(t['gradient'], t['soft'], 2, 0.2, 0.5, 0.5, 0.4, 0.5))
     upscale = DepthUpscale()
-    add('depth_upscale', upscale, lambda t: upscale.use(t['depth'], Rect(0.2, 0.3, 0.5, 0.6), 0.1, t['soft'], 0.5, 2.0, 2.0))
-    cut = DepthCut()
-    add('depth_cut', cut, lambda t: cut.use(t['depth'], Rect(0.2, 0.3, 0.5, 0.6), 0.5, 2.0))
+    add('depth_upscale', upscale, lambda t: upscale.use(t['depth'], Rect(0.2, 0.3, 0.5, 0.6), 0.1, t['soft'], 0.5, 2.0))
+    crop = DepthCrop()
+    add('depth_crop', crop, lambda t: crop.use(t['depth'], Rect(0.2, 0.3, 0.5, 0.6), 0.5, 2.0))
     key = ColormapKey()
     add('colormap_key', key, lambda t: key.use((10.0 / SIZE, 38.0 / SIZE, 100.0 / SIZE, 70.0 / SIZE), 4, 3,
                                                12.0 / SIZE, 6.0 / SIZE))

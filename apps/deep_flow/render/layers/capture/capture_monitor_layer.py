@@ -4,7 +4,7 @@ from OpenGL.GL import GL_RGBA16F
 
 from modules import render
 from modules.gl import Fbo, Style, Texture, clear_color
-from ....settings import CaptureSettings, CaptureView, ViewDepthMaskSettings
+from ....settings import CaptureSettings, CaptureView, ViewCropSettings
 
 DRAW_MODES: dict[CaptureView, render.DepthDrawMode] = {CaptureView.DEPTH: render.DepthDrawMode.COLOR,
                                                        CaptureView.BOTH: render.DepthDrawMode.OVER_IMAGE}
@@ -12,14 +12,14 @@ DRAW_MODES: dict[CaptureView, render.DepthDrawMode] = {CaptureView.DEPTH: render
 
 class CaptureMonitorLayer(render.LayerBase):
     """The capture's `image` and `depth` as `settings.show` says, the depth on a log scale from the view's `near` to
-    its `far` (`band`, the view's depth mask's); drawn again with each new capture."""
+    its `far` (`band`, the view's crop, its front and back); drawn again with each new capture."""
 
     def __init__(self, image: render.CaptureImageLayer, depth: render.CaptureDepthLayer, settings: CaptureSettings,
-                 band: ViewDepthMaskSettings) -> None:
+                 band: ViewCropSettings) -> None:
         self._image: render.CaptureImageLayer = image
         self._depth: render.CaptureDepthLayer = depth
         self.settings: CaptureSettings = settings
-        self._band: ViewDepthMaskSettings = band
+        self._band: ViewCropSettings = band
         self._fbo: Fbo = Fbo()
         self._depth_colormap: render.DepthColormap = render.DepthColormap()
         self._drawn: tuple | None = None

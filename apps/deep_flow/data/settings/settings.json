@@ -6,7 +6,7 @@
     "keyframe_interval": 50,
     "color": true,
     "resolution": "P800",
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "data/models",
     "fov": 80.0,
     "split_seconds": 60,
@@ -271,13 +271,13 @@
   },
   "render": {
     "debug": true,
+    "pause": false,
     "layer": {
       "main": [
-        "show",
-        "view"
+        "motion"
       ],
       "debug": [
-        "fluid"
+        "show"
       ]
     },
     "capture": {
@@ -290,16 +290,19 @@
       "crop": {
         "center_x": 0.5,
         "center_y": 0.5,
-        "height": 1.0
-      },
-      "depth_mask": {
+        "height": 1.0,
         "near": 0.1,
-        "far": 1.7,
+        "far": 1.7
+      },
+      "mask": {
         "guided_radius": 2.0,
         "edge_contrast": 0.03
       },
       "depth": {
-        "tolerance": 0.2
+        "tolerance": 0.2,
+        "fill": {
+          "enabled": true
+        }
       },
       "color_grade": {
         "enabled": true,
@@ -312,15 +315,15 @@
         "sharpen": 0.82
       },
       "monitor_main": {
-        "texture": "output.mask",
+        "texture": "mask.mask",
         "view": "COLORMAP",
         "advanced": {
           "channel": "ALL",
           "scale": 1.0,
+          "blend_mode": "ADD",
           "glyph_spacing": "SPACING_32",
           "colormap": "JET",
-          "legend": true,
-          "blend_mode": "ADD"
+          "legend": true
         }
       },
       "monitor_debug": {
@@ -329,10 +332,10 @@
         "advanced": {
           "channel": "ALL",
           "scale": 1.0,
+          "blend_mode": "ADD",
           "glyph_spacing": "SPACING_32",
           "colormap": "JET",
-          "legend": true,
-          "blend_mode": "ADD"
+          "legend": true
         }
       }
     },
@@ -344,30 +347,6 @@
       "x_gain": 1.0,
       "y_gain": 1.0,
       "z_gain": 0.4,
-      "monitor_main": {
-        "texture": "output.velocity",
-        "view": "GLYPHS",
-        "advanced": {
-          "channel": "ALL",
-          "scale": 1.0,
-          "glyph_spacing": "SPACING_16",
-          "colormap": "JET",
-          "legend": true,
-          "blend_mode": "ADD"
-        }
-      },
-      "monitor_debug": {
-        "texture": "output.boundary_velocity",
-        "view": "COLORMAP",
-        "advanced": {
-          "channel": "ALL",
-          "scale": 1.0,
-          "glyph_spacing": "SPACING_32",
-          "colormap": "JET",
-          "legend": true,
-          "blend_mode": "ADD"
-        }
-      },
       "xy": {
         "levels": 4,
         "window": "SEVEN",
@@ -379,41 +358,41 @@
         "edge": 0.1,
         "window": "SEVEN",
         "tolerance": 0.2,
-        "smooth": 100.0,
+        "smooth": 50.0,
         "xy_smooth": false,
         "catch_up": 8.0,
         "dead_zone": 0.02,
         "max_speed": 6.0,
         "threshold": 5.0
+      },
+      "monitor_main": {
+        "texture": "output.velocity",
+        "view": "GLYPHS",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_16",
+          "colormap": "JET",
+          "legend": true
+        }
+      },
+      "monitor_debug": {
+        "texture": "z.output",
+        "view": "IMAGE",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 100.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
       }
     },
     "bridge": {
       "width": 448,
       "height": 800,
-      "monitor_main": {
-        "texture": "output.boundary_velocity",
-        "view": "COLORMAP",
-        "advanced": {
-          "channel": "ALL",
-          "scale": 1.0,
-          "glyph_spacing": "SPACING_32",
-          "colormap": "JET",
-          "legend": true,
-          "blend_mode": "ADD"
-        }
-      },
-      "monitor_debug": {
-        "texture": "output.boundary_velocity",
-        "view": "COLORMAP",
-        "advanced": {
-          "channel": "ALL",
-          "scale": 1.0,
-          "glyph_spacing": "SPACING_32",
-          "colormap": "JET",
-          "legend": true,
-          "blend_mode": "ADD"
-        }
-      },
       "readings": {
         "lowpass": {
           "advect": 0.5,
@@ -449,7 +428,7 @@
           "bow": 0.0,
           "stop": 1.0,
           "wake": 0.0,
-          "depth_mask": 0.0,
+          "mask": 0.0,
           "saturation": 1.18,
           "brightness": 1.0
         },
@@ -460,7 +439,7 @@
           "bow": 0.0,
           "stop": 0.0,
           "wake": 0.0,
-          "depth_mask": 0.0
+          "mask": 0.0
         }
       },
       "body_force": {
@@ -479,7 +458,7 @@
           "bow": 0.0,
           "stop": 0.0,
           "wake": 0.0,
-          "depth_mask": 0.0,
+          "mask": 0.0,
           "saturation": 1.0,
           "brightness": 1.0
         },
@@ -490,7 +469,7 @@
           "bow": 0.0,
           "stop": 0.0,
           "wake": 0.0,
-          "depth_mask": 0.0
+          "mask": 0.0
         }
       },
       "expansion": {
@@ -500,7 +479,31 @@
         "bow": 0.0,
         "stop": 0.0,
         "wake": 0.0,
-        "depth_mask": 0.0
+        "mask": 0.0
+      },
+      "monitor_main": {
+        "texture": "output.boundary_velocity",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
+      },
+      "monitor_debug": {
+        "texture": "output.boundary_velocity",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
       }
     },
     "fluid": {
@@ -511,50 +514,6 @@
       "height": 512,
       "depth": 64,
       "depth_ratio": 1.0,
-      "monitor_main": {
-        "texture": "output.boundary_velocity",
-        "view": "COLORMAP",
-        "advanced": {
-          "channel": "ALL",
-          "scale": 1.0,
-          "opacity": 6.0,
-          "depth_fade": 0.0,
-          "slice": false,
-          "slice_position": 0.5,
-          "slice_focus": 0.5,
-          "glyph_spacing": "SPACING_32",
-          "colormap": "JET",
-          "legend": true,
-          "blend_mode": "ADD",
-          "orbit": {
-            "yaw": 0.0,
-            "pitch": 0.0,
-            "zoom": 1.0
-          }
-        }
-      },
-      "monitor_debug": {
-        "texture": "velocity",
-        "view": "COLORMAP",
-        "advanced": {
-          "channel": "ALL",
-          "scale": 2.0,
-          "opacity": 3.0,
-          "depth_fade": 0.0,
-          "slice": true,
-          "slice_position": 0.48,
-          "slice_focus": 0.36,
-          "glyph_spacing": "SPACING_32",
-          "colormap": "JET",
-          "legend": true,
-          "blend_mode": "ADD",
-          "orbit": {
-            "yaw": 52.59975975870282,
-            "pitch": 4.846153846153827,
-            "zoom": 0.7184107424569811
-          }
-        }
-      },
       "time": {
         "time_step": "MEASURED",
         "fixed_fps": 60.0,
@@ -566,7 +525,7 @@
         "expansion_rate": 0.0,
         "boundary": {
           "velocity_drag": 75.0,
-          "velocity_gain": 3.0,
+          "velocity_gain": 1.0,
           "density_drag": 300.0,
           "density_gain": 10.0,
           "temperature_drag": 200.0,
@@ -589,7 +548,7 @@
         "viscosity_iter": 20
       },
       "vorticity": {
-        "strength_1": 5.0,
+        "strength_1": 10.0,
         "strength_2": 0.0,
         "strength_3": 0.0,
         "radius_1": 0.1,
@@ -691,8 +650,52 @@
             "Frosted.cube",
             "Vibrance.cube"
           ],
-          "file": "Blockbuster.cube",
+          "file": "",
           "strength": 1.0
+        }
+      },
+      "monitor_main": {
+        "texture": "output.boundary_velocity",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true,
+          "opacity": 6.0,
+          "depth_fade": 0.0,
+          "slice": false,
+          "slice_position": 0.5,
+          "slice_focus": 0.5,
+          "orbit": {
+            "yaw": 0.0,
+            "pitch": 0.0,
+            "zoom": 1.0
+          }
+        }
+      },
+      "monitor_debug": {
+        "texture": "density",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 2.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true,
+          "opacity": 3.0,
+          "depth_fade": 0.0,
+          "slice": true,
+          "slice_position": 0.48,
+          "slice_focus": 0.36,
+          "orbit": {
+            "yaw": 52.59975975870282,
+            "pitch": 4.846153846153827,
+            "zoom": 0.7184107424569811
+          }
         }
       }
     },

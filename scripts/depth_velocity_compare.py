@@ -23,8 +23,8 @@ Each loop prints, for A and B, in the still part: x/y and z as the fluid gets th
 px inside the mask) and inside (12 px and more), and z on the table (outside, 16 px and more); per
 move, the body's x/y and z in its slow and fast half and fast over slow, how its z follows its real
 depth change, and the frames x/y takes to stop after it; the restarts of the depth velocity, and the
-flow's time on the GPU per frame; then the one results table's row (`ROW`), with, where the frames hold
-the depth mask, the share of the mask without a z position and the depth mask's fit to the image's edges. `--fast` runs one loop without the window, as fast as it goes;
+flow's time on the GPU per frame; then the one results table's row (`ROW`), with the share of the mask
+without a z position and the mask's fit to the image's edges. `--fast` runs one loop without the window, as fast as it goes;
 `--verify` compares A's first frames with the numpy references instead.
 """
 
@@ -171,11 +171,10 @@ class Frames:
     def __len__(self) -> int:
         return len(self.calls)
 
-    def load(self, k: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None]:
-        """The luminance, the depth, the mask and the depth mask, None in frames saved before it."""
-        depth_mask = self.folder / f'depth_mask_{k:04d}.npy'
+    def load(self, k: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """The luminance, the depth and the mask, 0 to 1 (a mask saved as a bool before is 0 or 1)."""
         return (np.load(self.folder / f'luminance_{k:04d}.npy').astype(np.float32), np.load(self.folder / f'depth_{k:04d}.npy').astype(np.float32),
-                np.load(self.folder / f'mask_{k:04d}.npy'), np.load(depth_mask) if depth_mask.exists() else None)
+                np.load(self.folder / f'mask_{k:04d}.npy').astype(np.float32))
 
     def motion(self) -> np.ndarray:
         """Per frame, the mean luminance change in the mask since the frame before (0 to 1). Also
@@ -184,7 +183,7 @@ class Frames:
         motion, before = np.zeros(len(self)), None
         changes = np.zeros((self.height, self.width), np.int32)
         for k in range(len(self)):
-            luminance, mask = np.load(self.folder / f'luminance_{k:04d}.npy').astype(np.float32), np.load(self.folder / f'mask_{k:04d}.npy')
+            luminance, mask = np.load(self.folder / f'luminance_{k:04d}.npy').astype(np.float32), np.load(self.folder / f'mask_{k:04d}.npy') > 0.5
             if before is not None:
                 change = np.abs(luminance - before)
                 changes += change > MOVED
@@ -260,19 +259,20 @@ class Measures:
         self.milliseconds: list[float] = []
         self.fluid_z: list[float] = []           # z as the fluid gets it, inside, px per frame
         self.without_z: list[float] = []         # the share of the mask without a z position, in the parts measured
-        self.fit: list[float] = []               # the image's brightness gradient along the depth mask's edge, in the still part
+        self.fit: list[float] = []               # the image's brightness gradient along the mask's edge, in the still part
         self._before: np.ndarray | None = None
 
     def add(self, t: float, segment: str, xy: np.ndarray, track: np.ndarray, z: np.ndarray, depth: np.ndarray, mask: np.ndarray,
-            moved: np.ndarray, milliseconds: float, weight: np.ndarray | None = None, depth_mask: np.ndarray | None = None,
+            moved: np.ndarray, milliseconds: float, weight: np.ndarray | None = None,
             luminance: np.ndarray | None = None) -> None:
-        """`xy` and `z` are as the fluid gets them, in px per frame; `track` is the depth velocity's state;
-        `moved` the pixels that move in the loop; `weight` the z position's, 0 where the motion has no depth for a
-        pixel; `depth_mask` and `luminance` for the depth mask's fit to the image's edges."""
+        """`xy` and `z` are as the fluid gets them, in px per frame; `track` is the depth velocity's state; `mask`
+        the player's pixels (the mask above 0.5); `moved` the pixels that move in the loop; `weight` the z
+        position's, 0 where the motion has no depth for a pixel; `luminance` for the mask's fit to the image's
+        edges."""
         if segment and weight is not None and mask.any():
             self.without_z.append(float(np.mean(weight[mask] <= 0.0)))
-        if segment == 'still' and depth_mask is not None and luminance is not None and depth_mask.any():
-            cut = depth_mask.astype(np.uint8)
+        if segment == 'still' and luminance is not None and mask.any():
+            cut = mask.astype(np.uint8)
             edge_of_cut = (cut - cv2.erode(cut, np.ones((3, 3), np.uint8))).astype(bool)
             gradient = np.hypot(cv2.Sobel(luminance, cv2.CV_32F, 1, 0, ksize=3), cv2.Sobel(luminance, cv2.CV_32F, 0, 1, ksize=3))
             if edge_of_cut.any():
@@ -345,7 +345,7 @@ class Measures:
         return '\n    '.join([' | '.join(lines[:5])] + lines[5:])
 
     def row(self, segments: np.ndarray) -> str:
-        """The one results table's row: the share of the mask without a z position, the depth mask's fit, z's
+        """The one results table's row: the share of the mask without a z position, the mask's fit, z's
         noise inside and at the edge (the still part's p99), z inside in the slow and the fast halves (their
         mean), fast over noise, x/y at the edge (p99), and the flow's ms per frame."""
         def p99(name: str) -> float:
@@ -384,16 +384,15 @@ class Side:
             self.visualizer.resize(width, height)
         self.measures = Measures()
 
-    def step(self, frames: Frames, k: int, luminance: Texture, depth: Texture, mask: Texture, depth_mask: Texture | None = None) -> None:
+    def step(self, frames: Frames, k: int, luminance: Texture, depth: Texture, mask: Texture) -> None:
         c = frames.calls[k]
         self.flow.set_input(luminance)
         self.flow.set_mask(mask)
-        self.flow.set_depth_mask(depth_mask)
         self.flow.update(depth, c['delta_time'], c['view_span'], tuple(c['depth_step']),
                          depth_range=tuple(c.get('depth_range', (0.0, 0.0))))
 
     def z_px(self, velocity: np.ndarray, delta_time: float, width: int) -> np.ndarray:
-        """The velocity's z (image widths per second, times its gain, gated by the mask and the depth mask) as
+        """The velocity's z (image widths per second, times its gain, weighted by the mask) as
         px per frame: z as the fluid gets it."""
         s = self.settings
         return np.abs(velocity[..., 2] / (s.z_gain if s.z_gain else 1.0)) * delta_time * width
@@ -430,8 +429,8 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
     state, catch_up, previous = np.zeros((h, w, 4)), np.zeros((h, w, 2)), None
     last = min(frames_to_check, len(frames)) - 1
     for k in range(last + 1):
-        lum, depth, mask, _ = frames.load(k)
-        upload(luminance, lum); upload(depth_texture, depth); upload(mask_texture, mask.astype(np.float32))
+        lum, depth, mask = frames.load(k)
+        upload(luminance, lum); upload(depth_texture, depth); upload(mask_texture, mask)
         side.step(frames, k, luminance, depth_texture, mask_texture)
         if previous is None:
             previous = lum
@@ -480,7 +479,7 @@ def main() -> int:
     window = context(not args.fast, panel_w * 2, panel_h)
     recorded = frames.calls[0]['settings']
     sides = [Side('A', recorded, overrides(args.a), w, h, not args.fast), Side('B', recorded, overrides(args.b), w, h, not args.fast)]
-    luminance, depth_texture, mask_texture, depth_mask_texture = Texture(), Texture(), Texture(), Texture()
+    luminance, depth_texture, mask_texture = Texture(), Texture(), Texture()
     span = float(np.median([c['view_span'] for c in frames.calls]))
     controls = {'view': args.view, 'paused': False, 'step': 0, 'scale': 1.0}
 
@@ -507,12 +506,10 @@ def main() -> int:
     for side in sides:
         print(f'{side.name}: {side.changed or "as recorded"}')
 
-    def feed(k: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None]:
-        lum, depth, mask, depth_mask = frames.load(k)
-        upload(luminance, lum); upload(depth_texture, depth); upload(mask_texture, mask.astype(np.float32))
-        if depth_mask is not None:
-            upload(depth_mask_texture, depth_mask.astype(np.float32))
-        return lum, depth, mask, depth_mask
+    def feed(k: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        lum, depth, mask = frames.load(k)
+        upload(luminance, lum); upload(depth_texture, depth); upload(mask_texture, mask)
+        return lum, depth, mask > 0.5
 
     loop, k, started = 1, 0, time.perf_counter()
     while not glfw.window_should_close(window):
@@ -539,27 +536,27 @@ def main() -> int:
                 side.flow.reset()
                 side.measures = Measures()
             for j in range(target):
-                _, _, _, held = feed(j)
+                feed(j)
                 for side in sides:
-                    side.step(frames, j, luminance, depth_texture, mask_texture, depth_mask_texture if held is not None else None)
+                    side.step(frames, j, luminance, depth_texture, mask_texture)
             k = target
         controls['step'] = 0
 
-        lum, depth, mask, depth_mask = feed(k)
+        lum, depth, mask = feed(k)
         segment = frames.segment(k)
         for side in sides:
             glFinish()
             began = time.perf_counter()
-            side.step(frames, k, luminance, depth_texture, mask_texture, depth_mask_texture if depth_mask is not None else None)
+            side.step(frames, k, luminance, depth_texture, mask_texture)
             glFinish()                            # the flow's own time on the GPU, before its read back
             milliseconds = (time.perf_counter() - began) * 1000.0
             velocity = read_back(side.flow.velocity)
             xy = side.xy_px(velocity, frames.calls[k]['delta_time'], w)
-            z = side.z_px(velocity, frames.calls[k]['delta_time'], w)       # as the fluid gets it: gated by both masks
+            z = side.z_px(velocity, frames.calls[k]['delta_time'], w)       # as the fluid gets it: weighted by the mask
             track = read_back(side.flow.depth_velocity.difference)
             weight = read_back(side.flow.z_position)[..., 1] if 'depth_range' in frames.calls[k] else None
             side.measures.add(float(frames.t[k]), segment, xy, track, z, depth, mask, frames.moved, milliseconds,
-                              weight, depth_mask, lum)
+                              weight, lum)
 
         if not args.fast:
             shown = [side.show(controls['view'], depth_texture, controls['scale'], w) for side in sides]

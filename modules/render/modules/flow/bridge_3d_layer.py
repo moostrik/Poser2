@@ -3,7 +3,7 @@ readings, each as a velocity and as an acceleration; two mixes make what the flu
 boundary (a velocity, density, temperature from the readings as velocities) and the body force (an
 acceleration from the readings as accelerations, its density and temperature a push's presence from the
 readings as velocities, the change of speed); a third, the expansion, where the water swells, a presence from
-the readings as velocities and the depth mask. Each density and temperature is 0 to 1 (±1 warm): a presence,
+the readings as velocities and the mask. Each density and temperature is 0 to 1 (±1 warm): a presence,
 the readings' speed in widths/s, capped at 1, the dye the fluid fills the water toward or adds at a rate.
 
 Each trail holds where its motion was, a z position; every output mixes its readings' z positions by the
@@ -50,8 +50,8 @@ class BoundaryVelocitySettings(BoundaryMixSettings):
 
 
 class AmountMixSettings(MixSettings):
-    """An amount's mix: the readings' speeds and the depth mask, a presence while still."""
-    depth_mask = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the depth mask: the player there, still or not")
+    """An amount's mix: the readings' speeds and the mask, a presence while still."""
+    mask = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the mask: the player there, still or not")
 
 
 class BoundaryAmountMixSettings(AmountMixSettings, BoundaryMixSettings):
@@ -100,7 +100,7 @@ PARTS: dict[str, Change] = {'start': Change.START, 'bow': Change.BOW, 'stop': Ch
 
 
 class ExpansionSettings(AmountMixSettings):
-    """The expansion: where the water swells, a presence 0 to 1 from the readings' speeds and the depth mask."""
+    """The expansion: where the water swells, a presence 0 to 1 from the readings' speeds and the mask."""
 
 
 class Bridge3DLayerSettings(BridgeLayerSettings):
@@ -119,7 +119,7 @@ class Bridge3DLayer(BridgeLayer):
         boundary     the readings as velocities: `velocity`; `density` and `temperature` from their sizes
         body_force   the readings as accelerations: `acceleration`; `density` and `temperature` from the
                      readings as velocities, a push's change of speed; each None while its shares are all 0
-        expansion    the readings as velocities and the depth mask: a presence, capped at 1; None while its
+        expansion    the readings as velocities and the mask: a presence, capped at 1; None while its
                      shares are all 0, and the newest capture's in a tick of several
     The density and the temperature are colored by a density and a temperature bridge per side, with the
     same color. The defaults are the boundary's trail alone.
@@ -231,9 +231,9 @@ class Bridge3DLayer(BridgeLayer):
 
     @staticmethod
     def _mixed(mix: MixSettings, names: tuple[str, ...] | None = None) -> bool:
-        """Whether an output has a share above 0 among `names`: by default its readings, and an amount's depth mask."""
+        """Whether an output has a share above 0 among `names`: by default its readings, and an amount's mask."""
         if names is None:
-            names = (*READINGS, 'depth_mask') if isinstance(mix, AmountMixSettings) else READINGS
+            names = (*READINGS, 'mask') if isinstance(mix, AmountMixSettings) else READINGS
         return any(getattr(mix, name) > 0.0 for name in names)
 
     def _boundary_mixes(self) -> tuple[MixSettings, ...]:
@@ -365,31 +365,31 @@ class Bridge3DLayer(BridgeLayer):
         target.end()
 
     def _mix_z_position(self, target: Fbo, readings: dict[str, Texture], mix: MixSettings,
-                        depth_mask: tuple[Texture, Texture, float] | None = None) -> None:
-        """The z position of an output mixing `readings` at its shares, and `depth_mask` (the mask, the motion's
-        z position now, its share), into `target`."""
+                        mask: tuple[Texture, Texture, float] | None = None) -> None:
+        """The z position of an output mixing `readings` at its shares, and `mask` (the mask, the motion's z
+        position now, its share), into `target`."""
         lowpass, bandpass = self._lowpass, self._bandpass
         target.begin()
         self._z_position_mix_shader.use([(readings[name], getattr(mix, name)) for name in READINGS],
                                         (lowpass.trail, bandpass.fast, bandpass.slow),
-                                        (lowpass.z_position, bandpass.fast_z_position, bandpass.slow_z_position), depth_mask)
+                                        (lowpass.z_position, bandpass.fast_z_position, bandpass.slow_z_position), mask)
         target.end()
 
     def _mix_amount(self, amount: Fbo, z_position: Fbo, input: BridgeInput, mix: AmountMixSettings,
                     capped: bool = False) -> None:
-        """An amount: the readings' speeds at its shares and the depth mask at its share, into `amount`, with
-        `capped` held at 1, a presence, and its z position, into `z_position`. Without a depth mask or the
-        motion's z position the mask's share adds nothing."""
+        """An amount: the readings' speeds at its shares and the mask at its share, into `amount`, with `capped`
+        held at 1, a presence, and its z position, into `z_position`. Without a mask or the motion's z position
+        the mask's share adds nothing."""
         readings: dict[str, Texture] = self._velocities()
         sources: list[tuple[Texture, float]] = [(readings[name], getattr(mix, name)) for name in READINGS]
-        depth_mask: tuple[Texture, Texture, float] | None = None
-        if mix.depth_mask > 0.0 and input.depth_mask is not None and input.z_position is not None:
-            depth_mask = (input.depth_mask, input.z_position, mix.depth_mask)
-            sources.append((input.depth_mask, mix.depth_mask))
+        mask: tuple[Texture, Texture, float] | None = None
+        if mix.mask > 0.0 and input.mask is not None and input.z_position is not None:
+            mask = (input.mask, input.z_position, mix.mask)
+            sources.append((input.mask, mix.mask))
         amount.begin()
         self._mix_shader.use(sources, lengths=True, capped=capped)
         amount.end()
-        self._mix_z_position(z_position, readings, mix, depth_mask)
+        self._mix_z_position(z_position, readings, mix, mask)
 
     @staticmethod
     def _update_density(density: DensityBridge, amount: Texture, color: Texture) -> None:

@@ -1,77 +1,71 @@
-"""ViewDepth: how far. The camera's depth read into the view once, blended within a surface, at the outline from the
-mask's side; and the depth mask, that depth cut to the player's band, on the mask's outline."""
+"""ViewDepth: how far. The camera's depth read into the view once, blended within a surface, kept where it is the
+player's and the mask is; then filled across the mask by push-pull, so the mask and the depth agree pixel for
+pixel."""
 
 # Third-party imports
-from OpenGL.GL import GL_NEAREST, GL_R16F, GL_R32F
+from OpenGL.GL import GL_NEAREST, GL_R32F
 
 # Local application imports
-from modules.flow import DepthUpscale, Port, TextureKind
+from modules.flow import DepthFill, DepthUpscale, Port, TextureKind
 from modules.gl import Fbo, Texture
 from modules.utils import Rect
-from ....settings import ViewDepthMaskSettings, ViewDepthSettings
-from .shaders import DepthMask
-from .view_depth_mask import ViewDepthMask
+from ....settings import ViewCropSettings, ViewDepthSettings
 
 
 class ViewDepth:
-    """`read` brings a depth into the view, cut to the crop: within a surface, the depth pixels within `tolerance`
-    of each other blended; at the outline, a pixel's depth from the side of the depth mask's mask it lies on, within
-    the mask's reach (`guided_radius`). Then the depth mask: where that depth lies in the band. The band and the mask
-    are the depth mask's, which it is handed."""
+    """`read` brings a depth into the view across the crop: within a surface, the depth pixels within `tolerance` of
+    each other blended; kept where it lies inside the box (the crop's near and far) and the mask is above 0. `fill`
+    fills the mask where the read has none (the band between the depth's coarse edge and the mask's, the camera's
+    holes), with `fill.enabled`; off, the depth is the read."""
 
-    def __init__(self, settings: ViewDepthSettings, depth_mask: ViewDepthMask) -> None:
+    def __init__(self, settings: ViewDepthSettings, box: ViewCropSettings) -> None:
         self.settings: ViewDepthSettings = settings
-        self._who: ViewDepthMask = depth_mask
-        self._depth: Fbo = Fbo(interpolation=GL_NEAREST)     # an edge never reads as a distance in between
-        self._depth_mask: Fbo = Fbo()
+        self._box: ViewCropSettings = box
+        self._read: Fbo = Fbo(interpolation=GL_NEAREST)      # an edge never reads as a distance in between
+        self._depth: Fbo = Fbo(interpolation=GL_NEAREST)
         self._read_shader: DepthUpscale = DepthUpscale()
-        self._cut_shader: DepthMask = DepthMask()
+        self._fill: DepthFill = DepthFill()
 
     @property
     def depth(self) -> Texture:
-        return self._depth
-
-    @property
-    def depth_mask(self) -> Texture:
-        return self._depth_mask
+        """The depth the view hands on: the filled one, or the read with the fill off."""
+        return self._depth if self.settings.fill.enabled else self._read
 
     @property
     def ports(self) -> dict[str, Port]:
-        band: ViewDepthMaskSettings = self._who.settings
-        return {'depth': Port(self._depth, TextureKind.DEPTH, depth_range=(band.near, band.far)),
-                'depth_mask': Port(self._depth_mask, TextureKind.SCALAR)}
+        band: tuple[float, float] = (self._box.near, self._box.far)
+        return {'read': Port(self._read, TextureKind.DEPTH, depth_range=band),
+                'depth': Port(self.depth, TextureKind.DEPTH, depth_range=band)}
 
     @property
     def made_with(self) -> tuple:
         """The settings its textures are made with, so its owner makes them again when one changes."""
-        return (self.settings.tolerance,)
+        return (self.settings.tolerance, self.settings.fill.enabled)
 
     def allocate(self, width: int, height: int) -> None:
+        self._read.allocate(width, height, GL_R32F)
         self._depth.allocate(width, height, GL_R32F)
-        self._depth_mask.allocate(width, height, GL_R16F)
         self._read_shader.allocate()
-        self._cut_shader.allocate()
+        self._fill.allocate(width, height)
 
     def deallocate(self) -> None:
+        self._read.deallocate()
         self._depth.deallocate()
-        self._depth_mask.deallocate()
         self._read_shader.deallocate()
-        self._cut_shader.deallocate()
+        self._fill.deallocate()
 
     def clear(self) -> None:
+        self._read.clear()
         self._depth.clear()
-        self._depth_mask.clear()
 
-    def read(self, depth: Texture | None, crop: Rect) -> None:
-        """`depth` into the view across `crop`, from the mask's side at the outline, then its cut to the band; none
-        without a depth."""
+    def read(self, depth: Texture | None, crop: Rect, mask: Texture) -> None:
+        """`depth` into the view across `crop`, where it is the player's and `mask` is, then filled across `mask`;
+        none without a depth."""
         self.clear()                    # without a depth: none, not the last capture's
         if depth is None:
             return
-        band: ViewDepthMaskSettings = self._who.settings
-        self._depth.begin()
-        self._read_shader.use(depth, crop, self.settings.tolerance, self._who.mask, band.near, band.far, band.guided_radius)
-        self._depth.end()
-        self._depth_mask.begin()
-        self._cut_shader.use(self._depth, band.near, band.far)
-        self._depth_mask.end()
+        self._read.begin()
+        self._read_shader.use(depth, crop, self.settings.tolerance, mask, self._box.near, self._box.far)
+        self._read.end()
+        if self.settings.fill.enabled:
+            self._fill.use(self._read, mask, self._depth)
