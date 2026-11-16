@@ -169,12 +169,18 @@ about ±0.4 inside and ±0.3 at the edge.
 | the one path, gated by its depth mask | 3.7%          | 0.491 | 12.28 / 5.90          | 0.540 | 0.855 | 0.070        | 1.84        |           |
 | the read, `depth.fill.enabled` off    | 4.4%          | 0.491 | 11.97 / 5.94          | 0.559 | 0.843 | 0.071        | 1.75        |           |
 | the read and the fill, the preset     | 3.9%          | 0.492 | 11.84 / 6.07          | 0.542 | 0.831 | 0.070        | 1.82        | 0.20 ms   |
+| the same, tolerance 10 m (bilinear)   | 6.0%          | 0.492 | 12.37 / 5.15          | 0.560 | 0.821 | 0.067        | 1.82        |           |
 
 The view as built gives z what the paths before it gave, with no depth mask: every column lies within the runs'
 spread but the share without a z position, 3.9% against 3.7%, with no mechanism found. Without the fill the band
 between the depth's edge and the mask's has no z (4.4%). What is left with the fill is the motion's step filter's
 band ([MOTION.md](MOTION.md#depth_velocity-z)). The earlier paths replayed without their gate gave an edge noise of
 15.2, z from the background's depth the read left inside the mask.
+
+Without the tolerance's limit (10 m, the four depth pixels always blended) the share without a z position rises
+from 3.9% to 6.0% and the edge's noise falls from 6.1 to 5.2, both past the runs' spread: a blend across an edge
+makes a ramp of in-between depths, whose steps the motion's step filter drops, so fewer pixels at the edge carry
+z **(deduction)**. With the step filter gone (C5) that ramp would read as z, so the limit stays.
 
 Against reading the nearest depth pixel everywhere, on the stillslowfast recording, 3 runs, the motion's
 thresholds at 0, `SURFACE` gives: neighbouring pixels inside the body with the very same depth 11% (67%), z
