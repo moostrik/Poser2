@@ -48,12 +48,9 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
   model about 30 fps), Online Video Depth Anything (42 fps on an A100), FlashDepth (24 fps at 2K) **(site fact,
   from their papers, not measured here)**. Which one, its latency against the camera's, and whether its depth
   holds the depth velocity's needs is the item's first question.
-- **B4.** The view's panels: the window on the camera image (`fixed_x`, `fixed_y`, `fixed_height`) a panel of its
-  own, `window`, its fields named without "fixed": `center_x`, `center_y`, `height`. The view's panels in the
-  order the view runs: window, depth, mask, color grade, then the monitors. Presets, VIEW.md and `view_check.py`
-  follow.
-
-Question, for B4: `window`, `center_x`, `center_y` and `height`, or other names?
+- **B4.** The view's panels: its crop of the camera image (`fixed_x`, `fixed_y`, `fixed_height`) a panel of its
+  own, `crop`, its fields `center_x`, `center_y`, `height`. The view's panels in the order the view runs: crop,
+  depth, mask, color grade, then the monitors. Presets, VIEW.md and `view_check.py` follow.
 
 Question, for later: the pose monitor (`PoseMonitorCompositor`) draws its chosen layer and the features into an FBO
 of its own, which makes it a compositor by the render rule; drawn straight into the panel it needs none and is a
@@ -229,7 +226,7 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways instead of leaving parallel legacy ones: hd_trio's copy, deleted in line I.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth.depth_read`, B1.
-- Keep presets and settings schemas in sync; name a concept after what it is: the view's window, B4.
+- Keep presets and settings schemas in sync; name a concept after what it is: the view's crop, B4.
 - A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
