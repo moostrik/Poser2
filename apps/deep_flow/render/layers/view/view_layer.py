@@ -22,7 +22,7 @@ from modules.flow import DepthRead, DepthView, DepthUpscale, DepthVelocitySettin
                          depth_step, fixed_window, place_points, view_per_depth_pixel, view_span
 from modules.gl import Fbo, SwapFbo, Style, Texture, shaders
 from modules.pose import BBox, Frame, Points2D
-from modules.render import StageLayer, StageOutput
+from modules.render import ColorSettings, ForegroundLook, StageLayer, StageOutput
 from modules.utils import Rect
 from ....settings import ViewLayerSettings
 from .shaders import DepthMask
@@ -43,9 +43,10 @@ class ViewInput:
 class ViewOutput(StageOutput):
     """The view's textures, at the view's size: `image` the color, `foreground` the color where the mask is,
     `depth` the metres as the motion measures z from them, `mask` the player's shape on the image's edges,
-    `depth_mask` where the depth lies from `near` to `far`."""
+    `depth_mask` where the depth lies from `near` to `far`, `color` the foreground's look, the density's color."""
     image: Annotated[Texture, TextureKind.IMAGE]
     foreground: Annotated[Texture, TextureKind.IMAGE]
+    color: Annotated[Texture, TextureKind.IMAGE]
     depth: Annotated[DepthView, TextureKind.SCALAR]
     mask: Annotated[Texture, TextureKind.SCALAR]
     depth_mask: Annotated[Texture, TextureKind.SCALAR]
@@ -54,13 +55,16 @@ class ViewOutput(StageOutput):
 class ViewLayer(StageLayer[ViewInput, ViewOutput]):
     """The view stage's layer. `fov` is the camera image's horizontal field (degrees), for the metres a view width
     spans; `depth_settings` the motion's depth velocity, whose `tolerance` tells one surface from another. Places
-    the pose's points in the window (`crop_pose_points`, `lost`) for the pose drawn over the view. Draws nothing."""
+    the pose's points in the window (`crop_pose_points`, `lost`) for the pose drawn over the view; its last pass is
+    the foreground's look (`settings.color`), in camera `cam_id`'s track color. Draws nothing."""
 
-    def __init__(self, settings: ViewLayerSettings, depth_settings: DepthVelocitySettings, fov: float) -> None:
+    def __init__(self, cam_id: int, settings: ViewLayerSettings, depth_settings: DepthVelocitySettings, fov: float,
+                 color_settings: ColorSettings) -> None:
         super().__init__(settings)
         self.settings: ViewLayerSettings = settings
         self._depth_settings: DepthVelocitySettings = depth_settings
         self._fov: float = fov
+        self._color: ForegroundLook = ForegroundLook(cam_id, settings.color, color_settings)
 
         self._image: Fbo = Fbo()
         self._depth: Fbo = Fbo(interpolation=GL_NEAREST)     # an edge never reads as a distance in between
@@ -89,7 +93,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
     def output(self) -> ViewOutput:
         s: ViewLayerSettings = self.settings
         depth: DepthView = DepthView(self._depth, view_span(self._window, self._fov), depth_step(self._window, self._grid_size), s.near, s.far)
-        return ViewOutput(self._image, self._foreground, depth, self._mask, self._depth_mask)
+        return ViewOutput(self._image, self._foreground, self._color.texture, depth, self._mask, self._depth_mask)
 
     @property
     def timestamp(self) -> float | None:
@@ -117,6 +121,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         self._guided.allocate(width, height, GL_R16F)
         self._products.allocate(width, height, GL_RGBA32F)
         self._coefficients.allocate(width, height, GL_RG32F)
+        self._color.allocate(width, height, GL_RGBA16F)
         for shader in self._shaders():
             shader.allocate()
         self._made = None
@@ -124,6 +129,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
     def deallocate(self) -> None:
         for fbo in (self._image, self._depth, self._depth_mask, self._mask, self._foreground, self._guided, self._products, self._coefficients):
             fbo.deallocate()
+        self._color.deallocate()
         for shader in self._shaders():
             shader.deallocate()
         super().deallocate()
@@ -134,6 +140,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
     def reset(self) -> None:
         for fbo in (self._image, self._depth, self._depth_mask, self._mask, self._foreground):
             fbo.clear()
+        self._color.clear()
         self._made = None
         self._timestamp = None
         self._pose_points = None
@@ -191,6 +198,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         self._foreground.end()
 
         Style.pop_style()
+        self._color.process(self._foreground, self._mask)
 
         self._pose_points = self._place_pose(input.pose)
 

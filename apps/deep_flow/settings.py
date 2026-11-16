@@ -59,7 +59,7 @@ class Layers(IntEnum):
     view_mask =     auto()
     view_depth_mask = auto()
     view_pose =     auto()
-    foreground_look = auto()
+    view_color =    auto()
     # data layers
     time_series =   auto()
     data_B_W =      auto()
@@ -251,6 +251,7 @@ class ViewLayerSettings(render.StageLayerSettings):
     guided_radius: Field[float] = Field(2.0, min=0.0, max=8.0, step=0.25, newline=True, description="How far the image moves the mask's edge to its own, in depth pixels; 0 = off")
     edge_contrast: Field[float] = Field(0.03, min=0.001, max=0.3, step=0.001, description="The image's brightness spread (0 to 1) above which the mask's edge follows the image's")
     depth_read:    Field[DepthRead] = Field(DepthRead.SURFACE, newline=True, description="How the depth is read into the view: its edge on its own pixels or on the mask's")
+    color:         Group[render.ForegroundLookSettings] = Group(render.ForegroundLookSettings)
 
 
 class DepthDrawMode(IntEnum):
@@ -271,7 +272,6 @@ class ViewDepthLayerSettings(BaseSettings):
 class FlowInputSettings(BaseSettings):
     """Which layers feed the flow, chosen live, and how the fluid weights its injections."""
     motion_image:    Field[Layers] = Field(Layers.view_image,      description="The picture the motion is measured on")
-    bridge_image:    Field[Layers] = Field(Layers.foreground_look, description="The picture the density's color comes from")
     scale_by_motion: Field[bool]   = Field(True, description="Weight each injection by the player's motion; off is full weight")
 
 
@@ -296,7 +296,6 @@ class RenderSettings(BaseSettings):
     preview: Group[PreviewGroup]                 = Group(PreviewGroup)
     view_depth: Group[ViewDepthLayerSettings]    = Group(ViewDepthLayerSettings)
     view_pose: Group[render.ViewPoseLayerSettings] = Group(render.ViewPoseLayerSettings)
-    foreground_look: Group[render.ForegroundLookSettings] = Group(render.ForegroundLookSettings)
     color_mask: Group[render.SimilaritySilhouetteLayerSettings] = Group(render.SimilaritySilhouetteLayerSettings)
     inputs : Group[FlowInputSettings]            = Group(FlowInputSettings)
     view   : Group[ViewLayerSettings]            = Group(ViewLayerSettings)

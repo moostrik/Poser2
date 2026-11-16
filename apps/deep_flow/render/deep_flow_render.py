@@ -61,7 +61,7 @@ class DeepFlowRender(RenderBase):
             pose_compositor = self.L[Layers.pose][i] =      render.PoseCompositor(      i, self.board,   cam_image.texture, cam_crop, settings.preview.pose,      settings.colors)
 
             # The flow's view of the capture, and what is drawn from it
-            view =          self.L[Layers.view][i] =        ViewLayer(           settings.view, settings.motion.z, fov)
+            view =          self.L[Layers.view][i] =        ViewLayer(           i, settings.view, settings.motion.z, fov, settings.colors)
             output: ViewOutput = view.output
             masks[i] = output.mask
             self.L[Layers.view_image][i] =                  ViewOutputLayer(     view, output.image)
@@ -70,10 +70,9 @@ class DeepFlowRender(RenderBase):
             self.L[Layers.view_depth_mask][i] =             ViewOutputLayer(     view, output.depth_mask)
             self.L[Layers.view_depth][i] =                  ViewDepthLayer(      view, settings.view_depth)
             self.L[Layers.view_pose][i] =                   render.ViewPoseLayer(       i, view,                                    settings.view_pose,         settings.colors)
-            view_foreground: render.LayerBase = self.L[Layers.view_foreground][i]
-            foreground_look = self.L[Layers.foreground_look][i] = render.ForegroundLookLayer(i, view_foreground, output.mask,           settings.foreground_look, settings.colors)
+            self.L[Layers.view_color][i] =                  ViewOutputLayer(     view, output.color)
 
-            ms_mask =       self.L[Layers.color_mask][i] =  render.SimilaritySilhouetteLayer(i, self.board,   foreground_look.texture,   masks, settings.color_mask, settings.colors)
+            ms_mask =       self.L[Layers.color_mask][i] =  render.SimilaritySilhouetteLayer(i, self.board,   output.color,   masks, settings.color_mask, settings.colors)
             self.L[Layers.motion][i] =                      render.Motion3DLayer(       i, settings.motion)
             self.L[Layers.bridge][i] =                      render.Bridge3DLayer(       settings.bridge)
             fluid =         self.L[Layers.fluid][i] =       render.Fluid3DLayer(        settings.fluid)
@@ -296,9 +295,8 @@ class DeepFlowRender(RenderBase):
                 self._run_capture(i, capture, same_tick=index > 0)
 
     def _run_capture(self, i: int, capture: Capture, same_tick: bool) -> None:
-        """One capture: its image and depth into GL, the view of it with its player's pose, the foreground's look,
-        the motion, and the bridge stepping over the time since the capture before, from the pictures the panel
-        names. `same_tick`: another capture in this tick, whose bridge outputs the fluid takes with the last's."""
+        """One capture: its image and depth into GL, the view of it with its player's pose and its color, the
+        motion, and the bridge stepping over the time since the capture before, the density's color the view's. `same_tick`: another capture in this tick, whose bridge outputs the fluid takes with the last's."""
         inputs: FlowInputSettings = self.settings.inputs
         image = cast(render.CaptureImageLayer, self.L[Layers.capture_image][i])
         depth = cast(render.CaptureDepthLayer, self.L[Layers.capture_depth][i])
@@ -315,17 +313,15 @@ class DeepFlowRender(RenderBase):
         self._view_timer.begin()
         view.update()
         self._view_timer.end()
-        self.L[Layers.foreground_look][i].update()
 
         interval: float = render.frame_interval(capture.timestamp, self._capture_timestamps.get(i), self.settings.motion.fps, self._dt, self._dt)
         self._capture_timestamps[i] = capture.timestamp
         self.motion_rates.setdefault(i, FPS()).processed()
         motion_image: render.LayerBase = self._layer(inputs.motion_image, i) or self.L[Layers.view_image][i]
-        color: render.LayerBase | None = self._layer(inputs.bridge_image, i)
         output: ViewOutput = view.output
         motion.set_input(render.MotionInput(motion_image.texture, capture.timestamp, interval, output.depth, output.mask, output.depth_mask))
         motion.update()
-        bridge.set_input(render.BridgeInput(motion.output.velocity, interval, color.texture if color is not None else None,
+        bridge.set_input(render.BridgeInput(motion.output.velocity, interval, output.color,
                                         mask=output.mask, depth_mask=output.depth_mask, z_position=motion.output.z_position, same_tick=same_tick))
         bridge.update()
 

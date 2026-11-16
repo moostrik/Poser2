@@ -46,10 +46,6 @@ added. One commit per step, both presets (`settings.json`, `very nice.json`) and
 guard tests, the render's tests and one -sim start (the panels in place, the presets loaded without unknown
 keys).
 
-- **A4.** The color in the view: the view's last pass, `color`, run by the render's look class that hd_trio's
-  centered foreground also runs, its output read by the bridge, its settings `view.color`; `enabled` off passes
-  the foreground as it is. `inputs.bridge_image` and deep_flow's `foreground_look` layer and panel go. VIEW.md
-  says it.
 - **A5.** A monitor per stage, in the stage's panel, showing all its FBOs: deep_flow's own wiring, a
   `MonitorLayer` per stage with its stage fixed. The capture's image and depth layers declare their ports;
   `MonitorLayer` gets `view_depth`'s depth colormaps. `monitor_a`, `monitor_b`, the view's wrapper layers and
@@ -253,7 +249,7 @@ Not worked on until asked for; each with what is known.
 
 ## Rules it touches
 
-- Keep presets and settings schemas in sync: the view's color, the monitors, the panel tree, the layer select, A4 to A9.
+- Keep presets and settings schemas in sync: the monitors, the panel tree, the layer select, A5 to A9.
 - Remove obsolete pathways: the wrapper layers, `view_depth`, `monitor_a`, `monitor_b`, `inputs`, `stage`, the
   pose's layers and deep_flow's composite, A5 to A7.
 - Settings connect the user and a component, not two components: the view's tolerance and size, A8.

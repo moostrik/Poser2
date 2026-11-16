@@ -41,7 +41,7 @@ CHAIN: tuple[ChainLayer, ...] = (
     ChainLayer(Layers.view_depth_mask, Size.VIEW, Layers.view_image),
     ChainLayer(Layers.view_depth,      Size.VIEW, Layers.view_image, tick=True),
     ChainLayer(Layers.view_pose,       Size.VIEW, Layers.view_image, tick=True),
-    ChainLayer(Layers.foreground_look, Size.VIEW, Layers.view_image, tick=True, capture=True),  # the density's color
+    ChainLayer(Layers.view_color,      Size.VIEW, Layers.view_image),   # the density's color, the view's last pass
     ChainLayer(Layers.color_mask,      Size.VIEW, Layers.view_image, tick=True),
     # the motion, the bridge, the fluid
     ChainLayer(Layers.motion,          Size.LARGE, tick=True, capture=True),

@@ -356,19 +356,6 @@
       "use_scores": false,
       "draw_anchors": false
     },
-    "foreground_look": {
-      "blend_factor": 0.2,
-      "exposure": 0.99,
-      "gamma": 0.8,
-      "offset": 0.0,
-      "contrast": 1.24,
-      "saturation": 1.01,
-      "levels": 0,
-      "smoothness": 0.0,
-      "colorize": 0.0,
-      "sharpen": 0.82,
-      "use_mask": true
-    },
     "color_mask": {
       "stage": 3,
       "max_players": 1,
@@ -381,7 +368,6 @@
     },
     "inputs": {
       "motion_image": "view_image",
-      "bridge_image": "foreground_look",
       "scale_by_motion": false
     },
     "view": {
@@ -392,7 +378,21 @@
       "far": 1.7,
       "guided_radius": 2.0,
       "edge_contrast": 0.03,
-      "depth_read": "SURFACE"
+      "depth_read": "SURFACE",
+      "color": {
+        "enabled": true,
+        "blend_factor": 0.2,
+        "exposure": 0.99,
+        "gamma": 0.8,
+        "offset": 0.0,
+        "contrast": 1.24,
+        "saturation": 1.01,
+        "levels": 0,
+        "smoothness": 0.0,
+        "colorize": 0.0,
+        "sharpen": 0.82,
+        "use_mask": true
+      }
     },
     "motion": {
       "guard": true,

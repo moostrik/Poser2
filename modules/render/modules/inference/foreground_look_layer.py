@@ -13,6 +13,7 @@ from .shaders import CelShade
 
 class ForegroundLookSettings(BaseSettings):
     """The foreground's look."""
+    enabled:        Field[bool]  = Field(True, description="The look on; off, the foreground as it is")
     blend_factor:   Field[float] = Field(0.2, min=0.0, max=1.0, description="Foreground temporal blending")
     exposure:       Field[float] = Field(1.2, min=0.1, max=3.0, description="Exposure multiplier")
     gamma:          Field[float] = Field(1.0, min=0.5, max=2.0, description="Gamma correction")
@@ -75,10 +76,19 @@ class ForegroundLook:
         self._blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
 
     def process(self, source: Texture, mask: Texture | None) -> None:
-        """The look of `source`, the player's colors on black, with `mask` as its alpha where `use_mask`."""
+        """The look of `source`, the player's colors on black, with `mask` as its alpha where `use_mask`; `source` as
+        it is while not `enabled`."""
         s: ForegroundLookSettings = self.settings
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
+
+        if not s.enabled:
+            self._effect_fbo.swap()
+            self._effect_fbo.begin()
+            source.draw()
+            self._effect_fbo.end()
+            Style.pop_style()
+            return
 
         self._blend_fbo.swap()
         self._blend_fbo.begin()

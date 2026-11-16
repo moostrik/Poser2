@@ -21,10 +21,10 @@ Once per capture, in order:
 | the foreground  | the image where the mask is                                                                     |
 | the pose        | the pose's points placed in the window, for the pose drawn over the view                        |
 
-Its outputs are the image, the foreground, the depth, the mask and the depth mask; the panel picks the motion's
-picture and the density's among them (`inputs`). The density's color is the foreground's look
-(`ForegroundLook`: the blend over time, the cel shade, the hue shift, the sharpening) on the view's foreground
-(`foreground_look`), once per capture.
+Its outputs are the image, the foreground, the color, the depth, the mask and the depth mask; the panel picks the
+motion's picture (`inputs`). The color, the density's, is the view's last pass: the foreground's look
+(`ForegroundLook`: the blend over time, the cel shade, the hue shift, the sharpening, settings `view.color`) on the
+view's foreground, once per capture; with `view.color.enabled` off it is the foreground as it is.
 
 The color is resampled twice, straightened in the uploader and cut to the view here, a little softer than one
 resample **(deduction)**, for keeping the camera's work and the flow's apart.

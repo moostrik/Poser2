@@ -229,10 +229,9 @@ temperature of the capture with the larger amount (`CaptureMax`), the rest the n
 layers feed the inputs is app policy: hd_trio wires fixed layers, measures on its centered mask,
 gives each bridge the centered foreground as the picture behind its density and temperature, each
 injection the camera's track color, and weights the own camera's injection by the player's motion
-and another's by the cross-camera similarity times `similarity_scale`; deep_flow picks the pictures
-on its panel, live, among the view's outputs, one `Layers` field per picture (`motion_image`,
-`bridge_image`) in its `inputs` group with `scale_by_motion` (`apps/deep_flow/settings.py`), and
-takes the mask from the view stage, its own layer (`apps/deep_flow/render/layers/view/`). deep_flow
+and another's by the cross-camera similarity times `similarity_scale`; deep_flow picks the motion's
+picture on its panel, live, among the view's outputs (`inputs.motion_image`, with `scale_by_motion`,
+`apps/deep_flow/settings.py`), gives the bridge the view's color, and takes the mask from the view stage, its own layer (`apps/deep_flow/render/layers/view/`). deep_flow
 gives each camera two monitors, `monitor_a` and `monitor_b`, each handed every stage's `ports`; they go
 into the panel's select lists like any layer, and two show A beside B.
 
