@@ -168,7 +168,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
             return
         s: ViewLayerSettings = self.settings
         d: ViewDepthSettings = s.depth
-        made: tuple = (input.timestamp, s.fixed_x, s.fixed_y, s.fixed_height, s.guided_radius, s.edge_contrast,
+        made: tuple = (input.timestamp, s.fixed_x, s.fixed_y, s.fixed_height, s.mask.guided_radius, s.mask.edge_contrast,
                        d.near, d.far, d.depth_read, d.tolerance, image.width, image.height, self._image.width, self._image.height,
                        self._color_grade.made_with)
         if made == self._made:
@@ -216,7 +216,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
             return
         self._depth.begin()
         self._depth_shader.use(depth, roi, s.depth.tolerance, read, mask=self._mask,
-                               near=s.depth.near, far=s.depth.far, reach=s.guided_radius)
+                               near=s.depth.near, far=s.depth.far, reach=s.mask.guided_radius)
         self._depth.end()
 
     def _cut_and_guide(self, s: ViewLayerSettings) -> None:
@@ -233,7 +233,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         """The depth mask, its edge moved to the image's (the guided filter): the products, their box means, the
         coefficients, their box means, the output. The radius, in the depth's pixels, is drawn in the view's; the
         filter's ε is `edge_contrast` squared, a variance of the image's brightness. Off, the depth mask itself."""
-        radius: int = round(s.guided_radius * view_per_depth_pixel(self._window, self._grid_size[1], self._image.height))
+        radius: int = round(s.mask.guided_radius * view_per_depth_pixel(self._window, self._grid_size[1], self._image.height))
         if radius < 1:
             return self._depth_mask
         products, coefficients = self._products, self._coefficients
@@ -243,7 +243,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         for fbo in (products, coefficients):
             if fbo is coefficients:
                 coefficients.begin()
-                self._guided_shader.coefficients(products, s.edge_contrast ** 2)
+                self._guided_shader.coefficients(products, s.mask.edge_contrast ** 2)
                 coefficients.end()
             for horizontal in (True, False):
                 fbo.swap()

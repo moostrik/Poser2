@@ -190,7 +190,7 @@ def main() -> int:
         grid = depth.depth.cpu().numpy()
         if d.depth_read == DepthRead.MASK:
             want = mask_sided_depth(grid, uu, vv, d.tolerance, read(output.mask) > 0.5, d.near, d.far,
-                                    settings.guided_radius)
+                                    settings.mask.guided_radius)
         else:
             want = edge_aware_depth(grid, uu, vv, d.tolerance)
         off = np.abs(got - want) > 0.001

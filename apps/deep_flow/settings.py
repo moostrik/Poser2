@@ -214,11 +214,18 @@ class _PoseCompositorSettings(render.PoseCompositorSettings):
 
 # The view's layer's settings (render/layers/view)
 class ViewDepthSettings(BaseSettings):
-    """The view's depth: the player's depth band, how the depth is read into the view and the tolerance it reads at."""
+    """The view's depth: the player's depth band, the depth mask's; how the depth is read into the view and the
+    tolerance it reads at."""
     near:       Field[float]     = Field(0.5, min=0.1, max=12.0, step=0.05, description="Nearest depth that is the player (m)")
     far:        Field[float]     = Field(4.0, min=0.1, max=12.0, step=0.05, description="Farthest depth that is the player (m)")
     depth_read: Field[DepthRead] = Field(DepthRead.SURFACE, newline=True, description="How the depth is read into the view: its edge on its own pixels or on the mask's")
     tolerance:  Field[float]     = Field(0.2, min=0.05, max=0.5, step=0.01, description="Depth jump beyond which the read blends no two depth pixels, m")
+
+
+class ViewMaskSettings(BaseSettings):
+    """The view's mask: the depth mask, its edge moved onto the image's by the guided filter."""
+    guided_radius: Field[float] = Field(2.0, min=0.0, max=8.0, step=0.25, description="How far the image moves the mask's edge to its own, in depth pixels; 0 = off")
+    edge_contrast: Field[float] = Field(0.03, min=0.001, max=0.3, step=0.001, description="The image's brightness spread (0 to 1) above which the mask's edge follows the image's")
 
 
 class ColorGradeSettings(BaseSettings):
@@ -234,17 +241,15 @@ class ColorGradeSettings(BaseSettings):
 
 
 class ViewLayerSettings(render.StageLayerSettings):
-    """The view's size, its window on the camera image and the mask's edge; its depth and its color grade in their
-    panels."""
+    """The view's size and its window on the camera image; its color grade, its mask and its depth in their panels."""
     width:         Field[int]   = Field(448, min=32, max=4096, step=32, description="The view's width (pixels)")
     height:        Field[int]   = Field(800, min=32, max=4096, step=32, description="The view's height (pixels)")
     fixed_x:       Field[float] = Field(0.5, min=0.0, max=1.0, description="The window's center across the camera image")
     fixed_y:       Field[float] = Field(0.5, min=0.0, max=1.0, description="The window's center down the camera image")
     fixed_height:  Field[float] = Field(1.0, min=0.05, max=2.0, description="The window's height, a share of the camera image's")
-    guided_radius: Field[float] = Field(2.0, min=0.0, max=8.0, step=0.25, newline=True, description="How far the image moves the mask's edge to its own, in depth pixels; 0 = off")
-    edge_contrast: Field[float] = Field(0.03, min=0.001, max=0.3, step=0.001, description="The image's brightness spread (0 to 1) above which the mask's edge follows the image's")
-    depth: Group[ViewDepthSettings] = Group(ViewDepthSettings)
     color_grade: Group[ColorGradeSettings] = Group(ColorGradeSettings)
+    mask:        Group[ViewMaskSettings]   = Group(ViewMaskSettings)
+    depth:       Group[ViewDepthSettings]  = Group(ViewDepthSettings)
 
 
 class CaptureView(IntEnum):
