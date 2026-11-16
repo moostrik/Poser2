@@ -19,7 +19,7 @@ from nicegui import ui
 from modules.log_config import LogRingBuffer
 from modules.settings import BaseSettings, Field, Access, Widget
 
-from .controls import ActionButton, Control, PinnedReadout, access_css_class, build_control, build_entry, generate_label
+from .controls import DEPTH_BG, ActionButton, Control, PinnedReadout, access_css_class, build_control, build_entry, generate_label
 from .log_drawer import LOG_DRAWER_DEFAULT_HEIGHT, build_log_drawer
 from .poll import POLL_INTERVAL, tick
 from .preset_controls import PresetStore, preset_controls
@@ -29,9 +29,6 @@ logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
 STATIC_URL = "/panel"
-
-# The background of a card by its depth, lighter the deeper it sits.
-DEPTH_BG = ["bg-grey-9", "bg-grey-8", "bg-grey-7", "bg-grey-6", "bg-grey-5"]
 
 
 class HideToggle(NamedTuple):

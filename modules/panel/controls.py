@@ -47,6 +47,9 @@ from .knob import Knob, CHANGE_THROTTLE
 
 SLIDER_WIDTH: int = 48      # Tailwind width step of a slider without a `width` hint
 
+# The background of a card by its depth, lighter the deeper it sits; a path select's levels take it too.
+DEPTH_BG = ["bg-grey-9", "bg-grey-8", "bg-grey-7", "bg-grey-6", "bg-grey-5"]
+
 ElementT = TypeVar('ElementT', bound=ui.element)
 
 
@@ -706,22 +709,21 @@ def path_label(path: str) -> str:
     return path.replace('.', ' › ') if path else '—'
 
 
-PATH_MENU_GRACE: float = 0.3    # s the mouse may be outside a path select's menu before it closes
+PATH_MENU_GRACE: float = 0.3    # s the mouse may be outside a path select's list before it closes
 
 
 class PathSelect(Control):
     """A dotted path from the current list of another field (``options``), picked in one nested list: a button
-    showing the path, opening a cascading menu of its levels, steps and paths side by side. A step's menu opens
-    on a click on it, flush against its parent; the menu opens with the shown path's steps open and the path
-    marked. A pick writes the field and the menu stays open; it closes when the mouse has left it for
-    ``PATH_MENU_GRACE``, on a click outside or on Escape. Polls both, always."""
+    showing the path, opening a list of its top level, steps and paths side by side. A step expands in place, its
+    level underneath on the next card tint (``DEPTH_BG``), as the nested panels do; the list opens with the shown
+    path's steps expanded and the path marked. A pick writes the field and the list stays open; it closes when
+    the mouse has left it for ``PATH_MENU_GRACE``, on a click outside or on Escape. Polls both, always."""
     widget = Widget.path_select
 
     def build(self) -> None:
         self.options_field = self.field.options
         self.paths: list[str] = list(getattr(self.settings, self.options_field.name)) if self.options_field else []
-        self.items: dict[str, ui.item] = {}         # the menu's paths, as filled last
-        self.chain: list[ui.menu] = []              # the menus of the shown path's steps, top down
+        self.items: dict[str, ui.item] = {}         # the list's paths, as filled last
         self.close_timer: ui.timer | None = None
         self.button = self.tooltip(ui.button(path_label(self.shown)).props(
             "dense outline no-caps align=left" + self.lock(readonly=False)))
@@ -729,49 +731,31 @@ class PathSelect(Control):
         if self.locked:
             return
         with self.button:
-            self.menu = self._menu(nested=False)
+            self.menu = ui.menu().props('anchor="bottom left" self="top left"')
         self.menu.on('before-show', lambda _: self._fill())
-        self.menu.on('show', lambda _: self._open_chain(0))
-
-    def _menu(self, nested: bool) -> ui.menu:
-        """A menu that holds the mouse while it is in it; a nested one flush against its step, overlapping it."""
-        menu = ui.menu().props('anchor="top end" self="top start" :offset="[-2, 0]"' if nested
-                               else 'anchor="bottom left" self="top left"')
-        menu.on('mouseenter', lambda _: self._hold())
-        menu.on('mouseleave', lambda _: self._release())
-        return menu
+        self.menu.on('mouseenter', lambda _: self._hold())
+        self.menu.on('mouseleave', lambda _: self._release())
 
     def _fill(self) -> None:
         """The levels, from the paths as they are now."""
         self.menu.clear()
         self.items = {}
-        self.chain = []
-        with self.menu:
-            self._level('')
+        with self.menu, ui.column().classes(f"gap-1 p-1 min-w-48 {DEPTH_BG[0]}"):
+            self._level('', 0)
 
-    def _level(self, prefix: str) -> None:
-        with ui.list().props('dense'):
-            for key, label in path_level(self.paths, prefix).items():
-                if key.endswith('.'):
-                    with ui.item().props('clickable'):
-                        ui.item_section(label)
-                        submenu = self._menu(nested=True)
-                        with submenu:
-                            self._level(key)
-                    if self.shown.startswith(key):
-                        index: int = len(self.chain)
-                        self.chain.append(submenu)
-                        submenu.on('show', lambda _, i=index: self._open_chain(i + 1))
-                else:
-                    item = ui.item(label, on_click=lambda _, k=key: self.commit(k))
-                    if key == self.shown:
-                        item.props('active')
-                    self.items[key] = item
-
-    def _open_chain(self, index: int) -> None:
-        """The shown path's steps open, one after another as each shows."""
-        if index < len(self.chain):
-            self.chain[index].open()
+    def _level(self, prefix: str, depth: int) -> None:
+        for key, label in path_level(self.paths, prefix).items():
+            if key.endswith('.'):
+                tint: str = DEPTH_BG[min(depth + 1, len(DEPTH_BG) - 1)]
+                step = ui.expansion(label.removesuffix(' ›'), value=self.shown.startswith(key)).props(
+                    "duration=0 dense dense-toggle").classes(f"w-full rounded {tint}")
+                with step, ui.column().classes("gap-0 w-full"):
+                    self._level(key, depth + 1)
+            else:
+                item = ui.item(label, on_click=lambda _, k=key: self.commit(k)).props('clickable dense').classes("w-full rounded")
+                if key == self.shown:
+                    item.props('active')
+                self.items[key] = item
 
     def _hold(self) -> None:
         if self.close_timer is not None:
