@@ -102,8 +102,8 @@ What is measured today (the tables with numbers in the flow's documents, 73), by
 Further measurements on the motion are free where a result points to something (Matthias, 2026-11-16), each
 stated before it is made.
 
-Question, for A3: the rows of [VIEW.md's depth table](VIEW.md#the-depth) that name the depth mask's gate and
-`view.depth.tolerance`: deleted with the new baseline, or kept beside it?
+- **A5.** When A3 and A4 are done: the rows of [VIEW.md's depth table](VIEW.md#the-depth) that name the depth
+  mask's gate and `view.depth.tolerance` deleted; until then they stay beside the new baseline, to compare.
 
 ## B. The view
 
