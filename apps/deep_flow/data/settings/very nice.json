@@ -320,15 +320,14 @@
         "center_y": 0.5,
         "height": 1.0
       },
-      "depth": {
-        "depth_read": "SURFACE",
-        "tolerance": 0.2
-      },
       "depth_mask": {
         "near": 0.1,
         "far": 1.7,
         "guided_radius": 2.0,
         "edge_contrast": 0.03
+      },
+      "depth": {
+        "tolerance": 0.2
       },
       "color_grade": {
         "enabled": true,

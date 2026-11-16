@@ -15,15 +15,16 @@ recorded rate, again and again, A on the left, B on the right:
     5  the velocity as arrows
 
 The loop splits into a still part and moves, each a slow half then a fast one: by `segments.json`
-beside the frames ({"still": [from, to], "moves": [[from, fast from, to], ...]}, seconds) where there
-is one, else by the frames' motion (the mean luminance change in the mask): the moves are where it
+beside the frames ({"still": [from, to], "moves": [[from, fast from, to], ...]}, seconds; a move as
+[from, slow to, fast from, to] leaves out the time between) where there is one, else by the frames' motion (the mean luminance change in the mask): the moves are where it
 rises above the still part's for a while, and a move's fast half is where it steps up most.
 
 Each loop prints, for A and B, in the still part: x/y and z as the fluid gets them, at the edge (0–6
 px inside the mask) and inside (12 px and more), and z on the table (outside, 16 px and more); per
 move, the body's x/y and z in its slow and fast half and fast over slow, how its z follows its real
 depth change, and the frames x/y takes to stop after it; the restarts of the depth velocity, and the
-flow's time on the GPU per frame. `--fast` runs one loop without the window, as fast as it goes;
+flow's time on the GPU per frame; then the one results table's row (`ROW`), with, where the frames hold
+the depth mask, the share of the mask without a z position and the depth mask's fit to the image's edges. `--fast` runs one loop without the window, as fast as it goes;
 `--verify` compares A's first frames with the numpy references instead.
 """
 
@@ -163,16 +164,18 @@ class Frames:
         if given.exists():
             parts = json.loads(given.read_text())
             self.still: tuple[float, float] = tuple(parts['still'])
-            self.moves: list[tuple[float, float, float]] = [tuple(move) for move in parts['moves']]
+            self.moves: list[tuple[float, ...]] = [tuple(move) for move in parts['moves']]
         else:
             self.still, self.moves = split_moves(self.t, motion)
 
     def __len__(self) -> int:
         return len(self.calls)
 
-    def load(self, k: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def load(self, k: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None]:
+        """The luminance, the depth, the mask and the depth mask, None in frames saved before it."""
+        depth_mask = self.folder / f'depth_mask_{k:04d}.npy'
         return (np.load(self.folder / f'luminance_{k:04d}.npy').astype(np.float32), np.load(self.folder / f'depth_{k:04d}.npy').astype(np.float32),
-                np.load(self.folder / f'mask_{k:04d}.npy'))
+                np.load(self.folder / f'mask_{k:04d}.npy'), np.load(depth_mask) if depth_mask.exists() else None)
 
     def motion(self) -> np.ndarray:
         """Per frame, the mean luminance change in the mask since the frame before (0 to 1). Also
@@ -192,18 +195,21 @@ class Frames:
         return motion
 
     def segment(self, k: int) -> str:
-        """'still', 'move N slow' or 'move N fast' (N from 1), or '' between them."""
+        """'still', 'move N slow' or 'move N fast' (N from 1), or '' between them. A move given with four
+        moments (from, slow to, fast from, to) leaves out the time between its halves."""
         t = self.t[k]
         if self.still[0] <= t < self.still[1]:
             return 'still'
-        for n, (begin, fast, end) in enumerate(self.moves, 1):
+        for n, move in enumerate(self.moves, 1):
+            begin, fast, end = move[0], move[-2], move[-1]
+            slow_end = move[1] if len(move) == 4 else fast
             if begin <= t < end:
-                return f'move {n} {"slow" if t < fast else "fast"}'
+                return f'move {n} slow' if t < slow_end else f'move {n} fast' if t >= fast else ''
         return ''
 
     def describe(self) -> str:
         return (f'still {self.still[0]:.1f}-{self.still[1]:.1f} s; '
-                + '; '.join(f'move {n} {b:.1f}-{e:.1f} s, fast from {f:.1f}' for n, (b, f, e) in enumerate(self.moves, 1)))
+                + '; '.join(f'move {n} {m[0]:.1f}-{m[-1]:.1f} s, fast from {m[-2]:.1f}' for n, m in enumerate(self.moves, 1)))
 
 
 def split_moves(t: np.ndarray, motion: np.ndarray) -> tuple[tuple[float, float], list[tuple[float, float, float]]]:
@@ -252,12 +258,25 @@ class Measures:
         self.times: list[float] = []
         self.restarts: dict[str, list[float]] = {'still': [], 'moving': []}
         self.milliseconds: list[float] = []
+        self.fluid_z: list[float] = []           # z as the fluid gets it, inside, px per frame
+        self.without_z: list[float] = []         # the share of the mask without a z position, in the parts measured
+        self.fit: list[float] = []               # the image's brightness gradient along the depth mask's edge, in the still part
         self._before: np.ndarray | None = None
 
     def add(self, t: float, segment: str, xy: np.ndarray, track: np.ndarray, z: np.ndarray, depth: np.ndarray, mask: np.ndarray,
-            moved: np.ndarray, milliseconds: float) -> None:
+            moved: np.ndarray, milliseconds: float, weight: np.ndarray | None = None, depth_mask: np.ndarray | None = None,
+            luminance: np.ndarray | None = None) -> None:
         """`xy` and `z` are as the fluid gets them, in px per frame; `track` is the depth velocity's state;
-        `moved` the pixels that move in the loop."""
+        `moved` the pixels that move in the loop; `weight` the z position's, 0 where the motion has no depth for a
+        pixel; `depth_mask` and `luminance` for the depth mask's fit to the image's edges."""
+        if segment and weight is not None and mask.any():
+            self.without_z.append(float(np.mean(weight[mask] <= 0.0)))
+        if segment == 'still' and depth_mask is not None and luminance is not None and depth_mask.any():
+            cut = depth_mask.astype(np.uint8)
+            edge_of_cut = (cut - cv2.erode(cut, np.ones((3, 3), np.uint8))).astype(bool)
+            gradient = np.hypot(cv2.Sobel(luminance, cv2.CV_32F, 1, 0, ksize=3), cv2.Sobel(luminance, cv2.CV_32F, 0, 1, ksize=3))
+            if edge_of_cut.any():
+                self.fit.append(float(np.mean(gradient[edge_of_cut])))
         width = depth.shape[1]
         inside = cv2.distanceTransform(mask.astype(np.uint8), cv2.DIST_L2, 3)
         outside = cv2.distanceTransform((~mask).astype(np.uint8), cv2.DIST_L2, 3)
@@ -276,6 +295,7 @@ class Measures:
         self.body_depth.append(near)
         self.body_xy.append(float(np.mean(xy[core])) if core.any() else 0.0)
         self.body_z.append(float(np.mean(track[..., 0][core])) * width if core.any() else np.nan)
+        self.fluid_z.append(float(np.mean(z[core])) if core.any() else 0.0)
         moving = core & moved
         self.moving_xy.append(float(np.mean(xy[moving])) if moving.any() else 0.0)
         self.moving_z.append(float(np.mean(track[..., 0][moving])) * width if moving.any() else np.nan)
@@ -321,7 +341,29 @@ class Measures:
                          f'z/real {np.dot(z, r) / max(np.dot(r, r), 1e-12):.2f} (corr {np.corrcoef(z, r)[0, 1]:.2f}) | {stop}')
         lines.append('restarts ' + ', '.join(f'{name} {np.mean(v) * 100:.2f}%' for name, v in self.restarts.items() if v))
         lines.append(f'{np.median(self.milliseconds):.2f} ms per frame')
+        lines.append(self.row(segments))
         return '\n    '.join([' | '.join(lines[:5])] + lines[5:])
+
+    def row(self, segments: np.ndarray) -> str:
+        """The one results table's row: the share of the mask without a z position, the depth mask's fit, z's
+        noise inside and at the edge (the still part's p99), z inside in the slow and the fast halves (their
+        mean), fast over noise, x/y at the edge (p99), and the flow's ms per frame."""
+        def p99(name: str) -> float:
+            parts = self.still[name]
+            values = np.concatenate(parts) if parts else np.zeros(0)
+            return float(np.percentile(values, 99)) if values.size else 0.0
+
+        fluid_z = np.array(self.fluid_z)
+        slow = np.array([s.endswith('slow') for s in segments])
+        fast = np.array([s.endswith('fast') for s in segments])
+        slow_z = float(np.mean(fluid_z[slow])) if slow.any() else 0.0
+        fast_z = float(np.mean(fluid_z[fast])) if fast.any() else 0.0
+        noise = p99('z inside')
+        without = f'{np.mean(self.without_z) * 100:.1f}%' if self.without_z else 'n/a'
+        fit = f'{np.mean(self.fit):.4f}' if self.fit else 'n/a'
+        return (f'ROW no z position {without} | fit {fit} | z noise inside / edge {noise:.3f} / {p99("z edge"):.3f} | '
+                f'slow {slow_z:.3f} | fast {fast_z:.3f} | fast / noise {fast_z / max(noise, 1e-9):.3f} | '
+                f'x/y at edge {p99("xy edge"):.3f} | {np.median(self.milliseconds):.2f} ms')
 
 
 class Side:
@@ -342,11 +384,19 @@ class Side:
             self.visualizer.resize(width, height)
         self.measures = Measures()
 
-    def step(self, frames: Frames, k: int, luminance: Texture, depth: Texture, mask: Texture) -> None:
+    def step(self, frames: Frames, k: int, luminance: Texture, depth: Texture, mask: Texture, depth_mask: Texture | None = None) -> None:
         c = frames.calls[k]
         self.flow.set_input(luminance)
         self.flow.set_mask(mask)
-        self.flow.update(depth, c['delta_time'], c['view_span'], tuple(c['depth_step']))
+        self.flow.set_depth_mask(depth_mask)
+        self.flow.update(depth, c['delta_time'], c['view_span'], tuple(c['depth_step']),
+                         depth_range=tuple(c.get('depth_range', (0.0, 0.0))))
+
+    def z_px(self, velocity: np.ndarray, delta_time: float, width: int) -> np.ndarray:
+        """The velocity's z (image widths per second, times its gain, gated by the mask and the depth mask) as
+        px per frame: z as the fluid gets it."""
+        s = self.settings
+        return np.abs(velocity[..., 2] / (s.z_gain if s.z_gain else 1.0)) * delta_time * width
 
     def xy_px(self, velocity: np.ndarray, delta_time: float, width: int) -> np.ndarray:
         """The velocity's x/y (image widths per second, times the gains) as px per frame."""
@@ -380,7 +430,7 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
     state, catch_up, previous = np.zeros((h, w, 4)), np.zeros((h, w, 2)), None
     last = min(frames_to_check, len(frames)) - 1
     for k in range(last + 1):
-        lum, depth, mask = frames.load(k)
+        lum, depth, mask, _ = frames.load(k)
         upload(luminance, lum); upload(depth_texture, depth); upload(mask_texture, mask.astype(np.float32))
         side.step(frames, k, luminance, depth_texture, mask_texture)
         if previous is None:
@@ -430,7 +480,7 @@ def main() -> int:
     window = context(not args.fast, panel_w * 2, panel_h)
     recorded = frames.calls[0]['settings']
     sides = [Side('A', recorded, overrides(args.a), w, h, not args.fast), Side('B', recorded, overrides(args.b), w, h, not args.fast)]
-    luminance, depth_texture, mask_texture = Texture(), Texture(), Texture()
+    luminance, depth_texture, mask_texture, depth_mask_texture = Texture(), Texture(), Texture(), Texture()
     span = float(np.median([c['view_span'] for c in frames.calls]))
     controls = {'view': args.view, 'paused': False, 'step': 0, 'scale': 1.0}
 
@@ -457,10 +507,12 @@ def main() -> int:
     for side in sides:
         print(f'{side.name}: {side.changed or "as recorded"}')
 
-    def feed(k: int) -> tuple[np.ndarray, np.ndarray]:
-        lum, depth, mask = frames.load(k)
+    def feed(k: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None]:
+        lum, depth, mask, depth_mask = frames.load(k)
         upload(luminance, lum); upload(depth_texture, depth); upload(mask_texture, mask.astype(np.float32))
-        return depth, mask
+        if depth_mask is not None:
+            upload(depth_mask_texture, depth_mask.astype(np.float32))
+        return lum, depth, mask, depth_mask
 
     loop, k, started = 1, 0, time.perf_counter()
     while not glfw.window_should_close(window):
@@ -487,26 +539,27 @@ def main() -> int:
                 side.flow.reset()
                 side.measures = Measures()
             for j in range(target):
-                feed(j)
+                _, _, _, held = feed(j)
                 for side in sides:
-                    side.step(frames, j, luminance, depth_texture, mask_texture)
+                    side.step(frames, j, luminance, depth_texture, mask_texture, depth_mask_texture if held is not None else None)
             k = target
         controls['step'] = 0
 
-        depth, mask = feed(k)
+        lum, depth, mask, depth_mask = feed(k)
         segment = frames.segment(k)
         for side in sides:
             glFinish()
             began = time.perf_counter()
-            side.step(frames, k, luminance, depth_texture, mask_texture)
+            side.step(frames, k, luminance, depth_texture, mask_texture, depth_mask_texture if depth_mask is not None else None)
             glFinish()                            # the flow's own time on the GPU, before its read back
             milliseconds = (time.perf_counter() - began) * 1000.0
-            xy = side.xy_px(read_back(side.flow.velocity), frames.calls[k]['delta_time'], w)
+            velocity = read_back(side.flow.velocity)
+            xy = side.xy_px(velocity, frames.calls[k]['delta_time'], w)
+            z = side.z_px(velocity, frames.calls[k]['delta_time'], w)       # as the fluid gets it: gated by both masks
             track = read_back(side.flow.depth_velocity.difference)
-            z = np.abs(read_back(side.flow.depth_velocity.depth_velocity)[..., 0]) * w
-            if side.settings.use_mask:
-                z = z * mask
-            side.measures.add(float(frames.t[k]), segment, xy, track, z, depth, mask, frames.moved, milliseconds)
+            weight = read_back(side.flow.z_position)[..., 1] if 'depth_range' in frames.calls[k] else None
+            side.measures.add(float(frames.t[k]), segment, xy, track, z, depth, mask, frames.moved, milliseconds,
+                              weight, depth_mask, lum)
 
         if not args.fast:
             shown = [side.show(controls['view'], depth_texture, controls['scale'], w) for side in sides]

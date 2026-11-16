@@ -1,25 +1,42 @@
 # The view
 
 The flow's view of a capture, the stage before the motion: the camera image and the aligned depth cut to one
-crop at the motion's size, the depth read into it, and the player's two masks. What comes before it, the
+crop at the motion's size, the player's outline, and the depth read into it on that outline. What comes before it, the
 uploader's corrected camera frame, is in [INPUT_THREADS.md](INPUT_THREADS.md#the-uploader); the sizes it works
 at and why are in [RESOLUTION.md](RESOLUTION.md). **(deduction)** marks what is inferred.
 
 The stage is `ViewLayer` (settings `view`, deep_flow's own, `apps/deep_flow/render/layers/view/view_layer.py`); its geometry and the
-depth's read are plain modules in `modules/flow/view` (`view_window.py`, `depth_read.py`, `DepthUpscale`).
+depth's read are plain modules in `modules/flow/view` (`view_window.py`, `depth_read.py`, `DepthCut`, `DepthUpscale`).
 
 ## The stage
 
-Once per capture, in order; each step but the crop is a part, a class with its textures, ports and settings
-group, and the monitor lists each part's textures under its name:
+The image has 800 rows and the depth 300, and only the image knows the player's outline sharply. So the depth
+stays at its own size until the outline exists, and each step runs once per capture, in order: who, where, how
+far. Each step but the crop is a part, a class with its textures, ports and settings group, and the monitor lists
+each part's textures under its name:
 
 | Step                       | Makes                                                                                  |
 |----------------------------|----------------------------------------------------------------------------------------|
 | the crop                   | the image cut to the view's crop (`crop`), at the view's `width` × `height`            |
-| `depth` (`ViewDepth`)      | the aligned depth read into the crop ([The depth read](#the-depth-read)), a `DepthView` ([MOTION.md](MOTION.md#when-it-measures)) |
-| `depth_mask` (`ViewDepthMask`) | the depth mask, where the depth lies from `near` to `far`, and the mask, its edge moved onto the image's ([The mask and the depth mask](#the-mask-and-the-depth-mask)) |
+| `depth_mask` (`ViewDepthMask`) | who: the cut, the player on the depth's own pixels, the depth pixel each view pixel lies in from `near` to `far`, unblended (`DepthCut`); where: the mask, the cut's outline moved onto the image's ([The mask and the depth mask](#the-mask-and-the-depth-mask)) |
+| `depth` (`ViewDepth`)      | how far: the aligned depth read into the crop once, from the mask's side at the outline ([The depth read](#the-depth-read)), a `DepthView` ([MOTION.md](MOTION.md#when-it-measures)); and the depth mask, that depth cut to the band |
 | `color_grade` (`ColorGrade`) | the graded image, the density's color: the image graded (`exposure`, `offset`, `gamma`, `contrast`, `saturation`) and sharpened (`sharpen`), premultiplied by the mask last (`use_mask`) |
 | the pose                   | the pose's points placed in the crop, for the pose drawn over the view                 |
+
+```mermaid
+flowchart TB
+  I["Image<br/>448 × 800"]
+  D["Depth<br/>480 × 300"]
+  C["Crop: the image<br/>448 × 800"]
+  W1["Who: the cut on the depth's own pixels<br/>448 × 800, unblended, a staircase"]
+  W2["Where: the guided filter, the mask<br/>448 × 800, the outline on the image's edges"]
+  H["How far: the depth read once<br/>448 × 800, at the outline from the mask's side;<br/>the depth mask, its cut, on the mask's outline"]
+  M["Motion, 448 × 800<br/>x/y from the image, z from the depth"]
+  I --> C --> W2
+  D --> W1 --> W2 --> H --> M
+  D --> H
+  C --> M
+```
 
 Its outputs, in the order it makes them, are the image, the depth, the depth mask, the mask and the graded
 image, each the texture of the part that makes it; the input's depth is a depth in the band, drawn in its
@@ -36,44 +53,31 @@ resample **(deduction)**, for keeping the camera's work and the flow's apart.
 | Setting                              | Preset        | Is                                                                        |
 |--------------------------------------|---------------|---------------------------------------------------------------------------|
 | `crop.center_x`, `center_y`, `height` | 0.5, 0.5, 1  | the crop's center and height on the camera image, shares of it            |
-| `depth.depth_read`                   | `SURFACE`     | how the depth is read into the view                                       |
-| `depth.tolerance`                    | 0.2 m         | the depth jump beyond which the read blends no two depth pixels           |
 | `depth_mask.near`, `far`             | 0.1, 1.7 m    | the player's depth range, the box's front and back                        |
-| `depth_mask.guided_radius`           | 2             | how far the image moves the mask's edge, in depth pixels; 0 off           |
+| `depth_mask.guided_radius`           | 2             | how far the image moves the mask's edge, in depth pixels; 0 off; also the read's reach for the mask's side |
 | `depth_mask.edge_contrast`           | 0.03          | the image's brightness spread (0 to 1) above which the edge follows the image's |
+| `depth.tolerance`                    | 0.2 m         | the depth jump beyond which the read blends no two depth pixels           |
 
 ## The depth read
 
 The aligned depth is coarser than the view (`NEURAL_480`, 480 × 300 on the whole camera image), so each view
-pixel reads it between its pixels (`DepthUpscale`). `depth_read` chooses how; which of the two stays is in
-[FLOW_PLAN.md](FLOW_PLAN.md#b-the-camera-and-the-view).
+pixel reads it between its pixels (`DepthUpscale`, `depth_read.mask_sided_depth`), once, after the mask exists:
 
-| `depth_read` | Within a surface                   | At an edge, a view pixel takes                             |
-|--------------|------------------------------------|------------------------------------------------------------|
-| `SURFACE`    | the four depth pixels interpolated | the depth pixel it lies in: the edge on the depth's pixels |
-| `MASK`       | as `SURFACE`                       | the nearest depth pixel on the side the mask gives it      |
+- Within a surface: the four depth pixels around a view pixel, interpolated bilinearly where they lie within
+  `depth.tolerance` of each other, else the one it lies in, so an edge never reads as a distance in between; a 0,
+  no depth, is never blended (`edge_aware_depth`).
+- At the outline: where that depth is not on the pixel's side of the mask (a depth in `near`..`far` inside the
+  mask, anything else, no depth included, outside it), the nearest depth pixel on its side within
+  `guided_radius`, as that is how far the guided filter may move the mask's edge off the depth's; with none in
+  reach it keeps its own.
 
-`SURFACE` (`depth_read.edge_aware_depth`): the four depth pixels around a view pixel, interpolated bilinearly
-where they lie within `depth.tolerance` of each other, else the one it lies in, so an edge never reads
-as a distance in between; a 0, no depth, is never blended.
+The depth's edge and the depth mask's then lie on the mask's: no depth from behind the player lies inside the
+mask, and z's gate cuts where the outline is. z is the depth's change over time per pixel, so a pixel that changes
+side between two frames reads as z **(deduction)**. A depth pixel that straddles the outline is taken whole.
 
-`MASK` (`mask_sided_depth`) reads as `SURFACE` does wherever that depth is on the pixel's side of the mask: a
-depth in `near`..`far` inside the mask, anything else, no depth included, outside it. A pixel whose depth is on
-the wrong side takes the nearest depth pixel on its side within `guided_radius`, as that is how far the guided
-filter may move the mask's edge off the depth's; with none in reach it keeps its own. The depth's edge and the
-depth mask's then lie on the mask's. The mask is made from a depth read, so `MASK` reads twice: `SURFACE`, the
-cut and the guided mask, then the read with that mask and the cut again. It carries the guided filter's edge
-into the depth without a setting of its own.
-
-What each read gives z **(deduction)**:
-
-| Read      | z's edge                | z inside                  | Risks                                                | Cost                  |
-|-----------|-------------------------|---------------------------|------------------------------------------------------|-----------------------|
-| `SURFACE` | the depth's pixels      | the depth's, interpolated | the depth mask a staircase of depth pixels           | the read              |
-| `MASK`    | the mask's, the image's | as `SURFACE`              | a depth pixel that straddles the edge is taken whole | a second read and cut |
-
-z is the depth's change over time per pixel, so a pixel that changes side between two frames reads as z. With
-`MASK` no depth from behind the player lies inside the mask, and z's gate cuts where the edge is.
+Two reads were compared before this one, kept here as the comparison it came from: `SURFACE`, the read within a
+surface alone, the depth mask cut from it, a staircase of depth pixels; and `MASK`, that read, the cut and the
+guided mask, then the read from the mask's side and the cut again, two reads and two cuts.
 
 Not a read: joint bilateral upsampling with the camera image (Kopf, Cohen, Lischinski, Uyttendaele 2007, a 5 × 5
 window, σd 0.5 depth pixel, σr 0.1 on color 0 to 1). It moves the mask with the depth, which costs x/y at the
@@ -102,6 +106,25 @@ depth velocity's track has no depth: its step filter (`DepthStepFilter`,
 read. The bridge's outputs take their z positions from the trails, which fill it
 ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)).
 
+The one path against those two, measured with `scripts/depth_velocity_capture.py` and
+`depth_velocity_compare.py` on the measure recording: three captures of each path's first 16.5 s (the app at
+about 19 fps while it saves the frames), replayed through the motion with its thresholds at 0, the still part 1–5
+s, the slow move 5.5–10 s, the fast 11.5–16 s; z as the fluid gets it, in px per frame, gated by the mask and the
+depth mask; noise the still part's p99 12 px and more inside the mask and within 6 px of its edge; slow and fast
+z's mean inside; fit the image's brightness gradient (Sobel, 0 to 1) along the depth mask's edge; "no z position"
+the share of the mask where the motion's z position has no weight. Each row the mean of three; one run's noise
+swings by about ±0.07 inside.
+
+| Path (`view.depth.tolerance` 0.2 m) | No z position | Fit   | z noise inside / edge | Slow  | Fast  | Fast ÷ noise | x/y at edge | View, GPU |
+|-------------------------------------|---------------|-------|-----------------------|-------|-------|--------------|-------------|-----------|
+| `SURFACE`, compared                 | 7.5%          | 0.325 | 0.398 / 1.054         | 0.102 | 0.123 | 0.32         | 1.79        |           |
+| `MASK`, compared                    | 7.2%          | 0.493 | 0.425 / 1.106         | 0.108 | 0.117 | 0.28         | 1.83        |           |
+| the one path                        | 7.2%          | 0.491 | 0.391 / 1.176         | 0.104 | 0.142 | 0.36         | 1.80        | 0.37 ms   |
+
+The one path has `MASK`'s outline, its fit and its share without a z position, with one read and one cut fewer;
+its noise lies within the runs' spread. Its fast z is higher than both, by more than the spread within a path;
+no mechanism in the code is found for it, so it is not counted as a gain.
+
 Against reading the nearest depth pixel everywhere, on the stillslowfast recording, 3 runs, the motion's
 thresholds at 0, `SURFACE` gives: neighbouring pixels inside the body with the very same depth 11% (67%), z
 inside the mask p99 0.040 widths/s (0.057), z at the edge 0.041 (0.050), the mask's fit unchanged.
@@ -110,19 +133,18 @@ inside the mask p99 0.040 widths/s (0.057), z at the edge 0.041 (0.050), the mas
 
 The player's shape and where the depth is the player's are two things:
 
-- `mask`: the depth mask, its edge moved onto the camera image's by the guided filter (He 2010), then the AA's
+- `mask`: the cut, its edge moved onto the camera image's by the guided filter (He 2010), then the AA's
   threshold at 0.5, a crisp edge where the image puts it. Where the image has no edge the filter only averages
-  the cut, and the threshold makes that a smoothed outline. `guided_radius` is in the cut's (the depth's)
-  pixels, how far its edge may be off, turned into the view's each frame from the crop; `edge_contrast` is
-  squared inside as the filter's ε. It gates x/y in the motion with `use_mask`, and the dye's color in the
-  bridge.
+  the cut, and the threshold makes that a smoothed outline, the depth's own, within about a depth pixel.
+  `guided_radius` is in the cut's (the depth's) pixels, how far its edge may be off, turned into the view's each
+  frame from the crop; `edge_contrast` is squared inside as the filter's ε. It gates x/y in the motion with
+  `use_mask`, and the dye's color in the bridge.
 - `depth_mask`, the view's depth cut by `near` and `far`, is the motion's `depth_mask`: it gates z on top of
-  the mask, always, and it is the z position's weight with the mask. The z position's value is held to 0..1
-  where the track lags past the range.
+  the mask, always, and it is the z position's weight with the mask. The depth is read from the mask's side, so
+  it lies on the mask's outline, where the depth has a player's depth in reach. The z position's value is held
+  to 0..1 where the track lags past the range.
 
-The dye's outline is the mask's: its color and the x/y of its amount stop at the guided edge. With `SURFACE`
-the depth mask is cut along the depth's pixels, a staircase inside the mask's outline, and z's share of the
-dye's amount steps along it.
+The dye's outline is the mask's: its color and the x/y and z of its amount stop at the guided edge.
 
 The preset has no erosion, as one pulls the guided edge off the image's. Measured on stillslowfast, the still
 part, the motion's thresholds at 0; z and x/y in widths/s, p99 within 6 px of the mask's edge and inside it;
@@ -140,14 +162,15 @@ fit along the mask's edge. One run's p99 swings by about ±0.02; fit holds to ±
 
 ## Checked
 
-`apps/deep_flow/scripts/view_check.py [--read surface|mask]` plays a recording's captures through the uploader and the view
-stage and holds each read to its numpy reference:
+`apps/deep_flow/scripts/view_check.py` plays a recording's captures through the uploader and the view stage and
+holds the cut and the read to their numpy references:
 
-| Read                      | Pixels off the reference, 40 captures of the measure recording                                |
+| Pass                      | Pixels off the reference, 40 captures of the measure recording                                |
 |---------------------------|-----------------------------------------------------------------------------------------------|
-| `SURFACE`                 | none by over 1 mm                                                                             |
-| `MASK`                    | none; 0.02% a tie between two depth pixels on the mask's side equally near, either the rule's |
+| the cut (`depth_cut`)     | none                                                                                          |
+| the read (`mask_sided_depth`) | none by over 1 mm; 0.02% a tie between two depth pixels on the mask's side equally near, either the rule's |
 | joint bilateral, not kept | none by over 2 cm, at most 1.2 cm: the GPU blends the image with coarser weights              |
 
-The mask overlaps the depth mask 98% with `SURFACE` and exactly with `MASK`. Without the app:
-`modules/flow/tests/test_view_window.py`, the window's geometry and the two reads.
+The mask overlaps the depth mask exactly (with `SURFACE` it was 98%). Its passes on the GPU, the median of 40:
+the crop 0.02 ms, the cut 0.02, the guide 0.17, the read and its cut 0.10, the color grade 0.05, the whole view
+0.37. Without the app: `modules/flow/tests/test_view_window.py`, the window's geometry, the cut and the read.

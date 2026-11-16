@@ -2,12 +2,13 @@
 
 `ViewInput` is the capture as the app hands it each tick: its color image and its depth on the camera image's view
 (the uploader's, taken into GL by the capture's source layers), its capture time and the pose of its player.
-`ViewOutput` is what the motion and the bridge read. The view runs its steps in order, each a part with its own
-textures but the crop: the crop (the image cut to the view's crop at the view's size), `ViewDepth` (the depth
-read into it), `ViewDepthMask` (the depth cut to the player's band, which gates z, and the mask, that cut's edge
-moved onto the image's by the guided filter, He 2010), with `MASK` the depth again on the mask and cut again,
-and `ColorGrade` (the color, the image graded, premultiplied by the mask). The view is made again when a new capture
-comes in, told by its capture time, or when a setting it is made with changes.
+`ViewOutput` is what the motion and the bridge read. The view runs its steps in order, each once, each a part with
+its own textures but the crop: the crop (the image cut to the view's crop at the view's size); `ViewDepthMask`, who
+and where (the player cut on the depth's own pixels, and the mask, that cut's outline moved onto the image's by the
+guided filter, He 2010, the one outline); `ViewDepth`, how far (the depth read into the view once, at the outline
+from the mask's side, and the depth mask, that depth cut to the band, which gates z); and `ColorGrade` (the graded
+image, premultiplied by the mask). The view is made again when a new capture comes in, told by its capture time,
+or when a setting it is made with changes.
 """
 
 # Standard library imports
@@ -19,7 +20,7 @@ import numpy as np
 from OpenGL.GL import GL_RGBA16F
 
 # Local application imports
-from modules.flow import DepthRead, DepthView, HasPorts, Port, Ports, TextureKind, depth_step, fixed_window, place_points, view_span
+from modules.flow import DepthView, HasPorts, Port, Ports, TextureKind, depth_step, fixed_window, place_points, view_span
 from modules.gl import Fbo, Style, Texture
 from modules.pose import BBox, Frame, Points2D
 from modules.render import StageLayer, StageOutput
@@ -83,7 +84,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         band: ViewDepthMaskSettings = self.settings.depth_mask
         depth: DepthView = DepthView(self._depth.depth, view_span(self._crop, self._fov), depth_step(self._crop, self._grid_size),
                                      band.near, band.far)
-        return ViewOutput(self._image, depth, self._depth_mask.depth_mask, self._depth_mask.mask, self._color_grade.texture)
+        return ViewOutput(self._image, depth, self._depth.depth_mask, self._depth_mask.mask, self._color_grade.texture)
 
     @property
     def ports(self) -> dict[str, Port]:
@@ -96,7 +97,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
 
     def _components(self) -> dict[str, HasPorts]:
         return {'crop': Ports({'image': Port(self._image, TextureKind.IMAGE)}),     # a step without a class of its own
-                'depth': self._depth, 'depth_mask': self._depth_mask, 'color_grade': self._color_grade}
+                'depth_mask': self._depth_mask, 'depth': self._depth, 'color_grade': self._color_grade}
 
     @property
     def texture(self) -> Texture:
@@ -180,16 +181,12 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         image.draw(src=roi)
         self._image.end()
 
-        # The depth read within a surface first, cut by the player's band, the cut's edge moved onto the image's;
-        # with MASK the depth read again, an edge's side from that mask, and cut again, so the depth's edges lie on
-        # the mask's
-        read: DepthRead = DepthRead(s.depth.depth_read)
-        self._depth.read(depth, roi, DepthRead.SURFACE)
-        self._depth_mask.cut(self._depth.depth)
+        # Who, where, how far, each once: the player cut on the depth's own pixels, its outline moved onto the
+        # image's (the mask), the depth read into the view from the mask's side and cut to the band, so the depth's
+        # edges and the depth mask's lie on the mask's
+        self._depth_mask.cut(depth, roi)
         self._depth_mask.guide(self._image, roi, self._grid_size[1])
-        if read == DepthRead.MASK and depth is not None:
-            self._depth.read(depth, roi, read)
-            self._depth_mask.cut(self._depth.depth)
+        self._depth.read(depth, roi)
 
         Style.pop_style()
         self._color_grade.process(self._image, self._depth_mask.mask)

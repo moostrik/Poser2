@@ -92,6 +92,19 @@ median of 40 runs (`apps/deep_flow/scripts/view_check.py --time`), ms:
 The guided filter is seven passes of the view's size, its products and means 32-bit; the whole view is under 1% of
 a frame at 60 fps.
 
+The one path ([VIEW.md](VIEW.md#the-stage)), each read once, on the measure recording's last of 40 captures
+(`20261112-125832_measure`, the view 448 × 800, the preset's view settings), the same way, ms; not the same
+capture as above, so the two tables are not compared pass by pass:
+
+| Pass                               | ms    |
+|------------------------------------|-------|
+| the crop                           | 0.017 |
+| the cut, on the depth's pixels     | 0.024 |
+| the guided filter and threshold    | 0.168 |
+| the depth read and its cut         | 0.102 |
+| the color grade                    | 0.051 |
+| the view                           | 0.374 |
+
 ### The advection
 
 At 448 × 800 × 64, the density on the grid:

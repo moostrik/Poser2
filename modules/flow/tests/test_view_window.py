@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import (depth_step, edge_aware_depth, fixed_window, mask_sided_depth, place_points,
+from modules.flow import (depth_cut, depth_step, edge_aware_depth, fixed_window, mask_sided_depth, place_points,
                           view_per_depth_pixel, view_span)
 from modules.utils import Rect
 
@@ -36,6 +36,22 @@ class EdgeAwareDepthTest(unittest.TestCase):
         depth = np.ones((2, 2))
         self.assertEqual(at(depth, 0.1, 0.1), 1.0)                 # a corner outside: the nearest, inside
         self.assertEqual(at(depth, -0.5, 1.0), 0.0)
+
+
+class DepthCutTest(unittest.TestCase):
+    def cut(self, depth: np.ndarray, x: float, y: float) -> bool:
+        height, width = depth.shape
+        return bool(depth_cut(depth, np.array([x / width]), np.array([y / height]), 1.0, 2.0)[0])
+
+    def test_the_depth_pixel_a_point_lies_in_decides_unblended(self) -> None:
+        depth = np.array([[1.5, 3.0], [1.5, 3.0]])                 # the player at 1.5 m, the room behind at 3 m
+        self.assertTrue(self.cut(depth, 0.9, 1.0))                 # in the player's pixel, near the room's
+        self.assertFalse(self.cut(depth, 1.1, 1.0))                # in the room's pixel, near the player's
+
+    def test_no_depth_and_beyond_the_grid_are_not_the_player(self) -> None:
+        depth = np.array([[1.5, 0.0], [1.5, 0.0]])
+        self.assertFalse(self.cut(depth, 1.5, 1.0))
+        self.assertFalse(self.cut(depth, -0.5, 1.0))
 
 
 class MaskSidedDepthTest(unittest.TestCase):

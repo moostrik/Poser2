@@ -1,27 +1,23 @@
 #version 460 core
 
-// The depth read into the view, one of two ways (`DepthRead`), metres in red; a 0, no depth, is never blended,
-// and beyond the depth's grid is no depth.
-//   SURFACE    the four depth pixels around a view pixel interpolated bilinearly where they lie within `tolerance`
-//              (m) of each other, else the one it lies in, so an edge never reads as a depth in between.
-//   MASK       as SURFACE where that depth is on the side the mask gives the pixel: the player's (a depth from
-//              `near` to `far`) where the mask is, anything else (none included) where it is not; else the nearest
-//              depth pixel on that side within `reach`, else SURFACE's.
+// The depth read into the view, metres in red, from the mask's side at the outline: the four depth pixels around a
+// view pixel interpolated bilinearly where they lie within `tolerance` (m) of each other, else the one it lies in,
+// so an edge never reads as a depth in between; where that depth is not on the side the mask gives the pixel (the
+// player's, a depth from `near` to `far`, where the mask is; anything else, none included, where it is not), the
+// nearest depth pixel on that side within `reach`, else the read. A 0, no depth, is never blended, and beyond the
+// depth's grid is no depth.
 
 #include "position.glsl"
 
-const int SURFACE = 0;
-const int MASK = 1;
-const int MAX_REACH = 9;        // MASK: the most depth pixels it looks, each way (`guided_radius` at most 8, + 0.5)
+const int MAX_REACH = 9;        // the most depth pixels it looks, each way (`guided_radius` at most 8, + 0.5)
 
 uniform sampler2D depth;        // metres on the camera image, 0 for none
-uniform sampler2D mask;         // MASK: the player's mask in the view (red, 0 to 1)
+uniform sampler2D mask;         // the player's mask in the view (red, 0 to 1)
 uniform vec4 roi;               // the view's window on the depth, x, y, width, height in 0..1, origin top-left
 uniform float tolerance;
-uniform int mode;
-uniform float near;             // MASK: the player's depth range (m)
+uniform float near;             // the player's depth range (m)
 uniform float far;
-uniform float reach;            // MASK: how far it looks for a depth on the mask's side (depth pixels)
+uniform float reach;            // how far it looks for a depth on the mask's side (depth pixels)
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -37,7 +33,7 @@ bool player(float d) {
     return d > 0.0 && d >= near && d <= far;
 }
 
-// MASK: the read where it is on the mask's side, else the nearest depth pixel within `reach` that is, else the read
+// The read where it is on the mask's side, else the nearest depth pixel within `reach` that is, else the read
 float mask_side(float metres, vec2 p, ivec2 size) {
     bool inside = texture(mask, texCoord).r > 0.5;
     if (player(metres) == inside) {
@@ -84,8 +80,5 @@ void main() {
     } else {
         metres = fetch(ivec2(floor(uv * vec2(size))), size);
     }
-    if (mode == MASK) {
-        metres = mask_side(metres, p, size);
-    }
-    fragColor = vec4(metres, 0.0, 0.0, 1.0);
+    fragColor = vec4(mask_side(metres, p, size), 0.0, 0.0, 1.0);
 }

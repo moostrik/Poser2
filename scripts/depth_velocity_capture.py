@@ -1,14 +1,16 @@
 """Save what the Lucas–Kanade flow gets, frame by frame, from one loop of a recording, for depth_velocity_compare.
 
-    python scripts/depth_velocity_capture.py RECORDING [--out temp/depth_velocity] [--set PATH=VALUE ...]
+    python scripts/depth_velocity_capture.py RECORDING [--out temp/depth_velocity] [--name NAME] [--seconds S]
+                                             [--set PATH=VALUE ...]
 
-Runs deep_flow on the recording (as -sim, without the panel), from the start of its loop to the next,
-with the preset's settings and the Lucas–Kanade flow. Each measure of the flow is saved to
-OUT/RECORDING/: `luminance_NNNN.npy` (the newest luminance frame, 0 to 1), `depth_NNNN.npy` (the
-depth it got, m, at the flow's size, before the step filter), `mask_NNNN.npy` (the player's mask),
-and `calls.json`: each measure's arguments and its moment, `t`, in seconds, and the flow's settings.
-The compare replays them from no motion. About 3 GB for
-15 seconds at the flow's 448×800: delete it when done with it. This is the one step that runs the app.
+Runs deep_flow on the recording (as -sim, without the panel), from the start of its loop to the next, or
+for its first `--seconds`, with the preset's settings and the Lucas–Kanade flow. Each measure of the flow is
+saved to OUT/NAME (the recording's name without `--name`): `luminance_NNNN.npy` (the newest luminance frame,
+0 to 1), `depth_NNNN.npy` (the depth it got, m, at the flow's size, before the step filter), `mask_NNNN.npy`
+(the player's mask), `depth_mask_NNNN.npy` (where the depth is the player's), and `calls.json`: each
+measure's arguments and its moment, `t`, in seconds, and the flow's settings. The compare replays them from
+no motion. About 3 GB for 15 seconds at the flow's 448×800: delete it when done with it. This is the one
+step that runs the app.
 """
 
 import ctypes
@@ -18,6 +20,7 @@ import sys
 import threading
 import time
 from argparse import ArgumentParser
+from enum import Enum
 from pathlib import Path
 
 os.environ.setdefault('DEPTHAI_LEVEL', 'error')
@@ -34,6 +37,17 @@ from modules.flow import FlowUtil, LucasKanadeFlow3D  # noqa: E402
 from apps.deep_flow.main import DeepFlowMain  # noqa: E402
 
 LOOP_TIMEOUT: float = 60.0      # seconds a loop may take before the capture gives up
+SHORTEST_LOOP: float = 5.0      # seconds a loop takes at least: a loop call back sooner after its start is the start's
+
+
+def parsed(value: str, current: object) -> object:
+    """`value` as the type of the setting it replaces: an enum by its name or number, a bool by its word."""
+    if isinstance(current, Enum):
+        kind = type(current)
+        return kind[value.upper()] if not value.lstrip('-').isdigit() else kind(int(value))
+    if isinstance(current, bool):
+        return value.lower() in ('1', 'true', 'on', 'yes')
+    return type(current)(float(value))
 
 
 def main() -> int:
@@ -41,17 +55,19 @@ def main() -> int:
     parser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('recording', help='the recording folder name under the app\'s recordings')
     parser.add_argument('--out', type=Path, default=Path('temp/depth_velocity'))
+    parser.add_argument('--name', default='', help='the capture\'s folder under OUT (default: the recording\'s name)')
+    parser.add_argument('--seconds', type=float, default=0.0, help='stop this long after the loop starts (default: the whole loop)')
     parser.add_argument('--set', action='append', default=[], metavar='PATH=VALUE',
-                        help="an app setting by its path for this capture, e.g. render.center.mask.guided_radius=0.02")
+                        help="an app setting by its path for this capture, e.g. render.view.depth.tolerance=0.1")
     args = parser.parse_args()
-    out_dir: Path = args.out / args.recording
+    out_dir: Path = args.out / (args.name or args.recording)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     setup_logging(verbose=False, name='deep_flow')
     install_excepthooks()
     targets: dict[str, Fbo] = {}
     calls: list[dict] = []
-    recording, starting = threading.Event(), threading.Event()
+    recording, starting, done = threading.Event(), threading.Event(), threading.Event()
 
     def read(name: str, source, w: int, h: int) -> np.ndarray:
         if name not in targets:
@@ -79,11 +95,18 @@ def main() -> int:
             w, h = luminance.width, luminance.height
             index = len(calls)
             mask = self._mask if self._mask is not None and self._mask.allocated else None
+            depth_mask = self._depth_mask if self._depth_mask is not None and self._depth_mask.allocated else None
             np.save(out_dir / f'luminance_{index:04d}.npy', read('luminance', luminance, w, h)[..., 0])
             np.save(out_dir / f'depth_{index:04d}.npy', read('depth', depth, w, h)[..., 0])
             np.save(out_dir / f'mask_{index:04d}.npy', (read('mask', mask, w, h)[..., 0] > 0.5) if mask is not None else np.ones((h, w), bool))
+            np.save(out_dir / f'depth_mask_{index:04d}.npy',
+                    (read('depth_mask', depth_mask, w, h)[..., 0] > 0.5) if depth_mask is not None else np.ones((h, w), bool))
             calls.append(dict(t=time.perf_counter(), delta_time=delta_time, view_span=view_span, depth_step=list(depth_step),
-                              width=w, height=h, settings=self.settings.to_dict()))
+                              depth_range=list(flags.get('depth_range', (0.0, 0.0))), width=w, height=h,
+                              settings=self.settings.to_dict()))
+            if args.seconds > 0.0 and calls[-1]['t'] - calls[0]['t'] >= args.seconds:
+                recording.clear()
+                done.set()
         update(self, depth, delta_time, view_span, depth_step, **flags)
 
     LucasKanadeFlow3D.update = saved
@@ -93,28 +116,34 @@ def main() -> int:
     app.player.add_loop_callback(loops.release)
 
     def run() -> None:
-        time.sleep(8.0)                           # the app and its models come up
-        for item in args.set:                     # the settings the capture runs with, beside the preset's
-            path, value = item.split('=', 1)
-            *groups, name = path.split('.')
-            owner = app.settings
-            for group in groups:
-                owner = getattr(owner, group)
-            setattr(owner, name, type(getattr(owner, name))(float(value)))
-        simulator = app.settings.camera.simulator
-        simulator.folder = args.recording
-        time.sleep(0.5)
-        simulator.start = True
-        loops.acquire(timeout=LOOP_TIMEOUT)       # the loop's start
-        starting.set()
-        time.sleep(0.5)
-        while loops.acquire(blocking=False):      # its start can call back twice
-            pass
-        loops.acquire(timeout=LOOP_TIMEOUT)       # the next loop: one loop recorded
-        recording.clear()
-        (out_dir / 'calls.json').write_text(json.dumps(calls, default=str))
-        print(f'{len(calls)} frames to {out_dir}', flush=True)
-        app.stop()
+        try:
+            time.sleep(8.0)                       # the app and its models come up
+            for item in args.set:                 # the settings the capture runs with, beside the preset's
+                path, value = item.split('=', 1)
+                *groups, name = path.split('.')
+                owner = app.settings
+                for group in groups:
+                    owner = getattr(owner, group)
+                setattr(owner, name, parsed(value, getattr(owner, name)))
+            simulator = app.settings.camera.simulator
+            simulator.folder = args.recording
+            time.sleep(0.5)
+            simulator.start = True
+            loops.acquire(timeout=LOOP_TIMEOUT)   # the loop's start
+            starting.set()
+            time.sleep(0.5)
+            while loops.acquire(blocking=False):  # its start can call back twice
+                pass
+            began: float = time.perf_counter()
+            deadline: float = began + LOOP_TIMEOUT
+            while not done.is_set() and time.perf_counter() < deadline:     # the next loop, or --seconds of it
+                if loops.acquire(timeout=0.1) and time.perf_counter() - began >= SHORTEST_LOOP:
+                    break                         # a call back sooner is its start's again, not the next loop
+            recording.clear()
+            (out_dir / 'calls.json').write_text(json.dumps(calls, default=str))
+            print(f'{len(calls)} frames to {out_dir}', flush=True)
+        finally:
+            app.stop()                            # whatever happened, the app does not keep running
 
     app.start()
     threading.Thread(target=run, daemon=True).start()
