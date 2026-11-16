@@ -51,6 +51,9 @@ class Group(Generic[T]):
     last : bool, optional
         The child comes after the other children, a subclass's included,
         on a panel and in a preset.
+    description : str, optional
+        One short line of panel text: what the child is. A GUI hint, as a
+        field's description.
     """
 
     def __init__(
@@ -59,9 +62,11 @@ class Group(Generic[T]):
         *,
         share: Sequence[Field | FieldAlias] | None = None,
         last: bool = False,
+        description: str = "",
     ):
         self.settings_type = settings_type
         self.last: bool = last
+        self.description: str = description
         self._share_refs: list[Field | FieldAlias] = list(share) if share else []
         self.share_map: dict[str, str] = {}  # parent_name → child_name
         self.name = ""

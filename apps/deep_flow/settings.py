@@ -245,7 +245,7 @@ class ViewLayerSettings(render.StageLayerSettings):
     width:         Field[int]   = Field(448, min=32, max=4096, step=32, description="The view's width (pixels)")
     height:        Field[int]   = Field(800, min=32, max=4096, step=32, description="The view's height (pixels)")
     crop:        Group[ViewCropSettings]      = Group(ViewCropSettings)
-    mask:        Group[ViewMaskSettings]      = Group(ViewMaskSettings)
+    mask:        Group[ViewMaskSettings]      = Group(ViewMaskSettings, description="The player's mask: the crop's depth, its edge guided onto the image's")
     depth:       Group[ViewDepthSettings]     = Group(ViewDepthSettings)
     color_grade: Group[ColorGradeSettings]    = Group(ColorGradeSettings)
 

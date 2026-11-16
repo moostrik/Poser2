@@ -17,7 +17,7 @@ from typing import Callable, NamedTuple
 from nicegui import ui
 
 from modules.log_config import LogRingBuffer
-from modules.settings import BaseSettings, Field, Access, Widget
+from modules.settings import BaseSettings, Field, Access, Group, Widget
 
 from .controls import DEPTH_BG, ActionButton, Control, PinnedReadout, access_css_class, build_control, build_entry, generate_label
 from .log_drawer import LOG_DRAWER_DEFAULT_HEIGHT, build_log_drawer
@@ -118,13 +118,16 @@ def body(settings: BaseSettings, controls: list[Control], state: PanelState, *,
 
     for name, child in settings.children.items():
         if has_visible_content(child):
-            card(name, child, controls, state, depth=depth, expansions=expansions, path=path)
+            group = getattr(type(settings), name, None)
+            description: str = group.description if isinstance(group, Group) else ""
+            card(name, child, controls, state, depth=depth, expansions=expansions, path=path, description=description)
 
 
 def card(name: str, settings: BaseSettings, controls: list[Control], state: PanelState, *,
-         depth: int, expansions: list[ui.expansion], path: str) -> None:
-    """One settings instance as a collapsible card: a header with its name and, when it has
-    children, an expand/collapse-all button; its body inside. The state remembers whether it is open.
+         depth: int, expansions: list[ui.expansion], path: str, description: str = "") -> None:
+    """One settings instance as a collapsible card: a header with its name, its group's
+    `description` as the name's tooltip, and, when it has children, an expand/collapse-all button;
+    its body inside. The state remembers whether it is open.
     """
     key = state.card_key(path, name)
     access_class = ACCESS_CLASS.get(content_access_types(settings), "")
@@ -152,7 +155,9 @@ def card(name: str, settings: BaseSettings, controls: list[Control], state: Pane
 
     with exp.add_slot("header"):
         with ui.row().classes("w-full items-center gap-1"):
-            ui.label(generate_label(name).upper()).classes("flex-1")
+            title = ui.label(generate_label(name).upper()).classes("flex-1")
+            if description:
+                title.tooltip(description)
             if settings.children:
                 button = ui.button(icon="unfold_more", on_click=toggle_children).props(
                     "dense flat round size=xs"
