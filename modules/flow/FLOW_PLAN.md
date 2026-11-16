@@ -49,6 +49,10 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
   from their papers, not measured here)**. Which one, its latency against the camera's, and whether its depth
   holds the depth velocity's needs is the item's first question.
 
+Question, for later: Colorize, the view's last pass (`render.Colorize`, settings `view.color`), worked on as a
+whole; and its name, which gl's hue shift alone (`shaders.Colorize`) and its own field for that shift's amount
+(`colorize`) also carry: `HueShift` and `hue_shift`, or else?
+
 A finer depth would give the mask and z a finer edge at the source; the camera's sizes are a given
 ([RESOLUTION.md](RESOLUTION.md#the-rules)).
 
