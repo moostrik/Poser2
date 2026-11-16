@@ -33,4 +33,4 @@ paths:
 - Pass `0xFFFFFFFFFFFFFFFF` as `glWaitSync`'s timeout, never PyOpenGL's `GL_TIMEOUT_IGNORED`: in PyOpenGL 3.1.10 it is a signed value the driver rejects (GL_INVALID_VALUE), and with error checking off the error surfaces at a later `glGetError`, in unrelated code
 - `modules/gl/shaders` holds the shaders that are useful to any app
 - An app's own shader sits in that app
-- Shaders get checked in the GL harness
+- Shaders get checked in the GPU harness
