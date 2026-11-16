@@ -180,7 +180,8 @@ band ([MOTION.md](MOTION.md#depth_velocity-z)). The earlier paths replayed witho
 Without the tolerance's limit (10 m, the four depth pixels always blended) the share without a z position rises
 from 3.9% to 6.0% and the edge's noise falls from 6.1 to 5.2, both past the runs' spread: a blend across an edge
 makes a ramp of in-between depths, whose steps the motion's step filter drops, so fewer pixels at the edge carry
-z **(deduction)**. With the step filter gone (C5) that ramp would read as z, so the limit stays.
+z **(deduction)**. With the limit, more of the mask carries z and the edge is a little noisier; the real z,
+slow and fast, is the same either way.
 
 Against reading the nearest depth pixel everywhere, on the stillslowfast recording, 3 runs, the motion's
 thresholds at 0, `SURFACE` gives: neighbouring pixels inside the body with the very same depth 11% (67%), z

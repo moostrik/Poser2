@@ -59,7 +59,8 @@ it is still the highest (0.90 against 0.83 and 0.84), the runs overlapping in pa
 recording.
 
 Known in the motion, left as it is: two numbers say "another surface" in space beside the view's
-(`motion.z.tolerance`, also its restart in time, and `motion.z.edge`, which goes in C5).
+(`motion.z.tolerance`, also its restart in time, and `motion.z.edge`, the step filter's against silhouette
+jitter, which leaves a band a depth sample wide along every edge without z).
 
 A finer depth would give the mask and z a finer edge at the source; the camera's sizes are a given
 ([RESOLUTION.md](RESOLUTION.md#the-rules)).
@@ -80,16 +81,9 @@ A finer depth would give the mask and z a finer edge at the source; the camera's
   ([MOTION.md](MOTION.md#the-guard)): z as measured up to a knee (about 1.5 m/s), compressed above it toward a
   maximum (about 3 m/s), the speed gate (6 m/s) behind it; a curve per reading, no time filter, checked first
   against the spread of z speeds on a recording.
-- **C5.** The step filter goes. It zeroes the depth where its neighbours jump by more than `z.edge`
-  (`depth_step_filter.frag`), within one frame: by the view's split (one frame the view's, two frames the
-  motion's) that is the view's, and the view already keeps the player's depth on one surface wherever the mask
-  is, so the filter only drops a band one depth sample wide along every outline, the 3.9% of the mask without a
-  z position ([VIEW.md](VIEW.md#the-depth)). `z.edge` goes with it; the edge's z noise, the body moving between
-  frames, stays the motion's through `z.tolerance` in time. Checked: three captures, against the view's preset
-  row, on the motion's raw output.
 
 Question, for C: the motion's `z.tolerance` reviewed. One number, 0.2 m, does two jobs: in space, which depth
-samples a window averages as one surface (beside `z.edge`, 0.1 m, the step filter's, gone in C5); in time, how far a new
+samples a window averages as one surface (beside `z.edge`, 0.1 m, the step filter's); in time, how far a new
 depth may lie from the track before it counts as another surface and the track starts over. 0.2 m is large on a
 body, set by the job in time; whether the two jobs want two numbers, and what each should be. The view's own,
 measured at 0.2, 0.1 and 0.05 m, moved nothing past the runs' spread ([VIEW.md](VIEW.md#the-depth)).
@@ -254,7 +248,5 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways instead of leaving parallel legacy ones: hd_trio's copy, deleted in line I.
 - A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
-- Keep presets and settings schemas in sync; remove obsolete pathways: C5 (`z.edge`).
-- Fix a problem where it is made: C5, each job in the stage that makes it.
 
 Not designed yet, so their rules are not named: C1 to C4; D1 to D4; E1, E2; F1 to F3; H1; I1 to I4.
