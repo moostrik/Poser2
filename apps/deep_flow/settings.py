@@ -48,29 +48,20 @@ class Layers(IntEnum):
     cam_crop =      auto()
     capture_image = auto()
     capture_depth = auto()
-    # composite layers
-    tracker =       auto()
-    pose =          auto()
     # the stages
     view =          auto()
-    view_pose =     auto()
     motion =        auto()
     bridge =        auto()
     fluid =         auto()
-    # data layers
-    time_series =   auto()
-    data_B_W =      auto()
-    data_B_F =      auto()
-    data_A_W =      auto()
-    data_A_F =      auto()
-    data_time =     auto()
-    # the stages' monitors, and the show
+    # the stages' monitors, the show, the board's timings, the pose
     capture_monitor = auto()
     view_monitor =  auto()
     motion_monitor = auto()
     bridge_monitor = auto()
     fluid_monitor = auto()
     composite =     auto()
+    time_series =   auto()
+    pose_monitor =  auto()
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +76,7 @@ class MainView(IntEnum):
 
 class LayerSettings(BaseSettings):
     left:   Field[list[Layers]] = Field([Layers.composite],                  description="Layers drawn in the left viewport",  widget=Widget.playlist)
-    right:  Field[list[Layers]] = Field([Layers.pose],                       description="Layers drawn in the right viewport", widget=Widget.playlist)
+    right:  Field[list[Layers]] = Field([Layers.pose_monitor],               description="Layers drawn in the right viewport", widget=Widget.playlist)
     output: Field[list[Layers]] = Field([Layers.fluid],                      description="Layers mixed into the show texture", widget=Widget.playlist)
     record: Field[list[Layers]] = Field([Layers.composite],                  description="Layers drawn into the screen recording", widget=Widget.playlist)
 
@@ -229,6 +220,7 @@ class _DataLayerSettings(render.DataLayerSettings):
 class _TrackerCompositorSettings(render.TrackerCompositorSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
     box_stage: Field[Stage] = Field(Stage.RAW, description="Pipeline stage of the bounding boxes")
+    image: Field[bool] = Field(False, description="The camera image under them; off, they lie over any layer of its frame")
 
 class _PoseCompositorSettings(render.PoseCompositorSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for camera crop")
@@ -259,26 +251,42 @@ class LayerGroup(BaseSettings):
     select   : Group[LayerSettings]                 = Group(LayerSettings)
     composite: Group[render.LayerCompositorSettings] = Group(render.LayerCompositorSettings)
 
-class DataGroup(BaseSettings):
-    a: Group[_DataLayerSettings] = Group(_DataLayerSettings)
-    b: Group[_DataLayerSettings] = Group(_DataLayerSettings)
+class PoseFrame(IntEnum):
+    """Where the pose monitor draws the pose."""
+    CROP = 0        # on the crop, with the crop's image: the pose model's input
+    CAMERA = 1      # on the camera's frame, with its boxes; no image
+    VIEW = 2        # on the view; no image
 
-class PreviewGroup(BaseSettings):
-    tracker: Group[_TrackerCompositorSettings] = Group(_TrackerCompositorSettings)
-    pose   : Group[_PoseCompositorSettings]    = Group(_PoseCompositorSettings)
+
+class PoseFeatures(IntEnum):
+    """The features the pose monitor draws over the pose."""
+    NONE = 0
+    FRAME = 1       # the current frame's
+    WINDOW = 2      # the window's, over time
+
+
+class PoseMonitorSettings(BaseSettings):
+    """The pose monitor: the pose stage it reads, where it draws the pose and the features over it; how each is
+    drawn in its group."""
+    stage:    Field[Stage]        = Field(Stage.LERP, description="The pose stage drawn")
+    frame:    Field[PoseFrame]    = Field(PoseFrame.CAMERA, description="Where the pose is drawn")
+    features: Field[PoseFeatures] = Field(PoseFeatures.NONE, description="The features drawn over the pose")
+
+    crop    : Group[_PoseCompositorSettings]    = Group(_PoseCompositorSettings, share=[stage])
+    camera  : Group[_TrackerCompositorSettings] = Group(_TrackerCompositorSettings, share=[stage])
+    view    : Group[render.ViewPoseLayerSettings] = Group(render.ViewPoseLayerSettings)
+    data    : Group[_DataLayerSettings]         = Group(_DataLayerSettings, share=[stage])
 
 class RenderSettings(BaseSettings):
     main_view: Field[MainView]                   = Field(MainView.DEBUG, description="The main window: the debug panels, or the show alone")
     input_fps: Field[float]                      = Field(60.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
     layer  : Group[LayerGroup]                   = Group(LayerGroup)
-    data   : Group[DataGroup]                    = Group(DataGroup)
-    preview: Group[PreviewGroup]                 = Group(PreviewGroup)
-    view_pose: Group[render.ViewPoseLayerSettings] = Group(render.ViewPoseLayerSettings)
     capture: Group[CaptureSettings]              = Group(CaptureSettings)
     view   : Group[ViewLayerSettings]            = Group(ViewLayerSettings)
     motion : Group[render.Motion3DLayerSettings] = Group(render.Motion3DLayerSettings, share=[input_fps.as_('fps')])
     bridge : Group[render.Bridge3DLayerSettings] = Group(render.Bridge3DLayerSettings)
     fluid  : Group[render.Fluid3DLayerSettings]  = Group(render.Fluid3DLayerSettings)
+    pose   : Group[PoseMonitorSettings]          = Group(PoseMonitorSettings)
     time_series: Group[render.TimeSeriesLayerSettings] = Group(render.TimeSeriesLayerSettings)
     colors : Group[render.ColorSettings]         = Group(render.ColorSettings)
     window : Group[WindowSettings]               = Group(WindowSettings)

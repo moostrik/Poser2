@@ -293,48 +293,36 @@
         }
       }
     },
-    "data": {
-      "a": {
+    "pose": {
+      "stage": "LERP",
+      "frame": "CAMERA",
+      "features": "NONE",
+      "crop": {
+        "line_width": 2.0,
+        "line_smooth": 0.0,
+        "use_gpu_crop": true
+      },
+      "camera": {
+        "pose_line_width": 2.0,
+        "bbox_line_width": 2,
+        "image": false
+      },
+      "view": {
+        "line_width": 3.0,
+        "line_smooth": 0.0,
+        "use_scores": false,
+        "draw_anchors": false
+      },
+      "data": {
         "mode": "WINDOW",
         "feature_field": "AngleMotion",
-        "stage": "SMOOTH",
         "line_width": 3.0,
         "line_smooth": 1.0,
         "use_scores": false,
         "render_labels": true,
         "use_history_color": false,
         "angle_offset": "NONE"
-      },
-      "b": {
-        "mode": "WINDOW",
-        "feature_field": "AngleMotion",
-        "stage": "SMOOTH",
-        "line_width": 6.0,
-        "line_smooth": 6.0,
-        "use_scores": false,
-        "render_labels": true,
-        "use_history_color": true,
-        "angle_offset": "NONE"
       }
-    },
-    "preview": {
-      "tracker": {
-        "stage": "LERP",
-        "pose_line_width": 2.0,
-        "bbox_line_width": 2
-      },
-      "pose": {
-        "stage": "LERP",
-        "line_width": 2.0,
-        "line_smooth": 0.0,
-        "use_gpu_crop": true
-      }
-    },
-    "view_pose": {
-      "line_width": 3.0,
-      "line_smooth": 0.0,
-      "use_scores": false,
-      "draw_anchors": false
     },
     "capture": {
       "monitor": {

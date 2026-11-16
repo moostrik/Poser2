@@ -14,9 +14,9 @@ from modules import render
 from modules.utils import FPS, Color, Rect, Point2f
 
 from ..board import RenderBoard
-from ..settings import Layers, MainView, RenderSettings
-from .layers import ViewInput, ViewOutput, ViewLayer
-from .chain import Size, TICK_LAYERS, CAPTURE_LAYERS, MONITORS, size_of, layers_of, shape_of
+from ..settings import Layers, MainView, PoseFrame, RenderSettings
+from .layers import ViewInput, ViewOutput, ViewLayer, PoseMonitorLayer
+from .chain import Size, TICK_LAYERS, CAPTURE_LAYERS, MONITORS, POSE_SHAPES, size_of, layers_of, shape_of
 
 
 OUTPUT_WIDTH: int = 1080
@@ -44,23 +44,15 @@ class DeepFlowRender(RenderBase):
 
         self.L: dict[Layers, dict[int, render.LayerBase]] = {layer: {} for layer in Layers}
 
-        # Set data.b overrides
-        settings.data.b.line_width = 6.0
-        settings.data.b.line_smooth = 6.0
-        settings.data.b.use_history_color = True
-
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   render.CameraImageLayer(    i, self.board)
             cam_crop =      self.L[Layers.cam_crop][i] =    render.CropImageLayer(      i, self.board)
             self.L[Layers.capture_image][i] =               render.CaptureImageLayer()
             self.L[Layers.capture_depth][i] =               render.CaptureDepthLayer()
 
-            tracker_compositor = self.L[Layers.tracker][i] = render.TrackerCompositor(  i, self.board,   cam_image.texture,          settings.preview.tracker,   settings.colors)
-            pose_compositor = self.L[Layers.pose][i] =      render.PoseCompositor(      i, self.board,   cam_image.texture, cam_crop, settings.preview.pose,      settings.colors)
-
-            # The stages, each with its monitor
+            # The stages, each with its monitor, and the pose's monitor
             view =          self.L[Layers.view][i] =        ViewLayer(           i, settings.view, settings.motion.z, fov, settings.colors)
-            self.L[Layers.view_pose][i] =                   render.ViewPoseLayer(       i, view,                                    settings.view_pose,         settings.colors)
+            self.L[Layers.pose_monitor][i] =                PoseMonitorLayer(    i, self.board, cam_image, cam_crop, view, settings.pose, settings.colors)
             self.L[Layers.motion][i] =                      render.Motion3DLayer(       i, settings.motion)
             self.L[Layers.bridge][i] =                      render.Bridge3DLayer(       settings.bridge)
             fluid =         self.L[Layers.fluid][i] =       render.Fluid3DLayer(        settings.fluid)
@@ -72,12 +64,6 @@ class DeepFlowRender(RenderBase):
                 self.L[key][i] = render.MonitorLayer(stage, monitor_settings)
 
             self.L[Layers.composite][i] =                   render.LayerCompositor(                          [fluid],                  settings.layer.composite)
-
-            self.L[Layers.data_A_W][i]  = render.FeatureWindowLayer(i, self.board, settings.data.a, settings.colors)
-            self.L[Layers.data_A_F][i]  = render.FeatureFrameLayer( i, self.board, settings.data.a, settings.colors)
-            self.L[Layers.data_B_W][i]  = render.FeatureWindowLayer(i, self.board, settings.data.b, settings.colors)
-            self.L[Layers.data_B_F][i]  = render.FeatureFrameLayer( i, self.board, settings.data.b, settings.colors)
-            self.L[Layers.data_time][i] = render.MotionTimeRenderer(i, self.board)
         self.L[Layers.time_series][0] = render.TimeSeriesLayer(self.board, settings.time_series)      # the board's series, one for all cameras
 
         # Split view: the left and right panels side by side or stacked, whichever shows what they hold larger
@@ -455,6 +441,8 @@ class DeepFlowRender(RenderBase):
     def _layer_size(self, layer_type: Layers) -> tuple[int, int]:
         """The shape of `layer_type`'s panel: its shape layer's texture, the output's without one."""
         shape: Layers | None = shape_of(layer_type)
+        if layer_type == Layers.pose_monitor:
+            shape = POSE_SHAPES[PoseFrame(self.settings.pose.frame)]
         if shape is not None and 0 in self.L[shape]:
             texture: Texture = self.L[shape][0].texture
             if texture.allocated:

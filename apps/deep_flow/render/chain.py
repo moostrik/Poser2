@@ -4,7 +4,7 @@ when it runs."""
 from dataclasses import dataclass
 from enum import IntEnum
 
-from ..settings import Layers
+from ..settings import Layers, PoseFrame
 
 
 class Size(IntEnum):
@@ -36,7 +36,6 @@ CHAIN: tuple[ChainLayer, ...] = (
     ChainLayer(Layers.capture_monitor, shape=Layers.capture_image, tick=True),
     # the view: the window cut, the depth read, the masks, the foreground, the color
     ChainLayer(Layers.view,            Size.VIEW, Layers.view, tick=True, capture=True),
-    ChainLayer(Layers.view_pose,       Size.VIEW, Layers.view, tick=True),
     ChainLayer(Layers.view_monitor,    Size.VIEW, Layers.view, tick=True),
     # the motion, the bridge, the fluid
     ChainLayer(Layers.motion,          Size.LARGE, tick=True, capture=True),
@@ -47,10 +46,11 @@ CHAIN: tuple[ChainLayer, ...] = (
     ChainLayer(Layers.fluid_monitor,   Size.LARGE, tick=True),
     # the display
     ChainLayer(Layers.composite,       Size.LARGE, tick=True),
-    ChainLayer(Layers.tracker,         Size.PANEL, Layers.cam_image, tick=True),   # camera stretched into a panel-sized FBO
-    ChainLayer(Layers.pose,            Size.PANEL, Layers.cam_crop, tick=True),    # crop stretched into a panel-sized FBO
+    # the pose, beside the chain: its shape its frame's (`DeepFlowRender._layer_size`)
+    ChainLayer(Layers.pose_monitor,    Size.PANEL, tick=True),
 )
 LAYERS: dict[Layers, ChainLayer] = {chain_layer.layer: chain_layer for chain_layer in CHAIN}
+POSE_SHAPES: dict[PoseFrame, Layers] = {PoseFrame.CROP: Layers.cam_crop, PoseFrame.CAMERA: Layers.cam_image, PoseFrame.VIEW: Layers.view}
 MONITORS: tuple[Layers, ...] = (Layers.capture_monitor, Layers.view_monitor, Layers.motion_monitor, Layers.bridge_monitor,
                                 Layers.fluid_monitor)
 TICK_LAYERS: list[Layers] = [chain_layer.layer for chain_layer in CHAIN if chain_layer.tick]

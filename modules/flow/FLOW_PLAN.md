@@ -35,8 +35,8 @@ distinct.
 **What:** five stages, capture, view, motion, bridge and fluid, each one panel and one monitor; the pose beside
 them with a monitor of its own. What is shown is a monitor, the time series or the fluid's look.
 
-**Why:** in deep_flow the pose is drawn by eight layers of its own, the composite only grades the fluid, the
-panels are one flat list, and the layer select holds four lists.
+**Why:** in deep_flow the composite only grades the fluid, the panels are one flat list, and the layer select
+holds four lists.
 
 **How:** deep_flow and the flow (its 2D and 3D fluid among it) are worked on freely; hd_trio runs its own copy
 of the 2D flow ([FLOW.md](FLOW.md)) and follows in line I. A layer both apps still use (the pose's, the look
@@ -45,10 +45,6 @@ added. One commit per step, both presets (`settings.json`, `very nice.json`) and
 guard tests, the render's tests and one -sim start (the panels in place, the presets loaded without unknown
 keys).
 
-- **A6.** A pose monitor: the pose stage it reads (raw, clean, smooth, lerp); the pose drawn on the crop with its
-  image, on the camera's frame with its boxes, or on the view, the last two without an image so they lie over
-  any layer of that frame; the features of the frame or the window as an optional overlay. It replaces
-  `tracker`, `pose`, `view_pose` and the four `data_*` layers; `data_time` goes; `time_series` stays a layer.
 - **A7.** The composite leaves deep_flow: the LUT becomes an option of the fluid's look, on the same
   `LutSettings` the compositor uses, and the show draws its layers in order.
 - **A8.** The panel tree in the chain's order: `capture`, `view`, `motion`, `bridge`, `fluid`, then `pose`; the
@@ -242,8 +238,8 @@ Not worked on until asked for; each with what is known.
 
 ## Rules it touches
 
-- Keep presets and settings schemas in sync: the pose monitor, the panel tree, the layer select, A6 to A9.
-- Remove obsolete pathways: the pose's layers and deep_flow's composite, A6, A7.
+- Keep presets and settings schemas in sync: the panel tree, the layer select, A7 to A9.
+- Remove obsolete pathways: deep_flow's composite, A7.
 - Settings connect the user and a component, not two components: the view's tolerance and size, A8.
 - Remove obsolete pathways instead of leaving parallel legacy ones: hd_trio's copy, deleted in line I.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the

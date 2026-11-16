@@ -4,7 +4,7 @@
 from typing import Any
 
 from modules.settings import Field, BaseSettings
-from modules.gl import Fbo, Texture
+from modules.gl import Fbo, Texture, clear_color
 from modules.utils import Rect
 from ...layer_base import LayerBase
 
@@ -18,6 +18,7 @@ class TrackerCompositorSettings(BaseSettings):
     box_stage:      Field[int] = Field(0, description="Pipeline stage of the bounding boxes")
     pose_line_width:Field[float] = Field(2.0, min=0.5, max=10.0, description="Pose line width")
     bbox_line_width:Field[int]   = Field(2, min=1, max=10, description="Bounding box line width in pixels")
+    image:          Field[bool]  = Field(True, description="The camera image under them; off, they lie over any layer of its frame")
 
 
 class TrackerCompositor(LayerBase):
@@ -76,7 +77,10 @@ class TrackerCompositor(LayerBase):
 
         # Composite: camera + tracklets + bboxes + all pose lines
         self._fbo.begin()
-        self._cam_texture.draw()
+        if self.settings.image:
+            self._cam_texture.draw()
+        else:
+            clear_color()
         self._depth_track_renderer.draw()
         self._bbox_renderer_A.settings.color = self._color_settings.history
         self._bbox_renderer_A.draw()
