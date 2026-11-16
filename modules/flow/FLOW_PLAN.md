@@ -11,7 +11,7 @@ inferred, **(site fact)** what the operator saw.
 
 | #   | Line                                                                         | State                            | Documents                                          |
 |-----|------------------------------------------------------------------------------|----------------------------------|----------------------------------------------------|
-| B   | [The camera and the view](#b-the-camera-and-the-view)                        | built; its look, two outputs     | [VIEW.md](VIEW.md)                                 |
+| B   | [The camera and the view](#b-the-camera-and-the-view)                        | built; its look by eye           | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; its details open          | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; the dye's amount to judge | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | open                             | [FLUID_3D.md](FLUID_3D.md)                         |
@@ -31,135 +31,15 @@ distinct.
 
 ## B. The camera and the view
 
-The goal: a clear path from the camera's depth and image to the motion, each step understandable, that leads to
-as little noise as possible in the motion while it keeps as much real z motion as possible. The motion is taken
-as it is here; what is inconsistent in it is listed below and is line C's.
+The view's goal is in [VIEW.md](VIEW.md#the-goal): who, where and how far from one frame, the player's image,
+mask and depth agreeing pixel for pixel at the motion's size, adding no noise of its own. How it is judged is in
+[FLOW.md](FLOW.md#the-goals).
 
-Each stage's goal and how it is judged are in [FLOW.md](FLOW.md#the-goals); the smoothing is judged on its own
-in line C.
+Built and measured ([VIEW.md](VIEW.md#the-depth)): the crop in 3D, the one mask, the depth read and filled; its z
+within the runs' spread of the views before it.
 
-Built: every capture reaches the motion ([INPUT_THREADS.md](INPUT_THREADS.md)); one path for the depth and the
-mask, who, where and how far, each once, measured against the two reads before it, and its tolerance at 0.2, 0.1
-and 0.05 m; the view's two outputs that agree, the mask and the player's depth wherever it is, the crop in 3D and
-the depth filled by push-pull, measured on the motion's raw output ([VIEW.md](VIEW.md#the-stage)).
-
-- **B1.** The one path's look, by eye on the edges recording: the outline and the color's edge, now that the
-  color grade works on the straight image and premultiplies by the mask last. Needs the operator at the screen.
-  B1 also asks whether the mask should be the guided filter's own alpha rather than its one-pixel threshold, as
-  that changes the look.
-- **B3.** z measured at the depth's own size, then upscaled to the motion's. The depth has no detail finer
-  than its pixels (one is about 2.7 view pixels) and x/y none finer than its window (about 7 px,
-  [RESOLUTION.md](RESOLUTION.md)), so measuring z on the upscaled depth spends about 7 times the work on
-  samples with nothing new, and lets the upscale make a change over time of its own: a view pixel flips between
-  a read and a filled depth as the mask's edge moves **(deduction)**. Measured at its own size, z exists exactly
-  where the depth does, its own mask; the band between the depth's edge and the mask's is filled once, on z.
-  The motion's output stays at the motion's size, x, y and z together, so the bridge sees no change.
-
-Today:
-
-```mermaid
-flowchart TB
-  D["Camera depth<br/>480 × 300"]
-  I["Camera image<br/>992 × 800"]
-  C["crop: image 448 × 800,<br/>depth inside the box 448 × 800 (nearest)"]
-  M["mask 448 × 800"]
-  R["read: depth upscaled to 448 × 800,<br/>tolerance at edges"]
-  F["fill: push-pull on the depth,<br/>the band inside the mask"]
-  XY["x/y: Lucas–Kanade, 448 × 800"]
-  SF["step filter, 448 × 800<br/>(edges in depth pixels)"]
-  DV["depth velocity: z, z position,<br/>448 × 800"]
-  V["velocity x, y, z, 448 × 800,<br/>weighted by the mask"]
-  I --> C --> M
-  D --> C
-  D --> R
-  M --> R --> F --> SF --> DV --> V
-  C --> XY --> V
-  XY -- "displacement, 448 × 800" --> DV
-```
-
-B3:
-
-```mermaid
-flowchart TB
-  D["Camera depth<br/>480 × 300"]
-  I["Camera image<br/>992 × 800"]
-  C["crop: image 448 × 800,<br/>depth inside the box ~170 × 300"]
-  M["mask 448 × 800"]
-  XY["x/y: Lucas–Kanade, 448 × 800"]
-  A["displacement averaged<br/>to ~170 × 300"]
-  SF["step filter, ~170 × 300"]
-  DV["depth velocity: z, z position,<br/>~170 × 300"]
-  U["upscale z and z position to 448 × 800,<br/>push-pull fills the band inside the mask"]
-  V["velocity x, y, z, 448 × 800,<br/>weighted by the mask"]
-  I --> C --> M
-  D --> C
-  C -- "depth" --> SF --> DV --> U --> V
-  M --> U
-  C -- "image" --> XY --> V
-  XY --> A --> DV
-```
-  - The view hands out the image and the mask at the motion's size and the depth inside the box at its own
-    size: `crop.depth`, the camera's depth across the crop's window on its own pixels, 0 outside the box, its
-    size the window's in depth pixels (about 170 × 300 at the preset), made again when the crop changes. The
-    `depth` part (`ViewDepth`, the read and the fill) leaves the view; `DepthUpscale` and `depth_read.masked_depth`
-    go; `view.depth.tolerance` goes, as the view upscales no depth.
-  - The motion:
-    1. x/y at the motion's size from the image, as now; its `same_surface` reads the depth at the depth's
-       size by uv, as it already does (`lucas_kanade_tile.comp`). Today every mask pixel has a depth, the view
-       filling it; with the depth unfilled, the band between the depth's edge and the mask's has none, and a
-       window whose center has no depth would count no sample and give no x/y there. So a window whose center
-       has no depth counts all its samples, as with `same_surface` off; inside the body and past the mask x/y
-       is as today. In the shader and its numpy reference (`lucas_kanade_flow`), with a test.
-    2. x/y's displacement averaged down to the depth's size (a box over the view pixels each depth pixel
-       covers), for the depth velocity's carry.
-    3. The depth velocity (`DepthVelocity`, its track, step filter and windows) and the z position at the
-       depth's size, `depth_step` one depth pixel. `z.threshold` and the catch-up's `motion_floor` stay in the
-       view's pixels: each is in pixels of the texture it runs on today (the threshold over the depth
-       velocity's width, `moving()` in `depth_velocity_shader.frag` over the displacement's size), so both are
-       turned into the depth's pixels by the view's pixels per depth pixel, the presets keeping their meaning.
-       A crop change resizes the depth, reallocates the depth velocity and starts its track over. The z
-       position is made there without the mask, which is at the motion's size; the catch-up's 3 × 3 of
-       displacement texels now spans 3 × 3 depth pixels, about 8 view pixels, accepted, as the displacement
-       is smooth over about 7 px **(deduction)**.
-    4. z and the z position upscaled to the motion's size as pairs (value × weight, weight), the weight 1
-       where the crop's depth has a value, the step filter's strip included (its z 0 is a value, kept as
-       today): read bilinearly, then filled where the weight is 0 inside the mask, the band between the
-       depth's edge and the mask's, by push-pull (`DepthFill` taking a weight, no longer a depth's presence),
-       0 outside the mask; then composed with x/y as now, weighted by the mask, and the z position's weight
-       times the mask.
-  - What reads the depth, each named here: the x/y solve (`same_surface`), the depth velocity, the z position,
-    the solve's capture for debugging (`SolveCapture`, any size), the view's monitor.
-  - Blending two z velocities at an edge mixes two real motions, where blending two depths made a surface in
-    between, so the upsampling has no tolerance **(deduction)**; whether it needs one is shown by the
-    measurement.
-  - The references (`depth_read.push_pull` with a weight, the displacement's average, the upsampling), their
-    tests; `view_check` on the crop's depth at its size; the motion's monitor ports at their sizes; the capture
-    saves the depth at its size, and the compare takes the depth at its size and its regions (inside, edge,
-    table) at the motion's; the preset, VIEW.md, MOTION.md, RESOLUTION.md and TIMING.md follow.
-  - Checked, first without the app: the references' tests (the displacement's average, the weighted
-    push-pull, the upscale) and `view_check` on the crop's depth at its size. Then against the view's preset
-    row in VIEW.md, measured the same way: three new captures of the measure recording's first 16.5 s (the
-    earlier ones hold the depth upscaled), replayed through the motion on its raw output; the same segments and
-    the same regions from the mask at the motion's size, z read after the upscale as the bridge gets it; the
-    same row, the mean of three against the runs' spread. Expected: the share without a z position as today's,
-    about 3.9% (0 would mean the fill covers the step filter's strip); slow and fast z within the spread (lower
-    would mean the upscale smooths real motion); x/y at the edge unchanged; the motion's GPU time lower. The
-    noise is the open column: whether the upscale's flips at the edge were noise.
-
-Left as it is: the color at the edge is not un-mixed, as matting would find the foreground's own color; the
-motion's xy there sees mixed color, weighed down by the mask.
-
-Question, for B: the one path's fast z at the view's tolerance 0.2 m was higher than in every other row of
-VIEW.md's smoothed table, by more than the runs' spread, with no mechanism found in the code. On the raw output
-it is still the highest (0.90 against 0.83 and 0.84), the runs overlapping in part; whether it holds on another
-recording.
-
-Known in the motion, left as it is: two numbers say "another surface" in space beside the view's
-(`motion.z.tolerance`, also its restart in time, and `motion.z.edge`, the step filter's against silhouette
-jitter, which leaves a band a depth sample wide along every edge without z).
-
-A finer depth would give the mask and z a finer edge at the source; the camera's sizes are a given
-([RESOLUTION.md](RESOLUTION.md#the-rules)).
+- **B1.** The view's look, by eye on the edges recording, with the pause: the outline and the color's edge. Needs
+  the operator at the screen.
 
 ## C. The motion
 
@@ -344,11 +224,5 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways instead of leaving parallel legacy ones: hd_trio's copy, deleted in line I.
 - A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
-
-- Remove obsolete pathways; keep presets and settings schemas in sync: B3 (`ViewDepth`, `DepthUpscale`,
-  `view.depth`).
-- Fix a problem where it is made: B3, z measured where the depth's samples are.
-- A step down of 2× or more averages what it leaves ([RESOLUTION.md](RESOLUTION.md#the-rules)): B3, the
-  displacement's average.
 
 Not designed yet, so their rules are not named: C1 to C4; D1 to D4; E1, E2; F1 to F3; H1; I1 to I4.
