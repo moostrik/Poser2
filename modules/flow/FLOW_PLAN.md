@@ -39,20 +39,25 @@ Built and measured ([VIEW.md](VIEW.md#the-depth)): the crop in 3D, the one mask,
 its z within the runs' spread of the views before it.
 
 - **B1.** The view's look, by eye on the edges recording, with the pause: the outline and the color's edge, with
-  B3's feather. Needs the operator at the screen.
+  B3's erode and feather. Needs the operator at the screen.
 - **B2.** The depth's names, one term each, form only: the filled texture is named for what it is, `depth.filled`
   beside `depth.upscaled` (the view's output keeps `depth`, what the motion takes); the numpy references'
   file `modules/flow/view/depth_read.py`, which holds the crop's depth, the upscale and the fill, becomes
   `view_depth.py`, after its subject; VIEW.md says "upscale" for the pass wherever it describes the view as
   built, the earlier paths' sections keeping their names (`SURFACE`, `MASK`) as the configuration they were
   measured with. Checked: the tests and the import.
-- **B3.** The color grade's feather: the width of the soft edge the graded image is premultiplied with, a
-  setting `color_grade.feather` in view pixels, 0 the mask's own edge (one pixel, `MaskAntialias`). The grade
-  softens its copy of the mask's edge for its premultiply, as compositing feathers a matte where the picture is
-  made; the mask itself, which the motion and the depth use, stays as it is, so the feather changes the dye's
-  color and nothing of the motion. Checked by eye in B1, at 0, 2 and 4 px.
+- **B3.** The color: the part that makes the player's color for the density, now `color_grade`, grades,
+  sharpens and premultiplies by the mask; it is named for what it gives, `color` (`ViewColor`, its texture and
+  the view's output `color`, was `graded_image`); the bridge's input keeps `image`, as hd_trio feeds it a camera
+  image. Its copy of the mask gets two settings in view pixels, applied before the premultiply, as compositing
+  works a matte where the picture is made: `erode`, the edge pulled inward, dropping the outermost pixels whose
+  color the camera mixed with the background's; `feather`, the edge softened inward, the color fading in over
+  that width. Both 0 the mask's own edge (one pixel, `MaskAntialias`). One pass: the mask blurred by a Gaussian of
+  half the feather, cut further inward by the erode, then faded. The mask itself, which the motion and the depth
+  use, stays as it is, so both change the dye's color and nothing of the motion. Checked by eye in B1, erode 0
+  to 2 and feather 0 to 4 px.
 - **B4.** The motion before and after today's view changes, measured as [FLOW.md](FLOW.md#the-goals) says: the
-  upscale's edge at 0.1 m (was 0.2 m), the fill always on, B2 and B3 at the preset (feather 0). Three captures of
+  upscale's edge at 0.1 m (was 0.2 m), the fill always on, B2 and B3 at the preset (erode and feather 0). Three captures of
   the measure recording's first 16.5 s, replayed through the motion on its raw output (thresholds, `z.smooth` and
   `z.catch_up` at 0), the same segments and regions; the mean of three against the "upscale and the fill, the
   preset" row in VIEW.md and the runs' spread. Expected: every column within the spread, the edge's change
