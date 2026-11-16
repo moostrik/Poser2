@@ -277,4 +277,10 @@ Not worked on until asked for; each with what is known.
 - A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
+- Remove obsolete pathways; keep presets and settings schemas in sync: B3 (`ViewDepth`, `DepthUpscale`,
+  `view.depth`).
+- Fix a problem where it is made: B3, z measured where the depth's samples are.
+- A step down of 2× or more averages what it leaves ([RESOLUTION.md](RESOLUTION.md#the-rules)): B3, the
+  displacement's average.
+
 Not designed yet, so their rules are not named: C1 to C4; D1 to D4; E1, E2; F1 to F3; H1; I1 to I4.
