@@ -326,7 +326,7 @@
         "depth_read": "SURFACE",
         "tolerance": 0.2
       },
-      "grade": {
+      "color_grade": {
         "enabled": true,
         "use_mask": true,
         "exposure": 0.99,

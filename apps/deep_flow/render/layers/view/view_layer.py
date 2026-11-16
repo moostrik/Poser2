@@ -24,8 +24,9 @@ from modules.gl import Fbo, SwapFbo, Style, Texture, shaders
 from modules.pose import BBox, Frame, Points2D
 from modules.render import StageLayer, StageOutput
 from modules.utils import Rect
-from ....settings import GradeSettings, ViewDepthSettings, ViewLayerSettings
-from .shaders import DepthMask, Grade
+from ....settings import ViewDepthSettings, ViewLayerSettings
+from .color_grade import ColorGrade
+from .shaders import DepthMask
 
 
 @dataclass
@@ -56,14 +57,14 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
     """The view stage's layer. `fov` is the camera image's horizontal field (degrees), for the metres a view width
     spans; `settings.depth.tolerance` tells one surface from another. Places
     the pose's points in the window (`crop_pose_points`, `lost`) for the pose drawn over the view; its last pass is
-    the color: the foreground graded, sharpened and masked. Draws nothing."""
+    `ColorGrade` (`settings.color_grade`). Draws nothing."""
 
     def __init__(self, settings: ViewLayerSettings, fov: float) -> None:
         super().__init__(settings)
         self.settings: ViewLayerSettings = settings
         self._fov: float = fov
 
-        self._color: SwapFbo = SwapFbo()                # the foreground graded, then sharpened, then masked
+        self._color_grade: ColorGrade = ColorGrade(settings.color_grade)
         self._image: Fbo = Fbo()
         self._depth: Fbo = Fbo(interpolation=GL_NEAREST)     # an edge never reads as a distance in between
         self._depth_mask: Fbo = Fbo()
@@ -78,9 +79,6 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         self._guided_shader: shaders.GuidedFilter = shaders.GuidedFilter()
         self._threshold_shader: shaders.MaskAntialias = shaders.MaskAntialias()
         self._foreground_shader: shaders.MaskMultiply = shaders.MaskMultiply()
-        self._grade_shader: Grade = Grade()
-        self._sharpen_shader: shaders.Sharpen = shaders.Sharpen()
-        self._color_mask_shader: shaders.MaskApply = shaders.MaskApply()
 
         self._window: Rect = Rect(0.0, 0.0, 1.0, 1.0)  # uv on the camera image, rows down
         self._grid_size: tuple[int, int] = (0, 0)       # the depth's grid, its samples on the camera image
@@ -94,7 +92,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
     def output(self) -> ViewOutput:
         s: ViewLayerSettings = self.settings
         depth: DepthView = DepthView(self._depth, view_span(self._window, self._fov), depth_step(self._window, self._grid_size), s.depth.near, s.depth.far)
-        return ViewOutput(self._image, self._foreground, self._color, depth, self._mask, self._depth_mask)
+        return ViewOutput(self._image, self._foreground, self._color_grade.texture, depth, self._mask, self._depth_mask)
 
     @property
     def texture(self) -> Texture:
@@ -127,26 +125,27 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         self._guided.allocate(width, height, GL_R16F)
         self._products.allocate(width, height, GL_RGBA32F)
         self._coefficients.allocate(width, height, GL_RG32F)
-        self._color.allocate(width, height, GL_RGBA16F)
+        self._color_grade.allocate(width, height, GL_RGBA16F)
         for shader in self._shaders():
             shader.allocate()
         self._made = None
 
     def deallocate(self) -> None:
         for fbo in (self._image, self._depth, self._depth_mask, self._mask, self._foreground, self._guided, self._products,
-                    self._coefficients, self._color):
+                    self._coefficients):
             fbo.deallocate()
+        self._color_grade.deallocate()
         for shader in self._shaders():
             shader.deallocate()
         super().deallocate()
 
     def _shaders(self) -> tuple:
-        return (self._depth_shader, self._depth_mask_shader, self._guided_shader, self._threshold_shader, self._foreground_shader,
-                self._grade_shader, self._sharpen_shader, self._color_mask_shader)
+        return (self._depth_shader, self._depth_mask_shader, self._guided_shader, self._threshold_shader, self._foreground_shader)
 
     def reset(self) -> None:
-        for fbo in (self._image, self._depth, self._depth_mask, self._mask, self._foreground, self._color):
+        for fbo in (self._image, self._depth, self._depth_mask, self._mask, self._foreground):
             fbo.clear()
+        self._color_grade.clear()
         self._made = None
         self._timestamp = None
         self._pose_points = None
@@ -169,10 +168,9 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
             return
         s: ViewLayerSettings = self.settings
         d: ViewDepthSettings = s.depth
-        g: GradeSettings = s.grade
         made: tuple = (input.timestamp, s.fixed_x, s.fixed_y, s.fixed_height, s.guided_radius, s.edge_contrast,
                        d.near, d.far, d.depth_read, d.tolerance, image.width, image.height, self._image.width, self._image.height,
-                       g.enabled, g.use_mask, g.exposure, g.offset, g.gamma, g.contrast, g.saturation, g.sharpen)
+                       self._color_grade.made_with)
         if made == self._made:
             return
         self._made = made
@@ -206,33 +204,10 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         self._foreground_shader.use(self._image, self._mask)
         self._foreground.end()
 
-        self._make_color(g)
         Style.pop_style()
+        self._color_grade.process(self._foreground, self._mask)
 
         self._pose_points = self._place_pose(input.pose)
-
-    def _make_color(self, g: GradeSettings) -> None:
-        """The foreground graded, sharpened where `sharpen`, with the mask as alpha where `use_mask`; the
-        foreground as it is while the grade is not `enabled`."""
-        self._color.swap()
-        self._color.begin()
-        if g.enabled:
-            self._grade_shader.use(self._foreground, g.exposure, g.offset, g.gamma, g.contrast, g.saturation)
-        else:
-            self._foreground.draw()
-        self._color.end()
-        if not g.enabled:
-            return
-        if g.sharpen > 0.0:
-            self._color.swap()
-            self._color.begin()
-            self._sharpen_shader.use(self._color.back, g.sharpen)
-            self._color.end()
-        if g.use_mask:
-            self._color.swap()
-            self._color.begin()
-            self._color_mask_shader.use(self._color.back, self._mask)
-            self._color.end()
 
     def _read_depth(self, depth: Texture | None, roi: Rect, read: DepthRead, s: ViewLayerSettings) -> None:
         """The depth into the view the way `read` says; none without a depth."""

@@ -221,8 +221,8 @@ class ViewDepthSettings(BaseSettings):
     tolerance:  Field[float]     = Field(0.2, min=0.05, max=0.5, step=0.01, description="Depth jump beyond which the read blends no two depth pixels, m")
 
 
-class GradeSettings(BaseSettings):
-    """The view's color: the foreground graded, in the order applied, then sharpened, the mask as its alpha."""
+class ColorGradeSettings(BaseSettings):
+    """ColorGrade: the foreground graded, in the order applied, then sharpened, the mask as its alpha."""
     enabled:    Field[bool]  = Field(True, description="The color graded; off, the foreground as it is")
     use_mask:   Field[bool]  = Field(True, description="The mask as the color's alpha")
     exposure:   Field[float] = Field(1.0, min=0.1, max=3.0, newline=True, description="The color times this")
@@ -234,7 +234,8 @@ class GradeSettings(BaseSettings):
 
 
 class ViewLayerSettings(render.StageLayerSettings):
-    """The view's size, its window on the camera image and the mask's edge; its depth and its grade in their panels."""
+    """The view's size, its window on the camera image and the mask's edge; its depth and its color grade in their
+    panels."""
     width:         Field[int]   = Field(448, min=32, max=4096, step=32, description="The view's width (pixels)")
     height:        Field[int]   = Field(800, min=32, max=4096, step=32, description="The view's height (pixels)")
     fixed_x:       Field[float] = Field(0.5, min=0.0, max=1.0, description="The window's center across the camera image")
@@ -243,7 +244,7 @@ class ViewLayerSettings(render.StageLayerSettings):
     guided_radius: Field[float] = Field(2.0, min=0.0, max=8.0, step=0.25, newline=True, description="How far the image moves the mask's edge to its own, in depth pixels; 0 = off")
     edge_contrast: Field[float] = Field(0.03, min=0.001, max=0.3, step=0.001, description="The image's brightness spread (0 to 1) above which the mask's edge follows the image's")
     depth: Group[ViewDepthSettings] = Group(ViewDepthSettings)
-    grade: Group[GradeSettings]     = Group(GradeSettings)
+    color_grade: Group[ColorGradeSettings] = Group(ColorGradeSettings)
 
 
 class CaptureView(IntEnum):
