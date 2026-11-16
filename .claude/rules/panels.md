@@ -7,7 +7,7 @@ paths:
 ---
 # Panels
 
-- A settings class mirrors the code it configures: a group for each part, in the order the code runs them
+- A settings class mirrors the code it configures: a group for each step, in the order the code runs them
 - Within a group, prefer the fields in the order the code uses them
 - A component's monitors come last in its settings
 - A panel that holds more than one chain (an app's root, the render panel) may order its groups by use
