@@ -53,12 +53,6 @@ the depth filled by push-pull, measured on the motion's raw output ([VIEW.md](VI
 Left as it is: the color at the edge is not un-mixed, as matting would find the foreground's own color; the
 motion's xy there sees mixed color, weighed down by the mask.
 
-Question, for B: the edge's depth averaged by the fill, the edge pixels given a weight below 1 (by
-their distance to `crop.depth`'s outline) so they blend toward the depth inside them. On the motion's raw output
-the edge's z noise is already below the inside's (6.1 against 11.8, [VIEW.md](VIEW.md#the-depth)), and a weight
-would soften the edge's real z with it **(deduction)**; measured, a weight against none, three captures each,
-kept only past the runs' spread.
-
 Question, for B: the one path's fast z at the view's tolerance 0.2 m was higher than in every other row of
 VIEW.md's smoothed table, by more than the runs' spread, with no mechanism found in the code. On the raw output
 it is still the highest (0.90 against 0.83 and 0.84), the runs overlapping in part; whether it holds on another
