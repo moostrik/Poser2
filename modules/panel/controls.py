@@ -628,8 +628,8 @@ def enum_options(field: Field) -> dict[Enum, str]:
     return {m: getattr(m, 'label', None) or generate_label(m.name) for m in members}
 
 
-def _size(select: ui.select, field: Field) -> None:
-    """A select's width: the field's `width` hint, else `w-48`."""
+def _size(select: ui.element, field: Field) -> None:
+    """A select's width, or a select-like box's: the field's `width` hint, else `w-48`."""
     select.classes(f"w-{field.width if field.width is not None else 48} max-w-full")
 
 
@@ -705,7 +705,7 @@ def path_step(path: str) -> str:
 
 
 def path_label(path: str) -> str:
-    """A path as the path select's button shows it: its levels joined by ' › '."""
+    """A path as the path select's box shows it: its levels joined by ' › '."""
     return path.replace('.', ' › ') if path else '—'
 
 
@@ -713,8 +713,8 @@ PATH_MENU_GRACE: float = 0.3    # s the mouse may be outside a path select's lis
 
 
 class PathSelect(Control):
-    """A dotted path from the current list of another field (``options``), picked in one nested list: a button
-    showing the path, opening a list of its top level, steps and paths side by side. A step expands in place, its
+    """A dotted path from the current list of another field (``options``), picked in one nested list: a box like a
+    select's, its title small inside it, showing the path and opening a list of its top level, steps and paths side by side. A step expands in place, its
     level underneath on the next card tint (``DEPTH_BG``), as the nested panels do; the list opens with the shown
     path's steps expanded and the path marked. A pick writes the field and the list stays open; it closes when
     the mouse has left it for ``PATH_MENU_GRACE``, on a click outside or on Escape. Polls both, always."""
@@ -725,12 +725,14 @@ class PathSelect(Control):
         self.paths: list[str] = list(getattr(self.settings, self.options_field.name)) if self.options_field else []
         self.items: dict[str, ui.item] = {}         # the list's paths, as filled last
         self.close_timer: ui.timer | None = None
-        self.button = self.tooltip(ui.button(path_label(self.shown)).props(
-            "dense outline no-caps align=left" + self.lock(readonly=False)))
-        self.button.classes(f"w-{self.field.width if self.field.width is not None else SLIDER_WIDTH} max-w-full")
+        # A box like a select's, its title small inside it; the input only shows the path, typing does nothing
+        self.box = self.tooltip(ui.input(label=self.label, value=path_label(self.shown)).props(
+            "dense outlined readonly" + self.lock(readonly=False)))
+        _size(self.box, self.field)
+        self.box.classes("cursor-pointer")
         if self.locked:
             return
-        with self.button:
+        with self.box:
             self.menu = ui.menu().props('anchor="bottom left" self="top left"')
         self.menu.on('before-show', lambda _: self._fill())
         self.menu.on('mouseenter', lambda _: self._hold())
@@ -764,7 +766,7 @@ class PathSelect(Control):
 
     def _release(self) -> None:
         self._hold()
-        with self.button:
+        with self.box:
             self.close_timer = ui.timer(PATH_MENU_GRACE, self.menu.close, once=True)
 
     def polls(self) -> bool:
@@ -776,7 +778,7 @@ class PathSelect(Control):
         super().poll()
 
     def show(self, value: Any) -> None:
-        self.button.set_text(path_label(value))
+        self.box.set_value(path_label(value))
         for key, item in self.items.items():
             if key == value:
                 item.props('active')
