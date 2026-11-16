@@ -51,6 +51,13 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
 - **B4.** The view's panels: its crop of the camera image (`fixed_x`, `fixed_y`, `fixed_height`) a panel of its
   own, `crop`, its fields `center_x`, `center_y`, `height`. The view's panels in the order the view runs: crop,
   depth, mask, color grade, then the monitors. Presets, VIEW.md and `view_check.py` follow.
+- **B5.** The view's color as compositing does it (Porter and Duff; Brinkmann): `ColorGrade` grades and sharpens
+  the straight image, and the mask is its alpha last. Grading the cut foreground changes the half-masked edge
+  pixels apart from the rest and the sharpen pulls the cut's black into a bright rim inside the edge. The
+  foreground step and `output.foreground` go, read by nothing downstream: the outputs are image, depth, mask,
+  depth mask and color. The ports follow the view's parts in the order it runs (crop, depth, mask, color grade),
+  and the input depth is a depth (kind DEPTH, the depth band's near and far), so its monitor draws its colormap.
+  The look at the edge changes: judged by eye.
 
 Question, for later: the pose monitor (`PoseMonitorCompositor`) draws its chosen layer and the features into an FBO
 of its own, which makes it a compositor by the render rule; drawn straight into the panel it needs none and is a
@@ -227,6 +234,8 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth.depth_read`, B1.
 - Keep presets and settings schemas in sync; name a concept after what it is: the view's crop, B4.
+- Fix a problem where it is made; remove obsolete pathways: the view's grade on the straight image, the
+  foreground gone, the input depth's kind, B5.
 - A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
