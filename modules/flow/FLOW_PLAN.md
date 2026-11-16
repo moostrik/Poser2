@@ -51,8 +51,8 @@ and 0.05 m ([VIEW.md](VIEW.md#the-stage)).
 flowchart TB
   I["Camera image<br/>992 × 800"]
   D["Camera depth<br/>480 × 300, metres"]
-  C["crop → image<br/>448 × 800"]
-  K["cut → cut: who<br/>near, far; 0/1 on the depth's own pixels"]
+  C["crop → image: the box's window<br/>center_x, center_y, height; 448 × 800"]
+  K["crop → depth: who, the box's front and back<br/>near, far; the depth's own pixels, 0 outside; 448 × 800"]
   M["mask → mask: where<br/>guided filter; soft alpha, 448 × 800"]
   R["depth → read: how far<br/>tolerance; the player's depth where mask > 0, else 0"]
   F["depth → depth: the fill<br/>push-pull inside the mask; 448 × 800"]
@@ -95,12 +95,16 @@ flowchart TB
        has no settings of its own; `depth.fill`, a switch, on, turns it off to compare: off, the read as it is.
   - A numpy reference beside each pass (`depth_read.py`), unit-tested on a body with holes and an outline;
     the shader checked against it in `view_check`, with its GPU time.
-  - Three parts, one per step, each named after what it gives: `cut` (near, far), `mask` (guided_radius,
-    edge_contrast), `depth` (tolerance; its ports the read, then the filled depth); the paths `view.cut.cut`,
-    `view.mask.mask`, `view.depth.read`, `view.depth.depth`. `ViewDepthMask` splits into the cut and the mask,
-    `ViewDepth` holds the read and the fill, their settings follow;
-    `ViewOutput.depth_mask` goes. `depth.tolerance` stays: it keeps edges inside the mask (an arm before the
-    body) from reading as a depth in between.
+  - The crop is a crop of the box in 3D: its sides (center_x, center_y, height) take the image's window, its
+    front and back (near, far, moved from `depth_mask`) the depth inside it. The cut goes into it: `crop.depth`
+    is the camera's depth inside the box on its own pixels (unblended), 0 outside, at the view's size.
+  - Three parts after the crop, one per step: `crop` (center_x, center_y, height, near, far; ports `image`,
+    `depth`), `mask` (guided_radius, edge_contrast; port `mask`, guided from where `crop.depth` is above 0),
+    `depth` (tolerance, fill; ports `read`, then `depth`). `ViewDepthMask` becomes the mask alone, the crop gets
+    a class of its own (its two textures), `ViewDepth` holds the read and the fill, their settings follow;
+    `ViewOutput.depth_mask` goes. The read samples the camera's depth, not `crop.depth`, as it blends the four
+    depth pixels around a view pixel. `depth.tolerance` stays: it keeps edges inside the mask (an arm before
+    the body) from reading as a depth in between.
   - The motion weighs z by the mask alone (`compose_velocity.frag`, `z_position.frag`, `MotionInput.depth_mask`
     gone); the bridge's z position takes the mask for "the player is there" (`z_position_mix`, its share
     `depth_mask` becomes `mask`); `BridgeInput.depth_mask` goes.
@@ -111,13 +115,12 @@ flowchart TB
     bridge; the documents, the preset and the scripts; `view_check`; the three captures. One commit.
   - Checked: `view_check`, the passes 0 pixels off their references; three captures on the measure recording
     with the fill and three without, against the one path's 0.2 m row in VIEW.md, with the share of the mask
-    without depth, 0 with the fill. The color
-    grade is untouched, it premultiplies by the mask as before.
+    without depth, 0 with the fill. The color grade is untouched, it premultiplies by the mask as before.
   - Left as it is: the color at the edge is not un-mixed, as matting would find the foreground's own color; the
     motion's xy there sees mixed color, weighed down by the mask.
 
 Question, for B after B2: the edge's depth averaged by the fill, the edge pixels given a weight below 1 (by
-their distance to the cut's outline) so they blend toward the depth inside them. The edge's z noise is mostly
+their distance to `crop.depth`'s outline) so they blend toward the depth inside them. The edge's z noise is mostly
 the body moving between frames, which one frame's average does not reach, and it would soften the edge's real
 z with it **(deduction)**; measured, a weight against none, three captures each, kept only past the runs'
 spread.
