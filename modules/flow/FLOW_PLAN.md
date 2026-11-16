@@ -11,7 +11,6 @@ inferred, **(site fact)** what the operator saw.
 
 | #   | Line                                                                         | State                            | Documents                                          |
 |-----|------------------------------------------------------------------------------|----------------------------------|----------------------------------------------------|
-| A   | [The capture](#a-the-capture)                                                | open: the tilt's black bands     | [OAK4.md](../camera/oak4/OAK4.md#tilt-correction)  |
 | B   | [The view](#b-the-view)                                                      | built                            | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; its details open          | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; the dye's amount to judge | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
@@ -30,17 +29,6 @@ The apps on deep_flow's input have their own plan, [apps/APPS_PLAN.md](../../app
 
 The 3D fluid's lines are weighed by [its goal](FLUID_3D.md#the-goal): sharp, translucent ink patterns, layers
 distinct.
-
-## A. The capture
-
-The goal: the camera's image and depth fill the frame the flow takes in.
-
-Question, for A: the tilt correction leaves black above and below the picture, a little less in the depth. Its
-homography refits the straightened picture into the frame so that the whole of it stays visible
-(`tilt_homography` in `modules/camera/geometry/tilt_correction.py`, the smaller of the two scales, centered): a
-tilted picture straightens into a trapezoid, its wide end sets the scale, and the rows its height does not fill
-are left black, with wedges at its narrow end's corners ([OAK4.md](../camera/oak4/OAK4.md#tilt-correction)).
-How it should fill the frame instead is open.
 
 ## B. The view
 
