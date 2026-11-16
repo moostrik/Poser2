@@ -232,6 +232,25 @@ class _PoseCompositorSettings(render.PoseCompositorSettings):
     front_stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage of the front line (track color)")
 
 # The view's layers' settings (render/layers/view)
+class ColorizeSettings(BaseSettings):
+    """Colorize: how the player's colors are styled."""
+    enabled:        Field[bool]  = Field(True, description="Colorize on; off, the foreground as it is")
+    blend_factor:   Field[float] = Field(0.2, min=0.0, max=1.0, description="Foreground temporal blending")
+    exposure:       Field[float] = Field(1.2, min=0.1, max=3.0, description="Exposure multiplier")
+    gamma:          Field[float] = Field(1.0, min=0.5, max=2.0, description="Gamma correction")
+    offset:         Field[float] = Field(0.0, min=-0.5, max=0.5, description="Exposure offset")
+    contrast:       Field[float] = Field(1.1, min=0.5, max=2.0, description="Contrast")
+    saturation:     Field[float] = Field(2.0, min=0.5, max=2.0, description="Color saturation")
+    # Cel shade
+    levels:         Field[int]   = Field(9, min=0, max=12, description="Number of color bands (0 = off: no bands)")
+    smoothness:     Field[float] = Field(0.33, min=0.0, max=0.5, description="Gradient between bands")
+    # Colorize
+    colorize:       Field[float] = Field(0.96, min=0.0, max=1.0, description="Colorize toward the track color (0.0 = off)")
+    # Post
+    sharpen:        Field[float] = Field(0.0, min=0.0, max=2.0, description="Sharpen result (0.0 = off)")
+    use_mask:       Field[bool]  = Field(True, description="Apply mask to foreground")
+
+
 class ViewLayerSettings(render.StageLayerSettings):
     """The view's size, its window on the camera image, the player's depth band, the depth tolerance its read uses
     and the mask's edge."""
@@ -246,7 +265,7 @@ class ViewLayerSettings(render.StageLayerSettings):
     guided_radius: Field[float] = Field(2.0, min=0.0, max=8.0, step=0.25, newline=True, description="How far the image moves the mask's edge to its own, in depth pixels; 0 = off")
     edge_contrast: Field[float] = Field(0.03, min=0.001, max=0.3, step=0.001, description="The image's brightness spread (0 to 1) above which the mask's edge follows the image's")
     depth_read:    Field[DepthRead] = Field(DepthRead.SURFACE, newline=True, description="How the depth is read into the view: its edge on its own pixels or on the mask's")
-    color:         Group[render.ColorizeSettings] = Group(render.ColorizeSettings)
+    color:         Group[ColorizeSettings] = Group(ColorizeSettings)
 
 
 class CaptureView(IntEnum):

@@ -1,33 +1,13 @@
 """Colorize: the player's colors blended over time, cel shaded, their hue shifted toward the camera's track color,
-sharpened, and the mask as alpha. `Colorize` is the chain, which deep_flow's view runs as its last pass and
-`CenterForegroundLayer` on its cut-out; `ColorizeLayer` runs it on a foreground another layer made."""
+sharpened, and the mask as alpha. `Colorize` is the chain, the view's last pass; `ColorizeLayer` runs it on a
+foreground another layer made."""
 
 # Local application imports
-from modules.gl import Fbo, SwapFbo, Texture, Style, shaders
-from modules.settings import Field, BaseSettings
+from modules.gl import SwapFbo, Texture, Style, shaders
+from modules.render import ColorSettings, HasCaptureTime, LayerBase
 from modules.utils import Color
-from ...layer_base import LayerBase, HasCaptureTime
-from ...color_settings import ColorSettings
+from ....settings import ColorizeSettings
 from .shaders import CelShade
-
-
-class ColorizeSettings(BaseSettings):
-    """Colorize: how the player's colors are styled."""
-    enabled:        Field[bool]  = Field(True, description="Colorize on; off, the foreground as it is")
-    blend_factor:   Field[float] = Field(0.2, min=0.0, max=1.0, description="Foreground temporal blending")
-    exposure:       Field[float] = Field(1.2, min=0.1, max=3.0, description="Exposure multiplier")
-    gamma:          Field[float] = Field(1.0, min=0.5, max=2.0, description="Gamma correction")
-    offset:         Field[float] = Field(0.0, min=-0.5, max=0.5, description="Exposure offset")
-    contrast:       Field[float] = Field(1.1, min=0.5, max=2.0, description="Contrast")
-    saturation:     Field[float] = Field(2.0, min=0.5, max=2.0, description="Color saturation")
-    # Cel shade
-    levels:         Field[int]   = Field(9, min=0, max=12, description="Number of color bands (0 = off: no bands)")
-    smoothness:     Field[float] = Field(0.33, min=0.0, max=0.5, description="Gradient between bands")
-    # Colorize
-    colorize:       Field[float] = Field(0.96, min=0.0, max=1.0, description="Colorize toward the track color (0.0 = off)")
-    # Post
-    sharpen:        Field[float] = Field(0.0, min=0.0, max=2.0, description="Sharpen result (0.0 = off)")
-    use_mask:       Field[bool]  = Field(True, description="Apply mask to foreground")
 
 
 class Colorize:

@@ -3,8 +3,7 @@
 `ViewInput` is the capture as the app hands it each tick: its color image and its depth on the camera image's view
 (the uploader's, taken into GL by the capture's source layers), its capture time and the pose of its player.
 `ViewOutput` is what the motion and the bridge read: the image and the depth cut to the view's fixed window at the
-view's size (the motion's), the depth read across a surface (`DepthUpscale`, at the `tolerance` the motion's z
-shares), the depth mask (the view's depth cut by `near` and `far`, which gates z), the mask (the depth mask, its
+view's size, the depth read across a surface (`DepthUpscale`, at the view's `tolerance`), the depth mask (the view's depth cut by `near` and `far`, which gates z), the mask (the depth mask, its
 edge moved onto the image's by the guided filter, He 2010), the foreground (the image where the mask is) and its
 color, the foreground colorized. The view is made again
 when a new capture comes in, told by its capture time, or when a setting it is made with changes.
@@ -23,9 +22,10 @@ from modules.flow import DepthRead, DepthView, DepthUpscale, TextureKind, \
                          depth_step, fixed_window, place_points, view_per_depth_pixel, view_span
 from modules.gl import Fbo, SwapFbo, Style, Texture, shaders
 from modules.pose import BBox, Frame, Points2D
-from modules.render import ColorSettings, Colorize, StageLayer, StageOutput
+from modules.render import ColorSettings, StageLayer, StageOutput
 from modules.utils import Rect
 from ....settings import ViewLayerSettings
+from .colorize import Colorize
 from .shaders import DepthMask
 
 

@@ -1,9 +1,10 @@
 """Renders centered and rotated foreground, colorized (`Colorize`), with optional mask."""
 
 # Local application imports
-from modules.render import LayerBase, HasCaptureTime, Colorize, ColorSettings
+from modules.render import LayerBase, HasCaptureTime, ColorSettings
 from modules.gl import Fbo, Texture, Style, shaders
 from .center_geometry import CenterGeometry, SourceSpace
+from .colorize import Colorize
 from ....settings import CenterForegroundLayerSettings
 
 

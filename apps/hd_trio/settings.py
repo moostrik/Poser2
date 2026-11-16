@@ -363,8 +363,23 @@ class CenterCamLayerSettings(BaseSettings):
     use_mask:       Field[bool]  = Field(True, description="Apply mask to camera output")
 
 
-class CenterForegroundLayerSettings(render.ColorizeSettings):
+class CenterForegroundLayerSettings(BaseSettings):
     """Configuration for CenterForegroundLayer: its colorize."""
+    enabled:        Field[bool]  = Field(True, description="Colorize on; off, the foreground as it is")
+    blend_factor:   Field[float] = Field(0.2, min=0.0, max=1.0, description="Foreground temporal blending")
+    exposure:       Field[float] = Field(1.2, min=0.1, max=3.0, description="Exposure multiplier")
+    gamma:          Field[float] = Field(1.0, min=0.5, max=2.0, description="Gamma correction")
+    offset:         Field[float] = Field(0.0, min=-0.5, max=0.5, description="Exposure offset")
+    contrast:       Field[float] = Field(1.1, min=0.5, max=2.0, description="Contrast")
+    saturation:     Field[float] = Field(2.0, min=0.5, max=2.0, description="Color saturation")
+    # Cel shade
+    levels:         Field[int]   = Field(9, min=0, max=12, description="Number of color bands (0 = off: no bands)")
+    smoothness:     Field[float] = Field(0.33, min=0.0, max=0.5, description="Gradient between bands")
+    # Colorize
+    colorize:       Field[float] = Field(0.96, min=0.0, max=1.0, description="Colorize toward the track color (0.0 = off)")
+    # Post
+    sharpen:        Field[float] = Field(0.0, min=0.0, max=2.0, description="Sharpen result (0.0 = off)")
+    use_mask:       Field[bool]  = Field(True, description="Apply mask to foreground")
 
 
 # The flow's stage layers' settings, hd_trio's copy (render/layers/flow)
