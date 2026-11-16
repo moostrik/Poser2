@@ -81,7 +81,7 @@ def time_view(view: ViewLayer, image: Texture, depth: Texture) -> None:
 
     def depth_mask_pass() -> None:
         view._depth_mask.begin()
-        view._depth_mask_shader.use(view._depth, s.near, s.far)
+        view._depth_mask_shader.use(view._depth, s.depth.near, s.depth.far)
         view._depth_mask.end()
 
     def threshold_pass() -> None:
@@ -95,11 +95,11 @@ def time_view(view: ViewLayer, image: Texture, depth: Texture) -> None:
         view._foreground.end()
 
     def whole(read: DepthRead) -> None:
-        settings_read = s.depth_read
-        s.depth_read = read
+        settings_read = s.depth.depth_read
+        s.depth.depth_read = read
         view._made = None
         view.update()
-        s.depth_read = settings_read
+        s.depth.depth_read = settings_read
 
     Style.push_style()
     Style.set_blend_mode(Style.BlendMode.DISABLED)
@@ -145,8 +145,9 @@ def main() -> int:
     settings = ViewLayerSettings()
     settings.initialize()
     settings.update_from_dict(preset['view'])
+    d = settings.depth
     if args.read:
-        settings.depth_read = DepthRead[args.read.upper()]
+        d.depth_read = DepthRead[args.read.upper()]
     view = ViewLayer(settings, json.loads(PRESET.read_text(encoding='utf-8'))['camera']['fov'])
     view.allocate(preset['view']['width'], preset['view']['height'])
 
@@ -160,7 +161,7 @@ def main() -> int:
     depth_texture = Tensor(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
 
     print(f'{args.recording}: {count} captures, view {view.output.image.width} x {view.output.image.height}, '
-          f'tolerance {settings.tolerance} m, near {settings.near} far {settings.far}')
+          f'tolerance {d.tolerance} m, near {d.near} far {d.far}')
     off_total, ties, pixels, overlaps, shares = 0, 0, 0, [], []
     last: dict[str, np.ndarray] = {}
     for i in range(count):
@@ -187,16 +188,16 @@ def main() -> int:
         v = w.y + (np.arange(height) + 0.5) / height * w.height
         uu, vv = np.meshgrid(u, v)
         grid = depth.depth.cpu().numpy()
-        if settings.depth_read == DepthRead.MASK:
-            want = mask_sided_depth(grid, uu, vv, settings.tolerance, read(output.mask) > 0.5, settings.near, settings.far,
+        if d.depth_read == DepthRead.MASK:
+            want = mask_sided_depth(grid, uu, vv, d.tolerance, read(output.mask) > 0.5, d.near, d.far,
                                     settings.guided_radius)
         else:
-            want = edge_aware_depth(grid, uu, vv, settings.tolerance)
+            want = edge_aware_depth(grid, uu, vv, d.tolerance)
         off = np.abs(got - want) > 0.001
-        if settings.depth_read == DepthRead.MASK:
+        if d.depth_read == DepthRead.MASK:
             # two depth pixels on the pixel's side as near as each other: either is the rule's, float decides
-            def sided(d: np.ndarray) -> np.ndarray:
-                return ((d > 0.0) & (d >= settings.near) & (d <= settings.far)) == (read(output.mask) > 0.5)
+            def sided(values: np.ndarray) -> np.ndarray:
+                return ((values > 0.0) & (values >= d.near) & (values <= d.far)) == (read(output.mask) > 0.5)
             tie = off & sided(got) & sided(want)
             ties += int(tie.sum())
             off &= ~tie
@@ -217,7 +218,7 @@ def main() -> int:
     if args.time:
         time_view(view, image_texture, depth_texture)
     print(f'depth in the view: {off_total} of {pixels} pixels off the reference'
-          + (f', {ties} more a tie between two on the mask\'s side' if settings.depth_read == DepthRead.MASK else ''))
+          + (f', {ties} more a tie between two on the mask\'s side' if d.depth_read == DepthRead.MASK else ''))
     if overlaps:
         print(f'mask vs depth mask: overlap mean {np.mean(overlaps):.3f}, min {np.min(overlaps):.3f}; '
               f'the player {np.mean(shares) * 100:.1f}% of the view')

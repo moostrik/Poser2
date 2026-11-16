@@ -213,28 +213,37 @@ class _PoseCompositorSettings(render.PoseCompositorSettings):
     front_stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage of the front line (track color)")
 
 # The view's layer's settings (render/layers/view)
+class ViewDepthSettings(BaseSettings):
+    """The view's depth: the player's depth band, how the depth is read into the view and the tolerance it reads at."""
+    near:       Field[float]     = Field(0.5, min=0.1, max=12.0, step=0.05, description="Nearest depth that is the player (m)")
+    far:        Field[float]     = Field(4.0, min=0.1, max=12.0, step=0.05, description="Farthest depth that is the player (m)")
+    depth_read: Field[DepthRead] = Field(DepthRead.SURFACE, newline=True, description="How the depth is read into the view: its edge on its own pixels or on the mask's")
+    tolerance:  Field[float]     = Field(0.2, min=0.05, max=0.5, step=0.01, description="Depth jump beyond which the read blends no two depth pixels, m")
+
+
+class GradeSettings(BaseSettings):
+    """The view's color: the foreground graded, in the order applied, then sharpened, the mask as its alpha."""
+    enabled:    Field[bool]  = Field(True, description="The color graded; off, the foreground as it is")
+    use_mask:   Field[bool]  = Field(True, description="The mask as the color's alpha")
+    exposure:   Field[float] = Field(1.0, min=0.1, max=3.0, newline=True, description="The color times this")
+    offset:     Field[float] = Field(0.0, min=-0.5, max=0.5, description="Added to the color, after the exposure")
+    gamma:      Field[float] = Field(1.0, min=0.5, max=2.0, description="Gamma")
+    contrast:   Field[float] = Field(1.0, min=0.5, max=2.0, description="Contrast around mid grey")
+    saturation: Field[float] = Field(1.0, min=0.0, max=2.0, description="Saturation, times this")
+    sharpen:    Field[float] = Field(0.0, min=0.0, max=2.0, description="Sharpen (0 = off)")
+
+
 class ViewLayerSettings(render.StageLayerSettings):
-    """The view's size, its window on the camera image, the player's depth band, the depth tolerance its read uses,
-    the mask's edge and the color's grade."""
+    """The view's size, its window on the camera image and the mask's edge; its depth and its grade in their panels."""
     width:         Field[int]   = Field(448, min=32, max=4096, step=32, description="The view's width (pixels)")
     height:        Field[int]   = Field(800, min=32, max=4096, step=32, description="The view's height (pixels)")
-    tolerance:     Field[float] = Field(0.2, min=0.05, max=0.5, step=0.01, description="Depth jump beyond which the read blends no two depth pixels, m")
     fixed_x:       Field[float] = Field(0.5, min=0.0, max=1.0, description="The window's center across the camera image")
     fixed_y:       Field[float] = Field(0.5, min=0.0, max=1.0, description="The window's center down the camera image")
     fixed_height:  Field[float] = Field(1.0, min=0.05, max=2.0, description="The window's height, a share of the camera image's")
-    near:          Field[float] = Field(0.5, min=0.1, max=12.0, step=0.05, newline=True, description="Nearest depth that is the player (m)")
-    far:           Field[float] = Field(4.0, min=0.1, max=12.0, step=0.05, description="Farthest depth that is the player (m)")
     guided_radius: Field[float] = Field(2.0, min=0.0, max=8.0, step=0.25, newline=True, description="How far the image moves the mask's edge to its own, in depth pixels; 0 = off")
     edge_contrast: Field[float] = Field(0.03, min=0.001, max=0.3, step=0.001, description="The image's brightness spread (0 to 1) above which the mask's edge follows the image's")
-    depth_read:    Field[DepthRead] = Field(DepthRead.SURFACE, newline=True, description="How the depth is read into the view: its edge on its own pixels or on the mask's")
-    grade_enabled: Field[bool]  = Field(True, newline=True, description="The color graded; off, the foreground as it is")
-    exposure:      Field[float] = Field(1.0, min=0.1, max=3.0, description="The color times this")
-    offset:        Field[float] = Field(0.0, min=-0.5, max=0.5, description="Added to the color, after the exposure")
-    gamma:         Field[float] = Field(1.0, min=0.5, max=2.0, description="Gamma")
-    contrast:      Field[float] = Field(1.0, min=0.5, max=2.0, description="Contrast around mid grey")
-    saturation:    Field[float] = Field(1.0, min=0.0, max=2.0, description="Saturation, times this")
-    sharpen:       Field[float] = Field(0.0, min=0.0, max=2.0, description="Sharpen (0 = off)")
-    use_mask:      Field[bool]  = Field(True, description="The mask as the color's alpha")
+    depth: Group[ViewDepthSettings] = Group(ViewDepthSettings)
+    grade: Group[GradeSettings]     = Group(GradeSettings)
 
 
 class CaptureView(IntEnum):
@@ -244,19 +253,11 @@ class CaptureView(IntEnum):
     BOTH = 2        # its depth in the colormap over its color image
 
 
-class CaptureMonitorSettings(BaseSettings):
+class CaptureSettings(BaseSettings):
     """The capture's monitor: the color, the depth or both, the depth in `colormap` from the view's near to its far."""
     show:     Field[CaptureView] = Field(CaptureView.BOTH, description="What is shown: the color, the depth or both")
     colormap: Field[Colormap]    = Field(Colormap.JET, description="The depth's colors, from the view's near to its far")
 
-
-class CaptureSettings(BaseSettings):
-    """The capture: its monitor, on the capture's image and depth."""
-    monitor: Group[CaptureMonitorSettings] = Group(CaptureMonitorSettings)
-
-
-class LayerGroup(BaseSettings):
-    select   : Group[LayerSettings]                 = Group(LayerSettings)
 
 class PoseFrame(IntEnum):
     """Where the pose monitor draws the pose."""
@@ -287,7 +288,7 @@ class PoseMonitorSettings(BaseSettings):
 class RenderSettings(BaseSettings):
     main_view: Field[MainView]                   = Field(MainView.DEBUG, description="The main window: the debug panels, or the show alone")
     input_fps: Field[float]                      = Field(60.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
-    layer  : Group[LayerGroup]                   = Group(LayerGroup)
+    layer  : Group[LayerSettings]                = Group(LayerSettings)
     # the chain, in its order, then the pose beside it
     capture: Group[CaptureSettings]              = Group(CaptureSettings)
     view   : Group[ViewLayerSettings]            = Group(ViewLayerSettings)

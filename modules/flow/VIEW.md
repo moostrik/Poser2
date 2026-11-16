@@ -24,7 +24,7 @@ Once per capture, in order:
 Its outputs are the image, the foreground, the color, the depth, the mask and the depth mask; the panel picks the
 motion's picture (`inputs`). The color, the density's, is the view's last pass, once per capture: the
 foreground graded (`Grade`: `exposure`, `offset`, `gamma`, `contrast`, `saturation`), sharpened (`sharpen`) and
-masked (`use_mask`); with `grade_enabled` off it is the foreground as it is.
+masked (`use_mask`), settings `view.grade`; with its `enabled` off it is the foreground as it is.
 
 The color is resampled twice, straightened in the uploader and cut to the view here, a little softer than one
 resample **(deduction)**, for keeping the camera's work and the flow's apart.
@@ -32,10 +32,11 @@ resample **(deduction)**, for keeping the camera's work and the flow's apart.
 | Setting                              | Preset        | Is                                                                        |
 |--------------------------------------|---------------|---------------------------------------------------------------------------|
 | `fixed_x`, `fixed_y`, `fixed_height` | 0.5, 0.5, 1   | the window's center and height on the camera image, shares of it          |
-| `near`, `far`                        | 0.1, 1.7 m    | the player's depth range, the box's front and back                        |
 | `guided_radius`                      | 2             | how far the image moves the mask's edge, in depth pixels; 0 off           |
 | `edge_contrast`                      | 0.03          | the image's brightness spread (0 to 1) above which the edge follows the image's |
-| `depth_read`                         | `SURFACE`     | how the depth is read into the view                                       |
+| `depth.near`, `depth.far`            | 0.1, 1.7 m    | the player's depth range, the box's front and back                        |
+| `depth.depth_read`                   | `SURFACE`     | how the depth is read into the view                                       |
+| `depth.tolerance`                    | 0.2 m         | the depth jump beyond which the read blends no two depth pixels           |
 
 ## The depth read
 

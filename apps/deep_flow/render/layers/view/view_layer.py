@@ -24,7 +24,7 @@ from modules.gl import Fbo, SwapFbo, Style, Texture, shaders
 from modules.pose import BBox, Frame, Points2D
 from modules.render import StageLayer, StageOutput
 from modules.utils import Rect
-from ....settings import ViewLayerSettings
+from ....settings import GradeSettings, ViewDepthSettings, ViewLayerSettings
 from .shaders import DepthMask, Grade
 
 
@@ -54,7 +54,7 @@ class ViewOutput(StageOutput):
 
 class ViewLayer(StageLayer[ViewInput, ViewOutput]):
     """The view stage's layer. `fov` is the camera image's horizontal field (degrees), for the metres a view width
-    spans; `settings.tolerance` tells one surface from another. Places
+    spans; `settings.depth.tolerance` tells one surface from another. Places
     the pose's points in the window (`crop_pose_points`, `lost`) for the pose drawn over the view; its last pass is
     the color: the foreground graded, sharpened and masked. Draws nothing."""
 
@@ -93,7 +93,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
     @property
     def output(self) -> ViewOutput:
         s: ViewLayerSettings = self.settings
-        depth: DepthView = DepthView(self._depth, view_span(self._window, self._fov), depth_step(self._window, self._grid_size), s.near, s.far)
+        depth: DepthView = DepthView(self._depth, view_span(self._window, self._fov), depth_step(self._window, self._grid_size), s.depth.near, s.depth.far)
         return ViewOutput(self._image, self._foreground, self._color, depth, self._mask, self._depth_mask)
 
     @property
@@ -168,9 +168,11 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         if not image.allocated or not self._image.allocated:
             return
         s: ViewLayerSettings = self.settings
-        made: tuple = (input.timestamp, s.fixed_x, s.fixed_y, s.fixed_height, s.near, s.far, s.guided_radius, s.edge_contrast,
-                       s.depth_read, s.tolerance, image.width, image.height, self._image.width, self._image.height,
-                       s.grade_enabled, s.exposure, s.offset, s.gamma, s.contrast, s.saturation, s.sharpen, s.use_mask)
+        d: ViewDepthSettings = s.depth
+        g: GradeSettings = s.grade
+        made: tuple = (input.timestamp, s.fixed_x, s.fixed_y, s.fixed_height, s.guided_radius, s.edge_contrast,
+                       d.near, d.far, d.depth_read, d.tolerance, image.width, image.height, self._image.width, self._image.height,
+                       g.enabled, g.use_mask, g.exposure, g.offset, g.gamma, g.contrast, g.saturation, g.sharpen)
         if made == self._made:
             return
         self._made = made
@@ -191,42 +193,42 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         # The depth read within a surface first, cut by the player's range, the cut's edge moved onto the image's;
         # with MASK the depth read again, an edge's side from that mask, and cut again, so the depth's edges lie on
         # the mask's
-        read: DepthRead = DepthRead(s.depth_read)
+        read: DepthRead = DepthRead(d.depth_read)
         self._read_depth(depth, roi, DepthRead.SURFACE, s)
         self._cut_and_guide(s)
         if read == DepthRead.MASK and depth is not None:
             self._read_depth(depth, roi, read, s)
             self._depth_mask.begin()
-            self._depth_mask_shader.use(self._depth, s.near, s.far)
+            self._depth_mask_shader.use(self._depth, d.near, d.far)
             self._depth_mask.end()
 
         self._foreground.begin()
         self._foreground_shader.use(self._image, self._mask)
         self._foreground.end()
 
-        self._make_color(s)
+        self._make_color(g)
         Style.pop_style()
 
         self._pose_points = self._place_pose(input.pose)
 
-    def _make_color(self, s: ViewLayerSettings) -> None:
+    def _make_color(self, g: GradeSettings) -> None:
         """The foreground graded, sharpened where `sharpen`, with the mask as alpha where `use_mask`; the
-        foreground as it is while not `grade_enabled`."""
+        foreground as it is while the grade is not `enabled`."""
         self._color.swap()
         self._color.begin()
-        if s.grade_enabled:
-            self._grade_shader.use(self._foreground, s.exposure, s.offset, s.gamma, s.contrast, s.saturation)
+        if g.enabled:
+            self._grade_shader.use(self._foreground, g.exposure, g.offset, g.gamma, g.contrast, g.saturation)
         else:
             self._foreground.draw()
         self._color.end()
-        if not s.grade_enabled:
+        if not g.enabled:
             return
-        if s.sharpen > 0.0:
+        if g.sharpen > 0.0:
             self._color.swap()
             self._color.begin()
-            self._sharpen_shader.use(self._color.back, s.sharpen)
+            self._sharpen_shader.use(self._color.back, g.sharpen)
             self._color.end()
-        if s.use_mask:
+        if g.use_mask:
             self._color.swap()
             self._color.begin()
             self._color_mask_shader.use(self._color.back, self._mask)
@@ -238,14 +240,14 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         if depth is None:
             return
         self._depth.begin()
-        self._depth_shader.use(depth, roi, self.settings.tolerance, read, mask=self._mask,
-                               near=s.near, far=s.far, reach=s.guided_radius)
+        self._depth_shader.use(depth, roi, s.depth.tolerance, read, mask=self._mask,
+                               near=s.depth.near, far=s.depth.far, reach=s.guided_radius)
         self._depth.end()
 
     def _cut_and_guide(self, s: ViewLayerSettings) -> None:
         """The depth mask, the view's depth cut by `near` and `far`; the mask, its edge moved onto the image's."""
         self._depth_mask.begin()
-        self._depth_mask_shader.use(self._depth, s.near, s.far)
+        self._depth_mask_shader.use(self._depth, s.depth.near, s.depth.far)
         self._depth_mask.end()
         guided: Texture = self._guide_edge(s)
         self._mask.begin()

@@ -272,82 +272,95 @@
   "render": {
     "main_view": "DEBUG",
     "layer": {
-      "select": {
-        "a": [
-          "show"
-        ],
-        "b": [
-          "fluid"
-        ]
-      }
-    },
-    "pose": {
-      "stage": "LERP",
-      "frame": "CAMERA",
-      "features": "NONE",
-      "crop": {
-        "back_stage": "CLEAN",
-        "middle_stage": "SMOOTH",
-        "front_stage": "LERP",
-        "line_width": 2.0,
-        "line_smooth": 0.0,
-        "use_gpu_crop": true
-      },
-      "camera": {
-        "box_stage": "RAW",
-        "pose_line_width": 2.0,
-        "bbox_line_width": 2,
-        "image": false
-      },
-      "view": {
-        "line_width": 3.0,
-        "line_smooth": 0.0,
-        "use_scores": false,
-        "draw_anchors": false
-      },
-      "data": {
-        "mode": "WINDOW",
-        "feature_field": "AngleMotion",
-        "line_width": 3.0,
-        "line_smooth": 1.0,
-        "use_scores": false,
-        "render_labels": true,
-        "use_history_color": false,
-        "angle_offset": "NONE"
-      }
+      "a": [
+        "show",
+        "view"
+      ],
+      "b": [
+        "fluid"
+      ]
     },
     "capture": {
-      "monitor": {
-        "show": "BOTH",
-        "colormap": "JET"
-      }
+      "show": "BOTH",
+      "colormap": "JET"
     },
     "view": {
-      "monitor_a": {
-        "texture": "output.depth",
-        "view": "COLORMAP"
-      },
       "width": 448,
       "height": 800,
-      "tolerance": 0.2,
       "fixed_x": 0.5,
       "fixed_y": 0.5,
       "fixed_height": 1.0,
-      "near": 0.1,
-      "far": 1.7,
       "guided_radius": 2.0,
       "edge_contrast": 0.03,
-      "depth_read": "SURFACE",
-      "grade_enabled": true,
-      "exposure": 0.99,
-      "offset": 0.0,
-      "gamma": 0.8,
-      "contrast": 1.24,
-      "saturation": 1.01,
-      "sharpen": 0.82,
-      "use_mask": true
+      "depth": {
+        "near": 0.1,
+        "far": 1.7,
+        "depth_read": "SURFACE",
+        "tolerance": 0.2
+      },
+      "grade": {
+        "enabled": true,
+        "use_mask": true,
+        "exposure": 0.99,
+        "offset": 0.0,
+        "gamma": 0.8,
+        "contrast": 1.24,
+        "saturation": 1.01,
+        "sharpen": 0.82
+      },
+      "monitor_a": {
+        "texture": "output.mask",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "opacity": 6.0,
+          "depth_fade": 0.0,
+          "slice": false,
+          "slice_position": 0.5,
+          "slice_focus": 0.5,
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true,
+          "blend_mode": "ADD",
+          "orbit": {
+            "yaw": 0.0,
+            "pitch": 0.0,
+            "zoom": 1.0
+          }
+        }
+      },
+      "monitor_b": {
+        "texture": "output.boundary_velocity",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "opacity": 6.0,
+          "depth_fade": 0.0,
+          "slice": false,
+          "slice_position": 0.5,
+          "slice_focus": 0.5,
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true,
+          "blend_mode": "ADD",
+          "orbit": {
+            "yaw": 0.0,
+            "pitch": 0.0,
+            "zoom": 1.0
+          }
+        }
+      }
     },
     "motion": {
+      "guard": true,
+      "width": 448,
+      "height": 800,
+      "use_mask": true,
+      "x_gain": 1.0,
+      "y_gain": 1.0,
+      "z_gain": 0.4,
       "monitor_a": {
         "texture": "output.velocity",
         "view": "GLYPHS",
@@ -360,6 +373,7 @@
           "slice_position": 0.5859375,
           "slice_focus": 0.5,
           "glyph_spacing": "SPACING_16",
+          "colormap": "JET",
           "legend": true,
           "blend_mode": "ADD",
           "orbit": {
@@ -369,13 +383,28 @@
           }
         }
       },
-      "guard": true,
-      "width": 448,
-      "height": 800,
-      "use_mask": true,
-      "x_gain": 1.0,
-      "y_gain": 1.0,
-      "z_gain": 0.4,
+      "monitor_b": {
+        "texture": "output.boundary_velocity",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "opacity": 6.0,
+          "depth_fade": 0.0,
+          "slice": false,
+          "slice_position": 0.5,
+          "slice_focus": 0.5,
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true,
+          "blend_mode": "ADD",
+          "orbit": {
+            "yaw": 0.0,
+            "pitch": 0.0,
+            "zoom": 1.0
+          }
+        }
+      },
       "xy": {
         "levels": 4,
         "window": "SEVEN",
@@ -398,6 +427,50 @@
     "bridge": {
       "width": 448,
       "height": 800,
+      "monitor_a": {
+        "texture": "output.boundary_velocity",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "opacity": 6.0,
+          "depth_fade": 0.0,
+          "slice": false,
+          "slice_position": 0.5,
+          "slice_focus": 0.5,
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true,
+          "blend_mode": "ADD",
+          "orbit": {
+            "yaw": 0.0,
+            "pitch": 0.0,
+            "zoom": 1.0
+          }
+        }
+      },
+      "monitor_b": {
+        "texture": "output.boundary_velocity",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "opacity": 6.0,
+          "depth_fade": 0.0,
+          "slice": false,
+          "slice_position": 0.5,
+          "slice_focus": 0.5,
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true,
+          "blend_mode": "ADD",
+          "orbit": {
+            "yaw": 0.0,
+            "pitch": 0.0,
+            "zoom": 1.0
+          }
+        }
+      },
       "readings": {
         "lowpass": {
           "advect": 0.5,
@@ -488,6 +561,35 @@
       }
     },
     "fluid": {
+      "guard": true,
+      "wall": "OPEN",
+      "slip_time": 60.0,
+      "width": 288,
+      "height": 512,
+      "depth": 64,
+      "depth_ratio": 1.0,
+      "monitor_a": {
+        "texture": "output.boundary_velocity",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "opacity": 6.0,
+          "depth_fade": 0.0,
+          "slice": false,
+          "slice_position": 0.5,
+          "slice_focus": 0.5,
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true,
+          "blend_mode": "ADD",
+          "orbit": {
+            "yaw": 0.0,
+            "pitch": 0.0,
+            "zoom": 1.0
+          }
+        }
+      },
       "monitor_b": {
         "texture": "velocity",
         "view": "COLORMAP",
@@ -500,6 +602,7 @@
           "slice_position": 0.48,
           "slice_focus": 0.36,
           "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
           "legend": true,
           "blend_mode": "ADD",
           "orbit": {
@@ -509,13 +612,6 @@
           }
         }
       },
-      "guard": true,
-      "wall": "OPEN",
-      "slip_time": 60.0,
-      "width": 288,
-      "height": 512,
-      "depth": 64,
-      "depth_ratio": 1.0,
       "time": {
         "time_step": "MEASURED",
         "fixed_fps": 60.0,
@@ -612,11 +708,6 @@
         "smooth": 3
       },
       "composite": {
-        "lut": {
-          "folder": "data/luts",
-          "file": "Blockbuster.cube",
-          "strength": 1.0
-        },
         "emission": 10.0,
         "opacity": 1.2,
         "fog": 0.269,
@@ -647,7 +738,54 @@
           "sky_fill": 1.0,
           "anisotropy": 0.13,
           "back_scattering": 0.46
+        },
+        "lut": {
+          "folder": "data/luts",
+          "files": [
+            "",
+            "Blockbuster.cube",
+            "Cityscape.cube",
+            "Frosted.cube",
+            "Vibrance.cube"
+          ],
+          "file": "Blockbuster.cube",
+          "strength": 1.0
         }
+      }
+    },
+    "pose": {
+      "stage": "LERP",
+      "frame": "CAMERA",
+      "features": "NONE",
+      "crop": {
+        "back_stage": "CLEAN",
+        "middle_stage": "SMOOTH",
+        "front_stage": "LERP",
+        "line_width": 2.0,
+        "line_smooth": 0.0,
+        "use_gpu_crop": true
+      },
+      "camera": {
+        "box_stage": "RAW",
+        "pose_line_width": 2.0,
+        "bbox_line_width": 2,
+        "image": false
+      },
+      "view": {
+        "line_width": 3.0,
+        "line_smooth": 0.0,
+        "use_scores": false,
+        "draw_anchors": false
+      },
+      "data": {
+        "mode": "WINDOW",
+        "feature_field": "AngleMotion",
+        "line_width": 3.0,
+        "line_smooth": 1.0,
+        "use_scores": false,
+        "render_labels": true,
+        "use_history_color": false,
+        "angle_offset": "NONE"
       }
     },
     "time_series": {
@@ -731,19 +869,6 @@
         "a": 1.0
       }
     },
-    "window": {
-      "title": "Poser",
-      "v_sync": false,
-      "monitor": "M0",
-      "x": 1921,
-      "y": 31,
-      "width": 1918,
-      "height": 2080,
-      "secondary_list": [],
-      "secondary_fullscreen": false,
-      "fullscreen_mode": "WINDOWED",
-      "fullscreen_mouse": false
-    },
     "screen_recorder": {
       "look_back": false,
       "name": "",
@@ -757,6 +882,19 @@
       "duration": 0.0,
       "reserve": 1.0,
       "quality": 18
+    },
+    "window": {
+      "title": "Poser",
+      "v_sync": false,
+      "monitor": "M0",
+      "x": 1921,
+      "y": 31,
+      "width": 1918,
+      "height": 2080,
+      "secondary_list": [],
+      "secondary_fullscreen": false,
+      "fullscreen_mode": "WINDOWED",
+      "fullscreen_mouse": false
     }
   },
   "inout": {

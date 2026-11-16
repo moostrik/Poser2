@@ -38,8 +38,8 @@ class DeepFlowRender(RenderBase):
 
         self.board: RenderBoard = board
 
-        self._a_layers: list[ChainLayers] = shown(settings.layer.select.a)      # panel a, the show and the recording
-        self._b_layers: list[ChainLayers] = shown(settings.layer.select.b)
+        self._a_layers: list[ChainLayers] = shown(settings.layer.a)      # panel a, the show and the recording
+        self._b_layers: list[ChainLayers] = shown(settings.layer.b)
 
         self.L: dict[ChainLayers, dict[int, render.LayerBase]] = {layer: {} for layer in ChainLayers}
         self._monitors_b: dict[ChainLayers, dict[int, render.MonitorLayer]] = {}     # each stage's monitor B, panel b's
@@ -58,7 +58,7 @@ class DeepFlowRender(RenderBase):
             fluid =         self.L[ChainLayers.fluid][i] =       render.Fluid3DLayer(        settings.fluid)
             self.L[ChainLayers.capture_monitor][i] = CaptureMonitorLayer(cast(render.CaptureImageLayer, self.L[ChainLayers.capture_image][i]),
                                                                     cast(render.CaptureDepthLayer, self.L[ChainLayers.capture_depth][i]),
-                                                                    settings.capture.monitor, settings.view)
+                                                                    settings.capture, settings.view.depth)
             # each stage's monitor A in self.L, shown in panel a; its monitor B in self._monitors_b, shown in panel b
             for key, stage, stage_settings in ((ChainLayers.view_monitor, render.FlowStage.VIEW, settings.view),
                                                (ChainLayers.motion_monitor, render.FlowStage.MOTION, settings.motion),
@@ -238,9 +238,8 @@ class DeepFlowRender(RenderBase):
                 for layer in self.L[layer_type].values():
                     cast(render.StageLayer, layer).reset()
 
-        select = self.settings.layer.select
-        self._a_layers = shown(select.a)
-        self._b_layers = shown(select.b)
+        self._a_layers = shown(self.settings.layer.a)
+        self._b_layers = shown(self.settings.layer.b)
         self._update_layout()
         self._follow_view_size()
 

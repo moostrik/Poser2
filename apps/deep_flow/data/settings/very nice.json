@@ -266,14 +266,12 @@
   "render": {
     "main_view": "SHOW",
     "layer": {
-      "select": {
-        "a": [
-          "show"
-        ],
-        "b": [
-          "fluid"
-        ]
-      }
+      "a": [
+        "show"
+      ],
+      "b": [
+        "fluid"
+      ]
     },
     "pose": {
       "stage": "LERP",
@@ -307,10 +305,8 @@
       }
     },
     "capture": {
-      "monitor": {
-        "show": "BOTH",
-        "colormap": "JET"
-      }
+      "show": "BOTH",
+      "colormap": "JET"
     },
     "view": {
       "monitor_a": {
@@ -319,23 +315,27 @@
       },
       "width": 448,
       "height": 800,
-      "tolerance": 0.2,
       "fixed_x": 0.5,
       "fixed_y": 0.5,
       "fixed_height": 1.0,
-      "near": 0.1,
-      "far": 1.7,
       "guided_radius": 2.0,
       "edge_contrast": 0.03,
-      "depth_read": "SURFACE",
-      "grade_enabled": true,
-      "exposure": 0.99,
-      "offset": 0.0,
-      "gamma": 0.8,
-      "contrast": 1.24,
-      "saturation": 1.01,
-      "sharpen": 0.82,
-      "use_mask": true
+      "depth": {
+        "near": 0.1,
+        "far": 1.7,
+        "depth_read": "SURFACE",
+        "tolerance": 0.2
+      },
+      "grade": {
+        "enabled": true,
+        "use_mask": true,
+        "exposure": 0.99,
+        "offset": 0.0,
+        "gamma": 0.8,
+        "contrast": 1.24,
+        "saturation": 1.01,
+        "sharpen": 0.82
+      }
     },
     "motion": {
       "monitor_a": {
