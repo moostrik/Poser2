@@ -729,7 +729,8 @@ class PathSelect(Control):
         if self.locked:
             return
         with self.box:
-            self.menu = ui.menu().props('anchor="bottom left" self="top left"')
+            # no focus taken or given back: a focus on the box would scroll the page back to it when the list closes
+            self.menu = ui.menu().props('anchor="bottom left" self="top left" no-focus no-refocus')
         self.menu.on('before-show', lambda _: self._fill())
 
     def _fill(self) -> None:
