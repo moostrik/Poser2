@@ -36,22 +36,19 @@ as little noise as possible in the motion while it keeps as much real z motion a
 as it is here; what is inconsistent in it is listed below and is line C's.
 
 Built: every capture reaches the motion ([INPUT_THREADS.md](INPUT_THREADS.md)); one path for the depth and the
-mask, who, where and how far, each once, measured against the two reads before it ([VIEW.md](VIEW.md#the-stage)).
+mask, who, where and how far, each once, measured against the two reads before it, and its tolerance at 0.2, 0.1
+and 0.05 m ([VIEW.md](VIEW.md#the-stage)).
 
 - **B1.** The one path's look, by eye on the edges recording: the outline and the color's edge, now that the
   color grade works on the straight image and premultiplies by the mask last. Needs the operator at the screen.
-- **B11.** The view's own tolerance. The view's read asks only whether two neighbouring depth pixels are
-  one surface, to blend them; the motion's 0.2 m is that large for its job in time, a fast push staying one
-  surface from frame to frame, which the view does not have. Smaller blends fewer body parts into distances
-  where nothing is (a hand before the chest); too small leaves slanted surfaces blocky, which reads as z noise.
-  Measured at 0.2, 0.1 and 0.05 m in VIEW.md's table of the one path; never above the motion's.
+
+Question, for B: the one path's fast z at the view's tolerance 0.2 m is higher than in every other row of
+VIEW.md's table, by more than the runs' spread, with no mechanism found in the code; whether it holds on
+another recording.
 
 Known in the motion, left as it is: its step filter drops a band one depth sample wide along every outline
 whatever the read; two numbers say "another surface" in space beside the view's (`motion.z.tolerance`, also its
 restart in time, and `motion.z.edge`); z is gated twice, by the mask and the depth mask.
-
-Question, for B: the view's depth settings gone through together; among them MASK's read takes the mask's
-`guided_radius` as its reach.
 
 A finer depth would give the mask and z a finer edge at the source; the camera's sizes are a given
 ([RESOLUTION.md](RESOLUTION.md#the-rules)).
@@ -76,8 +73,8 @@ A finer depth would give the mask and z a finer edge at the source; the camera's
 Question, for C: the motion's `z.tolerance` reviewed. One number, 0.2 m, does two jobs: in space, which depth
 samples a window averages as one surface (beside `z.edge`, 0.1 m, the step filter's); in time, how far a new
 depth may lie from the track before it counts as another surface and the track starts over. 0.2 m is large on a
-body, set by the job in time; whether the two jobs want two numbers, and what each should be, after B11 has the
-view's.
+body, set by the job in time; whether the two jobs want two numbers, and what each should be. The view's own,
+measured at 0.2, 0.1 and 0.05 m, moved nothing past the runs' spread ([VIEW.md](VIEW.md#the-depth-read)).
 
 ## D. The bridge
 
@@ -238,7 +235,6 @@ Not worked on until asked for; each with what is known.
 ## Rules it touches
 
 - Remove obsolete pathways instead of leaving parallel legacy ones: hd_trio's copy, deleted in line I.
-- Keep presets and settings schemas in sync: the view's tolerance, B11.
 - A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 

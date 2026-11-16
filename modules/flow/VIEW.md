@@ -120,10 +120,16 @@ swings by about ±0.07 inside.
 | `SURFACE`, compared                 | 7.5%          | 0.325 | 0.398 / 1.054         | 0.102 | 0.123 | 0.32         | 1.79        |           |
 | `MASK`, compared                    | 7.2%          | 0.493 | 0.425 / 1.106         | 0.108 | 0.117 | 0.28         | 1.83        |           |
 | the one path                        | 7.2%          | 0.491 | 0.391 / 1.176         | 0.104 | 0.142 | 0.36         | 1.80        | 0.37 ms   |
+| the one path, tolerance 0.1 m       | 7.3%          | 0.492 | 0.439 / 0.948         | 0.100 | 0.113 | 0.26         | 1.79        |           |
+| the one path, tolerance 0.05 m      | 7.4%          | 0.493 | 0.425 / 1.068         | 0.103 | 0.116 | 0.28         | 1.79        |           |
 
 The one path has `MASK`'s outline, its fit and its share without a z position, with one read and one cut fewer;
-its noise lies within the runs' spread. Its fast z is higher than both, by more than the spread within a path;
-no mechanism in the code is found for it, so it is not counted as a gain.
+its noise lies within the runs' spread. Its fast z at 0.2 m is higher than every other row, by more than the
+spread within a path; no mechanism in the code is found for it, so it is not counted as a gain.
+
+The view's tolerance asks only whether two neighbouring depth pixels are one surface, to blend them; the motion's
+own 0.2 m is that large for its job in time. At 0.1 and 0.05 m no column moves past the runs' spread (one run's
+noise inside 0.38 to 0.49), so the preset keeps 0.2 m, never above the motion's.
 
 Against reading the nearest depth pixel everywhere, on the stillslowfast recording, 3 runs, the motion's
 thresholds at 0, `SURFACE` gives: neighbouring pixels inside the body with the very same depth 11% (67%), z
