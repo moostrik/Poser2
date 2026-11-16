@@ -299,6 +299,7 @@ class PoseMonitorSettings(BaseSettings):
 class RenderSettings(BaseSettings):
     main_view: Field[MainView]                   = Field(MainView.DEBUG, description="The main window: the debug panels, or the show alone")
     input_fps: Field[float]                      = Field(60.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
+    layer  : Group[LayerGroup]                   = Group(LayerGroup)
     # the chain, in its order, then the pose beside it
     capture: Group[CaptureSettings]              = Group(CaptureSettings)
     view   : Group[ViewLayerSettings]            = Group(ViewLayerSettings)
@@ -307,7 +308,6 @@ class RenderSettings(BaseSettings):
     fluid  : Group[render.Fluid3DLayerSettings]  = Group(render.Fluid3DLayerSettings)
     pose   : Group[PoseMonitorSettings]          = Group(PoseMonitorSettings)
     # the display
-    layer  : Group[LayerGroup]                   = Group(LayerGroup)
     time_series: Group[render.TimeSeriesLayerSettings] = Group(render.TimeSeriesLayerSettings)
     colors : Group[render.ColorSettings]         = Group(render.ColorSettings)
     screen_recorder: Group[ScreenRecorderSettings] = Group(ScreenRecorderSettings)
