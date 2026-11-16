@@ -46,12 +46,11 @@ its z within the runs' spread of the views before it.
   `view_depth.py`, after its subject; VIEW.md says "upscale" for the pass wherever it describes the view as
   built, the earlier paths' sections keeping their names (`SURFACE`, `MASK`) as the configuration they were
   measured with. Checked: the tests and the import.
-- **B3.** The mask's feather: the width of its soft edge, now one pixel (`MaskAntialias`, the threshold
-  smoothed over the pixel it crosses, `fwidth`), a setting `mask.feather` in view pixels, its default 1, today's
-  edge. The edge is soft for the look: the graded image is premultiplied by the mask, so a wider edge fades the
-  dye's color in over more pixels. The motion weights x/y and z by the mask, so a wider edge also weights the
-  pixels along the outline down (inferred); the depth is filled wherever the mask is above 0, so it follows.
-  Checked by eye in B1, at 1, 2 and 4 px.
+- **B3.** The color grade's feather: the width of the soft edge the graded image is premultiplied with, a
+  setting `color_grade.feather` in view pixels, 0 the mask's own edge (one pixel, `MaskAntialias`). The grade
+  softens its copy of the mask's edge for its premultiply, as compositing feathers a matte where the picture is
+  made; the mask itself, which the motion and the depth use, stays as it is, so the feather changes the dye's
+  color and nothing of the motion. Checked by eye in B1, at 0, 2 and 4 px.
 
 ## C. The motion
 
