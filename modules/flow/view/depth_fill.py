@@ -5,14 +5,22 @@ from OpenGL.GL import GL_NEAREST, GL_RG32F
 
 # Local application imports
 from modules.gl import Fbo, Texture
-from .depth_read import pyramid_sizes
 from .shaders import PushPull
 
 
+def pyramid_sizes(height: int, width: int) -> list[tuple[int, int]]:
+    """The push's levels below the first, (height, width), each half the one above rounded up, down to 1 × 1."""
+    sizes: list[tuple[int, int]] = []
+    while height > 1 or width > 1:
+        height, width = (height + 1) // 2, (width + 1) // 2
+        sizes.append((height, width))
+    return sizes
+
+
 class DepthFill:
-    """`use` writes the read filled where the mask is above 0 into a target: a pixel with a depth keeps it, one
-    without takes the depth around it (`depth_read.push_pull`). The pyramid, every level half the one above down to
-    1 × 1, is made with its owner's textures."""
+    """`use` writes a depth filled where the mask is above 0 into a target (push-pull, Gortler et al. 1996): a pixel
+    with a depth keeps it, one without takes the depth around it. The pyramid, every level half the one above down
+    to 1 × 1, is made with its owner's textures."""
 
     def __init__(self) -> None:
         self._pushed: list[Fbo] = []                    # the levels below the read, each (depth × weight, weight)

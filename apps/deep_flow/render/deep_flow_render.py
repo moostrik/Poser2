@@ -310,7 +310,7 @@ class DeepFlowRender(RenderBase):
         output: ViewOutput = view.output
         motion.set_input(render.MotionInput(output.image, capture.timestamp, interval, output.depth, output.mask))
         motion.update()
-        bridge.set_input(render.BridgeInput(motion.output.velocity, interval, output.graded_image,
+        bridge.set_input(render.BridgeInput(motion.output.velocity, interval, output.color,
                                         mask=output.mask, z_position=motion.output.z_position, same_tick=same_tick))
         bridge.update()
 

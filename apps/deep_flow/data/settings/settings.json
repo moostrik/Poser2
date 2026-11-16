@@ -274,7 +274,7 @@
     "pause": false,
     "layer": {
       "main": [
-        "view"
+        "bridge"
       ],
       "debug": [
         "view"
@@ -298,18 +298,20 @@
         "guided_radius": 3.0,
         "edge_contrast": 0.03
       },
-      "color_grade": {
+      "color": {
         "enabled": true,
-        "use_mask": true,
         "exposure": 0.99,
         "offset": 0.0,
         "gamma": 0.8,
         "contrast": 1.24,
         "saturation": 1.01,
-        "sharpen": 0.82
+        "sharpen": 0.82,
+        "use_mask": true,
+        "erode": 0,
+        "feather": 0.0
       },
       "monitor_main": {
-        "texture": "mask.mask",
+        "texture": "depth.filled",
         "view": "COLORMAP",
         "advanced": {
           "channel": "ALL",
@@ -321,8 +323,8 @@
         }
       },
       "monitor_debug": {
-        "texture": "depth.depth",
-        "view": "COLORMAP",
+        "texture": "depth.filled",
+        "view": "IMAGE",
         "advanced": {
           "channel": "ALL",
           "scale": 1.0,
@@ -352,7 +354,7 @@
         "edge": 0.1,
         "window": "SEVEN",
         "tolerance": 0.2,
-        "smooth": 50.0,
+        "smooth": 0.0,
         "xy_smooth": false,
         "catch_up": 8.0,
         "dead_zone": 0.02,
@@ -360,11 +362,11 @@
         "threshold": 5.0
       },
       "monitor_main": {
-        "texture": "output.velocity",
-        "view": "GLYPHS",
+        "texture": "z.output",
+        "view": "IMAGE",
         "advanced": {
           "channel": "ALL",
-          "scale": 1.0,
+          "scale": 58.9,
           "blend_mode": "ADD",
           "glyph_spacing": "SPACING_16",
           "colormap": "JET",
@@ -422,7 +424,7 @@
           "bow": 0.0,
           "stop": 1.0,
           "wake": 0.0,
-          "mask": 0.0,
+          "mask": 1.0,
           "saturation": 1.18,
           "brightness": 1.0
         },
@@ -476,7 +478,7 @@
         "mask": 0.0
       },
       "monitor_main": {
-        "texture": "output.expansion",
+        "texture": "boundary_density.input",
         "view": "COLORMAP",
         "advanced": {
           "channel": "ALL",

@@ -1,5 +1,4 @@
-"""Depth Upscale shader: the aligned depth read into the view where it is the player's and the mask is
-(`depth_read.upscaled_depth`)."""
+"""Depth Upscale shader: the aligned depth upscaled to the view where it is the player's and the mask is."""
 
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform4f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture

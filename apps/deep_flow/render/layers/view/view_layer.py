@@ -6,8 +6,8 @@
 its own textures: `ViewCrop`, the box in 3D and who (the image inside its sides, and the camera's depth inside the
 box on the depth's own pixels); `ViewMask`, where (that depth's outline moved onto the image's by the guided filter,
 He 2010, the one outline); `ViewDepth`, how far (the depth upscaled to the view once where it is the player's and the
-mask is, then filled across the mask by push-pull, so the mask and the depth agree); and `ColorGrade` (the graded
-image, premultiplied by the mask). The view is made again when a new capture comes in, told by its capture time,
+mask is, then filled across the mask by push-pull, so the mask and the depth agree); and `ViewColor` (the player's color
+for the density, graded and premultiplied by the mask's copy, eroded and feathered). The view is made again when a new capture comes in, told by its capture time,
 or when a setting it is made with changes.
 """
 
@@ -26,7 +26,7 @@ from modules.pose import BBox, Frame, Points2D
 from modules.render import StageLayer, StageOutput
 from modules.utils import Rect
 from ....settings import ViewCropSettings, ViewLayerSettings
-from .color_grade import ColorGrade
+from .view_color import ViewColor
 from .view_crop import ViewCrop
 from .view_depth import ViewDepth
 from .view_mask import ViewMask
@@ -47,12 +47,12 @@ class ViewInput:
 class ViewOutput(StageOutput):
     """The view's textures, at the view's size, in the order the view makes them: `image` the cropped color, `mask`
     the player's shape on the image's edges, `depth` the player's metres wherever the mask is, as the motion
-    measures z from them, `graded_image` the image graded and premultiplied by the mask, the bridge's density
-    color."""
+    measures z from them, `color` the player's color for the density, the image graded and premultiplied by the
+    mask's copy."""
     image: Annotated[Texture, TextureKind.IMAGE]
     mask: Annotated[Texture, TextureKind.SCALAR]
     depth: Annotated[DepthView, TextureKind.DEPTH]
-    graded_image: Annotated[Texture, TextureKind.IMAGE]
+    color: Annotated[Texture, TextureKind.IMAGE]
 
 
 class ViewLayer(StageLayer[ViewInput, ViewOutput]):
@@ -69,7 +69,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         self._crop: ViewCrop = ViewCrop(settings.crop)
         self._mask: ViewMask = ViewMask(settings.mask)
         self._depth: ViewDepth = ViewDepth(settings.crop)
-        self._color_grade: ColorGrade = ColorGrade(settings.color_grade)
+        self._color: ViewColor = ViewColor(settings.color)
 
         self._window: Rect = Rect(0.0, 0.0, 1.0, 1.0)  # the box's sides, uv on the camera image, rows down
         self._grid_size: tuple[int, int] = (0, 0)       # the depth's grid, its samples on the camera image
@@ -84,7 +84,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         box: ViewCropSettings = self.settings.crop
         depth: DepthView = DepthView(self._depth.depth, view_span(self._window, self._fov), depth_step(self._window, self._grid_size),
                                      box.near, box.far)
-        return ViewOutput(self._crop.image, self._mask.mask, depth, self._color_grade.texture)
+        return ViewOutput(self._crop.image, self._mask.mask, depth, self._color.texture)
 
     @property
     def ports(self) -> dict[str, Port]:
@@ -96,7 +96,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         return ports
 
     def _components(self) -> dict[str, HasPorts]:
-        return {'crop': self._crop, 'mask': self._mask, 'depth': self._depth, 'color_grade': self._color_grade}
+        return {'crop': self._crop, 'mask': self._mask, 'depth': self._depth, 'color': self._color}
 
     @property
     def texture(self) -> Texture:
@@ -124,21 +124,21 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         self._crop.allocate(width, height)
         self._mask.allocate(width, height)
         self._depth.allocate(width, height)
-        self._color_grade.allocate(width, height, GL_RGBA16F)
+        self._color.allocate(width, height, GL_RGBA16F)
         self._made = None
 
     def deallocate(self) -> None:
         self._crop.deallocate()
         self._mask.deallocate()
         self._depth.deallocate()
-        self._color_grade.deallocate()
+        self._color.deallocate()
         super().deallocate()
 
     def reset(self) -> None:
         self._crop.clear()
         self._mask.clear()
         self._depth.clear()
-        self._color_grade.clear()
+        self._color.clear()
         self._made = None
         self._timestamp = None
         self._pose_points = None
@@ -162,7 +162,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
             return
         s: ViewLayerSettings = self.settings
         made: tuple = (input.timestamp, image.width, image.height, view.width, view.height, self._crop.made_with,
-                       self._mask.made_with, self._color_grade.made_with)
+                       self._mask.made_with, self._color.made_with)
         if made == self._made:
             return
         self._made = made
@@ -184,7 +184,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         self._depth.upscale(depth, roi, self._mask.mask)
 
         Style.pop_style()
-        self._color_grade.process(view, self._mask.mask)
+        self._color.process(view, self._mask.mask)
 
         self._pose_points = self._place_pose(input.pose)
 

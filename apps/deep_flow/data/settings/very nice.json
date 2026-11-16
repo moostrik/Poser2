@@ -326,15 +326,17 @@
         "guided_radius": 2.0,
         "edge_contrast": 0.03
       },
-      "color_grade": {
+      "color": {
         "enabled": true,
-        "use_mask": true,
         "exposure": 0.99,
         "offset": 0.0,
         "gamma": 0.8,
         "contrast": 1.24,
         "saturation": 1.01,
-        "sharpen": 0.82
+        "sharpen": 0.82,
+        "use_mask": true,
+        "erode": 0,
+        "feather": 0.0
       }
     },
     "motion": {

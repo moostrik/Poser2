@@ -222,26 +222,29 @@ class ViewMaskSettings(BaseSettings):
     edge_contrast: Field[float] = Field(0.03, min=0.001, max=0.3, step=0.001, description="The image's brightness spread (0 to 1) above which the mask's edge follows the image's")
 
 
-class ColorGradeSettings(BaseSettings):
-    """ColorGrade: the image graded, in the order applied, then sharpened, premultiplied by the mask."""
+class ViewColorSettings(BaseSettings):
+    """ViewColor: the image graded, in the order applied, then sharpened; then premultiplied by the mask's copy,
+    eroded and feathered."""
     enabled:    Field[bool]  = Field(True, description="The color graded; off, the image as it is")
-    use_mask:   Field[bool]  = Field(True, description="The color cut by the mask, premultiplied")
     exposure:   Field[float] = Field(1.0, min=0.1, max=3.0, newline=True, description="The color times this")
     offset:     Field[float] = Field(0.0, min=-0.5, max=0.5, description="Added to the color, after the exposure")
     gamma:      Field[float] = Field(1.0, min=0.5, max=2.0, description="Gamma")
     contrast:   Field[float] = Field(1.0, min=0.5, max=2.0, description="Contrast around mid grey")
     saturation: Field[float] = Field(1.0, min=0.0, max=2.0, description="Saturation, times this")
     sharpen:    Field[float] = Field(0.0, min=0.0, max=2.0, description="Sharpen (0 = off)")
+    use_mask:   Field[bool]  = Field(True, newline=True, description="The color cut by the mask, premultiplied")
+    erode:      Field[int]   = Field(0, min=0, max=4, step=1, description="Pixels the color's edge moves inside the mask's (view pixels)")
+    feather:    Field[float] = Field(0.0, min=0.0, max=16.0, step=0.5, description="Width the color fades in over inside its edge (view pixels); 0 = hard")
 
 
 class ViewLayerSettings(render.StageLayerSettings):
-    """The view's size; its crop, mask and color grade in their panels, in the order the view runs them; the depth,
-    between the mask and the grade, has no settings."""
+    """The view's size; its crop, mask and color in their panels, in the order the view runs them; the depth,
+    between the mask and the color, has no settings."""
     width:         Field[int]   = Field(448, min=32, max=4096, step=32, description="The view's width (pixels)")
     height:        Field[int]   = Field(800, min=32, max=4096, step=32, description="The view's height (pixels)")
     crop:        Group[ViewCropSettings]      = Group(ViewCropSettings)
     mask:        Group[ViewMaskSettings]      = Group(ViewMaskSettings, description="The player's mask: the crop's depth, its edge guided onto the image's")
-    color_grade: Group[ColorGradeSettings]    = Group(ColorGradeSettings)
+    color:       Group[ViewColorSettings]     = Group(ViewColorSettings)
 
     monitor_main:  Group[render.Monitor2DLayerSettings] = Group(render.Monitor2DLayerSettings, last=True, tint=render.MAIN_TINT)
     monitor_debug: Group[render.Monitor2DLayerSettings] = Group(render.Monitor2DLayerSettings, last=True, tint=render.DEBUG_TINT)

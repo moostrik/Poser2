@@ -1,5 +1,4 @@
-"""Push-pull shader: a depth's holes filled from the depth around them (Gortler et al. 1996), its passes
-(`depth_read.push_pull`)."""
+"""Push-pull shader: a depth's holes filled from the depth around them (Gortler et al. 1996), its passes."""
 
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture

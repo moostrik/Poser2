@@ -7,7 +7,7 @@
 //   2  the last pull, onto the read: a pixel with a depth keeps it, one without takes the pulled level's depth
 //      (its pair's ratio); 0 where the mask is 0 or nothing was found
 // A coarser pixel's center lies in the middle of the two it covers, its edges clamped; rows count from the bottom,
-// as GL holds a texture (the numpy reference, `depth_read.push_pull`, groups them the same way).
+// as GL holds a texture.
 
 uniform sampler2D tex0;     // 0: the finer level (or the read); 1: this level's push; 2: the read (metres)
 uniform sampler2D tex1;     // 1, 2: the coarser pulled level

@@ -23,36 +23,36 @@ class ViewDepth:
     def __init__(self, box: ViewCropSettings) -> None:
         self._box: ViewCropSettings = box
         self._upscaled: Fbo = Fbo(interpolation=GL_NEAREST)      # an edge never reads as a distance in between
-        self._depth: Fbo = Fbo(interpolation=GL_NEAREST)
+        self._filled: Fbo = Fbo(interpolation=GL_NEAREST)
         self._upscale_shader: DepthUpscale = DepthUpscale()
         self._fill: DepthFill = DepthFill()
 
     @property
     def depth(self) -> Texture:
         """The depth the view hands on, the upscaled depth filled."""
-        return self._depth
+        return self._filled
 
     @property
     def ports(self) -> dict[str, Port]:
         band: tuple[float, float] = (self._box.near, self._box.far)
         return {'upscaled': Port(self._upscaled, TextureKind.DEPTH, depth_range=band),
-                'depth': Port(self._depth, TextureKind.DEPTH, depth_range=band)}
+                'filled': Port(self._filled, TextureKind.DEPTH, depth_range=band)}
 
     def allocate(self, width: int, height: int) -> None:
         self._upscaled.allocate(width, height, GL_R32F)
-        self._depth.allocate(width, height, GL_R32F)
+        self._filled.allocate(width, height, GL_R32F)
         self._upscale_shader.allocate()
         self._fill.allocate(width, height)
 
     def deallocate(self) -> None:
         self._upscaled.deallocate()
-        self._depth.deallocate()
+        self._filled.deallocate()
         self._upscale_shader.deallocate()
         self._fill.deallocate()
 
     def clear(self) -> None:
         self._upscaled.clear()
-        self._depth.clear()
+        self._filled.clear()
 
     def upscale(self, depth: Texture | None, crop: Rect, mask: Texture) -> None:
         """`depth` upscaled into the view across `crop`, where it is the player's and `mask` is, then filled across
@@ -63,4 +63,4 @@ class ViewDepth:
         self._upscaled.begin()
         self._upscale_shader.use(depth, crop, EDGE, mask, self._box.near, self._box.far)
         self._upscaled.end()
-        self._fill.use(self._upscaled, mask, self._depth)
+        self._fill.use(self._upscaled, mask, self._filled)

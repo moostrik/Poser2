@@ -6,8 +6,8 @@ comes before it, the uploader's corrected camera frame, is in [INPUT_THREADS.md]
 the sizes it works at and why are in [RESOLUTION.md](RESOLUTION.md). **(deduction)** marks what is inferred.
 
 The stage is `ViewLayer` (settings `view`, deep_flow's own, `apps/deep_flow/render/layers/view/view_layer.py`); its geometry and the
-depth's read and fill are plain modules in `modules/flow/view` (`view_window.py`, `depth_read.py`, `DepthCrop`,
-`DepthUpscale`, `DepthFill`).
+depth's upscale and fill are plain modules in `modules/flow/view` (`view_window.py`, `DepthCrop`, `DepthUpscale`,
+`DepthFill`).
 
 ## The goal
 
@@ -26,8 +26,8 @@ its textures, ports and settings group, and the monitor lists each part's textur
 |------------------------------|--------------------------------------------------------------------------------------|
 | `crop` (`ViewCrop`)          | the box in 3D: `image`, the camera image inside its sides (`center_x`, `center_y`, `height`) at the view's `width` × `height`; who: `depth`, the camera's depth inside its front and back (`near`, `far`) on the depth's own pixels, unblended, 0 outside (`DepthCrop`) |
 | `mask` (`ViewMask`)          | where: `mask`, the crop's depth's outline moved onto the image's ([The mask](#the-mask)) |
-| `depth` (`ViewDepth`)        | how far: `upscaled`, the aligned depth upscaled to the view once where it is the player's and the mask is; `depth`, that filled across the mask ([The depth](#the-depth)), a `DepthView` ([MOTION.md](MOTION.md#when-it-measures)) |
-| `color_grade` (`ColorGrade`) | the graded image, the density's color: the image graded (`exposure`, `offset`, `gamma`, `contrast`, `saturation`) and sharpened (`sharpen`), premultiplied by the mask last (`use_mask`) |
+| `depth` (`ViewDepth`)        | how far: `upscaled`, the aligned depth upscaled to the view once where it is the player's and the mask is; `filled`, that filled across the mask, the view's depth ([The depth](#the-depth)), a `DepthView` ([MOTION.md](MOTION.md#when-it-measures)) |
+| `color` (`ViewColor`)        | `color`, the player's color for the density: the image graded (`exposure`, `offset`, `gamma`, `contrast`, `saturation`) and sharpened (`sharpen`), premultiplied last by the mask's copy (`use_mask`), its edge eroded by `erode` and feathered inward over `feather` view pixels |
 | the pose                     | the pose's points placed in the crop, for the pose drawn over the view               |
 
 ```mermaid
@@ -37,9 +37,9 @@ flowchart TB
   C["crop → image: the box's sides<br/>448 × 800"]
   K["crop → depth: who, the box's front and back<br/>the depth's own pixels, 0 outside; 448 × 800"]
   M["mask → mask: where<br/>guided filter; 448 × 800"]
-  R["depth → read: how far<br/>the player's depth where the mask is, else 0"]
-  F["depth → depth: the fill<br/>push-pull inside the mask; 448 × 800"]
-  G["color_grade → graded image<br/>graded, then premultiplied by the mask"]
+  R["depth → upscaled: how far<br/>the player's depth where the mask is, else 0"]
+  F["depth → filled<br/>push-pull inside the mask; 448 × 800"]
+  G["color → color<br/>graded, then premultiplied by the mask's copy, eroded and feathered"]
   MO["Motion, 448 × 800<br/>x/y from the image, z from the depth,<br/>each pixel weighted by the mask"]
   I --> C
   D --> K
@@ -59,13 +59,21 @@ matting model, where the foreground layer, its color and its depth, is defined w
 2004 store color, depth and alpha per layer). So the motion weights each pixel by the mask and needs no second
 mask.
 
-Its outputs, in the order it makes them, are the image, the mask, the depth and the graded image, each the
-texture of the part that makes it; the input's depth is a depth in the box's range, drawn in its colormap. The image and the graded image are both a color picture of the player at the view's size, as cut and
-as graded; the bridge takes the graded image as its `color`, the density's. The color grade works on the straight
-image and premultiplies it by the mask last, RGB and alpha alike, as compositing does and as the render blends
-(Porter and Duff 1984; Brinkmann): grading or sharpening a cut
-image changes its half-masked edge apart from the rest and pulls the cut's black into the edge. With
-`color_grade.enabled` off the graded image is the image as it is, masked where `use_mask`.
+Its outputs, in the order it makes them, are the image, the mask, the depth and the color, each the texture of
+the part that makes it; the input's depth is a depth in the box's range, drawn in its colormap. The image and the
+color are both a color picture of the player at the view's size, as cut and as graded; the bridge takes the color
+as its `image`, the density's color. The color part works on the straight image and premultiplies it by the mask
+last, RGB and alpha alike, as compositing does and as the render blends (Porter and Duff 1984; Brinkmann): grading
+or sharpening a cut image changes its half-masked edge apart from the rest and pulls the cut's black into the
+edge. With `color.enabled` off the color is the image as it is, masked where `use_mask`.
+
+The premultiply takes a copy of the mask, worked as compositing works a matte where the picture is made, so the
+mask the motion and the depth use stays as it is:
+- `erode` moves the copy's edge inward by whole pixels, one 3 × 3 minimum each (`Erode`), dropping the outermost
+  pixels, whose color the camera mixed with the background's;
+- `feather` then fades it in inward over its width: the copy blurred by a Gaussian of half the width is 0.5 on
+  its edge, and 2 × it − 1, clamped (`Feather`), is 0 on and outside the edge and rises to 1 inside, so nothing
+  reaches past the eroded edge.
 
 The color is resampled twice, straightened in the uploader and cut to the view here, a little softer than one
 resample **(deduction)**, for keeping the camera's work and the flow's apart.
@@ -84,15 +92,15 @@ coarser than the mask's: between them lies a band about `guided_radius` wide (2 
 pixels) where the mask is and the player's depth is not. The depth is made in two passes, once, after the mask
 exists:
 
-- The upscale (`DepthUpscale`, `depth_read.upscaled_depth`): the four depth pixels around a view pixel, interpolated
-  bilinearly where they lie within 0.1 m of each other (`EDGE`, `view_depth.py`), else the one it lies in, so an
-  edge never reads as a distance in between; a 0, no depth, is never blended (`edge_aware_depth`). Kept where it
+- The upscale (`DepthUpscale`): the four depth pixels around a view pixel, interpolated bilinearly where they lie
+  within 0.1 m of each other (`EDGE`, `view_depth.py`), else the one it lies in, so an edge never reads as a
+  distance in between; a 0, no depth, is never blended. Kept where it
   is the player's (`near`..`far`) and the mask is above 0, else 0. The edge's jump is a constant, not a setting:
   it lies above the depth's noise between neighbours on one surface and below the smallest edge to keep, a hand
   before the chest, as the motion's `z.edge` (0.1 m); 0.05, 0.1 and 0.2 m measured alike, no limit did not (the
   tables below). It keeps the edges inside the mask (an arm before the body) from reading as a depth in between,
   and so more of the mask keeps a z position through the motion.
-- The fill (`DepthFill`, `depth_read.push_pull`): push-pull (Gortler et al. 1996). Push: each level down halves
+- The fill (`DepthFill`): push-pull (Gortler et al. 1996). Push: each level down halves
   the size, rounded up, to 1 × 1, a pixel the mean of the pairs (depth × weight, weight) below it, the upscaled
   depth's weight 1 where it has a depth. Pull: from the coarsest up, a level's pair plus (1 − its weight) times the
   coarser pulled level's, read bilinearly. A pixel with a depth keeps it; one without takes the mean of the depth
@@ -179,6 +187,7 @@ about ±0.4 inside and ±0.3 at the edge.
 | the upscale alone, without the fill   | 4.4%          | 0.491 | 11.97 / 5.94          | 0.559 | 0.843 | 0.071        | 1.75        |           |
 | the upscale and the fill, the preset  | 3.9%          | 0.492 | 11.84 / 6.07          | 0.542 | 0.831 | 0.070        | 1.82        | 0.20 ms   |
 | the same, tolerance 10 m (bilinear)   | 6.0%          | 0.492 | 12.37 / 5.15          | 0.560 | 0.821 | 0.067        | 1.82        |           |
+| the edge 0.1 m, `guided_radius` 3, one run | 3.8%     | 0.580 | 12.02 / 5.96          | 0.547 | 0.838 | 0.070        | 1.69        |           |
 
 The view as built gives z what the paths before it gave, with no depth mask: every column lies within the runs'
 spread but the share without a z position, 3.9% against 3.7%, with no mechanism found. Without the fill the band
@@ -191,6 +200,11 @@ from 3.9% to 6.0% and the edge's noise falls from 6.1 to 5.2, both past the runs
 makes a ramp of in-between depths, whose steps the motion's step filter drops, so fewer pixels at the edge carry
 z **(deduction)**. With the limit, more of the mask carries z and the edge is a little noisier; the real z,
 slow and fast, is the same either way.
+
+The view as it is now (the edge a constant 0.1 m, the fill always on), one run with the preset's `guided_radius`
+3 where the rows above have 2: every z column lies within or at the edge of the preset row's three runs. The fit
+rises and x/y at the edge falls, as the wider guided filter moves the mask's edge further onto the image's
+(**deduction**); the two changes are not measured apart.
 
 Against reading the nearest depth pixel everywhere, on the stillslowfast recording, 3 runs, the motion's
 thresholds at 0, `SURFACE` gives: neighbouring pixels inside the body with the very same depth 11% (67%), z
@@ -225,16 +239,18 @@ fit along the mask's edge. One run's p99 swings by about ±0.02; fit holds to ±
 
 ## Checked
 
-`apps/deep_flow/scripts/view_check.py` plays a recording's captures through the uploader and the view stage and
-holds the crop's depth, the upscale and the fill to their numpy references:
+Shaders are checked in a GPU harness. `apps/deep_flow/scripts/view_check.py` plays a recording's captures through
+the uploader and the view stage, prints the share of the mask without depth, times each pass (`--time`) and saves
+the last capture's textures side by side (`--png`). When the passes were built they were held, once, against
+plain array versions of the same rules:
 
-| Pass                          | Pixels off the reference, 40 captures of the measure recording                            |
+| Pass                          | Pixels off, 40 captures of the measure recording                                          |
 |-------------------------------|-------------------------------------------------------------------------------------------|
-| the crop's depth (`depth_crop`) | none by over 1 mm                                                                       |
-| the upscale (`upscaled_depth`) | none by over 1 mm                                                                         |
-| the fill (`push_pull`)        | none by over 1 mm                                                                         |
+| the crop's depth              | none by over 1 mm                                                                         |
+| the upscale                   | none by over 1 mm                                                                         |
+| the fill                      | none by over 1 mm                                                                         |
 | joint bilateral, not kept     | none by over 2 cm, at most 1.2 cm: the GPU blends the image with coarser weights          |
 
 The mask without depth is 1.62% of the mask upscaled, 0.00% after the fill. The passes on the GPU, the median
 of 40, are in [TIMING.md](TIMING.md#the-view). Without the app: `modules/flow/tests/test_view_window.py`, the
-window's geometry, the crop's depth, the upscale and the fill.
+window's geometry and the fill's pyramid sizes.
