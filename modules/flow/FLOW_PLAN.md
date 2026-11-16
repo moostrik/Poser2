@@ -70,9 +70,13 @@ standmoves and blocky, their only remains.
     runs; its rows still name the depth mask's gate and `view.depth.tolerance`;
   - the view's time in [TIMING.md](TIMING.md#the-view), with the erode and the feather;
   - the view's and the motion's rows of [TIMING.md's stages](TIMING.md#the-stages).
-- **A4.** The motion's baselines before C, each on the raw output with x/y beside z: the measure recording at
-  the preset, for C3 (A3's result row is it); a recording at 2–3.5 m, made by the operator, for C2; the raw output
-  against the smoothed on the measure recording, for C4.
+- **A4.** What each part of the motion does for [its goal](MOTION.md#the-goal), before C: least noise while
+  keeping the most real motion. Each part turned off (or to its neutral value) alone from the preset, on the
+  measure recording, its x/y and z beside each other: still noise, slow, fast, fast ÷ noise, and the GPU ms.
+  - x/y: `levels`, `window`, `damping`, `same_surface`, `threshold`, `use_mask`;
+  - z: the step filter (`edge`), `window`, `tolerance`, `smooth`, `catch_up`, `dead_zone`, `threshold`,
+    `xy_smooth`.
+  A part that does nothing for the goal is a question for C.
 
 ## B. The view
 
