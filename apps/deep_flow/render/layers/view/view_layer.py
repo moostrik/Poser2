@@ -5,7 +5,7 @@
 `ViewOutput` is what the motion and the bridge read: the image and the depth cut to the view's fixed window at the
 view's size, the depth read across a surface (`DepthUpscale`, at the view's `tolerance`), the depth mask (the view's depth cut by `near` and `far`, which gates z), the mask (the depth mask, its
 edge moved onto the image's by the guided filter, He 2010), the foreground (the image where the mask is) and its
-color, the foreground colorized. The view is made again
+color, the foreground graded and sharpened. The view is made again
 when a new capture comes in, told by its capture time, or when a setting it is made with changes.
 """
 
@@ -22,11 +22,10 @@ from modules.flow import DepthRead, DepthView, DepthUpscale, TextureKind, \
                          depth_step, fixed_window, place_points, view_per_depth_pixel, view_span
 from modules.gl import Fbo, SwapFbo, Style, Texture, shaders
 from modules.pose import BBox, Frame, Points2D
-from modules.render import ColorSettings, StageLayer, StageOutput
+from modules.render import StageLayer, StageOutput
 from modules.utils import Rect
 from ....settings import ViewLayerSettings
-from ..colorize import Colorize
-from .shaders import DepthMask
+from .shaders import DepthMask, Grade
 
 
 @dataclass
@@ -44,7 +43,7 @@ class ViewInput:
 class ViewOutput(StageOutput):
     """The view's textures, at the view's size: `image` the color, `foreground` the color where the mask is,
     `depth` the metres as the motion measures z from them, `mask` the player's shape on the image's edges,
-    `depth_mask` where the depth lies from `near` to `far`, `color` the foreground colorized, the density's color."""
+    `depth_mask` where the depth lies from `near` to `far`, `color` the foreground graded, the density's color."""
     image: Annotated[Texture, TextureKind.IMAGE]
     foreground: Annotated[Texture, TextureKind.IMAGE]
     color: Annotated[Texture, TextureKind.IMAGE]
@@ -57,14 +56,14 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
     """The view stage's layer. `fov` is the camera image's horizontal field (degrees), for the metres a view width
     spans; `settings.tolerance` tells one surface from another. Places
     the pose's points in the window (`crop_pose_points`, `lost`) for the pose drawn over the view; its last pass is
-    `Colorize` (`settings.color`), in camera `cam_id`'s track color. Draws nothing."""
+    the color: the foreground graded, sharpened and masked. Draws nothing."""
 
-    def __init__(self, cam_id: int, settings: ViewLayerSettings, fov: float, color_settings: ColorSettings) -> None:
+    def __init__(self, settings: ViewLayerSettings, fov: float) -> None:
         super().__init__(settings)
         self.settings: ViewLayerSettings = settings
         self._fov: float = fov
-        self._color: Colorize = Colorize(cam_id, settings.color, color_settings)
 
+        self._color: SwapFbo = SwapFbo()                # the foreground graded, then sharpened, then masked
         self._image: Fbo = Fbo()
         self._depth: Fbo = Fbo(interpolation=GL_NEAREST)     # an edge never reads as a distance in between
         self._depth_mask: Fbo = Fbo()
@@ -79,6 +78,9 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         self._guided_shader: shaders.GuidedFilter = shaders.GuidedFilter()
         self._threshold_shader: shaders.MaskAntialias = shaders.MaskAntialias()
         self._foreground_shader: shaders.MaskMultiply = shaders.MaskMultiply()
+        self._grade_shader: Grade = Grade()
+        self._sharpen_shader: shaders.Sharpen = shaders.Sharpen()
+        self._color_mask_shader: shaders.MaskApply = shaders.MaskApply()
 
         self._window: Rect = Rect(0.0, 0.0, 1.0, 1.0)  # uv on the camera image, rows down
         self._grid_size: tuple[int, int] = (0, 0)       # the depth's grid, its samples on the camera image
@@ -92,7 +94,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
     def output(self) -> ViewOutput:
         s: ViewLayerSettings = self.settings
         depth: DepthView = DepthView(self._depth, view_span(self._window, self._fov), depth_step(self._window, self._grid_size), s.near, s.far)
-        return ViewOutput(self._image, self._foreground, self._color.texture, depth, self._mask, self._depth_mask)
+        return ViewOutput(self._image, self._foreground, self._color, depth, self._mask, self._depth_mask)
 
     @property
     def texture(self) -> Texture:
@@ -131,20 +133,20 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         self._made = None
 
     def deallocate(self) -> None:
-        for fbo in (self._image, self._depth, self._depth_mask, self._mask, self._foreground, self._guided, self._products, self._coefficients):
+        for fbo in (self._image, self._depth, self._depth_mask, self._mask, self._foreground, self._guided, self._products,
+                    self._coefficients, self._color):
             fbo.deallocate()
-        self._color.deallocate()
         for shader in self._shaders():
             shader.deallocate()
         super().deallocate()
 
     def _shaders(self) -> tuple:
-        return (self._depth_shader, self._depth_mask_shader, self._guided_shader, self._threshold_shader, self._foreground_shader)
+        return (self._depth_shader, self._depth_mask_shader, self._guided_shader, self._threshold_shader, self._foreground_shader,
+                self._grade_shader, self._sharpen_shader, self._color_mask_shader)
 
     def reset(self) -> None:
-        for fbo in (self._image, self._depth, self._depth_mask, self._mask, self._foreground):
+        for fbo in (self._image, self._depth, self._depth_mask, self._mask, self._foreground, self._color):
             fbo.clear()
-        self._color.clear()
         self._made = None
         self._timestamp = None
         self._pose_points = None
@@ -167,7 +169,8 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
             return
         s: ViewLayerSettings = self.settings
         made: tuple = (input.timestamp, s.fixed_x, s.fixed_y, s.fixed_height, s.near, s.far, s.guided_radius, s.edge_contrast,
-                       s.depth_read, s.tolerance, image.width, image.height, self._image.width, self._image.height)
+                       s.depth_read, s.tolerance, image.width, image.height, self._image.width, self._image.height,
+                       s.grade_enabled, s.exposure, s.offset, s.gamma, s.contrast, s.saturation, s.sharpen, s.use_mask)
         if made == self._made:
             return
         self._made = made
@@ -201,10 +204,33 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         self._foreground_shader.use(self._image, self._mask)
         self._foreground.end()
 
+        self._make_color(s)
         Style.pop_style()
-        self._color.process(self._foreground, self._mask)
 
         self._pose_points = self._place_pose(input.pose)
+
+    def _make_color(self, s: ViewLayerSettings) -> None:
+        """The foreground graded, sharpened where `sharpen`, with the mask as alpha where `use_mask`; the
+        foreground as it is while not `grade_enabled`."""
+        self._color.swap()
+        self._color.begin()
+        if s.grade_enabled:
+            self._grade_shader.use(self._foreground, s.exposure, s.offset, s.gamma, s.contrast, s.saturation)
+        else:
+            self._foreground.draw()
+        self._color.end()
+        if not s.grade_enabled:
+            return
+        if s.sharpen > 0.0:
+            self._color.swap()
+            self._color.begin()
+            self._sharpen_shader.use(self._color.back, s.sharpen)
+            self._color.end()
+        if s.use_mask:
+            self._color.swap()
+            self._color.begin()
+            self._color_mask_shader.use(self._color.back, self._mask)
+            self._color.end()
 
     def _read_depth(self, depth: Texture | None, roi: Rect, read: DepthRead, s: ViewLayerSettings) -> None:
         """The depth into the view the way `read` says; none without a depth."""

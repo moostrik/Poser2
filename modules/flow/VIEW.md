@@ -22,9 +22,9 @@ Once per capture, in order:
 | the pose        | the pose's points placed in the window, for the pose drawn over the view                        |
 
 Its outputs are the image, the foreground, the color, the depth, the mask and the depth mask; the panel picks the
-motion's picture (`inputs`). The color, the density's, is the view's last pass: the foreground colorized
-(`Colorize`: the blend over time, the cel shade, the hue shift, the sharpening, settings `view.color`) on the
-view's foreground, once per capture; with `view.color.enabled` off it is the foreground as it is.
+motion's picture (`inputs`). The color, the density's, is the view's last pass, once per capture: the
+foreground graded (`Grade`: `exposure`, `offset`, `gamma`, `contrast`, `saturation`), sharpened (`sharpen`) and
+masked (`use_mask`); with `grade_enabled` off it is the foreground as it is.
 
 The color is resampled twice, straightened in the uploader and cut to the view here, a little softer than one
 resample **(deduction)**, for keeping the camera's work and the flow's apart.

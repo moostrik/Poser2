@@ -32,7 +32,6 @@ import monitor_harness as mh  # noqa: E402
 from modules.camera import CameraFrame, FrameType  # noqa: E402
 from modules.recording import read_metadata  # noqa: E402
 from modules.flow import DepthRead, edge_aware_depth, mask_sided_depth  # noqa: E402
-from modules.render import ColorSettings  # noqa: E402
 from modules.gl import Style, Tensor, Texture  # noqa: E402
 from modules.inference import GpuDepth, GpuImage, SerialUploader, SerialUploaderSettings  # noqa: E402
 from apps.deep_flow.render.layers import ViewInput, ViewLayer  # noqa: E402
@@ -148,7 +147,7 @@ def main() -> int:
     settings.update_from_dict(preset['view'])
     if args.read:
         settings.depth_read = DepthRead[args.read.upper()]
-    view = ViewLayer(0, settings, json.loads(PRESET.read_text(encoding='utf-8'))['camera']['fov'], ColorSettings())
+    view = ViewLayer(settings, json.loads(PRESET.read_text(encoding='utf-8'))['camera']['fov'])
     view.allocate(preset['view']['width'], preset['view']['height'])
 
     uploader = SerialUploader(SerialUploaderSettings())

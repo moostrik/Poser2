@@ -328,20 +328,14 @@
       "guided_radius": 2.0,
       "edge_contrast": 0.03,
       "depth_read": "SURFACE",
-      "color": {
-        "enabled": true,
-        "blend_factor": 0.2,
-        "exposure": 0.99,
-        "gamma": 0.8,
-        "offset": 0.0,
-        "contrast": 1.24,
-        "saturation": 1.01,
-        "levels": 0,
-        "smoothness": 0.0,
-        "colorize": 0.0,
-        "sharpen": 0.82,
-        "use_mask": true
-      }
+      "grade_enabled": true,
+      "exposure": 0.99,
+      "offset": 0.0,
+      "gamma": 0.8,
+      "contrast": 1.24,
+      "saturation": 1.01,
+      "sharpen": 0.82,
+      "use_mask": true
     },
     "motion": {
       "monitor_a": {

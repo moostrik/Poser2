@@ -51,7 +51,7 @@ class DeepFlowRender(RenderBase):
             self.L[ChainLayers.capture_depth][i] =               render.CaptureDepthLayer()
 
             # The stages, each with its monitor, and the pose's monitor
-            view =          self.L[ChainLayers.view][i] =        ViewLayer(           i, settings.view, fov, settings.colors)
+            view =          self.L[ChainLayers.view][i] =        ViewLayer(           settings.view, fov)
             self.L[ChainLayers.pose_monitor][i] =                PoseMonitorCompositor(i, self.board, cam_image, cam_crop, view, settings.pose, settings.colors)
             self.L[ChainLayers.motion][i] =                      render.Motion3DLayer(       i, settings.motion)
             self.L[ChainLayers.bridge][i] =                      render.Bridge3DLayer(       settings.bridge)

@@ -49,10 +49,6 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
   from their papers, not measured here)**. Which one, its latency against the camera's, and whether its depth
   holds the depth velocity's needs is the item's first question.
 
-Question, for later: Colorize, the view's last pass (deep_flow's `Colorize` in `render/layers/colorize/`, settings `view.color`), worked on as a
-whole; and its name, which gl's hue shift alone (`shaders.Colorize`) and its own field for that shift's amount
-(`colorize`) also carry: `HueShift` and `hue_shift`, or else?
-
 Question, for later: the pose monitor (`PoseMonitorCompositor`) draws its chosen layer and the features into an FBO
 of its own, which makes it a compositor by the render rule; drawn straight into the panel it needs none and is a
 `PoseMonitorLayer`. And it takes the camera image only because `TrackerCompositor` (its `image` off) and
