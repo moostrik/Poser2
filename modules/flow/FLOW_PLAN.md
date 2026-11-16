@@ -34,14 +34,19 @@ distinct.
 Built: every capture reaches the motion ([INPUT_THREADS.md](INPUT_THREADS.md)), the mask's edge on the image's
 and the depth read across a surface ([VIEW.md](VIEW.md)).
 
-- **B1.** The depth read: `view.depth.depth_read` holds `SURFACE` and `MASK` ([VIEW.md](VIEW.md#the-depth-read)). One
-  stays, chosen together by eye on the edges recording; the other goes. In the same sitting, the color's edge
-  now that the color grade works on the straight image and takes the mask last.
-
-Question, for B1: the path itself. The image has 800 rows and the depth 300, and only the image knows the
-player's outline sharply. Now the depth is scaled up first, the masks are cut from that, and `MASK` reads it
-again; proposed, not decided: the depth stays at its own size until the mask exists and is read into the view
-once, from the mask's side at the outline, so there is one outline.
+- **B1.** One path for the depth and the mask. The image has 800 rows and the depth 300, and only the image
+  knows the player's outline sharply. Now the depth is scaled up first, the masks are cut from that, and `MASK`
+  reads it again ([VIEW.md](VIEW.md#the-depth-read)). Instead the depth stays at its own size until the mask
+  exists, in three steps, each once, drawn below:
+  - Who: the band cut on the depth's own pixels, a blocky yes or no.
+  - Where: the guided filter moves that outline onto the image's edges: the mask, the one outline. Where the
+    image has no edge it stays the depth's, smoothed.
+  - How far: the depth read into the view once, blended within a surface, at the outline from the mask's side.
+    The depth mask is that depth's cut and lies on the mask's outline.
+  - `depth_read` and its `SURFACE` go; `tolerance` keeps one job, the blend within a surface.
+  - Measured against the path now, on stillslowfast, the motion's thresholds at 0: the one results table
+    (noise, slow, fast, fast ÷ slow, fast ÷ noise, GPU), the mask's fit and the share of the mask without a z
+    position; then by eye on the edges recording, with the color's edge.
 
 ```mermaid
 flowchart TB
