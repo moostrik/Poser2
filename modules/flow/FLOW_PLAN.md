@@ -36,18 +36,6 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
 
 - **B1.** The depth read: `view.depth.depth_read` holds `SURFACE` and `MASK` ([VIEW.md](VIEW.md#the-depth-read)). One
   stays, chosen together by eye on the edges recording; the other goes.
-- **B2.** A camera without depth, its mask from another source: deep_flow's mask is the depth's
-  ([VIEW.md](VIEW.md#the-mask-and-the-depth-mask)); a mask from RVM, for a camera without depth, would come back
-  from hd_trio. With it the motion's `depth_mask`, the depth's own cut that gates z, is still the view stage's,
-  and RVM's mask, on the crop, would have to be cut into the view's window.
-- **B3.** A depth for a 2D camera: the 3D fluid puts a pixel in at its z position and nothing where it has none
-  ([FLUID_3D.md](FLUID_3D.md#the-bodys-depth)), so a 2D camera gives it nothing. A depth made from the image
-  (a monocular depth model) on the view would give the motion its z and z position as a depth camera's does.
-  A single-frame model (Depth Anything V2) is good on a frame but flickers frame to frame, which the depth
-  velocity would read as z; video models keep it consistent and stream: Video Depth Anything (its smallest
-  model about 30 fps), Online Video Depth Anything (42 fps on an A100), FlashDepth (24 fps at 2K) **(site fact,
-  from their papers, not measured here)**. Which one, its latency against the camera's, and whether its depth
-  holds the depth velocity's needs is the item's first question.
 - **B4.** The view's panels: its crop of the camera image (`fixed_x`, `fixed_y`, `fixed_height`) a panel of its
   own, `crop`, its fields `center_x`, `center_y`, `height`. The view's panels in the order the view runs: crop,
   depth, mask, color grade, then the monitors. Presets, VIEW.md and `view_check.py` follow.
@@ -227,6 +215,18 @@ Not worked on until asked for; each with what is known.
   at the top shared down to both, or a share between panels. In a field panel the system's name is
   dropped as in `input`.
 - The camera as a standalone OAK app: the depth's alignment, the PC's now, then needs a home.
+- A camera without depth, its mask from another source: deep_flow's mask is the depth's
+  ([VIEW.md](VIEW.md#the-mask-and-the-depth-mask)); a mask from RVM, for a camera without depth, would come back
+  from hd_trio. With it the motion's `depth_mask`, the depth's own cut that gates z, is still the view stage's,
+  and RVM's mask, on the crop, would have to be cut into the view's window.
+- A depth for a 2D camera: the 3D fluid puts a pixel in at its z position and nothing where it has none
+  ([FLUID_3D.md](FLUID_3D.md#the-bodys-depth)), so a 2D camera gives it nothing. A depth made from the image
+  (a monocular depth model) on the view would give the motion its z and z position as a depth camera's does.
+  A single-frame model (Depth Anything V2) is good on a frame but flickers frame to frame, which the depth
+  velocity would read as z; video models keep it consistent and stream: Video Depth Anything (its smallest
+  model about 30 fps), Online Video Depth Anything (42 fps on an A100), FlashDepth (24 fps at 2K) **(site fact,
+  from their papers, not measured here)**. Which one, its latency against the camera's, and whether its depth
+  holds the depth velocity's needs is the first question.
 
 ## Rules it touches
 
@@ -239,4 +239,4 @@ Not worked on until asked for; each with what is known.
 - A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
-Not designed yet, so their rules are not named: B2, B3; C1 to C4; D1 to D4; E1, E2; F1 to F3; H1; I1 to I4.
+Not designed yet, so their rules are not named: C1 to C4; D1 to D4; E1, E2; F1 to F3; H1; I1 to I4.
