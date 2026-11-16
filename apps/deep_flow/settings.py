@@ -224,7 +224,6 @@ class ViewMaskSettings(BaseSettings):
 
 class ViewDepthSettings(BaseSettings):
     """ViewDepth, how far: the depth read into the view where it is the player's and the mask is, then filled."""
-    tolerance: Field[float] = Field(0.2, min=0.05, max=0.5, step=0.01, description="Depth jump beyond which the read blends no two depth pixels, m")
     fill_enabled: Field[bool] = Field(True, description="The mask filled with the player's depth (push-pull); off, the read as it is")
 
 

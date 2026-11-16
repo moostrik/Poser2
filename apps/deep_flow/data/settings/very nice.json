@@ -327,7 +327,6 @@
         "edge_contrast": 0.03
       },
       "depth": {
-        "tolerance": 0.2,
         "fill_enabled": true
       },
       "color_grade": {

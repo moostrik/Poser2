@@ -11,10 +11,12 @@ from modules.gl import Fbo, Texture
 from modules.utils import Rect
 from ....settings import ViewCropSettings, ViewDepthSettings
 
+EDGE: float = 0.1       # m, the depth jump the read keeps as an edge: below a hand before the chest, as the motion's edge
+
 
 class ViewDepth:
-    """`read` brings a depth into the view across the crop: within a surface, the depth pixels within `tolerance` of
-    each other blended; kept where it lies inside the box (the crop's near and far) and the mask is above 0. `fill`
+    """`read` brings a depth into the view across the crop: within a surface, the depth pixels within `EDGE` of each
+    other blended; kept where it lies inside the box (the crop's near and far) and the mask is above 0. `fill`
     fills the mask where the read has none (the band between the depth's coarse edge and the mask's, the camera's
     holes), with `fill_enabled`; off, the depth is the read."""
 
@@ -40,7 +42,7 @@ class ViewDepth:
     @property
     def made_with(self) -> tuple:
         """The settings its textures are made with, so its owner makes them again when one changes."""
-        return (self.settings.tolerance, self.settings.fill_enabled)
+        return (self.settings.fill_enabled,)
 
     def allocate(self, width: int, height: int) -> None:
         self._read.allocate(width, height, GL_R32F)
@@ -65,7 +67,7 @@ class ViewDepth:
         if depth is None:
             return
         self._read.begin()
-        self._read_shader.use(depth, crop, self.settings.tolerance, mask, self._box.near, self._box.far)
+        self._read_shader.use(depth, crop, EDGE, mask, self._box.near, self._box.far)
         self._read.end()
         if self.settings.fill_enabled:
             self._fill.use(self._read, mask, self._depth)

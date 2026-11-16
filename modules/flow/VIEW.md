@@ -76,7 +76,6 @@ resample **(deduction)**, for keeping the camera's work and the flow's apart.
 | `crop.near`, `far`                   | 0.1, 1.7 m    | the box's front and back, the player's depth range                        |
 | `mask.guided_radius`                 | 2             | how far the image moves the mask's edge, in depth pixels; 0 off           |
 | `mask.edge_contrast`                 | 0.03          | the image's brightness spread (0 to 1) above which the edge follows the image's |
-| `depth.tolerance`                    | 0.2 m         | the depth jump beyond which the read blends no two depth pixels           |
 | `depth.fill_enabled`                 | on            | the read filled across the mask; off, the depth is the read               |
 
 ## The depth
@@ -87,10 +86,13 @@ pixels) where the mask is and the player's depth is not. The depth is made in tw
 exists:
 
 - The read (`DepthUpscale`, `depth_read.masked_depth`): the four depth pixels around a view pixel, interpolated
-  bilinearly where they lie within `depth.tolerance` of each other, else the one it lies in, so an edge never
-  reads as a distance in between; a 0, no depth, is never blended (`edge_aware_depth`). Kept where it is the
-  player's (`near`..`far`) and the mask is above 0, else 0. The tolerance keeps the edges inside the mask (an arm
-  before the body) from reading as a depth in between.
+  bilinearly where they lie within 0.1 m of each other (`EDGE`, `view_depth.py`), else the one it lies in, so an
+  edge never reads as a distance in between; a 0, no depth, is never blended (`edge_aware_depth`). Kept where it
+  is the player's (`near`..`far`) and the mask is above 0, else 0. The edge's jump is a constant, not a setting:
+  it lies above the depth's noise between neighbours on one surface and below the smallest edge to keep, a hand
+  before the chest, as the motion's `z.edge` (0.1 m); 0.05, 0.1 and 0.2 m measured alike, no limit did not (the
+  tables below). It keeps the edges inside the mask (an arm before the body) from reading as a depth in between,
+  and so more of the mask keeps a z position through the motion.
 - The fill (`DepthFill`, `depth_read.push_pull`): push-pull (Gortler et al. 1996). Push: each level down halves
   the size, rounded up, to 1 × 1, a pixel the mean of the pairs (depth × weight, weight) below it, the read's
   weight 1 where it has a depth. Pull: from the coarsest up, a level's pair plus (1 − its weight) times the

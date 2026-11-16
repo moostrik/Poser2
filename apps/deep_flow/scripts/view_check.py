@@ -4,7 +4,7 @@ Plays a recording's color and depth frames through the `SerialUploader` (the col
 app does), takes them into GL and runs the view stage at the preset's settings. Checks, per frame:
 - the crop's depth against its numpy reading (`depth_crop`): pixels off by over 1 mm (expected: none);
 - the read against its numpy reading (`masked_depth`) on the GPU's mask: pixels off by over 1 mm (expected: none,
-  a float rounding at the tolerance's edge at most);
+  a float rounding at the edge's jump at most);
 - the fill against its numpy reading (`push_pull`) on the GPU's read and mask: pixels off by over 1 mm;
 - the share of the mask without depth, in the read and in the depth (0 with the fill), and the share of the view
   that is the player.
@@ -36,7 +36,7 @@ from modules.recording import read_metadata  # noqa: E402
 from modules.flow import depth_crop, masked_depth, push_pull  # noqa: E402
 from modules.gl import Style, Tensor, Texture  # noqa: E402
 from modules.inference import GpuDepth, GpuImage, SerialUploader, SerialUploaderSettings  # noqa: E402
-from apps.deep_flow.render.layers import ViewInput, ViewLayer  # noqa: E402
+from apps.deep_flow.render.layers import EDGE, ViewInput, ViewLayer  # noqa: E402
 from apps.deep_flow.settings import ViewLayerSettings  # noqa: E402
 from modules.video import StreamReader  # noqa: E402
 
@@ -131,7 +131,7 @@ def main() -> int:
     depth_texture = Tensor(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
 
     print(f'{args.recording}: {count} captures, view {view.output.image.width} x {view.output.image.height}, '
-          f'tolerance {d.tolerance} m, near {band.near} far {band.far}, fill {d.fill_enabled}')
+          f'edge {EDGE} m, near {band.near} far {band.far}, fill {d.fill_enabled}')
     crop_off, read_off, fill_off, pixels = 0, 0, 0, 0
     unread, unfilled, shares = [], [], []
     last: dict[str, np.ndarray] = {}
@@ -162,7 +162,7 @@ def main() -> int:
         uu, vv = np.meshgrid(u, v)
         grid = depth.depth.cpu().numpy()
         crop_off += int((np.abs(cropped - depth_crop(grid, uu, vv, band.near, band.far)) > 0.001).sum())
-        read_off += int((np.abs(got_read - masked_depth(grid, uu, vv, d.tolerance, mask, band.near, band.far)) > 0.001).sum())
+        read_off += int((np.abs(got_read - masked_depth(grid, uu, vv, EDGE, mask, band.near, band.far)) > 0.001).sum())
         got = read(output.depth.texture)
         if d.fill_enabled:
             fill_off += int((np.abs(got - push_pull(got_read.astype(np.float64), mask)) > 0.001).sum())
