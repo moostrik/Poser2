@@ -20,6 +20,7 @@ inferred, **(site fact)** what the operator saw.
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                      | [FLOW.md](FLOW.md)                                 |
 | I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | not started                      | [FLOW.md](FLOW.md)                                 |
 | J   | [Every setting and its description](#j-every-setting-and-its-description)    | last, after the refactor         | `CLAUDE.md`, `.claude/rules`                       |
+| K   | [A measurement system](#k-a-measurement-system)                              | not designed                     | [FLOW.md](FLOW.md#the-goals)                       |
 
 B1, D1 and D2 need the operator at the screen; the other lines go on meanwhile.
 
@@ -208,6 +209,24 @@ concurrency rules touch none of it.
   description is one short line of panel text, what and its unit; and whether every quantity is in the flow's
   textbook units, which a scan cannot judge.
 
+## K. A measurement system
+
+The goal: one way to measure a change to the flow, each stage on its own output with the stages after it neutral
+([FLOW.md](FLOW.md#the-goals)), so a result can be trusted the first time. Today's is `depth_velocity_capture` and
+`depth_velocity_compare`, run by hand; what went wrong with it on 2026-11-16, each a requirement:
+- The configuration drifted: a capture takes the preset as saved, so a setting changed in the panel (the mask's
+  `guided_radius`) entered a measurement unasked. A measurement fixes every setting it does not vary.
+- Baselines were measured under other conditions (smoothed, with a gate the motion has since lost) and compared
+  as if alike. A baseline is measured with the same settings and code paths as what it is compared against, or
+  measured again.
+- The runs' spread decided what counts, and one run swings (z noise inside ±0.6 on the raw output): a result
+  states its spread, and how many runs it rests on.
+- A capture is about 1.1 GB and replays need hand-written segment files: captures, segments and rows sit in one
+  place, named after what they measure, and old ones are deleted.
+
+Question, for K: what the system is (a script that captures, replays and writes the row with the configuration
+it ran with; or a mode of the app), and which of the stages it measures first.
+
 ## Parked
 
 Not worked on until asked for; each with what is known.
@@ -219,7 +238,7 @@ Not worked on until asked for; each with what is known.
   stage is changed in both and FLOW.md describes both. `Fluid3DLayer` (91 lines) is a thin layer over the flow's
   `Fluid3D`; `Bridge3DLayer` (417 lines) is the bridge itself (it wires `VelocityLowpass`, `VelocityBandpass`,
   `ZPositionMix` and the density and temperature bridges, holds `Bridge3DLayerSettings`, declares the ports), and
-  `ViewLayer` the view (its parts `ViewCrop`, `ViewMask`, `ViewDepth`, `ColorGrade`, deep_flow's own); the monitors
+  `ViewLayer` the view (its parts `ViewCrop`, `ViewMask`, `ViewDepth`, `ViewColor`, deep_flow's own); the monitors
   (`Monitor2DLayer`, `Monitor3DLayer`), which draw the ports, are the render's. Each stage subclasses the render's `LayerBase` to sit in its update loop, and modules
   may not import the render, so the stages could not live in the flow **(deduction)**. The textbook split: each
   stage a plain flow class as `Fluid3D` is, with its settings, ports, inputs and outputs, and a thin render layer
