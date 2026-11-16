@@ -34,7 +34,7 @@ distinct.
 Built: every capture reaches the motion ([INPUT_THREADS.md](INPUT_THREADS.md)), the mask's edge on the image's
 and the depth read across a surface ([VIEW.md](VIEW.md)).
 
-- **B1.** The depth read: `view.depth_read` holds `SURFACE` and `MASK` ([VIEW.md](VIEW.md#the-depth-read)). One
+- **B1.** The depth read: `view.depth.depth_read` holds `SURFACE` and `MASK` ([VIEW.md](VIEW.md#the-depth-read)). One
   stays, chosen together by eye on the edges recording; the other goes.
 - **B2.** A camera without depth, its mask from another source: deep_flow's mask is the depth's
   ([VIEW.md](VIEW.md#the-mask-and-the-depth-mask)); a mask from RVM, for a camera without depth, would come back
@@ -48,6 +48,12 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
   model about 30 fps), Online Video Depth Anything (42 fps on an A100), FlashDepth (24 fps at 2K) **(site fact,
   from their papers, not measured here)**. Which one, its latency against the camera's, and whether its depth
   holds the depth velocity's needs is the item's first question.
+- **B4.** The view's panels: the window on the camera image (`fixed_x`, `fixed_y`, `fixed_height`) a panel of its
+  own, `window`, its fields named without "fixed": `center_x`, `center_y`, `height`. The view's panels in the
+  order the view runs: window, depth, mask, color grade, then the monitors. Presets, VIEW.md and `view_check.py`
+  follow.
+
+Question, for B4: `window`, `center_x`, `center_y` and `height`, or other names?
 
 Question, for later: the pose monitor (`PoseMonitorCompositor`) draws its chosen layer and the features into an FBO
 of its own, which makes it a compositor by the render rule; drawn straight into the panel it needs none and is a
