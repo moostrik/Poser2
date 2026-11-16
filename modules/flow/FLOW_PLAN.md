@@ -37,16 +37,6 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
 - **B1.** The depth read: `view.depth.depth_read` holds `SURFACE` and `MASK` ([VIEW.md](VIEW.md#the-depth-read)). One
   stays, chosen together by eye on the edges recording; the other goes. In the same sitting, the color's edge
   now that the color grade works on the straight image and takes the mask last.
-- **B9.** The path select as one nested list, a cascading menu, in place of a select per level. One button shows
-  the path picked (`depth_mask › mask`); it opens a menu of the top level, steps and textures side by side, a
-  step opening its own beside it, as deep as the paths go. It opens with the current pick's steps open and the
-  pick marked. A pick shows at once and the menu stays open, so textures are looked through one after another.
-  - A submenu opens on a click on its step, not on hover: crossing the steps below on the way to an open
-    submenu opens none of them.
-  - A submenu sits flush against its parent, overlapping it, so the mouse never leaves the menu between levels.
-  - It closes when the mouse has left all of it, after a grace of about 0.3 s against a slip, on a click outside
-    or on Escape.
-  - The field stays the one dotted path; the panel's test follows, and MONITOR.md.
 
 Question, for B: the view's depth settings gone through together; among them MASK's read takes the mask's
 `guided_radius` as its reach.

@@ -1,9 +1,9 @@
 """The path select's levels: a dotted path list split a level at a time, steps and textures side by side in the
-order the paths come, and the step a path lies in."""
+order the paths come, the step a path lies in, and the path as its button shows it."""
 
 import unittest
 
-from ..controls import path_level, path_step
+from ..controls import path_label, path_level, path_step
 
 PATHS: list[str] = ['input.image', 'input.depth', 'depth.depth', 'depth_mask.depth_mask', 'depth_mask.mask',
                     'velocity', 'xy.solve.level', 'output.image']
@@ -23,6 +23,10 @@ class PathSelectTest(unittest.TestCase):
         self.assertEqual(path_step('depth_mask.mask'), 'depth_mask.')
         self.assertEqual(path_step('xy.solve.level'), 'xy.solve.')
         self.assertEqual(path_step('velocity'), '')
+
+    def test_the_button_shows_the_levels_joined(self) -> None:
+        self.assertEqual(path_label('xy.solve.level'), 'xy › solve › level')
+        self.assertEqual(path_label(''), '—')
 
 
 if __name__ == '__main__':

@@ -701,78 +701,103 @@ def path_step(path: str) -> str:
     return f"{head}{dot}" if dot else ''
 
 
+def path_label(path: str) -> str:
+    """A path as the path select's button shows it: its levels joined by ' › '."""
+    return path.replace('.', ' › ') if path else '—'
+
+
+PATH_MENU_GRACE: float = 0.3    # s the mouse may be outside a path select's menu before it closes
+
+
 class PathSelect(Control):
-    """A dotted path from the current list of another field (``options``), picked a level at a time: a select
-    per level down to the step looked through. A select before the last only filters the next; the field is
-    written only when a texture is picked. When the last select closes without a pick, the selects go back to
-    the step of the path the field holds. Polls both, always."""
+    """A dotted path from the current list of another field (``options``), picked in one nested list: a button
+    showing the path, opening a cascading menu of its levels, steps and paths side by side. A step's menu opens
+    on a click on it, flush against its parent; the menu opens with the shown path's steps open and the path
+    marked. A pick writes the field and the menu stays open; it closes when the mouse has left it for
+    ``PATH_MENU_GRACE``, on a click outside or on Escape. Polls both, always."""
     widget = Widget.path_select
 
     def build(self) -> None:
         self.options_field = self.field.options
         self.paths: list[str] = list(getattr(self.settings, self.options_field.name)) if self.options_field else []
-        self.looked: str = path_step(self.shown)   # the step looked through; the shown path's at first
-        self.row = ui.row().classes("gap-1 items-center no-wrap max-w-full")
-        self._build_levels()
-
-    def _build_levels(self, open_last: bool = False) -> None:
-        """A select per level, from the top down to the step looked through."""
-        self.row.clear()
-        prefixes: list[str] = ['']
-        for i, char in enumerate(self.looked):
-            if char == '.':
-                prefixes.append(self.looked[:i + 1])
-        last: ui.select | None = None
-        with self.row:
-            for depth, prefix in enumerate(prefixes):
-                options: dict[str, str] = path_level(self.paths, prefix)
-                deeper: str | None = prefixes[depth + 1] if depth + 1 < len(prefixes) else None
-                value: str | None = deeper if deeper in options else (self.shown if self.shown in options else None)
-                select = ui.select(options=options, value=value, label=self.label if depth == 0 else None).props(
-                    "dense outlined" + self.lock())
-                select.classes(f"w-{self.field.width if self.field.width is not None else 36} max-w-full")
-                if depth == 0:
-                    self.tooltip(select)
-                if not self.locked:
-                    select.on_value_change(lambda e: self._pick(e.value))
-                last = select
-        if not self.locked and last is not None:
-            looked: str = self.looked
-            last.on('popup-hide', lambda _: self._closed(looked))
-            if open_last:
-                last.run_method('showPopup')
-
-    def _pick(self, key: str | None) -> None:
-        if key is None or key == self.looked:  # a select clears itself when its options change; not a choice
+        self.items: dict[str, ui.item] = {}         # the menu's paths, as filled last
+        self.chain: list[ui.menu] = []              # the menus of the shown path's steps, top down
+        self.close_timer: ui.timer | None = None
+        self.button = self.tooltip(ui.button(path_label(self.shown)).props(
+            "dense outline no-caps align=left" + self.lock(readonly=False)))
+        self.button.classes(f"w-{self.field.width if self.field.width is not None else SLIDER_WIDTH} max-w-full")
+        if self.locked:
             return
-        if key.endswith('.'):
-            self.looked = key                   # a step: look through it, the field unchanged
-            self._build_levels(open_last=True)
-            return
-        self.looked = path_step(key)
-        self.commit(key)
+        with self.button:
+            self.menu = self._menu(nested=False)
+        self.menu.on('before-show', lambda _: self._fill())
+        self.menu.on('show', lambda _: self._open_chain(0))
 
-    def _closed(self, looked: str) -> None:
-        """The last select, the one through `looked`, closed: without a pick, back to the step of the path the
-        field holds. A select closing because a step was picked in it is no longer the last: nothing."""
-        if looked == self.looked and self.looked != path_step(self.shown):
-            self.looked = path_step(self.shown)
-            self._build_levels()
+    def _menu(self, nested: bool) -> ui.menu:
+        """A menu that holds the mouse while it is in it; a nested one flush against its step, overlapping it."""
+        menu = ui.menu().props('anchor="top end" self="top start" :offset="[-2, 0]"' if nested
+                               else 'anchor="bottom left" self="top left"')
+        menu.on('mouseenter', lambda _: self._hold())
+        menu.on('mouseleave', lambda _: self._release())
+        return menu
+
+    def _fill(self) -> None:
+        """The levels, from the paths as they are now."""
+        self.menu.clear()
+        self.items = {}
+        self.chain = []
+        with self.menu:
+            self._level('')
+
+    def _level(self, prefix: str) -> None:
+        with ui.list().props('dense'):
+            for key, label in path_level(self.paths, prefix).items():
+                if key.endswith('.'):
+                    with ui.item().props('clickable'):
+                        ui.item_section(label)
+                        submenu = self._menu(nested=True)
+                        with submenu:
+                            self._level(key)
+                    if self.shown.startswith(key):
+                        index: int = len(self.chain)
+                        self.chain.append(submenu)
+                        submenu.on('show', lambda _, i=index: self._open_chain(i + 1))
+                else:
+                    item = ui.item(label, on_click=lambda _, k=key: self.commit(k))
+                    if key == self.shown:
+                        item.props('active')
+                    self.items[key] = item
+
+    def _open_chain(self, index: int) -> None:
+        """The shown path's steps open, one after another as each shows."""
+        if index < len(self.chain):
+            self.chain[index].open()
+
+    def _hold(self) -> None:
+        if self.close_timer is not None:
+            self.close_timer.cancel()
+            self.close_timer = None
+
+    def _release(self) -> None:
+        self._hold()
+        with self.button:
+            self.close_timer = ui.timer(PATH_MENU_GRACE, self.menu.close, once=True)
 
     def polls(self) -> bool:
         return True
 
     def poll(self) -> None:
         if self.options_field:
-            paths = list(getattr(self.settings, self.options_field.name))
-            if paths != self.paths:
-                self.paths = paths
-                self._build_levels()
+            self.paths = list(getattr(self.settings, self.options_field.name))     # the menu takes them when it opens
         super().poll()
 
     def show(self, value: Any) -> None:
-        self.looked = path_step(value)
-        self._build_levels()
+        self.button.set_text(path_label(value))
+        for key, item in self.items.items():
+            if key == value:
+                item.props('active')
+            else:
+                item.props(remove='active')
 
 
 class Radio(Control):

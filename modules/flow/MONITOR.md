@@ -25,7 +25,7 @@ The monitor's panel group (`Monitor2DLayerSettings`, `Monitor3DLayerSettings`) s
 
 | Setting                  | Values                                                      | Means                                       |
 |--------------------------|-------------------------------------------------------------|---------------------------------------------|
-| `texture`                | the stage's port paths, in the order the data runs          | the port shown, picked a step at a time (a path select: a select per level, those before the last only filter, back to the shown texture's step when the last closes without a pick); a path the stage no longer has shows its first output |
+| `texture`                | the stage's port paths, in the order the data runs          | the port shown, picked in one nested list (a path select: a button with the path, a cascading menu of the steps, a step's menu opening on a click, the shown path's steps open; it stays open on a pick and closes when the mouse has left it); a path the stage no longer has shows its first output |
 | `view`                   | `COLORMAP` (default), `GLYPHS`, `IMAGE`, `HISTOGRAM`, `STRIP` | how the channels are drawn, the most used first |
 | `advanced.channel`       | `X`, `Y`, `Z`, `W`, `ALL` (default)                         | which of the texture's channels are drawn   |
 | `advanced.scale`         | 0.01 to 100, a log slider                                   | multiplier on the values, in every view; in the cube 1 after it is full |
