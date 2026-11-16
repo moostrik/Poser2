@@ -26,7 +26,9 @@ next is in the one plan:
 
 The 2D bridge and the 2D fluid have no document yet; what holds for them is under
 [Constraints](#constraints), and they get theirs when they are rebuilt
-([FLOW_PLAN.md](FLOW_PLAN.md#i-the-2d-flow-follows-the-3d)).
+([FLOW_PLAN.md](FLOW_PLAN.md#i-the-2d-flow-follows-the-3d)). hd_trio runs its own copy of the 2D system
+(`apps/hd_trio/flow/`) and of its layers (`apps/hd_trio/render/layers/flow/`), taken as they were; the 2D in
+`modules/flow` and `render/modules/flow` is no app's until that rebuild.
 
 ## The two systems
 

@@ -15,7 +15,8 @@ from modules.tracker import OnePerCamTrackerSettings, TrackerFrameSourceSettings
 from modules.pose import nodes, trackers, window, analytics, RecorderSettings as PoseRecorderSettings
 from modules import inference
 from modules.session import SessionSettings
-from modules.gl import WindowSettings
+from modules.gl import Style, WindowSettings
+from .flow import GradientFlowSettings, Fluid2DSettings, bridge_2d
 from .sequencer import SequencerSettings
 
 
@@ -111,8 +112,6 @@ class Layers(IntEnum):
     motion =        auto()
     bridge =        auto()
     fluid =         auto()
-    monitor_a =     auto()
-    monitor_b =     auto()
     composite =     auto()
 
 
@@ -368,6 +367,50 @@ class CenterForegroundLayerSettings(render.ForegroundLookSettings):
     """Configuration for CenterForegroundLayer: the foreground's look."""
 
 
+# The flow's stage layers' settings, hd_trio's copy (render/layers/flow)
+class StageLayerSettings(BaseSettings):
+    """What every stage layer's settings hold, first on its panel: the reset. Each stage declares its
+    working size itself (`width`, `height`, the 3D fluid's `depth`), after the switches it puts first."""
+    reset: Field[bool] =    Field(False, widget=Widget.button, description="Start the stage from rest")
+
+
+class MotionLayerSettings(StageLayerSettings):
+    """What the 2D and the 3D motion layer share; each adds its optical flow's group."""
+    guard: Field[bool] =                    Field(True, description="Set non-finite values to 0, count and log them; off once the motion is stable")
+    width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
+    height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
+    fps: Field[float] =                     Field(30.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate the capture gaps are held around")
+
+
+class BridgeLayerSettings(StageLayerSettings):
+    """What the 2D and the 3D bridge layer share; each adds its bridges' groups."""
+    width: Field[int] =     Field(2160, min=32, max=4096, step=32, description="Width the bridge writes its outputs at")
+    height: Field[int] =    Field(3840, min=32, max=4096, step=32, description="Height the bridge writes its outputs at")
+
+
+class FluidLayerSettings(StageLayerSettings):
+    """What the 2D and the 3D fluid layer share; each adds its fluid's group, and its `blend_mode` where its
+    panel puts the drawing."""
+
+
+class Motion2DLayerSettings(GradientFlowSettings, MotionLayerSettings):
+    """Configuration for Motion2DLayer: the stage's settings and its flow's own, one panel, the stage's first."""
+    guard: Field[bool] = Field(False, visible=False, description="The 2D flow has no guard")
+
+
+class Bridge2DLayerSettings(BridgeLayerSettings):
+    """Configuration for Bridge2DLayer: each bridge's group."""
+    trail       = Group(bridge_2d.SmoothTrailSettings)
+    density     = Group(bridge_2d.DensityBridgeSettings)
+    temperature = Group(bridge_2d.TemperatureBridgeSettings)
+
+
+class Fluid2DLayerSettings(Fluid2DSettings, FluidLayerSettings):
+    """Configuration for Fluid2DLayer: the stage's settings and its fluid's own, one panel, the stage's
+    first; the stage's width and height are the fluid's simulation grid."""
+    blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD, newline=True, description="How the show is drawn over the layers before it")
+
+
 class LayerGroup(BaseSettings):
     select: Group[LayerSettings]                 = Group(LayerSettings)
     composite: Group[render.LayerCompositorSettings] = Group(render.LayerCompositorSettings)
@@ -423,11 +466,9 @@ class RenderSettings(BaseSettings):
     preview: Group[PreviewGroup]              = Group(PreviewGroup)
     center : Group[CenterGroup]               = Group(CenterGroup, share=[similarity_scale])
     intro_sequence: Group[IntroSequenceSettings] = Group(IntroSequenceSettings)
-    motion : Group[render.Motion2DLayerSettings] = Group(render.Motion2DLayerSettings, share=[input_fps.as_('fps')])
-    bridge : Group[render.Bridge2DLayerSettings] = Group(render.Bridge2DLayerSettings)
-    fluid  : Group[render.Fluid2DLayerSettings]  = Group(render.Fluid2DLayerSettings)
-    monitor_a: Group[render.MonitorLayerSettings] = Group(render.MonitorLayerSettings)
-    monitor_b: Group[render.MonitorLayerSettings] = Group(render.MonitorLayerSettings)
+    motion : Group[Motion2DLayerSettings]     = Group(Motion2DLayerSettings, share=[input_fps.as_('fps')])
+    bridge : Group[Bridge2DLayerSettings]     = Group(Bridge2DLayerSettings)
+    fluid  : Group[Fluid2DLayerSettings]      = Group(Fluid2DLayerSettings)
     colors : Group[render.ColorSettings]      = Group(render.ColorSettings)
     window : Group[WindowSettings]            = Group(WindowSettings)
 

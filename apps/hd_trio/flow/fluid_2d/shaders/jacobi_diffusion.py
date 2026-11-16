@@ -1,0 +1,61 @@
+"""JacobiDiffusion shader - Iterative diffusion solver for velocity viscosity."""
+
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from modules.gl import Shader, draw_quad, Texture
+
+
+class JacobiDiffusion(Shader):
+    """Jacobi iterative solver for diffusion (viscosity)."""
+
+    def __init__(self) -> None:
+        super().__init__()
+
+    def use(self, source: Texture, obstacle: Texture,
+            grid_scale: float, aspect: float, viscosity_dt: float,
+            has_obstacles: bool = True) -> None:
+        """Apply one Jacobi iteration for diffusion.
+
+        Args:
+            source: Previous iteration of field to diffuse (velocity RG32F)
+            obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1)
+            grid_scale: Grid spacing (typically 1.0)
+            aspect: Aspect ratio (width/height)
+            viscosity_dt: Viscosity * delta_time (diffusion rate)
+            has_obstacles: When False, skip obstacle texture reads for performance
+        """
+        # Anisotropic grid spacing
+        dx = grid_scale
+        dy = grid_scale * aspect
+
+        # Laplacian weights: 1/dx², 1/dy²
+        alpha_x = 1.0 / (dx * dx)
+        alpha_y = 1.0 / (dy * dy)
+
+        # Central coefficient: 1/(ν·Δt)
+        gamma = 1.0 / max(viscosity_dt, 1e-6)
+
+        # Beta = 1 / (2*alpha_x + 2*alpha_y + gamma)
+        beta = 1.0 / (2.0 * alpha_x + 2.0 * alpha_y + gamma)
+
+        # Bind shader program
+        glUseProgram(self.shader_program)
+
+        # Obstacle flag
+        glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
+
+        # Bind textures
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, source.tex_id)
+        glUniform1i(self.get_uniform_loc("uSource"), 0)
+
+        glActiveTexture(GL_TEXTURE1)
+        glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
+        glUniform1i(self.get_uniform_loc("uObstacle"), 1)
+
+        # Set uniforms
+        glUniform2f(self.get_uniform_loc("uAlpha"), alpha_x, alpha_y)
+        glUniform1f(self.get_uniform_loc("uGamma"), gamma)
+        glUniform1f(self.get_uniform_loc("uBeta"), beta)
+
+        # Draw fullscreen quad
+        draw_quad()

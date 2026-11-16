@@ -11,6 +11,7 @@ from modules.pose import MotionTime
 from modules import render
 
 from .settings import Layers, RenderSettings, ShowStage, Stage
+from .render.layers import Fluid2DLayer
 
 if TYPE_CHECKING:
     from .render.layers import CenterGeometry
@@ -189,7 +190,7 @@ class FluidStage(StageLayer):
     def enter(self) -> None:
         self.set_geometry_stage(Stage.LERP)
         self.set_similarity_scale(0.0)
-        cast(render.Fluid2DLayer, self.layers[Layers.fluid]).reset()
+        cast(Fluid2DLayer, self.layers[Layers.fluid]).reset()
 
     def update(self, progress: float) -> None:
         self.compose([

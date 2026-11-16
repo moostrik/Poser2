@@ -1,0 +1,67 @@
+"""JacobiPressure shader - Iterative Poisson pressure solver."""
+
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from modules.gl import Shader, draw_quad, Texture
+
+import logging
+logger = logging.getLogger(__name__)
+
+
+class JacobiPressure(Shader):
+    """Jacobi iterative solver for Poisson pressure equation."""
+
+    def __init__(self) -> None:
+        super().__init__()
+
+    def use(self, source: Texture, divergence: Texture, obstacle: Texture, grid_scale: float, aspect: float,
+            has_obstacles: bool = True) -> None:
+        """Apply one Jacobi iteration.
+
+        Args:
+            source: Previous pressure estimate (R32F)
+            divergence: Velocity divergence (R32F)
+            obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1)
+            grid_scale: Grid scaling factor (typically 1)
+            aspect: Aspect ratio (width/height)
+            has_obstacles: When False, skip obstacle texture reads for performance
+        """
+        if not self.allocated or not self.shader_program:
+            logger.warning("JacobiPressure shader not allocated or shader program missing.")
+            return
+        if not source.allocated or not divergence.allocated or not obstacle.allocated:
+            logger.warning("JacobiPressure shader: input texture(s) not allocated.")
+            return
+
+        # Compute Jacobi parameters
+        # Anisotropic grid spacing
+        dx = grid_scale
+        dy = grid_scale * aspect
+
+        # Laplacian weights
+        alpha_x = 1.0 / (dx * dx)
+        alpha_y = 1.0 / (dy * dy)
+        beta = 1.0 / (2.0 * alpha_x + 2.0 * alpha_y)
+
+        glUseProgram(self.shader_program)
+
+        # Obstacle flag
+        glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
+
+        # Bind textures
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, source.tex_id)
+        glUniform1i(self.get_uniform_loc("uSource"), 0)
+
+        glActiveTexture(GL_TEXTURE1)
+        glBindTexture(GL_TEXTURE_2D, divergence.tex_id)
+        glUniform1i(self.get_uniform_loc("uDivergence"), 1)
+
+        glActiveTexture(GL_TEXTURE2)
+        glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
+        glUniform1i(self.get_uniform_loc("uObstacle"), 2)
+
+        # Set uniforms
+        glUniform2f(self.get_uniform_loc("uAlpha"), alpha_x, alpha_y)
+        glUniform1f(self.get_uniform_loc("uBeta"), beta)
+
+        draw_quad()

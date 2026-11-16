@@ -59,7 +59,8 @@ BANNED: list[tuple[str, str]] = [
 
 # the flow's terms (modules/flow's documents, .claude/rules/flow.md): banned in the flow's code only,
 # where the words are the fluid's
-FLOW_ROOTS: tuple[Path, ...] = (ROOT / 'modules' / 'flow', ROOT / 'modules' / 'render' / 'modules' / 'flow')
+FLOW_ROOTS: tuple[Path, ...] = (ROOT / 'modules' / 'flow', ROOT / 'modules' / 'render' / 'modules' / 'flow',
+                                ROOT / 'apps' / 'hd_trio' / 'flow', ROOT / 'apps' / 'hd_trio' / 'render' / 'layers' / 'flow')
 FLOW_BANNED: list[tuple[str, str]] = [
     ('the quantity or boundary, not body alone (the flow)', r'^body$|^bodies$'),
 ]

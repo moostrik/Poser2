@@ -1,0 +1,179 @@
+#version 460 core
+
+/*
+ * JacobiPressureCompute - Multi-iteration Jacobi solver using shared memory
+ *
+ * Performs multiple Jacobi iterations per dispatch using shared memory tiling.
+ * 16x16 workgroup with 1-pixel halo (18x18 shared memory) allows each iteration
+ * to read neighbors from fast shared memory instead of global texture memory.
+ *
+ * Solves Poisson equation: ∇²p = -∇·v
+ * Using Jacobi iteration: p^(k+1) = β * (αx*(pL + pR) + αy*(pB + pT) - div)
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// Input textures (read via sampler for boundary handling)
+layout(binding = 0) uniform sampler2D uDivergence;  // Velocity divergence (R32F)
+layout(binding = 1) uniform sampler2D uObstacle;    // Obstacle mask (R8, CLAMP_TO_BORDER=1)
+
+// Pressure field - read/write via image
+layout(r16f, binding = 0) uniform image2D uPressureIn;   // Previous pressure
+layout(r16f, binding = 1) uniform image2D uPressureOut;  // Output pressure
+
+// Solver parameters
+uniform vec2 uAlpha;      // Laplacian weights (1/dx², 1/dy²)
+uniform float uBeta;      // 1 / (2*αx + 2*αy)
+uniform int uIterations;  // Number of iterations to perform in this dispatch
+uniform ivec2 uSize;      // Texture dimensions
+uniform bool uHasObstacles;  // Skip obstacle handling when false
+
+// Shared memory tile: 16x16 interior + 1-pixel halo on each side = 18x18
+shared float s_pressure[18][18];
+shared float s_obstacle[18][18];
+
+// Helper to load pressure from input image with bounds checking
+float loadPressure(ivec2 coord) {
+    coord = clamp(coord, ivec2(0), uSize - 1);
+    return imageLoad(uPressureIn, coord).r;
+}
+
+// Helper to check if coord is obstacle
+float sampleObstacle(ivec2 coord) {
+    vec2 uv = (vec2(coord) + 0.5) / vec2(uSize);
+    return texture(uObstacle, uv).r;
+}
+
+// Sample divergence at coord
+float sampleDivergence(ivec2 coord) {
+    vec2 uv = (vec2(coord) + 0.5) / vec2(uSize);
+    return texture(uDivergence, uv).r;
+}
+
+void main() {
+    // Global pixel coordinates
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+
+    // Local coordinates within workgroup (0-15)
+    ivec2 lid = ivec2(gl_LocalInvocationID.xy);
+
+    // Shared memory coordinates (+1 for halo offset)
+    ivec2 sid = lid + 1;
+
+    // Base coordinates of this workgroup's tile in global space
+    ivec2 tileBase = ivec2(gl_WorkGroupID.xy) * 16;
+
+    // Early exit if outside texture bounds (but still participate in shared mem loads)
+    bool validPixel = all(lessThan(gid, uSize));
+
+    // Check if this pixel is an obstacle (obstacles have zero pressure)
+    float myObstacle = uHasObstacles ? sampleObstacle(gid) : 0.0;
+    bool obstacle = myObstacle > 0.5;
+
+    // Load divergence (constant across iterations)
+    float divergence = sampleDivergence(gid);
+
+    // Load obstacle offset for boundary conditions
+    // (not needed - we use shared obstacle tile instead)
+
+    // ===== Initial shared memory load =====
+    // Each thread loads its center pixel
+    float myPressure = validPixel ? loadPressure(gid) : 0.0;
+    s_pressure[sid.y][sid.x] = myPressure;
+
+    // Load obstacle tile into shared memory (skip when no obstacles)
+    if (uHasObstacles) {
+        s_obstacle[sid.y][sid.x] = myObstacle;
+    }
+
+    // Load halo pixels (threads on edges load extra pixels)
+    // Top halo (lid.y == 0 loads row above)
+    if (lid.y == 0) {
+        ivec2 haloCoord = tileBase + ivec2(lid.x, -1);
+        s_pressure[0][sid.x] = loadPressure(haloCoord);
+        if (uHasObstacles) s_obstacle[0][sid.x] = sampleObstacle(haloCoord);
+    }
+    // Bottom halo (lid.y == 15 loads row below)
+    if (lid.y == 15) {
+        ivec2 haloCoord = tileBase + ivec2(lid.x, 16);
+        s_pressure[17][sid.x] = loadPressure(haloCoord);
+        if (uHasObstacles) s_obstacle[17][sid.x] = sampleObstacle(haloCoord);
+    }
+    // Left halo (lid.x == 0 loads column left)
+    if (lid.x == 0) {
+        ivec2 haloCoord = tileBase + ivec2(-1, lid.y);
+        s_pressure[sid.y][0] = loadPressure(haloCoord);
+        if (uHasObstacles) s_obstacle[sid.y][0] = sampleObstacle(haloCoord);
+    }
+    // Right halo (lid.x == 15 loads column right)
+    if (lid.x == 15) {
+        ivec2 haloCoord = tileBase + ivec2(16, lid.y);
+        s_pressure[sid.y][17] = loadPressure(haloCoord);
+        if (uHasObstacles) s_obstacle[sid.y][17] = sampleObstacle(haloCoord);
+    }
+    // Corner halos
+    if (lid.x == 0 && lid.y == 0) {
+        s_pressure[0][0] = loadPressure(tileBase + ivec2(-1, -1));
+        if (uHasObstacles) s_obstacle[0][0] = sampleObstacle(tileBase + ivec2(-1, -1));
+    }
+    if (lid.x == 15 && lid.y == 0) {
+        s_pressure[0][17] = loadPressure(tileBase + ivec2(16, -1));
+        if (uHasObstacles) s_obstacle[0][17] = sampleObstacle(tileBase + ivec2(16, -1));
+    }
+    if (lid.x == 0 && lid.y == 15) {
+        s_pressure[17][0] = loadPressure(tileBase + ivec2(-1, 16));
+        if (uHasObstacles) s_obstacle[17][0] = sampleObstacle(tileBase + ivec2(-1, 16));
+    }
+    if (lid.x == 15 && lid.y == 15) {
+        s_pressure[17][17] = loadPressure(tileBase + ivec2(16, 16));
+        if (uHasObstacles) s_obstacle[17][17] = sampleObstacle(tileBase + ivec2(16, 16));
+    }
+
+    barrier();
+
+    // ===== Jacobi iterations in shared memory =====
+    float newPressure = myPressure;
+
+    for (int iter = 0; iter < uIterations; iter++) {
+        if (validPixel && !obstacle) {
+            // Read neighbors from shared memory
+            float pT = s_pressure[sid.y + 1][sid.x];  // Top
+            float pB = s_pressure[sid.y - 1][sid.x];  // Bottom
+            float pR = s_pressure[sid.y][sid.x + 1];  // Right
+            float pL = s_pressure[sid.y][sid.x - 1];  // Left
+            float pC = s_pressure[sid.y][sid.x];      // Center
+
+            if (uHasObstacles) {
+                // Neumann boundary conditions from shared obstacle tile
+                float oT = s_obstacle[sid.y + 1][sid.x];
+                float oB = s_obstacle[sid.y - 1][sid.x];
+                float oR = s_obstacle[sid.y][sid.x + 1];
+                float oL = s_obstacle[sid.y][sid.x - 1];
+
+                pT = mix(pT, pC, oT);
+                pB = mix(pB, pC, oB);
+                pR = mix(pR, pC, oR);
+                pL = mix(pL, pC, oL);
+            }
+
+            // Jacobi iteration
+            newPressure = uBeta * (uAlpha.x * (pL + pR) + uAlpha.y * (pB + pT) - divergence);
+        } else if (obstacle) {
+            newPressure = 0.0;
+        }
+
+        // Synchronize before updating shared memory
+        barrier();
+
+        // Update shared memory with new pressure
+        s_pressure[sid.y][sid.x] = newPressure;
+
+        // Synchronize before next iteration reads
+        barrier();
+    }
+
+    // ===== Write final result =====
+    if (validPixel) {
+        imageStore(uPressureOut, gid, vec4(newPressure, 0.0, 0.0, 0.0));
+    }
+}

@@ -1,5 +1,6 @@
-"""The two flow systems' settings: each app preset loads into its system without an unknown key, and
-every field of the flow's settings classes is named somewhere in the flow's code."""
+"""The two flow systems' settings: deep_flow's preset loads into the 3D system without an unknown key, and
+every field of the flow's settings classes is named somewhere in the flow's code. hd_trio's presets load
+into its own copy (apps/hd_trio/tests)."""
 
 import json
 import re
@@ -11,7 +12,6 @@ from modules.render import Motion2DLayerSettings, Bridge2DLayerSettings, Fluid2D
                                   Motion3DLayerSettings, Bridge3DLayerSettings, Fluid3DLayerSettings, MonitorLayerSettings
 
 ROOT: Path = Path(__file__).resolve().parents[5]
-PRESETS_2D: list[Path] = [ROOT / 'apps' / 'hd_trio' / 'data' / 'settings' / name for name in ('studio.json', 'umu.json')]
 PRESETS_3D: list[Path] = [ROOT / 'apps' / 'deep_flow' / 'data' / 'settings' / 'settings.json']
 SOURCES: list[Path] = [ROOT / 'modules' / 'flow', ROOT / 'modules' / 'render' / 'modules' / 'flow']
 STAGES: tuple[str, ...] = ('motion', 'bridge', 'fluid', 'monitor_a', 'monitor_b')
@@ -50,9 +50,6 @@ class PresetTest(unittest.TestCase):
                     settings: BaseSettings = system[stage]()
                     with self.assertNoLogs('modules.settings.base_settings', level='WARNING'):
                         settings.update_from_dict(render[stage])
-
-    def test_hd_trio_presets_load_into_the_2d_system(self) -> None:
-        self._load(PRESETS_2D, SYSTEMS['2D'])
 
     def test_deep_flow_preset_loads_into_the_3d_system(self) -> None:
         self._load(PRESETS_3D, SYSTEMS['3D'])

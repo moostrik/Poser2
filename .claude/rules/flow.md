@@ -3,6 +3,8 @@ description: Naming in the flow: the fluid's things by the textbook word, readin
 paths:
   - "modules/flow/**"
   - "modules/render/modules/flow/**"
+  - "apps/hd_trio/flow/**"
+  - "apps/hd_trio/render/layers/flow/**"
 ---
 # Flow naming
 

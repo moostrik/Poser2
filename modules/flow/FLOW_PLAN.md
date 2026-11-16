@@ -40,23 +40,13 @@ them with a monitor of its own. What is shown is a monitor, the time series or t
 layers; a stage's data is shown three ways (wrapper layers, display layers such as `view_depth`, and
 `monitor_a`/`monitor_b`, which lose their port when their stage changes); the panels are one flat list.
 
-**How:** deep_flow and the flow (its 2D and 3D fluid among it) are worked on freely; hd_trio keeps working on its
-own copy of the flow it runs today, and follows later, in its own refactor. A1 makes that copy; a layer both
-apps still use (the pose's, the look class, `LayerCompositor`) keeps its API, what deep_flow needs of it added.
-One commit
-per step, both presets (`settings.json`, `very nice.json`) and the documents it changes with it, checked by the
+**How:** deep_flow and the flow (its 2D and 3D fluid among it) are worked on freely; hd_trio runs its own copy
+of the 2D flow ([FLOW.md](FLOW.md)) and follows in line I. A layer both apps still use (the pose's, the look
+class, `LayerCompositor`) and `Port`, `FlowUtil` and `FlowBase` keep their API, what deep_flow needs of them
+added. One commit per step, both presets (`settings.json`, `very nice.json`) and the documents it changes with it, checked by the
 guard tests, the render's tests and one -sim start (the panels in place, the presets loaded without unknown
 keys).
 
-- **A1.** hd_trio's flow, copied into hd_trio as it is: its layers (`Motion2DLayer`, `Bridge2DLayer`,
-  `Fluid2DLayer`, with what they share with the 3D layers: `StageLayer`, `MotionLayer`, `BridgeLayer`,
-  `FluidLayer`, their inputs and outputs, `Injection`, the shaders `DensityColor` and `DensityColorize`) to
-  `apps/hd_trio/render/layers/flow/`, and the 2D system they run (`GradientFlow`, `bridge_2d`, `fluid_2d`, their
-  shaders, and what they share with the 3D: `time_step`, `wall_mode`, `AddBoolean`, `MagnitudeShader`) to
-  `apps/hd_trio/flow/`. Only `Port`, `FlowUtil` and `FlowBase` stay shared, exported, and keep their API. hd_trio's settings and presets take the copy; its `monitor_a` and `monitor_b` go (it does not need
-  them). The 2D parts of `test_layer_names.py` and `test_flow_systems.py` go with the copy; `FLOW_ROOTS` and
-  `flow.md`'s paths cover it; FLOW.md says where hd_trio's 2D lives. Checked by hd_trio's tests and one -sim start
-  of hd_trio in its venv (depthai 2). The copy is not changed, and lives until line I brings hd_trio onto the flow.
 - **A2.** The view into deep_flow, for now: `ViewLayer`, `ViewOutputLayer` and `ViewDepthLayer` (both import it)
   and their shaders from `render/modules/flow` to `apps/deep_flow/render/layers/view/`, with their tests;
   `scripts/view_check.py` to `apps/deep_flow/scripts/`; the app's view folder added to `FLOW_ROOTS`
@@ -195,7 +185,7 @@ The latency and the cadence, camera to render, and the input's GPU steps are mea
 
 The 2D system (`GradientFlow`, `bridge_2d`, `Fluid2D`, hd_trio) runs as on `main`
 ([FLOW.md's constraints](FLOW.md#constraints)). It follows the 3D's principles once the 3D is finished, and this
-line is hd_trio's fold-in: the 2D rebuilt in `modules/flow`, hd_trio put on it, and its copy (A1) deleted:
+line is hd_trio's fold-in: the 2D rebuilt in `modules/flow`, hd_trio put on it, and its copy (`apps/hd_trio/flow/`, `apps/hd_trio/render/layers/flow/`) deleted:
 
 - **I1.** The 2D fluid: it adds the injected velocity times dt (`Fluid2D.add_velocity`), as Stam's Stable Fluids
   adds a source; but the bridge's velocity is a velocity, in view widths per second like the
@@ -276,9 +266,8 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways: the four lists, the wrapper layers, `view_depth`, `monitor_a`, `monitor_b`,
   `inputs`, `stage`, the pose's layers and deep_flow's composite, A3, A5 to A7.
 - Settings connect the user and a component, not two components: the view's tolerance and size, A8.
-- A layer that is not general and that one app uses sits in `apps/<app>/render/layers/`: hd_trio's flow layers,
-  A1; the view, A2.
-- Remove obsolete pathways instead of leaving parallel legacy ones: hd_trio's copy, until its refactor, A1.
+- A layer that is not general and that one app uses sits in `apps/<app>/render/layers/`: the view, A2.
+- Remove obsolete pathways instead of leaving parallel legacy ones: hd_trio's copy, deleted in line I.
 - A script sits in its app's `scripts/` folder when only that app uses it: `view_check.py`, A2.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, B1.

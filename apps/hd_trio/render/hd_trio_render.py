@@ -9,7 +9,7 @@ from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId, shaders
 from modules.board import HasFrames
 from modules.camera import RigCameraSettings, CameraHealthSettings
-from modules.flow import Port, hold_tick
+from modules.flow import hold_tick
 from modules.pose import Frame, Similarity, AngleMotion
 from modules import render
 from modules.utils import Rect, Point2f, Color
@@ -18,7 +18,8 @@ from ..board import RenderBoard
 from ..settings import Layers, RenderSettings, ShowStage
 from ..render_stages import STAGES, StageLayer
 from ..intro_sequence import IntroSequencePlayer, SequenceDataProxy, FixedColorProxy
-from .layers import CenterGeometry, CenterCamLayer, CenterMaskLayer, CenterForegroundLayer, SourceSpace
+from .layers import CenterGeometry, CenterCamLayer, CenterMaskLayer, CenterForegroundLayer, SourceSpace, Motion2DLayer, Bridge2DLayer, \
+                    Fluid2DLayer, MotionInput, BridgeInput, BridgeOutput, Injection, FluidInput
 
 
 UPDATE_LAYERS: list[Layers] = [
@@ -36,8 +37,6 @@ UPDATE_LAYERS: list[Layers] = [
     Layers.motion,
     Layers.bridge,
     Layers.fluid,
-    Layers.monitor_a,
-    Layers.monitor_b,
     # Layers.composite, -> updated via stage system
 ]
 
@@ -50,8 +49,6 @@ LARGE_LAYERS: list[Layers] = [
     Layers.motion,
     Layers.bridge,
     Layers.fluid,
-    Layers.monitor_a,
-    Layers.monitor_b,
     Layers.composite,
 ]
 
@@ -108,11 +105,9 @@ class HDTrioRender(RenderBase):
             self.L[Layers.intro_pose][i] =                   render.ViewPoseLayer(     i, intro_geometry,                             settings.intro_sequence.pose, cast(render.ColorSettings, self._intro_color_proxy))
 
             ms_mask =       self.L[Layers.color_mask][i] =  render.SimilaritySilhouetteLayer(i, self.board,      center_foreground.texture, center_masks, settings.center.color,  settings.colors)
-            self.L[Layers.motion][i] =                      render.Motion2DLayer(       settings.motion)
-            self.L[Layers.bridge][i] =                      render.Bridge2DLayer(       settings.bridge)
-            fluid =         self.L[Layers.fluid][i] =       render.Fluid2DLayer(        settings.fluid)
-            self.L[Layers.monitor_a][i] =                   render.MonitorLayer(        settings.monitor_a)
-            self.L[Layers.monitor_b][i] =                   render.MonitorLayer(        settings.monitor_b)
+            self.L[Layers.motion][i] =                      Motion2DLayer(              settings.motion)
+            self.L[Layers.bridge][i] =                      Bridge2DLayer(              settings.bridge)
+            fluid =         self.L[Layers.fluid][i] =       Fluid2DLayer(               settings.fluid)
 
             self.L[Layers.composite][i] =                   render.LayerCompositor(                          [fluid, ms_mask],           settings.layer.composite)
 
@@ -188,43 +183,31 @@ class HDTrioRender(RenderBase):
         another's at the cross-camera similarity times `similarity_scale`."""
         dt: float = self._dt
         colors: list[Color] = self.settings.colors.track_colors
-        bridges: dict[int, render.Bridge2DLayer] = {i: cast(render.Bridge2DLayer, layer) for i, layer in self.L[Layers.bridge].items()}
+        bridges: dict[int, Bridge2DLayer] = {i: cast(Bridge2DLayer, layer) for i, layer in self.L[Layers.bridge].items()}
 
         for i, _motion in self.L[Layers.motion].items():
-            motion = cast(render.Motion2DLayer, _motion)
+            motion = cast(Motion2DLayer, _motion)
             if i not in bridges:
                 continue
             mask_view: render.LayerBase = self.L[Layers.center_mask][i]
-            motion.set_input(render.MotionInput(mask_view.texture, mask_view.timestamp if isinstance(mask_view, render.HasCaptureTime) else None, dt))
-            bridges[i].set_input(render.BridgeInput(motion.output.velocity, dt, self.L[Layers.center_foreground][i].texture))
+            motion.set_input(MotionInput(mask_view.texture, mask_view.timestamp if isinstance(mask_view, render.HasCaptureTime) else None, dt))
+            bridges[i].set_input(BridgeInput(motion.output.velocity, dt, self.L[Layers.center_foreground][i].texture))
 
         for i, _fluid in self.L[Layers.fluid].items():
-            fluid = cast(render.Fluid2DLayer, _fluid)
+            fluid = cast(Fluid2DLayer, _fluid)
             pose: Frame | None = self.board.get_frame(self.settings.stage, i)
             motion_value: float = float(pose[AngleMotion].value) if pose is not None and AngleMotion in pose else 0.0
             similarities: np.ndarray = (np.nan_to_num(pose[Similarity].values) if pose is not None and Similarity in pose
                                         else np.zeros(self.max_players)) * self.settings.similarity_scale
             # More motion, a faster fade
             self.settings.fluid.density.fade_time = FADE_TIME_STILL - motion_value ** 2 * FADE_TIME_RANGE
-            injections: list[render.Injection] = []
+            injections: list[Injection] = []
             for j, bridge in bridges.items():
-                output: render.BridgeOutput = bridge.output
+                output: BridgeOutput = bridge.output
                 weight: float = motion_value if j == i else (float(similarities[j]) if j < len(similarities) else 0.0)
                 color: Color = colors[j % len(colors)]
-                injections.append(render.Injection(output.boundary_velocity, output.boundary_density, output.boundary_temperature, weight=weight, color=(color.r, color.g, color.b)))
-            fluid.set_input(render.FluidInput(dt, injections))
-
-        for i, _motion in self.L[Layers.motion].items():
-            if i not in bridges or i not in self.L[Layers.fluid]:
-                continue
-            ports: dict[render.FlowStage, dict[str, Port]] = {
-                render.FlowStage.MOTION: cast(render.Motion2DLayer, _motion).ports,
-                render.FlowStage.BRIDGE: bridges[i].ports,
-                render.FlowStage.FLUID: cast(render.Fluid2DLayer, self.L[Layers.fluid][i]).ports,
-            }
-            for key in (Layers.monitor_a, Layers.monitor_b):
-                if i in self.L[key]:
-                    cast(render.MonitorLayer, self.L[key][i]).set_input(render.MonitorInput(ports))
+                injections.append(Injection(output.boundary_velocity, output.boundary_density, output.boundary_temperature, weight=weight, color=(color.r, color.g, color.b)))
+            fluid.set_input(FluidInput(dt, injections))
 
     def update(self) -> None:
         self._notify_update()
