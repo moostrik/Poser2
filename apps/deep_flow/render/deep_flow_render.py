@@ -15,7 +15,7 @@ from modules.utils import FPS, Color, Rect, Point2f
 
 from ..board import RenderBoard
 from ..settings import Layers, MainView, PoseFrame, RenderSettings
-from .layers import ViewInput, ViewOutput, ViewLayer, PoseMonitorCompositor
+from .layers import CaptureMonitorLayer, ViewInput, ViewOutput, ViewLayer, PoseMonitorCompositor
 from .chain import Size, TICK_LAYERS, CAPTURE_LAYERS, MONITORS, POSE_SHAPES, size_of, layers_of, shape_of
 
 
@@ -55,8 +55,10 @@ class DeepFlowRender(RenderBase):
             self.L[Layers.motion][i] =                      render.Motion3DLayer(       i, settings.motion)
             self.L[Layers.bridge][i] =                      render.Bridge3DLayer(       settings.bridge)
             fluid =         self.L[Layers.fluid][i] =       render.Fluid3DLayer(        settings.fluid)
-            for key, stage, monitor_settings in ((Layers.capture_monitor, render.FlowStage.CAPTURE, settings.capture.monitor),
-                                                 (Layers.view_monitor, render.FlowStage.VIEW, settings.view.monitor),
+            self.L[Layers.capture_monitor][i] = CaptureMonitorLayer(cast(render.CaptureImageLayer, self.L[Layers.capture_image][i]),
+                                                                    cast(render.CaptureDepthLayer, self.L[Layers.capture_depth][i]),
+                                                                    settings.capture.monitor, settings.view)
+            for key, stage, monitor_settings in ((Layers.view_monitor, render.FlowStage.VIEW, settings.view.monitor),
                                                  (Layers.motion_monitor, render.FlowStage.MOTION, settings.motion.monitor),
                                                  (Layers.bridge_monitor, render.FlowStage.BRIDGE, settings.bridge.monitor),
                                                  (Layers.fluid_monitor, render.FlowStage.FLUID, settings.fluid.monitor)):
@@ -83,7 +85,7 @@ class DeepFlowRender(RenderBase):
         # The fluid's and the monitors' input, built right before they run, from what ran before them this tick
         self._wirings: dict[Layers, Callable[[], None]] = {
             Layers.fluid: self._wire_fluid,
-            Layers.capture_monitor: self._wire_monitors,
+            Layers.view_monitor: self._wire_monitors,
         }
 
         # Each camera's captures the motion measures, for the panel's cadence (read on any thread)
@@ -316,10 +318,7 @@ class DeepFlowRender(RenderBase):
         for i, _motion in self.L[Layers.motion].items():
             if i not in self.L[Layers.bridge] or i not in self.L[Layers.fluid] or i not in self.L[Layers.view]:
                 continue
-            capture_ports: dict[str, Port] = {**cast(render.CaptureImageLayer, self.L[Layers.capture_image][i]).ports,
-                                              **cast(render.CaptureDepthLayer, self.L[Layers.capture_depth][i]).ports}
             ports: dict[render.FlowStage, dict[str, Port]] = {
-                render.FlowStage.CAPTURE: capture_ports,
                 render.FlowStage.VIEW: cast(ViewLayer, self.L[Layers.view][i]).ports,
                 render.FlowStage.MOTION: cast(render.Motion3DLayer, _motion).ports,
                 render.FlowStage.BRIDGE: cast(render.Bridge3DLayer, self.L[Layers.bridge][i]).ports,

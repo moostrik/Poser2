@@ -20,9 +20,7 @@ from modules.gl import Colormap, Fbo, Texture, Texture3D, Style, MouseButton
 from modules.flow import Visualizer, Strip, ALL_CHANNELS, Legend, LegendKind, DrawnSize, Port, TextureKind, VolumeCut, VolumeCube, CubeColor, VolumeGlyphs, Cut, Orbit, PITCH_LIMIT, ZOOM_LIMITS, box_size, axis_labels, REFERENCE_STEP, ZPositionView
 from modules.settings import Field, BaseSettings, Group, Widget
 from ...layer_base import LayerBase
-from .shaders import DepthColormap
-
-DEPTH_COLOR: int = 1        # DepthColormap's mode: the depth in the colormap alone
+from .shaders import DepthColormap, DepthDrawMode
 
 
 class FlowStage(IntEnum):
@@ -31,7 +29,6 @@ class FlowStage(IntEnum):
     MOTION = auto()
     BRIDGE = auto()
     FLUID = auto()
-    CAPTURE = auto()
 
 
 class MonitorView(IntEnum):
@@ -349,7 +346,7 @@ class MonitorLayer(LayerBase):
             self._depth_picture.allocate(width, height, GL_RGBA16F)
         near, far = depth_range
         self._depth_picture.begin()
-        self._depth_colormap.use(depth, depth, near, far, DEPTH_COLOR, self.settings.advanced.colormap)
+        self._depth_colormap.use(depth, depth, near, far, DepthDrawMode.COLOR, self.settings.advanced.colormap)
         self._depth_picture.end()
         self._shown_3d = self._depth_picture
         if self.settings.advanced.legend:

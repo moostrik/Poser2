@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 import torch
 
 # Local application imports
-from modules.flow import Port, TextureKind
 from modules.gl import Tensor, Texture
 from ...layer_base import LayerBase
 
@@ -30,11 +29,6 @@ class CaptureImageLayer(LayerBase):
     def timestamp(self) -> float | None:
         """The capture time of the image it holds (`Capture.timestamp`), None before the first."""
         return self._timestamp
-
-    @property
-    def ports(self) -> dict[str, Port]:
-        """What a monitor shows of it: the image."""
-        return {'image': Port(self._image, TextureKind.IMAGE)} if self._image.allocated else {}
 
     def set_capture(self, capture: "Capture") -> None:
         """The capture whose image the next update takes in; render thread."""

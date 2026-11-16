@@ -6,7 +6,6 @@ import torch
 from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_NEAREST
 
 # Local application imports
-from modules.flow import Port, TextureKind
 from modules.gl import Tensor, Texture
 from ...layer_base import LayerBase
 
@@ -32,11 +31,6 @@ class CaptureDepthLayer(LayerBase):
     def timestamp(self) -> float | None:
         """The capture time of the depth it holds (`Capture.timestamp`), None before the first."""
         return self._timestamp
-
-    @property
-    def ports(self) -> dict[str, Port]:
-        """What a monitor shows of it: the depth, metres as a scalar."""
-        return {'depth': Port(self._depth, TextureKind.SCALAR)} if self._depth.allocated else {}
 
     def set_capture(self, capture: "Capture") -> None:
         """The capture whose depth the next update takes in; render thread."""

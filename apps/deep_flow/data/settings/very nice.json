@@ -311,8 +311,8 @@
     },
     "capture": {
       "monitor": {
-        "texture": "image",
-        "view": "COLORMAP"
+        "show": "BOTH",
+        "colormap": "JET"
       }
     },
     "view": {

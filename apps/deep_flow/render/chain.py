@@ -49,8 +49,7 @@ CHAIN: tuple[ChainLayer, ...] = (
 )
 LAYERS: dict[Layers, ChainLayer] = {chain_layer.layer: chain_layer for chain_layer in CHAIN}
 POSE_SHAPES: dict[PoseFrame, Layers] = {PoseFrame.CROP: Layers.cam_crop, PoseFrame.CAMERA: Layers.cam_image, PoseFrame.VIEW: Layers.view}
-MONITORS: tuple[Layers, ...] = (Layers.capture_monitor, Layers.view_monitor, Layers.motion_monitor, Layers.bridge_monitor,
-                                Layers.fluid_monitor)
+MONITORS: tuple[Layers, ...] = (Layers.view_monitor, Layers.motion_monitor, Layers.bridge_monitor, Layers.fluid_monitor)   # the flow's
 TICK_LAYERS: list[Layers] = [chain_layer.layer for chain_layer in CHAIN if chain_layer.tick]
 CAPTURE_LAYERS: list[Layers] = [chain_layer.layer for chain_layer in CHAIN if chain_layer.capture]
 

@@ -234,6 +234,7 @@ view's image, gives the bridge the view's color and takes the mask from the view
 (`apps/deep_flow/render/layers/view/`), every injection at full weight. Each of its stages (capture, view,
 motion, bridge, fluid) has its own monitor, its settings in the stage's panel (`<stage>.monitor`), shown in the
 panel's select lists as `<stage>_monitor`; a view's depth is drawn in its colormap from its near to its far.
+The capture's monitor is a simple one: the color, the depth or both.
 
 ## Packages
 

@@ -22,7 +22,7 @@ from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import OnePerCamTrackerSettings, TrackerFrameSourceSettings
 from modules.pose import nodes, trackers, window
 from modules import inference
-from modules.gl import WindowSettings
+from modules.gl import Colormap, WindowSettings
 from modules.flow import DepthRead
 from modules.video import ScreenRecorderSettings
 
@@ -249,9 +249,22 @@ class ViewLayerSettings(render.StageLayerSettings):
     color:         Group[render.ColorizeSettings] = Group(render.ColorizeSettings)
 
 
+class CaptureView(IntEnum):
+    """What the capture's monitor shows."""
+    COLOR = 0       # the capture's color image
+    DEPTH = 1       # its depth, in the colormap
+    BOTH = 2        # its depth in the colormap over its color image
+
+
+class CaptureMonitorSettings(BaseSettings):
+    """The capture's monitor: the color, the depth or both, the depth in `colormap` from the view's near to its far."""
+    show:     Field[CaptureView] = Field(CaptureView.BOTH, description="What is shown: the color, the depth or both")
+    colormap: Field[Colormap]    = Field(Colormap.JET, description="The depth's colors, from the view's near to its far")
+
+
 class CaptureSettings(BaseSettings):
     """The capture: its monitor, on the capture's image and depth."""
-    monitor: Group[render.MonitorLayerSettings] = Group(render.MonitorLayerSettings)
+    monitor: Group[CaptureMonitorSettings] = Group(CaptureMonitorSettings)
 
 
 class LayerGroup(BaseSettings):
