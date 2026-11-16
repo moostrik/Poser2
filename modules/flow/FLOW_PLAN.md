@@ -1,8 +1,8 @@
 # The flow's plan
 
-What is next for the flow, the one place that says it: the main lines (A to J), first deep_flow's chain, panels
-and display, then along the flow's chain (camera and view, motion, bridge, the fluid's physics, its look), then
-those across the stages; each line's items in the order they are worked (A1, A2, ...); what is parked. A built
+What is next for the flow, the one place that says it: the main lines (B to J), along the flow's chain (camera
+and view, motion, bridge, the fluid's physics, its look), then those across the stages; each line's items in the
+order they are worked (B1, B2, ...); what is parked. A built
 item leaves the plan; the others keep their numbers. How each stage works is in its own document
 ([FLOW.md](FLOW.md) lists them); an item links to the section it changes. **(deduction)** marks what is
 inferred, **(site fact)** what the operator saw.
@@ -11,7 +11,6 @@ inferred, **(site fact)** what the operator saw.
 
 | #   | Line                                                                         | State                            | Documents                                          |
 |-----|------------------------------------------------------------------------------|----------------------------------|----------------------------------------------------|
-| A   | [deep_flow's chain](#a-deep_flows-chain-panels-and-display)                  | next                             | `apps/deep_flow`                                   |
 | B   | [The camera and the view](#b-the-camera-and-the-view)                        | built; the depth read to choose  | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; its details open          | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; the dye's amount to judge | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
@@ -29,25 +28,6 @@ The apps on deep_flow's input have their own plan, [apps/APPS_PLAN.md](../../app
 
 The 3D fluid's lines are weighed by [its goal](FLUID_3D.md#the-goal): sharp, translucent ink patterns, layers
 distinct.
-
-## A. deep_flow's chain, panels and display
-
-**What:** five stages, capture, view, motion, bridge and fluid, each one panel and one monitor; the pose beside
-them with a monitor of its own. What is shown is a monitor, the time series or the fluid's look.
-
-**Why:** in deep_flow the layer select holds four lists.
-
-**How:** deep_flow and the flow (its 2D and 3D fluid among it) are worked on freely; hd_trio runs its own copy
-of the 2D flow ([FLOW.md](FLOW.md)) and follows in line I. A layer both apps still use (the pose's, the look
-class, `LayerCompositor`) and `Port`, `FlowUtil` and `FlowBase` keep their API, what deep_flow needs of them
-added. One commit per step, both presets (`settings.json`, `very nice.json`) and the documents it changes with it, checked by the
-guard tests, the render's tests and one -sim start (the panels in place, the presets loaded without unknown
-keys).
-
-- **A9.** The layer select cut to two panels, `a` and `b`, in place of `left`, `right`, `output` and `record`; the
-  show draws `a`, and the recording records `a` or the window. A layer taken out of a list goes back to its place among
-  the unselected, in `Layers`' order: the panel's playlist (`modules/panel/controls.py`) keeps the order it was
-  dragged into, for every app.
 
 ## B. The camera and the view
 
@@ -155,7 +135,10 @@ The latency and the cadence, camera to render, and the input's GPU steps are mea
 
 The 2D system (`GradientFlow`, `bridge_2d`, `Fluid2D`, hd_trio) runs as on `main`
 ([FLOW.md's constraints](FLOW.md#constraints)). It follows the 3D's principles once the 3D is finished, and this
-line is hd_trio's fold-in: the 2D rebuilt in `modules/flow`, hd_trio put on it, and its copy (`apps/hd_trio/flow/`, `apps/hd_trio/render/layers/flow/`) deleted:
+line is hd_trio's fold-in: the 2D rebuilt in `modules/flow`, hd_trio put on it, and its copy (`apps/hd_trio/flow/`,
+`apps/hd_trio/render/layers/flow/`) deleted. Until then deep_flow and the flow are worked on freely; a layer both
+apps still use (the pose's, the look class, `LayerCompositor`, `LutGrade`) and `Port`, `FlowUtil` and `FlowBase`
+keep their API, what deep_flow needs of them added:
 
 - **I1.** The 2D fluid: it adds the injected velocity times dt (`Fluid2D.add_velocity`), as Stam's Stable Fluids
   adds a source; but the bridge's velocity is a velocity, in view widths per second like the
@@ -232,7 +215,6 @@ Not worked on until asked for; each with what is known.
 
 ## Rules it touches
 
-- Keep presets and settings schemas in sync: the layer select, A9.
 - Remove obsolete pathways instead of leaving parallel legacy ones: hd_trio's copy, deleted in line I.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, B1.

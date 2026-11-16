@@ -276,18 +276,11 @@
     "tolerance": 0.2,
     "layer": {
       "select": {
-        "left": [
+        "a": [
           "fluid"
         ],
-        "right": [
+        "b": [
           "fluid_monitor"
-        ],
-        "output": [
-          "cam_image",
-          "view_monitor"
-        ],
-        "record": [
-          "fluid"
         ]
       }
     },

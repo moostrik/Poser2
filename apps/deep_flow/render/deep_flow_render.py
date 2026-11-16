@@ -38,9 +38,8 @@ class DeepFlowRender(RenderBase):
 
         self.board: RenderBoard = board
 
-        self._left_layers: list[Layers] = settings.layer.select.left
-        self._right_layers: list[Layers] = settings.layer.select.right
-        self._output_layers: list[Layers] = settings.layer.select.output
+        self._a_layers: list[Layers] = settings.layer.select.a      # panel a, the show and the recording
+        self._b_layers: list[Layers] = settings.layer.select.b
 
         self.L: dict[Layers, dict[int, render.LayerBase]] = {layer: {} for layer in Layers}
 
@@ -102,7 +101,7 @@ class DeepFlowRender(RenderBase):
         self.window_manager.add_mouse_move_callback(self._on_mouse_move)
         self.window_manager.add_mouse_scroll_callback(self._on_mouse_scroll)
 
-        # The screen recording: the `record` layers, or the main window, drawn into the capture's screen frame
+        # The screen recording: panel a's layers, or the main window, drawn into the capture's screen frame
         self._screen_capture: ScreenCapture = ScreenCapture()
         self.screen_recorder: ScreenRecorder = ScreenRecorder(settings.screen_recorder, self._screen_capture, screen_recordings)
         settings.screen_recorder.bind(ScreenRecorderSettings.snap, self._on_snap)
@@ -118,7 +117,7 @@ class DeepFlowRender(RenderBase):
     def _read_panel_aspect_ratios(self) -> list[float]:
         """The shape of each panel, the shape of its first layer."""
         aspect_ratios: list[float] = []
-        for layer_types in (self._left_layers, self._right_layers):
+        for layer_types in (self._a_layers, self._b_layers):
             width, height = self._layer_size(layer_types[0]) if layer_types else (OUTPUT_WIDTH, OUTPUT_HEIGHT)
             aspect_ratios.append(width / height)
         return aspect_ratios
@@ -229,15 +228,14 @@ class DeepFlowRender(RenderBase):
                     cast(render.StageLayer, layer).reset()
 
         select = self.settings.layer.select
-        self._left_layers = select.left
-        self._right_layers = select.right
-        self._output_layers = select.output
+        self._a_layers = select.a
+        self._b_layers = select.b
         self._update_layout()
         self._follow_view_size()
 
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         seen: set[Layers] = set()
-        for layer_type in TICK_LAYERS + self._left_layers + self._right_layers + self._output_layers:
+        for layer_type in TICK_LAYERS + self._a_layers + self._b_layers:
             if layer_type in seen:
                 continue
             if layer_type in CAPTURE_LAYERS:
@@ -341,7 +339,7 @@ class DeepFlowRender(RenderBase):
         self._draw_screen_recording(width, height)
 
     def _draw_screen_recording(self, width: int, height: int) -> None:
-        """The screen frame, when the recorder records this tick: the `record` layers, each fit and centered at its
+        """The screen frame, when the recorder records this tick: panel a's layers, each fit and centered at its
         own shape and added on black as the show draws them, or the main window just drawn; then the recorder's
         tick, which copies it."""
         recorder_settings: ScreenRecorderSettings = self.settings.screen_recorder
@@ -356,7 +354,7 @@ class DeepFlowRender(RenderBase):
                 Style.set_blend_mode(Style.BlendMode.DISABLED)
                 Style.push_style()
                 Style.set_blend_mode(Style.BlendMode.ADD)
-                for layer_type in self.settings.layer.select.record:
+                for layer_type in self._a_layers:
                     if 0 in self.L[layer_type]:
                         x, y, w, h = place(*self._layer_size(layer_type), capture.width, capture.height)
                         glViewport(round(x), round(y), round(w), round(h))
@@ -367,9 +365,9 @@ class DeepFlowRender(RenderBase):
         self.screen_recorder.update(self.window_manager.frame_time)
 
     def _on_snap(self, _: bool) -> None:
-        """The recording's size: the first `record` layer's, or the main window's when it is recorded."""
+        """The recording's size: panel a's first layer's, or the main window's when it is recorded."""
         recorder_settings: ScreenRecorderSettings = self.settings.screen_recorder
-        record: list[Layers] = self.settings.layer.select.record
+        record: list[Layers] = self._a_layers
         if recorder_settings.main_window:
             width, height = self._window_size
         elif record:
@@ -380,31 +378,29 @@ class DeepFlowRender(RenderBase):
         recorder_settings.height = height
 
     def _draw_panels(self, width: int, height: int) -> None:
-        """The debug panels: the left and the right layers, side by side or stacked."""
+        """The debug panels: panel a's and panel b's layers, side by side or stacked."""
         clear_color()
 
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
-        # Left panel
-        left_rect: Rect = self.subdivision.get_rect('panels', 0)
-        self._draw_fit(self._left_layers, left_rect.x, height - left_rect.y - left_rect.height, left_rect.width, left_rect.height, True)
+        a_rect: Rect = self.subdivision.get_rect('panels', 0)
+        self._draw_fit(self._a_layers, a_rect.x, height - a_rect.y - a_rect.height, a_rect.width, a_rect.height, True)
 
-        # Right panel
-        right_rect: Rect = self.subdivision.get_rect('panels', 1)
-        self._draw_fit(self._right_layers, right_rect.x, height - right_rect.y - right_rect.height, right_rect.width, right_rect.height, True)
+        b_rect: Rect = self.subdivision.get_rect('panels', 1)
+        self._draw_fit(self._b_layers, b_rect.x, height - b_rect.y - b_rect.height, b_rect.width, b_rect.height, True)
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         self._draw_show(width, height)
 
     def _draw_show(self, width: int, height: int) -> None:
-        """The show: the `output` layers in order, each fit to `width` × `height` at its own shape."""
+        """The show: panel a's layers in order, each fit to `width` × `height` at its own shape."""
         clear_color()
 
         Style.set_blend_mode(Style.BlendMode.DISABLED)
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.ADD)
 
-        self._draw_fit(self._output_layers, 0, 0, width, height)
+        self._draw_fit(self._a_layers, 0, 0, width, height)
 
         Style.pop_style()
 

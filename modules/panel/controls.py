@@ -926,8 +926,9 @@ class SortableList(Control):
 
     def _apply(self) -> None:
         if self.with_checkboxes and self.with_order:
-            # Playlist: active items first, then inactive (preserving relative order)
-            self.order = [m for m in self.order if m in self.active] + [m for m in self.order if m not in self.active]
+            # Playlist: active items first in their order, then the inactive in the enum's, so one taken out goes
+            # back to its place
+            self.order = [m for m in self.order if m in self.active] + [m for m in self.members if m not in self.active]
         self.commit([m for m in self.order if m in self.active])
 
     def commit(self, value: Any) -> None:

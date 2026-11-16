@@ -270,14 +270,11 @@
     "tolerance": 0.2,
     "layer": {
       "select": {
-        "left": [
+        "a": [
           "fluid"
         ],
-        "right": [
+        "b": [
           "fluid_monitor"
-        ],
-        "output": [
-          "fluid"
         ]
       }
     },

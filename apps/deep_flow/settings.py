@@ -74,15 +74,14 @@ class Layers(IntEnum):
 
 class MainView(IntEnum):
     """What the main window shows: the debug panels, or the show alone."""
-    DEBUG = 0       # the left and the right panel, as `left` and `right` pick them
-    SHOW = auto()   # the `output` layers alone, fit to the whole window, as a secondary window shows it
+    DEBUG = 0       # panel a and panel b, as `a` and `b` pick them
+    SHOW = auto()   # panel a's layers alone, fit to the whole window, as a secondary window shows it
 
 
 class LayerSettings(BaseSettings):
-    left:   Field[list[Layers]] = Field([Layers.fluid],                      description="Layers drawn in the left viewport",  widget=Widget.playlist)
-    right:  Field[list[Layers]] = Field([Layers.pose_monitor],               description="Layers drawn in the right viewport", widget=Widget.playlist)
-    output: Field[list[Layers]] = Field([Layers.fluid],                      description="Layers drawn, in order, as the show", widget=Widget.playlist)
-    record: Field[list[Layers]] = Field([Layers.fluid],                      description="Layers drawn into the screen recording", widget=Widget.playlist)
+    """The two panels' layers, each drawn in order: `a` is the show and what the screen recording records."""
+    a: Field[list[Layers]] = Field([Layers.fluid],        description="Layers drawn in panel a, the show", widget=Widget.playlist)
+    b: Field[list[Layers]] = Field([Layers.pose_monitor], description="Layers drawn in panel b", widget=Widget.playlist)
 
 
 # ---------------------------------------------------------------------------
