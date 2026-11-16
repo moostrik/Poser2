@@ -1,5 +1,7 @@
 """Deep Flow render — split-view layer graph with the 3D flow: motion, bridge and the volumetric fluid."""
 
+from dataclasses import dataclass
+from enum import IntEnum
 from threading import Event
 from typing import Callable, cast
 
@@ -19,79 +21,72 @@ from ..settings import Layers, MainView, RenderSettings, FlowInputSettings
 from .layers import ViewInput, ViewOutput, ViewLayer, ViewOutputLayer, ViewDepthLayer
 
 
-UPDATE_LAYERS: list[Layers] = [
-    Layers.cam_image,
-    Layers.cam_crop,
-    Layers.capture_image,
-    Layers.capture_depth,
+class Size(IntEnum):
+    """The size a layer is allocated at."""
+    OUTPUT = 0      # the output, OUTPUT_WIDTH × OUTPUT_HEIGHT
+    VIEW = 1        # the view's, the motion's `width` × `height`
+    LARGE = 2       # twice the output
+    PANEL = 3       # a panel of the main window
 
-    Layers.view,                # the flow's view of the capture: image, depth, masks, foreground
-    Layers.view_depth,
-    Layers.view_pose,
-    Layers.foreground_look,     # the density's color, the look of the view's foreground
 
-    Layers.color_mask,
-    Layers.motion,
-    Layers.bridge,
-    Layers.fluid,
-    Layers.monitor_a,
-    Layers.monitor_b,
-    Layers.composite,
-]
+@dataclass(frozen=True)
+class ChainLayer:
+    """A layer of the chain: its size, the layer whose texture is its panel's shape (None: the output's), whether
+    it runs every tick (else only while a panel shows it), and whether once per capture (`_run_captures`)."""
+    layer: Layers
+    size: Size = Size.OUTPUT
+    shape: Layers | None = None
+    tick: bool = False
+    capture: bool = False
 
-INTERFACE_LAYERS: list[Layers] = [
-    Layers.tracker,
-    Layers.pose,
-]
 
-LARGE_LAYERS: list[Layers] = [
-    Layers.motion,
-    Layers.bridge,
-    Layers.fluid,
-    Layers.monitor_a,
-    Layers.monitor_b,
-    Layers.composite,
-]
+# The chain, in the order it runs: each stage with its layers, the outputs it hands on and its display layers
+CHAIN: tuple[ChainLayer, ...] = (
+    # the capture: the camera's image and its crop, the capture's image and depth into GL
+    ChainLayer(Layers.cam_image,       shape=Layers.cam_image, tick=True),
+    ChainLayer(Layers.cam_crop,        shape=Layers.cam_crop, tick=True),
+    ChainLayer(Layers.capture_image,   shape=Layers.capture_image, tick=True, capture=True),
+    ChainLayer(Layers.capture_depth,   shape=Layers.capture_image, tick=True, capture=True),   # on the image's view, at the depth's own grid
+    # the view: the window cut, the depth read, the masks, the foreground
+    ChainLayer(Layers.view,            Size.VIEW, Layers.view_image, tick=True, capture=True),
+    ChainLayer(Layers.view_image,      Size.VIEW, Layers.view_image),
+    ChainLayer(Layers.view_foreground, Size.VIEW, Layers.view_image),
+    ChainLayer(Layers.view_mask,       Size.VIEW, Layers.view_image),
+    ChainLayer(Layers.view_depth_mask, Size.VIEW, Layers.view_image),
+    ChainLayer(Layers.view_depth,      Size.VIEW, Layers.view_image, tick=True),
+    ChainLayer(Layers.view_pose,       Size.VIEW, Layers.view_image, tick=True),
+    ChainLayer(Layers.foreground_look, Size.VIEW, Layers.view_image, tick=True, capture=True),  # the density's color
+    ChainLayer(Layers.color_mask,      Size.VIEW, Layers.view_image, tick=True),
+    # the motion, the bridge, the fluid
+    ChainLayer(Layers.motion,          Size.LARGE, tick=True, capture=True),
+    ChainLayer(Layers.bridge,          Size.LARGE, tick=True, capture=True),
+    ChainLayer(Layers.fluid,           Size.LARGE, tick=True),
+    # the display
+    ChainLayer(Layers.monitor_a,       Size.LARGE, tick=True),
+    ChainLayer(Layers.monitor_b,       Size.LARGE, tick=True),
+    ChainLayer(Layers.composite,       Size.LARGE, tick=True),
+    ChainLayer(Layers.tracker,         Size.PANEL, Layers.cam_image, tick=True),   # camera stretched into a panel-sized FBO
+    ChainLayer(Layers.pose,            Size.PANEL, Layers.cam_crop, tick=True),    # crop stretched into a panel-sized FBO
+)
+LAYERS: dict[Layers, ChainLayer] = {chain_layer.layer: chain_layer for chain_layer in CHAIN}
+TICK_LAYERS: list[Layers] = [chain_layer.layer for chain_layer in CHAIN if chain_layer.tick]
+CAPTURE_LAYERS: list[Layers] = [chain_layer.layer for chain_layer in CHAIN if chain_layer.capture]
 
-# Run once per capture, in this order, in place of the first of them in UPDATE_LAYERS (`_run_captures`)
-CAPTURE_LAYERS: list[Layers] = [
-    Layers.capture_image,
-    Layers.capture_depth,
-    Layers.view,
-    Layers.foreground_look,
-    Layers.motion,
-    Layers.bridge,
-]
 
-# The view stage and what is drawn from it, at the motion's size
-VIEW_LAYERS: list[Layers] = [
-    Layers.view,
-    Layers.view_image,
-    Layers.view_foreground,
-    Layers.view_depth,
-    Layers.view_mask,
-    Layers.view_depth_mask,
-    Layers.view_pose,
-    Layers.foreground_look,
-    Layers.color_mask,
-]
+def size_of(layer: Layers) -> Size:
+    """The size `layer` is allocated at; a layer the chain does not name is output-sized."""
+    return LAYERS[layer].size if layer in LAYERS else Size.OUTPUT
+
+
+def layers_of(size: Size) -> list[Layers]:
+    return [chain_layer.layer for chain_layer in CHAIN if chain_layer.size == size]
+
 
 OUTPUT_WIDTH: int = 1080
 OUTPUT_HEIGHT: int = 1920
 
 BORDER: Color = Color(0.4, 0.4, 0.4)    # the border around each layer in the main window, so a black layer shows
 BORDER_WIDTH: float = 2.0       # px
-
-# The layers that are not output-shaped, each with the layer whose texture holds its shape
-SHAPE_LAYERS: dict[Layers, Layers] = {
-    Layers.cam_image:      Layers.cam_image,
-    Layers.cam_crop:       Layers.cam_crop,
-    Layers.capture_image:  Layers.capture_image,
-    Layers.capture_depth:  Layers.capture_image,  # on the image's view, at the depth's own grid
-    Layers.tracker:        Layers.cam_image,  # camera stretched into a panel-sized FBO
-    Layers.pose:           Layers.cam_crop,   # crop stretched into a panel-sized FBO
-    **{layer: Layers.view_image for layer in VIEW_LAYERS},
-}
 
 
 class DeepFlowRender(RenderBase):
@@ -106,8 +101,6 @@ class DeepFlowRender(RenderBase):
 
         self.board: RenderBoard = board
 
-        self._update_layers: list[Layers] = UPDATE_LAYERS
-        self._interface_layers: list[Layers] = INTERFACE_LAYERS
         self._left_layers: list[Layers] = settings.layer.select.left
         self._right_layers: list[Layers] = settings.layer.select.right
         self._output_layers: list[Layers] = settings.layer.select.output
@@ -234,11 +227,12 @@ class DeepFlowRender(RenderBase):
         self._view_size = (self.settings.motion.width, self.settings.motion.height)
         for layer_type, cam_dict in self.L.items():
             for layer in cam_dict.values():
-                if layer_type in LARGE_LAYERS:
+                size: Size = size_of(layer_type)
+                if size == Size.LARGE:
                     layer.allocate(OUTPUT_WIDTH * 2, OUTPUT_HEIGHT * 2, GL_RGBA16F)
-                elif layer_type in VIEW_LAYERS:
+                elif size == Size.VIEW:
                     layer.allocate(*self._view_size, GL_RGBA16F)
-                else:
+                elif size == Size.OUTPUT:
                     layer.allocate(OUTPUT_WIDTH, OUTPUT_HEIGHT, GL_RGBA16F)
         self.allocate_window_renders()
         self._border.allocate()
@@ -246,8 +240,8 @@ class DeepFlowRender(RenderBase):
         Shader.enable_hot_reload()
 
     def allocate_window_renders(self) -> None:
-        # Allocate interface layers to split-view panel sizes
-        for layer_type in INTERFACE_LAYERS:
+        # Allocate the panel-sized layers to split-view panel sizes
+        for layer_type in layers_of(Size.PANEL):
             for i in range(self.num_cams):
                 w, h = self.subdivision.get_allocation_size('panels', 0)
                 self.L[layer_type][i].allocate(w, h, GL_RGBA)
@@ -259,7 +253,7 @@ class DeepFlowRender(RenderBase):
         if size == self._view_size:
             return
         self._view_size = size
-        for layer_type in VIEW_LAYERS:
+        for layer_type in layers_of(Size.VIEW):
             for layer in self.L[layer_type].values():
                 layer.deallocate()
                 layer.allocate(*size, GL_RGBA16F)
@@ -337,7 +331,7 @@ class DeepFlowRender(RenderBase):
 
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         seen: set[Layers] = set()
-        for layer_type in self._update_layers + self._interface_layers + self._left_layers + self._right_layers + self._output_layers:
+        for layer_type in TICK_LAYERS + self._left_layers + self._right_layers + self._output_layers:
             if layer_type in seen:
                 continue
             if layer_type in CAPTURE_LAYERS:
@@ -547,8 +541,10 @@ class DeepFlowRender(RenderBase):
         Style.pop_style()
 
     def _layer_size(self, layer_type: Layers) -> tuple[int, int]:
-        if layer_type in SHAPE_LAYERS and 0 in self.L[SHAPE_LAYERS[layer_type]]:      # cam_foreground exists with RVM only
-            texture: Texture = self.L[SHAPE_LAYERS[layer_type]][0].texture
+        """The shape of `layer_type`'s panel: its shape layer's texture, the output's without one."""
+        shape: Layers | None = LAYERS[layer_type].shape if layer_type in LAYERS else None
+        if shape is not None and 0 in self.L[shape]:
+            texture: Texture = self.L[shape][0].texture
             if texture.allocated:
                 return texture.width, texture.height
         return OUTPUT_WIDTH, OUTPUT_HEIGHT
