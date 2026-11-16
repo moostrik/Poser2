@@ -11,7 +11,8 @@ inferred, **(site fact)** what the operator saw.
 
 | #   | Line                                                                         | State                            | Documents                                          |
 |-----|------------------------------------------------------------------------------|----------------------------------|----------------------------------------------------|
-| B   | [The camera and the view](#b-the-camera-and-the-view)                        | built; its look by eye           | [VIEW.md](VIEW.md)                                 |
+| A   | [The capture](#a-the-capture)                                                | open: the tilt's black bands     | [OAK4.md](../camera/oak4/OAK4.md#tilt-correction)  |
+| B   | [The view](#b-the-view)                                                      | built                            | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; its details open          | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; the dye's amount to judge | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | open                             | [FLUID_3D.md](FLUID_3D.md)                         |
@@ -22,7 +23,7 @@ inferred, **(site fact)** what the operator saw.
 | J   | [Every setting and its description](#j-every-setting-and-its-description)    | last, after the refactor         | `CLAUDE.md`, `.claude/rules`                       |
 | K   | [A measurement system](#k-a-measurement-system)                              | not designed                     | [FLOW.md](FLOW.md#the-goals)                       |
 
-B1, D1 and D2 need the operator at the screen; the other lines go on meanwhile.
+D1 and D2 need the operator at the screen; the other lines go on meanwhile.
 
 The apps on deep_flow's input have their own plan, [apps/APPS_PLAN.md](../../apps/APPS_PLAN.md); recording and
 -sim, deep_flow's live checks among them, theirs, [RECORDING_PLAN.md](../recording/RECORDING_PLAN.md).
@@ -30,17 +31,26 @@ The apps on deep_flow's input have their own plan, [apps/APPS_PLAN.md](../../app
 The 3D fluid's lines are weighed by [its goal](FLUID_3D.md#the-goal): sharp, translucent ink patterns, layers
 distinct.
 
-## B. The camera and the view
+## A. The capture
+
+The goal: the camera's image and depth fill the frame the flow takes in.
+
+Question, for A: the tilt correction leaves black above and below the picture, a little less in the depth. Its
+homography refits the straightened picture into the frame so that the whole of it stays visible
+(`tilt_homography` in `modules/camera/geometry/tilt_correction.py`, the smaller of the two scales, centered): a
+tilted picture straightens into a trapezoid, its wide end sets the scale, and the rows its height does not fill
+are left black, with wedges at its narrow end's corners ([OAK4.md](../camera/oak4/OAK4.md#tilt-correction)).
+How it should fill the frame instead is open.
+
+## B. The view
 
 The view's goal is in [VIEW.md](VIEW.md#the-goal): who, where and how far from one frame, the player's image,
 mask and depth agreeing pixel for pixel at the motion's size, adding no noise of its own. How it is judged is in
 [FLOW.md](FLOW.md#the-goals).
 
 Built and measured ([VIEW.md](VIEW.md#the-depth)): the crop in 3D, the one mask, the depth upscaled and filled,
-the color with its erode and feather; its z within the runs' spread of the views before it.
-
-- **B1.** The view's look, by eye on the edges recording, with the pause: the outline and the color's edge, with
-  the color's erode and feather. Needs the operator at the screen.
+the color with its erode and feather, its look judged by eye; its z within the runs' spread of the views before
+it. New points go here.
 
 ## C. The motion
 
