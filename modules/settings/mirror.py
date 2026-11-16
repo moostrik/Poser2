@@ -139,11 +139,20 @@ def _describe_field(settings: BaseSettings, name: str, field: Field, enums: dict
     }
 
 
+_GROUP_HINTS = ("description", "tint")      # the Group parameters carried as they are
+
+
+def _group_hints(settings: BaseSettings, name: str) -> dict[str, Any]:
+    group = getattr(type(settings), name, None)
+    return {hint: getattr(group, hint) for hint in _GROUP_HINTS} if isinstance(group, Group) else {}
+
+
 def _describe_settings(settings: BaseSettings, enums: dict[str, Any]) -> dict[str, Any]:
     return {
         "type": type(settings).__name__,
         "fields": [_describe_field(settings, name, field, enums) for name, field in settings.fields.items()],
-        "children": [[name, _describe_settings(child, enums)] for name, child in settings.children.items()],
+        "children": [[name, _describe_settings(child, enums), _group_hints(settings, name)]
+                     for name, child in settings.children.items()],
     }
 
 
@@ -197,8 +206,8 @@ def _make_class(description: dict[str, Any], enums: dict[str, type[Enum]]) -> ty
     for field_description in description["fields"]:
         for ref, other in field_description["references"].items():
             setattr(fields[field_description["name"]], ref, fields.get(other) if other is not None else None)
-    for name, child in description["children"]:
-        attributes[name] = Group(_make_class(child, enums))
+    for name, child, hints in description["children"]:
+        attributes[name] = Group(_make_class(child, enums), **hints)
     attributes["_wiring"] = wiring
     return type(description["type"], (MirrorSettings,), attributes)
 

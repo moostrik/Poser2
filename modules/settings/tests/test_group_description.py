@@ -2,7 +2,7 @@
 
 import unittest
 
-from modules.settings import BaseSettings, Field, Group
+from modules.settings import BaseSettings, Field, Group, mirror
 
 
 class _Child(BaseSettings):
@@ -32,6 +32,15 @@ class GroupDescriptionTest(unittest.TestCase):
         class _Tinted(BaseSettings):
             child = Group(_Child, tint="#4d5a4f")
         self.assertEqual(getattr(_Tinted, 'child').tint, "#4d5a4f")
+
+    def test_the_mirror_keeps_the_hints(self) -> None:
+        class _Tinted(BaseSettings):
+            child = Group(_Child, description="What the child is", tint="#4d5a4f")
+        settings = _Tinted()
+        settings.initialize()
+        mirrored = mirror.build_mirror(mirror.describe(settings))
+        group = getattr(type(mirrored), 'child')
+        self.assertEqual((group.description, group.tint), ("What the child is", "#4d5a4f"))
 
     def test_the_preset_is_unchanged(self) -> None:
         settings = _Base()
