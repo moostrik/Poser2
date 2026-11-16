@@ -22,7 +22,8 @@ from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import OnePerCamTrackerSettings, TrackerFrameSourceSettings
 from modules.pose import nodes, trackers, window
 from modules import inference
-from modules.gl import WindowSettings
+from modules.gl import Colormap, WindowSettings
+from modules.flow import DepthRead
 from modules.video import ScreenRecorderSettings
 
 
@@ -239,6 +240,34 @@ class _PoseCompositorSettings(render.PoseCompositorSettings):
     middle_stage: Field[Stage] = Field(Stage.SMOOTH, description="Pipeline stage of the middle line (white, 2x wide)")
     front_stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage of the front line (track color)")
 
+# The view's layers' settings (render/layers/view)
+class ViewLayerSettings(render.StageLayerSettings):
+    """The view's window on the camera image, the player's depth band and the mask's edge."""
+    fixed_x:       Field[float] = Field(0.5, min=0.0, max=1.0, description="The window's center across the camera image")
+    fixed_y:       Field[float] = Field(0.5, min=0.0, max=1.0, description="The window's center down the camera image")
+    fixed_height:  Field[float] = Field(1.0, min=0.05, max=2.0, description="The window's height, a share of the camera image's")
+    near:          Field[float] = Field(0.5, min=0.1, max=12.0, step=0.05, newline=True, description="Nearest depth that is the player (m)")
+    far:           Field[float] = Field(4.0, min=0.1, max=12.0, step=0.05, description="Farthest depth that is the player (m)")
+    guided_radius: Field[float] = Field(2.0, min=0.0, max=8.0, step=0.25, newline=True, description="How far the image moves the mask's edge to its own, in depth pixels; 0 = off")
+    edge_contrast: Field[float] = Field(0.03, min=0.001, max=0.3, step=0.001, description="The image's brightness spread (0 to 1) above which the mask's edge follows the image's")
+    depth_read:    Field[DepthRead] = Field(DepthRead.SURFACE, newline=True, description="How the depth is read into the view: its edge on its own pixels or on the mask's")
+
+
+class DepthDrawMode(IntEnum):
+    GREY = 0            # near white, far black
+    COLOR = 1           # the OAK's color map
+    OVER_IMAGE = 2      # the color map over the camera image
+
+
+class ViewDepthLayerSettings(BaseSettings):
+    """How the view's depth is drawn: a log scale from the view's near to far, as depthai's `colorizeDepthFrame`, in
+    a colormap (jet is depthai's)."""
+    draw_mode:    Field[DepthDrawMode] = Field(DepthDrawMode.COLOR, description="How depth is drawn")
+    colormap:     Field[Colormap]      = Field(Colormap.JET, description="The colors depth is drawn in")
+    use_mask:     Field[bool]          = Field(True, description="The mask as the picture's alpha")
+    mask_opacity: Field[float]         = Field(1.0, min=0.0, max=1.0, description="Mask alpha strength")
+
+
 class FlowInputSettings(BaseSettings):
     """Which layers feed the flow, chosen live, and how the fluid weights its injections."""
     motion_image:    Field[Layers] = Field(Layers.view_image,      description="The picture the motion is measured on")
@@ -265,12 +294,12 @@ class RenderSettings(BaseSettings):
     layer  : Group[LayerGroup]                   = Group(LayerGroup)
     data   : Group[DataGroup]                    = Group(DataGroup)
     preview: Group[PreviewGroup]                 = Group(PreviewGroup)
-    view_depth: Group[render.ViewDepthLayerSettings] = Group(render.ViewDepthLayerSettings)
+    view_depth: Group[ViewDepthLayerSettings]    = Group(ViewDepthLayerSettings)
     view_pose: Group[render.ViewPoseLayerSettings] = Group(render.ViewPoseLayerSettings)
     foreground_look: Group[render.ForegroundLookSettings] = Group(render.ForegroundLookSettings)
     color_mask: Group[render.SimilaritySilhouetteLayerSettings] = Group(render.SimilaritySilhouetteLayerSettings)
     inputs : Group[FlowInputSettings]            = Group(FlowInputSettings)
-    view   : Group[render.ViewLayerSettings]     = Group(render.ViewLayerSettings)
+    view   : Group[ViewLayerSettings]            = Group(ViewLayerSettings)
     motion : Group[render.Motion3DLayerSettings] = Group(render.Motion3DLayerSettings, share=[input_fps.as_('fps')])
     bridge : Group[render.Bridge3DLayerSettings] = Group(render.Bridge3DLayerSettings)
     fluid  : Group[render.Fluid3DLayerSettings]  = Group(render.Fluid3DLayerSettings)

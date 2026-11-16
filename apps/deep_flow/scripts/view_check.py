@@ -11,7 +11,7 @@ Saves the last frame's image, depth mask, mask and foreground side by side as a 
 
 With `--time`, then each of the view's passes on the last capture, the median of 40 runs, and the whole view.
 
-    python scripts/view_check.py [RECORDING] [--frames 40] [--png PATH] [--read surface|mask] [--time]
+    python apps/deep_flow/scripts/view_check.py [RECORDING] [--frames 40] [--png PATH] [--read surface|mask] [--time]
 """
 import OpenGL
 OpenGL.ERROR_CHECKING = False  # as launcher.py runs the app; a glGetError per call would time the CPU
@@ -21,8 +21,8 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'scripts'))
 import cv2  # noqa: E402
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
@@ -34,7 +34,8 @@ from modules.recording import read_metadata  # noqa: E402
 from modules.flow import DepthRead, DepthVelocitySettings, edge_aware_depth, mask_sided_depth  # noqa: E402
 from modules.gl import Style, Tensor, Texture  # noqa: E402
 from modules.inference import GpuDepth, GpuImage, SerialUploader, SerialUploaderSettings  # noqa: E402
-from modules.render import ViewInput, ViewLayer, ViewLayerSettings  # noqa: E402
+from apps.deep_flow.render.layers import ViewInput, ViewLayer  # noqa: E402
+from apps.deep_flow.settings import ViewLayerSettings  # noqa: E402
 from modules.video import StreamReader  # noqa: E402
 
 RECORDINGS = Path('apps/deep_flow/data/recordings')

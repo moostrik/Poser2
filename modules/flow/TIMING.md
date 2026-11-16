@@ -75,7 +75,7 @@ recording on 7 November); every other stage runs every frame.
 
 The view stage is made once per capture, before the motion. Each pass alone on the edges recording's last of 40
 captures (`20261112-130012_edges`, the view 448 × 800, the preset's view settings), the GPU otherwise idle, the
-median of 40 runs (`scripts/view_check.py --time`), ms:
+median of 40 runs (`apps/deep_flow/scripts/view_check.py --time`), ms:
 
 | Pass                               | ms    |
 |------------------------------------|-------|

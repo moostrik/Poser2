@@ -17,14 +17,13 @@ from .modules.tracker import    TrackerCompositor, TrackerCompositorSettings, Tr
 from .modules.inference import  CropLayer, CropLayerSettings, CropImageLayer, SegmentationMaskLayer, SegmentationForegroundLayer, \
                                 ForegroundLook, ForegroundLookLayer, ForegroundLookSettings, CaptureImageLayer, CaptureDepthLayer
 from .modules.flow import       StageLayer, StageLayerSettings, StageOutput, \
-                                ViewInput, ViewOutput, ViewLayer, ViewLayerSettings, ViewOutputLayer, ViewDepthLayer, ViewDepthLayerSettings, DepthDrawMode, \
                                 MotionInput, MotionOutput, MotionLayer, MotionLayerSettings, frame_interval, \
                                 BridgeInput, BridgeOutput, BridgeLayer, BridgeLayerSettings, \
                                 Injection, FluidInput, FluidOutput, FluidLayer, FluidLayerSettings, \
                                 Motion2DLayer, Motion2DLayerSettings, Motion3DLayer, Motion3DLayerSettings, \
                                 Bridge2DLayer, Bridge2DLayerSettings, Bridge3DLayer, Bridge3DLayerSettings, \
                                 Fluid2DLayer, Fluid2DLayerSettings, Fluid3DLayer, Fluid3DLayerSettings, \
-                                MonitorLayer, MonitorLayerSettings, MonitorInput, MonitorView, FlowStage, Channel
+                                MonitorLayer, MonitorLayerSettings, MonitorInput, MonitorView, FlowStage, Channel, DepthColormap
 from .modules.board import      TimeSeriesLayer, TimeSeriesLayerSettings
 
 # general: the layers that draw no module's data

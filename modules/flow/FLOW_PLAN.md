@@ -47,12 +47,6 @@ added. One commit per step, both presets (`settings.json`, `very nice.json`) and
 guard tests, the render's tests and one -sim start (the panels in place, the presets loaded without unknown
 keys).
 
-- **A2.** The view into deep_flow, for now: `ViewLayer`, `ViewOutputLayer` and `ViewDepthLayer` (both import it)
-  and their shaders from `render/modules/flow` to `apps/deep_flow/render/layers/view/`, with their tests;
-  `scripts/view_check.py` to `apps/deep_flow/scripts/`; the app's view folder added to `FLOW_ROOTS`
-  (`tests/test_glossary.py`) and to `.claude/rules/flow.md`'s paths; VIEW.md's and FLOW.md's paths. The motion,
-  bridge and fluid layers stay in `render/modules/flow`: they are layers (the render's loop and settings), and
-  `modules/flow`, which may not import the render, holds what they run.
 - **A3.** One declaration of the chain in the renderer, in place of the four lists: each stage with its layer and
   its outputs, in order (A5 adds the monitors).
 - **A4.** The color in the view: the view's last pass, `color`, run by the render's look class that hd_trio's
@@ -266,9 +260,7 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways: the four lists, the wrapper layers, `view_depth`, `monitor_a`, `monitor_b`,
   `inputs`, `stage`, the pose's layers and deep_flow's composite, A3, A5 to A7.
 - Settings connect the user and a component, not two components: the view's tolerance and size, A8.
-- A layer that is not general and that one app uses sits in `apps/<app>/render/layers/`: the view, A2.
 - Remove obsolete pathways instead of leaving parallel legacy ones: hd_trio's copy, deleted in line I.
-- A script sits in its app's `scripts/` folder when only that app uses it: `view_check.py`, A2.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, B1.
 - A `Field` description is one short line of panel text: J1.

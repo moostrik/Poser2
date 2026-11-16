@@ -16,6 +16,7 @@ from modules.utils import FPS, Color, Rect, Point2f
 
 from ..board import RenderBoard
 from ..settings import Layers, MainView, RenderSettings, FlowInputSettings
+from .layers import ViewInput, ViewOutput, ViewLayer, ViewOutputLayer, ViewDepthLayer
 
 
 UPDATE_LAYERS: list[Layers] = [
@@ -129,14 +130,14 @@ class DeepFlowRender(RenderBase):
             pose_compositor = self.L[Layers.pose][i] =      render.PoseCompositor(      i, self.board,   cam_image.texture, cam_crop, settings.preview.pose,      settings.colors)
 
             # The flow's view of the capture, and what is drawn from it
-            view =          self.L[Layers.view][i] =        render.ViewLayer(           settings.view, settings.motion.z, fov)
-            output: render.ViewOutput = view.output
+            view =          self.L[Layers.view][i] =        ViewLayer(           settings.view, settings.motion.z, fov)
+            output: ViewOutput = view.output
             masks[i] = output.mask
-            self.L[Layers.view_image][i] =                  render.ViewOutputLayer(     view, output.image)
-            self.L[Layers.view_foreground][i] =             render.ViewOutputLayer(     view, output.foreground)
-            self.L[Layers.view_mask][i] =                   render.ViewOutputLayer(     view, output.mask)
-            self.L[Layers.view_depth_mask][i] =             render.ViewOutputLayer(     view, output.depth_mask)
-            self.L[Layers.view_depth][i] =                  render.ViewDepthLayer(      view, settings.view_depth)
+            self.L[Layers.view_image][i] =                  ViewOutputLayer(     view, output.image)
+            self.L[Layers.view_foreground][i] =             ViewOutputLayer(     view, output.foreground)
+            self.L[Layers.view_mask][i] =                   ViewOutputLayer(     view, output.mask)
+            self.L[Layers.view_depth_mask][i] =             ViewOutputLayer(     view, output.depth_mask)
+            self.L[Layers.view_depth][i] =                  ViewDepthLayer(      view, settings.view_depth)
             self.L[Layers.view_pose][i] =                   render.ViewPoseLayer(       i, view,                                    settings.view_pose,         settings.colors)
             view_foreground: render.LayerBase = self.L[Layers.view_foreground][i]
             foreground_look = self.L[Layers.foreground_look][i] = render.ForegroundLookLayer(i, view_foreground, output.mask,           settings.foreground_look, settings.colors)
@@ -369,7 +370,7 @@ class DeepFlowRender(RenderBase):
         inputs: FlowInputSettings = self.settings.inputs
         image = cast(render.CaptureImageLayer, self.L[Layers.capture_image][i])
         depth = cast(render.CaptureDepthLayer, self.L[Layers.capture_depth][i])
-        view = cast(render.ViewLayer, self.L[Layers.view][i])
+        view = cast(ViewLayer, self.L[Layers.view][i])
         motion = cast(render.Motion3DLayer, self.L[Layers.motion][i])
         bridge = cast(render.Bridge3DLayer, self.L[Layers.bridge][i])
 
@@ -378,7 +379,7 @@ class DeepFlowRender(RenderBase):
         depth.set_capture(capture)
         depth.update()
         pose: Frame | None = capture.poses[min(capture.poses)] if capture.poses else None
-        view.set_input(render.ViewInput(image.texture, depth.texture, capture.timestamp, pose))
+        view.set_input(ViewInput(image.texture, depth.texture, capture.timestamp, pose))
         self._view_timer.begin()
         view.update()
         self._view_timer.end()
@@ -389,7 +390,7 @@ class DeepFlowRender(RenderBase):
         self.motion_rates.setdefault(i, FPS()).processed()
         motion_image: render.LayerBase = self._layer(inputs.motion_image, i) or self.L[Layers.view_image][i]
         color: render.LayerBase | None = self._layer(inputs.bridge_image, i)
-        output: render.ViewOutput = view.output
+        output: ViewOutput = view.output
         motion.set_input(render.MotionInput(motion_image.texture, capture.timestamp, interval, output.depth, output.mask, output.depth_mask))
         motion.update()
         bridge.set_input(render.BridgeInput(motion.output.velocity, interval, color.texture if color is not None else None,
@@ -424,7 +425,7 @@ class DeepFlowRender(RenderBase):
             if i not in self.L[Layers.bridge] or i not in self.L[Layers.fluid] or i not in self.L[Layers.view]:
                 continue
             ports: dict[render.FlowStage, dict[str, Port]] = {
-                render.FlowStage.VIEW: cast(render.ViewLayer, self.L[Layers.view][i]).ports,
+                render.FlowStage.VIEW: cast(ViewLayer, self.L[Layers.view][i]).ports,
                 render.FlowStage.MOTION: cast(render.Motion3DLayer, _motion).ports,
                 render.FlowStage.BRIDGE: cast(render.Bridge3DLayer, self.L[Layers.bridge][i]).ports,
                 render.FlowStage.FLUID: cast(render.Fluid3DLayer, self.L[Layers.fluid][i]).ports,

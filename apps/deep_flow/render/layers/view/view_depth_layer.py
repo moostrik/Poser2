@@ -1,32 +1,13 @@
 """The view stage's depth as a picture, for the panels and the show."""
 
-# Standard library imports
-from enum import IntEnum
-
 # Third-party imports
 from OpenGL.GL import GL_RGBA16F
 
 # Local application imports
-from modules.gl import Colormap, Fbo, Style, Texture, shaders
-from modules.settings import BaseSettings, Field
-from ...layer_base import LayerBase
+from modules.gl import Fbo, Style, Texture, shaders
+from modules.render import DepthColormap, LayerBase
+from ....settings import DepthDrawMode, ViewDepthLayerSettings
 from .view_layer import ViewLayer
-from .shaders import DepthColormap
-
-
-class DepthDrawMode(IntEnum):
-    GREY = 0            # near white, far black
-    COLOR = 1           # the OAK's color map
-    OVER_IMAGE = 2      # the color map over the camera image
-
-
-class ViewDepthLayerSettings(BaseSettings):
-    """How the view's depth is drawn: a log scale from the view's near to far, as depthai's `colorizeDepthFrame`, in
-    a colormap (jet is depthai's)."""
-    draw_mode:    Field[DepthDrawMode] = Field(DepthDrawMode.COLOR, description="How depth is drawn")
-    colormap:     Field[Colormap]      = Field(Colormap.JET, description="The colors depth is drawn in")
-    use_mask:     Field[bool]          = Field(True, description="The mask as the picture's alpha")
-    mask_opacity: Field[float]         = Field(1.0, min=0.0, max=1.0, description="Mask alpha strength")
 
 
 class ViewDepthLayer(LayerBase):

@@ -232,9 +232,9 @@ injection the camera's track color, and weights the own camera's injection by th
 and another's by the cross-camera similarity times `similarity_scale`; deep_flow picks the pictures
 on its panel, live, among the view's outputs, one `Layers` field per picture (`motion_image`,
 `bridge_image`) in its `inputs` group with `scale_by_motion` (`apps/deep_flow/settings.py`), and
-takes the mask from the view stage. Both apps give each camera two monitors, `monitor_a`
-and `monitor_b`, each handed every stage's `ports`; they go into the panel's select lists like
-any layer, and two show A beside B.
+takes the mask from the view stage, its own layer (`apps/deep_flow/render/layers/view/`). deep_flow
+gives each camera two monitors, `monitor_a` and `monitor_b`, each handed every stage's `ports`; they go
+into the panel's select lists like any layer, and two show A beside B.
 
 ## Packages
 

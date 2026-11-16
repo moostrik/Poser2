@@ -5,7 +5,7 @@ window at the motion's size, the depth read into it, and the player's two masks.
 uploader's corrected camera frame, is in [INPUT_THREADS.md](INPUT_THREADS.md#the-uploader); the sizes it works
 at and why are in [RESOLUTION.md](RESOLUTION.md). **(deduction)** marks what is inferred.
 
-The stage is `ViewLayer` (settings `view`, `modules/render/modules/flow/view_layer.py`); its geometry and the
+The stage is `ViewLayer` (settings `view`, deep_flow's own, `apps/deep_flow/render/layers/view/view_layer.py`); its geometry and the
 depth's read are plain modules in `modules/flow/view` (`view_window.py`, `depth_read.py`, `DepthUpscale`).
 
 ## The stage
@@ -135,7 +135,7 @@ fit along the mask's edge. One run's p99 swings by about ±0.02; fit holds to ±
 
 ## Checked
 
-`scripts/view_check.py [--read surface|mask]` plays a recording's captures through the uploader and the view
+`apps/deep_flow/scripts/view_check.py [--read surface|mask]` plays a recording's captures through the uploader and the view
 stage and holds each read to its numpy reference:
 
 | Read                      | Pixels off the reference, 40 captures of the measure recording                                |

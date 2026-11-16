@@ -1,7 +1,4 @@
 from .stage_layer import        StageLayer, StageLayerSettings, StageOutput
-from .view_layer import         ViewInput, ViewOutput, ViewLayer, ViewLayerSettings
-from .view_output_layer import  ViewOutputLayer
-from .view_depth_layer import   ViewDepthLayer, ViewDepthLayerSettings, DepthDrawMode
 from .motion_layer import       MotionInput, MotionOutput, MotionLayer, MotionLayerSettings, frame_interval
 from .bridge_layer import       BridgeInput, BridgeOutput, BridgeLayer, BridgeLayerSettings
 from .fluid_layer import        Injection, FluidInput, FluidOutput, FluidLayer, FluidLayerSettings
@@ -12,3 +9,4 @@ from .bridge_3d_layer import    Bridge3DLayer, Bridge3DLayerSettings
 from .fluid_2d_layer import     Fluid2DLayer, Fluid2DLayerSettings
 from .fluid_3d_layer import     Fluid3DLayer, Fluid3DLayerSettings
 from .monitor_layer import      MonitorLayer, MonitorLayerSettings, MonitorInput, MonitorView, FlowStage, Channel
+from .shaders import            DepthColormap

@@ -2,7 +2,7 @@
 
 # Local application imports
 from modules.gl import Texture
-from ...layer_base import LayerBase
+from modules.render import LayerBase
 from .view_layer import ViewLayer
 
 

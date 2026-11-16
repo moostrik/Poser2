@@ -22,22 +22,10 @@ from modules.flow import DepthRead, DepthView, DepthUpscale, DepthVelocitySettin
                          depth_step, fixed_window, place_points, view_per_depth_pixel, view_span
 from modules.gl import Fbo, SwapFbo, Style, Texture, shaders
 from modules.pose import BBox, Frame, Points2D
-from modules.settings import Field
+from modules.render import StageLayer, StageOutput
 from modules.utils import Rect
-from .stage_layer import StageLayer, StageLayerSettings, StageOutput
+from ....settings import ViewLayerSettings
 from .shaders import DepthMask
-
-
-class ViewLayerSettings(StageLayerSettings):
-    """The view's window on the camera image, the player's depth band and the mask's edge."""
-    fixed_x:       Field[float] = Field(0.5, min=0.0, max=1.0, description="The window's center across the camera image")
-    fixed_y:       Field[float] = Field(0.5, min=0.0, max=1.0, description="The window's center down the camera image")
-    fixed_height:  Field[float] = Field(1.0, min=0.05, max=2.0, description="The window's height, a share of the camera image's")
-    near:          Field[float] = Field(0.5, min=0.1, max=12.0, step=0.05, newline=True, description="Nearest depth that is the player (m)")
-    far:           Field[float] = Field(4.0, min=0.1, max=12.0, step=0.05, description="Farthest depth that is the player (m)")
-    guided_radius: Field[float] = Field(2.0, min=0.0, max=8.0, step=0.25, newline=True, description="How far the image moves the mask's edge to its own, in depth pixels; 0 = off")
-    edge_contrast: Field[float] = Field(0.03, min=0.001, max=0.3, step=0.001, description="The image's brightness spread (0 to 1) above which the mask's edge follows the image's")
-    depth_read:    Field[DepthRead] = Field(DepthRead.SURFACE, newline=True, description="How the depth is read into the view: its edge on its own pixels or on the mask's")
 
 
 @dataclass
