@@ -17,7 +17,8 @@ from typing import Annotated
 
 from modules.gl import Texture, Style
 from modules.flow import DepthView, TextureKind
-from modules.settings import Field
+from modules.settings import Field, Group
+from .monitor_2d_layer import Monitor2DLayerSettings
 from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 
 MAX_FRAME_INTERVAL: float = 0.5    # s: a longer gap between two captures is a pause or a loop, not a frame's
@@ -74,6 +75,9 @@ class MotionLayerSettings(StageLayerSettings):
     width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
     fps: Field[float] =                     Field(30.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate the capture gaps are held around")
+
+    monitor_main:  Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True)
+    monitor_debug: Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True)
 
 
 class MotionLayer(StageLayer[MotionInput, MotionOutput]):

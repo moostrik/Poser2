@@ -23,7 +23,8 @@ from .modules.flow import       StageLayer, StageLayerSettings, StageOutput, \
                                 Motion2DLayer, Motion2DLayerSettings, Motion3DLayer, Motion3DLayerSettings, \
                                 Bridge2DLayer, Bridge2DLayerSettings, Bridge3DLayer, Bridge3DLayerSettings, \
                                 Fluid2DLayer, Fluid2DLayerSettings, Fluid3DLayer, Fluid3DLayerSettings, \
-                                MonitorLayer, MonitorLayerSettings, MonitorInput, MonitorView, FlowStage, Channel, DepthColormap, DepthDrawMode
+                                Monitor2DLayer, Monitor2DLayerSettings, Monitor3DLayer, Monitor3DLayerSettings, \
+                                MonitorInput, MonitorView, FlowStage, Channel, DepthColormap, DepthDrawMode
 from .modules.board import      TimeSeriesLayer, TimeSeriesLayerSettings
 
 # general: the layers that draw no module's data

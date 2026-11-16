@@ -27,7 +27,7 @@ from OpenGL.GL import (GL_FLOAT, GL_FRAMEBUFFER, GL_QUERY_RESULT, GL_R32F, GL_RE
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from modules.flow import REFERENCE_STEP, Cut, OnDemand, Port, TextureKind, VolumeCut  # noqa: E402
 from modules.gl import Context, Fbo, MouseButton, Texture, Texture3D  # noqa: E402
-from modules.render import Channel, FlowStage, MonitorInput, MonitorLayer, MonitorLayerSettings, MonitorView  # noqa: E402
+from modules.render import Channel, FlowStage, MonitorInput, Monitor3DLayer, Monitor3DLayerSettings, MonitorView  # noqa: E402
 
 OUT: str = os.path.join('temp', 'monitor_harness')
 PANEL: tuple[int, int] = (540, 960)         # a panel's size, about what a main-window panel gives
@@ -74,10 +74,10 @@ class Monitor:
     """A monitor on one port, drawn into a viewport as the app draws it."""
 
     def __init__(self, port: Port, view: MonitorView) -> None:
-        self.settings = MonitorLayerSettings()
+        self.settings = Monitor3DLayerSettings()     # the 3D monitor, so a volume port draws too
         self.settings.texture = 'output.velocity'
         self.settings.view = view
-        self.layer = MonitorLayer(FlowStage.MOTION, self.settings)
+        self.layer = Monitor3DLayer(FlowStage.MOTION, self.settings)
         self.layer.allocate(*OUTPUT)
         self.layer.set_input(MonitorInput({FlowStage.MOTION: {'output.velocity': port}}))
 

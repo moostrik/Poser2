@@ -18,7 +18,8 @@ from OpenGL.GL import GL_RGBA16F
 
 from modules.gl import Fbo, Texture, Style
 from modules.flow import HasPorts, Port, Ports, TextureKind
-from modules.settings import Field
+from modules.settings import Field, Group
+from .monitor_2d_layer import Monitor2DLayerSettings
 from .shaders import DensityColor
 from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 
@@ -72,6 +73,9 @@ class BridgeLayerSettings(StageLayerSettings):
     """What the 2D and the 3D bridge layer share; each adds its bridges' groups."""
     width: Field[int] =     Field(2160, min=32, max=4096, step=32, description="Width the bridge writes its outputs at")
     height: Field[int] =    Field(3840, min=32, max=4096, step=32, description="Height the bridge writes its outputs at")
+
+    monitor_main:  Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True)
+    monitor_debug: Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True)
 
 
 class BridgeLayer(StageLayer[BridgeInput, BridgeOutput]):

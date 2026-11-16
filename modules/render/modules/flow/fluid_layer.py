@@ -59,7 +59,7 @@ class FluidOutput(StageOutput):
 
 class FluidLayerSettings(StageLayerSettings):
     """What the 2D and the 3D fluid layer share; each adds its fluid's group, and its `blend_mode` where its
-    panel puts the drawing."""
+    panel puts the drawing, and its two monitors, the 2D fluid's flat, the 3D fluid's 3D."""
 
 
 class FluidLayer(StageLayer[FluidInput, FluidOutput]):

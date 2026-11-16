@@ -249,6 +249,9 @@ class ViewLayerSettings(render.StageLayerSettings):
     depth_mask:  Group[ViewDepthMaskSettings] = Group(ViewDepthMaskSettings)
     color_grade: Group[ColorGradeSettings]    = Group(ColorGradeSettings)
 
+    monitor_main:  Group[render.Monitor2DLayerSettings] = Group(render.Monitor2DLayerSettings, last=True)
+    monitor_debug: Group[render.Monitor2DLayerSettings] = Group(render.Monitor2DLayerSettings, last=True)
+
 
 class CaptureView(IntEnum):
     """What the capture's monitor shows."""

@@ -37,12 +37,6 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
 - **B1.** The depth read: `view.depth.depth_read` holds `SURFACE` and `MASK` ([VIEW.md](VIEW.md#the-depth-read)). One
   stays, chosen together by eye on the edges recording; the other goes. In the same sitting, the color's edge
   now that the color grade works on the straight image and takes the mask last.
-- **B6.** A flat monitor and a 3D monitor. One monitor (`MonitorLayer`, 395 lines) does both, so its 3D
-  settings (slice, orbit, depth fade) show on the flat stages, where they do nothing. `Monitor2DLayer` draws flat
-  textures; `Monitor3DLayer` adds the volume views and the mouse (drag to turn and zoom, wheel for the slice,
-  click to reset). The monitors leave the stage base: each stage declares its own two, last: the view, the
-  motion and the bridge 2D, the fluid 3D. Only the 3D monitors get the mouse. MONITOR.md,
-  `test_monitor_mouse.py` and `test_layer_names.py` follow.
 
 Question, for B: the view's depth settings gone through together; among them MASK's read takes the mask's
 `guided_radius` as its reach.
@@ -182,8 +176,8 @@ Not worked on until asked for; each with what is known.
   stage is changed in both and FLOW.md describes both. `Fluid3DLayer` (91 lines) is a thin layer over the flow's
   `Fluid3D`; `Bridge3DLayer` (417 lines) is the bridge itself (it wires `VelocityLowpass`, `VelocityBandpass`,
   `ZPositionMix` and the density and temperature bridges, holds `Bridge3DLayerSettings`, declares the ports), and
-  `ViewLayer` (263 lines) the view (the depth mask, the guided filter, the cut); `MonitorLayer`, which draws the
-  ports, is the render's. Each stage subclasses the render's `LayerBase` to sit in its update loop, and modules
+  `ViewLayer` the view (its parts `ViewDepth`, `ViewDepthMask`, `ColorGrade`, deep_flow's own); the monitors
+  (`Monitor2DLayer`, `Monitor3DLayer`), which draw the ports, are the render's. Each stage subclasses the render's `LayerBase` to sit in its update loop, and modules
   may not import the render, so the stages could not live in the flow **(deduction)**. The textbook split: each
   stage a plain flow class as `Fluid3D` is, with its settings, ports, inputs and outputs, and a thin render layer
   per stage that calls it, beside the monitor. deep_flow's panels follow wherever the stages end up.
@@ -233,8 +227,6 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways instead of leaving parallel legacy ones: hd_trio's copy, deleted in line I.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth.depth_read`, B1.
-- Panels: a component's monitors last in its settings: B6.
-- Prefer composition over inheritance, an `ABC` for a family that shares code: the 2D and 3D monitor, B6.
 - A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 

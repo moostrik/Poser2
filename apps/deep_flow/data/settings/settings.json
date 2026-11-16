@@ -318,20 +318,10 @@
         "advanced": {
           "channel": "ALL",
           "scale": 1.0,
-          "opacity": 6.0,
-          "depth_fade": 0.0,
-          "slice": false,
-          "slice_position": 0.5,
-          "slice_focus": 0.5,
           "glyph_spacing": "SPACING_32",
           "colormap": "JET",
           "legend": true,
-          "blend_mode": "ADD",
-          "orbit": {
-            "yaw": 0.0,
-            "pitch": 0.0,
-            "zoom": 1.0
-          }
+          "blend_mode": "ADD"
         }
       },
       "monitor_debug": {
@@ -340,20 +330,10 @@
         "advanced": {
           "channel": "ALL",
           "scale": 1.0,
-          "opacity": 6.0,
-          "depth_fade": 0.0,
-          "slice": false,
-          "slice_position": 0.5,
-          "slice_focus": 0.5,
           "glyph_spacing": "SPACING_32",
           "colormap": "JET",
           "legend": true,
-          "blend_mode": "ADD",
-          "orbit": {
-            "yaw": 0.0,
-            "pitch": 0.0,
-            "zoom": 1.0
-          }
+          "blend_mode": "ADD"
         }
       }
     },
@@ -371,20 +351,10 @@
         "advanced": {
           "channel": "ALL",
           "scale": 1.0,
-          "opacity": 6.0,
-          "depth_fade": 0.0,
-          "slice": true,
-          "slice_position": 0.5859375,
-          "slice_focus": 0.5,
           "glyph_spacing": "SPACING_16",
           "colormap": "JET",
           "legend": true,
-          "blend_mode": "ADD",
-          "orbit": {
-            "yaw": 52.59975975870282,
-            "pitch": 4.846153846153827,
-            "zoom": 0.7184107424569811
-          }
+          "blend_mode": "ADD"
         }
       },
       "monitor_debug": {
@@ -393,20 +363,10 @@
         "advanced": {
           "channel": "ALL",
           "scale": 1.0,
-          "opacity": 6.0,
-          "depth_fade": 0.0,
-          "slice": false,
-          "slice_position": 0.5,
-          "slice_focus": 0.5,
           "glyph_spacing": "SPACING_32",
           "colormap": "JET",
           "legend": true,
-          "blend_mode": "ADD",
-          "orbit": {
-            "yaw": 0.0,
-            "pitch": 0.0,
-            "zoom": 1.0
-          }
+          "blend_mode": "ADD"
         }
       },
       "xy": {
@@ -437,20 +397,10 @@
         "advanced": {
           "channel": "ALL",
           "scale": 1.0,
-          "opacity": 6.0,
-          "depth_fade": 0.0,
-          "slice": false,
-          "slice_position": 0.5,
-          "slice_focus": 0.5,
           "glyph_spacing": "SPACING_32",
           "colormap": "JET",
           "legend": true,
-          "blend_mode": "ADD",
-          "orbit": {
-            "yaw": 0.0,
-            "pitch": 0.0,
-            "zoom": 1.0
-          }
+          "blend_mode": "ADD"
         }
       },
       "monitor_debug": {
@@ -459,20 +409,10 @@
         "advanced": {
           "channel": "ALL",
           "scale": 1.0,
-          "opacity": 6.0,
-          "depth_fade": 0.0,
-          "slice": false,
-          "slice_position": 0.5,
-          "slice_focus": 0.5,
           "glyph_spacing": "SPACING_32",
           "colormap": "JET",
           "legend": true,
-          "blend_mode": "ADD",
-          "orbit": {
-            "yaw": 0.0,
-            "pitch": 0.0,
-            "zoom": 1.0
-          }
+          "blend_mode": "ADD"
         }
       },
       "readings": {

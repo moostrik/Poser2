@@ -68,7 +68,7 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 | 2D flow, 3D flow     | a system: a motion layer and a bridge layer per camera, a fluid layer per show output                                                                                                                               | `Motion2DLayer` + `Bridge2DLayer` + `Fluid2DLayer`; `…3D…`                                    |
 | 2D camera, 3D camera | an image and a mask; those and a depth image on the same view                                                                                                                                                       | `MotionInput` without / with `depth`                                                          |
 | port                 | a stage's named texture with its kind (image, velocity, acceleration, scalar, z position) and the channels that hold its values; its input and output fields declare theirs, every component its own ([MONITOR.md](MONITOR.md)) | `Port`, `TextureKind`, `HasPorts`, `ports_of`, in `modules/flow`                              |
-| monitor              | a layer that shows one port of its stage, picked on the panel, drawn only while it is shown; its views in [MONITOR.md](MONITOR.md)                                                                                  | `MonitorLayer`, `<stage>.monitor_main`, `monitor_debug`                                       |
+| monitor              | a layer that shows one port of its stage, picked on the panel, drawn only while it is shown; its views in [MONITOR.md](MONITOR.md)                                                                                  | `Monitor2DLayer`, `Monitor3DLayer`, `<stage>.monitor_main`, `monitor_debug`                   |
 
 "bridge" is ofxFlowTools' word (`ftVelocityBridge`, `ftDensityBridge`, `ftTemperatureBridge`);
 it says where the stage sits; the table says what it does.
@@ -168,7 +168,7 @@ context of its own, would move the wait to the bridge, and the screen still show
 | `Bridge2DLayer`, `Bridge3DLayer`                                   | on `bridge_2d`; on `bridge_3d`, the velocity lowpass beside the bandpass              |
 | `FluidLayer` (ABC)                                                 | `StageLayer[FluidInput, FluidOutput]`: injects, then steps; its `texture` is the show |
 | `Fluid2DLayer`, `Fluid3DLayer`                                     | on `Fluid2D`; on `Fluid3D`                                                            |
-| `MonitorLayer`                                                     | shows one port of one stage, while shown; not a stage                                 |
+| `Monitor2DLayer`, `Monitor3DLayer`                                 | shows one port of one stage, while shown, flat or in 3D too; not a stage              |
 | `MotionLayerSettings`, `BridgeLayerSettings`, `FluidLayerSettings` | the stages' base settings, each a `StageLayerSettings`                                |
 
 `StageLayer`: `set_input(I)` before the render loop; `output: O`, a `StageOutput`, whose fields with
@@ -196,7 +196,7 @@ dt and injects both systems' RGBA density and temperature, each velocity's z as 
 sign turned: w points away from the viewer); how the fluid takes each is in
 [FLUID_3D.md](FLUID_3D.md).
 
-`MonitorLayer`: `set_input(MonitorInput)`; `update()` keeps the panel's list of the chosen stage's
+`Monitor2DLayer` (`Monitor3DLayer` with volumes and the mouse): `set_input(MonitorInput)`; `update()` keeps the panel's list of the chosen stage's
 port names (`names`, the options of `texture`); `draw()` renders the port once per tick, however
 many panels show it, by its kind or by `view`, and nothing while not shown; its views and settings
 are in [MONITOR.md](MONITOR.md). It is not a stage: it has no output and no `reset`.
@@ -251,7 +251,7 @@ The capture's monitor is a simple one: the color, the depth or both.
 | `modules/flow/time_step.py`, `modules/flow/wall_mode.py` | shared                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `modules/flow/port.py`                                   | `Port`, `Ports`, `TextureKind`, `HasPorts`, `OnDemand`, `prefixed`, `ports_of`                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `modules/flow/visualization/`                            | the monitors' drawing: `Visualizer` (image, colormap, glyphs and histogram into one FBO), `Strip`, `Legend` with `log_axis.py`, `DrawnSize`, `ALL_CHANNELS`; a volume's `VolumeCube` with `CubeColor`, `VolumeGlyphs` and their `Orbit`, and `Cut`, `VolumeCut` for the strip and the scripts                                                                                                                                                                                                                                    |
-| `modules/render/modules/flow/`                           | `motion_layer.py` (`MotionInput`, `MotionOutput`, `MotionLayer`, `frame_interval`), `motion_2d_layer.py`, `motion_3d_layer.py`; `bridge_layer.py` (`BridgeInput`, `BridgeOutput`, `BridgeLayer`), `bridge_2d_layer.py`, `bridge_3d_layer.py`; `fluid_layer.py` (`Injection`, `FluidInput`, `FluidOutput`, `FluidLayer`), `fluid_2d_layer.py`, `fluid_3d_layer.py`; `monitor_layer.py` (`MonitorInput`, `MonitorLayer`, `MonitorLayerSettings`, `MonitorAdvancedSettings`, `FlowStage`, `MonitorView`, `Channel`, `GlyphSpacing`) |
+| `modules/render/modules/flow/`                           | `motion_layer.py` (`MotionInput`, `MotionOutput`, `MotionLayer`, `frame_interval`), `motion_2d_layer.py`, `motion_3d_layer.py`; `bridge_layer.py` (`BridgeInput`, `BridgeOutput`, `BridgeLayer`), `bridge_2d_layer.py`, `bridge_3d_layer.py`; `fluid_layer.py` (`Injection`, `FluidInput`, `FluidOutput`, `FluidLayer`), `fluid_2d_layer.py`, `fluid_3d_layer.py`; `monitor_2d_layer.py` (`MonitorInput`, `Monitor2DLayer`, `Monitor2DLayerSettings`, `Monitor2DAdvancedSettings`, `FlowStage`, `MonitorView`, `Channel`, `GlyphSpacing`), `monitor_3d_layer.py` (`Monitor3DLayer`, `Monitor3DLayerSettings`, `Monitor3DAdvancedSettings`, `OrbitSettings`) |
 
 Neither `fluid_2d` nor `fluid_3d` imports the other. The settings group of each fluid is `fluid`.
 `motion/` has no `_2d` and `_3d` packages because its 3D flow is its 2D flow plus z:

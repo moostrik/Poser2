@@ -348,19 +348,9 @@
         "advanced": {
           "channel": "ALL",
           "scale": 1.0,
-          "opacity": 6.0,
-          "depth_fade": 0.0,
-          "slice": true,
-          "slice_position": 0.5859375,
-          "slice_focus": 0.5,
           "glyph_spacing": "SPACING_16",
           "legend": true,
-          "blend_mode": "ADD",
-          "orbit": {
-            "yaw": 98.2195514253695,
-            "pitch": 0.5412382166660393,
-            "zoom": 0.7184107424569811
-          }
+          "blend_mode": "ADD"
         }
       },
       "guard": true,

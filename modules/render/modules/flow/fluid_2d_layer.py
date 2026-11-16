@@ -13,10 +13,11 @@ from OpenGL.GL import GL_RGBA16F
 
 # Local application imports
 from modules.gl import Fbo, Style, Texture
-from modules.settings import Field
+from modules.settings import Field, Group
 from modules.flow import Fluid2D, Fluid2DSettings, HasPorts
 from .shaders import DensityColorize
 from .fluid_layer import FluidLayer, FluidLayerSettings, FluidInput, FluidOutput, Injection
+from .monitor_2d_layer import Monitor2DLayerSettings
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,9 @@ class Fluid2DLayerSettings(Fluid2DSettings, FluidLayerSettings):
     """Configuration for Fluid2DLayer: the stage's settings and its fluid's own, one panel, the stage's
     first; the stage's width and height are the fluid's simulation grid."""
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD, newline=True, description="How the show is drawn over the layers before it")
+
+    monitor_main:  Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True)
+    monitor_debug: Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True)
 
 
 class Fluid2DLayer(FluidLayer):

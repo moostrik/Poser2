@@ -10,6 +10,7 @@ from modules.flow import CompositeSettings, Fluid3D, Fluid3DSettings, HasPorts
 from modules.settings import Field, Group
 from ...general.grade import LutGrade, LutSettings
 from .fluid_layer import FluidLayer, FluidLayerSettings, FluidOutput, Injection
+from .monitor_3d_layer import Monitor3DLayerSettings
 
 
 class Fluid3DCompositeSettings(CompositeSettings):
@@ -23,6 +24,9 @@ class Fluid3DLayerSettings(Fluid3DSettings, FluidLayerSettings):
     """Configuration for Fluid3DLayer: the stage's settings and its fluid's own, one panel, the stage's
     first; the fluid's width, height and depth are the stage's working size."""
     composite: Group[Fluid3DCompositeSettings] = Group(Fluid3DCompositeSettings)
+
+    monitor_main:  Group[Monitor3DLayerSettings] = Group(Monitor3DLayerSettings, last=True)
+    monitor_debug: Group[Monitor3DLayerSettings] = Group(Monitor3DLayerSettings, last=True)
 
 
 class Fluid3DLayer(FluidLayer):

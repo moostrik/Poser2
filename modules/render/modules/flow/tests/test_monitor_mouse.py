@@ -1,16 +1,21 @@
-"""The monitor's mouse: a scroll steps one of the show's layers and stays inside the volume; a drag
+"""The 3D monitor's mouse: a scroll steps one of the show's layers and stays inside the volume; a drag
 turns its orbit; a reset brings the front view at the middle layer back. Both write the monitor's
-settings, so the panel shows them and a preset keeps them."""
+settings, so the panel shows them and a preset keeps them. The flat monitor has no mouse."""
 
 import unittest
 
 from modules.gl import MouseButton
-from modules.render import FlowStage, MonitorLayer, MonitorLayerSettings
+from modules.render import FlowStage, Monitor2DLayer, Monitor2DLayerSettings, Monitor3DLayer, Monitor3DLayerSettings
 
 
 class MonitorMouseTest(unittest.TestCase):
+    def test_a_flat_monitor_has_no_mouse(self) -> None:
+        monitor = Monitor2DLayer(FlowStage.VIEW, Monitor2DLayerSettings())
+        for name in ('drag', 'scroll', 'reset_view'):
+            self.assertFalse(hasattr(monitor, name))
+
     def test_a_scroll_steps_one_layer_and_stays_inside(self) -> None:
-        monitor = MonitorLayer(FlowStage.FLUID, MonitorLayerSettings())
+        monitor = Monitor3DLayer(FlowStage.FLUID, Monitor3DLayerSettings())
         advanced = monitor.settings.advanced
         monitor.scroll(1, 16)
         self.assertAlmostEqual(advanced.slice_position, 9.5 / 16)
@@ -20,7 +25,7 @@ class MonitorMouseTest(unittest.TestCase):
         self.assertAlmostEqual(advanced.slice_position, 0.5 / 16)
 
     def test_a_drag_turns_and_a_reset_brings_the_front_view_back(self) -> None:
-        monitor = MonitorLayer(FlowStage.FLUID, MonitorLayerSettings())
+        monitor = Monitor3DLayer(FlowStage.FLUID, Monitor3DLayerSettings())
         orbit = monitor.settings.advanced.orbit
         monitor.drag(0.2, 0.1, MouseButton.LEFT)
         monitor.drag(0.0, -0.2, MouseButton.RIGHT)

@@ -42,7 +42,7 @@ class DeepFlowRender(RenderBase):
         self._debug_layers: list[ChainLayers] = shown(settings.layer.debug)
 
         self.L: dict[ChainLayers, dict[int, render.LayerBase]] = {layer: {} for layer in ChainLayers}
-        self._debug_monitors: dict[ChainLayers, dict[int, render.MonitorLayer]] = {}     # each stage's debug monitor
+        self._debug_monitors: dict[ChainLayers, dict[int, render.Monitor2DLayer]] = {}     # each stage's debug monitor
 
         for i in range(self.num_cams):
             cam_image =     self.L[ChainLayers.cam_image][i] =   render.CameraImageLayer(    i, self.board)
@@ -60,13 +60,15 @@ class DeepFlowRender(RenderBase):
                                                                     cast(render.CaptureDepthLayer, self.L[ChainLayers.capture_depth][i]),
                                                                     settings.capture, settings.view.depth_mask)
             # each stage's main monitor in self.L, shown in the main panel; its debug monitor in self._debug_monitors,
-            # shown in the debug panel
-            for key, stage, stage_settings in ((ChainLayers.view_monitor, render.FlowStage.VIEW, settings.view),
-                                               (ChainLayers.motion_monitor, render.FlowStage.MOTION, settings.motion),
-                                               (ChainLayers.bridge_monitor, render.FlowStage.BRIDGE, settings.bridge),
-                                               (ChainLayers.fluid_monitor, render.FlowStage.FLUID, settings.fluid)):
-                self.L[key][i] = render.MonitorLayer(stage, stage_settings.monitor_main)
-                self._debug_monitors.setdefault(key, {})[i] = render.MonitorLayer(stage, stage_settings.monitor_debug)
+            # shown in the debug panel; the flat stages' flat, the fluid's 3D
+            for key, stage, flat in ((ChainLayers.view_monitor, render.FlowStage.VIEW, settings.view),
+                                     (ChainLayers.motion_monitor, render.FlowStage.MOTION, settings.motion),
+                                     (ChainLayers.bridge_monitor, render.FlowStage.BRIDGE, settings.bridge)):
+                self.L[key][i] = render.Monitor2DLayer(stage, flat.monitor_main)
+                self._debug_monitors.setdefault(key, {})[i] = render.Monitor2DLayer(stage, flat.monitor_debug)
+            self.L[ChainLayers.fluid_monitor][i] = render.Monitor3DLayer(render.FlowStage.FLUID, settings.fluid.monitor_main)
+            self._debug_monitors.setdefault(ChainLayers.fluid_monitor, {})[i] = \
+                render.Monitor3DLayer(render.FlowStage.FLUID, settings.fluid.monitor_debug)
         self.L[ChainLayers.time_series][0] = render.TimeSeriesLayer(self.board, settings.time_series)      # the board's series, one for all cameras
 
         # Split view: the left and right panels side by side or stacked, whichever shows what they hold larger
@@ -199,9 +201,13 @@ class DeepFlowRender(RenderBase):
 
     # ========== The mouse: the monitors' volume views ==========
 
-    def _monitors(self) -> list[render.MonitorLayer]:
-        return [cast(render.MonitorLayer, layer) for key in MONITORS
+    def _monitors(self) -> list[render.Monitor2DLayer]:
+        return [cast(render.Monitor2DLayer, layer) for key in MONITORS
                 for layer in (*self.L[key].values(), *self._debug_monitors.get(key, {}).values())]
+
+    def _volume_monitors(self) -> list[render.Monitor3DLayer]:
+        """The monitors with a 3D view, the ones the mouse moves."""
+        return [monitor for monitor in self._monitors() if isinstance(monitor, render.Monitor3DLayer)]
 
     def _on_mouse_button(self, x: float, y: float, button: MouseButton, pressed: bool) -> None:
         """A press starts a drag; a middle click that did not move resets the views."""
@@ -209,7 +215,7 @@ class DeepFlowRender(RenderBase):
             self._drag, self._dragged = (button, x, y), False
             return
         if self._drag is not None and self._drag[0] == MouseButton.MIDDLE and not self._dragged:
-            for monitor in self._monitors():
+            for monitor in self._volume_monitors():
                 monitor.reset_view()
         self._drag = None
 
@@ -217,13 +223,13 @@ class DeepFlowRender(RenderBase):
         if self._drag is None:
             return
         button, last_x, last_y = self._drag
-        for monitor in self._monitors():
+        for monitor in self._volume_monitors():
             monitor.drag(x - last_x, y - last_y, button)
         self._drag, self._dragged = (button, x, y), True
 
     def _on_mouse_scroll(self, steps: float) -> None:
         """A layer per step for every monitor, the show's density's layers."""
-        for monitor in self._monitors():
+        for monitor in self._volume_monitors():
             monitor.scroll(steps, self.settings.fluid.depth)
 
     def reset_fluid(self) -> None:

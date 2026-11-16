@@ -1,7 +1,10 @@
 # The monitor
 
-The flow's monitor (`MonitorLayer`, `modules/flow/visualization/`): a layer that shows one port of
-its stage, picked on the panel, drawn only while it is shown. Each of the flow's stages has its own (`FlowStage`:
+The flow's monitor (`modules/flow/visualization/`): a layer that shows one port of its stage, picked on the
+panel, drawn only while it is shown. `Monitor2DLayer` draws flat ports; `Monitor3DLayer` extends it with volumes
+(the cube, the glyphs in 3D, the flat front for the strip) and the mouse, and with their settings. A stage takes
+the one its ports need: the view, the motion and the bridge the flat one, the fluid the 3D one. Each of the
+flow's stages has its own (`FlowStage`:
 `VIEW`, `MOTION`, `BRIDGE`, `FLUID`), two in deep_flow, one for the main panel and one for the debug panel, their
 settings last in the stage's panel (`<stage>.monitor_main`, `monitor_debug`); deep_flow's capture has
 a simple one of its own (`CaptureMonitorLayer`: the color, the depth or both). The stages and their ports are in
@@ -16,8 +19,9 @@ marks what is inferred from them.
 
 ## Settings and views
 
-The monitor's panel group (`MonitorLayerSettings`) says what is drawn; its `advanced` group
-(`MonitorAdvancedSettings`) says how. Neither has row breaks of its own; the panel wraps them.
+The monitor's panel group (`Monitor2DLayerSettings`, `Monitor3DLayerSettings`) says what is drawn; its
+`advanced` group (`Monitor2DAdvancedSettings`; `Monitor3DAdvancedSettings` adds the cube's `opacity`,
+`depth_fade`, `slice`, `slice_position`, `slice_focus` and the `orbit`) says how. Neither has row breaks of its own; the panel wraps them.
 
 | Setting                  | Values                                                      | Means                                       |
 |--------------------------|-------------------------------------------------------------|---------------------------------------------|
@@ -144,8 +148,8 @@ as it is.
   back: one layer, or the projection along z, y or x, the max for an image port and the mean for a
   velocity or a scalar, whose signs would cancel in a max.
 - The orbit is `advanced.orbit` (`yaw`, `pitch`, `zoom`) and the slice's place `slice_position`,
-  settings the mouse writes, so the panel shows and sets them and a preset keeps them. In deep_flow a drag that starts anywhere in the main window goes to every monitor, so
-  the main and the debug monitor stay on one view: the left button turns (a drag across the window 180°), the right
+  settings the mouse writes, so the panel shows and sets them and a preset keeps them. In deep_flow a drag that starts anywhere in the main window goes to every 3D monitor, so
+  the main and the debug monitor stay on one view; a flat monitor takes no mouse: the left button turns (a drag across the window 180°), the right
   zooms, scroll steps one of the fluid's `depth` layers (away from the user is further back,
   a volume with fewer layers showing its nearest), a middle click without a move resets to the
   front view at the middle layer. `Orbit` frames the box by the narrower field of view, so it

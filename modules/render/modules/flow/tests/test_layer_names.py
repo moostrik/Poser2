@@ -7,14 +7,14 @@ import unittest
 from modules.render import Bridge2DLayer, Bridge2DLayerSettings, Bridge3DLayer, Bridge3DLayerSettings, \
                                   Fluid2DLayer, Fluid2DLayerSettings, Fluid3DLayer, Fluid3DLayerSettings, \
                                   Motion2DLayer, Motion2DLayerSettings, Motion3DLayer, Motion3DLayerSettings, \
-                                  MonitorLayer, MonitorLayerSettings, FlowStage
+                                  Monitor2DLayer, Monitor2DLayerSettings, Monitor3DLayer, Monitor3DLayerSettings, FlowStage
 
 def layers() -> list[object]:
     """One of each flow layer; their constructors make no GL calls."""
     return [Motion2DLayer(Motion2DLayerSettings()), Motion3DLayer(0, Motion3DLayerSettings()),
             Bridge2DLayer(Bridge2DLayerSettings()), Bridge3DLayer(Bridge3DLayerSettings()),
             Fluid2DLayer(Fluid2DLayerSettings()), Fluid3DLayer(Fluid3DLayerSettings()),
-            MonitorLayer(FlowStage.FLUID, MonitorLayerSettings())]
+            Monitor2DLayer(FlowStage.VIEW, Monitor2DLayerSettings()), Monitor3DLayer(FlowStage.FLUID, Monitor3DLayerSettings())]
 
 
 class LayerNamesTest(unittest.TestCase):
