@@ -29,34 +29,36 @@ two render ticks; its fps is 1000 over its mean.
 
 ## The stages
 
-On 15 November, at the preset as saved (commit 802de71c, the hands recording `20261112-124918_hands`,
-the pose model running): the velocity's grid 288 × 512 × 64, the density 448 × 800 × 64 with the fine
-density at 2160 × 3840 × 24, MacCormack. Beside it, from 7 November, the preset then, its grid
+On 16 November, a time, at the preset as saved (commit fdf8f8de, the hands recording
+`20261112-124918_hands`, the pose model running, one run): the view with its fill, the motion without the
+depth mask. On 15 November, the same recording and grid at commit 802de71c: the velocity's grid
+288 × 512 × 64, the density 448 × 800 × 64 with the fine density at 2160 × 3840 × 24, MacCormack. Beside
+them, from 7 November, the preset then, its grid
 448 × 800 × 64 with the density on the grid, and the default this document set, 256 × 448 × 128:
 
-| Stage                     | Timer                          | 15 Nov                | 7 Nov, 448 × 800 × 64 | 7 Nov, 256 × 448 × 128 |
-|---------------------------|--------------------------------|-----------------------|-----------------------|------------------------|
-| image upload              | `GPU Image Upload`             | 4.62 / 18.52          |                       |                        |
-| view                      | `GPU view`                     | 0.09 / 0.09           |                       |                        |
-| motion                    | `GPU motion`                   | 0.30 / 0.19           | 0.40 / 0.63           | 0.43 / 0.65            |
-| bridge, lowpass           | `GPU bridge lowpass`           | 0.05 / 0.05           | 0.08 / 0.08           | 0.09 / 0.08            |
-| bridge, bandpass          | `GPU bridge bandpass`          | 0.12 / 0.12           | 0.39 / 0.71           |                        |
-| bridge, the mixes         | `GPU bridge mix`               | 0.09 / 0.11           | 0.07 / 0.06           | 0.07 / 0.06            |
-| bridge                    | `GPU bridge`                   | 0.29 / 0.31           |                       |                        |
-| fluid, inject             | `GPU fluid inject`             | 0.71 / 1.05           | 0.96 / 1.34           | 0.30 / 0.55            |
-| fluid, dampen             | `GPU fluid dampen`             |                       | 0.52 / 0.83           | 0.35 / 0.60            |
-| fluid, advect velocity    | `GPU fluid advect velocity`    | 0.29 / 0.47           | 1.90 / 5.79           | 0.86 / 1.21            |
-| fluid, viscosity          | `GPU fluid viscosity`          | 0                     | 0                     | 0                      |
-| fluid, vorticity          | `GPU fluid vorticity`          | 0.86 / 1.30           | 2.00 / 2.64           | 1.28 / 1.59            |
-| fluid, advect temperature | `GPU fluid advect temperature` | 0                     | 0.45 / 0.86           | 0.23 / 0.23            |
-| fluid, buoyancy           | `GPU fluid buoyancy`           | 0                     | 0                     | 0                      |
-| fluid, pressure           | `GPU fluid pressure`           | 1.49 / 2.17           | 6.74 / 8.09           | 4.40 / 5.91            |
-| fluid, faces to centers   | `GPU fluid faces to centers`   | 0.13 / 0.14           |                       |                        |
-| fluid, density            | `GPU fluid density`            | 5.67 / 7.59           | 2.04 / 5.29           | 1.10 / 1.76            |
-| fluid, light              | `GPU fluid light`              | 0                     |                       |                        |
-| fluid, composite          | `GPU fluid composite`          | 1.19 / 1.60           | 1.16 / 1.45           | 2.44 / 3.53            |
-| fluid, the step           | `GPU fluid`                    | 9.67 / 12.07          | 14.86 / 21.64         | 10.68 / 12.09          |
-| the frame                 | `Render interval`              | 12.22 / 22.91, 82 fps | 17.93 / 25.34, 56 fps | 13.29 / 18.50, 75 fps  |
+| Stage                     | Timer                          | 16 Nov                | 15 Nov                | 7 Nov, 448 × 800 × 64 | 7 Nov, 256 × 448 × 128 |
+|---------------------------|--------------------------------|-----------------------|-----------------------|-----------------------|------------------------|
+| image upload              | `GPU Image Upload`             | 4.80 / 19.61          | 4.62 / 18.52          |                       |                        |
+| view                      | `GPU view`                     | 0.21 / 0.21           | 0.09 / 0.09           |                       |                        |
+| motion                    | `GPU motion`                   | 0.29 / 0.19           | 0.30 / 0.19           | 0.40 / 0.63           | 0.43 / 0.65            |
+| bridge, lowpass           | `GPU bridge lowpass`           | 0.05 / 0.05           | 0.05 / 0.05           | 0.08 / 0.08           | 0.09 / 0.08            |
+| bridge, bandpass          | `GPU bridge bandpass`          | 0.13 / 0.13           | 0.12 / 0.12           | 0.39 / 0.71           |                        |
+| bridge, the mixes         | `GPU bridge mix`               | 0.10 / 0.11           | 0.09 / 0.11           | 0.07 / 0.06           | 0.07 / 0.06            |
+| bridge                    | `GPU bridge`                   | 0.30 / 0.32           | 0.29 / 0.31           |                       |                        |
+| fluid, inject             | `GPU fluid inject`             | 1.14 / 1.54           | 0.71 / 1.05           | 0.96 / 1.34           | 0.30 / 0.55            |
+| fluid, dampen             | `GPU fluid dampen`             |                       |                       | 0.52 / 0.83           | 0.35 / 0.60            |
+| fluid, advect velocity    | `GPU fluid advect velocity`    | 0.29 / 0.44           | 0.29 / 0.47           | 1.90 / 5.79           | 0.86 / 1.21            |
+| fluid, viscosity          | `GPU fluid viscosity`          | 0                     | 0                     | 0                     | 0                      |
+| fluid, vorticity          | `GPU fluid vorticity`          | 0.82 / 1.16           | 0.86 / 1.30           | 2.00 / 2.64           | 1.28 / 1.59            |
+| fluid, advect temperature | `GPU fluid advect temperature` | 0                     | 0                     | 0.45 / 0.86           | 0.23 / 0.23            |
+| fluid, buoyancy           | `GPU fluid buoyancy`           | 0                     | 0                     | 0                     | 0                      |
+| fluid, pressure           | `GPU fluid pressure`           | 1.48 / 2.19           | 1.49 / 2.17           | 6.74 / 8.09           | 4.40 / 5.91            |
+| fluid, faces to centers   | `GPU fluid faces to centers`   | 0.16 / 0.34           | 0.13 / 0.14           |                       |                        |
+| fluid, density            | `GPU fluid density`            | 5.70 / 7.58           | 5.67 / 7.59           | 2.04 / 5.29           | 1.10 / 1.76            |
+| fluid, light              | `GPU fluid light`              | 0                     | 0                     |                       |                        |
+| fluid, composite          | `GPU fluid composite`          | 1.21 / 1.69           | 1.19 / 1.60           | 1.16 / 1.45           | 2.44 / 3.53            |
+| fluid, the step           | `GPU fluid`                    | 9.71 / 12.06          | 9.67 / 12.07          | 14.86 / 21.64         | 10.68 / 12.09          |
+| the frame                 | `Render interval`              | 12.36 / 22.56, 81 fps | 12.22 / 22.91, 82 fps | 17.93 / 25.34, 56 fps | 13.29 / 18.50, 75 fps  |
 
 On 15 November the bandpass runs at the preset; on 7 November it ran only while a mix took one of its
 readings, so its row then is from a run with `body_force.acceleration` taking `change`, `start`, `bow`,
@@ -66,7 +68,9 @@ holds the pose model's; the motion's p95 under its mean is a mean pulled up by a
 dispatches. On 15 November the density is the step's largest pass, the fine density's 2160 × 3840 × 24
 among it; the pressure, multigrid since, is a quarter of what its 40 Jacobi iterations took on
 7 November. The composite marches one step per layer over the 2160 × 3840 output, so it grows with
-`layers`, not with the grid's x and y.
+`layers`, not with the grid's x and y. On 16 November the view takes 0.21 ms against 0.09, its fill
+0.09 of it ([The view](#the-view)); the motion is the same without the depth mask; the inject's 1.14 against
+0.71 is not looked into.
 
 The view and the motion run once per capture, 50 a second on the hands recording (44 on the standmoves
 recording on 7 November); every other stage runs every frame.
@@ -75,17 +79,17 @@ recording on 7 November); every other stage runs every frame.
 
 The view stage is made once per capture, before the motion. Each pass alone on the measure recording's last of
 40 captures (`20261112-125832_measure`, the view 448 × 800, the preset's view settings), 2026-11-16, the GPU
-otherwise idle, the median of 40 runs (`apps/deep_flow/scripts/view_check.py --time`), ms; the color is the
-color grade before its erode and feather:
+otherwise idle, the median of 40 runs (`apps/deep_flow/scripts/view_check.py --time`), ms, commit fdf8f8de; the
+color at the preset's `erode` 0 and `feather` 0, which skip their passes, and at 2 and 4 (`--erode 2 --feather 4`):
 
-| Pass                               | ms    |
-|------------------------------------|-------|
-| the crop, its image and depth      | 0.016 |
-| the guided filter and threshold    | 0.059 |
-| the upscale and the fill           | 0.103 |
-| the fill alone                     | 0.085 |
-| the color grade                    | 0.019 |
-| the view                           | 0.197 |
+| Pass                               | `erode` 0, `feather` 0 | `erode` 2, `feather` 4 |
+|------------------------------------|------------------------|------------------------|
+| the crop, its image and depth      | 0.016                  | 0.016                  |
+| the guided filter and threshold    | 0.065                  | 0.065                  |
+| the upscale and the fill           | 0.103                  | 0.103                  |
+| the fill alone                     | 0.085                  | 0.086                  |
+| the color                          | 0.019                  | 0.061                  |
+| the view                           | 0.203                  | 0.245                  |
 
 ### The advection
 

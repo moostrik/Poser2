@@ -96,6 +96,8 @@ def main() -> int:
     parser.add_argument('--frames', type=int, default=40)
     parser.add_argument('--png', default='')
     parser.add_argument('--time', action='store_true', help='also time each pass on the last capture')
+    parser.add_argument('--erode', type=int, help="the color's erode, where not the preset's")
+    parser.add_argument('--feather', type=float, help="the color's feather, where not the preset's")
     args = parser.parse_args()
     chunk = RECORDINGS / args.recording / '0_000.mkv'
     info = read_metadata(chunk).info
@@ -110,6 +112,10 @@ def main() -> int:
     settings = ViewLayerSettings()
     settings.initialize()
     settings.update_from_dict(preset['view'])
+    if args.erode is not None:
+        settings.color.erode = args.erode
+    if args.feather is not None:
+        settings.color.feather = args.feather
     band = settings.crop
     view = ViewLayer(settings, json.loads(PRESET.read_text(encoding='utf-8'))['camera']['fov'])
     view.allocate(preset['view']['width'], preset['view']['height'])

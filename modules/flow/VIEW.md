@@ -159,6 +159,19 @@ The view as it is now (the edge a constant 0.1 m, the fill always on), one run w
 rises and x/y at the edge falls, as the wider guided filter moves the mask's edge further onto the image's
 (**deduction**); the two changes are not measured apart.
 
+The rows above were captured while the capture saved each frame inside the loop, which left the motion 20 of the
+camera's 50 frames a second, its interval held at 20 to 40 ms; no row below compares with them. With the frames
+kept in memory and saved after the loop the motion gets every frame, and three captures agree within 0.03:
+
+| Result, 2026-11-16, commit fdf8f8de with the scripts of A2 | No z position | Fit   | z noise inside / edge | Slow  | Fast  | Fast ÷ noise | x/y at edge | View, GPU |
+|-------------------------------------------------------------|---------------|-------|-----------------------|-------|-------|--------------|-------------|-----------|
+| the view as built, every frame, three captures (spread)     | 3.6% (0.0)    | 0.567 | 9.06 / 5.04 (0.03)    | 0.347 | 0.649 | 0.072        | 1.39 (0.00) | 0.20 ms   |
+
+The measure recording's first 16.5 s, 810 frames a capture (`measure_1` to `measure_3`), the preset as saved (the
+view's `guided_radius` 3, edge 0.1 m; the motion's `levels` 4, `edge` 0.1 m, `tolerance` 0.2 m, `dead_zone`
+0.02 m) with `xy.threshold`, `z.threshold`, `z.smooth` and `z.catch_up` at 0; the stretches and the columns as
+above.
+
 ## The mask
 
 The mask is where the crop's depth is (above 0), its edge moved onto the camera image's by the guided filter (He
