@@ -76,7 +76,6 @@ resample **(deduction)**, for keeping the camera's work and the flow's apart.
 | `crop.near`, `far`                   | 0.1, 1.7 m    | the box's front and back, the player's depth range                        |
 | `mask.guided_radius`                 | 2             | how far the image moves the mask's edge, in depth pixels; 0 off           |
 | `mask.edge_contrast`                 | 0.03          | the image's brightness spread (0 to 1) above which the edge follows the image's |
-| `depth.fill_enabled`                 | on            | the read filled across the mask; off, the depth is the read               |
 
 ## The depth
 
@@ -99,7 +98,9 @@ exists:
   coarser pulled level's, read bilinearly. A pixel with a depth keeps it; one without takes the mean of the depth
   around it, from the finest level that has one. Where the mask is 0 the depth is 0. The band between the
   depth's edge and the mask's takes the depth just inside it, and the camera's few holes in the body are filled on
-  the way. A filled pixel moves with its surroundings, rather than reading as no z.
+  the way. A filled pixel moves with its surroundings, rather than reading as no z. The fill is always on: it
+  gives every pixel of the mask a depth, so the density made there has a place in the fluid, and it leaves the
+  motion's z as it was (the table below, with and without it).
 
 The fill takes the mean around a pixel, not the nearest pixel or a plane: a plane fitted at the outline extends
 the edge's slope, where the stereo is noisiest **(deduction)**. z is the depth's change over time per pixel, so a
@@ -175,7 +176,7 @@ about ±0.4 inside and ±0.3 at the edge.
 |---------------------------------------|---------------|-------|-----------------------|-------|-------|--------------|-------------|-----------|
 | `MASK`, gated by its depth mask       | 3.7%          | 0.493 | 12.32 / 5.93          | 0.567 | 0.828 | 0.067        | 1.87        |           |
 | the one path, gated by its depth mask | 3.7%          | 0.491 | 12.28 / 5.90          | 0.540 | 0.855 | 0.070        | 1.84        |           |
-| the read, `depth.fill_enabled` off    | 4.4%          | 0.491 | 11.97 / 5.94          | 0.559 | 0.843 | 0.071        | 1.75        |           |
+| the read alone, without the fill      | 4.4%          | 0.491 | 11.97 / 5.94          | 0.559 | 0.843 | 0.071        | 1.75        |           |
 | the read and the fill, the preset     | 3.9%          | 0.492 | 11.84 / 6.07          | 0.542 | 0.831 | 0.070        | 1.82        | 0.20 ms   |
 | the same, tolerance 10 m (bilinear)   | 6.0%          | 0.492 | 12.37 / 5.15          | 0.560 | 0.821 | 0.067        | 1.82        |           |
 

@@ -298,9 +298,6 @@
         "guided_radius": 3.0,
         "edge_contrast": 0.03
       },
-      "depth": {
-        "fill_enabled": true
-      },
       "color_grade": {
         "enabled": true,
         "use_mask": true,

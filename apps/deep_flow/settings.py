@@ -222,11 +222,6 @@ class ViewMaskSettings(BaseSettings):
     edge_contrast: Field[float] = Field(0.03, min=0.001, max=0.3, step=0.001, description="The image's brightness spread (0 to 1) above which the mask's edge follows the image's")
 
 
-class ViewDepthSettings(BaseSettings):
-    """ViewDepth, how far: the depth read into the view where it is the player's and the mask is, then filled."""
-    fill_enabled: Field[bool] = Field(True, description="The mask filled with the player's depth (push-pull); off, the read as it is")
-
-
 class ColorGradeSettings(BaseSettings):
     """ColorGrade: the image graded, in the order applied, then sharpened, premultiplied by the mask."""
     enabled:    Field[bool]  = Field(True, description="The color graded; off, the image as it is")
@@ -240,12 +235,12 @@ class ColorGradeSettings(BaseSettings):
 
 
 class ViewLayerSettings(render.StageLayerSettings):
-    """The view's size; its crop, mask, depth and color grade in their panels, in the order the view runs them."""
+    """The view's size; its crop, mask and color grade in their panels, in the order the view runs them; the depth,
+    between the mask and the grade, has no settings."""
     width:         Field[int]   = Field(448, min=32, max=4096, step=32, description="The view's width (pixels)")
     height:        Field[int]   = Field(800, min=32, max=4096, step=32, description="The view's height (pixels)")
     crop:        Group[ViewCropSettings]      = Group(ViewCropSettings)
     mask:        Group[ViewMaskSettings]      = Group(ViewMaskSettings, description="The player's mask: the crop's depth, its edge guided onto the image's")
-    depth:       Group[ViewDepthSettings]     = Group(ViewDepthSettings)
     color_grade: Group[ColorGradeSettings]    = Group(ColorGradeSettings)
 
     monitor_main:  Group[render.Monitor2DLayerSettings] = Group(render.Monitor2DLayerSettings, last=True)

@@ -116,7 +116,6 @@ def main() -> int:
     settings = ViewLayerSettings()
     settings.initialize()
     settings.update_from_dict(preset['view'])
-    d = settings.depth
     band = settings.crop
     view = ViewLayer(settings, json.loads(PRESET.read_text(encoding='utf-8'))['camera']['fov'])
     view.allocate(preset['view']['width'], preset['view']['height'])
@@ -131,7 +130,7 @@ def main() -> int:
     depth_texture = Tensor(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
 
     print(f'{args.recording}: {count} captures, view {view.output.image.width} x {view.output.image.height}, '
-          f'edge {EDGE} m, near {band.near} far {band.far}, fill {d.fill_enabled}')
+          f'edge {EDGE} m, near {band.near} far {band.far}')
     crop_off, read_off, fill_off, pixels = 0, 0, 0, 0
     unread, unfilled, shares = [], [], []
     last: dict[str, np.ndarray] = {}
@@ -164,8 +163,7 @@ def main() -> int:
         crop_off += int((np.abs(cropped - depth_crop(grid, uu, vv, band.near, band.far)) > 0.001).sum())
         read_off += int((np.abs(got_read - masked_depth(grid, uu, vv, EDGE, mask, band.near, band.far)) > 0.001).sum())
         got = read(output.depth.texture)
-        if d.fill_enabled:
-            fill_off += int((np.abs(got - push_pull(got_read.astype(np.float64), mask)) > 0.001).sum())
+        fill_off += int((np.abs(got - push_pull(got_read.astype(np.float64), mask)) > 0.001).sum())
         pixels += got.size
 
         inside = mask > 0.0
@@ -184,8 +182,7 @@ def main() -> int:
         time_view(view, image_texture, depth_texture)
     print(f'the crop\'s depth: {crop_off} of {pixels} pixels off the reference')
     print(f'the read: {read_off} of {pixels} pixels off the reference')
-    if d.fill_enabled:
-        print(f'the fill: {fill_off} of {pixels} pixels off the reference')
+    print(f'the fill: {fill_off} of {pixels} pixels off the reference')
     if unread:
         print(f'the mask without depth: {np.mean(unread) * 100:.2f}% in the read, {np.mean(unfilled) * 100:.2f}% in the depth; '
               f'the player {np.mean(shares) * 100:.1f}% of the view')

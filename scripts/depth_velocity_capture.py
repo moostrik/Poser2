@@ -58,7 +58,7 @@ def main() -> int:
     parser.add_argument('--name', default='', help='the capture\'s folder under OUT (default: the recording\'s name)')
     parser.add_argument('--seconds', type=float, default=0.0, help='stop this long after the loop starts (default: the whole loop)')
     parser.add_argument('--set', action='append', default=[], metavar='PATH=VALUE',
-                        help="an app setting by its path for this capture, e.g. render.view.depth.fill_enabled=False")
+                        help="an app setting by its path for this capture, e.g. render.view.mask.guided_radius=3")
     args = parser.parse_args()
     out_dir: Path = args.out / (args.name or args.recording)
     out_dir.mkdir(parents=True, exist_ok=True)

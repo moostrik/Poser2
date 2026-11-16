@@ -68,7 +68,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
 
         self._crop: ViewCrop = ViewCrop(settings.crop)
         self._mask: ViewMask = ViewMask(settings.mask)
-        self._depth: ViewDepth = ViewDepth(settings.depth, settings.crop)
+        self._depth: ViewDepth = ViewDepth(settings.crop)
         self._color_grade: ColorGrade = ColorGrade(settings.color_grade)
 
         self._window: Rect = Rect(0.0, 0.0, 1.0, 1.0)  # the box's sides, uv on the camera image, rows down
@@ -162,7 +162,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
             return
         s: ViewLayerSettings = self.settings
         made: tuple = (input.timestamp, image.width, image.height, view.width, view.height, self._crop.made_with,
-                       self._mask.made_with, self._depth.made_with, self._color_grade.made_with)
+                       self._mask.made_with, self._color_grade.made_with)
         if made == self._made:
             return
         self._made = made

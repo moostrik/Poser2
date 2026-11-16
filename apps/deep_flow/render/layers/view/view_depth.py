@@ -9,19 +9,18 @@ from OpenGL.GL import GL_NEAREST, GL_R32F
 from modules.flow import DepthFill, DepthUpscale, Port, TextureKind
 from modules.gl import Fbo, Texture
 from modules.utils import Rect
-from ....settings import ViewCropSettings, ViewDepthSettings
+from ....settings import ViewCropSettings
 
 EDGE: float = 0.1       # m, the depth jump the read keeps as an edge: below a hand before the chest, as the motion's edge
 
 
 class ViewDepth:
     """`read` brings a depth into the view across the crop: within a surface, the depth pixels within `EDGE` of each
-    other blended; kept where it lies inside the box (the crop's near and far) and the mask is above 0. `fill`
-    fills the mask where the read has none (the band between the depth's coarse edge and the mask's, the camera's
-    holes), with `fill_enabled`; off, the depth is the read."""
+    other blended; kept where it lies inside the box (the crop's near and far) and the mask is above 0; then the
+    fill fills the mask where the read has none (the band between the depth's coarse edge and the mask's, the
+    camera's holes). It has no settings."""
 
-    def __init__(self, settings: ViewDepthSettings, box: ViewCropSettings) -> None:
-        self.settings: ViewDepthSettings = settings
+    def __init__(self, box: ViewCropSettings) -> None:
         self._box: ViewCropSettings = box
         self._read: Fbo = Fbo(interpolation=GL_NEAREST)      # an edge never reads as a distance in between
         self._depth: Fbo = Fbo(interpolation=GL_NEAREST)
@@ -30,19 +29,14 @@ class ViewDepth:
 
     @property
     def depth(self) -> Texture:
-        """The depth the view hands on: the filled one, or the read with the fill off."""
-        return self._depth if self.settings.fill_enabled else self._read
+        """The depth the view hands on, the read filled."""
+        return self._depth
 
     @property
     def ports(self) -> dict[str, Port]:
         band: tuple[float, float] = (self._box.near, self._box.far)
         return {'read': Port(self._read, TextureKind.DEPTH, depth_range=band),
-                'depth': Port(self.depth, TextureKind.DEPTH, depth_range=band)}
-
-    @property
-    def made_with(self) -> tuple:
-        """The settings its textures are made with, so its owner makes them again when one changes."""
-        return (self.settings.fill_enabled,)
+                'depth': Port(self._depth, TextureKind.DEPTH, depth_range=band)}
 
     def allocate(self, width: int, height: int) -> None:
         self._read.allocate(width, height, GL_R32F)
@@ -69,5 +63,4 @@ class ViewDepth:
         self._read.begin()
         self._read_shader.use(depth, crop, EDGE, mask, self._box.near, self._box.far)
         self._read.end()
-        if self.settings.fill_enabled:
-            self._fill.use(self._read, mask, self._depth)
+        self._fill.use(self._read, mask, self._depth)
