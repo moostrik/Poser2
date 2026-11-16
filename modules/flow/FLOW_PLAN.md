@@ -38,6 +38,45 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
   stays, chosen together by eye on the edges recording; the other goes. In the same sitting, the color's edge
   now that the color grade works on the straight image and takes the mask last.
 
+Question, for B1: the path itself. The image has 800 rows and the depth 300, and only the image knows the
+player's outline sharply. Now the depth is scaled up first, the masks are cut from that, and `MASK` reads it
+again; proposed, not decided: the depth stays at its own size until the mask exists and is read into the view
+once, from the mask's side at the outline, so there is one outline.
+
+```mermaid
+flowchart TB
+  subgraph NOW["Now"]
+    direction TB
+    nI["Image<br/>448 × 800"]
+    nD["Depth<br/>480 × 300"]
+    n1["1 Depth scaled up to 448 × 800<br/>blended within tolerance, else nearest"]
+    n2["2 Band cut: depth mask, 448 × 800<br/>a staircase of depth pixels"]
+    n3["3 Guided filter: mask, 448 × 800<br/>edge moved onto the image's"]
+    n4["4 MASK only: depth read again<br/>from the mask's side, cut again"]
+    nM["Motion, 448 × 800<br/>z gated by two outlines:<br/>mask and depth mask"]
+    nD --> n1 --> n2 --> n3 --> n4 --> nM
+    nI --> n3
+    nI --> nM
+  end
+  subgraph NEW["Proposed"]
+    direction TB
+    pI["Image<br/>448 × 800"]
+    pD["Depth<br/>480 × 300"]
+    p1["1 Who: band cut on the depth's pixels<br/>480 × 300, a blocky yes or no"]
+    p2["2 Where: guided filter, mask<br/>448 × 800, edge moved onto the image's"]
+    p3["3 How far: depth read once, 448 × 800<br/>edge pixels from the mask's side"]
+    pM["Motion, 448 × 800<br/>z gated by one outline: the mask"]
+    pD --> p1 --> p2 --> p3 --> pM
+    pD --> p3
+    pI --> p2
+    pI --> pM
+  end
+```
+
+Known in the motion, left as it is: its step filter drops a band one depth sample wide along every outline
+whatever the read; three numbers say "another surface" (`view.depth.tolerance`, `motion.z.tolerance`,
+`motion.z.edge`); z is gated twice, by the mask and the depth mask.
+
 Question, for B: the view's depth settings gone through together; among them MASK's read takes the mask's
 `guided_radius` as its reach.
 
