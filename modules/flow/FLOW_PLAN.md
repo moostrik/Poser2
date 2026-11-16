@@ -46,6 +46,34 @@ and 0.05 m ([VIEW.md](VIEW.md#the-stage)).
   foreground layer, its color and its depth, is defined wherever alpha is, its edge filled from inside (Zitnick
   et al. 2004 store color, depth and alpha per layer). The split: what one frame shows is the view's (who,
   where, how far), what needs two frames is the motion's (what moved, how far to trust it).
+
+```mermaid
+flowchart TB
+  I["Camera image<br/>992 × 800"]
+  D["Camera depth<br/>480 × 300, metres"]
+  C["crop → image<br/>448 × 800"]
+  K["cut → cut: who<br/>near, far; 0/1 on the depth's own pixels"]
+  M["mask → mask: where<br/>guided filter; soft alpha, 448 × 800"]
+  R["depth → read: how far<br/>tolerance; the player's depth where mask > 0, else 0"]
+  F["depth → depth: the fill<br/>push-pull inside the mask; 448 × 800"]
+  G["color_grade → graded image<br/>graded, then premultiplied by the mask"]
+  MO["Motion, two frames, 448 × 800<br/>xy from the image, z from the depth,<br/>each pixel weighted by the mask"]
+  B["Bridge<br/>velocity from the motion, color from the graded image,<br/>the mask for the player being there"]
+  I --> C
+  D --> K
+  C --> M
+  K --> M
+  D --> R
+  M --> R --> F
+  C --> G
+  M --> G
+  C --> MO
+  F --> MO
+  M --> MO
+  MO --> B
+  G --> B
+  M --> B
+```
   - Why the depth mask goes: the read takes its side at mask > 0.5, so a pixel with a mask of 0.3 carries the
     background's depth, and the motion weighs that z by 0.3; the depth mask's hard cut hides it. With the side
     at mask > 0, every pixel the motion weighs carries the player's depth, and the depth mask adds nothing: a
