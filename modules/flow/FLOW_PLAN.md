@@ -71,12 +71,25 @@ standmoves and blocky, their only remains.
   - the view's time in [TIMING.md](TIMING.md#the-view), with the erode and the feather;
   - the view's and the motion's rows of [TIMING.md's stages](TIMING.md#the-stages).
 - **A4.** What each part of the motion does for [its goal](MOTION.md#the-goal), before C: least noise while
-  keeping the most real motion. Each part turned off (or to its neutral value) alone from the preset, on the
-  measure recording, its x/y and z beside each other: still noise, slow, fast, fast ÷ noise, and the GPU ms.
-  - x/y: `levels`, `window`, `damping`, `same_surface`, `threshold`, `use_mask`;
-  - z: the step filter (`edge`), `window`, `tolerance`, `smooth`, `catch_up`, `dead_zone`, `threshold`,
-    `xy_smooth`.
-  A part that does nothing for the goal is a question for C.
+  keeping the most real motion. Each row has x/y and z beside each other: still noise, slow, fast, fast ÷ noise,
+  and the GPU ms. The parts work in groups, measured in the chain's order, each with the groups after it neutral:
+  1. the x/y solve: `levels`, `window`, `damping`; z's track is carried along it;
+  2. what counts as one surface: `tolerance`, the step filter (`edge`), `same_surface`, z's `window`;
+  3. z over time: `smooth`, `catch_up`;
+  4. the cut at rest: `dead_zone`, z's `threshold`, x/y's `threshold`; measured last, everything on.
+
+  `use_mask` and `xy_smooth` are left out: the mask says where, not how noisy, and `xy_smooth` is a convenience.
+  The steps:
+  - the still and the moving stretches marked in the hands, edges and show recordings; a recording without a
+    still stretch gives the moving numbers only, said in its rows;
+  - pass 1, on and off, on the four recordings: each part alone, and the pairs that depend on each other
+    together (step filter × `tolerance`, `smooth` × `catch_up`, `dead_zone` × `threshold`);
+  - pass 2, values, for the parts that matter, on the measure and the show recording and any recording where
+    pass 1 came out differently: half and double the preset's value (`levels` and the windows a step down and up),
+    the pairs in a small grid.
+
+  All rows of a recording replay its same three captures. A part that does nothing for the goal, or a value
+  that holds on one recording only, is a question for C. The recordings are at 0.65–1.5 m; 2–3.5 m stays C2's.
 
 ## B. The view
 
