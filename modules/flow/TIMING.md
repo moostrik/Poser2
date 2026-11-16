@@ -73,41 +73,10 @@ recording on 7 November); every other stage runs every frame.
 
 ### The view
 
-The view stage is made once per capture, before the motion. Each pass alone on the edges recording's last of 40
-captures (`20261112-130012_edges`, the view 448 × 800, the preset's view settings), the GPU otherwise idle, the
-median of 40 runs (`apps/deep_flow/scripts/view_check.py --time`), ms:
-
-| Pass                               | ms    |
-|------------------------------------|-------|
-| the image into the view            | 0.006 |
-| the depth read, `SURFACE`          | 0.011 |
-| the depth mask                     | 0.005 |
-| the guided filter                  | 0.054 |
-| the mask's threshold               | 0.005 |
-| the depth read again, `MASK`       | 0.028 |
-| the foreground                     | 0.006 |
-| the view, `SURFACE`                | 0.087 |
-| the view, `MASK`                   | 0.120 |
-
-The guided filter is seven passes of the view's size, its products and means 32-bit; the whole view is under 1% of
-a frame at 60 fps.
-
-The one path ([VIEW.md](VIEW.md#the-stage)), each read once, on the measure recording's last of 40 captures
-(`20261112-125832_measure`, the view 448 × 800, the preset's view settings), the same way, ms; not the same
-capture as above, so the two tables are not compared pass by pass:
-
-| Pass                               | ms    |
-|------------------------------------|-------|
-| the crop                           | 0.017 |
-| the cut, on the depth's pixels     | 0.024 |
-| the guided filter and threshold    | 0.168 |
-| the depth read and its cut         | 0.102 |
-| the color grade                    | 0.051 |
-| the view                           | 0.374 |
-
-The view as built ([VIEW.md](VIEW.md#the-depth): the crop in 3D, the mask, the upscale and the fill), the same
-capture and way, ms. The guided filter, unchanged, times 0.06 here against 0.17 above, so the two tables differ
-by the GPU's state as well, and are not compared pass by pass:
+The view stage is made once per capture, before the motion. Each pass alone on the measure recording's last of
+40 captures (`20261112-125832_measure`, the view 448 × 800, the preset's view settings), 2026-11-16, the GPU
+otherwise idle, the median of 40 runs (`apps/deep_flow/scripts/view_check.py --time`), ms; the color is the
+color grade before its erode and feather:
 
 | Pass                               | ms    |
 |------------------------------------|-------|

@@ -61,19 +61,19 @@ What is measured today (the tables with numbers in the flow's documents, 73), by
 | `20261111-123241`                 | no                   | time            | INPUT_THREADS.md's cadence                                   |
 | none named                        |                      | mostly time     | about half: BRIDGE_3D.md's filters' GPU, FLUID_3D.md's walls and expansion, TIMING.md's particles and budget |
 
-Candidates to delete (each costly to have made, so each on Matthias's word):
-- Tables of code that is gone: VIEW.md's `SURFACE`/`MASK`/joint-bilateral reads and the one path's smoothed rows,
-  its "pixels off" check (the numpy twins), its mask-erosion table (the cut and the gate it measured are gone);
-  TIMING.md's two view tables of the passes before today's.
-- Results on recordings no longer on disk can't be measured again: kept as what was found, or deleted.
-- Captures in `temp/depth_velocity`: 24 of 28 (about 26 GB) are of paths measured and gone; the view's preset
-  rows (`measure_fill_*`, `measure_b4_1`) stay while VIEW.md's newest rows are the baseline.
+Deleted on Matthias's word (2026-11-16): the tables of code that is gone (VIEW.md's earlier reads, its check
+against array versions, its mask-erosion table; TIMING.md's view tables of the earlier passes) and 21 captures of
+the view's earlier paths. Kept: the results on recordings no longer on disk, and the captures of stillslowfast,
+standmoves and blocky, their only remains.
 
-- **A1.** A script that captures, replays and writes the results row together with the full configuration it
+- **A1.** Every table on a recording no longer on disk (stillslowfast, standmoves, blocky, `20261111-123241`)
+  marked as not reproducible, beside the recording it names; measured again when its stage is next worked on.
+- **A2.** A script that captures, replays and writes the results row together with the full configuration it
   ran with, meeting the rules above; the motion first.
 
-Question, for A: are the proposed rules the ones (a rule file for measurements, through the rules thread), and
-which candidates go?
+Question, for A: the rules, worded by the rules thread as a section "Measurements" in `.claude/rules/flow.md`
+(the old row of a changed pass is replaced, not deleted, as docs.md asks before deleting): to be sent as they
+are?
 
 ## B. The view
 
@@ -92,7 +92,7 @@ Its goal and what is built: [VIEW.md](VIEW.md). New points go here.
   (space), and how far a new depth may lie from the track before it starts over (time). A number for space and
   one for time, each measured on the raw output; 0.2 m is large on a body, set by the job in time.
 - **C4.** The smoothing (`z.smooth`, `z.catch_up`) judged on its own, the raw output against the smoothed
-  ([FLOW.md](FLOW.md#the-goals)), once A1 is built.
+  ([FLOW.md](FLOW.md#the-goals)), once A2 is built.
 
 ## D. The bridge
 
@@ -200,4 +200,4 @@ Not worked on until asked for; each with what is known.
 - A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
-Not designed yet, so their rules are not named: A1, C2 to C4, D1, E1, F1, H1, I1 to I4.
+Not designed yet, so their rules are not named: A2, C2 to C4, D1, E1, F1, H1, I1 to I4.
