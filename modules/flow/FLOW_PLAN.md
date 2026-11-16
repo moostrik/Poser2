@@ -41,23 +41,35 @@ and 0.05 m ([VIEW.md](VIEW.md#the-stage)).
 
 - **B1.** The one path's look, by eye on the edges recording: the outline and the color's edge, now that the
   color grade works on the straight image and premultiplies by the mask last. Needs the operator at the screen.
-- **B2.** The view gives two things, the mask and the depth; the depth mask goes. The split: what one frame
-  shows is the view's (who, where, how far), what needs two frames is the motion's (what moved, how far to
-  trust it). The depth mask adds nothing the depth lacks: the depth is read from the mask's side, so inside the
-  mask it is the player's, and 0 where the read found none in reach; the motion already gives such a pixel no z
-  velocity (`depth_velocity_shader.frag`) and no z position (`z_position.frag`). What it adds is a hard 0/1 on z
-  where the mask fades it; weighing each pixel by its alpha is the textbook form, a gate its coarse version
-  **(deduction)**.
-  - The view's parts are named after what they give: `mask` (the cut, then the mask) and `depth` (the read).
-    The panel group `view.depth_mask` becomes `view.mask`; `ViewDepthMask`, `ViewDepth` and their settings
-    follow; `ViewOutput.depth_mask` goes.
+- **B2.** The view gives two things that agree, the mask and the depth; the depth mask goes. The mask is the
+  player's soft alpha; the depth is the player's wherever the mask is above 0, as in the matting model: the
+  foreground layer, its color and its depth, is defined wherever alpha is, its edge filled from inside (Zitnick
+  et al. 2004 store color, depth and alpha per layer). The split: what one frame shows is the view's (who,
+  where, how far), what needs two frames is the motion's (what moved, how far to trust it).
+  - Why the depth mask goes: the read takes its side at mask > 0.5, so a pixel with a mask of 0.3 carries the
+    background's depth, and the motion weighs that z by 0.3; the depth mask's hard cut hides it. With the side
+    at mask > 0, every pixel the motion weighs carries the player's depth, and the depth mask adds nothing: a
+    pixel without depth already gets no z velocity (`depth_velocity_shader.frag`) and no z position
+    (`z_position.frag`). Weighing each pixel by its alpha is the textbook form, a hard gate its coarse version
+    **(deduction)**.
+  - The read's side becomes mask > 0 (`mask_side` in `depth_upscale.frag`); its fill stays the nearest player
+    pixel within `reach`, not a plane: a plane fitted at the outline extends the edge's slope, where the
+    stereo is noisiest **(deduction)**.
+  - Three parts, one per step, each named after what it gives: `cut` (near, far), `mask` (guided_radius,
+    edge_contrast), `depth` (tolerance); the paths `view.cut.cut`, `view.mask.mask`, `view.depth.depth`.
+    `ViewDepthMask` splits into the cut and the mask, `ViewDepth` keeps only the read, their settings follow;
+    `ViewOutput.depth_mask` goes. `depth.tolerance` stays: it keeps edges inside the mask (an arm before the
+    body) from reading as a depth in between.
   - The motion weighs z by the mask alone (`compose_velocity.frag`, `z_position.frag`, `MotionInput.depth_mask`
     gone); the bridge's z position takes the mask for "the player is there" (`z_position_mix`, its share
     `depth_mask` becomes `mask`); `BridgeInput.depth_mask` goes.
   - The preset, VIEW.md, MOTION.md, BRIDGE_3D.md and the capture and compare scripts (the saved depth mask, the
     z position's weight) follow.
-  - Checked: three captures on the measure recording, against the one path's 0.2 m row in VIEW.md; the color
-    grade is untouched, it premultiplies by the mask as before.
+  - Checked: `view_check` against the read's reference at the new side; three captures on the measure
+    recording, against the one path's 0.2 m row in VIEW.md. The color grade is untouched, it premultiplies by
+    the mask as before.
+  - Left as it is: the color at the edge is not un-mixed, as matting would find the foreground's own color; the
+    motion's xy there sees mixed color, weighed down by the mask.
 
 Question, for B: the one path's fast z at the view's tolerance 0.2 m is higher than in every other row of
 VIEW.md's table, by more than the runs' spread, with no mechanism found in the code; whether it holds on
