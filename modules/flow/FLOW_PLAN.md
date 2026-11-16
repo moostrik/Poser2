@@ -36,10 +36,6 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
 
 - **B1.** The depth read: `view.depth.depth_read` holds `SURFACE` and `MASK` ([VIEW.md](VIEW.md#the-depth-read)). One
   stays, chosen together by eye on the edges recording; the other goes.
-- **B4.** A crop panel. The three settings that pick the part of the camera image the view shows get a panel of
-  their own, `crop`: `center_x`, `center_y` and `height` (now `fixed_x`, `fixed_y`, `fixed_height`). The crop is
-  one step of the view, a settings group with no class behind it. The view's panels go in the order the view
-  works: crop, depth, depth mask, color grade, the monitors last. Presets, VIEW.md and `view_check.py` follow.
 - **B5.** The view built from its parts. The view is one class that does everything itself, so its texture names
   come out muddled. It is split into three parts, each a class with its own textures, ports and settings, as
   `ColorGrade` is: `depth` brings the camera's depth into the view (`SURFACE` or `MASK`), `depth_mask` cuts the
@@ -255,10 +251,9 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways instead of leaving parallel legacy ones: hd_trio's copy, deleted in line I.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth.depth_read`, B1.
-- Keep presets and settings schemas in sync; name a concept after what it is: the view's crop, B4.
 - Fix a problem where it is made; remove obsolete pathways: the view's grade on the straight image, the
   foreground gone, the input depth's kind, B5.
-- Panels: a settings class mirrors the code, a stage's ports follow its parts, the monitors last: B4 to B6.
+- Panels: a settings class mirrors the code, a stage's ports follow its parts, the monitors last: B5, B6.
 - Prefer composition over inheritance, an `ABC` for a family that shares code: the 2D and 3D monitor, B6.
 - Name a concept after what it is, one term everywhere: main and debug, B7.
 - A `Field` description is one short line of panel text: J1.

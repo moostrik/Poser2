@@ -14,7 +14,7 @@ Once per capture, in order:
 
 | Step            | Makes                                                                                          |
 |-----------------|------------------------------------------------------------------------------------------------|
-| the window      | the image cut to the view's fixed window (`fixed_x`, `fixed_y`, `fixed_height`), at the view's `width` × `height` |
+| the crop        | the image cut to the view's crop (`crop.center_x`, `crop.center_y`, `crop.height`), at the view's `width` × `height` |
 | the depth read  | the aligned depth read into the same window ([The depth read](#the-depth-read)), a `DepthView` ([MOTION.md](MOTION.md#when-it-measures)) |
 | the depth mask  | where the view's depth lies from `near` to `far`                                                |
 | the mask        | the depth mask, its edge moved onto the image's ([The mask and the depth mask](#the-mask-and-the-depth-mask)) |
@@ -31,12 +31,12 @@ resample **(deduction)**, for keeping the camera's work and the flow's apart.
 
 | Setting                              | Preset        | Is                                                                        |
 |--------------------------------------|---------------|---------------------------------------------------------------------------|
-| `fixed_x`, `fixed_y`, `fixed_height` | 0.5, 0.5, 1   | the window's center and height on the camera image, shares of it          |
-| `mask.guided_radius`                 | 2             | how far the image moves the mask's edge, in depth pixels; 0 off           |
-| `mask.edge_contrast`                 | 0.03          | the image's brightness spread (0 to 1) above which the edge follows the image's |
+| `crop.center_x`, `center_y`, `height` | 0.5, 0.5, 1  | the crop's center and height on the camera image, shares of it            |
 | `depth.near`, `depth.far`            | 0.1, 1.7 m    | the player's depth range, the box's front and back                        |
 | `depth.depth_read`                   | `SURFACE`     | how the depth is read into the view                                       |
 | `depth.tolerance`                    | 0.2 m         | the depth jump beyond which the read blends no two depth pixels           |
+| `mask.guided_radius`                 | 2             | how far the image moves the mask's edge, in depth pixels; 0 off           |
+| `mask.edge_contrast`                 | 0.03          | the image's brightness spread (0 to 1) above which the edge follows the image's |
 
 ## The depth read
 

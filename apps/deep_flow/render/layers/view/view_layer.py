@@ -2,7 +2,7 @@
 
 `ViewInput` is the capture as the app hands it each tick: its color image and its depth on the camera image's view
 (the uploader's, taken into GL by the capture's source layers), its capture time and the pose of its player.
-`ViewOutput` is what the motion and the bridge read: the image and the depth cut to the view's fixed window at the
+`ViewOutput` is what the motion and the bridge read: the image and the depth cut to the view's crop at the
 view's size, the depth read across a surface (`DepthUpscale`, at the view's `tolerance`), the depth mask (the view's depth cut by `near` and `far`, which gates z), the mask (the depth mask, its
 edge moved onto the image's by the guided filter, He 2010), the foreground (the image where the mask is) and its
 color, the foreground graded and sharpened. The view is made again
@@ -33,7 +33,7 @@ from .shaders import DepthMask
 class ViewInput:
     """One camera's capture for the view stage: `image` its color, `depth` its metres (0 for none, None without a
     depth camera), both on the camera image's view; `timestamp` its capture time, the capture's identity (None: no
-    capture yet); `pose` its player's, whose points the view places in its window, or None."""
+    capture yet); `pose` its player's, whose points the view places in its crop, or None."""
     image: Annotated[Texture, TextureKind.IMAGE]
     depth: Annotated[Texture | None, TextureKind.SCALAR]
     timestamp: float | None
@@ -56,7 +56,7 @@ class ViewOutput(StageOutput):
 class ViewLayer(StageLayer[ViewInput, ViewOutput]):
     """The view stage's layer. `fov` is the camera image's horizontal field (degrees), for the metres a view width
     spans; `settings.depth.tolerance` tells one surface from another. Places
-    the pose's points in the window (`crop_pose_points`, `lost`) for the pose drawn over the view; its last pass is
+    the pose's points in the crop (`crop_pose_points`, `lost`) for the pose drawn over the view; its last pass is
     `ColorGrade` (`settings.color_grade`). Draws nothing."""
 
     def __init__(self, settings: ViewLayerSettings, fov: float) -> None:
@@ -80,7 +80,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         self._threshold_shader: shaders.MaskAntialias = shaders.MaskAntialias()
         self._foreground_shader: shaders.MaskMultiply = shaders.MaskMultiply()
 
-        self._window: Rect = Rect(0.0, 0.0, 1.0, 1.0)  # uv on the camera image, rows down
+        self._crop: Rect = Rect(0.0, 0.0, 1.0, 1.0)  # uv on the camera image, rows down
         self._grid_size: tuple[int, int] = (0, 0)       # the depth's grid, its samples on the camera image
         self._made: tuple | None = None                 # the capture and the settings the view was made from
         self._timestamp: float | None = None
@@ -91,7 +91,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
     @property
     def output(self) -> ViewOutput:
         s: ViewLayerSettings = self.settings
-        depth: DepthView = DepthView(self._depth, view_span(self._window, self._fov), depth_step(self._window, self._grid_size), s.depth.near, s.depth.far)
+        depth: DepthView = DepthView(self._depth, view_span(self._crop, self._fov), depth_step(self._crop, self._grid_size), s.depth.near, s.depth.far)
         return ViewOutput(self._image, self._foreground, self._color_grade.texture, depth, self._mask, self._depth_mask)
 
     @property
@@ -168,7 +168,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
             return
         s: ViewLayerSettings = self.settings
         d: ViewDepthSettings = s.depth
-        made: tuple = (input.timestamp, s.fixed_x, s.fixed_y, s.fixed_height, s.mask.guided_radius, s.mask.edge_contrast,
+        made: tuple = (input.timestamp, s.crop.center_x, s.crop.center_y, s.crop.height, s.mask.guided_radius, s.mask.edge_contrast,
                        d.near, d.far, d.depth_read, d.tolerance, image.width, image.height, self._image.width, self._image.height,
                        self._color_grade.made_with)
         if made == self._made:
@@ -176,8 +176,8 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         self._made = made
         self._timestamp = input.timestamp
 
-        self._window = fixed_window(s.fixed_x, s.fixed_y, s.fixed_height, self._image.width / self._image.height, image.width / image.height)
-        roi: Rect = self._window
+        self._crop = fixed_window(s.crop.center_x, s.crop.center_y, s.crop.height, self._image.width / self._image.height, image.width / image.height)
+        roi: Rect = self._crop
         depth: Texture | None = input.depth if input.depth is not None and input.depth.allocated else None
         self._grid_size = (depth.width, depth.height) if depth is not None else (0, 0)
 
@@ -233,7 +233,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         """The depth mask, its edge moved to the image's (the guided filter): the products, their box means, the
         coefficients, their box means, the output. The radius, in the depth's pixels, is drawn in the view's; the
         filter's ε is `edge_contrast` squared, a variance of the image's brightness. Off, the depth mask itself."""
-        radius: int = round(s.mask.guided_radius * view_per_depth_pixel(self._window, self._grid_size[1], self._image.height))
+        radius: int = round(s.mask.guided_radius * view_per_depth_pixel(self._crop, self._grid_size[1], self._image.height))
         if radius < 1:
             return self._depth_mask
         products, coefficients = self._products, self._coefficients
@@ -261,5 +261,5 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         bbox: Rect = pose[BBox].to_rect()
         points: Points2D = pose[Points2D]
         x, y = points.get_xy_arrays()
-        view_x, view_y = place_points(np.asarray(x), np.asarray(y), bbox, self._window)
+        view_x, view_y = place_points(np.asarray(x), np.asarray(y), bbox, self._crop)
         return Points2D.from_xy_arrays(view_x, view_y, points.scores)

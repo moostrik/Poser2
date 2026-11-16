@@ -213,6 +213,13 @@ class _PoseCompositorSettings(render.PoseCompositorSettings):
     front_stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage of the front line (track color)")
 
 # The view's layer's settings (render/layers/view)
+class ViewCropSettings(BaseSettings):
+    """The view's crop: the part of the camera image the view shows, its center and its height."""
+    center_x: Field[float] = Field(0.5, min=0.0, max=1.0, description="The crop's center across the camera image, a share of its width")
+    center_y: Field[float] = Field(0.5, min=0.0, max=1.0, description="The crop's center down the camera image, a share of its height")
+    height:   Field[float] = Field(1.0, min=0.05, max=2.0, description="The crop's height, a share of the camera image's")
+
+
 class ViewDepthSettings(BaseSettings):
     """The view's depth: the player's depth band, the depth mask's; how the depth is read into the view and the
     tolerance it reads at."""
@@ -241,15 +248,13 @@ class ColorGradeSettings(BaseSettings):
 
 
 class ViewLayerSettings(render.StageLayerSettings):
-    """The view's size and its window on the camera image; its color grade, its mask and its depth in their panels."""
+    """The view's size; its crop, depth, mask and color grade in their panels, in the order the view runs them."""
     width:         Field[int]   = Field(448, min=32, max=4096, step=32, description="The view's width (pixels)")
     height:        Field[int]   = Field(800, min=32, max=4096, step=32, description="The view's height (pixels)")
-    fixed_x:       Field[float] = Field(0.5, min=0.0, max=1.0, description="The window's center across the camera image")
-    fixed_y:       Field[float] = Field(0.5, min=0.0, max=1.0, description="The window's center down the camera image")
-    fixed_height:  Field[float] = Field(1.0, min=0.05, max=2.0, description="The window's height, a share of the camera image's")
-    color_grade: Group[ColorGradeSettings] = Group(ColorGradeSettings)
-    mask:        Group[ViewMaskSettings]   = Group(ViewMaskSettings)
+    crop:        Group[ViewCropSettings]   = Group(ViewCropSettings)
     depth:       Group[ViewDepthSettings]  = Group(ViewDepthSettings)
+    mask:        Group[ViewMaskSettings]   = Group(ViewMaskSettings)
+    color_grade: Group[ColorGradeSettings] = Group(ColorGradeSettings)
 
 
 class CaptureView(IntEnum):

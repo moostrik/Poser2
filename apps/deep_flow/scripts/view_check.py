@@ -72,7 +72,7 @@ def time_view(view: ViewLayer, image: Texture, depth: Texture) -> None:
     """Each of the view's passes on the last capture, the median of 40 runs (ms), as `ViewLayer._update` runs them;
     then the whole view made again, and with MASK's second read."""
     s = view.settings
-    roi = view._window
+    roi = view._crop
 
     def image_pass() -> None:
         view._image.begin()
@@ -183,7 +183,7 @@ def main() -> int:
 
         got = read(output.depth.texture)
         height, width = got.shape
-        w = view._window        # the window the view was cut with, uv rows down
+        w = view._crop          # the crop the view was cut with, uv rows down
         u = w.x + (np.arange(width) + 0.5) / width * w.width
         v = w.y + (np.arange(height) + 0.5) / height * w.height
         uu, vv = np.meshgrid(u, v)
