@@ -7,7 +7,7 @@ from modules.gl import Fbo, Texture, clear_color
 from ....settings import PoseFeatures, PoseFrame, PoseMonitorSettings
 
 
-class PoseMonitorLayer(render.LayerBase):
+class PoseMonitorCompositor(render.LayerBase):
     """The pose of camera `cam_id`'s player as `settings.frame` says: on the crop with its image
     (`PoseCompositor`), on the camera's frame with its boxes (`TrackerCompositor`, no image), or on the view
     (`ViewPoseLayer`); `settings.features` the features over it. Without an image it lies over any layer of its

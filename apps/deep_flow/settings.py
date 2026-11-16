@@ -43,23 +43,28 @@ class Stage(IntEnum):
 # ---------------------------------------------------------------------------
 
 class Layers(IntEnum):
-    # source layers
-    cam_image =     0
-    cam_crop =      auto()
-    capture_image = auto()
+    """Every layer the renderer holds, in the chain's order, each stage with its monitor; the pose last."""
+    # the capture
+    capture_image = 0
     capture_depth = auto()
-    # the stages
-    view =          auto()
-    motion =        auto()
-    bridge =        auto()
-    fluid =         auto()
-    # the stages' monitors, the show, the board's timings, the pose
     capture_monitor = auto()
+    # the view
+    view =          auto()
     view_monitor =  auto()
+    # the motion
+    motion =        auto()
     motion_monitor = auto()
+    # the bridge
+    bridge =        auto()
     bridge_monitor = auto()
+    # the fluid, its look the show
+    fluid =         auto()
     fluid_monitor = auto()
+    # the board's timings
     time_series =   auto()
+    # the pose: the camera's image and its crop, and the pose's monitor
+    cam_image =     auto()
+    cam_crop =      auto()
     pose_monitor =  auto()
 
 
@@ -229,7 +234,11 @@ class _PoseCompositorSettings(render.PoseCompositorSettings):
 
 # The view's layers' settings (render/layers/view)
 class ViewLayerSettings(render.StageLayerSettings):
-    """The view's window on the camera image, the player's depth band and the mask's edge."""
+    """The view's size, its window on the camera image, the player's depth band, the depth tolerance its read uses
+    and the mask's edge."""
+    width:         Field[int]   = Field(448, min=32, max=4096, step=32, description="The view's width (pixels)")
+    height:        Field[int]   = Field(800, min=32, max=4096, step=32, description="The view's height (pixels)")
+    tolerance:     Field[float] = Field(0.2, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m")
     fixed_x:       Field[float] = Field(0.5, min=0.0, max=1.0, description="The window's center across the camera image")
     fixed_y:       Field[float] = Field(0.5, min=0.0, max=1.0, description="The window's center down the camera image")
     fixed_height:  Field[float] = Field(1.0, min=0.05, max=2.0, description="The window's height, a share of the camera image's")
@@ -278,13 +287,20 @@ class PoseMonitorSettings(BaseSettings):
 class RenderSettings(BaseSettings):
     main_view: Field[MainView]                   = Field(MainView.DEBUG, description="The main window: the debug panels, or the show alone")
     input_fps: Field[float]                      = Field(60.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
-    layer  : Group[LayerGroup]                   = Group(LayerGroup)
+    # what the view and the motion both read, set once
+    view_width: Field[int]                       = Field(448, min=32, max=4096, step=32, description="The view's and the motion's width (pixels)")
+    view_height: Field[int]                      = Field(800, min=32, max=4096, step=32, description="The view's and the motion's height (pixels)")
+    tolerance: Field[float]                      = Field(0.2, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m: the view's depth read and the motion's z")
+    # the chain, in its order, then the pose beside it
     capture: Group[CaptureSettings]              = Group(CaptureSettings)
-    view   : Group[ViewLayerSettings]            = Group(ViewLayerSettings)
-    motion : Group[render.Motion3DLayerSettings] = Group(render.Motion3DLayerSettings, share=[input_fps.as_('fps')])
+    view   : Group[ViewLayerSettings]            = Group(ViewLayerSettings, share=[view_width.as_('width'), view_height.as_('height'), tolerance])
+    motion : Group[render.Motion3DLayerSettings] = Group(render.Motion3DLayerSettings, share=[input_fps.as_('fps'), view_width.as_('width'),
+                                                                                            view_height.as_('height'), tolerance])
     bridge : Group[render.Bridge3DLayerSettings] = Group(render.Bridge3DLayerSettings)
     fluid  : Group[render.Fluid3DLayerSettings]  = Group(render.Fluid3DLayerSettings)
     pose   : Group[PoseMonitorSettings]          = Group(PoseMonitorSettings)
+    # the display
+    layer  : Group[LayerGroup]                   = Group(LayerGroup)
     time_series: Group[render.TimeSeriesLayerSettings] = Group(render.TimeSeriesLayerSettings)
     colors : Group[render.ColorSettings]         = Group(render.ColorSettings)
     window : Group[WindowSettings]               = Group(WindowSettings)

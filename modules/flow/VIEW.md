@@ -14,7 +14,7 @@ Once per capture, in order:
 
 | Step            | Makes                                                                                          |
 |-----------------|------------------------------------------------------------------------------------------------|
-| the window      | the image cut to the view's fixed window (`fixed_x`, `fixed_y`, `fixed_height`), at the motion's `width` × `height` |
+| the window      | the image cut to the view's fixed window (`fixed_x`, `fixed_y`, `fixed_height`), at `view_width` × `view_height` |
 | the depth read  | the aligned depth read into the same window ([The depth read](#the-depth-read)), a `DepthView` ([MOTION.md](MOTION.md#when-it-measures)) |
 | the depth mask  | where the view's depth lies from `near` to `far`                                                |
 | the mask        | the depth mask, its edge moved onto the image's ([The mask and the depth mask](#the-mask-and-the-depth-mask)) |
@@ -49,7 +49,7 @@ pixel reads it between its pixels (`DepthUpscale`). `depth_read` chooses how; wh
 | `MASK`       | as `SURFACE`                       | the nearest depth pixel on the side the mask gives it      |
 
 `SURFACE` (`depth_read.edge_aware_depth`): the four depth pixels around a view pixel, interpolated bilinearly
-where they lie within the motion's `z.tolerance` of each other, else the one it lies in, so an edge never reads
+where they lie within `tolerance` (the render's, shared with the motion's z) of each other, else the one it lies in, so an edge never reads
 as a distance in between; a 0, no depth, is never blended.
 
 `MASK` (`mask_sided_depth`) reads as `SURFACE` does wherever that depth is on the pixel's side of the mask: a

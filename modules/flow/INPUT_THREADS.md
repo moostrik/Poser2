@@ -58,8 +58,8 @@ waits there. `scripts/depth_align_check.py` holds both to the shader on recorded
 
 The line between the uploader and the flow: what every user of the camera needs (the color's conversion and
 straightening, the depth's alignment by the camera's calibration) is the uploader's and reads camera settings
-only; what only the flow needs (the view's window and size, the depth's read into it by the motion's
-`z.tolerance`, the mask) is the flow's view stage ([VIEW.md](VIEW.md)).
+only; what only the flow needs (the view's window and size, the depth's read into it at the
+`tolerance` it shares with the motion's z, the mask) is the flow's view stage ([VIEW.md](VIEW.md)).
 
 When an image is on the GPU, the uploader hands it to four others, each of which only takes note and returns:
 

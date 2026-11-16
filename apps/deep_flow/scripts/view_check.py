@@ -31,7 +31,8 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_FLOAT, GL_NEAREST, GL_RED, GL_RGBA,
 import monitor_harness as mh  # noqa: E402
 from modules.camera import CameraFrame, FrameType  # noqa: E402
 from modules.recording import read_metadata  # noqa: E402
-from modules.flow import DepthRead, DepthVelocitySettings, edge_aware_depth, mask_sided_depth  # noqa: E402
+from modules.flow import DepthRead, edge_aware_depth, mask_sided_depth  # noqa: E402
+from modules.render import ColorSettings  # noqa: E402
 from modules.gl import Style, Tensor, Texture  # noqa: E402
 from modules.inference import GpuDepth, GpuImage, SerialUploader, SerialUploaderSettings  # noqa: E402
 from apps.deep_flow.render.layers import ViewInput, ViewLayer  # noqa: E402
@@ -144,15 +145,12 @@ def main() -> int:
     window = mh.context()
     settings = ViewLayerSettings()
     settings.initialize()
-    for name, value in preset['view'].items():
-        setattr(settings, name, value)
+    settings.update_from_dict(preset['view'])
+    settings.tolerance = preset['tolerance']        # the render's, shared to the view and the motion
     if args.read:
         settings.depth_read = DepthRead[args.read.upper()]
-    depth_settings = DepthVelocitySettings()
-    depth_settings.initialize()
-    depth_settings.tolerance = preset['motion']['z']['tolerance']
-    view = ViewLayer(settings, depth_settings, json.loads(PRESET.read_text(encoding='utf-8'))['camera']['fov'])
-    view.allocate(preset['motion']['width'], preset['motion']['height'])
+    view = ViewLayer(0, settings, json.loads(PRESET.read_text(encoding='utf-8'))['camera']['fov'], ColorSettings())
+    view.allocate(preset['view_width'], preset['view_height'])
 
     uploader = SerialUploader(SerialUploaderSettings())
     images: list[GpuImage] = []
@@ -164,7 +162,7 @@ def main() -> int:
     depth_texture = Tensor(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
 
     print(f'{args.recording}: {count} captures, view {view.output.image.width} x {view.output.image.height}, '
-          f'tolerance {depth_settings.tolerance} m, near {settings.near} far {settings.far}')
+          f'tolerance {settings.tolerance} m, near {settings.near} far {settings.far}')
     off_total, ties, pixels, overlaps, shares = 0, 0, 0, [], []
     last: dict[str, np.ndarray] = {}
     for i in range(count):
@@ -192,10 +190,10 @@ def main() -> int:
         uu, vv = np.meshgrid(u, v)
         grid = depth.depth.cpu().numpy()
         if settings.depth_read == DepthRead.MASK:
-            want = mask_sided_depth(grid, uu, vv, depth_settings.tolerance, read(output.mask) > 0.5, settings.near, settings.far,
+            want = mask_sided_depth(grid, uu, vv, settings.tolerance, read(output.mask) > 0.5, settings.near, settings.far,
                                     settings.guided_radius)
         else:
-            want = edge_aware_depth(grid, uu, vv, depth_settings.tolerance)
+            want = edge_aware_depth(grid, uu, vv, settings.tolerance)
         off = np.abs(got - want) > 0.001
         if settings.depth_read == DepthRead.MASK:
             # two depth pixels on the pixel's side as near as each other: either is the rule's, float decides

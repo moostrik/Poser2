@@ -35,7 +35,7 @@ distinct.
 **What:** five stages, capture, view, motion, bridge and fluid, each one panel and one monitor; the pose beside
 them with a monitor of its own. What is shown is a monitor, the time series or the fluid's look.
 
-**Why:** in deep_flow the panels are one flat list, and the layer select holds four lists.
+**Why:** in deep_flow the layer select holds four lists.
 
 **How:** deep_flow and the flow (its 2D and 3D fluid among it) are worked on freely; hd_trio runs its own copy
 of the 2D flow ([FLOW.md](FLOW.md)) and follows in line I. A layer both apps still use (the pose's, the look
@@ -44,9 +44,6 @@ added. One commit per step, both presets (`settings.json`, `very nice.json`) and
 guard tests, the render's tests and one -sim start (the panels in place, the presets loaded without unknown
 keys).
 
-- **A8.** The panel tree in the chain's order: `capture`, `view`, `motion`, `bridge`, `fluid`, then `pose`; the
-  display (`layer`, `colors`) apart. `Layers` in the same order, the pose's monitor last. The depth tolerance
-  and the view's size declared once, shared to the view and the motion.
 - **A9.** The layer select cut to two panels, `a` and `b`, in place of `left`, `right`, `output` and `record`; the
   show draws `a`, and the recording records `a` or the window. A layer taken out of a list goes back to its place among
   the unselected, in `Layers`' order: the panel's playlist (`modules/panel/controls.py`) keeps the order it was
@@ -203,7 +200,7 @@ Not worked on until asked for; each with what is known.
   ports, is the render's. Each stage subclasses the render's `LayerBase` to sit in its update loop, and modules
   may not import the render, so the stages could not live in the flow **(deduction)**. The textbook split: each
   stage a plain flow class as `Fluid3D` is, with its settings, ports, inputs and outputs, and a thin render layer
-  per stage that calls it, beside the monitor. A8's panels follow wherever the stages end up.
+  per stage that calls it, beside the monitor. deep_flow's panels follow wherever the stages end up.
 
 - The 4K upscale: depth in 3D at the grid and detail in 2D at 4K, a march at the grid's size, one
   edge-aware upscale of the flat result and a 4K detail layer advected by the grid's velocity; what
@@ -235,8 +232,7 @@ Not worked on until asked for; each with what is known.
 
 ## Rules it touches
 
-- Keep presets and settings schemas in sync: the panel tree, the layer select, A8, A9.
-- Settings connect the user and a component, not two components: the view's tolerance and size, A8.
+- Keep presets and settings schemas in sync: the layer select, A9.
 - Remove obsolete pathways instead of leaving parallel legacy ones: hd_trio's copy, deleted in line I.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth_read`, B1.

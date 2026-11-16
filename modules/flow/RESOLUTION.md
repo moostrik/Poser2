@@ -37,9 +37,9 @@ The tilt is a homography the host applies where the frame is drawn into the view
 the frame stays 800 rows at any tilt; a recording holds the frame as delivered. Which IMX586 mode the
 Camera node makes 800 rows from (2000 × 1500 or 1920 × 1080) is not checked.
 
-The view stage and what is drawn from it (`VIEW_LAYERS` in `apps/deep_flow/render/deep_flow_render.py`) are allocated at the
-motion's `width` and `height` and follow them, as the view is there for the fluid **(site fact)** and the other
-readers, the debug panels and the color mask over the composite, show the same detail enlarged. A larger view read
+The view stage and what is drawn from it (`Size.VIEW` in `apps/deep_flow/render/chain.py`) are allocated at
+`render.view_width` × `render.view_height`, the size the motion runs at too, and follow it, as the view is there for
+the fluid **(site fact)** and the other readers, the debug panels, show the same detail enlarged. A larger view read
 back bilinearly 2.4× down would hand the solve an aliased image. The fluid reads the bridge's outputs
 bilinearly: at 1.56× that loses little, as the readings are smooth over the motion's window and the
 lowpass's blur **(deduction)**.

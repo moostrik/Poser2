@@ -15,7 +15,7 @@ from modules.utils import FPS, Color, Rect, Point2f
 
 from ..board import RenderBoard
 from ..settings import Layers, MainView, PoseFrame, RenderSettings
-from .layers import ViewInput, ViewOutput, ViewLayer, PoseMonitorLayer
+from .layers import ViewInput, ViewOutput, ViewLayer, PoseMonitorCompositor
 from .chain import Size, TICK_LAYERS, CAPTURE_LAYERS, MONITORS, POSE_SHAPES, size_of, layers_of, shape_of
 
 
@@ -51,8 +51,8 @@ class DeepFlowRender(RenderBase):
             self.L[Layers.capture_depth][i] =               render.CaptureDepthLayer()
 
             # The stages, each with its monitor, and the pose's monitor
-            view =          self.L[Layers.view][i] =        ViewLayer(           i, settings.view, settings.motion.z, fov, settings.colors)
-            self.L[Layers.pose_monitor][i] =                PoseMonitorLayer(    i, self.board, cam_image, cam_crop, view, settings.pose, settings.colors)
+            view =          self.L[Layers.view][i] =        ViewLayer(           i, settings.view, fov, settings.colors)
+            self.L[Layers.pose_monitor][i] =                PoseMonitorCompositor(i, self.board, cam_image, cam_crop, view, settings.pose, settings.colors)
             self.L[Layers.motion][i] =                      render.Motion3DLayer(       i, settings.motion)
             self.L[Layers.bridge][i] =                      render.Bridge3DLayer(       settings.bridge)
             fluid =         self.L[Layers.fluid][i] =       render.Fluid3DLayer(        settings.fluid)
@@ -137,7 +137,7 @@ class DeepFlowRender(RenderBase):
         self.allocate_window_renders()
 
     def allocate(self) -> None:
-        self._view_size = (self.settings.motion.width, self.settings.motion.height)
+        self._view_size = (self.settings.view_width, self.settings.view_height)
         for layer_type, cam_dict in self.L.items():
             for layer in cam_dict.values():
                 size: Size = size_of(layer_type)
@@ -162,7 +162,7 @@ class DeepFlowRender(RenderBase):
     def _follow_view_size(self) -> None:
         """Reallocate the view layers when the motion's size changed: the view is drawn at the size the
         motion and the bridge read it."""
-        size: tuple[int, int] = (self.settings.motion.width, self.settings.motion.height)
+        size: tuple[int, int] = (self.settings.view_width, self.settings.view_height)
         if size == self._view_size:
             return
         self._view_size = size

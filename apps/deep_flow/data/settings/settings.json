@@ -271,6 +271,9 @@
   },
   "render": {
     "main_view": "DEBUG",
+    "view_width": 448,
+    "view_height": 800,
+    "tolerance": 0.2,
     "layer": {
       "select": {
         "left": [
@@ -380,8 +383,6 @@
         }
       },
       "guard": true,
-      "width": 448,
-      "height": 800,
       "use_mask": true,
       "x_gain": 1.0,
       "y_gain": 1.0,
@@ -396,7 +397,6 @@
       "z": {
         "edge": 0.1,
         "window": "SEVEN",
-        "tolerance": 0.2,
         "smooth": 100.0,
         "xy_smooth": false,
         "catch_up": 8.0,

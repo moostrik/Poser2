@@ -3,9 +3,10 @@
 `ViewInput` is the capture as the app hands it each tick: its color image and its depth on the camera image's view
 (the uploader's, taken into GL by the capture's source layers), its capture time and the pose of its player.
 `ViewOutput` is what the motion and the bridge read: the image and the depth cut to the view's fixed window at the
-view's size (the motion's), the depth read across a surface (`DepthUpscale`, the motion's `z.tolerance`), the depth
-mask (the view's depth cut by `near` and `far`, which gates z), the mask (the depth mask, its edge moved onto the
-image's by the guided filter, He 2010), and the foreground (the image where the mask is). The view is made again
+view's size (the motion's), the depth read across a surface (`DepthUpscale`, at the `tolerance` the motion's z
+shares), the depth mask (the view's depth cut by `near` and `far`, which gates z), the mask (the depth mask, its
+edge moved onto the image's by the guided filter, He 2010), the foreground (the image where the mask is) and its
+color, the foreground's look. The view is made again
 when a new capture comes in, told by its capture time, or when a setting it is made with changes.
 """
 
@@ -18,7 +19,7 @@ import numpy as np
 from OpenGL.GL import GL_NEAREST, GL_R16F, GL_R32F, GL_RG32F, GL_RGBA16F, GL_RGBA32F
 
 # Local application imports
-from modules.flow import DepthRead, DepthView, DepthUpscale, DepthVelocitySettings, TextureKind, \
+from modules.flow import DepthRead, DepthView, DepthUpscale, TextureKind, \
                          depth_step, fixed_window, place_points, view_per_depth_pixel, view_span
 from modules.gl import Fbo, SwapFbo, Style, Texture, shaders
 from modules.pose import BBox, Frame, Points2D
@@ -54,15 +55,13 @@ class ViewOutput(StageOutput):
 
 class ViewLayer(StageLayer[ViewInput, ViewOutput]):
     """The view stage's layer. `fov` is the camera image's horizontal field (degrees), for the metres a view width
-    spans; `depth_settings` the motion's depth velocity, whose `tolerance` tells one surface from another. Places
+    spans; `settings.tolerance` tells one surface from another. Places
     the pose's points in the window (`crop_pose_points`, `lost`) for the pose drawn over the view; its last pass is
     the foreground's look (`settings.color`), in camera `cam_id`'s track color. Draws nothing."""
 
-    def __init__(self, cam_id: int, settings: ViewLayerSettings, depth_settings: DepthVelocitySettings, fov: float,
-                 color_settings: ColorSettings) -> None:
+    def __init__(self, cam_id: int, settings: ViewLayerSettings, fov: float, color_settings: ColorSettings) -> None:
         super().__init__(settings)
         self.settings: ViewLayerSettings = settings
-        self._depth_settings: DepthVelocitySettings = depth_settings
         self._fov: float = fov
         self._color: ForegroundLook = ForegroundLook(cam_id, settings.color, color_settings)
 
@@ -168,7 +167,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
             return
         s: ViewLayerSettings = self.settings
         made: tuple = (input.timestamp, s.fixed_x, s.fixed_y, s.fixed_height, s.near, s.far, s.guided_radius, s.edge_contrast,
-                       s.depth_read, self._depth_settings.tolerance, image.width, image.height, self._image.width, self._image.height)
+                       s.depth_read, s.tolerance, image.width, image.height, self._image.width, self._image.height)
         if made == self._made:
             return
         self._made = made
@@ -213,7 +212,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         if depth is None:
             return
         self._depth.begin()
-        self._depth_shader.use(depth, roi, self._depth_settings.tolerance, read, mask=self._mask,
+        self._depth_shader.use(depth, roi, self.settings.tolerance, read, mask=self._mask,
                                near=s.near, far=s.far, reach=s.guided_radius)
         self._depth.end()
 

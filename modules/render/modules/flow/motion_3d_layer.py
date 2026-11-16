@@ -5,14 +5,19 @@ import logging
 
 # Local application imports
 from modules.gl import GpuTimer
-from modules.flow import LucasKanadeFlow3D, LucasKanadeFlow3DSettings, DepthView, HasPorts
+from modules.flow import LucasKanadeFlow3D, LucasKanadeFlow3DSettings, DepthVelocitySettings, DepthView, HasPorts
+from modules.settings import Field, Group
 from .motion_layer import MotionLayer, MotionLayerSettings, MotionInput, MotionOutput
 
 logger = logging.getLogger(__name__)
 
 
 class Motion3DLayerSettings(LucasKanadeFlow3DSettings, MotionLayerSettings):
-    """Configuration for Motion3DLayer: the stage's settings and its flow's own, one panel, the stage's first."""
+    """Configuration for Motion3DLayer: the stage's settings and its flow's own, one panel, the stage's first; the
+    depth tolerance its z reads, which a parent can share with others that read it."""
+    tolerance: Field[float] = Field(0.2, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m (higher: fuller pushes, fewer splits)")
+
+    z = Group(DepthVelocitySettings, share=[tolerance])
 
 
 class Motion3DLayer(MotionLayer):
