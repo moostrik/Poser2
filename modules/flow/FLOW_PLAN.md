@@ -57,11 +57,6 @@ density's color) read badly side by side; their names (`camera`, `density_color`
 Question, for B: the view's depth settings gone through together; among them MASK's read takes the mask's
 `guided_radius` as its reach.
 
-Question, for later: the pose monitor (`PoseMonitorCompositor`) draws its chosen layer and the features into an FBO
-of its own, which makes it a compositor by the render rule; drawn straight into the panel it needs none and is a
-`PoseMonitorLayer`. And it takes the camera image only because `TrackerCompositor` (its `image` off) and
-`PoseCompositor` (`use_gpu_crop` on) ask for it; optional there, shared with hd_trio, or as it is?
-
 A finer depth would give the mask and z a finer edge at the source; the camera's sizes are a given
 ([RESOLUTION.md](RESOLUTION.md#the-rules)).
 
