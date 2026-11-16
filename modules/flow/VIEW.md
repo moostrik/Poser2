@@ -26,7 +26,7 @@ its textures, ports and settings group, and the monitor lists each part's textur
 |------------------------------|--------------------------------------------------------------------------------------|
 | `crop` (`ViewCrop`)          | the box in 3D: `image`, the camera image inside its sides (`center_x`, `center_y`, `height`) at the view's `width` × `height`; who: `depth`, the camera's depth inside its front and back (`near`, `far`) on the depth's own pixels, unblended, 0 outside (`DepthCrop`) |
 | `mask` (`ViewMask`)          | where: `mask`, the crop's depth's outline moved onto the image's ([The mask](#the-mask)) |
-| `depth` (`ViewDepth`)        | how far: `read`, the aligned depth read into the view once where it is the player's and the mask is; `depth`, that read filled across the mask ([The depth](#the-depth)), a `DepthView` ([MOTION.md](MOTION.md#when-it-measures)) |
+| `depth` (`ViewDepth`)        | how far: `upscaled`, the aligned depth upscaled to the view once where it is the player's and the mask is; `depth`, that filled across the mask ([The depth](#the-depth)), a `DepthView` ([MOTION.md](MOTION.md#when-it-measures)) |
 | `color_grade` (`ColorGrade`) | the graded image, the density's color: the image graded (`exposure`, `offset`, `gamma`, `contrast`, `saturation`) and sharpened (`sharpen`), premultiplied by the mask last (`use_mask`) |
 | the pose                     | the pose's points placed in the crop, for the pose drawn over the view               |
 
@@ -84,7 +84,7 @@ coarser than the mask's: between them lies a band about `guided_radius` wide (2 
 pixels) where the mask is and the player's depth is not. The depth is made in two passes, once, after the mask
 exists:
 
-- The read (`DepthUpscale`, `depth_read.masked_depth`): the four depth pixels around a view pixel, interpolated
+- The upscale (`DepthUpscale`, `depth_read.upscaled_depth`): the four depth pixels around a view pixel, interpolated
   bilinearly where they lie within 0.1 m of each other (`EDGE`, `view_depth.py`), else the one it lies in, so an
   edge never reads as a distance in between; a 0, no depth, is never blended (`edge_aware_depth`). Kept where it
   is the player's (`near`..`far`) and the mask is above 0, else 0. The edge's jump is a constant, not a setting:
@@ -93,8 +93,8 @@ exists:
   tables below). It keeps the edges inside the mask (an arm before the body) from reading as a depth in between,
   and so more of the mask keeps a z position through the motion.
 - The fill (`DepthFill`, `depth_read.push_pull`): push-pull (Gortler et al. 1996). Push: each level down halves
-  the size, rounded up, to 1 × 1, a pixel the mean of the pairs (depth × weight, weight) below it, the read's
-  weight 1 where it has a depth. Pull: from the coarsest up, a level's pair plus (1 − its weight) times the
+  the size, rounded up, to 1 × 1, a pixel the mean of the pairs (depth × weight, weight) below it, the upscaled
+  depth's weight 1 where it has a depth. Pull: from the coarsest up, a level's pair plus (1 − its weight) times the
   coarser pulled level's, read bilinearly. A pixel with a depth keeps it; one without takes the mean of the depth
   around it, from the finest level that has one. Where the mask is 0 the depth is 0. The band between the
   depth's edge and the mask's takes the depth just inside it, and the camera's few holes in the body are filled on
@@ -164,7 +164,7 @@ The view's tolerance asks only whether two neighbouring depth pixels are one sur
 own 0.2 m is that large for its job in time. At 0.1 and 0.05 m no column moves past the runs' spread (one run's
 noise inside 0.38 to 0.49), so the preset keeps 0.2 m, never above the motion's.
 
-The view as built (the read where the mask is, then the fill) against the one path before it, on the motion's raw
+The view as built (the upscale where the mask is, then the fill) against the one path before it, on the motion's raw
 output: the same recording and segments, three captures each, replayed with the thresholds, `z.smooth` and
 `z.catch_up` at 0; the earlier paths' own three captures replayed the same way, their depth set to 0 where their
 depth mask was 0, which gives z what the depth mask's gate gave it (no z and no z position there, x/y as it was);
@@ -176,8 +176,8 @@ about ±0.4 inside and ±0.3 at the edge.
 |---------------------------------------|---------------|-------|-----------------------|-------|-------|--------------|-------------|-----------|
 | `MASK`, gated by its depth mask       | 3.7%          | 0.493 | 12.32 / 5.93          | 0.567 | 0.828 | 0.067        | 1.87        |           |
 | the one path, gated by its depth mask | 3.7%          | 0.491 | 12.28 / 5.90          | 0.540 | 0.855 | 0.070        | 1.84        |           |
-| the read alone, without the fill      | 4.4%          | 0.491 | 11.97 / 5.94          | 0.559 | 0.843 | 0.071        | 1.75        |           |
-| the read and the fill, the preset     | 3.9%          | 0.492 | 11.84 / 6.07          | 0.542 | 0.831 | 0.070        | 1.82        | 0.20 ms   |
+| the upscale alone, without the fill   | 4.4%          | 0.491 | 11.97 / 5.94          | 0.559 | 0.843 | 0.071        | 1.75        |           |
+| the upscale and the fill, the preset  | 3.9%          | 0.492 | 11.84 / 6.07          | 0.542 | 0.831 | 0.070        | 1.82        | 0.20 ms   |
 | the same, tolerance 10 m (bilinear)   | 6.0%          | 0.492 | 12.37 / 5.15          | 0.560 | 0.821 | 0.067        | 1.82        |           |
 
 The view as built gives z what the paths before it gave, with no depth mask: every column lies within the runs'
@@ -226,15 +226,15 @@ fit along the mask's edge. One run's p99 swings by about ±0.02; fit holds to ±
 ## Checked
 
 `apps/deep_flow/scripts/view_check.py` plays a recording's captures through the uploader and the view stage and
-holds the crop's depth, the read and the fill to their numpy references:
+holds the crop's depth, the upscale and the fill to their numpy references:
 
 | Pass                          | Pixels off the reference, 40 captures of the measure recording                            |
 |-------------------------------|-------------------------------------------------------------------------------------------|
 | the crop's depth (`depth_crop`) | none by over 1 mm                                                                       |
-| the read (`masked_depth`)     | none by over 1 mm                                                                         |
+| the upscale (`upscaled_depth`) | none by over 1 mm                                                                         |
 | the fill (`push_pull`)        | none by over 1 mm                                                                         |
 | joint bilateral, not kept     | none by over 2 cm, at most 1.2 cm: the GPU blends the image with coarser weights          |
 
-The mask without depth is 1.62% of the mask in the read, 0.00% after the fill. The passes on the GPU, the median
+The mask without depth is 1.62% of the mask upscaled, 0.00% after the fill. The passes on the GPU, the median
 of 40, are in [TIMING.md](TIMING.md#the-view). Without the app: `modules/flow/tests/test_view_window.py`, the
-window's geometry, the crop's depth, the read and the fill.
+window's geometry, the crop's depth, the upscale and the fill.

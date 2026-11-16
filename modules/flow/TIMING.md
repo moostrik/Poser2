@@ -105,7 +105,7 @@ capture as above, so the two tables are not compared pass by pass:
 | the color grade                    | 0.051 |
 | the view                           | 0.374 |
 
-The view as built ([VIEW.md](VIEW.md#the-depth): the crop in 3D, the mask, the read and the fill), the same
+The view as built ([VIEW.md](VIEW.md#the-depth): the crop in 3D, the mask, the upscale and the fill), the same
 capture and way, ms. The guided filter, unchanged, times 0.06 here against 0.17 above, so the two tables differ
 by the GPU's state as well, and are not compared pass by pass:
 
@@ -113,7 +113,7 @@ by the GPU's state as well, and are not compared pass by pass:
 |------------------------------------|-------|
 | the crop, its image and depth      | 0.016 |
 | the guided filter and threshold    | 0.059 |
-| the read and the fill              | 0.103 |
+| the upscale and the fill           | 0.103 |
 | the fill alone                     | 0.085 |
 | the color grade                    | 0.019 |
 | the view                           | 0.197 |

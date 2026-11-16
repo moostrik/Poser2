@@ -3,13 +3,12 @@
 Plays a recording's color and depth frames through the `SerialUploader` (the color straightened, the depth aligned, as the
 app does), takes them into GL and runs the view stage at the preset's settings. Checks, per frame:
 - the crop's depth against its numpy reading (`depth_crop`): pixels off by over 1 mm (expected: none);
-- the read against its numpy reading (`masked_depth`) on the GPU's mask: pixels off by over 1 mm (expected: none,
-  a float rounding at the edge's jump at most);
-- the fill against its numpy reading (`push_pull`) on the GPU's read and mask: pixels off by over 1 mm;
-- the share of the mask without depth, in the read and in the depth (0 with the fill), and the share of the view
-  that is the player.
-Saves the last frame's image, the crop's depth, the mask, the read, the depth and the graded image side by side as a
-PNG, the depths from the box's front (white) to its back (black).
+- the upscaled depth against its numpy reading (`upscaled_depth`) on the GPU's mask: pixels off by over 1 mm
+  (expected: none, a float rounding at the edge's jump at most);
+- the fill against its numpy reading (`push_pull`) on the GPU's upscaled depth and mask: pixels off by over 1 mm;
+- the share of the mask without depth, upscaled and filled (0), and the share of the view that is the player.
+Saves the last frame's image, the crop's depth, the mask, the upscaled depth, the depth and the graded image side by
+side as a PNG, the depths from the box's front (white) to its back (black).
 
 With `--time`, then each of the view's passes on the last capture, the median of 40 runs, and the whole view.
 
@@ -33,7 +32,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_FLOAT, GL_NEAREST, GL_RED, GL_RGBA,
 import monitor_harness as mh  # noqa: E402
 from modules.camera import CameraFrame, FrameType  # noqa: E402
 from modules.recording import read_metadata  # noqa: E402
-from modules.flow import depth_crop, masked_depth, push_pull  # noqa: E402
+from modules.flow import depth_crop, upscaled_depth, push_pull  # noqa: E402
 from modules.gl import Style, Tensor, Texture  # noqa: E402
 from modules.inference import GpuDepth, GpuImage, SerialUploader, SerialUploaderSettings  # noqa: E402
 from apps.deep_flow.render.layers import EDGE, ViewInput, ViewLayer  # noqa: E402
@@ -84,8 +83,8 @@ def time_view(view: ViewLayer, image: Texture, depth: Texture) -> None:
     Style.set_blend_mode(Style.BlendMode.DISABLED)
     rows = [('crop, image and depth', lambda: crop.crop(image, depth, roi)),
             ('mask, the guide', lambda: mask.guide(crop.image, crop.depth, roi, view._grid_size[1])),
-            ('depth, read and fill', lambda: view_depth.read(depth, roi, mask.mask)),
-            ('depth, the fill', lambda: view_depth._fill.use(view_depth._read, mask.mask, view_depth._depth)),
+            ('depth, upscale and fill', lambda: view_depth.upscale(depth, roi, mask.mask)),
+            ('depth, the fill', lambda: view_depth._fill.use(view_depth._upscaled, mask.mask, view_depth._depth)),
             ('color grade', lambda: view._color_grade.process(crop.image, mask.mask)),
             ('the view', whole)]
     for name, work in rows:
@@ -131,8 +130,8 @@ def main() -> int:
 
     print(f'{args.recording}: {count} captures, view {view.output.image.width} x {view.output.image.height}, '
           f'edge {EDGE} m, near {band.near} far {band.far}')
-    crop_off, read_off, fill_off, pixels = 0, 0, 0, 0
-    unread, unfilled, shares = [], [], []
+    crop_off, upscaled_off, fill_off, pixels = 0, 0, 0, 0
+    empty_upscaled, unfilled, shares = [], [], []
     last: dict[str, np.ndarray] = {}
     for i in range(count):
         t = float(i)
@@ -153,47 +152,47 @@ def main() -> int:
 
         cropped = read(view._crop.depth)
         mask = read(output.mask)
-        got_read = read(view._depth._read)
-        height, width = got_read.shape
+        got_upscaled = read(view._depth._upscaled)
+        height, width = got_upscaled.shape
         w = view._window        # the box's sides the view was cut with, uv rows down
         u = w.x + (np.arange(width) + 0.5) / width * w.width
         v = w.y + (np.arange(height) + 0.5) / height * w.height
         uu, vv = np.meshgrid(u, v)
         grid = depth.depth.cpu().numpy()
         crop_off += int((np.abs(cropped - depth_crop(grid, uu, vv, band.near, band.far)) > 0.001).sum())
-        read_off += int((np.abs(got_read - masked_depth(grid, uu, vv, EDGE, mask, band.near, band.far)) > 0.001).sum())
+        upscaled_off += int((np.abs(got_upscaled - upscaled_depth(grid, uu, vv, EDGE, mask, band.near, band.far)) > 0.001).sum())
         got = read(output.depth.texture)
-        fill_off += int((np.abs(got - push_pull(got_read.astype(np.float64), mask)) > 0.001).sum())
+        fill_off += int((np.abs(got - push_pull(got_upscaled.astype(np.float64), mask)) > 0.001).sum())
         pixels += got.size
 
         inside = mask > 0.0
         if inside.any():
-            unread.append(float((inside & (got_read <= 0.0)).sum()) / float(inside.sum()))
+            empty_upscaled.append(float((inside & (got_upscaled <= 0.0)).sum()) / float(inside.sum()))
             unfilled.append(float((inside & (got <= 0.0)).sum()) / float(inside.sum()))
         shares.append(float((mask > 0.5).mean()))
         if i == count - 1:
             def near_white(metres: np.ndarray) -> np.ndarray:
                 return np.where(metres > 0.0, 1.0 - (metres - band.near) / max(band.far - band.near, 1e-6), 0.0)
             last = {'image': read(output.image, 4), 'crop depth': near_white(cropped), 'mask': mask,
-                    'read': near_white(got_read), 'depth': near_white(got), 'graded_image': read(output.graded_image, 4)}
+                    'upscaled': near_white(got_upscaled), 'depth': near_white(got), 'graded_image': read(output.graded_image, 4)}
 
     uploader.stop()
     if args.time:
         time_view(view, image_texture, depth_texture)
     print(f'the crop\'s depth: {crop_off} of {pixels} pixels off the reference')
-    print(f'the read: {read_off} of {pixels} pixels off the reference')
+    print(f'the upscaled depth: {upscaled_off} of {pixels} pixels off the reference')
     print(f'the fill: {fill_off} of {pixels} pixels off the reference')
-    if unread:
-        print(f'the mask without depth: {np.mean(unread) * 100:.2f}% in the read, {np.mean(unfilled) * 100:.2f}% in the depth; '
+    if empty_upscaled:
+        print(f'the mask without depth: {np.mean(empty_upscaled) * 100:.2f}% upscaled, {np.mean(unfilled) * 100:.2f}% in the depth; '
               f'the player {np.mean(shares) * 100:.1f}% of the view')
     if args.png and last:
         def bgr(picture: np.ndarray) -> np.ndarray:
             if picture.ndim == 2:
                 picture = np.repeat(picture[..., None], 3, axis=2)
             return (np.clip(picture[..., :3][..., ::-1], 0.0, 1.0) * 255.0).astype(np.uint8)
-        cv2.imwrite(args.png, np.hstack([bgr(last[k]) for k in ('image', 'crop depth', 'mask', 'read', 'depth', 'graded_image')]))
+        cv2.imwrite(args.png, np.hstack([bgr(last[k]) for k in ('image', 'crop depth', 'mask', 'upscaled', 'depth', 'graded_image')]))
         print(f'saved {args.png}')
-    return 1 if max(crop_off, read_off, fill_off) > pixels * 1e-4 else 0
+    return 1 if max(crop_off, upscaled_off, fill_off) > pixels * 1e-4 else 0
 
 
 if __name__ == '__main__':

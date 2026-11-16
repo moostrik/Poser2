@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import (depth_crop, depth_step, edge_aware_depth, fixed_window, masked_depth, place_points,
+from modules.flow import (depth_crop, depth_step, edge_aware_depth, fixed_window, upscaled_depth, place_points,
                           push_pull, pyramid_sizes, view_per_depth_pixel, view_span)
 from modules.utils import Rect
 
@@ -54,10 +54,10 @@ class DepthCropTest(unittest.TestCase):
         self.assertEqual(self.crop(depth, -0.5, 1.0), 0.0)
 
 
-class MaskedDepthTest(unittest.TestCase):
+class UpscaledDepthTest(unittest.TestCase):
     def read(self, depth: np.ndarray, x: float, y: float, mask: float) -> float:
         height, width = depth.shape
-        return float(masked_depth(depth, np.array([x / width]), np.array([y / height]), 0.2, np.array([mask]),
+        return float(upscaled_depth(depth, np.array([x / width]), np.array([y / height]), 0.2, np.array([mask]),
                                   1.0, 2.0)[0])
 
     def test_the_player_s_depth_where_the_mask_is(self) -> None:

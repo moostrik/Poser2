@@ -1,7 +1,7 @@
 """The depth in the view as numpy, what `DepthCrop`, `DepthUpscale` and `DepthFill` do on the GPU, for the tests and
-the harness: the camera's depth inside the view's box on its own pixels (`depth_crop`), the depth read into the
-view, finer than its own pixels, where it is the player's and the mask is (`masked_depth`, on `edge_aware_depth`),
-and that read filled across the mask by push-pull (`push_pull`). A depth is (H, W) metres, 0 for none, rows down;
+the harness: the camera's depth inside the view's box on its own pixels (`depth_crop`), the depth upscaled to the
+view, finer than its own pixels, where it is the player's and the mask is (`upscaled_depth`, on
+`edge_aware_depth`), and that filled across the mask by push-pull (`push_pull`). A depth is (H, W) metres, 0 for none, rows down;
 uv is rows down."""
 
 import numpy as np
@@ -42,8 +42,8 @@ def edge_aware_depth(depth: np.ndarray, u: np.ndarray, v: np.ndarray, tolerance:
     return np.where((low > 0.0) & (high - low <= tolerance), blended, nearest)
 
 
-def masked_depth(depth: np.ndarray, u: np.ndarray, v: np.ndarray, tolerance: float, mask: np.ndarray,
-                 near: float, far: float) -> np.ndarray:
+def upscaled_depth(depth: np.ndarray, u: np.ndarray, v: np.ndarray, tolerance: float, mask: np.ndarray,
+                   near: float, far: float) -> np.ndarray:
     """`edge_aware_depth` where it is the player's, a depth from `near` to `far` (m), and `mask` (0 to 1, at the
     point) is above 0; else 0. Mirrors DepthUpscale."""
     surface: np.ndarray = edge_aware_depth(depth, u, v, tolerance)

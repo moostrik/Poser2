@@ -5,7 +5,7 @@
 `ViewOutput` is what the motion and the bridge read. The view runs its steps in order, each once, each a part with
 its own textures: `ViewCrop`, the box in 3D and who (the image inside its sides, and the camera's depth inside the
 box on the depth's own pixels); `ViewMask`, where (that depth's outline moved onto the image's by the guided filter,
-He 2010, the one outline); `ViewDepth`, how far (the depth read into the view once where it is the player's and the
+He 2010, the one outline); `ViewDepth`, how far (the depth upscaled to the view once where it is the player's and the
 mask is, then filled across the mask by push-pull, so the mask and the depth agree); and `ColorGrade` (the graded
 image, premultiplied by the mask). The view is made again when a new capture comes in, told by its capture time,
 or when a setting it is made with changes.
@@ -177,11 +177,11 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         # Who, where, how far, each once: the box's image and the depth inside it on the depth's own pixels, that
-        # depth's outline moved onto the image's (the mask), the depth read into the view where it is the player's
+        # depth's outline moved onto the image's (the mask), the depth upscaled to the view where it is the player's
         # and the mask is, then filled across the mask, so the mask and the depth agree
         self._crop.crop(image, depth, roi)
         self._mask.guide(view, self._crop.depth, roi, self._grid_size[1])
-        self._depth.read(depth, roi, self._mask.mask)
+        self._depth.upscale(depth, roi, self._mask.mask)
 
         Style.pop_style()
         self._color_grade.process(view, self._mask.mask)
