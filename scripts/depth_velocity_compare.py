@@ -25,10 +25,15 @@ move, the body's x/y and z in its slow and fast half and fast over slow, how its
 depth change, and the frames x/y takes to stop after it; the restarts of the depth velocity, and the
 flow's time on the GPU per frame; then the one results table's row (`ROW`), with the share of the mask
 without a z position and the mask's fit to the image's edges. `--fast` runs one loop without the window, as fast as it goes;
+with `--fast`, several captures, `--side NAME:PATH=VALUE,...` or `--out FILE` measure every side on every capture
+and print one row a side, x/y beside z: the mean over the captures and its spread, the ms each side comes after A
+over the moves, and with `--out` the rows and their stamp (date, commit, captures, each side's settings) added
+to that file. A capture's stretches come from `segments.json` in its recording's folder, else beside the capture.
 `--verify` compares A's first frames with the numpy references instead.
 """
 
 import json
+import subprocess
 import sys
 import time
 from argparse import ArgumentParser
@@ -59,6 +64,8 @@ GROUPED: dict[str, str] = {'xy_levels': 'xy.levels', 'xy_window': 'xy.window', '
                            'z_catch_up': 'z.catch_up', 'z_dead_zone': 'z.dead_zone', 'z_threshold': 'z.threshold'}   # in frames saved flat, before the groups
 MOVED: float = 0.05          # luminance change of a pixel that moves
 MOVED_FRAMES: int = 5         # frames it changes that much in, over the loop
+RECORDINGS: Path = Path(__file__).resolve().parent.parent / 'apps' / 'deep_flow' / 'data' / 'recordings'
+LAG_REACH: int = 12           # frames a side may lag or lead the first, searched
 VIEWS: dict[int, str] = {1: 'z of the track', 2: 'z after the threshold', 3: 'depth', 4: 'velocity colormap', 5: 'velocity arrows'}
 
 
@@ -159,8 +166,13 @@ class Frames:
         self.width, self.height = self.calls[0]['width'], self.calls[0]['height']
         t = np.array([c['t'] for c in self.calls])
         self.t: np.ndarray = t - t[0]
+        stamp = folder / 'capture.json'
+        self.capture: dict = json.loads(stamp.read_text()) if stamp.exists() else {}
         motion = self.motion()
-        given = folder / 'segments.json'
+        given = folder / 'segments.json'                 # beside the capture, as before
+        if self.capture.get('recording'):                # the recording's own, written once for all its captures
+            own = RECORDINGS / self.capture['recording'] / 'segments.json'
+            given = own if own.exists() else given
         if given.exists():
             parts = json.loads(given.read_text())
             self.still: tuple[float, float] = tuple(parts['still'])
@@ -247,6 +259,29 @@ def split_moves(t: np.ndarray, motion: np.ndarray) -> tuple[tuple[float, float],
     return (WARM_UP, still_end), moves
 
 
+def frame_regions(segment: str, depth: np.ndarray, mask: np.ndarray, luminance: np.ndarray | None) -> dict:
+    """A frame's regions, the same for every flow that measures it: `core` (the mask's pixels with depth, 12 px
+    and more inside), `edge` (0 to 6 px inside), `table` (outside, 16 px and more, no further than 0.8 m behind
+    the body), `near` (the core's median depth) and `fit` (the image's brightness gradient along the mask's edge,
+    in the still part, else None)."""
+    fit: float | None = None
+    if segment == 'still' and luminance is not None and mask.any():
+        cut = mask.astype(np.uint8)
+        edge_of_cut = (cut - cv2.erode(cut, np.ones((3, 3), np.uint8))).astype(bool)
+        gradient = np.hypot(cv2.Sobel(luminance, cv2.CV_32F, 1, 0, ksize=3), cv2.Sobel(luminance, cv2.CV_32F, 0, 1, ksize=3))
+        if edge_of_cut.any():
+            fit = float(np.mean(gradient[edge_of_cut]))
+    inside = cv2.distanceTransform(mask.astype(np.uint8), cv2.DIST_L2, 3)
+    core = mask & (depth > 0) & (inside > 12)
+    edge = mask & (depth > 0) & (inside <= 6)
+    near = float(np.median(depth[core])) if core.any() else np.nan
+    table = np.zeros_like(mask)
+    if segment == 'still':
+        outside = cv2.distanceTransform((~mask).astype(np.uint8), cv2.DIST_L2, 3)
+        table = (~mask) & (depth > 0) & (outside > 16) & (depth < near + 0.8)
+    return dict(core=core, edge=edge, near=near, table=table, fit=fit)
+
+
 class Measures:
     """One loop's measures of one flow."""
 
@@ -264,31 +299,26 @@ class Measures:
         self.restarts: dict[str, list[float]] = {'still': [], 'moving': []}
         self.milliseconds: list[float] = []
         self.fluid_z: list[float] = []           # z as the fluid gets it, inside, px per frame
+        self.signed_z: list[float] = []          # the same with its sign, over the pixels that move in the loop: the pixels' noise cancels, the moving part's z stays
         self.without_z: list[float] = []         # the share of the mask without a z position, in the parts measured
         self.fit: list[float] = []               # the image's brightness gradient along the mask's edge, in the still part
         self._before: np.ndarray | None = None
 
     def add(self, t: float, segment: str, xy: np.ndarray, track: np.ndarray, z: np.ndarray, depth: np.ndarray, mask: np.ndarray,
             moved: np.ndarray, milliseconds: float, weight: np.ndarray | None = None,
-            luminance: np.ndarray | None = None) -> None:
+            luminance: np.ndarray | None = None, signed_z: np.ndarray | None = None, regions: dict | None = None) -> None:
         """`xy` and `z` are as the fluid gets them, in px per frame; `track` is the depth velocity's state; `mask`
         the player's pixels (the mask above 0.5); `moved` the pixels that move in the loop; `weight` the z
         position's, 0 where the motion has no depth for a pixel; `luminance` for the mask's fit to the image's
         edges."""
         if segment and weight is not None and mask.any():
             self.without_z.append(float(np.mean(weight[mask] <= 0.0)))
-        if segment == 'still' and luminance is not None and mask.any():
-            cut = mask.astype(np.uint8)
-            edge_of_cut = (cut - cv2.erode(cut, np.ones((3, 3), np.uint8))).astype(bool)
-            gradient = np.hypot(cv2.Sobel(luminance, cv2.CV_32F, 1, 0, ksize=3), cv2.Sobel(luminance, cv2.CV_32F, 0, 1, ksize=3))
-            if edge_of_cut.any():
-                self.fit.append(float(np.mean(gradient[edge_of_cut])))
+        if regions is None:
+            regions = frame_regions(segment, depth, mask, luminance)
+        if regions['fit'] is not None:
+            self.fit.append(regions['fit'])
         width = depth.shape[1]
-        inside = cv2.distanceTransform(mask.astype(np.uint8), cv2.DIST_L2, 3)
-        outside = cv2.distanceTransform((~mask).astype(np.uint8), cv2.DIST_L2, 3)
-        core = mask & (depth > 0) & (inside > 12)
-        edge = mask & (depth > 0) & (inside <= 6)
-        near = float(np.median(depth[core])) if core.any() else np.nan
+        core, edge, near, table = regions['core'], regions['edge'], regions['near'], regions['table']
         if self._before is not None and segment:
             held = core & (self._before[..., 1] > 0)
             if held.any():                        # a track there the frame before that now has no rate: it started over
@@ -302,6 +332,7 @@ class Measures:
         self.body_xy.append(float(np.mean(xy[core])) if core.any() else 0.0)
         self.body_z.append(float(np.mean(track[..., 0][core])) * width if core.any() else np.nan)
         self.fluid_z.append(float(np.mean(z[core])) if core.any() else 0.0)
+        self.signed_z.append(float(np.mean(signed_z[core & moved])) if signed_z is not None and (core & moved).any() else 0.0)
         moving = core & moved
         self.moving_xy.append(float(np.mean(xy[moving])) if moving.any() else 0.0)
         self.moving_z.append(float(np.mean(track[..., 0][moving])) * width if moving.any() else np.nan)
@@ -310,7 +341,7 @@ class Measures:
             self.static_share.append(float(np.mean(~moved[mask])) if mask.any() else 0.0)
             self.still['xy edge'].append(xy[edge]); self.still['xy inside'].append(xy[core])
             self.still['z edge'].append(z[edge]); self.still['z inside'].append(z[core])
-            self.still['z table'].append(z[(~mask) & (depth > 0) & (outside > 16) & (depth < near + 0.8)])
+            self.still['z table'].append(z[table])
 
     def report(self, span: float, width: int, moves: int) -> str:
         lines: list[str] = []
@@ -349,6 +380,85 @@ class Measures:
         lines.append(f'{np.median(self.milliseconds):.2f} ms per frame')
         lines.append(self.row(segments))
         return '\n    '.join([' | '.join(lines[:5])] + lines[5:])
+
+    def values(self, span: float, width: int) -> dict[str, float]:
+        """The row's numbers, x/y beside z, all in px per frame as the fluid gets them: the still part's noise
+        (p99) inside and at the edge, the mean inside in the slow and the fast halves, fast over noise; how the
+        track's z follows the real depth change over the moves (its share of it and their correlation); the
+        share of the mask without a z position, the mask's fit, and the flow's ms per frame. NaN where the
+        loop has no such part."""
+        def p99(name: str) -> float:
+            parts = self.still[name]
+            found = np.concatenate(parts) if parts else np.zeros(0)
+            return float(np.percentile(found, 99)) if found.size else float('nan')
+
+        def mean(series: list[float], where: np.ndarray) -> float:
+            return float(np.mean(np.array(series)[where])) if where.any() else float('nan')
+
+        segments = np.array(self.segments)
+        slow = np.array([s.endswith('slow') for s in segments])
+        fast = np.array([s.endswith('fast') for s in segments])
+        result: dict[str, float] = {}
+        for axis, series in (('xy', self.body_xy), ('z', self.fluid_z)):
+            noise, fast_mean = p99(f'{axis} inside'), mean(series, fast)
+            result[f'{axis} noise'] = noise
+            result[f'{axis} noise edge'] = p99(f'{axis} edge')
+            result[f'{axis} slow'] = mean(series, slow)
+            result[f'{axis} fast'] = fast_mean
+            result[f'{axis} fast/noise'] = fast_mean / noise if noise > 0 else float('nan')
+        still = segments == 'still'
+        part = np.abs(np.array(self.signed_z))            # the moving part's z: the mean of its pixels, signed
+        result['z part still'] = float(np.percentile(part[still], 99)) if still.any() else float('nan')
+        result['z part fast'] = mean(list(part), fast)
+        d = np.array(self.body_depth)
+        real = np.zeros_like(d); real[1:] = -(d[1:] - d[:-1]) / (d[:-1] * span) * width
+        kernel = np.ones(5) / 5
+        real = np.convolve(np.nan_to_num(real), kernel, 'same')
+        body_z = np.convolve(np.nan_to_num(np.array(self.body_z)), kernel, 'same')
+        moving = slow | fast
+        if moving.sum() >= 3 and float(np.dot(real[moving], real[moving])) > 0:
+            result['z/real'] = float(np.dot(body_z[moving], real[moving]) / np.dot(real[moving], real[moving]))
+            result['z corr'] = float(np.corrcoef(body_z[moving], real[moving])[0, 1])
+        else:
+            result['z/real'] = result['z corr'] = float('nan')
+        result['no z position'] = float(np.mean(self.without_z)) if self.without_z else float('nan')
+        result['fit'] = float(np.mean(self.fit)) if self.fit else float('nan')
+        result['ms'] = float(np.median(self.milliseconds))
+        return result
+
+    def lag(self, first: 'Measures') -> dict[str, float]:
+        """This flow's x/y and z beside `first`'s over the moves, on the pixels that move in the loop (x/y their
+        mean length, z their mean with its sign): the share of `first`'s it keeps (`kept`, 1 the same), and the
+        ms it comes after it (`lag`): the shift at which the two series fit best, between frames by the parabola
+        through the best shift and its neighbors."""
+        moving = np.array([bool(s) and s != 'still' for s in self.segments])
+        times = np.array(self.times)
+        interval = float(np.median(np.diff(times))) * 1000.0 if len(times) > 1 else 0.0
+        result: dict[str, float] = {}
+        for axis, mine, theirs in (('xy', self.moving_xy, first.moving_xy), ('z', self.signed_z, first.signed_z)):
+            a, b = np.nan_to_num(np.array(theirs)), np.nan_to_num(np.array(mine))
+            result[f'{axis} lag'] = result[f'{axis} kept'] = float('nan')
+            if moving.sum() < 2 * LAG_REACH or len(a) != len(b):
+                continue
+            power = float(np.dot(a[moving], a[moving]))
+            result[f'{axis} kept'] = float(np.dot(a[moving], b[moving])) / power if power > 0 else float('nan')
+            a, b = a - a[moving].mean(), b - b[moving].mean()
+            index = np.flatnonzero(moving)
+            fits: list[float] = []
+            for shift in range(-LAG_REACH, LAG_REACH + 1):
+                at = index + shift
+                held = (at >= 0) & (at < len(b))
+                ours, theirs_now = b[at[held]], a[index[held]]
+                size = float(np.linalg.norm(ours) * np.linalg.norm(theirs_now))
+                fits.append(float(np.dot(theirs_now, ours)) / size if size > 0 else 0.0)
+            best = int(np.argmax(fits))
+            between = 0.0
+            if 0 < best < len(fits) - 1:
+                left, top, right = fits[best - 1], fits[best], fits[best + 1]
+                bend = left - 2.0 * top + right
+                between = 0.5 * (left - right) / bend if bend != 0.0 else 0.0
+            result[f'{axis} lag'] = (best - LAG_REACH + between) * interval
+        return result
 
     def row(self, segments: np.ndarray) -> str:
         """The one results table's row: the share of the mask without a z position, the mask's fit, z's
@@ -462,10 +572,88 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
     return 0
 
 
+COLUMNS: tuple[str, ...] = ('xy noise', 'xy slow', 'xy fast', 'xy fast/noise', 'xy kept', 'xy lag', 'xy noise edge',
+                            'z noise', 'z slow', 'z fast', 'z fast/noise', 'z kept', 'z lag', 'z noise edge',
+                            'z part still', 'z part fast', 'z/real', 'z corr', 'no z position', 'fit', 'ms')
+
+
+def commit() -> str:
+    """The checkout's commit, short, with a + where files differ from it."""
+    def git(*words: str) -> str:
+        return subprocess.run(['git', *words], capture_output=True, text=True, cwd=Path(__file__).resolve().parent.parent).stdout.strip()
+    return git('rev-parse', '--short', 'HEAD') + ('+' if git('status', '--porcelain', '--untracked-files=no') else '')
+
+
+def measure(captures: list[Path], specs: list[tuple[str, dict[str, object]]], out: Path | None, label: str) -> int:
+    """Every side on every capture, one loop each without the window: per side the row's mean over the captures
+    and its spread (highest minus lowest), the lag behind the first side, and the whole with its stamp added to
+    `out` as one line of JSON."""
+    context(False, 64, 64)
+    luminance, depth_texture, mask_texture = Texture(), Texture(), Texture()
+    per_side: dict[str, list[dict[str, float]]] = {name: [] for name, _ in specs}
+    settings: dict[str, dict] = {}
+    stamps: list[dict] = []
+    described: str = ''
+    for folder in captures:
+        frames = Frames(folder)
+        described = frames.describe()
+        w, h = frames.width, frames.height
+        span = float(np.median([c['view_span'] for c in frames.calls]))
+        sides = [Side(name, frames.calls[0]['settings'], changed, w, h, False) for name, changed in specs]
+        for k in range(len(frames)):
+            lum, depth, mask = frames.load(k)
+            upload(luminance, lum); upload(depth_texture, depth); upload(mask_texture, mask)
+            segment = frames.segment(k)
+            regions = frame_regions(segment, depth, mask > 0.5, lum)
+            for side in sides:
+                glFinish()
+                began = time.perf_counter()
+                side.step(frames, k, luminance, depth_texture, mask_texture)
+                glFinish()
+                milliseconds = (time.perf_counter() - began) * 1000.0
+                velocity = read_back(side.flow.velocity)
+                delta_time = frames.calls[k]['delta_time']
+                track = read_back(side.flow.depth_velocity.difference)
+                weight = read_back(side.flow.z_position)[..., 1] if side is sides[0] and 'depth_range' in frames.calls[k] else None   # the view's, the same for every side
+                gain = side.settings.z_gain if side.settings.z_gain else 1.0
+                side.measures.add(float(frames.t[k]), segment, side.xy_px(velocity, delta_time, w), track,
+                                  side.z_px(velocity, delta_time, w), depth, mask > 0.5, frames.moved, milliseconds, weight, lum,
+                                  velocity[..., 2] / gain * delta_time * w, regions)
+        for side in sides:
+            found = side.measures.values(span, w) | side.measures.lag(sides[0].measures)
+            per_side[side.name].append(found)
+            settings[side.name] = side.settings.to_dict()
+            side.flow.deallocate()
+        stamps.append({'capture': folder.name} | frames.capture)
+        print(f'{folder.name}: {len(frames)} frames, {described}', flush=True)
+
+    result: dict = {'kind': 'result', 'label': label, 'date': time.strftime('%Y-%m-%d %H:%M'), 'commit': commit(),
+                    'captures': stamps, 'stretches': described, 'sides': {}}
+    print(f'{"side":<34}' + ''.join(f'{column:>15}' for column in COLUMNS))
+    for name, changed in specs:
+        table = np.array([[found.get(column, np.nan) for column in COLUMNS] for found in per_side[name]])
+        with np.errstate(all='ignore'):
+            mean, spread = np.nanmean(table, axis=0), np.nanmax(table, axis=0) - np.nanmin(table, axis=0)
+        result['sides'][name] = {'changed': {path: str(value) for path, value in changed.items()}, 'settings': settings[name],
+                                 'mean': dict(zip(COLUMNS, mean.tolist())), 'spread': dict(zip(COLUMNS, spread.tolist())),
+                                 'captures': per_side[name]}
+        print(f'{name:<34}' + ''.join(f'{m:>9.3f}~{s:<5.2f}' for m, s in zip(mean, spread)), flush=True)
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with out.open('a', encoding='utf-8') as file:
+            file.write(json.dumps(result, default=str) + '\n')
+    glfw.terminate()
+    return 0
+
+
 def main() -> int:
     assert __doc__ is not None
     parser = ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('frames', type=Path)
+    parser.add_argument('frames', type=Path, nargs='+', help='a capture; several with --fast, measured as one row')
+    parser.add_argument('--side', action='append', default=[], metavar='NAME:PATH=VALUE,...',
+                        help='with --fast, a further side by its name and its settings; the lag is behind A')
+    parser.add_argument('--out', type=Path, help='with --fast, the file each call adds its rows and their stamp to, as a line of JSON')
+    parser.add_argument('--label', default='', help='with --out, what this call measures')
     parser.add_argument('--a', action='append', default=[], metavar='NAME=VALUE', help="override one of A's settings")
     parser.add_argument('--b', action='append', default=[], metavar='NAME=VALUE', help="override one of B's settings")
     parser.add_argument('--fast', action='store_true', help='one loop without the window, then the measures')
@@ -476,7 +664,15 @@ def main() -> int:
     parser.add_argument('--view', type=int, choices=sorted(VIEWS), default=1, help='the view to start in (default 1)')
     parser.add_argument('--snapshot', type=Path, help='save the window halfway through the first loop, as an image')
     args = parser.parse_args()
-    frames = Frames(args.frames)
+    if args.fast and (len(args.frames) > 1 or args.side or args.out):
+        specs: list[tuple[str, dict[str, object]]] = [('A', overrides(args.a))]
+        if args.b:
+            specs.append(('B', overrides(args.b)))
+        for item in args.side:
+            name, _, changes = item.partition(':')
+            specs.append((name, overrides([change for change in changes.split(',') if change])))
+        return measure(args.frames, specs, args.out, args.label)
+    frames = Frames(args.frames[0])
     if args.verify:
         return verify(frames, overrides(args.a), args.verify_frames)
 

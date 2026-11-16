@@ -8,7 +8,8 @@ for its first `--seconds`, with the preset's settings and the Lucas–Kanade flo
 saved to OUT/NAME (the recording's name without `--name`): `luminance_NNNN.npy` (the newest luminance frame,
 0 to 1), `depth_NNNN.npy` (the depth it got, m, at the flow's size, before the step filter), `mask_NNNN.npy`
 (the player's mask, 0 to 1, the weight of each pixel), and `calls.json`: each
-measure's arguments and its moment, `t`, in seconds, and the flow's settings. The compare replays them from
+measure's arguments and its moment, `t`, in seconds, and the flow's settings; and `capture.json`: the recording,
+the commit, `--set` and the view's settings it ran with. The compare replays them from
 no motion. About 3 GB for 15 seconds at the flow's 448×800: delete it when done with it. This is the one
 step that runs the app.
 """
@@ -16,6 +17,7 @@ step that runs the app.
 import ctypes
 import json
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -34,6 +36,7 @@ from OpenGL.raw.GL.VERSION.GL_1_1 import glGetTexImage as raw_get_tex_image  # n
 from modules.log_config import setup_logging, install_excepthooks  # noqa: E402
 from modules.gl import Fbo, Style  # noqa: E402
 from modules.flow import FlowUtil, LucasKanadeFlow3D  # noqa: E402
+from modules import render  # noqa: E402
 from apps.deep_flow.main import DeepFlowMain  # noqa: E402
 
 LOOP_TIMEOUT: float = 60.0      # seconds a loop may take before the capture gives up
@@ -85,6 +88,15 @@ def main() -> int:
         return array
 
     update = LucasKanadeFlow3D.update
+    held: list[tuple[np.ndarray, np.ndarray, np.ndarray]] = []     # the frames, saved after the loop: saving in it costs captures
+    gaps: list[float | None] = []                                   # each measure's gap between two capture times, as it is
+    frame_interval = render.frame_interval
+
+    def gap_kept(timestamp, last, *rest) -> float:
+        gaps.append(timestamp - last if timestamp is not None and last is not None else None)
+        return frame_interval(timestamp, last, *rest)
+
+    render.frame_interval = gap_kept
 
     def saved(self, depth, delta_time, view_span, depth_step, **flags) -> None:
         if starting.is_set():                     # on the render thread: the loop starts here
@@ -93,13 +105,11 @@ def main() -> int:
         if recording.is_set() and depth is not None:
             luminance = self.luminance
             w, h = luminance.width, luminance.height
-            index = len(calls)
             mask = self._mask if self._mask is not None and self._mask.allocated else None
-            np.save(out_dir / f'luminance_{index:04d}.npy', read('luminance', luminance, w, h)[..., 0])
-            np.save(out_dir / f'depth_{index:04d}.npy', read('depth', depth, w, h)[..., 0])
-            np.save(out_dir / f'mask_{index:04d}.npy',
-                    read('mask', mask, w, h)[..., 0].astype(np.float16) if mask is not None else np.ones((h, w), np.float16))
-            calls.append(dict(t=time.perf_counter(), delta_time=delta_time, view_span=view_span, depth_step=list(depth_step),
+            held.append((read('luminance', luminance, w, h)[..., 0].copy(), read('depth', depth, w, h)[..., 0].copy(),
+                         read('mask', mask, w, h)[..., 0].astype(np.float16) if mask is not None else np.ones((h, w), np.float16)))
+            calls.append(dict(t=time.perf_counter(), delta_time=delta_time, gap=gaps[-1] if gaps else None,
+                              view_span=view_span, depth_step=list(depth_step),
                               depth_range=list(flags.get('depth_range', (0.0, 0.0))), width=w, height=h,
                               settings=self.settings.to_dict()))
             if args.seconds > 0.0 and calls[-1]['t'] - calls[0]['t'] >= args.seconds:
@@ -138,7 +148,18 @@ def main() -> int:
                 if loops.acquire(timeout=0.1) and time.perf_counter() - began >= SHORTEST_LOOP:
                     break                         # a call back sooner is its start's again, not the next loop
             recording.clear()
+            time.sleep(0.2)                       # the render thread's last measure is in
+            for index, (luminance, depth, mask) in enumerate(held[:len(calls)]):
+                np.save(out_dir / f'luminance_{index:04d}.npy', luminance)
+                np.save(out_dir / f'depth_{index:04d}.npy', depth)
+                np.save(out_dir / f'mask_{index:04d}.npy', mask)
+            del calls[len(held):]
             (out_dir / 'calls.json').write_text(json.dumps(calls, default=str))
+            root = Path(__file__).resolve().parent.parent
+            head = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True, cwd=root).stdout.strip()
+            (out_dir / 'capture.json').write_text(json.dumps(dict(
+                recording=args.recording, commit=head, date=time.strftime('%Y-%m-%d %H:%M'), seconds=args.seconds,
+                set=args.set, view=app.settings.render.view.to_dict()), default=str))
             print(f'{len(calls)} frames to {out_dir}', flush=True)
         finally:
             app.stop()                            # whatever happened, the app does not keep running
