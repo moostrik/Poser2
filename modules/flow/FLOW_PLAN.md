@@ -1,6 +1,6 @@
 # The flow's plan
 
-What is next for the flow, the one place that says it: the main lines (B to K), along the flow's chain (the view,
+What is next for the flow, the one place that says it: the main lines (A to J), along the flow's chain (the view,
 the motion, the bridge, the fluid's physics, its look), then those across the stages; each line's steps in the
 order they are worked (B1, B2, ...), what is not decided as a question; what is parked. A built step leaves the
 plan; the others keep their numbers. How each stage works is in its own document ([FLOW.md](FLOW.md) lists
@@ -11,6 +11,7 @@ operator saw.
 
 | #   | Line                                                                         | State                            | Documents                                          |
 |-----|------------------------------------------------------------------------------|----------------------------------|----------------------------------------------------|
+| A   | [The measurements](#a-the-measurements)                                      | rules proposed                   | [FLOW.md](FLOW.md#the-goals)                       |
 | B   | [The view](#b-the-view)                                                      | built                            | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; steps open                | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; the body force            | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
@@ -19,7 +20,6 @@ operator saw.
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                      | [FLOW.md](FLOW.md)                                 |
 | I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | not started                      | [FLOW.md](FLOW.md)                                 |
 | J   | [Every setting and its description](#j-every-setting-and-its-description)    | last, after the refactor         | `CLAUDE.md`, `.claude/rules`                       |
-| K   | [A measurement system](#k-a-measurement-system)                              | not designed                     | [FLOW.md](FLOW.md#the-goals)                       |
 
 D1 needs the operator at the screen; the other lines go on meanwhile.
 
@@ -29,6 +29,51 @@ chain's timing is in [TIMING.md](TIMING.md) and [INPUT_THREADS.md](INPUT_THREADS
 
 The 3D fluid's lines are weighed by [its goal](FLUID_3D.md#the-goal): sharp, translucent ink patterns, layers
 distinct.
+
+## A. The measurements
+
+The goal: a measurement that can be trusted the first time, and kept only while it still says something. Two
+kinds:
+- **Time**: what a pass costs, in ms on the GPU or the CPU. It holds while the pass's code and size are the same,
+  whatever the recording; it goes stale when the pass changes.
+- **Result**: what a stage makes (z's noise and its real z, the fit, the water's speed, the look). It holds only
+  for its recording, its settings and its code paths; 2026-11-16 showed all three move it (a panel setting slipped
+  into a capture, a baseline compared without the gate it was made with, one run swinging ±0.6).
+
+Proposed rules, for the measurements in the flow's documents:
+- Every table names its kind, date, commit, recording (one in `data/recordings`, kept while a table uses it),
+  settings (the preset and what it varies) and, for a result, its runs and their spread.
+- A time is measured again when its pass changes, and the old row goes with the pass.
+- A result is compared only with rows of the same recording, settings and code paths, measured again where they
+  differ; a stage is measured on its own output with the stages after it neutral ([FLOW.md](FLOW.md#the-goals)).
+- Captures and replays are working files, deleted once their row is written.
+
+What is measured today (the tables with numbers in the flow's documents, 73), by the recording they name:
+| Recording                         | Still on disk        | Kind            | Where                                                        |
+|-----------------------------------|----------------------|-----------------|--------------------------------------------------------------|
+| `20261112-125832_measure`         | yes                  | result, time    | VIEW.md's depth tables; TIMING.md's view (one path); INPUT_THREADS.md's waits and cadence |
+| `20261112-124918_hands`           | yes                  | time            | TIMING.md's stages (15 November); INPUT_THREADS.md           |
+| `20261112-130012_edges`           | yes                  | time            | TIMING.md's view (`SURFACE`, `MASK`, gone)                   |
+| `20261112-130105_show`            | yes                  | time            | RESOLUTION.md, MONITOR.md                                    |
+| stillslowfast (`20261103-184710`) | no, its capture only | result, time    | FLUID_3D.md (pressure, advection, particles, look), VIEW.md's mask table, TIMING.md (speed-ups, baseline, the look) |
+| standmoves (`20261103-215324`)    | no, its capture only | result, time    | BRIDGE_3D.md, MOTION.md, FLUID_3D.md's measuring, TIMING.md  |
+| blocky (`20261111-091147`)        | no, its capture only | result, time    | INPUT_THREADS.md's cadence, TIMING.md's box                  |
+| `20261111-123241`                 | no                   | time            | INPUT_THREADS.md's cadence                                   |
+| none named                        |                      | mostly time     | about half: BRIDGE_3D.md's filters' GPU, FLUID_3D.md's walls and expansion, TIMING.md's particles and budget |
+
+Candidates to delete (each costly to have made, so each on Matthias's word):
+- Tables of code that is gone: VIEW.md's `SURFACE`/`MASK`/joint-bilateral reads and the one path's smoothed rows,
+  its "pixels off" check (the numpy twins), its mask-erosion table (the cut and the gate it measured are gone);
+  TIMING.md's two view tables of the passes before today's.
+- Results on recordings no longer on disk can't be measured again: kept as what was found, or deleted.
+- Captures in `temp/depth_velocity`: 24 of 28 (about 26 GB) are of paths measured and gone; the view's preset
+  rows (`measure_fill_*`, `measure_b4_1`) stay while VIEW.md's newest rows are the baseline.
+
+- **A1.** A script that captures, replays and writes the results row together with the full configuration it
+  ran with, meeting the rules above; the motion first.
+
+Question, for A: are the proposed rules the ones (a rule file for measurements, through the rules thread), and
+which candidates go?
 
 ## B. The view
 
@@ -47,7 +92,7 @@ Its goal and what is built: [VIEW.md](VIEW.md). New points go here.
   (space), and how far a new depth may lie from the track before it starts over (time). A number for space and
   one for time, each measured on the raw output; 0.2 m is large on a body, set by the job in time.
 - **C4.** The smoothing (`z.smooth`, `z.catch_up`) judged on its own, the raw output against the smoothed
-  ([FLOW.md](FLOW.md#the-goals)), once K is built.
+  ([FLOW.md](FLOW.md#the-goals)), once A1 is built.
 
 ## D. The bridge
 
@@ -95,21 +140,6 @@ Once the 3D is finished, the 2D rebuilt in `modules/flow` on the 3D's principles
 - **J1.** Every setting and its description gone through, last, after the refactor, against the rule: a `Field`
   description is one short line of panel text, what and its unit; and whether every quantity is in the flow's
   textbook units, which a scan cannot judge.
-
-## K. A measurement system
-
-The goal: one way to measure a change to the flow, each stage on its own output with the stages after it neutral
-([FLOW.md](FLOW.md#the-goals)), so a result can be trusted the first time. Today's, `depth_velocity_capture` and
-`depth_velocity_compare` run by hand, went wrong on 2026-11-16 in four ways, each a requirement:
-- a setting changed in the panel entered a measurement unasked: a measurement fixes every setting it does not vary;
-- baselines measured under other conditions were compared as if alike: a baseline runs on the same settings and
-  code paths, or is measured again;
-- one run swings (z noise inside ±0.6 on the raw output): a result states its spread and how many runs it rests on;
-- a capture is about 1.1 GB and replays need hand-written segment files: captures, segments and rows sit in one
-  place, named after what they measure, and old ones are deleted.
-
-- **K1.** A script that captures, replays and writes the results row together with the full configuration it
-  ran with, meeting the four requirements; the motion first.
 
 ## Parked
 
@@ -170,4 +200,4 @@ Not worked on until asked for; each with what is known.
 - A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
-Not designed yet, so their rules are not named: C2 to C4, D1, E1, F1, H1, I1 to I4, K1.
+Not designed yet, so their rules are not named: A1, C2 to C4, D1, E1, F1, H1, I1 to I4.
