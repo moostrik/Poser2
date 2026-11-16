@@ -52,24 +52,45 @@ and 0.05 m ([VIEW.md](VIEW.md#the-stage)).
     pixel without depth already gets no z velocity (`depth_velocity_shader.frag`) and no z position
     (`z_position.frag`). Weighing each pixel by its alpha is the textbook form, a hard gate its coarse version
     **(deduction)**.
-  - The read's side becomes mask > 0 (`mask_side` in `depth_upscale.frag`); its fill stays the nearest player
-    pixel within `reach`, not a plane: a plane fitted at the outline extends the edge's slope, where the
-    stereo is noisiest **(deduction)**.
+  - The depth in two passes, one hole filling for the edge and the body alike:
+    1. The read (`DepthUpscale`) keeps a depth only where it is the player's (near to far) and the mask is above
+       0; everything else is 0. Its search for the nearest pixel on the mask's side within `reach` goes, and
+       with it `guided_radius`'s second job as that reach.
+    2. The fill (`DepthFill`, new, in `modules/flow/view`): push-pull (Gortler et al. 1996) over the read. Push:
+       each level down halves the size (448 × 800 to about 7 × 13, seven levels), a pixel the weighted mean of
+       its four, weight 1 where there is a depth, 0 where not, the weight carried down. Pull: from the coarsest
+       up, a pixel keeps its depth by its weight and takes the rest from the coarser level, read bilinearly.
+       Every pixel where the mask is above 0 then holds the player's depth, the outline's band and the camera's
+       holes in the body alike; where the mask is 0 it is 0. A filled pixel moves with its surroundings
+       instead of reading as no z. Filled from the mean around it, not the nearest pixel or a plane: a plane
+       fitted at the outline extends the edge's slope, where the stereo is noisiest **(deduction)**.
+  - A numpy reference beside each pass (`depth_read.py`), unit-tested on a body with holes and an outline;
+    the shader checked against it in `view_check`, with its GPU time.
   - Three parts, one per step, each named after what it gives: `cut` (near, far), `mask` (guided_radius,
-    edge_contrast), `depth` (tolerance); the paths `view.cut.cut`, `view.mask.mask`, `view.depth.depth`.
-    `ViewDepthMask` splits into the cut and the mask, `ViewDepth` keeps only the read, their settings follow;
+    edge_contrast), `depth` (tolerance; its ports the read, then the filled depth); the paths `view.cut.cut`,
+    `view.mask.mask`, `view.depth.read`, `view.depth.depth`. `ViewDepthMask` splits into the cut and the mask,
+    `ViewDepth` holds the read and the fill, their settings follow;
     `ViewOutput.depth_mask` goes. `depth.tolerance` stays: it keeps edges inside the mask (an arm before the
     body) from reading as a depth in between.
   - The motion weighs z by the mask alone (`compose_velocity.frag`, `z_position.frag`, `MotionInput.depth_mask`
     gone); the bridge's z position takes the mask for "the player is there" (`z_position_mix`, its share
     `depth_mask` becomes `mask`); `BridgeInput.depth_mask` goes.
-  - The preset, VIEW.md, MOTION.md, BRIDGE_3D.md and the capture and compare scripts (the saved depth mask, the
-    z position's weight) follow.
-  - Checked: `view_check` against the read's reference at the new side; three captures on the measure
-    recording, against the one path's 0.2 m row in VIEW.md. The color grade is untouched, it premultiplies by
-    the mask as before.
+  - The preset, VIEW.md (its diagram: the camera image is 992 × 800, the view 448 × 800), RESOLUTION.md,
+    MOTION.md, BRIDGE_3D.md and the capture and compare scripts (the saved depth mask, the z position's weight)
+    follow.
+  - Order: the references and their tests; the two passes; the parts and their names; the motion and the
+    bridge; the documents, the preset and the scripts; `view_check`; the three captures. One commit.
+  - Checked: `view_check`, the passes 0 pixels off their references; three captures on the measure recording,
+    against the one path's 0.2 m row in VIEW.md, with the share of the mask without depth, now 0. The color
+    grade is untouched, it premultiplies by the mask as before.
   - Left as it is: the color at the edge is not un-mixed, as matting would find the foreground's own color; the
     motion's xy there sees mixed color, weighed down by the mask.
+
+Question, for B after B2: the edge's depth averaged by the fill, the edge pixels given a weight below 1 (by
+their distance to the cut's outline) so they blend toward the depth inside them. The edge's z noise is mostly
+the body moving between frames, which one frame's average does not reach, and it would soften the edge's real
+z with it **(deduction)**; measured, a weight against none, three captures each, kept only past the runs'
+spread.
 
 Question, for B: the one path's fast z at the view's tolerance 0.2 m is higher than in every other row of
 VIEW.md's table, by more than the runs' spread, with no mechanism found in the code; whether it holds on
