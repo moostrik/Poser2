@@ -37,13 +37,22 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
 - **B1.** The depth read: `view.depth.depth_read` holds `SURFACE` and `MASK` ([VIEW.md](VIEW.md#the-depth-read)). One
   stays, chosen together by eye on the edges recording; the other goes. In the same sitting, the color's edge
   now that the color grade works on the straight image and takes the mask last.
-- **B8.** The monitor's list in the order the data runs, for every stage: the input first, the parts in the order
-  the stage runs them, the outputs last (now the reverse). An output shows as `output.*` and not again under the
-  part that makes it, so the view's color reads as an output. The view's outputs in the order it makes them:
-  image, depth, depth mask, mask, color. `test_stage_layer.py` and the presets' monitor picks follow.
+- **B8.** A stage's textures as steps, as a frame debugger shows a render (RenderDoc, Nsight). Now a port is a
+  flat name (`output.mask`) that mixes where a texture comes from with its role, so the list shows either the
+  structure or the roles. Instead a stage hands its monitors its steps in run order, each with the textures it
+  writes: `input` first (what it takes, the stage before's outputs), its own steps (the view: `crop`, `depth`,
+  `depth_mask`, `color_grade`), `output` last (what it hands on). `input` and `output` hold the same textures as
+  the steps, not copies: `output/mask` is `depth_mask/mask` reached as the stage's contract. A step may hold
+  steps of its own, the same model one level down.
+  - The monitors stay two per stage, each with its tuned settings; one monitor per panel would lose them on
+    every switch.
+  - The monitor's panel: a step select, then a texture select of what that step holds; the setting one path,
+    `depth_mask/mask`. The view's outputs in the order it makes them: image, depth, depth mask, mask, color.
+  - Every stage follows (the motion, the bridge, the fluid), `test_stage_layer.py`, the monitor harness, the
+    presets' monitor picks, MONITOR.md and FLOW.md.
 
 Question, for B8: the view's outputs `image` (the cropped camera image the motion measures on) and `color` (the
-density's color) read badly side by side; their names.
+density's color) read badly side by side; their names (`camera`, `density_color`?).
 
 Question, for B: the view's depth settings gone through together; among them MASK's read takes the mask's
 `guided_radius` as its reach.
