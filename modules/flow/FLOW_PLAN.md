@@ -11,7 +11,7 @@ inferred, **(site fact)** what the operator saw.
 
 | #   | Line                                                                         | State                            | Documents                                          |
 |-----|------------------------------------------------------------------------------|----------------------------------|----------------------------------------------------|
-| B   | [The camera and the view](#b-the-camera-and-the-view)                        | built; its look and tolerance    | [VIEW.md](VIEW.md)                                 |
+| B   | [The camera and the view](#b-the-camera-and-the-view)                        | built; its look, two outputs     | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; its details open          | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; the dye's amount to judge | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | open                             | [FLUID_3D.md](FLUID_3D.md)                         |
@@ -41,14 +41,30 @@ and 0.05 m ([VIEW.md](VIEW.md#the-stage)).
 
 - **B1.** The one path's look, by eye on the edges recording: the outline and the color's edge, now that the
   color grade works on the straight image and premultiplies by the mask last. Needs the operator at the screen.
+- **B2.** The view gives two things, the mask and the depth; the depth mask goes. The split: what one frame
+  shows is the view's (who, where, how far), what needs two frames is the motion's (what moved, how far to
+  trust it). The depth mask adds nothing the depth lacks: the depth is read from the mask's side, so inside the
+  mask it is the player's, and 0 where the read found none in reach; the motion already gives such a pixel no z
+  velocity (`depth_velocity_shader.frag`) and no z position (`z_position.frag`). What it adds is a hard 0/1 on z
+  where the mask fades it; weighing each pixel by its alpha is the textbook form, a gate its coarse version
+  **(deduction)**.
+  - The view's parts are named after what they give: `mask` (the cut, then the mask) and `depth` (the read).
+    The panel group `view.depth_mask` becomes `view.mask`; `ViewDepthMask`, `ViewDepth` and their settings
+    follow; `ViewOutput.depth_mask` goes.
+  - The motion weighs z by the mask alone (`compose_velocity.frag`, `z_position.frag`, `MotionInput.depth_mask`
+    gone); the bridge's z position takes the mask for "the player is there" (`z_position_mix`, its share
+    `depth_mask` becomes `mask`); `BridgeInput.depth_mask` goes.
+  - The preset, VIEW.md, MOTION.md, BRIDGE_3D.md and the capture and compare scripts (the saved depth mask, the
+    z position's weight) follow.
+  - Checked: three captures on the measure recording, against the one path's 0.2 m row in VIEW.md; the color
+    grade is untouched, it premultiplies by the mask as before.
 
 Question, for B: the one path's fast z at the view's tolerance 0.2 m is higher than in every other row of
 VIEW.md's table, by more than the runs' spread, with no mechanism found in the code; whether it holds on
 another recording.
 
-Known in the motion, left as it is: its step filter drops a band one depth sample wide along every outline
-whatever the read; two numbers say "another surface" in space beside the view's (`motion.z.tolerance`, also its
-restart in time, and `motion.z.edge`); z is gated twice, by the mask and the depth mask.
+Known in the motion, left as it is: two numbers say "another surface" in space beside the view's
+(`motion.z.tolerance`, also its restart in time, and `motion.z.edge`, which goes in C5).
 
 A finer depth would give the mask and z a finer edge at the source; the camera's sizes are a given
 ([RESOLUTION.md](RESOLUTION.md#the-rules)).
@@ -69,9 +85,14 @@ A finer depth would give the mask and z a finer edge at the source; the camera's
   ([MOTION.md](MOTION.md#the-guard)): z as measured up to a knee (about 1.5 m/s), compressed above it toward a
   maximum (about 3 m/s), the speed gate (6 m/s) behind it; a curve per reading, no time filter, checked first
   against the spread of z speeds on a recording.
+- **C5.** The step filter goes, after B2. It zeroes the depth where its neighbours jump by more than `z.edge`
+  (`depth_step_filter.frag`), within one frame: by B2's split that is the view's, and the view's read from the
+  mask's side already keeps the outline on one surface, so it only drops a band one depth sample wide along
+  every outline whatever the read. `z.edge` goes with it; the edge's z noise, the body moving between frames,
+  stays the motion's through `z.tolerance` in time. Checked: three captures, against B2's row.
 
 Question, for C: the motion's `z.tolerance` reviewed. One number, 0.2 m, does two jobs: in space, which depth
-samples a window averages as one surface (beside `z.edge`, 0.1 m, the step filter's); in time, how far a new
+samples a window averages as one surface (beside `z.edge`, 0.1 m, the step filter's, gone in C5); in time, how far a new
 depth may lie from the track before it counts as another surface and the track starts over. 0.2 m is large on a
 body, set by the job in time; whether the two jobs want two numbers, and what each should be. The view's own,
 measured at 0.2, 0.1 and 0.05 m, moved nothing past the runs' spread ([VIEW.md](VIEW.md#the-depth-read)).
@@ -237,5 +258,10 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways instead of leaving parallel legacy ones: hd_trio's copy, deleted in line I.
 - A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
+- Name a concept after what it is and rename it everywhere in the same change: B2, the view's parts and ports.
+- Keep presets and settings schemas in sync; remove obsolete pathways: B2 (`view.depth_mask`, the bridge's
+  share), C5 (`z.edge`).
+- When a settings path or a port name reads wrong, fix the structure it comes from: B2.
+- Fix a problem where it is made: B2 and C5, each job in the stage that makes it.
 
 Not designed yet, so their rules are not named: C1 to C4; D1 to D4; E1, E2; F1 to F3; H1; I1 to I4.
