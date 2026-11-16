@@ -51,6 +51,8 @@ its z within the runs' spread of the views before it.
   - VIEW.md says "upscale" for the pass wherever it describes the view as built, the earlier paths' sections
     keeping their names (`SURFACE`, `MASK`) as the configuration they were measured with; its "Checked" section
     follows.
+  - The shaders' docstrings lose their pointer to `depth_read`; `shader_check`, which runs `DepthCrop` and
+    `DepthUpscale` in the GPU harness, stays.
   - Checked: the tests and the import.
 - **B3.** The color: the part that makes the player's color for the density, now `color_grade`, grades,
   sharpens and premultiplies by the mask; it is named for what it gives, `color` (`ViewColor`, its texture and
@@ -59,23 +61,27 @@ its z within the runs' spread of the views before it.
   works a matte where the picture is made: `erode`, the edge pulled inward, dropping the outermost pixels whose
   color the camera mixed with the background's; `feather`, the edge softened inward, the color fading in over
   that width. Both 0 the mask's own edge (one pixel, `MaskAntialias`). In order, on the color's own textures
-  made with the view's: the erode, the `Erode` shader (a minimum filter, `modules/gl/shaders`), moving the edge
-  inward; then the feather, a Gaussian blur of half its width and 2 × blurred − 1 clamped (`Feather`, new, the
+  made with the view's: the erode, the `Erode` shader (`modules/gl/shaders`, the minimum of a 3 × 3), one pass
+  of radius 1 per pixel, so `erode` is in whole pixels (0 to 4, step 1), as the shader's own radius only spaces
+  its samples apart; then the feather, a Gaussian blur of half its width and 2 × blurred − 1 clamped (`Feather`, new, the
   view's), 0 on and outside the eroded edge, rising inward, so nothing reaches past it. The mask itself, which
   the motion and the depth use, stays as it is, so both change the dye's color and nothing of the motion.
+  - The panel follows the code's order: `enabled`; the grade (`exposure` to `saturation`) and `sharpen`; then
+    the premultiply, `use_mask`, `erode`, `feather` (`use_mask` moves down from the top).
+  - Its file and settings follow its name: `color_grade.py` becomes `view_color.py`, `ColorGradeSettings`
+    becomes `ViewColorSettings`.
   - Its call sites follow: `deep_flow_render.py` (the bridge takes `output.color`), `view_check` (its timing row
     and its picture), both presets' `color_grade` group (now `color`), VIEW.md's table, chart and text, and the
     parked note that names `ColorGrade`. Its GPU time, erode and feather on, from `view_check --time` into
     TIMING.md.
-  - Checked by eye in B1, erode 0 to 2 and feather 0 to 4 px.
+  - Checked by eye in B1, erode 0 to 2 and feather 0 to 4 px; committed after B1.
 - **B4.** The motion before and after today's view changes, measured as [FLOW.md](FLOW.md#the-goals) says: the
   upscale's edge at 0.1 m (was 0.2 m), the fill always on, B2 and B3 at the preset (erode and feather 0). Three captures of
   the measure recording's first 16.5 s, replayed through the motion on its raw output (thresholds, `z.smooth` and
   `z.catch_up` at 0), the same segments and regions; the mean of three against the "upscale and the fill, the
   preset" row in VIEW.md and the runs' spread. Expected: every column within the spread, the edge's change
   showing only on edges closer than 0.2 m. Erode and feather are not in it: they change the color, not the
-  mask the motion uses, and are judged by eye in B1. The row goes into VIEW.md; B2 and B3 are committed with
-  it.
+  mask the motion uses, and are judged by eye in B1. The row goes into VIEW.md; B2 is committed with it.
 
 ## C. The motion
 
