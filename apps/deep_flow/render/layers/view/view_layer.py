@@ -25,7 +25,7 @@ from modules.pose import BBox, Frame, Points2D
 from modules.render import ColorSettings, StageLayer, StageOutput
 from modules.utils import Rect
 from ....settings import ViewLayerSettings
-from .colorize import Colorize
+from ..colorize import Colorize
 from .shaders import DepthMask
 
 

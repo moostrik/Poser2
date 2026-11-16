@@ -49,7 +49,7 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
   from their papers, not measured here)**. Which one, its latency against the camera's, and whether its depth
   holds the depth velocity's needs is the item's first question.
 
-Question, for later: Colorize, the view's last pass (deep_flow's `Colorize` in `render/layers/view/`, settings `view.color`), worked on as a
+Question, for later: Colorize, the view's last pass (deep_flow's `Colorize` in `render/layers/colorize/`, settings `view.color`), worked on as a
 whole; and its name, which gl's hue shift alone (`shaders.Colorize`) and its own field for that shift's amount
 (`colorize`) also carry: `HueShift` and `hue_shift`, or else?
 
