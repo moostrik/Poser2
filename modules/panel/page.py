@@ -120,21 +120,25 @@ def body(settings: BaseSettings, controls: list[Control], state: PanelState, *,
         if has_visible_content(child):
             group = getattr(type(settings), name, None)
             description: str = group.description if isinstance(group, Group) else ""
-            card(name, child, controls, state, depth=depth, expansions=expansions, path=path, description=description)
+            tint: str = group.tint if isinstance(group, Group) else ""
+            card(name, child, controls, state, depth=depth, expansions=expansions, path=path, description=description,
+                 tint=tint)
 
 
 def card(name: str, settings: BaseSettings, controls: list[Control], state: PanelState, *,
-         depth: int, expansions: list[ui.expansion], path: str, description: str = "") -> None:
+         depth: int, expansions: list[ui.expansion], path: str, description: str = "", tint: str = "") -> None:
     """One settings instance as a collapsible card: a header with its name, its group's
     `description` as the name's tooltip, and, when it has children, an expand/collapse-all button;
-    its body inside. The state remembers whether it is open.
+    its body inside, on its depth's grey or its group's `tint`. The state remembers whether it is open.
     """
     key = state.card_key(path, name)
     access_class = ACCESS_CLASS.get(content_access_types(settings), "")
-    bg = DEPTH_BG[min(depth, len(DEPTH_BG) - 1)]
+    bg = "" if tint else DEPTH_BG[min(depth, len(DEPTH_BG) - 1)]
     exp = ui.expansion(generate_label(name), value=state.card_open(key)).props(
         "duration=0 dense dense-toggle"
     ).classes(f"w-full rounded {bg}" + (f" {access_class}" if access_class else ""))
+    if tint:
+        exp.style(f"background-color: {tint}")
     exp.on("show", lambda: state.set_card_open(key, True))
     exp.on("hide", lambda: state.set_card_open(key, False))
     expansions.append(exp)

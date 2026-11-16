@@ -54,6 +54,9 @@ class Group(Generic[T]):
     description : str, optional
         One short line of panel text: what the child is. A GUI hint, as a
         field's description.
+    tint : str, optional
+        The child's panel's background, a CSS color, in place of its depth's
+        grey; empty for the grey. A GUI hint.
     """
 
     def __init__(
@@ -63,10 +66,12 @@ class Group(Generic[T]):
         share: Sequence[Field | FieldAlias] | None = None,
         last: bool = False,
         description: str = "",
+        tint: str = "",
     ):
         self.settings_type = settings_type
         self.last: bool = last
         self.description: str = description
+        self.tint: str = tint
         self._share_refs: list[Field | FieldAlias] = list(share) if share else []
         self.share_map: dict[str, str] = {}  # parent_name → child_name
         self.name = ""

@@ -24,7 +24,8 @@ from .modules.flow import       StageLayer, StageLayerSettings, StageOutput, \
                                 Bridge2DLayer, Bridge2DLayerSettings, Bridge3DLayer, Bridge3DLayerSettings, \
                                 Fluid2DLayer, Fluid2DLayerSettings, Fluid3DLayer, Fluid3DLayerSettings, \
                                 Monitor2DLayer, Monitor2DLayerSettings, Monitor3DLayer, Monitor3DLayerSettings, \
-                                MonitorInput, MonitorView, FlowStage, Channel, DepthColormap, DepthDrawMode
+                                MonitorInput, MonitorView, FlowStage, Channel, DepthColormap, DepthDrawMode, \
+                                MAIN_TINT, DEBUG_TINT
 from .modules.board import      TimeSeriesLayer, TimeSeriesLayerSettings
 
 # general: the layers that draw no module's data

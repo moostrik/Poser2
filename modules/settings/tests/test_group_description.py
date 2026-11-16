@@ -26,6 +26,12 @@ class GroupDescriptionTest(unittest.TestCase):
 
     def test_none_given_is_empty(self) -> None:
         self.assertEqual(getattr(_Base, 'plain').description, "")
+        self.assertEqual(getattr(_Base, 'plain').tint, "")
+
+    def test_a_tint_is_on_the_descriptor(self) -> None:
+        class _Tinted(BaseSettings):
+            child = Group(_Child, tint="#4d5a4f")
+        self.assertEqual(getattr(_Tinted, 'child').tint, "#4d5a4f")
 
     def test_the_preset_is_unchanged(self) -> None:
         settings = _Base()

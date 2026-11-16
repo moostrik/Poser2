@@ -8,6 +8,7 @@ from .bridge_2d_layer import    Bridge2DLayer, Bridge2DLayerSettings
 from .bridge_3d_layer import    Bridge3DLayer, Bridge3DLayerSettings
 from .fluid_2d_layer import     Fluid2DLayer, Fluid2DLayerSettings
 from .fluid_3d_layer import     Fluid3DLayer, Fluid3DLayerSettings
-from .monitor_2d_layer import   Monitor2DLayer, Monitor2DLayerSettings, MonitorInput, MonitorView, FlowStage, Channel
+from .monitor_2d_layer import   Monitor2DLayer, Monitor2DLayerSettings, MonitorInput, MonitorView, FlowStage, Channel, \
+                                MAIN_TINT, DEBUG_TINT
 from .monitor_3d_layer import   Monitor3DLayer, Monitor3DLayerSettings
 from .shaders import            DepthColormap, DepthDrawMode

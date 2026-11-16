@@ -243,8 +243,8 @@ class ViewLayerSettings(render.StageLayerSettings):
     mask:        Group[ViewMaskSettings]      = Group(ViewMaskSettings, description="The player's mask: the crop's depth, its edge guided onto the image's")
     color_grade: Group[ColorGradeSettings]    = Group(ColorGradeSettings)
 
-    monitor_main:  Group[render.Monitor2DLayerSettings] = Group(render.Monitor2DLayerSettings, last=True)
-    monitor_debug: Group[render.Monitor2DLayerSettings] = Group(render.Monitor2DLayerSettings, last=True)
+    monitor_main:  Group[render.Monitor2DLayerSettings] = Group(render.Monitor2DLayerSettings, last=True, tint=render.MAIN_TINT)
+    monitor_debug: Group[render.Monitor2DLayerSettings] = Group(render.Monitor2DLayerSettings, last=True, tint=render.DEBUG_TINT)
 
 
 class CaptureView(IntEnum):

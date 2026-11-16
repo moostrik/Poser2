@@ -17,7 +17,7 @@ from modules.settings import Field, Group
 from modules.flow import Fluid2D, Fluid2DSettings, HasPorts
 from .shaders import DensityColorize
 from .fluid_layer import FluidLayer, FluidLayerSettings, FluidInput, FluidOutput, Injection
-from .monitor_2d_layer import Monitor2DLayerSettings
+from .monitor_2d_layer import DEBUG_TINT, MAIN_TINT, Monitor2DLayerSettings
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +29,8 @@ class Fluid2DLayerSettings(Fluid2DSettings, FluidLayerSettings):
     first; the stage's width and height are the fluid's simulation grid."""
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD, newline=True, description="How the show is drawn over the layers before it")
 
-    monitor_main:  Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True)
-    monitor_debug: Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True)
+    monitor_main:  Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=MAIN_TINT)
+    monitor_debug: Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=DEBUG_TINT)
 
 
 class Fluid2DLayer(FluidLayer):

@@ -19,6 +19,9 @@ from modules.settings import Field, BaseSettings, Group, Widget
 from ...layer_base import LayerBase
 from .shaders import DepthColormap, DepthDrawMode
 
+MAIN_TINT: str = "#4d5a4f"      # the main monitor's panel: a grey with a little green
+DEBUG_TINT: str = "#5e4b4b"     # the debug monitor's panel: a grey with a little red
+
 
 class FlowStage(IntEnum):
     """A stage of a flow system, as a monitor names it."""
