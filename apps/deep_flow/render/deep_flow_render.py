@@ -141,7 +141,7 @@ class DeepFlowRender(RenderBase):
         self.allocate_window_renders()
 
     def allocate(self) -> None:
-        self._view_size = (self.settings.view_width, self.settings.view_height)
+        self._view_size = (self.settings.view.width, self.settings.view.height)
         for layer_type, cam_dict in self.L.items():
             for layer in cam_dict.values():
                 size: Size = size_of(layer_type)
@@ -167,9 +167,8 @@ class DeepFlowRender(RenderBase):
                 self.L[layer_type][i].allocate(w, h, GL_RGBA)
 
     def _follow_view_size(self) -> None:
-        """Reallocate the view layers when the motion's size changed: the view is drawn at the size the
-        motion and the bridge read it."""
-        size: tuple[int, int] = (self.settings.view_width, self.settings.view_height)
+        """Reallocate the view layers when the view's size changed."""
+        size: tuple[int, int] = (self.settings.view.width, self.settings.view.height)
         if size == self._view_size:
             return
         self._view_size = size

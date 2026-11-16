@@ -237,7 +237,7 @@ class ViewLayerSettings(render.StageLayerSettings):
     and the mask's edge."""
     width:         Field[int]   = Field(448, min=32, max=4096, step=32, description="The view's width (pixels)")
     height:        Field[int]   = Field(800, min=32, max=4096, step=32, description="The view's height (pixels)")
-    tolerance:     Field[float] = Field(0.2, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m")
+    tolerance:     Field[float] = Field(0.2, min=0.05, max=0.5, step=0.01, description="Depth jump beyond which the read blends no two depth pixels, m")
     fixed_x:       Field[float] = Field(0.5, min=0.0, max=1.0, description="The window's center across the camera image")
     fixed_y:       Field[float] = Field(0.5, min=0.0, max=1.0, description="The window's center down the camera image")
     fixed_height:  Field[float] = Field(1.0, min=0.05, max=2.0, description="The window's height, a share of the camera image's")
@@ -299,15 +299,10 @@ class PoseMonitorSettings(BaseSettings):
 class RenderSettings(BaseSettings):
     main_view: Field[MainView]                   = Field(MainView.DEBUG, description="The main window: the debug panels, or the show alone")
     input_fps: Field[float]                      = Field(60.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
-    # what the view and the motion both read, set once
-    view_width: Field[int]                       = Field(448, min=32, max=4096, step=32, description="The view's and the motion's width (pixels)")
-    view_height: Field[int]                      = Field(800, min=32, max=4096, step=32, description="The view's and the motion's height (pixels)")
-    tolerance: Field[float]                      = Field(0.2, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m: the view's depth read and the motion's z")
     # the chain, in its order, then the pose beside it
     capture: Group[CaptureSettings]              = Group(CaptureSettings)
-    view   : Group[ViewLayerSettings]            = Group(ViewLayerSettings, share=[view_width.as_('width'), view_height.as_('height'), tolerance])
-    motion : Group[render.Motion3DLayerSettings] = Group(render.Motion3DLayerSettings, share=[input_fps.as_('fps'), view_width.as_('width'),
-                                                                                            view_height.as_('height'), tolerance])
+    view   : Group[ViewLayerSettings]            = Group(ViewLayerSettings)
+    motion : Group[render.Motion3DLayerSettings] = Group(render.Motion3DLayerSettings, share=[input_fps.as_('fps')])
     bridge : Group[render.Bridge3DLayerSettings] = Group(render.Bridge3DLayerSettings)
     fluid  : Group[render.Fluid3DLayerSettings]  = Group(render.Fluid3DLayerSettings)
     pose   : Group[PoseMonitorSettings]          = Group(PoseMonitorSettings)
@@ -315,8 +310,8 @@ class RenderSettings(BaseSettings):
     layer  : Group[LayerGroup]                   = Group(LayerGroup)
     time_series: Group[render.TimeSeriesLayerSettings] = Group(render.TimeSeriesLayerSettings)
     colors : Group[render.ColorSettings]         = Group(render.ColorSettings)
-    window : Group[WindowSettings]               = Group(WindowSettings)
     screen_recorder: Group[ScreenRecorderSettings] = Group(ScreenRecorderSettings)
+    window : Group[WindowSettings]               = Group(WindowSettings)
 
 
 class CadenceSettings(BaseSettings):

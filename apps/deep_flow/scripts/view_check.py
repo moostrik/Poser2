@@ -146,11 +146,10 @@ def main() -> int:
     settings = ViewLayerSettings()
     settings.initialize()
     settings.update_from_dict(preset['view'])
-    settings.tolerance = preset['tolerance']        # the render's, shared to the view and the motion
     if args.read:
         settings.depth_read = DepthRead[args.read.upper()]
     view = ViewLayer(0, settings, json.loads(PRESET.read_text(encoding='utf-8'))['camera']['fov'], ColorSettings())
-    view.allocate(preset['view_width'], preset['view_height'])
+    view.allocate(preset['view']['width'], preset['view']['height'])
 
     uploader = SerialUploader(SerialUploaderSettings())
     images: list[GpuImage] = []

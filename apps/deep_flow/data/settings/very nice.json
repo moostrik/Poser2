@@ -265,9 +265,6 @@
   },
   "render": {
     "main_view": "SHOW",
-    "view_width": 448,
-    "view_height": 800,
-    "tolerance": 0.2,
     "layer": {
       "select": {
         "a": [
@@ -320,6 +317,9 @@
         "texture": "output.depth",
         "view": "COLORMAP"
       },
+      "width": 448,
+      "height": 800,
+      "tolerance": 0.2,
       "fixed_x": 0.5,
       "fixed_y": 0.5,
       "fixed_height": 1.0,
@@ -366,6 +366,8 @@
         }
       },
       "guard": true,
+      "width": 448,
+      "height": 800,
       "use_mask": true,
       "x_gain": 1.0,
       "y_gain": 1.0,
@@ -380,6 +382,7 @@
       "z": {
         "edge": 0.1,
         "window": "SEVEN",
+        "tolerance": 0.2,
         "smooth": 100.0,
         "xy_smooth": false,
         "catch_up": 8.0,

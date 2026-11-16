@@ -38,7 +38,7 @@ the frame stays 800 rows at any tilt; a recording holds the frame as delivered. 
 Camera node makes 800 rows from (2000 × 1500 or 1920 × 1080) is not checked.
 
 The view stage and what is drawn from it (`Size.VIEW` in `apps/deep_flow/render/chain.py`) are allocated at
-`render.view_width` × `render.view_height`, the size the motion runs at too, and follow it, as the view is there for
+`render.view.width` × `render.view.height`, set to the size the motion runs at too, and follow it, as the view is there for
 the fluid **(site fact)** and the other readers, the debug panels, show the same detail enlarged. A larger view read
 back bilinearly 2.4× down would hand the solve an aliased image. The fluid reads the bridge's outputs
 bilinearly: at 1.56× that loses little, as the readings are smooth over the motion's window and the
