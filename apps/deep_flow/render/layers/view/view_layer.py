@@ -19,7 +19,7 @@ import numpy as np
 from OpenGL.GL import GL_RGBA16F
 
 # Local application imports
-from modules.flow import DepthRead, DepthView, HasPorts, Port, TextureKind, depth_step, fixed_window, place_points, view_span
+from modules.flow import DepthRead, DepthView, HasPorts, Port, Ports, TextureKind, depth_step, fixed_window, place_points, view_span
 from modules.gl import Fbo, Style, Texture
 from modules.pose import BBox, Frame, Points2D
 from modules.render import StageLayer, StageOutput
@@ -95,7 +95,8 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         return ports
 
     def _components(self) -> dict[str, HasPorts]:
-        return {'depth': self._depth, 'depth_mask': self._depth_mask, 'color_grade': self._color_grade}
+        return {'crop': Ports({'image': Port(self._image, TextureKind.IMAGE)}),     # a step without a class of its own
+                'depth': self._depth, 'depth_mask': self._depth_mask, 'color_grade': self._color_grade}
 
     @property
     def texture(self) -> Texture:
