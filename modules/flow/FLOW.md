@@ -57,7 +57,7 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 
 | Camera | 2D flow                 | 3D flow                              |
 |--------|-------------------------|--------------------------------------|
-| 2D     | image, mask             | no z position, so nothing goes in ([FLOW_PLAN.md](FLOW_PLAN.md#b-the-camera-and-the-view)) |
+| 2D     | image, mask             | no z position, so nothing goes in ([FLOW_PLAN.md](FLOW_PLAN.md#parked)) |
 | 3D     | image, mask; depth idle | image, mask, depth; z and w measured |
 
 ## Terms
