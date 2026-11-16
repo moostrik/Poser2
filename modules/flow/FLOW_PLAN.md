@@ -46,6 +46,17 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
   depth mask and color. The ports follow the view's parts in the order it runs (crop, depth, mask, color grade),
   and the input depth is a depth (kind DEPTH, the depth band's near and far), so its monitor draws its colormap.
   The look at the edge changes: judged by eye.
+- **B6.** A 2D and a 3D monitor: `MonitorLayer` (395 lines) draws both, and its volume settings (`slice`,
+  `slice_position`, `slice_focus`, `depth_fade`, `orbit`) sit on every stage's panel, doing nothing on a 2D one.
+  `Monitor2DLayer` holds the 2D views; `Monitor3DLayer` extends it with the volume views (the cube, the glyphs,
+  the cut, the orbit, the slice) and their settings. A stage takes the one its ports need: the view and the
+  motion 2D, the fluid 3D, the bridge by its ports.
+- **B7.** The panels by their use: panels `a` and `b` become `main` and `debug`, each stage's monitors
+  `monitor_main` and `monitor_debug`, and the `main_view` select (`DEBUG`, `SHOW`) a toggle, `debug`: on, the main
+  and the debug panel; off, the main panel alone, as a secondary window shows it. Presets follow.
+
+Question, for B: the view's depth settings gone through together; among them MASK's read takes the mask's
+`guided_radius` as its reach.
 
 Question, for later: the pose monitor (`PoseMonitorCompositor`) draws its chosen layer and the features into an FBO
 of its own, which makes it a compositor by the render rule; drawn straight into the panel it needs none and is a
@@ -236,6 +247,8 @@ Not worked on until asked for; each with what is known.
 - Keep presets and settings schemas in sync; name a concept after what it is: the view's crop, B4.
 - Fix a problem where it is made; remove obsolete pathways: the view's grade on the straight image, the
   foreground gone, the input depth's kind, B5.
+- Prefer composition over inheritance, an `ABC` for a family that shares code: the 2D and 3D monitor, B6.
+- Name a concept after what it is, one term everywhere: main and debug, B7.
 - A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
