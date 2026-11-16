@@ -16,7 +16,7 @@ and `Motion2DLayer`.
 ## The goal
 
 The player's velocity per pixel, from two frames: x, y and z in widths/s, with as little noise as possible
-while it keeps as much of the real motion as possible, z most of all. What one frame shows is the view's; what
+while it keeps as much of the real motion as possible. What one frame shows is the view's; what
 to trust over time is the motion's ([FLOW.md](FLOW.md#the-goals)).
 
 ## How it measures

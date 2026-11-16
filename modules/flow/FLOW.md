@@ -38,7 +38,7 @@ The flow's goal: the player's motion into the fluid, shown as sharp, translucent
 | Stage                                 | Goal                                                                                         |
 |---------------------------------------|----------------------------------------------------------------------------------------------|
 | [the view](VIEW.md#the-goal), one frame  | who, where and how far: the player's image, mask and depth, agreeing pixel for pixel at the motion's size, adding no noise of its own |
-| [the motion](MOTION.md#the-goal), two frames | the player's velocity per pixel, x, y and z in widths/s, with as little noise as possible while it keeps as much of the real motion as possible, z most of all |
+| [the motion](MOTION.md#the-goal), two frames | the player's velocity per pixel, x, y and z in widths/s, with as little noise as possible while it keeps as much of the real motion as possible |
 | [the bridge](BRIDGE_3D.md#the-goal)   | the motion translated into what the fluid takes, and held between the camera's frames        |
 
 A stage is judged against its goal on its own output, the stages after it neutral: a change to the view on the
