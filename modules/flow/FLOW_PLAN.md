@@ -124,6 +124,14 @@ Its goal and what is built: [VIEW.md](VIEW.md). New points go here.
 - **C4.** The smoothing (`z.smooth`, `z.catch_up`) judged on its own, the raw output against the smoothed
   ([FLOW.md](FLOW.md#the-goals)), once A2 is built.
 
+Question, for C, from A4's pass 1: z's order over time. Now: measure, smooth (with the catch-up), dead zone,
+threshold. The dead zone gates on the smoothed depth, which lags, and its 2 cm sits twice in the catch-up's
+opening rule (`catch_up_share`), so with smoothing it doubles the lag (hands 45 to 97 ms) and takes a quarter to
+half of z. Proposed by Matthias: the dead zone before the smooth, a backlash on the measured depth; the smooth a
+last resort; the catch-up in the smooth, making up its lag in the middle of a movement, its rule without the
+dead zone. At `smooth` 0 both orders are the same. To decide with pass 2's values (the dead zone at 0.01 m,
+smoothed).
+
 ## D. The bridge
 
 What is built: [BRIDGE_3D.md](BRIDGE_3D.md).
