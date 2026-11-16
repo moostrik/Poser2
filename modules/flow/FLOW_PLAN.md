@@ -60,7 +60,9 @@ What is measured today (the tables with numbers in the flow's documents, 73), by
 - **A2.** The motion's measuring made fit for A3 and A4, in `scripts/depth_velocity_compare.py`: the row with
   x/y beside z (still noise inside, slow, fast, fast ÷ noise), the lag of a side behind the other over the moving
   stretches (ms, from the two series' best shift), several captures in one call with their mean and spread, and
-  the row written with its stamp: kind, date, commit, recording, captures, and the settings of each side.
+  the row written with its stamp: kind, date, commit, recording, captures, and the settings of each side. A
+  recording's stretches are read from a `segments.json` in the recording's own folder, written once, where they
+  now sit beside each capture and go with it.
 - **A3.** New baselines for today's view and motion (the depth mask gone, the fill, edge 0.1 m, erode and
   feather):
   - the result in [VIEW.md's depth table](VIEW.md#the-depth), raw z and x/y on the measure recording, three
@@ -80,7 +82,9 @@ What is measured today (the tables with numbers in the flow's documents, 73), by
   A part's neutral value is its off where it has one (`damping` 0, `same_surface` off, `smooth` 0, `catch_up` 0,
   `dead_zone` 0, the thresholds 0, `levels` 1, z's `window` 1×1) and else the end of its range that does least:
   `edge` 0.3 m, `tolerance` 0.5 m, x/y's `window` 3×3. The steps:
-  - the still and the moving stretches marked in the hands, edges and show recordings. The measure recording
+  - the four recordings gone through first: the still and the moving stretches of each in its `segments.json`,
+    and what each holds (the distance, what the player does, its stretches, the columns it gives) in a table in
+    MOTION.md, above the results. The measure recording
     has moves slow then fast, so it gives every column; the others give the still noise, how z follows the real
     depth, and the lag, and slow against fast only where they hold such a move **(deduction)**;
   - pass 1, the preset against neutral, on the four recordings: each part alone, and the pairs that depend on
