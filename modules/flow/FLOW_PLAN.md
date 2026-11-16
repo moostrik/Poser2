@@ -41,8 +41,13 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
   dotted path is its step (`depth_mask.mask`, `xy.solve`), so the list already holds the structure; it runs
   reversed now (output on top, input at the bottom). It runs `input.*` first (what the stage takes, the stage
   before's outputs), its steps in run order, `output.*` last (what it hands on); `input` and `output` name the
-  same textures as the steps, not copies. One select stays: in this order its entries read grouped by step.
-  - The monitors stay two per stage, each with its tuned settings.
+  same textures as the steps, not copies.
+  - The monitor's panel picks the path a level at a time: a select per level of the dotted path (`depth_mask`,
+    then `mask`; `xy`, then `solve`), as many as the paths are deep. The selects before the last only filter
+    the next, they are no setting: the setting stays the one full path, and nothing on screen changes until a
+    texture is picked. A filter left without a pick snaps back to the shown texture's step. The widget, a path
+    select, is the panel's (`modules/panel`), for any dotted path field.
+  - The monitors stay two per stage, each with its tuned settings; comparing two textures is main against debug.
   - The view's outputs in the order it makes them: image, depth, depth mask, mask, color.
   - Every stage follows, `test_stage_layer.py`, MONITOR.md and FLOW.md; the presets' picks keep their paths.
 
