@@ -228,7 +228,8 @@ Not worked on until asked for; each with what is known.
 
 - Remove obsolete pathways instead of leaving parallel legacy ones: hd_trio's copy, deleted in line I.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
-  preset's `view.depth_read`, B1.
+  preset's `view.depth.depth_read`, B1.
+- Keep presets and settings schemas in sync; name a concept after what it is: the view's window, B4.
 - A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
