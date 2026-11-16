@@ -157,23 +157,24 @@ noise inside 0.38 to 0.49), so the preset keeps 0.2 m, never above the motion's.
 
 The view as built (the read where the mask is, then the fill) against the one path before it, on the motion's raw
 output: the same recording and segments, three captures each, replayed with the thresholds, `z.smooth` and
-`z.catch_up` at 0; the one path's own three captures replayed the same way, the motion now without a depth mask;
-z weighted by the mask; regions from the mask above 0.5; fit along the mask's edge. The one path's captures hold
-the mask as 0 or 1, the view's as 0 to 1, which touches about one pixel of the edge's six. One run's noise swings
-by about ±0.6 inside and ±0.4 at the edge.
+`z.catch_up` at 0; the earlier paths' own three captures replayed the same way, their depth set to 0 where their
+depth mask was 0, which gives z what the depth mask's gate gave it (no z and no z position there, x/y as it was);
+z weighted by the mask; regions from the mask above 0.5; fit along the mask's edge. The earlier captures hold the
+mask as 0 or 1, the view's as 0 to 1, which touches about one pixel of the edge's six. One run's noise swings by
+about ±0.4 inside and ±0.3 at the edge.
 
 | View (`view.depth.tolerance` 0.2 m)   | No z position | Fit   | z noise inside / edge | Slow  | Fast  | Fast ÷ noise | x/y at edge | View, GPU |
 |---------------------------------------|---------------|-------|-----------------------|-------|-------|--------------|-------------|-----------|
-| the one path, before                  | 7.2%          | 0.491 | 13.33 / 15.25         | 0.569 | 0.897 | 0.067        | 1.80        |           |
+| `MASK`, gated by its depth mask       | 3.7%          | 0.493 | 12.32 / 5.93          | 0.567 | 0.828 | 0.067        | 1.87        |           |
+| the one path, gated by its depth mask | 3.7%          | 0.491 | 12.28 / 5.90          | 0.540 | 0.855 | 0.070        | 1.84        |           |
 | the read, `depth.fill.enabled` off    | 4.4%          | 0.491 | 11.97 / 5.94          | 0.559 | 0.843 | 0.071        | 1.75        |           |
 | the read and the fill, the preset     | 3.9%          | 0.492 | 11.84 / 6.07          | 0.542 | 0.831 | 0.070        | 1.82        | 0.20 ms   |
 
-z's noise at the edge falls by more than half, the fill on or off, so it comes from the read: the one path copied
-the nearest depth pixel within `reach` at the edge, and as the mask's edge moved from frame to frame the copied
-pixel jumped, each jump a z **(deduction)**. The fill lowers the share of the mask without a z position and
-changes nothing else past the runs' spread; what is left is the motion's step filter's band
-([MOTION.md](MOTION.md#depth_velocity-z)). The noise inside falls too, past the spread, with no mechanism found,
-so it is not counted as a gain. Slow and fast z stay within about 5%.
+The view as built gives z what the paths before it gave, with no depth mask: every column lies within the runs'
+spread but the share without a z position, 3.9% against 3.7%, with no mechanism found. Without the fill the band
+between the depth's edge and the mask's has no z (4.4%). What is left with the fill is the motion's step filter's
+band ([MOTION.md](MOTION.md#depth_velocity-z)). The earlier paths replayed without their gate gave an edge noise of
+15.2, z from the background's depth the read left inside the mask.
 
 Against reading the nearest depth pixel everywhere, on the stillslowfast recording, 3 runs, the motion's
 thresholds at 0, `SURFACE` gives: neighbouring pixels inside the body with the very same depth 11% (67%), z

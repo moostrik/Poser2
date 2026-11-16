@@ -172,8 +172,14 @@ class Frames:
         return len(self.calls)
 
     def load(self, k: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """The luminance, the depth and the mask, 0 to 1 (a mask saved as a bool before is 0 or 1)."""
-        return (np.load(self.folder / f'luminance_{k:04d}.npy').astype(np.float32), np.load(self.folder / f'depth_{k:04d}.npy').astype(np.float32),
+        """The luminance, the depth and the mask, 0 to 1 (a mask saved as a bool before is 0 or 1). A capture made
+        with a depth mask, which gated z, has its depth 0 where that mask is: a pixel without depth has no z and
+        no z position, as the gate gave it, and its x/y as before."""
+        depth: np.ndarray = np.load(self.folder / f'depth_{k:04d}.npy').astype(np.float32)
+        depth_mask: Path = self.folder / f'depth_mask_{k:04d}.npy'
+        if depth_mask.exists():
+            depth = np.where(np.load(depth_mask), depth, 0.0).astype(np.float32)
+        return (np.load(self.folder / f'luminance_{k:04d}.npy').astype(np.float32), depth,
                 np.load(self.folder / f'mask_{k:04d}.npy').astype(np.float32))
 
     def motion(self) -> np.ndarray:
