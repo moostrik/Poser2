@@ -31,6 +31,10 @@ distinct.
 
 ## B. The camera and the view
 
+The goal: a clear path from the camera's depth and image to the motion, each step understandable, that leads to
+as little noise as possible in the motion while it keeps as much real z motion as possible. The motion is taken
+as it is here; what is inconsistent in it is listed below and is line C's.
+
 Built: every capture reaches the motion ([INPUT_THREADS.md](INPUT_THREADS.md)), the mask's edge on the image's
 and the depth read across a surface ([VIEW.md](VIEW.md)).
 
@@ -38,15 +42,24 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
   knows the player's outline sharply. Now the depth is scaled up first, the masks are cut from that, and `MASK`
   reads it again ([VIEW.md](VIEW.md#the-depth-read)). Instead the depth stays at its own size until the mask
   exists, in three steps, each once, drawn below:
-  - Who: the band cut on the depth's own pixels, a blocky yes or no.
+  - Who: the band cut on the depth's own pixels, a blocky yes or no; in the view one pass that reads the depth
+    unblended and tests the band. It keeps its own texture, beside the final depth mask, so the monitor shows it.
   - Where: the guided filter moves that outline onto the image's edges: the mask, the one outline. Where the
     image has no edge it stays the depth's, smoothed.
   - How far: the depth read into the view once, blended within a surface, at the outline from the mask's side.
     The depth mask is that depth's cut and lies on the mask's outline.
-  - `depth_read` and its `SURFACE` go; `tolerance` keeps one job, the blend within a surface.
-  - Measured against the path now, on stillslowfast, the motion's thresholds at 0: the one results table
-    (noise, slow, fast, fast ÷ slow, fast ÷ noise, GPU), the mask's fit and the share of the mask without a z
-    position; then by eye on the edges recording, with the color's edge.
+  - `depth_read` and its `SURFACE` go; `tolerance` keeps one job, the blend within a surface. The view's panels
+    follow the new run order: crop, depth mask, depth, color grade. `DepthRead`, `DepthUpscale`'s modes, the
+    references in `depth_read.py`, `test_view_window.py`, `view_check.py`, `shader_check.py`, the presets and
+    VIEW.md follow; VIEW.md keeps its `SURFACE` and `MASK` table as the comparison this came from.
+  - Measured, three rows: `SURFACE` and `MASK` as they are, captured before the build while they exist, and the
+    new path; on the measure recording (`20261112-125832_measure`: still, slow, fast), three runs each, the
+    motion's thresholds at 0: the one results table (noise, slow, fast, fast ÷ slow, fast ÷ noise, GPU), the
+    mask's fit, and the share of the mask without a z position.
+  - The tools for it: `depth_velocity_capture.py` saves the depth mask the motion gets too, and
+    `depth_velocity_compare.py` hands it on and reads the weight of the motion's `z_position`, which is 0 where
+    the motion has no depth for a pixel.
+  - Then by eye on the edges recording, with the color's edge.
 - **B11.** The view's own tolerance, after B1. The view's read asks only whether two neighbouring depth pixels are
   one surface, to blend them; the motion's 0.2 m is that large for its job in time, a fast push staying one
   surface from frame to frame, which the view does not have. Smaller blends fewer body parts into distances
