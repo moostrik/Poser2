@@ -37,19 +37,14 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
 - **B1.** The depth read: `view.depth.depth_read` holds `SURFACE` and `MASK` ([VIEW.md](VIEW.md#the-depth-read)). One
   stays, chosen together by eye on the edges recording; the other goes. In the same sitting, the color's edge
   now that the color grade works on the straight image and takes the mask last.
-- **B8.** A stage's textures as steps, as a frame debugger shows a render (RenderDoc, Nsight). Now a port is a
-  flat name (`output.mask`) that mixes where a texture comes from with its role, so the list shows either the
-  structure or the roles. Instead a stage hands its monitors its steps in run order, each with the textures it
-  writes: `input` first (what it takes, the stage before's outputs), its own steps (the view: `crop`, `depth`,
-  `depth_mask`, `color_grade`), `output` last (what it hands on). `input` and `output` hold the same textures as
-  the steps, not copies: `output/mask` is `depth_mask/mask` reached as the stage's contract. A step may hold
-  steps of its own, the same model one level down.
-  - The monitors stay two per stage, each with its tuned settings; one monitor per panel would lose them on
-    every switch.
-  - The monitor's panel: a step select, then a texture select of what that step holds; the setting one path,
-    `depth_mask/mask`. The view's outputs in the order it makes them: image, depth, depth mask, mask, color.
-  - Every stage follows (the motion, the bridge, the fluid), `test_stage_layer.py`, the monitor harness, the
-    presets' monitor picks, MONITOR.md and FLOW.md.
+- **B8.** A stage's textures in the order the data runs, as a frame debugger lists a render's passes. A port's
+  dotted path is its step (`depth_mask.mask`, `xy.solve`), so the list already holds the structure; it runs
+  reversed now (output on top, input at the bottom). It runs `input.*` first (what the stage takes, the stage
+  before's outputs), its steps in run order, `output.*` last (what it hands on); `input` and `output` name the
+  same textures as the steps, not copies. One select stays: in this order its entries read grouped by step.
+  - The monitors stay two per stage, each with its tuned settings.
+  - The view's outputs in the order it makes them: image, depth, depth mask, mask, color.
+  - Every stage follows, `test_stage_layer.py`, MONITOR.md and FLOW.md; the presets' picks keep their paths.
 
 Question, for B8: the view's outputs `image` (the cropped camera image the motion measures on) and `color` (the
 density's color) read badly side by side; their names (`camera`, `density_color`?).
