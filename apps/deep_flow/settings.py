@@ -59,7 +59,6 @@ class Layers(IntEnum):
     motion_monitor = auto()
     bridge_monitor = auto()
     fluid_monitor = auto()
-    composite =     auto()
     time_series =   auto()
     pose_monitor =  auto()
 
@@ -71,14 +70,14 @@ class Layers(IntEnum):
 class MainView(IntEnum):
     """What the main window shows: the debug panels, or the show alone."""
     DEBUG = 0       # the left and the right panel, as `left` and `right` pick them
-    SHOW = auto()   # the composite alone, fit to the whole window, as a secondary window shows it
+    SHOW = auto()   # the `output` layers alone, fit to the whole window, as a secondary window shows it
 
 
 class LayerSettings(BaseSettings):
-    left:   Field[list[Layers]] = Field([Layers.composite],                  description="Layers drawn in the left viewport",  widget=Widget.playlist)
+    left:   Field[list[Layers]] = Field([Layers.fluid],                      description="Layers drawn in the left viewport",  widget=Widget.playlist)
     right:  Field[list[Layers]] = Field([Layers.pose_monitor],               description="Layers drawn in the right viewport", widget=Widget.playlist)
-    output: Field[list[Layers]] = Field([Layers.fluid],                      description="Layers mixed into the show texture", widget=Widget.playlist)
-    record: Field[list[Layers]] = Field([Layers.composite],                  description="Layers drawn into the screen recording", widget=Widget.playlist)
+    output: Field[list[Layers]] = Field([Layers.fluid],                      description="Layers drawn, in order, as the show", widget=Widget.playlist)
+    record: Field[list[Layers]] = Field([Layers.fluid],                      description="Layers drawn into the screen recording", widget=Widget.playlist)
 
 
 # ---------------------------------------------------------------------------
@@ -249,7 +248,6 @@ class CaptureSettings(BaseSettings):
 
 class LayerGroup(BaseSettings):
     select   : Group[LayerSettings]                 = Group(LayerSettings)
-    composite: Group[render.LayerCompositorSettings] = Group(render.LayerCompositorSettings)
 
 class PoseFrame(IntEnum):
     """Where the pose monitor draws the pose."""

@@ -8,12 +8,15 @@ The density volume holds the colored density (RGBA16F GL_TEXTURE_3D on the simul
 from modules.gl import GpuTimer, Style, Texture
 from modules.flow import CompositeSettings, Fluid3D, Fluid3DSettings, HasPorts
 from modules.settings import Field, Group
+from ...general.grade import LutGrade, LutSettings
 from .fluid_layer import FluidLayer, FluidLayerSettings, FluidOutput, Injection
 
 
 class Fluid3DCompositeSettings(CompositeSettings):
-    """The fluid's composite, and how the layer draws its picture over the layers before it."""
+    """The fluid's composite, how the layer draws its picture over the layers before it, and the LUT it is drawn
+    through."""
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD, description="How the show is drawn over the layers before it")
+    lut: Group[LutSettings] =               Group(LutSettings)
 
 
 class Fluid3DLayerSettings(Fluid3DSettings, FluidLayerSettings):
@@ -32,6 +35,7 @@ class Fluid3DLayer(FluidLayer):
         self.settings: Fluid3DLayerSettings = settings
         self._fluid: Fluid3D = Fluid3D(settings)
         self._inject_timer: GpuTimer = GpuTimer("GPU fluid inject")     # an injection's drag, force and sources
+        self._grade: LutGrade = LutGrade(settings.composite.lut)
 
     @property
     def blend_mode(self) -> Style.BlendMode:
@@ -54,11 +58,21 @@ class Fluid3DLayer(FluidLayer):
 
     def allocate(self, width: int, height: int, internal_format: int | None = None) -> None:
         self._fluid.allocate(width, height)
+        self._grade.allocate()
 
     def deallocate(self) -> None:
         self._fluid.deallocate()
         self._inject_timer.deallocate()
+        self._grade.deallocate()
         super().deallocate()
+
+    def draw(self) -> None:
+        """The show, through its LUT where one is picked."""
+        Style.push_style()
+        Style.set_blend_mode(self.blend_mode)
+        if self.texture.allocated:
+            self._grade.draw(self.texture)
+        Style.pop_style()
 
     def reset(self) -> None:
         self._fluid.reset()

@@ -284,23 +284,8 @@
           "view_monitor"
         ],
         "record": [
-          "composite"
+          "fluid"
         ]
-      },
-      "composite": {
-        "blend_mode": "SCREEN",
-        "lut": {
-          "folder": "data/luts",
-          "files": [
-            "",
-            "Blockbuster.cube",
-            "Cityscape.cube",
-            "Frosted.cube",
-            "Vibrance.cube"
-          ],
-          "file": "Blockbuster.cube",
-          "strength": 1.0
-        }
       }
     },
     "pose": {
@@ -637,6 +622,11 @@
         "smooth": 3
       },
       "composite": {
+        "lut": {
+          "folder": "data/luts",
+          "file": "Blockbuster.cube",
+          "strength": 1.0
+        },
         "emission": 10.0,
         "opacity": 1.2,
         "fog": 0.269,

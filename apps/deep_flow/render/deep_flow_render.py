@@ -62,8 +62,6 @@ class DeepFlowRender(RenderBase):
                                                  (Layers.bridge_monitor, render.FlowStage.BRIDGE, settings.bridge.monitor),
                                                  (Layers.fluid_monitor, render.FlowStage.FLUID, settings.fluid.monitor)):
                 self.L[key][i] = render.MonitorLayer(stage, monitor_settings)
-
-            self.L[Layers.composite][i] =                   render.LayerCompositor(                          [fluid],                  settings.layer.composite)
         self.L[Layers.time_series][0] = render.TimeSeriesLayer(self.board, settings.time_series)      # the board's series, one for all cameras
 
         # Split view: the left and right panels side by side or stacked, whichever shows what they hold larger
@@ -237,13 +235,6 @@ class DeepFlowRender(RenderBase):
         self._update_layout()
         self._follow_view_size()
 
-        for i, _composite_layer in self.L[Layers.composite].items():
-            composite_layer = cast(render.LayerCompositor, _composite_layer)
-            composite_layer.set_layers([
-                self.L[key][i] for key in self._output_layers
-                if key is not Layers.composite and key in self.L and i in self.L[key]   # it cannot draw into itself
-            ])
-
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         seen: set[Layers] = set()
         for layer_type in TICK_LAYERS + self._left_layers + self._right_layers + self._output_layers:
@@ -406,14 +397,14 @@ class DeepFlowRender(RenderBase):
         self._draw_show(width, height)
 
     def _draw_show(self, width: int, height: int) -> None:
-        """The show: the composite alone, fit to `width` × `height`."""
+        """The show: the `output` layers in order, each fit to `width` × `height` at its own shape."""
         clear_color()
 
         Style.set_blend_mode(Style.BlendMode.DISABLED)
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.ADD)
 
-        self._draw_fit([Layers.composite], 0, 0, width, height)
+        self._draw_fit(self._output_layers, 0, 0, width, height)
 
         Style.pop_style()
 

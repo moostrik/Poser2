@@ -13,7 +13,8 @@ from modules.render import Motion2DLayerSettings, Bridge2DLayerSettings, Fluid2D
 
 ROOT: Path = Path(__file__).resolve().parents[5]
 PRESETS_3D: list[Path] = [ROOT / 'apps' / 'deep_flow' / 'data' / 'settings' / 'settings.json']
-SOURCES: list[Path] = [ROOT / 'modules' / 'flow', ROOT / 'modules' / 'render' / 'modules' / 'flow']
+SOURCES: list[Path] = [ROOT / 'modules' / 'flow', ROOT / 'modules' / 'render' / 'modules' / 'flow',
+                       ROOT / 'modules' / 'render' / 'general' / 'grade']     # the fluid's LUT
 STAGES: tuple[str, ...] = ('motion', 'bridge', 'fluid')
 SYSTEMS: dict[str, dict[str, type[BaseSettings]]] = {
     '2D': {'motion': Motion2DLayerSettings, 'bridge': Bridge2DLayerSettings, 'fluid': Fluid2DLayerSettings},

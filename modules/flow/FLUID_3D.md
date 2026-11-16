@@ -714,7 +714,7 @@ with a faint glow (`emission` 0.1), the water turning blue with depth and dark b
 `caustic_depth` 0.8), the dye glowing within by octaves (`scattering` 0.4), dark-rimmed by `powder` 0.6,
 its shadows lifted by `sky_fill` 0.15, the light a little forward (`anisotropy` 0.3, `back_scattering`
 0.2). Judged on stillslowfast through `fluid_compare.py` at 1080 × 1920, from the fluid's output alone:
-the app's grade after it (its composite's LUT and blend) and the camera's colors on the dye, white on the
+the grade after it (the fluid layer's LUT, `composite.lut`, and its blend) and the camera's colors on the dye, white on the
 recording, are not in that picture.
 
 | Part       | How                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |

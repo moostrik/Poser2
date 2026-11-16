@@ -27,4 +27,5 @@ from .modules.flow import       StageLayer, StageLayerSettings, StageOutput, \
 from .modules.board import      TimeSeriesLayer, TimeSeriesLayerSettings
 
 # general: the layers that draw no module's data
-from .general.composite import  LayerCompositor, LayerCompositorSettings, LutSettings
+from .general.composite import  LayerCompositor, LayerCompositorSettings
+from .general.grade import      LutGrade, LutSettings

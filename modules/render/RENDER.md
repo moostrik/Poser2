@@ -9,7 +9,7 @@ Three categories, each a folder. A layer is found by what it draws, not by its t
 | Category   | Holds                                                               | Packages                                                     |
 |------------|---------------------------------------------------------------------|--------------------------------------------------------------|
 | `modules/` | the layers that draw a module's data                                | `pose/`, `camera/`, `tracker/`, `inference/`, `flow/`, `board/` |
-| `general/` | the layers that draw no module's data and are useful to any app     | `composite/`                                                 |
+| `general/` | the layers that draw no module's data and are useful to any app     | `composite/`, `grade/`                                       |
 | `shared/`  | the layers that are not general and that more than one app uses     | none yet: every layer two apps use draws a module's data or is general |
 
 A layer that is not general and that one app uses sits in that app, in `apps/<app>/render/layers/`. It moves to
@@ -26,7 +26,7 @@ its layers and, in `shaders/`, the shaders of those layers, so a shader sits wit
 ```
 modules/render/
   modules/   pose/  camera/  tracker/ (with panoramic/)  inference/  flow/  board/
-  general/   composite/
+  general/   composite/  grade/
 ```
 
 A shader useful to any app (a mask operation, a blend, a tint) sits in `modules/gl/shaders/` ([GL.md](../gl/GL.md));

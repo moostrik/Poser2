@@ -44,8 +44,6 @@ CHAIN: tuple[ChainLayer, ...] = (
     ChainLayer(Layers.bridge_monitor,  Size.LARGE, tick=True),
     ChainLayer(Layers.fluid,           Size.LARGE, tick=True),
     ChainLayer(Layers.fluid_monitor,   Size.LARGE, tick=True),
-    # the display
-    ChainLayer(Layers.composite,       Size.LARGE, tick=True),
     # the pose, beside the chain: its shape its frame's (`DeepFlowRender._layer_size`)
     ChainLayer(Layers.pose_monitor,    Size.PANEL, tick=True),
 )

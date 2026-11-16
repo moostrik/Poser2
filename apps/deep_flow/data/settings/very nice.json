@@ -276,21 +276,6 @@
         "output": [
           "fluid"
         ]
-      },
-      "composite": {
-        "blend_mode": "ALPHA",
-        "lut": {
-          "folder": "data/luts",
-          "files": [
-            "",
-            "Blockbuster.cube",
-            "Cityscape.cube",
-            "Frosted.cube",
-            "Vibrance.cube"
-          ],
-          "file": "Blockbuster.cube",
-          "strength": 0.0
-        }
       }
     },
     "pose": {
@@ -603,6 +588,11 @@
         "smooth": 3
       },
       "composite": {
+        "lut": {
+          "folder": "data/luts",
+          "file": "Blockbuster.cube",
+          "strength": 0.0
+        },
         "emission": 16.77,
         "opacity": 1.0,
         "fog": 0.347,
