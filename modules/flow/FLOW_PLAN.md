@@ -53,6 +53,11 @@ Question, for later: Colorize, the view's last pass (`render.Colorize`, settings
 whole; and its name, which gl's hue shift alone (`shaders.Colorize`) and its own field for that shift's amount
 (`colorize`) also carry: `HueShift` and `hue_shift`, or else?
 
+Question, for later: the pose monitor (`PoseMonitorCompositor`) draws its chosen layer and the features into an FBO
+of its own, which makes it a compositor by the render rule; drawn straight into the panel it needs none and is a
+`PoseMonitorLayer`. And it takes the camera image only because `TrackerCompositor` (its `image` off) and
+`PoseCompositor` (`use_gpu_crop` on) ask for it; optional there, shared with hd_trio, or as it is?
+
 A finer depth would give the mask and z a finer edge at the source; the camera's sizes are a given
 ([RESOLUTION.md](RESOLUTION.md#the-rules)).
 
