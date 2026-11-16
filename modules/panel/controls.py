@@ -709,22 +709,18 @@ def path_label(path: str) -> str:
     return path.replace('.', ' › ') if path else '—'
 
 
-PATH_MENU_GRACE: float = 0.3    # s the mouse may be outside a path select's list before it closes
-
-
 class PathSelect(Control):
     """A dotted path from the current list of another field (``options``), picked in one nested list: a box like a
-    select's, its title small inside it, showing the path and opening a list of its top level, steps and paths side by side. A step expands in place, its
-    level underneath on the next card tint (``DEPTH_BG``), as the nested panels do; the list opens with the shown
-    path's steps expanded and the path marked. A pick writes the field and the list stays open; it closes when
-    the mouse has left it for ``PATH_MENU_GRACE``, on a click outside or on Escape. Polls both, always."""
+    select's, its title small inside it, showing the path and opening a list of its top level, steps and paths
+    side by side. A step expands in place, its level underneath on the next card tint (``DEPTH_BG``), as the
+    nested panels do; the list opens with the shown path's steps expanded and the path marked. A pick writes the
+    field and the list stays open; it closes on a click outside or on Escape. Polls both, always."""
     widget = Widget.path_select
 
     def build(self) -> None:
         self.options_field = self.field.options
         self.paths: list[str] = list(getattr(self.settings, self.options_field.name)) if self.options_field else []
         self.items: dict[str, ui.item] = {}         # the list's paths, as filled last
-        self.close_timer: ui.timer | None = None
         # A box like a select's, its title small inside it; the input only shows the path, typing does nothing
         self.box = self.tooltip(ui.input(label=self.label, value=path_label(self.shown)).props(
             "dense outlined readonly" + self.lock(readonly=False)))
@@ -735,8 +731,6 @@ class PathSelect(Control):
         with self.box:
             self.menu = ui.menu().props('anchor="bottom left" self="top left"')
         self.menu.on('before-show', lambda _: self._fill())
-        self.menu.on('mouseenter', lambda _: self._hold())
-        self.menu.on('mouseleave', lambda _: self._release())
 
     def _fill(self) -> None:
         """The levels, from the paths as they are now."""
@@ -758,16 +752,6 @@ class PathSelect(Control):
                 if key == self.shown:
                     item.props('active')
                 self.items[key] = item
-
-    def _hold(self) -> None:
-        if self.close_timer is not None:
-            self.close_timer.cancel()
-            self.close_timer = None
-
-    def _release(self) -> None:
-        self._hold()
-        with self.box:
-            self.close_timer = ui.timer(PATH_MENU_GRACE, self.menu.close, once=True)
 
     def polls(self) -> bool:
         return True
