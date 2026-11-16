@@ -64,6 +64,15 @@ standmoves and blocky, their only remains.
   marked as not reproducible, beside the recording it names; measured again when its stage is next worked on.
 - **A2.** A script that captures, replays and writes the results row together with the full configuration it
   ran with, meeting the measurement rules; the motion first.
+- **A3.** New baselines for today's view and motion (the depth mask gone, the fill, edge 0.1 m, erode and
+  feather):
+  - the result in [VIEW.md's depth table](VIEW.md#the-depth), raw z and x/y on the measure recording, three
+    runs; its rows still name the depth mask's gate and `view.depth.tolerance`;
+  - the view's time in [TIMING.md](TIMING.md#the-view), with the erode and the feather;
+  - the view's and the motion's rows of [TIMING.md's stages](TIMING.md#the-stages).
+- **A4.** The motion's baselines before C, each on the raw output with x/y beside z: the measure recording at
+  the preset, for C3 (A3's result row is it); a recording at 2–3.5 m, made by the operator, for C2; the raw output
+  against the smoothed on the measure recording, for C4.
 
 ## B. The view
 
@@ -188,7 +197,8 @@ Not worked on until asked for; each with what is known.
 
 - Name a concept after what it is and rename it everywhere in the same change: C1.
 - A `Field` description is one short line of panel text: J1.
-- A measured table names its kind, date, commit, recording and settings: A1, A2.
+- A measured table names its kind, date, commit, recording and settings: A1 to A4.
+- Ask to measure a time again when its pass's code or size changes: A3.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 Not designed yet, so their rules are not named: A2, C2 to C4, D1, E1, F1, H1, I1 to I4.
