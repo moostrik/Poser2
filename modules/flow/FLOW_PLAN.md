@@ -206,6 +206,9 @@ concurrency rules touch none of it.
 
 Not worked on until asked for; each with what is known.
 
+- The numpy versions of the flow's shaders removed, module by module, with the tests built on them: shaders are
+  checked in the GL harness. About 11 files in `modules/` and `apps/` carry them (the motion's, the bridge's,
+  the view's); the view's go in B2.
 - The flow's stages in `modules/flow`, the render only drawing them: the flow sits in two packages now, so a
   stage is changed in both and FLOW.md describes both. `Fluid3DLayer` (91 lines) is a thin layer over the flow's
   `Fluid3D`; `Bridge3DLayer` (417 lines) is the bridge itself (it wires `VelocityLowpass`, `VelocityBandpass`,
