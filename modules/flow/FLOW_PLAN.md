@@ -110,6 +110,12 @@ A finer depth would give the mask and z a finer edge at the source; the camera's
   maximum (about 3 m/s), the speed gate (6 m/s) behind it; a curve per reading, no time filter, checked first
   against the spread of z speeds on a recording.
 
+Question, for C: the motion's `z.tolerance` reviewed. One number, 0.2 m, does two jobs: in space, which depth
+samples a window averages as one surface (beside `z.edge`, 0.1 m, the step filter's); in time, how far a new
+depth may lie from the track before it counts as another surface and the track starts over. 0.2 m is large on a
+body, set by the job in time; whether the two jobs want two numbers, and what each should be, after B11 has the
+view's.
+
 ## D. The bridge
 
 Built: each output at its readings' depth ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)), the depth mask's
