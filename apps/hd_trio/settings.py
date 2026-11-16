@@ -363,8 +363,8 @@ class CenterCamLayerSettings(BaseSettings):
     use_mask:       Field[bool]  = Field(True, description="Apply mask to camera output")
 
 
-class CenterForegroundLayerSettings(render.ForegroundLookSettings):
-    """Configuration for CenterForegroundLayer: the foreground's look."""
+class CenterForegroundLayerSettings(render.ColorizeSettings):
+    """Configuration for CenterForegroundLayer: its colorize."""
 
 
 # The flow's stage layers' settings, hd_trio's copy (render/layers/flow)

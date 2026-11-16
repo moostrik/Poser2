@@ -1,6 +1,6 @@
-"""The foreground's look: the player's colors blended over time, cel shaded, their hue shifted toward the camera's
-track color, sharpened, and the mask as alpha. `ForegroundLook` is the chain, which `CenterForegroundLayer` runs on
-its cut-out; `ForegroundLookLayer` runs it on a foreground another layer made."""
+"""Colorize: the player's colors blended over time, cel shaded, their hue shifted toward the camera's track color,
+sharpened, and the mask as alpha. `Colorize` is the chain, which deep_flow's view runs as its last pass and
+`CenterForegroundLayer` on its cut-out; `ColorizeLayer` runs it on a foreground another layer made."""
 
 # Local application imports
 from modules.gl import Fbo, SwapFbo, Texture, Style, shaders
@@ -11,9 +11,9 @@ from ...color_settings import ColorSettings
 from .shaders import CelShade
 
 
-class ForegroundLookSettings(BaseSettings):
-    """The foreground's look."""
-    enabled:        Field[bool]  = Field(True, description="The look on; off, the foreground as it is")
+class ColorizeSettings(BaseSettings):
+    """Colorize: how the player's colors are styled."""
+    enabled:        Field[bool]  = Field(True, description="Colorize on; off, the foreground as it is")
     blend_factor:   Field[float] = Field(0.2, min=0.0, max=1.0, description="Foreground temporal blending")
     exposure:       Field[float] = Field(1.2, min=0.1, max=3.0, description="Exposure multiplier")
     gamma:          Field[float] = Field(1.0, min=0.5, max=2.0, description="Gamma correction")
@@ -30,13 +30,13 @@ class ForegroundLookSettings(BaseSettings):
     use_mask:       Field[bool]  = Field(True, description="Apply mask to foreground")
 
 
-class ForegroundLook:
+class Colorize:
     """The chain, into its own buffers: `process` takes a foreground and its mask, `texture` holds the result,
     `clear` forgets what the temporal blend holds."""
 
-    def __init__(self, cam_id: int, settings: ForegroundLookSettings, color_settings: ColorSettings) -> None:
+    def __init__(self, cam_id: int, settings: ColorizeSettings, color_settings: ColorSettings) -> None:
         self._cam_id: int = cam_id
-        self.settings: ForegroundLookSettings = settings
+        self.settings: ColorizeSettings = settings
         self._color_settings: ColorSettings = color_settings
 
         self._blend_fbo: SwapFbo = SwapFbo()
@@ -76,9 +76,9 @@ class ForegroundLook:
         self._blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
 
     def process(self, source: Texture, mask: Texture | None) -> None:
-        """The look of `source`, the player's colors on black, with `mask` as its alpha where `use_mask`; `source` as
+        """`source` colorized, the player's colors on black, with `mask` as its alpha where `use_mask`; `source` as
         it is while not `enabled`."""
-        s: ForegroundLookSettings = self.settings
+        s: ColorizeSettings = self.settings
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
@@ -123,15 +123,15 @@ class ForegroundLook:
         Style.pop_style()
 
 
-class ForegroundLookLayer(LayerBase):
-    """The look of `source`'s foreground, the player's colors on black, with `mask` as alpha. Runs again on each new
+class ColorizeLayer(LayerBase):
+    """`source`'s foreground colorized, the player's colors on black, with `mask` as alpha. Runs again on each new
     frame of the source, told by its capture time; `timestamp` forwards it."""
 
-    def __init__(self, cam_id: int, source: LayerBase, mask: Texture, settings: ForegroundLookSettings, color_settings: ColorSettings) -> None:
+    def __init__(self, cam_id: int, source: LayerBase, mask: Texture, settings: ColorizeSettings, color_settings: ColorSettings) -> None:
         self._source: LayerBase = source
         self._mask: Texture = mask
-        self.settings: ForegroundLookSettings = settings
-        self._look: ForegroundLook = ForegroundLook(cam_id, settings, color_settings)
+        self.settings: ColorizeSettings = settings
+        self._look: Colorize = Colorize(cam_id, settings, color_settings)
         self._timestamp: float | None = None
 
     @property
@@ -140,7 +140,7 @@ class ForegroundLookLayer(LayerBase):
 
     @property
     def timestamp(self) -> float | None:
-        """The capture time of the frame the look it holds was made from, its source's; None without one."""
+        """The capture time of the frame it holds was colorized from, its source's; None without one."""
         return self._timestamp
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:

@@ -6,7 +6,7 @@
 view's size (the motion's), the depth read across a surface (`DepthUpscale`, at the `tolerance` the motion's z
 shares), the depth mask (the view's depth cut by `near` and `far`, which gates z), the mask (the depth mask, its
 edge moved onto the image's by the guided filter, He 2010), the foreground (the image where the mask is) and its
-color, the foreground's look. The view is made again
+color, the foreground colorized. The view is made again
 when a new capture comes in, told by its capture time, or when a setting it is made with changes.
 """
 
@@ -23,7 +23,7 @@ from modules.flow import DepthRead, DepthView, DepthUpscale, TextureKind, \
                          depth_step, fixed_window, place_points, view_per_depth_pixel, view_span
 from modules.gl import Fbo, SwapFbo, Style, Texture, shaders
 from modules.pose import BBox, Frame, Points2D
-from modules.render import ColorSettings, ForegroundLook, StageLayer, StageOutput
+from modules.render import ColorSettings, Colorize, StageLayer, StageOutput
 from modules.utils import Rect
 from ....settings import ViewLayerSettings
 from .shaders import DepthMask
@@ -44,7 +44,7 @@ class ViewInput:
 class ViewOutput(StageOutput):
     """The view's textures, at the view's size: `image` the color, `foreground` the color where the mask is,
     `depth` the metres as the motion measures z from them, `mask` the player's shape on the image's edges,
-    `depth_mask` where the depth lies from `near` to `far`, `color` the foreground's look, the density's color."""
+    `depth_mask` where the depth lies from `near` to `far`, `color` the foreground colorized, the density's color."""
     image: Annotated[Texture, TextureKind.IMAGE]
     foreground: Annotated[Texture, TextureKind.IMAGE]
     color: Annotated[Texture, TextureKind.IMAGE]
@@ -57,13 +57,13 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
     """The view stage's layer. `fov` is the camera image's horizontal field (degrees), for the metres a view width
     spans; `settings.tolerance` tells one surface from another. Places
     the pose's points in the window (`crop_pose_points`, `lost`) for the pose drawn over the view; its last pass is
-    the foreground's look (`settings.color`), in camera `cam_id`'s track color. Draws nothing."""
+    `Colorize` (`settings.color`), in camera `cam_id`'s track color. Draws nothing."""
 
     def __init__(self, cam_id: int, settings: ViewLayerSettings, fov: float, color_settings: ColorSettings) -> None:
         super().__init__(settings)
         self.settings: ViewLayerSettings = settings
         self._fov: float = fov
-        self._color: ForegroundLook = ForegroundLook(cam_id, settings.color, color_settings)
+        self._color: Colorize = Colorize(cam_id, settings.color, color_settings)
 
         self._image: Fbo = Fbo()
         self._depth: Fbo = Fbo(interpolation=GL_NEAREST)     # an edge never reads as a distance in between

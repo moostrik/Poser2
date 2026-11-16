@@ -1,14 +1,14 @@
-"""Renders centered and rotated foreground with the foreground's look (`ForegroundLook`) and optional mask."""
+"""Renders centered and rotated foreground, colorized (`Colorize`), with optional mask."""
 
 # Local application imports
-from modules.render import LayerBase, HasCaptureTime, ForegroundLook, ColorSettings
+from modules.render import LayerBase, HasCaptureTime, Colorize, ColorSettings
 from modules.gl import Fbo, Texture, Style, shaders
 from .center_geometry import CenterGeometry, SourceSpace
 from ....settings import CenterForegroundLayerSettings
 
 
 class CenterForegroundLayer(LayerBase):
-    """Renders foreground image cropped and rotated, with the foreground's look.
+    """Renders foreground image cropped and rotated, colorized.
 
     `space` says whether the foreground is on the pose's crop or on the camera image. With
     `premultiply` the source is a whole image, and the mask multiplies it right after the cut-out, so
@@ -33,7 +33,7 @@ class CenterForegroundLayer(LayerBase):
         # FBOs
         self._roi_fbo: Fbo = Fbo()
         self._premultiplied_fbo: Fbo = Fbo()    # the cut-out times the mask, with `premultiply`
-        self._look: ForegroundLook = ForegroundLook(cam_id, settings, color_settings)
+        self._look: Colorize = Colorize(cam_id, settings, color_settings)
 
         # Shaders
         self._premultiply_shader = shaders.MaskMultiply()
@@ -62,7 +62,7 @@ class CenterForegroundLayer(LayerBase):
         self._look.deallocate()
 
     def update(self) -> None:
-        """Render the foreground centered by CenterGeometry in its space, with the foreground's look."""
+        """Render the foreground centered by CenterGeometry in its space, colorized."""
         if self._geometry.lost:
             self._look.clear()
             self._timestamp = None
