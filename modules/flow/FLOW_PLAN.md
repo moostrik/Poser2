@@ -47,6 +47,11 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
   - Measured against the path now, on stillslowfast, the motion's thresholds at 0: the one results table
     (noise, slow, fast, fast ÷ slow, fast ÷ noise, GPU), the mask's fit and the share of the mask without a z
     position; then by eye on the edges recording, with the color's edge.
+- **B11.** The view's own tolerance, after B1. The view's read asks only whether two neighbouring depth pixels are
+  one surface, to blend them; the motion's 0.2 m is that large for its job in time, a fast push staying one
+  surface from frame to frame, which the view does not have. Smaller blends fewer body parts into distances
+  where nothing is (a hand before the chest); too small leaves slanted surfaces blocky, which reads as z noise.
+  Measured at 0.2, 0.1 and 0.05 m in B1's table; never above the motion's.
 
 ```mermaid
 flowchart TB
@@ -79,8 +84,8 @@ flowchart TB
 ```
 
 Known in the motion, left as it is: its step filter drops a band one depth sample wide along every outline
-whatever the read; three numbers say "another surface" (`view.depth.tolerance`, `motion.z.tolerance`,
-`motion.z.edge`); z is gated twice, by the mask and the depth mask.
+whatever the read; two numbers say "another surface" in space beside the view's (`motion.z.tolerance`, also its
+restart in time, and `motion.z.edge`); z is gated twice, by the mask and the depth mask.
 
 Question, for B: the view's depth settings gone through together; among them MASK's read takes the mask's
 `guided_radius` as its reach.
