@@ -35,11 +35,23 @@ The view's goal is in [VIEW.md](VIEW.md#the-goal): who, where and how far from o
 mask and depth agreeing pixel for pixel at the motion's size, adding no noise of its own. How it is judged is in
 [FLOW.md](FLOW.md#the-goals).
 
-Built and measured ([VIEW.md](VIEW.md#the-depth)): the crop in 3D, the one mask, the depth read and filled; its z
-within the runs' spread of the views before it.
+Built and measured ([VIEW.md](VIEW.md#the-depth)): the crop in 3D, the one mask, the depth upscaled and filled;
+its z within the runs' spread of the views before it.
 
-- **B1.** The view's look, by eye on the edges recording, with the pause: the outline and the color's edge. Needs
-  the operator at the screen.
+- **B1.** The view's look, by eye on the edges recording, with the pause: the outline and the color's edge, with
+  B3's feather. Needs the operator at the screen.
+- **B2.** The depth's names, one term each, form only: the filled texture is named for what it is, `depth.filled`
+  beside `depth.upscaled` (the view's output keeps `depth`, what the motion takes); the numpy references'
+  file `modules/flow/view/depth_read.py`, which holds the crop's depth, the upscale and the fill, becomes
+  `view_depth.py`, after its subject; VIEW.md says "upscale" for the pass wherever it describes the view as
+  built, the earlier paths' sections keeping their names (`SURFACE`, `MASK`) as the configuration they were
+  measured with. Checked: the tests and the import.
+- **B3.** The mask's feather: the width of its soft edge, now one pixel (`MaskAntialias`, the threshold
+  smoothed over the pixel it crosses, `fwidth`), a setting `mask.feather` in view pixels, its default 1, today's
+  edge. The edge is soft for the look: the graded image is premultiplied by the mask, so a wider edge fades the
+  dye's color in over more pixels. The motion weights x/y and z by the mask, so a wider edge also weights the
+  pixels along the outline down (inferred); the depth is filled wherever the mask is above 0, so it follows.
+  Checked by eye in B1, at 1, 2 and 4 px.
 
 ## C. The motion
 
