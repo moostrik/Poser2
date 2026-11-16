@@ -40,28 +40,42 @@ its z within the runs' spread of the views before it.
 
 - **B1.** The view's look, by eye on the edges recording, with the pause: the outline and the color's edge, with
   B3's erode and feather. Needs the operator at the screen.
-- **B2.** The depth's names, one term each, form only: the filled texture is named for what it is, `depth.filled`
-  beside `depth.upscaled` (the view's output keeps `depth`, what the motion takes); the numpy references'
-  file `modules/flow/view/depth_read.py`, which holds the crop's depth, the upscale and the fill, becomes
-  `view_depth.py`, after its subject; VIEW.md says "upscale" for the pass wherever it describes the view as
-  built, the earlier paths' sections keeping their names (`SURFACE`, `MASK`) as the configuration they were
-  measured with. Checked: the tests and the import.
+- **B2.** The depth's names, one term each, and no numpy twins:
+  - The filled texture is named for what it is, `depth.filled` beside `depth.upscaled` (the view's output keeps
+    `depth`, what the motion takes); the preset's monitor picks follow.
+  - The numpy versions of the view's shaders go (`modules/flow/view/depth_read.py`: `depth_crop`,
+    `edge_aware_depth`, `upscaled_depth`, `push_pull`, and their tests in `test_view_window.py`): they exist only
+    to check the shaders, and the shaders are checked. `pyramid_sizes`, which `DepthFill` allocates by, moves into
+    `depth_fill.py`. `view_check` keeps the timing, the share of the mask without depth and the pictures, without
+    the comparison.
+  - VIEW.md says "upscale" for the pass wherever it describes the view as built, the earlier paths' sections
+    keeping their names (`SURFACE`, `MASK`) as the configuration they were measured with; its "Checked" section
+    follows.
+  - Checked: the tests and the import.
 - **B3.** The color: the part that makes the player's color for the density, now `color_grade`, grades,
   sharpens and premultiplies by the mask; it is named for what it gives, `color` (`ViewColor`, its texture and
   the view's output `color`, was `graded_image`); the bridge's input keeps `image`, as hd_trio feeds it a camera
   image. Its copy of the mask gets two settings in view pixels, applied before the premultiply, as compositing
   works a matte where the picture is made: `erode`, the edge pulled inward, dropping the outermost pixels whose
   color the camera mixed with the background's; `feather`, the edge softened inward, the color fading in over
-  that width. Both 0 the mask's own edge (one pixel, `MaskAntialias`). One pass: the mask blurred by a Gaussian of
-  half the feather, cut further inward by the erode, then faded. The mask itself, which the motion and the depth
-  use, stays as it is, so both change the dye's color and nothing of the motion. Checked by eye in B1, erode 0
-  to 2 and feather 0 to 4 px.
+  that width. Both 0 the mask's own edge (one pixel, `MaskAntialias`). In order, on the color's own textures
+  made with the view's: the erode, the `Erode` shader (a minimum filter, `modules/gl/shaders`), moving the edge
+  inward; then the feather, a Gaussian blur of half its width and 2 × blurred − 1 clamped (`Feather`, new, the
+  view's), 0 on and outside the eroded edge, rising inward, so nothing reaches past it. The mask itself, which
+  the motion and the depth use, stays as it is, so both change the dye's color and nothing of the motion.
+  - Its call sites follow: `deep_flow_render.py` (the bridge takes `output.color`), `view_check` (its timing row
+    and its picture), both presets' `color_grade` group (now `color`), VIEW.md's table, chart and text, and the
+    parked note that names `ColorGrade`. Its GPU time, erode and feather on, from `view_check --time` into
+    TIMING.md.
+  - Checked by eye in B1, erode 0 to 2 and feather 0 to 4 px.
 - **B4.** The motion before and after today's view changes, measured as [FLOW.md](FLOW.md#the-goals) says: the
   upscale's edge at 0.1 m (was 0.2 m), the fill always on, B2 and B3 at the preset (erode and feather 0). Three captures of
   the measure recording's first 16.5 s, replayed through the motion on its raw output (thresholds, `z.smooth` and
   `z.catch_up` at 0), the same segments and regions; the mean of three against the "upscale and the fill, the
   preset" row in VIEW.md and the runs' spread. Expected: every column within the spread, the edge's change
-  showing only on edges closer than 0.2 m. The row goes into VIEW.md; B2 and B3 are committed with it.
+  showing only on edges closer than 0.2 m. Erode and feather are not in it: they change the color, not the
+  mask the motion uses, and are judged by eye in B1. The row goes into VIEW.md; B2 and B3 are committed with
+  it.
 
 ## C. The motion
 
@@ -196,7 +210,7 @@ Not worked on until asked for; each with what is known.
   stage is changed in both and FLOW.md describes both. `Fluid3DLayer` (91 lines) is a thin layer over the flow's
   `Fluid3D`; `Bridge3DLayer` (417 lines) is the bridge itself (it wires `VelocityLowpass`, `VelocityBandpass`,
   `ZPositionMix` and the density and temperature bridges, holds `Bridge3DLayerSettings`, declares the ports), and
-  `ViewLayer` the view (its parts `ViewDepth`, `ViewDepthMask`, `ColorGrade`, deep_flow's own); the monitors
+  `ViewLayer` the view (its parts `ViewCrop`, `ViewMask`, `ViewDepth`, `ColorGrade`, deep_flow's own); the monitors
   (`Monitor2DLayer`, `Monitor3DLayer`), which draw the ports, are the render's. Each stage subclasses the render's `LayerBase` to sit in its update loop, and modules
   may not import the render, so the stages could not live in the flow **(deduction)**. The textbook split: each
   stage a plain flow class as `Fluid3D` is, with its settings, ports, inputs and outputs, and a thin render layer
@@ -246,5 +260,9 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways instead of leaving parallel legacy ones: hd_trio's copy, deleted in line I.
 - A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
+- Name a concept after what it is and rename it everywhere in the same change: B2 (`depth.filled`), B3 (`color`).
+- Keep presets and settings schemas in sync: B3 (`view.color_grade` to `view.color`, `erode`, `feather`).
+- Remove obsolete pathways: B2 (the numpy twins of the view's shaders).
+- Unit-test infrastructure, rely on running the system for the rest: B2.
 
 Not designed yet, so their rules are not named: C1 to C4; D1 to D4; E1, E2; F1 to F3; H1; I1 to I4.
