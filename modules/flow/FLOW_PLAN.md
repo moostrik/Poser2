@@ -51,6 +51,12 @@ its z within the runs' spread of the views before it.
   softens its copy of the mask's edge for its premultiply, as compositing feathers a matte where the picture is
   made; the mask itself, which the motion and the depth use, stays as it is, so the feather changes the dye's
   color and nothing of the motion. Checked by eye in B1, at 0, 2 and 4 px.
+- **B4.** The motion before and after today's view changes, measured as [FLOW.md](FLOW.md#the-goals) says: the
+  upscale's edge at 0.1 m (was 0.2 m), the fill always on, B2 and B3 at the preset (feather 0). Three captures of
+  the measure recording's first 16.5 s, replayed through the motion on its raw output (thresholds, `z.smooth` and
+  `z.catch_up` at 0), the same segments and regions; the mean of three against the "upscale and the fill, the
+  preset" row in VIEW.md and the runs' spread. Expected: every column within the spread, the edge's change
+  showing only on edges closer than 0.2 m. The row goes into VIEW.md; B2 and B3 are committed with it.
 
 ## C. The motion
 
