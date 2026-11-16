@@ -54,6 +54,50 @@ the depth filled by push-pull, measured on the motion's raw output ([VIEW.md](VI
   a read and a filled depth as the mask's edge moves **(deduction)**. Measured at its own size, z exists exactly
   where the depth does, its own mask; the band between the depth's edge and the mask's is filled once, on z.
   The motion's output stays at the motion's size, x, y and z together, so the bridge sees no change.
+
+Today:
+
+```mermaid
+flowchart TB
+  D["Camera depth<br/>480 × 300"]
+  I["Camera image<br/>992 × 800"]
+  C["crop: image 448 × 800,<br/>depth inside the box 448 × 800 (nearest)"]
+  M["mask 448 × 800"]
+  R["read: depth upscaled to 448 × 800,<br/>tolerance at edges"]
+  F["fill: push-pull on the depth,<br/>the band inside the mask"]
+  XY["x/y: Lucas–Kanade, 448 × 800"]
+  SF["step filter, 448 × 800<br/>(edges in depth pixels)"]
+  DV["depth velocity: z, z position,<br/>448 × 800"]
+  V["velocity x, y, z, 448 × 800,<br/>weighted by the mask"]
+  I --> C --> M
+  D --> C
+  D --> R
+  M --> R --> F --> SF --> DV --> V
+  C --> XY --> V
+  XY -- "displacement, 448 × 800" --> DV
+```
+
+B3:
+
+```mermaid
+flowchart TB
+  D["Camera depth<br/>480 × 300"]
+  I["Camera image<br/>992 × 800"]
+  C["crop: image 448 × 800,<br/>depth inside the box ~170 × 300"]
+  M["mask 448 × 800"]
+  XY["x/y: Lucas–Kanade, 448 × 800"]
+  A["displacement averaged<br/>to ~170 × 300"]
+  SF["step filter, ~170 × 300"]
+  DV["depth velocity: z, z position,<br/>~170 × 300"]
+  U["upscale z and z position to 448 × 800,<br/>push-pull fills the band inside the mask"]
+  V["velocity x, y, z, 448 × 800,<br/>weighted by the mask"]
+  I --> C --> M
+  D --> C
+  C -- "depth" --> SF --> DV --> U --> V
+  M --> U
+  C -- "image" --> XY --> V
+  XY --> A --> DV
+```
   - The view hands out the image and the mask at the motion's size and the depth inside the box at its own
     size: `crop.depth`, the camera's depth across the crop's window on its own pixels, 0 outside the box, its
     size the window's in depth pixels (about 170 × 300 at the preset), made again when the crop changes. The
