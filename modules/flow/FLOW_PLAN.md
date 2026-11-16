@@ -42,10 +42,16 @@ and 0.05 m ([VIEW.md](VIEW.md#the-stage)).
 - **B1.** The one path's look, by eye on the edges recording: the outline and the color's edge, now that the
   color grade works on the straight image and premultiplies by the mask last. Needs the operator at the screen.
 - **B2.** The view gives two things that agree, the mask and the depth; the depth mask goes. The mask is the
-  player's soft alpha; the depth is the player's wherever the mask is above 0, as in the matting model: the
-  foreground layer, its color and its depth, is defined wherever alpha is, its edge filled from inside (Zitnick
-  et al. 2004 store color, depth and alpha per layer). The split: what one frame shows is the view's (who,
-  where, how far), what needs two frames is the motion's (what moved, how far to trust it).
+  guided filter's outline thresholded at 0.5, its edge antialiased over one pixel (`MaskAntialias`); the depth
+  is the player's wherever the mask is above 0, as in the matting model: the foreground layer, its color and
+  its depth, is defined wherever alpha is, its edge filled from inside (Zitnick et al. 2004 store color, depth
+  and alpha per layer). The split: what one frame shows is the view's (who, where, how far), what needs two
+  frames is the motion's (what moved, how far to trust it).
+  - What it solves: the depth's edge is coarse (480 × 300), the mask's follows the image; between them lies a
+    band about `guided_radius` wide (2 depth pixels, about 5 view pixels) where the mask is but the player's
+    depth is not. Today the read fills it from the nearest pixel within `reach` but takes its side at mask
+    > 0.5, and the depth mask hides what is left. The camera's holes in the body are few; the fill takes them
+    on the way.
 
 ```mermaid
 flowchart TB
@@ -88,26 +94,32 @@ flowchart TB
        each level down halves the size (448 × 800 to about 7 × 13, seven levels), a pixel the weighted mean of
        its four, weight 1 where there is a depth, 0 where not, the weight carried down. Pull: from the coarsest
        up, a pixel keeps its depth by its weight and takes the rest from the coarser level, read bilinearly.
-       Every pixel where the mask is above 0 then holds the player's depth, the outline's band and the camera's
-       holes in the body alike; where the mask is 0 it is 0. A filled pixel moves with its surroundings
+       Every pixel where the mask is above 0 then holds the player's depth, the band between the depth's edge
+       and the mask's foremost, the camera's few holes in the body alike; where the mask is 0 it is 0. The
+       band needs only the first two or three levels; the rest cost little at their sizes, so the pyramid is
+       the textbook's whole one. Its textures are made with the view's, not per frame. A filled pixel moves with its surroundings
        instead of reading as no z. Filled from the mean around it, not the nearest pixel or a plane: a plane
        fitted at the outline extends the edge's slope, where the stereo is noisiest **(deduction)**. Push-pull
-       has no settings of its own; `depth.fill`, a switch, on, turns it off to compare: off, the read as it is.
+       has no settings of its own; `depth.fill.enabled`, on, turns it off to compare: off, the read as it is.
   - A numpy reference beside each pass (`depth_read.py`), unit-tested on a body with holes and an outline;
     the shader checked against it in `view_check`, with its GPU time.
   - The crop is a crop of the box in 3D: its sides (center_x, center_y, height) take the image's window, its
     front and back (near, far, moved from `depth_mask`) the depth inside it. The cut goes into it: `crop.depth`
     is the camera's depth inside the box on its own pixels (unblended), 0 outside, at the view's size.
   - Three parts after the crop, one per step: `crop` (center_x, center_y, height, near, far; ports `image`,
-    `depth`), `mask` (guided_radius, edge_contrast; port `mask`, guided from where `crop.depth` is above 0),
-    `depth` (tolerance, fill; ports `read`, then `depth`). `ViewDepthMask` becomes the mask alone, the crop gets
+    `depth`), `mask` (guided_radius, edge_contrast; port `mask`, guided from where `crop.depth` is above 0, its
+    products pass taking `depth > 0` as the 0/1 it filters), `depth` (tolerance, the group `fill`; ports
+    `read`, then `depth`). `ViewDepthMask` becomes the mask alone, the crop gets
     a class of its own (its two textures), `ViewDepth` holds the read and the fill, their settings follow;
     `ViewOutput.depth_mask` goes. The read samples the camera's depth, not `crop.depth`, as it blends the four
     depth pixels around a view pixel. `depth.tolerance` stays: it keeps edges inside the mask (an arm before
     the body) from reading as a depth in between.
   - The motion weighs z by the mask alone (`compose_velocity.frag`, `z_position.frag`, `MotionInput.depth_mask`
     gone); the bridge's z position takes the mask for "the player is there" (`z_position_mix`, its share
-    `depth_mask` becomes `mask`); `BridgeInput.depth_mask` goes.
+    `depth_mask` becomes `mask`); `BridgeInput.depth_mask` goes, and its field in hd_trio's copies of the two
+    inputs (`apps/hd_trio/render/layers/flow/motion_layer.py`, `bridge_layer.py`).
+  - The tests and checks that use the depth mask follow: `test_view_window`, `test_z_position`,
+    `test_weighted_sum`, `bridge_shader_check`, `shader_check`.
   - The preset, VIEW.md (its diagram: the camera image is 992 × 800, the view 448 × 800), RESOLUTION.md,
     MOTION.md, BRIDGE_3D.md and the capture and compare scripts (the saved depth mask, the z position's weight)
     follow.
@@ -116,7 +128,10 @@ flowchart TB
   - Checked: `view_check`, the passes 0 pixels off their references; three captures on the measure recording
     with the fill and three without, against the one path's 0.2 m row in VIEW.md, with the share of the mask
     without depth, 0 with the fill. The color grade is untouched, it premultiplies by the mask as before.
-  - Left as it is: the color at the edge is not un-mixed, as matting would find the foreground's own color; the
+  - The share without z position measures the band: today's 7.2% is mostly it, hidden by the depth mask
+    **(deduction)**; with the fill it is 0.
+  - Left as it is: the mask's one-pixel edge, not the guided filter's own alpha, which would change the look
+    (B1's question); the color at the edge is not un-mixed, as matting would find the foreground's own color; the
     motion's xy there sees mixed color, weighed down by the mask.
 
 Question, for B after B2: the edge's depth averaged by the fill, the edge pixels given a weight below 1 (by
