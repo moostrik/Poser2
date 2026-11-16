@@ -47,36 +47,44 @@ the depth filled by push-pull, measured on the motion's raw output ([VIEW.md](VI
   color grade works on the straight image and premultiplies by the mask last. Needs the operator at the screen.
   B1 also asks whether the mask should be the guided filter's own alpha rather than its one-pixel threshold, as
   that changes the look.
-- **B3.** z measured at the depth's own size, then brought up to the motion's. The depth has no detail finer
+- **B3.** z measured at the depth's own size, then upscaled to the motion's. The depth has no detail finer
   than its pixels (one is about 2.7 view pixels) and x/y none finer than its window (about 7 px,
-  [RESOLUTION.md](RESOLUTION.md)), so measuring z on the stretched depth spends about 7 times the work on
-  samples with nothing new, and lets the stretch make a change over time of its own: a view pixel flips between
+  [RESOLUTION.md](RESOLUTION.md)), so measuring z on the upscaled depth spends about 7 times the work on
+  samples with nothing new, and lets the upscale make a change over time of its own: a view pixel flips between
   a read and a filled depth as the mask's edge moves **(deduction)**. Measured at its own size, z exists exactly
   where the depth does, its own mask; the band between the depth's edge and the mask's is filled once, on z.
+  The motion's output stays at the motion's size, x, y and z together, so the bridge sees no change.
   - The view hands out the image and the mask at the motion's size and the depth inside the box at its own
     size: `crop.depth`, the camera's depth across the crop's window on its own pixels, 0 outside the box, its
     size the window's in depth pixels (about 170 × 300 at the preset), made again when the crop changes. The
     `depth` part (`ViewDepth`, the read and the fill) leaves the view; `DepthUpscale` and `depth_read.masked_depth`
-    go; `view.depth.tolerance` goes, as the view stretches no depth.
+    go; `view.depth.tolerance` goes, as the view upscales no depth.
   - The motion:
     1. x/y at the motion's size from the image, as now; its `same_surface` reads the depth at the depth's
        size, sampled at its own uv.
     2. x/y's displacement averaged down to the depth's size (a box over the view pixels each depth pixel
        covers), for the depth velocity's carry.
     3. The depth velocity (`DepthVelocity`, its track, step filter and windows) and the z position at the
-       depth's size, `depth_step` one depth pixel.
-    4. z and the z position brought up to the motion's size as pairs (value × weight, weight), the weight 1
-       where the depth has a value: read bilinearly, then filled where the weight is 0 inside the mask by
-       push-pull (`DepthFill` taking a weight, no longer a depth's presence), 0 outside the mask; then composed
-       with x/y as now, weighted by the mask.
+       depth's size, `depth_step` one depth pixel. `z.threshold` and the catch-up's `motion_floor` stay in the
+       view's pixels: each is in pixels of the texture it runs on today (the threshold over the depth
+       velocity's width, `moving()` in `depth_velocity_shader.frag` over the displacement's size), so both are
+       turned into the depth's pixels by the view's pixels per depth pixel, the presets keeping their meaning.
+       A crop change resizes the depth, reallocates the depth velocity and starts its track over.
+    4. z and the z position upscaled to the motion's size as pairs (value × weight, weight), the weight 1
+       where the crop's depth has a value, the step filter's strip included (its z 0 is a value, kept as
+       today): read bilinearly, then filled where the weight is 0 inside the mask, the band between the
+       depth's edge and the mask's, by push-pull (`DepthFill` taking a weight, no longer a depth's presence),
+       0 outside the mask; then composed with x/y as now, weighted by the mask.
   - Blending two z velocities at an edge mixes two real motions, where blending two depths made a surface in
     between, so the upsampling has no tolerance **(deduction)**; whether it needs one is shown by the
     measurement.
   - The references (`depth_read.push_pull` with a weight, the displacement's average, the upsampling), their
     tests; `view_check` on the crop's depth at its size; the motion's monitor ports at their sizes; the capture
-    saves the depth at its size; the preset, VIEW.md, MOTION.md, RESOLUTION.md and TIMING.md follow.
+    saves the depth at its size, and the compare takes the depth at its size and its regions (inside, edge,
+    table) at the motion's; the preset, VIEW.md, MOTION.md, RESOLUTION.md and TIMING.md follow.
   - Checked: three captures on the measure recording on the motion's raw output, against the view's preset
-    row in VIEW.md; the motion's GPU time against today's.
+    row in VIEW.md, the share without a z position as today's (the strip kept); the motion's GPU time against
+    today's.
 
 Left as it is: the color at the edge is not un-mixed, as matting would find the foreground's own color; the
 motion's xy there sees mixed color, weighed down by the mask.
