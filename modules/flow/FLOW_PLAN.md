@@ -91,7 +91,8 @@ flowchart TB
        Every pixel where the mask is above 0 then holds the player's depth, the outline's band and the camera's
        holes in the body alike; where the mask is 0 it is 0. A filled pixel moves with its surroundings
        instead of reading as no z. Filled from the mean around it, not the nearest pixel or a plane: a plane
-       fitted at the outline extends the edge's slope, where the stereo is noisiest **(deduction)**.
+       fitted at the outline extends the edge's slope, where the stereo is noisiest **(deduction)**. Push-pull
+       has no settings of its own; `depth.fill`, a switch, on, turns it off to compare: off, the read as it is.
   - A numpy reference beside each pass (`depth_read.py`), unit-tested on a body with holes and an outline;
     the shader checked against it in `view_check`, with its GPU time.
   - Three parts, one per step, each named after what it gives: `cut` (near, far), `mask` (guided_radius,
@@ -108,8 +109,9 @@ flowchart TB
     follow.
   - Order: the references and their tests; the two passes; the parts and their names; the motion and the
     bridge; the documents, the preset and the scripts; `view_check`; the three captures. One commit.
-  - Checked: `view_check`, the passes 0 pixels off their references; three captures on the measure recording,
-    against the one path's 0.2 m row in VIEW.md, with the share of the mask without depth, now 0. The color
+  - Checked: `view_check`, the passes 0 pixels off their references; three captures on the measure recording
+    with the fill and three without, against the one path's 0.2 m row in VIEW.md, with the share of the mask
+    without depth, 0 with the fill. The color
     grade is untouched, it premultiplies by the mask as before.
   - Left as it is: the color at the edge is not un-mixed, as matting would find the foreground's own color; the
     motion's xy there sees mixed color, weighed down by the mask.
