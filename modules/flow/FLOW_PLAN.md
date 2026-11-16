@@ -11,7 +11,7 @@ operator saw.
 
 | #   | Line                                                                         | State                            | Documents                                          |
 |-----|------------------------------------------------------------------------------|----------------------------------|----------------------------------------------------|
-| A   | [The measurements](#a-the-measurements)                                      | rules proposed                   | [FLOW.md](FLOW.md#the-goals)                       |
+| A   | [The measurements](#a-the-measurements)                                      | rules set; A1, A2 open           | [FLOW.md](FLOW.md#the-goals)                       |
 | B   | [The view](#b-the-view)                                                      | built                            | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; steps open                | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; the body force            | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
@@ -40,13 +40,7 @@ kinds:
   for its recording, its settings and its code paths; 2026-11-16 showed all three move it (a panel setting slipped
   into a capture, a baseline compared without the gate it was made with, one run swinging ±0.6).
 
-Proposed rules, for the measurements in the flow's documents:
-- Every table names its kind, date, commit, recording (one in `data/recordings`, kept while a table uses it),
-  settings (the preset and what it varies) and, for a result, its runs and their spread.
-- A time is measured again when its pass changes, and the old row goes with the pass.
-- A result is compared only with rows of the same recording, settings and code paths, measured again where they
-  differ; a stage is measured on its own output with the stages after it neutral ([FLOW.md](FLOW.md#the-goals)).
-- Captures and replays are working files, deleted once their row is written.
+The rules are in `.claude/rules/flow.md`, "Flow measurements".
 
 What is measured today (the tables with numbers in the flow's documents, 73), by the recording they name:
 | Recording                         | Still on disk        | Kind            | Where                                                        |
@@ -69,11 +63,7 @@ standmoves and blocky, their only remains.
 - **A1.** Every table on a recording no longer on disk (stillslowfast, standmoves, blocky, `20261111-123241`)
   marked as not reproducible, beside the recording it names; measured again when its stage is next worked on.
 - **A2.** A script that captures, replays and writes the results row together with the full configuration it
-  ran with, meeting the rules above; the motion first.
-
-Question, for A: the rules, worded by the rules thread as a section "Measurements" in `.claude/rules/flow.md`
-(the old row of a changed pass is replaced, not deleted, as docs.md asks before deleting): to be sent as they
-are?
+  ran with, meeting the measurement rules; the motion first.
 
 ## B. The view
 
@@ -198,6 +188,7 @@ Not worked on until asked for; each with what is known.
 
 - Name a concept after what it is and rename it everywhere in the same change: C1.
 - A `Field` description is one short line of panel text: J1.
+- A measured table names its kind, date, commit, recording and settings: A1, A2.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 Not designed yet, so their rules are not named: A2, C2 to C4, D1, E1, F1, H1, I1 to I4.
