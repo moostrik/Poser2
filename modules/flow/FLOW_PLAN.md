@@ -126,9 +126,15 @@ flowchart TB
     tests; `view_check` on the crop's depth at its size; the motion's monitor ports at their sizes; the capture
     saves the depth at its size, and the compare takes the depth at its size and its regions (inside, edge,
     table) at the motion's; the preset, VIEW.md, MOTION.md, RESOLUTION.md and TIMING.md follow.
-  - Checked: three captures on the measure recording on the motion's raw output, against the view's preset
-    row in VIEW.md, the share without a z position as today's (the strip kept); the motion's GPU time against
-    today's.
+  - Checked, first without the app: the references' tests (the displacement's average, the weighted
+    push-pull, the upscale) and `view_check` on the crop's depth at its size. Then against the view's preset
+    row in VIEW.md, measured the same way: three new captures of the measure recording's first 16.5 s (the
+    earlier ones hold the depth upscaled), replayed through the motion on its raw output; the same segments and
+    the same regions from the mask at the motion's size, z read after the upscale as the bridge gets it; the
+    same row, the mean of three against the runs' spread. Expected: the share without a z position as today's,
+    about 3.9% (0 would mean the fill covers the step filter's strip); slow and fast z within the spread (lower
+    would mean the upscale smooths real motion); x/y at the edge unchanged; the motion's GPU time lower. The
+    noise is the open column: whether the upscale's flips at the edge were noise.
 
 Left as it is: the color at the edge is not un-mixed, as matting would find the foreground's own color; the
 motion's xy there sees mixed color, weighed down by the mask.
