@@ -2,9 +2,35 @@
 when it runs."""
 
 from dataclasses import dataclass
-from enum import IntEnum
+from enum import IntEnum, auto
 
 from ..settings import Layers, PoseFrame
+
+
+class ChainLayers(IntEnum):
+    """Every layer the renderer runs, in the chain's order, each stage with its monitor; the pose last."""
+    # the capture
+    capture_image = 0
+    capture_depth = auto()
+    capture_monitor = auto()
+    # the view
+    view =          auto()
+    view_monitor =  auto()
+    # the motion
+    motion =        auto()
+    motion_monitor = auto()
+    # the bridge
+    bridge =        auto()
+    bridge_monitor = auto()
+    # the fluid, its look the show
+    fluid =         auto()
+    fluid_monitor = auto()
+    # the app's timings
+    time_series =   auto()
+    # the pose: the camera's image and its crop, and the pose's monitor
+    cam_image =     auto()
+    cam_crop =      auto()
+    pose_monitor =  auto()
 
 
 class Size(IntEnum):
@@ -19,9 +45,9 @@ class Size(IntEnum):
 class ChainLayer:
     """A layer of the chain: its size, the layer whose texture is its panel's shape (None: the output's), whether
     it runs every tick (else only while a panel shows it), and whether once per capture."""
-    layer: Layers
+    layer: ChainLayers
     size: Size = Size.OUTPUT
-    shape: Layers | None = None
+    shape: ChainLayers | None = None
     tick: bool = False
     capture: bool = False
 
@@ -29,41 +55,58 @@ class ChainLayer:
 # Each stage with its layers, the outputs it hands on and its display layers
 CHAIN: tuple[ChainLayer, ...] = (
     # the capture: the camera's image and its crop, the capture's image and depth into GL
-    ChainLayer(Layers.cam_image,       shape=Layers.cam_image, tick=True),
-    ChainLayer(Layers.cam_crop,        shape=Layers.cam_crop, tick=True),
-    ChainLayer(Layers.capture_image,   shape=Layers.capture_image, tick=True, capture=True),
-    ChainLayer(Layers.capture_depth,   shape=Layers.capture_image, tick=True, capture=True),   # on the image's view, at the depth's own grid
-    ChainLayer(Layers.capture_monitor, shape=Layers.capture_image, tick=True),
+    ChainLayer(ChainLayers.cam_image,       shape=ChainLayers.cam_image, tick=True),
+    ChainLayer(ChainLayers.cam_crop,        shape=ChainLayers.cam_crop, tick=True),
+    ChainLayer(ChainLayers.capture_image,   shape=ChainLayers.capture_image, tick=True, capture=True),
+    ChainLayer(ChainLayers.capture_depth,   shape=ChainLayers.capture_image, tick=True, capture=True),   # on the image's view, at the depth's own grid
+    ChainLayer(ChainLayers.capture_monitor, shape=ChainLayers.capture_image, tick=True),
     # the view: the window cut, the depth read, the masks, the foreground, the color
-    ChainLayer(Layers.view,            Size.VIEW, Layers.view, tick=True, capture=True),
-    ChainLayer(Layers.view_monitor,    Size.VIEW, Layers.view, tick=True),
+    ChainLayer(ChainLayers.view,            Size.VIEW, ChainLayers.view, tick=True, capture=True),
+    ChainLayer(ChainLayers.view_monitor,    Size.VIEW, ChainLayers.view, tick=True),
     # the motion, the bridge, the fluid
-    ChainLayer(Layers.motion,          Size.LARGE, tick=True, capture=True),
-    ChainLayer(Layers.motion_monitor,  Size.LARGE, tick=True),
-    ChainLayer(Layers.bridge,          Size.LARGE, tick=True, capture=True),
-    ChainLayer(Layers.bridge_monitor,  Size.LARGE, tick=True),
-    ChainLayer(Layers.fluid,           Size.LARGE, tick=True),
-    ChainLayer(Layers.fluid_monitor,   Size.LARGE, tick=True),
+    ChainLayer(ChainLayers.motion,          Size.LARGE, tick=True, capture=True),
+    ChainLayer(ChainLayers.motion_monitor,  Size.LARGE, tick=True),
+    ChainLayer(ChainLayers.bridge,          Size.LARGE, tick=True, capture=True),
+    ChainLayer(ChainLayers.bridge_monitor,  Size.LARGE, tick=True),
+    ChainLayer(ChainLayers.fluid,           Size.LARGE, tick=True),
+    ChainLayer(ChainLayers.fluid_monitor,   Size.LARGE, tick=True),
     # the pose, beside the chain: its shape its frame's (`DeepFlowRender._layer_size`)
-    ChainLayer(Layers.pose_monitor,    Size.PANEL, tick=True),
+    ChainLayer(ChainLayers.pose_monitor,    Size.PANEL, tick=True),
 )
-LAYERS: dict[Layers, ChainLayer] = {chain_layer.layer: chain_layer for chain_layer in CHAIN}
-POSE_SHAPES: dict[PoseFrame, Layers] = {PoseFrame.CROP: Layers.cam_crop, PoseFrame.CAMERA: Layers.cam_image, PoseFrame.VIEW: Layers.view}
-MONITORS: tuple[Layers, ...] = (Layers.view_monitor, Layers.motion_monitor, Layers.bridge_monitor, Layers.fluid_monitor)   # the flow's
-TICK_LAYERS: list[Layers] = [chain_layer.layer for chain_layer in CHAIN if chain_layer.tick]
-CAPTURE_LAYERS: list[Layers] = [chain_layer.layer for chain_layer in CHAIN if chain_layer.capture]
+LAYERS: dict[ChainLayers, ChainLayer] = {chain_layer.layer: chain_layer for chain_layer in CHAIN}
+POSE_SHAPES: dict[PoseFrame, ChainLayers] = {PoseFrame.CROP: ChainLayers.cam_crop, PoseFrame.CAMERA: ChainLayers.cam_image, PoseFrame.VIEW: ChainLayers.view}
+MONITORS: tuple[ChainLayers, ...] = (ChainLayers.view_monitor, ChainLayers.motion_monitor, ChainLayers.bridge_monitor, ChainLayers.fluid_monitor)   # the flow's
+TICK_LAYERS: list[ChainLayers] = [chain_layer.layer for chain_layer in CHAIN if chain_layer.tick]
+CAPTURE_LAYERS: list[ChainLayers] = [chain_layer.layer for chain_layer in CHAIN if chain_layer.capture]
+
+# What a panel can show, the select's `Layers`, and the chain's layer that draws it
+SHOWN: dict[Layers, ChainLayers] = {
+    Layers.capture:     ChainLayers.capture_monitor,
+    Layers.view:        ChainLayers.view_monitor,
+    Layers.motion:      ChainLayers.motion_monitor,
+    Layers.bridge:      ChainLayers.bridge_monitor,
+    Layers.fluid:       ChainLayers.fluid_monitor,
+    Layers.show:        ChainLayers.fluid,
+    Layers.time_series: ChainLayers.time_series,
+    Layers.pose:        ChainLayers.pose_monitor,
+}
 
 
-def size_of(layer: Layers) -> Size:
+def shown(layers: list[Layers]) -> list[ChainLayers]:
+    """The chain's layers that draw what a panel's `layers` select, in order."""
+    return [SHOWN[layer] for layer in layers]
+
+
+def size_of(layer: ChainLayers) -> Size:
     """The size `layer` is allocated at; a layer the chain does not name is output-sized."""
     return LAYERS[layer].size if layer in LAYERS else Size.OUTPUT
 
 
-def layers_of(size: Size) -> list[Layers]:
+def layers_of(size: Size) -> list[ChainLayers]:
     """The chain's layers allocated at `size`, in order."""
     return [chain_layer.layer for chain_layer in CHAIN if chain_layer.size == size]
 
 
-def shape_of(layer: Layers) -> Layers | None:
+def shape_of(layer: ChainLayers) -> ChainLayers | None:
     """The layer whose texture is `layer`'s panel's shape; None for the output's."""
     return LAYERS[layer].shape if layer in LAYERS else None

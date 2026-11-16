@@ -14,9 +14,9 @@ from modules import render
 from modules.utils import FPS, Color, Rect, Point2f
 
 from ..board import RenderBoard
-from ..settings import Layers, MainView, PoseFrame, RenderSettings
+from ..settings import MainView, PoseFrame, RenderSettings
 from .layers import CaptureMonitorLayer, ViewInput, ViewOutput, ViewLayer, PoseMonitorCompositor
-from .chain import Size, TICK_LAYERS, CAPTURE_LAYERS, MONITORS, POSE_SHAPES, size_of, layers_of, shape_of
+from .chain import ChainLayers, Size, TICK_LAYERS, CAPTURE_LAYERS, MONITORS, POSE_SHAPES, shown, size_of, layers_of, shape_of
 
 
 OUTPUT_WIDTH: int = 1080
@@ -38,35 +38,35 @@ class DeepFlowRender(RenderBase):
 
         self.board: RenderBoard = board
 
-        self._a_layers: list[Layers] = settings.layer.select.a      # panel a, the show and the recording
-        self._b_layers: list[Layers] = settings.layer.select.b
+        self._a_layers: list[ChainLayers] = shown(settings.layer.select.a)      # panel a, the show and the recording
+        self._b_layers: list[ChainLayers] = shown(settings.layer.select.b)
 
-        self.L: dict[Layers, dict[int, render.LayerBase]] = {layer: {} for layer in Layers}
-        self._monitors_b: dict[Layers, dict[int, render.MonitorLayer]] = {}     # each stage's monitor B, panel b's
+        self.L: dict[ChainLayers, dict[int, render.LayerBase]] = {layer: {} for layer in ChainLayers}
+        self._monitors_b: dict[ChainLayers, dict[int, render.MonitorLayer]] = {}     # each stage's monitor B, panel b's
 
         for i in range(self.num_cams):
-            cam_image =     self.L[Layers.cam_image][i] =   render.CameraImageLayer(    i, self.board)
-            cam_crop =      self.L[Layers.cam_crop][i] =    render.CropImageLayer(      i, self.board)
-            self.L[Layers.capture_image][i] =               render.CaptureImageLayer()
-            self.L[Layers.capture_depth][i] =               render.CaptureDepthLayer()
+            cam_image =     self.L[ChainLayers.cam_image][i] =   render.CameraImageLayer(    i, self.board)
+            cam_crop =      self.L[ChainLayers.cam_crop][i] =    render.CropImageLayer(      i, self.board)
+            self.L[ChainLayers.capture_image][i] =               render.CaptureImageLayer()
+            self.L[ChainLayers.capture_depth][i] =               render.CaptureDepthLayer()
 
             # The stages, each with its monitor, and the pose's monitor
-            view =          self.L[Layers.view][i] =        ViewLayer(           i, settings.view, fov, settings.colors)
-            self.L[Layers.pose_monitor][i] =                PoseMonitorCompositor(i, self.board, cam_image, cam_crop, view, settings.pose, settings.colors)
-            self.L[Layers.motion][i] =                      render.Motion3DLayer(       i, settings.motion)
-            self.L[Layers.bridge][i] =                      render.Bridge3DLayer(       settings.bridge)
-            fluid =         self.L[Layers.fluid][i] =       render.Fluid3DLayer(        settings.fluid)
-            self.L[Layers.capture_monitor][i] = CaptureMonitorLayer(cast(render.CaptureImageLayer, self.L[Layers.capture_image][i]),
-                                                                    cast(render.CaptureDepthLayer, self.L[Layers.capture_depth][i]),
+            view =          self.L[ChainLayers.view][i] =        ViewLayer(           i, settings.view, fov, settings.colors)
+            self.L[ChainLayers.pose_monitor][i] =                PoseMonitorCompositor(i, self.board, cam_image, cam_crop, view, settings.pose, settings.colors)
+            self.L[ChainLayers.motion][i] =                      render.Motion3DLayer(       i, settings.motion)
+            self.L[ChainLayers.bridge][i] =                      render.Bridge3DLayer(       settings.bridge)
+            fluid =         self.L[ChainLayers.fluid][i] =       render.Fluid3DLayer(        settings.fluid)
+            self.L[ChainLayers.capture_monitor][i] = CaptureMonitorLayer(cast(render.CaptureImageLayer, self.L[ChainLayers.capture_image][i]),
+                                                                    cast(render.CaptureDepthLayer, self.L[ChainLayers.capture_depth][i]),
                                                                     settings.capture.monitor, settings.view)
             # each stage's monitor A in self.L, shown in panel a; its monitor B in self._monitors_b, shown in panel b
-            for key, stage, stage_settings in ((Layers.view_monitor, render.FlowStage.VIEW, settings.view),
-                                               (Layers.motion_monitor, render.FlowStage.MOTION, settings.motion),
-                                               (Layers.bridge_monitor, render.FlowStage.BRIDGE, settings.bridge),
-                                               (Layers.fluid_monitor, render.FlowStage.FLUID, settings.fluid)):
+            for key, stage, stage_settings in ((ChainLayers.view_monitor, render.FlowStage.VIEW, settings.view),
+                                               (ChainLayers.motion_monitor, render.FlowStage.MOTION, settings.motion),
+                                               (ChainLayers.bridge_monitor, render.FlowStage.BRIDGE, settings.bridge),
+                                               (ChainLayers.fluid_monitor, render.FlowStage.FLUID, settings.fluid)):
                 self.L[key][i] = render.MonitorLayer(stage, stage_settings.monitor_a)
                 self._monitors_b.setdefault(key, {})[i] = render.MonitorLayer(stage, stage_settings.monitor_b)
-        self.L[Layers.time_series][0] = render.TimeSeriesLayer(self.board, settings.time_series)      # the board's series, one for all cameras
+        self.L[ChainLayers.time_series][0] = render.TimeSeriesLayer(self.board, settings.time_series)      # the board's series, one for all cameras
 
         # Split view: the left and right panels side by side or stacked, whichever shows what they hold larger
         self._window_size: tuple[int, int] = (settings.window.width, settings.window.height)
@@ -86,9 +86,9 @@ class DeepFlowRender(RenderBase):
         self._view_size: tuple[int, int] = (0, 0)       # the view layers' size: the motion's, set in allocate
 
         # The fluid's and the monitors' input, built right before they run, from what ran before them this tick
-        self._wirings: dict[Layers, Callable[[], None]] = {
-            Layers.fluid: self._wire_fluid,
-            Layers.view_monitor: self._wire_monitors,
+        self._wirings: dict[ChainLayers, Callable[[], None]] = {
+            ChainLayers.fluid: self._wire_fluid,
+            ChainLayers.view_monitor: self._wire_monitors,
         }
 
         # Each camera's captures the motion measures, for the panel's cadence (read on any thread)
@@ -234,18 +234,18 @@ class DeepFlowRender(RenderBase):
 
         if self._reset_fluid.is_set():
             self._reset_fluid.clear()
-            for layer_type in [Layers.motion, Layers.bridge, Layers.fluid]:
+            for layer_type in [ChainLayers.motion, ChainLayers.bridge, ChainLayers.fluid]:
                 for layer in self.L[layer_type].values():
                     cast(render.StageLayer, layer).reset()
 
         select = self.settings.layer.select
-        self._a_layers = select.a
-        self._b_layers = select.b
+        self._a_layers = shown(select.a)
+        self._b_layers = shown(select.b)
         self._update_layout()
         self._follow_view_size()
 
         Style.set_blend_mode(Style.BlendMode.ALPHA)
-        seen: set[Layers] = set()
+        seen: set[ChainLayers] = set()
         for layer_type in TICK_LAYERS + self._a_layers + self._b_layers:
             if layer_type in seen:
                 continue
@@ -268,7 +268,7 @@ class DeepFlowRender(RenderBase):
     def _run_captures(self) -> None:
         """Every capture since the last tick, each camera's in order, through the capture layers (`_run_capture`).
         A tick without a capture runs none of them, so no stage works on a frame twice."""
-        for i in self.L[Layers.view]:
+        for i in self.L[ChainLayers.view]:
             for index, capture in enumerate(self.board.take_captures(i)):
                 self._run_capture(i, capture, same_tick=index > 0)
 
@@ -277,11 +277,11 @@ class DeepFlowRender(RenderBase):
         motion on the view's image, and the bridge stepping over the time since the capture before, the density's
         color the view's. `same_tick`: another capture in this tick, whose bridge outputs the fluid takes with the
         last's."""
-        image = cast(render.CaptureImageLayer, self.L[Layers.capture_image][i])
-        depth = cast(render.CaptureDepthLayer, self.L[Layers.capture_depth][i])
-        view = cast(ViewLayer, self.L[Layers.view][i])
-        motion = cast(render.Motion3DLayer, self.L[Layers.motion][i])
-        bridge = cast(render.Bridge3DLayer, self.L[Layers.bridge][i])
+        image = cast(render.CaptureImageLayer, self.L[ChainLayers.capture_image][i])
+        depth = cast(render.CaptureDepthLayer, self.L[ChainLayers.capture_depth][i])
+        view = cast(ViewLayer, self.L[ChainLayers.view][i])
+        motion = cast(render.Motion3DLayer, self.L[ChainLayers.motion][i])
+        bridge = cast(render.Bridge3DLayer, self.L[ChainLayers.bridge][i])
 
         image.set_capture(capture)
         image.update()
@@ -306,8 +306,8 @@ class DeepFlowRender(RenderBase):
     def _wire_fluid(self) -> None:
         """Each fluid's input, one injection per bridge, at full weight."""
         dt: float = self._dt
-        bridges: dict[int, render.Bridge3DLayer] = {i: cast(render.Bridge3DLayer, layer) for i, layer in self.L[Layers.bridge].items()}
-        for i, _fluid in self.L[Layers.fluid].items():
+        bridges: dict[int, render.Bridge3DLayer] = {i: cast(render.Bridge3DLayer, layer) for i, layer in self.L[ChainLayers.bridge].items()}
+        for i, _fluid in self.L[ChainLayers.fluid].items():
             fluid = cast(render.Fluid3DLayer, _fluid)
             injections: list[render.Injection] = []
             for bridge in bridges.values():
@@ -326,14 +326,14 @@ class DeepFlowRender(RenderBase):
 
     def _wire_monitors(self) -> None:
         """The monitors' input, every stage's ports; each monitor shows its own stage's."""
-        for i, _motion in self.L[Layers.motion].items():
-            if i not in self.L[Layers.bridge] or i not in self.L[Layers.fluid] or i not in self.L[Layers.view]:
+        for i, _motion in self.L[ChainLayers.motion].items():
+            if i not in self.L[ChainLayers.bridge] or i not in self.L[ChainLayers.fluid] or i not in self.L[ChainLayers.view]:
                 continue
             ports: dict[render.FlowStage, dict[str, Port]] = {
-                render.FlowStage.VIEW: cast(ViewLayer, self.L[Layers.view][i]).ports,
+                render.FlowStage.VIEW: cast(ViewLayer, self.L[ChainLayers.view][i]).ports,
                 render.FlowStage.MOTION: cast(render.Motion3DLayer, _motion).ports,
-                render.FlowStage.BRIDGE: cast(render.Bridge3DLayer, self.L[Layers.bridge][i]).ports,
-                render.FlowStage.FLUID: cast(render.Fluid3DLayer, self.L[Layers.fluid][i]).ports,
+                render.FlowStage.BRIDGE: cast(render.Bridge3DLayer, self.L[ChainLayers.bridge][i]).ports,
+                render.FlowStage.FLUID: cast(render.Fluid3DLayer, self.L[ChainLayers.fluid][i]).ports,
             }
             for monitor in self._monitors():
                 monitor.set_input(render.MonitorInput(ports))
@@ -376,7 +376,7 @@ class DeepFlowRender(RenderBase):
     def _on_snap(self, _: bool) -> None:
         """The recording's size: panel a's first layer's, or the main window's when it is recorded."""
         recorder_settings: ScreenRecorderSettings = self.settings.screen_recorder
-        record: list[Layers] = self._a_layers
+        record: list[ChainLayers] = self._a_layers
         if recorder_settings.main_window:
             width, height = self._window_size
         elif record:
@@ -413,7 +413,7 @@ class DeepFlowRender(RenderBase):
 
         Style.pop_style()
 
-    def _draw_fit(self, layer_types: list[Layers], x: float, y: float, width: float, height: float, border: bool = False,
+    def _draw_fit(self, layer_types: list[ChainLayers], x: float, y: float, width: float, height: float, border: bool = False,
                   panel_b: bool = False) -> None:
         """Draw each layer into a GL rect (origin bottom left) at its own shape, centered; with `border`, a border around
         each; in `panel_b` a stage's monitor B, else its monitor A."""
@@ -439,10 +439,10 @@ class DeepFlowRender(RenderBase):
         self._border.use(Rect(0.0, 0.0, 1.0, 1.0), BORDER, BORDER_WIDTH / width, BORDER_WIDTH / height)
         Style.pop_style()
 
-    def _layer_size(self, layer_type: Layers) -> tuple[int, int]:
+    def _layer_size(self, layer_type: ChainLayers) -> tuple[int, int]:
         """The shape of `layer_type`'s panel: its shape layer's texture, the output's without one."""
-        shape: Layers | None = shape_of(layer_type)
-        if layer_type == Layers.pose_monitor:
+        shape: ChainLayers | None = shape_of(layer_type)
+        if layer_type == ChainLayers.pose_monitor:
             shape = POSE_SHAPES[PoseFrame(self.settings.pose.frame)]
         if shape is not None and 0 in self.L[shape]:
             texture: Texture = self.L[shape][0].texture

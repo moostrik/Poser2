@@ -39,38 +39,19 @@ class Stage(IntEnum):
 
 
 # ---------------------------------------------------------------------------
-#  Layers enum
+#  Layer selection settings (split view)
 # ---------------------------------------------------------------------------
 
 class Layers(IntEnum):
-    """Every layer the renderer holds, in the chain's order, each stage with its monitor; the pose last."""
-    # the capture
-    capture_image = 0
-    capture_depth = auto()
-    capture_monitor = auto()
-    # the view
+    """What a panel can show, in the chain's order: each stage's monitor, the show, the timings and the pose."""
+    capture =       0
     view =          auto()
-    view_monitor =  auto()
-    # the motion
     motion =        auto()
-    motion_monitor = auto()
-    # the bridge
     bridge =        auto()
-    bridge_monitor = auto()
-    # the fluid, its look the show
     fluid =         auto()
-    fluid_monitor = auto()
-    # the board's timings
-    time_series =   auto()
-    # the pose: the camera's image and its crop, and the pose's monitor
-    cam_image =     auto()
-    cam_crop =      auto()
-    pose_monitor =  auto()
-
-
-# ---------------------------------------------------------------------------
-#  Layer selection settings (split view)
-# ---------------------------------------------------------------------------
+    show =          auto()     # the fluid's output, its look
+    time_series =   auto()     # the app's timings, over time
+    pose =          auto()
 
 class MainView(IntEnum):
     """What the main window shows: the debug panels, or the show alone."""
@@ -80,8 +61,8 @@ class MainView(IntEnum):
 
 class LayerSettings(BaseSettings):
     """The two panels' layers, each drawn in order: `a` is the show and what the screen recording records."""
-    a: Field[list[Layers]] = Field([Layers.fluid],        description="Layers drawn in panel a, the show", widget=Widget.playlist)
-    b: Field[list[Layers]] = Field([Layers.pose_monitor], description="Layers drawn in panel b", widget=Widget.playlist)
+    a: Field[list[Layers]] = Field([Layers.show], description="Layers drawn in panel a, the show", widget=Widget.playlist)
+    b: Field[list[Layers]] = Field([Layers.pose], description="Layers drawn in panel b", widget=Widget.playlist)
 
 
 # ---------------------------------------------------------------------------

@@ -268,10 +268,10 @@
     "layer": {
       "select": {
         "a": [
-          "fluid"
+          "show"
         ],
         "b": [
-          "fluid_monitor"
+          "fluid"
         ]
       }
     },
