@@ -2,10 +2,11 @@
 
 A stage takes an input the app builds each tick (`set_input`), hands out an output (`output`), and
 starts from rest on `reset`, which its panel's reset button asks for. The next stage reads the
-output's fields by name. The monitors read the stage's `ports`, one list with the data running
-bottom to top: the output's fields as `output.<field>` on top, each component's textures under its
-settings group's name (`trail.smooth`, `xy.solve`), the input's fields as `input.<field>` at the bottom. Each texture is
-written once: a dataclass field declares its kind, a component names its own in its `ports`.
+output's fields by name. The monitors read the stage's `ports`, one list in the order the data runs:
+the input's fields as `input.<field>` first, each component's textures under its settings group's name
+(`trail.smooth`, `xy.solve`) in the order the stage runs them, the output's fields as `output.<field>`
+last; `input` and `output` name the same textures as the parts, not copies. A dataclass field declares
+its kind, a component names its own in its `ports`.
 Inputs share no base: each stage reads its own fields, and nothing takes any stage's input."""
 
 from abc import ABC, abstractmethod
@@ -57,15 +58,15 @@ class StageLayer[I, O: StageOutput](LayerBase, ABC):
 
     @property
     def ports(self) -> dict[str, Port]:
-        """What the monitors show of the stage, the data running bottom to top: `output.*` on top,
-        each component's under its name from the last the stage runs to the first, `input.*` at the
-        bottom. A texture not allocated is left out, so a part the stage does not run gives none."""
-        inputs: dict[str, Port] = ports_of(self._input) if self._input is not None else {}
+        """What the monitors show of the stage, in the order the data runs: `input.*`, each component's
+        under its name in the order the stage runs them, `output.*`. A texture not allocated is left out,
+        so a part the stage does not run gives none."""
+        inputs: dict[str, Port] = prefixed('input', ports_of(self._input)) if self._input is not None else {}
         parts: dict[str, Port] = {}
         for name, component in self._components().items():
             parts.update(prefixed(name, component.ports))
-        ports: dict[str, Port] = {**prefixed('input', inputs), **parts, **prefixed('output', self.output.ports)}
-        return {name: port for name, port in reversed(ports.items()) if port.texture.allocated}
+        ports: dict[str, Port] = {**inputs, **parts, **prefixed('output', self.output.ports)}
+        return {name: port for name, port in ports.items() if port.texture.allocated}
 
     def _components(self) -> dict[str, HasPorts]:
         """The parts that own textures, by their settings group's name ('' for none), in the order

@@ -310,7 +310,7 @@
     },
     "view": {
       "monitor_main": {
-        "texture": "depth.depth",
+        "texture": "output.depth",
         "view": "COLORMAP"
       },
       "width": 448,

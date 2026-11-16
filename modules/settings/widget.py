@@ -49,6 +49,7 @@ class Widget(Enum):
     ip_field = auto()
     textarea = auto()
     text_select = auto()
+    path_select = auto()    # a dotted path from another field's list, picked a level at a time
     # value-object widgets
     color = auto()
     color_alpha = auto()
@@ -182,6 +183,7 @@ _TYPES: dict[Widget, tuple[type, ...] | None] = {
     Widget.ip_field: (str,),
     Widget.textarea: (str,),
     Widget.text_select: (str,),
+    Widget.path_select: (str,),
     Widget.color: None,
     Widget.color_alpha: None,
     Widget.point2f: None,

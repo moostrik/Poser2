@@ -103,10 +103,12 @@ is a stage's only way out, and the next stage reads its fields by name. A textur
 on the field (`velocity: Annotated[Texture, TextureKind.VELOCITY]`), in inputs and outputs alike
 (`ports_of`), and every component that owns textures names them once with their kinds in its `ports`
 (`HasPorts`): `FlowBase` its `input` and `output`, a subclass its others. A stage names its components
-once (`_components`), by their settings group, and its `ports`, what the monitors show, is one list with
-the data running bottom to top, the prefix its group: `output.*` on top, each component's from the last
-the stage runs to the first (`z.track`, `xy.solve`, `bandpass.fast`, `lowpass.trail`), `input.*` at the
-bottom. A texture not allocated is left out, so a part the stage does not run gives none. Not by
+once (`_components`), by their settings group, and its `ports`, what the monitors show, is one list in
+the order the data runs, the prefix its group, as a frame debugger lists a render's passes: `input.*`
+first, each component's in the order the stage runs them (`lowpass.trail`, `bandpass.fast`, `xy.solve`,
+`z.track`), `output.*` last; `input` and `output` name the same textures as the components, not copies.
+The dotted path is the step, which the monitor's path select picks a level at a time. A texture not
+allocated is left out, so a part the stage does not run gives none. Not by
 reflection over attributes: it would find the FBOs, not their kinds, and a swap's back buffer would be a
 port too. A layer's `texture` stays what it draws, read by the composite. The layers hold no reference to
 each other, and no input knows an output's type. A field is named with the same noun for the same kind of

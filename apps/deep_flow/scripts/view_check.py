@@ -7,7 +7,7 @@ app does), takes them into GL and runs the view stage at the preset's settings. 
   two depth pixels on the mask's side equally near, counted apart;
 - the mask against the depth mask it is made from: their overlap (intersection over union; the guided filter
   only moves the edge, by a few view pixels, so near 1) and the share of the view that is the player.
-Saves the last frame's image, depth mask, mask and color side by side as a PNG.
+Saves the last frame's image, depth mask, mask and graded image side by side as a PNG.
 
 With `--time`, then each of the view's passes on the last capture, the median of 40 runs, and the whole view.
 
@@ -197,7 +197,7 @@ def main() -> int:
         shares.append(float(mask.mean()))
         if i == count - 1:
             last = {'image': read(output.image, 4), 'depth_mask': read(output.depth_mask), 'mask': read(output.mask),
-                    'color': read(output.color, 4)}
+                    'graded_image': read(output.graded_image, 4)}
 
     uploader.stop()
     if args.time:
@@ -212,7 +212,7 @@ def main() -> int:
             if picture.ndim == 2:
                 picture = np.repeat(picture[..., None], 3, axis=2)
             return (np.clip(picture[..., :3][..., ::-1], 0.0, 1.0) * 255.0).astype(np.uint8)
-        cv2.imwrite(args.png, np.hstack([bgr(last[k]) for k in ('image', 'depth_mask', 'mask', 'color')]))
+        cv2.imwrite(args.png, np.hstack([bgr(last[k]) for k in ('image', 'depth_mask', 'mask', 'graded_image')]))
         print(f'saved {args.png}')
     return 1 if off_total > pixels * 1e-4 else 0
 

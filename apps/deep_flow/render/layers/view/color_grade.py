@@ -26,7 +26,7 @@ class ColorGrade:
 
     @property
     def ports(self) -> dict[str, Port]:
-        return {'color': Port(self._fbo, TextureKind.IMAGE)}
+        return {'graded_image': Port(self._fbo, TextureKind.IMAGE)}
 
     @property
     def made_with(self) -> tuple:

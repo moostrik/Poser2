@@ -43,14 +43,15 @@ class ViewInput:
 
 @dataclass
 class ViewOutput(StageOutput):
-    """The view's textures, at the view's size: `image` the cropped color, `color` the image graded and
-    premultiplied by the mask, the density's color, `depth` the metres as the motion measures z from them, `mask` the player's shape
-    on the image's edges, `depth_mask` where the depth lies from `near` to `far`."""
+    """The view's textures, at the view's size, in the order the view makes them: `image` the cropped color,
+    `depth` the metres as the motion measures z from them, `depth_mask` where the depth lies from `near` to `far`,
+    `mask` the player's shape on the image's edges, `graded_image` the image graded and premultiplied by the mask,
+    the bridge's density color."""
     image: Annotated[Texture, TextureKind.IMAGE]
-    color: Annotated[Texture, TextureKind.IMAGE]
     depth: Annotated[DepthView, TextureKind.DEPTH]
-    mask: Annotated[Texture, TextureKind.SCALAR]
     depth_mask: Annotated[Texture, TextureKind.SCALAR]
+    mask: Annotated[Texture, TextureKind.SCALAR]
+    graded_image: Annotated[Texture, TextureKind.IMAGE]
 
 
 class ViewLayer(StageLayer[ViewInput, ViewOutput]):
@@ -82,15 +83,12 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         band: ViewDepthMaskSettings = self.settings.depth_mask
         depth: DepthView = DepthView(self._depth.depth, view_span(self._crop, self._fov), depth_step(self._crop, self._grid_size),
                                      band.near, band.far)
-        return ViewOutput(self._image, self._color_grade.texture, depth, self._depth_mask.mask, self._depth_mask.depth_mask)
+        return ViewOutput(self._image, depth, self._depth_mask.depth_mask, self._depth_mask.mask, self._color_grade.texture)
 
     @property
     def ports(self) -> dict[str, Port]:
-        """The stage's ports with each texture once, under the part that holds it, and the input's depth a depth
-        in the band, so a monitor draws its colormap."""
+        """The stage's ports, the input's depth a depth in the band, so a monitor draws its colormap."""
         ports: dict[str, Port] = super().ports
-        held: set[int] = {id(port.texture) for name, port in ports.items() if not name.startswith(('input.', 'output.'))}
-        ports = {name: port for name, port in ports.items() if not (name.startswith('output.') and id(port.texture) in held)}
         if 'input.depth' in ports:
             band: ViewDepthMaskSettings = self.settings.depth_mask
             ports['input.depth'] = Port(ports['input.depth'].texture, TextureKind.DEPTH, depth_range=(band.near, band.far))

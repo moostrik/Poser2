@@ -63,18 +63,18 @@ class GlyphSpacing(IntEnum):
 
 class Monitor2DAdvancedSettings(BaseSettings):
     """How the monitor draws: the channels, the scale, the glyphs' spacing, the legend and the blend."""
-    channel: Field[Channel] =       Field(Channel.ALL, width=16, description="The channels drawn")
+    channel: Field[Channel] =       Field(Channel.ALL, description="The channels drawn")
     scale: Field[float] =           Field(1.0, min=0.01, max=100.0, widget=Widget.log_slider, description="Multiplier on the values")
-    glyph_spacing: Field[GlyphSpacing] = Field(GlyphSpacing.SPACING_32, width=24, description="Distance between glyphs (pixels)")
-    colormap: Field[Colormap] =     Field(Colormap.JET, width=24, description="A depth's colors, from its near to its far")
+    blend_mode: Field[Style.BlendMode] = Field(Style.BlendMode.ADD, description="How the monitor is drawn over the panel")
+    glyph_spacing: Field[GlyphSpacing] = Field(GlyphSpacing.SPACING_32, description="Distance between glyphs (pixels)")
+    colormap: Field[Colormap] =     Field(Colormap.JET, description="A depth's colors, from its near to its far")
     legend: Field[bool] =           Field(True, description="The overlay: titles, log axes and the color key")
-    blend_mode: Field[Style.BlendMode] = Field(Style.BlendMode.ADD, width=32, description="How the monitor is drawn over the panel")
 
 
 class Monitor2DLayerSettings(BaseSettings):
     """Configuration for Monitor2DLayer: what it shows of its stage, and in `advanced` how."""
-    names: Field[list[str]] =       Field([""], access=Field.READ, visible=False, description="The stage's textures")
-    texture: Field[str] =           Field("output.boundary_velocity", widget=Widget.text_select, options=names, description="The texture shown")
+    names: Field[list[str]] =       Field([""], access=Field.READ, visible=False, description="The stage's textures, in the order the data runs")
+    texture: Field[str] =           Field("output.boundary_velocity", widget=Widget.path_select, options=names, description="The texture shown, picked a step at a time")
     view: Field[MonitorView] =      Field(MonitorView.COLORMAP, description="How the port is drawn: by its kind, glyphs, raw, histogram or strip")
 
     advanced = Group(Monitor2DAdvancedSettings)

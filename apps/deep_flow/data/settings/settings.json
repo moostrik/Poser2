@@ -313,7 +313,7 @@
         "sharpen": 0.82
       },
       "monitor_main": {
-        "texture": "depth_mask.mask",
+        "texture": "output.mask",
         "view": "COLORMAP",
         "advanced": {
           "channel": "ALL",

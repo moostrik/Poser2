@@ -681,6 +681,100 @@ class TextSelect(Control):
         self.select.set_value(value if value in self.options else None)
 
 
+def path_level(paths: list[str], prefix: str) -> dict[str, str]:
+    """The entries one level below `prefix` ('' for the top, else ending in a dot), in the order the paths
+    come: a step as its prefix one level deeper (`'depth_mask.'`), a texture as its whole path
+    (`'output.depth'`), each with its label, the level's name; a step's label ends in ' ›'."""
+    level: dict[str, str] = {}
+    for path in paths:
+        if not path.startswith(prefix) or path == prefix:
+            continue
+        name, _, rest = path[len(prefix):].partition('.')
+        key: str = f"{prefix}{name}." if rest else path
+        level.setdefault(key, f"{name} ›" if rest else name)
+    return level
+
+
+def path_step(path: str) -> str:
+    """The step a path lies in, its prefix up to its last dot with the dot; '' for a path at the top."""
+    head, dot, _ = path.rpartition('.')
+    return f"{head}{dot}" if dot else ''
+
+
+class PathSelect(Control):
+    """A dotted path from the current list of another field (``options``), picked a level at a time: a select
+    per level down to the step looked through. A select before the last only filters the next; the field is
+    written only when a texture is picked. When the last select closes without a pick, the selects go back to
+    the step of the path the field holds. Polls both, always."""
+    widget = Widget.path_select
+
+    def build(self) -> None:
+        self.options_field = self.field.options
+        self.paths: list[str] = list(getattr(self.settings, self.options_field.name)) if self.options_field else []
+        self.looked: str = path_step(self.shown)   # the step looked through; the shown path's at first
+        self.row = ui.row().classes("gap-1 items-center no-wrap max-w-full")
+        self._build_levels()
+
+    def _build_levels(self, open_last: bool = False) -> None:
+        """A select per level, from the top down to the step looked through."""
+        self.row.clear()
+        prefixes: list[str] = ['']
+        for i, char in enumerate(self.looked):
+            if char == '.':
+                prefixes.append(self.looked[:i + 1])
+        last: ui.select | None = None
+        with self.row:
+            for depth, prefix in enumerate(prefixes):
+                options: dict[str, str] = path_level(self.paths, prefix)
+                deeper: str | None = prefixes[depth + 1] if depth + 1 < len(prefixes) else None
+                value: str | None = deeper if deeper in options else (self.shown if self.shown in options else None)
+                select = ui.select(options=options, value=value, label=self.label if depth == 0 else None).props(
+                    "dense outlined" + self.lock())
+                select.classes(f"w-{self.field.width if self.field.width is not None else 36} max-w-full")
+                if depth == 0:
+                    self.tooltip(select)
+                if not self.locked:
+                    select.on_value_change(lambda e: self._pick(e.value))
+                last = select
+        if not self.locked and last is not None:
+            looked: str = self.looked
+            last.on('popup-hide', lambda _: self._closed(looked))
+            if open_last:
+                last.run_method('showPopup')
+
+    def _pick(self, key: str | None) -> None:
+        if key is None or key == self.looked:  # a select clears itself when its options change; not a choice
+            return
+        if key.endswith('.'):
+            self.looked = key                   # a step: look through it, the field unchanged
+            self._build_levels(open_last=True)
+            return
+        self.looked = path_step(key)
+        self.commit(key)
+
+    def _closed(self, looked: str) -> None:
+        """The last select, the one through `looked`, closed: without a pick, back to the step of the path the
+        field holds. A select closing because a step was picked in it is no longer the last: nothing."""
+        if looked == self.looked and self.looked != path_step(self.shown):
+            self.looked = path_step(self.shown)
+            self._build_levels()
+
+    def polls(self) -> bool:
+        return True
+
+    def poll(self) -> None:
+        if self.options_field:
+            paths = list(getattr(self.settings, self.options_field.name))
+            if paths != self.paths:
+                self.paths = paths
+                self._build_levels()
+        super().poll()
+
+    def show(self, value: Any) -> None:
+        self.looked = path_step(value)
+        self._build_levels()
+
+
 class Radio(Control):
     widget = Widget.radio
 
