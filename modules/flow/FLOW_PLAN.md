@@ -37,6 +37,13 @@ and the depth read across a surface ([VIEW.md](VIEW.md)).
 - **B1.** The depth read: `view.depth.depth_read` holds `SURFACE` and `MASK` ([VIEW.md](VIEW.md#the-depth-read)). One
   stays, chosen together by eye on the edges recording; the other goes. In the same sitting, the color's edge
   now that the color grade works on the straight image and takes the mask last.
+- **B8.** The monitor's list in the order the data runs, for every stage: the input first, the parts in the order
+  the stage runs them, the outputs last (now the reverse). An output shows as `output.*` and not again under the
+  part that makes it, so the view's color reads as an output. The view's outputs in the order it makes them:
+  image, depth, depth mask, mask, color. `test_stage_layer.py` and the presets' monitor picks follow.
+
+Question, for B8: the view's outputs `image` (the cropped camera image the motion measures on) and `color` (the
+density's color) read badly side by side; their names.
 
 Question, for B: the view's depth settings gone through together; among them MASK's read takes the mask's
 `guided_radius` as its reach.
