@@ -1,7 +1,7 @@
 # The view
 
 The flow's view of a capture, the stage before the motion: the camera image and the aligned depth cut to one
-window at the motion's size, the depth read into it, and the player's two masks. What comes before it, the
+crop at the motion's size, the depth read into it, and the player's two masks. What comes before it, the
 uploader's corrected camera frame, is in [INPUT_THREADS.md](INPUT_THREADS.md#the-uploader); the sizes it works
 at and why are in [RESOLUTION.md](RESOLUTION.md). **(deduction)** marks what is inferred.
 
@@ -10,21 +10,22 @@ depth's read are plain modules in `modules/flow/view` (`view_window.py`, `depth_
 
 ## The stage
 
-Once per capture, in order:
+Once per capture, in order; each step but the crop is a part, a class with its textures, ports and settings
+group, and the monitor lists each part's textures under its name:
 
-| Step            | Makes                                                                                          |
-|-----------------|------------------------------------------------------------------------------------------------|
-| the crop        | the image cut to the view's crop (`crop.center_x`, `crop.center_y`, `crop.height`), at the view's `width` × `height` |
-| the depth read  | the aligned depth read into the same window ([The depth read](#the-depth-read)), a `DepthView` ([MOTION.md](MOTION.md#when-it-measures)) |
-| the depth mask  | where the view's depth lies from `near` to `far`                                                |
-| the mask        | the depth mask, its edge moved onto the image's ([The mask and the depth mask](#the-mask-and-the-depth-mask)) |
-| the foreground  | the image where the mask is                                                                     |
-| the pose        | the pose's points placed in the window, for the pose drawn over the view                        |
+| Step                       | Makes                                                                                  |
+|----------------------------|----------------------------------------------------------------------------------------|
+| the crop                   | the image cut to the view's crop (`crop`), at the view's `width` × `height`            |
+| `depth` (`ViewDepth`)      | the aligned depth read into the crop ([The depth read](#the-depth-read)), a `DepthView` ([MOTION.md](MOTION.md#when-it-measures)) |
+| `depth_mask` (`ViewDepthMask`) | the depth mask, where the depth lies from `near` to `far`, and the mask, its edge moved onto the image's ([The mask and the depth mask](#the-mask-and-the-depth-mask)) |
+| `color_grade` (`ColorGrade`) | the color, the density's: the image graded (`exposure`, `offset`, `gamma`, `contrast`, `saturation`) and sharpened (`sharpen`), the mask its alpha last (`use_mask`) |
+| the pose                   | the pose's points placed in the crop, for the pose drawn over the view                 |
 
-Its outputs are the image, the foreground, the color, the depth, the mask and the depth mask; the panel picks the
-motion's picture (`inputs`). The color, the density's, is the view's last pass, once per capture
-(`ColorGrade`, settings `view.color_grade`): the foreground graded (`exposure`, `offset`, `gamma`, `contrast`,
-`saturation`), sharpened (`sharpen`) and masked (`use_mask`); with its `enabled` off it is the foreground as it is.
+Its outputs are the image, the color, the depth, the mask and the depth mask, each the texture of the part that
+makes it; the input's depth is a depth in the band, drawn in its colormap. The color grade works on the straight
+image and takes the mask last, as compositing does (Porter and Duff 1984; Brinkmann): grading or sharpening a cut
+image changes its half-masked edge apart from the rest and pulls the cut's black into the edge. With
+`color_grade.enabled` off the color is the image as it is, masked where `use_mask`.
 
 The color is resampled twice, straightened in the uploader and cut to the view here, a little softer than one
 resample **(deduction)**, for keeping the camera's work and the flow's apart.
@@ -32,11 +33,11 @@ resample **(deduction)**, for keeping the camera's work and the flow's apart.
 | Setting                              | Preset        | Is                                                                        |
 |--------------------------------------|---------------|---------------------------------------------------------------------------|
 | `crop.center_x`, `center_y`, `height` | 0.5, 0.5, 1  | the crop's center and height on the camera image, shares of it            |
-| `depth.near`, `depth.far`            | 0.1, 1.7 m    | the player's depth range, the box's front and back                        |
 | `depth.depth_read`                   | `SURFACE`     | how the depth is read into the view                                       |
 | `depth.tolerance`                    | 0.2 m         | the depth jump beyond which the read blends no two depth pixels           |
-| `mask.guided_radius`                 | 2             | how far the image moves the mask's edge, in depth pixels; 0 off           |
-| `mask.edge_contrast`                 | 0.03          | the image's brightness spread (0 to 1) above which the edge follows the image's |
+| `depth_mask.near`, `far`             | 0.1, 1.7 m    | the player's depth range, the box's front and back                        |
+| `depth_mask.guided_radius`           | 2             | how far the image moves the mask's edge, in depth pixels; 0 off           |
+| `depth_mask.edge_contrast`           | 0.03          | the image's brightness spread (0 to 1) above which the edge follows the image's |
 
 ## The depth read
 
@@ -50,7 +51,7 @@ pixel reads it between its pixels (`DepthUpscale`). `depth_read` chooses how; wh
 | `MASK`       | as `SURFACE`                       | the nearest depth pixel on the side the mask gives it      |
 
 `SURFACE` (`depth_read.edge_aware_depth`): the four depth pixels around a view pixel, interpolated bilinearly
-where they lie within the view's `tolerance` of each other, else the one it lies in, so an edge never reads
+where they lie within `depth.tolerance` of each other, else the one it lies in, so an edge never reads
 as a distance in between; a 0, no depth, is never blended.
 
 `MASK` (`mask_sided_depth`) reads as `SURFACE` does wherever that depth is on the pixel's side of the mask: a
@@ -109,7 +110,7 @@ The player's shape and where the depth is the player's are two things:
 - `mask`: the depth mask, its edge moved onto the camera image's by the guided filter (He 2010), then the AA's
   threshold at 0.5, a crisp edge where the image puts it. Where the image has no edge the filter only averages
   the cut, and the threshold makes that a smoothed outline. `guided_radius` is in the cut's (the depth's)
-  pixels, how far its edge may be off, turned into the view's each frame from the window; `edge_contrast` is
+  pixels, how far its edge may be off, turned into the view's each frame from the crop; `edge_contrast` is
   squared inside as the filter's ε. It gates x/y in the motion with `use_mask`, and the dye's color in the
   bridge.
 - `depth_mask`, the view's depth cut by `near` and `far`, is the motion's `depth_mask`: it gates z on top of

@@ -221,23 +221,22 @@ class ViewCropSettings(BaseSettings):
 
 
 class ViewDepthSettings(BaseSettings):
-    """The view's depth: the player's depth band, the depth mask's; how the depth is read into the view and the
-    tolerance it reads at."""
-    near:       Field[float]     = Field(0.5, min=0.1, max=12.0, step=0.05, description="Nearest depth that is the player (m)")
-    far:        Field[float]     = Field(4.0, min=0.1, max=12.0, step=0.05, description="Farthest depth that is the player (m)")
-    depth_read: Field[DepthRead] = Field(DepthRead.SURFACE, newline=True, description="How the depth is read into the view: its edge on its own pixels or on the mask's")
+    """ViewDepth: how the depth is read into the view and the tolerance it reads at."""
+    depth_read: Field[DepthRead] = Field(DepthRead.SURFACE, description="How the depth is read into the view: its edge on its own pixels or on the mask's")
     tolerance:  Field[float]     = Field(0.2, min=0.05, max=0.5, step=0.01, description="Depth jump beyond which the read blends no two depth pixels, m")
 
 
-class ViewMaskSettings(BaseSettings):
-    """The view's mask: the depth mask, its edge moved onto the image's by the guided filter."""
-    guided_radius: Field[float] = Field(2.0, min=0.0, max=8.0, step=0.25, description="How far the image moves the mask's edge to its own, in depth pixels; 0 = off")
+class ViewDepthMaskSettings(BaseSettings):
+    """ViewDepthMask: the player's depth band, the cut; the guided filter that moves the cut's edge onto the image's."""
+    near:          Field[float] = Field(0.5, min=0.1, max=12.0, step=0.05, description="Nearest depth that is the player (m)")
+    far:           Field[float] = Field(4.0, min=0.1, max=12.0, step=0.05, description="Farthest depth that is the player (m)")
+    guided_radius: Field[float] = Field(2.0, min=0.0, max=8.0, step=0.25, newline=True, description="How far the image moves the mask's edge to its own, in depth pixels; 0 = off")
     edge_contrast: Field[float] = Field(0.03, min=0.001, max=0.3, step=0.001, description="The image's brightness spread (0 to 1) above which the mask's edge follows the image's")
 
 
 class ColorGradeSettings(BaseSettings):
-    """ColorGrade: the foreground graded, in the order applied, then sharpened, the mask as its alpha."""
-    enabled:    Field[bool]  = Field(True, description="The color graded; off, the foreground as it is")
+    """ColorGrade: the image graded, in the order applied, then sharpened, the mask as its alpha."""
+    enabled:    Field[bool]  = Field(True, description="The color graded; off, the image as it is")
     use_mask:   Field[bool]  = Field(True, description="The mask as the color's alpha")
     exposure:   Field[float] = Field(1.0, min=0.1, max=3.0, newline=True, description="The color times this")
     offset:     Field[float] = Field(0.0, min=-0.5, max=0.5, description="Added to the color, after the exposure")
@@ -248,13 +247,13 @@ class ColorGradeSettings(BaseSettings):
 
 
 class ViewLayerSettings(render.StageLayerSettings):
-    """The view's size; its crop, depth, mask and color grade in their panels, in the order the view runs them."""
+    """The view's size; its crop, depth, depth mask and color grade in their panels, in the order the view runs them."""
     width:         Field[int]   = Field(448, min=32, max=4096, step=32, description="The view's width (pixels)")
     height:        Field[int]   = Field(800, min=32, max=4096, step=32, description="The view's height (pixels)")
-    crop:        Group[ViewCropSettings]   = Group(ViewCropSettings)
-    depth:       Group[ViewDepthSettings]  = Group(ViewDepthSettings)
-    mask:        Group[ViewMaskSettings]   = Group(ViewMaskSettings)
-    color_grade: Group[ColorGradeSettings] = Group(ColorGradeSettings)
+    crop:        Group[ViewCropSettings]      = Group(ViewCropSettings)
+    depth:       Group[ViewDepthSettings]     = Group(ViewDepthSettings)
+    depth_mask:  Group[ViewDepthMaskSettings] = Group(ViewDepthMaskSettings)
+    color_grade: Group[ColorGradeSettings]    = Group(ColorGradeSettings)
 
 
 class CaptureView(IntEnum):

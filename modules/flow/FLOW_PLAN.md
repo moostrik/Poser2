@@ -35,22 +35,8 @@ Built: every capture reaches the motion ([INPUT_THREADS.md](INPUT_THREADS.md)), 
 and the depth read across a surface ([VIEW.md](VIEW.md)).
 
 - **B1.** The depth read: `view.depth.depth_read` holds `SURFACE` and `MASK` ([VIEW.md](VIEW.md#the-depth-read)). One
-  stays, chosen together by eye on the edges recording; the other goes.
-- **B5.** The view built from its parts. The view is one class that does everything itself, so its texture names
-  come out muddled. It is split into three parts, each a class with its own textures, ports and settings, as
-  `ColorGrade` is: `depth` brings the camera's depth into the view (`SURFACE` or `MASK`), `depth_mask` cuts the
-  depth to the player's band and moves its outline onto the image's edges, `color_grade` sets the player's
-  colors. The view runs them in order (with `MASK`, depth again on the mask) and the monitor lists each part's
-  textures under its name.
-  - The band (`near`, `far`) is the depth mask's, which makes the cut; the depth part takes the band and, with
-    `MASK`, the mask and its reach from the depth mask instead of holding them.
-  - Each texture is listed once, under its part; the stage's outputs point to those, and the presets' monitor
-    picks (`output.mask` and the like) follow.
-  - The color grade colors the whole image first and cuts the player out last, as compositing does (Porter and
-    Duff; Brinkmann), so the cut-out's black edge no longer gets into the colors as a bright rim. The
-    in-between foreground (`output.foreground`) goes; nothing reads it.
-  - The input depth is a depth (with the band's near and far), so its monitor draws its colormap.
-  - `view_check.py` and VIEW.md follow; the look at the edge changes and is judged by eye.
+  stays, chosen together by eye on the edges recording; the other goes. In the same sitting, the color's edge
+  now that the color grade works on the straight image and takes the mask last.
 - **B6.** A flat monitor and a 3D monitor, after B7. One monitor (`MonitorLayer`, 395 lines) does both, so its 3D
   settings (slice, orbit, depth fade) show on the flat stages, where they do nothing. `Monitor2DLayer` draws flat
   textures; `Monitor3DLayer` adds the volume views and the mouse (drag to turn and zoom, wheel for the slice,
@@ -251,9 +237,7 @@ Not worked on until asked for; each with what is known.
 - Remove obsolete pathways instead of leaving parallel legacy ones: hd_trio's copy, deleted in line I.
 - Remove obsolete pathways; keep presets and settings schemas in sync: the depth read not chosen and the
   preset's `view.depth.depth_read`, B1.
-- Fix a problem where it is made; remove obsolete pathways: the view's grade on the straight image, the
-  foreground gone, the input depth's kind, B5.
-- Panels: a settings class mirrors the code, a stage's ports follow its parts, the monitors last: B5, B6.
+- Panels: a component's monitors last in its settings: B6.
 - Prefer composition over inheritance, an `ABC` for a family that shares code: the 2D and 3D monitor, B6.
 - Name a concept after what it is, one term everywhere: main and debug, B7.
 - A `Field` description is one short line of panel text: J1.

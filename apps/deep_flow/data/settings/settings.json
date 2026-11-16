@@ -293,12 +293,12 @@
         "height": 1.0
       },
       "depth": {
-        "near": 0.1,
-        "far": 1.7,
         "depth_read": "SURFACE",
         "tolerance": 0.2
       },
-      "mask": {
+      "depth_mask": {
+        "near": 0.1,
+        "far": 1.7,
         "guided_radius": 2.0,
         "edge_contrast": 0.03
       },
@@ -313,7 +313,7 @@
         "sharpen": 0.82
       },
       "monitor_a": {
-        "texture": "output.mask",
+        "texture": "depth_mask.mask",
         "view": "COLORMAP",
         "advanced": {
           "channel": "ALL",

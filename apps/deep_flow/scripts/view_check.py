@@ -7,7 +7,7 @@ app does), takes them into GL and runs the view stage at the preset's settings. 
   two depth pixels on the mask's side equally near, counted apart;
 - the mask against the depth mask it is made from: their overlap (intersection over union; the guided filter
   only moves the edge, by a few view pixels, so near 1) and the share of the view that is the player.
-Saves the last frame's image, depth mask, mask and foreground side by side as a PNG.
+Saves the last frame's image, depth mask, mask and color side by side as a PNG.
 
 With `--time`, then each of the view's passes on the last capture, the median of 40 runs, and the whole view.
 
@@ -76,23 +76,8 @@ def time_view(view: ViewLayer, image: Texture, depth: Texture) -> None:
 
     def image_pass() -> None:
         view._image.begin()
-        view._roi_shader.use(image, roi)
+        image.draw(src=roi)
         view._image.end()
-
-    def depth_mask_pass() -> None:
-        view._depth_mask.begin()
-        view._depth_mask_shader.use(view._depth, s.depth.near, s.depth.far)
-        view._depth_mask.end()
-
-    def threshold_pass() -> None:
-        view._mask.begin()
-        view._threshold_shader.use(view._guided)
-        view._mask.end()
-
-    def foreground_pass() -> None:
-        view._foreground.begin()
-        view._foreground_shader.use(view._image, view._mask)
-        view._foreground.end()
 
     def whole(read: DepthRead) -> None:
         settings_read = s.depth.depth_read
@@ -103,13 +88,12 @@ def time_view(view: ViewLayer, image: Texture, depth: Texture) -> None:
 
     Style.push_style()
     Style.set_blend_mode(Style.BlendMode.DISABLED)
-    rows = [('image into the view', image_pass),
-            ('depth read, SURFACE', lambda: view._read_depth(depth, roi, DepthRead.SURFACE, s)),
-            ('depth mask', depth_mask_pass),
-            ('guided filter', lambda: view._guide_edge(s)),
-            ('mask threshold', threshold_pass),
-            ('depth read, MASK', lambda: view._read_depth(depth, roi, DepthRead.MASK, s)),
-            ('foreground', foreground_pass)]
+    rows = [('crop', image_pass),
+            ('depth read, SURFACE', lambda: view._depth.read(depth, roi, DepthRead.SURFACE)),
+            ('depth mask, the cut', lambda: view._depth_mask.cut(view._depth.depth)),
+            ('depth mask, the guide', lambda: view._depth_mask.guide(view._image, roi, view._grid_size[1])),
+            ('depth read, MASK', lambda: view._depth.read(depth, roi, DepthRead.MASK)),
+            ('color grade', lambda: view._color_grade.process(view._image, view._depth_mask.mask))]
     for name, work in rows:
         for _ in range(3):
             work()
@@ -146,6 +130,7 @@ def main() -> int:
     settings.initialize()
     settings.update_from_dict(preset['view'])
     d = settings.depth
+    band = settings.depth_mask
     if args.read:
         d.depth_read = DepthRead[args.read.upper()]
     view = ViewLayer(settings, json.loads(PRESET.read_text(encoding='utf-8'))['camera']['fov'])
@@ -161,7 +146,7 @@ def main() -> int:
     depth_texture = Tensor(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
 
     print(f'{args.recording}: {count} captures, view {view.output.image.width} x {view.output.image.height}, '
-          f'tolerance {d.tolerance} m, near {d.near} far {d.far}')
+          f'tolerance {d.tolerance} m, near {band.near} far {band.far}')
     off_total, ties, pixels, overlaps, shares = 0, 0, 0, [], []
     last: dict[str, np.ndarray] = {}
     for i in range(count):
@@ -189,15 +174,15 @@ def main() -> int:
         uu, vv = np.meshgrid(u, v)
         grid = depth.depth.cpu().numpy()
         if d.depth_read == DepthRead.MASK:
-            want = mask_sided_depth(grid, uu, vv, d.tolerance, read(output.mask) > 0.5, d.near, d.far,
-                                    settings.mask.guided_radius)
+            want = mask_sided_depth(grid, uu, vv, d.tolerance, read(output.mask) > 0.5, band.near, band.far,
+                                    band.guided_radius)
         else:
             want = edge_aware_depth(grid, uu, vv, d.tolerance)
         off = np.abs(got - want) > 0.001
         if d.depth_read == DepthRead.MASK:
             # two depth pixels on the pixel's side as near as each other: either is the rule's, float decides
             def sided(values: np.ndarray) -> np.ndarray:
-                return ((values > 0.0) & (values >= d.near) & (values <= d.far)) == (read(output.mask) > 0.5)
+                return ((values > 0.0) & (values >= band.near) & (values <= band.far)) == (read(output.mask) > 0.5)
             tie = off & sided(got) & sided(want)
             ties += int(tie.sum())
             off &= ~tie
@@ -212,7 +197,7 @@ def main() -> int:
         shares.append(float(mask.mean()))
         if i == count - 1:
             last = {'image': read(output.image, 4), 'depth_mask': read(output.depth_mask), 'mask': read(output.mask),
-                    'foreground': read(output.foreground, 4)}
+                    'color': read(output.color, 4)}
 
     uploader.stop()
     if args.time:
@@ -227,7 +212,7 @@ def main() -> int:
             if picture.ndim == 2:
                 picture = np.repeat(picture[..., None], 3, axis=2)
             return (np.clip(picture[..., :3][..., ::-1], 0.0, 1.0) * 255.0).astype(np.uint8)
-        cv2.imwrite(args.png, np.hstack([bgr(last[k]) for k in ('image', 'depth_mask', 'mask', 'foreground')]))
+        cv2.imwrite(args.png, np.hstack([bgr(last[k]) for k in ('image', 'depth_mask', 'mask', 'color')]))
         print(f'saved {args.png}')
     return 1 if off_total > pixels * 1e-4 else 0
 

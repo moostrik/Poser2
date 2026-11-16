@@ -58,7 +58,7 @@ waits there. `scripts/depth_align_check.py` holds both to the shader on recorded
 
 The line between the uploader and the flow: what every user of the camera needs (the color's conversion and
 straightening, the depth's alignment by the camera's calibration) is the uploader's and reads camera settings
-only; what only the flow needs (the view's window and size, the depth's read into it at its
+only; what only the flow needs (the view's crop and size, the depth's read into it at its
 `tolerance`, the mask) is the flow's view stage ([VIEW.md](VIEW.md)).
 
 When an image is on the GPU, the uploader hands it to four others, each of which only takes note and returns:
@@ -88,7 +88,7 @@ tracklet message; `CameraSync` is for the apps with several cameras.
 
 `CaptureSync` (`modules/inference/capture_sync.py`) matches an image, its depth and the poses of one moment by
 capture time. With `pose_wait` 0 a capture never waits for its poses: it carries the poses of the frame before,
-which with the view's window fixed only puts the pose's points drawn over the view a frame behind. Its submits
+which with the view's crop fixed only puts the pose's points drawn over the view a frame behind. Its submits
 queue the parts, at most 8 of a stream per camera (the oldest dropped, `dropped` on the panel), and its own thread
 matches them and hands every complete capture, in the order of capture, to the board.
 
@@ -112,8 +112,8 @@ it 6.4 ms on average to upload.
 
 The board keeps each camera's captures until the render takes them (`CaptureStoreMixin.take_captures`, at most
 4; beyond that the oldest is dropped and counted). Each tick the render runs every capture since the last, in
-order (`_run_capture` in `apps/deep_flow/render/deep_flow_render.py`): its image and depth into GL, the view stage, the foreground's
-look, the motion, and the bridge stepping over the time since the capture before. A tick without a capture runs
+order (`_run_capture` in `apps/deep_flow/render/deep_flow_render.py`): its image and depth into GL, the view stage (its color grade
+the last of its parts), the motion, and the bridge stepping over the time since the capture before. A tick without a capture runs
 none of them, so no stage works on a frame twice; the fluid runs every tick on the tick's `dt`.
 
 With two captures in one tick the 3D bridge hands the fluid, per pixel, the density and the temperature of the

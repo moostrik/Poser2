@@ -58,7 +58,7 @@ class DeepFlowRender(RenderBase):
             fluid =         self.L[ChainLayers.fluid][i] =       render.Fluid3DLayer(        settings.fluid)
             self.L[ChainLayers.capture_monitor][i] = CaptureMonitorLayer(cast(render.CaptureImageLayer, self.L[ChainLayers.capture_image][i]),
                                                                     cast(render.CaptureDepthLayer, self.L[ChainLayers.capture_depth][i]),
-                                                                    settings.capture, settings.view.depth)
+                                                                    settings.capture, settings.view.depth_mask)
             # each stage's monitor A in self.L, shown in panel a; its monitor B in self._monitors_b, shown in panel b
             for key, stage, stage_settings in ((ChainLayers.view_monitor, render.FlowStage.VIEW, settings.view),
                                                (ChainLayers.motion_monitor, render.FlowStage.MOTION, settings.motion),

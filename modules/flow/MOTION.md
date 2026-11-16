@@ -79,8 +79,8 @@ the stamp of the frame it drew, so the app reads it off the layer it takes the t
 `DepthView(texture, view_span, depth_step)` (`modules/flow/motion/depth_view.py`) is the depth on
 the flow's view: the texture, the metres one view width spans per metre of depth, and the uv
 between two depth samples. The view stage makes it (`ViewOutput.depth`): the depth read into the
-view's window across a surface, the `view_span` from the window and the camera's horizontal field of
-view it takes at construction, and the `depth_step` from the aligned depth's grid and the window
+view's crop across a surface, the `view_span` from the crop and the camera's horizontal field of
+view it takes at construction, and the `depth_step` from the aligned depth's grid and the crop
 (`modules/flow/view/view_window.py`).
 
 ## The settings

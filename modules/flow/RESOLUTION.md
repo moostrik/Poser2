@@ -20,7 +20,7 @@ help, more color would not.
 |------------------------------|---------------------------------------------|----------------------------|-----------------------------------------------------------|
 | camera color                 | `P800` cut to 5:4 (`direct_size`)           | 992 × 800, 50 fps          | the crop around the player, at most 800 rows               |
 | camera depth                 | Neural Depth `NEURAL_480`                   | 480 × 300                  | one depth pixel about 2.7 view rows at the whole image's height |
-| the image (the view)         | the view's window, drawn once               | 448 × 800, the motion's    | the window's rows, one to one at most                      |
+| the image (the view)         | the view's crop, drawn once                 | 448 × 800, the motion's    | the window's rows, one to one at most                      |
 | the mask                     | the depth's cut, guided onto the image      | 448 × 800                  | edges the image's                                          |
 | `depth_mask`                 | the view's depth cut by near and far        | 448 × 800                  | a staircase of depth pixels at the edges                   |
 | the depth on the view        | the aligned depth, read across a surface    | 448 × 800                  | smooth within a surface, a depth pixel's step at an edge   |

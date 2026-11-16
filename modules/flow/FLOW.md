@@ -16,7 +16,7 @@ next is in the one plan:
 |--------------------------------------|---------------------------------------------------------------------------------------------|
 | [FLOW_PLAN.md](FLOW_PLAN.md)         | what is next: the main lines in order, their items, the details, what is parked             |
 | [INPUT_THREADS.md](INPUT_THREADS.md) | the threads a frame passes from the camera to the render, and the cadence                   |
-| [VIEW.md](VIEW.md)                   | the view stage: the window, the depth read, the mask and the depth mask                     |
+| [VIEW.md](VIEW.md)                   | the view stage: the crop, the depth read, the depth mask and the mask, the color grade      |
 | [MOTION.md](MOTION.md)               | the motion: when it measures, the Lucas–Kanade solve and the depth velocity, their settings |
 | [BRIDGE_3D.md](BRIDGE_3D.md)         | the 3D bridge: the filters, the readings, the mix and its outputs' units                    |
 | [FLUID_3D.md](FLUID_3D.md)           | the 3D fluid: how it takes the bridge, its fields, density and look                         |
