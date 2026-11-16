@@ -229,9 +229,9 @@ class ViewDepthMaskSettings(BaseSettings):
 
 
 class ColorGradeSettings(BaseSettings):
-    """ColorGrade: the image graded, in the order applied, then sharpened, the mask as its alpha."""
+    """ColorGrade: the image graded, in the order applied, then sharpened, premultiplied by the mask."""
     enabled:    Field[bool]  = Field(True, description="The color graded; off, the image as it is")
-    use_mask:   Field[bool]  = Field(True, description="The mask as the color's alpha")
+    use_mask:   Field[bool]  = Field(True, description="The color cut by the mask, premultiplied")
     exposure:   Field[float] = Field(1.0, min=0.1, max=3.0, newline=True, description="The color times this")
     offset:     Field[float] = Field(0.0, min=-0.5, max=0.5, description="Added to the color, after the exposure")
     gamma:      Field[float] = Field(1.0, min=0.5, max=2.0, description="Gamma")

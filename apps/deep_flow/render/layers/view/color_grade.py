@@ -1,4 +1,4 @@
-"""ColorGrade: the view's last pass, its image graded and sharpened, the mask its alpha last: the color, the
+"""ColorGrade: the view's last pass, its image graded and sharpened, premultiplied by the mask last: the color, the
 density's. As compositing does it: the corrections on the straight image, the matte applied after them."""
 
 # Local application imports
@@ -9,15 +9,16 @@ from .shaders import Grade
 
 
 class ColorGrade:
-    """`process` grades an image (`Grade`) and sharpens it where `sharpen`, while `enabled`, then takes the mask as
-    its alpha where `use_mask`, into its own buffer. `texture` holds the result."""
+    """`process` grades an image (`Grade`) and sharpens it where `sharpen`, while `enabled`, then premultiplies it
+    by the mask where `use_mask` (RGB and alpha alike, as the render blends), into its own buffer. `texture` holds
+    the result."""
 
     def __init__(self, settings: ColorGradeSettings) -> None:
         self.settings: ColorGradeSettings = settings
         self._fbo: SwapFbo = SwapFbo()
         self._grade_shader: Grade = Grade()
         self._sharpen_shader: shaders.Sharpen = shaders.Sharpen()
-        self._mask_shader: shaders.MaskApply = shaders.MaskApply()
+        self._mask_shader: shaders.MaskMultiply = shaders.MaskMultiply()     # the premultiply: RGB and alpha by the mask
 
     @property
     def texture(self) -> Texture:

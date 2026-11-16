@@ -18,12 +18,13 @@ group, and the monitor lists each part's textures under its name:
 | the crop                   | the image cut to the view's crop (`crop`), at the view's `width` × `height`            |
 | `depth` (`ViewDepth`)      | the aligned depth read into the crop ([The depth read](#the-depth-read)), a `DepthView` ([MOTION.md](MOTION.md#when-it-measures)) |
 | `depth_mask` (`ViewDepthMask`) | the depth mask, where the depth lies from `near` to `far`, and the mask, its edge moved onto the image's ([The mask and the depth mask](#the-mask-and-the-depth-mask)) |
-| `color_grade` (`ColorGrade`) | the color, the density's: the image graded (`exposure`, `offset`, `gamma`, `contrast`, `saturation`) and sharpened (`sharpen`), the mask its alpha last (`use_mask`) |
+| `color_grade` (`ColorGrade`) | the color, the density's: the image graded (`exposure`, `offset`, `gamma`, `contrast`, `saturation`) and sharpened (`sharpen`), premultiplied by the mask last (`use_mask`) |
 | the pose                   | the pose's points placed in the crop, for the pose drawn over the view                 |
 
 Its outputs are the image, the color, the depth, the mask and the depth mask, each the texture of the part that
 makes it; the input's depth is a depth in the band, drawn in its colormap. The color grade works on the straight
-image and takes the mask last, as compositing does (Porter and Duff 1984; Brinkmann): grading or sharpening a cut
+image and premultiplies it by the mask last, RGB and alpha alike, as compositing does and as the render blends
+(Porter and Duff 1984; Brinkmann): grading or sharpening a cut
 image changes its half-masked edge apart from the rest and pulls the cut's black into the edge. With
 `color_grade.enabled` off the color is the image as it is, masked where `use_mask`.
 

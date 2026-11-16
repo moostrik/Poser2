@@ -6,7 +6,7 @@
 textures but the crop: the crop (the image cut to the view's crop at the view's size), `ViewDepth` (the depth
 read into it), `ViewDepthMask` (the depth cut to the player's band, which gates z, and the mask, that cut's edge
 moved onto the image's by the guided filter, He 2010), with `MASK` the depth again on the mask and cut again,
-and `ColorGrade` (the color, the image graded, the mask its alpha). The view is made again when a new capture
+and `ColorGrade` (the color, the image graded, premultiplied by the mask). The view is made again when a new capture
 comes in, told by its capture time, or when a setting it is made with changes.
 """
 
@@ -43,8 +43,8 @@ class ViewInput:
 
 @dataclass
 class ViewOutput(StageOutput):
-    """The view's textures, at the view's size: `image` the cropped color, `color` the image graded, the mask its
-    alpha, the density's color, `depth` the metres as the motion measures z from them, `mask` the player's shape
+    """The view's textures, at the view's size: `image` the cropped color, `color` the image graded and
+    premultiplied by the mask, the density's color, `depth` the metres as the motion measures z from them, `mask` the player's shape
     on the image's edges, `depth_mask` where the depth lies from `near` to `far`."""
     image: Annotated[Texture, TextureKind.IMAGE]
     color: Annotated[Texture, TextureKind.IMAGE]
