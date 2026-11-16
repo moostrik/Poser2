@@ -34,8 +34,8 @@ class StageLayerSettings(BaseSettings):
     first."""
     reset: Field[bool] =    Field(False, widget=Widget.button, description="Start the stage from rest")
 
-    monitor_a = Group(MonitorLayerSettings)
-    monitor_b = Group(MonitorLayerSettings)
+    monitor_a = Group(MonitorLayerSettings, last=True)     # a stage's own panels first, its monitors at the end
+    monitor_b = Group(MonitorLayerSettings, last=True)
 
 
 class StageLayer[I, O: StageOutput](LayerBase, ABC):

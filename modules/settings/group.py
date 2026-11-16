@@ -48,6 +48,9 @@ class Group(Generic[T]):
         Parent fields whose values are shared with the child.  Sharing is
         bidirectional: parent writes propagate to the child, and child
         writes propagate upward to the parent (and fan out to siblings).
+    last : bool, optional
+        The child comes after the other children, a subclass's included,
+        on a panel and in a preset.
     """
 
     def __init__(
@@ -55,8 +58,10 @@ class Group(Generic[T]):
         settings_type: type[T],
         *,
         share: Sequence[Field | FieldAlias] | None = None,
+        last: bool = False,
     ):
         self.settings_type = settings_type
+        self.last: bool = last
         self._share_refs: list[Field | FieldAlias] = list(share) if share else []
         self.share_map: dict[str, str] = {}  # parent_name → child_name
         self.name = ""

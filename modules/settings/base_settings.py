@@ -61,7 +61,7 @@ class BaseSettings:
             for attr_name, attr_value in vars(cls).items():
                 if not attr_name.startswith("_") and isinstance(attr_value, (Field, Group)):
                     names.setdefault(attr_name, None)
-        group_names: dict[str, None] = {}
+        group_names: dict[str, Group] = {}
         for attr_name in names:
             attr_value = next(vars(cls)[attr_name] for cls in mro if attr_name in vars(cls))
             if isinstance(attr_value, Field):
@@ -71,7 +71,7 @@ class BaseSettings:
                 self._callbacks[attr_name] = []
                 self._locks[attr_name] = threading.Lock()
             elif isinstance(attr_value, Group):
-                group_names[attr_name] = None
+                group_names[attr_name] = attr_value
 
         # Apply kwargs (init_only fields are still writable here)
         for name, value in kwargs.items():
@@ -81,8 +81,9 @@ class BaseSettings:
                 )
             self._fields[name].set(self, value)
 
-        # Create children from Group descriptors (after kwargs so shared fields have updated values)
-        for attr_name in group_names:
+        # Create children from Group descriptors (after kwargs so shared fields have updated values); a group
+        # declared `last` after the others, a subclass's included
+        for attr_name in sorted(group_names, key=lambda name: group_names[name].last):     # stable: declared order kept
             group_desc = self._get_group_descriptor(attr_name)
             if group_desc is None:
                 continue
