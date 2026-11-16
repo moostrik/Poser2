@@ -127,7 +127,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 
 - Run Python and tests through Bash, never PowerShell
 - Start each Bash command with the program itself (no `cd`, env-var prefix or heredoc) so it matches the allow-rules in `.claude/settings.json`
-- Change files with Edit/Write, not scripts
+- Prefer Edit/Write over scripts for changing files
 - Run a test of the app or a GPU harness only on the user's go, and only what the plan names
 - Before each run, say in one line what it measures and how long it takes
 - A run lasts only as long as the test needs
