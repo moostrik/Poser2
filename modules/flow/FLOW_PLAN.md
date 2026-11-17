@@ -21,7 +21,7 @@ operator saw.
 | I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | not started                      | [FLOW.md](FLOW.md)                                 |
 | J   | [Every setting and its description](#j-every-setting-and-its-description)    | last, after the refactor         | `CLAUDE.md`, `.claude/rules`                       |
 
-D2 and D3 need the operator at the screen; the other lines go on meanwhile.
+D3 and E2 need the operator at the screen; the other lines go on meanwhile.
 
 The apps on deep_flow's input have their own plan, [apps/APPS_PLAN.md](../../apps/APPS_PLAN.md); recording and
 -sim, deep_flow's live checks among them, theirs, [RECORDING_PLAN.md](../recording/RECORDING_PLAN.md). The
@@ -113,8 +113,6 @@ keeps the picture **(deduction)**.
     and TIMING.md's mention of `body_force.acceleration`. hd_trio keeps its own copy and does not change.
   - Checked by: the flow's and the render's unit tests; `injection_check.py` for the shader; deep_flow `-sim`
     loading both presets with no unknown key and the monitors showing their textures.
-- **D2.** The temperature and the expansion checked in the app, each in its own panel: what each does to the
-  water and whether it works. The temperature after E1, with `buoyancy` above 0.
 - **D3.** The acceleration tuned at the screen: which readings (`stop`, `change`, `wake`) and its `gain`.
 
 ## E. The 3D fluid's physics
@@ -122,6 +120,8 @@ keeps the picture **(deduction)**.
 - **E1.** The temperature fixed: its advection moves to the density's, carried by the projected velocity (Fedkiw
   2001, Bridson), where today it is carried mid-step, after the confinement and before the projection, by a
   velocity not yet free of divergence; the buoyancy reads the temperature of the step before.
+- **E2.** The temperature and the expansion checked in the app, each in its own panel: what each does to the
+  water and whether it works. The temperature after E1, with `buoyancy` above 0.
 
 ## F. The 3D fluid's look at 4K
 
@@ -234,4 +234,4 @@ Not worked on until asked for; each with what is known.
 - Name the fluid's things by the textbook word (`boundary`, `body_force`): D1.
 - A settings class mirrors the code it configures, a group for each step in the order the code runs them: D1.
 
-Not designed yet, so their rules are not named: D2, D3, E1, F1, H1, I1 to I4.
+Not designed yet, so their rules are not named: D3, E1, E2, F1, H1, I1 to I4.
