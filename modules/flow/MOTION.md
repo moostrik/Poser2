@@ -403,6 +403,19 @@ larger on show). A level doubles the motion the solve follows, about 2 × 2^(lev
   The raw row stops in 90 ms on hands, so a stop of 82 is the filter no longer adding to it. Measure's stops
   (48 ms z, 514 ms x/y) are the same in every row, the raw one included: its moves do not end at rest.
 
+- `levels` 5 and z's `threshold` 1 after C5, a result, 2026-11-18, one run on `hands_1` and `measure_1`
+  (f45cd914), each beside the C2 defaults, lag against the raw row (`levels` 4):
+
+  | Row                       | z noise / edge, hands | z lag / kept / stop, hands | x/y noise / kept, hands | x/y kept, measure |
+  |---------------------------|-----------------------|----------------------------|-------------------------|-------------------|
+  | defaults                  | 0.64 / 1.29           | 3.8 ms / 0.81 / 82 ms      | 0.67 / 0.84             | 0.80              |
+  | `levels` 5                | 0.73 / 1.29           | 2.7 ms / 0.81 / 147 ms     | 0.75 / 1.09             | 0.98              |
+  | z `threshold` 1           | 0.14 / 0.80           | 3.8 ms / 0.78 / 82 ms      | 0.67 / 0.84             | 0.80              |
+  | `levels` 5, `threshold` 1 | 0.23 / 0.80           | 2.6 ms / 0.78 / 90 ms      | 0.75 / 1.09             | 0.98              |
+
+  `levels` 5 finds a fast x/y that 4 misses (kept past the raw row's); for z it gains 1 ms since C5, and its
+  stop on hands is later, not explained yet. `threshold` 1 quarters z's still noise for 3% of z.
+
 Beside the velocity the 3D motion hands out where the body is now in the box's depth, `z_position`
 (`ZPosition`): from the depth track's disparity, (depth − near) / (far − near) over the player's depth
 range, the depth source's `near` and `far` (`DepthView`), 0 front to 1 back, times its weight in red and
