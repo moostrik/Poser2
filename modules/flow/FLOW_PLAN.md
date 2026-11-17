@@ -155,8 +155,11 @@ Not worked on until asked for; each with what is known.
 - **z from x/y's spread (looming).** A surface coming toward the camera grows in the image, so its x/y motion
   spreads: its speed toward the camera is its depth times the flow's divergence over 2 (time to contact, Lee
   1976). A second measurement of z, clean where the depth's is noisy, needing texture and a patch facing the
-  camera; the filter would fuse the two. To look at once C2 is built, first on the captures: how the
-  spread follows the depth's z on the hands and the show recording **(deduction, not measured)**.
+  camera; the filter would fuse the two. Looked at on the captures, 2026-11-17 (one each, the motion raw, the
+  flow blurred 3 to 6 px, the signed mean over the player's moving pixels against the depth's z): it follows a
+  push (hands, correlation +0.59 at half the size) and a sideways arm less (measure, +0.40 at twice the size),
+  and free movement the wrong way (show, −0.42): a sideways limb, a turn or a limb passing in front spreads the
+  flow too. At rest it is 2 to 5 times quieter per pixel than the depth's z. Not fused or tried further.
 
 - The numpy versions of the flow's shaders removed, module by module, with the tests built on them: shaders are
   checked in a GPU harness. About 10 files in `modules/` and `apps/` carry them (the motion's, the bridge's).
