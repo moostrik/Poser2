@@ -73,10 +73,10 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
     effect on four recordings, the step filter has taken the jump out **(deduction)**;
   - z's smoothing has its own three numbers, x/y's `threshold` one job, the cut of x/y: `z.xy_rest`
     (px/frame, 0.5), the x/y speed below which z counts as at rest, where the shader took `xy.threshold`;
-    `halving_speed` 0 is off, `smooth` throughout;
+    `halving_speed` renamed `xy_halving`, as it is on x/y's speed too, 0 off, `smooth` throughout;
   - `xy_smooth` smooths x/y over z's time, the 1€ rule's, in place of `smooth` at rest;
   - z's panel in groups in the order the code runs them: surface (`edge`, `window`, `max_speed`), smoothing
-    (`smooth`, `halving_speed`, `xy_rest`, `xy_smooth`), cut (`dead_zone`, `threshold`); each description says
+    (`smooth`, `xy_rest`, `xy_halving`, `xy_smooth`), cut (`dead_zone`, `threshold`); each description says
     what the setting does and on what (x/y or z), in one line; MOTION.md's z opens with the steps in order and
     their settings.
 
