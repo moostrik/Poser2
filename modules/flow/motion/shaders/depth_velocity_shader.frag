@@ -19,7 +19,7 @@
 // image moves (the 3×3 displacement past `motion_floor`), the time the track follows over blends from
 // `smoothing` toward `catch_up_smoothing`; and the carry takes each texel's depth a frame on by its rate. One
 // pass writes both: the track into its target, this frame's Emas into uCatchUp.
-// The numpy reference is depth_velocity.track_depth
+
 
 uniform sampler2D tex0;  // Depth now R (m)
 uniform sampler2D tex1;  // The track the frame before: z, disparity (1/m), rate (1/m per second), anchor (m)

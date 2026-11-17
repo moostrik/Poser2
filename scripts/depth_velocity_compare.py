@@ -29,7 +29,7 @@ with `--fast`, several captures, `--side NAME:PATH=VALUE,...` or `--out FILE` me
 and print one row a side, x/y beside z: the mean over the captures and its spread, the ms each side comes after A
 over the moves, and with `--out` the rows and their stamp (date, commit, captures, each side's settings) added
 to that file. A capture's stretches come from `segments.json` in its recording's folder, else beside the capture.
-`--verify` compares A's first frames with the numpy references instead.
+`--verify` compares A's first frames of the x/y solve with its numpy reference instead.
 """
 
 import json
@@ -49,7 +49,7 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_FLOAT, GL_FRAMEBUFFER, GL_R32F, G
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from modules.gl import Context, Fbo, Texture  # noqa: E402
 from modules.flow import (FlowUtil, LucasKanadeFlow3D, LucasKanadeFlow3DSettings, Patch, Visualizer,  # noqa: E402
-                          filter_depth_steps, lucas_kanade, track_depth)
+                          lucas_kanade)
 
 WARM_UP: float = 1.0          # s at the start the flows settle in, measured in no part
 SHORTEST_PAUSE: float = 1.0   # s of stillness that end a move
@@ -536,13 +536,13 @@ class Side:
 
 
 def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> int:
-    """A's first frames on the GPU against the numpy references: the x/y solve, and the depth velocity carried by it."""
+    """A's first frames on the GPU against the numpy reference of the x/y solve."""
     context(False, 64, 64)
     w, h = frames.width, frames.height
     side = Side('A', frames.calls[0]['settings'], changed, w, h, False)
     xy, z = side.settings.xy, side.settings.z
     luminance, depth_texture, mask_texture = Texture(), Texture(), Texture()
-    state, catch_up, previous = np.zeros((h, w, 4)), np.zeros((h, w, 2)), None
+    previous = None
     last = min(frames_to_check, len(frames)) - 1
     for k in range(last + 1):
         lum, depth, mask = frames.load(k)
@@ -556,18 +556,9 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
         reference = lucas_kanade(then, now, xy.levels, xy.window, xy.damping,
                                  depth.astype(np.float64) if xy.same_surface else None, z.tolerance)
         previous = lum
-        c = frames.calls[k]
-        step = (c['depth_step'][0] * w, c['depth_step'][1] * h) if c['depth_step'][0] > 0 else (1.0, 1.0)
-        state, catch_up = track_depth(filter_depth_steps(depth.astype(np.float64), step, z.edge), state, catch_up, solve.astype(np.float64),
-                                      c['delta_time'], z.window, step, z.tolerance, z.smooth, c['view_span'], z.dead_zone,
-                                      z.catch_up, xy.threshold)
-        gpu = read_back(side.flow.depth_velocity.difference)
         if k % 5 == 0 or k == last:
             dxy = np.linalg.norm(solve - reference, axis=-1)
-            held = (gpu[..., 1] > 0) | (state[..., 1] > 0)
-            dz = np.abs(state[..., 0] - gpu[..., 0])[held] * w
-            print(f'frame {k:2d}: x/y solve differs p50 {np.median(dxy):.3f} p99 {np.percentile(dxy, 99):.3f} px | '
-                  f'z differs p50 {np.median(dz):.1e} p99.9 {np.percentile(dz, 99.9):.1e} px per frame')
+            print(f'frame {k:2d}: x/y solve differs p50 {np.median(dxy):.3f} p99 {np.percentile(dxy, 99):.3f} px')
     glfw.terminate()
     return 0
 

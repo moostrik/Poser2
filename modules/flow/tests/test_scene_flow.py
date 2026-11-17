@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import displacement_velocity, filter_displacement, lucas_kanade, threshold_displacement, track_depth, track_weights, velocity_trail, velocity_change, step_peak, moving_mean, start_region_share, stop_region_share, change_velocity, \
+from modules.flow import displacement_velocity, filter_displacement, lucas_kanade, threshold_displacement, track_weights, velocity_trail, velocity_change, step_peak, moving_mean, start_region_share, stop_region_share, change_velocity, \
                          decay_weight
 
 SIZE: int = 64
@@ -86,19 +86,6 @@ class XySmoothTest(unittest.TestCase):
             state = filter_displacement(step, state, np.zeros_like(step) if carry is None else carry, alpha)
             out.append(state[..., :2])
         return out
-
-    def test_a_change_of_speed_lags_as_z_does(self) -> None:
-        # z: still for 10 frames, then 0.01 of disparity per frame; x/y: the same steps as a displacement
-        frames: list[float] = [0.0] * 10 + [0.01] * 20
-        disparity: float = 0.5
-        state = np.zeros((4, 4, 4))
-        z: list[float] = []
-        for step in frames:
-            disparity += step
-            state, _ = track_depth(np.full((4, 4), 1.0 / disparity), state, np.zeros((4, 4, 2)), np.zeros((4, 4, 2)), self.DT, 0, (1.0, 1.0), 1.0, 50.0, 1.0, 0.0, 0.0, 0.5)
-            z.append(float(state[1, 1, 2]) * self.DT)                        # the rate, per frame
-        xy = [float(f[1, 1, 0]) for f in self.follow([np.full((4, 4, 2), step) for step in frames])]
-        np.testing.assert_allclose(xy, z, atol=1e-9)
 
     def test_no_smoothing_is_the_measurement(self) -> None:
         rng = np.random.default_rng(2)

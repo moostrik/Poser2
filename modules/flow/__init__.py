@@ -16,7 +16,7 @@ from .flow_util import FlowUtil
 from .view import fixed_window, view_span, depth_step, view_per_depth_pixel, place_points, pyramid_sizes, DepthFill, DepthCrop, DepthUpscale
 
 # Motion: the optical flow
-from .motion import DepthView, DepthVelocity, DepthVelocitySettings, catch_up_share, color_motion, filter_depth_steps, track_depth, track_weights, depth_threshold, \
+from .motion import DepthView, DepthVelocity, DepthVelocitySettings, filter_depth_steps, track_weights, depth_threshold, \
                     GradientFlow, GradientFlowSettings, Patch, LucasKanadeFlow, LucasKanadeFlowSettings, lucas_kanade, threshold_displacement, \
                     LucasKanadeFlow3D, LucasKanadeFlow3DSettings, filter_displacement, displacement_velocity, z_position
 

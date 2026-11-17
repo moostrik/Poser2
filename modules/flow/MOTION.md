@@ -50,7 +50,7 @@ displacement, and each measurement only corrects them (an alpha–beta filter) o
 
 The anchor follows z past the dead zone, so a motion loses only its first `dead_zone`. The catch-up's Emas are
 of the miss of the prediction, signed and its size: a lag misses one way, jitter both ways and cancels; where
-the image moves too (`color_motion`) the follow time blends toward `catch_up_smooth`, and the carry takes each
+the image moves too (the 3 × 3 displacement past `xy.threshold`) the follow time blends toward `catch_up_smooth`, and the carry takes each
 texel's depth a frame on. The step filter is `DepthStepFilter`, the window's test of "another surface".
 `tolerance` is no limit on speed: 0.2 m a frame is 5 m/s at 25 fps. z comes in view widths per frame, over
 the metres one view width spans at the depth (`view_span` per metre), and `threshold` comes off it. With
