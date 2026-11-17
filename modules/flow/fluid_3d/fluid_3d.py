@@ -985,14 +985,15 @@ class Fluid3D:
 
     def add_density(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
         """The boundary's dye (RGBA, its color times its presence, the presence as alpha, 0 to 1): the water in the
-        slab dragged toward it times input.density_gain (at most fully dyed) over input.density_drag, never past
-        it, by the carriers."""
+        slab dragged toward it times input.density_gain (at most fully dyed), never past it, by the carriers: up
+        over input.density_drag, down over input.density_release (0 = never down)."""
         if not self._allocated:
             return
         input = self.settings.input
         share: float = drag_share(self._dt, input.density_drag) * weight
+        release: float = drag_share(self._dt, input.density_release) * weight if input.density_release > 0.0 else 0.0
         for carrier in self._densities:
-            carrier.add(texture, share, self._dt, self._spread(), InjectMode.FILL, input.density_gain, z_position)
+            carrier.add(texture, share, self._dt, self._spread(), InjectMode.FILL, input.density_gain, z_position, release)
 
     def add_temperature(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
         """The boundary's warmth (-1 cold to 1 hot, its presence folded in): the water in the slab dragged toward
@@ -1003,7 +1004,7 @@ class Fluid3D:
         share: float = drag_share(self._dt, input.temperature_drag) * weight
         self._inject_shader.use(texture, self._temperature, self._spread(), share,
                                 internal_format=GL_R16F, mode=int(InjectMode.FILL), scalar=True, gain=input.temperature_gain,
-                                z_position=z_position)
+                                z_position=z_position, release=share)
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def add_expansion(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:

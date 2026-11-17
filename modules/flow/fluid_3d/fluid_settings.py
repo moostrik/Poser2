@@ -103,6 +103,7 @@ class InputSettings(BaseSettings):
     velocity_gain: Field[float]     = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's velocity times this is what the water is dragged toward; 1 = as fast as the body")
     acceleration_gain: Field[float] = Field(1.0,    min=0.0,    max=10.0,   color="teal", newline=True, description="The body force's acceleration times this is added × dt; 1 = its Δv added once")
     density_drag: Field[float]      = Field(200.0,  min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Time the water takes to take on the body's dye (ms); 0 = at once")
+    density_release: Field[float]   = Field(0.0,    min=0.0,    max=1000.0, step=1.0, color="cyan", description="Time the water's dye takes to fall to the body's where it is less (ms); 0 = never falls")
     density_gain: Field[float]      = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's dye times this, at most fully dyed, is the target; 1 = fully dyed at 1 width/s")
     temperature_drag: Field[float]  = Field(200.0,  min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Time the water takes to take on the body's warmth (ms); 0 = at once")
     temperature_gain: Field[float]  = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's warmth times this, at most ±1, is the target; 1 = fully warm at 1 width/s")

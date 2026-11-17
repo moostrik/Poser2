@@ -54,12 +54,12 @@ class Density(DensityCarrier):
         self._density.clear_all()
 
     def add(self, texture: Texture, gain: float, dt: float, spread: float, mode: InjectMode = InjectMode.FILL,
-            target_gain: float = 1.0, z_position: Texture | None = None) -> None:
+            target_gain: float = 1.0, z_position: Texture | None = None, release: float = 0.0) -> None:
         if not self.allocated:
             return
         strength: float = gain if mode == InjectMode.FILL else gain * dt
         self._inject_shader.use(texture, self._density, spread, strength, internal_format=GL_RGBA16F, mode=int(mode), gain=target_gain,
-                                z_position=z_position)
+                                z_position=z_position, release=release)
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def update(self, step: CarrierStep) -> None:

@@ -15,7 +15,8 @@ class InjectAmount3D(ComputeShader):
     WORKGROUP_SIZE_Z = 1
 
     def use(self, source: Texture, volume: Texture3D, spread: float, strength: float,
-            cubic: bool = False, mode: int = 0, gain: float = 1.0, z_position: Texture | None = None) -> None:
+            cubic: bool = False, mode: int = 0, gain: float = 1.0, z_position: Texture | None = None,
+            release: float = 0.0) -> None:
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
@@ -27,5 +28,6 @@ class InjectAmount3D(ComputeShader):
         glUniform1i(self.get_uniform_loc("uCubic"), int(cubic))
         glUniform1i(self.get_uniform_loc("uMode"), mode)
         glUniform1f(self.get_uniform_loc("uGain"), gain)
+        glUniform1f(self.get_uniform_loc("uRelease"), release)
         glUniform3i(self.get_uniform_loc("uSize"), volume.width, volume.height, volume.depth)
         self.dispatch(volume.width, volume.height)     # a column each

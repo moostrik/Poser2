@@ -17,8 +17,9 @@ uniform bool  uHasZPosition;
 uniform float uSpread;       // the gaussian's sigma in normalized depth
 uniform float uStrength;
 uniform bool  uCubic;        // the source enlarged by a cubic B-spline, else bilinearly
-uniform int   uMode;         // 0 ADD, 1 FILL (toward the source's amount × uGain, at most 1, up or down, never past it)
+uniform int   uMode;         // 0 ADD, 1 FILL (toward the source's amount × uGain, at most 1, never past it: up by uStrength, down by uRelease)
 uniform float uGain;         // FILL: the source's amount times this, at most 1, is the target
+uniform float uRelease;      // FILL: the share where the target is below the amount; 0 = never down
 uniform ivec3 uSize;
 
 float bspline_alpha(vec2 uv) {
@@ -50,12 +51,20 @@ void main() {
     if (center == NO_Z_POSITION) return;
     ivec2 cells = slab_cells(center, uSize.z);
     for (int z = cells.x; z <= cells.y; z++) {
-        float weight = slab_cell(z, center, uSize.z) * uStrength;     // the body's share of this cell (slab.glsl)
-        if (weight < 0.001) continue;
+        float slab = slab_cell(z, center, uSize.z);     // the body's share of this cell (slab.glsl)
+        float weight = slab * uStrength;
+        float release = slab * uRelease;
+        if (max(weight, uMode == 1 ? release : 0.0) < 0.001) continue;
         ivec3 gid = ivec3(column, z);
         float current = imageLoad(uVolume, gid).r;
-        if (uMode == 1) current += (min(source * uGain, 1.0) - current) * min(weight, 1.0);
-        else current += source * weight;
+        if (uMode == 1) {
+            float target = min(source * uGain, 1.0);
+            float share = target > current ? weight : release;
+            if (share < 0.001) continue;
+            current += (target - current) * min(share, 1.0);
+        } else {
+            current += source * weight;
+        }
         imageStore(uVolume, gid, vec4(current, 0.0, 0.0, 0.0));
     }
 }

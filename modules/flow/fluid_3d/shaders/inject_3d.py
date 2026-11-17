@@ -12,7 +12,7 @@ from .z_position_binding import bind_z_position
 class InjectMode(IntEnum):
     """How a source goes into a field."""
     ADD = 0         # added × dt, unbounded
-    FILL = 1        # the field dragged toward the source by the drag's share, never past it
+    FILL = 1        # the field dragged toward the source, never past it: up by the drag's share, down by the release's
 
 
 class Inject3D(ComputeShader):
@@ -28,7 +28,7 @@ class Inject3D(ComputeShader):
     def use(self, input_2d: Texture, volume: Texture3D,
             spread: float, strength: float = 1.0,
             internal_format: int = GL_RGBA16F, mode: int = 0, scalar: bool = False, gain: float = 1.0,
-            z_position: Texture | None = None) -> None:
+            z_position: Texture | None = None, release: float = 0.0) -> None:
         """Add the 2D input into the 3D volume.
 
         Args:
@@ -42,6 +42,8 @@ class Inject3D(ComputeShader):
             gain: FILL: the input times this, at most full, is the target
             z_position: The input's z position (red over green); a pixel without one, or every pixel without
                 it, puts nothing in
+            release: FILL: the share where the target is below the field (`strength` where it is above);
+                0 = never down
         """
         if not self.allocated or not self.shader_program:
             return
@@ -63,6 +65,7 @@ class Inject3D(ComputeShader):
         glUniform1i(self.get_uniform_loc("uMode"), mode)
         glUniform1i(self.get_uniform_loc("uScalar"), int(scalar))
         glUniform1f(self.get_uniform_loc("uGain"), gain)
+        glUniform1f(self.get_uniform_loc("uRelease"), release)
         glUniform3i(self.get_uniform_loc("uSize"),
                     volume.width, volume.height, volume.depth)
 

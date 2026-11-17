@@ -109,7 +109,7 @@ go in by `inject_3d`'s `FILL`:
 |----------------|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|---------------------------|-----------------------------------|
 | `velocity`     | widths/s                          | the boundary: drags the water toward it where it is non-zero, over `velocity_drag`, never past it (`add_to_faces_3d`, [The drag](#the-drag)) | `input.velocity_gain`     | the water as fast as the body     |
 | `acceleration` | widths/s²                         | the body force: adds it × dt (`add_to_faces_3d`)                                                                                              | `input.acceleration_gain` | a Δv added once                   |
-| `density`      | the dye: color × presence, 0 to 1 | drags the water toward it × `density_gain` (at most 1) in the slab where the body is, never past it, over `density_drag`                      | `input.density_gain`      | fully dyed at 1 width/s           |
+| `density`      | the dye: color × presence, 0 to 1 | drags the water toward it × `density_gain` (at most 1) where the body is, never past it: up over `density_drag`, down over `density_release`  | `input.density_gain`      | fully dyed at 1 width/s           |
 | `temperature`  | warmth, -1 to 1                   | drags the water toward it × `temperature_gain` (at most ±1) in the slab where the body is, over `temperature_drag`                            | `input.temperature_gain`  | fully warm or cold at 1 width/s   |
 | `expansion`    | presence, 0 to 1                  | the projection makes the divergence the rate × it, not 0 ([The expansion](#the-expansion))                                                    | `input.expansion_rate`    | its volume gained per second, 1/s |
 
@@ -416,6 +416,7 @@ as a tuning:
 | `input.velocity_drag`                                                          | 50 ms         | how fast the water takes the body's speed                                                    |
 | `input.acceleration_gain`                                                      | 1             | a Δv added once                                                                              |
 | `input.density_drag`, `temperature_drag`; `density_gain`, `temperature_gain`   | 200 ms; 1     | the water takes the dye in a fifth of a second, fully dyed where the body moves at 1 width/s |
+| `input.density_release`                                                        | 0             | the dye never falls where the body is                                                        |
 | `density.advection_scale`, `temperature.advection_scale`                       | 1             | the density moves with the water                                                             |
 | `velocity.advection_scale`                                                     | 1             | the velocity carries itself the full step                                                    |
 | `width`, `height`, `depth`                                                     | 256, 448, 128 | half a width deep, within 60 fps                                                             |
