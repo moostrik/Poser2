@@ -17,6 +17,7 @@ class CubeColor(IntEnum):
     AS_STORED = 0           # the values as they are: an image's color, or raw
     DIRECTION = 1           # a vector by its direction alone
     CENTERED = 2            # a scalar centered on grey, so the sign shows
+    FROM_OKLAB = 3          # an image stored as Oklab, premultiplied, turned back to RGB, then as stored
 
 
 class VolumeCubeShader(Shader):

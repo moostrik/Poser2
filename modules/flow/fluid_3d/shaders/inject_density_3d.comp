@@ -1,0 +1,43 @@
+#version 460 core
+
+/*
+ * InjectDensity3D - the bridge's density into the density volume, in the gaussian slab around each pixel's z
+ * position (nothing without one), one invocation a column: the source is its color (premultiplied by its
+ * alpha, the coverage) times its amount (density_blend.glsl), blended into each cell by the body's share of the
+ * cell (slab.glsl) × uStrength; with uOklab the source turned into Oklab first, (L, a, b) × its amount.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;   // a column of cells each
+
+layout(binding = 0) uniform sampler2D uAmount;     // the bridge's amount, red
+layout(binding = 1) uniform sampler2D uZPosition;  // its z position, red over green
+layout(binding = 2) uniform sampler2D uColor;      // its color, premultiplied by its alpha
+layout(rgba16f, binding = 0) uniform image3D uVolume;
+
+uniform bool  uHasZPosition;
+uniform float uSpread;      // the gaussian's sigma in normalized depth
+uniform float uStrength;    // over: the drag's share this step; add: dt
+uniform bool  uOklab;       // the volume holds Oklab
+uniform ivec3 uSize;
+
+#include "color.glsl"
+#include "density_blend.glsl"
+#include "slab.glsl"
+
+void main() {
+    ivec2 column = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(column, uSize.xy))) return;
+    vec2 uv = (vec2(column) + 0.5) / vec2(uSize.xy);
+    vec4 source = texture(uColor, uv) * density_amount(texture(uAmount, uv).r);
+    if (source.a <= 0.0) return;    // nothing to blend in: the column stays as it is, unread and unwritten
+    if (uOklab) source.rgb = rgb2oklab(source.rgb / source.a) * source.a;
+    float center = slab_center(uv);
+    if (center == NO_Z_POSITION) return;
+    ivec2 cells = slab_cells(center, uSize.z);
+    for (int z = cells.x; z <= cells.y; z++) {
+        float share = slab_cell(z, center, uSize.z) * uStrength;     // the body's share of this cell
+        if (share < 0.001) continue;
+        ivec3 gid = ivec3(column, z);
+        imageStore(uVolume, gid, blend_density(imageLoad(uVolume, gid), source, share));
+    }
+}

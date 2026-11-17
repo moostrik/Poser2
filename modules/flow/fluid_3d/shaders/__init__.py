@@ -15,6 +15,7 @@ from .vorticity_force_3d import VorticityForce3D
 from .buoyancy_3d import Buoyancy3D
 from .inject_3d import Inject3D, InjectMode
 from .inject_amount_3d import InjectAmount3D
+from .inject_density_3d import InjectDensity3D
 from .velocity_average_3d import VelocityAverage3D
 from .noise_coordinates_3d import NoiseCoordinates3D
 from .turbulent_advect_3d import TurbulentAdvect3D

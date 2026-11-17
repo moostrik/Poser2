@@ -3,7 +3,7 @@ camera, as the cube colored by the port's kind or as stored, with a slice in foc
 flat for the strip. The mouse turns and zooms the camera and steps the slice."""
 
 from modules.gl import Texture, Texture3D, MouseButton
-from modules.flow import LegendKind, Port, TextureKind, VolumeCut, VolumeCube, CubeColor, VolumeGlyphs, Cut, Orbit, \
+from modules.flow import LegendKind, Port, TextureKind, ColorSpace, VolumeCut, VolumeCube, CubeColor, VolumeGlyphs, Cut, Orbit, \
                          PITCH_LIMIT, ZOOM_LIMITS, box_size, axis_labels
 from modules.settings import Field, BaseSettings, Group, Widget
 from .monitor_2d_layer import Monitor2DLayer, Monitor2DLayerSettings, Monitor2DAdvancedSettings, MonitorView, FlowStage, Channel
@@ -48,6 +48,13 @@ _CUBE_COLORS: dict[TextureKind, CubeColor] = {
     TextureKind.Z_POSITION: CubeColor.CENTERED,
     TextureKind.DEPTH: CubeColor.CENTERED,
 }
+
+
+def _image_color(port: Port) -> CubeColor:
+    """How the image view colors a volume: as stored, or an image stored as Oklab turned back to RGB, as the
+    composite shows it."""
+    oklab: bool = port.kind == TextureKind.IMAGE and port.color_space == ColorSpace.OKLAB
+    return CubeColor.FROM_OKLAB if oklab else CubeColor.AS_STORED
 
 
 class Monitor3DLayer(Monitor2DLayer):
@@ -144,7 +151,7 @@ class Monitor3DLayer(Monitor2DLayer):
                                                       not port.kind.vector, channel, port.kind == TextureKind.ACCELERATION,
                                                       advanced.legend)
         else:
-            color: CubeColor = _CUBE_COLORS[port.kind] if view == MonitorView.COLORMAP else CubeColor.AS_STORED
+            color: CubeColor = _CUBE_COLORS[port.kind] if view == MonitorView.COLORMAP else _image_color(port)
             self._shown = self._volume_cube.process(volume, self._orbit, depth, scale, channel, color,
                                                     advanced.opacity, advanced.depth_fade,
                                                     advanced.slice_position if advanced.slice else None, advanced.legend,

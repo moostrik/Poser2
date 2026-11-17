@@ -13,12 +13,12 @@ from OpenGL.GL import (GL_CLAMP_TO_BORDER, GL_FLOAT, GL_R16F, GL_REPEAT, GL_RGBA
                        GL_TEXTURE_3D, GL_TEXTURE_FETCH_BARRIER_BIT, glBindTexture, glMemoryBarrier, glTexSubImage3D)
 
 from modules.gl import Texture, Texture3D, SwapTexture3D
-from ..port import Port, TextureKind
+from ..port import ColorSpace, Port, TextureKind
 from .density import Density
 from .density_carrier import CarrierStep, DensityCarrier
 from .field_advection import FieldAdvection
-from .fluid_settings import DensitySample, Fluid3DSettings
-from .shaders import MarchLook, Composite3D, CompositeLight, InjectAmount3D, InjectMode, NoiseCoordinates3D, TurbulentAdvect3D, VelocityAverage3D
+from .fluid_settings import DensityBlend, DensitySample, Fluid3DSettings
+from .shaders import MarchLook, Composite3D, CompositeLight, InjectAmount3D, NoiseCoordinates3D, TurbulentAdvect3D, VelocityAverage3D
 from .swirl_noise import swirl_noise
 
 _BARRIER: int = int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
@@ -91,14 +91,12 @@ class FineDensity(DensityCarrier):
     def reset(self) -> None:
         self._amount.clear_all()
 
-    def add(self, amount: Texture, color: Texture, gain: float, dt: float, spread: float,
-            mode: InjectMode = InjectMode.FILL, target_gain: float = 1.0, z_position: Texture | None = None,
-            release: float = 0.0) -> None:
+    def add(self, amount: Texture, color: Texture, strength: float, dt: float, spread: float, blend: DensityBlend,
+            gain: float, z_position: Texture | None = None) -> None:
         if not self.allocated:
             return
-        strength: float = gain if mode == InjectMode.FILL else gain * dt
-        self._inject_shader.use(amount, color, self._amount, spread, strength, cubic=self.settings.fine_density.cubic, mode=int(mode),
-                                gain=target_gain, z_position=z_position, release=release)
+        self._inject_shader.use(amount, color, self._amount, spread, strength, int(blend), gain,
+                                cubic=self.settings.fine_density.cubic, z_position=z_position)
         glMemoryBarrier(_BARRIER)
 
     def update(self, step: CarrierStep) -> None:
@@ -148,7 +146,8 @@ class FineDensity(DensityCarrier):
     def composite(self, output: Texture, look: MarchLook, light: CompositeLight | None = None) -> None:
         if not self.allocated:
             return
-        self._composite_shader.use(self._amount, output, look, color=self._density.weight, light=light)
+        self._composite_shader.use(self._amount, output, look, color=self._density.weight, light=light,
+                                   oklab=self.settings.density.color_space == ColorSpace.OKLAB)
         glMemoryBarrier(_BARRIER)
 
     @property

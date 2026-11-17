@@ -16,8 +16,8 @@ from modules.gl import GpuTimer, LayeredFbo, StorageBuffer, Style, Texture, Text
 from ..port import Port
 from ..wall_mode import WallMode
 from .density_carrier import CarrierStep, DensityCarrier
-from .fluid_settings import Fluid3DSettings, Overlap, ParticleDraw
-from .shaders import (RING_BYTES, MarchLook, CompositeLight, InjectMode, ParticleAdvect, ParticleComposite, ParticleEmit, ParticleRing, ParticleSprites, ParticleSurface, ParticleWeighted,
+from .fluid_settings import DensityBlend, Fluid3DSettings, Overlap, ParticleDraw
+from .shaders import (RING_BYTES, MarchLook, CompositeLight, ParticleAdvect, ParticleComposite, ParticleEmit, ParticleRing, ParticleSprites, ParticleSurface, ParticleWeighted,
                       ParticleSurfaceShade, ParticleSurfaceSmooth)
 
 PARTICLE_BYTES: int = 32        # position and mass/age (vec4), previous position and color (vec4)
@@ -141,20 +141,19 @@ class ParticleDensity(DensityCarrier):
         spread: float = settings.input.spread / FULL_WIDTH_HALF_MAXIMUM / max(self._z_extent, 1e-6)     # the sigma, a share of the depth
         return slab_sum(REFERENCE_Z_POSITION, spread, self._layers) / max(self.settings.particles.rate, 1e-6)
 
-    def add(self, amount: Texture, color: Texture, gain: float, dt: float, spread: float,
-            mode: InjectMode = InjectMode.FILL, target_gain: float = 1.0, z_position: Texture | None = None,
-            release: float = 0.0) -> None:
-        """Particles born where the dye is, as many as its presence × the rate; a FILL's share counted as that
-        share of fully dyed added in the step, so a particle look sees a FILL and an ADD alike. Particles are
-        only born, so the release's share has nothing to take."""
-        if mode == InjectMode.FILL:
-            gain = gain * target_gain / max(dt, 1e-6)
-        if not self.allocated or not amount.allocated or not color.allocated or gain <= 0.0:
+    def add(self, amount: Texture, color: Texture, strength: float, dt: float, spread: float, blend: DensityBlend,
+            gain: float, z_position: Texture | None = None) -> None:
+        """Particles born where the dye is, as many as its amount × the rate, their mass the share of it the blend
+        adds this step: over's share counted as that share of fully dyed added, as the grid's first step from
+        clear water does, so a particle look sees over and add alike. Their color is RGB, as the bridge's: a
+        particle mixes with none."""
+        if not self.allocated or not amount.allocated or not color.allocated or strength <= 0.0:
             return
         self._seed += 1
         self._scale = (self._output[0] * self._output[1]) / max(1, color.width * color.height)
         self._emit_timer.begin()
-        self._emit_shader.use(amount, color, self._particles, self._ring, self._count, gain=gain, dt=dt,
+        self._emit_shader.use(amount, color, self._particles, self._ring, self._count, strength=strength,
+                              blend=int(blend), gain=gain, dt=dt,
                               rate=self.settings.particles.rate, floor=AMOUNT_FLOOR,
                               layers=self._layers, spread=spread, seed=self._seed, z_position=z_position)
         self._emit_timer.end()

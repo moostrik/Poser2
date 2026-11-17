@@ -8,17 +8,18 @@ from .z_position_binding import bind_z_position
 
 
 class InjectAmount3D(ComputeShader):
-    """Add the amount (red, capped at 1) × its color's alpha × strength into the volume's slab at each pixel's z
+    """Blend the amount (red, `density_blend.glsl`) × its color's alpha into the volume's slab at each pixel's z
     position."""
 
     WORKGROUP_SIZE_X = 16
     WORKGROUP_SIZE_Y = 16
     WORKGROUP_SIZE_Z = 1
 
-    def use(self, amount: Texture, color: Texture, volume: Texture3D, spread: float, strength: float,
-            cubic: bool = False, mode: int = 0, gain: float = 1.0, z_position: Texture | None = None,
-            release: float = 0.0) -> None:
-        if not self.allocated or not self.shader_program:
+    def use(self, amount: Texture, color: Texture, volume: Texture3D, spread: float, strength: float, blend: int,
+            gain: float, cubic: bool = False, z_position: Texture | None = None) -> None:
+        """`strength` over's drag share this step, or add's dt; `blend` `DensityBlend`; `gain` the amount times
+        this; `cubic` the amount enlarged by a cubic B-spline."""
+        if not self.allocated or not self.shader_program or not amount.allocated or not color.allocated:
             return
         glUseProgram(self.shader_program)
         self.bind_texture(0, amount, "uInput")
@@ -28,8 +29,7 @@ class InjectAmount3D(ComputeShader):
         glUniform1f(self.get_uniform_loc("uSpread"), spread)
         glUniform1f(self.get_uniform_loc("uStrength"), strength)
         glUniform1i(self.get_uniform_loc("uCubic"), int(cubic))
-        glUniform1i(self.get_uniform_loc("uMode"), mode)
+        glUniform1i(self.get_uniform_loc("uBlend"), blend)
         glUniform1f(self.get_uniform_loc("uGain"), gain)
-        glUniform1f(self.get_uniform_loc("uRelease"), release)
         glUniform3i(self.get_uniform_loc("uSize"), volume.width, volume.height, volume.depth)
         self.dispatch(volume.width, volume.height)     # a column each

@@ -1,6 +1,6 @@
 """The 3D fluid's injections at each pixel's z position against the slab they should fill: the largest difference.
 
-A 2D source of ones goes into a volume by `Inject3D` and `InjectAmount3D` (ADD, strength 1), each column at its
+A 2D source of ones goes into a volume by `InjectDensity3D` and `InjectAmount3D` (ADD, strength 1), each column at its
 z position, half the columns without one (nothing goes in there); each cell should hold the body's share of it,
 the gaussian's area between its faces over its length (slab.glsl). Without a z position bound nothing goes in.
 No app: a hidden window gives the GL context.
@@ -18,7 +18,8 @@ from OpenGL.GL import GL_FLOAT, GL_R16F, GL_RG, GL_RG32F, GL_RGBA, GL_RGBA16F, G
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from modules.gl import Texture, Texture3D  # noqa: E402
-from modules.flow.fluid_3d.shaders import Inject3D, InjectAmount3D  # noqa: E402
+from modules.flow import DensityBlend  # noqa: E402
+from modules.flow.fluid_3d.shaders import InjectDensity3D, InjectAmount3D  # noqa: E402
 from depth_velocity_compare import context  # noqa: E402
 
 
@@ -55,12 +56,13 @@ def main() -> None:
     expected = np.where(expected * 1.0 < 0.001, 0.0, expected)      # a share below this is skipped
 
     passed = True
-    inject = Inject3D()
+    add: int = int(DensityBlend.ADD)
+    inject = InjectDensity3D()
     inject.allocate()
     volume = Texture3D()
     volume.allocate(w, h, layers, GL_RGBA16F)
     volume.clear()
-    inject.use(source, volume, spread, 1.0, internal_format=GL_RGBA16F, mode=0, z_position=z_position)
+    inject.use(source, source, volume, spread, 1.0, add, 1.0, False, z_position)
     glFinish()
     got = volume.read_to_numpy()
     assert got is not None
@@ -73,7 +75,7 @@ def main() -> None:
     finer = Texture3D()
     finer.allocate(w, h, layers, GL_R16F)
     finer.clear()
-    amount.use(source, finer, spread, 1.0, z_position=z_position)
+    amount.use(source, source, finer, spread, 1.0, add, 1.0, z_position=z_position)
     glFinish()
     got = finer.read_to_numpy()
     assert got is not None
@@ -82,7 +84,7 @@ def main() -> None:
     print(f"inject amount at each column's z position: max diff {diff:.2e} {'ok' if diff < 5e-3 else 'FAIL'}")
 
     volume.clear()
-    inject.use(source, volume, spread, 1.0, internal_format=GL_RGBA16F, mode=0)
+    inject.use(source, source, volume, spread, 1.0, add, 1.0, False)
     glFinish()
     got = volume.read_to_numpy()
     assert got is not None

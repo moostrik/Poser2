@@ -4,9 +4,9 @@
  * ParticleEmit - new particles from a density source, into the ring.
  *
  * Per texel of the color (premultiplied by its alpha, the coverage), its amount the bridge's (read by uv,
- * capped at 1) times the color's alpha: its expected
+ * density_blend.glsl) times the color's alpha: its expected
  * count this step is rate × dt × g, g = min(amount / floor, 1), rounded by a hash so faint density still
- * spawns now and then; each new particle takes amount × gain × dt × slab / expected as its mass, so
+ * spawns now and then; each new particle takes amount × uStrength × slab / expected as its mass, so
  * the texel's mass is the grid's in expectation (slab: the gaussian's sum over the grid's layers)
  * and a strong drop makes heavy particles. Its color is the color's, straight, its place a random point in
  * the texel, its z drawn from the injection's gaussian around the texel's z position (none without one). The slots come from an atomic head, modulo
@@ -26,7 +26,7 @@ layout(binding = 0) uniform sampler2D uColor;      // the color, premultiplied b
 layout(binding = 1) uniform sampler2D uZPosition;   // the amount's z position, red over green
 layout(binding = 2) uniform sampler2D uAmount;      // the amount, red
 
-uniform float uGain;        // the source's gain × the injection's weight
+uniform float uStrength;    // the share of the amount added this step: over, the drag's; add, dt; × the injection's weight
 uniform float uDt;          // s
 uniform float uRate;        // particles per texel per second where density is
 uniform float uFloor;       // the amount below which a texel spawns fewer
@@ -38,6 +38,7 @@ uniform uint  uSeed;        // the frame
 
 const int MAX_PER_TEXEL = 16;
 
+#include "density_blend.glsl"
 #include "slab.glsl"
 
 uint hash(uint x) {
@@ -59,7 +60,7 @@ void main() {
 
     vec4 source = texelFetch(uColor, gid, 0);
     vec2 texel = (vec2(gid) + 0.5) / vec2(size);
-    float amount = min(abs(texture(uAmount, texel).r), 1.0) * source.a;
+    float amount = density_amount(texture(uAmount, texel).r) * source.a;
     if (amount <= 0.0) return;
     float center = slab_center(texel);
     if (center == NO_Z_POSITION) return;        // no place in the depth: no particle
@@ -71,7 +72,7 @@ void main() {
     if (n <= 0) return;
 
     float middle = slab_middle(center, uLayers);    // the slab's center in the volume's z, as the grid's layers place it
-    float mass = amount * uGain * uDt * slab_column(center, uLayers) / max(expected, 1e-6);
+    float mass = amount * uStrength * slab_column(center, uLayers) / max(expected, 1e-6);
     vec3 color = clamp(source.rgb / source.a, 0.0, 1.0);
     float packed_color = uintBitsToFloat(packUnorm4x8(vec4(color, 1.0)));
     float packed_mass = uintBitsToFloat(packHalf2x16(vec2(mass, 0.0)));

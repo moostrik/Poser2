@@ -11,7 +11,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_REPEA
 
 from modules.gl import ComputeShader, StorageBuffer, SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
 from ..wall_mode import WallMode
-from .fluid_settings import Advection, Light, Limiter, PressureSolver, ScatteringModel, Fluid3DSettings, PressureSettings, ParticleSettings, DensitySettings, FineDensitySettings
+from .fluid_settings import Advection, Light, Limiter, PressureSolver, ScatteringModel, DensityBlend, Fluid3DSettings, PressureSettings, ParticleSettings, DensitySettings, FineDensitySettings
 from .multigrid_pressure import MultigridPressure
 from .face_velocity import FaceVelocity
 from ..shaders import AddBoolean
@@ -117,6 +117,7 @@ class Fluid3D:
 
         self._reallocate_pending: bool = False
         self._densities_pending: bool = False
+        self._densities_clear: bool = False     # the density's color space changed: what it holds reads wrong
         self._wall_dirty: bool = False
 
         self._gpu_timer: GpuTimer = GpuTimer("GPU fluid")
@@ -217,6 +218,7 @@ class Fluid3D:
             self.settings.fine_density.bind(field, reallocate_densities)
         for field in (DensitySettings.width, DensitySettings.height, DensitySettings.depth):
             self.settings.density.bind(field, reallocate_densities)
+        self.settings.density.bind(DensitySettings.color_space, lambda _: setattr(self, '_densities_clear', True))
         for field in (ParticleSettings.enabled, ParticleSettings.count, ParticleSettings.slices):
             self.settings.particles.bind(field, reallocate_densities)
         self.settings.bind(Fluid3DSettings.width, lambda _: self._request_reallocate())
@@ -912,6 +914,11 @@ class Fluid3D:
             self._densities_pending = False
             self._allocate_densities()
 
+        if self._densities_clear:
+            self._densities_clear = False
+            for carrier in self._densities:
+                carrier.reset()
+
         if self._wall_dirty:
             self._wall_dirty = False
             self._apply_wall_modes()
@@ -984,17 +991,16 @@ class Fluid3D:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def add_density(self, amount: Texture, color: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
-        """The boundary's dye, the bridge's `amount` (red, capped at 1) times its `color` (RGBA, premultiplied by
-        its alpha, the coverage): the water in the slab dragged toward it times input.density_gain (at most fully
-        dyed), never past it, by the carriers: up over input.density_drag, down over input.density_release (0 =
-        never down)."""
+        """The boundary's dye, the bridge's `amount` (red) times input.density_gain times its `color` (RGBA,
+        premultiplied by its alpha, the coverage), into the carriers by input.density_blend: over the water's dye
+        by input.density_drag's share, the amount capped at 1, or added × dt."""
         if not self._allocated:
             return
         input = self.settings.input
-        share: float = drag_share(self._dt, input.density_drag) * weight
-        release: float = drag_share(self._dt, input.density_release) * weight if input.density_release > 0.0 else 0.0
+        blend: DensityBlend = input.density_blend
+        strength: float = (drag_share(self._dt, input.density_drag) if blend == DensityBlend.OVER else self._dt) * weight
         for carrier in self._densities:
-            carrier.add(amount, color, share, self._dt, self._spread(), InjectMode.FILL, input.density_gain, z_position, release)
+            carrier.add(amount, color, strength, self._dt, self._spread(), blend, input.density_gain, z_position)
 
     def add_temperature(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
         """The boundary's warmth (-1 cold to 1 hot, its presence folded in): the water in the slab dragged toward
@@ -1004,7 +1010,7 @@ class Fluid3D:
         input = self.settings.input
         share: float = drag_share(self._dt, input.temperature_drag) * weight
         self._inject_shader.use(texture, self._temperature, self._spread(), share,
-                                internal_format=GL_R16F, mode=int(InjectMode.FILL), scalar=True, gain=input.temperature_gain,
+                                internal_format=GL_R16F, mode=int(InjectMode.FILL), gain=input.temperature_gain,
                                 z_position=z_position, release=share)
         glMemoryBarrier(_BARRIER_IMAGE)
 
@@ -1018,7 +1024,7 @@ class Fluid3D:
             self._expansion_vol.clear()
             self._expansion_fresh = True
         self._inject_shader.use(texture, self._expansion_vol, self._spread(), weight,
-                                internal_format=GL_R16F, mode=int(InjectMode.ADD), scalar=True, z_position=z_position)
+                                internal_format=GL_R16F, mode=int(InjectMode.ADD), z_position=z_position)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def set_obstacle(self, texture: Texture) -> None:

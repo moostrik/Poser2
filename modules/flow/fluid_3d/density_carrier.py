@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from modules.gl import Texture, Texture3D
 from ..finite_guard import GuardSlot
 from ..port import Port
-from .fluid_settings import Advection, Limiter
-from .shaders import CompositeLight, MarchLook, InjectMode
+from .fluid_settings import Advection, DensityBlend, Limiter
+from .shaders import CompositeLight, MarchLook
 
 
 @dataclass
@@ -55,14 +55,12 @@ class DensityCarrier(ABC):
         """No density anywhere."""
 
     @abstractmethod
-    def add(self, amount: Texture, color: Texture, gain: float, dt: float, spread: float,
-            mode: InjectMode = InjectMode.FILL, target_gain: float = 1.0, z_position: Texture | None = None,
-            release: float = 0.0) -> None:
-        """A source, the bridge's `amount` (red, capped at 1) times its `color` (RGBA, premultiplied by its alpha,
-        the coverage), the dye, into the gaussian slab at each pixel's `z_position` (red over green), nothing where it has none or without
-        one, with sigma `spread`: by `mode`, added × gain × dt (ADD), or the water dragged toward it times
-        `target_gain` (at most fully dyed), never past it, up by the share `gain` and down by the share
-        `release` (FILL)."""
+    def add(self, amount: Texture, color: Texture, strength: float, dt: float, spread: float, blend: DensityBlend,
+            gain: float, z_position: Texture | None = None) -> None:
+        """A source, the bridge's `amount` (red) times `gain` times its `color` (RGBA, premultiplied by its alpha,
+        the coverage), the dye, into the gaussian slab at each pixel's `z_position` (red over green), nothing
+        where it has none or without one, with sigma `spread`, by `blend` (`density_blend.glsl`): over the water's
+        by the share `strength`, the amount capped at 1, or added × `strength` (dt); `dt` the step."""
 
     @abstractmethod
     def update(self, step: CarrierStep) -> None:

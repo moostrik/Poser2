@@ -135,7 +135,7 @@ class Composite3D(ComputeShader):
     volume is sampled by uv."""
 
     def use(self, density: Texture3D, output_2d: Texture, look: MarchLook, *,
-            color: Texture3D | None = None, light: CompositeLight | None = None) -> None:
+            color: Texture3D | None = None, light: CompositeLight | None = None, oklab: bool = False) -> None:
         """Composite the density volume into the 2D output, one march step per layer.
 
         Args:
@@ -145,6 +145,7 @@ class Composite3D(ComputeShader):
             color: With it, `density` is the amount alone and its color is this volume's (color × amount, amount)
             light: With its light per layer, each sample also lit: its color × that light, the caustic net on the
                 sun's share, × `light.intensity`; with its rays, the water's light added
+            oklab: The density's color (`density`'s, or `color`'s) is Oklab, turned back to RGB per sample
         """
         if not self.allocated or not self.shader_program:
             return
@@ -161,6 +162,7 @@ class Composite3D(ComputeShader):
         glUniform3f(self.get_uniform_loc("uFog"), *look.fog)
         glUniform1f(self.get_uniform_loc("uClearBelow"), look.clear_below)
         glUniform1i(self.get_uniform_loc("uSplit"), int(color is not None))
+        glUniform1i(self.get_uniform_loc("uOklab"), int(oklab))
         if color is not None:
             self.bind_texture_3d(1, color, "uColor")
         direct: Texture3D | None = light.direct if light is not None else None

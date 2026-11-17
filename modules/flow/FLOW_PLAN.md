@@ -14,7 +14,7 @@ operator saw.
 | A   | [The measurements](#a-the-measurements)                                      | built                             | [FLOW.md](FLOW.md#the-goals)                       |
 | B   | [The view](#b-the-view)                                                      | built                             | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; C2 the values, C3 range    | [MOTION.md](MOTION.md)                             |
-| D   | [The bridge](#d-the-bridge)                                                  | built; D5 blend                   | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
+| D   | [The bridge](#d-the-bridge)                                                  | built; D6 the checks              | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | the temperature                   | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | F1, F2 white                      | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                       | [FLOW.md](FLOW.md)                                 |
@@ -98,34 +98,13 @@ the same water **(site fact)**.
 
 Built (2026-11-17): the density's color with its coverage, and its amount apart (Porter and Duff 1984: alpha is
 coverage); the luma matte in the view ([VIEW.md](VIEW.md#the-stage)), the bridge's two outputs
-([BRIDGE_3D.md](BRIDGE_3D.md#the-mix)).
+([BRIDGE_3D.md](BRIDGE_3D.md#the-mix)); the density's blend, over or added, and its color space, RGB or Oklab
+([FLUID_3D.md](FLUID_3D.md#the-densitys-blend)), committed before the app's check on Matthias's word.
 
-- **D5.** The density's blend, in the grid, the fine density and the particles' carrier alike. It replaces
-  the fill's switch, a cell drawn toward the input only where the input's amount is higher and untouched
-  otherwise, which leaves patches where the input meets older density; and `density_release`, which goes, as a
-  falling input pulls the fluid dark **(site fact)**. The temperature keeps its drag as now.
-  - The blend, a setting, `input.density_blend`:
-    - `over`, the default: compositing over (Porter and Duff 1984), premultiplied; each tick a cell under the
-      input becomes the input plus the cell × (1 − the input's amount), by `density_drag`'s share. The amount
-      never falls and never passes 1; the color is the density-weighted mix. The default as the density is a
-      boundary value, held at the body, and `over` is that hold without the fall.
-    - `add`: the source (Stam 2003; Bridson 2015), the input × `density_gain` × dt added. Where the amount would
-      pass 1, all four channels are scaled down together so the amount lands at 1; the color stays the
-      density-weighted mix of what went in.
-  - The amount: min(the bridge's amount × `density_gain`, 1) × the color's alpha. The gain, default 1,
-    amplifies the speed, a slow player putting in more; the alpha, the coverage, comes in as given.
-  - The color space, a setting, `density.color_space`: `rgb`, as now, or `oklab` (Ottosson 2020), the color
-    stored as (L × density, a × density, b × density, density), so the flow and both blends mix colors as the
-    eye sees them. Converted into Oklab in the injection, not the bridge, as the particles read the bridge's
-    color; back to RGB in the composite; switching clears the density.
-  - The monitor: the fluid's `density` port carries its color space; the `IMAGE` view, the cube and the slice,
-    converts Oklab back to RGB, showing what the composite shows; `COLORMAP` keeps the stored channels, L, a, b
-    and the amount.
-  - The preset: `density_release` goes, the new keys come in at their defaults.
-  - FLUID_3D.md follows; the injection's and the march's times measured again, with -sim while Matthias is away.
-  - Tests: as D4's; no new test. Checked in the app: `over` leaves no patches where the input meets older
-    density; `add` builds up without going white; `oklab` mixes without turning muddy; the monitor's `IMAGE`
-    shows what the composite shows.
+- **D6.** The checks. In the app: no dark rim at any gain; the luma matte from 0 to 1; `over` leaves no patches
+  where the input meets older density; `add` builds up without going white; `oklab` mixes without turning
+  muddy; the monitor's `IMAGE` shows what the composite shows. The injection's and the march's times measured
+  again, with -sim while Matthias is away; the preset saved after.
 
 ## E. The 3D fluid's physics
 
@@ -246,8 +225,6 @@ The cameras:
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
-- A setting's default is the textbook value: D5's `density_blend`, its default with its reason.
-- Keep presets in sync, update all call sites in the same change: D5's `density_release`.
-- Ask to measure a time again when its pass's code or size changes: D5.
+- Ask to measure a time again when its pass's code or size changes: D6.
 
 Not designed yet, so their rules are not named: C3, E1, E2, F1, F2, H1, I1 to I4.

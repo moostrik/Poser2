@@ -6,6 +6,7 @@ from enum import IntEnum
 from modules.settings import Field, BaseSettings, Group, Widget
 from modules.utils import Color
 
+from ..port import ColorSpace
 from ..wall_mode import WallMode
 from ..time_step import TimeStepMode
 
@@ -69,6 +70,13 @@ class Overlap(IntEnum):
     WEIGHTED = 2            # weighted blended order-independent transparency: one pass, near density over far by a depth weight (McGuire, Bavoil 2013)
 
 
+class DensityBlend(IntEnum):
+    """How the body's dye goes into the water, premultiplied: over it, compositing (Porter and Duff 1984), or
+    added to it, a source (Stam 2003)."""
+    OVER = 0        # the dye over the water's by the drag's share: the amount never falls and never passes 1
+    ADD = 1         # the dye × the gain × dt added; at more than fully dyed all four channels scaled down to it
+
+
 class ParticleSettings(BaseSettings):
     """The particles: the ring, the emission, the look; drawn over the volume."""
     enabled: Field[bool]            = Field(False,                                                      description="Particles carried by the water, drawn over the volume")
@@ -95,16 +103,16 @@ class TimeSettings(BaseSettings):
 
 class InputSettings(BaseSettings):
     """The bridge's input, in the order the layer injects it: how thick the body is in the box's depth; the
-    boundary's velocity, density and temperature, each the water dragged toward the body's value times a gain
-    (capped at fully dyed and ±1 warm) over a time; the body force's acceleration added × dt times a gain; the
-    expansion's rate."""
+    boundary's velocity and temperature, each the water dragged toward the body's value times a gain (capped at
+    ±1 warm) over a time; the body force's acceleration added × dt times a gain; the density, its dye over the
+    water's or added; the expansion's rate."""
     spread: Field[float]            = Field(0.2,    min=0.0,    max=1.0,    step=0.001,             description="The body's thickness in z, widths, where it is at least half there; 0 = none")
     velocity_drag: Field[float]     = Field(50.0,   min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Time the water takes to close the gap to the body's velocity (ms); 0 = at once")
     velocity_gain: Field[float]     = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's velocity times this is what the water is dragged toward; 1 = as fast as the body")
     acceleration_gain: Field[float] = Field(1.0,    min=0.0,    max=10.0,   color="teal", newline=True, description="The body force's acceleration times this is added × dt; 1 = its Δv added once")
-    density_drag: Field[float]      = Field(200.0,  min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Time the water takes to take on the body's dye (ms); 0 = at once")
-    density_release: Field[float]   = Field(0.0,    min=0.0,    max=1000.0, step=1.0, color="cyan", description="Time the water's dye takes to fall to the body's where it is less (ms); 0 = never falls")
-    density_gain: Field[float]      = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's dye times this, at most fully dyed, is the target; 1 = fully dyed at 1 width/s")
+    density_blend: Field[DensityBlend] = Field(DensityBlend.OVER, newline=True,                 description="The body's dye over the water's, or added to it")
+    density_drag: Field[float]      = Field(200.0,  min=0.0,    max=1000.0, step=1.0, color="cyan", description="Over: time the water takes to take on the body's dye (ms); 0 = at once")
+    density_gain: Field[float]      = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's amount times this; over: at most fully dyed; 1 = fully dyed at 1 width/s")
     temperature_drag: Field[float]  = Field(200.0,  min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Time the water takes to take on the body's warmth (ms); 0 = at once")
     temperature_gain: Field[float]  = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's warmth times this, at most ±1, is the target; 1 = fully warm at 1 width/s")
     expansion_rate: Field[float]    = Field(0.0,    min=-5.0,   max=5.0,    step=0.01, color="teal", newline=True, description="Volume the water gains per second where the body is (1/s); below 0 it shrinks; 0 = off")
@@ -134,10 +142,11 @@ class VorticitySettings(BaseSettings):
 
 
 class DensitySettings(BaseSettings):
-    """The density: its size, how it is carried, fades and evaporates."""
+    """The density: its size, its color space, how it is carried, fades and evaporates."""
     width: Field[int]               = Field(448,    min=32,     max=4096,   step=8,                 description="The density's width; the dye's is the bridge's width")
     height: Field[int]              = Field(800,    min=32,     max=4096,   step=8,                 description="The density's height; the dye's is the bridge's height")
     depth: Field[int]               = Field(24,     min=4,      max=256,    step=4,                 description="The density's depth in z")
+    color_space: Field[ColorSpace]  = Field(ColorSpace.RGB,                                         description="The color stored as RGB, or as Oklab, mixing as the eye sees; a switch clears the density")
     advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,  newline=True,   description="How the density and the fine density are carried: MacCormack keeps their edges sharp")
     limiter: Field[Limiter]         = Field(Limiter.CLAMP,                              description="Where MacCormack overshoots: clamped to the step's bounds, or the plain step")
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey",      description="How far the density is carried per step; 1 = with the water, above it runs ahead")

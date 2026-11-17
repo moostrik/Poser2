@@ -1,16 +1,17 @@
-"""The density: an RGBA16F `GL_TEXTURE_3D` of color × amount and the amount, at its own `density.width` ×
-`density.height` × `density.depth` over the simulation's box, by default the dye's size, carried by the water's
+"""The density: an RGBA16F `GL_TEXTURE_3D` of color × amount and the amount, the color in `density.color_space`,
+at its own `density.width` × `density.height` × `density.depth` over the simulation's box, by default the dye's
+size, carried by the water's
 velocity read by uv between the simulation's cells; marched front to back into the output (`Composite3D`) when it is
 drawn, else the fine density's color. The buoyancy reads its amount, by uv."""
 
 from OpenGL.GL import GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, glMemoryBarrier
 
 from modules.gl import Texture, Texture3D, SwapTexture3D
-from ..port import Port, TextureKind
+from ..port import ColorSpace, Port, TextureKind
 from .density_carrier import CarrierStep, DensityCarrier
 from .field_advection import FieldAdvection
-from .fluid_settings import Fluid3DSettings
-from .shaders import MarchLook, Inject3D, InjectMode, Composite3D, CompositeLight
+from .fluid_settings import DensityBlend, Fluid3DSettings
+from .shaders import MarchLook, InjectDensity3D, Composite3D, CompositeLight
 
 _BARRIER_IMAGE: int = int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
 
@@ -25,7 +26,7 @@ class Density(DensityCarrier):
         self._scratch: Texture3D = Texture3D()      # the MacCormack predictor
         self._walls: tuple | None = None
         self._z_extent: float = 1.0
-        self._inject_shader: Inject3D = Inject3D()
+        self._inject_shader: InjectDensity3D = InjectDensity3D()
         self._composite_shader: Composite3D = Composite3D()
 
     def allocate(self, width: int, height: int, layers: int, extent: float, output_width: int, output_height: int) -> None:
@@ -53,14 +54,12 @@ class Density(DensityCarrier):
     def reset(self) -> None:
         self._density.clear_all()
 
-    def add(self, amount: Texture, color: Texture, gain: float, dt: float, spread: float,
-            mode: InjectMode = InjectMode.FILL, target_gain: float = 1.0, z_position: Texture | None = None,
-            release: float = 0.0) -> None:
+    def add(self, amount: Texture, color: Texture, strength: float, dt: float, spread: float, blend: DensityBlend,
+            gain: float, z_position: Texture | None = None) -> None:
         if not self.allocated:
             return
-        strength: float = gain if mode == InjectMode.FILL else gain * dt
-        self._inject_shader.use(amount, self._density, spread, strength, internal_format=GL_RGBA16F, mode=int(mode), gain=target_gain,
-                                z_position=z_position, release=release, color=color)
+        self._inject_shader.use(amount, color, self._density, spread, strength, int(blend), gain, self._oklab,
+                                z_position)
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def update(self, step: CarrierStep) -> None:
@@ -76,7 +75,7 @@ class Density(DensityCarrier):
     def composite(self, output: Texture, look: MarchLook, light: CompositeLight | None = None) -> None:
         if not self.allocated:
             return
-        self._composite_shader.use(self._density, output, look, light=light)
+        self._composite_shader.use(self._density, output, look, light=light, oklab=self._oklab)
         glMemoryBarrier(_BARRIER_IMAGE)
 
     @property
@@ -85,7 +84,13 @@ class Density(DensityCarrier):
 
     @property
     def ports(self) -> dict[str, Port]:
-        return {'density': Port(self._density, TextureKind.IMAGE, self._z_extent)} if self.allocated else {}
+        return {'density': Port(self._density, TextureKind.IMAGE, self._z_extent,
+                                color_space=self.settings.density.color_space)} if self.allocated else {}
+
+    @property
+    def _oklab(self) -> bool:
+        """Whether the color is stored as Oklab."""
+        return self.settings.density.color_space == ColorSpace.OKLAB
 
     def set_walls(self, xy: tuple[int, tuple[float, float, float, float]], z: tuple[int, tuple[float, float, float, float]]) -> None:
         self._walls = (xy, z)

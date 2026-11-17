@@ -32,6 +32,13 @@ class TextureKind(IntEnum):
         return self in (TextureKind.VELOCITY, TextureKind.ACCELERATION)
 
 
+class ColorSpace(IntEnum):
+    """How an image's color is stored, premultiplied by its alpha: as RGB, or as Oklab (Ottosson 2020), L, a and
+    b, where colors mix as the eye sees them."""
+    RGB = 0
+    OKLAB = auto()
+
+
 @dataclass(frozen=True)
 class LightPlace:
     """Where the light a volume is lit by is, in the volume's texture coordinates (0 to 1, z 0 the front):
@@ -47,7 +54,8 @@ class Port:
     it with one sampler type; `extent` is its depth as a share of its width, the box a view draws it
     in, so a layer gap looks as deep as it is. `prepare`, when set, is what a view calls before it
     reads the texture: its owner brings it up to date there, once however many views ask, or learns
-    that it is shown. `light`, on a volume, is where the light it is lit by is, drawn in its box."""
+    that it is shown. `light`, on a volume, is where the light it is lit by is, drawn in its box. `color_space`,
+    on an image, is how its color is stored, which its image view converts back to RGB."""
     texture: Texture | Texture3D
     kind: TextureKind
     extent: float = 0.0
@@ -55,6 +63,7 @@ class Port:
     held: int = 0           # the channels holding its values, x first; 0 from its kind and format (`channels`)
     light: LightPlace | None = None
     depth_range: tuple[float, float] | None = None     # a depth's near and far (m), the span its colormap covers
+    color_space: ColorSpace = ColorSpace.RGB
 
     @property
     def volume(self) -> bool:

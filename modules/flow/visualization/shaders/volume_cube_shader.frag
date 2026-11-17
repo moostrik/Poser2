@@ -2,7 +2,7 @@
 
 // Volume Cube: a volume drawn continuously in its box, one ray per pixel from the orbit camera,
 // marched front to back. Each sample is colored by `mode` (as stored; a vector by its direction alone;
-// a scalar centered on grey) and its amount, capped at 1, is its opacity: an image's largest channel,
+// a scalar centered on grey; an image stored as Oklab turned back to RGB, then as stored) and its amount, capped at 1, is its opacity: an image's largest channel,
 // a scalar's or a vector's size. Far samples are dimmed by depth_fade. With the slice on, the ray reads
 // the selected layer where it crosses it, and slice_focus moves opacity from the rest to it: at 0 the
 // slice is a sample as any other, at 1 it shows its amount as its opacity and the rest none. Out comes
@@ -13,7 +13,7 @@ uniform mat4 inverse_view_projection; // clip space back to the box's space
 uniform vec3 box;                     // the box's size, its width 1
 uniform float scale;                  // Multiplier on the values; at 1 after it, a sample is full
 uniform int channel;                  // 0 to 3 for x, y, z, w; 4 for all
-uniform int mode;                     // 0 as stored, 1 a vector by its direction, 2 centered on grey
+uniform int mode;                     // 0 as stored, 1 a vector by its direction, 2 centered on grey, 3 from Oklab
 uniform int steps;                    // samples along a ray through the whole box
 uniform float opacity;                // opacity per box width of a full sample
 uniform float depth_fade;             // dimming per box width behind the box's near side
@@ -27,7 +27,10 @@ out vec4 fragColor;
 const int ALL = 4;
 const int AS_STORED = 0;
 const int DIRECTION = 1;
+const int FROM_OKLAB = 3;
 const vec3 AXES[4] = vec3[](vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), vec3(0.0, 0.0, 1.0), vec3(1.0));
+
+#include "color.glsl"
 
 vec3 unproject(vec2 ndc, float depth) {
     vec4 p = inverse_view_projection * vec4(ndc, depth, 1.0);
@@ -36,7 +39,11 @@ vec3 unproject(vec2 ndc, float depth) {
 
 // A sample's color and its amount, capped at 1
 vec4 shade(vec3 uvw) {
-    vec4 value = texture(tex0, uvw) * scale;
+    vec4 value = texture(tex0, uvw);
+    if (mode == FROM_OKLAB && channel == ALL) {     // premultiplied: divided by the amount, turned, multiplied again
+        value.xyz = value.w > 1e-4 ? oklab2rgb(value.xyz / value.w) * value.w : vec3(0.0);
+    }
+    value *= scale;
     vec3 sample_color;
     float amount;
     if (mode == DIRECTION) {
@@ -44,7 +51,7 @@ vec4 shade(vec3 uvw) {
         float size = length(v);
         sample_color = size > 0.0 ? 0.5 + 0.5 * v / size : vec3(0.5);
         amount = size;
-    } else if (mode == AS_STORED) {
+    } else if (mode == AS_STORED || mode == FROM_OKLAB) {
         sample_color = channel == ALL ? value.xyz : vec3(value[channel]);
         amount = channel == ALL ? max(max(value.x, value.y), value.z) : value[channel];
     } else {

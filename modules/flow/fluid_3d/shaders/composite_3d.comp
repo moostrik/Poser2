@@ -23,6 +23,8 @@
  * color × amount over its amount, at the same place, each with COLOR_FLOOR of white
  * added, so where the coarse amount thins out under the finer one the color fades to
  * white instead of dividing by almost nothing (which drew the coarse cells as blocks).
+ * With uOklab the density holds Oklab, (L, a, b) × amount: each sample's color is divided by its amount,
+ * turned back to RGB and multiplied by it again, before anything else reads it.
  */
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
@@ -48,6 +50,9 @@ uniform bool  uLit;          // the density lit by uDirect
 uniform bool  uHasRays;      // the water's light added from uRays
 uniform float uIntensity;    // the light on thick density at full light, 1 = its own color
 uniform float uClearBelow;   // the dye below which a sample fades softly to clear, the transfer curve; 0 off
+uniform bool  uOklab;        // the density holds Oklab
+
+#include "color.glsl"
 
 void main() {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
@@ -70,7 +75,12 @@ void main() {
         vec4 s = texture(uDensity, uvw);
         if (uSplit) {
             vec4 c = texture(uColor, uvw);
-            s = vec4((max(c.rgb, vec3(0.0)) + COLOR_FLOOR) / (max(c.a, 0.0) + COLOR_FLOOR) * s.r, s.r);
+            vec3 white = uOklab ? vec3(1.0, 0.0, 0.0) : vec3(1.0);
+            vec3 stored = uOklab ? c.rgb : max(c.rgb, vec3(0.0));
+            vec3 color = (stored + COLOR_FLOOR * white) / (max(c.a, 0.0) + COLOR_FLOOR);
+            s = vec4((uOklab ? oklab2rgb(color) : color) * s.r, s.r);
+        } else if (uOklab) {
+            s.rgb = s.a > 1e-4 ? oklab2rgb(s.rgb / s.a) * s.a : vec3(0.0);
         }
 
         vec3 dye = max(s.rgb, vec3(0.0));

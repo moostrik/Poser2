@@ -18,18 +18,20 @@ class ParticleEmit(ComputeShader):
         super().__init__()
 
     def use(self, amount: Texture, color: Texture, particles: StorageBuffer, ring: StorageBuffer, count: int, *,
-            gain: float, dt: float, rate: float, floor: float, layers: int, spread: float,
+            strength: float, blend: int, gain: float, dt: float, rate: float, floor: float, layers: int, spread: float,
             seed: int, z_position: Texture | None = None) -> None:
         """Emit from the density, `amount` and `color`, into the ring of `count` particles, one texel of the color
         each.
 
         Args:
-            amount: The bridge's amount, red; capped at 1, times the color's alpha
+            amount: The bridge's amount, red; times the gain (over: capped at 1), times the color's alpha
             color: The color, premultiplied by its alpha
             particles: The particles' buffer
             ring: The ring's head (one uint)
             count: The ring's size
-            gain: The source's gain × the injection's weight
+            strength: The share of the amount added this step (over: the drag's, add: dt) × the injection's weight
+            blend: `DensityBlend`, which caps the amount at 1 (over) or not (add)
+            gain: The bridge's amount times this
             dt: The step (s)
             rate: Particles per texel per second where density is
             floor: The amount below which a texel spawns fewer
@@ -46,6 +48,8 @@ class ParticleEmit(ComputeShader):
         self.bind_texture(2, amount, "uAmount")
         particles.bind_base(0)
         ring.bind_base(1)
+        glUniform1f(self.get_uniform_loc("uStrength"), strength)
+        glUniform1i(self.get_uniform_loc("uBlend"), blend)
         glUniform1f(self.get_uniform_loc("uGain"), gain)
         glUniform1f(self.get_uniform_loc("uDt"), dt)
         glUniform1f(self.get_uniform_loc("uRate"), rate)
