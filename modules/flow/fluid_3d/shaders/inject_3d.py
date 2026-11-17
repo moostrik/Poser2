@@ -13,6 +13,7 @@ class InjectMode(IntEnum):
     """How a source goes into a field."""
     ADD = 0         # added × dt, unbounded
     FILL = 1        # the field dragged toward the source by the drag's share, never past it
+    DISPLACEMENT = 2  # the body's displacement added: the image plane's part by the slab, z's by its slope
 
 
 class Inject3D(ComputeShader):
@@ -28,7 +29,7 @@ class Inject3D(ComputeShader):
     def use(self, input_2d: Texture, volume: Texture3D,
             spread: float, strength: float = 1.0,
             internal_format: int = GL_RGBA16F, mode: int = 0, scalar: bool = False, gain: float = 1.0,
-            z_position: Texture | None = None) -> None:
+            z_position: Texture | None = None, depth: float = 1.0) -> None:
         """Add the 2D input into the 3D volume.
 
         Args:
@@ -37,11 +38,13 @@ class Inject3D(ComputeShader):
             spread: Gaussian sigma in normalized depth units
             strength: Injection strength multiplier
             internal_format: Image format for volume binding
-            mode: 0 ADD, 1 FILL (dragged toward the input, never past it)
+            mode: 0 ADD, 1 FILL (dragged toward the input, never past it), 2 DISPLACEMENT (red by the slab, green
+                by its slope in depth)
             scalar: A signed scalar in r, else a premultiplied density
             gain: FILL: the input times this, at most full, is the target
             z_position: The input's z position (red over green); a pixel without one, or every pixel without
                 it, puts nothing in
+            depth: DISPLACEMENT: the box's depth in widths
         """
         if not self.allocated or not self.shader_program:
             return
@@ -63,6 +66,7 @@ class Inject3D(ComputeShader):
         glUniform1i(self.get_uniform_loc("uMode"), mode)
         glUniform1i(self.get_uniform_loc("uScalar"), int(scalar))
         glUniform1f(self.get_uniform_loc("uGain"), gain)
+        glUniform1f(self.get_uniform_loc("uDepth"), depth)
         glUniform3i(self.get_uniform_loc("uSize"),
                     volume.width, volume.height, volume.depth)
 

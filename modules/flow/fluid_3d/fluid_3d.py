@@ -1,7 +1,7 @@
 """Fluid3D - 3D Navier-Stokes fluid simulation on the GPU: the velocity on the cells' faces, the temperature, the
 pressure and the obstacle on one grid, the density carried by `Density` and, where enabled, `FineDensity` and
 `ParticleDensity`; the bridge's two systems go in by `drag_velocity`, `add_acceleration`, `add_density`
-and `add_temperature`, the expansion by `add_expansion`, each at its pixels' z positions; `update` steps it and composites the look. How and why:
+and `add_temperature`, the volume source by `add_expansion` and `add_displacement`, each at its pixels' z positions; `update` steps it and composites the look. How and why:
 modules/flow/FLUID_3D.md, "The fluid", "The inputs" and "The walls".
 """
 import math
@@ -27,7 +27,7 @@ from .particle_density import ParticleDensity
 from .shaders.face_binding import Cell
 from .shaders import (AdvectFaces3D, FacesToCenters3D, ViscosityFaces3D, SEMI_LAGRANGIAN, PREDICTOR, CORRECTION,
                       
-    Divergence3D, ExpansionMean3D, PARTIAL_BYTES, Gradient3D,
+    Divergence3D, SourceMean3D, PARTIAL_BYTES, Gradient3D,
     JacobiPressure3D, SorPressure3D,
     VorticityCurl3D, VorticityForce3D, Buoyancy3D, AddToFaces3D,
     Inject3D,
@@ -83,7 +83,7 @@ class Fluid3D:
 
     Intermediate (single-buffer):
         divergence:       Texture3D R16F
-        expansion:        Texture3D R16F     a presence, summed over a tick's injections
+        source:           Texture3D R16F     the volume source φ, 1/s, summed over a tick's injections
         curl:             Texture3D RGBA16F  (wx, wy, wz, 0)
         buoyancy_force:   Texture3D RGBA16F  (Fx, Fy, Fz, 0)
 
@@ -170,12 +170,13 @@ class Fluid3D:
 
         # ---- Intermediate volumes (single buffer, no ping-pong) ----
         self._divergence_vol: Texture3D = Texture3D()
-        # The expansion, a presence summed over this tick's injections, and in a closed box its mean over the
-        # water's cells, per workgroup and in all; fresh from its first injection to the projection
-        self._expansion_vol: Texture3D = Texture3D()
-        self._expansion_partials: StorageBuffer = StorageBuffer()
-        self._expansion_mean: StorageBuffer = StorageBuffer()
-        self._expansion_fresh: bool = False
+        # The volume source φ (1/s), the expansion and the displacement summed over this tick's injections, and in
+        # a closed box its mean over the water's cells, per workgroup and in all; fresh from its first injection
+        # to the projection
+        self._source_vol: Texture3D = Texture3D()
+        self._source_partials: StorageBuffer = StorageBuffer()
+        self._source_mean: StorageBuffer = StorageBuffer()
+        self._source_fresh: bool = False
         # The confinements' curls: the first running one's (`_curl_vol`, which the turbulence reads too), then one
         # for each further confinement, allocated when it first runs
         self._curl_vol: Texture3D = Texture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
@@ -189,7 +190,7 @@ class Fluid3D:
 
         # ---- Compute shaders ----
         self._divergence_shader: Divergence3D = Divergence3D()
-        self._expansion_mean_shader: ExpansionMean3D = ExpansionMean3D()
+        self._source_mean_shader: SourceMean3D = SourceMean3D()
         self._gradient_shader: Gradient3D = Gradient3D()
         self._jacobi_pressure_shader: JacobiPressure3D = JacobiPressure3D()
         self._sor_pressure_shader: SorPressure3D = SorPressure3D()
@@ -251,7 +252,7 @@ class Fluid3D:
 
         # Allocate shaders
         self._divergence_shader.allocate()
-        self._expansion_mean_shader.allocate()
+        self._source_mean_shader.allocate()
         self._gradient_shader.allocate()
         self._jacobi_pressure_shader.allocate()
         self._sor_pressure_shader.allocate()
@@ -333,11 +334,11 @@ class Fluid3D:
 
         # Intermediate volumes
         self._divergence_vol.allocate(sim_w, sim_h, d, GL_R16F)
-        self._expansion_vol.allocate(sim_w, sim_h, d, GL_R16F)
-        self._expansion_vol.clear()
-        self._expansion_fresh = False
-        self._expansion_partials.allocate(ExpansionMean3D.groups((sim_w, sim_h, d)) * PARTIAL_BYTES)
-        self._expansion_mean.allocate(4)
+        self._source_vol.allocate(sim_w, sim_h, d, GL_R16F)
+        self._source_vol.clear()
+        self._source_fresh = False
+        self._source_partials.allocate(SourceMean3D.groups((sim_w, sim_h, d)) * PARTIAL_BYTES)
+        self._source_mean.allocate(4)
         self._curl_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
         self._buoyancy_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
         self._vorticity_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
@@ -361,9 +362,9 @@ class Fluid3D:
         self._obstacle.deallocate()
         self._obstacle_source.deallocate()
         self._divergence_vol.deallocate()
-        self._expansion_vol.deallocate()
-        self._expansion_partials.deallocate()
-        self._expansion_mean.deallocate()
+        self._source_vol.deallocate()
+        self._source_partials.deallocate()
+        self._source_mean.deallocate()
         self._curl_vol.deallocate()
         for curl in self._more_curls:
             curl.deallocate()
@@ -376,7 +377,7 @@ class Fluid3D:
         self._advection.deallocate()
         self._guard.deallocate()
         self._divergence_shader.deallocate()
-        self._expansion_mean_shader.deallocate()
+        self._source_mean_shader.deallocate()
         self._gradient_shader.deallocate()
         self._jacobi_pressure_shader.deallocate()
         self._sor_pressure_shader.deallocate()
@@ -415,7 +416,7 @@ class Fluid3D:
         self._layer_light_shader.reload()
         self._light_blur_shader.reload()
         self._divergence_shader.reload()
-        self._expansion_mean_shader.reload()
+        self._source_mean_shader.reload()
         self._gradient_shader.reload()
         self._jacobi_pressure_shader.reload()
         self._sor_pressure_shader.reload()
@@ -633,21 +634,20 @@ class Fluid3D:
 
     def _enforce_incompressibility(self) -> None:
         """Pressure projection (divergence → Jacobi solve → gradient subtraction), the three passes on one set
-        of walls, closed or open by `wall`; with this tick's expansion the solve makes the divergence φ, not 0."""
+        of walls, closed or open by `wall`; with this tick's volume source the solve makes the divergence φ, not 0."""
         closed: tuple[bool, bool, bool] = self._closed
         # a. The divergence, per cell from its six faces, less φ; in a closed box less φ's mean first
-        expansion: tuple[Texture3D, float, StorageBuffer | None] | None = None
-        rate: float = self.settings.input.expansion_rate
-        if self._expansion_fresh and rate != 0.0:
+        source: tuple[Texture3D, StorageBuffer | None] | None = None
+        if self._source_fresh:
             mean: StorageBuffer | None = None
             if all(closed):
-                self._expansion_mean_shader.use(self._expansion_vol, self._obstacle, self._has_obstacles,
-                                                self._expansion_partials, self._expansion_mean)
-                mean = self._expansion_mean
-            expansion = (self._expansion_vol, rate, mean)
-        self._expansion_fresh = False
+                self._source_mean_shader.use(self._source_vol, self._obstacle, self._has_obstacles,
+                                             self._source_partials, self._source_mean)
+                mean = self._source_mean
+            source = (self._source_vol, mean)
+        self._source_fresh = False
         self._divergence_shader.use(self._faces.volume, self._obstacle, self._divergence_vol,
-                                    self._cell, has_obstacles=self._has_obstacles, closed=closed, expansion=expansion)
+                                    self._cell, has_obstacles=self._has_obstacles, closed=closed, source=source)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
         # b. Solve Poisson equation for pressure, by the solver picked
@@ -1007,17 +1007,36 @@ class Fluid3D:
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def add_expansion(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
-        """The expansion (a presence, 0 to 1) added into the expansion's slab at `z_position`, summed over this
-        tick's injections; the projection makes the divergence input.expansion_rate (1/s at full presence) times
-        it. The first injection of a tick clears the last tick's."""
-        if not self._allocated or self.settings.input.expansion_rate == 0.0:
+        """The expansion (a presence, 0 to 1) times input.expansion_rate (1/s at full presence) added into the
+        volume source in the slab at `z_position`."""
+        rate: float = self.settings.input.expansion_rate
+        if not self._allocated or rate == 0.0:
             return
-        if not self._expansion_fresh:
-            self._expansion_vol.clear()
-            self._expansion_fresh = True
-        self._inject_shader.use(texture, self._expansion_vol, self._spread(), weight,
+        self._begin_source()
+        self._inject_shader.use(texture, self._source_vol, self._spread(), weight * rate,
                                 internal_format=GL_R16F, mode=int(InjectMode.ADD), scalar=True, z_position=z_position)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+
+    def add_displacement(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
+        """The body's displacement, the rate it fills the water (red −v·∇mask, 1/s; green z × the mask, widths/s,
+        z toward the camera), times input.displacement_gain added into the volume source: red in the slab at
+        `z_position`, green by the slab's slope in depth, so a body moving toward the camera fills the cells in
+        front of it and empties those behind."""
+        gain: float = self.settings.input.displacement_gain
+        if not self._allocated or gain == 0.0:
+            return
+        self._begin_source()
+        self._inject_shader.use(texture, self._source_vol, self._spread(), weight * gain,
+                                internal_format=GL_R16F, mode=int(InjectMode.DISPLACEMENT), scalar=True,
+                                z_position=z_position, depth=self._z_extent)
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+
+    def _begin_source(self) -> None:
+        """The volume source φ (1/s), the sum of this tick's expansions and displacements, which the projection
+        takes: cleared at the tick's first injection."""
+        if not self._source_fresh:
+            self._source_vol.clear()
+            self._source_fresh = True
 
     def set_obstacle(self, texture: Texture) -> None:
         """Replace obstacle volume with a 2D mask projected through all layers.
@@ -1092,7 +1111,7 @@ class Fluid3D:
                 'vorticity': volume(self._curl_vol, TextureKind.VELOCITY),
                 'temperature': volume(self._temperature, TextureKind.SCALAR),
                 'buoyancy': volume(self._buoyancy_force_vol, TextureKind.ACCELERATION),
-                'expansion': volume(self._expansion_vol, TextureKind.SCALAR),
+                'source': volume(self._source_vol, TextureKind.SCALAR),
                 'divergence': volume(self._divergence_vol, TextureKind.SCALAR),
                 'pressure': volume(self._pressure, TextureKind.SCALAR),
                 **({'light': Port(self._light_shown, TextureKind.IMAGE, extent, held=3, light=light)} if self._light_shown.allocated else {}),

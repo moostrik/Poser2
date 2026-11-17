@@ -97,7 +97,7 @@ class InputSettings(BaseSettings):
     """The bridge's input, in the order the layer injects it: how thick the body is in the box's depth; the
     boundary's velocity, density and temperature, each the water dragged toward the body's value times a gain
     (capped at fully dyed and ±1 warm) over a time; the body force's acceleration added × dt times a gain; the
-    expansion's rate."""
+    expansion's rate and the displacement's gain, the two summed into the projection's volume source."""
     spread: Field[float]            = Field(0.2,    min=0.0,    max=1.0,    step=0.001,             description="The body's thickness in z, widths, where it is at least half there; 0 = none")
     velocity_drag: Field[float]     = Field(50.0,   min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Time the water takes to close the gap to the body's velocity (ms); 0 = at once")
     velocity_gain: Field[float]     = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's velocity times this is what the water is dragged toward; 1 = as fast as the body")
@@ -107,6 +107,7 @@ class InputSettings(BaseSettings):
     temperature_drag: Field[float]  = Field(200.0,  min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Time the water takes to take on the body's warmth (ms); 0 = at once")
     temperature_gain: Field[float]  = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's warmth times this, at most ±1, is the target; 1 = fully warm at 1 width/s")
     expansion_rate: Field[float]    = Field(0.0,    min=-5.0,   max=5.0,    step=0.01, color="teal", newline=True, description="Volume the water gains per second where the body is (1/s); below 0 it shrinks; 0 = off")
+    displacement_gain: Field[float] = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's displacement times this; 1 = the body moves its own volume")
 
 
 class VelocitySettings(BaseSettings):

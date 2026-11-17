@@ -427,7 +427,7 @@
         "trail": 1.0,
         "change": 0.0,
         "start": 0.0,
-        "bow": 0.0,
+        "bow": 0.05,
         "stop": 1.0,
         "wake": 0.0,
         "mask": 0.0,
@@ -448,7 +448,7 @@
         "change": 0.0,
         "start": 0.0,
         "bow": 0.0,
-        "stop": 0.0,
+        "stop": 1.0,
         "wake": 0.0,
         "mask": 0.0
       },
@@ -500,7 +500,7 @@
         "density_gain": 10.0,
         "temperature_drag": 200.0,
         "temperature_gain": 1.0,
-        "expansion_rate": 0.0
+        "expansion_rate": 5.0
       },
       "velocity": {
         "advection": "SEMI_LAGRANGIAN",

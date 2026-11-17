@@ -4,6 +4,7 @@ from .bandpass_accelerations import BandpassAccelerations
 from .bandpass_changes import BandpassChanges, Change
 from .bandpass_trails import BandpassTrails
 from .density_bridge_shader import DensityBridgeShader
+from .displacement import Displacement
 from .lowpass_blur import LowpassBlur
 from .lowpass_step import LowpassStep
 from .z_position_mix import ZPositionMix

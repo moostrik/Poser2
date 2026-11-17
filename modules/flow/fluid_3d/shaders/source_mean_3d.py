@@ -1,4 +1,4 @@
-"""ExpansionMean3D - the expansion's mean over the water's cells, on the GPU, for a closed box."""
+"""SourceMean3D - the projection's volume source's mean over the water's cells, on the GPU, for a closed box."""
 from __future__ import annotations
 
 import math
@@ -10,8 +10,8 @@ from modules.gl import ComputeShader, StorageBuffer, Texture3D
 PARTIAL_BYTES: int = 8      # a group's partial: the sum and the water cells, two floats
 
 
-class ExpansionMean3D(ComputeShader):
-    """Sums the expansion per workgroup into `partials`, then the partials into `mean`, the sum over the water
+class SourceMean3D(ComputeShader):
+    """Sums the source per workgroup into `partials`, then the partials into `mean`, the sum over the water
     cells; nothing is read back."""
 
     WORKGROUP_SIZE_X = 8
@@ -24,12 +24,12 @@ class ExpansionMean3D(ComputeShader):
         return (math.ceil(cells[0] / cls.WORKGROUP_SIZE_X) * math.ceil(cells[1] / cls.WORKGROUP_SIZE_Y)
                 * math.ceil(cells[2] / cls.WORKGROUP_SIZE_Z))
 
-    def use(self, expansion: Texture3D, obstacle: Texture3D, has_obstacles: bool,
+    def use(self, source: Texture3D, obstacle: Texture3D, has_obstacles: bool,
             partials: StorageBuffer, mean: StorageBuffer) -> None:
-        """The expansion's mean into `mean` (one float).
+        """The source's mean into `mean` (one float).
 
         Args:
-            expansion: The expansion at the cells (R16F)
+            source: The volume source at the cells (R16F, 1/s)
             obstacle: The obstacle mask (R8 at the cells)
             has_obstacles: Whether an obstacle's cells count for nothing
             partials: At least `groups(cells)` × PARTIAL_BYTES bytes
@@ -37,9 +37,9 @@ class ExpansionMean3D(ComputeShader):
         """
         if not self.allocated or not self.shader_program:
             return
-        cells: tuple[int, int, int] = (expansion.width, expansion.height, expansion.depth)
+        cells: tuple[int, int, int] = (source.width, source.height, source.depth)
         glUseProgram(self.shader_program)
-        self.bind_texture_3d(0, expansion, 'uExpansion')
+        self.bind_texture_3d(0, source, 'uSource')
         self.bind_texture_3d(2, obstacle, 'uObstacle')
         glUniform3i(self.get_uniform_loc('uCells'), *cells)
         glUniform1i(self.get_uniform_loc('uHasObstacles'), int(has_obstacles))

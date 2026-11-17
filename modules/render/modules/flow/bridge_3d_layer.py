@@ -2,7 +2,8 @@
 readings, each as a velocity and as an acceleration; one mix per output makes what the fluid takes from them:
 the boundary's velocity, density and temperature from the readings as velocities, the body force's
 acceleration from the readings as accelerations, and the expansion, where the water swells, a presence from
-the readings as velocities and the mask. The density and the temperature are 0 to 1 (±1 warm): a presence,
+the readings as velocities and the mask, and the displacement, the body pushing water aside, from the readings
+mixed as velocities and the mask's gradient. The density and the temperature are 0 to 1 (±1 warm): a presence,
 the readings' speed in widths/s, capped at 1, the dye the fluid fills the water toward.
 
 Each trail holds where its motion was, a z position; every output mixes its readings' z positions by the
@@ -13,13 +14,13 @@ density or a temperature has a z position wherever its amount has one."""
 from collections.abc import Callable
 
 # Third-party imports
-from OpenGL.GL import GL_R32F, GL_RG16F, GL_RGBA16F
+from OpenGL.GL import GL_R32F, GL_RG16F, GL_RG32F, GL_RGBA16F
 
 # Local application imports
 from modules.gl import Fbo, GpuTimer, Texture
 from modules.flow import (
     VelocityLowpass, VelocityLowpassSettings,
-    VelocityBandpass, VelocityBandpassSettings, Change, WeightedSum, ZPositionMix,
+    VelocityBandpass, VelocityBandpassSettings, Change, WeightedSum, ZPositionMix, Displacement,
     TemperatureBridge, TemperatureBridgeSettings, CaptureMax,
     DensityBridge, DensityBridgeSettings, VelocityPeak, VelocityPeakSettings,
     HasPorts, Port, Ports, TextureKind,
@@ -80,17 +81,22 @@ class ExpansionSettings(AmountMixSettings):
     """The expansion: where the water swells, a presence 0 to 1 from the readings' speeds and the mask."""
 
 
+class DisplacementSettings(MixSettings):
+    """The displacement: the body pushing water aside, from the readings mixed as velocities and the mask."""
+
+
 class Bridge3DLayerSettings(BridgeLayerSettings):
     """Configuration for Bridge3DLayer: the readings, then one group per output, named as the output, in the
     order the bridge makes them: the velocity, the boundary the water is dragged toward (the readings mixed as
     velocities), the acceleration, the body force added × dt (the readings mixed as accelerations), the density
-    and the temperature, held at the body as boundary values, and the expansion."""
+    and the temperature, held at the body as boundary values, the expansion and the displacement."""
     readings     = Group(Bridge3DReadingsSettings)
     velocity     = Group(VelocityMixSettings)
     acceleration = Group(MixSettings)
     density      = Group(DensityMixSettings)
     temperature  = Group(TemperatureMixSettings)
     expansion    = Group(ExpansionSettings)
+    displacement = Group(DisplacementSettings)
 
 
 class Bridge3DLayer(BridgeLayer):
@@ -103,6 +109,9 @@ class Bridge3DLayer(BridgeLayer):
         temperature   the readings' speeds and the mask, warmed by a temperature bridge
         expansion     the readings' speeds and the mask: a presence, capped at 1; None while its
                       shares are all 0, and the newest capture's in a tick of several
+        displacement  the readings as velocities and the mask: red −v·∇mask (1/s), the rate the body fills the
+                      water, green z × the mask (widths/s); None while its shares are all 0 or without a mask,
+                      and the newest capture's in a tick of several
     The defaults are the trail alone in the velocity, the density and the temperature.
 
     The bandpass runs while a share of one of its readings is above 0, or a monitor shows one of its ports
@@ -130,8 +139,13 @@ class Bridge3DLayer(BridgeLayer):
         self._temperature_z_position: Fbo = Fbo()
         self._expansion: Fbo = Fbo()                    # a presence, 0 to 1
         self._expansion_z_position: Fbo = Fbo()
+        self._displacement_velocity: Fbo = Fbo()        # xyz, widths/s: its readings mixed
+        self._displacement: Fbo = Fbo()                 # red −v·∇mask (1/s), green z × the mask (widths/s)
+        self._displacement_z_position: Fbo = Fbo()
+        self._displacing: bool = False                  # the last step made a displacement
         self._peak: VelocityPeak = VelocityPeak(settings.velocity.peak)    # the velocity's p99 speed
         self._mix_shader: WeightedSum = WeightedSum()
+        self._displacement_shader: Displacement = Displacement()
         self._z_position_mix_shader: ZPositionMix = ZPositionMix()
         self._density: DensityBridge = DensityBridge(settings.density)
         self._temperature: TemperatureBridge = TemperatureBridge(settings.temperature)
@@ -154,7 +168,9 @@ class Bridge3DLayer(BridgeLayer):
             self._velocity_z_position, self._density_z_position, self._temperature_z_position,
             self._acceleration_z_position if acceleration else None,
             self._expansion if self._mixed(self.settings.expansion) else None,
-            self._expansion_z_position if self._mixed(self.settings.expansion) else None)
+            self._expansion_z_position if self._mixed(self.settings.expansion) else None,
+            self._displacement if self._displacing else None,
+            self._displacement_z_position if self._displacing else None)
 
     def _outputs(self) -> dict[str, Texture]:
         """The density and the temperature as the last step made them."""
@@ -181,7 +197,10 @@ class Bridge3DLayer(BridgeLayer):
                                       'z_position': Port(self._temperature_z_position, TextureKind.Z_POSITION),
                                       **self._temperature.ports}),
                 'expansion': Ports({'expansion': Port(self._expansion, TextureKind.SCALAR),
-                                    'z_position': Port(self._expansion_z_position, TextureKind.Z_POSITION)})}
+                                    'z_position': Port(self._expansion_z_position, TextureKind.Z_POSITION)}),
+                'displacement': Ports({'velocity': Port(self._displacement_velocity, TextureKind.VELOCITY),
+                                       'displacement': Port(self._displacement, TextureKind.SCALAR),
+                                       'z_position': Port(self._displacement_z_position, TextureKind.Z_POSITION)})}
 
     @staticmethod
     def _shown_ports(ports: dict[str, Port], shown: Callable[[], None]) -> Ports:
@@ -205,13 +224,14 @@ class Bridge3DLayer(BridgeLayer):
         """Every output's mix, in the order the bridge makes them."""
         settings: Bridge3DLayerSettings = self.settings
         return (settings.velocity, settings.acceleration, settings.density,
-                settings.temperature, settings.expansion)
+                settings.temperature, settings.expansion, settings.displacement)
 
     # ========== Lifecycle ==========
 
     def allocate(self, width: int, height: int, internal_format: int | None = None) -> None:
         super().allocate(width, height, internal_format)
         self._mix_shader.allocate()
+        self._displacement_shader.allocate()
         self._z_position_mix_shader.allocate()
         self._peak.allocate()
 
@@ -219,6 +239,7 @@ class Bridge3DLayer(BridgeLayer):
         super().deallocate()
         self._peak.deallocate()
         self._mix_shader.deallocate()
+        self._displacement_shader.deallocate()
         self._z_position_mix_shader.deallocate()
         for timer in (self._gpu_timer, self._lowpass_timer, self._bandpass_timer, self._mix_timer):
             timer.deallocate()
@@ -228,11 +249,13 @@ class Bridge3DLayer(BridgeLayer):
     def _mix_fbos(self) -> tuple[tuple[Fbo, int], ...]:
         return ((self._velocity, GL_RGBA16F), (self._acceleration, GL_RGBA16F),
                 (self._density_amount, GL_R32F), (self._temperature_amount, GL_R32F),
-                (self._expansion, GL_R32F), *((fbo, GL_RG16F) for fbo in self._z_position_fbos()))
+                (self._expansion, GL_R32F), (self._displacement_velocity, GL_RGBA16F), (self._displacement, GL_RG32F),
+                *((fbo, GL_RG16F) for fbo in self._z_position_fbos()))
 
     def _z_position_fbos(self) -> tuple[Fbo, ...]:
         return (self._velocity_z_position, self._acceleration_z_position,
-                self._density_z_position, self._temperature_z_position, self._expansion_z_position)
+                self._density_z_position, self._temperature_z_position, self._expansion_z_position,
+                self._displacement_z_position)
 
     def _allocate_stages(self, width: int, height: int, output_width: int, output_height: int) -> None:
         self._lowpass.allocate(width, height, output_width, output_height)
@@ -252,6 +275,7 @@ class Bridge3DLayer(BridgeLayer):
 
     def _reset_stages(self) -> None:
         self._merging = False
+        self._displacing = False
         self._lowpass.reset()
         self._bandpass.reset()
         self._density.reset()
@@ -291,6 +315,7 @@ class Bridge3DLayer(BridgeLayer):
         self._update_temperature(self._temperature, self._temperature_amount, color)
         if self._mixed(settings.expansion):
             self._mix_amount(self._expansion, self._expansion_z_position, input, settings.expansion, capped=True)
+        self._update_displacement(input, settings.displacement)
         if self._merging:
             for name, texture in self._outputs().items():
                 self._capture_max[name].take(texture)
@@ -339,6 +364,20 @@ class Bridge3DLayer(BridgeLayer):
         self._mix_shader.use(sources, lengths=True, capped=capped)
         amount.end()
         self._mix_z_position(z_position, readings, mix, mask)
+
+    def _update_displacement(self, input: BridgeInput, mix: DisplacementSettings) -> None:
+        """The displacement: its readings mixed as velocities, then −v·∇mask and z × the mask, and its z position
+        as the mixed velocity's; nothing while its shares are all 0 or without a mask."""
+        self._displacing = self._mixed(mix) and input.mask is not None
+        if not self._displacing:
+            return
+        assert input.mask is not None
+        velocities: dict[str, Texture] = self._velocities()
+        self._mix(self._displacement_velocity, velocities, mix)
+        self._displacement.begin()
+        self._displacement_shader.use(self._displacement_velocity, input.mask)
+        self._displacement.end()
+        self._mix_z_position(self._displacement_z_position, velocities, mix)
 
     @staticmethod
     def _update_density(density: DensityBridge, amount: Texture, color: Texture) -> None:

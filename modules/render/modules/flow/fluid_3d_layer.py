@@ -101,6 +101,8 @@ class Fluid3DLayer(FluidLayer):
         fluid.add_temperature(injection.temperature, injection.weight, injection.temperature_z_position)
         if injection.expansion is not None:
             fluid.add_expansion(injection.expansion, injection.weight, injection.expansion_z_position)
+        if injection.displacement is not None:
+            fluid.add_displacement(injection.displacement, injection.weight, injection.displacement_z_position)
 
     def _step(self, dt: float) -> None:
         self._fluid.update(dt)

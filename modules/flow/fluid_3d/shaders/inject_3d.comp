@@ -8,6 +8,9 @@
  *   1 FILL    the field dragged toward the input times uGain (capped at full) by weight, never past it: a density only where the input's
  *             alpha is above the field's, a scalar only where the input is not 0, so where the body is not
  *             nothing is pulled toward 0
+ *   2 DISPLACEMENT  the body's displacement (red −v·∇mask, 1/s; green z × the mask, widths/s, z toward the
+ *             camera) added: red × the cell's share, plus green × the slab's slope in depth over the box's depth
+ *             (uDepth, widths), −v_z ∂χ/∂z with the depth running away from the camera; × uStrength
  */
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;   // a column of cells each
@@ -23,7 +26,8 @@ layout(rgba16f, binding = 0) uniform image3D uVolume;  // Read-write
 uniform bool  uHasZPosition;
 uniform float uSpread;       // Gaussian sigma in normalized depth units
 uniform float uStrength;     // Injection strength multiplier: × dt for ADD, the drag's share for FILL
-uniform int   uMode;         // 0 ADD, 1 FILL
+uniform int   uMode;         // 0 ADD, 1 FILL, 2 DISPLACEMENT
+uniform float uDepth;        // DISPLACEMENT: the box's depth in widths
 uniform float uGain;         // FILL: the input times this, at most full, is the target
 uniform bool  uScalar;       // a signed scalar in r (the temperature), else a premultiplied density
 uniform ivec3 uSize;
@@ -50,6 +54,15 @@ void main() {
     float center = slab_center(uv);
     if (center == NO_Z_POSITION) return;
     ivec2 cells = slab_cells(center, uSize.z);
+    if (uMode == 2) {
+        if (source.r == 0.0 && source.g == 0.0) return;     // a still body, or none
+        for (int z = cells.x; z <= cells.y; z++) {
+            float rate = source.r * slab_cell(z, center, uSize.z) + source.g * slab_slope(z, center, uSize.z) / uDepth;
+            ivec3 gid = ivec3(column, z);
+            imageStore(uVolume, gid, imageLoad(uVolume, gid) + vec4(rate * uStrength, 0.0, 0.0, 0.0));
+        }
+        return;
+    }
     for (int z = cells.x; z <= cells.y; z++) {
         // The body's share of this cell's depth (slab.glsl)
         float weight = slab_cell(z, center, uSize.z) * uStrength;

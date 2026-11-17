@@ -94,14 +94,14 @@ acceleration per unit mass; a body in the fluid is a boundary that moves.
 | a body's value            | is dragged toward it where the body is, over a time, never past it       | the boundary: `velocity`, `density`, `temperature`                 |
 | a velocity change, Δv     | adds it once in total: as an acceleration, the pulse over its area, × dt | the bandpass's readings as accelerations                           |
 | an acceleration           | adds it × dt                                                             | buoyancy, the vorticity force, the body force: `acceleration`      |
-| a source                  | adds it × dt, an amount per second                                       | the expansion's volume                                             |
+| a source                  | adds it × dt, an amount per second                                       | the volume source: the expansion, the displacement                 |
 
 ### What the fluid takes
 
 What the fluid does with each of the bridge's outputs; the readings they are mixed from, and what
 each output says of the body, are in [BRIDGE_3D.md](BRIDGE_3D.md#the-mix).
 
-The five outputs, each a mix of the six readings in its own subpanel of the bridge; the fluid's `input`, one
+The six outputs, each a mix of the six readings in its own subpanel of the bridge; the fluid's `input`, one
 panel in the order the layer injects them, says how the water follows each; the density and the temperature
 go in by `inject_3d`'s `FILL`:
 
@@ -111,7 +111,8 @@ go in by `inject_3d`'s `FILL`:
 | `acceleration` | widths/s²                         | the body force: adds it × dt (`add_to_faces_3d`)                                                                                              | `input.acceleration_gain` | a Δv added once                   |
 | `density`      | the dye: color × presence, 0 to 1 | fills the water toward it × `density_gain` (at most 1) in the slab, never past it, over `density_drag`                                        | `input.density_gain`      | fully dyed at 1 width/s           |
 | `temperature`  | warmth, -1 to 1                   | drags the water toward it × `temperature_gain` (at most ±1) in the slab where the body is, over `temperature_drag`                            | `input.temperature_gain`  | fully warm or cold at 1 width/s   |
-| `expansion`    | presence, 0 to 1                  | the projection makes the divergence the rate × it, not 0 ([The expansion](#the-expansion))                                                    | `input.expansion_rate`    | its volume gained per second, 1/s |
+| `expansion`    | presence, 0 to 1                  | the rate × it into the volume source ([The volume source](#the-volume-source))                                                                | `input.expansion_rate`    | its volume gained per second, 1/s |
+| `displacement` | −v·∇mask, 1/s; z × mask, widths/s | the gain × the rate the body fills each cell into the volume source ([The volume source](#the-volume-source))                                 | `input.displacement_gain` | the body moves its own volume     |
 
 The boundary and the body force are the two systems every solver distinguishes: a moving boundary,
 whose values the water takes, and the body force, which adds to it. The boundary's density and
@@ -275,23 +276,34 @@ on the faces it is ([The staggered velocity](#the-staggered-velocity)), and the 
 leaves is the half float's rounding. With the solve exact the water keeps more of its speed, 0.150
 widths/s in the mean against Jacobi's 0.134.
 
-### The expansion
+### The volume source
 
-The water swelling where the body is (Nguyen, Fedkiw and Jensen 2002; Feldman et al. 2003): the projection
-makes the divergence φ, not 0, φ = `input.expansion_rate` × the expansion, in 1/s, signed. The expansion, a
-presence 0 to 1 from the bridge ([BRIDGE_3D.md](BRIDGE_3D.md#the-mix)), goes into its slab at its z position
-(`add_expansion`, `inject_3d`'s `ADD`), summed over a tick's injections into a volume at the cells (R16F), which
-the tick's first injection clears; the divergence pass takes φ off before the solve (`divergence_3d`), and the
-solvers and the gradient stay. A source of volume is neither a velocity nor a force: the water flows out of it
-by itself, or into it below 0. Rate 0, the default, is the textbook's ∇·u = 0, and nothing is injected.
+The projection makes the divergence φ, not 0 (Nguyen, Fedkiw and Jensen 2002; Feldman et al. 2003): φ, in 1/s,
+signed, is the volume source, a volume at the cells (R16F) that sums a tick's injections and that the tick's
+first injection clears; the divergence pass takes φ off before the solve (`divergence_3d`), and the solvers and
+the gradient stay. A source of volume is neither a velocity nor a force: the water flows out of it by itself, or
+into it below 0. Without an injection, or with both settings 0, it is the textbook's ∇·u = 0, and nothing is
+injected. Two inputs go into it, each skipped while its setting is 0:
+
+- The expansion, the water swelling where the body is, a fountain: `input.expansion_rate` × the presence 0 to 1
+  from the bridge ([BRIDGE_3D.md](BRIDGE_3D.md#the-mix)), into its slab at its z position (`add_expansion`,
+  `inject_3d`'s `ADD`).
+- The displacement, the body pushing water aside: the rate the body fills a cell, ∂χ/∂t = −v·∇χ, χ the body's
+  share of the cell, the mask times the slab's profile at its z position, v the body's velocity; positive where
+  the body moves into water, negative where it leaves, a source ahead and an equal sink behind, about 0 summed,
+  0 for a still body. `input.displacement_gain` × it (`add_displacement`, `inject_3d`'s `DISPLACEMENT`): the
+  bridge's red, −v·∇mask, spread by the slab's share of each cell, and z's part, the bridge's green (z × the
+  mask, z toward the camera) times the slab's slope in depth over the box's depth (`slab_slope`, the profile's
+  heights at a cell's two faces over its length), so the cells in front of a body moving toward the camera
+  fill and those behind it empty. The volume the body moves is its skin's, `spread` thick **(deduction)**.
 
 With every wall closed the water cannot swell, and the solve with closed walls needs the divergence to sum to 0
-(Neumann's compatibility): there the expansion's mean over the water's cells is taken off first
-(`ExpansionMean3D`, a sum per workgroup into a buffer, then one group over the partials; nothing read back), so a
-push in one place is a slight pull everywhere else. Without an expansion the faces' differences cancel cell to
+(Neumann's compatibility): there the source's mean over the water's cells is taken off first
+(`SourceMean3D`, a sum per workgroup into a buffer, then one group over the partials; nothing read back), so a
+push in one place is a slight pull everywhere else. Without a source the faces' differences cancel cell to
 cell and a closed wall's face is 0, so the divergence sums to 0 already; through an open wall the water leaves.
 
-Measured with `scripts/expansion_check.py`: a disc of full presence at the box's middle depth, rate 0.5/s, one
+The expansion measured with `scripts/expansion_check.py`: a disc of full presence at the box's middle depth, rate 0.5/s, one
 projection from rest, deep_flow's preset (288 × 512 × 64, multigrid); the error is the RMS of the divergence less
 φ over φ's, the floor the same box without a source, the swinging body's velocity projected once, the RMS after
 over before:
@@ -354,7 +366,7 @@ module by what it does, everything else by its quantity.
 | Kind                      | Names                                                                                                                                           |
 |---------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
 | the mixes' knobs          | shares, 0 to 1, one per reading in each output, summed                                                                                          |
-| the fluid's input methods | `drag_velocity`, `add_acceleration`, `add_density`, `add_temperature`, `add_expansion`                                                          |
+| the fluid's input methods | `drag_velocity`, `add_acceleration`, `add_density`, `add_temperature`, `add_expansion`, `add_displacement`                                      |
 | the fluid's fields        | `velocity` (its own settings: fade, evaporation, top speed, vorticity, viscosity, self-advection), `density`, `temperature`, `pressure`         |
 
 The readings, the filters, the two systems, the input groups and the wall are the flow

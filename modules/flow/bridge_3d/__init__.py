@@ -3,7 +3,7 @@
 from .density_bridge import DensityBridge, DensityBridgeSettings
 from .trails import decay_weight
 from .velocity_lowpass import VelocityLowpass, VelocityLowpassSettings, gaussian_weights, blur_sigma, blur_dispatches
-from .shaders import Change, WeightedSum, ZPositionMix
+from .shaders import Change, Displacement, WeightedSum, ZPositionMix
 from .velocity_bandpass import VelocityBandpass, VelocityBandpassSettings, step_peak, band_width, change_acceleration_scale
 from .magnitude import Magnitude, VelocityMagnitude
 from .temperature_bridge import TemperatureBridge, TemperatureBridgeSettings

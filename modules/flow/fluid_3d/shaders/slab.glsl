@@ -51,6 +51,22 @@ float slab_at(float z, float center, int layers) {
     return slab_between((z - 0.5) / float(layers), (z + 0.5) / float(layers), center, layers);
 }
 
+// The profile's height at `depth` (a share of the depth, 0 the front), 1 at its middle
+float slab_profile(float depth, float center, int layers) {
+    float offset = (depth - slab_middle(center, layers)) / uSpread;
+    return exp(-0.5 * offset * offset);
+}
+
+// The profile's slope in depth over a cell, layer `z` of `layers`: its mean, the heights at the cell's back and
+// front faces over its length, per share of the depth, positive where the profile rises toward the back; the
+// slopes of a column sum to 0 where the profile fits in the box
+float slab_slope(int z, float center, int layers) {
+    if (uSpread <= 1e-6) return 0.0;
+    float front = float(z) / float(layers);
+    float back = float(z + 1) / float(layers);
+    return (slab_profile(back, center, layers) - slab_profile(front, center, layers)) / (back - front);
+}
+
 // The cells a body at `center` reaches with a share worth adding, [first, last]: its profile out to 4 sigmas
 ivec2 slab_cells(float center, int layers) {
     float middle = slab_middle(center, layers) * float(layers);

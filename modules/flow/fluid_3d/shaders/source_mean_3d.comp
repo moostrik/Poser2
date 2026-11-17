@@ -1,16 +1,16 @@
 #version 460 core
 
 /*
- * ExpansionMean3D - the expansion's mean over the water's cells, for a closed box, whose solve needs the
+ * SourceMean3D - the projection's volume source's mean over the water's cells, for a closed box, whose solve needs the
  * divergence's target to sum to 0. Two passes, by uPass:
- *   0  each workgroup sums its cells' expansion and counts its water cells (an obstacle's is none) into
+ *   0  each workgroup sums its cells' source and counts its water cells (an obstacle's is none) into
  *      uPartials[group]
  *   1  one workgroup sums the partials and writes the mean, the sum over the count, to uMean
  */
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;    // 256 a group, pass 1 one group of 256
 
-layout(binding = 0) uniform sampler3D uExpansion;  // R16F at the cells, a presence summed over the injections
+layout(binding = 0) uniform sampler3D uSource;     // R16F at the cells, 1/s, summed over the injections
 layout(binding = 2) uniform sampler3D uObstacle;   // R8 at the cells
 layout(std430, binding = 0) buffer Partials { vec2 uPartials[]; };     // per group: the sum, the water cells
 layout(std430, binding = 1) buffer Mean { float uMean; };
@@ -37,7 +37,7 @@ void main() {
     if (uPass == 0) {
         ivec3 i = ivec3(gl_GlobalInvocationID.xyz);
         bool water = all(lessThan(i, uCells)) && !(uHasObstacles && texelFetch(uObstacle, i, 0).r > 0.5);
-        if (water) sum = vec2(texelFetch(uExpansion, i, 0).r, 1.0);
+        if (water) sum = vec2(texelFetch(uSource, i, 0).r, 1.0);
     } else {
         for (int g = int(index); g < uGroups; g += int(LANES)) sum += uPartials[g];
     }
