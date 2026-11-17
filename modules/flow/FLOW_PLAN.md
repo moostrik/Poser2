@@ -16,7 +16,7 @@ operator saw.
 | C   | [The motion](#c-the-motion)                                                  | built; C2 the values, C3 range    | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; D4 the density's blend, D5 | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | the temperature                   | [FLUID_3D.md](FLUID_3D.md)                         |
-| F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | open                              | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
+| F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | F1, F2 white                      | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                       | [FLOW.md](FLOW.md)                                 |
 | I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | not started                       | [FLOW.md](FLOW.md)                                 |
 | J   | [Every setting and its description](#j-every-setting-and-its-description)    | last, after the refactor          | `CLAUDE.md`, `.claude/rules`                       |
@@ -132,6 +132,14 @@ What is built: [FLUID_3D.md](FLUID_3D.md#the-density).
 - **F1.** The blobs' and the surface's p95: a sprite that grows to twice `radius` on a strong drop fills four
   times the pixels; the cut at 2 sigma and the lower cap ([TIMING.md](TIMING.md#the-particles-1)), judged on the
   look.
+- **F2.** White by choice, in the shown image only, the stored density untouched. First, FLUID_3D.md states how the
+  march mixes the density's colors now: as light, adding, or as ink, absorbing. Then one setting in the march,
+  `highlight_white`: how far the brightest, densest parts go toward white, 0 = the pure color. After the march has
+  summed a pixel's light, a shoulder as film has: as the pixel's brightness nears full, its color loses saturation
+  toward white and keeps its hue (in Oklab, a and b shrink as L rises). Thin density keeps its color; only where it
+  piles up does it whiten. If the march is ink, white comes another way, the background through thin density, and
+  the step is planned again. Checked in the app: at 0 the colors as stored; turned up, the dense cores whiten and
+  the thin edges stay colored.
 
 ## H. One unit across the stages
 
@@ -222,4 +230,4 @@ The cameras:
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
 
-Not designed yet, so their rules are not named: C3, D4, D5, E1, E2, F1, H1, I1 to I4.
+Not designed yet, so their rules are not named: C3, D4, D5, E1, E2, F1, F2, H1, I1 to I4.
