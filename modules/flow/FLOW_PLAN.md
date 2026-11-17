@@ -97,7 +97,7 @@ What is measured today (the tables with numbers in the flow's documents, 73), by
   All rows of a recording replay its same three captures; the captures stay until Matthias is asked. The table
   goes in [MOTION.md's settings](MOTION.md#the-settings), in place of the reasons from recordings that are gone.
   A part that does nothing for the goal, or a value that holds on one recording only, is a question for C. The
-  recordings are at 0.65–1.5 m; 2–3.5 m stays C4's.
+  recordings are at 0.65–1.5 m; 2–3.5 m stays C5's.
 
 Further measurements on the motion are free where a result points to something (Matthias, 2026-11-16), each
 stated before it is made.
@@ -131,12 +131,17 @@ and z's window earn their place.
   The numpy reference of the track (`track_depth`, read by the compare's `--verify`) goes with it, not rewritten
   (the parked cleanup's part for z). MOTION.md's parts and the `dead_zone` description follow. Checked on one
   capture of the hands and of the measure recording, the same sides before and after (a short smooth with the
-  cut, `dead_zone` 0, 0.01, 0.02): still noise, z kept, lag.
-- **C3.** The values, after C2, each measured on the four recordings and judged in the app: `smooth`, `catch_up`,
-  `dead_zone` and z's `threshold` for the new order; the step filter at 0.05 m; x/y's `threshold` around 0.4;
-  a step up on `levels`, x/y's `window` and `damping` against their ms. The settings' defaults and MOTION.md's
-  reasons follow; the preset when Matthias saves it. No new recording.
-- **C4.** The range: `edge`, `dead_zone` and the thresholds are in metres or px, tuned at 0.65–1.5 m; stereo
+  cut, `dead_zone` 0, 0.01, 0.02): still noise, z kept, lag; about 5 minutes a run. The four recordings are
+  measured once, at C4.
+- **C3.** The catch-up's rule replaced by the 1€ filter's (Casiez, Roussel, Vogel 2012): the smoothing time
+  shortens as the speed rises, two numbers, the smoothing at rest and how fast it opens; the speed it opens on
+  to hold x/y's, which carries little noise. The catch-up's Emas and their texture go. Measured as C2 is, the
+  same sides, against C2's catch-up.
+- **C4.** The values, after C3, each measured on the four recordings and judged in the app: the smoothing's two
+  numbers, `dead_zone` and z's `threshold`; the step filter at 0.05 m; x/y's `threshold` around 0.4; a step up
+  on `levels`, x/y's `window` and `damping` against their ms. The settings' defaults and MOTION.md's reasons
+  follow; the preset when Matthias saves it. No new recording.
+- **C5.** The range: `edge`, `dead_zone` and the thresholds are in metres or px, tuned at 0.65–1.5 m; stereo
   noise grows with the square of the distance, so at 2–3.5 m they may need to be in disparity **(deduction)**.
   A recording at 2–3.5 m, made by the operator, and they measured there.
 
@@ -194,6 +199,12 @@ Once the 3D is finished, the 2D rebuilt in `modules/flow` on the 3D's principles
 ## Parked
 
 Not worked on until asked for; each with what is known.
+
+- **z from x/y's spread (looming).** A surface coming toward the camera grows in the image, so its x/y motion
+  spreads: its speed toward the camera is its depth times the flow's divergence over 2 (time to contact, Lee
+  1976). A second measurement of z, clean where the depth's is noisy, needing texture and a patch facing the
+  camera; the filter would fuse the two. To look at once C2 to C4 are built, first on the captures: how the
+  spread follows the depth's z on the hands and the show recording **(deduction, not measured)**.
 
 - The numpy versions of the flow's shaders removed, module by module, with the tests built on them: shaders are
   checked in a GPU harness. About 10 files in `modules/` and `apps/` carry them (the motion's, the bridge's).
@@ -253,6 +264,6 @@ Not worked on until asked for; each with what is known.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 - Shaders get checked in a GPU harness: C2.
-- Compare a result only with rows of the same recording, settings and code paths: C2, C3.
+- Compare a result only with rows of the same recording, settings and code paths: C2 to C4.
 
-Not designed yet, so their rules are not named: C4, D1, E1, F1, H1, I1 to I4.
+Not designed yet, so their rules are not named: C5, D1, E1, F1, H1, I1 to I4.
