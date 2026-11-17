@@ -42,7 +42,7 @@ The flow's goal: the player's motion into the fluid, shown as sharp, translucent
 | [the bridge](BRIDGE_3D.md#the-goal)   | the motion translated into what the fluid takes, and held between the camera's frames        |
 
 A stage is judged against its goal on its own output, the stages after it neutral: a change to the view on the
-motion's raw output, its smoothing and thresholds at 0 (`z.smooth`, `z.catch_up`, `xy.threshold`,
+motion's raw output, its smoothing and thresholds at 0 (`z.smooth`, `xy.threshold`,
 `z.threshold`), so a later stage's filters do not hide it.
 
 ## The two systems

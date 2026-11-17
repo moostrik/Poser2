@@ -1,6 +1,7 @@
 """Depth Velocity: the player's motion toward the camera, z, from the depth image, in view widths per frame:
 per pixel a disparity and its rate, carried along the x/y displacement and corrected by each measurement
-(an alpha–beta filter), with a dead zone, a catch-up and a step filter before it. How and why:
+(an alpha–beta filter) over a time that shortens as the image moves (the 1€ filter's), with a step filter
+before it and a dead zone after it. How and why:
 modules/flow/MOTION.md, "z: the depth velocity".
 
 `filter_depth_steps` and `depth_threshold` below are the numpy references of their shaders.
@@ -8,7 +9,7 @@ modules/flow/MOTION.md, "z: the depth velocity".
 import math
 
 import numpy as np
-from OpenGL.GL import GL_R16F, GL_R32F, GL_RG32F, GL_RGBA32F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
+from OpenGL.GL import GL_R16F, GL_R32F, GL_RGBA32F
 
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import BaseSettings, Field
@@ -23,12 +24,12 @@ class DepthVelocitySettings(BaseSettings):
     edge:           Field[float] = Field(0.1, min=0.05, max=0.3, step=0.01, description="Edge depth step, m (lower: cleaner edges, fewer fingers)")
     window:         Field[Patch] = Field(Patch.SEVEN, min=Patch.ONE, max=Patch.NINE, description="Depth averaging size (larger: less noise, small parts blur)")
     tolerance:      Field[float] = Field(0.2, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m (higher: fuller pushes, fewer splits)")
-    smooth:         Field[float] = Field(50.0, min=0.0, max=500.0, step=1.0, newline=True, description="Smoothing time of z in ms, 0 = two-frame change (higher: less noise, more lag)")
-    xy_smooth:      Field[bool]  = Field(False, width=48, description="x/y smoothed over smooth, so both lag alike (on: less noise, more lag)")
-    catch_up:       Field[float] = Field(8.0, min=0.0, max=50.0, step=1.0, description="Shorter smoothing during a fast push, in ms, 0 = off (lower: quicker pushes)")
-    dead_zone:      Field[float] = Field(0.02, min=0.0, max=0.05, step=0.001, newline=True, description="Depth drift ignored before z counts as motion, in m (higher: less drift, slower start)")
+    smooth:         Field[float] = Field(100.0, min=0.0, max=500.0, step=1.0, newline=True, description="Smoothing time of z at rest in ms, 0 = two-frame change (higher: less noise at rest)")
+    halving_speed:  Field[float] = Field(0.5, min=0.05, max=5.0, step=0.05, description="Image speed at which the smoothing time is half, in px/frame (lower: less lag)")
+    xy_smooth:      Field[bool]  = Field(False, width=48, description="x/y smoothed as z is, so both lag alike (on: less noise, more lag)")
+    dead_zone:      Field[float] = Field(0.0, min=0.0, max=0.05, step=0.001, newline=True, description="Depth drift ignored before z counts as motion, in m (higher: less drift, slower start)")
     max_speed:      Field[float] = Field(6.0, min=0.0, max=20.0, step=0.5, description="The fastest a body part moves in depth, m/s; a faster track reads another surface (0 = off)")
-    threshold:      Field[float] = Field(1.0, min=0.0, max=5.0, step=0.05, description="z below this is noise, in px/frame (higher: less noise, less slow z)")
+    threshold:      Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="z below this is noise, in px/frame (higher: less noise, less slow z)")
 
 
 def track_weights(delta_time: float, smooth: float, share: float | np.ndarray) -> tuple[float | np.ndarray, float | np.ndarray]:
@@ -46,8 +47,7 @@ class DepthVelocity(FlowBase):
     Pipeline, on each new flow frame:
         1. Take the depth → the raw Fbo (R32F, metres, at the flow's size, nearest), and without
            its edges → the input SwapFbo
-        2. Correct the track carried from the last one → the estimate SwapFbo (RGBA32F: z, disparity, rate, anchor),
-           and in a second run of the same shader its catch-up → the catch-up SwapFbo (RG32F)
+        2. Correct the track carried from the last one → the estimate SwapFbo (RGBA32F: z, disparity, rate, anchor)
         3. Take the noise floor off z → output_fbo (R16F)
     """
 
@@ -65,7 +65,6 @@ class DepthVelocity(FlowBase):
 
         self._raw: Fbo = Fbo()                   # the depth as it came, before its edges are taken off
         self._estimate: SwapFbo = SwapFbo()
-        self._catch_up: SwapFbo = SwapFbo()      # the Emas of the miss of the prediction, signed and its size (RG32F, m)
 
     @property
     def depth_velocity(self) -> Texture:
@@ -82,16 +81,13 @@ class DepthVelocity(FlowBase):
     def ports(self) -> dict[str, Port]:
         """`input` is the depth with its edges taken off, `raw` as it came."""
         return {'raw': Port(self._raw, TextureKind.SCALAR), **super().ports,
-                'estimate': Port(self._estimate, TextureKind.SCALAR),
-                'catch_up': Port(self._catch_up, TextureKind.SCALAR)}
+                'estimate': Port(self._estimate, TextureKind.SCALAR)}
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         super().allocate(width, height, output_width, output_height)
         self._raw.allocate(width, height, GL_R32F)
         self._estimate.allocate(width, height, GL_RGBA32F)
         self._estimate.clear_all()
-        self._catch_up.allocate(width, height, GL_RG32F)
-        self._catch_up.clear_all()
         self._step_filter_shader.allocate()
         self._velocity_shader.allocate()
         self._threshold_shader.allocate()
@@ -100,7 +96,6 @@ class DepthVelocity(FlowBase):
         super().deallocate()
         self._raw.deallocate()
         self._estimate.deallocate()
-        self._catch_up.deallocate()
         self._step_filter_shader.deallocate()
         self._velocity_shader.deallocate()
         self._threshold_shader.deallocate()
@@ -108,10 +103,9 @@ class DepthVelocity(FlowBase):
     def reset(self) -> None:
         super().reset()
         self._estimate.clear_all()
-        self._catch_up.clear_all()
 
     def update_depth(self, depth: Texture, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
-                     smooth: float, threshold: float, tolerance: float, dead_zone: float, catch_up_smooth: float, motion_floor: float,
+                     smooth: float, halving_speed: float, threshold: float, tolerance: float, dead_zone: float, motion_floor: float,
                      displacement: Texture | None = None, edge: float | None = None, max_speed: float = 0.0,
                      guard: GuardSlot | None = None) -> None:
         """Advance on a new flow frame: correct the track by the new depth, then take the noise floor off.
@@ -122,12 +116,12 @@ class DepthVelocity(FlowBase):
             view_span: Metres one view width spans per metre of depth; 0 or less reads no motion
             depth_step: uv between two depth samples in the flow's view; 0 takes one flow texel
             window: Radius in depth samples
-            smooth: Time over which the track averages (ms); 0 is the change of two frames
+            smooth: Time over which the track averages at rest (ms); 0 is the change of two frames
+            halving_speed: Image speed at which that time is half (px per frame)
             threshold: Depth motion below this is noise, taken off the rest (px per frame)
             tolerance: Depth further than this is another surface: not averaged in, the track starts over (m)
             dead_zone: Depth the track wanders within its anchor without z (m); 0 is none
-            catch_up_smooth: Time over which the track follows while it catches up a motion (ms); 0 is never
-            motion_floor: Displacement the image must move by for the track to catch up (px per frame)
+            motion_floor: Image speed below which the image is still (px per frame)
             displacement: How far each pixel moved since then (uv); when given, the track is carried
                 along the motion (Lucas–Kanade flow)
             edge: Depth step within a 3×3 of depth samples that marks an edge, dropped (m); None takes `tolerance`
@@ -138,7 +132,6 @@ class DepthVelocity(FlowBase):
             return
         width, height = self._input_fbo.width, self._input_fbo.height
         step: tuple[float, float] = depth_step if depth_step[0] > 0.0 and depth_step[1] > 0.0 else (1.0 / width, 1.0 / height)
-        alpha, _ = track_weights(delta_time, smooth, 1.0)
 
         FlowUtil.blit(self._raw, depth)
         self._input_fbo.swap()
@@ -146,15 +139,11 @@ class DepthVelocity(FlowBase):
         self._step_filter_shader.use(self._raw, step, tolerance if edge is None else edge)
         self._input_fbo.end()
 
-        # one pass reads the track and the catch-up of the frame before, and writes both
         self._estimate.swap()
-        self._catch_up.swap()
         self._estimate.begin()
-        self._velocity_shader.use(self._input_fbo, self._estimate.back, self._catch_up.back, self._catch_up,
-                                  float(alpha), smooth, catch_up_smooth, float(alpha), motion_floor, max(delta_time, 1e-6), view_span,
-                                  step, window, tolerance, dead_zone, displacement, max_speed, guard)
+        self._velocity_shader.use(self._input_fbo, self._estimate.back, smooth, halving_speed, motion_floor, max(delta_time, 1e-6),
+                                  view_span, step, window, tolerance, dead_zone, displacement, max_speed, guard)
         self._estimate.end()
-        glMemoryBarrier(int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT))
 
         self._output_fbo.begin()
         self._threshold_shader.use(self._estimate, threshold / max(width, 1))     # px as view widths

@@ -5,7 +5,7 @@
 FRAMES is what depth_velocity_capture saved from one loop of a recording (temp/depth_velocity/RECORDING).
 No app and no camera: a window gives the GL context, and two `LucasKanadeFlow3D`, A and B, measure the
 saved frames with the settings they were recorded with; `--a` and `--b` override any of them by its
-path in the panel (xy.levels, xy.threshold, z.catch_up, z_gain, ...). The window plays the loop at its
+path in the panel (xy.levels, xy.threshold, z.halving_speed, z_gain, ...). The window plays the loop at its
 recorded rate, again and again, A on the left, B on the right:
 
     1  z of the track, red toward the camera, green away     space  pause

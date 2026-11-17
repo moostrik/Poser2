@@ -4,7 +4,7 @@ One frame of the depth track: the motion toward the camera in view widths per fr
 disparity carried along the motion and corrected by the mean over a window of depth samples.
 """
 
-from OpenGL.GL import GL_FALSE, GL_RG32F, GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE_2D, GL_WRITE_ONLY, glActiveTexture, glBindImageTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
 
 from modules.gl import Shader, draw_quad, Texture
 from ...finite_guard import GuardSlot
@@ -12,24 +12,19 @@ from ...finite_guard import GuardSlot
 
 class DepthVelocityShader(Shader):
     """Writes the track: z (view widths per frame), disparity (1/m), its rate (1/m per second) and its
-    anchor (m); and beside it the catch-up: the Emas of the miss of the prediction, signed and its size (m)."""
+    anchor (m)."""
 
-    def use(self, depth: Texture, track: Texture, catch_up: Texture, catch_up_out: Texture, alpha: float, smooth: float, catch_up_smooth: float,
-            ema: float, motion_floor: float, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
-            tolerance: float, dead_zone: float, displacement: Texture | None = None, max_speed: float = 0.0,
-            guard: GuardSlot | None = None) -> None:
-        """Correct the track by the new depth into the bound target, and write this frame's catch-up into `catch_up_out`.
+    def use(self, depth: Texture, track: Texture, smooth: float, halving_speed: float, motion_floor: float, delta_time: float,
+            view_span: float, depth_step: tuple[float, float], window: int, tolerance: float, dead_zone: float,
+            displacement: Texture | None = None, max_speed: float = 0.0, guard: GuardSlot | None = None) -> None:
+        """Correct the track by the new depth into the bound target.
 
         Args:
             depth: Depth now (m)
             track: The track the frame before
-            catch_up: The catch-up the frame before
-            catch_up_out: This frame's catch-up (RG32F), written beside the track
-            alpha: Weight of a full window's measurement on the disparity (1 takes it whole)
-            smooth: Time the track follows over (ms); 0 takes the measurement whole
-            catch_up_smooth: Time it follows over while catching up (ms); 0 is never
-            ema: Weight of a new miss on its Emas
-            motion_floor: Displacement the image must move by to catch up (px per frame)
+            smooth: Time the track follows over at rest (ms); 0 takes the measurement whole
+            halving_speed: Image speed at which that time is half (px per frame)
+            motion_floor: Image speed below which the image is still (px per frame)
             delta_time: Seconds since the last depth
             view_span: Metres one view width spans per metre of depth; 0 or less reads no motion
             depth_step: uv between two depth samples
@@ -42,7 +37,7 @@ class DepthVelocityShader(Shader):
         """
         if not self.allocated or not self.shader_program:
             return
-        if not depth.allocated or not track.allocated or not catch_up.allocated:
+        if not depth.allocated or not track.allocated:
             return
 
         glUseProgram(self.shader_program)
@@ -51,8 +46,6 @@ class DepthVelocityShader(Shader):
         glBindTexture(GL_TEXTURE_2D, depth.tex_id)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, track.tex_id)
-        glActiveTexture(GL_TEXTURE3)
-        glBindTexture(GL_TEXTURE_2D, catch_up.tex_id)
 
         warp: bool = displacement is not None and displacement.allocated
         if warp:
@@ -63,16 +56,12 @@ class DepthVelocityShader(Shader):
         glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniform1i(self.get_uniform_loc("tex1"), 1)
         glUniform1i(self.get_uniform_loc("displacement"), 2)
-        glUniform1i(self.get_uniform_loc("tex2"), 3)
         glUniform1i(self.get_uniform_loc("warp"), int(warp))
-        glBindImageTexture(0, catch_up_out.tex_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG32F)
         glUniform2f(self.get_uniform_loc("depth_step"), *depth_step)
         glUniform1i(self.get_uniform_loc("window"), window)
         glUniform1f(self.get_uniform_loc("tolerance"), tolerance)
-        glUniform1f(self.get_uniform_loc("alpha"), alpha)
         glUniform1f(self.get_uniform_loc("smoothing"), smooth)
-        glUniform1f(self.get_uniform_loc("catch_up_smoothing"), catch_up_smooth)
-        glUniform1f(self.get_uniform_loc("ema"), ema)
+        glUniform1f(self.get_uniform_loc("halving_speed"), halving_speed)
         glUniform1f(self.get_uniform_loc("motion_floor"), motion_floor)
         glUniform1f(self.get_uniform_loc("delta_time"), delta_time)
         glUniform1f(self.get_uniform_loc("view_span"), view_span)

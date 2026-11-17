@@ -89,8 +89,8 @@ def main() -> None:
     rows = [
         ('motion, whole', lambda: flow.update(depth, dt, span, step, depth_range=depth_range())),
         ('motion: x/y solve (pyramid, threshold)', lambda: flow._flow.update(depth, z.tolerance)),
-        ('motion: depth velocity', lambda: dv.update_depth(depth, dt, span, step, z.window, z.smooth, z.threshold, z.tolerance,
-                                                           z.dead_zone, z.catch_up, xy.threshold, flow._flow.solved, z.edge,
+        ('motion: depth velocity', lambda: dv.update_depth(depth, dt, span, step, z.window, z.smooth, z.halving_speed, z.threshold,
+                                                           z.tolerance, z.dead_zone, xy.threshold, flow._flow.solved, z.edge,
                                                            z.max_speed, None)),
         ('bridge: lowpass', lambda: bridge._lowpass.update(dt, False)),
         ('bridge: lowpass with acceleration', lambda: bridge._lowpass.update(dt, True)),

@@ -80,46 +80,16 @@ measure): z needs smoothing to be quiet, and what cuts a large, fast z most is a
 with smoothing and is the quiet one only without; `tolerance` and `same_surface` show no effect; the x/y solve,
 the step filter and z's window earn their place. The aim: quiet at rest, the most z kept, the least lag.
 
+Built (2026-11-17): the 1€ filter's rule in place of the catch-up, described in
+[MOTION.md](MOTION.md#z-the-depth-velocity) with its table.
+
 Tried and undone (2026-11-17): the dead zone before the filter, a backlash on the measured depth. Quieter at
 rest and later: the filter sees nothing until the zone opens, so its lag comes after the zone's where the two
 overlap now (hands, unsmoothed, `dead_zone` 0.02: 52 ms against 7; `smooth` 25: 90 against 65; measure's still
 noise 2.4 / 3.1 against 9.1 / 5.1).
 
-- **C1.** The catch-up's rule replaced by the 1€ filter's (Casiez, Roussel, Vogel 2012): the smoothing time is
-  the smooth at rest over 1 + speed / halving speed, so long at rest and short in a motion, within a frame. Two
-  numbers: `smooth`, now the time at rest (ms), and the halving speed (px per frame, as the thresholds are), the
-  speed at which the time is half. In `depth_velocity_shader.frag`:
-  - the speed is x/y's at the pixel, the largest of its 3 × 3, with `xy.threshold` taken off, so x/y's noise at
-    rest opens nothing;
-  - whether z's own speed opens it too is measured, not assumed: a variant that takes the larger of x/y's speed
-    and z's, z's from a copy of its rate followed over the time at rest and kept in the catch-up's texture, so no
-    third number; kept only if a push straight at the camera lags without it (hands);
-  - the carry takes each texel's depth a frame on by its rate whenever `smooth` is above 0, as the catch-up had
-    it;
-  - `dead_zone` stays, a setting at 0, its gate after the filter as now; `xy_smooth` follows the time at rest, as
-    it follows `smooth` now.
-
-  The rule that wins stays; the other and its setting go before the commit, with what reads them: the catch-up's
-  Emas, `scripts/motion_bridge_pass_check.py`, the compare's setting maps, MOTION.md's parts and settings. The
-  presets (`settings.json`, `very nice.json`) keep a removed key until Matthias saves them; it is ignored.
-  One run decides, the catch-up kept beside the new rule until then, uncommitted. On one capture of hands and of
-  measure (`hands_1`, `measure_1`), about 20 minutes:
-
-  | Rows                  | Settings                                                                          |
-  |-----------------------|-----------------------------------------------------------------------------------|
-  | the raw reference     | `z.smooth` 0, `z.catch_up` 0, `z.threshold` 0, `xy.threshold` 0                    |
-  | the catch-up, 5       | `z.smooth` 0, 12, 25, 50, 100 with `z.catch_up` 8; `z.threshold` 0                  |
-  | the new rule, 12      | time at rest (`z.smooth`) 50, 100, 200 × halving speed 0.5, 1, 2, 4 px/frame, on x/y's speed; `z.threshold` 0 |
-  | with z's own speed, 4 | time at rest 100 × halving speed 0.5, 1, 2, 4, on the larger of x/y's and z's speed  |
-  | the cut, 6 at most    | the best of each with `z.threshold` 0.5, 1, 2                                      |
-  | the tolerance, 2      | the best of each with `z.tolerance` 0.2 m, as saved                                |
-  | every row but the raw | `z.dead_zone` 0; `xy.threshold` 0.5, as saved, which is the catch-up's gate         |
-  | every row             | as saved: `xy.levels` 4, `xy.window` 7×7, `xy.damping` 0.03, `xy.same_surface` on, `z.edge` 0.1 m, `z.window` 7×7, `z.max_speed` 6 m/s, `z.xy_smooth` off; the view as captured; `z.tolerance` 0.5 m, where it starts a lagging estimate over least |
-
-  Each row: still noise inside and at the edge (measure), z kept and lag against the raw reference (hands), and
-  the motion's ms.
-- **C2.** The values, after C1, each measured on the four recordings and judged in the app: the smoothing's two
-  numbers and z's `threshold`, with `dead_zone` 0; x/y's `threshold` around 0.4; a step up on `levels`, x/y's
+- **C2.** The values, each measured on the four recordings and judged in the app: `smooth` and `halving_speed`
+  (and 0.25, 6 ms on hands) and z's `threshold`, with `dead_zone` 0; x/y's `threshold` around 0.4; a step up on `levels`, x/y's
   `window` and `damping` against their ms. The step filter and z's window stay unless a row shows a clear gain
   that keeps the z. The settings' defaults and MOTION.md's reasons follow; the preset when Matthias saves it.
   No new recording.
@@ -185,7 +155,7 @@ Not worked on until asked for; each with what is known.
 - **z from x/y's spread (looming).** A surface coming toward the camera grows in the image, so its x/y motion
   spreads: its speed toward the camera is its depth times the flow's divergence over 2 (time to contact, Lee
   1976). A second measurement of z, clean where the depth's is noisy, needing texture and a patch facing the
-  camera; the filter would fuse the two. To look at once C1 and C2 are built, first on the captures: how the
+  camera; the filter would fuse the two. To look at once C2 is built, first on the captures: how the
   spread follows the depth's z on the hands and the show recording **(deduction, not measured)**.
 
 - The numpy versions of the flow's shaders removed, module by module, with the tests built on them: shaders are
@@ -241,10 +211,8 @@ Not worked on until asked for; each with what is known.
 
 - A `Field` description is one short line of panel text: J1.
 - A measured table names its kind, date, commit, recording and settings: A1, A2.
-- Ask to measure a time again when its pass's code or size changes: C1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
-- Shaders get checked in a GPU harness: C1.
-- Compare a result only with rows of the same recording, settings and code paths: C1, C2.
+- Compare a result only with rows of the same recording, settings and code paths: C2.
 
 Not designed yet, so their rules are not named: C3, D1, E1, F1, H1, I1 to I4.
