@@ -194,6 +194,12 @@ Its speed at 4K:
   way down left: the predictor reading its eight texels itself and keeping their min and max for the
   limiter, about a fifth less **(deduction)**.
 
+The body in the fluid:
+
+- Obstacles with a velocity of their own: the fluid's obstacles (built, static, no caller today) with a solid
+  face holding the obstacle's velocity instead of 0 (Bridson 2015, ch. 5), so a moving body pushes the water
+  aside ahead of it and draws it in behind.
+
 The cameras:
 
 - A camera without depth, its mask from another source: deep_flow's mask is the depth's
