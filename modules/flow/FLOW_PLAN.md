@@ -9,17 +9,17 @@ operator saw.
 
 ## Main lines
 
-| #   | Line                                                                         | State                            | Documents                                          |
-|-----|------------------------------------------------------------------------------|----------------------------------|----------------------------------------------------|
-| A   | [The measurements](#a-the-measurements)                                      | built                            | [FLOW.md](FLOW.md#the-goals)                       |
-| B   | [The view](#b-the-view)                                                      | built                            | [VIEW.md](VIEW.md)                                 |
-| C   | [The motion](#c-the-motion)                                                  | built; C2 the values, C3 range   | [MOTION.md](MOTION.md)                             |
-| D   | [The bridge](#d-the-bridge)                                                  | built                            | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
-| E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | the temperature                  | [FLUID_3D.md](FLUID_3D.md)                         |
-| F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | open                             | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
-| H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                      | [FLOW.md](FLOW.md)                                 |
-| I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | not started                      | [FLOW.md](FLOW.md)                                 |
-| J   | [Every setting and its description](#j-every-setting-and-its-description)    | last, after the refactor         | `CLAUDE.md`, `.claude/rules`                       |
+| #   | Line                                                                         | State                             | Documents                                          |
+|-----|------------------------------------------------------------------------------|-----------------------------------|----------------------------------------------------|
+| A   | [The measurements](#a-the-measurements)                                      | built                             | [FLOW.md](FLOW.md#the-goals)                       |
+| B   | [The view](#b-the-view)                                                      | built                             | [VIEW.md](VIEW.md)                                 |
+| C   | [The motion](#c-the-motion)                                                  | built; C2 the values, C3 range    | [MOTION.md](MOTION.md)                             |
+| D   | [The bridge](#d-the-bridge)                                                  | built; D4 the density's blend, D5 | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
+| E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | the temperature                   | [FLUID_3D.md](FLUID_3D.md)                         |
+| F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | open                              | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
+| H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                       | [FLOW.md](FLOW.md)                                 |
+| I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | not started                       | [FLOW.md](FLOW.md)                                 |
+| J   | [Every setting and its description](#j-every-setting-and-its-description)    | last, after the refactor          | `CLAUDE.md`, `.claude/rules`                       |
 
 E2 needs the operator at the screen; the other lines go on meanwhile.
 
@@ -95,6 +95,23 @@ What is built: [BRIDGE_3D.md](BRIDGE_3D.md), and what the fluid does with it,
 The expansion is a source of volume where the body is, a fountain: water is made there and flows out. Seen in the
 app, 2026-11-17, with the `mask` share: it works; with the trail alone it hardly shows, as the velocity's drag holds
 the same water **(site fact)**.
+
+- **D4.** The density's blend, a setting, `input.density_blend`, in the grid and the fine density alike. It replaces
+  the fill's switch, a cell drawn toward the input only where the input's alpha is higher and untouched otherwise,
+  which leaves patches where the input meets older density; and `density_release`, which goes, as a falling input
+  pulls the fluid dark **(site fact)**.
+  - `over`, the default: compositing over (Porter and Duff 1984), premultiplied; each tick a cell under the input
+    becomes the input plus the cell × (1 − the input's alpha), by `density_drag`'s share. A faint input changes a
+    cell a little; the amount never falls and never passes 1; the color is a weighted mix. An input held in one
+    place fills toward 1.
+  - `add`: the source (Stam 2003; Bridson 2015), the input × `density_gain` × dt added. Where the amount would pass
+    1, all four channels are scaled down together so it lands at 1: the color stays the mix of what went in and
+    never turns white.
+  - `max`: the switch as it is, kept to compare.
+  - Checked in the app: in `over`, no patches where the input meets older density.
+- **D5.** The bridge's density alpha: the speed × the color's brightness, its brightest channel (HSV's value), and
+  the color at full brightness, so a dark pixel puts in little density instead of dark density. Checked in the app:
+  dark clothes and shadows leave no dark patches.
 
 ## E. The 3D fluid's physics
 
@@ -201,4 +218,4 @@ The cameras:
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
 
-Not designed yet, so their rules are not named: C3, E1, E2, F1, H1, I1 to I4.
+Not designed yet, so their rules are not named: C3, D4, D5, E1, E2, F1, H1, I1 to I4.
