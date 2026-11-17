@@ -9,6 +9,10 @@ the fluid does with each output in [FLUID_3D.md](FLUID_3D.md#the-inputs), what i
 inferred from them, **(site fact)** what the operator saw. The 2D bridge (`bridge_2d/`) gives the
 boundary only and stays as on `main` until it is rebuilt on the Lucas–Kanade flow.
 
+The bridge is `Bridge3D` (`bridge_3d/bridge_3d.py`), its settings `Bridge3DSettings` (`bridge_settings.py`);
+it takes the motion's textures as arguments and imports nothing of the render. Its layer, `Bridge3DLayer`,
+hands it the input and hands out its outputs ([FLOW.md](FLOW.md#the-layers)).
+
 ## The goal
 
 The motion translated into what the fluid takes, and held between the camera's frames
@@ -119,7 +123,7 @@ the frame's dt and the lowpass uses the Ema's real step, the same integral, exac
 
 What the fluid takes is two systems, the two a solver tells apart, and the expansion, a source of volume,
 each output mixing the six readings, each reading at a share, 0 to 1, as the light renderer mixes its layers
-(`Bridge3DLayer`, `WeightedSum`). The boundary is the body in the water, what the water is dragged toward: its
+(`Bridge3D`, `WeightedSum`). The boundary is the body in the water, what the water is dragged toward: its
 velocity, and its dye and warmth, which have no force and are held at the body. The body force is the
 Navier–Stokes force term, what is added: an acceleration, which the water keeps after the body is gone, so a
 stop can throw the water on. The panel shows `readings` (`lowpass`, `bandpass`), then one subpanel per output,
@@ -145,8 +149,8 @@ its share), capped at 1: a part moving at 1 width/s or faster is fully there, a 
 and a still body leaves no dye. The `mask` share adds the view's mask (`BridgeInput.mask`, 0 to 1 where the
 player is) at the share, a presence 0 to 1 by being there: at share 1 a still
 body is fully there. Widths/s is the velocity's own unit, so no reference speed is chosen.
-The density's color is the picture's (`DensityColor`: the image, or white, times the tint, gated by
-the mask) through `saturation` and `brightness`; the warmth is (warm − cold) × (1 − neutral × 0.5) ×
+The density's color is the picture's (`DensityColor`, `modules/flow/density_color.py`, the 2D bridge's too:
+the image, or white, times the tint, gated by the mask) through `saturation` and `brightness`; the warmth is (warm − cold) × (1 − neutral × 0.5) ×
 the presence, from the same color's red, blue and green. The readings of one unit share the mix, so
 the mix has no gain: the motion's gains balance the axes and the fluid's gains set how the water
 follows; a weight is a share. The acceleration and the expansion are `None` while their shares are

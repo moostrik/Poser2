@@ -5,22 +5,18 @@ only: a texture field holds the `Fbo`, `SwapFbo` or `Tensor` object itself, neve
 from it.
 
 `BridgeLayer` is the shape the 2D and the 3D bridge layer share: it steps its bridges on each update
-by the input's `dt` (they are filters in time) and makes the density's color from the image, the tint
-and the mask. The app updates it once per camera capture, `dt` the interval between captures, or
-once per render tick, `dt` the tick's. It draws nothing; the monitors
-draw its output's `textures`."""
+by the input's `dt` (they are filters in time), at the velocity's size, which it follows. The app
+updates it once per camera capture, `dt` the interval between captures, or once per render tick, `dt`
+the tick's. It draws nothing; the monitors draw its output's `textures`."""
 
 from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Annotated
 
-from OpenGL.GL import GL_RGBA16F
-
-from modules.gl import Fbo, Texture, Style
-from modules.flow import HasPorts, Port, Ports, TextureKind
+from modules.gl import Texture, Style
+from modules.flow import TextureKind
 from modules.settings import Field, Group
 from .monitor_2d_layer import DEBUG_TINT, MAIN_TINT, Monitor2DLayerSettings
-from .shaders import DensityColor
 from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 
 
@@ -73,27 +69,24 @@ class BridgeLayerSettings(StageLayerSettings):
 
 
 class BridgeLayer(StageLayer[BridgeInput, BridgeOutput]):
-    """The bridge stage's layer. `update` makes the density's color and runs the bridges (`_bridge`).
-    The bridges' filters run at the velocity's size, which the layer follows; the outputs are written
-    at `settings.width` by `settings.height`, which it follows too. The layer draws nothing."""
+    """The bridge stage's layer. `update` runs the bridges (`_bridge`) on the input. The bridges' filters run
+    at the velocity's size, which the layer follows; the outputs are written at `settings.width` by
+    `settings.height`, which it follows too. The layer draws nothing."""
 
     def __init__(self, settings: BridgeLayerSettings) -> None:
         super().__init__(settings)
         self.settings: BridgeLayerSettings = settings
-        self._color: Fbo = Fbo()                        # the density's color: the image's RGB, or white, times the tint and the mask
-        self._color_shader: DensityColor = DensityColor()
         self._flow_size: tuple[int, int] = (0, 0)       # the size the filters run at: the velocity's
         self._output_size: tuple[int, int] = (0, 0)     # the size the outputs are written at: settings.width/height
 
     # ========== Lifecycle ==========
 
     def allocate(self, width: int, height: int, internal_format: int | None = None) -> None:
-        """The size the app gives is not the bridge's: it writes at `settings.width` by `settings.height`."""
-        self._color_shader.allocate()
+        """The size the app gives is not the bridge's: it follows the velocity's and writes at `settings.width`
+        by `settings.height`, allocating on its first update."""
 
     def deallocate(self) -> None:
         self._deallocate_sizes()
-        self._color_shader.deallocate()
         super().deallocate()
 
     def reset(self) -> None:
@@ -108,7 +101,6 @@ class BridgeLayer(StageLayer[BridgeInput, BridgeOutput]):
             return
         self._deallocate_sizes()
         self._flow_size, self._output_size = flow_size, output_size
-        self._color.allocate(*output_size, GL_RGBA16F)
         self._allocate_stages(*flow_size, *output_size)
         self._reset_stages()
 
@@ -116,7 +108,6 @@ class BridgeLayer(StageLayer[BridgeInput, BridgeOutput]):
         if self._flow_size == (0, 0):
             return
         self._deallocate_stages()
-        self._color.deallocate()
         self._flow_size = self._output_size = (0, 0)
 
     @abstractmethod
@@ -130,16 +121,8 @@ class BridgeLayer(StageLayer[BridgeInput, BridgeOutput]):
     def _reset_stages(self) -> None: ...
 
     @abstractmethod
-    def _bridge(self, input: BridgeInput, color: Texture) -> None:
-        """Run the bridges on `input.velocity`, stepping `input.dt`; `color` is the density's color."""
-
-    @abstractmethod
-    def _bridges(self) -> dict[str, HasPorts]:
-        """The bridges it runs, by their settings group's name, in the order it runs them."""
-
-    def _components(self) -> dict[str, HasPorts]:
-        """The density's color, made first, then the bridges."""
-        return {'': Ports({'color': Port(self._color, TextureKind.IMAGE)}), **self._bridges()}
+    def _bridge(self, input: BridgeInput) -> None:
+        """Run the bridges on `input.velocity`, stepping `input.dt`, the density's color first."""
 
     # ========== Processing ==========
 
@@ -151,12 +134,7 @@ class BridgeLayer(StageLayer[BridgeInput, BridgeOutput]):
 
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
-
-        self._color.begin()
-        self._color_shader.use(input.image, input.color, input.mask)
-        self._color.end()
-        self._bridge(input, self._color)
-
+        self._bridge(input)
         Style.pop_style()
 
     def draw(self) -> None:

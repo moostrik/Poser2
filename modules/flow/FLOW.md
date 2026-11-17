@@ -189,8 +189,8 @@ context of its own, would move the wait to the bridge, and the screen still show
 | `StageLayer[I, O]` (ABC)                                           | what a stage is: an input, an output carrying its ports, its parts, a reset           |
 | `MotionLayer` (ABC)                                                | `StageLayer[MotionInput, MotionOutput]`: measures on a new camera frame               |
 | `Motion2DLayer`, `Motion3DLayer`                                   | on `GradientFlow`; on `LucasKanadeFlow3D`                                             |
-| `BridgeLayer` (ABC)                                                | `StageLayer[BridgeInput, BridgeOutput]`: the density's color, then the bridges        |
-| `Bridge2DLayer`, `Bridge3DLayer`                                   | on `bridge_2d`; on `bridge_3d`, the velocity lowpass beside the bandpass              |
+| `BridgeLayer` (ABC)                                                | `StageLayer[BridgeInput, BridgeOutput]`: follows the velocity, runs the bridges       |
+| `Bridge2DLayer`, `Bridge3DLayer`                                   | on `DensityColor` and `bridge_2d`; on `Bridge3D`                                      |
 | `FluidLayer` (ABC)                                                 | `StageLayer[FluidInput, FluidOutput]`: injects, then steps; its `texture` is the show |
 | `Fluid2DLayer`, `Fluid3DLayer`                                     | on `Fluid2D`; on `Fluid3D`                                                            |
 | `Monitor2DLayer`, `Monitor3DLayer`                                 | shows one port of one stage, while shown, flat or in 3D too; not a stage              |
@@ -206,9 +206,11 @@ and resize pattern; the flow runs at `settings.width` by `settings.height`, and 
 2D flow's velocity is per frame, not per second, and it reads no mask, until the 2D flow moves to the
 Lucas–Kanade solve.
 
-`BridgeLayer`'s `_update()`: the density's color (`DensityColor`: the image, or white, times the tint,
-gated by the mask), then `_bridge` the input's velocity into velocity, density and temperature
-([BRIDGE_3D.md](BRIDGE_3D.md)). The bridges' filters run at the velocity's size and their outputs at
+`BridgeLayer`'s `_update()`: `_bridge` the input's velocity into velocity, density and temperature, the
+density's color first (`DensityColor`: the image, or white, times the tint, gated by the mask), which
+`Bridge3D` runs itself and `Bridge2DLayer` calls. `Bridge3DLayer` turns the `BridgeInput` into
+`Bridge3D.update`'s arguments and its outputs into the `BridgeOutput` ([BRIDGE_3D.md](BRIDGE_3D.md)), as
+`Fluid3DLayer` does with `Fluid3D`. The bridges' filters run at the velocity's size and their outputs at
 `settings.width` by `settings.height`; the layer follows both. It draws nothing.
 
 `FluidLayer`'s `_update()`: `_inject` each injection's velocity, density and temperature at its
@@ -233,11 +235,11 @@ them), which each stage declares itself. The motion's is the size its flow runs 
 size it writes its outputs at (its filters follow the velocity's size), the fluid's its simulation
 grid (its density is at the size the app allocates). On the fluid layer `blend_mode`. A layer whose
 stage runs one component is that component's settings too (`Motion2DLayerSettings` is a
-`GradientFlowSettings`, `Motion3DLayerSettings` a `LucasKanadeFlow3DSettings`, the fluid layers' a
-`Fluid2DSettings` and a `Fluid3DSettings`), so the component's fields and groups sit on the stage's
-panel; the bridge layers, running several bridges, hold them in groups (the 3D bridge's: `readings`,
-with `lowpass` and `bandpass`; then one per output, each with its mix: `velocity`, `acceleration`,
-`density`, `temperature`, `expansion`). No `draw_mode`,
+`GradientFlowSettings`, `Motion3DLayerSettings` a `LucasKanadeFlow3DSettings`, `Bridge3DLayerSettings` a
+`Bridge3DSettings`, the fluid layers' a `Fluid2DSettings` and a `Fluid3DSettings`), so the component's
+fields and groups sit on the stage's panel (the 3D bridge's: `readings`, with `lowpass` and `bandpass`;
+then one per output, each with its mix: `velocity`, `acceleration`, `density`, `temperature`,
+`expansion`); the 2D bridge layer, running several bridges, holds them in groups. No `draw_mode`,
 `visualization`, `stage`, `max_players` or `fps`: the stages draw nothing, read no poses and take
 `dt` from their input.
 
@@ -269,7 +271,8 @@ The capture's monitor is a simple one: the color, the depth or both.
 |----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `modules/flow/motion/`                                   | `GradientFlow`; `LucasKanadeFlow`, the x/y solve with `LucasKanadeFlowSettings`; `LucasKanadeFlow3D`, composing it with `DepthVelocity`, with `LucasKanadeFlow3DSettings` (`use_mask`, the gains, `xy`, `z`); `DepthVelocitySettings`; `DepthView`; its document [MOTION.md](MOTION.md)                                                                                                                                                                                                                                          |
 | `modules/flow/bridge_2d/`                                | the 2D bridge                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `modules/flow/bridge_3d/`                                | the 3D bridge; its document [BRIDGE_3D.md](BRIDGE_3D.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `modules/flow/bridge_3d/`                                | `Bridge3D`, `Bridge3DSettings` with one group per output; its filters, mixes and the density and temperature bridges; its document [BRIDGE_3D.md](BRIDGE_3D.md)                                                                                                                                                                                                                                                                                                                                                                  |
+| `modules/flow/density_color.py`                          | `DensityColor`, the density's color, which `Bridge3D` runs and `Bridge2DLayer` calls                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `modules/flow/fluid_2d/`                                 | `Fluid2D`, `Fluid2DSettings` with its own `VelocitySettings`, `DensitySettings`, `TemperatureSettings`, `PressureSettings`; `shaders/`                                                                                                                                                                                                                                                                                                                                                                                           |
 | `modules/flow/fluid_3d/`                                 | `Fluid3D`, `Fluid3DSettings` with the box and one group per concern (`TimeSettings`, `CompositeSettings`, `ParticleSettings`, ...); the density's carriers (`DensityCarrier`: `Density`, `FineDensity`, `ParticleDensity`), `FieldAdvection`; `shaders/`; its document [FLUID_3D.md](FLUID_3D.md)                                                                                                                                                                                                                  |
 | `modules/flow/shaders/`                                  | the shared fragment shaders, `AddBoolean` among them                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |

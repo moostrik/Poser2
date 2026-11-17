@@ -17,7 +17,6 @@ operator saw.
 | D   | [The bridge](#d-the-bridge)                                                  | built                            | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | the temperature                  | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | open                             | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
-| G   | [Each stage a flow class](#g-each-stage-a-flow-class)                        | G1 the bridge                    | [FLOW.md](FLOW.md#packages)                        |
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                      | [FLOW.md](FLOW.md)                                 |
 | I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | not started                      | [FLOW.md](FLOW.md)                                 |
 | J   | [Every setting and its description](#j-every-setting-and-its-description)    | last, after the refactor         | `CLAUDE.md`, `.claude/rules`                       |
@@ -113,27 +112,6 @@ What is built: [FLUID_3D.md](FLUID_3D.md#the-density).
   times the pixels; the cut at 2 sigma and the lower cap ([TIMING.md](TIMING.md#the-particles-1)), judged on the
   look.
 
-## G. Each stage a flow class
-
-Each stage's work is a plain class in `modules/flow` with its settings and ports, taking its inputs as arguments,
-as `Fluid3D` and `LucasKanadeFlow3D` are; its render layer only hands it the input and calls it. The layers stay
-in the render, and so do the inputs' and outputs' dataclasses, the render's contract, which the flow may not
-import. The view is built so already, its parts (`ViewCrop`, `ViewMask`, `ViewDepth`, `ViewColor`) plain classes
-under a thin `ViewLayer`, and stays in deep_flow until a second app takes the 3D flow; then the crop, the mask and
-the depth move to `modules/flow` and the color, deep_flow's look, stays in the app.
-
-- **G1.** The bridge: a `Bridge3D` in `modules/flow/bridge_3d` takes what `Bridge3DLayer` does now: the lowpass,
-  the bandpass, the peak, the mixes and their z positions, the density and temperature bridges, the captures of
-  one tick (`CaptureMax`), the monitors' "shown" that runs a filter, its GPU timers, its settings
-  (`Bridge3DSettings`, the panels as they are) and its ports, under the names they have now, which the
-  monitors read them by. The density's color, `BridgeLayer`'s now, moves to the flow as a class of its own with
-  its `DensityColor` shader, which `Bridge3D` runs and the 2D bridge layer calls, so there is one. `BridgeLayer`
-  and `Bridge3DLayer` keep `BridgeInput`, `BridgeOutput`, the following of the velocity's size and the call. The
-  preset's keys do not change; every call site changes with it (deep_flow's render, `fluid_compare.py`,
-  `motion_bridge_pass_check.py`, the render's tests). BRIDGE_3D.md and FLOW.md's packages and layers say where
-  it sits. Checked by the flow's and the render's unit tests and deep_flow `-sim` loading the preset with no
-  unknown key, the bridge's monitors showing their ports.
-
 ## H. One unit across the stages
 
 - **H1.** Every length in the flow in the smaller side's widths: the motion's velocity, the bridge's readings, the
@@ -202,6 +180,8 @@ The body in the fluid:
 
 The cameras:
 
+- The view's crop, mask and depth move to `modules/flow` when a second app takes the 3D flow; the color, deep_flow's
+  look, stays in the app.
 - A camera without depth, its mask from another source: deep_flow's mask is the depth's
   ([VIEW.md](VIEW.md#the-mask)); a mask from RVM, for a camera without depth, would come back from hd_trio, on
   the crop, cut into the view's window.
@@ -220,6 +200,5 @@ The cameras:
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
-- Prefer composition over inheritance; update all call sites; keep presets in sync: G1.
 
 Not designed yet, so their rules are not named: C3, E1, E2, F1, H1, I1 to I4.

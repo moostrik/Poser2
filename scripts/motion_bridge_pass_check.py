@@ -85,16 +85,17 @@ def main() -> None:
     xy = flow.settings.xy
     dt, span, step = c['delta_time'], c['view_span'], tuple(c['depth_step'])
     dv = flow._depth_velocity
+    lowpass, bandpass = bridge._bridge_3d._lowpass, bridge._bridge_3d._bandpass
 
     rows = [
         ('motion, whole', lambda: flow.update(depth, dt, span, step, depth_range=depth_range())),
         ('motion: x/y solve (pyramid, threshold)', lambda: flow._flow.update()),
         ('motion: depth velocity', lambda: dv.update_depth(depth, dt, span, step, z.window, z.smooth, z.xy_halving, z.xy_rest,
                                                            z.threshold, z.edge, z.dead_zone, flow._flow.solved, z.max_speed, None)),
-        ('bridge: lowpass', lambda: bridge._lowpass.update(dt, False)),
-        ('bridge: lowpass with acceleration', lambda: bridge._lowpass.update(dt, True)),
-        ('bridge: bandpass', lambda: bridge._bandpass.update(dt, False)),
-        ('bridge: bandpass with accelerations', lambda: bridge._bandpass.update(dt, True)),
+        ('bridge: lowpass', lambda: lowpass.update(dt, False)),
+        ('bridge: lowpass with acceleration', lambda: lowpass.update(dt, True)),
+        ('bridge: bandpass', lambda: bandpass.update(dt, False)),
+        ('bridge: bandpass with accelerations', lambda: bandpass.update(dt, True)),
         ('bridge, whole', lambda: bridge.update()),
     ]
     print(f'{frames.width} x {frames.height}, frame {last}; levels {xy.levels}, window {int(xy.window)}')

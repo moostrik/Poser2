@@ -9,3 +9,5 @@ from .magnitude import Magnitude, VelocityMagnitude
 from .temperature_bridge import TemperatureBridge, TemperatureBridgeSettings
 from .capture_max import CaptureMax
 from .velocity_peak import VelocityPeak, VelocityPeakSettings, speed_percentile
+from .bridge_settings import Bridge3DSettings
+from .bridge_3d import Bridge3D
