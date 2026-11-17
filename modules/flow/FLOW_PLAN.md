@@ -96,26 +96,26 @@ The expansion is a source of volume where the body is, a fountain: water is made
 app, 2026-11-17, with the `mask` share: it works; with the trail alone it hardly shows, as the velocity's drag holds
 the same water **(site fact)**.
 
-- **D4.** The bridge's density in two outputs, as compositing has it (Porter and Duff 1984: alpha is coverage):
-  the color, the video's rgb with an alpha, how much of the pixel the player covers; and the amount, the mix of
-  the readings' speeds and the mask's share, as today. The bridge already makes both apart (`DensityColor`, the
-  `density.amount` port); `DensityBridge` stops merging them into one RGBA. Today `density_color.frag` multiplies
-  the color by the mask's gate and the merge drops that alpha, so the edge comes in dark at full amount **(code)**;
-  and a gain in the fluid would amplify the edge with the speed.
-  - The alpha: the mask's soft edge × the luma key's share of the color's brightness, its brightest channel
-    (HSV's value).
-  - The luma key (video compositing: darkness becomes transparency), a setting in the bridge's `density` group,
-    `luma_key`, 0..1, after the HSV pass (`saturation`, `brightness`): the key's share of the color's darkness
-    becomes less alpha, and the same share is taken out of the color. At 1 a half-dark red comes in as full red
-    at half the alpha, and black brings in nothing; at 0 as half-dark red at full alpha, as now. Default 1, the
+- **D4.** The density's color with its coverage, and its amount apart (Porter and Duff 1984: alpha is coverage).
+  The view's color is already graded and premultiplied by its own feathered copy of the mask, RGB and alpha alike
+  ([VIEW.md](VIEW.md#the-stage)); the bridge gates it by the mask again in `DensityColor`, runs its own HSV pass,
+  and `DensityBridge` drops the alpha and treats the color as straight, premultiplying it by the amount, so the
+  edge comes in darkened twice at full amount **(code)**.
+  - The view: the luma key (video compositing: darkness becomes transparency), a setting in its color step,
+    `color.luma_key`, 0..1, after the grading and before the premultiply: the key's share of the color's darkness,
+    its brightest channel (HSV's value), becomes less alpha, and the same share is taken out of the color. The
+    alpha is the feather × the key; the stored, premultiplied color stays as it is. At 1 a half-dark red is full
+    red at half the alpha, and black brings in nothing; at 0 half-dark red at full alpha, as now. Default 1, the
     look asked for: dark clothes and shadows leave no dark patches **(site fact)**.
+  - The bridge: takes the view's color as it comes, its alpha kept; its HSV pass (`saturation`, `brightness`) and
+    `DensityColor`'s mask gate go; `DensityBridge` stops merging, and the amount, the mix of the readings' speeds
+    and the mask's share, goes on apart (the `density.amount` port), as today.
   - The output and the injection carry the color and the amount (`bridge_layer.py`, `fluid_3d_layer.py`,
     `fluid_2d_layer.py`); `CaptureMax` picks the two as a pair, by the amount; the particles take their amount
     from the amount, their color from the color.
-  - The 2D bridge shares `DensityColor`: it keeps its look, the color times its alpha where it merges, until
-    line I.
-  - BRIDGE_3D.md follows. Checked in the app: no dark rim at any gain; the luma key from 0 to 1; the 2D flow as
-    before.
+  - The 2D bridge shares `DensityColor`: it keeps its look, gate and HSV included, until line I.
+  - VIEW.md and BRIDGE_3D.md follow; the preset loses the bridge's `saturation` and `brightness`. Checked in the
+    app: no dark rim at any gain; the luma key from 0 to 1; the 2D flow as before.
 - **D5.** The density's injection, in the grid, the fine density and the particles' carrier alike. It replaces
   the fill's switch, a cell drawn toward the input only where the input's amount is higher and untouched
   otherwise, which leaves patches where the input meets older density; and `density_release`, which goes, as a
@@ -232,6 +232,13 @@ The body in the fluid:
   face holding the obstacle's velocity instead of 0 (Bridson 2015, ch. 5), so a moving body pushes the water
   aside ahead of it and draws it in behind.
 
+The density's color:
+
+- The color grading moves from the view to the bridge, the luma key with it: the view sees the player, the bridge
+  makes what the fluid takes. The view then hands over the image with its feathered mask as alpha (erode and
+  feather are the mask's work and stay); the bridge divides by the alpha, grades, keys and multiplies back, as
+  compositing does. Weighed against the point below that the color, deep_flow's look, stays in the app.
+
 The cameras:
 
 - The view's crop, mask and depth move to `modules/flow` when a second app takes the 3D flow; the color, deep_flow's
@@ -255,7 +262,7 @@ The cameras:
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
 - A settings class mirrors the code it configures, its fields in the order the code uses them: D4's `luma_key`
-  after the HSV pass.
+  after the grading.
 - A setting's default is the textbook value: D4's `luma_key` and D5's `density_blend`, each default with its reason.
 - Keep presets in sync, update all call sites in the same change: D4's second texture, D5's `density_release`.
 - Ask to measure a time again when its pass's code or size changes: D5.
