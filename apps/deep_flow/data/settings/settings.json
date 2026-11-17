@@ -277,7 +277,7 @@
         "fluid"
       ],
       "debug": [
-        "fluid"
+        "bridge"
       ]
     },
     "capture": {
@@ -373,7 +373,7 @@
         }
       },
       "monitor_debug": {
-        "texture": "z.output",
+        "texture": "output.velocity",
         "view": "IMAGE",
         "advanced": {
           "channel": "ALL",
@@ -450,10 +450,10 @@
         "bow": 0.0,
         "stop": 1.0,
         "wake": 0.0,
-        "mask": 0.0
+        "mask": 0.05
       },
       "monitor_main": {
-        "texture": "density.input",
+        "texture": "output.density",
         "view": "COLORMAP",
         "advanced": {
           "channel": "ALL",
@@ -465,8 +465,8 @@
         }
       },
       "monitor_debug": {
-        "texture": "output.velocity",
-        "view": "COLORMAP",
+        "texture": "density.amount",
+        "view": "IMAGE",
         "advanced": {
           "channel": "ALL",
           "scale": 1.0,
@@ -496,7 +496,7 @@
         "velocity_drag": 75.0,
         "velocity_gain": 0.78,
         "acceleration_gain": 4.0,
-        "density_drag": 300.0,
+        "density_drag": 245.0,
         "density_gain": 10.0,
         "temperature_drag": 200.0,
         "temperature_gain": 1.0,
@@ -548,7 +548,7 @@
         "limiter": "CLAMP",
         "advection_scale": 0.88,
         "fade_time": 0.0,
-        "evaporation_time": 60.0,
+        "evaporation_time": 159.0,
         "evaporation_knee": 0.1
       },
       "fine_density": {
@@ -620,7 +620,7 @@
         }
       },
       "monitor_main": {
-        "texture": "output.velocity",
+        "texture": "output.density",
         "view": "COLORMAP",
         "advanced": {
           "channel": "ALL",
@@ -632,12 +632,12 @@
           "opacity": 6.0,
           "depth_fade": 0.0,
           "slice": false,
-          "slice_position": 0.5,
+          "slice_position": 0.5859375,
           "slice_focus": 0.5,
           "orbit": {
             "yaw": 0.0,
             "pitch": 0.0,
-            "zoom": 1.0
+            "zoom": 0.4441741953873573
           }
         }
       },
@@ -654,12 +654,12 @@
           "opacity": 3.0,
           "depth_fade": 0.0,
           "slice": true,
-          "slice_position": 0.48,
+          "slice_position": 0.5546875,
           "slice_focus": 0.36,
           "orbit": {
             "yaw": 52.59975975870282,
             "pitch": 4.846153846153827,
-            "zoom": 0.7184107424569811
+            "zoom": 0.4
           }
         }
       }
