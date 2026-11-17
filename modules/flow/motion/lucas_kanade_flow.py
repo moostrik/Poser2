@@ -23,6 +23,7 @@ class LucasKanadeFlowSettings(BaseSettings):
     levels:         Field[int]   = Field(3, min=1, max=5, description="Pyramid levels of the x/y solve, each doubles the reach (more: faster motion, more spill)")
     window:         Field[Patch] = Field(Patch.SEVEN, min=Patch.THREE, max=Patch.NINE, description="x/y patch size (larger: cleaner, more spill)")
     damping:        Field[float] = Field(0.03, min=0.0, max=0.1, step=0.001, description="Damps x/y where the patch has little texture (higher: less noise, smaller motion)")
+    z_smooth:       Field[bool]  = Field(False, newline=True, width=48, description="x/y smoothed over z's smoothing time, so both lag alike (on: less noise, more lag)")
     threshold:      Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, newline=True, description="x/y below this is cut as noise, in px/frame (higher: less noise, less slow motion)")
 
 

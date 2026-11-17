@@ -347,16 +347,17 @@
         "levels": 4,
         "window": "SEVEN",
         "damping": 0.03,
+        "z_smooth": false,
         "threshold": 0.5
       },
       "z": {
         "edge": 0.1,
         "window": "SEVEN",
-        "smooth": 100.0,
-        "xy_halving": 0.5,
-        "xy_smooth": false,
-        "dead_zone": 0.026,
         "max_speed": 6.0,
+        "smooth": 100.0,
+        "xy_rest": 0.5,
+        "xy_halving": 0.5,
+        "dead_zone": 0.05,
         "threshold": 0.5
       },
       "monitor_main": {

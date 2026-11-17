@@ -74,7 +74,7 @@ comes in view widths per frame, over the metres one view width spans at the dept
 `LucasKanadeFlow3D` turns the displacement and z, both view widths per frame, into one velocity in widths
 per second, times `x_gain`, `y_gain`, `z_gain`, gated as below. The tracks are carried by the displacement as
 solved, before `xy.threshold`: a slide too slow for the output still moves them, or on a slope it would read
-as z. With `xy_smooth`, x/y goes through z's filter over z's `smooth`, so both lag alike: a displacement is a step
+as z. With `z_smooth`, x/y goes through z's filter over z's `smooth`, so both lag alike: a displacement is a step
 of position, so with a steady frame interval and a full z window x/y answers a change of speed exactly as z does. The settings in flow
 pixels go with the flow's resolution; those in metres and milliseconds do not.
 
@@ -146,6 +146,7 @@ knob on z's size; the depth velocity's settings set z's noise and lag, not its s
 | levels       | 3       | 1–5 (1)             | B   | follows fast motion                    |
 | window       | 7×7     | 3×3–9×9             | B   | follows more of the motion than 3×3 or 5×5 |
 | damping      | 0.03    | 0–0.1 (0.001)       | B   | x/y's noise a quarter of undamped      |
+| z_smooth     | off     | on/off              | B   | x/y without extra lag                  |
 | threshold    | 0.5     | 0–5 px/frame (0.05) | B   | the still x/y noise 0                  |
 
 The x/y solve, on the raw output, with `levels` 4 (the preset) as the reference: x/y kept over the moves, and
@@ -179,7 +180,6 @@ larger on show). A level doubles the motion the solve follows, about 2 × 2^(lev
 | smooth     | 100 ms       | 0–500 (1)       | A   | the still z noise 31× below the raw    |
 | xy_rest    | 0.5 px/frame | 0–5 (0.05)      | A   | above x/y's noise at rest              |
 | xy_halving | 0.5 px/frame | 0–5 (0.05)      | B   | a push lags 11 ms, keeps 87% of its z  |
-| xy_smooth  | off          | on/off          | B   | x/y without extra lag                  |
 | dead_zone  | 0 m          | 0–0.05 (0.001)  | B   | with z smoothed it costs z and lag     |
 | threshold  | 0.5 px/frame | 0–5 (0.05)      | A   | the still z noise 0                    |
 
@@ -219,11 +219,11 @@ larger on show). A level doubles the motion the solve follows, about 2 × 2^(lev
   A low halving speed is what keeps the lag down; z's own speed beside the image's, tried, let the still noise
   up to 2 to 4 for no less lag. The bridges read z as they read x/y; what z's smoothing does to them is in
   [BRIDGE_3D.md's Measured](BRIDGE_3D.md#measured).
-- xy_smooth puts x/y through the depth velocity's alpha–beta filter, carried along the motion, over z's time,
+- z_smooth (in the x/y panel, between `damping` and `threshold`) puts x/y through the depth velocity's alpha–beta filter, carried along the motion, over z's time,
   the 1€ rule's, worked out per pixel from the same x/y speed. It is the only x/y state kept from frame to frame:
   the solve starts each frame from no motion. The motion's reset clears it.
 - C1's change (`tolerance` and `same_surface` gone, `max_speed` before and after the filter, `xy_rest` in place
-  of `xy.threshold`, `xy_smooth` over z's time), 2026-11-17, one capture of hands and of measure, the defaults
+  of `xy.threshold`, `xy_smooth`, now `xy.z_smooth`, over z's time), 2026-11-17, one capture of hands and of measure, the defaults
   with `dead_zone` 0, before and after:
 
   | Row                  | z still noise, measure | z still noise, hands | z kept / lag, hands | x/y noise, hands / kept, measure | restarts at rest, measure |
@@ -232,8 +232,8 @@ larger on show). A level doubles the motion the solve follows, about 2 × 2^(lev
   | defaults, after      | 0 / 0.05               | 3.7 / 2.0            | 0.83 / 11 ms        | 0.50 / 0.81                      | 0.14%                     |
   | `threshold` 0, before | 0.41 / 0.55           | 4.6 / 2.8            | 0.86 / 11 ms        |                                  |                           |
   | `threshold` 0, after | 0.40 / 0.54            | 4.2 / 2.5            | 0.87 / 11 ms        |                                  |                           |
-  | `xy_smooth` on, before | 0 / 0.06             | 4.1 / 2.3            | 0.83 / 11 ms        | 8.3 (lag 218 ms) / 0.42          |                           |
-  | `xy_smooth` on, after | 0 / 0.05              | 3.7 / 2.0            | 0.83 / 11 ms        | 5.4 (lag 26 ms) / 0.89           |                           |
+  | `z_smooth` on, before | 0 / 0.06             | 4.1 / 2.3            | 0.83 / 11 ms        | 8.3 (lag 218 ms) / 0.42          |                           |
+  | `z_smooth` on, after  | 0 / 0.05              | 3.7 / 2.0            | 0.83 / 11 ms        | 5.4 (lag 26 ms) / 0.89           |                           |
   | `xy_halving` 0, after | 0 / 0                 | 3.2 / 2.2            | 0.40 / 202 ms       |                                  |                           |
   | `max_speed` 0, after | 0 / 0.07               | 4.9 / 3.0            | 0.84 / 10 ms        |                                  | 0                         |
 
@@ -261,7 +261,7 @@ memories set a non-finite value to 0 and count it into the motion's `FiniteGuard
 | Output           | Where                                 | Holds                                          |
 |------------------|---------------------------------------|------------------------------------------------|
 | `velocity`       | `compose_velocity.frag`               | the motion's output, x/y/z in widths/s         |
-| `displacement`   | `displacement_filter.frag`            | the x/y filter's memory, with `xy_smooth`      |
+| `displacement`   | `displacement_filter.frag`            | the x/y filter's memory, with `z_smooth`      |
 | `depth_velocity` | `depth_velocity_shader.frag`          | z's memory: the followed disparity, its rate and anchor (`estimate`) |
 
 Measured in a hidden window at 448 × 800, 40 frames at 25 fps: a NaN mask over 200 × 200 px gave
@@ -286,7 +286,7 @@ not at the solve. `gl_state()` (`modules/gl`) returns the GL state a pass runs w
 - The coarsest level starts from no motion inside the shader (`has_estimate` off), never from a
   cleared buffer: a clear handed a temporary array for its color sometimes left garbage at startup,
   the bit pattern of 100 or 1.75 in one channel, 7 of 8 starts, and the whole pyramid took it as the
-  start, every x/y arrow the same ("all arrows up"); with the `xy_smooth` filter it stuck until a reset.
+  start, every x/y arrow the same ("all arrows up"); with the `z_smooth` filter it stuck until a reset.
   Every clear to 0 now passes no memory (`clear_value`, `modules/gl/texture.py`).
 
 - The false z at an edge cannot be told from a push by time. Restarting the track where the depth

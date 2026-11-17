@@ -362,13 +362,13 @@
         "levels": 4,
         "window": "SEVEN",
         "damping": 0.03,
+        "z_smooth": false,
         "threshold": 0.5
       },
       "z": {
         "edge": 0.1,
         "window": "SEVEN",
         "smooth": 100.0,
-        "xy_smooth": false,
         "dead_zone": 0.02,
         "max_speed": 6.0,
         "threshold": 5.0

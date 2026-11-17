@@ -50,7 +50,7 @@ class LucasKanadeFlow3D:
         self._capture: SolveCapture | None = SolveCapture.from_environment()
         self._mask: Texture | None = None
 
-        self._filtered: SwapFbo = SwapFbo()         # with xy_smooth: the filter, its displacement and position error
+        self._filtered: SwapFbo = SwapFbo()         # with z_smooth: the filter, its displacement and position error
         self._followed: Fbo = Fbo()                 # the filtered displacement with the noise floor taken off
         self._following: bool = False
         self._velocity: Fbo = Fbo()
@@ -169,7 +169,7 @@ class LucasKanadeFlow3D:
                                               self._slot('depth_velocity', guarded))
 
         xy: Texture = self._flow.displacement
-        if z_s.xy_smooth:
+        if xy_s.z_smooth:
             if not self._following:
                 self._filtered.clear_all()                  # from no motion, not from when it was last on
                 self._following = True
@@ -221,7 +221,7 @@ def z_position(disparity: np.ndarray, near: float, far: float, mask: np.ndarray 
 
 
 def filter_displacement(displacement: np.ndarray, state: np.ndarray, carry: np.ndarray, alpha: float) -> np.ndarray:
-    """The filter x/y goes through with z.xy_smooth, one frame on (H, W, 4): the filtered
+    """The filter x/y goes through with xy.z_smooth, one frame on (H, W, 4): the filtered
     displacement (x, y, pixels per frame) and the position error (x, y, pixels). Mirrors
     displacement_filter.frag.
 

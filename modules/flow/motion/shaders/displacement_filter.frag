@@ -1,7 +1,7 @@
 #version 460 core
 
 // Displacement Filter Shader
-// With xy_smooth, x/y through the depth track's alpha–beta filter over z's time, so it lags as z does. The
+// With z_smooth, x/y through the depth track's alpha–beta filter over z's time, so it lags as z does. The
 // positions step by the measured displacement each frame; the state is carried from where the pixel
 // was `carry` back, its displacement predicts the step, and the residual corrects it by alpha and
 // alpha² / (2 − alpha). The time is z's, the 1€ filter's: `smoothing` at rest, over 1 + speed / `xy_halving`

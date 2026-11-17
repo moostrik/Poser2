@@ -28,7 +28,6 @@ class DepthVelocitySettings(BaseSettings):
     smooth:         Field[float] = Field(100.0, min=0.0, max=500.0, step=1.0, newline=True, description="z: smoothing time at rest, in ms; 0 the change of two frames (higher: less noise at rest)")
     xy_rest:        Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="x/y speed below which z counts as at rest, in px/frame")
     xy_halving:     Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="x/y speed past xy_rest at which z's smoothing time is half, in px/frame (0: smooth throughout)")
-    xy_smooth:      Field[bool]  = Field(False, width=48, description="x/y smoothed over z's time, so both lag alike (on: less noise, more lag)")
     dead_zone:      Field[float] = Field(0.0, min=0.0, max=0.05, step=0.001, newline=True, description="z: depth drift ignored before z counts as motion, in m (higher: less drift, slower start)")
     threshold:      Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="z below this is cut as noise, in px/frame (higher: less noise, less slow z)")
 

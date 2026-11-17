@@ -1,5 +1,5 @@
 """The Lucas–Kanade flow's numpy references: it finds how far an image moved and gives that as a
-velocity, and with xy_smooth filters it as z is. Also the trail bridge's shaping of a velocity. Its depth is tested in test_depth_velocity."""
+velocity, and with z_smooth filters it as z is. Also the trail bridge's shaping of a velocity. Its depth is tested in test_depth_velocity."""
 
 import unittest
 
@@ -64,7 +64,7 @@ class ThresholdTest(unittest.TestCase):
 
 
 class XySmoothTest(unittest.TestCase):
-    """x/y through the depth track's filter, with xy_smooth."""
+    """x/y through the depth track's filter, with z_smooth."""
     DT: float = 1.0 / 30.0
 
     def follow(self, steps: list[np.ndarray], carry: np.ndarray | None = None, smooth: float = 50.0) -> list[np.ndarray]:

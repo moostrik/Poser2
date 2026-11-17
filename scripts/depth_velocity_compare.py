@@ -60,7 +60,7 @@ SWITCHED: dict[str, str] = {'x': 'x_gain', 'y': 'y_gain', 'z': 'z_gain'}   # in 
 GROUPED: dict[str, str] = {'xy_levels': 'xy.levels', 'xy_window': 'xy.window', 'xy_damping': 'xy.damping',
                            'xy_same_surface': 'xy.same_surface', 'xy_threshold': 'xy.threshold',
                            'z_edge': 'z.edge', 'z_window': 'z.window', 'z_tolerance': 'z.tolerance',
-                           'z_smooth': 'z.smooth', 'xy_smooth': 'z.xy_smooth',
+                           'z_smooth': 'z.smooth', 'xy_smooth': 'xy.z_smooth',
                            'z_catch_up': 'z.catch_up', 'z_dead_zone': 'z.dead_zone', 'z_threshold': 'z.threshold'}   # in frames saved flat, before the groups
 MOVED: float = 0.05          # luminance change of a pixel that moves
 MOVED_FRAMES: int = 5         # frames it changes that much in, over the loop
@@ -115,6 +115,10 @@ def read_back(texture: Texture) -> np.ndarray:
 def recorded_settings(recorded: dict) -> dict:
     """The settings a frame was saved with, as the settings' dict: saved flat before the groups, nested since."""
     result: dict = {}
+    z_group = recorded.get('z')
+    if isinstance(z_group, dict) and 'xy_smooth' in z_group:          # nested, before it moved to x/y as z_smooth
+        recorded = {**recorded, 'z': {k: v for k, v in z_group.items() if k != 'xy_smooth'},
+                    'xy': {**recorded.get('xy', {}), 'z_smooth': z_group['xy_smooth']}}
     for key, value in recorded.items():
         key = RENAMED.get(key, key)
         if key in SWITCHED and isinstance(value, bool):     # the old axis switches; a "z" group is a dict
