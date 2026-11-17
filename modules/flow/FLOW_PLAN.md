@@ -64,10 +64,11 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
   0.1 and 0.2 m; `tolerance` 0.2 against 0.5 changed nothing on four recordings, as the step filter has already
   taken the jump out **(deduction)**. In `depth_velocity_shader.frag` and `DepthVelocity`:
   - within a frame, `edge`: the step filter (as now) and the window's samples (now `tolerance`);
-  - between frames, `max_speed` (6 m/s) × the frame's time (12 cm at 50 fps): the carried texels that count as
-    the measurement's surface, and the restart on the miss before the filter. They replace `tolerance` in the
-    carry and the restart, and the check on the filtered rate after the filter, which a smoothed track at rest
-    softens below 6 m/s **(deduction)**;
+  - between frames, `max_speed` (6 m/s), in two checks: a jump, before the filter, further than
+    `max_speed` × the frame's time (12 cm at 50 fps), for the carried texels that count as the measurement's
+    surface and for the restart on the miss, both now `tolerance`; and a speed, after the filter, the filtered
+    rate past `max_speed`, as now (a depth sliding away steadily, each step small against the prediction).
+    At 0 neither checks, its own case;
   - x/y's `same_surface` goes, with its part of the solve: `LucasKanadeFlow.update`'s depth and tolerance, the
     depth in `lucas_kanade_tile.comp`, the x/y solve's numpy version's and its test (`test_scene_flow`),
     `scripts/solve_replay.py`, the capture's recorded settings;
@@ -86,10 +87,27 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
   The 1€ rule opens on x/y's speed, not on z's own as the original filter does: z's own (from a copy followed
   over the time at rest) let the still noise up to 2 to 4 for no less lag, as z's noise is far above a push
   where the filter's signals have little.
-  Checked on one capture of hands and of measure, now against the change, the preset as saved: still noise
-  inside and at the edge, z kept, lag, x/y kept, the restarts' share at rest and while moving; about 5 minutes.
-  The presets keep a removed key until Matthias saves; `scripts/motion_bridge_pass_check.py`, the compare's
-  setting maps, MOTION.md's parts and settings tables follow.
+  Checked on one capture of hands and of measure (`hands_1`, `measure_1`), the code now against the change,
+  about 5 minutes each way: the same rows, `dead_zone` 0 in all of them, the rest the code's defaults (`smooth`
+  100, the halving 0.5, the thresholds 0.5, `edge` 0.1, `max_speed` 6, the windows 7×7, `levels` 4, `damping`
+  0.03):
+
+  | Row                         | Shows                                                          |
+  |-----------------------------|----------------------------------------------------------------|
+  | the raw reference           | what kept and lag are against                                  |
+  | the defaults                | that z is the same without `tolerance` and `same_surface`      |
+  | `z.threshold` 0             | the same before the cut, where a change is not hidden          |
+  | `xy_halving` 0 (after only) | that off is `smooth` throughout: the lag of a fixed 100 ms     |
+  | `max_speed` 0 (after only)  | what the two checks do: restarts and z without them            |
+  | `xy_smooth` on              | x/y's noise and lag over z's time, where it was a fixed 100 ms |
+
+  Each row: z's still noise inside and at the edge (measure), z kept and lag (hands), x/y's still noise, kept
+  and lag, the restarts' share at rest and while moving (added to the compare's row), the motion's ms. It passes
+  when the defaults' and the `z.threshold` 0 rows are the same before and after within the captures' spread
+  (0.1), and the restarts at rest stay near 0.
+  `halving_speed` is renamed in `settings.json`, its value kept; a removed key stays in the presets until
+  Matthias saves. `scripts/motion_bridge_pass_check.py`, the compare's setting maps and its `--verify` (the
+  depth it hands the x/y solve), MOTION.md's parts and settings tables follow.
 - **C2.** The values, each measured on the four recordings and judged in the app: `smooth` and `xy_halving`
   (and 0.25, 6 ms on hands) and z's `threshold`, with `dead_zone` 0; x/y's `threshold` around 0.4; a step up on `levels`, x/y's
   `window` and `damping` against their ms. The step filter and z's window stay unless a row shows a clear gain
