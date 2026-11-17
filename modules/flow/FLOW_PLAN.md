@@ -13,7 +13,7 @@ operator saw.
 |-----|------------------------------------------------------------------------------|----------------------------------|----------------------------------------------------|
 | A   | [The measurements](#a-the-measurements)                                      | built                            | [FLOW.md](FLOW.md#the-goals)                       |
 | B   | [The view](#b-the-view)                                                      | built                            | [VIEW.md](VIEW.md)                                 |
-| C   | [The motion](#c-the-motion)                                                  | built; steps open                | [MOTION.md](MOTION.md)                             |
+| C   | [The motion](#c-the-motion)                                                  | built; C2 the values tonight     | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; the body force            | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | the temperature                  | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | open                             | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
@@ -60,15 +60,28 @@ rest and later: the filter sees nothing until the zone opens, so its lag comes a
 overlap now (hands, unsmoothed, `dead_zone` 0.02: 52 ms against 7; `smooth` 25: 90 against 65; measure's still
 noise 2.4 / 3.1 against 9.1 / 5.1).
 
-- **C2.** The values, each measured on the four recordings and judged in the app: `smooth` and `xy_halving`
-  (and 0.25, 6 ms on hands) and z's `threshold`, with `dead_zone` 0; x/y's `threshold` around 0.4; a step up on `levels`, x/y's
-  `window` and `damping` against their ms. The step filter and z's window stay unless a row shows a clear gain
-  that keeps the z. The settings' defaults and MOTION.md's reasons follow; the preset when Matthias saves it.
-  No new recording.
-- **C3.** The range: `edge`, `max_speed` and the thresholds are in metres or px, tuned at 0.65–1.5 m; stereo
-  noise grows with the square of the distance, so at 2–3.5 m they may need to be in disparity, and a depth's
-  noise from frame to frame may come near `max_speed`'s 12 cm and start the track over at rest **(deduction)**. A recording
-  at 2–3.5 m, made by the operator, and they measured there.
+- **C2.** The values, one run on the four recordings unattended, then judged by Matthias in the app. The settings'
+  defaults and MOTION.md's reasons follow on his word; the preset when he saves it. No new recording.
+  - The surfaces that are not the player left out: a still surface inside the mask that wanders, as the shiny desk
+    in a corner does, reads as z and is no measure of the motion. Each recording's frames are looked at first; a
+    surface in the mask that is not the player gets a box (uv) in `exclude` in the recording's `segments.json`,
+    and the compare measures no pixel inside it. The recordings' still stretches are looked at for the same.
+  - Each row one change from the defaults, on one capture of each recording (`hands_1`, `measure_1`, `edges_1`,
+    `show_1`; three agreed within 0.1), the code at the commit of the run, `dead_zone` 0:
+
+    | Group           | Rows                                                                                   |
+    |-----------------|----------------------------------------------------------------------------------------|
+    | the reference   | raw (`smooth` 0, the thresholds 0, `max_speed` 0); the defaults                       |
+    | z's smoothing   | `smooth` 50, 100, 200 × `xy_halving` 0.25, 0.5, 1 (9); `xy_rest` 0.25, 1               |
+    | z's cut         | `threshold` 0.25, 1, 2                                                                 |
+    | z's surface     | `edge` 0.05; z's `window` 9×9; `max_speed` 4, 8                                        |
+    | x/y             | `levels` 5; x/y's `window` 9×9; `damping` 0.02, 0.045; `threshold` 0.25, 0.4; `z_smooth` on |
+
+    About 26 rows a recording, about 45 minutes in all. Each row: z's still noise inside and at the edge, z kept
+    and lag, x/y's still noise, kept and lag, the restarts at rest and moving, the motion's ms.
+  - The outcome, a table a recording into MOTION.md, and a proposal: the values quiet at rest (still noise near
+    0 after the cut) with the most z kept at the least lag on all four; a value that holds on one recording only
+    is named so. Matthias judges it in the app before a default changes.
 
 ## D. The bridge
 
@@ -119,6 +132,11 @@ Once the 3D is finished, the 2D rebuilt in `modules/flow` on the 3D's principles
 
 ## Parked
 
+- **The range (was C3).** `edge`, `max_speed` and the thresholds are in metres or px, tuned at 0.65–1.5 m;
+  stereo noise grows with the square of the distance, so at 2–3.5 m they may need to be in disparity, and a
+  depth's noise from frame to frame may come near `max_speed`'s 12 cm and start the track over at rest
+  **(deduction)**. Parked until the camera is moved to its place; then a recording at 2–3.5 m and they measured
+  there.
 Not worked on until asked for; each with what is known.
 
 - **z from x/y's spread (looming).** A surface coming toward the camera grows in the image, so its x/y motion
@@ -186,4 +204,4 @@ Not worked on until asked for; each with what is known.
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
 
-Not designed yet, so their rules are not named: C3, D1, E1, F1, H1, I1 to I4.
+Not designed yet, so their rules are not named: D1, E1, F1, H1, I1 to I4.
