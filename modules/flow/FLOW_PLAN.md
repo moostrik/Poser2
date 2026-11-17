@@ -11,7 +11,7 @@ operator saw.
 
 | #   | Line                                                                         | State                            | Documents                                          |
 |-----|------------------------------------------------------------------------------|----------------------------------|----------------------------------------------------|
-| A   | [The measurements](#a-the-measurements)                                      | rules set; A1, A2 open           | [FLOW.md](FLOW.md#the-goals)                       |
+| A   | [The measurements](#a-the-measurements)                                      | measured; the write-up open      | [FLOW.md](FLOW.md#the-goals)                       |
 | B   | [The view](#b-the-view)                                                      | built                            | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; steps open                | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; the body force            | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
@@ -57,53 +57,16 @@ What is measured today (the tables with numbers in the flow's documents, 73), by
 
 - **A1.** Every table on a recording no longer on disk (stillslowfast, standmoves, blocky, `20261111-123241`)
   marked as not reproducible, beside the recording it names; measured again when its stage is next worked on.
-- **A2.** The motion's measuring made fit for A3 and A4, in `scripts/depth_velocity_compare.py`: the row with
-  x/y beside z (still noise inside, slow, fast, fast ÷ noise), the lag of a side behind the other over the moving
-  stretches (ms, from the two series' best shift), several captures in one call with their mean and spread, and
-  the row written with its stamp: kind, date, commit, recording, captures, and the settings of each side. A
-  recording's stretches are read from a `segments.json` in the recording's own folder, written once, where they
-  now sit beside each capture and go with it.
-- **A3.** New baselines for today's view and motion (the depth mask gone, the fill, edge 0.1 m, erode and
-  feather):
-  - the result in [VIEW.md's depth table](VIEW.md#the-depth), raw z and x/y on the measure recording, three
-    captures; its rows still name the depth mask's gate and `view.depth.tolerance`;
-  - the view's time in [TIMING.md](TIMING.md#the-view), at the preset's `erode` and `feather` and at 2 and 4,
-    as at 0 their passes are skipped;
-  - a new column in [TIMING.md's stages](TIMING.md#the-stages), every timer of one run on the hands recording.
-- **A4.** What each part of the motion does for [its goal](MOTION.md#the-goal), before C: least noise while
-  keeping the most real motion, at the lowest latency. The parts work in groups, measured in the chain's order,
-  each with the groups after it neutral:
-  1. the x/y solve: `levels`, `window`, `damping`; z's track is carried along it;
-  2. what counts as one surface: `tolerance`, the step filter (`edge`), `same_surface`, z's `window`;
-  3. z over time: `smooth`, `catch_up`, and `tolerance` again, as it also starts a track over;
-  4. the cut at rest: `dead_zone`, z's `threshold`, x/y's `threshold`; measured last, everything on.
-
-  `use_mask` and `xy_smooth` are left out: the mask says where, not how noisy, and `xy_smooth` is a convenience.
-  A part's neutral value is its off where it has one (`damping` 0, `same_surface` off, `smooth` 0, `catch_up` 0,
-  `dead_zone` 0, the thresholds 0, `levels` 1, z's `window` 1×1) and else the end of its range that does least:
-  `edge` 0.3 m, `tolerance` 0.5 m, x/y's `window` 3×3. The steps:
-  - the four recordings gone through first: the still and the moving stretches of each in its `segments.json`,
-    and what each holds (the distance, what the player does, its stretches, the columns it gives) in a table in
-    MOTION.md, above the results. The measure recording
-    has moves slow then fast, so it gives every column; the others give the still noise, how z follows the real
-    depth, and the lag, and slow against fast only where they hold such a move **(deduction)**;
-  - pass 1, the preset against neutral, on the four recordings: each part alone, and the pairs that depend on
-    each other together (step filter × `tolerance`, `smooth` × `catch_up`, `smooth` × `tolerance`,
-    `dead_zone` × `threshold`);
-  - pass 2, values, for the parts that matter, on the measure and the show recording and any recording where
-    pass 1 came out differently: half and double the preset's value inside its range (`levels` and the windows a
-    step down and up), the pairs in a small grid.
-
-  All rows of a recording replay its same three captures; the captures stay until Matthias is asked. The table
-  goes in [MOTION.md's settings](MOTION.md#the-settings), in place of the reasons from recordings that are gone.
-  A part that does nothing for the goal, or a value that holds on one recording only, is a question for C. The
-  recordings are at 0.65–1.5 m; 2–3.5 m stays C3's.
+- **A2.** The write-up of the motion's measurements (each part against neutral, then values): the tables into [MOTION.md's settings](MOTION.md#the-settings), in place of the reasons
+  from recordings that are gone, with what each of the four recordings holds above them; the rows from
+  `temp/depth_velocity/results.jsonl` (pass 1 on the four recordings, three captures each; pass 2 on hands and
+  measure, one capture; the short runs of 2026-11-17). Pass 2 on the show recording is not run; C2's run on the
+  four recordings takes its place. The captures stay until Matthias is asked.
+- **A3.** When A2 and C2 are done: the rows of [VIEW.md's depth table](VIEW.md#the-depth) that name the depth
+  mask's gate and `view.depth.tolerance` deleted; until then they stay beside the new baseline, to compare.
 
 Further measurements on the motion are free where a result points to something (Matthias, 2026-11-16), each
 stated before it is made.
-
-- **A5.** When A3 and A4 are done: the rows of [VIEW.md's depth table](VIEW.md#the-depth) that name the depth
-  mask's gate and `view.depth.tolerance` deleted; until then they stay beside the new baseline, to compare.
 
 ## B. The view
 
@@ -111,7 +74,7 @@ Its goal and what is built: [VIEW.md](VIEW.md). New points go here.
 
 ## C. The motion
 
-From A4's measurements (four recordings, every frame) and the short runs after it (one capture of hands and of
+From line A's measurements (four recordings, every frame) and the short runs after it (one capture of hands and of
 measure): z needs smoothing to be quiet, and what cuts a large, fast z most is a long smooth (kept 84% at 25 ms,
 43% at 100), which the catch-up gives back (82 to 85%) at almost no noise at rest; the dead zone costs z and lag
 with smoothing and is the quiet one only without; `tolerance` and `same_surface` show no effect; the x/y solve,
@@ -124,24 +87,37 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
 
 - **C1.** The catch-up's rule replaced by the 1€ filter's (Casiez, Roussel, Vogel 2012): the smoothing time is
   the smooth at rest over 1 + speed / halving speed, so long at rest and short in a motion, within a frame. Two
-  numbers: the smooth at rest (ms) and the halving speed (px per frame), the speed at which the time is half.
-  The speed is the larger of x/y's at the pixel (its 3 × 3, which carries little noise) and z's own, from a slow
-  copy of z's rate kept in the estimate where the dead zone's anchor is, so a push straight at the camera opens
-  it too. The dead zone, the catch-up's Emas and their texture go.
-  One run decides, the catch-up kept beside the new rule until then, uncommitted; the loser is removed before
-  the commit. On one capture of hands and of measure (`hands_1`, `measure_1`), about 15 minutes:
+  numbers: `smooth`, now the time at rest (ms), and the halving speed (px per frame, as the thresholds are), the
+  speed at which the time is half. In `depth_velocity_shader.frag`:
+  - the speed is x/y's at the pixel, the largest of its 3 × 3, with `xy.threshold` taken off, so x/y's noise at
+    rest opens nothing;
+  - whether z's own speed opens it too is measured, not assumed: a variant that takes the larger of x/y's speed
+    and z's, z's from a copy of its rate followed over the time at rest and kept in the catch-up's texture, so no
+    third number; kept only if a push straight at the camera lags without it (hands);
+  - the carry takes each texel's depth a frame on by its rate whenever `smooth` is above 0, as the catch-up had
+    it;
+  - `dead_zone` stays, a setting at 0, its gate after the filter as now; `xy_smooth` follows the time at rest, as
+    it follows `smooth` now.
 
-  | Rows                 | Settings                                                                          |
-  |----------------------|-----------------------------------------------------------------------------------|
-  | the raw reference    | `z.smooth` 0, `z.catch_up` 0, `z.threshold` 0, `xy.threshold` 0                    |
-  | the catch-up, 5      | `z.smooth` 0, 12, 25, 50, 100 with `z.catch_up` 8; `z.threshold` 0                  |
-  | the new rule, 12     | rest (`z.smooth`) 50, 100, 200 × halving speed 0.5, 1, 2, 4 px/frame; `z.threshold` 0 |
-  | the cut, 6 at most   | the best of each with `z.threshold` 0.5, 1, 2                                      |
-  | the tolerance, 2     | the best of each with `z.tolerance` 0.2 m, as saved                                |
+  The rule that wins stays; the other and its setting go before the commit, with what reads them: the catch-up's
+  Emas, `scripts/motion_bridge_pass_check.py`, the compare's setting maps, MOTION.md's parts and settings. The
+  presets (`settings.json`, `very nice.json`) keep a removed key until Matthias saves them; it is ignored.
+  One run decides, the catch-up kept beside the new rule until then, uncommitted. On one capture of hands and of
+  measure (`hands_1`, `measure_1`), about 20 minutes:
+
+  | Rows                  | Settings                                                                          |
+  |-----------------------|-----------------------------------------------------------------------------------|
+  | the raw reference     | `z.smooth` 0, `z.catch_up` 0, `z.threshold` 0, `xy.threshold` 0                    |
+  | the catch-up, 5       | `z.smooth` 0, 12, 25, 50, 100 with `z.catch_up` 8; `z.threshold` 0                  |
+  | the new rule, 12      | time at rest (`z.smooth`) 50, 100, 200 × halving speed 0.5, 1, 2, 4 px/frame, on x/y's speed; `z.threshold` 0 |
+  | with z's own speed, 4 | time at rest 100 × halving speed 0.5, 1, 2, 4, on the larger of x/y's and z's speed  |
+  | the cut, 6 at most    | the best of each with `z.threshold` 0.5, 1, 2                                      |
+  | the tolerance, 2      | the best of each with `z.tolerance` 0.2 m, as saved                                |
   | every row but the raw | `z.dead_zone` 0; `xy.threshold` 0.5, as saved, which is the catch-up's gate         |
-  | every row            | as saved: `xy.levels` 4, `xy.window` 7×7, `xy.damping` 0.03, `xy.same_surface` on, `z.edge` 0.1 m, `z.window` 7×7, `z.max_speed` 6 m/s, `z.xy_smooth` off; the view as captured; `z.tolerance` 0.5 m, where it starts a lagging estimate over least |
+  | every row             | as saved: `xy.levels` 4, `xy.window` 7×7, `xy.damping` 0.03, `xy.same_surface` on, `z.edge` 0.1 m, `z.window` 7×7, `z.max_speed` 6 m/s, `z.xy_smooth` off; the view as captured; `z.tolerance` 0.5 m, where it starts a lagging estimate over least |
 
-  Each row: still noise inside and at the edge (measure), z kept and lag against the raw reference (hands).
+  Each row: still noise inside and at the edge (measure), z kept and lag against the raw reference (hands), and
+  the motion's ms.
 - **C2.** The values, after C1, each measured on the four recordings and judged in the app: the smoothing's two
   numbers and z's `threshold`, with `dead_zone` 0; x/y's `threshold` around 0.4; a step up on `levels`, x/y's
   `window` and `damping` against their ms. The step filter and z's window stay unless a row shows a clear gain
@@ -152,13 +128,8 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
   at 2–3.5 m, made by the operator, and they measured there.
 
 Questions, for C:
-- The dead zone: with z smoothed, the smooth and the threshold do its job (still noise 0 on measure and edges
-  without it) and it costs a quarter to half of z and 20 to 50 ms. Removed (the setting, the anchor, its part of
-  the catch-up's rule) once C2's run on the four recordings holds without it?
 - `tolerance` and `same_surface` showed no effect on the four recordings, none of which has the case they are
   for, an arm moving sideways 10 to 20 cm before the chest. Measured on such a recording first, or constants now?
-- The numpy reference of the z track (`track_depth`) and its tests: kept, or gone with the compare's `--verify`
-  of z?
 
 ## D. The bridge
 
@@ -269,8 +240,8 @@ Not worked on until asked for; each with what is known.
 ## Rules it touches
 
 - A `Field` description is one short line of panel text: J1.
-- A measured table names its kind, date, commit, recording and settings: A1 to A4.
-- Ask to measure a time again when its pass's code or size changes: A3.
+- A measured table names its kind, date, commit, recording and settings: A1, A2.
+- Ask to measure a time again when its pass's code or size changes: C1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 - Shaders get checked in a GPU harness: C1.
