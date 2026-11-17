@@ -354,12 +354,12 @@
         "edge": 0.1,
         "window": "SEVEN",
         "tolerance": 0.2,
-        "smooth": 0.0,
+        "smooth": 100.0,
+        "halving_speed": 0.5,
         "xy_smooth": false,
-        "catch_up": 8.0,
-        "dead_zone": 0.02,
+        "dead_zone": 0.0,
         "max_speed": 6.0,
-        "threshold": 5.0
+        "threshold": 0.5
       },
       "monitor_main": {
         "texture": "z.output",

@@ -371,7 +371,6 @@
         "tolerance": 0.2,
         "smooth": 100.0,
         "xy_smooth": false,
-        "catch_up": 8.0,
         "dead_zone": 0.02,
         "max_speed": 6.0,
         "threshold": 5.0
