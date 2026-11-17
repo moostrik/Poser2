@@ -134,7 +134,7 @@ drops about ten frames of each kind in the first 0.3 s, while the panel is built
 
 ## The cadence
 
-Measured in -sim on the P800 recording (20261111-123241, 992 × 800 at 50 fps, the player in view), per loop of the
+Measured in -sim on the P800 recording (20261111-123241 ([gone](FLOW.md#recordings-gone)), 992 × 800 at 50 fps, the player in view), per loop of the
 recording, by `scripts/cadence_probe.py`; two loops each, the two runs back to back:
 
 | Depth alignment            | Motion measures | Ticks   | Tick p95 | Worst tick | Capture latency p95 | Camera thread p95 |
@@ -166,7 +166,7 @@ NEURAL_480, USB, 45 s each, the camera's thread converting on the GPU itself:
 | the dye still for over 50 ms       | 197 times, up to 104 ms | 0, at most 45.6 ms        |
 | render ticks                       | 80/s                    | 118/s                     |
 
-With a player in view the pose model's GPU work costs frames where any thread waits behind it. In -sim (`blocky`,
+With a player in view the pose model's GPU work costs frames where any thread waits behind it. In -sim (`blocky` (gone),
 50 fps, the host detector on the uploaded image), the pose step on the camera's thread and the render measuring
 only the newest capture per tick:
 

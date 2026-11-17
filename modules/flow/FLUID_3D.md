@@ -68,7 +68,7 @@ The depth scale is the box's depth over the smaller of its width and height (`de
 0.07 at 32 layers, 0.5 at 256 × 448 × 128): the box's depth stands for as much real depth as its width does, so
 a body moving toward the camera crosses the box's depth in the time the same speed crosses its width. At one
 scale with x and y, a near hand's real 2–3 m/s pushed water the box could not hold, and the projection turned
-it sideways: on standmoves at 448 × 800 × 32 the water reached 5.2 widths/s, scaled 1.7, no step above 2.
+it sideways: on standmoves ([gone](FLOW.md#recordings-gone)) at 448 × 800 × 32 the water reached 5.2 widths/s, scaled 1.7, no step above 2.
 
 `time_scale` is the fluid's time as a share of real time: every pass steps by dt × it, the sources and the drag
 included, so at 0.5 the whole fluid runs at half speed and keeps its shapes. A viscosity costs 0.7 ms a step.
@@ -247,7 +247,7 @@ pressure, each on the walls as [The walls](#the-walls) states:
 | `SOR`       | red-black Gauss–Seidel over-relaxed by `relaxation`: each color from the other's newest values (`sor_pressure_3d`); 1.95 diverged, so its range stops at 1.85                                                                                                                                                            | `iterations`, its sweeps |
 | `MULTIGRID` | V-cycles (`multigrid_pressure.py`): on each level two red-black Gauss–Seidel sweeps, the residual restricted to the level halved, its correction solved from 0 and added back trilinearly, two sweeps again; down to 8 × 14 × 4 at the default grid, 16 sweeps there in one dispatch; obstacles on the finest level only | `cycles`, 1              |
 
-Measured through the harness on stillslowfast, the step's time with `glFinish` around it, the solve's
+Measured through the harness on stillslowfast (gone), the step's time with `glFinish` around it, the solve's
 residual |div − L p| over |div| (the mean and the p99, at four quarters of the loop), and the projected
 velocity's divergence, central differences, a cell's share:
 
@@ -375,7 +375,7 @@ layer's slice (`VolumeCut`). `--every N` steps the bridge and the fluid once per
 summed dt, a frame-rate check. Numpy only where the harness cannot reach: the drag's share and
 floor as a formula (`test_drag.py`).
 
-On stillslowfast (353 frames, 43 ms each) and standmoves (1356 frames, 44 ms), the water on the
+On stillslowfast (gone) (353 frames, 43 ms each) and standmoves (gone) (1356 frames, 44 ms), the water on the
 moving player: its mean in the moves' fast halves over the body's (the trail's), the highest water
 over the loop over the highest body, and the coast, s after a move's end until the water is under
 20% of its fast mean; the body's coast beside it. The preset is `velocity_drag` 50 ms, `gain` 1,
@@ -437,7 +437,7 @@ speed off, a failsafe; the bridge's mix the boundary's trail alone and its lowpa
 the camera's crop (from its `view_span` of 0.76 m, **(deduction)**) where it is at least half there. Kept as tuned: the composite's look (`emission`, `opacity`,
 `tint`, `fog`).
 
-Measured with these on standmoves through the harness: the water 0.89 of the body's speed in the
+Measured with these on standmoves (gone) through the harness: the water 0.89 of the body's speed in the
 fast halves, its peak 0.76 of the body's, the step 11.5 ms with the harness (mean; p95 12.8).
 
 ### One unit
@@ -468,7 +468,7 @@ The output's allocation is not in it. A cell taken as the grid's width over the 
 ## Tuning
 
 What remains is the preset, saved by the operator on the clips: `depth`, the gains, `velocity_drag`, the
-lowpass's `smooth`, the mixes; judged on deep_flow with the standmoves and stillslowfast
+lowpass's `smooth`, the mixes; judged on deep_flow with the standmoves (gone) and stillslowfast (gone)
 recordings. Judge on: slow against fast reads; a stop coasts; a flick leaves one drop at its end
 with the body force's density; the burst's fps; the wall.
 
@@ -485,7 +485,7 @@ correction kept there grows the velocity at the walls step after step, to eight 
 second at the preset's grid (measured without the guard).
 
 Measured in a hidden window at 448 × 800 × 64, a swirl dragged in and left, then a square of
-density carried for 2 s, no confinement, no viscosity; and on stillslowfast through the harness at
+density carried for 2 s, no confinement, no viscosity; and on stillslowfast (gone) through the harness at
 the preset:
 
 | Measure                                                        | Semi-Lagrangian | MacCormack |
@@ -519,7 +519,7 @@ Each field chooses its limiter beside its advection (`velocity.limiter`, `densit
 REVERT, the paper's recommendation, the predictor where the correction overshoots. The correction overshoots
 at the sharpest features: the revert gives up the whole correction there, the clamp keeps the edge steep and
 flattens only its top; it keeps more of what the step lost, energy in a velocity, and clamps each channel on
-its own (a slight hue shift at an RGBA density's sharp edges). On standmoves at 4K, the luminance's gradient
+its own (a slight hue shift at an RGBA density's sharp edges). On standmoves (gone) at 4K, the luminance's gradient
 (mean / p99) over the lit pixels: revert 8.3 / 73, clamp 10.3 / 92, the plain step 5.1 / 45; the density pass
 4.1 ms for either limiter, 1.37 for the plain step. A blend of the plain step into the corrected value
 (Houdini's remedy for the revert's grid artifacts) takes sharpness back for nothing else to gain, so the
@@ -530,7 +530,7 @@ dye's size by the fine density's layers in deep_flow's preset (448 × 800 × 24,
 every advection), so it keeps the dye's color as the bridge made it, its bands and edges included, where the
 simulation's 288 × 512 cells blurred them **(site fact: less blocky)**; it moves without the turbulence below
 the grid, which only the fine density takes. Where the two are carried apart, the fine density lies where the
-density's amount is near 0 (3.9% of the pixels under 0.01 on the blocky recording at 4.7 s, with the density
+density's amount is near 0 (3.9% of the pixels under 0.01 on the blocky recording (gone) at 4.7 s, with the density
 on the grid's cells), and divided by almost nothing the color jumped from texel to texel. Each takes
 `COLOR_FLOOR` (0.01) of white before the division, so there the color fades to white; elsewhere the frames
 move by 1 of 255 on average.
@@ -554,7 +554,7 @@ expectation, whatever the look. Everything stays on the GPU: the CPU dispatches 
 reads no particle back.
 
 Measured in a hidden window, the output at 2160 × 3840, the grid 448 × 800 × 64, the step with the
-carrier's draw; with the ring full, and on stillslowfast through the harness at the preset (`rate` 2
+carrier's draw; with the ring full, and on stillslowfast (gone) through the harness at the preset (`rate` 2
 for the blobby looks):
 
 | `draw`, `overlap`   | Particles | Ring full, GPU ms | stillslowfast, ms mean / p95 |
@@ -655,7 +655,7 @@ detail than the bridge's 448 × 800 it comes from.
 | storage     | 3D textures, as every field: the advection reads a traced point in one trilinear fetch, z included, and the driver tiles the texels in x, y and z; a texture array filters within a layer only, two fetches and a mix for z, and its layers are tiled apart, which suits drawing into layers (the particles' slices), not tracing through them                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 Measured: the step at 4K × 16, 32 and 64 layers, semi-Lagrangian and MacCormack, against the budget,
-in TIMING.md; judged by eye against the RGBA 4K look on standmoves. A second preset, `flat.json`, for this
+in TIMING.md; judged by eye against the RGBA 4K look on standmoves (gone). A second preset, `flat.json`, for this
 look with a velocity grid still to pick (448 × 800 × 64 or 128 × 224 × 16).
 
 What a 4K volume cannot do, and so where the detail comes from:
@@ -713,7 +713,7 @@ with a faint glow (`emission` 0.1), the water turning blue with depth and dark b
 `fog` 0.32 widths), its shafts from `fog_scattering` 0.15 and broad caustics (`caustics` 0.6, `caustic_size` 0.25,
 `caustic_depth` 0.8), the dye glowing within by octaves (`scattering` 0.4), dark-rimmed by `powder` 0.6,
 its shadows lifted by `sky_fill` 0.15, the light a little forward (`anisotropy` 0.3, `back_scattering`
-0.2). Judged on stillslowfast through `fluid_compare.py` at 1080 × 1920, from the fluid's output alone:
+0.2). Judged on stillslowfast (gone) through `fluid_compare.py` at 1080 × 1920, from the fluid's output alone:
 the grade after it (the fluid layer's LUT, `composite.lut`, and its blend) and the camera's colors on the dye, white on the
 recording, are not in that picture.
 
@@ -819,7 +819,7 @@ Jacobi's 40 iterations leave 0.002 on both, and the density's total in the swirl
 solve unconverged. On the swing at ε 1.93, closed, the water keeps more of its speed (inside at 12 s
 0.0103 against 0.0080, semi-Lagrangian), and at ε 5 MacCormack's inside holds at 0.033 against the
 centered 0.021; `slip_time` 2 decays alike on both. Through `fluid_compare.py` the water against the body is
-the same within 0.01 on stillslowfast and standmoves. An obstacle's cells read 0 (`--obstacle`). Open
+the same within 0.01 on stillslowfast (gone) and standmoves (gone). An obstacle's cells read 0 (`--obstacle`). Open
 walls decay as the centered velocity's do (the swing at ε 1.93, the mean at 4 s and 6 s: 0.0073 and
 0.0032 against 0.0077 and 0.0031); the open swirl drains alike, its floor 0.0001 against the centered
 0.0005 to 0.0015.

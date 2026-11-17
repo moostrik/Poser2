@@ -72,7 +72,7 @@ among it; the pressure, multigrid since, is a quarter of what its 40 Jacobi iter
 0.09 of it ([The view](#the-view)); the motion is the same without the depth mask; the inject's 1.14 against
 0.71 is not looked into.
 
-The view and the motion run once per capture, 50 a second on the hands recording (44 on the standmoves
+The view and the motion run once per capture, 50 a second on the hands recording (44 on the standmoves ([gone](FLOW.md#recordings-gone))
 recording on 7 November); every other stage runs every frame.
 
 ### The view
@@ -257,10 +257,10 @@ switch, measured against the baseline, and then kept one of two ways or dropped:
 | not faster                                        | dropped, its row kept under Measured                                                                    |
 
 The test, the same for every item: three timing runs back to back, baseline, change, baseline
-(`-timing 60 -warmup 10`, the pose on, standmoves), the pass's own GPU timer the measure: the two
+(`-timing 60 -warmup 10`, the pose on, standmoves (gone)), the pass's own GPU timer the measure: the two
 baselines' difference is the noise, and the change counts as faster when it beats the pass it
 replaces by at least 2.5 times that; then
-`scripts/fluid_compare.py` on stillslowfast, A the baseline, B the change, its numbers and the
+`scripts/fluid_compare.py` on stillslowfast (gone), A the baseline, B the change, its numbers and the
 composited output side by side (a `--save` to add). The same numbers and the same picture: a
 replacement. Different: an option, judged on the look in the app.
 
@@ -299,7 +299,7 @@ its row under Measured.
 Each change, by its number in [How each is judged](#how-each-is-judged), against the code before it, three runs back to back (`trial_runs.py`, the preset with the
 density on the grid unless the row says otherwise): the pass before, with the change, before again. The
 noise is the two befores' difference; a change counts as faster when it beats both by 2.5 times that.
-The harness's check is `fluid_compare.py` on stillslowfast, its water numbers and four saved outputs
+The harness's check is `fluid_compare.py` on stillslowfast (gone), its water numbers and four saved outputs
 against the code before.
 
 | #   | Change                                                                               | Pass, ms mean                      | Before | Change | Before again | Noise | Faster | Harness and picture      | Kept as     |
@@ -436,7 +436,7 @@ Sources: [McAdams, Sifakis, Teran 2010](https://pages.cs.wisc.edu/~sifakis/proje
 ## The staggered velocity
 
 The velocity on the cells' faces ([FLUID_3D.md](FLUID_3D.md#the-staggered-velocity)) against the centered one
-(`28655856`), deep_flow's preset, in the app (`trial_runs.py`, standmoves, the pose on), ms mean, two runs each
+(`28655856`), deep_flow's preset, in the app (`trial_runs.py`, standmoves (gone), the pose on), ms mean, two runs each
 within 0.03:
 
 | Pass                     | Centered | Faces | Faces, three R16F |
@@ -475,7 +475,7 @@ measured again.
 
 ## The motion and the bridge
 
-Each pass alone on the stillslowfast frames (`motion_bridge_pass_check.py`, 448 × 800, 4 levels, window 3), two
+Each pass alone on the stillslowfast (gone) frames (`motion_bridge_pass_check.py`, 448 × 800, 4 levels, window 3), two
 runs each:
 
 | Change                                                               | Before   | After    | The result                        |
@@ -493,7 +493,7 @@ the floats' last bits the solve amplifies. Not worth a pass of their own: the ba
 ### The body at its own depth
 
 The z positions and the passes they ride in ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)), each pass alone on the
-stillslowfast frames as above, the second of two runs, deep_flow's preset with the lowpass's `blur` at 0.081:
+stillslowfast (gone) frames as above, the second of two runs, deep_flow's preset with the lowpass's `blur` at 0.081:
 
 | Step                                                         | lowpass | with its rate | bandpass | with its accelerations | the bridge whole | motion whole |
 |--------------------------------------------------------------|---------|---------------|----------|------------------------|------------------|--------------|
@@ -548,7 +548,7 @@ volume's round trip saves.
 
 `density.advection` apart from the velocity's, deep_flow's preset (288 × 512 × 64 cells, the 4K amount
 2160 × 3840 × 24, `fine_density.sample` MIDDLE): the density's pass alone (`fluid_pass_check.py`), and on
-stillslowfast at 2160 × 3840 the composited output's sharpness, its luminance's gradient mean and p99 over
+stillslowfast (gone) at 2160 × 3840 the composited output's sharpness, its luminance's gradient mean and p99 over
 the lit pixels, at four steps of the loop (`fluid_compare.py --save`):
 
 | `density.advection` | density pass, ms | the fluid's step, ms mean / p95 | gradient mean | gradient p99 |
@@ -561,7 +561,7 @@ speckle where the limiter clamps **(deduction from the picture)**.
 
 ## The box as deep as it is wide
 
-`depth_check.py` on stillslowfast's fast half, deep_flow's preset (288 × 512 × 64 cells), the body's own z
+`depth_check.py` on stillslowfast (gone)'s fast half, deep_flow's preset (288 × 512 × 64 cells), the body's own z
 off (its share 0) so what shows is xy turned into z; `isotropy_check.py` for the swirls:
 
 | The box                                  | water z / xy | divergence after the projection, /s | the step, ms mean / p95 |
@@ -592,7 +592,7 @@ multigrid's semi-coarsened levels, against 1.04 in the thin box's cubic cells.
 | the sweep stored sheared, only the layers in the box   | 0.31  | 1.32      | 1.64 |
 | the sky's light in the light on the dye                | 0.30  | 1.13      | 1.43 |
 
-The picture stays the same over the changes: on stillslowfast at 2160 × 3840, against the third row, the
+The picture stays the same over the changes: on stillslowfast (gone) at 2160 × 3840, against the third row, the
 8-bit outputs at four steps differ by 0.01 to 0.05 on average, their p99 1.
 
 | Part of the look      | its cost, light + composite |

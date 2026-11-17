@@ -121,56 +121,26 @@ image's noise and texture into the depth. No read adds depth detail inside the b
 the outline and stays the depth's, interpolated, inside it. A depth pixel's own flicker stays, as a soft bump of
 its size; removing it would filter the depth's noise.
 
+The upscale's edge, 0.1 m (`EDGE`), keeps the four depth pixels of one surface: blended across an edge, they
+make a ramp of in-between depths whose steps the motion's step filter drops, so fewer pixels at the edge carry z
+(on the earlier path at 20 frames a second, the share of the mask without a z position 3.9% with the limit, 6.0%
+without it) **(deduction)**.
+
 Measured with `scripts/depth_velocity_capture.py` and `depth_velocity_compare.py` on the measure recording
-(`20261112-125832_measure`), 2026-11-16: three captures of its first 16.5 s (the app at about 19 fps while it
-saves the frames), replayed through the motion on its raw output (the thresholds, `z.smooth` and `z.catch_up` at
-0); the still part 1–5 s, the slow move 5.5–10 s, the fast 11.5–16 s; z as the fluid gets it, in px per frame,
-weighted by the mask; noise the still part's p99 12 px and more inside the mask and within 6 px of its edge; slow
-and fast z's mean inside; fit the image's brightness gradient (Sobel, 0 to 1) along the mask's edge; "no z
-position" the share of the mask where the motion's z position has no weight; regions from the mask above 0.5.
-The views before this one (`MASK`, the one path) are replayed from their own captures, their depth set to 0
-where their depth mask was 0, which gives z what that gate gave it; their captures hold the mask as 0 or 1, the
-view's as 0 to 1, which touches about one pixel of the edge's six. Each row the mean of three unless it says; one
-run's noise swings by about ±0.4 inside and ±0.3 at the edge.
+(`20261112-125832_measure`), 2026-11-16, commit fdf8f8de: three captures of its first 16.5 s, every camera frame
+(810 a capture, `measure_1` to `measure_3`), replayed through the motion on its raw output (`xy.threshold`,
+`z.threshold` and `z.smooth` at 0); the preset then (the view's `guided_radius` 3; the motion's `levels` 4, `edge`
+0.1 m, `tolerance` 0.2 m, `dead_zone` 0.02 m); the still part 1–5 s, the slow move 5.5–10 s, the fast 11.5–16 s;
+z as the fluid gets it, in px per frame, weighted by the mask; noise the still part's p99 12 px and more inside
+the mask and within 6 px of its edge; slow and fast z's mean inside; fit the image's brightness gradient (Sobel,
+0 to 1) along the mask's edge; "no z position" the share of the mask where the motion's z position has no weight;
+regions from the mask above 0.5. In brackets the three captures' spread:
 
-| View (`view.depth.tolerance` 0.2 m)   | No z position | Fit   | z noise inside / edge | Slow  | Fast  | Fast ÷ noise | x/y at edge | View, GPU |
-|---------------------------------------|---------------|-------|-----------------------|-------|-------|--------------|-------------|-----------|
-| `MASK`, gated by its depth mask       | 3.7%          | 0.493 | 12.32 / 5.93          | 0.567 | 0.828 | 0.067        | 1.87        |           |
-| the one path, gated by its depth mask | 3.7%          | 0.491 | 12.28 / 5.90          | 0.540 | 0.855 | 0.070        | 1.84        |           |
-| the upscale alone, without the fill   | 4.4%          | 0.491 | 11.97 / 5.94          | 0.559 | 0.843 | 0.071        | 1.75        |           |
-| the upscale and the fill, the preset  | 3.9%          | 0.492 | 11.84 / 6.07          | 0.542 | 0.831 | 0.070        | 1.82        | 0.20 ms   |
-| the same, tolerance 10 m (bilinear)   | 6.0%          | 0.492 | 12.37 / 5.15          | 0.560 | 0.821 | 0.067        | 1.82        |           |
-| the edge 0.1 m, `guided_radius` 3, one run | 3.8%     | 0.580 | 12.02 / 5.96          | 0.547 | 0.838 | 0.070        | 1.69        |           |
+| Result                 | No z position | Fit   | z noise inside / edge | Slow  | Fast  | Fast ÷ noise | x/y at edge | View, GPU |
+|------------------------|---------------|-------|-----------------------|-------|-------|--------------|-------------|-----------|
+| the view as built      | 3.6% (0.0)    | 0.567 | 9.06 / 5.04 (0.03)    | 0.347 | 0.649 | 0.072        | 1.39 (0.00) | 0.20 ms   |
 
-The view as built gives z what the paths before it gave, with no depth mask: every column lies within the runs'
-spread but the share without a z position, 3.9% against 3.7%, with no mechanism found. Without the fill the band
-between the depth's edge and the mask's has no z (4.4%). What is left with the fill is the motion's step filter's
-band ([MOTION.md](MOTION.md#depth_velocity-z)). The earlier paths replayed without their gate gave an edge noise of
-15.2, z from the background's depth the read left inside the mask.
-
-Without the tolerance's limit (10 m, the four depth pixels always blended) the share without a z position rises
-from 3.9% to 6.0% and the edge's noise falls from 6.1 to 5.2, both past the runs' spread: a blend across an edge
-makes a ramp of in-between depths, whose steps the motion's step filter drops, so fewer pixels at the edge carry
-z **(deduction)**. With the limit, more of the mask carries z and the edge is a little noisier; the real z,
-slow and fast, is the same either way.
-
-The view as it is now (the edge a constant 0.1 m, the fill always on), one run with the preset's `guided_radius`
-3 where the rows above have 2: every z column lies within or at the edge of the preset row's three runs. The fit
-rises and x/y at the edge falls, as the wider guided filter moves the mask's edge further onto the image's
-(**deduction**); the two changes are not measured apart.
-
-The rows above were captured while the capture saved each frame inside the loop, which left the motion 20 of the
-camera's 50 frames a second, its interval held at 20 to 40 ms; no row below compares with them. With the frames
-kept in memory and saved after the loop the motion gets every frame, and three captures agree within 0.03:
-
-| Result, 2026-11-16, commit fdf8f8de with the scripts of A2 | No z position | Fit   | z noise inside / edge | Slow  | Fast  | Fast ÷ noise | x/y at edge | View, GPU |
-|-------------------------------------------------------------|---------------|-------|-----------------------|-------|-------|--------------|-------------|-----------|
-| the view as built, every frame, three captures (spread)     | 3.6% (0.0)    | 0.567 | 9.06 / 5.04 (0.03)    | 0.347 | 0.649 | 0.072        | 1.39 (0.00) | 0.20 ms   |
-
-The measure recording's first 16.5 s, 810 frames a capture (`measure_1` to `measure_3`), the preset as saved (the
-view's `guided_radius` 3, edge 0.1 m; the motion's `levels` 4, `edge` 0.1 m, `tolerance` 0.2 m, `dead_zone`
-0.02 m) with `xy.threshold`, `z.threshold`, `z.smooth` and `z.catch_up` at 0; the stretches and the columns as
-above.
+What is left without a z position is the motion's step filter's band ([MOTION.md](MOTION.md#depth_velocity-z)).
 
 ## The mask
 

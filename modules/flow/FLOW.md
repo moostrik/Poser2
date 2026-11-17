@@ -45,6 +45,14 @@ A stage is judged against its goal on its own output, the stages after it neutra
 motion's raw output, its smoothing and thresholds at 0 (`z.smooth`, `xy.threshold`,
 `z.threshold`), so a later stage's filters do not hide it.
 
+### Recordings gone
+
+A table measured on a recording no longer on disk is not reproducible, and its stage is measured again on a
+recording that is when the stage is next worked on. The recordings gone, marked "(gone)" where a document names
+them: stillslowfast (`20261103-184710`), standmoves (`20261103-215324`), blocky (`20261111-091147`), and the P800
+recording `20261111-123241`. Captures of the first three remain in `temp/depth_velocity`, at 20 of the camera's
+50 frames a second. The recordings on disk are in [MOTION.md's settings](MOTION.md#the-settings).
+
 ## The two systems
 
 | System  | Velocity | Motion                                          | Bridge      | Fluid            | Without depth                   | With depth                                         |

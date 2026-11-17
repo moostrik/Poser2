@@ -100,10 +100,23 @@ The defaults are the best measured for deep_flow, in this order of importance:
 - B: a clear difference between slow and fast motion, in x, y and z
 - C: least smear
 
-Every number is measured with `scripts/depth_velocity_compare.py` on the GPU, unless marked
-**(deduction)**. The configuration: the flow at 448×800, deep_flow's preset, Neural Depth on an
-OAK4, and two recordings at 0.65–1.5 m: `stillslowfast` (still, then an arm slow and fast) and
-`standmoves` (arm sweeps, pushes toward the camera). The whole flow takes 2.0 ms per frame.
+Every number is measured with `scripts/depth_velocity_capture.py` and `depth_velocity_compare.py` on the GPU,
+unless marked **(deduction)**, 2026-11-16 and 17, commits fdf8f8de to 73861281: the flow at 448×800, the preset
+then, Neural Depth on an OAK4, every camera frame (50 a second), each part against its neutral value with the
+parts after it neutral, on the motion's raw output (the thresholds, `smooth` and `dead_zone` at 0) unless a row
+says. Three captures a recording agree within 0.1; the rows here are their mean. Noise is the still stretch's
+p99 per pixel inside the player (12 px and more from the mask's edge) and at its edge (within 6 px), in px per
+frame; kept is a side's share of the raw output's motion over the moves. The whole motion takes about 2 ms a
+frame. The recordings, at 0.65–1.5 m, their stretches in `segments.json` in each recording's folder:
+
+| Recording                 | What the player does                                   | Distance  | Still       |
+|---------------------------|--------------------------------------------------------|-----------|-------------|
+| `20261112-125832_measure` | still, then an arm sideways, slow then fast            | 1.2 m     | 1–5 s       |
+| `20261112-124918_hands`   | hands pushed toward the camera and back, close         | 0.5–0.8 m | 0.8 s, not quite |
+| `20261112-130012_edges`   | arm waves and hands at the silhouette, a turn           | 1.2 m     | 2 s         |
+| `20261112-130105_show`    | free movement, walking in and out                       | 1.0–1.6 m | 0.9 s       |
+
+The measure recording's arm moves sideways, so it says little about z kept or its lag; those come from hands.
 
 ### lucas_kanade
 
@@ -120,35 +133,64 @@ knob on z's size; the depth velocity's settings set z's noise and lag, not its s
 | Setting      | Default | Range (step)        | For | Why                                    |
 |--------------|---------|---------------------|-----|----------------------------------------|
 | levels       | 3       | 1–5 (1)             | B   | follows fast motion                    |
-| window       | 7×7     | 3×3–9×9             | B   | fast ÷ noise 4.4, against 3.7 at 5×5   |
-| damping      | 0.03    | 0–0.1 (0.001)       | B   | takes the x/y noise, keeps slow motion |
-| same_surface | on      | on/off              | C   | less smear, a hand far in front        |
-| threshold    | 0.5     | 0–5 px/frame (0.05) | B   | the solve's jitter off                 |
+| window       | 7×7     | 3×3–9×9             | B   | follows more of the motion than 3×3 or 5×5 |
+| damping      | 0.03    | 0–0.1 (0.001)       | B   | x/y's noise a quarter of undamped      |
+| same_surface | on      | on/off              | C   | no measured effect                     |
+| threshold    | 0.5     | 0–5 px/frame (0.05) | B   | the still x/y noise 0                  |
 
-- levels: 1 and 2 barely see motion at 448×800. Each level is solved at its own size (Bouguet's
-  pyramid), so more levels stay clean. 5 levels reach about 32 px per frame: on `stillslowfast` with
-  thresholds 0, fast x/y goes 0.51 → 1.30 and fast ÷ noise 3.6 → 5.3, for +0.33 ms; on `standmoves`
-  the sweep's z drops 2.04 → 1.55 and the push keeps its z.
-- window: 7×7 smears more than 5×5, but B ranks above C.
-- same_surface works only where a no-depth band separates the hand from what is behind it, as with a
-  hand held far out. Where a limb is about 20 cm before the body, Neural Depth ramps over about 30 px
-  instead of stepping, and the patch's samples stay within the tolerance; see
-  [FLOW_PLAN.md](FLOW_PLAN.md#c-the-motion). It costs +0.05 ms.
+The x/y solve, on the raw output, with `levels` 4 (the preset) as the reference: x/y kept over the moves, and
+x/y's still noise inside (measure / hands / edges / show):
+
+| Change                 | x/y kept                    | x/y still noise              |
+|------------------------|-----------------------------|------------------------------|
+| none                   | 1                           | 0.22 / 0.96 / 0.27 / 0.42    |
+| `levels` 1             | 0.17 / 0.17 / 0.30 / 0.12   | 0.09 / 0.22 / 0.14 / 0.22    |
+| `levels` 3             | 0.67 / 0.68 (measure / hands) | 0.19 / 0.65                |
+| `levels` 5             | 1.22 / 1.27                 | 0.25 / 1.09                  |
+| `window` 3×3           | 0.57 / 0.56 / 0.73 / 0.53   | 0.17 / 0.46 / 0.23 / 0.36    |
+| `window` 5×5           | 0.85 / 0.82                 | 0.20 / 0.84                  |
+| `window` 9×9           | 1.08 / 1.13                 | 0.22 / 1.01                  |
+| `damping` 0            | 1.39 / 1.44 / 1.09 / 1.36   | 1.23 / 1.76 / 1.11 / 1.10    |
+| `damping` 0.015        | 1.11 / 1.09                 | 0.29 / 1.00                  |
+| `damping` 0.06         | 0.86 / 0.89                 | 0.16 / 0.95                  |
+| `same_surface` off     | 1.00 / 1.02 / 1.00 / 1.00   | the same                     |
+| `threshold` 0.5        | 0.81 / 0.83 / 0.73 / 0.92   | 0                            |
+
+The x/y solve leaves z as it is, but a solve that follows less reads part of a slide as z (`levels` 1: z 22%
+larger on show). A level doubles the motion the solve follows, about 2 × 2^(levels − 1) px per frame; `levels`
+5 follows about a fifth more than 4. `same_surface` works only where a no-depth band separates the hand from
+what is behind it; the step filter and the mask leave little for it to separate **(deduction)**.
 
 ### depth_velocity (z)
 
 | Setting   | Default      | Range (step)    | For | Why                                    |
 |-----------|--------------|-----------------|-----|----------------------------------------|
-| edge      | 0.1 m        | 0.05–0.3 (0.01) | A   | halves the edge spikes                 |
-| window    | 7×7          | 1×1–9×9         | A   | the most samples averaged              |
-| tolerance | 0.2 m        | 0.05–0.5 (0.01) | B   | keeps a push's z                       |
+| edge      | 0.1 m        | 0.05–0.3 (0.01) | A   | the edge noise 40% below 0.3 m          |
+| window    | 7×7          | 1×1–9×9         | A   | the edge noise a quarter of 1×1         |
+| tolerance | 0.2 m        | 0.05–0.5 (0.01) | B   | no measured effect against 0.5 m        |
 | smooth        | 100 ms       | 0–500 (1)       | A   | the still z noise 31× below the raw    |
 | halving_speed | 0.5 px/frame | 0.05–5 (0.05)   | B   | a push lags 11 ms, keeps 87% of its z  |
 | xy_smooth     | off          | on/off          | B   | x/y without extra lag                  |
 | dead_zone     | 0 m          | 0–0.05 (0.001)  | B   | with z smoothed it costs z and lag     |
 | threshold     | 0.5 px/frame | 0–5 (0.05)      | A   | the still z noise 0                    |
 
-- tolerance at 0.05: a push loses 77% of its z, and the track restarts 6× as often while moving.
+- edge, window and tolerance on the raw output, z's still noise inside / at the edge (measure / hands / edges /
+  show):
+
+  | Change              | Inside                       | At the edge                  |
+  |---------------------|------------------------------|------------------------------|
+  | none                | 12.9 / 30.4 / 11.8 / 14.1    | 6.0 / 10.1 / 5.9 / 6.1       |
+  | `edge` 0.05 m       | 12.0 / 26.3 (measure / hands) | 4.4 / 5.5                   |
+  | `edge` 0.2 m        | 14.0 / 33.6                  | 8.0 / 17.9                   |
+  | `edge` 0.3 m        | 14.4 / 34.1 / 13.1 / 14.6    | 9.4 / 19.9 / 9.3 / 10.0      |
+  | `window` 1×1        | 15.4 / 35.1 / 14.5 / 16.1    | 24.3 / 28.8 / 24.3 / 24.1    |
+  | `window` 5×5        | 13.5 / 31.6                  | 9.5 / 13.4                   |
+  | `window` 9×9        | 12.2 / 29.4                  | 4.7 / 9.3                    |
+  | `tolerance` 0.5 m   | 13.0 / 30.7 / 11.9 / 14.1    | 6.1 / 12.0 / 6.0 / 6.1       |
+
+  `edge` 0.05 m keeps 97% of hands' z; z's `window` changes how much a small part blurs, not z's size. A
+  `tolerance` of 0.5 m against 0.2 kept a little more z with smoothing on show (0.47 against 0.42 with the
+  catch-up then).
 - smooth and halving_speed, measured 2026-11-17 on one capture of the hands recording (lag, z kept against
   the raw) and of the measure recording (the still noise inside / at the edge, px per frame), `dead_zone` 0,
   `tolerance` 0.5 m:

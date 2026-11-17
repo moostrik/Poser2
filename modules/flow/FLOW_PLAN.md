@@ -11,7 +11,7 @@ operator saw.
 
 | #   | Line                                                                         | State                            | Documents                                          |
 |-----|------------------------------------------------------------------------------|----------------------------------|----------------------------------------------------|
-| A   | [The measurements](#a-the-measurements)                                      | measured; the write-up open      | [FLOW.md](FLOW.md#the-goals)                       |
+| A   | [The measurements](#a-the-measurements)                                      | built                            | [FLOW.md](FLOW.md#the-goals)                       |
 | B   | [The view](#b-the-view)                                                      | built                            | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; steps open                | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; the body force            | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
@@ -32,38 +32,9 @@ distinct.
 
 ## A. The measurements
 
-The goal: a measurement that can be trusted the first time, and kept only while it still says something. Two
-kinds:
-- **Time**: what a pass costs, in ms on the GPU or the CPU. It holds while the pass's code and size are the same,
-  whatever the recording; it goes stale when the pass changes.
-- **Result**: what a stage makes (z's noise and its real z, the fit, the water's speed, the look). It holds only
-  for its recording, its settings and its code paths; 2026-11-16 showed all three move it (a panel setting slipped
-  into a capture, a baseline compared without the gate it was made with, one run swinging ±0.6).
-
-The rules are in `.claude/rules/flow.md`, "Flow measurements".
-
-What is measured today (the tables with numbers in the flow's documents, 73), by the recording they name:
-| Recording                         | Still on disk        | Kind            | Where                                                        |
-|-----------------------------------|----------------------|-----------------|--------------------------------------------------------------|
-| `20261112-125832_measure`         | yes                  | result, time    | VIEW.md's depth tables; TIMING.md's view (one path); INPUT_THREADS.md's waits and cadence |
-| `20261112-124918_hands`           | yes                  | time            | TIMING.md's stages (15 November); INPUT_THREADS.md           |
-| `20261112-130012_edges`           | yes                  | time            | TIMING.md's view (`SURFACE`, `MASK`, gone)                   |
-| `20261112-130105_show`            | yes                  | time            | RESOLUTION.md, MONITOR.md                                    |
-| stillslowfast (`20261103-184710`) | no, its capture only | result, time    | FLUID_3D.md (pressure, advection, particles, look), VIEW.md's mask table, TIMING.md (speed-ups, baseline, the look) |
-| standmoves (`20261103-215324`)    | no, its capture only | result, time    | BRIDGE_3D.md, MOTION.md, FLUID_3D.md's measuring, TIMING.md  |
-| blocky (`20261111-091147`)        | no, its capture only | result, time    | INPUT_THREADS.md's cadence, TIMING.md's box                  |
-| `20261111-123241`                 | no                   | time            | INPUT_THREADS.md's cadence                                   |
-| none named                        |                      | mostly time     | about half: BRIDGE_3D.md's filters' GPU, FLUID_3D.md's walls and expansion, TIMING.md's particles and budget |
-
-- **A1.** Every table on a recording no longer on disk (stillslowfast, standmoves, blocky, `20261111-123241`)
-  marked as not reproducible, beside the recording it names; measured again when its stage is next worked on.
-- **A2.** The write-up of the motion's measurements (each part against neutral, then values): the tables into [MOTION.md's settings](MOTION.md#the-settings), in place of the reasons
-  from recordings that are gone, with what each of the four recordings holds above them; the rows from
-  `temp/depth_velocity/results.jsonl` (pass 1 on the four recordings, three captures each; pass 2 on hands and
-  measure, one capture; the short runs of 2026-11-17). Pass 2 on the show recording is not run; C2's run on the
-  four recordings takes its place. The captures stay until Matthias is asked.
-- **A3.** When A2 and C2 are done: the rows of [VIEW.md's depth table](VIEW.md#the-depth) that name the depth
-  mask's gate and `view.depth.tolerance` deleted; until then they stay beside the new baseline, to compare.
+Built: the rules in `.claude/rules/flow.md`, "Flow measurements"; the motion's measuring, its recordings and its
+tables in [MOTION.md's settings](MOTION.md#the-settings); the view's baseline in [VIEW.md](VIEW.md#the-depth);
+the recordings gone and what that means for their tables in [FLOW.md](FLOW.md#recordings-gone).
 
 Further measurements on the motion are free where a result points to something (Matthias, 2026-11-16), each
 stated before it is made.
@@ -213,7 +184,6 @@ Not worked on until asked for; each with what is known.
 ## Rules it touches
 
 - A `Field` description is one short line of panel text: J1.
-- A measured table names its kind, date, commit, recording and settings: A1, A2.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
