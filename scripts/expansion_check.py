@@ -1,10 +1,9 @@
-"""The expansion through the projection: after it, the water's divergence is φ, in a closed box and an open one.
+"""The expansion through the projection: the water's divergence after it, in a closed box and an open one.
 
 The fluid at deep_flow's preset, the water at rest, a disc of full presence at z position 0.5 injected as the
-expansion at `--rate` (1/s); one projection. Per wall it prints φ's sum over the water's cells (0 in a closed box,
-the mean taken off), the divergence's mean, and the error, the RMS of the divergence less φ over φ's RMS. The
-solve's own floor beside it: the same box, no source, the swinging body's velocity dragged in and projected
-once, the RMS of the divergence after over before. The error with a source should be of the floor's order.
+expansion at `--rate` (1/s); one projection. Per wall it prints the presence's sum over the cells and the
+divergence's mean (0 in a closed box). The solve's own floor beside it: the same box, no source, the swinging
+body's velocity dragged in and projected once, the RMS of the divergence after over before.
 
 `--time`: the expansion's GPU time in a closed box instead, the median of 40 runs each: the injection, the mean,
 the divergence pass and the projection, without and with it.
@@ -25,7 +24,7 @@ from OpenGL.GL import glFinish  # noqa: E402
 
 import monitor_harness as mh  # noqa: E402
 import maccormack_check as mc  # noqa: E402
-from modules.flow import Advection, Fluid3D, divergence_target  # noqa: E402
+from modules.flow import Advection, Fluid3D  # noqa: E402
 
 W, H = mc.W, mc.H
 
@@ -76,11 +75,9 @@ def with_source(wall: str, rate: float, overrides: list[str]) -> None:
         expansion = fluid._expansion_vol.read_to_numpy()
         assert expansion is not None
         expansion = expansion.astype(np.float64).reshape(fluid._depth, fluid._simulation_height, fluid._simulation_width, -1)[..., 0]
-        phi = divergence_target(expansion, rate, closed=wall == 'CLOSED')
         fluid._enforce_incompressibility()
         div = divergence(fluid)
-        print(f'{wall:<7} source  φ sum {phi.sum():+.2e}  presence {expansion.sum():8.1f} cells  divergence mean {div.mean():+.2e}  '
-              f'error RMS(div − φ) / RMS(φ) {rms(div - phi) / max(rms(phi), 1e-12):.4f}', flush=True)
+        print(f'{wall:<7} source  presence {expansion.sum():8.1f} cells  divergence mean {div.mean():+.2e}', flush=True)
     finally:
         presence_texture.deallocate()
         place_texture.deallocate()

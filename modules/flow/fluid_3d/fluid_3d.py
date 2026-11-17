@@ -7,7 +7,6 @@ modules/flow/FLUID_3D.md, "The fluid", "The inputs" and "The walls".
 import math
 from dataclasses import replace
 
-import numpy as np
 from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_REPEAT, GL_R16F, GL_R32F, GL_R8, GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
 
 from modules.gl import ComputeShader, StorageBuffer, SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
@@ -57,7 +56,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-# ── the drag's arithmetic, the shader's in numpy ─────────────────────────
+# ── the drag's share ────────────────────────────────────────────────────
 
 def drag_share(delta_time: float, drag_time: float) -> float:
     """The share of the gap to the body's velocity the water closes in one step of `delta_time` (s):
@@ -65,21 +64,6 @@ def drag_share(delta_time: float, drag_time: float) -> float:
     if drag_time <= 0.0:
         return 1.0
     return 1.0 - math.exp(-delta_time * 1000.0 / drag_time)
-
-
-def drag_gate(speed: np.ndarray) -> np.ndarray:
-    """Where the body is: its speed (widths/s) over the floor, at most 1."""
-    return np.minimum(speed / DRAG_FLOOR, 1.0)
-
-
-def drag_velocity_step(velocity: np.ndarray, boundary: np.ndarray, gain: float, share: float, weight: float = 1.0,
-                       slab: float = 1.0) -> np.ndarray:
-    """One drag step on (..., 3) velocities, in the volume's frame: v + (boundary × gain − v) × pull, with
-    pull = share × gate × weight × slab, `boundary` the body's velocity. Mirrors add_to_faces_3d.comp's drag,
-    without its w = −z."""
-    gate: np.ndarray = drag_gate(np.linalg.norm(boundary, axis=-1, keepdims=True))
-    pull: np.ndarray = share * gate * weight * slab
-    return velocity + (boundary * gain - velocity) * pull
 
 
 # ---------------------------------------------------------------------------

@@ -151,8 +151,8 @@ the trail's speed above a floor, `min(|v_body| / DRAG_FLOOR, 1)`, `DRAG_FLOOR` a
 widths/s, so a dead trail drags nothing toward 0; `weight` is the injection's, `slab` the gaussian.
 Every factor is at most 1, so the injection never passes its target, whatever `gain`, `weight` or
 the frame rate: it leaves the fluid at most as fast as the body × `gain`; what the simulation then
-does with the velocity, the projection and the confinement, is its own. w = −z. The arithmetic is
-in numpy beside the fluid (`drag_share`, `drag_gate`, `drag_velocity_step`, `test_drag.py`).
+does with the velocity, the projection and the confinement, is its own. w = −z. `share` is set on the CPU (`drag_share`, tested in
+`test_drag.py`).
 
 `density.advection_scale` and `temperature.advection_scale` are 1: the density moves with the water.
 `velocity.advection_scale` is 1: the velocity carries itself the full step, the physics; viscosity and
@@ -370,8 +370,7 @@ through the flow, a `Bridge3DLayer` and a `Fluid3DLayer` per side, A against B, 
 preset and one setting changed by its panel path (`fluid.input.velocity_drag=0`,
 `bridge.readings.lowpass.smooth=300`), and reads the fluid's velocity and density on the injection
 layer's slice (`VolumeCut`). `--every N` steps the bridge and the fluid once per N frames with the
-summed dt, a frame-rate check. Numpy only where the harness cannot reach: the drag's share and
-floor as a formula (`test_drag.py`).
+summed dt, a frame-rate check. The drag's share, set on the CPU, is tested as a formula (`test_drag.py`).
 
 On stillslowfast (gone) (353 frames, 43 ms each) and standmoves (gone) (1356 frames, 44 ms), the water on the
 moving player: its mean in the moves' fast halves over the body's (the trail's), the highest water

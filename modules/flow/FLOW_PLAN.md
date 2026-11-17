@@ -17,7 +17,6 @@ operator saw.
 | D   | [The bridge](#d-the-bridge)                                                  | built; D3 at the screen          | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | the temperature                  | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | open                             | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
-| G   | [No numpy copies of shaders](#g-no-numpy-copies-of-shaders)                  | G3                               | `.claude/rules/gl.md`                              |
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                      | [FLOW.md](FLOW.md)                                 |
 | I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | not started                      | [FLOW.md](FLOW.md)                                 |
 | J   | [Every setting and its description](#j-every-setting-and-its-description)    | last, after the refactor         | `CLAUDE.md`, `.claude/rules`                       |
@@ -113,16 +112,6 @@ What is built: [FLUID_3D.md](FLUID_3D.md#the-density).
   times the pixels; the cut at 2 sigma and the lower cap ([TIMING.md](TIMING.md#the-particles-1)), judged on the
   look.
 
-## G. No numpy copies of shaders
-
-Shaders are checked in a GPU harness, so a numpy copy of one only invites the next. Each step removes a stage's
-copies, the tests and script parts built on them and their mentions in the documents; the CPU arithmetic that
-sets a shader's values (a weight, a sigma, a share) is no copy and stays, with its tests. A harness case is made
-when a shader needs one.
-
-- **G3.** The fluid's: the drag's gate and step, `expansion_mean.py`; `test_expansion.py`, `test_drag.py`'s
-  part, `expansion_check.py`'s target; FLUID_3D.md's lines on them.
-
 ## H. One unit across the stages
 
 - **H1.** Every length in the flow in the smaller side's widths: the motion's velocity, the bridge's readings, the
@@ -209,6 +198,5 @@ The cameras:
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
-- Shaders get checked in a GPU harness; remove obsolete pathways: G3.
 
 Not designed yet, so their rules are not named: C3, D3, E1, E2, F1, H1, I1 to I4.

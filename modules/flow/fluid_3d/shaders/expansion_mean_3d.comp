@@ -6,7 +6,6 @@
  *   0  each workgroup sums its cells' expansion and counts its water cells (an obstacle's is none) into
  *      uPartials[group]
  *   1  one workgroup sums the partials and writes the mean, the sum over the count, to uMean
- * The numpy reference is fluid_3d.expansion_mean.
  */
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;    // 256 a group, pass 1 one group of 256
