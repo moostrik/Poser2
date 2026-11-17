@@ -100,7 +100,6 @@ def main() -> None:
         ('inject: drag', lambda: fluid.drag_velocity(body), 16.0 * faces),
         ('inject: body force', lambda: fluid.add_acceleration(body), 16.0 * faces),
         ('inject: boundary density', lambda: fluid.add_boundary_density(dye), 16.0 * cells + 4.0 * fine),
-        ('inject: body force density', lambda: fluid.add_body_force_density(dye), 16.0 * cells + 4.0 * fine),
     ]
     print(f'{w} x {h} x {d} cells, the fine density {fine / 1e6:.0f} M texels; floor at {args.bandwidth:.0f} GB/s')
     print(f"{'pass':<30} {'ms':>7} {'floor ms':>9} {'x floor':>8}")

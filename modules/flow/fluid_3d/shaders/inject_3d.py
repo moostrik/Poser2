@@ -12,8 +12,7 @@ from .z_position_binding import bind_z_position
 class InjectMode(IntEnum):
     """How a source goes into a field."""
     ADD = 0         # added × dt, unbounded
-    RATE = 1        # added × dt, the field capped at its full value (fully dyed, ±1 warm)
-    FILL = 2        # the field dragged toward the source by the drag's share, never past it
+    FILL = 1        # the field dragged toward the source by the drag's share, never past it
 
 
 class Inject3D(ComputeShader):
@@ -38,8 +37,8 @@ class Inject3D(ComputeShader):
             spread: Gaussian sigma in normalized depth units
             strength: Injection strength multiplier
             internal_format: Image format for volume binding
-            mode: 0 ADD, 1 RATE (added, capped at full), 2 FILL (dragged toward the input, never past it)
-            scalar: A signed scalar in r, capped at ±1, else a premultiplied density, its alpha at 1
+            mode: 0 ADD, 1 FILL (dragged toward the input, never past it)
+            scalar: A signed scalar in r, else a premultiplied density
             gain: FILL: the input times this, at most full, is the target
             z_position: The input's z position (red over green); a pixel without one, or every pixel without
                 it, puts nothing in

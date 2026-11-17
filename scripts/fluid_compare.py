@@ -6,7 +6,7 @@ FRAMES is what depth_velocity_capture saved from one loop of a recording. No app
 gives the GL context, one `LucasKanadeFlow3D` measures the saved frames with the settings they were saved with,
 and every side is a `Bridge3DLayer` and a `Fluid3DLayer` on its velocity, with deep_flow's preset (`render.bridge`,
 `render.fluid`); PATH=VALUE sets one setting by its panel path under `bridge.` or `fluid.`
-(fluid.input.boundary.velocity_drag=50, bridge.readings.lowpass.smooth=300, fluid.input.boundary.velocity_gain=2). The bridge and the
+(fluid.input.velocity_drag=50, bridge.readings.lowpass.smooth=300, fluid.input.velocity_gain=2). The bridge and the
 fluid step once per flow frame by the frame's saved interval; `--every N` steps them once per N frames with the
 frames' summed interval (the flow still measures every frame), a frame-rate check. `--save DIR` writes every side's
 composited output at four steps of the loop, a quarter apart, as 8-bit PNGs (DIR/<side>_<step>.png), for a picture
@@ -101,13 +101,11 @@ class Side:
         self.bridge.update()
         out = self.bridge.output
         injection = Injection(out.boundary_velocity, out.boundary_density, out.boundary_temperature,
-                              out.body_force_acceleration, out.body_force_density, out.body_force_temperature,
+                              out.body_force_acceleration,
                               boundary_velocity_z_position=out.boundary_velocity_z_position,
                               boundary_density_z_position=out.boundary_density_z_position,
                               boundary_temperature_z_position=out.boundary_temperature_z_position,
-                              body_force_acceleration_z_position=out.body_force_acceleration_z_position,
-                              body_force_density_z_position=out.body_force_density_z_position,
-                              body_force_temperature_z_position=out.body_force_temperature_z_position)
+                              body_force_acceleration_z_position=out.body_force_acceleration_z_position)
         self.fluid.set_input(FluidInput(delta_time, [injection]))
         glFinish()
         began = time.perf_counter()

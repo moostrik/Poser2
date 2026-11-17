@@ -21,8 +21,8 @@ from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 @dataclass
 class Injection:
     """One bridge output as one fluid takes it: the boundary's `boundary_velocity`, `boundary_density`,
-    `boundary_temperature` and the body force's `body_force_acceleration`, `body_force_density`,
-    `body_force_temperature` and the 3D bridge's `expansion` from the bridge output, at `weight`, 0 to 1, the injection's share of the fluid's velocity, density and temperature, as a layer's weight in a mix. The app
+    `boundary_temperature`, the body force's `body_force_acceleration` and the 3D bridge's `expansion` from the
+    bridge output, at `weight`, 0 to 1, the injection's share of the fluid's velocity, density and temperature, as a layer's weight in a mix. The app
     sets the weight from whatever it reads; the fluid never knows why. `color` is the color the 2D fluid gives
     the injection's density at its output, where the 2D density is an amount; the 3D fluid's density arrives
     colored and ignores it."""
@@ -30,15 +30,11 @@ class Injection:
     boundary_density: Texture
     boundary_temperature: Texture
     body_force_acceleration: Texture | None = None
-    body_force_density: Texture | None = None
-    body_force_temperature: Texture | None = None
     weight: float = 1.0
     boundary_velocity_z_position: Texture | None = None
     boundary_density_z_position: Texture | None = None
     boundary_temperature_z_position: Texture | None = None
     body_force_acceleration_z_position: Texture | None = None
-    body_force_density_z_position: Texture | None = None
-    body_force_temperature_z_position: Texture | None = None
     expansion: Texture | None = None
     expansion_z_position: Texture | None = None
     color: tuple[float, float, float] = (1.0, 1.0, 1.0)

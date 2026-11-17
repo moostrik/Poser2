@@ -14,7 +14,7 @@ operator saw.
 | A   | [The measurements](#a-the-measurements)                                      | built                            | [FLOW.md](FLOW.md#the-goals)                       |
 | B   | [The view](#b-the-view)                                                      | built                            | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; C2 the values tonight     | [MOTION.md](MOTION.md)                             |
-| D   | [The bridge](#d-the-bridge)                                                  | built; the panels                | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
+| D   | [The bridge](#d-the-bridge)                                                  | built; D3 at the screen          | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | the temperature                  | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | open                             | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                      | [FLOW.md](FLOW.md)                                 |
@@ -88,31 +88,8 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
 What is built: [BRIDGE_3D.md](BRIDGE_3D.md), and what the fluid does with it,
 [FLUID_3D.md](FLUID_3D.md#the-inputs).
 
-The textbooks put a body in water two ways: as a boundary, the water dragged toward the body's velocity and never
-past it; and as a body force, an acceleration added, which the water keeps after the body is gone, so a stop can
-throw the water on. Dye and warmth have no force: they are held at the body (a boundary value) or added (a
-source). Seen in the app, 2026-11-17: the stop as an acceleration gives nice effects; the added dye shows little
-difference **(site fact)**. With the video's colors as the dye, adding piles them up into a smear, where holding
-keeps the picture **(deduction)**.
+Seen in the app, 2026-11-17: the stop as an acceleration gives nice effects **(site fact)**.
 
-- **D1.** The panels by what the fluid gets, the `boundary` and `body_force` groups gone.
-  - The bridge: `readings`, then one panel per output, named as the output: `boundary_velocity` (with its
-    peak), `body_force_acceleration`, `boundary_density`, `boundary_temperature`, `expansion`. The outputs,
-    `Injection`, the ports and the 2D bridge keep their names, so the panels mirror the outputs and keep the
-    textbook words.
-  - The added dye and warmth removed: their mixes, outputs and z positions in the bridge, the fluid's
-    `add_body_force_density` and `add_body_force_temperature`, `density_rate` and `temperature_rate`, and the
-    injection's `RATE` mode and its branch in the injection shader, which only they use; `FILL` and `ADD`
-    stay. Seven outputs become five.
-  - The fluid's `input`, one flat panel in the order the layer injects: `spread`, `velocity_drag`,
-    `velocity_gain`, `acceleration_gain`, `density_drag`, `density_gain`, `temperature_drag`,
-    `temperature_gain`, `expansion_rate`. The acceleration takes no drag: it has no target to close on, and its
-    timing is the bandpass's (`fast_smooth`, `slow_smooth`).
-  - In the same change: every call site (`fluid_compare.py` among them); both presets, `settings.json` and
-    `very nice.json`, and any port they pick for a monitor; BRIDGE_3D.md, FLUID_3D.md, FLOW.md's panel lines
-    and TIMING.md's mention of `body_force.acceleration`. hd_trio keeps its own copy and does not change.
-  - Checked by: the flow's and the render's unit tests; `injection_check.py` for the shader; deep_flow `-sim`
-    loading both presets with no unknown key and the monitors showing their textures.
 - **D3.** The acceleration tuned at the screen: which readings (`stop`, `change`, `wake`) and its `gain`.
 
 ## E. The 3D fluid's physics
@@ -230,8 +207,5 @@ Not worked on until asked for; each with what is known.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
-- Update all call sites; keep presets in sync; remove obsolete pathways: D1.
-- Name the fluid's things by the textbook word (`boundary`, `body_force`): D1.
-- A settings class mirrors the code it configures, a group for each step in the order the code runs them: D1.
 
 Not designed yet, so their rules are not named: D3, E1, E2, F1, H1, I1 to I4.

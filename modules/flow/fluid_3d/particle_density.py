@@ -141,10 +141,10 @@ class ParticleDensity(DensityCarrier):
         spread: float = settings.input.spread / FULL_WIDTH_HALF_MAXIMUM / max(self._z_extent, 1e-6)     # the sigma, a share of the depth
         return slab_sum(REFERENCE_Z_POSITION, spread, self._layers) / max(self.settings.particles.rate, 1e-6)
 
-    def add(self, texture: Texture, gain: float, dt: float, spread: float, mode: InjectMode = InjectMode.RATE,
+    def add(self, texture: Texture, gain: float, dt: float, spread: float, mode: InjectMode = InjectMode.FILL,
             target_gain: float = 1.0, z_position: Texture | None = None) -> None:
         """Particles born where the dye is, as many as its presence × the rate; a FILL's share counted as that
-        share of fully dyed added in the step, so a particle look sees both systems alike."""
+        share of fully dyed added in the step, so a particle look sees a FILL and an ADD alike."""
         if mode == InjectMode.FILL:
             gain = gain * target_gain / max(dt, 1e-6)
         if not self.allocated or not texture.allocated or gain <= 0.0:

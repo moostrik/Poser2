@@ -89,36 +89,35 @@ The rule, by what each input is. The trail is a velocity in the fluid's own unit
 would act as an acceleration and its gain as a rate. In Navier–Stokes the body force is an
 acceleration per unit mass; a body in the fluid is a boundary that moves.
 
-| Input is              | The fluid                                                                | Here                                                     |
-|-----------------------|--------------------------------------------------------------------------|----------------------------------------------------------|
-| a body's velocity     | is dragged toward it where the body is, over a time, never past it       | the bridge's `boundary.velocity`                         |
-| a velocity change, Δv | adds it once in total: as an acceleration, the pulse over its area, × dt | the bandpass's readings as accelerations                 |
-| an acceleration       | adds it × dt                                                             | buoyancy, the vorticity force, `body_force.acceleration` |
-| a source              | adds it × dt, an amount per second                                       | the densities and the temperatures                       |
+| Input is                  | The fluid                                                                | Here                                                               |
+|---------------------------|--------------------------------------------------------------------------|--------------------------------------------------------------------|
+| a body's value            | is dragged toward it where the body is, over a time, never past it       | `boundary_velocity`, `boundary_density`, `boundary_temperature`    |
+| a velocity change, Δv     | adds it once in total: as an acceleration, the pulse over its area, × dt | the bandpass's readings as accelerations                           |
+| an acceleration           | adds it × dt                                                             | buoyancy, the vorticity force, `body_force_acceleration`           |
+| a source                  | adds it × dt, an amount per second                                       | the expansion's volume                                             |
 
 ### What the fluid takes
 
 What the fluid does with each of the bridge's outputs; the readings they are mixed from, and what
 each output says of the body, are in [BRIDGE_3D.md](BRIDGE_3D.md#the-mix).
 
-The outputs, in two subpanels, one per system, each a mix of the six readings, and the expansion in its own; the fluid's settings
-say how the water follows each; the densities and the temperatures go in by `inject_3d`, `FILL` for
-the boundary, `RATE` for the body force:
+The five outputs, each a mix of the six readings in its own subpanel of the bridge; the fluid's `input`, one
+panel in the order the layer injects them, says how the water follows each; the density and the temperature
+go in by `inject_3d`'s `FILL`:
 
-| Subpanel     | Output         | Unit                              | The fluid                                                                                                                      | The fluid's setting                  | 1 means                               |
-|--------------|----------------|-----------------------------------|--------------------------------------------------------------------------------------------------------------------------------|--------------------------------------|---------------------------------------|
-| `boundary`   | `velocity`     | widths/s                          | drags the water toward it where it is non-zero, over `velocity_drag`, never past it (`add_to_faces_3d`, [The drag](#the-drag)) | `input.boundary.velocity_gain`       | the water as fast as the body         |
-| `boundary`   | `density`      | the dye: color × presence, 0 to 1 | fills the water toward it × `density_gain` (at most 1) in the slab, never past it, over `density_drag`                         | `input.boundary.density_gain`        | fully dyed at 1 width/s               |
-| `boundary`   | `temperature`  | warmth, -1 to 1                   | drags the water toward it × `temperature_gain` (at most ±1) in the slab where the body is, over `temperature_drag`             | `input.boundary.temperature_gain`    | fully warm or cold at 1 width/s       |
-| `body_force` | `acceleration` | widths/s²                         | adds it × dt (`add_to_faces_3d`)                                                                                               | `input.body_force.acceleration_gain` | a Δv added once                       |
-| `body_force` | `density`      | a push's dye, presence 0 to 1     | adds it at a rate × dt into the slab, capped at fully dyed: the pipette                                                        | `input.body_force.density_rate`      | fully dyed per second at a full push  |
-| `body_force` | `temperature`  | a push's warmth, -1 to 1          | adds it at a rate × dt into the slab, capped at ±1                                                                             | `input.body_force.temperature_rate`  | full warmth per second at a full push |
-| `expansion`  | `expansion`    | presence, 0 to 1                  | the projection makes the divergence the rate × it, not 0 ([The expansion](#the-expansion))                                     | `input.expansion_rate`               | its volume gained per second, 1/s     |
+| Output                    | Unit                              | The fluid                                                                                                                      | The fluid's setting       | 1 means                           |
+|---------------------------|-----------------------------------|--------------------------------------------------------------------------------------------------------------------------------|---------------------------|-----------------------------------|
+| `boundary_velocity`       | widths/s                          | drags the water toward it where it is non-zero, over `velocity_drag`, never past it (`add_to_faces_3d`, [The drag](#the-drag)) | `input.velocity_gain`     | the water as fast as the body     |
+| `body_force_acceleration` | widths/s²                         | adds it × dt (`add_to_faces_3d`)                                                                                               | `input.acceleration_gain` | a Δv added once                   |
+| `boundary_density`        | the dye: color × presence, 0 to 1 | fills the water toward it × `density_gain` (at most 1) in the slab, never past it, over `density_drag`                         | `input.density_gain`      | fully dyed at 1 width/s           |
+| `boundary_temperature`    | warmth, -1 to 1                   | drags the water toward it × `temperature_gain` (at most ±1) in the slab where the body is, over `temperature_drag`             | `input.temperature_gain`  | fully warm or cold at 1 width/s   |
+| `expansion`               | presence, 0 to 1                  | the projection makes the divergence the rate × it, not 0 ([The expansion](#the-expansion))                                     | `input.expansion_rate`    | its volume gained per second, 1/s |
 
-The two subpanels are the two systems every solver distinguishes: a moving boundary, whose values
-the water takes, and the body force, which adds to it. The boundary's density and temperature are
-dragged toward as its velocity is, each over its own time and never past the body's value; the body
-force's are added at a rate, capped at fully dyed and ±1.
+The boundary and the body force are the two systems every solver distinguishes: a moving boundary,
+whose values the water takes, and the body force, which adds to it. The boundary's density and
+temperature are dragged toward as its velocity is, each over its own time and never past the body's
+value. The acceleration takes no drag: it has no target to close on, and its timing is the bandpass's
+(`fast_smooth`, `slow_smooth`).
 
 ### The body's depth
 
@@ -355,13 +354,12 @@ module by what it does, everything else by its quantity.
 | Kind                      | Names                                                                                                                                           |
 |---------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
 | the mixes' knobs          | shares, 0 to 1, one per reading in each output, summed                                                                                          |
-| the fluid's input methods | `drag_velocity`, `add_acceleration`, `add_boundary_density`, `add_body_force_density`, `add_boundary_temperature`, `add_body_force_temperature` |
+| the fluid's input methods | `drag_velocity`, `add_acceleration`, `add_boundary_density`, `add_boundary_temperature`, `add_expansion`                                        |
 | the fluid's fields        | `velocity` (its own settings: fade, evaporation, top speed, vorticity, viscosity, self-advection), `density`, `temperature`, `pressure`         |
 
 The readings, the filters, the two systems, the input groups and the wall are the flow
-documents' ([FLOW.md](FLOW.md#terms)). "Drag" is what the fluid does with `boundary.velocity`, seen as `velocity_drag`, not the name of a
-thing; "impulse", "body" alone, "force" alone, "model" and "delta" name nothing; "brush" and
-"pipette" are the physics of the two densities, not names. A reading is what a module of the
+documents' ([FLOW.md](FLOW.md#terms)). "Drag" is what the fluid does with `boundary_velocity`, seen as `velocity_drag`, not the name of a
+thing; "impulse", "body" alone, "force" alone, "model" and "delta" name nothing. A reading is what a module of the
 bridge makes from the motion; not "signal", "band", "component", "event".
 
 ## Measuring
@@ -369,7 +367,7 @@ bridge makes from the motion; not "signal", "band", "component", "event".
 Tests go through the harness, `scripts/fluid_compare.py` beside `bridge_compare.py`: nothing saves
 the bridge's outputs, so it chains the saved frames of a recording (`depth_velocity_capture`)
 through the flow, a `Bridge3DLayer` and a `Fluid3DLayer` per side, A against B, with deep_flow's
-preset and one setting changed by its panel path (`fluid.input.boundary.velocity_drag=0`,
+preset and one setting changed by its panel path (`fluid.input.velocity_drag=0`,
 `bridge.readings.lowpass.smooth=300`), and reads the fluid's velocity and density on the injection
 layer's slice (`VolumeCut`). `--every N` steps the bridge and the fluid once per N frames with the
 summed dt, a frame-rate check. Numpy only where the harness cannot reach: the drag's share and
@@ -396,7 +394,7 @@ injection, the projection and the confinement **(deduction)**. With `smooth` 300
 falls from 0.85 to 0.23 s and the water's stays at 0.94: the coast is the fluid's. The GPU time in
 the harness is the step with its composite at 2160 × 3840, timed by `glFinish` around it.
 
-The body force, the stop and the change as accelerations alone (`boundary.velocity.trail` 0), the
+The body force, the stop and the change as accelerations alone (`boundary_velocity.trail` 0), the
 highest water mean around the stops, at the frames' rate and at every second frame:
 
 | Reading as acceleration | Stop, 23 fps | Stop, 11.5 fps |
@@ -413,18 +411,18 @@ the fluid alone wants the bridge at the frames' rate and the fluid at every seco
 Every field gets the default its meaning says, so a fresh settings file reads as the design, not
 as a tuning:
 
-| Field                                                                                                                                      | Default         | Means                                                                                                                            |
-|--------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------------------------------------------------------------------------------------------------------------------------------|
-| `input.boundary.velocity_gain`                                                                                                             | 1               | the water as fast as the body                                                                                                    |
-| `input.boundary.velocity_drag`                                                                                                             | 50 ms           | how fast the water takes the body's speed                                                                                        |
-| `input.body_force.acceleration_gain`                                                                                                       | 1               | a Δv added once                                                                                                                  |
-| `input.boundary.density_drag`, `temperature_drag`; `density_gain`, `temperature_gain`; `input.body_force.density_rate`, `temperature_rate` | 200 ms; 1; 1 /s | the water takes the dye in a fifth of a second, fully dyed where the body moves at 1 width/s; a full push dyes fully in a second |
-| `density.advection_scale`, `temperature.advection_scale`                                                                                   | 1               | the density moves with the water                                                                                                 |
-| `velocity.advection_scale`                                                                                                                 | 1               | the velocity carries itself the full step                                                                                        |
-| `width`, `height`, `depth`                                                                                                                 | 256, 448, 128   | half a width deep, within 60 fps                                                                                                 |
-| `fine_density.enabled`, `particles.enabled`                                                                                                | off, off        | the density drawn                                                                                                                |
-| `input.spread`                                                                                                                             | 0.2             | the body 0.2 widths thick at half its height                                                                                     |
-| `wall` (every field, the volume)                                                                                                           | closed          | the operator's settings                                                                                                          |
+| Field                                                                          | Default       | Means                                                                                        |
+|--------------------------------------------------------------------------------|---------------|----------------------------------------------------------------------------------------------|
+| `input.velocity_gain`                                                          | 1             | the water as fast as the body                                                                |
+| `input.velocity_drag`                                                          | 50 ms         | how fast the water takes the body's speed                                                    |
+| `input.acceleration_gain`                                                      | 1             | a Δv added once                                                                              |
+| `input.density_drag`, `temperature_drag`; `density_gain`, `temperature_gain`   | 200 ms; 1     | the water takes the dye in a fifth of a second, fully dyed where the body moves at 1 width/s |
+| `density.advection_scale`, `temperature.advection_scale`                       | 1             | the density moves with the water                                                             |
+| `velocity.advection_scale`                                                     | 1             | the velocity carries itself the full step                                                    |
+| `width`, `height`, `depth`                                                     | 256, 448, 128 | half a width deep, within 60 fps                                                             |
+| `fine_density.enabled`, `particles.enabled`                                    | off, off      | the density drawn                                                                            |
+| `input.spread`                                                                 | 0.2           | the body 0.2 widths thick at half its height                                                 |
+| `wall` (every field, the volume)                                               | closed        | the operator's settings                                                                      |
 
 The fields' physics take the textbook's water, with no artificial decay or thickness, as defaults: the
 fields' `fade_time` and `evaporation_time` 0 (off: the water keeps its momentum, the density and the warmth
@@ -469,8 +467,7 @@ The output's allocation is not in it. A cell taken as the grid's width over the 
 
 What remains is the preset, saved by the operator on the clips: `depth`, the gains, `velocity_drag`, the
 lowpass's `smooth`, the mixes; judged on deep_flow with the standmoves (gone) and stillslowfast (gone)
-recordings. Judge on: slow against fast reads; a stop coasts; a flick leaves one drop at its end
-with the body force's density; the burst's fps; the wall.
+recordings. Judge on: slow against fast reads; a stop coasts; the burst's fps; the wall.
 
 ## The advection
 
@@ -613,7 +610,7 @@ and a streak's alpha is its mass.
 
 | Part       | How                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 |------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| emission   | each tick, at the bridge's size, the boundary's density and the body force's, each by its setting in `input`: a texel spawns `rate × amount × dt` particles, rounded by a hash so faint dye still spawns now and then; each takes an even share of the texel's amount as its mass, the density's color, a random place in the texel and a z drawn from the injection slab's gaussian; no velocity of its own, the grid carries it and the drag gave the grid the body's |
+| emission   | each tick, at the bridge's size, the boundary's density, by its settings in `input`: a texel spawns `rate × amount × dt` particles, rounded by a hash so faint dye still spawns now and then; each takes an even share of the texel's amount as its mass, the density's color, a random place in the texel and a z drawn from the injection slab's gaussian; no velocity of its own, the grid carries it and the drag gave the grid the body's                          |
 | one knob   | a high `rate` many light particles, the points' and the streaks' look; a low `rate` few heavy ones, the blobs'; the mass and the size follow                                                                                                                                                                                                                                                                                                                            |
 | duration   | three things end a particle, the first that comes: `density.fade_time`, the mass's exponential decay, as the grid density's; `evaporation_time`, the saturating loss, as the grid density's; the ring, once more are alive than `count`, the oldest fading over `ring_fade` before they are overwritten                                                                                                                                                                 |
 | the budget | in a steady state about `rate` × the emission × the lifetime are alive; while that stays under `count` the fade decides how long dye lasts and the ring is only the cap; the panel shows the seconds the ring takes to wrap, one counter read asynchronously, no particle                                                                                                                                                                                               |

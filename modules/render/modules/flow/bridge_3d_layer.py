@@ -1,10 +1,9 @@
 """The 3D bridge layer: the velocity lowpass and the velocity bandpass read a 3D velocity (xyz) into six
-readings, each as a velocity and as an acceleration; two mixes make what the fluid takes from them: the
-boundary (a velocity, density, temperature from the readings as velocities) and the body force (an
-acceleration from the readings as accelerations, its density and temperature a push's presence from the
-readings as velocities, the change of speed); a third, the expansion, where the water swells, a presence from
-the readings as velocities and the mask. Each density and temperature is 0 to 1 (±1 warm): a presence,
-the readings' speed in widths/s, capped at 1, the dye the fluid fills the water toward or adds at a rate.
+readings, each as a velocity and as an acceleration; one mix per output makes what the fluid takes from them:
+the boundary's velocity, density and temperature from the readings as velocities, the body force's
+acceleration from the readings as accelerations, and the expansion, where the water swells, a presence from
+the readings as velocities and the mask. The density and the temperature are 0 to 1 (±1 warm): a presence,
+the readings' speed in widths/s, capped at 1, the dye the fluid fills the water toward.
 
 Each trail holds where its motion was, a z position; every output mixes its readings' z positions by the
 readings' sizes at its shares (`ZPositionMix`), so the fluid takes each at the depth it was made at, and a
@@ -66,32 +65,10 @@ class BoundaryTemperatureSettings(TemperatureBridgeSettings, BoundaryAmountMixSe
     """The boundary's temperature: its mask's mix, then its warmth."""
 
 
-class BodyForceDensitySettings(DensityBridgeSettings, AmountMixSettings):
-    """The body force's density: its amount's mix (a push's change of speed), then its color."""
-
-
-class BodyForceTemperatureSettings(TemperatureBridgeSettings, AmountMixSettings):
-    """The body force's temperature: its mask's mix (a push's change of speed), then its warmth."""
-
-
 class Bridge3DReadingsSettings(BaseSettings):
     """What the bridge reads from the motion: the lowpass and the bandpass."""
     lowpass  = Group(VelocityLowpassSettings)
     bandpass = Group(VelocityBandpassSettings)
-
-
-class BoundarySettings(BaseSettings):
-    """The boundary: what the water is dragged toward, the readings mixed as velocities."""
-    velocity    = Group(BoundaryVelocitySettings)
-    density     = Group(BoundaryDensitySettings)
-    temperature = Group(BoundaryTemperatureSettings)
-
-
-class BodyForceSettings(BaseSettings):
-    """The body force: what is added × dt, the readings mixed as accelerations."""
-    acceleration = Group(MixSettings)
-    density      = Group(BodyForceDensitySettings)
-    temperature  = Group(BodyForceTemperatureSettings)
 
 
 READINGS: tuple[str, ...] = ('trail', 'change', 'start', 'bow', 'stop', 'wake')
@@ -104,29 +81,33 @@ class ExpansionSettings(AmountMixSettings):
 
 
 class Bridge3DLayerSettings(BridgeLayerSettings):
-    """Configuration for Bridge3DLayer: the readings, then the boundary, the body force and the expansion with
-    their mixes."""
-    readings   = Group(Bridge3DReadingsSettings)
-    boundary   = Group(BoundarySettings)
-    body_force = Group(BodyForceSettings)
-    expansion  = Group(ExpansionSettings)
+    """Configuration for Bridge3DLayer: the readings, then one group per output, named as the output, in the
+    order the bridge makes them: the boundary's what the water is dragged toward (the readings mixed as
+    velocities), the body force's what is added × dt (the readings mixed as accelerations)."""
+    readings                = Group(Bridge3DReadingsSettings)
+    boundary_velocity       = Group(BoundaryVelocitySettings)
+    body_force_acceleration = Group(MixSettings)
+    boundary_density        = Group(BoundaryDensitySettings)
+    boundary_temperature    = Group(BoundaryTemperatureSettings)
+    expansion               = Group(ExpansionSettings)
 
 
 class Bridge3DLayer(BridgeLayer):
     """The 3D bridge layer. The lowpass reads the trail, the bandpass the change, start, bow, stop and wake, each
     reading as a velocity (widths/s) and as an acceleration (widths/s²). Each output mixes the six at a share,
     0 to 1, as the light renderer mixes its layers; the readings of one unit share it, so the mix has no gain.
-        boundary     the readings as velocities: `velocity`; `density` and `temperature` from their sizes
-        body_force   the readings as accelerations: `acceleration`; `density` and `temperature` from the
-                     readings as velocities, a push's change of speed; each None while its shares are all 0
-        expansion    the readings as velocities and the mask: a presence, capped at 1; None while its
-                     shares are all 0, and the newest capture's in a tick of several
-    The density and the temperature are colored by a density and a temperature bridge per side, with the
-    same color. The defaults are the boundary's trail alone.
+        boundary_velocity        the readings as velocities
+        body_force_acceleration  the readings as accelerations; None while its shares are all 0
+        boundary_density         the readings' speeds and the mask, colored by a density bridge
+        boundary_temperature     the readings' speeds and the mask, warmed by a temperature bridge
+        expansion                the readings' speeds and the mask: a presence, capped at 1; None while its
+                                 shares are all 0, and the newest capture's in a tick of several
+    The defaults are the trail alone in the boundary's outputs.
 
     The bandpass runs while a share of one of its readings is above 0, or a monitor shows one of its ports
     (a port's `prepare` says it is shown, and the next tick runs it), from rest when it starts; a filter
-    writes its accelerations while the body force takes one of its readings or a monitor shows it.
+    writes its accelerations while the body force's acceleration takes one of its readings or a monitor
+    shows it.
 
     With several captures in one render tick (`BridgeInput.same_tick`) the densities and the temperatures it
     hands out are, per pixel, those of the capture with the larger amount (`CaptureMax`); the rest the newest's."""
@@ -140,64 +121,53 @@ class Bridge3DLayer(BridgeLayer):
         self._bandpass_shown: bool = False
         self._bandpass_running: bool = False    # it ran the tick before
         self._boundary_velocity: Fbo = Fbo()            # xyz, widths/s
+        self._body_force_acceleration: Fbo = Fbo()      # xyz, widths/s²
         self._boundary_density_amount: Fbo = Fbo()
         self._boundary_temperature_amount: Fbo = Fbo()
-        self._body_force_acceleration: Fbo = Fbo()      # xyz, widths/s²
-        self._body_force_density_amount: Fbo = Fbo()
-        self._body_force_temperature_amount: Fbo = Fbo()
         self._boundary_velocity_z_position: Fbo = Fbo()             # red over green
+        self._body_force_acceleration_z_position: Fbo = Fbo()
         self._boundary_density_z_position: Fbo = Fbo()
         self._boundary_temperature_z_position: Fbo = Fbo()
-        self._body_force_acceleration_z_position: Fbo = Fbo()
-        self._body_force_density_z_position: Fbo = Fbo()
-        self._body_force_temperature_z_position: Fbo = Fbo()
         self._expansion: Fbo = Fbo()                    # a presence, 0 to 1
         self._expansion_z_position: Fbo = Fbo()
-        self._peak: VelocityPeak = VelocityPeak(settings.boundary.velocity.peak)    # the boundary velocity's p99 speed
+        self._peak: VelocityPeak = VelocityPeak(settings.boundary_velocity.peak)    # the boundary velocity's p99 speed
         self._mix_shader: WeightedSum = WeightedSum()
         self._z_position_mix_shader: ZPositionMix = ZPositionMix()
-        self._boundary_density: DensityBridge = DensityBridge(settings.boundary.density)
-        self._boundary_temperature: TemperatureBridge = TemperatureBridge(settings.boundary.temperature)
-        self._body_force_density: DensityBridge = DensityBridge(settings.body_force.density)
-        self._body_force_temperature: TemperatureBridge = TemperatureBridge(settings.body_force.temperature)
+        self._boundary_density: DensityBridge = DensityBridge(settings.boundary_density)
+        self._boundary_temperature: TemperatureBridge = TemperatureBridge(settings.boundary_temperature)
         self._gpu_timer: GpuTimer = GpuTimer("GPU bridge")
         self._lowpass_timer: GpuTimer = GpuTimer("GPU bridge lowpass")
         self._bandpass_timer: GpuTimer = GpuTimer("GPU bridge bandpass")
-        self._mix_timer: GpuTimer = GpuTimer("GPU bridge mix")      # the outputs' mixes, the densities and temperatures
-        # The densities and temperatures over a tick's captures: boundary and body force, each density and temperature
+        self._mix_timer: GpuTimer = GpuTimer("GPU bridge mix")      # the outputs' mixes, the density and the temperature
+        # The density and the temperature over a tick's captures
         self._capture_max: dict[str, CaptureMax] = {name: CaptureMax(by_alpha=name.endswith('density'))
-                                                    for name in ('boundary_density', 'boundary_temperature', 'body_force_density', 'body_force_temperature')}
+                                                    for name in ('boundary_density', 'boundary_temperature')}
         self._merging: bool = False     # the outputs are the larger of this tick's captures
 
     @property
     def output(self) -> BridgeOutput:
-        body_force: BodyForceSettings = self.settings.body_force
+        acceleration: bool = self._mixed(self.settings.body_force_acceleration)
         merged: dict[str, Texture] = self._merged()
         return BridgeOutput(
             self._boundary_velocity, merged['boundary_density'], merged['boundary_temperature'],
-            self._body_force_acceleration if self._mixed(body_force.acceleration) else None,
-            merged['body_force_density'] if self._mixed(body_force.density) else None,
-            merged['body_force_temperature'] if self._mixed(body_force.temperature) else None,
+            self._body_force_acceleration if acceleration else None,
             self._boundary_velocity_z_position, self._boundary_density_z_position, self._boundary_temperature_z_position,
-            self._body_force_acceleration_z_position if self._mixed(body_force.acceleration) else None,
-            self._body_force_density_z_position if self._mixed(body_force.density) else None,
-            self._body_force_temperature_z_position if self._mixed(body_force.temperature) else None,
+            self._body_force_acceleration_z_position if acceleration else None,
             self._expansion if self._mixed(self.settings.expansion) else None,
             self._expansion_z_position if self._mixed(self.settings.expansion) else None)
 
     def _outputs(self) -> dict[str, Texture]:
-        """The densities and temperatures as the last step made them."""
-        return {'boundary_density': self._boundary_density.density, 'boundary_temperature': self._boundary_temperature.temperature,
-                'body_force_density': self._body_force_density.density, 'body_force_temperature': self._body_force_temperature.temperature}
+        """The density and the temperature as the last step made them."""
+        return {'boundary_density': self._boundary_density.density, 'boundary_temperature': self._boundary_temperature.temperature}
 
     def _merged(self) -> dict[str, Texture]:
-        """The densities and temperatures the fluid takes: the larger of this tick's captures while it had several."""
+        """The density and the temperature the fluid takes: the larger of this tick's captures while it had several."""
         if self._merging:
             return {name: capture_max.texture for name, capture_max in self._capture_max.items()}
         return self._outputs()
 
     def _bridges(self) -> dict[str, HasPorts]:
-        """The readings, then each side's mix and its density and temperature."""
+        """The readings, then the outputs' mixes, the density and the temperature."""
         boundary: Ports = Ports({'velocity': Port(self._boundary_velocity, TextureKind.VELOCITY),
                                  'velocity_z_position': Port(self._boundary_velocity_z_position, TextureKind.Z_POSITION),
                                  'density_amount': Port(self._boundary_density_amount, TextureKind.SCALAR),
@@ -205,16 +175,11 @@ class Bridge3DLayer(BridgeLayer):
                                  'temperature_amount': Port(self._boundary_temperature_amount, TextureKind.SCALAR),
                                  'temperature_z_position': Port(self._boundary_temperature_z_position, TextureKind.Z_POSITION)})
         body_force: Ports = Ports({'acceleration': Port(self._body_force_acceleration, TextureKind.ACCELERATION),
-                                   'acceleration_z_position': Port(self._body_force_acceleration_z_position, TextureKind.Z_POSITION),
-                                   'density_amount': Port(self._body_force_density_amount, TextureKind.SCALAR),
-                                   'density_z_position': Port(self._body_force_density_z_position, TextureKind.Z_POSITION),
-                                   'temperature_amount': Port(self._body_force_temperature_amount, TextureKind.SCALAR),
-                                   'temperature_z_position': Port(self._body_force_temperature_z_position, TextureKind.Z_POSITION)})
+                                   'acceleration_z_position': Port(self._body_force_acceleration_z_position, TextureKind.Z_POSITION)})
         return {'lowpass': self._shown_ports(self._lowpass.ports, self._show_lowpass),
                 'bandpass': self._shown_ports(self._bandpass.ports, self._show_bandpass),
-                'boundary': boundary, 'boundary_density': self._boundary_density, 'boundary_temperature': self._boundary_temperature,
-                'body_force': body_force, 'body_force_density': self._body_force_density,
-                'body_force_temperature': self._body_force_temperature,
+                'boundary': boundary, 'body_force': body_force,
+                'boundary_density': self._boundary_density, 'boundary_temperature': self._boundary_temperature,
                 'expansion': Ports({'expansion': Port(self._expansion, TextureKind.SCALAR),
                                     'z_position': Port(self._expansion_z_position, TextureKind.Z_POSITION)})}
 
@@ -236,13 +201,11 @@ class Bridge3DLayer(BridgeLayer):
             names = (*READINGS, 'mask') if isinstance(mix, AmountMixSettings) else READINGS
         return any(getattr(mix, name) > 0.0 for name in names)
 
-    def _boundary_mixes(self) -> tuple[MixSettings, ...]:
-        boundary: BoundarySettings = self.settings.boundary
-        return (boundary.velocity, boundary.density, boundary.temperature)
-
-    def _body_force_mixes(self) -> tuple[MixSettings, ...]:
-        body_force: BodyForceSettings = self.settings.body_force
-        return (body_force.acceleration, body_force.density, body_force.temperature)
+    def _mixes(self) -> tuple[MixSettings, ...]:
+        """Every output's mix, in the order the bridge makes them."""
+        settings: Bridge3DLayerSettings = self.settings
+        return (settings.boundary_velocity, settings.body_force_acceleration, settings.boundary_density,
+                settings.boundary_temperature, settings.expansion)
 
     # ========== Lifecycle ==========
 
@@ -263,32 +226,28 @@ class Bridge3DLayer(BridgeLayer):
             capture_max.deallocate()
 
     def _mix_fbos(self) -> tuple[tuple[Fbo, int], ...]:
-        return ((self._boundary_velocity, GL_RGBA16F), (self._boundary_density_amount, GL_R32F),
-                (self._boundary_temperature_amount, GL_R32F), (self._body_force_acceleration, GL_RGBA16F),
-                (self._body_force_density_amount, GL_R32F), (self._body_force_temperature_amount, GL_R32F),
+        return ((self._boundary_velocity, GL_RGBA16F), (self._body_force_acceleration, GL_RGBA16F),
+                (self._boundary_density_amount, GL_R32F), (self._boundary_temperature_amount, GL_R32F),
                 (self._expansion, GL_R32F), *((fbo, GL_RG16F) for fbo in self._z_position_fbos()))
 
     def _z_position_fbos(self) -> tuple[Fbo, ...]:
-        return (self._boundary_velocity_z_position, self._boundary_density_z_position, self._boundary_temperature_z_position,
-                self._body_force_acceleration_z_position, self._body_force_density_z_position,
-                self._body_force_temperature_z_position, self._expansion_z_position)
+        return (self._boundary_velocity_z_position, self._body_force_acceleration_z_position,
+                self._boundary_density_z_position, self._boundary_temperature_z_position, self._expansion_z_position)
 
     def _allocate_stages(self, width: int, height: int, output_width: int, output_height: int) -> None:
         self._lowpass.allocate(width, height, output_width, output_height)
         self._bandpass.allocate(width, height)
         for fbo, internal_format in self._mix_fbos():
             fbo.allocate(width, height, internal_format)
-        for temperature in (self._boundary_temperature, self._body_force_temperature):
-            temperature.allocate(width, height)
-        for density in (self._boundary_density, self._body_force_density):
-            density.allocate(output_width, output_height)
+        self._boundary_density.allocate(output_width, output_height)
+        self._boundary_temperature.allocate(width, height)
 
     def _deallocate_stages(self) -> None:
         self._lowpass.deallocate()
         self._bandpass.deallocate()
         for fbo, _ in self._mix_fbos():
             fbo.deallocate()
-        for stage in (self._boundary_temperature, self._body_force_temperature, self._boundary_density, self._body_force_density):
+        for stage in (self._boundary_density, self._boundary_temperature):
             stage.deallocate()
 
     def _reset_stages(self) -> None:
@@ -296,7 +255,6 @@ class Bridge3DLayer(BridgeLayer):
         self._lowpass.reset()
         self._bandpass.reset()
         self._boundary_density.reset()
-        self._body_force_density.reset()
 
     # ========== The bridges ==========
 
@@ -306,42 +264,33 @@ class Bridge3DLayer(BridgeLayer):
             for name, texture in self._outputs().items():
                 self._capture_max[name].hold(texture)
         self._merging = input.same_tick
-        body_force: tuple[MixSettings, ...] = self._body_force_mixes()
-        mixes: tuple[MixSettings, ...] = (*self._boundary_mixes(), *body_force, self.settings.expansion)
+        settings: Bridge3DLayerSettings = self.settings
+        acceleration: MixSettings = settings.body_force_acceleration
 
         self._lowpass_timer.begin()
         self._lowpass.set_velocity(input.velocity)
         self._lowpass.set_z_position(input.z_position)
-        self._lowpass.update(input.dt, self._lowpass_shown or self.settings.body_force.acceleration.trail > 0.0)
+        self._lowpass.update(input.dt, self._lowpass_shown or acceleration.trail > 0.0)
         self._lowpass_timer.end()
         self._bandpass_timer.begin()
-        self._update_bandpass(input, self._bandpass_shown or any(self._mixed(mix, BANDPASS_READINGS) for mix in mixes),
-                              self._bandpass_shown or self._mixed(self.settings.body_force.acceleration, BANDPASS_READINGS))
+        self._update_bandpass(input, self._bandpass_shown or any(self._mixed(mix, BANDPASS_READINGS) for mix in self._mixes()),
+                              self._bandpass_shown or self._mixed(acceleration, BANDPASS_READINGS))
         self._bandpass_timer.end()
         self._lowpass_shown = self._bandpass_shown = False
         self._mix_timer.begin()
 
-        boundary: BoundarySettings = self.settings.boundary
-        self._mix(self._boundary_velocity, self._velocities(), boundary.velocity)
-        self._mix_z_position(self._boundary_velocity_z_position, self._velocities(), boundary.velocity)
+        self._mix(self._boundary_velocity, self._velocities(), settings.boundary_velocity)
+        self._mix_z_position(self._boundary_velocity_z_position, self._velocities(), settings.boundary_velocity)
         self._peak.update(self._boundary_velocity, input.dt)
-        self._mix_amount(self._boundary_density_amount, self._boundary_density_z_position, input, boundary.density)
-        self._mix_amount(self._boundary_temperature_amount, self._boundary_temperature_z_position, input, boundary.temperature)
+        if self._mixed(acceleration):
+            self._mix(self._body_force_acceleration, self._accelerations(), acceleration)
+            self._mix_z_position(self._body_force_acceleration_z_position, self._accelerations(), acceleration)
+        self._mix_amount(self._boundary_density_amount, self._boundary_density_z_position, input, settings.boundary_density)
         self._update_density(self._boundary_density, self._boundary_density_amount, color)
+        self._mix_amount(self._boundary_temperature_amount, self._boundary_temperature_z_position, input, settings.boundary_temperature)
         self._update_temperature(self._boundary_temperature, self._boundary_temperature_amount, color)
-
-        side: BodyForceSettings = self.settings.body_force
-        if self._mixed(side.acceleration):
-            self._mix(self._body_force_acceleration, self._accelerations(), side.acceleration)
-            self._mix_z_position(self._body_force_acceleration_z_position, self._accelerations(), side.acceleration)
-        if self._mixed(side.density):
-            self._mix_amount(self._body_force_density_amount, self._body_force_density_z_position, input, side.density)
-            self._update_density(self._body_force_density, self._body_force_density_amount, color)
-        if self._mixed(side.temperature):
-            self._mix_amount(self._body_force_temperature_amount, self._body_force_temperature_z_position, input, side.temperature)
-            self._update_temperature(self._body_force_temperature, self._body_force_temperature_amount, color)
-        if self._mixed(self.settings.expansion):
-            self._mix_amount(self._expansion, self._expansion_z_position, input, self.settings.expansion, capped=True)
+        if self._mixed(settings.expansion):
+            self._mix_amount(self._expansion, self._expansion_z_position, input, settings.expansion, capped=True)
         if self._merging:
             for name, texture in self._outputs().items():
                 self._capture_max[name].take(texture)
@@ -393,14 +342,14 @@ class Bridge3DLayer(BridgeLayer):
 
     @staticmethod
     def _update_density(density: DensityBridge, amount: Texture, color: Texture) -> None:
-        """A side's density from its amount, with the color."""
+        """The density from its amount, with the color."""
         density.set_color(color)
         density.set_alpha(amount)
         density.update()
 
     @staticmethod
     def _update_temperature(temperature: TemperatureBridge, amount: Texture, color: Texture) -> None:
-        """A side's temperature from its amount, with the color."""
+        """The temperature from its amount, with the color."""
         temperature.set_color(color)
         temperature.set_mask(amount)
         temperature.update()

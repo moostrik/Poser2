@@ -393,61 +393,39 @@
           "stop_region_size": 128.0
         }
       },
-      "boundary": {
-        "velocity": {
-          "trail": 1.0,
-          "change": 0.0,
-          "start": 0.0,
-          "bow": 0.0,
-          "stop": 1.0,
-          "wake": 0.0
-        },
-        "density": {
-          "trail": 1.0,
-          "change": 0.0,
-          "start": 0.0,
-          "bow": 0.0,
-          "stop": 1.0,
-          "wake": 0.0,
-          "saturation": 1.18,
-          "brightness": 1.0
-        },
-        "temperature": {
-          "trail": 1.0,
-          "change": 0.0,
-          "start": 0.0,
-          "bow": 0.0,
-          "stop": 0.0,
-          "wake": 0.0
-        }
+      "boundary_velocity": {
+        "trail": 1.0,
+        "change": 0.0,
+        "start": 0.0,
+        "bow": 0.0,
+        "stop": 1.0,
+        "wake": 0.0
       },
-      "body_force": {
-        "acceleration": {
-          "trail": 0.0,
-          "change": 0.0,
-          "start": 0.0,
-          "bow": 0.0,
-          "stop": 0.0,
-          "wake": 0.0
-        },
-        "density": {
-          "trail": 0.0,
-          "change": 0.0,
-          "start": 0.0,
-          "bow": 0.0,
-          "stop": 0.0,
-          "wake": 0.0,
-          "saturation": 1.0,
-          "brightness": 1.0
-        },
-        "temperature": {
-          "trail": 0.0,
-          "change": 0.0,
-          "start": 0.0,
-          "bow": 0.0,
-          "stop": 0.0,
-          "wake": 0.0
-        }
+      "body_force_acceleration": {
+        "trail": 0.0,
+        "change": 0.0,
+        "start": 0.0,
+        "bow": 0.0,
+        "stop": 0.0,
+        "wake": 0.0
+      },
+      "boundary_density": {
+        "trail": 1.0,
+        "change": 0.0,
+        "start": 0.0,
+        "bow": 0.0,
+        "stop": 1.0,
+        "wake": 0.0,
+        "saturation": 1.18,
+        "brightness": 1.0
+      },
+      "boundary_temperature": {
+        "trail": 1.0,
+        "change": 0.0,
+        "start": 0.0,
+        "bow": 0.0,
+        "stop": 0.0,
+        "wake": 0.0
       }
     },
     "fluid": {
@@ -487,19 +465,13 @@
       },
       "input": {
         "spread": 0.237,
-        "boundary": {
-          "velocity_drag": 75.0,
-          "velocity_gain": 3.0,
-          "density_drag": 300.0,
-          "density_gain": 10.0,
-          "temperature_drag": 200.0,
-          "temperature_gain": 1.0
-        },
-        "body_force": {
-          "acceleration_gain": 1.0,
-          "density_rate": 1.0,
-          "temperature_rate": 1.0
-        }
+        "velocity_drag": 75.0,
+        "velocity_gain": 3.0,
+        "acceleration_gain": 1.0,
+        "density_drag": 300.0,
+        "density_gain": 10.0,
+        "temperature_drag": 200.0,
+        "temperature_gain": 1.0
       },
       "velocity": {
         "advection": "SEMI_LAGRANGIAN",

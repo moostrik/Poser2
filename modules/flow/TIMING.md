@@ -61,7 +61,7 @@ them, from 7 November, the preset then, its grid
 | the frame                 | `Render interval`              | 12.36 / 22.56, 81 fps | 12.22 / 22.91, 82 fps | 17.93 / 25.34, 56 fps | 13.29 / 18.50, 75 fps  |
 
 On 15 November the bandpass runs at the preset; on 7 November it ran only while a mix took one of its
-readings, so its row then is from a run with `body_force.acceleration` taking `change`, `start`, `bow`,
+readings, so its row then is from a run with `body_force_acceleration` taking `change`, `start`, `bow`,
 `stop` and `wake` at 1. The image upload's timer spans the CUDA work between its timestamps, so its p95
 holds the pose model's; the motion's p95 under its mean is a mean pulled up by a few long frames (max
 10 ms). The viscosity is 0, and the buoyancy and the light are off in the preset, so they skip their

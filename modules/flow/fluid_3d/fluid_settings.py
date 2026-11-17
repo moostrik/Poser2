@@ -93,29 +93,19 @@ class TimeSettings(BaseSettings):
     time_scale: Field[float]        = Field(1.0,    min=0.05,   max=2.0,    step=0.05,              description="The fluid's time as a share of real time; 0.5 = everything at half speed, 1 = real time")
 
 
-class BoundarySettings(BaseSettings):
-    """The boundary, the body in the water: what the water is dragged toward, each field a line, its target the
-    body's value times a gain (capped at fully dyed and ±1 warm) and the time it takes to follow."""
+class InputSettings(BaseSettings):
+    """The bridge's input, in the order the layer injects it: how thick the body is in the box's depth; the
+    boundary's velocity, density and temperature, each the water dragged toward the body's value times a gain
+    (capped at fully dyed and ±1 warm) over a time; the body force's acceleration added × dt times a gain; the
+    expansion's rate."""
+    spread: Field[float]            = Field(0.2,    min=0.0,    max=1.0,    step=0.001,             description="The body's thickness in z, widths, where it is at least half there; 0 = none")
     velocity_drag: Field[float]     = Field(50.0,   min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Time the water takes to close the gap to the body's velocity (ms); 0 = at once")
     velocity_gain: Field[float]     = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's velocity times this is what the water is dragged toward; 1 = as fast as the body")
+    acceleration_gain: Field[float] = Field(1.0,    min=0.0,    max=10.0,   color="teal", newline=True, description="The body force's acceleration times this is added × dt; 1 = its Δv added once")
     density_drag: Field[float]      = Field(200.0,  min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Time the water takes to take on the body's dye (ms); 0 = at once")
     density_gain: Field[float]      = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's dye times this, at most fully dyed, is the target; 1 = fully dyed at 1 width/s")
     temperature_drag: Field[float]  = Field(200.0,  min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Time the water takes to take on the body's warmth (ms); 0 = at once")
     temperature_gain: Field[float]  = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's warmth times this, at most ±1, is the target; 1 = fully warm at 1 width/s")
-
-
-class BodyForceSettings(BaseSettings):
-    """The body force, the Navier–Stokes force term: the acceleration added × dt, a push's dye and warmth at a rate."""
-    acceleration_gain: Field[float] = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body force's acceleration times this is added × dt; 1 = its Δv added once")
-    density_rate: Field[float]      = Field(1.0,    min=0.0,    max=20.0,   color="teal",           description="Fully dyed water a full push adds per second, never past fully dyed")
-    temperature_rate: Field[float]  = Field(1.0,    min=0.0,    max=20.0,   color="teal",           description="Full warmth a full push adds per second, never past ±1")
-
-
-class InputSettings(BaseSettings):
-    """The bridge's input: how thick the body is in the box's depth, and each system's gains."""
-    spread: Field[float]            = Field(0.2,    min=0.0,    max=1.0,    step=0.001,             description="The body's thickness in z, widths, where it is at least half there; 0 = none")
-    boundary: Group[BoundarySettings]       = Group(BoundarySettings)
-    body_force: Group[BodyForceSettings]    = Group(BodyForceSettings)
     expansion_rate: Field[float]    = Field(0.0,    min=-5.0,   max=5.0,    step=0.01, color="teal", newline=True, description="Volume the water gains per second where the body is (1/s); below 0 it shrinks; 0 = off")
 
 

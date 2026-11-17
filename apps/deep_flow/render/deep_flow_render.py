@@ -324,14 +324,11 @@ class DeepFlowRender(RenderBase):
             for bridge in bridges.values():
                 output: render.BridgeOutput = bridge.output
                 injections.append(render.Injection(output.boundary_velocity, output.boundary_density, output.boundary_temperature,
-                                               output.body_force_acceleration, output.body_force_density,
-                                               output.body_force_temperature,
+                                               output.body_force_acceleration,
                                                boundary_velocity_z_position=output.boundary_velocity_z_position,
                                                boundary_density_z_position=output.boundary_density_z_position,
                                                boundary_temperature_z_position=output.boundary_temperature_z_position,
                                                body_force_acceleration_z_position=output.body_force_acceleration_z_position,
-                                               body_force_density_z_position=output.body_force_density_z_position,
-                                               body_force_temperature_z_position=output.body_force_temperature_z_position,
                                                expansion=output.expansion, expansion_z_position=output.expansion_z_position))
             fluid.set_input(render.FluidInput(dt, injections))
 

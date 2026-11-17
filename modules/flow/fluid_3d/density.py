@@ -53,7 +53,7 @@ class Density(DensityCarrier):
     def reset(self) -> None:
         self._density.clear_all()
 
-    def add(self, texture: Texture, gain: float, dt: float, spread: float, mode: InjectMode = InjectMode.RATE,
+    def add(self, texture: Texture, gain: float, dt: float, spread: float, mode: InjectMode = InjectMode.FILL,
             target_gain: float = 1.0, z_position: Texture | None = None) -> None:
         if not self.allocated:
             return

@@ -117,32 +117,26 @@ the frame's dt and the lowpass uses the Ema's real step, the same integral, exac
 ## The mix
 
 What the fluid takes is two systems, the two a solver tells apart, and the expansion, a source of volume,
-each mixing the six readings, each reading at a share, 0 to 1, as the light renderer mixes its layers
-(`Bridge3DLayer`, `WeightedSum`). The panel shows four subpanels: `readings` (`lowpass`, `bandpass`),
-`boundary`, `body_force` and `expansion`. Each output's group holds the six shares as knobs on the first row
-(`MixSettings`: `trail`, `change`, `start`, `bow`, `stop`, `wake`), an amount's (a density's, a temperature's,
-the expansion) a seventh, `mask` (`AmountMixSettings`), and a density's own settings on the second
-(`saturation`, `brightness`). The density and the temperature are colored by a density and a temperature
-bridge per side, with the same color.
+each output mixing the six readings, each reading at a share, 0 to 1, as the light renderer mixes its layers
+(`Bridge3DLayer`, `WeightedSum`). The boundary is the body in the water, what the water is dragged toward: its
+velocity, and its dye and warmth, which have no force and are held at the body. The body force is the
+Navier–Stokes force term, what is added: an acceleration, which the water keeps after the body is gone, so a
+stop can throw the water on. The panel shows `readings` (`lowpass`, `bandpass`), then one subpanel per output,
+named as the output, in the order the bridge makes them. Each output's group holds the six shares as knobs on
+the first row (`MixSettings`: `trail`, `change`, `start`, `bow`, `stop`, `wake`), an amount's (the density's,
+the temperature's, the expansion's) a seventh, `mask` (`AmountMixSettings`), and the density's own settings on
+the second (`saturation`, `brightness`).
 
-| Subpanel     | Groups                                   | Readings enter as                                       | Is                                                   |
-|--------------|------------------------------------------|---------------------------------------------------------|------------------------------------------------------|
-| `readings`   | `lowpass`, `bandpass`                    |                                                         | the filters' settings                                |
-| `boundary`   | `velocity`, `density`, `temperature`     | velocities                                              | the body in the water: what the water is dragged toward |
-| `body_force` | `acceleration`, `density`, `temperature` | accelerations; the density and the temperature from velocities, a push's change of speed | the Navier–Stokes force term: what is added          |
-| `expansion`  | its mix                                  | velocities                                              | where the water swells: a source of volume           |
+| Subpanel                  | Readings enter as | Output, its unit                                                                                     | Default       |
+|---------------------------|-------------------|------------------------------------------------------------------------------------------------------|---------------|
+| `readings`                |                   | the filters' settings, `lowpass` and `bandpass`                                                      |               |
+| `boundary_velocity`       | velocities        | widths/s, the body's velocity; with its `peak` ([The peak](#the-peak))                               | the trail 1   |
+| `body_force_acceleration` | accelerations     | widths/s², a Δv added once over a change                                                             | all 0: `None` |
+| `boundary_density`        | velocities        | the dye, RGBA: the color times its presence, the presence as alpha, 0 to 1                           | the trail 1   |
+| `boundary_temperature`    | velocities        | the warmth, −1 cold to 1 hot, its presence folded in                                                 | the trail 1   |
+| `expansion`               | velocities        | where the water swells, a presence 0 to 1, capped there; the newest capture's in a tick of several   | all 0: `None` |
 
-The seven outputs (`BridgeOutput`, `Injection`), each in a unit of the body:
-
-| Output                    | Unit                                                                                                     | Default       |
-|---------------------------|----------------------------------------------------------------------------------------------------------|---------------|
-| `boundary_velocity`       | widths/s, the body's velocity                                                                            | the trail 1   |
-| `boundary_density`        | the dye, RGBA: the color times its presence, the presence as alpha, 0 to 1                               | the trail 1   |
-| `boundary_temperature`    | the warmth, −1 cold to 1 hot, its presence folded in                                                      | the trail 1   |
-| `body_force_acceleration` | widths/s², a Δv added once over a change                                                                 | all 0: `None` |
-| `body_force_density`      | a push's dye, its presence from the change of speed                                                       | all 0: `None` |
-| `body_force_temperature`  | a push's warmth, the same way                                                                             | all 0: `None` |
-| `expansion`               | where the water swells, a presence 0 to 1, capped there; the newest capture's in a tick of several       | all 0: `None` |
+The five outputs (`BridgeOutput`, `Injection`) are the subpanels' names, each in a unit of the body.
 
 The presence is the mix's speed in widths/s, the sum of its readings' sizes (the length of each, at
 its share), capped at 1: a part moving at 1 width/s or faster is fully there, a slower one partly,
@@ -153,15 +147,14 @@ The density's color is the picture's (`DensityColor`: the image, or white, times
 the mask) through `saturation` and `brightness`; the warmth is (warm − cold) × (1 − neutral × 0.5) ×
 the presence, from the same color's red, blue and green. The readings of one unit share the mix, so
 the mix has no gain: the motion's gains balance the axes and the fluid's gains set how the water
-follows; a weight is a share. A body force output and the expansion are `None` while their shares are
-all 0. The mixes' ports are `boundary.velocity`, `boundary.density_amount`, `boundary.temperature_amount`,
-`body_force.acceleration`, `body_force.density_amount`, `body_force.temperature_amount` and
-`expansion.expansion`; the
-colored ones are the density and temperature bridges' own (`boundary_density.output`, ...).
+follows; a weight is a share. The acceleration and the expansion are `None` while their shares are
+all 0. The mixes' ports are `boundary.velocity`, `body_force.acceleration`, `boundary.density_amount`,
+`boundary.temperature_amount` and `expansion.expansion`; the colored ones are the density and
+temperature bridges' own (`boundary_density.output`, ...).
 
-A wake may drag (its share in `boundary.velocity`: the water behind a leaving limb is pulled to the
-speed it left with, and let go when the pulse dies), kick (its share in `body_force.acceleration`),
-leave dye where it is or push it in, or any of these at once; the same reading in two outputs is a
+A wake may drag (its share in `boundary_velocity`: the water behind a leaving limb is pulled to the
+speed it left with, and let go when the pulse dies), kick (its share in `body_force_acceleration`),
+leave dye where it is, or any of these at once; the same reading in two outputs is a
 choice, not an error. The change beside its parts lets a preset take the physics (the true
 acceleration, braking at stops) or the look (a stop that pushes).
 
@@ -193,10 +186,10 @@ and blurs with its trail; the bandpass's fast and slow trail each hold one.
 |--------------------------------------|----------------------------------------------------------------------------------------------------------------------|
 | `boundary_velocity_z_position`       | its readings' z positions weighted by their sizes at their shares (`ZPositionMix`)                                  |
 | `body_force_acceleration_z_position` | the same, by the accelerations' sizes                                                                                |
-| each density's and temperature's     | the same, by its readings' sizes at its own shares: its amount and its place from the same trails                    |
+| the density's and the temperature's  | the same, by its readings' sizes at its own shares: its amount and its place from the same trails                    |
 | their `mask` share                   | the motion's z position now, weighted by the mask at the share                                                       |
 
-A density's amount is mixed from the trails, which the lowpass advects and blurs past where the body has a
+The density's amount is mixed from the trails, which the lowpass advects and blurs past where the body has a
 depth now (the depth velocity gives none in a band a depth sample wide along every outline); its z position
 mixed from the same trails has one wherever its amount has, so the fluid never puts dye where there is no
 place for it.
@@ -208,7 +201,7 @@ so motion without depth does not pull an output's.
 
 ## The peak
 
-How fast the body gets, to set the gains by: `boundary.velocity.peak` (`VelocityPeak`, `BoundaryVelocitySettings`),
+How fast the body gets, to set the gains by: `boundary_velocity.peak` (`VelocityPeak`, `BoundaryVelocitySettings`),
 `enabled`, off by default, and `speed`, read only: the 99th percentile of the boundary velocity's speed over the
 moving pixels of the last second, in widths/s. The percentile, not the maximum, so a few wrong pixels do not set
 it; over the moving pixels, so a still body and the empty image do not pull it down, and a leaving limb's wake
