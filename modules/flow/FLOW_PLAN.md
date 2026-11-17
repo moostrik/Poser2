@@ -112,7 +112,10 @@ the same water **(site fact)**.
   - The color space, a setting, `density.color_space`: `rgb`, as now, or `oklab` (Ottosson 2020), the color
     stored as (L × density, a × density, b × density, density), so the flow and both blends mix colors as the
     eye sees them. Converted into Oklab in the injection, not the bridge, as the particles read the bridge's
-    color; back to RGB in the composite and the monitor; switching clears the density.
+    color; back to RGB in the composite; switching clears the density.
+  - The monitor: the fluid's `density` port carries its color space; the `IMAGE` view, the cube and the slice,
+    converts Oklab back to RGB, showing what the composite shows; `COLORMAP` keeps the stored channels, L, a, b
+    and the amount.
   - FLUID_3D.md follows; the injection's and the march's times measured again.
   - Checked in the app: `over` leaves no patches where the input meets older density; `add` builds up without
     going white; `oklab` mixes without turning muddy.
