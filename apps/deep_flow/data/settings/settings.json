@@ -274,7 +274,7 @@
     "pause": false,
     "layer": {
       "main": [
-        "motion"
+        "fluid"
       ],
       "debug": [
         "fluid"
