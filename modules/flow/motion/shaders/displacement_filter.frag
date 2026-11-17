@@ -5,7 +5,8 @@
 // positions step by the measured displacement each frame; the state is carried from where the pixel
 // was `carry` back, its displacement predicts the step, and the residual corrects it by alpha and
 // alpha² / (2 − alpha). The time is z's, the 1€ filter's: `smoothing` at rest, over 1 + speed / `xy_halving`
-// in a motion, the speed the largest displacement of the 3×3 past `xy_rest` (0 halving: `smoothing` throughout).
+// in a motion, past `xy_rest`: the speed the larger of the 3×3's largest measured displacement and the carried
+// filtered one, px per frame (0 halving: `smoothing` throughout).
 // Out: the filtered displacement (RG, uv per frame) and the position error (BA, uv).
 
 uniform sampler2D tex0;  // The measured displacement (RG, uv per frame)
@@ -44,15 +45,16 @@ float xy_speed() {
 }
 
 void main() {
+    vec4 carried = texture(tex1, texCoord - texture(carry, texCoord).xy);
     float alpha = 1.0;
     if (smoothing > 0.0) {
         float follow_time = smoothing;
         if (xy_halving > 0.0) {
-            follow_time = smoothing / (1.0 + max(xy_speed() - xy_rest, 0.0) / xy_halving);
+            float speed = max(xy_speed(), length(carried.rg * vec2(textureSize(tex1, 0))));
+            follow_time = smoothing / (1.0 + max(speed - xy_rest, 0.0) / xy_halving);
         }
         alpha = 1.0 - exp(-delta_time * 1000.0 / follow_time);
     }
-    vec4 carried = texture(tex1, texCoord - texture(carry, texCoord).xy);
     float beta = alpha * alpha / (2.0 - alpha);
     vec2 residual = texture(tex0, texCoord).xy - carried.ba - carried.rg;
     fragColor = guard(vec4(carried.rg + beta * residual, -(1.0 - alpha) * residual));

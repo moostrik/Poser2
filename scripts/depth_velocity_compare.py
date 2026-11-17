@@ -66,6 +66,7 @@ MOVED: float = 0.05          # luminance change of a pixel that moves
 MOVED_FRAMES: int = 5         # frames it changes that much in, over the loop
 RECORDINGS: Path = Path(__file__).resolve().parent.parent / 'apps' / 'deep_flow' / 'data' / 'recordings'
 LAG_REACH: int = 12           # frames a side may lag or lead the first, searched
+STOP_REACH: int = 60          # frames after a move's end its stop is searched
 VIEWS: dict[int, str] = {1: 'z of the track', 2: 'z after the threshold', 3: 'depth', 4: 'velocity colormap', 5: 'velocity arrows'}
 
 
@@ -467,6 +468,30 @@ class Measures:
         result['no z position'] = float(np.mean(self.without_z)) if self.without_z else float('nan')
         result['fit'] = float(np.mean(self.fit)) if self.fit else float('nan')
         result['ms'] = float(np.median(self.milliseconds))
+        result |= self.stops()
+        return result
+
+    def stops(self) -> dict[str, float]:
+        """The ms x/y and z take after a move's end to fall under a tenth of the move's peak, on the pixels that
+        move in the loop (x/y their mean length, z their mean with its sign, its size), the mean over the moves;
+        a move that does not fall within STOP_REACH frames counts as STOP_REACH."""
+        segments, times = np.array(self.segments), np.array(self.times)
+        names = sorted({s.rsplit(' ', 1)[0] for s in segments if s.startswith('move ')})
+        result: dict[str, float] = {}
+        for axis, series in (('xy', self.moving_xy), ('z', self.signed_z)):
+            values = np.abs(np.nan_to_num(np.array(series)))
+            found: list[float] = []
+            for name in names:
+                move = np.flatnonzero(np.char.startswith(segments.astype(str), name + ' '))
+                end = int(move[-1])
+                peak = float(np.max(values[move]))
+                after = values[end + 1:end + 1 + STOP_REACH]
+                if peak <= 0.0 or after.size == 0:
+                    continue
+                calm = after <= 0.1 * peak
+                k = int(np.argmax(calm)) + 1 if calm.any() else STOP_REACH
+                found.append((times[min(end + k, len(times) - 1)] - times[end]) * 1000.0)
+            result[f'{axis} stop'] = float(np.mean(found)) if found else float('nan')
         return result
 
     def lag(self, first: 'Measures') -> dict[str, float]:
@@ -578,8 +603,8 @@ class Side:
         return self.visualizer.texture
 
 
-COLUMNS: tuple[str, ...] = ('xy noise', 'xy slow', 'xy fast', 'xy fast/noise', 'xy kept', 'xy lag', 'xy noise edge',
-                            'z noise', 'z slow', 'z fast', 'z fast/noise', 'z kept', 'z lag', 'z noise edge',
+COLUMNS: tuple[str, ...] = ('xy noise', 'xy slow', 'xy fast', 'xy fast/noise', 'xy kept', 'xy lag', 'xy stop', 'xy noise edge',
+                            'z noise', 'z slow', 'z fast', 'z fast/noise', 'z kept', 'z lag', 'z stop', 'z noise edge',
                             'z part still', 'z part fast', 'z/real', 'z corr', 'restarts still', 'restarts moving',
                             'no z position', 'fit', 'ms')
 
@@ -640,6 +665,7 @@ def measure(captures: list[Path], specs: list[tuple[str, dict[str, object]]], ou
             sums_of.deallocate()
             side.flow.deallocate()
         region_texture.deallocate()
+        summer.deallocate()
         stamps.append({'capture': folder.name} | frames.capture)
         print(f'{folder.name}: {len(frames)} frames, {described}', flush=True)
 

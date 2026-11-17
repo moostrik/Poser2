@@ -53,6 +53,7 @@ the step filter and z's window earn their place. The aim: quiet at rest, the mos
 
 Built (2026-11-17): the 1€ filter's rule in place of the catch-up; one setting per job (`edge` within a frame,
 `max_speed` between frames, `xy_rest` and `xy_halving` for z's smoothing, `tolerance` and `same_surface` gone);
+(2026-11-18) the measuring's sums on the GPU, the 1€ rule opened by the track's own speed too, the stop's ms;
 described in [MOTION.md](MOTION.md#z-the-depth-velocity) with their tables.
 
 Tried and undone (2026-11-17): the dead zone before the filter, a backlash on the measured depth. Quieter at
@@ -60,18 +61,13 @@ rest and later: the filter sees nothing until the zone opens, so its lag comes a
 overlap now (hands, unsmoothed, `dead_zone` 0.02: 52 ms against 7; `smooth` 25: 90 against 65; measure's still
 noise 2.4 / 3.1 against 9.1 / 5.1).
 
-- **C5.** The 1€ rule opened on the estimate's own speed as well, as the filter does (Casiez et al. 2012): it
-  opens on the measurement's speed, so at a stop it closes to the full `smooth` when the estimate should follow
-  the stop, and the estimate coasts. Measured on hands, `xy.z_smooth` on: x/y at the push's end 12.6 px a frame
-  50 ms on where off it is 2.3, under 1 after 300 ms. In `depth_velocity_shader.frag` the speed the larger of
-  x/y's and the carried estimate's z (px a frame); in `displacement_filter.frag` of x/y's and the carried
-  filtered x/y. A column for it in the compare: the ms a side's z and x/y take after a move's end to fall under a
-  tenth of its peak. Checked on `hands_1` and `measure_1` against now: the stop's ms, lag, kept, the still noise.
 - **C2.** The values, measured 2026-11-17 on the four recordings, the tables in MOTION.md
   ([the motion's values](MOTION.md#depth_velocity-z)); the surfaces in the mask that are not the player left
-  out by `exclude` in each recording's `segments.json`. Proposed: `levels` 5, `xy_halving` 0.25, `max_speed` 8,
-  z's `threshold` 0.5 or 1 by eye. After C5 the smoothing's rows measured again; the defaults then set with
-  Matthias at the PC, MOTION.md's reasons following, the preset when he saves it.
+  out by `exclude` in each recording's `segments.json`. Proposed: `levels` 5, `max_speed` 8, z's `threshold`
+  0.5 or 1 by eye; `xy_halving` stays 0.5: since the 1€ rule opens on the track's own speed (2026-11-18) it lags
+  4 ms on hands at a still noise of 0.64, 0.25 lags 2 ms at 3.7. `levels` 5 and `max_speed` 8 measured again
+  with it, together; the defaults then set with Matthias at the PC, MOTION.md's reasons following, the preset
+  when he saves it.
 - **C3.** The range. `edge`, `max_speed` and the thresholds are in metres or px, tuned at 0.65–1.5 m; stereo
   noise grows with the square of the distance, so at 2–3.5 m they may need to be in disparity, and a depth's
   noise from frame to frame may come near `max_speed`'s 12 cm and start the track over at rest **(deduction)**.

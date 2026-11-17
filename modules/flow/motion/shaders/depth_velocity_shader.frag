@@ -14,8 +14,8 @@
 // it is empty. z is the rate over the metres one view width spans there, `depth × view_span`, in view
 // widths per frame. Depth is read nearest, so an edge never reads as a distance in between.
 // The time the track follows over is the 1€ filter's (Casiez, Roussel, Vogel 2012): `smoothing` at rest,
-// over 1 + speed / `xy_halving` in a motion, the speed x/y's here (its 3×3 displacement) past `xy_rest`;
-// 0 `xy_halving` is `smoothing` throughout. The carry takes each texel's depth a frame on by its rate. With `dead_zone` above 0,
+// over 1 + speed / `xy_halving` in a motion, past `xy_rest`: the speed the larger of x/y's here (its 3×3
+// displacement) and the carried track's own z, both px per frame; 0 `xy_halving` is `smoothing` throughout. The carry takes each texel's depth a frame on by its rate. With `dead_zone` above 0,
 // z is 0 while the tracked depth stays within it of its anchor; past it, z at its full speed, and the
 // anchor follows at `dead_zone` behind (a backlash); a track that starts over is anchored anew.
 
@@ -121,13 +121,14 @@ void step_track() {
     float miss = predicted > 0.0 ? 1.0 / measurement - 1.0 / predicted : 0.0;      // m
     bool follows = predicted > 0.0 && abs(miss) <= jump;
 
-    // The 1€ filter's time: `smoothing` at rest, shorter as x/y moves
+    // The 1€ filter's time: `smoothing` at rest, shorter as x/y or the track's own z moves
     float full = 1.0;
     if (smoothed) {
         float follow_time = smoothing;
         if (xy_halving > 0.0) {
-            float speed = warp ? max(xy_speed(size) - xy_rest, 0.0) : 0.0;
-            follow_time = smoothing / (1.0 + speed / xy_halving);
+            float speed = warp ? xy_speed(size) : 0.0;
+            if (track.x > 0.0) speed = max(speed, abs(track.y) * delta_time / (track.x * view_span) * size.x);
+            follow_time = smoothing / (1.0 + max(speed - xy_rest, 0.0) / xy_halving);
         }
         full = 1.0 - exp(-delta_time * 1000.0 / follow_time);
     }
