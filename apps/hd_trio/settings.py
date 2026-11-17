@@ -146,7 +146,7 @@ class OakGroup(BaseSettings):
     cam_2        : Group[OakCameraSettings]            = Group(OakCameraSettings, share=_cam_share)
     camera_health: Group[CameraHealthSettings]      = Group(CameraHealthSettings)
     simulator    : Group[PlayerSettings]         = Group(PlayerSettings, share=[num_cams, fps])
-    person_detector     : Group[inference.detection.Settings] = Group(inference.detection.Settings)     # the replay backend's person detector
+    person_detector     : Group[inference.detection.PersonDetectorSettings] = Group(inference.detection.PersonDetectorSettings)     # the replay backend's person detector
     tracker      : Group[OnePerCamTrackerSettings]  = Group(OnePerCamTrackerSettings)
     frame_sync   : Group[inference.CameraSyncSettings]      = Group(inference.CameraSyncSettings, share=[num_cams, fps])
     tracklet_sync: Group[inference.CameraSyncSettings]      = Group(inference.CameraSyncSettings, share=[num_cams, fps])
@@ -246,11 +246,11 @@ class PoseGroup(BaseSettings):
     _batch_share  : list = [max_players, model_type, model_path, verbose]
     _feature_share: list = [frequency, output_frequency]
 
-    pose            : Group[inference.pose.Settings]          = Group(inference.pose.Settings, share=_batch_share)
-    segmentation    : Group[inference.segmentation.Settings]  = Group(inference.segmentation.Settings, share=_batch_share)
+    pose            : Group[inference.pose.PosePredictorSettings]          = Group(inference.pose.PosePredictorSettings, share=_batch_share)
+    segmentation    : Group[inference.segmentation.SegmentationPredictorSettings]  = Group(inference.segmentation.SegmentationPredictorSettings, share=_batch_share)
     frame_source    : Group[TrackerFrameSourceSettings]       = Group(TrackerFrameSourceSettings)
-    pose_crop       : Group[inference.crop.Settings]          = Group(inference.crop.Settings, share=[max_players])
-    segmentation_crop: Group[inference.crop.Settings]         = Group(inference.crop.Settings, share=[max_players])
+    pose_crop       : Group[inference.crop.CropExtractorSettings]          = Group(inference.crop.CropExtractorSettings, share=[max_players])
+    segmentation_crop: Group[inference.crop.CropExtractorSettings]         = Group(inference.crop.CropExtractorSettings, share=[max_players])
     angle_extractor : Group[nodes.AngleExtractorSettings]     = Group(nodes.AngleExtractorSettings)
     bbox            : Group[BboxFeature]                      = Group(BboxFeature, share=_feature_share)
     point           : Group[PointFeature]                     = Group(PointFeature, share=_feature_share)

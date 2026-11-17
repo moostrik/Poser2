@@ -11,7 +11,7 @@ from modules.utils import PerformanceTimer
 from .. import crop, ModelType
 from .image import Image, ImageDict, ImageCallback
 from .runner_onnx import RunnerONNX
-from .settings import Settings
+from .settings import SegmentationPredictorSettings
 
 if TYPE_CHECKING:
     from .runner_trt import RunnerTRT
@@ -30,8 +30,8 @@ class Predictor:
     the masks from this thread.
     """
 
-    def __init__(self, settings: Settings) -> None:
-        self.settings: Settings = settings
+    def __init__(self, settings: SegmentationPredictorSettings) -> None:
+        self.settings: SegmentationPredictorSettings = settings
 
         # One runner per model type; TensorRT is imported only when it is used.
         self._runner: SegmentationRunner

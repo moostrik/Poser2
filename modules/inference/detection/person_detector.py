@@ -24,7 +24,7 @@ from ..source import GpuImage
 from .decode import normalise, person_boxes
 from .io import Detection, DetectionCallback
 from .runner_onnx import RunnerONNX
-from .settings import Settings
+from .settings import PersonDetectorSettings
 
 if TYPE_CHECKING:
     from .runner_trt import RunnerTRT
@@ -35,9 +35,9 @@ DetectionRunner: TypeAlias = "RunnerONNX | RunnerTRT"
 
 
 class PersonDetector(Thread):
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: PersonDetectorSettings) -> None:
         super().__init__(daemon=True)
-        self.settings: Settings = settings
+        self.settings: PersonDetectorSettings = settings
         self.width: int = settings.width
         self.height: int = settings.height
 

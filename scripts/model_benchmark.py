@@ -1,11 +1,11 @@
-"""Inference benchmark: an app's models through the app's runners, without cameras or the app.
+"""Inference benchmark: an app's models through their predictors, without cameras or the app.
 
-    python -m modules.inference.tools.benchmark --app white_space
-    python -m modules.inference.tools.benchmark --app hd_trio --model-type onnx --reference logs/<earlier>.npz
+    python scripts/model_benchmark.py --app white_space
+    python scripts/model_benchmark.py --app hd_trio --model-type onnx --reference logs/<earlier>.npz
 
 Loads the app's startup preset for the models it enables, their resolutions and its batch size
-(the players), feeds the same seeded crops (or `--image`) at the app's crop size, and times every
-batch: the runner's own inference time and the latency from submit to callback. Writes
+(the players), feeds the same seeded crops (or `--image`) at the app's crop size one batch at a time,
+and times every batch: the predictor's own process time and the latency from submit to callback. Writes
 `logs/inference_<app>_<type>_<date>_<time>.json` in the timing report's format, so
 `scripts/timing_compare.py` compares two of them, with the GPU memory each model takes, and an
 `.npz` of the last batch's outputs; `--reference` compares those with an earlier `.npz`.
@@ -14,9 +14,9 @@ batch: the runner's own inference time and the latency from submit to callback. 
 import importlib
 import json
 import logging
+import sys
 import time
 from argparse import ArgumentParser
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from threading import Event
@@ -25,54 +25,40 @@ from typing import Any, Callable
 import numpy as np
 import torch
 
-from modules.settings import BaseSettings, presets
-from modules.utils import PerformanceTimer, timing
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from .. import ModelType
-from ..optical_flow.io import OpticalFlowInput
-from ..pose.io import PoseInput
-from ..segmentation.io import SegmentationInput
+from modules.inference import ModelType, crop, optical_flow, pose, segmentation  # noqa: E402
+from modules.pose import BBox, Frame, FrameDict, Points2D  # noqa: E402
+from modules.settings import BaseSettings, presets  # noqa: E402
+from modules.utils import PerformanceTimer, Rect, timing  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
-LOG_DIR = Path(__file__).resolve().parents[3] / "logs"
-READY_TIMEOUT = 120.0   # seconds a runner may take to load its model
+LOG_DIR = Path(__file__).resolve().parents[1] / "logs"
+READY_TIMEOUT = 120.0   # seconds a model may take to load
 RESULT_TIMEOUT = 5.0    # seconds a batch may take
 
 
-@dataclass
-class Model:
-    """One model: its name (the settings group and the subpackage of its runners), how it is fed and read."""
-    name: str
-    make_input: Callable[[int, list[torch.Tensor], list[torch.Tensor]], Any]
-    read_output: Callable[[Any], dict[str, np.ndarray]]
-    add_callback: Callable[[Any, Callable[[Any], None]], None]
+def _pose_output(frames: FrameDict) -> dict[str, np.ndarray]:
+    ordered = [frames[track_id] for track_id in sorted(frames)]
+    return {'points': np.stack([f[Points2D].values for f in ordered]), 'scores': np.stack([f[Points2D].scores for f in ordered])}
 
 
-def _pose_output(output: Any) -> dict[str, np.ndarray]:
-    return {'points': np.stack(output.point_batch), 'scores': np.stack(output.score_batch)}
+def _segmentation_output(images: segmentation.ImageDict) -> dict[str, np.ndarray]:
+    ordered = [images[track_id] for track_id in sorted(images)]
+    return {'mask': torch.stack([i.mask for i in ordered]).float().cpu().numpy(),
+            'fgr': torch.stack([i.foreground for i in ordered]).float().cpu().numpy()}
 
 
-def _segmentation_output(output: Any) -> dict[str, np.ndarray]:
-    return {'mask': output.mask_tensor.float().cpu().numpy(), 'fgr': output.fgr_tensor.float().cpu().numpy()}
+def _flow_output(flows: optical_flow.FlowDict) -> dict[str, np.ndarray]:
+    return {'flow': torch.stack([flows[track_id] for track_id in sorted(flows)]).float().cpu().numpy()}
 
 
-def _flow_output(output: Any) -> dict[str, np.ndarray]:
-    return {'flow': output.flow_tensor.float().cpu().numpy()}
-
-
-MODELS: list[Model] = [
-    Model('pose',
-          lambda batch_id, crops, _prev: PoseInput(batch_id=batch_id, gpu_images=crops), _pose_output,
-          lambda runner, callback: runner.add_pose_callback(callback)),
-    Model('segmentation',
-          lambda batch_id, crops, _prev: SegmentationInput(batch_id=batch_id, gpu_images=crops,
-                                                           track_ids=list(range(len(crops)))), _segmentation_output,
-          lambda runner, callback: runner.add_segmentation_callback(callback)),
-    Model('optical_flow',
-          lambda batch_id, crops, prev: OpticalFlowInput(batch_id=batch_id, gpu_image_pairs=list(zip(prev, crops)),
-                                                         track_ids=list(range(len(crops)))), _flow_output,
-          lambda runner, callback: runner.add_flow_callback(callback)),
+# name (the settings group), the predictor class, how its results are registered and read
+MODELS: list[tuple[str, type, Callable[[Any, Callable[[Any], None]], None], Callable[[Any], dict[str, np.ndarray]]]] = [
+    ('pose', pose.Predictor, lambda p, cb: p.add_frames_callback(cb), _pose_output),
+    ('segmentation', segmentation.Predictor, lambda p, cb: p.add_segmentation_callback(lambda _poses, images: cb(images)), _segmentation_output),
+    ('optical_flow', optical_flow.Predictor, lambda p, cb: p.add_flow_callback(cb), _flow_output),
 ]
 
 
@@ -104,8 +90,9 @@ def model_settings(app_group: BaseSettings, model_type: ModelType) -> BaseSettin
     return copy
 
 
-def make_crops(batch: int, width: int, height: int, image: Path | None, seed: int) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
-    """The batch's crops and the previous frame's: (3, H, W) float16 RGB [0, 1] on the GPU, as the crop extractor gives."""
+def make_batch(batch: int, width: int, height: int, image: Path | None, seed: int) -> tuple[FrameDict, crop.CropImageDict]:
+    """The batch's poses and their crops with the previous frame's: (3, H, W) float16 RGB [0, 1] on the GPU, as the
+    crop extractor gives."""
     if image is not None:
         import cv2
         bgr = cv2.imread(str(image))
@@ -119,7 +106,12 @@ def make_crops(batch: int, width: int, height: int, image: Path | None, seed: in
         frames = [rng.random((3, height, width), dtype=np.float32) for _ in range(2)]
     curr = torch.from_numpy(frames[0]).to('cuda', torch.float16)
     prev = torch.from_numpy(frames[1]).to('cuda', torch.float16)
-    return [curr.clone() for _ in range(batch)], [prev.clone() for _ in range(batch)]
+    torch.cuda.synchronize()
+    box = BBox.from_rect(Rect(0.0, 0.0, 1.0, 1.0))
+    poses: FrameDict = {i: Frame(track_id=i, cam_id=0, timestamp=0.0, features={BBox: box}) for i in range(batch)}
+    crops: crop.CropImageDict = {i: crop.Image(crop=curr.clone(), prev_crop=prev.clone(), ready=None) for i in range(batch)}
+    torch.cuda.synchronize()
+    return poses, crops
 
 
 def gpu_used_mb() -> float:
@@ -127,22 +119,19 @@ def gpu_used_mb() -> float:
     return (total - free) / 1024 / 1024
 
 
-def run_model(model: Model, settings: BaseSettings, crop_w: int, crop_h: int, warmup: int, iterations: int,
-              image: Path | None, seed: int) -> tuple[dict[str, np.ndarray], float, dict[str, dict[str, float]]]:
-    """Time one model; returns the last batch's outputs, the GPU memory its runner took (MB) and its timer stats.
+def run_model(name: str, predictor_class: type, add_callback: Callable, read_output: Callable, settings: BaseSettings,
+              crop_w: int, crop_h: int, warmup: int, iterations: int, image: Path | None,
+              seed: int) -> tuple[dict[str, np.ndarray], float, dict[str, dict[str, float]]]:
+    """Time one model; returns the last batch's outputs, the GPU memory its predictor took (MB) and the timers' stats
+    (the predictor's own and the latency).
 
     The stats are read here, while the timers live: the session holds them weakly.
     """
-    runner_module = importlib.import_module(f"..{model.name}.runner_"
-                                            f"{'onnx' if settings.model_type is ModelType.ONNX else 'trt'}", __package__)
-    runner_class = getattr(runner_module, 'RunnerONNX' if settings.model_type is ModelType.ONNX else 'RunnerTRT')
-
-    label = f"{model.name} {settings.model_type.name} {settings.resolution.name} b{settings.max_players}"
-    inference_timer = PerformanceTimer(name=f"{label} inference")
+    label = f"{name} {settings.model_type.name} {settings.resolution.name} b{settings.max_players}"
     latency_timer = PerformanceTimer(name=f"{label} latency")
 
     memory_before = gpu_used_mb()
-    runner = runner_class(settings)
+    predictor = predictor_class(settings)
     result: dict[str, Any] = {}
     done = Event()
 
@@ -150,37 +139,32 @@ def run_model(model: Model, settings: BaseSettings, crop_w: int, crop_h: int, wa
         result['output'] = output
         done.set()
 
-    model.add_callback(runner, on_output)
-    runner.start()
-    deadline = time.monotonic() + READY_TIMEOUT
-    while not runner.is_ready:
-        if time.monotonic() > deadline or not runner.is_alive():
-            runner.stop()
-            raise RuntimeError(f"{label}: runner not ready (model {settings.model_path}/{settings.model})")
-        time.sleep(0.05)
-    memory_mb = gpu_used_mb() - memory_before
-
-    crops, prev = make_crops(settings.max_players, crop_w, crop_h, image, seed)
+    add_callback(predictor, on_output)
+    predictor.start()
     outputs: dict[str, np.ndarray] = {}
     try:
+        deadline = time.perf_counter() + READY_TIMEOUT
+        while not predictor.is_ready:
+            if time.perf_counter() > deadline:
+                raise RuntimeError(f"{label}: model not ready ({settings.model_path}/{settings.model})")
+            time.sleep(0.05)
+        memory_mb = gpu_used_mb() - memory_before
+
+        poses, crops = make_batch(settings.max_players, crop_w, crop_h, image, seed)
         for i in range(warmup + iterations):
             done.clear()
             start = time.perf_counter()
-            runner.submit(model.make_input(i + 1, crops, prev))
+            predictor.submit(poses, crops)
             if not done.wait(RESULT_TIMEOUT):
                 raise RuntimeError(f"{label}: no result for batch {i + 1}")
             latency_ms = (time.perf_counter() - start) * 1000.0
-            output = result['output']
-            if not output.processed:
-                raise RuntimeError(f"{label}: batch {i + 1} was not processed")
             if i == warmup:
                 PerformanceTimer.start_session()
             if i >= warmup:
-                inference_timer.add_time(output.inference_time_ms, report=False)
                 latency_timer.add_time(latency_ms, report=False)
-        outputs = {f"{model.name}/{k}": v for k, v in model.read_output(result['output']).items()}
+        outputs = {f"{name}/{k}": v for k, v in read_output(result['output']).items()}
     finally:
-        runner.stop()
+        predictor.stop()
     return outputs, memory_mb, PerformanceTimer.stop_session()
 
 
@@ -214,19 +198,20 @@ def main() -> None:
     stats: dict[str, dict[str, float]] = {}
     memory: dict[str, float] = {}
     outputs: dict[str, np.ndarray] = {}
-    for model in MODELS:
-        group = getattr(app_settings.pose, model.name, None)
+    for name, predictor_class, add_callback, read_output in MODELS:
+        group = getattr(app_settings.pose, name, None)
         if group is None or not group.enabled:
             continue
         # the segmentation's own crops where the app cuts them, else the pose model's
-        crop = getattr(app_settings.pose, f"{model.name}_crop", None) or app_settings.pose.pose_crop
+        crop_settings = getattr(app_settings.pose, f"{name}_crop", None) or app_settings.pose.pose_crop
         settings = model_settings(group, model_type)
-        logger.info("%s: %s, batch %d, crop %dx%d", model.name, settings.model, settings.max_players,
-                    crop.output_width, crop.output_height)
-        model_outputs, memory_mb, model_stats = run_model(model, settings, crop.output_width, crop.output_height,
-                                             args.warmup, args.iterations, args.image, args.seed)
+        logger.info("%s: %s, batch %d, crop %dx%d", name, settings.model, settings.max_players,
+                    crop_settings.output_width, crop_settings.output_height)
+        model_outputs, memory_mb, model_stats = run_model(name, predictor_class, add_callback, read_output, settings,
+                                                          crop_settings.output_width, crop_settings.output_height,
+                                                          args.warmup, args.iterations, args.image, args.seed)
         stats.update(model_stats)
-        memory[model.name] = memory_mb
+        memory[name] = memory_mb
         outputs.update(model_outputs)
 
     LOG_DIR.mkdir(exist_ok=True)

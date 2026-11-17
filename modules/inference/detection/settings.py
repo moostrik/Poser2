@@ -24,7 +24,7 @@ RESOLUTION_DIMS: dict[Resolution, tuple[int, int]] = {  # (width, height)
 }
 
 
-class Settings(BaseSettings):
+class PersonDetectorSettings(BaseSettings):
     """A YOLO person detector on the host, the replay backend's stand-in for the device's detector;
     `confidence` and `overlap` default to the values the oak pipeline sets."""
 

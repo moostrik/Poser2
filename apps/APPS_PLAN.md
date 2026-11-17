@@ -99,7 +99,7 @@ Checked at the rig: a live recording with `mirrored` on (a live frame comes with
 does not, so the run stored the clips as they came; the recorder's test covers the mirroring); the fluid's look.
 
 Reported: 5, hd_trio held up to the rules; its findings are 7 to 9. Built: 6, the previous crop is off by default
-(`crop.Settings.enable_prev_crop`): only the optical-flow model reads it, and no app turns it on; 7, the show's
+(`crop.CropExtractorSettings.enable_prev_crop`): only the optical-flow model reads it, and no app turns it on; 7, the show's
 sequencer takes the panel's start, stop, skip and playlist changes as requests carried out at the next tick, its
 callbacks under their own lock and logged with their traceback, and the intro player plays on the tick's time;
 both, and `main`, unbind on stop what they bind; 8, the render's constructor writes no settings (its `data.b`

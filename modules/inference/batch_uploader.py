@@ -1,5 +1,5 @@
-"""The batch uploader: a moment's frames of several cameras onto the GPU as one batch, for the apps whose cameras are
-synced first (white_space, hd_trio).
+"""The batch uploader: a moment's frames of several cameras onto the GPU as one batch, for cameras that are
+synced first.
 
 `submit_set` takes the set the frames' `CameraSync` formed, each camera's color frame of one moment by `cam_id`, and
 returns: sets wait whole, at most `WAITING`; beyond that the oldest set is dropped whole and counted (`dropped`), so

@@ -10,7 +10,7 @@ import torch
 
 from ..trt_runtime import get_tensorrt_runtime, get_init_lock, get_exec_lock
 from .recurrent_state import RecurrentState
-from .settings import Settings
+from .settings import SegmentationPredictorSettings
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ OUTPUT_NAMES: tuple[str, ...] = ('fgr', 'pha', 'r1o', 'r2o', 'r3o', 'r4o')
 
 
 class RunnerTRT:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: SegmentationPredictorSettings) -> None:
         self.model_file: str = f"{settings.model_path}/{settings.model}"
         self.model_width: int = settings.width
         self.model_height: int = settings.height

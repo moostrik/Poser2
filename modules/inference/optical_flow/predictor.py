@@ -10,7 +10,7 @@ from modules.utils import PerformanceTimer
 
 from .. import crop, ModelType
 from .runner_onnx import RunnerONNX
-from .settings import Settings
+from .settings import OpticalFlowPredictorSettings
 
 if TYPE_CHECKING:
     from .runner_trt import RunnerTRT
@@ -31,8 +31,8 @@ class Predictor:
     come from this thread.
     """
 
-    def __init__(self, settings: Settings) -> None:
-        self.settings: Settings = settings
+    def __init__(self, settings: OpticalFlowPredictorSettings) -> None:
+        self.settings: OpticalFlowPredictorSettings = settings
 
         # One runner per model type; TensorRT is imported only when it is used.
         self._runner: OpticalFlowRunner

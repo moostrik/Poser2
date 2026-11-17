@@ -42,7 +42,7 @@ class Crop:
 
 class PredictorTest(unittest.TestCase):
     def test_a_batch_replaced_while_the_model_runs_is_counted_not_run(self) -> None:
-        settings = segmentation.Settings(model_type=ModelType.ONNX, reset_interval=2)
+        settings = segmentation.SegmentationPredictorSettings(model_type=ModelType.ONNX, reset_interval=2)
         settings.initialize()
         predictor = segmentation.Predictor(settings)
         runner = FakeRunner()

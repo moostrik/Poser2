@@ -39,7 +39,7 @@ class Crop:
 
 class PredictorTest(unittest.TestCase):
     def test_a_batch_replaced_while_the_model_runs_is_counted_not_run(self) -> None:
-        settings = optical_flow.Settings(model_type=ModelType.ONNX)
+        settings = optical_flow.OpticalFlowPredictorSettings(model_type=ModelType.ONNX)
         settings.initialize()
         predictor = optical_flow.Predictor(settings)
         runner = FakeRunner()

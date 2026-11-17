@@ -8,7 +8,7 @@ import onnxruntime as ort
 import torch
 
 from ..ort_runtime import preload_cuda
-from .settings import Settings
+from .settings import OpticalFlowPredictorSettings
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ DTYPES: dict[str, type] = {'tensor(float)': np.float32, 'tensor(float16)': np.fl
 
 
 class RunnerONNX:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: OpticalFlowPredictorSettings) -> None:
         self.model_file: str = f"{settings.model_path}/{settings.model}"
         self.model_width: int = settings.width
         self.model_height: int = settings.height

@@ -1,10 +1,11 @@
 import logging
+from threading import Lock
 
 import torch
 import torch.nn.functional as F
 
 from modules.pose import BBox, FrameDict, replace
-from .crop import Image, CropImageDict, ImageCallback, Settings
+from .crop import Image, CropImageDict, ImageCallback, CropExtractorSettings
 from .source import ImageDict, TimestampDict
 from modules.utils import Rect, Point2f
 
@@ -23,8 +24,9 @@ class CropExtractor:
     All tensors are float16 RGB CHW [0, 1] at a fixed output resolution.
     """
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: CropExtractorSettings) -> None:
         self.settings = settings
+        self._callback_lock: Lock = Lock()
         self._callbacks: list[ImageCallback] = []       # run in registration order
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
 
@@ -96,7 +98,9 @@ class CropExtractor:
                     logger.exception(f"Error processing pose {track_id}")
             crops_ready.record(self._stream)
 
-        for callback in self._callbacks:
+        with self._callback_lock:
+            callbacks: list[ImageCallback] = list(self._callbacks)
+        for callback in callbacks:
             try:
                 callback(cropped_poses, crop_images)
             except Exception:
@@ -146,5 +150,6 @@ class CropExtractor:
         return crop_chw
 
     def add_image_callback(self, callback: ImageCallback) -> None:
-        if callback not in self._callbacks:
-            self._callbacks.append(callback)
+        with self._callback_lock:
+            if callback not in self._callbacks:
+                self._callbacks.append(callback)

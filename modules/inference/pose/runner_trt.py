@@ -10,7 +10,7 @@ import torch
 
 from ..trt_runtime import get_tensorrt_runtime, get_init_lock, get_exec_lock
 from .decode import NUM_KEYPOINTS
-from .settings import Settings
+from .settings import PosePredictorSettings
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ TORCH_DTYPES = {trt.DataType.FLOAT: torch.float32, trt.DataType.HALF: torch.floa
 
 
 class RunnerTRT:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: PosePredictorSettings) -> None:
         self.model_file: str = settings.model_path + '/' + settings.model
         self.model_width: int = settings.width
         self.model_height: int = settings.height

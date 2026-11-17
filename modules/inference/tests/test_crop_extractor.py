@@ -17,7 +17,7 @@ class CropStampTest(unittest.TestCase):
         self.uploader = SerialUploader(SerialUploaderSettings())
         self.snapshots: list[ImageSnapshot] = []
         self.uploader.add_snapshot_callback(self.snapshots.append)
-        self.settings = crop.Settings()
+        self.settings = crop.CropExtractorSettings()
         self.settings.initialize()
         self.extractor = CropExtractor(self.settings)
         self.results: list[FrameDict] = []

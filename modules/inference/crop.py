@@ -29,7 +29,7 @@ CropImageDict: TypeAlias = dict[int, Image]
 ImageCallback: TypeAlias = Callable[[FrameDict, CropImageDict], None]
 
 
-class Settings(BaseSettings):
+class CropExtractorSettings(BaseSettings):
     """Configuration for GPU-based image cropping."""
     # Padding around the person's box, as a fraction of it, on both axes. Live: it only moves the
     # crop window. One value, not one per axis: the crop is then grown to the output's aspect, which

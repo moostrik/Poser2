@@ -1,4 +1,4 @@
-"""The serial uploader: the camera's one hand-off in deep_flow, each frame onto the GPU on its own, the moment it
+"""The serial uploader: the camera's one hand-off, each frame onto the GPU on its own, the moment it
 comes. The camera's thread queues its frames here and returns; this thread puts each on the GPU and hands it on, in
 arrival order, so a color frame goes up at once to start the pose and no GPU work and no consumer runs on the
 camera's thread."""

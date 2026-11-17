@@ -17,8 +17,8 @@ _MODELS = {
 }
 
 
-class Settings(BaseSettings):
-    """Settings for optical flow (RAFT)."""
+class OpticalFlowPredictorSettings(BaseSettings):
+    """The optical flow's settings (RAFT)."""
 
     max_players:  Field[int]        = Field(1, min=1, max=16, access=Field.INIT)
     model_type: Field[ModelType]  = Field(ModelType.TRT, access=Field.INIT)

@@ -13,7 +13,7 @@ import torch
 from onnx import TensorProto, helper, numpy_helper
 
 from modules.inference import GpuImage, ModelType
-from modules.inference.detection import PersonDetector, Resolution, Settings
+from modules.inference.detection import PersonDetector, Resolution, PersonDetectorSettings
 from modules.utils import Rect
 
 WIDTH, HEIGHT = 512, 448
@@ -70,7 +70,7 @@ class PersonDetectorTest(unittest.TestCase):
     def setUp(self) -> None:
         self.folder = tempfile.mkdtemp()
         write_stub_model(os.path.join(self.folder, MODEL_FILE), self.symbolic)
-        self.settings = Settings(model_path=self.folder)
+        self.settings = PersonDetectorSettings(model_path=self.folder)
         self.settings.initialize()
         self.detector = PersonDetector(self.settings)
         self.detections = []
@@ -124,7 +124,7 @@ class SymbolicInputTest(PersonDetectorTest):
 
 class ModelFileTest(unittest.TestCase):
     def test_the_size_and_the_runtime_pick_the_file_each_in_its_own_folder(self) -> None:
-        settings = Settings(resolution=Resolution.R640X512, model_path='onnx_folder', engine_path='engine_folder')
+        settings = PersonDetectorSettings(resolution=Resolution.R640X512, model_path='onnx_folder', engine_path='engine_folder')
         self.assertEqual((settings.width, settings.height), (640, 512))
         self.assertEqual(settings.model_file, 'onnx_folder/yolov8n_coco_640x512.onnx')
         settings.model_type = ModelType.TRT
@@ -133,7 +133,7 @@ class ModelFileTest(unittest.TestCase):
 
 class MissingModelTest(unittest.TestCase):
     def test_a_missing_file_fails_to_load_with_its_name(self) -> None:
-        settings = Settings(model_path=tempfile.mkdtemp())
+        settings = PersonDetectorSettings(model_path=tempfile.mkdtemp())
         settings.initialize()
         detector = PersonDetector(settings)
         with self.assertLogs('modules.inference.detection.person_detector', level='ERROR') as logs:

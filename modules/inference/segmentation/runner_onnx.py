@@ -10,7 +10,7 @@ import torch
 
 from ..ort_runtime import preload_cuda
 from .recurrent_state import RecurrentState
-from .settings import Settings
+from .settings import SegmentationPredictorSettings
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ RECURRENT_CHANNELS: tuple[tuple[int, int], ...] = ((16, 2), (20, 4), (40, 8), (6
 
 
 class RunnerONNX:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: SegmentationPredictorSettings) -> None:
         self.model_file: str = f"{settings.model_path}/{settings.model}"
         self.model_width: int = settings.width
         self.model_height: int = settings.height

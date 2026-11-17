@@ -1,2 +1,2 @@
-from .settings import Settings
+from .settings import PosePredictorSettings
 from .predictor import Predictor

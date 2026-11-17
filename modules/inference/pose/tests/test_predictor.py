@@ -45,7 +45,7 @@ class Crop:
 
 class PredictorTest(unittest.TestCase):
     def test_a_batch_replaced_while_the_model_runs_is_counted_not_run(self) -> None:
-        settings = pose.Settings(model_type=ModelType.ONNX)
+        settings = pose.PosePredictorSettings(model_type=ModelType.ONNX)
         settings.initialize()
         predictor = pose.Predictor(settings)
         runner = FakeRunner()

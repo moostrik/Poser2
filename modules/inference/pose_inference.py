@@ -36,10 +36,10 @@ def has_points(frame: Frame) -> bool:
 class PoseInference(FrameDictCallbackMixin):
     """The crop and pose predictor as one async step; see the module docstring."""
 
-    def __init__(self, crop_settings: crop.Settings, pose_settings: pose.Settings,
-                 segmentation_crop_settings: crop.Settings | None = None) -> None:
+    def __init__(self, crop_settings: crop.CropExtractorSettings, pose_settings: pose.PosePredictorSettings,
+                 segmentation_crop_settings: crop.CropExtractorSettings | None = None) -> None:
         super().__init__()
-        self._pose_settings: pose.Settings = pose_settings
+        self._pose_settings: pose.PosePredictorSettings = pose_settings
         self._crop_extractor = CropExtractor(crop_settings)
         self._segmentation_crop_extractor: CropExtractor | None = (
             CropExtractor(segmentation_crop_settings) if segmentation_crop_settings is not None else None)

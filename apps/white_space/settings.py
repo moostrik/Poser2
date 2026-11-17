@@ -118,7 +118,7 @@ class OakGroup(BaseSettings):
     cam_3     : Group[OakCameraSettings]            = Group(OakCameraSettings, share=_cam_share)
     camera_health: Group[CameraHealthSettings]   = Group(CameraHealthSettings)
     simulator : Group[PlayerSettings]         = Group(PlayerSettings, share=[num_cams, fps])
-    person_detector  : Group[inference.detection.Settings] = Group(inference.detection.Settings)     # the replay backend's person detector
+    person_detector  : Group[inference.detection.PersonDetectorSettings] = Group(inference.detection.PersonDetectorSettings)     # the replay backend's person detector
     frame_sync: Group[inference.CameraSyncSettings]         = Group(inference.CameraSyncSettings, share=[num_cams, fps])
     tracklet_sync: Group[inference.CameraSyncSettings]      = Group(inference.CameraSyncSettings, share=[num_cams, fps])
 
@@ -247,9 +247,9 @@ class PoseGroup(BaseSettings):
 
     _feature_share: list = [frequency, output_frequency]
 
-    pose            : Group[inference.pose.Settings]         = Group(inference.pose.Settings, share=[max_players, model_type, model_path, verbose])
+    pose            : Group[inference.pose.PosePredictorSettings]         = Group(inference.pose.PosePredictorSettings, share=[max_players, model_type, model_path, verbose])
     frame_source    : Group[TrackerFrameSourceSettings]      = Group(TrackerFrameSourceSettings)
-    pose_crop       : Group[inference.crop.Settings]         = Group(inference.crop.Settings, share=[max_players])
+    pose_crop       : Group[inference.crop.CropExtractorSettings]         = Group(inference.crop.CropExtractorSettings, share=[max_players])
     angle_extractor : Group[nodes.AngleExtractorSettings]    = Group(nodes.AngleExtractorSettings)
     angle_calibrator: Group[nodes.AngleCalibratorSettings]   = Group(nodes.AngleCalibratorSettings)
     leg_deviation_extractor: Group[nodes.LegDeviationExtractorSettings] = Group(nodes.LegDeviationExtractorSettings)

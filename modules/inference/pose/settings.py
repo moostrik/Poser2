@@ -1,4 +1,4 @@
-from ..model_types import ModelType, Resolution, RESOLUTION_DIMS, ASPECT_RATIOS
+from ..model_types import ModelType, Resolution, RESOLUTION_DIMS
 from modules.settings import BaseSettings, Field
 
 _MODELS = {
@@ -17,8 +17,8 @@ _MODELS = {
 }
 
 
-class Settings(BaseSettings):
-    """Settings for pose detection (RTMPose)."""
+class PosePredictorSettings(BaseSettings):
+    """The pose model's settings (RTMPose)."""
 
     enabled:    Field[bool]       = Field(True)
     max_players:  Field[int]        = Field(1, min=1, max=16, access=Field.INIT)
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     @property
     def aspect_ratio(self) -> float:
-        return ASPECT_RATIOS[self.resolution]
+        return self.width / self.height
 
     @property
     def model(self) -> str:

@@ -18,9 +18,9 @@ class PoseInferenceImagesTest(unittest.TestCase):
         self.uploader = SerialUploader(SerialUploaderSettings())
         self.snapshots: list[ImageSnapshot] = []
         self.uploader.add_snapshot_callback(self.snapshots.append)
-        crop_settings = crop.Settings()
+        crop_settings = crop.CropExtractorSettings()
         crop_settings.initialize()
-        self.pose_settings = pose.Settings()
+        self.pose_settings = pose.PosePredictorSettings()
         self.pose_settings.initialize()
         self.inference = PoseInference(crop_settings, self.pose_settings)
         self.pose = Frame(track_id=0, cam_id=0, timestamp=1.0, features={BBox: BBox.from_rect(Rect(0.25, 0.25, 0.5, 0.5))})
@@ -34,10 +34,10 @@ class PoseInferenceImagesTest(unittest.TestCase):
         self.assertIn(0, crops)
 
     def test_the_segmentation_crop_is_cut_from_the_same_images_and_region_at_its_size(self) -> None:
-        pose_crop = crop.Settings()
+        pose_crop = crop.CropExtractorSettings()
         pose_crop.output_width, pose_crop.output_height = 192, 256
         pose_crop.initialize()
-        segmentation_crop = crop.Settings()
+        segmentation_crop = crop.CropExtractorSettings()
         segmentation_crop.output_width, segmentation_crop.output_height = 768, 1024
         segmentation_crop.initialize()
         inference = PoseInference(pose_crop, self.pose_settings, segmentation_crop)
