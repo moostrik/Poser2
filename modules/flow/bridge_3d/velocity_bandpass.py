@@ -9,13 +9,12 @@ modules/flow/BRIDGE_3D.md, "The changes", "The pulse's area" and "The z position
 import logging
 import math
 
-import numpy as np
 from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R16F, GL_RG16F, GL_RG32F, GL_RGBA16F, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, glBindTexture, glGenerateMipmap, glTexParameteri
 
 from modules.gl import Fbo, SwapFbo, Texture, shaders
 from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil, Port, TextureKind
-from .trails import EPSILON, decay_weight, direction
+from .trails import decay_weight
 from .shaders import BandpassAccelerations, BandpassChanges, BandpassTrails, Change, VelocityBandpassRegion, VelocityBandpassRegionMean, VelocityBandpassRegionSpeed
 
 logger = logging.getLogger(__name__)
@@ -345,57 +344,3 @@ class VelocityBandpass(FlowBase):
         trail.begin()
         self._trail_shader.use(trail.back, weight, input, 1.0 - weight)
         trail.end()
-
-
-# ── numpy reference ─────────────────────────────────────────────────────
-
-def velocity_change(fast: np.ndarray, slow: np.ndarray, sign: float, share: np.ndarray | float = 1.0,
-                     edge: bool = False, scale: float = 1.0) -> np.ndarray:
-    """One change (..., ) from the trails (..., 3): max(sign * (fast - slow) along the motion, 0) times `scale`
-    (1 / `step_peak`), times the share its region shares (a start or a stop), or with `edge` times the rest (a bow
-    or a wake). Mirrors bandpass_changes.comp."""
-    unit: np.ndarray = direction(fast, slow)
-    part: np.ndarray | float = 1.0 - share if edge else share
-    return np.maximum(0.0, sign * np.sum((fast - slow) * unit, axis=-1)) * scale * part
-
-
-def moving_mean(velocity: np.ndarray) -> np.ndarray:
-    """A region's mean velocity (3,) over its moving pixels, those of its pixels (N, 3) the motion gives a velocity;
-    0 where none moves. Mirrors velocity_bandpass_region.frag and velocity_bandpass_region_mean.frag."""
-    moving: np.ndarray = np.linalg.norm(velocity, axis=-1) > EPSILON
-    return np.mean(velocity[moving], axis=0) if moving.any() else np.zeros(3)
-
-
-def start_region_share(region_fast: np.ndarray, region_slow: np.ndarray, region_weight: float) -> float:
-    """How much of a start counts, 0..1, from its region's mean moving velocity through the fast and the slow trail
-    (`moving_mean` of each frame, smoothed): as far as it grows; region weight 0 lets all count. Mirrors
-    bandpass_changes.comp."""
-    fast: float = float(np.linalg.norm(region_fast))
-    change: float = (fast - float(np.linalg.norm(region_slow))) / max(fast, EPSILON)
-    return 1.0 + (min(max(change, 0.0), 1.0) - 1.0) * region_weight
-
-
-def stop_region_share(fast: np.ndarray, slow: np.ndarray, region_weight: float) -> float:
-    """How much of a stop counts, 0..1, from the trails over its region's pixels (N, 3): as far as their mean speed
-    falls; region weight 0 lets all count. Mirrors bandpass_changes.comp."""
-    fast_speed: float = float(np.mean(np.linalg.norm(fast, axis=-1)))
-    slow_speed: float = float(np.mean(np.linalg.norm(slow, axis=-1)))
-    change: float = (slow_speed - fast_speed) / max(slow_speed, EPSILON)
-    return 1.0 + (min(max(change, 0.0), 1.0) - 1.0) * region_weight
-
-
-def change_velocity(trail: np.ndarray, change: np.ndarray) -> np.ndarray:
-    """The change (...) along the trail's direction (..., 3). Mirrors bandpass_changes.comp."""
-    length: np.ndarray = np.linalg.norm(trail, axis=-1, keepdims=True)
-    unit: np.ndarray = np.divide(trail, length, out=np.zeros_like(trail), where=length > EPSILON)
-    return unit * np.maximum(0.0, change)[..., None]
-
-
-def whole_change(fast: np.ndarray, slow: np.ndarray, fast_smooth: float, slow_smooth: float,
-                 delta_time: float, acceleration: bool = False) -> np.ndarray:
-    """The whole change (..., 3), signed: (fast − slow) / step_peak as a velocity, widths/s, or with `acceleration`
-    (fast − slow) over the band's width, widths/s². Mirrors the bandpass's change passes."""
-    if acceleration:
-        return (fast - slow) * change_acceleration_scale(fast_smooth, slow_smooth, delta_time)
-    peak: float = step_peak(fast_smooth, slow_smooth)
-    return (fast - slow) / peak if peak > 0.0 else np.zeros_like(fast)

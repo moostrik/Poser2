@@ -8,7 +8,6 @@
 // trail's, else the release; the z position the same step on the motion's z position weighted by the speed it
 // brings, so it is where the motion it holds was (red the z position times the weight, green the weight).
 // With uAcceleration, the trail's rate: (new - moved) / dt.
-// The numpy references are trails.advect, velocity_lowpass.velocity_trail, trail_acceleration and z_position_trail
 
 layout(local_size_x = 16, local_size_y = 16) in;
 

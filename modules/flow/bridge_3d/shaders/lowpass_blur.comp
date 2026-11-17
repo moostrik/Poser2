@@ -3,8 +3,7 @@
 // Lowpass Blur
 // The lowpass's Gaussian blur by one sigma, up to three fields (slots) in one dispatch: the textbook separable
 // Gaussian, its weights exp(-k^2 / 2 sigma^2) out to uRadius, normalized, both directions in one 16 x 16
-// tile and its border in shared memory. Outside the image is 0, as the trail's border is. The numpy
-// reference is velocity_lowpass.gaussian_blur
+// tile and its border in shared memory. Outside the image is 0, as the trail's border is.
 
 layout(local_size_x = 16, local_size_y = 16) in;
 

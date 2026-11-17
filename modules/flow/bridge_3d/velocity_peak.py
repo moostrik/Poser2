@@ -1,11 +1,9 @@
 """VelocityPeak: the 99th percentile of a velocity's speed over about a second, counted on the GPU into log bins
-and read back from two pixel buffers without waiting; and its numpy reference. How and why: BRIDGE_3D.md, "The
-peak"."""
+and read back from two pixel buffers without waiting. How and why: BRIDGE_3D.md, "The peak"."""
 
 from __future__ import annotations
 
 import ctypes
-import math
 
 import numpy as np
 from OpenGL.GL import (GL_ALREADY_SIGNALED, GL_CONDITION_SATISFIED, GL_NEAREST, GL_PIXEL_PACK_BUFFER, GL_R32UI,
@@ -30,21 +28,6 @@ class VelocityPeakSettings(BaseSettings):
     """The peak: whether it is measured, and what it read."""
     enabled = Field(False, description="Measure the p99 speed once a second")
     speed = Field(0.0, access=Field.READ, description="p99 speed of the moving pixels, last second (widths/s); 10 = at least 10")
-
-
-def speed_bin(speeds: np.ndarray, bins: int = BINS, low: float = SPEED_LOW, high: float = SPEED_HIGH) -> np.ndarray:
-    """Each speed's bin on the log scale from `low` to `high`, −1 for a still one (below `low`); above `high`
-    the last bin. Mirrors histogram_count.comp's speed mode."""
-    speeds = np.asarray(speeds, dtype=np.float64)
-    moving: np.ndarray = speeds >= low
-    index: np.ndarray = np.floor(np.log(np.where(moving, speeds, low) / low) / math.log(high / low) * bins)
-    return np.where(moving, np.clip(index, 0, bins - 1), -1).astype(np.int64)
-
-
-def speed_counts(speeds: np.ndarray, bins: int = BINS, low: float = SPEED_LOW, high: float = SPEED_HIGH) -> np.ndarray:
-    """The bins' counts of `speeds`, as the shader adds them."""
-    index: np.ndarray = speed_bin(speeds, bins, low, high)
-    return np.bincount(index[index >= 0], minlength=bins)
 
 
 def speed_percentile(counts: np.ndarray, percentile: float = PERCENTILE, low: float = SPEED_LOW,

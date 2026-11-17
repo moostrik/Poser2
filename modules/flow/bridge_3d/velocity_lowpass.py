@@ -166,18 +166,7 @@ class VelocityLowpass(FlowBase):
                 self._blur_shader.use([fbo.back if fbo is not None else None for fbo in blurred], list(blurred), weights)
 
 
-# ── numpy reference ─────────────────────────────────────────────────────
-
-def z_position_trail(previous: np.ndarray, previous_trail: np.ndarray, velocity: np.ndarray, current: np.ndarray,
-                     attack: float, release: float) -> np.ndarray:
-    """One step of the trail's z position (..., 2, red the z position times its weight, green the weight): the same
-    Ema step as the trail's, by `attack` where the 3D speed rises above the trail's, else by `release`, on the
-    motion's z position `current` weighted by the speed it brings. Mirrors lowpass_step.comp."""
-    speed: np.ndarray = np.linalg.norm(velocity, axis=-1, keepdims=True)
-    rising: np.ndarray = speed > np.linalg.norm(previous_trail, axis=-1, keepdims=True)
-    weight: np.ndarray = np.where(rising, attack, release)
-    return weight * previous + (1.0 - weight) * speed * current
-
+# ── the blur's values ───────────────────────────────────────────────────
 
 def blur_sigma(blur: float, delta_time: float, width: int) -> float:
     """One step's sigma in pixels: a spread of `blur` widths at half its height in one second, as diffusion
@@ -202,27 +191,3 @@ def gaussian_weights(sigma: float) -> np.ndarray:
     k: np.ndarray = np.arange(radius + 1, dtype=np.float64)
     weights: np.ndarray = np.exp(-k * k / (2.0 * sigma * sigma))
     return weights / (weights[0] + 2.0 * weights[1:].sum())
-
-
-def gaussian_blur(field: np.ndarray, sigma: float) -> np.ndarray:
-    """`field` (H, W, C) blurred by the Gaussian of `sigma` pixels, separable, 0 outside. Mirrors lowpass_blur.comp."""
-    weights: np.ndarray = gaussian_weights(sigma)
-    kernel: np.ndarray = np.concatenate((weights[:0:-1], weights))
-    radius: int = len(weights) - 1
-    padded: np.ndarray = np.pad(field.astype(np.float64), ((radius, radius), (radius, radius), (0, 0)))
-    rows: np.ndarray = sum(kernel[i] * padded[:, i:i + field.shape[1]] for i in range(len(kernel)))
-    return sum(kernel[i] * rows[i:i + field.shape[0]] for i in range(len(kernel)))
-
-
-def velocity_trail(previous: np.ndarray, velocity: np.ndarray, attack: float, release: float) -> np.ndarray:
-    """One step of the trail (..., 3): by `attack` where the 3D speed rises above the trail's, else by `release`.
-    Mirrors lowpass_step.comp."""
-    rising: np.ndarray = np.linalg.norm(velocity, axis=-1, keepdims=True) > np.linalg.norm(previous, axis=-1, keepdims=True)
-    weight: np.ndarray = np.where(rising, attack, release)
-    return weight * previous + (1.0 - weight) * velocity
-
-
-def trail_acceleration(previous: np.ndarray, trail: np.ndarray, delta_time: float) -> np.ndarray:
-    """The trail's rate (..., 3), widths/s², from the trail before (advected) and after one step. Mirrors the
-    lowpass's rate pass."""
-    return (trail - previous) / delta_time if delta_time > 0.0 else np.zeros_like(trail)

@@ -5,7 +5,6 @@
 // of the velocity, weight * previous + (1 - weight) * velocity, by its own weight; each z position the same
 // step on the motion's z position weighted by the speed it brings, so it is where the motion the trail holds
 // was (red the z position times the weight, green the weight).
-// The numpy references are velocity_bandpass's trail step and velocity_lowpass.z_position_trail
 
 layout(local_size_x = 16, local_size_y = 16) in;
 

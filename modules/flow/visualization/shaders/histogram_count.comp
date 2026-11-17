@@ -6,7 +6,7 @@
 // the end bin.
 // With `speed` the length of each sample's xyz instead, into the first row's bins on a log scale from
 // `speed_low` to `speed_high`: a length below `speed_low` is still and not counted, one above `speed_high`
-// lands in the end bin. The numpy reference is bridge_3d.speed_bin
+// lands in the end bin.
 
 layout(local_size_x = 16, local_size_y = 16) in;
 

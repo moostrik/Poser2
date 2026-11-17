@@ -4,8 +4,8 @@
 // The bandpass's whole change and, with uAcceleration, every reading as an acceleration, in one dispatch:
 // the change (fast - slow) × uScale (1 / the step peak), signed; as an acceleration (fast - slow) ×
 // uAccelerationScale (1 / the band's width), and each part's velocity × uAccelerationScale × the step peak
-// (uPartScale), the same pulse over the band's width. The numpy references are velocity_bandpass.whole_change
-// and change_acceleration_scale
+// (uPartScale), the same pulse over the band's width. The scales are velocity_bandpass's step_peak and
+// change_acceleration_scale
 
 layout(local_size_x = 16, local_size_y = 16) in;
 

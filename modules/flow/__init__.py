@@ -22,12 +22,11 @@ from .motion import DepthView, DepthVelocity, DepthVelocitySettings, GradientFlo
 # Bridges: the 3D bridge by name, the 2D bridge as `bridge_2d` (bridge_2d.DensityBridge, ...)
 from . import bridge_2d
 from .bridge_3d import  DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
-                        decay_weight, direction, advect, \
-                        VelocityLowpass, VelocityLowpassSettings, velocity_trail, trail_acceleration, z_position_trail, \
-                        gaussian_blur, gaussian_weights, blur_sigma, blur_dispatches, z_position_mix, weighted_sum, ZPositionMix, \
-                        VelocityBandpass, VelocityBandpassSettings, Change, WeightedSum, velocity_change, step_peak, moving_mean, start_region_share, stop_region_share, change_velocity, band_width, whole_change, \
+                        decay_weight, \
+                        VelocityLowpass, VelocityLowpassSettings, gaussian_weights, blur_sigma, blur_dispatches, ZPositionMix, \
+                        VelocityBandpass, VelocityBandpassSettings, Change, WeightedSum, step_peak, band_width, \
                         TemperatureBridge, TemperatureBridgeSettings, CaptureMax, \
-                        VelocityPeak, VelocityPeakSettings, speed_bin, speed_counts, speed_percentile
+                        VelocityPeak, VelocityPeakSettings, speed_percentile
 
 # Visualization
 from .visualization import Visualizer, histogram_grid, histogram_volume_grid, Strip, ALL_CHANNELS, summary_grid, Legend, LegendKind, DrawnSize, \

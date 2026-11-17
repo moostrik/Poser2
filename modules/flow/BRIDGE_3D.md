@@ -41,8 +41,9 @@ The band's width is what (fast − slow) adds up to over time, × dt, per unit o
 dt × (w_slow / (1 − w_slow) − w_fast / (1 − w_fast)) (`band_width`), which stays exact where a frame
 is longer than the fast trail (25 fps against 25 ms: 3.4% short with the plain difference). So each
 acceleration × dt adds its Δv once, whatever the frame rate and the trails' times, for a sudden or
-a gradual change; the velocity's height reads the Δv only for a sudden one. The trail's rate adds
-up to the trail's change the same way (`modules/flow/tests/test_bridge_accelerations.py`). A filter
+a gradual change; the velocity's height reads the Δv only for a sudden one
+(`modules/flow/tests/test_bridge_accelerations.py`). The trail's rate, (new − moved) / dt, adds up to the
+trail's change the same way. A filter
 writes its accelerations only while an output takes one or a monitor shows one of its ports.
 
 Every reading's acceleration integrates to the Δv over a change; they differ in their window: the
@@ -217,7 +218,7 @@ GPU has finished, log-interpolated within its bin; nothing waits. Off, nothing r
 0 until the first read after it is turned on.
 
 Measured with `scripts/velocity_peak_check.py` on an RTX 4090: on 448 × 512 speeds every sample is binned as
-`speed_counts` bins it but 2 in 183,500 at a bin's edge (the GPU's single-precision log), and `speed` reads the
+a count in numpy binned it but 2 in 183,500 at a bin's edge (the GPU's single-precision log), and `speed` reads the
 bins' percentile, 3.989 widths/s against numpy's 3.988 on the speeds. On deep_flow's 448 × 800 velocity
 (448 × 512 samples) the count takes 0.027 ms a velocity, the copy 0.018 ms once a second.
 

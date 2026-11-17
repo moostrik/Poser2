@@ -4,7 +4,7 @@
 // The bridge's mix: up to seven sources, each times its weight, summed (RGB); a source at weight 0 adds
 // nothing. With `lengths`, the length of each source's xyz times its weight, summed, for an amount; a scalar
 // source (red alone, the depth mask) gives its red. The sources share one unit, so the weights are shares,
-// not gains. With `capped` the sum is held at 1, a presence. The numpy reference is bridge_3d.weighted_sum
+// not gains. With `capped` the sum is held at 1, a presence.
 
 uniform sampler2D tex0;
 uniform sampler2D tex1;

@@ -6,7 +6,7 @@
 // so motion without depth does not pull it. The trail reads the lowpass's z position, a start and a bow the
 // fast trail's, a stop and a wake the slow trail's, the change the fast trail's where it is the faster, else
 // the slow's. The mask's share, its value at the share, reads the motion's z position now. Out: red the
-// z position times its weight, green the weight. The numpy reference is bridge_3d.z_position_mix
+// z position times its weight, green the weight.
 
 uniform sampler2D tex0;     // the readings: trail, change, start, bow, stop, wake (xyz)
 uniform sampler2D tex1;
@@ -28,7 +28,7 @@ uniform sampler2D z_position;       // the motion's z position now (red over gre
 in vec2 texCoord;
 out vec4 fragColor;
 
-const float EPSILON = 1e-4;     // EPSILON in trails: below this a speed is no motion
+const float EPSILON = 1e-4;     // below this a speed is no motion
 
 // A reading's z position at its trail, red over green, per unit of the trail's speed
 vec2 per_speed(sampler2D z_position, float speed) {
