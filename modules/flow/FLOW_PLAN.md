@@ -105,9 +105,13 @@ the same water **(site fact)**.
     cell a little; the amount never falls and never passes 1; the color is a weighted mix. An input held in one
     place fills toward 1.
   - `add`: the source (Stam 2003; Bridson 2015), the input × `density_gain` × dt added. Where the amount would pass
-    1, all four channels are scaled down together so it lands at 1: the color stays the mix of what went in and
-    never turns white.
+    1, all four channels are scaled down together so the amount lands at 1, a full cell, and the shown color stays
+    the mix of what went in.
   - `max`: the switch as it is, kept to compare.
+  - The density's color space, a setting, `density.color_space`: `rgb`, as now, or `oklab` (Ottosson 2020), the
+    color stored in Oklab, premultiplied as (L × density, a × density, b × density, density), so the flow, `over`
+    and `add` mix colors as the eye sees them. The bridge converts the color in, the composite converts it back
+    to RGB; switching clears the density.
   - Checked in the app: in `over`, no patches where the input meets older density.
 - **D5.** The bridge's density alpha: the speed × the color's brightness, its brightest channel (HSV's value), and
   the color at full brightness, so a dark pixel puts in little density instead of dark density. Checked in the app:
