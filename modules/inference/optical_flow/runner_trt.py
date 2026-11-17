@@ -1,365 +1,98 @@
-# Standard library imports
-from threading import Thread, Lock, Event
-import time
-
-# Third-party imports
-import torch
-import tensorrt as trt
-
-from .io import OpticalFlowInput, OpticalFlowOutput, OpticalFlowOutputCallback
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from .settings import Settings
-
-from ..trt_runtime import get_tensorrt_runtime, get_init_lock, get_exec_lock
+"""RAFT through TensorRT: the previous and current crops into preallocated batches on its stream, the flow out on the
+GPU. It takes turns with the other TensorRT models on the shared execution lock."""
 
 import logging
+import time
+
+import tensorrt as trt
+import torch
+
+from ..trt_runtime import get_tensorrt_runtime, get_init_lock, get_exec_lock
+from .settings import Settings
+
 logger = logging.getLogger(__name__)
 
+PRECISIONS = {trt.DataType.FLOAT: "FP32", trt.DataType.HALF: "FP16", trt.DataType.INT8: "INT8"}
+TORCH_DTYPES = {trt.DataType.FLOAT: torch.float32, trt.DataType.HALF: torch.float16}
 
-class RunnerTRT(Thread):
-    """Asynchronous GPU optical flow computation using RAFT with TensorRT.
 
-    Runs in full precision (FP32).
-
-    TensorRT-optimized inference for maximum performance. Drop-in replacement for PredictorONNX.
-
-    Uses preallocated buffers and dedicated CUDA stream for ultra-low latency.
-    All preprocessing and inference runs on the same dedicated stream to avoid sync overhead.
-
-    Uses a single-slot queue: only the most recent submitted batch waits to be processed.
-    An older pending batch is dropped, counted in `settings.dropped`, and its callbacks told on the submitting
-    thread (`processed=False`). Batches already processing on GPU cannot be cancelled.
-
-    Results go to the callbacks from the inference thread, which only enqueue.
-    """
-
-    def __init__(self, settings: 'Settings') -> None:
-        super().__init__()
-        self.settings: 'Settings' = settings
-
-        self.model_path: str = settings.model_path
-        self.model_name: str = settings.model
-        self.model_file: str = f"{self.model_path}/{self.model_name}"
+class RunnerTRT:
+    def __init__(self, settings: Settings) -> None:
+        self.model_file: str = f"{settings.model_path}/{settings.model}"
         self.model_width: int = settings.width
         self.model_height: int = settings.height
-        self.resolution_name: str = settings.resolution.name
-        self.verbose: bool = settings.verbose
+        self.max_batch: int = min(settings.max_players, 4)
+        self.model_precision: str = "UNKNOWN"
 
-        # Thread coordination
-        self._shutdown_event: Event = Event()
-        self._notify_update_event: Event = Event()
-        self._model_ready: Event = Event()
+        self._engine: trt.ICudaEngine
+        self._context: trt.IExecutionContext
+        self._stream: torch.cuda.Stream
+        self._input_names: list[str] = []
+        self._output_name: str = ''
+        self._torch_dtype: torch.dtype = torch.float32
+        self._img1_buffer: torch.Tensor     # (max_batch, 3, H, W) the previous crops
+        self._img2_buffer: torch.Tensor     # (max_batch, 3, H, W) the current crops
 
-        # Input queue
-        self._input_lock: Lock = Lock()
-        self._pending_batch: OpticalFlowInput | None = None
-        self._input_timestamp: float = time.perf_counter()
-        self._last_dropped_batch_id: int = 0
-
-        # Callbacks
-        self._callback_lock: Lock = Lock()
-        self._callbacks: list[OpticalFlowOutputCallback] = []       # run in registration order
-
-        # TensorRT engine and context (initialized in run())
-        self.engine: trt.ICudaEngine
-        self.context: trt.IExecutionContext
-        self.stream: torch.cuda.Stream
-        self.input_names: list[str]
-        self.output_name: str
-
-        # Model configuration (initialized in _setup())
-        self._max_batch: int = min(settings.max_players, 4)
-        self._torch_dtype: torch.dtype
-        self.model_precision: str
-
-        # Preallocated INPUT buffers (initialized in _setup())
-        # Note: Output buffer allocated fresh each call
-        self._img1_buffer: torch.Tensor  # (max_batch, 3, H, W) input 1
-        self._img2_buffer: torch.Tensor  # (max_batch, 3, H, W) input 2
-
-    @property
-    def is_ready(self) -> bool:
-        """Check if model is loaded and system is ready to process optical flow"""
-        return self._model_ready.is_set() and not self._shutdown_event.is_set() and self.is_alive()
-
-    def stop(self) -> None:
-        """Stop the inference thread gracefully."""
-        self._shutdown_event.set()
-
-        # Wake up inference thread
-        self._notify_update_event.set()
-        self.join(timeout=2.0)
-
-        if self.is_alive():
-            logger.warning("Optical Flow inference thread did not stop cleanly")
-
-    def run(self) -> None:
-        """Main inference thread loop. Initializes TensorRT engine and processes batches."""
-        try:
-            self._setup()
-        except Exception as e:
-            logger.error(f"Optical Flow: Failed to load model - {str(e)}")
-            return
-
-        while not self._shutdown_event.is_set():
-            self._notify_update_event.wait()
-
-            if self._shutdown_event.is_set():
-                break
-
-            self._notify_update_event.clear()
-
-            try:
-                self._process()
-
-            except Exception as e:
-                logger.error(f"Optical Flow: {str(e)}")
-    def submit(self, input_batch: OpticalFlowInput) -> None:
-        """Submit batch for processing. Replaces any pending (not yet started) batch."""
-        if self._shutdown_event.is_set():
-            return
-
-        if not self._model_ready.is_set():
-            return
-
-        # Validate batch size
-        if len(input_batch.gpu_image_pairs) > self._max_batch:
-            logger.warning(f"Optical Flow Batch size {len(input_batch.gpu_image_pairs)} exceeds max {self._max_batch}, will process only first {self._max_batch} pairs")
-
-        dropped_batch: OpticalFlowInput | None = None
-
-        with self._input_lock:
-            if self._pending_batch is not None:
-                dropped_batch = self._pending_batch
-                if self.verbose:
-                    lag = int((time.perf_counter() - self._input_timestamp) * 1000)
-                    logger.info(f"Optical Flow: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
-                self._last_dropped_batch_id = dropped_batch.batch_id
-
-            self._pending_batch = input_batch
-            self._input_timestamp = time.perf_counter()
-
-        # Notify about dropped batch
-        if dropped_batch is not None:
-            self.settings.dropped += 1
-            self._dispatch(OpticalFlowOutput(batch_id=dropped_batch.batch_id, track_ids=dropped_batch.track_ids, processed=False))
-
-        self._notify_update_event.set()
-
-    def _setup(self) -> None:
-        """Initialize TensorRT engine, context, and buffers. Called from run()."""
-        # Acquire global lock to prevent concurrent Myelin graph loading
-        with get_init_lock():
+    def setup(self) -> None:
+        """Load the engine, on the thread that will run it."""
+        with get_init_lock():       # one Myelin graph loads at a time
             runtime = get_tensorrt_runtime()
-
             with open(self.model_file, 'rb') as f:
                 engine_data = f.read()
+            self._engine = runtime.deserialize_cuda_engine(engine_data)
+            if self._engine is None:
+                raise RuntimeError(f"Failed to load engine {self.model_file}")
+            self._context = self._engine.create_execution_context()
 
-            self.engine = runtime.deserialize_cuda_engine(engine_data)
-            if self.engine is None:
-                raise RuntimeError("Failed to load engine")
-
-            self.context = self.engine.create_execution_context()
-
-        # Lock released - continue with setup
-
-        # Get input/output names
-        self.input_names = []
-        self.output_name = ""
-
-        for i in range(self.engine.num_io_tensors):
-            name = self.engine.get_tensor_name(i)
-            mode = self.engine.get_tensor_mode(name)
-
-            if mode == trt.TensorIOMode.INPUT:
-                self.input_names.append(name)
+        for i in range(self._engine.num_io_tensors):
+            name = self._engine.get_tensor_name(i)
+            if self._engine.get_tensor_mode(name) == trt.TensorIOMode.INPUT:
+                self._input_names.append(name)
             else:
-                self.output_name = name
+                self._output_name = name
+        if len(self._input_names) != 2:
+            raise RuntimeError(f"Expected 2 inputs, got {len(self._input_names)}")
 
-        if len(self.input_names) != 2:
-            raise ValueError(f"Expected 2 inputs, got {len(self.input_names)}")
+        input_dtype = self._engine.get_tensor_dtype(self._input_names[0])
+        self.model_precision = PRECISIONS.get(input_dtype, "UNKNOWN")
+        self._torch_dtype = TORCH_DTYPES.get(input_dtype, torch.float32)
 
-        # Determine model precision from input tensor
-        input_dtype = self.engine.get_tensor_dtype(self.input_names[0])
-        precision_map = {
-            trt.DataType.FLOAT: "FP32",
-            trt.DataType.HALF: "FP16",
-            trt.DataType.INT8: "INT8",
-        }
-        self.model_precision = precision_map.get(input_dtype, "UNKNOWN")
+        self._stream = torch.cuda.Stream()
+        with torch.cuda.stream(self._stream):
+            shape = (self.max_batch, 3, self.model_height, self.model_width)
+            self._img1_buffer = torch.empty(shape, dtype=self._torch_dtype, device='cuda')
+            self._img2_buffer = torch.empty(shape, dtype=self._torch_dtype, device='cuda')
+        self._stream.synchronize()
 
-        # Map TensorRT dtype to PyTorch dtype
-        dtype_to_torch = {
-            trt.DataType.FLOAT: torch.float32,
-            trt.DataType.HALF: torch.float16,
-        }
-        self._torch_dtype = dtype_to_torch.get(input_dtype, torch.float32)
+        # The inputs' addresses stay (a slice keeps the base pointer); the output's is set per call
+        self._context.set_tensor_address(self._input_names[0], self._img1_buffer.data_ptr())
+        self._context.set_tensor_address(self._input_names[1], self._img2_buffer.data_ptr())
 
-        # Dedicated CUDA stream for all GPU operations (preprocessing + inference)
-        self.stream = torch.cuda.Stream()
-
-        # Preallocate INPUT buffers on the dedicated stream for optimal memory placement
-        with torch.cuda.stream(self.stream):
-            # Input buffers: CHW format ready for TRT
-            self._img1_buffer = torch.empty(
-                (self._max_batch, 3, self.model_height, self.model_width),
-                dtype=self._torch_dtype, device='cuda'
-            )
-            self._img2_buffer = torch.empty(
-                (self._max_batch, 3, self.model_height, self.model_width),
-                dtype=self._torch_dtype, device='cuda'
-            )
-
-        self.stream.synchronize()
-
-        # Set persistent tensor addresses for INPUT buffers (base pointers don't change when slicing)
-        # Output address must be set per-call since it's allocated fresh each inference
-        self.context.set_tensor_address(self.input_names[0], self._img1_buffer.data_ptr())
-        self.context.set_tensor_address(self.input_names[1], self._img2_buffer.data_ptr())
-
-        self._model_ready.set()
-        logger.info(f"Optical Flow: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
-
-    def _claim(self) -> OpticalFlowInput | None:
-        """Atomically get and clear pending batch."""
-        with self._input_lock:
-            batch = self._pending_batch
-            self._pending_batch = None
-            return batch
-
-    def _process(self) -> None:
-        """Process the pending batch using TensorRT inference."""
-        batch: OpticalFlowInput | None = self._claim()
-
-        if batch is None:
-            return
-
-        output = OpticalFlowOutput(batch_id=batch.batch_id, track_ids=batch.track_ids, processed=False)
-
-        # Run inference
-        if batch.gpu_image_pairs:
-            # Limit processing to max batch size
-            pairs_to_process = batch.gpu_image_pairs[:self._max_batch]
-            track_ids_to_process = batch.track_ids[:self._max_batch]
-
-            try:
-                flow_tensor, inference_time_ms, lock_wait_ms = self._infer(pairs_to_process)
-
-                output = OpticalFlowOutput(
-                    batch_id=batch.batch_id,
-                    flow_tensor=flow_tensor,
-                    track_ids=track_ids_to_process,
-                    processed=True,
-                    inference_time_ms=inference_time_ms,
-                    lock_time_ms=lock_wait_ms
-                )
-            except Exception as e:
-                logger.error(f"Optical Flow: Inference failed: {str(e)}")
-        else:
-            output = OpticalFlowOutput(batch_id=batch.batch_id, track_ids=batch.track_ids, processed=True)
-
-        self._dispatch(output)
-
-    def _infer(self, gpu_pairs: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, float, float]:
-        """Run TensorRT RAFT inference on batch of GPU frame pairs.
-
-        All preprocessing and inference runs on the dedicated stream for zero sync overhead.
-        Uses preallocated buffers for zero allocation latency.
-
-        Args:
-            gpu_pairs: List of (prev_crop, curr_crop) tuples, each (3, H, W) RGB CHW float32 [0,1] on GPU
-
-        Returns:
-            Tuple of (flow_tensor, inference_time_ms, lock_wait_ms)
-            - flow_tensor: (B, 2, H, W) on CUDA, where [:, 0] is x-flow, [:, 1] is y-flow
-            - inference_time_ms: Time spent processing (excluding lock wait)
-            - lock_wait_ms: Time spent waiting for lock
-        """
-        method_start = time.perf_counter()
-        batch_size = len(gpu_pairs)
-
-        # Get input dimensions from first pair (CHW format: 3, H, W)
-        input_h, input_w = gpu_pairs[0][0].shape[1], gpu_pairs[0][0].shape[2]
-        needs_resize = (input_h != self.model_height or input_w != self.model_width)
-
-        # Get preallocated INPUT buffer slices for current batch
+    def infer(self, pairs: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, float]:
+        """The flow (N, 2, H, W), x and y in the model's pixels, from each previous to current crop (3, h, w) RGB in
+        [0, 1]; and the time waited for the shared execution lock (ms)."""
+        batch_size = len(pairs)
+        input_h, input_w = pairs[0][0].shape[1], pairs[0][0].shape[2]
+        h, w = self.model_height, self.model_width
         img1_buffer = self._img1_buffer[:batch_size]
         img2_buffer = self._img2_buffer[:batch_size]
+        flow_out = torch.empty((batch_size, 2, h, w), dtype=self._torch_dtype, device='cuda')
 
-        # Allocate output buffer fresh each call (no clone needed)
-        flow_out = torch.empty((batch_size, 2, self.model_height, self.model_width), dtype=self._torch_dtype, device='cuda')
-
-        # All preprocessing on dedicated stream (no cross-stream sync needed)
-        with torch.cuda.stream(self.stream):
-            # Stack GPU tensors: (B, 3, H, W) float32 RGB CHW [0,1]
-            prev_chw = torch.stack([p[0] for p in gpu_pairs], dim=0)
-            curr_chw = torch.stack([p[1] for p in gpu_pairs], dim=0)
-
-            # Scale to [0, 255] for RAFT, convert to model dtype
-            prev_chw = prev_chw.mul(255.0).to(self._torch_dtype)
-            curr_chw = curr_chw.mul(255.0).to(self._torch_dtype)
-
-            # Resize if needed (crop size != model size)
-            if needs_resize:
-                prev_chw = torch.nn.functional.interpolate(
-                    prev_chw, size=(self.model_height, self.model_width), mode='bilinear', align_corners=False
-                )
-                curr_chw = torch.nn.functional.interpolate(
-                    curr_chw, size=(self.model_height, self.model_width), mode='bilinear', align_corners=False
-                )
-
-            # Copy into preallocated buffers
+        with torch.cuda.stream(self._stream):
+            prev_chw = torch.stack([p[0] for p in pairs], dim=0).mul(255.0).to(self._torch_dtype)     # RAFT reads 0..255
+            curr_chw = torch.stack([p[1] for p in pairs], dim=0).mul(255.0).to(self._torch_dtype)
+            if input_h != h or input_w != w:
+                prev_chw = torch.nn.functional.interpolate(prev_chw, size=(h, w), mode='bilinear', align_corners=False)
+                curr_chw = torch.nn.functional.interpolate(curr_chw, size=(h, w), mode='bilinear', align_corners=False)
             img1_buffer.copy_(prev_chw)
             img2_buffer.copy_(curr_chw)
 
-        # TensorRT inference - acquire global lock (still on same stream)
-        lock_wait_start = time.perf_counter()
+        lock_wait_start: float = time.perf_counter()
         with get_exec_lock():
-            lock_acquired = time.perf_counter()
-
-            # Only set_input_shape per-call (input addresses are persistent from _setup)
-            self.context.set_input_shape(self.input_names[0], tuple(img1_buffer.shape))
-            self.context.set_input_shape(self.input_names[1], tuple(img2_buffer.shape))
-
-            # Output address must be set per-call (fresh allocation each inference)
-            self.context.set_tensor_address(self.output_name, flow_out.data_ptr())
-
-            # Execute on dedicated CUDA stream (preprocessing already complete on this stream)
-            self.context.execute_async_v3(stream_handle=self.stream.cuda_stream)
-            self.stream.synchronize()
-
-        method_end = time.perf_counter()
-
-        # Calculate timing metrics
-        lock_wait_ms = (lock_acquired - lock_wait_start) * 1000.0
-        total_time_ms = (method_end - method_start) * 1000.0
-        process_time_ms = total_time_ms - lock_wait_ms
-
-        # No clone needed - output buffer is fresh each call
-        return flow_out, process_time_ms, lock_wait_ms
-
-    # CALLBACK METHODS
-    def add_flow_callback(self, callback: OpticalFlowOutputCallback) -> None:
-        """Register callback to receive optical flow results."""
-        with self._callback_lock:
-            if callback not in self._callbacks:
-                self._callbacks.append(callback)
-
-    def remove_flow_callback(self, callback: OpticalFlowOutputCallback) -> None:
-        """Unregister previously registered callback."""
-        with self._callback_lock:
-            if callback in self._callbacks:
-                self._callbacks.remove(callback)
-
-    def _dispatch(self, output: OpticalFlowOutput) -> None:
-        """A result to the callbacks, copied under their lock and called outside it."""
-        with self._callback_lock:
-            callbacks: list[OpticalFlowOutputCallback] = list(self._callbacks)
-        for callback in callbacks:
-            try:
-                callback(output)
-            except Exception:
-                logger.exception("Optical Flow: error in a result callback")
+            lock_acquired: float = time.perf_counter()
+            self._context.set_input_shape(self._input_names[0], tuple(img1_buffer.shape))
+            self._context.set_input_shape(self._input_names[1], tuple(img2_buffer.shape))
+            self._context.set_tensor_address(self._output_name, flow_out.data_ptr())
+            self._context.execute_async_v3(stream_handle=self._stream.cuda_stream)
+            self._stream.synchronize()
+        return flow_out, (lock_acquired - lock_wait_start) * 1000.0

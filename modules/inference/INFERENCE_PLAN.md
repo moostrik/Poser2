@@ -23,17 +23,6 @@ No code in the package is one app's: the face model is smile's alone, the segmen
 `RecordedPoses` and `CaptureSync` deep_flow's, but each is general code with one user, which stays (as the camera's
 backends do). The package has no rules file; nothing it keeps needs one beyond `CLAUDE.md` **(deduction)**.
 
-## C. One thread per model, runners that only infer
-
-The optical-flow runners are each a `Thread` with its own queue, input lock, callback list and dispatch, written
-twice, once per backend: `RunnerONNX` and `RunnerTRT` share 155 of its ~390 lines **(seen)**. The face and person
-detectors and the pose and segmentation predictors have the textbook shape: the predictor owns the one thread, the
-queue, the drop count and the callbacks; each backend's runner holds `setup` and `infer` alone **(seen)**.
-
-- C3. The optical-flow predictor takes that shape
-- The output and the threads' count stay as they are; checked by the package's tests with a fake runner: the
-  optical flow has no live user (`enable_prev_crop` off)
-
 ## D. The small breaks
 
 - D1. `CropExtractor`'s callback list has no lock **(seen)**: it gets one, registered under it, copied under it,
@@ -52,7 +41,6 @@ queue, the drop count and the callbacks; each backend's runner holds `setup` and
 
 - Treat latency as a first-order concern; choose a path by its measured latency: A1, measured on the camera
 - Fix a problem where it is made: B1, the optical flow waits for the event its crops carry
-- `CLAUDE.md` Composition, prefer composition; Types, an ABC or shared code for a family: C
 - `CLAUDE.md` Concurrency, a callback list has its own lock: D1
 - `glossary.md`, a settings class is `<ClassName>Settings`: D2
 - `CLAUDE.md` Packages, a script sits in a `scripts/` folder; Time, `perf_counter` for every stamp: D3
