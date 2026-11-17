@@ -64,9 +64,10 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
   0.2 m; `tolerance` 0.2 against 0.5 changed nothing on four recordings, as the step filter has already taken the
   jump out **(deduction)**. In `depth_velocity_shader.frag` and `DepthVelocity`:
   - space: `edge` for the step filter (as now), the window's samples and the carried texels (now `tolerance`);
-  - time: the restart on a miss past `tolerance` goes, `max_speed` (6 m/s) the one restart: a jump in depth
-    between two frames is another surface when it is faster than a body moves. A miss of 0.2 m a frame is
-    10 m/s at 50 fps, so `max_speed` already restarts first **(deduction)**;
+  - time: `max_speed` (6 m/s) the one restart, on the miss before the filter: a new depth further from the
+    prediction than a body moves in the frame (`max_speed` × the frame's time, 12 cm at 50 fps) is another
+    surface, and the track starts over. It replaces the restart on a miss past `tolerance` and the check on the
+    filtered rate after the filter, which a smoothed track at rest softens below 6 m/s **(deduction)**;
   - x/y's `same_surface` reads `edge` where it read `tolerance` (`LucasKanadeFlow.update`), until x/y is gone
     through.
 
