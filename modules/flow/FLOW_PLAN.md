@@ -60,31 +60,24 @@ rest and later: the filter sees nothing until the zone opens, so its lag comes a
 overlap now (hands, unsmoothed, `dead_zone` 0.02: 52 ms against 7; `smooth` 25: 90 against 65; measure's still
 noise 2.4 / 3.1 against 9.1 / 5.1).
 
-- **C2.** The values, one run on the four recordings unattended, then judged by Matthias in the app. The settings'
-  defaults and MOTION.md's reasons follow on his word; the preset when he saves it. No new recording.
-  - The surfaces that are not the player left out: a still surface inside the mask that wanders, as the shiny desk
-    in a corner does, reads as z and is no measure of the motion. Each recording's frames are looked at first; a
-    surface in the mask that is not the player gets a box (uv) in `exclude` in the recording's `segments.json`,
-    and the compare measures no pixel inside it. The recordings' still stretches are looked at for the same.
-  - Each row one change from the defaults, on one capture of each recording (`hands_1`, `measure_1`, `edges_1`,
-    `show_1`; three agreed within 0.1), the code at the commit of the run, `dead_zone` 0:
-
-    | Group           | Rows                                                                                   |
-    |-----------------|----------------------------------------------------------------------------------------|
-    | the reference   | raw (`smooth` 0, the thresholds 0, `max_speed` 0); the defaults                       |
-    | z's smoothing   | `smooth` 50, 100, 200 × `xy_halving` 0.25, 0.5, 1 (9); `xy_rest` 0.25, 1               |
-    | z's cut         | `threshold` 0.25, 1, 2                                                                 |
-    | z's surface     | `edge` 0.05; z's `window` 9×9; `max_speed` 4, 8                                        |
-    | x/y             | `levels` 5; x/y's `window` 9×9; `damping` 0.02, 0.045; `threshold` 0.25, 0.4; `z_smooth` on |
-
-    About 26 rows a recording, about 45 minutes in all. Each row: z's still noise inside and at the edge, z kept
-    and lag, x/y's still noise, kept and lag, the restarts at rest and moving, the motion's ms.
-  - The outcome, a table a recording into MOTION.md, and a proposal: the values quiet at rest (still noise near
-    0 after the cut) with the most z kept at the least lag on all four; a value that holds on one recording only
-    is named so. Matthias judges it in the app before a default changes.
-  Measured 2026-11-17, the tables in MOTION.md; the defaults wait for Matthias at the PC (proposed: `levels` 5,
-  `xy_halving` 0.25, `max_speed` 8, z's `threshold` 0.5 or 1 by eye). `z_smooth` on makes x/y noisy at rest on
-  hands, not explained yet.
+- **C4.** The measuring's sums on the GPU, in `scripts/depth_velocity_compare.py`: a run read back three float
+  textures a side a frame and summed them on one CPU core, the GPU and the other cores idle. A compute shader
+  sums each region a frame (the core, the edge, the table, the moving pixels; `excluded` out) for every column,
+  the p99s from a histogram (bins of 1/128 px a frame), and a side reads back only those sums. The regions stay
+  on the CPU, once a frame for all sides. Checked on `hands_1` and `measure_1`: the rows the same as the CPU's
+  within a bin.
+- **C5.** The 1€ rule opened on the estimate's own speed as well, as the filter does (Casiez et al. 2012): it
+  opens on the measurement's speed, so at a stop it closes to the full `smooth` when the estimate should follow
+  the stop, and the estimate coasts. Measured on hands, `xy.z_smooth` on: x/y at the push's end 12.6 px a frame
+  50 ms on where off it is 2.3, under 1 after 300 ms. In `depth_velocity_shader.frag` the speed the larger of
+  x/y's and the carried estimate's z (px a frame); in `displacement_filter.frag` of x/y's and the carried
+  filtered x/y. A column for it in the compare: the ms a side's z and x/y take after a move's end to fall under a
+  tenth of its peak. Checked on `hands_1` and `measure_1` against now: the stop's ms, lag, kept, the still noise.
+- **C2.** The values, measured 2026-11-17 on the four recordings, the tables in MOTION.md
+  ([the motion's values](MOTION.md#depth_velocity-z)); the surfaces in the mask that are not the player left
+  out by `exclude` in each recording's `segments.json`. Proposed: `levels` 5, `xy_halving` 0.25, `max_speed` 8,
+  z's `threshold` 0.5 or 1 by eye. After C5 the smoothing's rows measured again; the defaults then set with
+  Matthias at the PC, MOTION.md's reasons following, the preset when he saves it.
 - **C3.** The range. `edge`, `max_speed` and the thresholds are in metres or px, tuned at 0.65–1.5 m; stereo
   noise grows with the square of the distance, so at 2–3.5 m they may need to be in disparity, and a depth's
   noise from frame to frame may come near `max_speed`'s 12 cm and start the track over at rest **(deduction)**.
