@@ -5,7 +5,7 @@
 FRAMES is what depth_velocity_capture saved from one loop of a recording (temp/depth_velocity/RECORDING).
 No app and no camera: a window gives the GL context, and two `LucasKanadeFlow3D`, A and B, measure the
 saved frames with the settings they were recorded with; `--a` and `--b` override any of them by its
-path in the panel (xy.levels, xy.threshold, z.xy_halving, z_gain, ...). The window plays the loop at its
+path in the panel (xy.levels, xy.threshold, z.halving_speed, z_gain, ...). The window plays the loop at its
 recorded rate, again and again, A on the left, B on the right:
 
     1  z of the track, red toward the camera, green away     space  pause
@@ -53,14 +53,14 @@ from modules.flow import FlowUtil, LucasKanadeFlow3D, LucasKanadeFlow3DSettings,
 
 WARM_UP: float = 1.0          # s at the start the flows settle in, measured in no part
 SHORTEST_PAUSE: float = 1.0   # s of stillness that end a move
-RENAMED: dict[str, str] = {'z_time': 'z_smooth', 'z_catch_up_time': 'z_catch_up', 'xy_follow_z_time': 'xy_smooth', 'xy_follow_z': 'xy_smooth', 'xy_regularizer': 'xy_damping',
+RENAMED: dict[str, str] = {'z_time': 'z_smooth','z_catch_up_time': 'z_catch_up', 'xy_follow_z_time': 'xy_smooth', 'xy_follow_z': 'xy_smooth', 'xy_regularizer': 'xy_damping',
                            'strength_x': 'x_gain', 'strength_y': 'y_gain', 'strength_z': 'z_gain',
                            'lucas_kanade': 'xy', 'depth_track': 'z', 'solve': 'xy', 'depth_velocity': 'z'}   # in frames saved before
 SWITCHED: dict[str, str] = {'x': 'x_gain', 'y': 'y_gain', 'z': 'z_gain'}   # in frames saved with axis switches: off is a gain of 0
 GROUPED: dict[str, str] = {'xy_levels': 'xy.levels', 'xy_window': 'xy.window', 'xy_damping': 'xy.damping',
                            'xy_same_surface': 'xy.same_surface', 'xy_threshold': 'xy.threshold',
                            'z_edge': 'z.edge', 'z_window': 'z.window', 'z_tolerance': 'z.tolerance',
-                           'z_smooth': 'z.smooth', 'xy_smooth': 'xy.z_smooth',
+                           'z_smooth': 'z.smooth', 'xy_smooth': 'xy.smooth_like_z',
                            'z_catch_up': 'z.catch_up', 'z_dead_zone': 'z.dead_zone', 'z_threshold': 'z.threshold'}   # in frames saved flat, before the groups
 MOVED: float = 0.05          # luminance change of a pixel that moves
 MOVED_FRAMES: int = 5         # frames it changes that much in, over the loop
@@ -117,9 +117,14 @@ def recorded_settings(recorded: dict) -> dict:
     """The settings a frame was saved with, as the settings' dict: saved flat before the groups, nested since."""
     result: dict = {}
     z_group = recorded.get('z')
-    if isinstance(z_group, dict) and 'xy_smooth' in z_group:          # nested, before it moved to x/y as z_smooth
+    if isinstance(z_group, dict) and 'xy_smooth' in z_group:          # nested, before it moved to x/y as smooth_like_z
         recorded = {**recorded, 'z': {k: v for k, v in z_group.items() if k != 'xy_smooth'},
-                    'xy': {**recorded.get('xy', {}), 'z_smooth': z_group['xy_smooth']}}
+                    'xy': {**recorded.get('xy', {}), 'smooth_like_z': z_group['xy_smooth']}}
+    z_group, xy_group = recorded.get('z'), recorded.get('xy')
+    if isinstance(z_group, dict) and isinstance(xy_group, dict):        # nested, before rest_speed, halving_speed, smooth_like_z
+        names = {'xy_rest': 'rest_speed', 'xy_halving': 'halving_speed', 'z_smooth': 'smooth_like_z'}
+        recorded = {**recorded, 'z': {names.get(k, k): v for k, v in z_group.items()},
+                    'xy': {names.get(k, k): v for k, v in xy_group.items()}}
     for key, value in recorded.items():
         key = RENAMED.get(key, key)
         if key in SWITCHED and isinstance(value, bool):     # the old axis switches; a "z" group is a dict

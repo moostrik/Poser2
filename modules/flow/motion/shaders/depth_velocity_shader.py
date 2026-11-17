@@ -14,7 +14,7 @@ class DepthVelocityShader(Shader):
     """Writes the track: z (view widths per frame), disparity (1/m), its rate (1/m per second) and its
     anchor (m)."""
 
-    def use(self, depth: Texture, track: Texture, smooth: float, xy_halving: float, xy_rest: float, delta_time: float,
+    def use(self, depth: Texture, track: Texture, smooth: float, halving_speed: float, rest_speed: float, delta_time: float,
             view_span: float, depth_step: tuple[float, float], window: int, edge: float, dead_zone: float,
             displacement: Texture | None = None, max_speed: float = 0.0, guard: GuardSlot | None = None) -> None:
         """Correct the track by the new depth into the bound target.
@@ -23,8 +23,8 @@ class DepthVelocityShader(Shader):
             depth: Depth now (m)
             track: The track the frame before
             smooth: Time the track follows over at rest (ms); 0 takes the measurement whole
-            xy_halving: x/y speed past `xy_rest` at which that time is half (px per frame); 0 is `smooth` throughout
-            xy_rest: x/y speed below which the image is at rest (px per frame)
+            halving_speed: speed (the larger of x/y's and the track's own) past `rest_speed` at which that time is half (px per frame); 0 is `smooth` throughout
+            rest_speed: speed below which the motion is at rest (px per frame)
             delta_time: Seconds since the last depth
             view_span: Metres one view width spans per metre of depth; 0 or less reads no motion
             depth_step: uv between two depth samples
@@ -61,8 +61,8 @@ class DepthVelocityShader(Shader):
         glUniform1i(self.get_uniform_loc("window"), window)
         glUniform1f(self.get_uniform_loc("edge"), edge)
         glUniform1f(self.get_uniform_loc("smoothing"), smooth)
-        glUniform1f(self.get_uniform_loc("xy_halving"), xy_halving)
-        glUniform1f(self.get_uniform_loc("xy_rest"), xy_rest)
+        glUniform1f(self.get_uniform_loc("halving_speed"), halving_speed)
+        glUniform1f(self.get_uniform_loc("rest_speed"), rest_speed)
         glUniform1f(self.get_uniform_loc("delta_time"), delta_time)
         glUniform1f(self.get_uniform_loc("view_span"), view_span)
         glUniform1f(self.get_uniform_loc("dead_zone"), dead_zone)

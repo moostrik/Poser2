@@ -52,7 +52,7 @@ with smoothing and is the quiet one only without; `tolerance` and `same_surface`
 the step filter and z's window earn their place. The aim: quiet at rest, the most z kept, the least lag.
 
 Built (2026-11-17): the 1€ filter's rule in place of the catch-up; one setting per job (`edge` within a frame,
-`max_speed` between frames, `xy_rest` and `xy_halving` for z's smoothing, `tolerance` and `same_surface` gone);
+`max_speed` between frames, `rest_speed` and `halving_speed` for z's smoothing, `tolerance` and `same_surface` gone);
 (2026-11-18) the measuring's sums on the GPU, the 1€ rule opened by the track's own speed too, the stop's ms;
 described in [MOTION.md](MOTION.md#z-the-depth-velocity) with their tables.
 
@@ -65,7 +65,7 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
   ([the motion's values](MOTION.md#depth_velocity-z)); the surfaces in the mask that are not the player left
   out by `exclude` in each recording's `segments.json`. Proposed: `levels` 5, z's `threshold` 0.5 or 1 by
   eye; `max_speed` stays 6 (its job is another surface at the player's edge, which `exclude` leaves out of
-  these runs, and it was tested before); `xy.z_smooth` off; `xy_halving` stays 0.5: since the 1€ rule opens on
+  these runs, and it was tested before); `xy.smooth_like_z` off; `halving_speed` stays 0.5: since the 1€ rule opens on
   the track's own speed (2026-11-18) it lags 4 ms on hands at a still noise of 0.64, 0.25 lags 2 ms at 3.7.
   `levels` 5 measured again after C5 (MOTION.md): x/y follows 20% more, z 1 ms less lag, a later stop on hands; the defaults then set with Matthias at the PC, MOTION.md's reasons following, the preset
   when he saves it.

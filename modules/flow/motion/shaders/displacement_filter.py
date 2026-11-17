@@ -8,7 +8,7 @@ from ...finite_guard import GuardSlot
 class DisplacementFilter(Shader):
     """Writes the filtered displacement (RG, uv per frame) and the position error (BA, uv)."""
 
-    def use(self, displacement: Texture, state: Texture, carry: Texture, smooth: float, xy_rest: float, xy_halving: float,
+    def use(self, displacement: Texture, state: Texture, carry: Texture, smooth: float, rest_speed: float, halving_speed: float,
             delta_time: float, guard: GuardSlot | None = None) -> None:
         """Filter one frame.
 
@@ -17,8 +17,8 @@ class DisplacementFilter(Shader):
             state: The filter the frame before
             carry: The displacement the state is carried by and the speed is read from, uv per frame
             smooth: Time followed over at rest (ms); 0 takes the measurement whole
-            xy_rest: x/y speed below which it is at rest (px per frame)
-            xy_halving: x/y speed past `xy_rest` at which the time is half (px per frame); 0 is `smooth` throughout
+            rest_speed: speed below which it is at rest (px per frame)
+            halving_speed: speed (the larger of x/y's and the track's own) past `rest_speed` at which the time is half (px per frame); 0 is `smooth` throughout
             delta_time: Seconds since the last frame
             guard: The displacement's slot in the motion's FiniteGuard; None no guard
         """
@@ -40,8 +40,8 @@ class DisplacementFilter(Shader):
         glUniform1i(self.get_uniform_loc("tex1"), 1)
         glUniform1i(self.get_uniform_loc("carry"), 2)
         glUniform1f(self.get_uniform_loc("smoothing"), smooth)
-        glUniform1f(self.get_uniform_loc("xy_rest"), xy_rest)
-        glUniform1f(self.get_uniform_loc("xy_halving"), xy_halving)
+        glUniform1f(self.get_uniform_loc("rest_speed"), rest_speed)
+        glUniform1f(self.get_uniform_loc("halving_speed"), halving_speed)
         glUniform1f(self.get_uniform_loc("delta_time"), delta_time)
         if guard is not None:
             guard.use(self.get_uniform_loc("uGuardSlot"))

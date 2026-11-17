@@ -14,8 +14,8 @@
 // it is empty. z is the rate over the metres one view width spans there, `depth × view_span`, in view
 // widths per frame. Depth is read nearest, so an edge never reads as a distance in between.
 // The time the track follows over is the 1€ filter's (Casiez, Roussel, Vogel 2012): `smoothing` at rest,
-// over 1 + speed / `xy_halving` in a motion, past `xy_rest`: the speed the larger of x/y's here (its 3×3
-// displacement) and the carried track's own z, both px per frame; 0 `xy_halving` is `smoothing` throughout. The carry takes each texel's depth a frame on by its rate. With `dead_zone` above 0,
+// over 1 + speed / `halving_speed` in a motion, past `rest_speed`: the speed the larger of x/y's here (its 3×3
+// displacement) and the carried track's own z, both px per frame; 0 `halving_speed` is `smoothing` throughout. The carry takes each texel's depth a frame on by its rate. With `dead_zone` above 0,
 // z is 0 while the tracked depth stays within it of its anchor; past it, z at its full speed, and the
 // anchor follows at `dead_zone` behind (a backlash); a track that starts over is anchored anew.
 
@@ -27,8 +27,8 @@ uniform vec2 depth_step; // uv between two depth samples
 uniform int window;      // Radius in depth samples
 uniform float edge;      // Depth step to another surface within a frame (m)
 uniform float smoothing;   // Time the track follows over at rest (ms), `smooth` in Python (`smooth` is a GLSL keyword); 0 takes the measurement whole
-uniform float xy_halving;          // x/y speed past xy_rest at which that time is half (px per frame); 0 off
-uniform float xy_rest;             // x/y speed below which the image is at rest (px per frame)
+uniform float halving_speed;       // speed past rest_speed at which that time is half (px per frame); 0 off
+uniform float rest_speed;          // speed below which the motion is at rest (px per frame)
 uniform float delta_time;           // Seconds since the last depth
 uniform float view_span; // Metres one view width spans per metre of depth
 uniform float dead_zone; // Depth the track wanders within its anchor without z (m); 0 is none
@@ -125,10 +125,10 @@ void step_track() {
     float full = 1.0;
     if (smoothed) {
         float follow_time = smoothing;
-        if (xy_halving > 0.0) {
+        if (halving_speed > 0.0) {
             float speed = warp ? xy_speed(size) : 0.0;
             if (track.x > 0.0) speed = max(speed, abs(track.y) * delta_time / (track.x * view_span) * size.x);
-            follow_time = smoothing / (1.0 + max(speed - xy_rest, 0.0) / xy_halving);
+            follow_time = smoothing / (1.0 + max(speed - rest_speed, 0.0) / halving_speed);
         }
         full = 1.0 - exp(-delta_time * 1000.0 / follow_time);
     }

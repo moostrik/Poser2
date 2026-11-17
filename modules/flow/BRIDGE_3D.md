@@ -237,7 +237,7 @@ bins' percentile, 3.989 widths/s against numpy's 3.988 on the speeds. On deep_fl
 `scripts/bridge_compare.py` on the standmoves ([gone](FLOW.md#recordings-gone)) recording (`20261103-215324`: four whole-arm moves
 from rest, with starts and stops, a player at 0.65–1.5 m), its frames as captured on 2026-11-05
 (`temp/depth_track_1105/`, 1449 frames, 25 fps, the stamps the replay's decode times), the flow run
-again on them with deep_flow's preset flow of 2026-11-06 (levels 4, same_surface and z_smooth on,
+again on them with deep_flow's preset flow of 2026-11-06 (levels 4, same_surface and smooth_like_z on,
 the depth velocity's `smooth` 50 ms unless named), each bridge at its preset values (trail: smooth
 1000 ms, attack 1 ms, advect 1, blur 4 px × 4; change: 25 / 150 ms, both region weights 1,
 regions 128 px), stepped once per flow frame. Per frame, the mean over the body's pixels that move

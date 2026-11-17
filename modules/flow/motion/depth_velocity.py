@@ -21,8 +21,8 @@ class DepthVelocitySettings(BaseSettings):
     window:         Field[Patch] = Field(Patch.SEVEN, min=Patch.ONE, max=Patch.NINE, description="z: depth samples averaged (larger: less noise, small parts blur)")
     max_speed:      Field[float] = Field(6.0, min=0.0, max=20.0, step=0.5, description="z: faster than this, in m/s, is another surface, the track starts over (0: no check)")
     smooth:         Field[float] = Field(100.0, min=0.0, max=500.0, step=1.0, newline=True, description="z: smoothing time at rest, in ms; 0 the change of two frames (higher: less noise at rest)")
-    xy_rest:        Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="x/y speed below which z counts as at rest, in px/frame")
-    xy_halving:     Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="x/y speed past xy_rest at which z's smoothing time is half, in px/frame (0: smooth throughout)")
+    rest_speed:     Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="speed below which the motion counts as at rest, in px/frame")
+    halving_speed:  Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="speed past rest_speed at which the smoothing time is half, in px/frame (0: smooth throughout)")
     dead_zone:      Field[float] = Field(0.0, min=0.0, max=0.05, step=0.001, newline=True, description="z: depth drift ignored before z counts as motion, in m (higher: less drift, slower start)")
     threshold:      Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="z below this is cut as noise, in px/frame (higher: less noise, less slow z)")
 
@@ -91,7 +91,7 @@ class DepthVelocity(FlowBase):
         self._estimate.clear_all()
 
     def update_depth(self, depth: Texture, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
-                     smooth: float, xy_halving: float, xy_rest: float, threshold: float, edge: float, dead_zone: float,
+                     smooth: float, halving_speed: float, rest_speed: float, threshold: float, edge: float, dead_zone: float,
                      displacement: Texture | None = None, max_speed: float = 0.0, guard: GuardSlot | None = None) -> None:
         """Advance on a new flow frame: correct the track by the new depth, then take the noise floor off.
 
@@ -102,8 +102,8 @@ class DepthVelocity(FlowBase):
             depth_step: uv between two depth samples in the flow's view; 0 takes one flow texel
             window: Radius in depth samples
             smooth: Time over which the track averages at rest (ms); 0 is the change of two frames
-            xy_halving: x/y speed past `xy_rest` at which that time is half (px per frame); 0 is `smooth` throughout
-            xy_rest: x/y speed below which the image is at rest (px per frame)
+            halving_speed: speed (the larger of x/y's and the track's own) past `rest_speed` at which that time is half (px per frame); 0 is `smooth` throughout
+            rest_speed: speed below which the motion is at rest (px per frame)
             threshold: Depth motion below this is noise, taken off the rest (px per frame)
             edge: Depth step to another surface within a frame (m): a 3×3 of depth samples spanning it is
                 dropped (the step filter), and the window averages only the samples within it
@@ -127,7 +127,7 @@ class DepthVelocity(FlowBase):
 
         self._estimate.swap()
         self._estimate.begin()
-        self._velocity_shader.use(self._input_fbo, self._estimate.back, smooth, xy_halving, xy_rest, max(delta_time, 1e-6),
+        self._velocity_shader.use(self._input_fbo, self._estimate.back, smooth, halving_speed, rest_speed, max(delta_time, 1e-6),
                                   view_span, step, window, edge, dead_zone, displacement, max_speed, guard)
         self._estimate.end()
 

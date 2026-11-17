@@ -362,7 +362,7 @@
         "levels": 4,
         "window": "SEVEN",
         "damping": 0.03,
-        "z_smooth": false,
+        "smooth_like_z": false,
         "threshold": 0.5
       },
       "z": {

@@ -47,7 +47,7 @@ class LucasKanadeFlow3D:
         self._capture: SolveCapture | None = SolveCapture.from_environment()
         self._mask: Texture | None = None
 
-        self._filtered: SwapFbo = SwapFbo()         # with z_smooth: the filter, its displacement and position error
+        self._filtered: SwapFbo = SwapFbo()         # with smooth_like_z: the filter, its displacement and position error
         self._followed: Fbo = Fbo()                 # the filtered displacement with the noise floor taken off
         self._following: bool = False
         self._velocity: Fbo = Fbo()
@@ -161,18 +161,18 @@ class LucasKanadeFlow3D:
             self._capture.after(captured, solved, {'levels': xy_s.levels, 'window': int(xy_s.window), 'damping': xy_s.damping})
 
         if depth is not None:
-            self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, z_s.window, z_s.smooth, z_s.xy_halving,
-                                              z_s.xy_rest, z_s.threshold, z_s.edge, z_s.dead_zone, solved, z_s.max_speed,
+            self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, z_s.window, z_s.smooth, z_s.halving_speed,
+                                              z_s.rest_speed, z_s.threshold, z_s.edge, z_s.dead_zone, solved, z_s.max_speed,
                                               self._slot('depth_velocity', guarded))
 
         xy: Texture = self._flow.displacement
-        if xy_s.z_smooth:
+        if xy_s.smooth_like_z:
             if not self._following:
                 self._filtered.clear_all()                  # from no motion, not from when it was last on
                 self._following = True
             self._filtered.swap()
             self._filtered.begin()
-            self._filter_shader.use(solved, self._filtered.back, solved, z_s.smooth, z_s.xy_rest, z_s.xy_halving,
+            self._filter_shader.use(solved, self._filtered.back, solved, z_s.smooth, z_s.rest_speed, z_s.halving_speed,
                                     max(delta_time, 1e-6), self._slot('displacement', guarded))
             self._filtered.end()
             self._followed.begin()
