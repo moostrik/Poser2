@@ -14,14 +14,14 @@ operator saw.
 | A   | [The measurements](#a-the-measurements)                                      | built                            | [FLOW.md](FLOW.md#the-goals)                       |
 | B   | [The view](#b-the-view)                                                      | built                            | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; C2 the values tonight     | [MOTION.md](MOTION.md)                             |
-| D   | [The bridge](#d-the-bridge)                                                  | built; the body force            | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
+| D   | [The bridge](#d-the-bridge)                                                  | built; the panels                | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | the temperature                  | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | open                             | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                      | [FLOW.md](FLOW.md)                                 |
 | I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | not started                      | [FLOW.md](FLOW.md)                                 |
 | J   | [Every setting and its description](#j-every-setting-and-its-description)    | last, after the refactor         | `CLAUDE.md`, `.claude/rules`                       |
 
-D1 needs the operator at the screen; the other lines go on meanwhile.
+D2 and D3 need the operator at the screen; the other lines go on meanwhile.
 
 The apps on deep_flow's input have their own plan, [apps/APPS_PLAN.md](../../apps/APPS_PLAN.md); recording and
 -sim, deep_flow's live checks among them, theirs, [RECORDING_PLAN.md](../recording/RECORDING_PLAN.md). The
@@ -85,10 +85,32 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
 
 ## D. The bridge
 
-What is built: [BRIDGE_3D.md](BRIDGE_3D.md).
+What is built: [BRIDGE_3D.md](BRIDGE_3D.md), and what the fluid does with it,
+[FLUID_3D.md](FLUID_3D.md#the-inputs).
 
-- **D1.** The body force's acceleration made useful: looked into on a recording, what it does to the water and
-  what it should do in the look, then tuned.
+The textbooks put a body in water two ways: as a boundary, the water dragged toward the body's velocity and never
+past it; and as a body force, an acceleration added, which the water keeps after the body is gone, so a stop can
+throw the water on. Dye and warmth have no force: they are held at the body (a boundary value) or added (a
+source). Seen in the app, 2026-11-17: the stop as an acceleration gives nice effects; the added dye shows little
+difference **(site fact)**. With the video's colors as the dye, adding piles them up into a smear, where holding
+keeps the picture **(deduction)**.
+
+- **D1.** The panels by what the fluid gets, the `boundary` and `body_force` groups gone. Boundary and body force
+  stay the words in the descriptions and the documents.
+  - The bridge: `readings`, `velocity` (the held velocity, with its peak), `acceleration` (the added velocity),
+    `density` (the held dye), `temperature`, `expansion`; the outputs and their ports named the same.
+  - The added dye and warmth removed: their mixes, outputs and z positions in the bridge, the fluid's
+    `add_body_force_density` and `add_body_force_temperature`, `density_rate` and `temperature_rate`, and the
+    injection's `RATE` mode, which only they use. Seven outputs become five.
+  - The fluid's `input`, one flat panel in the order the layer injects: `spread`, the velocity's `drag` and
+    `gain`, the acceleration's `gain`, the density's `drag` and `gain`, the temperature's, the expansion's
+    `rate`. The acceleration takes no drag: it has no target to close on, and its timing is the bandpass's
+    (`fast_smooth`, `slow_smooth`).
+  - Every call site, the 2D bridge's outputs and hd_trio's included, the preset, BRIDGE_3D.md, FLUID_3D.md and
+    `.claude/rules/flow.md`'s naming line in the same change.
+- **D2.** The temperature and the expansion checked in the app, each in its own panel: what each does to the
+  water and whether it works. The temperature after E1, with `buoyancy` above 0.
+- **D3.** The acceleration tuned at the screen: which readings (`stop`, `change`, `wake`) and its `gain`.
 
 ## E. The 3D fluid's physics
 
@@ -203,5 +225,8 @@ Not worked on until asked for; each with what is known.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
+- When a term changes, rename it everywhere in the same change; update all call sites; keep presets in sync;
+  remove obsolete pathways: D1.
+- A settings class mirrors the code it configures, a group for each step in the order the code runs them: D1.
 
-Not designed yet, so their rules are not named: D1, E1, F1, H1, I1 to I4.
+Not designed yet, so their rules are not named: D2, D3, E1, F1, H1, I1 to I4.
