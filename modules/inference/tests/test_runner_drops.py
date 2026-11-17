@@ -4,11 +4,9 @@ submitting thread, without the model loaded."""
 import threading
 import unittest
 
-from .. import optical_flow, segmentation
+from .. import optical_flow
 from ..optical_flow.io import OpticalFlowInput
 from ..optical_flow.runner_onnx import RunnerONNX as FlowRunner
-from ..segmentation.io import SegmentationInput
-from ..segmentation.runner_onnx import RunnerONNX as SegmentationRunner
 
 
 class RunnerDropTest(unittest.TestCase):
@@ -27,13 +25,6 @@ class RunnerDropTest(unittest.TestCase):
         runner = FlowRunner(settings)
         self.check(runner, settings, OpticalFlowInput(batch_id=1, gpu_image_pairs=[], track_ids=[]),
                    OpticalFlowInput(batch_id=2, gpu_image_pairs=[], track_ids=[]), runner.add_flow_callback)
-
-    def test_segmentation(self) -> None:
-        settings = segmentation.Settings()
-        settings.initialize()
-        runner = SegmentationRunner(settings)
-        self.check(runner, settings, SegmentationInput(batch_id=1, gpu_images=[], track_ids=[]),
-                   SegmentationInput(batch_id=2, gpu_images=[], track_ids=[]), runner.add_segmentation_callback)
 
 
 if __name__ == '__main__':

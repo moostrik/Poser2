@@ -25,17 +25,14 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 
 ## C. One thread per model, runners that only infer
 
-The segmentation and optical-flow runners are each a `Thread` with its own queue, input lock, callback list and
-dispatch, written twice, once per backend: `RunnerONNX` and `RunnerTRT` share 205 of the segmentation's ~500 lines,
-155 of the optical flow's ~390 **(seen)**. The face and person detectors and the pose predictor have the textbook
-shape: the predictor owns the one thread, the queue, the drop count and the callbacks; each backend's runner holds
-`setup` and `infer` alone **(seen)**.
+The optical-flow runners are each a `Thread` with its own queue, input lock, callback list and dispatch, written
+twice, once per backend: `RunnerONNX` and `RunnerTRT` share 155 of its ~390 lines **(seen)**. The face and person
+detectors and the pose and segmentation predictors have the textbook shape: the predictor owns the one thread, the
+queue, the drop count and the callbacks; each backend's runner holds `setup` and `infer` alone **(seen)**.
 
-- C2. The segmentation predictor takes that shape
-- C3. The optical-flow predictor the same
-- The output and the threads' count stay as they are; each step is checked by the package's tests (with a fake
-  runner where they need one) and a run of the app that uses it: hd_trio for the segmentation; the optical flow has
-  no live user (`enable_prev_crop` off), so its tests alone
+- C3. The optical-flow predictor takes that shape
+- The output and the threads' count stay as they are; checked by the package's tests with a fake runner: the
+  optical flow has no live user (`enable_prev_crop` off)
 
 ## D. The small breaks
 

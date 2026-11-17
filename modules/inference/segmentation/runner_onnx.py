@@ -1,526 +1,132 @@
-# Standard library imports
-from threading import Thread, Lock, Event
-import time
-
-# Third-party imports
-import numpy as np
-import torch
-import onnxruntime as ort
-
-from ..ort_runtime import preload_cuda
-
-from .io import SegmentationInput, SegmentationOutput, SegmentationOutputCallback
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from .settings import Settings
+"""Robust Video Matting through ONNX Runtime on CUDA: the crops and each player's recurrent states into a
+preallocated batch on its stream, the alpha matte and the model's foreground out on the GPU. The batch is padded to
+`max_batch`, the size it is warmed up at."""
 
 import logging
+
+import numpy as np
+import onnxruntime as ort
+import torch
+
+from ..ort_runtime import preload_cuda
+from .recurrent_state import RecurrentState
+from .settings import Settings
+
 logger = logging.getLogger(__name__)
 
-
-class RecurrentState:
-    """Container for RVM recurrent states (r1, r2, r3, r4)."""
-    def __init__(self, r1: torch.Tensor, r2: torch.Tensor, r3: torch.Tensor, r4: torch.Tensor):
-        self.r1 = r1
-        self.r2 = r2
-        self.r3 = r3
-        self.r4 = r4
+PRECISIONS: dict[str, str] = {'tensor(float)': 'FP32', 'tensor(float16)': 'FP16', 'tensor(double)': 'FP64', 'tensor(int8)': 'INT8'}
+DTYPES: dict[str, type] = {'tensor(float)': np.float32, 'tensor(float16)': np.float16, 'tensor(double)': np.float64, 'tensor(int8)': np.int8}
+RECURRENT_CHANNELS: tuple[tuple[int, int], ...] = ((16, 2), (20, 4), (40, 8), (64, 16))     # (channels, downscale) of r1..r4
 
 
-class RunnerONNX(Thread):
-    """Asynchronous GPU person segmentation using Robust Video Matting (RVM) with ONNX Runtime.
-
-    ONNX Runtime implementation for testing/validation. Use PredictorTRT for production.
-
-    Uses recurrent states for temporal coherence, eliminating flickering artifacts.
-    Single-slot queue: only the most recent batch waits processing; an older pending batch is dropped, counted in
-    `settings.dropped`, and its callbacks told on the submitting thread (`processed=False`). Batches already
-    processing cannot be cancelled.
-
-    Maintains per-tracklet recurrent states (r1-r4) for temporal consistency.
-    Results go to the callbacks from the inference thread, which only enqueue.
-    """
-
-    def __init__(self, settings: 'Settings') -> None:
-        super().__init__()
-        self.settings: 'Settings' = settings
-
-        self.model_path: str = settings.model_path
-        self.model_name: str = settings.model
-        self.model_file: str = f"{self.model_path}/{self.model_name}"
+class RunnerONNX:
+    def __init__(self, settings: Settings) -> None:
+        self.model_file: str = f"{settings.model_path}/{settings.model}"
         self.model_width: int = settings.width
         self.model_height: int = settings.height
-        self.resolution_name: str = settings.resolution.name
-        self.verbose: bool = settings.verbose
+        self.max_batch: int = min(settings.max_players, 4)
+        self.model_precision: str = "UNKNOWN"
 
-        # Thread coordination
-        self._shutdown_event: Event = Event()
-        self._notify_update_event: Event = Event()
-        self._model_ready: Event = Event()
-
-        # Input queue
-        self._input_lock: Lock = Lock()
-        self._pending_batch: SegmentationInput | None = None
-        self._input_timestamp: float = time.perf_counter()
-        self._last_dropped_batch_id: int = 0
-
-        # Callbacks
-        self._callback_lock: Lock = Lock()
-        self._callbacks: list[SegmentationOutputCallback] = []      # run in registration order
-
-        # Per-tracklet recurrent states for temporal coherence
-        self._recurrent_states: dict[int, RecurrentState] = {}
-        self._frame_counter: int = 0  # For periodic state reset
-        self._state_reset_interval: int = settings.reset_interval  # Reset all states every N frames (0=disabled)
-
-        # ONNX session (initialized in run thread)
         self._session: ort.InferenceSession | None = None
-        self._model_dtype = np.float16  # Default, determined in setup
-        self._torch_dtype: torch.dtype  # PyTorch dtype for preprocessing
+        self._model_dtype: type = np.float16
+        self._torch_dtype: torch.dtype = torch.float16
+        self._stream: torch.cuda.Stream
+        self._states: dict[int, RecurrentState] = {}    # per track id
+        self._zero_states: list[torch.Tensor] = []      # (1, C, h, w) per recurrent input, for a new player
+        self._src_buffer: torch.Tensor                  # (max_batch, 3, H, W)
+        self._state_buffers: list[torch.Tensor] = []    # (max_batch, C, h, w) per recurrent input
 
-        # Dedicated CUDA stream (initialized in _setup())
-        self.stream: torch.cuda.Stream
+    def setup(self) -> None:
+        """Load the model and warm it up, on the thread that will run it. It runs on CUDA only: the input is on the GPU."""
+        preload_cuda()
+        providers = [
+            ('CUDAExecutionProvider', {
+                'device_id': 0,
+                'arena_extend_strategy': 'kNextPowerOfTwo',
+                'gpu_mem_limit': 2 * 1024 * 1024 * 1024,
+                'cudnn_conv_algo_search': 'EXHAUSTIVE',
+                'do_copy_in_default_stream': True,
+            }),
+            'CPUExecutionProvider',
+        ]
+        sess_options = ort.SessionOptions()
+        sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+        sess_options.intra_op_num_threads = 1
+        sess_options.log_severity_level = 3
+        self._session = ort.InferenceSession(self.model_file, sess_options=sess_options, providers=providers)
+        if 'CUDAExecutionProvider' not in self._session.get_providers():
+            raise RuntimeError("CUDA provider not available: the runner binds CUDA tensors, the CPU provider cannot take them")
 
-        # Preallocated zero recurrent states for new tracklets (read-only, shared, GPU tensors)
-        self._zero_r1: torch.Tensor
-        self._zero_r2: torch.Tensor
-        self._zero_r3: torch.Tensor
-        self._zero_r4: torch.Tensor
+        input_type: str = self._session.get_inputs()[0].type        # 'src'
+        self.model_precision = PRECISIONS.get(input_type, f"UNKNOWN({input_type})")
+        self._model_dtype = DTYPES.get(input_type, np.float16)
+        self._torch_dtype = {np.float32: torch.float32, np.float16: torch.float16}.get(self._model_dtype, torch.float16)
 
-        # Preallocated input buffers (initialized in _setup())
-        self._src_buffer: torch.Tensor    # (max_batch, 3, H, W) normalized input
-        self._r1i_buffer: torch.Tensor    # (max_batch, 16, H/2, W/2)
-        self._r2i_buffer: torch.Tensor    # (max_batch, 20, H/4, W/4)
-        self._r3i_buffer: torch.Tensor    # (max_batch, 40, H/8, W/8)
-        self._r4i_buffer: torch.Tensor    # (max_batch, 64, H/16, W/16)
+        self._stream = torch.cuda.Stream()
+        h, w = self.model_height, self.model_width
+        with torch.cuda.stream(self._stream):
+            self._zero_states = [torch.zeros((1, c, h // s, w // s), dtype=self._torch_dtype, device='cuda') for c, s in RECURRENT_CHANNELS]
+            self._src_buffer = torch.empty((self.max_batch, 3, h, w), dtype=self._torch_dtype, device='cuda')
+            self._state_buffers = [torch.empty((self.max_batch, c, h // s, w // s), dtype=self._torch_dtype, device='cuda') for c, s in RECURRENT_CHANNELS]
+        self._stream.synchronize()
+        self._warmup()
 
-        # Batch inference settings
-        self._max_batch: int = min(settings.max_players, 4)
+    def reset_states(self) -> None:
+        """Every player starts again without memory."""
+        self._states.clear()
 
-    @property
-    def is_ready(self) -> bool:
-        """Check if model is loaded and system is ready to process segmentation"""
-        return self._model_ready.is_set() and not self._shutdown_event.is_set() and self.is_alive()
+    def infer(self, gpu_images: list[torch.Tensor], track_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float]:
+        """The alpha matte (N, H, W) and the foreground (N, 3, H, W) at the model's size for the crops (3, h, w) RGB in
+        [0, 1] of the players `track_ids`; and the time waited for the GPU's lock, 0: ONNX Runtime takes none."""
+        batch_size = len(gpu_images)
+        input_h, input_w = gpu_images[0].shape[1], gpu_images[0].shape[2]
+        h, w = self.model_height, self.model_width
 
-    def stop(self) -> None:
-        """Stop the inference thread gracefully."""
-        self._shutdown_event.set()
+        # Padded to max_batch, the shape it is warmed up at, with ids no player has
+        images: list[torch.Tensor] = list(gpu_images)
+        states: list[RecurrentState | None] = [self._states.get(track_id) for track_id in track_ids]
+        if batch_size < self.max_batch:
+            images += [torch.zeros((3, input_h, input_w), dtype=torch.float32, device='cuda')] * (self.max_batch - batch_size)
+            states += [None] * (self.max_batch - batch_size)
 
-        # Wake up inference thread
-        self._notify_update_event.set()
-        self.join(timeout=2.0)
+        fgr_out = torch.empty((self.max_batch, 3, h, w), dtype=self._torch_dtype, device='cuda')
+        pha_out = torch.empty((self.max_batch, 1, h, w), dtype=self._torch_dtype, device='cuda')
+        state_outs = [torch.empty((self.max_batch, c, h // s, w // s), dtype=self._torch_dtype, device='cuda') for c, s in RECURRENT_CHANNELS]
 
-        if self.is_alive():
-            logger.warning("Segmentation inference thread did not stop cleanly")
-
-    def run(self) -> None:
-        self._setup()
-
-        while not self._shutdown_event.is_set():
-            self._notify_update_event.wait()
-
-            if self._shutdown_event.is_set():
-                break
-
-            self._notify_update_event.clear()
-
-            try:
-                self._process()
-
-            except Exception as e:
-                logger.error(f"Segmentation: {str(e)}")
-    def submit(self, input_batch: SegmentationInput) -> None:
-        """Submit batch for processing. Replaces pending batch if not yet started.
-
-        Dropped batches receive callbacks with processed=False.
-        """
-        if self._shutdown_event.is_set():
-            return
-
-        if not self._model_ready.is_set():
-            return
-
-        # Validate batch size
-        if len(input_batch.gpu_images) > self._max_batch:
-            logger.warning(f"Segmentation Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
-
-        dropped_batch: SegmentationInput | None = None
-
-        with self._input_lock:
-            if self._pending_batch is not None:
-                dropped_batch = self._pending_batch
-                if self.verbose:
-                    lag = int((time.perf_counter() - self._input_timestamp) * 1000)
-                    logger.info(f"Segmentation: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
-                self._last_dropped_batch_id = dropped_batch.batch_id
-
-            self._pending_batch = input_batch
-            self._input_timestamp = time.perf_counter()
-
-        # Notify about dropped batch
-        if dropped_batch is not None:
-            self.settings.dropped += 1
-            self._dispatch(SegmentationOutput(batch_id=dropped_batch.batch_id, track_ids=dropped_batch.track_ids, processed=False))
-
-        self._notify_update_event.set()
-
-    def _setup(self) -> None:
-        """Initialize ONNX session, executor, and warmup. Called from run()."""
-        try:
-            # Initialize ONNX Runtime session with CUDA provider
-            preload_cuda()
-            providers = [
-                ('CUDAExecutionProvider', {
-                    'device_id': 0,
-                    'arena_extend_strategy': 'kNextPowerOfTwo',
-                    'gpu_mem_limit': 2 * 1024 * 1024 * 1024,  # 2GB
-                    'cudnn_conv_algo_search': 'EXHAUSTIVE',
-                    'do_copy_in_default_stream': True,
-                }),
-                'CPUExecutionProvider',
-            ]
-
-            sess_options = ort.SessionOptions()
-            sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-            sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-            sess_options.intra_op_num_threads = 1
-            sess_options.log_severity_level = 3  # 0=verbose, 1=info, 2=warning, 3=error
-
-            self._session = ort.InferenceSession(
-                self.model_file,
-                sess_options=sess_options,
-                providers=providers
-            )
-
-            # Verify CUDA provider is active
-            providers_used = self._session.get_providers()
-            if 'CUDAExecutionProvider' not in providers_used:
-                raise RuntimeError("CUDA provider not available: the runner binds CUDA tensors, the CPU provider cannot take them")
-
-            # Determine model precision from 'src' input tensor
-            src_input = self._session.get_inputs()[0]  # First input is 'src'
-            input_type = src_input.type
-
-            # Parse ONNX type string (e.g., 'tensor(float)', 'tensor(float16)')
-            precision_map = {
-                'tensor(float)': 'FP32',
-                'tensor(float16)': 'FP16',
-                'tensor(double)': 'FP64',
-                'tensor(int8)': 'INT8',
-            }
-            self.model_precision = precision_map.get(input_type, f"UNKNOWN({input_type})")
-
-            # Map ONNX type to numpy dtype for preprocessing
-            dtype_map = {
-                'tensor(float)': np.float32,
-                'tensor(float16)': np.float16,
-                'tensor(double)': np.float64,
-                'tensor(int8)': np.int8,
-            }
-            self._model_dtype = dtype_map.get(input_type, np.float16)
-
-            # Map numpy dtype to torch dtype for preprocessing
-            torch_dtype_map = {
-                np.float32: torch.float32,
-                np.float16: torch.float16,
-            }
-            self._torch_dtype = torch_dtype_map.get(self._model_dtype, torch.float16)
-
-            # Dedicated CUDA stream for all GPU operations (preprocessing + inference)
-            self.stream = torch.cuda.Stream()
-
-            # Preallocate zero recurrent states (read-only, shared across all new tracklets, GPU tensors)
-            with torch.cuda.stream(self.stream):
-                self._zero_r1 = torch.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=self._torch_dtype, device='cuda')
-                self._zero_r2 = torch.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=self._torch_dtype, device='cuda')
-                self._zero_r3 = torch.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=self._torch_dtype, device='cuda')
-                self._zero_r4 = torch.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=self._torch_dtype, device='cuda')
-
-                # Preallocate all INPUT buffers on the dedicated stream for optimal memory placement
-                self._src_buffer = torch.empty(
-                    (self._max_batch, 3, self.model_height, self.model_width),
-                    dtype=self._torch_dtype, device='cuda'
-                )
-
-                # Recurrent input buffers
-                self._r1i_buffer = torch.empty(
-                    (self._max_batch, 16, self.model_height // 2, self.model_width // 2),
-                    dtype=self._torch_dtype, device='cuda'
-                )
-                self._r2i_buffer = torch.empty(
-                    (self._max_batch, 20, self.model_height // 4, self.model_width // 4),
-                    dtype=self._torch_dtype, device='cuda'
-                )
-                self._r3i_buffer = torch.empty(
-                    (self._max_batch, 40, self.model_height // 8, self.model_width // 8),
-                    dtype=self._torch_dtype, device='cuda'
-                )
-                self._r4i_buffer = torch.empty(
-                    (self._max_batch, 64, self.model_height // 16, self.model_width // 16),
-                    dtype=self._torch_dtype, device='cuda'
-                )
-
-            self.stream.synchronize()
-
-            # Clear any existing states
-            self._recurrent_states.clear()
-
-            # Warmup: initialize CUDA kernels with dummy inference
-            self._warmup(self._session)
-
-            self._model_ready.set()
-            logger.info(f"Segmentation: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
-
-        except Exception as e:
-            logger.error(f"Segmentation: Failed to load model - {str(e)}")
-    def _claim(self) -> SegmentationInput | None:
-        """Atomically get and clear pending batch. Once retrieved, cannot be cancelled."""
-        with self._input_lock:
-            batch = self._pending_batch
-            self._pending_batch = None  # Clear slot - batch is now committed
-            return batch
-
-    def _process(self) -> None:
-        """Process pending batch using batched ONNX inference with recurrent states."""
-        batch: SegmentationInput | None = self._claim()
-
-        if batch is None:
-            return
-
-        # Increment frame counter for periodic state reset
-        self._frame_counter += 1
-
-        # Periodic state reset as failsafe (0=disabled)
-        if self._state_reset_interval > 0 and self._frame_counter % self._state_reset_interval == 0:
-            if self.verbose:
-                logger.debug(f"Segmentation: Periodic state reset at frame {self._frame_counter}")
-            self._recurrent_states.clear()
-
-        output = SegmentationOutput(batch_id=batch.batch_id, track_ids=batch.track_ids, processed=False)
-
-        # Run inference
-        gpu_images = batch.gpu_images[:self._max_batch]
-        track_ids_to_process = batch.track_ids[:self._max_batch]
-
-        if gpu_images:
-            try:
-                mask_tensor, fgr_tensor, inference_time_ms = self._infer(gpu_images, track_ids_to_process)
-                output = SegmentationOutput(
-                    batch_id=batch.batch_id,
-                    mask_tensor=mask_tensor,
-                    fgr_tensor=fgr_tensor,
-                    track_ids=batch.track_ids,
-                    processed=True,
-                    inference_time_ms=inference_time_ms
-                )
-            except Exception as e:
-                logger.error(f"Segmentation: Batched inference failed: {str(e)}")
-        self._dispatch(output)
-
-    def _infer(self, gpu_imgs: list[torch.Tensor], track_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float]:
-        """Run batched ONNX inference with per-tracklet recurrent states using GPU images.
-
-        All preprocessing and inference runs on the dedicated stream for zero sync overhead.
-        Uses preallocated buffers for zero allocation latency.
-        Keeps states on GPU as PyTorch tensors (views into output buffers).
-
-        Args:
-            gpu_imgs: List of RGB float32 tensors on GPU (H, W, 3) in [0,1] range
-            track_ids: Track ids for each image
-
-        Returns:
-            (alpha_matte (actual_batch,H,W), foreground (actual_batch,3,H,W), inference_ms)
-        """
-        actual_batch_size = len(gpu_imgs)
-        if actual_batch_size == 0 or self._session is None:
-            return torch.empty(0, dtype=self._torch_dtype, device='cuda'), torch.empty(0, 3, 0, 0, dtype=self._torch_dtype, device='cuda'), 0.0
-
-        batch_start = time.perf_counter()
-
-        # Get input image dimensions from first real image (CHW format: 3, H, W)
-        input_h, input_w = gpu_imgs[0].shape[1], gpu_imgs[0].shape[2]
-        needs_resize = (input_h != self.model_height or input_w != self.model_width)
-
-        # Pad to fixed batch size using missing IDs to avoid ONNX Runtime recompilation
-        num_padding = self._max_batch - actual_batch_size
-        padding_ids: list[int] = []
-
-        # Gather recurrent states for real tracklets first
-        states: list[RecurrentState | None] = []
-        for tid in track_ids:
-            states.append(self._recurrent_states.get(tid))
-
-        if num_padding > 0:
-            # Find which IDs from 0 to max_batch-1 are missing
-            all_ids = set(range(self._max_batch))
-            used_ids = set(track_ids)
-            available_ids = list(all_ids - used_ids)
-
-            # Add padding with zero images at SAME SIZE as input images (not model size)
-            for i in range(num_padding):
-                padding_id = available_ids[i]
-                gpu_imgs.append(torch.zeros((input_h, input_w, 3), dtype=torch.float32, device='cuda'))
-                track_ids.append(padding_id)
-                padding_ids.append(padding_id)
-                states.append(None)  # Padding gets zero states
-
-        # Get preallocated INPUT buffer slices for fixed batch
-        src_buffer = self._src_buffer[:self._max_batch]
-        r1i_buffer = self._r1i_buffer[:self._max_batch]
-        r2i_buffer = self._r2i_buffer[:self._max_batch]
-        r3i_buffer = self._r3i_buffer[:self._max_batch]
-        r4i_buffer = self._r4i_buffer[:self._max_batch]
-
-        # Allocate OUTPUT buffers fresh each call (recurrent states will be views into these)
-        fgr_out = torch.empty((self._max_batch, 3, self.model_height, self.model_width), dtype=self._torch_dtype, device='cuda')
-        pha_out = torch.empty((self._max_batch, 1, self.model_height, self.model_width), dtype=self._torch_dtype, device='cuda')
-        r1o_out = torch.empty((self._max_batch, 16, self.model_height // 2, self.model_width // 2), dtype=self._torch_dtype, device='cuda')
-        r2o_out = torch.empty((self._max_batch, 20, self.model_height // 4, self.model_width // 4), dtype=self._torch_dtype, device='cuda')
-        r3o_out = torch.empty((self._max_batch, 40, self.model_height // 8, self.model_width // 8), dtype=self._torch_dtype, device='cuda')
-        r4o_out = torch.empty((self._max_batch, 64, self.model_height // 16, self.model_width // 16), dtype=self._torch_dtype, device='cuda')
-
-        # All preprocessing on dedicated stream (no cross-stream sync needed)
-        with torch.cuda.stream(self.stream):
-            # Stack GPU tensors: (B, 3, H, W) float32 RGB CHW [0,1]
-            batch_chw = torch.stack(gpu_imgs, dim=0).to(self._torch_dtype)
-
-            # Resize if needed (crop size != model size)
-            if needs_resize:
-                batch_chw = torch.nn.functional.interpolate(
-                    batch_chw, size=(self.model_height, self.model_width), mode='bilinear', align_corners=False
-                )
-
-            # Already normalized to [0, 1], just copy into preallocated buffer
-            src_buffer.copy_(batch_chw)
-
-            # Gather recurrent states into preallocated buffers
+        with torch.cuda.stream(self._stream):
+            batch_chw = torch.stack(images, dim=0).to(self._torch_dtype)
+            if input_h != h or input_w != w:
+                batch_chw = torch.nn.functional.interpolate(batch_chw, size=(h, w), mode='bilinear', align_corners=False)
+            self._src_buffer.copy_(batch_chw)
             for i, state in enumerate(states):
-                if state is not None:
-                    r1i_buffer[i:i+1].copy_(state.r1)
-                    r2i_buffer[i:i+1].copy_(state.r2)
-                    r3i_buffer[i:i+1].copy_(state.r3)
-                    r4i_buffer[i:i+1].copy_(state.r4)
-                else:
-                    r1i_buffer[i:i+1].copy_(self._zero_r1)
-                    r2i_buffer[i:i+1].copy_(self._zero_r2)
-                    r3i_buffer[i:i+1].copy_(self._zero_r3)
-                    r4i_buffer[i:i+1].copy_(self._zero_r4)
+                sources = (state.r1, state.r2, state.r3, state.r4) if state is not None else self._zero_states
+                for buffer, source in zip(self._state_buffers, sources):
+                    buffer[i:i + 1].copy_(source)
+        self._stream.synchronize()      # ONNX Runtime runs on its own stream: the input must be written first
 
-        # CRITICAL: Synchronize stream before IOBinding to ensure all preprocessing is complete
-        self.stream.synchronize()
-
-        # Use preprocessed tensors directly for ONNX Runtime
-        torch_src = src_buffer
-        torch_r1i = r1i_buffer
-        torch_r2i = r2i_buffer
-        torch_r3i = r3i_buffer
-        torch_r4i = r4i_buffer
-
-        # Use IOBinding for GPU input/output
+        assert self._session is not None
         io_binding = self._session.io_binding()
-
-        # Bind inputs from PyTorch tensors
-        io_binding.bind_input('src', device_type='cuda', device_id=0,
-                              element_type=self._model_dtype, shape=tuple(torch_src.shape),
-                              buffer_ptr=torch_src.data_ptr())
-        io_binding.bind_input('r1i', device_type='cuda', device_id=0,
-                              element_type=self._model_dtype, shape=tuple(torch_r1i.shape),
-                              buffer_ptr=torch_r1i.data_ptr())
-        io_binding.bind_input('r2i', device_type='cuda', device_id=0,
-                              element_type=self._model_dtype, shape=tuple(torch_r2i.shape),
-                              buffer_ptr=torch_r2i.data_ptr())
-        io_binding.bind_input('r3i', device_type='cuda', device_id=0,
-                              element_type=self._model_dtype, shape=tuple(torch_r3i.shape),
-                              buffer_ptr=torch_r3i.data_ptr())
-        io_binding.bind_input('r4i', device_type='cuda', device_id=0,
-                              element_type=self._model_dtype, shape=tuple(torch_r4i.shape),
-                              buffer_ptr=torch_r4i.data_ptr())
-
-        # Bind outputs from preallocated PyTorch tensors
-        io_binding.bind_output('fgr', device_type='cuda', device_id=0,
-                               element_type=self._model_dtype, shape=tuple(fgr_out.shape),
-                               buffer_ptr=fgr_out.data_ptr())
-        io_binding.bind_output('pha', device_type='cuda', device_id=0,
-                               element_type=self._model_dtype, shape=tuple(pha_out.shape),
-                               buffer_ptr=pha_out.data_ptr())
-        io_binding.bind_output('r1o', device_type='cuda', device_id=0,
-                               element_type=self._model_dtype, shape=tuple(r1o_out.shape),
-                               buffer_ptr=r1o_out.data_ptr())
-        io_binding.bind_output('r2o', device_type='cuda', device_id=0,
-                               element_type=self._model_dtype, shape=tuple(r2o_out.shape),
-                               buffer_ptr=r2o_out.data_ptr())
-        io_binding.bind_output('r3o', device_type='cuda', device_id=0,
-                               element_type=self._model_dtype, shape=tuple(r3o_out.shape),
-                               buffer_ptr=r3o_out.data_ptr())
-        io_binding.bind_output('r4o', device_type='cuda', device_id=0,
-                               element_type=self._model_dtype, shape=tuple(r4o_out.shape),
-                               buffer_ptr=r4o_out.data_ptr())
-
-        # Run inference on the same stream
+        for name, tensor in zip(('src', 'r1i', 'r2i', 'r3i', 'r4i'), [self._src_buffer, *self._state_buffers]):
+            io_binding.bind_input(name, device_type='cuda', device_id=0, element_type=self._model_dtype,
+                                  shape=tuple(tensor.shape), buffer_ptr=tensor.data_ptr())
+        for name, tensor in zip(('fgr', 'pha', 'r1o', 'r2o', 'r3o', 'r4o'), [fgr_out, pha_out, *state_outs]):
+            io_binding.bind_output(name, device_type='cuda', device_id=0, element_type=self._model_dtype,
+                                   shape=tuple(tensor.shape), buffer_ptr=tensor.data_ptr())
         self._session.run_with_iobinding(io_binding)
+        self._stream.synchronize()
 
-        # Synchronize stream to ensure outputs are ready
-        self.stream.synchronize()
+        # The new states are views into this call's outputs, for the players only
+        r1o, r2o, r3o, r4o = state_outs
+        self._states = {track_id: RecurrentState(r1o[i:i + 1], r2o[i:i + 1], r3o[i:i + 1], r4o[i:i + 1])
+                        for i, track_id in enumerate(track_ids)}
+        return pha_out[:batch_size].squeeze(1), fgr_out[:batch_size], 0.0
 
-        # Build new recurrent states from outputs ONLY for real tracklets (skip padding IDs)
-        # States are views into output buffers - keep them on GPU
-        new_states_dict: dict[int, RecurrentState] = {}
-        for i, tid in enumerate(track_ids):
-            if tid not in padding_ids:
-                new_states_dict[tid] = RecurrentState(
-                    r1=r1o_out[i:i+1],  # View into output buffer (GPU tensor)
-                    r2=r2o_out[i:i+1],
-                    r3=r3o_out[i:i+1],
-                    r4=r4o_out[i:i+1]
-                )
-
-        # Update recurrent states
-        self._recurrent_states = new_states_dict
-
-        # Squeeze alpha channel and slice to actual batch size: (B, 1, H, W) -> (actual_batch, H, W)
-        pha_tensor = pha_out[:actual_batch_size].squeeze(1)
-        fgr_tensor = fgr_out[:actual_batch_size]
-
-        inference_time_ms = (time.perf_counter() - batch_start) * 1000.0
-
-        return pha_tensor, fgr_tensor, inference_time_ms
-
-    def _warmup(self, session: ort.InferenceSession) -> None:
-        """Initialize CUDA kernels for fixed batch size to prevent runtime recompilation."""
+    def _warmup(self) -> None:
+        """The CUDA kernels made for the fixed batch size, so none is compiled while running."""
         try:
-            # Create dummy GPU images (float32 RGB [0,1])
-            dummy_img = torch.zeros((self.model_height, self.model_width, 3), dtype=torch.float32, device='cuda')
-            dummy_images = [dummy_img] * self._max_batch
-            dummy_ids = list(range(self._max_batch))
-
-            pha, fgr, ms = self._infer(dummy_images, dummy_ids)
-
-            # Clear warmup states
-            self._recurrent_states.clear()
-
+            dummy = torch.zeros((3, self.model_height, self.model_width), dtype=torch.float32, device='cuda')
+            self.infer([dummy] * self.max_batch, list(range(self.max_batch)))
         except Exception as e:
             logger.info(f"Segmentation: Warmup failed (non-critical) - {str(e)}")
-    # CALLBACK METHODS
-    def add_segmentation_callback(self, callback: SegmentationOutputCallback) -> None:
-        """Register callback to receive segmentation results (success and dropped batches)."""
-        with self._callback_lock:
-            if callback not in self._callbacks:
-                self._callbacks.append(callback)
-
-    def remove_segmentation_callback(self, callback: SegmentationOutputCallback) -> None:
-        """Unregister previously registered callback."""
-        with self._callback_lock:
-            if callback in self._callbacks:
-                self._callbacks.remove(callback)
-
-    def _dispatch(self, output: SegmentationOutput) -> None:
-        """A result to the callbacks, copied under their lock and called outside it."""
-        with self._callback_lock:
-            callbacks: list[SegmentationOutputCallback] = list(self._callbacks)
-        for callback in callbacks:
-            try:
-                callback(output)
-            except Exception:
-                logger.exception("Segmentation: error in a result callback")
+        self._states.clear()

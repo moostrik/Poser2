@@ -1,45 +1,38 @@
-import math
-from threading import Lock
+import logging
+import time
+from threading import Event, Lock, Thread
 from typing import TYPE_CHECKING, TypeAlias
 
 import torch
 
-from .. import crop, ModelType
-from .image import Image, ImageDict, ImageCallback
 from modules.pose import FrameDict
-from .settings import Settings
 from modules.utils import PerformanceTimer
 
-
-from .io import SegmentationInput, SegmentationOutput
+from .. import crop, ModelType
+from .image import Image, ImageDict, ImageCallback
 from .runner_onnx import RunnerONNX
+from .settings import Settings
 
 if TYPE_CHECKING:
     from .runner_trt import RunnerTRT
 
-import logging
 logger = logging.getLogger(__name__)
-
 
 SegmentationRunner: TypeAlias = "RunnerONNX | RunnerTRT"
 
 
 class Predictor:
-    """GPU-based batch extractor for person segmentation masks using RVM.
+    """Person masks (Robust Video Matting) for the crops of a batch of poses, on its own thread, kept on the GPU.
 
-    Batches are processed asynchronously on GPU. Under load, pending batches may
-    be dropped by the Segmentation queue to maintain real-time performance.
-
-    Broadcasts (FrameDict, GPUFrameDict) with masks attached via callbacks. A dropped batch
-    broadcasts nothing: a newer one is already waiting, and an empty broadcast would read
-    as no player and blank the masks until it arrives. Frames without crops are forwarded
-    without masks. Masks stay on GPU to avoid unnecessary CPU transfers.
-
-    This design prioritizes low latency over data completeness, making it suitable
-    for real-time visualization where recent data is more valuable than old data.
+    A single-slot queue: a batch still waiting when a newer one comes is dropped and counted in `settings.dropped`.
+    A dropped batch reaches no callback: a newer one is already waiting, and an empty one would read as no player and
+    blank the masks until it arrives. Poses without crops go to the callbacks without masks, from the submitting thread;
+    the masks from this thread.
     """
 
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings) -> None:
+        self.settings: Settings = settings
+
         # One runner per model type; TensorRT is imported only when it is used.
         self._runner: SegmentationRunner
         if settings.model_type is ModelType.TRT:
@@ -47,135 +40,138 @@ class Predictor:
             self._runner = RunnerTRT(settings)
         else:
             self._runner = RunnerONNX(settings)
+        self._reset_interval: int = settings.reset_interval
+        self._batch_count: int = 0
+
+        self._thread: Thread = Thread(target=self._run, daemon=True, name="SegmentationPredictor")
+        self._shutdown: Event = Event()
+        self._wake: Event = Event()
+        self._ready: Event = Event()
+
         self._lock: Lock = Lock()
-        self._batch_counter: int = 0
-        self._verbose: bool = settings.verbose
+        self._pending: tuple[FrameDict, list[int], list[torch.Tensor]] | None = None
+        self._pending_timestamp: float = 0.0
 
-        # Callbacks
-        self._callbacks: list[ImageCallback] = []       # run in registration order
         self._callback_lock: Lock = Lock()
+        self._callbacks: list[ImageCallback] = []       # run in registration order
 
-        # Pending frames awaiting segmentation results, keyed by batch_id
-        self._pending_frames: dict[int, tuple[FrameDict, crop.CropImageDict]] = {}
+        self._process_timer = PerformanceTimer(name="RVM Segmentation  ", sample_count=1000, report_interval=100, color='cyan', omit_init=25)
 
-        # Active track ids, for detecting removed tracks
-        self._previous_track_ids: set[int] = set()
-
-        # Track inference times
-        self._process_timer =   PerformanceTimer(name="RVM Segmentation  ", sample_count=1000, report_interval=100, color='cyan', omit_init=25)
-        self._wait_timer =      PerformanceTimer(name="RVM Wait        ", sample_count=1000, report_interval=100, color='cyan', omit_init=25)
-        self._settings: Settings = settings
-
-        self._runner.add_segmentation_callback(self._on_segmentation_result)
+    @property
+    def is_ready(self) -> bool:
+        return self._ready.is_set() and not self._shutdown.is_set() and self._thread.is_alive()
 
     def start(self) -> None:
-        """Start the segmentation processing thread."""
-        self._runner.start()
+        self._thread.start()
 
     def stop(self) -> None:
-        """Stop the segmentation processing thread."""
-        self._runner.stop()
+        self._shutdown.set()
+        self._wake.set()
+        if self._thread.is_alive():
+            self._thread.join(timeout=2.0)
+        if self._thread.is_alive():
+            logger.warning("Segmentation: predictor thread did not stop cleanly")
 
     def submit(self, poses: FrameDict, crops: crop.CropImageDict) -> None:
-        """Submit poses with GPU images for async processing. Results broadcast via callbacks.
-
-        Args:
-            poses: Dictionary of poses keyed by track id
-            crops: Crop images already on GPU, keyed by track id
-        """
-        if not self._runner.is_ready:
-            return
-        if not self._settings.enabled:
+        """The poses and their crops on the GPU, keyed by track id, to run; the results go to the callbacks."""
+        if not self.is_ready or not self.settings.enabled:
             return
 
         track_ids: list[int] = []
-        gpu_image_list: list = []  # list[cp.ndarray]
-
+        images: list[torch.Tensor] = []
         for track_id in poses.keys():
             if track_id in crops:
                 track_ids.append(track_id)
-                gpu_image_list.append(crops[track_id].crop)
+                images.append(crops[track_id].crop)
 
-        # If no crops available, forward frames without segmentation to maintain data flow
-        if not gpu_image_list:
+        if not images:      # no crops: the poses go on without masks
             self._notify_callbacks(poses, {})
             return
 
+        max_batch: int = self._runner.max_batch
+        if len(images) > max_batch:
+            logger.warning(f"Segmentation: batch size {len(images)} exceeds max {max_batch}, only the first {max_batch} run")
+            track_ids, images = track_ids[:max_batch], images[:max_batch]
+
+        dropped: bool = False
         with self._lock:
-            self._batch_counter += 1
-            batch_id: int = self._batch_counter
-            self._pending_frames[batch_id] = (poses, crops)
+            if self._pending is not None:
+                dropped = True
+                if self.settings.verbose:
+                    lag = int((time.perf_counter() - self._pending_timestamp) * 1000)
+                    logger.info(f"Segmentation: dropped a batch with lag {lag} ms")
+            self._pending = (poses, track_ids, images)
+            self._pending_timestamp = time.perf_counter()
+        if dropped:
+            self.settings.dropped += 1
+        self._wake.set()
 
-        self._runner.submit(SegmentationInput(
-            batch_id=batch_id,
-            gpu_images=gpu_image_list,
-            track_ids=track_ids
-        ))
-
-    def _on_segmentation_result(self, output: SegmentationOutput) -> None:
-        """Callback from Segmentation thread when results are ready or dropped.
-
-        Forwards (FrameDict, GPUFrameDict) with masks attached. A dropped batch forwards
-        nothing, so the last masks stay until the newer batch's arrive.
-        """
-        # Retrieve and remove pending frames for this batch
+    def reset(self) -> None:
+        """The waiting batch dropped."""
         with self._lock:
-            pending = self._pending_frames.pop(output.batch_id, None)
+            self._pending = None
 
-        if pending is None:
-            return
-
-        poses, crops = pending
-
-        if not output.processed:
-            return
-
-        # A processed batch without masks forwards an empty dict
-        if output.mask_tensor is None or output.fgr_tensor is None:
-            self._notify_callbacks(poses, {})
-            return
-
-        # Track inference time
-        self._process_timer.add_time(output.inference_time_ms, report=self._verbose)
-
-        # Build ImageDict from segmentation results
-        result_frames: ImageDict = {}
-        for idx, track_id in enumerate(output.track_ids):
-            if idx < output.mask_tensor.shape[0]:
-                mask = output.mask_tensor[idx]  # (H, W) tensor on GPU
-                foreground = output.fgr_tensor[idx]
-                result_frames[track_id] = Image(
-                    mask=mask,
-                    foreground=foreground,
-                    timestamp=poses[track_id].timestamp if track_id in poses else math.nan,
-                )
-
-        # Broadcast to callbacks
-        self._notify_callbacks(poses, result_frames)
-
-    def _notify_callbacks(self, poses: FrameDict, mask_frames: ImageDict) -> None:
-        """Emit callbacks with poses and segmentation frames."""
-        with self._callback_lock:
-            callbacks: list[ImageCallback] = list(self._callbacks)
-        for callback in callbacks:
-            try:
-                callback(poses, mask_frames)
-            except Exception:
-                logger.exception("Segmentation: error in a mask callback")
     def add_segmentation_callback(self, callback: ImageCallback) -> None:
-        """Register callback to receive poses and segmentation images."""
         with self._callback_lock:
             if callback not in self._callbacks:
                 self._callbacks.append(callback)
 
     def remove_segmentation_callback(self, callback: ImageCallback) -> None:
-        """Unregister callback."""
         with self._callback_lock:
             if callback in self._callbacks:
                 self._callbacks.remove(callback)
 
-    def reset(self) -> None:
-        """Clear all pending and buffered data."""
+    def _notify_callbacks(self, poses: FrameDict, images: ImageDict) -> None:
+        with self._callback_lock:
+            callbacks: list[ImageCallback] = list(self._callbacks)
+        for callback in callbacks:
+            try:
+                callback(poses, images)
+            except Exception:
+                logger.exception("Segmentation: error in a mask callback")
+
+    def _run(self) -> None:
+        try:
+            self._runner.setup()
+        except Exception:
+            logger.exception(f"Segmentation: failed to load {self._runner.model_file}")
+            return
+        self._ready.set()
+        logger.info(f"Segmentation: {self.settings.resolution.name} model ready: {self._runner.model_width}x{self._runner.model_height} {self._runner.model_precision}")
+
+        while not self._shutdown.is_set():
+            self._wake.wait()
+            if self._shutdown.is_set():
+                break
+            self._wake.clear()
+            try:
+                self._process()
+            except Exception:
+                logger.exception("Segmentation: error processing a batch")
+
+    def _claim(self) -> tuple[FrameDict, list[int], list[torch.Tensor]] | None:
         with self._lock:
-            self._batch_counter = 0
-            self._pending_frames.clear()
+            pending = self._pending
+            self._pending = None
+            return pending
+
+    def _process(self) -> None:
+        pending = self._claim()
+        if pending is None:
+            return
+        poses, track_ids, images = pending
+
+        # Every player's memory cleared now and then, a failsafe against a state gone wrong
+        self._batch_count += 1
+        if self._reset_interval > 0 and self._batch_count % self._reset_interval == 0:
+            self._runner.reset_states()
+
+        start: float = time.perf_counter()
+        masks, foregrounds, lock_wait_ms = self._runner.infer(images, track_ids)
+        self._process_timer.add_time((time.perf_counter() - start) * 1000.0 - lock_wait_ms, report=self.settings.verbose)
+
+        results: ImageDict = {}
+        for i, track_id in enumerate(track_ids):
+            if track_id in poses:
+                results[track_id] = Image(mask=masks[i], foreground=foregrounds[i], timestamp=poses[track_id].timestamp)
+        self._notify_callbacks(poses, results)

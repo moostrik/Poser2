@@ -1,481 +1,124 @@
-# Standard library imports
-from threading import Thread, Lock, Event
-import time
-
-# Third-party imports
-import torch
-import tensorrt as trt
-
-from ..trt_runtime import get_tensorrt_runtime, get_init_lock, get_exec_lock
-from .io import SegmentationInput, SegmentationOutput, SegmentationOutputCallback
-
-from .settings import Settings
+"""Robust Video Matting through TensorRT: the crops and each player's recurrent states into a preallocated batch on
+its stream; out on the GPU the alpha matte at the crops' size and the crops multiplied by it. It takes
+turns with the other TensorRT models on the shared execution lock."""
 
 import logging
+import time
+
+import tensorrt as trt
+import torch
+
+from ..trt_runtime import get_tensorrt_runtime, get_init_lock, get_exec_lock
+from .recurrent_state import RecurrentState
+from .settings import Settings
+
 logger = logging.getLogger(__name__)
 
-class RecurrentState:
-    """Container for RVM recurrent states (r1, r2, r3, r4)."""
-    def __init__(self, r1: torch.Tensor, r2: torch.Tensor, r3: torch.Tensor, r4: torch.Tensor):
-        self.r1 = r1
-        self.r2 = r2
-        self.r3 = r3
-        self.r4 = r4
+PRECISIONS = {trt.DataType.FLOAT: "FP32", trt.DataType.HALF: "FP16", trt.DataType.INT8: "INT8"}
+TORCH_DTYPES = {trt.DataType.FLOAT: torch.float32, trt.DataType.HALF: torch.float16}
+RECURRENT_CHANNELS: tuple[tuple[int, int], ...] = ((16, 2), (20, 4), (40, 8), (64, 16))     # (channels, downscale) of r1..r4
+INPUT_NAMES: tuple[str, ...] = ('src', 'r1i', 'r2i', 'r3i', 'r4i')
+OUTPUT_NAMES: tuple[str, ...] = ('fgr', 'pha', 'r1o', 'r2o', 'r3o', 'r4o')
 
-class RunnerTRT(Thread):
-    """Asynchronous GPU person segmentation using Robust Video Matting (RVM) with TensorRT.
 
-    TensorRT-optimized inference for maximum performance. Drop-in replacement for PredictorONNX.
-
-    Uses preallocated buffers and dedicated CUDA stream for ultra-low latency.
-    All preprocessing and inference runs on the same dedicated stream to avoid sync overhead.
-
-    Uses recurrent states for temporal coherence, eliminating flickering artifacts.
-    Single-slot queue: only the most recent batch waits processing; an older pending batch is dropped, counted in
-    `settings.dropped`, and its callbacks told on the submitting thread (`processed=False`). Batches already
-    processing cannot be cancelled.
-
-    Maintains per-tracklet recurrent states (r1-r4) for temporal consistency.
-    Results go to the callbacks from the inference thread, which only enqueue.
-    """
-
-    def __init__(self, settings: 'Settings') -> None:
-        super().__init__()
-        self.settings: Settings = settings
-
-        self.model_path: str = settings.model_path
-        self.model_name: str = settings.model
-        self.model_file: str = f"{self.model_path}/{self.model_name}"
+class RunnerTRT:
+    def __init__(self, settings: Settings) -> None:
+        self.model_file: str = f"{settings.model_path}/{settings.model}"
         self.model_width: int = settings.width
         self.model_height: int = settings.height
-        self.resolution_name: str = settings.resolution.name
-        self.verbose: bool = settings.verbose
+        self.max_batch: int = min(settings.max_players, 4)
+        self.model_precision: str = "UNKNOWN"
 
-        # Thread coordination
-        self._shutdown_event: Event = Event()
-        self._notify_update_event: Event = Event()
-        self._model_ready: Event = Event()
+        self._engine: trt.ICudaEngine
+        self._context: trt.IExecutionContext
+        self._stream: torch.cuda.Stream
+        self._torch_dtype: torch.dtype = torch.float16
+        self._states: dict[int, RecurrentState] = {}    # per track id
+        self._zero_states: list[torch.Tensor] = []      # (1, C, h, w) per recurrent input, for a new player
+        self._src_buffer: torch.Tensor                  # (max_batch, 3, H, W)
+        self._state_buffers: list[torch.Tensor] = []    # (max_batch, C, h, w) per recurrent input
 
-        # Input queue
-        self._input_lock: Lock = Lock()
-        self._pending_batch: SegmentationInput | None = None
-        self._input_timestamp: float = time.perf_counter()
-        self._last_dropped_batch_id: int = 0
+    def setup(self) -> None:
+        """Load the engine, on the thread that will run it."""
+        with get_init_lock():       # one Myelin graph loads at a time
+            runtime = get_tensorrt_runtime()
+            with open(self.model_file, 'rb') as f:
+                engine_data = f.read()
+            self._engine = runtime.deserialize_cuda_engine(engine_data)
+            if self._engine is None:
+                raise RuntimeError(f"Failed to load engine {self.model_file}")
+            self._context = self._engine.create_execution_context()
 
-        # Callbacks
-        self._callback_lock: Lock = Lock()
-        self._callbacks: list[SegmentationOutputCallback] = []      # run in registration order
+        names = [self._engine.get_tensor_name(i) for i in range(self._engine.num_io_tensors)]
+        inputs = [n for n in names if self._engine.get_tensor_mode(n) == trt.TensorIOMode.INPUT]
+        if len(inputs) != len(INPUT_NAMES) or len(names) - len(inputs) != len(OUTPUT_NAMES):
+            raise RuntimeError(f"Expected 5 inputs and 6 outputs, got {len(inputs)} and {len(names) - len(inputs)}")
 
-        # Per-tracklet recurrent states for temporal coherence
-        self._recurrent_states: dict[int, RecurrentState] = {}
-        self._frame_counter: int = 0  # For periodic state reset
-        self._state_reset_interval: int = settings.reset_interval  # Reset all states every N frames (0=disabled)
+        src_dtype = self._engine.get_tensor_dtype('src')
+        self.model_precision = PRECISIONS.get(src_dtype, "UNKNOWN")
+        self._torch_dtype = TORCH_DTYPES.get(src_dtype, torch.float16)
 
-        # TensorRT engine and context (initialized in run())
-        self.engine: trt.ICudaEngine
-        self.context: trt.IExecutionContext
-        self.stream: torch.cuda.Stream
-        self.input_names: list[str]
-        self.output_names: list[str]
+        self._stream = torch.cuda.Stream()
+        h, w = self.model_height, self.model_width
+        with torch.cuda.stream(self._stream):
+            self._zero_states = [torch.zeros((1, c, h // s, w // s), dtype=self._torch_dtype, device='cuda') for c, s in RECURRENT_CHANNELS]
+            self._src_buffer = torch.empty((self.max_batch, 3, h, w), dtype=self._torch_dtype, device='cuda')
+            self._state_buffers = [torch.empty((self.max_batch, c, h // s, w // s), dtype=self._torch_dtype, device='cuda') for c, s in RECURRENT_CHANNELS]
+        self._stream.synchronize()
 
-        # Model configuration (initialized in _setup())
-        self._max_inputs: int = min(settings.max_players, 4)
-        self._torch_dtype: torch.dtype
+        # The inputs' addresses stay (a slice keeps the base pointer); the outputs' are set per call
+        for name, tensor in zip(INPUT_NAMES, [self._src_buffer, *self._state_buffers]):
+            self._context.set_tensor_address(name, tensor.data_ptr())
 
-        # Preallocated zero recurrent states for new tracklets (read-only, shared)
-        self._zero_r1: torch.Tensor
-        self._zero_r2: torch.Tensor
-        self._zero_r3: torch.Tensor
-        self._zero_r4: torch.Tensor
+    def reset_states(self) -> None:
+        """Every player starts again without memory."""
+        self._states.clear()
 
-        # Preallocated buffers (initialized in _setup())
-        self._src_buffer: torch.Tensor    # (max_batch, 3, H, W) normalized input
-        self._r1i_buffer: torch.Tensor    # (max_batch, 16, H/2, W/2)
-        self._r2i_buffer: torch.Tensor    # (max_batch, 20, H/4, W/4)
-        self._r3i_buffer: torch.Tensor    # (max_batch, 40, H/8, W/8)
-        self._r4i_buffer: torch.Tensor    # (max_batch, 64, H/16, W/16)
-        # Note: Output buffers allocated fresh each call (recurrent states are views into them)
-
-    @property
-    def is_ready(self) -> bool:
-        """Check if model is loaded and system is ready to process segmentation"""
-        return self._model_ready.is_set() and not self._shutdown_event.is_set() and self.is_alive()
-
-    def stop(self) -> None:
-        """Stop the inference thread gracefully."""
-        self._shutdown_event.set()
-
-        # Wake up inference thread
-        self._notify_update_event.set()
-        self.join(timeout=2.0)
-
-        if self.is_alive():
-            logger.warning("Segmentation inference thread did not stop cleanly")
-
-    def run(self) -> None:
-        self._setup()
-
-        while not self._shutdown_event.is_set():
-            self._notify_update_event.wait()
-
-            if self._shutdown_event.is_set():
-                break
-
-            self._notify_update_event.clear()
-
-            try:
-                self._process()
-
-            except Exception as e:
-                logger.error(f"Segmentation: {str(e)}")
-    def submit(self, input_batch: SegmentationInput) -> None:
-        """Submit batch for processing. Replaces pending batch if not yet started.
-
-        Dropped batches receive callbacks with processed=False.
-        """
-        if self._shutdown_event.is_set():
-            return
-
-        if not self._model_ready.is_set():
-            return
-
-        # Validate batch size
-        if len(input_batch.gpu_images) > self._max_batch:
-            logger.warning(f"Segmentation Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
-
-        dropped_batch: SegmentationInput | None = None
-
-        with self._input_lock:
-            if self._pending_batch is not None:
-                dropped_batch = self._pending_batch
-                if self.verbose:
-                    lag = int((time.perf_counter() - self._input_timestamp) * 1000)
-                    logger.info(f"Segmentation: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
-                self._last_dropped_batch_id = dropped_batch.batch_id
-
-            self._pending_batch = input_batch
-            self._input_timestamp = time.perf_counter()
-
-        # Notify about dropped batch
-        if dropped_batch is not None:
-            self.settings.dropped += 1
-            self._dispatch(SegmentationOutput(batch_id=dropped_batch.batch_id, track_ids=dropped_batch.track_ids, processed=False))
-
-        self._notify_update_event.set()
-
-    def _setup(self) -> None:
-        """Initialize TensorRT engine, context, and buffers. Called from run()."""
-        try:
-            # Acquire global lock to prevent concurrent Myelin graph loading
-            with get_init_lock():
-                runtime = get_tensorrt_runtime()
-
-                # print(f"TensorRT Segmentation: Loading engine from {self.model_file}")
-                with open(self.model_file, 'rb') as f:
-                    engine_data = f.read()
-
-                self.engine = runtime.deserialize_cuda_engine(engine_data)
-                if self.engine is None:
-                    logger.error("Segmentation: Failed to load engine")
-                    return
-
-                self.context = self.engine.create_execution_context()
-
-            # Lock released - continue with setup
-
-            # Get input/output names
-            self.input_names = []
-            self.output_names = []
-
-            for i in range(self.engine.num_io_tensors):
-                name = self.engine.get_tensor_name(i)
-                mode = self.engine.get_tensor_mode(name)
-
-                if mode == trt.TensorIOMode.INPUT:
-                    self.input_names.append(name)
-                else:
-                    self.output_names.append(name)
-
-            # Expected: 5 inputs (src, r1i-r4i), 6 outputs (fgr, pha, r1o-r4o)
-            if len(self.input_names) != 5:
-                logger.error(f"Segmentation: Expected 5 inputs, got {len(self.input_names)}")
-                return
-
-            if len(self.output_names) != 6:
-                logger.error(f"Segmentation: Expected 6 outputs, got {len(self.output_names)}")
-                return
-
-            # Determine model precision from 'src' input tensor
-            src_dtype = self.engine.get_tensor_dtype('src')
-            precision_map = {
-                trt.DataType.FLOAT: "FP32",
-                trt.DataType.HALF: "FP16",
-                trt.DataType.INT8: "INT8",
-            }
-            self.model_precision = precision_map.get(src_dtype, "UNKNOWN")
-
-            # Map TensorRT dtype to PyTorch dtype
-            dtype_to_torch = {
-                trt.DataType.FLOAT: torch.float32,
-                trt.DataType.HALF: torch.float16,
-            }
-            self._torch_dtype = dtype_to_torch.get(src_dtype, torch.float16)
-
-            # Clear any existing states
-            self._recurrent_states.clear()
-
-            # Preallocate zero recurrent states (read-only, shared across all new tracklets)
-            self._zero_r1 = torch.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=self._torch_dtype, device='cuda')
-            self._zero_r2 = torch.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=self._torch_dtype, device='cuda')
-            self._zero_r3 = torch.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=self._torch_dtype, device='cuda')
-            self._zero_r4 = torch.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=self._torch_dtype, device='cuda')
-
-            self._max_batch = self._max_inputs
-
-            # Dedicated CUDA stream for all GPU operations (preprocessing + inference)
-            self.stream = torch.cuda.Stream(-1) # -1 = high priority (the lower the number, the higher the priority)
-
-            # Preallocate all INPUT buffers on the dedicated stream for optimal memory placement
-            with torch.cuda.stream(self.stream):
-                # Input buffer: normalized CHW format ready for TRT
-                self._src_buffer = torch.empty(
-                    (self._max_batch, 3, self.model_height, self.model_width),
-                    dtype=self._torch_dtype, device='cuda'
-                )
-
-                # Recurrent input buffers
-                self._r1i_buffer = torch.empty(
-                    (self._max_batch, 16, self.model_height // 2, self.model_width // 2),
-                    dtype=self._torch_dtype, device='cuda'
-                )
-                self._r2i_buffer = torch.empty(
-                    (self._max_batch, 20, self.model_height // 4, self.model_width // 4),
-                    dtype=self._torch_dtype, device='cuda'
-                )
-                self._r3i_buffer = torch.empty(
-                    (self._max_batch, 40, self.model_height // 8, self.model_width // 8),
-                    dtype=self._torch_dtype, device='cuda'
-                )
-                self._r4i_buffer = torch.empty(
-                    (self._max_batch, 64, self.model_height // 16, self.model_width // 16),
-                    dtype=self._torch_dtype, device='cuda'
-                )
-
-            self.stream.synchronize()
-
-            # Set persistent tensor addresses for INPUT buffers (base pointers don't change when slicing)
-            # Output addresses must be set per-call since they're allocated fresh each inference
-            self.context.set_tensor_address('src', self._src_buffer.data_ptr())
-            self.context.set_tensor_address('r1i', self._r1i_buffer.data_ptr())
-            self.context.set_tensor_address('r2i', self._r2i_buffer.data_ptr())
-            self.context.set_tensor_address('r3i', self._r3i_buffer.data_ptr())
-            self.context.set_tensor_address('r4i', self._r4i_buffer.data_ptr())
-
-            self._model_ready.set()
-            logger.info(f"Segmentation: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
-
-        except Exception as e:
-            logger.error(f"Segmentation: Failed to load model - {str(e)}")
-            return
-
-    def _claim(self) -> SegmentationInput | None:
-        """Atomically get and clear pending batch. Once retrieved, cannot be cancelled."""
-        with self._input_lock:
-            batch = self._pending_batch
-            self._pending_batch = None
-            return batch
-
-    def _process(self) -> None:
-        """Process pending batch using batched TensorRT inference with recurrent states."""
-        batch: SegmentationInput | None = self._claim()
-
-        if batch is None:
-            return
-
-        # Increment frame counter for periodic state reset
-        self._frame_counter += 1
-
-        # Periodic state reset as failsafe (0=disabled)
-        if self._state_reset_interval > 0 and self._frame_counter % self._state_reset_interval == 0:
-            if self.verbose:
-                logger.debug(f"Segmentation: Periodic state reset at frame {self._frame_counter}")
-            self._recurrent_states.clear()
-
-        output = SegmentationOutput(batch_id=batch.batch_id, track_ids=batch.track_ids, processed=False)
-
-        # Run inference using selected mode
-        gpu_images = batch.gpu_images[:self._max_batch]
-        track_ids_to_process = batch.track_ids[:self._max_batch]
-
-        if gpu_images:
-            try:
-                mask_tensor, fgr_tensor, inference_time_ms, lock_wait_ms = self._infer(gpu_images, track_ids_to_process)
-                output = SegmentationOutput(
-                    batch_id=batch.batch_id,
-                    mask_tensor=mask_tensor,
-                    fgr_tensor=fgr_tensor,
-                    track_ids=batch.track_ids,
-                    processed=True,
-                    inference_time_ms=inference_time_ms,
-                    lock_time_ms=lock_wait_ms
-                )
-            except Exception as e:
-                logger.error(f"Segmentation: Batched inference failed: {str(e)}")
-        self._dispatch(output)
-
-    def _infer(self, gpu_imgs: list[torch.Tensor], track_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float, float]:
-        """Run batched TensorRT inference with per-tracklet recurrent states.
-
-        All preprocessing and inference runs on the dedicated stream for zero sync overhead.
-        Uses preallocated INPUT buffers for zero allocation latency.
-        OUTPUT buffers allocated fresh each call (recurrent states are views into them).
-
-        Args:
-            gpu_imgs: List of RGB float32 tensors on GPU (3, H, W) CHW [0,1]
-            track_ids: Track ids for each image
-
-        Returns:
-            (alpha_matte (B,H,W), foreground (B,3,H,W) CHW, inference_ms, lock_wait_ms)
-        """
-        batch_size = len(gpu_imgs)
-        if batch_size == 0:
-            return torch.empty(0, dtype=self._torch_dtype, device='cuda'), torch.empty(0, 3, 0, 0, dtype=self._torch_dtype, device='cuda'), 0.0, 0.0
-
-        method_start: float = time.perf_counter()
-
-        # Get input dimensions from first image (CHW format: 3, H, W)
-        input_h, input_w = gpu_imgs[0].shape[1], gpu_imgs[0].shape[2]
-        needs_resize = (input_h != self.model_height or input_w != self.model_width)
-
-        # Get preallocated INPUT buffer slices for current batch
+    def infer(self, gpu_images: list[torch.Tensor], track_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float]:
+        """The alpha matte (N, h, w) and the foreground (N, 3, h, w), the crops multiplied by it, for the crops (3, h, w)
+        RGB in [0, 1] of the players `track_ids`; and the time waited for the shared execution lock (ms)."""
+        batch_size = len(gpu_images)
+        input_h, input_w = gpu_images[0].shape[1], gpu_images[0].shape[2]
+        h, w = self.model_height, self.model_width
+        needs_resize = (input_h != h or input_w != w)
         src_buffer = self._src_buffer[:batch_size]
-        r1i_buffer = self._r1i_buffer[:batch_size]
-        r2i_buffer = self._r2i_buffer[:batch_size]
-        r3i_buffer = self._r3i_buffer[:batch_size]
-        r4i_buffer = self._r4i_buffer[:batch_size]
+        state_buffers = [buffer[:batch_size] for buffer in self._state_buffers]
 
-        # Allocate OUTPUT buffers fresh each call (recurrent states will be views into these)
-        fgr_out = torch.empty((batch_size, 3, self.model_height, self.model_width), dtype=self._torch_dtype, device='cuda')
-        pha_out = torch.empty((batch_size, 1, self.model_height, self.model_width), dtype=self._torch_dtype, device='cuda')
-        r1o_out = torch.empty((batch_size, 16, self.model_height // 2, self.model_width // 2), dtype=self._torch_dtype, device='cuda')
-        r2o_out = torch.empty((batch_size, 20, self.model_height // 4, self.model_width // 4), dtype=self._torch_dtype, device='cuda')
-        r3o_out = torch.empty((batch_size, 40, self.model_height // 8, self.model_width // 8), dtype=self._torch_dtype, device='cuda')
-        r4o_out = torch.empty((batch_size, 64, self.model_height // 16, self.model_width // 16), dtype=self._torch_dtype, device='cuda')
+        outputs = [torch.empty((batch_size, 3, h, w), dtype=self._torch_dtype, device='cuda'),
+                   torch.empty((batch_size, 1, h, w), dtype=self._torch_dtype, device='cuda')]
+        outputs += [torch.empty((batch_size, c, h // s, w // s), dtype=self._torch_dtype, device='cuda') for c, s in RECURRENT_CHANNELS]
 
-        # All preprocessing on dedicated stream (no cross-stream sync needed)
-        with torch.cuda.stream(self.stream):
-            # Stack GPU tensors: (B, 3, H, W) float32 RGB CHW [0,1]
-            batch_chw = torch.stack(gpu_imgs, dim=0).to(self._torch_dtype)
-
-            # Keep original for foreground computation (interpolate creates new tensor, so this is safe)
-            batch_chw_original = batch_chw
-
-            # Resize if needed (crop size != model size)
+        with torch.cuda.stream(self._stream):
+            batch_chw = torch.stack(gpu_images, dim=0).to(self._torch_dtype)
+            original = batch_chw
             if needs_resize:
-                batch_chw = torch.nn.functional.interpolate(
-                    batch_chw, size=(self.model_height, self.model_width), mode='bilinear', align_corners=False
-                )
-
-            # Already normalized to [0, 1], just copy into preallocated buffer
+                batch_chw = torch.nn.functional.interpolate(batch_chw, size=(h, w), mode='bilinear', align_corners=False)
             src_buffer.copy_(batch_chw)
+            for i, track_id in enumerate(track_ids):
+                state = self._states.get(track_id)
+                sources = (state.r1, state.r2, state.r3, state.r4) if state is not None else self._zero_states
+                for buffer, source in zip(state_buffers, sources):
+                    buffer[i:i + 1].copy_(source)
 
-            # Gather recurrent states for all tracklets into preallocated buffers
-            for i, tid in enumerate(track_ids):
-                state = self._recurrent_states.get(tid)
-                if state is not None:
-                    r1i_buffer[i:i+1].copy_(state.r1)
-                    r2i_buffer[i:i+1].copy_(state.r2)
-                    r3i_buffer[i:i+1].copy_(state.r3)
-                    r4i_buffer[i:i+1].copy_(state.r4)
-                else:
-                    r1i_buffer[i:i+1].copy_(self._zero_r1)
-                    r2i_buffer[i:i+1].copy_(self._zero_r2)
-                    r3i_buffer[i:i+1].copy_(self._zero_r3)
-                    r4i_buffer[i:i+1].copy_(self._zero_r4)
-
-        # TensorRT inference - acquire global lock (still on same stream)
         lock_wait_start: float = time.perf_counter()
         with get_exec_lock():
             lock_acquired: float = time.perf_counter()
+            for name, tensor in zip(INPUT_NAMES, [src_buffer, *state_buffers]):
+                self._context.set_input_shape(name, tuple(tensor.shape))
+            for name, tensor in zip(OUTPUT_NAMES, outputs):
+                self._context.set_tensor_address(name, tensor.data_ptr())
+            self._context.execute_async_v3(stream_handle=self._stream.cuda_stream)
+            self._stream.synchronize()
 
-            # Only set_input_shape per-call (input addresses are persistent from _setup)
-            self.context.set_input_shape('src', tuple(src_buffer.shape))
-            self.context.set_input_shape('r1i', tuple(r1i_buffer.shape))
-            self.context.set_input_shape('r2i', tuple(r2i_buffer.shape))
-            self.context.set_input_shape('r3i', tuple(r3i_buffer.shape))
-            self.context.set_input_shape('r4i', tuple(r4i_buffer.shape))
+        # The new states are views into this call's outputs
+        _, pha_out, r1o, r2o, r3o, r4o = outputs
+        self._states = {track_id: RecurrentState(r1o[i:i + 1], r2o[i:i + 1], r3o[i:i + 1], r4o[i:i + 1])
+                        for i, track_id in enumerate(track_ids)}
 
-            # Output addresses must be set per-call (fresh allocation each inference)
-            self.context.set_tensor_address('fgr', fgr_out.data_ptr())
-            self.context.set_tensor_address('pha', pha_out.data_ptr())
-            self.context.set_tensor_address('r1o', r1o_out.data_ptr())
-            self.context.set_tensor_address('r2o', r2o_out.data_ptr())
-            self.context.set_tensor_address('r3o', r3o_out.data_ptr())
-            self.context.set_tensor_address('r4o', r4o_out.data_ptr())
-
-            # Execute on dedicated CUDA stream (preprocessing already complete on this stream)
-            self.context.execute_async_v3(stream_handle=self.stream.cuda_stream)
-            self.stream.synchronize()
-
-        # Build new recurrent states from outputs (views into fresh buffers, no clone needed)
-        new_states_dict: dict[int, RecurrentState] = {}
-        for i, tid in enumerate(track_ids):
-            new_states_dict[tid] = RecurrentState(
-                r1=r1o_out[i:i+1],
-                r2=r2o_out[i:i+1],
-                r3=r3o_out[i:i+1],
-                r4=r4o_out[i:i+1],
-            )
-        self._recurrent_states = new_states_dict
-
-        # Squeeze alpha channel: (B, 1, H, W) -> (B, H, W)
-        # No clone needed - output buffers are fresh each call
-        pha_tensor = pha_out.squeeze(1)
-
-        # Scale mask to original resolution and apply to input
-        with torch.cuda.stream(self.stream):
+        # The matte at the crops' size, and the crops multiplied by it
+        with torch.cuda.stream(self._stream):
+            mask = pha_out.squeeze(1)
             if needs_resize:
-                # Upscale mask from model resolution to original input resolution
-                mask_scaled = torch.nn.functional.interpolate(
-                    pha_tensor.unsqueeze(1),  # (B, H, W) -> (B, 1, H, W)
-                    size=(input_h, input_w),
-                    mode='bilinear',
-                    align_corners=False
-                ).squeeze(1)  # (B, 1, H, W) -> (B, H, W)
-            else:
-                mask_scaled = pha_tensor
-
-            # Apply mask to original input: foreground = original * mask
-            # batch_chw_original is (B, 3, H, W), mask_scaled is (B, H, W)
-            foreground = batch_chw_original * mask_scaled.unsqueeze(1)  # (B, 3, H, W) * (B, 1, H, W)
-
-        method_end = time.perf_counter()
-
-        lock_wait_ms = (lock_acquired - lock_wait_start) * 1000.0
-        total_time_ms = (method_end - method_start) * 1000.0
-        process_time_ms = total_time_ms - lock_wait_ms
-
-        return mask_scaled, foreground, process_time_ms, lock_wait_ms
-
-    # CALLBACK METHODS
-    def add_segmentation_callback(self, callback: SegmentationOutputCallback) -> None:
-        """Register callback to receive segmentation results (success and dropped batches)."""
-        with self._callback_lock:
-            if callback not in self._callbacks:
-                self._callbacks.append(callback)
-
-    def remove_segmentation_callback(self, callback: SegmentationOutputCallback) -> None:
-        """Unregister previously registered callback."""
-        with self._callback_lock:
-            if callback in self._callbacks:
-                self._callbacks.remove(callback)
-
-    def _dispatch(self, output: SegmentationOutput) -> None:
-        """A result to the callbacks, copied under their lock and called outside it."""
-        with self._callback_lock:
-            callbacks: list[SegmentationOutputCallback] = list(self._callbacks)
-        for callback in callbacks:
-            try:
-                callback(output)
-            except Exception:
-                logger.exception("Segmentation: error in a result callback")
+                mask = torch.nn.functional.interpolate(mask.unsqueeze(1), size=(input_h, input_w), mode='bilinear', align_corners=False).squeeze(1)
+            foreground = original * mask.unsqueeze(1)
+        return mask, foreground, (lock_acquired - lock_wait_start) * 1000.0
