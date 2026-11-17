@@ -128,10 +128,19 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
   The speed is the larger of x/y's at the pixel (its 3 × 3, which carries little noise) and z's own, from a slow
   copy of z's rate kept in the estimate where the dead zone's anchor is, so a push straight at the camera opens
   it too. The dead zone, the catch-up's Emas and their texture go.
-  One run decides, the catch-up kept beside the new rule until then, uncommitted: on one capture of hands and of
-  measure, `dead_zone` 0, the catch-up (`smooth` 10, 15, 20, 25, 50 with `catch_up` 8) against the new rule
-  (rest 50, 100, 200 × halving speed 0.5, 1, 2, 4), the best few of each with z's `threshold` 0.5, 1, 2; each
-  row still noise inside and at the edge, z kept, lag; about 15 minutes. The loser is removed before the commit.
+  One run decides, the catch-up kept beside the new rule until then, uncommitted; the loser is removed before
+  the commit. On one capture of hands and of measure (`hands_1`, `measure_1`), about 15 minutes:
+
+  | Rows                 | Settings                                                                          |
+  |----------------------|-----------------------------------------------------------------------------------|
+  | the raw reference    | `z.smooth` 0, `z.catch_up` 0, `z.threshold` 0, `xy.threshold` 0                    |
+  | the catch-up, 5      | `z.smooth` 0, 12, 25, 50, 100 with `z.catch_up` 8; `z.threshold` 0                  |
+  | the new rule, 12     | rest (`z.smooth`) 50, 100, 200 × halving speed 0.5, 1, 2, 4 px/frame; `z.threshold` 0 |
+  | the cut, 6 at most   | the best of each with `z.threshold` 0.5, 1, 2                                      |
+  | every row but the raw | `z.dead_zone` 0; `xy.threshold` 0.5, as saved, which is the catch-up's gate         |
+  | every row            | as saved: `xy.levels` 4, `xy.window` 7×7, `xy.damping` 0.03, `xy.same_surface` on, `z.edge` 0.1 m, `z.window` 7×7, `z.tolerance` 0.2 m, `z.max_speed` 6 m/s, `z.xy_smooth` off; the view as captured |
+
+  Each row: still noise inside and at the edge (measure), z kept and lag against the raw reference (hands).
 - **C2.** The values, after C1, each measured on the four recordings and judged in the app: the smoothing's two
   numbers and z's `threshold`, with `dead_zone` 0; x/y's `threshold` around 0.4; a step up on `levels`, x/y's
   `window` and `damping` against their ms. The step filter and z's window stay unless a row shows a clear gain
