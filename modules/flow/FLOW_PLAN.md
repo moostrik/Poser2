@@ -60,12 +60,6 @@ rest and later: the filter sees nothing until the zone opens, so its lag comes a
 overlap now (hands, unsmoothed, `dead_zone` 0.02: 52 ms against 7; `smooth` 25: 90 against 65; measure's still
 noise 2.4 / 3.1 against 9.1 / 5.1).
 
-- **C4.** The measuring's sums on the GPU, in `scripts/depth_velocity_compare.py`: a run read back three float
-  textures a side a frame and summed them on one CPU core, the GPU and the other cores idle. A compute shader
-  sums each region a frame (the core, the edge, the table, the moving pixels; `excluded` out) for every column,
-  the p99s from a histogram (bins of 1/128 px a frame), and a side reads back only those sums. The regions stay
-  on the CPU, once a frame for all sides. Checked on `hands_1` and `measure_1`: the rows the same as the CPU's
-  within a bin.
 - **C5.** The 1€ rule opened on the estimate's own speed as well, as the filter does (Casiez et al. 2012): it
   opens on the measurement's speed, so at a stop it closes to the full `smooth` when the estimate should follow
   the stop, and the estimate coasts. Measured on hands, `xy.z_smooth` on: x/y at the push's end 12.6 px a frame

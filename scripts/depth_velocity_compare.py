@@ -47,6 +47,8 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_FLOAT, GL_FRAMEBUFFER, GL_R32F, G
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from modules.gl import Context, Fbo, Texture  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from measure_sums import MeasureSums, RegionTexture, SideSums, p99_of, region_bits  # noqa: E402
 from modules.flow import FlowUtil, LucasKanadeFlow3D, LucasKanadeFlow3DSettings, Patch, Visualizer  # noqa: E402
 
 WARM_UP: float = 1.0          # s at the start the flows settle in, measured in no part
@@ -318,7 +320,28 @@ class Measures:
         self.signed_z: list[float] = []          # the same with its sign, over the pixels that move in the loop: the pixels' noise cancels, the moving part's z stays
         self.without_z: list[float] = []         # the share of the mask without a z position, in the parts measured
         self.fit: list[float] = []               # the image's brightness gradient along the mask's edge, in the still part
+        self.histograms: dict[str, np.ndarray] | None = None     # with the GPU's sums: the still part's, in place of `still`
         self._before: np.ndarray | None = None
+
+    def add_sums(self, t: float, segment: str, sums: np.ndarray, regions: dict, milliseconds: float, weighed: bool) -> None:
+        """A frame's measures from the GPU's sums (`measure_sums.SUMS`), as `add` takes them from the arrays."""
+        core, moving, mask, held = sums[0], sums[4], sums[8], sums[9]
+        if segment and weighed and mask > 0:
+            self.without_z.append(sums[11] / mask)
+        if regions['fit'] is not None:
+            self.fit.append(regions['fit'])
+        if segment and held > 0:
+            self.restarts['still' if segment == 'still' else 'moving'].append(sums[10] / held)
+        self.milliseconds.append(milliseconds)
+        self.times.append(t)
+        self.segments.append(segment)
+        self.body_depth.append(regions['near'])
+        self.body_xy.append(sums[1] / core if core > 0 else 0.0)
+        self.body_z.append(sums[3] / core if core > 0 else np.nan)
+        self.fluid_z.append(sums[2] / core if core > 0 else 0.0)
+        self.signed_z.append(sums[6] / moving if moving > 0 else 0.0)
+        self.moving_xy.append(sums[5] / moving if moving > 0 else 0.0)
+        self.moving_z.append(sums[7] / moving if moving > 0 else np.nan)
 
     def add(self, t: float, segment: str, xy: np.ndarray, track: np.ndarray, z: np.ndarray, depth: np.ndarray, mask: np.ndarray,
             moved: np.ndarray, milliseconds: float, weight: np.ndarray | None = None,
@@ -404,6 +427,8 @@ class Measures:
         share of the mask without a z position, the mask's fit, and the flow's ms per frame. NaN where the
         loop has no such part."""
         def p99(name: str) -> float:
+            if self.histograms is not None:
+                return p99_of(self.histograms[name])
             parts = self.still[name]
             found = np.concatenate(parts) if parts else np.zeros(0)
             return float(np.percentile(found, 99)) if found.size else float('nan')
@@ -582,30 +607,39 @@ def measure(captures: list[Path], specs: list[tuple[str, dict[str, object]]], ou
         w, h = frames.width, frames.height
         span = float(np.median([c['view_span'] for c in frames.calls]))
         sides = [Side(name, frames.calls[0]['settings'], changed, w, h, False) for name, changed in specs]
+        summer = MeasureSums()
+        summer.allocate()
+        buffers: list[SideSums] = [SideSums(w, h) for _ in sides]
+        region_texture = RegionTexture()
         for k in range(len(frames)):
             lum, depth, mask = frames.load(k)
             upload(luminance, lum); upload(depth_texture, depth); upload(mask_texture, mask)
             segment = frames.segment(k)
             regions = frame_regions(segment, depth, mask > 0.5, lum, frames.excluded)
-            for side in sides:
+            region_texture.upload(region_bits(regions, frames.moved, mask > 0.5))
+            delta_time = frames.calls[k]['delta_time']
+            weighed = 'depth_range' in frames.calls[k]
+            for side, sums_of in zip(sides, buffers):
                 glFinish()
                 began = time.perf_counter()
                 side.step(frames, k, luminance, depth_texture, mask_texture)
                 glFinish()
                 milliseconds = (time.perf_counter() - began) * 1000.0
-                velocity = read_back(side.flow.velocity)
-                delta_time = frames.calls[k]['delta_time']
-                track = read_back(side.flow.depth_velocity.difference)
-                weight = read_back(side.flow.z_position)[..., 1] if side is sides[0] and 'depth_range' in frames.calls[k] else None   # the view's, the same for every side
-                gain = side.settings.z_gain if side.settings.z_gain else 1.0
-                side.measures.add(float(frames.t[k]), segment, side.xy_px(velocity, delta_time, w), track,
-                                  side.z_px(velocity, delta_time, w), depth, mask > 0.5, frames.moved, milliseconds, weight, lum,
-                                  velocity[..., 2] / gain * delta_time * w, regions)
-        for side in sides:
+                s = side.settings
+                to_px = (delta_time * w / (s.x_gain or 1.0), delta_time * w / (s.y_gain or 1.0), delta_time * w / (s.z_gain or 1.0))
+                first = side is sides[0] and weighed                  # the z position's weight is the view's, the first side's
+                estimate = side.flow.depth_velocity.difference
+                sums = summer.use(sums_of, side.flow.velocity, estimate, estimate.back, side.flow.z_position if first else None,
+                                  region_texture, to_px, float(w), segment == 'still')
+                side.measures.add_sums(float(frames.t[k]), segment, sums, regions, milliseconds, first)
+        for side, sums_of in zip(sides, buffers):
+            side.measures.histograms = sums_of.histograms()
             found = side.measures.values(span, w) | side.measures.lag(sides[0].measures)
             per_side[side.name].append(found)
             settings[side.name] = side.settings.to_dict()
+            sums_of.deallocate()
             side.flow.deallocate()
+        region_texture.deallocate()
         stamps.append({'capture': folder.name} | frames.capture)
         print(f'{folder.name}: {len(frames)} frames, {described}', flush=True)
 
