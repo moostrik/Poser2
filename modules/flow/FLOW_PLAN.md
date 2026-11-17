@@ -254,5 +254,10 @@ The cameras:
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
+- A settings class mirrors the code it configures, its fields in the order the code uses them: D4's `luma_key`
+  after the HSV pass.
+- A setting's default is the textbook value: D4's `luma_key` and D5's `density_blend`, each default with its reason.
+- Keep presets in sync, update all call sites in the same change: D4's second texture, D5's `density_release`.
+- Ask to measure a time again when its pass's code or size changes: D5.
 
-Not designed yet, so their rules are not named: C3, D4, D5, E1, E2, F1, F2, H1, I1 to I4.
+Not designed yet, so their rules are not named: C3, E1, E2, F1, F2, H1, I1 to I4.
