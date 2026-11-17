@@ -14,7 +14,7 @@ operator saw.
 | A   | [The measurements](#a-the-measurements)                                      | built                             | [FLOW.md](FLOW.md#the-goals)                       |
 | B   | [The view](#b-the-view)                                                      | built                             | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; C2 the values, C3 range    | [MOTION.md](MOTION.md)                             |
-| D   | [The bridge](#d-the-bridge)                                                  | built; D4 injection, D5 alpha     | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
+| D   | [The bridge](#d-the-bridge)                                                  | built; D4 alpha, D5 injection     | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | the temperature                   | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | F1, F2 white                      | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                       | [FLOW.md](FLOW.md)                                 |
@@ -96,19 +96,40 @@ The expansion is a source of volume where the body is, a fountain: water is made
 app, 2026-11-17, with the `mask` share: it works; with the trail alone it hardly shows, as the velocity's drag holds
 the same water **(site fact)**.
 
-- **D4.** The density's injection, in the grid and the fine density alike. It replaces the fill's switch, a cell
-  drawn toward the input only where the input's amount is higher and untouched otherwise, which leaves patches
-  where the input meets older density; and `density_release`, which goes, as a falling input pulls the fluid dark
-  **(site fact)**. The temperature keeps its drag as now.
+- **D4.** The bridge's density in two outputs, as compositing has it (Porter and Duff 1984: alpha is coverage):
+  the color, the video's rgb with an alpha, how much of the pixel the player covers; and the amount, the mix of
+  the readings' speeds and the mask's share, as today. The bridge already makes both apart (`DensityColor`, the
+  `density.amount` port); `DensityBridge` stops merging them into one RGBA. Today `density_color.frag` multiplies
+  the color by the mask's gate and the merge drops that alpha, so the edge comes in dark at full amount **(code)**;
+  and a gain in the fluid would amplify the edge with the speed.
+  - The alpha: the mask's soft edge × the luma key's share of the color's brightness, its brightest channel
+    (HSV's value).
+  - The luma key (video compositing: darkness becomes transparency), a setting in the bridge's `density` group,
+    `luma_key`, 0..1, after the HSV pass (`saturation`, `brightness`): the key's share of the color's darkness
+    becomes less alpha, and the same share is taken out of the color. At 1 a half-dark red comes in as full red
+    at half the alpha, and black brings in nothing; at 0 as half-dark red at full alpha, as now. Default 1, the
+    look asked for: dark clothes and shadows leave no dark patches **(site fact)**.
+  - The output and the injection carry the color and the amount (`bridge_layer.py`, `fluid_3d_layer.py`,
+    `fluid_2d_layer.py`); `CaptureMax` picks the two as a pair, by the amount; the particles take their amount
+    from the amount, their color from the color.
+  - The 2D bridge shares `DensityColor`: it keeps its look, the color times its alpha where it merges, until
+    line I.
+  - BRIDGE_3D.md follows. Checked in the app: no dark rim at any gain; the luma key from 0 to 1; the 2D flow as
+    before.
+- **D5.** The density's injection, in the grid, the fine density and the particles' carrier alike. It replaces
+  the fill's switch, a cell drawn toward the input only where the input's amount is higher and untouched
+  otherwise, which leaves patches where the input meets older density; and `density_release`, which goes, as a
+  falling input pulls the fluid dark **(site fact)**. The temperature keeps its drag as now.
   - The blend, a setting, `input.density_blend`:
     - `over`, the default: compositing over (Porter and Duff 1984), premultiplied; each tick a cell under the
       input becomes the input plus the cell × (1 − the input's amount), by `density_drag`'s share. The amount
-      never falls and never passes 1; the color is the density-weighted mix.
+      never falls and never passes 1; the color is the density-weighted mix. The default as the density is a
+      boundary value, held at the body, and `over` is that hold without the fall.
     - `add`: the source (Stam 2003; Bridson 2015), the input × `density_gain` × dt added. Where the amount would
       pass 1, all four channels are scaled down together so the amount lands at 1; the color stays the
       density-weighted mix of what went in.
-  - The amount: min(the bridge's density × `density_gain`, 1) × the bridge's alpha (D5). The gain, default 1,
-    amplifies the speed, a slow body putting in more; the alpha, the body's coverage, comes in as given.
+  - The amount: min(the bridge's amount × `density_gain`, 1) × the bridge's alpha (D4). The gain, default 1,
+    amplifies the speed, a slow player putting in more; the alpha, the coverage, comes in as given.
   - The color space, a setting, `density.color_space`: `rgb`, as now, or `oklab` (Ottosson 2020), the color
     stored as (L × density, a × density, b × density, density), so the flow and both blends mix colors as the
     eye sees them. Converted into Oklab in the injection, not the bridge, as the particles read the bridge's
@@ -116,23 +137,10 @@ the same water **(site fact)**.
   - The monitor: the fluid's `density` port carries its color space; the `IMAGE` view, the cube and the slice,
     converts Oklab back to RGB, showing what the composite shows; `COLORMAP` keeps the stored channels, L, a, b
     and the amount.
+  - The preset: `density_release` goes, the new keys come in at their defaults.
   - FLUID_3D.md follows; the injection's and the march's times measured again.
   - Checked in the app: `over` leaves no patches where the input meets older density; `add` builds up without
-    going white; `oklab` mixes without turning muddy.
-- **D5.** The bridge's density in two outputs, as compositing has it (Porter and Duff 1984: alpha is coverage):
-  the color, the video's rgb with an alpha, how much of the pixel the body covers; and the density, the speed, in
-  a texture of its own. Today one RGBA holds the color and the speed as its amount, and `density_color.frag`
-  multiplies the color by the mask's gate, so the edge comes in dark at full amount **(code)**; a gain in the
-  fluid would also amplify the edge with the speed.
-  - The alpha: the mask's soft edge × the luma key's share of the color's brightness, its brightest channel
-    (HSV's value).
-  - The luma key (video compositing: darkness becomes transparency), a setting, `density_luma_key`, 0..1,
-    default 1: the key's share of the color's darkness becomes less alpha, and the same share is taken out of
-    the color. At 1 a half-dark red comes in as full red at half the alpha, and black brings in nothing; at 0
-    as half-dark red at full alpha, as now.
-  - The readers follow: the capture max picks by the density; the particles take their amount from the
-    density, their color from the color.
-  - BRIDGE_3D.md follows. Checked in the app: no dark rim at any gain; the luma key from 0 to 1.
+    going white; `oklab` mixes without turning muddy; the monitor's `IMAGE` shows what the composite shows.
 
 ## E. The 3D fluid's physics
 
