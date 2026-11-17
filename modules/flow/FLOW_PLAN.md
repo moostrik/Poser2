@@ -14,7 +14,7 @@ operator saw.
 | A   | [The measurements](#a-the-measurements)                                      | built                            | [FLOW.md](FLOW.md#the-goals)                       |
 | B   | [The view](#b-the-view)                                                      | built                            | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; C2 the values, C3 range   | [MOTION.md](MOTION.md)                             |
-| D   | [The bridge](#d-the-bridge)                                                  | built; D3 at the screen          | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
+| D   | [The bridge](#d-the-bridge)                                                  | built; displacement             | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | the temperature                  | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | open                             | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
 | G   | [Each stage a flow class](#g-each-stage-a-flow-class)                        | G1 the bridge                    | [FLOW.md](FLOW.md#packages)                        |
@@ -22,7 +22,7 @@ operator saw.
 | I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | not started                      | [FLOW.md](FLOW.md)                                 |
 | J   | [Every setting and its description](#j-every-setting-and-its-description)    | last, after the refactor         | `CLAUDE.md`, `.claude/rules`                       |
 
-D3 and E2 need the operator at the screen; the other lines go on meanwhile.
+E2 needs the operator at the screen; the other lines go on meanwhile.
 
 The apps on deep_flow's input have their own plan, [apps/APPS_PLAN.md](../../apps/APPS_PLAN.md); recording and
 -sim, deep_flow's live checks among them, theirs, [RECORDING_PLAN.md](../recording/RECORDING_PLAN.md). The
@@ -93,17 +93,34 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
 What is built: [BRIDGE_3D.md](BRIDGE_3D.md), and what the fluid does with it,
 [FLUID_3D.md](FLUID_3D.md#the-inputs).
 
-Seen in the app, 2026-11-17: the stop as an acceleration gives nice effects **(site fact)**.
+The expansion is a source of volume where the body is, a fountain: water is made there and flows out. Seen in the
+app, 2026-11-17, with the `mask` share: it works; with the trail alone it hardly shows, as the velocity's drag holds
+the same water **(site fact)**. A real body makes no water: it pushes the water ahead of it aside, and the water
+flows around it into the room it leaves behind, which curls into the swirls beside a moving limb. Our body is a thin
+skin the water passes through, so nothing pushes it aside.
 
-- **D3.** The acceleration tuned at the screen: which readings (`stop`, `change`, `wake`) and its `gain`.
+- **D4.** The displacement: the body pushing water aside, a source ahead of a moving body and an equal sink behind
+  it (a doublet), in the projection beside the expansion.
+  - What: the rate at which the body fills a cell, ∂χ/∂t = −v·∇χ, χ the body's share of the cell (the mask in its
+    slab at its z position), v the body's velocity: positive where the body moves into water, negative where it
+    leaves, summing to about 0. A still body displaces nothing.
+  - The bridge: a new output, `displacement`, its panel the six readings' shares as the others'; in the image
+    plane −v·∇mask from the mixed velocity (1/s), and for z the mixed velocity's z times the mask; its z position
+    as the others'.
+  - The fluid: summed into the expansion's volume before the projection, so no new pass; the image-plane part
+    by the slab, the z part by the slab's derivative in z, positive on the side the body moves to;
+    `input.displacement_gain`, 1 = the body moves its own volume. The volume a body moves is its skin's,
+    `spread` thick **(deduction)**.
+  - Checked by: a still body gives 0, a moving one plus and minus of equal sum, in `expansion_check.py`; then
+    in the app, beside the expansion.
 
 ## E. The 3D fluid's physics
 
 - **E1.** The temperature fixed: its advection moves to the density's, carried by the projected velocity (Fedkiw
   2001, Bridson), where today it is carried mid-step, after the confinement and before the projection, by a
   velocity not yet free of divergence; the buoyancy reads the temperature of the step before.
-- **E2.** The temperature and the expansion checked in the app, each in its own panel: what each does to the
-  water and whether it works. The temperature after E1, with `buoyancy` above 0.
+- **E2.** The temperature checked in the app, in its own panel: what it does to the water and whether it works.
+  After E1, with `buoyancy` above 0.
 
 ## F. The 3D fluid's look at 4K
 
@@ -210,4 +227,4 @@ The cameras:
 - Compare a result only with rows of the same recording, settings and code paths: C2.
 - Prefer composition over inheritance; update all call sites; keep presets in sync: G1.
 
-Not designed yet, so their rules are not named: C3, D3, E1, E2, F1, H1, I1 to I4.
+Not designed yet, so their rules are not named: C3, D4, E1, E2, F1, H1, I1 to I4.
