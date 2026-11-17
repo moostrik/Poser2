@@ -122,11 +122,16 @@ rest and later: the filter sees nothing until the zone opens, so its lag comes a
 overlap now (hands, unsmoothed, `dead_zone` 0.02: 52 ms against 7; `smooth` 25: 90 against 65; measure's still
 noise 2.4 / 3.1 against 9.1 / 5.1).
 
-- **C1.** The catch-up's rule replaced by the 1€ filter's (Casiez, Roussel, Vogel 2012): the smoothing time
-  shortens as the speed rises, two numbers, the smoothing at rest and how fast it opens; the speed it opens on
-  to hold x/y's, which carries little noise. The catch-up's Emas and their texture go. Checked on one capture of
-  hands and of measure against the catch-up's rows (`smooth` 25 and 50 with `catch_up` 8): still noise, z
-  kept, lag; about 5 minutes a run.
+- **C1.** The catch-up's rule replaced by the 1€ filter's (Casiez, Roussel, Vogel 2012): the smoothing time is
+  the smooth at rest over 1 + speed / halving speed, so long at rest and short in a motion, within a frame. Two
+  numbers: the smooth at rest (ms) and the halving speed (px per frame), the speed at which the time is half.
+  The speed is the larger of x/y's at the pixel (its 3 × 3, which carries little noise) and z's own, from a slow
+  copy of z's rate kept in the estimate where the dead zone's anchor is, so a push straight at the camera opens
+  it too. The dead zone, the catch-up's Emas and their texture go.
+  One run decides, the catch-up kept beside the new rule until then, uncommitted: on one capture of hands and of
+  measure, `dead_zone` 0, the catch-up (`smooth` 10, 15, 20, 25, 50 with `catch_up` 8) against the new rule
+  (rest 50, 100, 200 × halving speed 0.5, 1, 2, 4), the best few of each with z's `threshold` 0.5, 1, 2; each
+  row still noise inside and at the edge, z kept, lag; about 15 minutes. The loser is removed before the commit.
 - **C2.** The values, after C1, each measured on the four recordings and judged in the app: the smoothing's two
   numbers and z's `threshold`, with `dead_zone` 0; x/y's `threshold` around 0.4; a step up on `levels`, x/y's
   `window` and `damping` against their ms. The step filter and z's window stay unless a row shows a clear gain
