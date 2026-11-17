@@ -20,21 +20,21 @@ from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 
 @dataclass
 class Injection:
-    """One bridge output as one fluid takes it: the boundary's `boundary_velocity`, `boundary_density`,
-    `boundary_temperature`, the body force's `body_force_acceleration` and the 3D bridge's `expansion` from the
+    """One bridge output as one fluid takes it: the boundary's `velocity`, `density`,
+    `temperature`, the body force's `acceleration` and the 3D bridge's `expansion` from the
     bridge output, at `weight`, 0 to 1, the injection's share of the fluid's velocity, density and temperature, as a layer's weight in a mix. The app
     sets the weight from whatever it reads; the fluid never knows why. `color` is the color the 2D fluid gives
     the injection's density at its output, where the 2D density is an amount; the 3D fluid's density arrives
     colored and ignores it."""
-    boundary_velocity: Texture
-    boundary_density: Texture
-    boundary_temperature: Texture
-    body_force_acceleration: Texture | None = None
+    velocity: Texture
+    density: Texture
+    temperature: Texture
+    acceleration: Texture | None = None
     weight: float = 1.0
-    boundary_velocity_z_position: Texture | None = None
-    boundary_density_z_position: Texture | None = None
-    boundary_temperature_z_position: Texture | None = None
-    body_force_acceleration_z_position: Texture | None = None
+    velocity_z_position: Texture | None = None
+    density_z_position: Texture | None = None
+    temperature_z_position: Texture | None = None
+    acceleration_z_position: Texture | None = None
     expansion: Texture | None = None
     expansion_z_position: Texture | None = None
     color: tuple[float, float, float] = (1.0, 1.0, 1.0)
@@ -90,7 +90,7 @@ class FluidLayer(StageLayer[FluidInput, FluidOutput]):
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
         for injection in input.injections:
-            if injection.boundary_velocity.allocated:      # a bridge that has not stepped yet has nothing to give
+            if injection.velocity.allocated:      # a bridge that has not stepped yet has nothing to give
                 self._inject(injection)
         self._step(input.dt)
         Style.pop_style()

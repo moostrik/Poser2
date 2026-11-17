@@ -77,7 +77,7 @@ class Monitor2DAdvancedSettings(BaseSettings):
 class Monitor2DLayerSettings(BaseSettings):
     """Configuration for Monitor2DLayer: what it shows of its stage, and in `advanced` how."""
     names: Field[list[str]] =       Field([""], access=Field.READ, visible=False, description="The stage's textures, in the order the data runs")
-    texture: Field[str] =           Field("output.boundary_velocity", widget=Widget.path_select, options=names, description="The texture shown, picked a step at a time")
+    texture: Field[str] =           Field("output.velocity", widget=Widget.path_select, options=names, description="The texture shown, picked a step at a time")
     view: Field[MonitorView] =      Field(MonitorView.COLORMAP, description="How the port is drawn: by its kind, glyphs, raw, histogram or strip")
 
     advanced = Group(Monitor2DAdvancedSettings)

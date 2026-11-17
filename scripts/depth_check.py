@@ -87,7 +87,7 @@ def main() -> int:
             if moving.any():
                 row['xy'].append(float(np.mean(np.hypot(velocity[..., 0], velocity[..., 1])[moving])))
                 row['z'].append(float(np.mean(np.abs(velocity[..., 2])[moving])))
-            body = read_back(side.bridge.output.boundary_velocity)
+            body = read_back(side.bridge.output.velocity)
             body_speed = np.linalg.norm(body[..., :3], axis=-1)
             there = body_speed > MOVING
             if there.any():

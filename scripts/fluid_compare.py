@@ -100,12 +100,12 @@ class Side:
         self.bridge.set_input(BridgeInput(velocity, delta_time, None, mask=mask, z_position=z_position))
         self.bridge.update()
         out = self.bridge.output
-        injection = Injection(out.boundary_velocity, out.boundary_density, out.boundary_temperature,
-                              out.body_force_acceleration,
-                              boundary_velocity_z_position=out.boundary_velocity_z_position,
-                              boundary_density_z_position=out.boundary_density_z_position,
-                              boundary_temperature_z_position=out.boundary_temperature_z_position,
-                              body_force_acceleration_z_position=out.body_force_acceleration_z_position)
+        injection = Injection(out.velocity, out.density, out.temperature,
+                              out.acceleration,
+                              velocity_z_position=out.velocity_z_position,
+                              density_z_position=out.density_z_position,
+                              temperature_z_position=out.temperature_z_position,
+                              acceleration_z_position=out.acceleration_z_position)
         self.fluid.set_input(FluidInput(delta_time, [injection]))
         glFinish()
         began = time.perf_counter()
@@ -121,7 +121,7 @@ class Side:
         return read_back(self.cut.process(volume, Cut.SLICE, self.slice, TextureKind.SCALAR, port.extent))
 
     def measure(self, moving: np.ndarray, core: np.ndarray, still: bool) -> None:
-        body = read_back(self.bridge.output.boundary_velocity)
+        body = read_back(self.bridge.output.velocity)
         self.series['body'].add(np.hypot(body[..., 0], body[..., 1]), *_fit(moving, core, body.shape[:2]), still)
         water = self._slice('velocity')
         self.series['water'].add(np.hypot(water[..., 0], water[..., 1]), *_fit(moving, core, water.shape[:2]), still)

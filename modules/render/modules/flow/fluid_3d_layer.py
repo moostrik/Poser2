@@ -94,11 +94,11 @@ class Fluid3DLayer(FluidLayer):
     def _inject_into(fluid: Fluid3D, injection: Injection) -> None:
         # The boundary's velocity is dragged toward, the body force's acceleration added × dt; the z (blue) of
         # each is the w. Each goes in at its own z position
-        fluid.drag_velocity(injection.boundary_velocity, injection.weight, injection.boundary_velocity_z_position)
-        if injection.body_force_acceleration is not None:
-            fluid.add_acceleration(injection.body_force_acceleration, injection.weight, injection.body_force_acceleration_z_position)
-        fluid.add_boundary_density(injection.boundary_density, injection.weight, injection.boundary_density_z_position)
-        fluid.add_boundary_temperature(injection.boundary_temperature, injection.weight, injection.boundary_temperature_z_position)
+        fluid.drag_velocity(injection.velocity, injection.weight, injection.velocity_z_position)
+        if injection.acceleration is not None:
+            fluid.add_acceleration(injection.acceleration, injection.weight, injection.acceleration_z_position)
+        fluid.add_density(injection.density, injection.weight, injection.density_z_position)
+        fluid.add_temperature(injection.temperature, injection.weight, injection.temperature_z_position)
         if injection.expansion is not None:
             fluid.add_expansion(injection.expansion, injection.weight, injection.expansion_z_position)
 

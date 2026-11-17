@@ -9,7 +9,7 @@ paths:
 ---
 # Flow naming
 
-- Name the fluid's things by the textbook word of fluid simulation where one exists: `boundary` for the body in the water, `wall` for the domain's edge, `body_force` for the Navier–Stokes force term, `lowpass` and `bandpass` for the filters
+- Name the fluid's things by the textbook word of fluid simulation where one exists: `wall` for the domain's edge, `lowpass` and `bandpass` for the filters; boundary (the body in the water) and body force (the Navier–Stokes force term) say how an input goes in, in its description, not its name
 - Name a reading by what it is (`trail`, `change`, `start`), and a module by what it does (`VelocityLowpass`, `VelocityBandpass`)
 - Name a value by its quantity (`velocity`, `acceleration`); the words "impulse", "body", "force" and "delta" name nothing on their own
 - Prefer the flow's textbook units: widths, widths/s, widths/s², seconds

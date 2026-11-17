@@ -91,9 +91,9 @@ acceleration per unit mass; a body in the fluid is a boundary that moves.
 
 | Input is                  | The fluid                                                                | Here                                                               |
 |---------------------------|--------------------------------------------------------------------------|--------------------------------------------------------------------|
-| a body's value            | is dragged toward it where the body is, over a time, never past it       | `boundary_velocity`, `boundary_density`, `boundary_temperature`    |
+| a body's value            | is dragged toward it where the body is, over a time, never past it       | the boundary: `velocity`, `density`, `temperature`                 |
 | a velocity change, Δv     | adds it once in total: as an acceleration, the pulse over its area, × dt | the bandpass's readings as accelerations                           |
-| an acceleration           | adds it × dt                                                             | buoyancy, the vorticity force, `body_force_acceleration`           |
+| an acceleration           | adds it × dt                                                             | buoyancy, the vorticity force, the body force: `acceleration`      |
 | a source                  | adds it × dt, an amount per second                                       | the expansion's volume                                             |
 
 ### What the fluid takes
@@ -105,13 +105,13 @@ The five outputs, each a mix of the six readings in its own subpanel of the brid
 panel in the order the layer injects them, says how the water follows each; the density and the temperature
 go in by `inject_3d`'s `FILL`:
 
-| Output                    | Unit                              | The fluid                                                                                                                      | The fluid's setting       | 1 means                           |
-|---------------------------|-----------------------------------|--------------------------------------------------------------------------------------------------------------------------------|---------------------------|-----------------------------------|
-| `boundary_velocity`       | widths/s                          | drags the water toward it where it is non-zero, over `velocity_drag`, never past it (`add_to_faces_3d`, [The drag](#the-drag)) | `input.velocity_gain`     | the water as fast as the body     |
-| `body_force_acceleration` | widths/s²                         | adds it × dt (`add_to_faces_3d`)                                                                                               | `input.acceleration_gain` | a Δv added once                   |
-| `boundary_density`        | the dye: color × presence, 0 to 1 | fills the water toward it × `density_gain` (at most 1) in the slab, never past it, over `density_drag`                         | `input.density_gain`      | fully dyed at 1 width/s           |
-| `boundary_temperature`    | warmth, -1 to 1                   | drags the water toward it × `temperature_gain` (at most ±1) in the slab where the body is, over `temperature_drag`             | `input.temperature_gain`  | fully warm or cold at 1 width/s   |
-| `expansion`               | presence, 0 to 1                  | the projection makes the divergence the rate × it, not 0 ([The expansion](#the-expansion))                                     | `input.expansion_rate`    | its volume gained per second, 1/s |
+| Output         | Unit                              | The fluid                                                                                                                                     | The fluid's setting       | 1 means                           |
+|----------------|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|---------------------------|-----------------------------------|
+| `velocity`     | widths/s                          | the boundary: drags the water toward it where it is non-zero, over `velocity_drag`, never past it (`add_to_faces_3d`, [The drag](#the-drag)) | `input.velocity_gain`     | the water as fast as the body     |
+| `acceleration` | widths/s²                         | the body force: adds it × dt (`add_to_faces_3d`)                                                                                              | `input.acceleration_gain` | a Δv added once                   |
+| `density`      | the dye: color × presence, 0 to 1 | fills the water toward it × `density_gain` (at most 1) in the slab, never past it, over `density_drag`                                        | `input.density_gain`      | fully dyed at 1 width/s           |
+| `temperature`  | warmth, -1 to 1                   | drags the water toward it × `temperature_gain` (at most ±1) in the slab where the body is, over `temperature_drag`                            | `input.temperature_gain`  | fully warm or cold at 1 width/s   |
+| `expansion`    | presence, 0 to 1                  | the projection makes the divergence the rate × it, not 0 ([The expansion](#the-expansion))                                                    | `input.expansion_rate`    | its volume gained per second, 1/s |
 
 The boundary and the body force are the two systems every solver distinguishes: a moving boundary,
 whose values the water takes, and the body force, which adds to it. The boundary's density and
@@ -354,11 +354,11 @@ module by what it does, everything else by its quantity.
 | Kind                      | Names                                                                                                                                           |
 |---------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
 | the mixes' knobs          | shares, 0 to 1, one per reading in each output, summed                                                                                          |
-| the fluid's input methods | `drag_velocity`, `add_acceleration`, `add_boundary_density`, `add_boundary_temperature`, `add_expansion`                                        |
+| the fluid's input methods | `drag_velocity`, `add_acceleration`, `add_density`, `add_temperature`, `add_expansion`                                                          |
 | the fluid's fields        | `velocity` (its own settings: fade, evaporation, top speed, vorticity, viscosity, self-advection), `density`, `temperature`, `pressure`         |
 
 The readings, the filters, the two systems, the input groups and the wall are the flow
-documents' ([FLOW.md](FLOW.md#terms)). "Drag" is what the fluid does with `boundary_velocity`, seen as `velocity_drag`, not the name of a
+documents' ([FLOW.md](FLOW.md#terms)). "Drag" is what the fluid does with the `velocity`, seen as `velocity_drag`, not the name of a
 thing; "impulse", "body" alone, "force" alone, "model" and "delta" name nothing. A reading is what a module of the
 bridge makes from the motion; not "signal", "band", "component", "event".
 
@@ -393,7 +393,7 @@ injection, the projection and the confinement **(deduction)**. With `smooth` 300
 falls from 0.85 to 0.23 s and the water's stays at 0.94: the coast is the fluid's. The GPU time in
 the harness is the step with its composite at 2160 × 3840, timed by `glFinish` around it.
 
-The body force, the stop and the change as accelerations alone (`boundary_velocity.trail` 0), the
+The body force, the stop and the change as accelerations alone (`velocity.trail` 0), the
 highest water mean around the stops, at the frames' rate and at every second frame:
 
 | Reading as acceleration | Stop, 23 fps | Stop, 11.5 fps |
