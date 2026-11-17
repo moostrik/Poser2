@@ -17,6 +17,7 @@ operator saw.
 | D   | [The bridge](#d-the-bridge)                                                  | built; D3 at the screen          | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | the temperature                  | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | open                             | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
+| G   | [Each stage a flow class](#g-each-stage-a-flow-class)                        | G1 the bridge                    | [FLOW.md](FLOW.md#packages)                        |
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                      | [FLOW.md](FLOW.md)                                 |
 | I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | not started                      | [FLOW.md](FLOW.md)                                 |
 | J   | [Every setting and its description](#j-every-setting-and-its-description)    | last, after the refactor         | `CLAUDE.md`, `.claude/rules`                       |
@@ -112,6 +113,21 @@ What is built: [FLUID_3D.md](FLUID_3D.md#the-density).
   times the pixels; the cut at 2 sigma and the lower cap ([TIMING.md](TIMING.md#the-particles-1)), judged on the
   look.
 
+## G. Each stage a flow class
+
+Each stage's work is a plain class in `modules/flow`, with its settings, ports, inputs and outputs, and its render
+layer only hands it the input and calls it, as `Fluid3D` and `Fluid3DLayer` are. The layers stay in the render. The
+view is built so already, its parts (`ViewCrop`, `ViewMask`, `ViewDepth`, `ViewColor`) plain classes under a
+thin `ViewLayer`, and stays in deep_flow until a second app takes the 3D flow; then the crop, the mask and the
+depth move to `modules/flow` and the color, deep_flow's look, stays in the app.
+
+- **G1.** The bridge: a `Bridge3D` in `modules/flow/bridge_3d` takes what `Bridge3DLayer` does now, the wiring of
+  the lowpass, the bandpass, the peak, the mixes and their z positions, the density and temperature bridges, the
+  settings (`Bridge3DSettings`, its panels as they are) and the ports; `Bridge3DLayer` keeps the input, the output
+  and the call. The preset's keys do not change. `fluid_compare.py` and `motion_bridge_pass_check.py` run
+  `Bridge3D` without the render; BRIDGE_3D.md and FLOW.md's packages say where it sits. Checked by the flow's
+  and the render's unit tests and deep_flow `-sim` loading the preset with no unknown key.
+
 ## H. One unit across the stages
 
 - **H1.** Every length in the flow in the smaller side's widths: the motion's velocity, the bridge's readings, the
@@ -141,12 +157,6 @@ Once the 3D is finished, the 2D rebuilt in `modules/flow` on the 3D's principles
 ## Parked
 
 Not worked on until asked for; each with what is known.
-
-- The flow's stages in `modules/flow`, the render only drawing them. A stage now sits in two packages (the bridge
-  is `Bridge3DLayer` in the render, the view `ViewLayer` in deep_flow), as each subclasses the render's
-  `LayerBase` and modules may not import the render **(deduction)**. The textbook split: each stage a plain flow
-  class as `Fluid3D` is, with its settings, ports, inputs and outputs, and a thin render layer per stage that
-  calls it, beside the monitor.
 
 The 3D fluid's look:
 
@@ -198,5 +208,6 @@ The cameras:
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
+- Prefer composition over inheritance; update all call sites; keep presets in sync: G1.
 
 Not designed yet, so their rules are not named: C3, D3, E1, E2, F1, H1, I1 to I4.
