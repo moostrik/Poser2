@@ -25,20 +25,17 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 
 ## C. One thread per model, runners that only infer
 
-The pose, segmentation and optical-flow runners are each a `Thread` with its own queue, input lock, callback list and
-dispatch, written twice, once per backend: `RunnerONNX` and `RunnerTRT` share 190 of the pose's ~430 lines, 205 of
-the segmentation's ~500, 155 of the optical flow's ~390 **(seen)**. The face and person detectors already have the
-textbook shape: the detector owns the one thread, the queue and the callbacks; each backend's runner holds `setup`
-and `infer` alone **(seen)**.
+The segmentation and optical-flow runners are each a `Thread` with its own queue, input lock, callback list and
+dispatch, written twice, once per backend: `RunnerONNX` and `RunnerTRT` share 205 of the segmentation's ~500 lines,
+155 of the optical flow's ~390 **(seen)**. The face and person detectors and the pose predictor have the textbook
+shape: the predictor owns the one thread, the queue, the drop count and the callbacks; each backend's runner holds
+`setup` and `infer` alone **(seen)**.
 
-- C1. The pose predictor takes that shape: `Predictor` owns the thread, the queue, the drop count and the callbacks;
-  `RunnerONNX` and `RunnerTRT` keep loading the model, its input and output binding and `infer`; the SimCC decode
-  sits once, beside them
-- C2. The segmentation predictor the same
+- C2. The segmentation predictor takes that shape
 - C3. The optical-flow predictor the same
 - The output and the threads' count stay as they are; each step is checked by the package's tests (with a fake
-  runner where they need one) and a `-sim` run of the app that uses it: deep_flow for the pose, hd_trio for the
-  segmentation; the optical flow has no live user (`enable_prev_crop` off), so its tests alone
+  runner where they need one) and a run of the app that uses it: hd_trio for the segmentation; the optical flow has
+  no live user (`enable_prev_crop` off), so its tests alone
 
 ## D. The small breaks
 

@@ -1,37 +1,37 @@
-from threading import Lock
+import logging
+import time
+from threading import Event, Lock, Thread
 from typing import TYPE_CHECKING, TypeAlias
 
 import torch
 
-from .. import crop, ModelType
 from modules.pose import Points2D, FrameDictCallbackMixin, replace, FrameDict
-from .settings import Settings
 from modules.utils import PerformanceTimer
 
-from .io import PoseInput, PoseOutput
+from .. import crop, ModelType
+from .decode import decode_simcc
 from .runner_onnx import RunnerONNX
+from .settings import Settings
 
 if TYPE_CHECKING:
     from .runner_trt import RunnerTRT
 
-import logging
 logger = logging.getLogger(__name__)
 
 PoseRunner: TypeAlias = "RunnerONNX | RunnerTRT"
 
+
 class Predictor(FrameDictCallbackMixin):
-    """GPU-based batch extractor for 2D pose points using RTMPose detection.
+    """2D pose points (RTMPose) for the crops of a batch of poses, on its own thread.
 
-    Batches are processed asynchronously on GPU. Under load, pending batches may
-    be dropped by the runner's queue to maintain real-time performance. Dropped
-    batches do not emit callbacks - only successfully processed batches are broadcast.
-
-    This design prioritizes low latency over data completeness, making it suitable
-    for real-time visualization where recent data is more valuable than old data.
+    A single-slot queue: a batch still waiting when a newer one comes is dropped and counted in `settings.dropped`;
+    only the batches the model ran reach the callbacks, from this thread.
     """
 
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings) -> None:
         super().__init__()
+        self.settings: Settings = settings
+
         # One runner per model type; TensorRT is imported only when it is used.
         self._runner: PoseRunner
         if settings.model_type is ModelType.ONNX:
@@ -40,86 +40,112 @@ class Predictor(FrameDictCallbackMixin):
             from .runner_trt import RunnerTRT
             self._runner = RunnerTRT(settings)
 
-        self._lock = Lock()
-        self._batch_counter: int = 0
-        self._waiting_batches: dict[int, tuple[FrameDict, list[int]]] = {}
+        self._thread: Thread = Thread(target=self._run, daemon=True, name="PosePredictor")
+        self._shutdown: Event = Event()
+        self._wake: Event = Event()
+        self._ready: Event = Event()
 
-        self._process_timer =   PerformanceTimer(name="RTM Pose Detection", sample_count=1000, report_interval=100, color='yellow', omit_init=25)
-        self._wait_timer =      PerformanceTimer(name="RTM Pose Wait     ", sample_count=1000, report_interval=100, color='yellow', omit_init=25)
+        self._lock: Lock = Lock()
+        self._pending: tuple[FrameDict, list[int], list[torch.Tensor], torch.cuda.Event | None] | None = None
+        self._pending_timestamp: float = 0.0
 
-        self._verbose: bool = settings.verbose
-        self._settings: Settings = settings
+        self._process_timer = PerformanceTimer(name="RTM Pose Detection", sample_count=1000, report_interval=100, color='yellow', omit_init=25)
 
-        self._runner.add_pose_callback(self._on_pose_result)
+    @property
+    def is_ready(self) -> bool:
+        return self._ready.is_set() and not self._shutdown.is_set() and self._thread.is_alive()
 
     def start(self) -> None:
-        """Start the detection processing thread."""
-        self._runner.start()
+        self._thread.start()
 
     def stop(self) -> None:
-        """Stop the detection processing thread."""
-        self._runner.stop()
+        self._shutdown.set()
+        self._wake.set()
+        if self._thread.is_alive():
+            self._thread.join(timeout=2.0)
+        if self._thread.is_alive():
+            logger.warning("Pose: predictor thread did not stop cleanly")
 
     def submit(self, poses: FrameDict, crops: crop.CropImageDict) -> None:
-        """Submit poses with GPU images for async processing. Results broadcast via callbacks.
-
-        Args:
-            poses: Dictionary of poses keyed by track id
-            crops: Crop images already on GPU, keyed by track id
-        """
-        if not self._runner.is_ready:
+        """The poses and their crops on the GPU, keyed by track id, to run; the results go to the callbacks."""
+        if not self.is_ready:
             return
 
         track_ids: list[int] = []
-        gpu_image_list: list = []  # list[cp.ndarray]
+        images: list[torch.Tensor] = []
         ready: torch.cuda.Event | None = None      # the crops' event, one for the batch
-
         for track_id in poses.keys():
             if track_id in crops:
                 track_ids.append(track_id)
-                gpu_image_list.append(crops[track_id].crop)
+                images.append(crops[track_id].crop)
                 ready = crops[track_id].ready
 
+        max_batch: int = self._runner.max_batch
+        if len(images) > max_batch:
+            logger.warning(f"Pose: batch size {len(images)} exceeds max {max_batch}, only the first {max_batch} run")
+            track_ids, images = track_ids[:max_batch], images[:max_batch]
+
+        dropped: bool = False
         with self._lock:
-            self._batch_counter += 1
-            batch_id: int = self._batch_counter
-            self._waiting_batches[batch_id] = (poses, track_ids)
-
-        self._runner.submit(PoseInput(batch_id=batch_id, gpu_images=gpu_image_list, ready=ready))
-
-    def _on_pose_result(self, output: PoseOutput) -> None:
-        """Callback from the runner thread when results are ready or dropped.
-
-        Only successful batches (processed=True) emit callbacks. Dropped batches
-        are silently ignored to prioritize real-time performance over completeness.
-        """
-        with self._lock:
-            batch_data: tuple[FrameDict, list[int]] | None = self._waiting_batches.pop(output.batch_id, None)
-
-        if not batch_data:
-            logger.warning(f"Pose Predictor: No waiting batch for batch_id {output.batch_id} (possible reset during processing)")
-            return
-
-        original_poses, track_ids = batch_data
-        result_poses: FrameDict = {}
-
-        # print(output.inference_time_ms)
-        self._process_timer.add_time(output.inference_time_ms, report=self._verbose)
-        # self._wait_timer.add_time(output.lock_time_ms, report=self._verbose)
-
-        if output.processed:
-            for idx, track_id in enumerate(track_ids):
-                if idx < len(output.point_batch) and track_id in original_poses:
-                    point_feature = Points2D(
-                        values=output.point_batch[idx],
-                        scores=output.score_batch[idx]
-                    )
-                    result_poses[track_id] = replace(original_poses[track_id], {Points2D: point_feature})
-
-            self._notify_frames_callbacks(result_poses)
+            if self._pending is not None:
+                dropped = True
+                if self.settings.verbose:
+                    lag = int((time.perf_counter() - self._pending_timestamp) * 1000)
+                    logger.info(f"Pose: dropped a batch with lag {lag} ms")
+            self._pending = (poses, track_ids, images, ready)
+            self._pending_timestamp = time.perf_counter()
+        if dropped:
+            self.settings.dropped += 1
+        self._wake.set()
 
     def reset(self) -> None:
-        """Clear all pending and buffered data."""
+        """The waiting batch dropped."""
         with self._lock:
-            self._waiting_batches.clear()
-            self._batch_counter = 0
+            self._pending = None
+
+    def _run(self) -> None:
+        try:
+            self._runner.setup()
+        except Exception:
+            logger.exception(f"Pose: failed to load {self._runner.model_file}")
+            return
+        self._ready.set()
+        logger.info(f"Pose: {self.settings.resolution.name} model ready: {self._runner.model_width}x{self._runner.model_height} {self._runner.model_precision}")
+
+        while not self._shutdown.is_set():
+            self._wake.wait()
+            if self._shutdown.is_set():
+                break
+            self._wake.clear()
+            try:
+                self._process()
+            except Exception:
+                logger.exception("Pose: error processing a batch")
+
+    def _claim(self) -> tuple[FrameDict, list[int], list[torch.Tensor], torch.cuda.Event | None] | None:
+        with self._lock:
+            pending = self._pending
+            self._pending = None
+            return pending
+
+    def _process(self) -> None:
+        pending = self._claim()
+        if pending is None:
+            return
+        poses, track_ids, images, ready = pending
+        if not images:
+            self._notify_frames_callbacks({})
+            return
+
+        start: float = time.perf_counter()
+        simcc_x, simcc_y, lock_wait_ms = self._runner.infer(images, ready)
+        keypoints, scores = decode_simcc(simcc_x, simcc_y)
+        keypoints[:, :, 0] /= self._runner.model_width
+        keypoints[:, :, 1] /= self._runner.model_height
+        self._process_timer.add_time((time.perf_counter() - start) * 1000.0 - lock_wait_ms, report=self.settings.verbose)
+
+        results: FrameDict = {}
+        for i, track_id in enumerate(track_ids):
+            if i < len(keypoints) and track_id in poses:
+                results[track_id] = replace(poses[track_id], {Points2D: Points2D(values=keypoints[i], scores=scores[i])})
+        self._notify_frames_callbacks(results)

@@ -1,439 +1,131 @@
-# Standard library imports
-from threading import Thread, Lock, Event
-import time
-
-# Third-party imports
-import numpy as np
-import torch
-import onnxruntime as ort
-
-from ..ort_runtime import preload_cuda
-
-from .io import PoseInput, PoseOutput, PoseOutputCallback
-
-from .settings import Settings
+"""RTMPose through ONNX Runtime on CUDA: the crops normalized into a preallocated batch on its stream, the SimCC
+outputs back to the CPU. The batch is padded to `max_batch`, the size it is warmed up at."""
 
 import logging
+
+import numpy as np
+import onnxruntime as ort
+import torch
+
+from ..ort_runtime import preload_cuda
+from .decode import NUM_KEYPOINTS
+from .settings import Settings
+
 logger = logging.getLogger(__name__)
 
-# ImageNet normalization constants (RGB order) - scaled to [0,1] range
+# ImageNet normalization (RGB), for inputs in [0, 1]
 IMAGENET_MEAN = torch.tensor([0.485, 0.456, 0.406], dtype=torch.float32).view(1, 3, 1, 1)
 IMAGENET_STD = torch.tensor([0.229, 0.224, 0.225], dtype=torch.float32).view(1, 3, 1, 1)
 
+PRECISIONS: dict[str, str] = {'tensor(float)': 'FP32', 'tensor(float16)': 'FP16', 'tensor(double)': 'FP64', 'tensor(int8)': 'INT8'}
+DTYPES: dict[str, type] = {'tensor(float)': np.float32, 'tensor(float16)': np.float16, 'tensor(double)': np.float64, 'tensor(int8)': np.int8}
 
-class RunnerONNX(Thread):
-    """Asynchronous GPU pose detection using ONNX Runtime.
 
-    Runs RTMPose in full precision (FP32).
-
-    Faster alternative to MMDetection using exported ONNX models.
-    Architecture identical to MMDetection for drop-in replacement.
-
-    A pending batch replaced by a newer one is counted in `settings.dropped` and its callbacks told on the
-    submitting thread (`processed=False`); results go to the callbacks from the inference thread, which only enqueue.
-    """
-
-    def __init__(self, settings: 'Settings') -> None:
-        super().__init__()
-        self.settings: Settings = settings
-
+class RunnerONNX:
+    def __init__(self, settings: Settings) -> None:
         self.model_file: str = settings.model_path + '/' + settings.model
         self.model_width: int = settings.width
         self.model_height: int = settings.height
-        self.model_num_warmups: int = settings.max_players
-        self.num_keypoints: int = 17  # RTMPose COCO format
-        self.simcc_split_ratio: float = 2.0  # From RTMPose config
-
-        self.verbose: bool = settings.verbose
-        self.resolution_name: str = settings.resolution.name
-
-        # Thread coordination (identical to MMDetection)
-        self._shutdown_event: Event = Event()
-        self._notify_update_event: Event = Event()
-        self._model_ready: Event = Event()
-
-        # Input queue (single slot)
-        self._input_lock: Lock = Lock()
-        self._pending_batch: PoseInput | None = None
-        self._input_timestamp: float = time.perf_counter()
-        self._last_dropped_batch_id: int = 0
-
-        # Callbacks
-        self._callback_lock: Lock = Lock()
-        self._callbacks: list[PoseOutputCallback] = []     # run in registration order
-
-        # ONNX session (initialized in run thread)
-        self._session: ort.InferenceSession | None = None
-        self._model_dtype = np.float32  # Default, determined in setup
+        self.max_batch: int = min(settings.max_players, 8)
         self.model_precision: str = "UNKNOWN"
 
-        # Batch inference settings
-        self._max_batch: int = min(settings.max_players, 8)
+        self._session: ort.InferenceSession | None = None
+        self._model_dtype: type = np.float32
+        self._torch_dtype: torch.dtype = torch.float32
+        self._stream: torch.cuda.Stream
+        self._mean_gpu: torch.Tensor
+        self._std_gpu: torch.Tensor
+        self._input_buffer: torch.Tensor     # (max_batch, 3, H, W) normalized input
+        self._resize_buffer: torch.Tensor    # (max_batch, 3, H, W) before normalization
 
-    @property
-    def is_ready(self) -> bool:
-        """Check if model is loaded and ready"""
-        return self._model_ready.is_set() and not self._shutdown_event.is_set() and self.is_alive()
+    def setup(self) -> None:
+        """Load the model and warm it up, on the thread that will run it. It runs on CUDA only: the input is on the GPU."""
+        preload_cuda()
+        providers = [
+            ('CUDAExecutionProvider', {
+                'device_id': 0,
+                'arena_extend_strategy': 'kNextPowerOfTwo',
+                'gpu_mem_limit': 2 * 1024 * 1024 * 1024,
+                'cudnn_conv_algo_search': 'EXHAUSTIVE',
+                'do_copy_in_default_stream': True,
+            }),
+            'CPUExecutionProvider',
+        ]
+        sess_options = ort.SessionOptions()
+        sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+        sess_options.intra_op_num_threads = 1
+        sess_options.log_severity_level = 3
+        self._session = ort.InferenceSession(self.model_file, sess_options, providers=providers)
+        if 'CUDAExecutionProvider' not in self._session.get_providers():
+            raise RuntimeError("CUDA provider not available: the runner binds CUDA tensors, the CPU provider cannot take them")
 
-    def stop(self) -> None:
-        self._shutdown_event.set()
-        self._notify_update_event.set()
-        self.join(timeout=2.0)
+        input_type: str = self._session.get_inputs()[0].type
+        self.model_precision = PRECISIONS.get(input_type, f"UNKNOWN({input_type})")
+        self._model_dtype = DTYPES.get(input_type, np.float32)
+        self._torch_dtype = {np.float32: torch.float32, np.float16: torch.float16}.get(self._model_dtype, torch.float32)
 
-        if self.is_alive():
-            logger.warning("ONNX inference thread did not stop cleanly")
+        self._stream = torch.cuda.Stream()
+        with torch.cuda.stream(self._stream):
+            self._mean_gpu = IMAGENET_MEAN.to(device='cuda', dtype=self._torch_dtype)
+            self._std_gpu = IMAGENET_STD.to(device='cuda', dtype=self._torch_dtype)
+            shape = (self.max_batch, 3, self.model_height, self.model_width)
+            self._input_buffer = torch.empty(shape, dtype=self._torch_dtype, device='cuda')
+            self._resize_buffer = torch.empty(shape, dtype=self._torch_dtype, device='cuda')
+        self._stream.synchronize()
+        self._warmup()
 
-    def run(self) -> None:
-        self._setup()
+    def infer(self, gpu_images: list[torch.Tensor], ready: torch.cuda.Event | None) -> tuple[np.ndarray, np.ndarray, float]:
+        """The SimCC outputs (N, K, W) and (N, K, H) for the crops (3, H, W) RGB in [0, 1], read once `ready` is
+        recorded; and the time waited for the GPU's lock, 0: ONNX Runtime takes none."""
+        if ready is not None:
+            self._stream.wait_event(ready)      # the crops are written on the crop stream
+        simcc_x, simcc_y = self._infer(gpu_images)
+        return simcc_x, simcc_y, 0.0
 
-        while not self._shutdown_event.is_set():
-            self._notify_update_event.wait()
-
-            if self._shutdown_event.is_set():
-                break
-
-            self._notify_update_event.clear()
-
-            try:
-                self._process()
-            except Exception as e:
-                logger.error(f"Pose: {str(e)}")
-    def submit(self, input_batch: PoseInput) -> None:
-        """Submit batch for processing. Identical to MMDetection."""
-        if self._shutdown_event.is_set():
-            return
-
-        if not self._model_ready.is_set():
-            return
-
-        # Validate batch size
-        if len(input_batch.gpu_images) > self._max_batch:
-            logger.warning(f"Pose Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
-
-        dropped_batch: PoseInput | None = None
-
-        with self._input_lock:
-            if self._pending_batch is not None:
-                dropped_batch = self._pending_batch
-                if self.verbose:
-                    lag = int((time.perf_counter() - self._input_timestamp) * 1000)
-                    logger.info(f"Pose: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
-                self._last_dropped_batch_id = dropped_batch.batch_id
-
-            self._pending_batch = input_batch
-            self._input_timestamp = time.perf_counter()
-
-        if dropped_batch is not None:
-            self.settings.dropped += 1
-            self._dispatch(PoseOutput(batch_id=dropped_batch.batch_id, processed=False))
-
-        self._notify_update_event.set()
-
-    def _setup(self) -> None:
-        """Initialize ONNX session and warmup. Called from run()."""
-        try:
-            # Create ONNX Runtime session with CUDA
-            preload_cuda()
-            providers = [
-                ('CUDAExecutionProvider', {
-                    'device_id': 0,
-                    'arena_extend_strategy': 'kNextPowerOfTwo',
-                    'gpu_mem_limit': 2 * 1024 * 1024 * 1024,
-                    'cudnn_conv_algo_search': 'EXHAUSTIVE',
-                    'do_copy_in_default_stream': True,
-                }),
-                'CPUExecutionProvider',
-            ]
-
-            sess_options = ort.SessionOptions()
-            sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-            sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-            sess_options.intra_op_num_threads = 1
-            sess_options.log_severity_level = 3  # 0=verbose, 1=info, 2=warning, 3=error
-
-            self._session = ort.InferenceSession(self.model_file, sess_options, providers=providers)
-
-            # Verify CUDA provider is active
-            providers_used = self._session.get_providers()
-            if 'CUDAExecutionProvider' not in providers_used:
-                raise RuntimeError("CUDA provider not available: the runner binds CUDA tensors, the CPU provider cannot take them")
-
-            # Determine model precision from 'input' tensor
-            input_tensor = self._session.get_inputs()[0]  # First input is 'input'
-            input_type = input_tensor.type
-
-            # Parse ONNX type string (e.g., 'tensor(float)', 'tensor(float16)')
-            precision_map = {
-                'tensor(float)': 'FP32',
-                'tensor(float16)': 'FP16',
-                'tensor(double)': 'FP64',
-                'tensor(int8)': 'INT8',
-            }
-            self.model_precision = precision_map.get(input_type, f"UNKNOWN({input_type})")
-
-            # Map ONNX type to numpy dtype for preprocessing
-            dtype_map = {
-                'tensor(float)': np.float32,
-                'tensor(float16)': np.float16,
-                'tensor(double)': np.float64,
-                'tensor(int8)': np.int8,
-            }
-            self._model_dtype = dtype_map.get(input_type, np.float32)
-
-            # Map numpy dtype to torch dtype for preprocessing
-            torch_dtype_map = {
-                np.float32: torch.float32,
-                np.float16: torch.float16,
-            }
-            self._torch_dtype = torch_dtype_map.get(self._model_dtype, torch.float32)
-
-            # Dedicated CUDA stream for all GPU operations (preprocessing + inference)
-            self.stream = torch.cuda.Stream()
-
-            # Preallocate INPUT buffers on the dedicated stream
-            with torch.cuda.stream(self.stream):
-                # GPU constants for ImageNet normalization
-                self._mean_gpu = IMAGENET_MEAN.to(device='cuda', dtype=self._torch_dtype)
-                self._std_gpu = IMAGENET_STD.to(device='cuda', dtype=self._torch_dtype)
-
-                # Input buffer: normalized CHW format ready for ONNX Runtime
-                self._input_buffer = torch.empty(
-                    (self._max_batch, 3, self.model_height, self.model_width),
-                    dtype=self._torch_dtype, device='cuda'
-                )
-
-                # Resize buffer: intermediate for bilinear resize
-                self._resize_buffer = torch.empty(
-                    (self._max_batch, 3, self.model_height, self.model_width),
-                    dtype=self._torch_dtype, device='cuda'
-                )
-
-            self.stream.synchronize()
-
-            # Warmup model
-            self._warmup()
-
-            self._model_ready.set()
-            logger.info(f"Pose: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
-
-        except Exception as e:
-            logger.error(f"Pose: Failed to load model - {str(e)}")
-    def _claim(self) -> PoseInput | None:
-        """Atomically get and clear pending batch."""
-        with self._input_lock:
-            batch = self._pending_batch
-            self._pending_batch = None
-            return batch
-
-    def _process(self) -> None:
-        batch: PoseInput | None = self._claim()
-
-        if batch is None:
-            return
-
-        gpu_images = batch.gpu_images[:self._max_batch]
-
-        if not gpu_images:
-            output = PoseOutput(batch_id=batch.batch_id, processed=True)
-        else:
-            batch_start = time.perf_counter()
-            if batch.ready is not None:
-                self.stream.wait_event(batch.ready)     # the crops are written on the crop stream
-            keypoints, scores = self._infer(gpu_images)
-
-            keypoints[:, :, 0] /= self.model_width
-            keypoints[:, :, 1] /= self.model_height
-
-            inference_time_ms = (time.perf_counter() - batch_start) * 1000.0
-            point_list = [keypoints[i] for i in range(len(keypoints))]
-            score_list = [scores[i] for i in range(len(scores))]
-
-            output = PoseOutput(
-                batch_id=batch.batch_id,
-                point_batch=point_list,
-                score_batch=score_list,
-                processed=True,
-                inference_time_ms=inference_time_ms
-            )
-
-        self._dispatch(output)
-
-    def _infer(self, gpu_imgs: list[torch.Tensor]) -> tuple[np.ndarray, np.ndarray]:
-        """Run inference on GPU images using IOBinding for zero-copy.
-
-        All preprocessing runs on the dedicated stream for zero sync overhead.
-        Uses preallocated buffers for zero allocation latency.
-
-        Args:
-            gpu_imgs: List of RGB float32 tensors on GPU (H, W, 3) in [0,1] range
-
-        Returns:
-            (keypoints, scores)
-        """
-        batch_size = len(gpu_imgs)
-
+    def _infer(self, gpu_images: list[torch.Tensor]) -> tuple[np.ndarray, np.ndarray]:
+        batch_size = len(gpu_images)
         if batch_size == 0 or self._session is None:
-            return np.empty((0, 17, 2)), np.empty((0, 17))
+            return np.empty((0, NUM_KEYPOINTS, 0)), np.empty((0, NUM_KEYPOINTS, 0))
 
-        # Get input dimensions from first image (CHW format: 3, H, W)
-        input_h, input_w = gpu_imgs[0].shape[1], gpu_imgs[0].shape[2]
+        input_h, input_w = gpu_images[0].shape[1], gpu_images[0].shape[2]
         needs_resize = (input_h != self.model_height or input_w != self.model_width)
+        input_buffer = self._input_buffer[:self.max_batch]
 
-        # Get preallocated INPUT buffer slice for current batch
-        input_buffer = self._input_buffer[:self._max_batch]
-
-        # All preprocessing on dedicated stream (no cross-stream sync needed)
-        with torch.cuda.stream(self.stream):
-            # Stack GPU tensors: (B, 3, H, W) float32 RGB CHW [0,1]
-            batch_chw = torch.stack(gpu_imgs, dim=0).to(self._torch_dtype)
-
-            # Resize if needed (crop size != model size)
+        with torch.cuda.stream(self._stream):
+            batch_chw = torch.stack(gpu_images, dim=0).to(self._torch_dtype)
             if needs_resize:
                 batch_chw = torch.nn.functional.interpolate(
-                    batch_chw, size=(self.model_height, self.model_width),
-                    mode='bilinear', align_corners=False
-                )
-
-            # Pad batch to max_batch size for consistent tensor shapes
-            if batch_size < self._max_batch:
-                pad_size = self._max_batch - batch_size
-                padding = torch.zeros(
-                    (pad_size, 3, self.model_height, self.model_width),
-                    dtype=self._torch_dtype, device='cuda'
-                )
+                    batch_chw, size=(self.model_height, self.model_width), mode='bilinear', align_corners=False)
+            # Padded to max_batch: the shape it is warmed up at
+            if batch_size < self.max_batch:
+                padding = torch.zeros((self.max_batch - batch_size, 3, self.model_height, self.model_width),
+                                      dtype=self._torch_dtype, device='cuda')
                 batch_chw = torch.cat([batch_chw, padding], dim=0)
-
-            # ImageNet normalization directly into preallocated input buffer
             torch.sub(batch_chw, self._mean_gpu, out=self._resize_buffer)
             torch.div(self._resize_buffer, self._std_gpu, out=input_buffer)
 
-        # CRITICAL: Synchronize stream before IOBinding to ensure all preprocessing is complete
-        self.stream.synchronize()
+        self._stream.synchronize()      # ONNX Runtime runs on its own stream: the input must be written first
 
-        # Use preprocessed tensor directly for ONNX Runtime
-        torch_input = input_buffer
-
-        # Get input/output names
         input_name = self._session.get_inputs()[0].name
         output_names = [o.name for o in self._session.get_outputs()]
-
-        # Use IOBinding for GPU input/output
         io_binding = self._session.io_binding()
-
-        # Bind input from PyTorch tensor
-        io_binding.bind_input(
-            name=input_name,
-            device_type='cuda',
-            device_id=0,
-            element_type=self._model_dtype,
-            shape=tuple(torch_input.shape),
-            buffer_ptr=torch_input.data_ptr()
-        )
-
-        # Bind outputs to GPU
+        io_binding.bind_input(name=input_name, device_type='cuda', device_id=0, element_type=self._model_dtype,
+                              shape=tuple(input_buffer.shape), buffer_ptr=input_buffer.data_ptr())
         io_binding.bind_output(output_names[0], device_type='cuda', device_id=0)
         io_binding.bind_output(output_names[1], device_type='cuda', device_id=0)
-
-        # Run inference on the same stream
         self._session.run_with_iobinding(io_binding)
+        self._stream.synchronize()
 
-        # Synchronize stream to ensure outputs are ready
-        self.stream.synchronize()
-
-        # Get outputs as numpy (copies from GPU)
         outputs = io_binding.copy_outputs_to_cpu()
-        simcc_x = outputs[0][:batch_size]
-        simcc_y = outputs[1][:batch_size]
-
-        # Decode SimCC outputs
-        keypoints, scores = RunnerONNX._decode_simcc(simcc_x, simcc_y, self.simcc_split_ratio)
-
-        return keypoints, scores
+        return outputs[0][:batch_size], outputs[1][:batch_size]
 
     def _warmup(self) -> None:
-        """Initialize CUDA kernels for fixed batch size to prevent runtime recompilation."""
+        """The CUDA kernels made for the fixed batch size, so none is compiled while running."""
         if self._session is None:
             return
-
         try:
-            # Create realistic dummy input on GPU (float32 RGB [0,1])
             dummy_img = torch.zeros((self.model_height, self.model_width, 3), dtype=torch.float32, device='cuda')
-
-            # Warmup with max_batch size (all inference runs with this size)
-            dummy_images = [dummy_img] * self._max_batch
-
-            keypoints, scores = self._infer(dummy_images)
-
+            self._infer([dummy_img] * self.max_batch)
         except Exception as e:
             logger.info(f"Pose: Warmup failed (non-critical) - {str(e)}")
-    # CALLBACK METHODS
-    def add_pose_callback(self, callback: PoseOutputCallback) -> None:
-        """Register callback to receive results."""
-        with self._callback_lock:
-            if callback not in self._callbacks:
-                self._callbacks.append(callback)
-
-    def remove_pose_callback(self, callback: PoseOutputCallback) -> None:
-        """Unregister previously registered callback."""
-        with self._callback_lock:
-            if callback in self._callbacks:
-                self._callbacks.remove(callback)
-
-    def _dispatch(self, output: PoseOutput) -> None:
-        """A result to the callbacks, copied under their lock and called outside it."""
-        with self._callback_lock:
-            callbacks: list[PoseOutputCallback] = list(self._callbacks)
-        for callback in callbacks:
-            try:
-                callback(output)
-            except Exception:
-                logger.exception("Pose: error in a result callback")
-
-    # STATIC METHODS
-    @staticmethod
-    def _decode_simcc(simcc_x: np.ndarray, simcc_y: np.ndarray, split_ratio: float, apply_softmax: bool = False) -> tuple[np.ndarray, np.ndarray]:
-        """Decode SimCC using MMPose's exact method from get_simcc_maximum.
-
-        Reference: mmpose/codecs/utils/post_processing.py::get_simcc_maximum
-        """
-        N, K, _ = simcc_x.shape
-
-        # Reshape for processing: (N, K, W) -> (N*K, W)
-        simcc_x_flat = simcc_x.reshape(N * K, -1)
-        simcc_y_flat = simcc_y.reshape(N * K, -1)
-
-        if apply_softmax:
-            # Exact MMPose softmax implementation
-            simcc_x_flat = simcc_x_flat - np.max(simcc_x_flat, axis=1, keepdims=True)
-            simcc_y_flat = simcc_y_flat - np.max(simcc_y_flat, axis=1, keepdims=True)
-            ex, ey = np.exp(simcc_x_flat), np.exp(simcc_y_flat)
-            simcc_x_flat = ex / np.sum(ex, axis=1, keepdims=True)
-            simcc_y_flat = ey / np.sum(ey, axis=1, keepdims=True)
-
-        # Get coordinates from argmax
-        x_locs = np.argmax(simcc_x_flat, axis=1)
-        y_locs = np.argmax(simcc_y_flat, axis=1)
-
-        # Get max values (scores) at predicted locations
-        max_val_x = np.amax(simcc_x_flat, axis=1)
-        max_val_y = np.amax(simcc_y_flat, axis=1)
-
-        # MMPose takes MINIMUM of x and y scores
-        mask = max_val_x > max_val_y
-        max_val_x[mask] = max_val_y[mask]
-        scores = max_val_x
-
-        # Convert to coordinates
-        x_coords = x_locs.astype(np.float32) / split_ratio
-        y_coords = y_locs.astype(np.float32) / split_ratio
-
-        # Reshape back to (N, K, 2) and (N, K)
-        keypoints = np.stack([x_coords, y_coords], axis=-1).reshape(N, K, 2)
-        scores = scores.reshape(N, K)
-
-        # Mark invalid keypoints
-        keypoints[scores <= 0.] = -1
-
-        scores = np.clip(scores, 0.0, 1.0)
-
-        return keypoints, scores

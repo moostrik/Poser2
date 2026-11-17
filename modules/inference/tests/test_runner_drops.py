@@ -4,11 +4,9 @@ submitting thread, without the model loaded."""
 import threading
 import unittest
 
-from .. import optical_flow, pose, segmentation
+from .. import optical_flow, segmentation
 from ..optical_flow.io import OpticalFlowInput
 from ..optical_flow.runner_onnx import RunnerONNX as FlowRunner
-from ..pose.io import PoseInput
-from ..pose.runner_onnx import RunnerONNX as PoseRunner
 from ..segmentation.io import SegmentationInput
 from ..segmentation.runner_onnx import RunnerONNX as SegmentationRunner
 
@@ -22,13 +20,6 @@ class RunnerDropTest(unittest.TestCase):
         runner.submit(second)                           # replaces the first before it ran
         self.assertEqual(told, [(1, False, threading.current_thread().name)])
         self.assertEqual(settings.dropped, 1)
-
-    def test_pose(self) -> None:
-        settings = pose.Settings()
-        settings.initialize()
-        runner = PoseRunner(settings)
-        self.check(runner, settings, PoseInput(batch_id=1, gpu_images=[]), PoseInput(batch_id=2, gpu_images=[]),
-                   runner.add_pose_callback)
 
     def test_optical_flow(self) -> None:
         settings = optical_flow.Settings()
