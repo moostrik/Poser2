@@ -4,7 +4,7 @@ Off unless the environment variable POSER_SOLVE_CAPTURE names a folder. Then bef
 luminance frames at every mip level the solve uses and the depth (a readback that waits for the GPU, so a
 debugging tool only), and after it, where the solve holds a non-finite value or a step larger than half the
 image a frame, it saves them with the solve and its settings as `solve_capture_<n>.npz`, at most
-`MAX_CAPTURES` a run. `scripts/solve_replay.py` reruns a capture through the GPU solve and the numpy reference.
+`MAX_CAPTURES` a run. `scripts/solve_replay.py` reruns a capture through the GPU solve.
 """
 
 from __future__ import annotations

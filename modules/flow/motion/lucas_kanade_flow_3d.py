@@ -3,13 +3,10 @@ one 3D velocity in image widths per second times `x_gain`, `y_gain`, `z_gain`, g
 and z by the depth mask; beside it `z_position`, where the body is now in the player's depth range, 0 front to 1
 back, times its weight in red and the weight in green (RG16F). How and why: modules/flow/MOTION.md, "The 3D
 velocity" and "depth_velocity (z)".
-
-`filter_displacement`, `displacement_velocity` and `z_position` below are the numpy references of the shaders.
 """
 
 import math
 
-import numpy as np
 from OpenGL.GL import GL_RG16F, GL_RG32F, GL_RGBA16F, GL_RGBA32F
 
 from modules.gl import Fbo, SwapFbo, Texture
@@ -18,7 +15,7 @@ from .. import FlowUtil, Port, TextureKind, prefixed
 from ..finite_guard import FiniteGuard, GuardSlot
 from .depth_velocity import DepthVelocity, DepthVelocitySettings
 from .solve_capture import SolveCapture
-from .lucas_kanade_flow import LucasKanadeFlow, LucasKanadeFlowSettings, _bilinear
+from .lucas_kanade_flow import LucasKanadeFlow, LucasKanadeFlowSettings
 from .shaders import ComposeVelocity, DisplacementFilter, DisplacementThreshold, ZPosition
 
 MIN_DELTA_TIME: float = 1e-3        # s: an interval at or below this is not a frame's
@@ -205,43 +202,3 @@ class LucasKanadeFlow3D:
             self._z_position.clear()
         self._guard.update(delta_time)
 
-
-# ── numpy reference ─────────────────────────────────────────────────────
-
-def z_position(disparity: np.ndarray, near: float, far: float, mask: np.ndarray | None = None) -> np.ndarray:
-    """Where the body is now in the depth range (..., 2): the z position, (depth - near) / (far - near) held to
-    0..1, times its weight, and the weight: the mask's (1 without), 0 without depth (1 / `disparity`, m). Mirrors
-    z_position.frag."""
-    depth: np.ndarray = np.where(disparity > 1e-6, 1.0 / np.maximum(disparity, 1e-6), 0.0)
-    weight: np.ndarray = ((depth > 0.0) & (far > near)).astype(np.float64)
-    if mask is not None:
-        weight = weight * mask
-    z: np.ndarray = np.where(weight > 0.0, np.clip((depth - near) / max(far - near, 1e-9), 0.0, 1.0), 0.0)
-    return np.stack((z * weight, weight), axis=-1)
-
-
-def filter_displacement(displacement: np.ndarray, state: np.ndarray, carry: np.ndarray, alpha: float) -> np.ndarray:
-    """The filter x/y goes through with xy.z_smooth, one frame on (H, W, 4): the filtered
-    displacement (x, y, pixels per frame) and the position error (x, y, pixels). Mirrors
-    displacement_filter.frag.
-
-    The depth velocity's alpha–beta filter, on positions that step by `displacement` (H, W, 2, pixels
-    per frame) each frame: the state (zeros to start) is carried from where each pixel was `carry`
-    back, linear between texels, its displacement predicts the step, and the residual corrects it by
-    `alpha` and alpha² / (2 − alpha), as a full window corrects z.
-    """
-    h, w = displacement.shape[:2]
-    rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
-    x, y = columns - carry[..., 0], rows - carry[..., 1]
-    carried: np.ndarray = np.stack([_bilinear(state[..., channel], x, y) for channel in range(4)], axis=-1)
-    beta: float = alpha * alpha / (2.0 - alpha)
-    residual: np.ndarray = displacement - carried[..., 2:] - carried[..., :2]
-    return np.concatenate((carried[..., :2] + beta * residual, -(1.0 - alpha) * residual), axis=-1)
-
-
-def displacement_velocity(displacement: np.ndarray, dt: float, width: int, height: int, strength: tuple[float, float]) -> np.ndarray:
-    """A displacement in uv per frame (..., 2) as a velocity in image widths per second, times `strength`.
-
-    v is uv of the height, so it is taken to widths first: a square motion stays square.
-    """
-    return displacement * np.array([1.0, height / width]) / dt * np.array(strength)

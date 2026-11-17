@@ -1,11 +1,8 @@
 """Lucas–Kanade Flow, the x/y solve: how far each pixel moved between two luminance frames, coarse to fine
 (Bouguet's pyramidal Lucas–Kanade), in uv per frame: `solved` as solved, `displacement` with `threshold` (px per
 frame) taken off its length. How and why: modules/flow/MOTION.md, "x/y: the Lucas–Kanade solve".
-
-`lucas_kanade` and `threshold_displacement` below are the numpy references of the shaders.
 """
 
-import numpy as np
 from OpenGL.GL import GL_RG32F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
 
 from modules.gl import Fbo, SwapFbo, Texture
@@ -130,85 +127,3 @@ class LucasKanadeFlow:
             glMemoryBarrier(int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT))
             estimate = target
 
-
-# ── numpy reference ─────────────────────────────────────────────────────
-
-def _pyramid(image: np.ndarray, levels: int) -> list[np.ndarray]:
-    """The image and its mip levels, each the 2x2 mean of the one before, as GL builds them."""
-    pyramid: list[np.ndarray] = [image]
-    for _ in range(1, levels):
-        top: np.ndarray = pyramid[-1]
-        h, w = top.shape[0] // 2, top.shape[1] // 2
-        pyramid.append(top[:h * 2, :w * 2].reshape(h, 2, w, 2).mean(axis=(1, 3)))
-    return pyramid
-
-
-def _bilinear(image: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
-    """`image` sampled at pixel coordinates (centers at integers), linear between them, clamped at the edges."""
-    h, w = image.shape
-    x = np.clip(x, 0.0, w - 1.0)
-    y = np.clip(y, 0.0, h - 1.0)
-    x0, y0 = np.floor(x).astype(int), np.floor(y).astype(int)
-    x1, y1 = np.minimum(x0 + 1, w - 1), np.minimum(y0 + 1, h - 1)
-    fx, fy = x - x0, y - y0
-    top: np.ndarray = image[y0, x0] * (1.0 - fx) + image[y0, x1] * fx
-    bottom: np.ndarray = image[y1, x0] * (1.0 - fx) + image[y1, x1] * fx
-    return top * (1.0 - fy) + bottom * fy
-
-
-def _solve_level(p_image: np.ndarray, c_image: np.ndarray, d: np.ndarray, u: np.ndarray, v: np.ndarray, window: int,
-                 damping: float) -> np.ndarray:
-    """One solve on one level: the displacement so far (uv) refined by the window's shift. Mirrors the shader."""
-    h, w = u.shape
-    lh, lw = c_image.shape
-    sxx = sxy = syy = sxt = syt = np.zeros((h, w))
-    for j in range(-window, window + 1):
-        for i in range(-window, window + 1):
-            px, py = u * lw - 0.5 + i, v * lh - 0.5 + j
-            qx, qy = px - d[..., 0] * lw, py - d[..., 1] * lh
-            gx = 0.25 * (_bilinear(c_image, px + 1, py) - _bilinear(c_image, px - 1, py)
-                         + _bilinear(p_image, qx + 1, qy) - _bilinear(p_image, qx - 1, qy))
-            gy = 0.25 * (_bilinear(c_image, px, py + 1) - _bilinear(c_image, px, py - 1)
-                         + _bilinear(p_image, qx, qy + 1) - _bilinear(p_image, qx, qy - 1))
-            gt = _bilinear(c_image, px, py) - _bilinear(p_image, qx, qy)
-            sxx, sxy, syy = sxx + gx * gx, sxy + gx * gy, syy + gy * gy
-            sxt, syt = sxt + gx * gt, syt + gy * gt
-    sxx, syy = sxx + damping, syy + damping
-    det: np.ndarray = sxx * syy - sxy * sxy
-    safe: np.ndarray = np.where(np.abs(det) > 1e-12, det, 1.0)
-    dx = np.where(np.abs(det) > 1e-12, -(syy * sxt - sxy * syt) / safe, 0.0)
-    dy = np.where(np.abs(det) > 1e-12, -(sxx * syt - sxy * sxt) / safe, 0.0)
-    reach: float = float(window + 1)                         # a level resolves at most its window's reach
-    dx = np.clip(np.nan_to_num(dx, nan=0.0, posinf=0.0, neginf=0.0), -reach, reach)
-    dy = np.clip(np.nan_to_num(dy, nan=0.0, posinf=0.0, neginf=0.0), -reach, reach)
-    return d + np.stack((dx / lw, dy / lh), axis=-1)
-
-
-def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, window: int = 2, damping: float = 0.001) -> np.ndarray:
-    """The displacement (H, W, 2) in pixels per frame, x along columns and y along rows, that carries
-    `previous` onto `current`: coarse to fine over `levels` mip levels, one solve per level over a
-    (2·window+1)² window, each level solved at its own size from the coarser one's displacement read
-    linear, the previous frame warped by it. Mirrors the shaders."""
-    h, w = current.shape
-    previous_levels: list[np.ndarray] = _pyramid(previous.astype(np.float64), levels)
-    current_levels: list[np.ndarray] = _pyramid(current.astype(np.float64), levels)
-    d: np.ndarray | None = None                             # the displacement in uv, at the coarser level's size
-    for level in reversed(range(levels)):
-        lh, lw = current_levels[level].shape
-        rows, columns = np.mgrid[0:lh, 0:lw].astype(np.float64)
-        u, v = (columns + 0.5) / lw, (rows + 0.5) / lh      # this level's texel centers in uv
-        if d is None:
-            start: np.ndarray = np.zeros((lh, lw, 2))
-        else:
-            ch, cw = d.shape[:2]
-            start = np.stack([_bilinear(d[..., c], u * cw - 0.5, v * ch - 0.5) for c in range(2)], axis=-1)
-        d = _solve_level(previous_levels[level], current_levels[level], start, u, v, window, damping)
-    assert d is not None
-    return d * np.array([w, h])
-
-
-def threshold_displacement(displacement: np.ndarray, threshold: float) -> np.ndarray:
-    """A displacement (..., 2) in pixels with `threshold` pixels taken off its length, 0 below it. Mirrors displacement_threshold.frag."""
-    length: np.ndarray = np.linalg.norm(displacement, axis=-1, keepdims=True)
-    kept: np.ndarray = np.maximum(length - threshold, 0.0)
-    return np.divide(displacement * kept, length, out=np.zeros_like(displacement), where=length > 1e-12)

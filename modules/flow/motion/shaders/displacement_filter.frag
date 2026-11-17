@@ -7,7 +7,6 @@
 // alpha² / (2 − alpha). The time is z's, the 1€ filter's: `smoothing` at rest, over 1 + speed / `xy_halving`
 // in a motion, the speed the largest displacement of the 3×3 past `xy_rest` (0 halving: `smoothing` throughout).
 // Out: the filtered displacement (RG, uv per frame) and the position error (BA, uv).
-// The numpy reference is lucas_kanade_flow_3d.filter_displacement
 
 uniform sampler2D tex0;  // The measured displacement (RG, uv per frame)
 uniform sampler2D tex1;  // The filter the frame before: displacement RG, position error BA

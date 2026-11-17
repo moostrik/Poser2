@@ -1,6 +1,6 @@
 """Play saved frames through the Lucas–Kanade flow's shaders, A beside B, and measure both.
 
-    python scripts/depth_velocity_compare.py FRAMES [--a NAME=VALUE ...] [--b NAME=VALUE ...] [--fast] [--verify]
+    python scripts/depth_velocity_compare.py FRAMES [--a NAME=VALUE ...] [--b NAME=VALUE ...] [--fast]
 
 FRAMES is what depth_velocity_capture saved from one loop of a recording (temp/depth_velocity/RECORDING).
 No app and no camera: a window gives the GL context, and two `LucasKanadeFlow3D`, A and B, measure the
@@ -29,7 +29,6 @@ with `--fast`, several captures, `--side NAME:PATH=VALUE,...` or `--out FILE` me
 and print one row a side, x/y beside z: the mean over the captures and its spread, the ms each side comes after A
 over the moves, and with `--out` the rows and their stamp (date, commit, captures, each side's settings) added
 to that file. A capture's stretches come from `segments.json` in its recording's folder, else beside the capture.
-`--verify` compares A's first frames of the x/y solve with its numpy reference instead.
 """
 
 import json
@@ -48,8 +47,7 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_FLOAT, GL_FRAMEBUFFER, GL_R32F, G
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from modules.gl import Context, Fbo, Texture  # noqa: E402
-from modules.flow import (FlowUtil, LucasKanadeFlow3D, LucasKanadeFlow3DSettings, Patch, Visualizer,  # noqa: E402
-                          lucas_kanade)
+from modules.flow import FlowUtil, LucasKanadeFlow3D, LucasKanadeFlow3DSettings, Patch, Visualizer  # noqa: E402
 
 WARM_UP: float = 1.0          # s at the start the flows settle in, measured in no part
 SHORTEST_PAUSE: float = 1.0   # s of stillness that end a move
@@ -541,33 +539,6 @@ class Side:
         return self.visualizer.texture
 
 
-def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> int:
-    """A's first frames on the GPU against the numpy reference of the x/y solve."""
-    context(False, 64, 64)
-    w, h = frames.width, frames.height
-    side = Side('A', frames.calls[0]['settings'], changed, w, h, False)
-    xy = side.settings.xy
-    luminance, depth_texture, mask_texture = Texture(), Texture(), Texture()
-    previous = None
-    last = min(frames_to_check, len(frames)) - 1
-    for k in range(last + 1):
-        lum, depth, mask = frames.load(k)
-        upload(luminance, lum); upload(depth_texture, depth); upload(mask_texture, mask)
-        side.step(frames, k, luminance, depth_texture, mask_texture)
-        if previous is None:
-            previous = lum
-            continue
-        solve = read_back(side.flow._solve)[..., :2] * np.array([w, h])                  # px per frame
-        now, then = (np.round(f * 255.0).astype(np.float64) / 255.0 for f in (lum, previous))    # as the R8 frames hold them
-        reference = lucas_kanade(then, now, xy.levels, xy.window, xy.damping)
-        previous = lum
-        if k % 5 == 0 or k == last:
-            dxy = np.linalg.norm(solve - reference, axis=-1)
-            print(f'frame {k:2d}: x/y solve differs p50 {np.median(dxy):.3f} p99 {np.percentile(dxy, 99):.3f} px')
-    glfw.terminate()
-    return 0
-
-
 COLUMNS: tuple[str, ...] = ('xy noise', 'xy slow', 'xy fast', 'xy fast/noise', 'xy kept', 'xy lag', 'xy noise edge',
                             'z noise', 'z slow', 'z fast', 'z fast/noise', 'z kept', 'z lag', 'z noise edge',
                             'z part still', 'z part fast', 'z/real', 'z corr', 'restarts still', 'restarts moving',
@@ -654,8 +625,6 @@ def main() -> int:
     parser.add_argument('--a', action='append', default=[], metavar='NAME=VALUE', help="override one of A's settings")
     parser.add_argument('--b', action='append', default=[], metavar='NAME=VALUE', help="override one of B's settings")
     parser.add_argument('--fast', action='store_true', help='one loop without the window, then the measures')
-    parser.add_argument('--verify', action='store_true', help="A's first frames against the numpy references")
-    parser.add_argument('--verify-frames', type=int, default=30, help='how many frames --verify checks (default 30; the numpy reference is slow)')
     parser.add_argument('--scale', type=float, default=0.9, help='window size per pixel of the frames (default 0.9)')
     parser.add_argument('--loops', type=int, default=0, help='stop after this many loops (default: until esc)')
     parser.add_argument('--view', type=int, choices=sorted(VIEWS), default=1, help='the view to start in (default 1)')
@@ -670,8 +639,6 @@ def main() -> int:
             specs.append((name, overrides([change for change in changes.split(',') if change])))
         return measure(args.frames, specs, args.out, args.label)
     frames = Frames(args.frames[0])
-    if args.verify:
-        return verify(frames, overrides(args.a), args.verify_frames)
 
     w, h = frames.width, frames.height
     panel_w, panel_h = int(w * args.scale), int(h * args.scale)

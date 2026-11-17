@@ -1,5 +1,5 @@
-"""The 3D motion's and bridge's GL shaders against their numpy references, on random fields: the largest
-difference of each. The z position's passes: the motion's (`ZPosition`), the lowpass's step (`LowpassStep`), the
+"""The 3D bridge's GL shaders against their numpy references, on random fields: the largest
+difference of each. The z position's passes: the lowpass's step (`LowpassStep`), the
 bandpass's trails (`BandpassTrails`) and an output's mix (`ZPositionMix`); and the lowpass's blur (`LowpassBlur`).
 
 No app and no camera: a hidden window gives the GL context.
@@ -17,9 +17,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from modules.gl import Fbo, Texture  # noqa: E402
 from modules.flow import (advect, blur_dispatches, gaussian_blur, gaussian_weights, trail_acceleration, velocity_trail,  # noqa: E402
-                          z_position, z_position_mix, z_position_trail, ZPositionMix)
+                          z_position_mix, z_position_trail, ZPositionMix)
 from modules.flow.bridge_3d.shaders import BandpassTrails, LowpassBlur, LowpassStep  # noqa: E402
-from modules.flow.motion.shaders import ZPosition  # noqa: E402
 from depth_velocity_compare import context, read_back  # noqa: E402
 
 HALF_FLOAT: float = 2e-3    # the relative step of RGBA16F near 1, and some
@@ -42,26 +41,6 @@ def report(name: str, got: np.ndarray, expected: np.ndarray, tolerance: float = 
     ok = diff < tolerance
     print(f"{name}: max diff {diff:.2e} {'ok' if ok else 'FAIL'}")
     return ok
-
-
-def check_z_position(rng: np.random.Generator) -> bool:
-    h, w = 37, 29
-    disparity = np.where(rng.uniform(size=(h, w)) < 0.2, 0.0, 1.0 / rng.uniform(0.05, 2.0, (h, w)))
-    mask = rng.uniform(size=(h, w))
-    track = texture(np.stack((np.zeros_like(disparity), disparity, np.zeros_like(disparity), np.zeros_like(disparity)), -1), GL_RGBA32F)
-    mask_texture = texture(np.stack((mask,) * 4, -1), GL_RGBA16F)
-    shader = ZPosition()
-    shader.allocate()
-    out = Fbo()
-    out.allocate(w, h, GL_RG16F)
-    passed = True
-    for name, m in (('with the mask', mask_texture), ('without', None)):
-        out.begin()
-        shader.use(track, 0.1, 1.7, m)
-        out.end()
-        expected = z_position(disparity, 0.1, 1.7, mask if m is not None else None)
-        passed &= report(f"motion z position, {name}", read_back(out)[..., :2], expected, 4e-3)
-    return passed
 
 
 def check_lowpass_step(rng: np.random.Generator) -> bool:
@@ -161,7 +140,6 @@ def main() -> None:
     context(False, 64, 64)
     rng = np.random.default_rng(7)
     passed = check_lowpass_blur(rng)
-    passed &= check_z_position(rng)
     passed &= check_lowpass_step(rng)
     passed &= check_bandpass_trails(rng)
     passed &= check_z_position_mix(rng)

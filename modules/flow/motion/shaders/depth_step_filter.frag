@@ -4,7 +4,7 @@
 // The depth without its edges: a sample whose 3×3 depth samples, `depth_step` (uv) apart, span a
 // step beyond `tolerance` (m) from the nearest to the furthest has no depth (0). At a silhouette
 // that is the band where stereo depth jitters between the two surfaces. Read nearest, so an edge
-// never reads as a distance in between. The numpy reference is depth_velocity.filter_depth_steps
+// never reads as a distance in between.
 
 uniform sampler2D tex0;  // Depth R (m), 0 where there is none
 uniform vec2 depth_step; // uv between two depth samples

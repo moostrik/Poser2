@@ -277,8 +277,8 @@ every texel, so the guard counts it).
 With the environment variable `POSER_SOLVE_CAPTURE` set to a folder, a solve that comes out wrong (a
 non-finite value, or a step past half the image a frame) is saved there with the two luminance frames
 at each mip level and the depth as they were just before it ran (`motion/solve_capture.py`), up to three
-a run. `scripts/solve_replay.py` reruns a capture through the GPU solve in a hidden window and the
-numpy reference: a capture the solve gets right there and wrong in the app points at the app's state,
+a run. `scripts/solve_replay.py` reruns a capture through the GPU solve in a hidden window: a capture the
+solve gets right there and wrong in the app points at the app's state,
 not at the solve. `gl_state()` (`modules/gl`) returns the GL state a pass runs with.
 
 ## Constraints

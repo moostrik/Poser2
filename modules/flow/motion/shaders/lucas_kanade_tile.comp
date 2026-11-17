@@ -5,8 +5,7 @@
 // Run from the coarsest level to the finest, each into a target of its level's size, so every window sits on
 // the level's texel centers; `estimate` is the coarser level's solve, read linear (uv, so it needs no
 // scaling); the coarsest has none (`has_estimate` off) and starts from no motion. `damping` is added to the
-// window's gradient sums, so a window without texture solves to no motion. The numpy reference is
-// lucas_kanade_flow.lucas_kanade.
+// window's gradient sums, so a window without texture solves to no motion.
 // A 16 × 16 tile of the level's texels a workgroup: the current frame's luminance around the tile is read once
 // into shared memory, and every window sample reads it there, at the texels' exact centers. The previous frame
 // is read where the estimate warps it, which differs pixel by pixel, so it stays a texture read.

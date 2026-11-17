@@ -1,37 +1,16 @@
-"""The z position's references: the motion's, a trail's step, an output's mix; and the lowpass's blur as diffusion."""
+"""The z position's references: a trail's step, an output's mix; and the lowpass's blur as diffusion."""
 
 import math
 import unittest
 
 import numpy as np
 
-from modules.flow import blur_dispatches, blur_sigma, gaussian_blur, gaussian_weights, z_position, z_position_mix, z_position_trail
+from modules.flow import blur_dispatches, blur_sigma, gaussian_blur, gaussian_weights, z_position_mix, z_position_trail
 
 
 def place(z: np.ndarray) -> np.ndarray:
     """A z position, red over green."""
     return z[..., 0] / z[..., 1]
-
-
-class TestMotionZPosition(unittest.TestCase):
-
-    def test_the_range_maps_near_to_far_on_zero_to_one(self) -> None:
-        z = z_position(1.0 / np.array([0.1, 0.9, 1.7]), 0.1, 1.7)
-        np.testing.assert_allclose(place(z), [0.0, 0.5, 1.0], atol=1e-9)
-        np.testing.assert_allclose(z[..., 1], 1.0)
-
-    def test_without_depth_is_no_z_position_not_the_front(self) -> None:
-        z = z_position(np.array([0.0]), 0.1, 1.7)
-        np.testing.assert_array_equal(z, 0.0)
-
-    def test_a_track_out_of_the_range_is_held_to_its_ends(self) -> None:
-        z = z_position(np.array([1.0 / 0.05, 1.0 / 3.0]), 0.1, 1.7)
-        np.testing.assert_allclose(place(z), [0.0, 1.0], atol=1e-9)
-
-    def test_the_weight_is_the_mask(self) -> None:
-        z = z_position(np.array([1.0 / 0.9, 1.0 / 0.9]), 0.1, 1.7, np.array([0.25, 0.0]))
-        np.testing.assert_allclose(z[..., 1], [0.25, 0.0])
-        self.assertAlmostEqual(float(place(z)[0]), 0.5)
 
 
 class TestTrailZPosition(unittest.TestCase):

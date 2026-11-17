@@ -3,12 +3,7 @@ per pixel a disparity and its rate, carried along the x/y displacement and corre
 (an alpha–beta filter) over a time that shortens as x/y moves (the 1€ filter's), with a step filter
 before it and a dead zone after it. How and why:
 modules/flow/MOTION.md, "z: the depth velocity".
-
-`filter_depth_steps` and `depth_threshold` below are the numpy references of their shaders.
 """
-import math
-
-import numpy as np
 from OpenGL.GL import GL_R16F, GL_R32F, GL_RGBA32F
 
 from modules.gl import Fbo, SwapFbo, Texture
@@ -30,15 +25,6 @@ class DepthVelocitySettings(BaseSettings):
     xy_halving:     Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="x/y speed past xy_rest at which z's smoothing time is half, in px/frame (0: smooth throughout)")
     dead_zone:      Field[float] = Field(0.0, min=0.0, max=0.05, step=0.001, newline=True, description="z: depth drift ignored before z counts as motion, in m (higher: less drift, slower start)")
     threshold:      Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="z below this is cut as noise, in px/frame (higher: less noise, less slow z)")
-
-
-def track_weights(delta_time: float, smooth: float, share: float | np.ndarray) -> tuple[float | np.ndarray, float | np.ndarray]:
-    """The alpha–beta filter's weights: alpha on the depth, beta on the rate, for a measurement that
-    holds `share` of its window. Alpha decays over `smooth` (ms), 1 at 0; beta is alpha² / (2 − alpha),
-    critically damped, so the rate settles without overshoot."""
-    alpha: float = 1.0 - math.exp(-delta_time * 1000.0 / smooth) if smooth > 0.0 else 1.0
-    weighted = alpha * share
-    return weighted, weighted * weighted / (2.0 - weighted)
 
 
 class DepthVelocity(FlowBase):
@@ -149,30 +135,3 @@ class DepthVelocity(FlowBase):
         self._threshold_shader.use(self._estimate, threshold / max(width, 1))     # px as view widths
         self._output_fbo.end()
 
-
-# ── numpy reference ─────────────────────────────────────────────────────
-
-def filter_depth_steps(depth: np.ndarray, step: tuple[float, float], tolerance: float) -> np.ndarray:
-    """The depth (H, W, m) without its edges: a sample whose 3×3 depth samples, `step` pixels apart
-    (x, y), span a step beyond `tolerance` (m) from the nearest to the furthest has no depth (0).
-    At a silhouette that is the band where stereo depth jitters between the two surfaces. Mirrors
-    depth_step_filter.frag."""
-    h, w = depth.shape
-    rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
-    near: np.ndarray = np.full((h, w), np.inf)
-    far: np.ndarray = np.zeros((h, w))
-    for j in (-1, 0, 1):
-        for i in (-1, 0, 1):
-            x = np.clip(np.floor(columns + 0.5 + i * step[0]).astype(int), 0, w - 1)
-            y = np.clip(np.floor(rows + 0.5 + j * step[1]).astype(int), 0, h - 1)
-            sample: np.ndarray = depth[y, x]
-            valid: np.ndarray = sample > 0.0
-            near = np.where(valid, np.minimum(near, sample), near)
-            far = np.where(valid, np.maximum(far, sample), far)
-    edge: np.ndarray = np.isfinite(near) & (far - near > tolerance)
-    return np.where(edge, 0.0, depth)
-
-
-def depth_threshold(value: np.ndarray, threshold: float) -> np.ndarray:
-    """A signed field with `threshold` taken off its size, 0 below it: the noise floor goes, and what is above stays continuous."""
-    return np.sign(value) * np.maximum(np.abs(value) - threshold, 0.0)

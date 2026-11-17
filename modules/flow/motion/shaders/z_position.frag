@@ -4,7 +4,7 @@
 // Where the body is now in the player's depth range, a z position: (depth - near) / (far - near), 0 front to
 // 1 back, held to 0..1 where the track lags out of the range, from the depth track's disparity (1 / depth),
 // times its weight in red, the weight in green. The weight is the mask's (1 without one), and 0 without depth:
-// no z position, not the front. The numpy reference is lucas_kanade_flow_3d.z_position
+// no z position, not the front.
 
 uniform sampler2D tex0;  // the depth track (RGBA32F): its disparity (1/m) in green
 uniform sampler2D tex1;  // mask R (0 to 1), read only with has_mask

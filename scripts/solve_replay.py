@@ -1,4 +1,4 @@
-"""Replay a captured Lucas–Kanade solve: its inputs checked, then the GPU solve and the numpy reference on them.
+"""Replay a captured Lucas–Kanade solve: its inputs checked, then the GPU solve on them.
 
 Capture first: run the app with POSER_SOLVE_CAPTURE set to a folder (`modules/flow/motion/solve_capture.py`); a
 solve that comes out wrong is saved there as solve_capture_<n>.npz with its inputs and settings. Then:
@@ -6,7 +6,7 @@ solve that comes out wrong is saved there as solve_capture_<n>.npz with its inpu
     python scripts/solve_replay.py <folder or .npz files> [--runs 50]
 
 For each capture it prints what the app's solve gave, whether each luminance mip level matches its full image
-downscaled, the depth's range (a capture holds it), the numpy reference with the same settings, and how many of `--runs` GPU solves
+downscaled, the depth's range (a capture holds it), and how many of `--runs` GPU solves
 in a hidden window come out wrong. A capture the GPU solves right here but wrong in the app points at the app's
 state at that moment, not at the solve.
 """
@@ -21,7 +21,7 @@ import numpy as np  # noqa: E402
 from OpenGL.GL import glFinish  # noqa: E402
 
 import monitor_harness as mh  # noqa: E402
-from modules.flow import LucasKanadeFlow, LucasKanadeFlowSettings, Patch, lucas_kanade  # noqa: E402
+from modules.flow import LucasKanadeFlow, LucasKanadeFlowSettings, Patch  # noqa: E402
 from modules.gl import Texture  # noqa: E402
 
 WRONG_STEP: float = 0.5     # uv a frame, as the capture judges
@@ -55,9 +55,6 @@ def report(path: Path, runs: int) -> None:
     if 'depth' in f.files:
         full = f['depth']
         print(f'  depth {full.shape}: non-finite {int((~np.isfinite(full)).sum())}, range {float(np.nanmin(full)):.2f} to {float(np.nanmax(full)):.2f} m')
-    reference = lucas_kanade(f['previous_0'].astype(np.float64) / 255, f['current_0'].astype(np.float64) / 255, levels=levels,
-                             window=window, damping=damping)
-    print(f'  numpy reference: non-finite {int((~np.isfinite(reference)).sum())}, largest step {float(np.nanmax(np.abs(reference))):.3f} px')
 
     settings = LucasKanadeFlowSettings()
     settings.levels, settings.window, settings.damping = levels, Patch(window), damping
