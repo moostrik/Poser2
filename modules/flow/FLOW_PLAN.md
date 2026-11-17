@@ -97,7 +97,7 @@ What is measured today (the tables with numbers in the flow's documents, 73), by
   All rows of a recording replay its same three captures; the captures stay until Matthias is asked. The table
   goes in [MOTION.md's settings](MOTION.md#the-settings), in place of the reasons from recordings that are gone.
   A part that does nothing for the goal, or a value that holds on one recording only, is a question for C. The
-  recordings are at 0.65–1.5 m; 2–3.5 m stays C2's.
+  recordings are at 0.65–1.5 m; 2–3.5 m stays C4's.
 
 Further measurements on the motion are free where a result points to something (Matthias, 2026-11-16), each
 stated before it is made.
@@ -111,26 +111,38 @@ Its goal and what is built: [VIEW.md](VIEW.md). New points go here.
 
 ## C. The motion
 
+From A4's measurements (four recordings, every frame): z needs its smoothing, the dead zone after it costs z
+and lag and blocks the catch-up, `tolerance` and `same_surface` show no effect, the x/y solve, the step filter
+and z's window earn their place.
+
 - **C1.** The depth velocity's `track` renamed by what it holds (the followed disparity, its rate and its anchor):
   `DepthVelocity._track` and the monitor's port `z.track`; a word that says nothing on its own.
+- **C2.** z's order over time: measure, dead zone, smooth with the catch-up, threshold. In
+  `depth_velocity_shader.frag`:
+  - the dead zone a backlash on the measured depth (the window's mean): the anchor stays while the measured
+    depth is within `dead_zone` of it and follows at `dead_zone` behind past it; the anchor's depth is what the
+    alpha–beta filter follows, so at rest it follows a constant and z is 0, and in a motion it follows the true
+    speed, the anchor's offset no part of a velocity;
+  - no gate on z after the filter;
+  - the catch-up's Emas of the filter's own miss (the anchor's depth against the prediction), which is 0 at rest
+    behind the backlash; its opening rule with a floor of its own, a constant, in place of twice the dead zone;
+  - a track that starts over is anchored at the measured depth, as now; the anchor is carried with the track.
 
-- **C2.** The range: `edge`, `tolerance` and `dead_zone` are in metres, tuned at 0.65–1.5 m; stereo noise grows
-  with the square of the distance, so at 2–3.5 m they may need to be in disparity **(deduction)**. A recording at
-  2–3.5 m, the three measured there on the raw output.
-- **C3.** `z.tolerance` split in two: one number, 0.2 m, now does three things in `depth_velocity_shader.frag`:
-  which depth samples a window averages as one surface and which carried texels count as the same surface
-  (space), and how far a new depth may lie from the track before it starts over (time). A number for space and
-  one for time, each measured on the raw output; 0.2 m is large on a body, set by the job in time.
-- **C4.** The smoothing (`z.smooth`, `z.catch_up`) judged on its own, the raw output against the smoothed
-  ([FLOW.md](FLOW.md#the-goals)), once A2 is built.
+  The numpy reference of the track (`track_depth`, read by the compare's `--verify`) goes with it, not rewritten
+  (the parked cleanup's part for z). MOTION.md's parts and the `dead_zone` description follow. Checked on one
+  capture of the hands and of the measure recording, the same sides before and after (a short smooth with the
+  cut, `dead_zone` 0, 0.01, 0.02): still noise, z kept, lag.
+- **C3.** The values, after C2, each measured on the four recordings and judged in the app: `smooth`, `catch_up`,
+  `dead_zone` and z's `threshold` for the new order; the step filter at 0.05 m; x/y's `threshold` around 0.4;
+  a step up on `levels`, x/y's `window` and `damping` against their ms. The settings' defaults and MOTION.md's
+  reasons follow; the preset when Matthias saves it. No new recording.
+- **C4.** The range: `edge`, `dead_zone` and the thresholds are in metres or px, tuned at 0.65–1.5 m; stereo
+  noise grows with the square of the distance, so at 2–3.5 m they may need to be in disparity **(deduction)**.
+  A recording at 2–3.5 m, made by the operator, and they measured there.
 
-Question, for C, from A4's pass 1: z's order over time. Now: measure, smooth (with the catch-up), dead zone,
-threshold. The dead zone gates on the smoothed depth, which lags, and its 2 cm sits twice in the catch-up's
-opening rule (`catch_up_share`), so with smoothing it doubles the lag (hands 45 to 97 ms) and takes a quarter to
-half of z. Proposed by Matthias: the dead zone before the smooth, a backlash on the measured depth; the smooth a
-last resort; the catch-up in the smooth, making up its lag in the middle of a movement, its rule without the
-dead zone. At `smooth` 0 both orders are the same. To decide with pass 2's values (the dead zone at 0.01 m,
-smoothed).
+Question, for C: `tolerance` and `same_surface` showed no effect on the four recordings, none of which has the
+case they are for, an arm moving sideways 10 to 20 cm before the chest. Measured on such a recording first, or
+constants now?
 
 ## D. The bridge
 
@@ -240,4 +252,7 @@ Not worked on until asked for; each with what is known.
 - Ask to measure a time again when its pass's code or size changes: A3.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
-Not designed yet, so their rules are not named: C2 to C4, D1, E1, F1, H1, I1 to I4.
+- Shaders get checked in a GPU harness: C2.
+- Compare a result only with rows of the same recording, settings and code paths: C2, C3.
+
+Not designed yet, so their rules are not named: C4, D1, E1, F1, H1, I1 to I4.
