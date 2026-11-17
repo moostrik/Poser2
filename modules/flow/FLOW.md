@@ -217,7 +217,7 @@ the fluid's only one. `Fluid2DLayer` keeps its injections apart: injection i's a
 channel i of the density, four at most, and the output colors each channel with its injection's
 color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's.
 `Fluid3DLayer` drags the fluid toward the velocity, the boundary, adds the acceleration, the body force, ×
-dt and fills it toward the RGBA density and the temperature, each velocity's z as the volume's w (its
+dt and drags it toward the RGBA density and the temperature, each velocity's z as the volume's w (its
 sign turned: w points away from the viewer); how the fluid takes each is in
 [FLUID_3D.md](FLUID_3D.md).
 

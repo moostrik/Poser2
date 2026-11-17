@@ -17,7 +17,7 @@ uniform bool  uHasZPosition;
 uniform float uSpread;       // the gaussian's sigma in normalized depth
 uniform float uStrength;
 uniform bool  uCubic;        // the source enlarged by a cubic B-spline, else bilinearly
-uniform int   uMode;         // 0 ADD, 1 FILL (toward the source's amount × uGain, at most 1, never past it)
+uniform int   uMode;         // 0 ADD, 1 FILL (toward the source's amount × uGain, at most 1, up or down, never past it)
 uniform float uGain;         // FILL: the source's amount times this, at most 1, is the target
 uniform ivec3 uSize;
 
@@ -54,7 +54,7 @@ void main() {
         if (weight < 0.001) continue;
         ivec3 gid = ivec3(column, z);
         float current = imageLoad(uVolume, gid).r;
-        if (uMode == 1) current += max(min(source * uGain, 1.0) - current, 0.0) * min(weight, 1.0);
+        if (uMode == 1) current += (min(source * uGain, 1.0) - current) * min(weight, 1.0);
         else current += source * weight;
         imageStore(uVolume, gid, vec4(current, 0.0, 0.0, 0.0));
     }

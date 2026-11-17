@@ -985,7 +985,7 @@ class Fluid3D:
 
     def add_density(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
         """The boundary's dye (RGBA, its color times its presence, the presence as alpha, 0 to 1): the water in the
-        slab filled toward it times input.density_gain (at most fully dyed) over input.density_drag, never past
+        slab dragged toward it times input.density_gain (at most fully dyed) over input.density_drag, never past
         it, by the carriers."""
         if not self._allocated:
             return
