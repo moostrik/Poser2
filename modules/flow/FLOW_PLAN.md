@@ -59,7 +59,8 @@ rest and later: the filter sees nothing until the zone opens, so its lag comes a
 overlap now (hands, unsmoothed, `dead_zone` 0.02: 52 ms against 7; `smooth` 25: 90 against 65; measure's still
 noise 2.4 / 3.1 against 9.1 / 5.1).
 
-- **C1.** z's "another surface" in one setting per idea; `z.tolerance` goes. `tolerance` (0.2 m) and `edge`
+- **C1.** One setting per job in the motion: z's "another surface", z's smoothing, x/y's cut; `z.tolerance` and
+  `xy.same_surface` go. `tolerance` (0.2 m) and `edge`
   (0.1 m) answer the same question in space, how big a depth jump is another surface, and disagree between 0.1 and
   0.2 m; `tolerance` 0.2 against 0.5 changed nothing on four recordings, as the step filter has already taken the
   jump out **(deduction)**. In `depth_velocity_shader.frag` and `DepthVelocity`:
@@ -68,12 +69,19 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
     prediction than a body moves in the frame (`max_speed` × the frame's time, 12 cm at 50 fps) is another
     surface, and the track starts over. It replaces the restart on a miss past `tolerance` and the check on the
     filtered rate after the filter, which a smoothed track at rest softens below 6 m/s **(deduction)**;
-  - x/y's `same_surface` reads `edge` where it read `tolerance` (`LucasKanadeFlow.update`), until x/y is gone
-    through.
+  - x/y's `same_surface` goes, with its part of the solve (`LucasKanadeFlow.update`'s depth and tolerance): no
+    effect on four recordings, the step filter has taken the jump out **(deduction)**;
+  - z's smoothing has its own three numbers, x/y's `threshold` one job, the cut of x/y: `z.rest_speed`
+    (px/frame, 0.5), the image speed below which z counts as at rest, where the shader took `xy.threshold`;
+    `halving_speed` 0 is off, `smooth` throughout;
+  - `xy_smooth` smooths x/y over z's time, the 1€ rule's, in place of `smooth` at rest.
 
+  The 1€ rule opens on x/y's speed, not on z's own as the original filter does: z's own (from a copy followed
+  over the time at rest) let the still noise up to 2 to 4 for no less lag, as z's noise is far above a push
+  where the filter's signals have little.
   Checked on one capture of hands and of measure, now against the change, the preset as saved: still noise
-  inside and at the edge, z kept, lag, the restarts' share while moving; about 5 minutes. The presets keep the
-  removed key until Matthias saves; MOTION.md's parts and settings table follow.
+  inside and at the edge, z kept, lag, x/y kept, the restarts' share while moving; about 5 minutes. The presets
+  keep a removed key until Matthias saves; MOTION.md's parts and settings tables follow.
 - **C2.** The values, each measured on the four recordings and judged in the app: `smooth` and `halving_speed`
   (and 0.25, 6 ms on hands) and z's `threshold`, with `dead_zone` 0; x/y's `threshold` around 0.4; a step up on `levels`, x/y's
   `window` and `damping` against their ms. The step filter and z's window stay unless a row shows a clear gain
@@ -82,9 +90,6 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
 - **C3.** The range: `edge` and the thresholds are in metres or px, tuned at 0.65–1.5 m; stereo noise grows
   with the square of the distance, so at 2–3.5 m they may need to be in disparity **(deduction)**. A recording
   at 2–3.5 m, made by the operator, and they measured there.
-
-Questions, for C:
-- x/y's settings gone through after z: `same_surface` showed no effect on the four recordings.
 
 ## D. The bridge
 
