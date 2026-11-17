@@ -362,13 +362,11 @@
         "levels": 4,
         "window": "SEVEN",
         "damping": 0.03,
-        "same_surface": true,
         "threshold": 0.5
       },
       "z": {
         "edge": 0.1,
         "window": "SEVEN",
-        "tolerance": 0.2,
         "smooth": 100.0,
         "xy_smooth": false,
         "dead_zone": 0.02,

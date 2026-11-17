@@ -274,10 +274,10 @@
     "pause": false,
     "layer": {
       "main": [
-        "bridge"
+        "motion"
       ],
       "debug": [
-        "view"
+        "fluid"
       ]
     },
     "capture": {
@@ -347,22 +347,20 @@
         "levels": 4,
         "window": "SEVEN",
         "damping": 0.03,
-        "same_surface": true,
         "threshold": 0.5
       },
       "z": {
         "edge": 0.1,
         "window": "SEVEN",
-        "tolerance": 0.2,
         "smooth": 100.0,
-        "halving_speed": 0.5,
+        "xy_halving": 0.5,
         "xy_smooth": false,
-        "dead_zone": 0.0,
+        "dead_zone": 0.026,
         "max_speed": 6.0,
         "threshold": 0.5
       },
       "monitor_main": {
-        "texture": "z.output",
+        "texture": "output.velocity",
         "view": "IMAGE",
         "advanced": {
           "channel": "ALL",
@@ -424,7 +422,7 @@
           "bow": 0.0,
           "stop": 1.0,
           "wake": 0.0,
-          "mask": 1.0,
+          "mask": 0.0,
           "saturation": 1.18,
           "brightness": 1.0
         },

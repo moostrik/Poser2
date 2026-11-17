@@ -4,17 +4,18 @@
 // One frame of the depth track, in disparity (1 / depth): the track the frame before, carried from
 // where the pixel was `displacement` (uv per frame) back, predicted on by its rate and corrected by
 // the new measurement, an alpha–beta filter. The measurement is the mean disparity over a window of
-// depth samples, of those within `tolerance` of the pixel's depth (not the background beside the
-// player); it corrects by alpha and beta times the share of the window it holds, so a thin window
-// corrects little. Further than `tolerance` from the prediction, or without a track there, the track
-// starts over with no rate (a limb passing over the pixel). Without depth at the pixel or without a
-// span, it is empty. z is the rate over the metres one view width spans there, `depth × view_span`,
-// in view widths per frame. Depth is read nearest, so an edge never reads as a distance in between;
-// the track is read linear between the texels that hold one of the same surface, within `tolerance`
-// of the measurement, so a track is never carried across an edge.
+// depth samples, of those within `edge` of the pixel's depth (not the background beside the player);
+// it corrects by alpha and beta times the share of the window it holds, so a thin window corrects little.
+// Within a frame `edge` tells two surfaces apart; between frames `max_speed`: the track is read linear
+// between the texels whose depth, a frame on by its rate, lies within `max_speed` × `delta_time` of the
+// measurement, so a track is never carried across another surface, and without one there, or with a
+// filtered rate past `max_speed` (a depth sliding away too fast), it starts over with no rate (a limb
+// passing over the pixel). 0 `max_speed` checks neither. Without depth at the pixel or without a span,
+// it is empty. z is the rate over the metres one view width spans there, `depth × view_span`, in view
+// widths per frame. Depth is read nearest, so an edge never reads as a distance in between.
 // The time the track follows over is the 1€ filter's (Casiez, Roussel, Vogel 2012): `smoothing` at rest,
-// over 1 + speed / `halving_speed` in a motion, the speed the image's here (its 3×3 displacement) past
-// `motion_floor`; and the carry takes each texel's depth a frame on by its rate. With `dead_zone` above 0,
+// over 1 + speed / `xy_halving` in a motion, the speed x/y's here (its 3×3 displacement) past `xy_rest`;
+// 0 `xy_halving` is `smoothing` throughout. The carry takes each texel's depth a frame on by its rate. With `dead_zone` above 0,
 // z is 0 while the tracked depth stays within it of its anchor; past it, z at its full speed, and the
 // anchor follows at `dead_zone` behind (a backlash); a track that starts over is anchored anew.
 
@@ -24,14 +25,14 @@ uniform sampler2D displacement;     // uv per frame (RG), with warp
 uniform bool warp;
 uniform vec2 depth_step; // uv between two depth samples
 uniform int window;      // Radius in depth samples
-uniform float tolerance; // Depth further than this is another surface (m)
+uniform float edge;      // Depth step to another surface within a frame (m)
 uniform float smoothing;   // Time the track follows over at rest (ms), `smooth` in Python (`smooth` is a GLSL keyword); 0 takes the measurement whole
-uniform float halving_speed;        // Image speed at which that time is half (px per frame)
-uniform float motion_floor;         // Image speed below which the image is still (px per frame)
+uniform float xy_halving;          // x/y speed past xy_rest at which that time is half (px per frame); 0 off
+uniform float xy_rest;             // x/y speed below which the image is at rest (px per frame)
 uniform float delta_time;           // Seconds since the last depth
 uniform float view_span; // Metres one view width spans per metre of depth
 uniform float dead_zone; // Depth the track wanders within its anchor without z (m); 0 is none
-uniform float max_speed; // The fastest a body part moves in depth (m/s): a track past it reads another surface; 0 is none
+uniform float max_speed; // The fastest a body part moves in depth (m/s): faster is another surface; 0 is no check
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -53,9 +54,9 @@ float depth_at(vec2 uv) {
 }
 
 // The track's disparity, rate and anchor (xyz) at `position` (texels, centers at integers), of the
-// texels that hold one of the measurement's surface, within `tolerance` of it, each taken `ahead`
+// texels that hold one of the measurement's surface, within `jump` (m) of it, each taken `ahead`
 // seconds on by its rate. None of them: no track
-vec3 carried(vec2 position, float measured_depth, float ahead) {
+vec3 carried(vec2 position, float measured_depth, float ahead, float jump) {
     ivec2 size = textureSize(tex1, 0);
     ivec2 base = ivec2(floor(position));
     vec2 f = position - vec2(base);
@@ -65,7 +66,7 @@ vec3 carried(vec2 position, float measured_depth, float ahead) {
         for (int dx = 0; dx <= 1; dx++) {
             ivec2 at = clamp(base + ivec2(dx, dy), ivec2(0), size - 1);
             vec4 texel = texelFetch(tex1, at, 0);
-            bool same = texel.g > 0.0 && abs(1.0 / (texel.g + texel.b * ahead) - measured_depth) <= tolerance;
+            bool same = texel.g > 0.0 && abs(1.0 / (texel.g + texel.b * ahead) - measured_depth) <= jump;
             float weight = (dx == 0 ? 1.0 - f.x : f.x) * (dy == 0 ? 1.0 - f.y : f.y) * float(same);
             sum += weight * texel.gba;
             total += weight;
@@ -74,8 +75,8 @@ vec3 carried(vec2 position, float measured_depth, float ahead) {
     return total > 1e-9 ? sum / total : vec3(0.0);
 }
 
-// The image's speed here: the largest displacement of the 3×3 texels (px per frame)
-float image_speed(vec2 size) {
+// x/y's speed here: the largest displacement of the 3×3 texels (px per frame)
+float xy_speed(vec2 size) {
     ivec2 at = ivec2(floor(texCoord * size));
     ivec2 last_texel = ivec2(size) - 1;
     float largest = 0.0;
@@ -101,7 +102,7 @@ void step_track() {
     for (int j = -window; j <= window; j++) {
         for (int i = -window; i <= window; i++) {
             float sample_depth = depth_at(texCoord + vec2(i, j) * depth_step);
-            if (sample_depth > 0.0 && abs(sample_depth - center) <= tolerance) {
+            if (sample_depth > 0.0 && abs(sample_depth - center) <= edge) {
                 total += 1.0 / sample_depth;
                 kept++;
             }
@@ -114,16 +115,20 @@ void step_track() {
     bool smoothed = smoothing > 0.0;
     vec2 moved = warp ? texture(displacement, texCoord).xy : vec2(0.0);
     vec2 size = vec2(textureSize(tex1, 0));
-    vec3 track = carried(texCoord * size - 0.5 - moved * size, 1.0 / measurement, smoothed ? delta_time : 0.0);
+    float jump = max_speed > 0.0 ? max_speed * delta_time : 1e9;                    // m a body moves in the frame
+    vec3 track = carried(texCoord * size - 0.5 - moved * size, 1.0 / measurement, smoothed ? delta_time : 0.0, jump);
     float predicted = track.x > 0.0 ? track.x + track.y * delta_time : 0.0;
     float miss = predicted > 0.0 ? 1.0 / measurement - 1.0 / predicted : 0.0;      // m
-    bool follows = predicted > 0.0 && abs(miss) <= tolerance;
+    bool follows = predicted > 0.0 && abs(miss) <= jump;
 
-    // The 1€ filter's time: `smoothing` at rest, shorter as the image moves
+    // The 1€ filter's time: `smoothing` at rest, shorter as x/y moves
     float full = 1.0;
     if (smoothed) {
-        float speed = warp ? max(image_speed(size) - motion_floor, 0.0) : 0.0;
-        float follow_time = smoothing / (1.0 + speed / max(halving_speed, 1e-6));
+        float follow_time = smoothing;
+        if (xy_halving > 0.0) {
+            float speed = warp ? max(xy_speed(size) - xy_rest, 0.0) : 0.0;
+            follow_time = smoothing / (1.0 + speed / xy_halving);
+        }
         full = 1.0 - exp(-delta_time * 1000.0 / follow_time);
     }
     float a = full * share;
@@ -131,9 +136,9 @@ void step_track() {
     float residual = measurement - predicted;
     float disparity = predicted + a * residual;
     float rate = track.y + b * residual / delta_time;
-    // The speed gate: a track whose depth would move faster than a body part does is reading another surface
-    // sliding over the pixel (a fast hand's edge leaving it), not a motion: it starts over. The depth's speed
-    // is the disparity's rate over the disparity squared
+    // The speed after the filter: a track whose depth slides away faster than a body part moves, each step
+    // within the jump, reads another surface sliding over the pixel (a sloped edge leaving it), not a
+    // motion: it starts over. The depth's speed is the disparity's rate over the disparity squared
     if (follows && max_speed > 0.0 && abs(rate) / (disparity * disparity) > max_speed) {
         follows = false;
     }

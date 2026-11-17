@@ -1,6 +1,6 @@
 """Depth Velocity: the player's motion toward the camera, z, from the depth image, in view widths per frame:
 per pixel a disparity and its rate, carried along the x/y displacement and corrected by each measurement
-(an alpha–beta filter) over a time that shortens as the image moves (the 1€ filter's), with a step filter
+(an alpha–beta filter) over a time that shortens as x/y moves (the 1€ filter's), with a step filter
 before it and a dead zone after it. How and why:
 modules/flow/MOTION.md, "z: the depth velocity".
 
@@ -20,16 +20,17 @@ from .shaders import DepthStepFilter, DepthThreshold, DepthVelocityShader
 
 
 class DepthVelocitySettings(BaseSettings):
-    """The z part: the depth velocity, a depth track carried along the displacement."""
-    edge:           Field[float] = Field(0.1, min=0.05, max=0.3, step=0.01, description="Edge depth step, m (lower: cleaner edges, fewer fingers)")
-    window:         Field[Patch] = Field(Patch.SEVEN, min=Patch.ONE, max=Patch.NINE, description="Depth averaging size (larger: less noise, small parts blur)")
-    tolerance:      Field[float] = Field(0.2, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m (higher: fuller pushes, fewer splits)")
-    smooth:         Field[float] = Field(100.0, min=0.0, max=500.0, step=1.0, newline=True, description="Smoothing time of z at rest in ms, 0 = two-frame change (higher: less noise at rest)")
-    halving_speed:  Field[float] = Field(0.5, min=0.05, max=5.0, step=0.05, description="Image speed at which the smoothing time is half, in px/frame (lower: less lag)")
-    xy_smooth:      Field[bool]  = Field(False, width=48, description="x/y smoothed as z is, so both lag alike (on: less noise, more lag)")
-    dead_zone:      Field[float] = Field(0.0, min=0.0, max=0.05, step=0.001, newline=True, description="Depth drift ignored before z counts as motion, in m (higher: less drift, slower start)")
-    max_speed:      Field[float] = Field(6.0, min=0.0, max=20.0, step=0.5, description="The fastest a body part moves in depth, m/s; a faster track reads another surface (0 = off)")
-    threshold:      Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="z below this is noise, in px/frame (higher: less noise, less slow z)")
+    """The z part: the depth velocity, a depth track carried along the displacement. Its panel in the order the code
+    runs it, a line each: the surface, the smoothing, the cut."""
+    edge:           Field[float] = Field(0.1, min=0.05, max=0.3, step=0.01, description="z: a depth step past this, in m, is another surface (lower: cleaner edges)")
+    window:         Field[Patch] = Field(Patch.SEVEN, min=Patch.ONE, max=Patch.NINE, description="z: depth samples averaged (larger: less noise, small parts blur)")
+    max_speed:      Field[float] = Field(6.0, min=0.0, max=20.0, step=0.5, description="z: faster than this, in m/s, is another surface, the track starts over (0: no check)")
+    smooth:         Field[float] = Field(100.0, min=0.0, max=500.0, step=1.0, newline=True, description="z: smoothing time at rest, in ms; 0 the change of two frames (higher: less noise at rest)")
+    xy_rest:        Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="x/y speed below which z counts as at rest, in px/frame")
+    xy_halving:     Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="x/y speed past xy_rest at which z's smoothing time is half, in px/frame (0: smooth throughout)")
+    xy_smooth:      Field[bool]  = Field(False, width=48, description="x/y smoothed over z's time, so both lag alike (on: less noise, more lag)")
+    dead_zone:      Field[float] = Field(0.0, min=0.0, max=0.05, step=0.001, newline=True, description="z: depth drift ignored before z counts as motion, in m (higher: less drift, slower start)")
+    threshold:      Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="z below this is cut as noise, in px/frame (higher: less noise, less slow z)")
 
 
 def track_weights(delta_time: float, smooth: float, share: float | np.ndarray) -> tuple[float | np.ndarray, float | np.ndarray]:
@@ -105,9 +106,8 @@ class DepthVelocity(FlowBase):
         self._estimate.clear_all()
 
     def update_depth(self, depth: Texture, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
-                     smooth: float, halving_speed: float, threshold: float, tolerance: float, dead_zone: float, motion_floor: float,
-                     displacement: Texture | None = None, edge: float | None = None, max_speed: float = 0.0,
-                     guard: GuardSlot | None = None) -> None:
+                     smooth: float, xy_halving: float, xy_rest: float, threshold: float, edge: float, dead_zone: float,
+                     displacement: Texture | None = None, max_speed: float = 0.0, guard: GuardSlot | None = None) -> None:
         """Advance on a new flow frame: correct the track by the new depth, then take the noise floor off.
 
         Args:
@@ -117,15 +117,16 @@ class DepthVelocity(FlowBase):
             depth_step: uv between two depth samples in the flow's view; 0 takes one flow texel
             window: Radius in depth samples
             smooth: Time over which the track averages at rest (ms); 0 is the change of two frames
-            halving_speed: Image speed at which that time is half (px per frame)
+            xy_halving: x/y speed past `xy_rest` at which that time is half (px per frame); 0 is `smooth` throughout
+            xy_rest: x/y speed below which the image is at rest (px per frame)
             threshold: Depth motion below this is noise, taken off the rest (px per frame)
-            tolerance: Depth further than this is another surface: not averaged in, the track starts over (m)
+            edge: Depth step to another surface within a frame (m): a 3×3 of depth samples spanning it is
+                dropped (the step filter), and the window averages only the samples within it
             dead_zone: Depth the track wanders within its anchor without z (m); 0 is none
-            motion_floor: Image speed below which the image is still (px per frame)
             displacement: How far each pixel moved since then (uv); when given, the track is carried
                 along the motion (Lucas–Kanade flow)
-            edge: Depth step within a 3×3 of depth samples that marks an edge, dropped (m); None takes `tolerance`
-            max_speed: The fastest a body part moves in depth (m/s), the speed gate; 0 is none
+            max_speed: The fastest a body part moves in depth (m/s): a jump between frames or a speed past it
+                is another surface, the track starts over; 0 is no check
             guard: The depth velocity's slot in the motion's FiniteGuard: a non-finite track 0 and counted; None no guard
         """
         if not self._allocated:
@@ -136,13 +137,13 @@ class DepthVelocity(FlowBase):
         FlowUtil.blit(self._raw, depth)
         self._input_fbo.swap()
         self._input_fbo.begin()
-        self._step_filter_shader.use(self._raw, step, tolerance if edge is None else edge)
+        self._step_filter_shader.use(self._raw, step, edge)
         self._input_fbo.end()
 
         self._estimate.swap()
         self._estimate.begin()
-        self._velocity_shader.use(self._input_fbo, self._estimate.back, smooth, halving_speed, motion_floor, max(delta_time, 1e-6),
-                                  view_span, step, window, tolerance, dead_zone, displacement, max_speed, guard)
+        self._velocity_shader.use(self._input_fbo, self._estimate.back, smooth, xy_halving, xy_rest, max(delta_time, 1e-6),
+                                  view_span, step, window, edge, dead_zone, displacement, max_speed, guard)
         self._estimate.end()
 
         self._output_fbo.begin()

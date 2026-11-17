@@ -1,4 +1,4 @@
-"""Displacement filter shader: x/y through the depth track's filter, so it lags as z does."""
+"""Displacement filter shader: x/y through the depth track's filter over z's time, so it lags as z does."""
 
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
@@ -8,14 +8,18 @@ from ...finite_guard import GuardSlot
 class DisplacementFilter(Shader):
     """Writes the filtered displacement (RG, uv per frame) and the position error (BA, uv)."""
 
-    def use(self, displacement: Texture, state: Texture, carry: Texture, alpha: float, guard: GuardSlot | None = None) -> None:
+    def use(self, displacement: Texture, state: Texture, carry: Texture, smooth: float, xy_rest: float, xy_halving: float,
+            delta_time: float, guard: GuardSlot | None = None) -> None:
         """Filter one frame.
 
         Args:
             displacement: The measured displacement, uv per frame
             state: The filter the frame before
-            carry: The displacement the state is carried by, uv per frame
-            alpha: Weight of the measurement on the position (1 takes it whole)
+            carry: The displacement the state is carried by and the speed is read from, uv per frame
+            smooth: Time followed over at rest (ms); 0 takes the measurement whole
+            xy_rest: x/y speed below which it is at rest (px per frame)
+            xy_halving: x/y speed past `xy_rest` at which the time is half (px per frame); 0 is `smooth` throughout
+            delta_time: Seconds since the last frame
             guard: The displacement's slot in the motion's FiniteGuard; None no guard
         """
         if not self.allocated or not self.shader_program:
@@ -35,7 +39,10 @@ class DisplacementFilter(Shader):
         glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniform1i(self.get_uniform_loc("tex1"), 1)
         glUniform1i(self.get_uniform_loc("carry"), 2)
-        glUniform1f(self.get_uniform_loc("alpha"), alpha)
+        glUniform1f(self.get_uniform_loc("smoothing"), smooth)
+        glUniform1f(self.get_uniform_loc("xy_rest"), xy_rest)
+        glUniform1f(self.get_uniform_loc("xy_halving"), xy_halving)
+        glUniform1f(self.get_uniform_loc("delta_time"), delta_time)
         if guard is not None:
             guard.use(self.get_uniform_loc("uGuardSlot"))
         else:

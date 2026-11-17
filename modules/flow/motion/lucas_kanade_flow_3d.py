@@ -16,7 +16,7 @@ from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import BaseSettings, Field, Group, Widget
 from .. import FlowUtil, Port, TextureKind, prefixed
 from ..finite_guard import FiniteGuard, GuardSlot
-from .depth_velocity import DepthVelocity, DepthVelocitySettings, track_weights
+from .depth_velocity import DepthVelocity, DepthVelocitySettings
 from .solve_capture import SolveCapture
 from .lucas_kanade_flow import LucasKanadeFlow, LucasKanadeFlowSettings, _bilinear
 from .shaders import ComposeVelocity, DisplacementFilter, DisplacementThreshold, ZPosition
@@ -158,26 +158,25 @@ class LucasKanadeFlow3D:
         z_s: DepthVelocitySettings = s.z
 
         captured = self._capture.before(self._flow.previous_luminance, self._flow.luminance, xy_s.levels, depth) if self._capture else None
-        self._flow.update(depth, z_s.tolerance)
+        self._flow.update()
         solved: Texture = self._flow.solved
         if self._capture is not None:
-            self._capture.after(captured, solved, {'levels': xy_s.levels, 'window': int(xy_s.window), 'damping': xy_s.damping,
-                                                   'same_surface': xy_s.same_surface, 'tolerance': z_s.tolerance})
+            self._capture.after(captured, solved, {'levels': xy_s.levels, 'window': int(xy_s.window), 'damping': xy_s.damping})
 
         if depth is not None:
-            self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, z_s.window, z_s.smooth, z_s.halving_speed,
-                                              z_s.threshold, z_s.tolerance, z_s.dead_zone, xy_s.threshold,
-                                              solved, z_s.edge, z_s.max_speed, self._slot('depth_velocity', guarded))
+            self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, z_s.window, z_s.smooth, z_s.xy_halving,
+                                              z_s.xy_rest, z_s.threshold, z_s.edge, z_s.dead_zone, solved, z_s.max_speed,
+                                              self._slot('depth_velocity', guarded))
 
         xy: Texture = self._flow.displacement
         if z_s.xy_smooth:
             if not self._following:
                 self._filtered.clear_all()                  # from no motion, not from when it was last on
                 self._following = True
-            alpha, _ = track_weights(delta_time, z_s.smooth, 1.0)
             self._filtered.swap()
             self._filtered.begin()
-            self._filter_shader.use(solved, self._filtered.back, solved, float(alpha), self._slot('displacement', guarded))
+            self._filter_shader.use(solved, self._filtered.back, solved, z_s.smooth, z_s.xy_rest, z_s.xy_halving,
+                                    max(delta_time, 1e-6), self._slot('displacement', guarded))
             self._filtered.end()
             self._followed.begin()
             self._threshold_shader.use(self._filtered, xy_s.threshold)

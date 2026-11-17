@@ -14,8 +14,8 @@ class DepthVelocityShader(Shader):
     """Writes the track: z (view widths per frame), disparity (1/m), its rate (1/m per second) and its
     anchor (m)."""
 
-    def use(self, depth: Texture, track: Texture, smooth: float, halving_speed: float, motion_floor: float, delta_time: float,
-            view_span: float, depth_step: tuple[float, float], window: int, tolerance: float, dead_zone: float,
+    def use(self, depth: Texture, track: Texture, smooth: float, xy_halving: float, xy_rest: float, delta_time: float,
+            view_span: float, depth_step: tuple[float, float], window: int, edge: float, dead_zone: float,
             displacement: Texture | None = None, max_speed: float = 0.0, guard: GuardSlot | None = None) -> None:
         """Correct the track by the new depth into the bound target.
 
@@ -23,16 +23,16 @@ class DepthVelocityShader(Shader):
             depth: Depth now (m)
             track: The track the frame before
             smooth: Time the track follows over at rest (ms); 0 takes the measurement whole
-            halving_speed: Image speed at which that time is half (px per frame)
-            motion_floor: Image speed below which the image is still (px per frame)
+            xy_halving: x/y speed past `xy_rest` at which that time is half (px per frame); 0 is `smooth` throughout
+            xy_rest: x/y speed below which the image is at rest (px per frame)
             delta_time: Seconds since the last depth
             view_span: Metres one view width spans per metre of depth; 0 or less reads no motion
             depth_step: uv between two depth samples
             window: Radius in depth samples
-            tolerance: Depth further than this is another surface: not averaged in, the track starts over (m)
+            edge: Depth step to another surface within a frame, not averaged in (m)
             dead_zone: Depth the track wanders within its anchor without z (m); 0 is none
             displacement: uv per frame; when given, the track is carried from where each pixel came from
-            max_speed: The fastest a body part moves in depth (m/s); a track past it starts over. 0 is none
+            max_speed: The fastest a body part moves in depth (m/s): a jump or a speed past it starts the track over. 0 is no check
             guard: The depth velocity's slot in the motion's FiniteGuard; None no guard
         """
         if not self.allocated or not self.shader_program:
@@ -59,10 +59,10 @@ class DepthVelocityShader(Shader):
         glUniform1i(self.get_uniform_loc("warp"), int(warp))
         glUniform2f(self.get_uniform_loc("depth_step"), *depth_step)
         glUniform1i(self.get_uniform_loc("window"), window)
-        glUniform1f(self.get_uniform_loc("tolerance"), tolerance)
+        glUniform1f(self.get_uniform_loc("edge"), edge)
         glUniform1f(self.get_uniform_loc("smoothing"), smooth)
-        glUniform1f(self.get_uniform_loc("halving_speed"), halving_speed)
-        glUniform1f(self.get_uniform_loc("motion_floor"), motion_floor)
+        glUniform1f(self.get_uniform_loc("xy_halving"), xy_halving)
+        glUniform1f(self.get_uniform_loc("xy_rest"), xy_rest)
         glUniform1f(self.get_uniform_loc("delta_time"), delta_time)
         glUniform1f(self.get_uniform_loc("view_span"), view_span)
         glUniform1f(self.get_uniform_loc("dead_zone"), dead_zone)

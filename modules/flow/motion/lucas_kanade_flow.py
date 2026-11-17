@@ -23,8 +23,7 @@ class LucasKanadeFlowSettings(BaseSettings):
     levels:         Field[int]   = Field(3, min=1, max=5, description="Pyramid levels of the x/y solve, each doubles the reach (more: faster motion, more spill)")
     window:         Field[Patch] = Field(Patch.SEVEN, min=Patch.THREE, max=Patch.NINE, description="x/y patch size (larger: cleaner, more spill)")
     damping:        Field[float] = Field(0.03, min=0.0, max=0.1, step=0.001, description="Damps x/y where the patch has little texture (higher: less noise, smaller motion)")
-    same_surface:   Field[bool]  = Field(True, newline=True, width=48, description="Patch counts only the center's surface (on: less smear, wide fast parts slower)")
-    threshold:      Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="x/y below this is noise, in px/frame (higher: less noise, less slow motion)")
+    threshold:      Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, newline=True, description="x/y below this is cut as noise, in px/frame (higher: less noise, less slow motion)")
 
 
 class LucasKanadeFlow:
@@ -36,7 +35,7 @@ class LucasKanadeFlow:
         self._solve: SwapFbo = SwapFbo()            # the displacement as solved, at full size: level 0
         self._levels: list[SwapFbo] = [SwapFbo() for _ in range(1, MAX_LEVELS)]    # levels 1 and up, each at its own size
         self._displacement: Fbo = Fbo()             # with the noise floor taken off
-        self._tile_shader: LucasKanadeTile = LucasKanadeTile()     # the solve, its window's current frame and depth shared
+        self._tile_shader: LucasKanadeTile = LucasKanadeTile()     # the solve, its window's current frame shared
         self._threshold_shader: DisplacementThreshold = DisplacementThreshold()
 
     @property
@@ -104,21 +103,20 @@ class LucasKanadeFlow:
         """Take `texture` as the newest frame."""
         self._frames.set_input(texture)
 
-    def update(self, depth: Texture | None = None, tolerance: float = 0.0) -> None:
-        """Solve the displacement between the newest two frames; with `depth` (metres in red) and
-        `same_surface`, a window counts only the samples within `tolerance` of its center's depth."""
+    def update(self) -> None:
+        """Solve the displacement between the newest two frames."""
         if not self._frames.ready:
             self._solve.clear_all()
             self._displacement.clear()
             return
         s: LucasKanadeFlowSettings = self.settings
-        self._pyramid(self._solve, self._frames.previous_luminance, self._frames.luminance, depth if s.same_surface else None, tolerance)
+        self._pyramid(self._solve, self._frames.previous_luminance, self._frames.luminance)
 
         self._displacement.begin()
         self._threshold_shader.use(self._solve, s.threshold)
         self._displacement.end()
 
-    def _pyramid(self, solve: SwapFbo, previous: Texture, current: Texture, depth: Texture | None, tolerance: float) -> None:
+    def _pyramid(self, solve: SwapFbo, previous: Texture, current: Texture) -> None:
         """The displacement carrying `previous` onto `current`, coarse to fine, into `solve`: one solve
         per level at that level's size, each from the coarser one's displacement read linear (uv, so
         it needs no scaling). The finest is `solve`."""
@@ -127,7 +125,7 @@ class LucasKanadeFlow:
         for level in reversed(range(min(s.levels, MAX_LEVELS))):
             target: SwapFbo = solve if level == 0 else self._levels[level - 1]
             target.swap()
-            self._tile_shader.use(target, previous, current, estimate, level, s.window, s.damping, depth, tolerance)     # the coarsest from no motion
+            self._tile_shader.use(target, previous, current, estimate, level, s.window, s.damping)     # the coarsest from no motion
             glMemoryBarrier(int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT))
             estimate = target
 
@@ -158,36 +156,23 @@ def _bilinear(image: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
 
 
 def _solve_level(p_image: np.ndarray, c_image: np.ndarray, d: np.ndarray, u: np.ndarray, v: np.ndarray, window: int,
-                 damping: float, depth: np.ndarray | None = None, tolerance: float = 0.0) -> np.ndarray:
-    """One solve on one level: the displacement so far (uv) refined by the window's shift, with `depth`
-    only its samples of the center's surface. Mirrors the shader."""
+                 damping: float) -> np.ndarray:
+    """One solve on one level: the displacement so far (uv) refined by the window's shift. Mirrors the shader."""
     h, w = u.shape
     lh, lw = c_image.shape
     sxx = sxy = syy = sxt = syt = np.zeros((h, w))
-    total, count = np.zeros((h, w)), 0
-    if depth is not None:
-        dh, dw = depth.shape
-        center = depth[np.clip(np.floor(v * dh).astype(int), 0, dh - 1), np.clip(np.floor(u * dw).astype(int), 0, dw - 1)]
     for j in range(-window, window + 1):
         for i in range(-window, window + 1):
             px, py = u * lw - 0.5 + i, v * lh - 0.5 + j
-            weight: np.ndarray = np.ones((h, w))
-            if depth is not None:
-                su, sv = u + i / lw, v + j / lh
-                sample = depth[np.clip(np.floor(sv * dh).astype(int), 0, dh - 1), np.clip(np.floor(su * dw).astype(int), 0, dw - 1)]
-                same = (sample > 0.0) & (np.abs(sample - center) <= tolerance)
-                weight = np.where(center > 0.0, weight * same, weight)
-            total, count = total + weight, count + 1
             qx, qy = px - d[..., 0] * lw, py - d[..., 1] * lh
             gx = 0.25 * (_bilinear(c_image, px + 1, py) - _bilinear(c_image, px - 1, py)
                          + _bilinear(p_image, qx + 1, qy) - _bilinear(p_image, qx - 1, qy))
             gy = 0.25 * (_bilinear(c_image, px, py + 1) - _bilinear(c_image, px, py - 1)
                          + _bilinear(p_image, qx, qy + 1) - _bilinear(p_image, qx, qy - 1))
             gt = _bilinear(c_image, px, py) - _bilinear(p_image, qx, qy)
-            sxx, sxy, syy = sxx + weight * gx * gx, sxy + weight * gx * gy, syy + weight * gy * gy
-            sxt, syt = sxt + weight * gx * gt, syt + weight * gy * gt
-    kept_damping: np.ndarray = damping * total / count
-    sxx, syy = sxx + kept_damping, syy + kept_damping
+            sxx, sxy, syy = sxx + gx * gx, sxy + gx * gy, syy + gy * gy
+            sxt, syt = sxt + gx * gt, syt + gy * gt
+    sxx, syy = sxx + damping, syy + damping
     det: np.ndarray = sxx * syy - sxy * sxy
     safe: np.ndarray = np.where(np.abs(det) > 1e-12, det, 1.0)
     dx = np.where(np.abs(det) > 1e-12, -(syy * sxt - sxy * syt) / safe, 0.0)
@@ -198,13 +183,11 @@ def _solve_level(p_image: np.ndarray, c_image: np.ndarray, d: np.ndarray, u: np.
     return d + np.stack((dx / lw, dy / lh), axis=-1)
 
 
-def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, window: int = 2, damping: float = 0.001,
-                 depth: np.ndarray | None = None, tolerance: float = 0.0) -> np.ndarray:
+def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, window: int = 2, damping: float = 0.001) -> np.ndarray:
     """The displacement (H, W, 2) in pixels per frame, x along columns and y along rows, that carries
     `previous` onto `current`: coarse to fine over `levels` mip levels, one solve per level over a
     (2·window+1)² window, each level solved at its own size from the coarser one's displacement read
-    linear, the previous frame warped by it. With `depth` (H, W, m), only the window's samples within
-    `tolerance` of the center's depth count. Mirrors the shaders."""
+    linear, the previous frame warped by it. Mirrors the shaders."""
     h, w = current.shape
     previous_levels: list[np.ndarray] = _pyramid(previous.astype(np.float64), levels)
     current_levels: list[np.ndarray] = _pyramid(current.astype(np.float64), levels)
@@ -218,7 +201,7 @@ def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, win
         else:
             ch, cw = d.shape[:2]
             start = np.stack([_bilinear(d[..., c], u * cw - 0.5, v * ch - 0.5) for c in range(2)], axis=-1)
-        d = _solve_level(previous_levels[level], current_levels[level], start, u, v, window, damping, depth, tolerance)
+        d = _solve_level(previous_levels[level], current_levels[level], start, u, v, window, damping)
     assert d is not None
     return d * np.array([w, h])
 

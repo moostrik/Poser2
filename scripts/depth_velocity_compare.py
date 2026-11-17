@@ -5,7 +5,7 @@
 FRAMES is what depth_velocity_capture saved from one loop of a recording (temp/depth_velocity/RECORDING).
 No app and no camera: a window gives the GL context, and two `LucasKanadeFlow3D`, A and B, measure the
 saved frames with the settings they were recorded with; `--a` and `--b` override any of them by its
-path in the panel (xy.levels, xy.threshold, z.halving_speed, z_gain, ...). The window plays the loop at its
+path in the panel (xy.levels, xy.threshold, z.xy_halving, z_gain, ...). The window plays the loop at its
 recorded rate, again and again, A on the left, B on the right:
 
     1  z of the track, red toward the camera, green away     space  pause
@@ -421,6 +421,8 @@ class Measures:
             result['z corr'] = float(np.corrcoef(body_z[moving], real[moving])[0, 1])
         else:
             result['z/real'] = result['z corr'] = float('nan')
+        for name, shares in self.restarts.items():
+            result[f'restarts {name}'] = float(np.mean(shares)) * 100.0 if shares else float('nan')     # % of the core's tracks
         result['no z position'] = float(np.mean(self.without_z)) if self.without_z else float('nan')
         result['fit'] = float(np.mean(self.fit)) if self.fit else float('nan')
         result['ms'] = float(np.median(self.milliseconds))
@@ -540,7 +542,7 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
     context(False, 64, 64)
     w, h = frames.width, frames.height
     side = Side('A', frames.calls[0]['settings'], changed, w, h, False)
-    xy, z = side.settings.xy, side.settings.z
+    xy = side.settings.xy
     luminance, depth_texture, mask_texture = Texture(), Texture(), Texture()
     previous = None
     last = min(frames_to_check, len(frames)) - 1
@@ -553,8 +555,7 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
             continue
         solve = read_back(side.flow._solve)[..., :2] * np.array([w, h])                  # px per frame
         now, then = (np.round(f * 255.0).astype(np.float64) / 255.0 for f in (lum, previous))    # as the R8 frames hold them
-        reference = lucas_kanade(then, now, xy.levels, xy.window, xy.damping,
-                                 depth.astype(np.float64) if xy.same_surface else None, z.tolerance)
+        reference = lucas_kanade(then, now, xy.levels, xy.window, xy.damping)
         previous = lum
         if k % 5 == 0 or k == last:
             dxy = np.linalg.norm(solve - reference, axis=-1)
@@ -565,7 +566,8 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
 
 COLUMNS: tuple[str, ...] = ('xy noise', 'xy slow', 'xy fast', 'xy fast/noise', 'xy kept', 'xy lag', 'xy noise edge',
                             'z noise', 'z slow', 'z fast', 'z fast/noise', 'z kept', 'z lag', 'z noise edge',
-                            'z part still', 'z part fast', 'z/real', 'z corr', 'no z position', 'fit', 'ms')
+                            'z part still', 'z part fast', 'z/real', 'z corr', 'restarts still', 'restarts moving',
+                            'no z position', 'fit', 'ms')
 
 
 def commit() -> str:

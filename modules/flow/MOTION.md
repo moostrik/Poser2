@@ -27,8 +27,7 @@ Each pixel's shift between two luminance frames, from a window of gradients, coa
 pyramidal Lucas–Kanade): each level is solved at its own size from the coarser level's estimate, read
 linearly, with the previous frame warped by it ([Constraints](#constraints) has why its own size). Out
 comes the displacement in uv per frame, `threshold` (px per frame) taken off its length, as below it is
-the solve's jitter. With a depth and `same_surface`, a window counts only its samples within `tolerance`
-of its center's depth. The settings in pixels go with the flow's resolution: a level doubles the motion
+the solve's jitter. The settings in pixels go with the flow's resolution: a level doubles the motion
 it follows, about 2 × 2^(levels − 1) px per frame at full size.
 
 ### z: the depth velocity
@@ -36,27 +35,39 @@ it follows, about 2 × 2^(levels − 1) px per frame at full size.
 One depth sample is mostly noise from frame to frame, and the change between two frames doubles it, so z
 is tracked, not differenced: each pixel holds a disparity and its rate, carried along the x/y
 displacement, and each measurement only corrects them (an alpha–beta filter) over a time that is `smooth` at
-rest and shortens as the image moves. The parts:
+rest and shortens as x/y moves. The steps, in the order they run, each with its settings; the panel holds
+them in that order, a line each for the surface, the smoothing and the cut:
+
+| Step         | Settings                                  | What it does                                                         |
+|--------------|-------------------------------------------|----------------------------------------------------------------------|
+| step filter  | `edge`                                    | no depth where 3 × 3 samples span a step past `edge`, the silhouette's flicker |
+| window       | `window`, `edge`                          | the mean disparity of the samples within `edge` of the pixel's depth |
+| another surface | `max_speed`                            | the track starts over where the depth jumps or slides faster than a body moves |
+| smoothing    | `smooth`, `xy_rest`, `xy_halving`         | the time the track follows over, long at rest, short as x/y moves   |
+| dead zone    | `dead_zone`                               | z 0 while the depth stays within it of its anchor; 0 by default      |
+| cut          | `threshold`                               | z below it is noise, taken off                                       |
+
+The parts:
 
 | Part        | How                                                                           | Why                                                           |
 |-------------|-------------------------------------------------------------------------------|---------------------------------------------------------------|
 | disparity   | the track holds 1 / depth                                                     | stereo noise is about constant in disparity                   |
-| `tolerance` | metres: what tells two surfaces apart                                         | a hand 10 cm before the chest is 10 cm at any distance        |
-| measurement | the mean disparity of the window's samples within `tolerance`, by their share | a thin window at a silhouette corrects little                 |
-| carry       | from where the pixel was a displacement back, same surface only               | a sliding surface keeps its depth; nothing crosses an edge    |
-| restart     | a miss past `tolerance`, or faster than `max_speed`                           | a limb passing; a sloped edge sliding off adds up to 9–11 m/s |
-| the time    | `smooth` over 1 + image speed / `halving_speed`, the 1€ filter's rule          | quiet at rest, little lag in a motion; x/y carries little noise |
+| measurement | the mean disparity of the window's samples within `edge`, by their share      | a thin window at a silhouette corrects little                 |
+| carry       | from where the pixel was a displacement back, the texels within `max_speed` × the frame's time of the measurement | a sliding surface keeps its depth; nothing crosses another surface |
+| restart     | a miss past `max_speed` × the frame's time, or a filtered rate past `max_speed` | a limb passing; a sloped edge sliding off adds up to 9–11 m/s |
+| the time    | `smooth` over 1 + x/y speed / `xy_halving`, the 1€ filter's rule              | quiet at rest, little lag in a motion; x/y carries little noise |
 | `dead_zone` | an anchor: z is 0 within it, past it z is whole; 0 by default                 | a surface's depth wanders by a few mm, unsmoothed             |
-| step filter | no depth where 3 × 3 samples span a step past `edge`                          | silhouette jitter; a band a depth sample wide reads no z      |
 
-The time is the 1€ filter's (Casiez, Roussel, Vogel 2012): the image speed is the largest displacement of the
-3 × 3 texels with `xy.threshold` taken off, so x/y's noise at rest opens nothing, and with `smooth` above 0 the
-carry takes each texel's depth a frame on by its rate. The anchor follows z past the dead zone, so a motion loses
-only its first `dead_zone`; with z smoothed it costs z and lag and adds no quiet, so it is 0 by default. The
-step filter is `DepthStepFilter`, the window's test of "another surface".
-`tolerance` is no limit on speed: 0.2 m a frame is 5 m/s at 25 fps. z comes in view widths per frame, over
-the metres one view width spans at the depth (`view_span` per metre), and `threshold` comes off it. With
-`smooth` 0 and a full window it is the plain change between two frames.
+Within a frame `edge` tells two surfaces apart, between frames `max_speed`: a body moves at most `max_speed` ×
+the frame's time (12 cm at 50 fps), so a depth further from the prediction is another surface, and a filtered
+rate past it is a surface sliding away (each step small against the prediction). 0 checks neither. The time is
+the 1€ filter's (Casiez, Roussel, Vogel 2012), opened by x/y's speed, not z's own as in the original filter: the
+x/y speed is the largest displacement of the 3 × 3 texels with `xy_rest` taken off, so x/y's noise at rest opens
+nothing; 0 `xy_halving` is `smooth` throughout. With `smooth` above 0 the carry takes each texel's depth a frame
+on by its rate. The anchor follows z past the dead zone, so a motion loses only its first `dead_zone`; with z
+smoothed it costs z and lag and adds no quiet, so it is 0 by default. The step filter is `DepthStepFilter`. z
+comes in view widths per frame, over the metres one view width spans at the depth (`view_span` per metre), and
+`threshold` comes off it. With `smooth` 0 and a full window it is the plain change between two frames.
 
 ### The 3D velocity
 
@@ -135,7 +146,6 @@ knob on z's size; the depth velocity's settings set z's noise and lag, not its s
 | levels       | 3       | 1–5 (1)             | B   | follows fast motion                    |
 | window       | 7×7     | 3×3–9×9             | B   | follows more of the motion than 3×3 or 5×5 |
 | damping      | 0.03    | 0–0.1 (0.001)       | B   | x/y's noise a quarter of undamped      |
-| same_surface | on      | on/off              | C   | no measured effect                     |
 | threshold    | 0.5     | 0–5 px/frame (0.05) | B   | the still x/y noise 0                  |
 
 The x/y solve, on the raw output, with `levels` 4 (the preset) as the reference: x/y kept over the moves, and
@@ -153,28 +163,27 @@ x/y's still noise inside (measure / hands / edges / show):
 | `damping` 0            | 1.39 / 1.44 / 1.09 / 1.36   | 1.23 / 1.76 / 1.11 / 1.10    |
 | `damping` 0.015        | 1.11 / 1.09                 | 0.29 / 1.00                  |
 | `damping` 0.06         | 0.86 / 0.89                 | 0.16 / 0.95                  |
-| `same_surface` off     | 1.00 / 1.02 / 1.00 / 1.00   | the same                     |
 | `threshold` 0.5        | 0.81 / 0.83 / 0.73 / 0.92   | 0                            |
 
 The x/y solve leaves z as it is, but a solve that follows less reads part of a slide as z (`levels` 1: z 22%
 larger on show). A level doubles the motion the solve follows, about 2 × 2^(levels − 1) px per frame; `levels`
-5 follows about a fifth more than 4. `same_surface` works only where a no-depth band separates the hand from
-what is behind it; the step filter and the mask leave little for it to separate **(deduction)**.
+5 follows about a fifth more than 4.
 
 ### depth_velocity (z)
 
-| Setting   | Default      | Range (step)    | For | Why                                    |
-|-----------|--------------|-----------------|-----|----------------------------------------|
-| edge      | 0.1 m        | 0.05–0.3 (0.01) | A   | the edge noise 40% below 0.3 m          |
-| window    | 7×7          | 1×1–9×9         | A   | the edge noise a quarter of 1×1         |
-| tolerance | 0.2 m        | 0.05–0.5 (0.01) | B   | no measured effect against 0.5 m        |
-| smooth        | 100 ms       | 0–500 (1)       | A   | the still z noise 31× below the raw    |
-| halving_speed | 0.5 px/frame | 0.05–5 (0.05)   | B   | a push lags 11 ms, keeps 87% of its z  |
-| xy_smooth     | off          | on/off          | B   | x/y without extra lag                  |
-| dead_zone     | 0 m          | 0–0.05 (0.001)  | B   | with z smoothed it costs z and lag     |
-| threshold     | 0.5 px/frame | 0–5 (0.05)      | A   | the still z noise 0                    |
+| Setting    | Default      | Range (step)    | For | Why                                    |
+|------------|--------------|-----------------|-----|----------------------------------------|
+| edge       | 0.1 m        | 0.05–0.3 (0.01) | A   | the edge noise 40% below 0.3 m         |
+| window     | 7×7          | 1×1–9×9         | A   | the edge noise a quarter of 1×1        |
+| max_speed  | 6 m/s        | 0–20 (0.5)      | A   | without it a sliding arm's z 2.5×      |
+| smooth     | 100 ms       | 0–500 (1)       | A   | the still z noise 31× below the raw    |
+| xy_rest    | 0.5 px/frame | 0–5 (0.05)      | A   | above x/y's noise at rest              |
+| xy_halving | 0.5 px/frame | 0–5 (0.05)      | B   | a push lags 11 ms, keeps 87% of its z  |
+| xy_smooth  | off          | on/off          | B   | x/y without extra lag                  |
+| dead_zone  | 0 m          | 0–0.05 (0.001)  | B   | with z smoothed it costs z and lag     |
+| threshold  | 0.5 px/frame | 0–5 (0.05)      | A   | the still z noise 0                    |
 
-- edge, window and tolerance on the raw output, z's still noise inside / at the edge (measure / hands / edges /
+- edge and window on the raw output, with `tolerance` (gone since) at 0.2 m, z's still noise inside / at the edge (measure / hands / edges /
   show):
 
   | Change              | Inside                       | At the edge                  |
@@ -186,12 +195,13 @@ what is behind it; the step filter and the mask leave little for it to separate 
   | `window` 1×1        | 15.4 / 35.1 / 14.5 / 16.1    | 24.3 / 28.8 / 24.3 / 24.1    |
   | `window` 5×5        | 13.5 / 31.6                  | 9.5 / 13.4                   |
   | `window` 9×9        | 12.2 / 29.4                  | 4.7 / 9.3                    |
-  | `tolerance` 0.5 m   | 13.0 / 30.7 / 11.9 / 14.1    | 6.1 / 12.0 / 6.0 / 6.1       |
 
-  `edge` 0.05 m keeps 97% of hands' z; z's `window` changes how much a small part blurs, not z's size. A
-  `tolerance` of 0.5 m against 0.2 kept a little more z with smoothing on show (0.47 against 0.42 with the
-  catch-up then).
-- smooth and halving_speed, measured 2026-11-17 on one capture of the hands recording (lag, z kept against
+  `edge` 0.05 m keeps 97% of hands' z; z's `window` changes how much a small part blurs, not z's size.
+  `tolerance` (0.2 m, a second "another surface" step for the window, the carry and the restart) against 0.5 m
+  changed nothing on four recordings, as the step filter has already taken the jump out **(deduction)**; it
+  went for `edge` within a frame and `max_speed` between frames, and x/y's `same_surface`, which read it, with
+  it (off and on the same on four recordings).
+- smooth and the halving speed, measured 2026-11-17 on one capture of the hands recording (lag, z kept against
   the raw) and of the measure recording (the still noise inside / at the edge, px per frame), `dead_zone` 0,
   `tolerance` 0.5 m:
 
@@ -209,9 +219,27 @@ what is behind it; the step filter and the mask leave little for it to separate 
   A low halving speed is what keeps the lag down; z's own speed beside the image's, tried, let the still noise
   up to 2 to 4 for no less lag. The bridges read z as they read x/y; what z's smoothing does to them is in
   [BRIDGE_3D.md's Measured](BRIDGE_3D.md#measured).
-- xy_smooth puts x/y through the depth velocity's alpha–beta filter, carried along the motion, with
-  z's `smooth` at rest. It is the only x/y state kept from frame to frame: the solve starts each frame from
-  no motion. The motion's reset clears it.
+- xy_smooth puts x/y through the depth velocity's alpha–beta filter, carried along the motion, over z's time,
+  the 1€ rule's, worked out per pixel from the same x/y speed. It is the only x/y state kept from frame to frame:
+  the solve starts each frame from no motion. The motion's reset clears it.
+- C1's change (`tolerance` and `same_surface` gone, `max_speed` before and after the filter, `xy_rest` in place
+  of `xy.threshold`, `xy_smooth` over z's time), 2026-11-17, one capture of hands and of measure, the defaults
+  with `dead_zone` 0, before and after:
+
+  | Row                  | z still noise, measure | z still noise, hands | z kept / lag, hands | x/y noise, hands / kept, measure | restarts at rest, measure |
+  |----------------------|------------------------|----------------------|---------------------|----------------------------------|---------------------------|
+  | defaults, before     | 0 / 0.06               | 4.1 / 2.3            | 0.83 / 11 ms        | 0.50 / 0.81                      | 0.06%                     |
+  | defaults, after      | 0 / 0.05               | 3.7 / 2.0            | 0.83 / 11 ms        | 0.50 / 0.81                      | 0.14%                     |
+  | `threshold` 0, before | 0.41 / 0.55           | 4.6 / 2.8            | 0.86 / 11 ms        |                                  |                           |
+  | `threshold` 0, after | 0.40 / 0.54            | 4.2 / 2.5            | 0.87 / 11 ms        |                                  |                           |
+  | `xy_smooth` on, before | 0 / 0.06             | 4.1 / 2.3            | 0.83 / 11 ms        | 8.3 (lag 218 ms) / 0.42          |                           |
+  | `xy_smooth` on, after | 0 / 0.05              | 3.7 / 2.0            | 0.83 / 11 ms        | 5.4 (lag 26 ms) / 0.89           |                           |
+  | `xy_halving` 0, after | 0 / 0                 | 3.2 / 2.2            | 0.40 / 202 ms       |                                  |                           |
+  | `max_speed` 0, after | 0 / 0.07               | 4.9 / 3.0            | 0.84 / 10 ms        |                                  | 0                         |
+
+  Hands' still noise fell by a tenth with the window's samples within `edge` (0.1 m) where `tolerance` (0.2 m)
+  let more of the surface behind in; its still stretch is a hand not quite still. Without `max_speed`'s checks the
+  sideways arm on measure reads 2.5 times the z (0.97 against 0.39 fast), a sliding surface read as z.
 
 Beside the velocity the 3D motion hands out where the body is now in the box's depth, `z_position`
 (`ZPosition`): from the depth track's disparity, (depth − near) / (far − near) over the player's depth
@@ -234,14 +262,15 @@ memories set a non-finite value to 0 and count it into the motion's `FiniteGuard
 |------------------|---------------------------------------|------------------------------------------------|
 | `velocity`       | `compose_velocity.frag`               | the motion's output, x/y/z in widths/s         |
 | `displacement`   | `displacement_filter.frag`            | the x/y filter's memory, with `xy_smooth`      |
-| `depth_velocity` | `depth_velocity_shader.frag`          | z's memory: the followed disparity, its rate and anchor (`track`) |
+| `depth_velocity` | `depth_velocity_shader.frag`          | z's memory: the followed disparity, its rate and anchor (`estimate`) |
 
 Measured in a hidden window at 448 × 800, 40 frames at 25 fps: a NaN mask over 200 × 200 px gave
 1 000 000 non-finite velocity values in the first second, zeroed, the velocity finite after; the x/y
 filter's memory filled with NaN, 358 400 displacement values once, every pixel, and the filter went on
 from 0. z's memory filled with NaN was counted 0 times and the velocity stayed finite: the carry takes
-a track's texel only within `tolerance` of the measurement, a comparison a NaN fails, so the track
-starts over and the NaN is gone without a non-finite value written.
+a track's texel only within `max_speed` × the frame's time of the measurement, a comparison a NaN fails, so the
+track starts over and the NaN is gone without a non-finite value written (with `max_speed` 0 the carry takes
+every texel, so the guard counts it).
 
 ## Debugging a solve
 
@@ -261,7 +290,7 @@ not at the solve. `gl_state()` (`modules/gl`) returns the GL state a pass runs w
   Every clear to 0 now passes no memory (`clear_value`, `modules/gl/texture.py`).
 
 - The false z at an edge cannot be told from a push by time. Restarting the track where the depth
-  changed past the tolerance over 2 frames cuts the edge z, and a push's z by 26%.
+  changed past a fixed step over 2 frames cuts the edge z, and a push's z by 26%.
 - It cannot be told by the depth's slope either. A weight on the slope cuts edges and pushes alike,
   by about 10%.
 - Sharpening the depth at the image's edges does not separate them. A luminance-guided joint bilateral

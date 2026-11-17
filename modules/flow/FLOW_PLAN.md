@@ -51,63 +51,15 @@ measure): z needs smoothing to be quiet, and what cuts a large, fast z most is a
 with smoothing and is the quiet one only without; `tolerance` and `same_surface` show no effect; the x/y solve,
 the step filter and z's window earn their place. The aim: quiet at rest, the most z kept, the least lag.
 
-Built (2026-11-17): the 1€ filter's rule in place of the catch-up, described in
-[MOTION.md](MOTION.md#z-the-depth-velocity) with its table.
+Built (2026-11-17): the 1€ filter's rule in place of the catch-up; one setting per job (`edge` within a frame,
+`max_speed` between frames, `xy_rest` and `xy_halving` for z's smoothing, `tolerance` and `same_surface` gone);
+described in [MOTION.md](MOTION.md#z-the-depth-velocity) with their tables.
 
 Tried and undone (2026-11-17): the dead zone before the filter, a backlash on the measured depth. Quieter at
 rest and later: the filter sees nothing until the zone opens, so its lag comes after the zone's where the two
 overlap now (hands, unsmoothed, `dead_zone` 0.02: 52 ms against 7; `smooth` 25: 90 against 65; measure's still
 noise 2.4 / 3.1 against 9.1 / 5.1).
 
-- **C1.** One setting per job in the motion: z's "another surface", z's smoothing, x/y's cut; `z.tolerance` and
-  `xy.same_surface` go. `tolerance` (0.2 m) and `edge` (0.1 m) answer the same question, and disagree between
-  0.1 and 0.2 m; `tolerance` 0.2 against 0.5 changed nothing on four recordings, as the step filter has already
-  taken the jump out **(deduction)**. In `depth_velocity_shader.frag` and `DepthVelocity`:
-  - within a frame, `edge`: the step filter (as now) and the window's samples (now `tolerance`);
-  - between frames, `max_speed` (6 m/s), in two checks: a jump, before the filter, further than
-    `max_speed` × the frame's time (12 cm at 50 fps), for the carried texels that count as the measurement's
-    surface and for the restart on the miss, both now `tolerance`; and a speed, after the filter, the filtered
-    rate past `max_speed`, as now (a depth sliding away steadily, each step small against the prediction).
-    At 0 neither checks, its own case;
-  - x/y's `same_surface` goes, with its part of the solve: `LucasKanadeFlow.update`'s depth and tolerance, the
-    depth in `lucas_kanade_tile.comp`, the x/y solve's numpy version's and its test (`test_scene_flow`),
-    `scripts/solve_replay.py`, the capture's recorded settings;
-  - z's smoothing has its own three numbers, x/y's `threshold` one job, the cut of x/y: `z.xy_rest`
-    (px/frame, 0.5), the x/y speed below which z counts as at rest, where the shader took `xy.threshold`;
-    `halving_speed` renamed `xy_halving`, as it is on x/y's speed too; at 0 the rule is off, `smooth`
-    throughout, its own case in the shader (the formula's 0 would be no smoothing);
-  - `xy_smooth` smooths x/y over z's time: the x/y filter (`displacement_filter.frag`) works out the same x/y
-    speed per pixel (the 3×3's largest past `xy_rest`) and the time from `smooth` and `xy_halving`, in place of
-    one alpha from `smooth` for the whole image;
-  - z's one panel in the order the code runs it, a new line for each group: surface (`edge`, `window`,
-    `max_speed`), smoothing (`smooth`, `xy_rest`, `xy_halving`, `xy_smooth`), cut (`dead_zone`, `threshold`);
-    the setting paths stay. Each description says what the setting does and on what (x/y or z), in one line;
-    MOTION.md's z opens with the steps in order and their settings.
-
-  The 1€ rule opens on x/y's speed, not on z's own as the original filter does: z's own (from a copy followed
-  over the time at rest) let the still noise up to 2 to 4 for no less lag, as z's noise is far above a push
-  where the filter's signals have little.
-  Checked on one capture of hands and of measure (`hands_1`, `measure_1`), the code now against the change,
-  about 5 minutes each way: the same rows, `dead_zone` 0 in all of them, the rest the code's defaults (`smooth`
-  100, the halving 0.5, the thresholds 0.5, `edge` 0.1, `max_speed` 6, the windows 7×7, `levels` 4, `damping`
-  0.03):
-
-  | Row                         | Shows                                                          |
-  |-----------------------------|----------------------------------------------------------------|
-  | the raw reference           | what kept and lag are against                                  |
-  | the defaults                | that z is the same without `tolerance` and `same_surface`      |
-  | `z.threshold` 0             | the same before the cut, where a change is not hidden          |
-  | `xy_halving` 0 (after only) | that off is `smooth` throughout: the lag of a fixed 100 ms     |
-  | `max_speed` 0 (after only)  | what the two checks do: restarts and z without them            |
-  | `xy_smooth` on              | x/y's noise and lag over z's time, where it was a fixed 100 ms |
-
-  Each row: z's still noise inside and at the edge (measure), z kept and lag (hands), x/y's still noise, kept
-  and lag, the restarts' share at rest and while moving (added to the compare's row), the motion's ms. It passes
-  when the defaults' and the `z.threshold` 0 rows are the same before and after within the captures' spread
-  (0.1), and the restarts at rest stay near 0.
-  `halving_speed` is renamed in `settings.json`, its value kept; a removed key stays in the presets until
-  Matthias saves. `scripts/motion_bridge_pass_check.py`, the compare's setting maps and its `--verify` (the
-  depth it hands the x/y solve), MOTION.md's parts and settings tables follow.
 - **C2.** The values, each measured on the four recordings and judged in the app: `smooth` and `xy_halving`
   (and 0.25, 6 ms on hands) and z's `threshold`, with `dead_zone` 0; x/y's `threshold` around 0.4; a step up on `levels`, x/y's
   `window` and `damping` against their ms. The step filter and z's window stay unless a row shows a clear gain
