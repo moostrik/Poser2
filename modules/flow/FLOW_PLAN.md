@@ -59,6 +59,20 @@ rest and later: the filter sees nothing until the zone opens, so its lag comes a
 overlap now (hands, unsmoothed, `dead_zone` 0.02: 52 ms against 7; `smooth` 25: 90 against 65; measure's still
 noise 2.4 / 3.1 against 9.1 / 5.1).
 
+- **C1.** z's "another surface" in one setting per idea; `z.tolerance` goes. `tolerance` (0.2 m) and `edge`
+  (0.1 m) answer the same question in space, how big a depth jump is another surface, and disagree between 0.1 and
+  0.2 m; `tolerance` 0.2 against 0.5 changed nothing on four recordings, as the step filter has already taken the
+  jump out **(deduction)**. In `depth_velocity_shader.frag` and `DepthVelocity`:
+  - space: `edge` for the step filter (as now), the window's samples and the carried texels (now `tolerance`);
+  - time: the restart on a miss past `tolerance` goes, `max_speed` (6 m/s) the one restart: a jump in depth
+    between two frames is another surface when it is faster than a body moves. A miss of 0.2 m a frame is
+    10 m/s at 50 fps, so `max_speed` already restarts first **(deduction)**;
+  - x/y's `same_surface` reads `edge` where it read `tolerance` (`LucasKanadeFlow.update`), until x/y is gone
+    through.
+
+  Checked on one capture of hands and of measure, now against the change, the preset as saved: still noise
+  inside and at the edge, z kept, lag, the restarts' share while moving; about 5 minutes. The presets keep the
+  removed key until Matthias saves; MOTION.md's parts and settings table follow.
 - **C2.** The values, each measured on the four recordings and judged in the app: `smooth` and `halving_speed`
   (and 0.25, 6 ms on hands) and z's `threshold`, with `dead_zone` 0; x/y's `threshold` around 0.4; a step up on `levels`, x/y's
   `window` and `damping` against their ms. The step filter and z's window stay unless a row shows a clear gain
@@ -69,8 +83,7 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
   at 2–3.5 m, made by the operator, and they measured there.
 
 Questions, for C:
-- `tolerance` and `same_surface` showed no effect on the four recordings, none of which has the case they are
-  for, an arm moving sideways 10 to 20 cm before the chest. Measured on such a recording first, or constants now?
+- x/y's settings gone through after z: `same_surface` showed no effect on the four recordings.
 
 ## D. The bridge
 
