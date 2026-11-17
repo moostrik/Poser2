@@ -132,18 +132,24 @@ What is built: [FLUID_3D.md](FLUID_3D.md#the-density).
 
 ## G. Each stage a flow class
 
-Each stage's work is a plain class in `modules/flow`, with its settings, ports, inputs and outputs, and its render
-layer only hands it the input and calls it, as `Fluid3D` and `Fluid3DLayer` are. The layers stay in the render. The
-view is built so already, its parts (`ViewCrop`, `ViewMask`, `ViewDepth`, `ViewColor`) plain classes under a
-thin `ViewLayer`, and stays in deep_flow until a second app takes the 3D flow; then the crop, the mask and the
-depth move to `modules/flow` and the color, deep_flow's look, stays in the app.
+Each stage's work is a plain class in `modules/flow` with its settings and ports, taking its inputs as arguments,
+as `Fluid3D` and `LucasKanadeFlow3D` are; its render layer only hands it the input and calls it. The layers stay
+in the render, and so do the inputs' and outputs' dataclasses, the render's contract, which the flow may not
+import. The view is built so already, its parts (`ViewCrop`, `ViewMask`, `ViewDepth`, `ViewColor`) plain classes
+under a thin `ViewLayer`, and stays in deep_flow until a second app takes the 3D flow; then the crop, the mask and
+the depth move to `modules/flow` and the color, deep_flow's look, stays in the app.
 
-- **G1.** The bridge: a `Bridge3D` in `modules/flow/bridge_3d` takes what `Bridge3DLayer` does now, the wiring of
-  the lowpass, the bandpass, the peak, the mixes and their z positions, the density and temperature bridges, the
-  settings (`Bridge3DSettings`, its panels as they are) and the ports; `Bridge3DLayer` keeps the input, the output
-  and the call. The preset's keys do not change. `fluid_compare.py` and `motion_bridge_pass_check.py` run
-  `Bridge3D` without the render; BRIDGE_3D.md and FLOW.md's packages say where it sits. Checked by the flow's
-  and the render's unit tests and deep_flow `-sim` loading the preset with no unknown key.
+- **G1.** The bridge: a `Bridge3D` in `modules/flow/bridge_3d` takes what `Bridge3DLayer` does now: the lowpass,
+  the bandpass, the peak, the mixes and their z positions, the density and temperature bridges, the captures of
+  one tick (`CaptureMax`), the monitors' "shown" that runs a filter, its GPU timers, its settings
+  (`Bridge3DSettings`, the panels as they are) and its ports, under the names they have now, which the
+  monitors read them by. The density's color, `BridgeLayer`'s now, moves to the flow as a class of its own with
+  its `DensityColor` shader, which `Bridge3D` runs and the 2D bridge layer calls, so there is one. `BridgeLayer`
+  and `Bridge3DLayer` keep `BridgeInput`, `BridgeOutput`, the following of the velocity's size and the call. The
+  preset's keys do not change; every call site changes with it (deep_flow's render, `fluid_compare.py`,
+  `motion_bridge_pass_check.py`, the render's tests). BRIDGE_3D.md and FLOW.md's packages and layers say where
+  it sits. Checked by the flow's and the render's unit tests and deep_flow `-sim` loading the preset with no
+  unknown key, the bridge's monitors showing their ports.
 
 ## H. One unit across the stages
 
