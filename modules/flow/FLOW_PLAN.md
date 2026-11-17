@@ -107,9 +107,8 @@ the same water **(site fact)**.
     - `add`: the source (Stam 2003; Bridson 2015), the input × `density_gain` × dt added. Where the amount would
       pass 1, all four channels are scaled down together so the amount lands at 1; the color stays the
       density-weighted mix of what went in.
-  - The amount: min(speed × `density_gain`, 1) × the mask's edge (D5) × the luma key's share of the color's
-    brightness, its brightest channel (HSV's value). The edge and the key come after the cap, so a high gain
-    cannot undo them.
+  - The amount: min(the bridge's amount × `density_gain`, 1) × the luma key's share of the color's brightness,
+    its brightest channel (HSV's value). The gain, default 1, amplifies the input, a slow body putting in more.
   - The luma key (video compositing: darkness becomes transparency), a setting, `input.density_luma_key`, 0..1,
     default 1: the key's share of the input color's darkness becomes less amount, and the same share is taken
     out of the color. At 1 a half-dark red comes in as full red at half the amount, and black brings in nothing;
@@ -123,8 +122,7 @@ the same water **(site fact)**.
     going white; `oklab` mixes without turning muddy; the luma key from 0 to 1.
 - **D5.** The mask's soft edge into the density's amount, not its color. Today `density_color.frag` multiplies
   the color by the mask's gate while the amount comes from the speed alone, so the edge comes in dark at full
-  amount. The bridge hands the edge to the fluid as a value of its own, beside the speed, and leaves the color
-  as the video's; the fluid multiplies it in after the gain's cap (D4); no gain in the bridge. BRIDGE_3D.md
+  amount. The bridge's amount becomes the speed × the edge, and the color stays the video's. BRIDGE_3D.md
   follows. Checked in the app: no dark rim at any luma key.
 
 ## E. The 3D fluid's physics
