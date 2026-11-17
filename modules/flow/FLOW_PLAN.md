@@ -95,19 +95,24 @@ source). Seen in the app, 2026-11-17: the stop as an acceleration gives nice eff
 difference **(site fact)**. With the video's colors as the dye, adding piles them up into a smear, where holding
 keeps the picture **(deduction)**.
 
-- **D1.** The panels by what the fluid gets, the `boundary` and `body_force` groups gone. Boundary and body force
-  stay the words in the descriptions and the documents.
-  - The bridge: `readings`, `velocity` (the held velocity, with its peak), `acceleration` (the added velocity),
-    `density` (the held dye), `temperature`, `expansion`; the outputs and their ports named the same.
+- **D1.** The panels by what the fluid gets, the `boundary` and `body_force` groups gone.
+  - The bridge: `readings`, then one panel per output, named as the output: `boundary_velocity` (with its
+    peak), `body_force_acceleration`, `boundary_density`, `boundary_temperature`, `expansion`. The outputs,
+    `Injection`, the ports and the 2D bridge keep their names, so the panels mirror the outputs and keep the
+    textbook words.
   - The added dye and warmth removed: their mixes, outputs and z positions in the bridge, the fluid's
     `add_body_force_density` and `add_body_force_temperature`, `density_rate` and `temperature_rate`, and the
-    injection's `RATE` mode, which only they use. Seven outputs become five.
-  - The fluid's `input`, one flat panel in the order the layer injects: `spread`, the velocity's `drag` and
-    `gain`, the acceleration's `gain`, the density's `drag` and `gain`, the temperature's, the expansion's
-    `rate`. The acceleration takes no drag: it has no target to close on, and its timing is the bandpass's
-    (`fast_smooth`, `slow_smooth`).
-  - Every call site, the 2D bridge's outputs and hd_trio's included, the preset, BRIDGE_3D.md, FLUID_3D.md and
-    `.claude/rules/flow.md`'s naming line in the same change.
+    injection's `RATE` mode and its branch in the injection shader, which only they use; `FILL` and `ADD`
+    stay. Seven outputs become five.
+  - The fluid's `input`, one flat panel in the order the layer injects: `spread`, `velocity_drag`,
+    `velocity_gain`, `acceleration_gain`, `density_drag`, `density_gain`, `temperature_drag`,
+    `temperature_gain`, `expansion_rate`. The acceleration takes no drag: it has no target to close on, and its
+    timing is the bandpass's (`fast_smooth`, `slow_smooth`).
+  - In the same change: every call site (`fluid_compare.py` among them); both presets, `settings.json` and
+    `very nice.json`, and any port they pick for a monitor; BRIDGE_3D.md, FLUID_3D.md, FLOW.md's panel lines
+    and TIMING.md's mention of `body_force.acceleration`. hd_trio keeps its own copy and does not change.
+  - Checked by: the flow's and the render's unit tests; `injection_check.py` for the shader; deep_flow `-sim`
+    loading both presets with no unknown key and the monitors showing their textures.
 - **D2.** The temperature and the expansion checked in the app, each in its own panel: what each does to the
   water and whether it works. The temperature after E1, with `buoyancy` above 0.
 - **D3.** The acceleration tuned at the screen: which readings (`stop`, `change`, `wake`) and its `gain`.
@@ -225,8 +230,8 @@ Not worked on until asked for; each with what is known.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
-- When a term changes, rename it everywhere in the same change; update all call sites; keep presets in sync;
-  remove obsolete pathways: D1.
+- Update all call sites; keep presets in sync; remove obsolete pathways: D1.
+- Name the fluid's things by the textbook word (`boundary`, `body_force`): D1.
 - A settings class mirrors the code it configures, a group for each step in the order the code runs them: D1.
 
 Not designed yet, so their rules are not named: D2, D3, E1, F1, H1, I1 to I4.
