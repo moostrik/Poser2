@@ -296,6 +296,11 @@ not at the solve. `gl_state()` (`modules/gl`) returns the GL state a pass runs w
 - Sharpening the depth at the image's edges does not separate them. A luminance-guided joint bilateral
   filter on the depth lowers push and sweep z alike, by 7%, for +0.14 ms.
 - A forward–backward check on x/y drops half the fast motion.
+- z from the x/y flow's spread (looming: the speed toward the camera is the depth times the divergence over 2,
+  Lee 1976) does not tell a push from other motion. On the captures of 2026-11-17 (the motion raw, the flow
+  blurred 3 to 6 px, the signed mean over the player's moving pixels against the depth's z) it follows a push
+  (hands, correlation +0.59 at half the size), a sideways arm less (measure, +0.40 at twice the size) and free
+  movement the wrong way (show, −0.42): a sideways limb, a turn or a limb passing in front spreads the flow too.
 - Iterations per level do less than one more level, at more GPU time.
 - Each level is solved at its own size. Solving every full-size pixel at a coarse level puts each
   window a fraction of a texel off its neighbor's, and where a window is badly conditioned the solve

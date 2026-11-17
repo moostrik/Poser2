@@ -13,10 +13,11 @@ operator saw.
 |-----|------------------------------------------------------------------------------|----------------------------------|----------------------------------------------------|
 | A   | [The measurements](#a-the-measurements)                                      | built                            | [FLOW.md](FLOW.md#the-goals)                       |
 | B   | [The view](#b-the-view)                                                      | built                            | [VIEW.md](VIEW.md)                                 |
-| C   | [The motion](#c-the-motion)                                                  | built; C2 the values tonight     | [MOTION.md](MOTION.md)                             |
+| C   | [The motion](#c-the-motion)                                                  | built; C2 the values, C3 range   | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; D3 at the screen          | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | the temperature                  | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | open                             | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
+| G   | [No numpy copies of shaders](#g-no-numpy-copies-of-shaders)                  | G2, G3                           | `.claude/rules/gl.md`                              |
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                      | [FLOW.md](FLOW.md)                                 |
 | I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | not started                      | [FLOW.md](FLOW.md)                                 |
 | J   | [Every setting and its description](#j-every-setting-and-its-description)    | last, after the refactor         | `CLAUDE.md`, `.claude/rules`                       |
@@ -82,6 +83,10 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
   - The outcome, a table a recording into MOTION.md, and a proposal: the values quiet at rest (still noise near
     0 after the cut) with the most z kept at the least lag on all four; a value that holds on one recording only
     is named so. Matthias judges it in the app before a default changes.
+- **C3.** The range. `edge`, `max_speed` and the thresholds are in metres or px, tuned at 0.65–1.5 m; stereo
+  noise grows with the square of the distance, so at 2–3.5 m they may need to be in disparity, and a depth's
+  noise from frame to frame may come near `max_speed`'s 12 cm and start the track over at rest **(deduction)**.
+  A recording at 2–3.5 m, with the camera in its place, and they measured there.
 
 ## D. The bridge
 
@@ -107,6 +112,19 @@ What is built: [FLUID_3D.md](FLUID_3D.md#the-density).
 - **F1.** The blobs' and the surface's p95: a sprite that grows to twice `radius` on a strong drop fills four
   times the pixels; the cut at 2 sigma and the lower cap ([TIMING.md](TIMING.md#the-particles-1)), judged on the
   look.
+
+## G. No numpy copies of shaders
+
+Shaders are checked in a GPU harness, so a numpy copy of one only invites the next. Each step removes a stage's
+copies, the tests and script parts built on them and their mentions in the documents; the CPU arithmetic that
+sets a shader's values (a weight, a sigma, a share) is no copy and stays, with its tests. A harness case is made
+when a shader needs one.
+
+- **G2.** The bridge's: the trails and their rate, the changes and the regions' shares, the blur, the mix
+  (`weighted_sum.py`), the z position's step and mix (`z_position_mix.py`), the peak's bins, `advect` and
+  `direction`; `bridge_shader_check.py`; the bridge's part of the tests; `velocity_peak_check.py`'s bins.
+- **G3.** The fluid's: the drag's gate and step, `expansion_mean.py`; `test_expansion.py`, `test_drag.py`'s
+  part, `expansion_check.py`'s target; FLUID_3D.md's lines on them.
 
 ## H. One unit across the stages
 
@@ -136,37 +154,31 @@ Once the 3D is finished, the 2D rebuilt in `modules/flow` on the 3D's principles
 
 ## Parked
 
-- **The range (was C3).** `edge`, `max_speed` and the thresholds are in metres or px, tuned at 0.65–1.5 m;
-  stereo noise grows with the square of the distance, so at 2–3.5 m they may need to be in disparity, and a
-  depth's noise from frame to frame may come near `max_speed`'s 12 cm and start the track over at rest
-  **(deduction)**. Parked until the camera is moved to its place; then a recording at 2–3.5 m and they measured
-  there.
 Not worked on until asked for; each with what is known.
 
-- **z from x/y's spread (looming).** A surface coming toward the camera grows in the image, so its x/y motion
-  spreads: its speed toward the camera is its depth times the flow's divergence over 2 (time to contact, Lee
-  1976). A second measurement of z, clean where the depth's is noisy, needing texture and a patch facing the
-  camera; the filter would fuse the two. Looked at on the captures, 2026-11-17 (one each, the motion raw, the
-  flow blurred 3 to 6 px, the signed mean over the player's moving pixels against the depth's z): it follows a
-  push (hands, correlation +0.59 at half the size) and a sideways arm less (measure, +0.40 at twice the size),
-  and free movement the wrong way (show, −0.42): a sideways limb, a turn or a limb passing in front spreads the
-  flow too. At rest it is 2 to 5 times quieter per pixel than the depth's z. Not fused or tried further.
-
-- The numpy versions of the flow's shaders removed, module by module, with the tests built on them: shaders are
-  checked in a GPU harness. About 10 files in `modules/` and `apps/` carry them (the motion's, the bridge's).
 - The flow's stages in `modules/flow`, the render only drawing them. A stage now sits in two packages (the bridge
   is `Bridge3DLayer` in the render, the view `ViewLayer` in deep_flow), as each subclasses the render's
   `LayerBase` and modules may not import the render **(deduction)**. The textbook split: each stage a plain flow
   class as `Fluid3D` is, with its settings, ports, inputs and outputs, and a thin render layer per stage that
   calls it, beside the monitor.
+
+The 3D fluid's look:
+
 - The 4K upscale: depth in 3D at the grid and detail in 2D at 4K, a march at the grid's size, one
   edge-aware upscale of the flat result and a 4K detail layer advected by the grid's velocity; what
   was found is in [FLUID_3D.md](FLUID_3D.md#the-densitys-detail).
-- The transfer curve in the particles' march: their slices hold a sum of the grid's layers, so the curve needs
-  its point in that sum ([FLUID_3D.md](FLUID_3D.md#the-look)); with the particles.
-- The particles, and how they combine with the fine density.
-- The particles' weight: the particles splatted into an `r32ui` grid by fixed-point
-  `imageAtomicAdd` (it needs integers), converted to the density volume the buoyancy reads.
+- The particles: how they combine with the fine density; the transfer curve in their march, whose slices hold a
+  sum of the grid's layers, so the curve needs its point in that sum ([FLUID_3D.md](FLUID_3D.md#the-look)); their
+  weight, splatted into an `r32ui` grid by fixed-point `imageAtomicAdd` (it needs integers), converted to the
+  density volume the buoyancy reads.
+- The density's detail carried by a flow map (BiMocq², Qu et al. 2019): the coordinates moved on
+  the coarse grid and the 4K density read through them, baked every half second; its benefit to be
+  shown first.
+- Vortex particles shed by the body for swirls below the grid (He et al. 2011; Weißmann and
+  Pinkall 2009).
+
+Its speed at 4K:
+
 - The sparse grid: each step a pass marks the 8 × 8 × 8 bricks whose velocity or density is above
   a floor, grown by one brick, into a list with an atomic counter; every pass but the pressure then
   runs `glDispatchComputeIndirect` over the list, one workgroup a brick, and a brick off the list
@@ -179,16 +191,9 @@ Not worked on until asked for; each with what is known.
   4K × 16 density, where each field's `advection` already lets the 4K density run semi-Lagrangian. The
   way down left: the predictor reading its eight texels itself and keeping their min and max for the
   limiter, about a fifth less **(deduction)**.
-- The density's detail carried by a flow map (BiMocq², Qu et al. 2019): the coordinates moved on
-  the coarse grid and the 4K density read through them, baked every half second; its benefit to be
-  shown first.
-- Vortex particles shed by the body for swirls below the grid (He et al. 2011; Weißmann and
-  Pinkall 2009).
-- Each field panel showing its own input gains as well, the same values as `input`'s: shared
-  between sibling panels, which `share` cannot do (it runs parent to child), so either hidden fields
-  at the top shared down to both, or a share between panels. In a field panel the system's name is
-  dropped as in `input`.
-- The camera as a standalone OAK app: the depth's alignment, the PC's now, then needs a home.
+
+The cameras:
+
 - A camera without depth, its mask from another source: deep_flow's mask is the depth's
   ([VIEW.md](VIEW.md#the-mask)); a mask from RVM, for a camera without depth, would come back from hd_trio, on
   the crop, cut into the view's window.
@@ -207,5 +212,6 @@ Not worked on until asked for; each with what is known.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
+- Shaders get checked in a GPU harness; remove obsolete pathways: G2, G3.
 
-Not designed yet, so their rules are not named: D3, E1, E2, F1, H1, I1 to I4.
+Not designed yet, so their rules are not named: C3, D3, E1, E2, F1, H1, I1 to I4.
