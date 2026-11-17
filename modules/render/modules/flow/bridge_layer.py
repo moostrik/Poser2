@@ -49,8 +49,7 @@ class BridgeOutput(StageOutput):
     dragged toward: `velocity`, widths/s; `density`, in 2D the amount alone, in 3D RGBA,
     the amount times the color, with the amount as alpha; `temperature`. The body force, what is
     added × dt, the 3D bridge's only: `acceleration`, widths/s², None while the bridge gives none.
-    The 3D bridge's `expansion`, where the water swells, a presence 0 to 1, or None; its `displacement`, the
-    body pushing water aside, red −v·∇mask (1/s) and green z × the mask (widths/s), or None. Where each goes in depth,
+    The 3D bridge's `expansion`, where the water swells, a presence 0 to 1, or None. Where each goes in depth,
     the 3D bridge's only: each output's `_z_position`, its readings' z positions; None without."""
     velocity: Annotated[Texture, TextureKind.VELOCITY]
     density: Annotated[Texture, TextureKind.IMAGE]
@@ -62,8 +61,6 @@ class BridgeOutput(StageOutput):
     acceleration_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
     expansion: Annotated[Texture | None, TextureKind.SCALAR] = None
     expansion_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
-    displacement: Annotated[Texture | None, TextureKind.SCALAR] = None
-    displacement_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
 
 
 class BridgeLayerSettings(StageLayerSettings):

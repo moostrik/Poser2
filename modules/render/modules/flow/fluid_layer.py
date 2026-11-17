@@ -21,7 +21,7 @@ from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 @dataclass
 class Injection:
     """One bridge output as one fluid takes it: the boundary's `velocity`, `density`,
-    `temperature`, the body force's `acceleration` and the 3D bridge's `expansion` and `displacement` from the
+    `temperature`, the body force's `acceleration` and the 3D bridge's `expansion` from the
     bridge output, at `weight`, 0 to 1, the injection's share of the fluid's velocity, density and temperature, as a layer's weight in a mix. The app
     sets the weight from whatever it reads; the fluid never knows why. `color` is the color the 2D fluid gives
     the injection's density at its output, where the 2D density is an amount; the 3D fluid's density arrives
@@ -37,8 +37,6 @@ class Injection:
     acceleration_z_position: Texture | None = None
     expansion: Texture | None = None
     expansion_z_position: Texture | None = None
-    displacement: Texture | None = None
-    displacement_z_position: Texture | None = None
     color: tuple[float, float, float] = (1.0, 1.0, 1.0)
 
 

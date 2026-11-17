@@ -329,9 +329,7 @@ class DeepFlowRender(RenderBase):
                                                density_z_position=output.density_z_position,
                                                temperature_z_position=output.temperature_z_position,
                                                acceleration_z_position=output.acceleration_z_position,
-                                               expansion=output.expansion, expansion_z_position=output.expansion_z_position,
-                                               displacement=output.displacement,
-                                               displacement_z_position=output.displacement_z_position))
+                                               expansion=output.expansion, expansion_z_position=output.expansion_z_position))
             fluid.set_input(render.FluidInput(dt, injections))
 
     def _wire_monitors(self) -> None:

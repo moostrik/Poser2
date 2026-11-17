@@ -117,9 +117,9 @@ the frame's dt and the lowpass uses the Ema's real step, the same integral, exac
 
 ## The mix
 
-What the fluid takes is two systems, the two a solver tells apart, and two sources of volume, the expansion
-and the displacement, each output mixing the six readings, each reading at a share, 0 to 1, as the light
-renderer mixes its layers (`Bridge3DLayer`, `WeightedSum`). The boundary is the body in the water, what the water is dragged toward: its
+What the fluid takes is two systems, the two a solver tells apart, and the expansion, a source of volume,
+each output mixing the six readings, each reading at a share, 0 to 1, as the light renderer mixes its layers
+(`Bridge3DLayer`, `WeightedSum`). The boundary is the body in the water, what the water is dragged toward: its
 velocity, and its dye and warmth, which have no force and are held at the body. The body force is the
 Navier–Stokes force term, what is added: an acceleration, which the water keeps after the body is gone, so a
 stop can throw the water on. The panel shows `readings` (`lowpass`, `bandpass`), then one subpanel per output,
@@ -136,9 +136,8 @@ the second (`saturation`, `brightness`).
 | `density`      | velocities        | boundary value | the dye, RGBA: the color times its presence, the presence as alpha, 0 to 1                           | the trail 1   |
 | `temperature`  | velocities        | boundary value | the warmth, −1 cold to 1 hot, its presence folded in                                                 | the trail 1   |
 | `expansion`    | velocities        | source         | where the water swells, a presence 0 to 1, capped there; the newest capture's in a tick of several   | all 0: `None` |
-| `displacement` | velocities        | source         | the body pushing water aside: red −v·∇mask, 1/s; green z × the mask, widths/s; the newest capture's  | all 0: `None` |
 
-The six outputs (`BridgeOutput`, `Injection`) are the subpanels' names, each named by what the fluid gets,
+The five outputs (`BridgeOutput`, `Injection`) are the subpanels' names, each named by what the fluid gets,
 in a unit of the body; how it goes in, as the boundary or the body force, is in the column beside it.
 
 The presence is the mix's speed in widths/s, the sum of its readings' sizes (the length of each, at
@@ -150,19 +149,11 @@ The density's color is the picture's (`DensityColor`: the image, or white, times
 the mask) through `saturation` and `brightness`; the warmth is (warm − cold) × (1 − neutral × 0.5) ×
 the presence, from the same color's red, blue and green. The readings of one unit share the mix, so
 the mix has no gain: the motion's gains balance the axes and the fluid's gains set how the water
-follows; a weight is a share. The acceleration, the expansion and the displacement are `None` while their
-shares are all 0, the displacement also without a mask. The ports follow the outputs, a group each, named
-as the output, in the order the bridge makes them: `velocity.velocity`, `acceleration.acceleration`,
-`density.amount`, `temperature.amount`, `expansion.expansion`, `displacement.velocity` and
-`displacement.displacement`, each with its `z_position`; the density's and the temperature's groups then
-hold their bridges' own (`density.input`, `density.output`, ...).
-
-The displacement is the rate at which the body fills the water, −v·∇mask, from its readings mixed as
-velocities (`displacement.velocity`, widths/s) and the mask's gradient, central differences at the velocity's
-texels, per width (`Displacement`): positive at the mask's edge the body moves toward, negative at the edge it
-leaves, 0 for a still body. Its green is the velocity's z times the mask, which the fluid turns into the part
-in depth by its slab's slope ([FLUID_3D.md](FLUID_3D.md#the-volume-source)). It has no `mask` share: the mask
-is in it already; its z position is the mixed velocity's.
+follows; a weight is a share. The acceleration and the expansion are `None` while their shares are
+all 0. The ports follow the outputs, a group each, named as the output, in the order the bridge makes
+them: `velocity.velocity`, `acceleration.acceleration`, `density.amount`, `temperature.amount` and
+`expansion.expansion`, each with its `z_position`; the density's and the temperature's groups then hold
+their bridges' own (`density.input`, `density.output`, ...).
 
 A wake may drag (its share in `velocity`: the water behind a leaving limb is pulled to the
 speed it left with, and let go when the pulse dies), kick (its share in `acceleration`),

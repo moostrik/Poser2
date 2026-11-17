@@ -72,12 +72,12 @@ def with_source(wall: str, rate: float, overrides: list[str]) -> None:
     try:
         fluid.add_expansion(presence_texture, 1.0, place_texture)
         glFinish()
-        expansion = fluid._source_vol.read_to_numpy()
+        expansion = fluid._expansion_vol.read_to_numpy()
         assert expansion is not None
         expansion = expansion.astype(np.float64).reshape(fluid._depth, fluid._simulation_height, fluid._simulation_width, -1)[..., 0]
         fluid._enforce_incompressibility()
         div = divergence(fluid)
-        print(f'{wall:<7} source  presence {expansion.sum() / rate if rate else 0.0:8.1f} cells  divergence mean {div.mean():+.2e}', flush=True)
+        print(f'{wall:<7} source  presence {expansion.sum():8.1f} cells  divergence mean {div.mean():+.2e}', flush=True)
     finally:
         presence_texture.deallocate()
         place_texture.deallocate()
@@ -110,24 +110,24 @@ def timing(rate: float, overrides: list[str]) -> None:
     presence_texture, place_texture = mh.texture_of(presence), mh.texture_of(place)
 
     def inject() -> None:
-        fluid._source_fresh = False
+        fluid._expansion_fresh = False
         fluid.add_expansion(presence_texture, 1.0, place_texture)
 
     def divergence_pass(expansion: bool) -> None:
         fluid._divergence_shader.use(fluid._faces.volume, fluid._obstacle, fluid._divergence_vol, fluid._cell,
                                      has_obstacles=fluid._has_obstacles, closed=fluid._closed,
-                                     source=(fluid._source_vol, fluid._source_mean) if expansion else None)
+                                     expansion=(fluid._expansion_vol, rate, fluid._expansion_mean) if expansion else None)
 
     def projection(expansion: bool) -> None:
-        fluid._source_fresh = expansion
+        fluid._expansion_fresh = expansion
         fluid._enforce_incompressibility()
 
     try:
         inject()
         glFinish()
         rows = [('injection', inject),
-                ('mean', lambda: fluid._source_mean_shader.use(fluid._source_vol, fluid._obstacle, fluid._has_obstacles,
-                                                               fluid._source_partials, fluid._source_mean)),
+                ('mean', lambda: fluid._expansion_mean_shader.use(fluid._expansion_vol, fluid._obstacle, fluid._has_obstacles,
+                                                                  fluid._expansion_partials, fluid._expansion_mean)),
                 ('divergence, without', lambda: divergence_pass(False)),
                 ('divergence, with', lambda: divergence_pass(True)),
                 ('projection, without', lambda: projection(False)),
