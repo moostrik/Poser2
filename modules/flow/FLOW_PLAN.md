@@ -137,8 +137,9 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
   | the catch-up, 5      | `z.smooth` 0, 12, 25, 50, 100 with `z.catch_up` 8; `z.threshold` 0                  |
   | the new rule, 12     | rest (`z.smooth`) 50, 100, 200 × halving speed 0.5, 1, 2, 4 px/frame; `z.threshold` 0 |
   | the cut, 6 at most   | the best of each with `z.threshold` 0.5, 1, 2                                      |
+  | the tolerance, 2     | the best of each with `z.tolerance` 0.2 m, as saved                                |
   | every row but the raw | `z.dead_zone` 0; `xy.threshold` 0.5, as saved, which is the catch-up's gate         |
-  | every row            | as saved: `xy.levels` 4, `xy.window` 7×7, `xy.damping` 0.03, `xy.same_surface` on, `z.edge` 0.1 m, `z.window` 7×7, `z.tolerance` 0.2 m, `z.max_speed` 6 m/s, `z.xy_smooth` off; the view as captured |
+  | every row            | as saved: `xy.levels` 4, `xy.window` 7×7, `xy.damping` 0.03, `xy.same_surface` on, `z.edge` 0.1 m, `z.window` 7×7, `z.max_speed` 6 m/s, `z.xy_smooth` off; the view as captured; `z.tolerance` 0.5 m, where it starts a lagging estimate over least |
 
   Each row: still noise inside and at the edge (measure), z kept and lag against the raw reference (hands).
 - **C2.** The values, after C1, each measured on the four recordings and judged in the app: the smoothing's two
