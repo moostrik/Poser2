@@ -223,8 +223,8 @@ class ViewMaskSettings(BaseSettings):
 
 
 class ViewColorSettings(BaseSettings):
-    """ViewColor: the image graded, in the order applied, then sharpened, its darkness keyed to transparency; then
-    premultiplied by the mask's copy, eroded and feathered."""
+    """ViewColor: the image graded, in the order applied, then sharpened, its alpha a matte from its brightness;
+    then premultiplied by the mask's copy, eroded and feathered."""
     enabled:    Field[bool]  = Field(True, description="The color graded; off, the image as it is")
     exposure:   Field[float] = Field(1.0, min=0.1, max=3.0, newline=True, description="The color times this")
     offset:     Field[float] = Field(0.0, min=-0.5, max=0.5, description="Added to the color, after the exposure")
@@ -232,7 +232,7 @@ class ViewColorSettings(BaseSettings):
     contrast:   Field[float] = Field(1.0, min=0.5, max=2.0, description="Contrast around mid grey")
     saturation: Field[float] = Field(1.0, min=0.0, max=2.0, description="Saturation, times this")
     sharpen:    Field[float] = Field(0.0, min=0.0, max=2.0, description="Sharpen (0 = off)")
-    luma_key:   Field[float] = Field(1.0, min=0.0, max=1.0, description="Darkness made transparency: alpha by brightness (0 = off)")
+    luma_matte: Field[float] = Field(1.0, min=0.0, max=1.0, description="Alpha from the color's brightness: darkness made transparency (0 = off)")
     use_mask:  Field[bool]  = Field(True, newline=True, description="The color cut by the mask, premultiplied")
     erode:      Field[int]   = Field(0, min=0, max=4, step=1, description="Pixels the color's edge moves inside the mask's (view pixels)")
     feather:    Field[float] = Field(0.0, min=0.0, max=16.0, step=0.5, description="Width the color fades in over inside its edge (view pixels); 0 = hard")

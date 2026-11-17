@@ -27,7 +27,7 @@ its textures, ports and settings group, and the monitor lists each part's textur
 | `crop` (`ViewCrop`)          | the box in 3D: `image`, the camera image inside its sides (`center_x`, `center_y`, `height`) at the view's `width` × `height`; who: `depth`, the camera's depth inside its front and back (`near`, `far`) on the depth's own pixels, unblended, 0 outside (`DepthCrop`) |
 | `mask` (`ViewMask`)          | where: `mask`, the crop's depth's outline moved onto the image's ([The mask](#the-mask)) |
 | `depth` (`ViewDepth`)        | how far: `upscaled`, the aligned depth upscaled to the view once where it is the player's and the mask is; `filled`, that filled across the mask, the view's depth ([The depth](#the-depth)), a `DepthView` ([MOTION.md](MOTION.md#when-it-measures)) |
-| `color` (`ViewColor`)        | `color`, the player's color for the density: the image graded (`exposure`, `offset`, `gamma`, `contrast`, `saturation`) and sharpened (`sharpen`), its darkness keyed to transparency (`luma_key`), premultiplied last by the mask's copy (`use_mask`), its edge eroded by `erode` and feathered inward over `feather` view pixels |
+| `color` (`ViewColor`)        | `color`, the player's color for the density: the image graded (`exposure`, `offset`, `gamma`, `contrast`, `saturation`) and sharpened (`sharpen`), its alpha a matte from its brightness (`luma_matte`), premultiplied last by the mask's copy (`use_mask`), its edge eroded by `erode` and feathered inward over `feather` view pixels |
 | the pose                     | the pose's points placed in the crop, for the pose drawn over the view               |
 
 ```mermaid
@@ -39,7 +39,7 @@ flowchart TB
   M["mask → mask: where<br/>guided filter; 448 × 800"]
   R["depth → upscaled: how far<br/>the player's depth where the mask is, else 0"]
   F["depth → filled<br/>push-pull inside the mask; 448 × 800"]
-  G["color → color<br/>graded, keyed, then premultiplied by the mask's copy, eroded and feathered"]
+  G["color → color<br/>graded, matted, then premultiplied by the mask's copy, eroded and feathered"]
   MO["Motion, 448 × 800<br/>x/y from the image, z from the depth,<br/>each pixel weighted by the mask"]
   I --> C
   D --> K
@@ -66,12 +66,13 @@ as its `image`, the density's color, its alpha kept as the color's coverage ([BR
 The color part works on the straight image and premultiplies it by the mask last, RGB and alpha alike, as
 compositing does and as the render blends (Porter and Duff 1984; Brinkmann): grading or sharpening a cut image
 changes its half-masked edge apart from the rest and pulls the cut's black into the edge. With `color.enabled` off
-the color is the image as it is, keyed and masked as set.
+the color is the image as it is, matted and masked as set.
 
-The luma key, after the grading and the sharpening and before the premultiply, makes darkness transparency, as
-video compositing keys a picture by its brightness: the alpha becomes 1 − `luma_key` + `luma_key` × the color's
-brightest channel (HSV's value), the RGB as it is (`LumaKey`). The premultiply then multiplies both by the mask's
-copy, so the stored alpha is the feather times the key. At 1, the default, a half-dark red is full red at half the
+The luma matte, after the grading and the sharpening and before the premultiply, is a matte from the color's
+brightness, its brightest channel (HSV's value), as video compositing mattes a picture by its brightness: darkness
+becomes transparency. The alpha becomes 1 − `luma_matte` + `luma_matte` × that brightness, the RGB as it is
+(`shaders.LumaMatte`). The premultiply then multiplies both by the mask's copy, so the stored alpha is the feather
+times the matte. At 1, the default, a half-dark red is full red at half the
 alpha and black brings in nothing, so dark clothes and shadows leave no dark patches in the fluid **(site
 fact)**; at 0 the alpha is the feather's alone. With `use_mask` off the color has no edge.
 

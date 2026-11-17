@@ -8,4 +8,5 @@ from .mask_multiply import MaskMultiply
 from .mask_antialias import MaskAntialias
 from .chroma_key import ChromaKey
 from .luma_key import LumaKey
+from .luma_matte import LumaMatte
 from .jump_flood import JumpFlood

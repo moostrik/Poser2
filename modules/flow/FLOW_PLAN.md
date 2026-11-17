@@ -97,7 +97,7 @@ app, 2026-11-17, with the `mask` share: it works; with the trail alone it hardly
 the same water **(site fact)**.
 
 Built (2026-11-17): the density's color with its coverage, and its amount apart (Porter and Duff 1984: alpha is
-coverage); the luma key in the view ([VIEW.md](VIEW.md#the-stage)), the bridge's two outputs
+coverage); the luma matte in the view ([VIEW.md](VIEW.md#the-stage)), the bridge's two outputs
 ([BRIDGE_3D.md](BRIDGE_3D.md#the-mix)).
 
 - **D5.** The density's blend, in the grid, the fine density and the particles' carrier alike. It replaces
@@ -219,9 +219,9 @@ The body in the fluid:
 
 The density's color:
 
-- The color grading moves from the view to the bridge, the luma key with it: the view sees the player, the bridge
+- The color grading moves from the view to the bridge, the luma matte with it: the view sees the player, the bridge
   makes what the fluid takes. The view then hands over the image with its feathered mask as alpha (erode and
-  feather are the mask's work and stay); the bridge divides by the alpha, grades, keys and multiplies back, as
+  feather are the mask's work and stay); the bridge divides by the alpha, grades, mattes and multiplies back, as
   compositing does. Weighed against the point below that the color, deep_flow's look, stays in the app.
 
 The cameras:

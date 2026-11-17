@@ -5,7 +5,7 @@ from .color import BrightnessContrast, Exposure, Hsl, Hsv, Lut, Colorize, ToneMa
     ColorMatrix, saturation_matrix, Posterize, Dither, DitherPattern, Vignette
 from .filter import Blur, Sharpen, Sobel, Dilate, Erode, GuidedFilter, Mosaic, Displace, Median, Bilateral, DualFilter
 from .mask import MaskApply, Threshold, AdaptiveThreshold, ColorFill, MaskMultiply, MaskAntialias, ChromaKey, LumaKey, \
-    JumpFlood
+    LumaMatte, JumpFlood
 from .composite import Mix, WeightedSum, Blend, BlendShaderMode
 from .transition import BarnDoorWipe, GradientWipe
 from .generate import WhiteNoise, SimplexNoise
