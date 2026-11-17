@@ -60,39 +60,44 @@ overlap now (hands, unsmoothed, `dead_zone` 0.02: 52 ms against 7; `smooth` 25: 
 noise 2.4 / 3.1 against 9.1 / 5.1).
 
 - **C1.** One setting per job in the motion: z's "another surface", z's smoothing, x/y's cut; `z.tolerance` and
-  `xy.same_surface` go. `tolerance` (0.2 m) and `edge`
-  (0.1 m) answer the same question in space, how big a depth jump is another surface, and disagree between 0.1 and
-  0.2 m; `tolerance` 0.2 against 0.5 changed nothing on four recordings, as the step filter has already taken the
-  jump out **(deduction)**. In `depth_velocity_shader.frag` and `DepthVelocity`:
-  - space: `edge` for the step filter (as now), the window's samples and the carried texels (now `tolerance`);
-  - time: `max_speed` (6 m/s) the one restart, on the miss before the filter: a new depth further from the
-    prediction than a body moves in the frame (`max_speed` × the frame's time, 12 cm at 50 fps) is another
-    surface, and the track starts over. It replaces the restart on a miss past `tolerance` and the check on the
-    filtered rate after the filter, which a smoothed track at rest softens below 6 m/s **(deduction)**;
-  - x/y's `same_surface` goes, with its part of the solve (`LucasKanadeFlow.update`'s depth and tolerance): no
-    effect on four recordings, the step filter has taken the jump out **(deduction)**;
+  `xy.same_surface` go. `tolerance` (0.2 m) and `edge` (0.1 m) answer the same question, and disagree between
+  0.1 and 0.2 m; `tolerance` 0.2 against 0.5 changed nothing on four recordings, as the step filter has already
+  taken the jump out **(deduction)**. In `depth_velocity_shader.frag` and `DepthVelocity`:
+  - within a frame, `edge`: the step filter (as now) and the window's samples (now `tolerance`);
+  - between frames, `max_speed` (6 m/s) × the frame's time (12 cm at 50 fps): the carried texels that count as
+    the measurement's surface, and the restart on the miss before the filter. They replace `tolerance` in the
+    carry and the restart, and the check on the filtered rate after the filter, which a smoothed track at rest
+    softens below 6 m/s **(deduction)**;
+  - x/y's `same_surface` goes, with its part of the solve: `LucasKanadeFlow.update`'s depth and tolerance, the
+    depth in `lucas_kanade_tile.comp`, the x/y solve's numpy version's and its test (`test_scene_flow`),
+    `scripts/solve_replay.py`, the capture's recorded settings;
   - z's smoothing has its own three numbers, x/y's `threshold` one job, the cut of x/y: `z.xy_rest`
     (px/frame, 0.5), the x/y speed below which z counts as at rest, where the shader took `xy.threshold`;
-    `halving_speed` renamed `xy_halving`, as it is on x/y's speed too, 0 off, `smooth` throughout;
-  - `xy_smooth` smooths x/y over z's time, the 1€ rule's, in place of `smooth` at rest;
-  - z's panel in groups in the order the code runs them: surface (`edge`, `window`, `max_speed`), smoothing
-    (`smooth`, `xy_rest`, `xy_halving`, `xy_smooth`), cut (`dead_zone`, `threshold`); each description says
-    what the setting does and on what (x/y or z), in one line; MOTION.md's z opens with the steps in order and
-    their settings.
+    `halving_speed` renamed `xy_halving`, as it is on x/y's speed too; at 0 the rule is off, `smooth`
+    throughout, its own case in the shader (the formula's 0 would be no smoothing);
+  - `xy_smooth` smooths x/y over z's time: the x/y filter (`displacement_filter.frag`) works out the same x/y
+    speed per pixel (the 3×3's largest past `xy_rest`) and the time from `smooth` and `xy_halving`, in place of
+    one alpha from `smooth` for the whole image;
+  - z's one panel in the order the code runs it, a new line for each group: surface (`edge`, `window`,
+    `max_speed`), smoothing (`smooth`, `xy_rest`, `xy_halving`, `xy_smooth`), cut (`dead_zone`, `threshold`);
+    the setting paths stay. Each description says what the setting does and on what (x/y or z), in one line;
+    MOTION.md's z opens with the steps in order and their settings.
 
   The 1€ rule opens on x/y's speed, not on z's own as the original filter does: z's own (from a copy followed
   over the time at rest) let the still noise up to 2 to 4 for no less lag, as z's noise is far above a push
   where the filter's signals have little.
   Checked on one capture of hands and of measure, now against the change, the preset as saved: still noise
-  inside and at the edge, z kept, lag, x/y kept, the restarts' share while moving; about 5 minutes. The presets
-  keep a removed key until Matthias saves; MOTION.md's parts and settings tables follow.
-- **C2.** The values, each measured on the four recordings and judged in the app: `smooth` and `halving_speed`
+  inside and at the edge, z kept, lag, x/y kept, the restarts' share at rest and while moving; about 5 minutes.
+  The presets keep a removed key until Matthias saves; `scripts/motion_bridge_pass_check.py`, the compare's
+  setting maps, MOTION.md's parts and settings tables follow.
+- **C2.** The values, each measured on the four recordings and judged in the app: `smooth` and `xy_halving`
   (and 0.25, 6 ms on hands) and z's `threshold`, with `dead_zone` 0; x/y's `threshold` around 0.4; a step up on `levels`, x/y's
   `window` and `damping` against their ms. The step filter and z's window stay unless a row shows a clear gain
   that keeps the z. The settings' defaults and MOTION.md's reasons follow; the preset when Matthias saves it.
   No new recording.
-- **C3.** The range: `edge` and the thresholds are in metres or px, tuned at 0.65–1.5 m; stereo noise grows
-  with the square of the distance, so at 2–3.5 m they may need to be in disparity **(deduction)**. A recording
+- **C3.** The range: `edge`, `max_speed` and the thresholds are in metres or px, tuned at 0.65–1.5 m; stereo
+  noise grows with the square of the distance, so at 2–3.5 m they may need to be in disparity, and a depth's
+  noise from frame to frame may come near `max_speed`'s 12 cm and start the track over at rest **(deduction)**. A recording
   at 2–3.5 m, made by the operator, and they measured there.
 
 ## D. The bridge
