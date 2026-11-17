@@ -141,19 +141,20 @@ class ParticleDensity(DensityCarrier):
         spread: float = settings.input.spread / FULL_WIDTH_HALF_MAXIMUM / max(self._z_extent, 1e-6)     # the sigma, a share of the depth
         return slab_sum(REFERENCE_Z_POSITION, spread, self._layers) / max(self.settings.particles.rate, 1e-6)
 
-    def add(self, texture: Texture, gain: float, dt: float, spread: float, mode: InjectMode = InjectMode.FILL,
-            target_gain: float = 1.0, z_position: Texture | None = None, release: float = 0.0) -> None:
+    def add(self, amount: Texture, color: Texture, gain: float, dt: float, spread: float,
+            mode: InjectMode = InjectMode.FILL, target_gain: float = 1.0, z_position: Texture | None = None,
+            release: float = 0.0) -> None:
         """Particles born where the dye is, as many as its presence × the rate; a FILL's share counted as that
         share of fully dyed added in the step, so a particle look sees a FILL and an ADD alike. Particles are
         only born, so the release's share has nothing to take."""
         if mode == InjectMode.FILL:
             gain = gain * target_gain / max(dt, 1e-6)
-        if not self.allocated or not texture.allocated or gain <= 0.0:
+        if not self.allocated or not amount.allocated or not color.allocated or gain <= 0.0:
             return
         self._seed += 1
-        self._scale = (self._output[0] * self._output[1]) / max(1, texture.width * texture.height)
+        self._scale = (self._output[0] * self._output[1]) / max(1, color.width * color.height)
         self._emit_timer.begin()
-        self._emit_shader.use(texture, self._particles, self._ring, self._count, gain=gain, dt=dt,
+        self._emit_shader.use(amount, color, self._particles, self._ring, self._count, gain=gain, dt=dt,
                               rate=self.settings.particles.rate, floor=AMOUNT_FLOOR,
                               layers=self._layers, spread=spread, seed=self._seed, z_position=z_position)
         self._emit_timer.end()

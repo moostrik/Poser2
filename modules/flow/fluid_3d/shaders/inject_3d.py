@@ -28,7 +28,7 @@ class Inject3D(ComputeShader):
     def use(self, input_2d: Texture, volume: Texture3D,
             spread: float, strength: float = 1.0,
             internal_format: int = GL_RGBA16F, mode: int = 0, scalar: bool = False, gain: float = 1.0,
-            z_position: Texture | None = None, release: float = 0.0) -> None:
+            z_position: Texture | None = None, release: float = 0.0, color: Texture | None = None) -> None:
         """Add the 2D input into the 3D volume.
 
         Args:
@@ -44,6 +44,8 @@ class Inject3D(ComputeShader):
                 it, puts nothing in
             release: FILL: the share where the target is below the field (`strength` where it is above);
                 0 = never down
+            color: A density's color, premultiplied by its alpha; `input_2d` is then its amount (red), and the
+                density the color times the amount, capped at 1
         """
         if not self.allocated or not self.shader_program:
             return
@@ -57,6 +59,10 @@ class Inject3D(ComputeShader):
 
         # Bind 3D volume as read-write image
         self.bind_image_3d_readwrite(0, volume, internal_format)
+
+        if color is not None:
+            self.bind_texture(2, color, "uColor")
+        glUniform1i(self.get_uniform_loc("uHasColor"), int(color is not None))
 
         # Uniforms
         bind_z_position(self, 1, z_position)

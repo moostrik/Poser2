@@ -99,7 +99,7 @@ def main() -> None:
         ('composite', fluid._composite_output, 8.0 * cells + 8.0 * output),
         ('inject: drag', lambda: fluid.drag_velocity(body), 16.0 * faces),
         ('inject: body force', lambda: fluid.add_acceleration(body), 16.0 * faces),
-        ('inject: boundary density', lambda: fluid.add_density(dye), 16.0 * cells + 4.0 * fine),
+        ('inject: boundary density', lambda: fluid.add_density(dye, dye), 16.0 * cells + 4.0 * fine),
     ]
     print(f'{w} x {h} x {d} cells, the fine density {fine / 1e6:.0f} M texels; floor at {args.bandwidth:.0f} GB/s')
     print(f"{'pass':<30} {'ms':>7} {'floor ms':>9} {'x floor':>8}")

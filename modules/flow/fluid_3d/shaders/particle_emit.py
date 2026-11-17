@@ -17,13 +17,15 @@ class ParticleEmit(ComputeShader):
     def __init__(self) -> None:
         super().__init__()
 
-    def use(self, source: Texture, particles: StorageBuffer, ring: StorageBuffer, count: int, *,
+    def use(self, amount: Texture, color: Texture, particles: StorageBuffer, ring: StorageBuffer, count: int, *,
             gain: float, dt: float, rate: float, floor: float, layers: int, spread: float,
             seed: int, z_position: Texture | None = None) -> None:
-        """Emit from `source` into the ring of `count` particles.
+        """Emit from the density, `amount` and `color`, into the ring of `count` particles, one texel of the color
+        each.
 
         Args:
-            source: RGBA, the amount times the color, the amount as alpha
+            amount: The bridge's amount, red; capped at 1, times the color's alpha
+            color: The color, premultiplied by its alpha
             particles: The particles' buffer
             ring: The ring's head (one uint)
             count: The ring's size
@@ -34,13 +36,14 @@ class ParticleEmit(ComputeShader):
             layers: The grid's layers, which place the center and sum the slab for the mass
             spread: Its sigma
             seed: The frame, for the hash
-            z_position: The source's z position (red over green); a texel without one, or every texel
+            z_position: The amount's z position (red over green); a texel without one, or every texel
                 without it, spawns none
         """
-        if not self.allocated or not self.shader_program or not source.allocated:
+        if not self.allocated or not self.shader_program or not amount.allocated or not color.allocated:
             return
         glUseProgram(self.shader_program)
-        self.bind_texture(0, source, "uSource")
+        self.bind_texture(0, color, "uColor")
+        self.bind_texture(2, amount, "uAmount")
         particles.bind_base(0)
         ring.bind_base(1)
         glUniform1f(self.get_uniform_loc("uGain"), gain)
@@ -52,5 +55,5 @@ class ParticleEmit(ComputeShader):
         glUniform1f(self.get_uniform_loc("uSpread"), spread)
         glUniform1ui(self.get_uniform_loc("uCount"), count)
         glUniform1ui(self.get_uniform_loc("uSeed"), seed & 0xFFFFFFFF)
-        self.dispatch(source.width, source.height)
+        self.dispatch(color.width, color.height)
         self.barrier_buffer()

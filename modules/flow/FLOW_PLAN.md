@@ -14,7 +14,7 @@ operator saw.
 | A   | [The measurements](#a-the-measurements)                                      | built                             | [FLOW.md](FLOW.md#the-goals)                       |
 | B   | [The view](#b-the-view)                                                      | built                             | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; C2 the values, C3 range    | [MOTION.md](MOTION.md)                             |
-| D   | [The bridge](#d-the-bridge)                                                  | built; D4 alpha, D5 blend         | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
+| D   | [The bridge](#d-the-bridge)                                                  | built; D5 blend                   | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | the temperature                   | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | F1, F2 white                      | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                       | [FLOW.md](FLOW.md)                                 |
@@ -96,32 +96,10 @@ The expansion is a source of volume where the body is, a fountain: water is made
 app, 2026-11-17, with the `mask` share: it works; with the trail alone it hardly shows, as the velocity's drag holds
 the same water **(site fact)**.
 
-- **D4.** The density's color with its coverage, and its amount apart (Porter and Duff 1984: alpha is coverage).
-  The view's color is already graded and premultiplied by its own feathered copy of the mask, RGB and alpha alike
-  ([VIEW.md](VIEW.md#the-stage)); the bridge gates it by the mask again in `DensityColor`, runs its own HSV pass,
-  and `DensityBridge` drops the alpha and treats the color as straight, premultiplying it by the amount, so the
-  edge comes in darkened twice at full amount **(code)**.
-  - The view: the luma key (video compositing: darkness becomes transparency), a setting in its color step,
-    `color.luma_key`, 0..1, between `sharpen` and `use_mask`, run in that order: after the grading and the
-    sharpening, before the premultiply, it sets the alpha to 1 − key + key × the color's brightness, its brightest
-    channel (HSV's value), the RGB as it is; the premultiply then multiplies both by the mask's copy. The stored
-    color stays as now, the alpha is the feather × the key: at 1 a half-dark red is full red at half the alpha,
-    and black brings in nothing; at 0 half-dark red at full alpha, as now. Default 1, the look asked for: dark
-    clothes and shadows leave no dark patches **(site fact)**. With `use_mask` off the color has no edge.
-  - The bridge: takes the view's color as it comes, its alpha kept, and passes no mask to `DensityColor` (the 2D
-    bridge still passes it, and keeps its own HSV pass, until line I); the 3D `DensityBridge`'s HSV pass
-    (`saturation`, `brightness`) goes, and it stops merging.
-  - The output: `density`, the amount, the mix of the readings' speeds and the mask's share, as the 2D bridge's
-    already is, and `color`, the color with its alpha (`bridge_layer.py`). `CaptureMax` picks the two as a pair,
-    by the amount; the particles take their amount from `density`, their color from `color`.
-  - The fluid takes both with today's injection, so the step stands alone: the amount × the color's alpha
-    into the FILL drag (`fluid_3d_layer.py`, `fluid_2d_layer.py`, `add_density`, the three carriers).
-  - The preset: the view's `color.saturation` takes the bridge's (1.01 × 1.18, about 1.19); the bridge's
-    `saturation` and `brightness` go.
-  - VIEW.md and BRIDGE_3D.md follow.
-  - Tests: the guard tests and the suites of `modules/flow`, `modules/render`, `modules/settings` and
-    `apps/deep_flow`, at the end; no new test, as the change is in shaders, checked in the app. Checked in the
-    app: no dark rim at any gain; the luma key from 0 to 1; the 2D flow as before.
+Built (2026-11-17): the density's color with its coverage, and its amount apart (Porter and Duff 1984: alpha is
+coverage); the luma key in the view ([VIEW.md](VIEW.md#the-stage)), the bridge's two outputs
+([BRIDGE_3D.md](BRIDGE_3D.md#the-mix)).
+
 - **D5.** The density's blend, in the grid, the fine density and the particles' carrier alike. It replaces
   the fill's switch, a cell drawn toward the input only where the input's amount is higher and untouched
   otherwise, which leaves patches where the input meets older density; and `density_release`, which goes, as a
@@ -134,7 +112,7 @@ the same water **(site fact)**.
     - `add`: the source (Stam 2003; Bridson 2015), the input × `density_gain` × dt added. Where the amount would
       pass 1, all four channels are scaled down together so the amount lands at 1; the color stays the
       density-weighted mix of what went in.
-  - The amount: min(the bridge's amount × `density_gain`, 1) × the bridge's alpha (D4). The gain, default 1,
+  - The amount: min(the bridge's amount × `density_gain`, 1) × the color's alpha. The gain, default 1,
     amplifies the speed, a slow player putting in more; the alpha, the coverage, comes in as given.
   - The color space, a setting, `density.color_space`: `rgb`, as now, or `oklab` (Ottosson 2020), the color
     stored as (L × density, a × density, b × density, density), so the flow and both blends mix colors as the
@@ -188,8 +166,8 @@ Once the 3D is finished, the 2D rebuilt in `modules/flow` on the 3D's principles
 - **I1.** The 2D fluid takes the boundary by a drag and the body force's acceleration times dt, as the 3D does
   ([FLUID_3D.md](FLUID_3D.md#the-inputs)), in place of adding the bridge's velocity as a source times dt.
 - **I2.** The 2D motion on the Lucas–Kanade solve, in widths/s with its velocity gate, in place of `GradientFlow`.
-- **I3.** The 2D bridge rebuilt on the 3D bridge's filters, the three copied classes (`DensityBridge`,
-  `TemperatureBridge`, `VelocityMagnitude`) shared again.
+- **I3.** The 2D bridge rebuilt on the 3D bridge's filters, the two copied classes (`TemperatureBridge`,
+  `VelocityMagnitude`) shared again.
 - **I4.** Each 2D stage its document as it is rebuilt (`BRIDGE_2D.md`, `FLUID_2D.md`); `fluid_2d.py`'s 21-line
   pipeline docstring goes with it.
 
@@ -268,11 +246,8 @@ The cameras:
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
-- A settings class mirrors the code it configures, its fields in the order the code uses them: D4's `luma_key`
-  after the grading.
-- A setting's default is the textbook value: D4's `luma_key` and D5's `density_blend`, each default with its reason.
-- Keep presets in sync, update all call sites in the same change: D4's `color` output and the bridge's
-  `saturation` into the view's, D5's `density_release`.
+- A setting's default is the textbook value: D5's `density_blend`, its default with its reason.
+- Keep presets in sync, update all call sites in the same change: D5's `density_release`.
 - Ask to measure a time again when its pass's code or size changes: D5.
 
 Not designed yet, so their rules are not named: C3, E1, E2, F1, F2, H1, I1 to I4.

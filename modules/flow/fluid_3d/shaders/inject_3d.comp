@@ -9,6 +9,8 @@
  *             by the body's share × uRelease (a density by its alpha, a scalar by its value); a density only where
  *             the input's alpha is not 0, a scalar only where the input is not 0, so where the body is not nothing
  *             is pulled toward 0
+ * A density comes as its amount (uInput's red) and its color (uColor, premultiplied by its alpha, the coverage):
+ * the color times the amount, capped at 1, is the premultiplied density.
  */
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;   // a column of cells each
@@ -16,6 +18,7 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;   // a column
 // 2D input texture
 layout(binding = 0) uniform sampler2D uInput;     // 2D source (any format)
 layout(binding = 1) uniform sampler2D uZPosition; // its z position, red over green
+layout(binding = 2) uniform sampler2D uColor;     // a density's color, premultiplied by its alpha
 
 // 3D output volume
 layout(rgba16f, binding = 0) uniform image3D uVolume;  // Read-write
@@ -28,6 +31,7 @@ uniform float uRelease;      // FILL: the share where the target is below the fi
 uniform int   uMode;         // 0 ADD, 1 FILL
 uniform float uGain;         // FILL: the input times this, at most full, is the target
 uniform bool  uScalar;       // a signed scalar in r (the temperature), else a premultiplied density
+uniform bool  uHasColor;     // uInput is a density's amount, its color uColor
 uniform ivec3 uSize;
 
 #include "slab.glsl"
@@ -39,6 +43,7 @@ void main() {
     // Sample 2D input at this XY position
     vec2 uv = (vec2(column) + 0.5) / vec2(uSize.xy);
     vec4 source = texture(uInput, uv);
+    if (uHasColor) source = texture(uColor, uv) * min(abs(source.r), 1.0);
     // Nothing to add or fill where the image is empty (most of it): the column stays as it is, unread and unwritten
     if (all(equal(source, vec4(0.0)))) return;
     if (uMode == 1) {

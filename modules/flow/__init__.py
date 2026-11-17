@@ -23,7 +23,7 @@ from .motion import DepthView, DepthVelocity, DepthVelocitySettings, GradientFlo
 from .density_color import DensityColor
 from . import bridge_2d
 from .bridge_3d import  Bridge3D, Bridge3DSettings, \
-                        DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
+                        Magnitude, VelocityMagnitude, \
                         decay_weight, \
                         VelocityLowpass, VelocityLowpassSettings, gaussian_weights, blur_sigma, blur_dispatches, ZPositionMix, \
                         VelocityBandpass, VelocityBandpassSettings, Change, WeightedSum, step_peak, band_width, \

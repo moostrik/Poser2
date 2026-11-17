@@ -1,26 +1,25 @@
 """Larger Amount shader: per pixel, the one of two textures with the larger amount."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE_2D, glActiveTexture, glBindTexture, \
+    glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
 class LargerAmount(Shader):
-    """Writes, per pixel, `held` or `source`, whichever has the larger amount, as it is."""
+    """Writes, per pixel, `held` or `source`, whichever has the larger amount, as it is: the size of the red of
+    `held_amount` and `source_amount`, read by uv, so the amounts may have another size."""
 
-    def use(self, held: Texture, source: Texture, by_alpha: bool) -> None:
-        """`by_alpha`: the amount is the alpha (a density, RGBA with its color); else the size of red (a temperature, ±)."""
-        if not self.allocated or not self.shader_program or not held.allocated or not source.allocated:
+    def use(self, held: Texture, source: Texture, held_amount: Texture, source_amount: Texture) -> None:
+        if not self.allocated or not self.shader_program:
+            return
+        if not all(texture.allocated for texture in (held, source, held_amount, source_amount)):
             return
 
         glUseProgram(self.shader_program)
-
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, held.tex_id)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, source.tex_id)
-
-        glUniform1i(self.get_uniform_loc("held"), 0)
-        glUniform1i(self.get_uniform_loc("source"), 1)
-        glUniform1i(self.get_uniform_loc("byAlpha"), int(by_alpha))
+        for unit, (name, texture) in enumerate((('held', held), ('source', source), ('heldAmount', held_amount),
+                                                ('sourceAmount', source_amount))):
+            glActiveTexture((GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3)[unit])
+            glBindTexture(GL_TEXTURE_2D, texture.tex_id)
+            glUniform1i(self.get_uniform_loc(name), unit)
 
         draw_quad()

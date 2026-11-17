@@ -1,7 +1,6 @@
 """The 3D bridge's settings: the readings, then one group per output, each with its mix."""
 
 from modules.settings import BaseSettings, Field, Group, Widget
-from .density_bridge import DensityBridgeSettings
 from .temperature_bridge import TemperatureBridgeSettings
 from .velocity_bandpass import VelocityBandpassSettings
 from .velocity_lowpass import VelocityLowpassSettings
@@ -37,8 +36,8 @@ class TrailAmountMixSettings(AmountMixSettings, TrailMixSettings):
     """An amount's mix of the trail by default: a boundary amount's."""
 
 
-class DensityMixSettings(DensityBridgeSettings, TrailAmountMixSettings):
-    """The density, held at the body as a boundary value: its amount's mix, then its color."""
+class DensityMixSettings(TrailAmountMixSettings):
+    """The density, held at the body as a boundary value: its amount's mix; its color is the image's."""
 
 
 class TemperatureMixSettings(TemperatureBridgeSettings, TrailAmountMixSettings):

@@ -1,5 +1,5 @@
-"""ViewColor: the view's last pass, the player's color for the density: its image graded and sharpened, then
-premultiplied by the mask. As compositing does it: the corrections on the straight image, the matte applied after
+"""ViewColor: the view's last pass, the player's color for the density: its image graded and sharpened, its darkness
+keyed to transparency, then premultiplied by the mask. As compositing does it: the corrections on the straight image, the matte applied after
 them, eroded and feathered where the picture is made, so the mask the motion and the depth use stays as it is."""
 
 # Third-party imports
@@ -9,12 +9,12 @@ from OpenGL.GL import GL_R16F
 from modules.flow import Port, TextureKind
 from modules.gl import Fbo, SwapFbo, Style, Texture, shaders
 from ....settings import ViewColorSettings
-from .shaders import Feather, Grade
+from .shaders import Feather, Grade, LumaKey
 
 
 class ViewColor:
-    """`process` grades an image (`Grade`) and sharpens it where `sharpen`, while `enabled`, then premultiplies it
-    by the mask where `use_mask` (RGB and alpha alike, as the render blends), into its own buffer; the mask's copy
+    """`process` grades an image (`Grade`) and sharpens it where `sharpen`, while `enabled`, sets its alpha by its
+    brightness where `luma_key` (`LumaKey`), then premultiplies it by the mask where `use_mask` (RGB and alpha alike, as the render blends), into its own buffer; the mask's copy
     first eroded by `erode` pixels, then feathered inward over `feather` pixels. `texture` holds the result."""
 
     def __init__(self, settings: ViewColorSettings) -> None:
@@ -24,6 +24,7 @@ class ViewColor:
         self._feathered: Fbo = Fbo()                        # the mask's copy feathered, the premultiply's
         self._grade_shader: Grade = Grade()
         self._sharpen_shader: shaders.Sharpen = shaders.Sharpen()
+        self._luma_key_shader: LumaKey = LumaKey()
         self._erode_shader: shaders.Erode = shaders.Erode()
         self._blur_shader: shaders.Blur = shaders.Blur()
         self._feather_shader: Feather = Feather()
@@ -41,11 +42,11 @@ class ViewColor:
     def made_with(self) -> tuple:
         """The settings the result is made with, so its owner makes it again when one changes."""
         s: ViewColorSettings = self.settings
-        return (s.enabled, s.exposure, s.offset, s.gamma, s.contrast, s.saturation, s.sharpen, s.use_mask, s.erode,
-                s.feather)
+        return (s.enabled, s.exposure, s.offset, s.gamma, s.contrast, s.saturation, s.sharpen, s.luma_key, s.use_mask,
+                s.erode, s.feather)
 
     def _shaders(self) -> tuple:
-        return (self._grade_shader, self._sharpen_shader, self._erode_shader, self._blur_shader, self._feather_shader,
+        return (self._grade_shader, self._sharpen_shader, self._luma_key_shader, self._erode_shader, self._blur_shader, self._feather_shader,
                 self._mask_shader)
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
@@ -79,6 +80,11 @@ class ViewColor:
             self._fbo.swap()
             self._fbo.begin()
             self._sharpen_shader.use(self._fbo.back, s.sharpen)
+            self._fbo.end()
+        if s.luma_key > 0.0:
+            self._fbo.swap()
+            self._fbo.begin()
+            self._luma_key_shader.use(self._fbo.back, s.luma_key)
             self._fbo.end()
         if s.use_mask:
             matte: Texture = self._matte_of(mask, int(s.erode), s.feather)

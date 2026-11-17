@@ -207,8 +207,8 @@ and resize pattern; the flow runs at `settings.width` by `settings.height`, and 
 Lucas–Kanade solve.
 
 `BridgeLayer`'s `_update()`: `_bridge` the input's velocity into velocity, density and temperature, the
-density's color first (`DensityColor`: the image, or white, times the tint, gated by the mask), which
-`Bridge3D` runs itself and `Bridge2DLayer` calls. `Bridge3DLayer` turns the `BridgeInput` into
+density's color first (`DensityColor`: the image, or white, times the tint, gated by the mask in 2D), which
+`Bridge3D` runs itself and `Bridge2DLayer` calls; the density goes out as its amount and its color apart. `Bridge3DLayer` turns the `BridgeInput` into
 `Bridge3D.update`'s arguments and its outputs into the `BridgeOutput` ([BRIDGE_3D.md](BRIDGE_3D.md)), as
 `Fluid3DLayer` does with `Fluid3D`. The bridges' filters run at the velocity's size and their outputs at
 `settings.width` by `settings.height`; the layer follows both. It draws nothing.
@@ -219,7 +219,7 @@ the fluid's only one. `Fluid2DLayer` keeps its injections apart: injection i's a
 channel i of the density, four at most, and the output colors each channel with its injection's
 color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's.
 `Fluid3DLayer` drags the fluid toward the velocity, the boundary, adds the acceleration, the body force, ×
-dt and drags it toward the RGBA density and the temperature, each velocity's z as the volume's w (its
+dt and drags it toward the density, the color times the amount, and the temperature, each velocity's z as the volume's w (its
 sign turned: w points away from the viewer); how the fluid takes each is in
 [FLUID_3D.md](FLUID_3D.md).
 
@@ -251,7 +251,7 @@ capture: each tick it takes the captures that came since the last (`take_capture
 in order, through the view stage, the motion and the bridge, each input built right before its
 stage (`_run_capture`), the bridge stepping over the time since the capture before; a tick without
 a capture runs none of them, and the fluid, which steps every tick, gets its input right before it
-runs. With two captures in one tick the 3D bridge hands the fluid, per pixel, the density and the
+runs. With two captures in one tick the 3D bridge hands the fluid, per pixel, the density, its color and the
 temperature of the capture with the larger amount (`CaptureMax`), the rest the newest's. Which
 layers feed the inputs is app policy: hd_trio wires fixed layers, measures on its centered mask,
 gives each bridge the centered foreground as the picture behind its density and temperature, each
@@ -338,8 +338,9 @@ frame. How a frame gets there, thread by thread, and what costs frames are in
   decide one.
 - The stages draw nothing; the monitors draw, only while shown, once per tick. A port's kind says
   how it is drawn when nothing else is asked; the monitor's `view` overrides it.
-- The 2D bridge keeps three classes the 3D bridge also has (`DensityBridge`, `TemperatureBridge`,
-  `VelocityMagnitude`) as copies, until the 2D bridge is rebuilt.
+- The 2D bridge keeps two classes the 3D bridge also has (`TemperatureBridge`, `VelocityMagnitude`) as
+  copies, until the 2D bridge is rebuilt; its `DensityBridge`, which the 3D bridge no longer has, colors its
+  density's port.
 - The 3D fluid layer runs the 3D fluid only. Comparing the two fluids on one input means both
   systems wired in one app.
 - An outside source gates an input through its weight: every injection carries `weight`, 1 by

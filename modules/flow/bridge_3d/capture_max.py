@@ -2,7 +2,8 @@
 
 The bridge steps once per capture; the fluid steps once per tick. With two captures in one tick the fluid takes,
 for a density and a temperature, per pixel the output of the capture whose amount there is larger, with its own
-color or warmth, so a capture's dye is not lost to the next one's; a velocity is the newest's alone.
+color or warmth, so a capture's dye is not lost to the next one's; a velocity is the newest's alone. The density's
+color goes with its amount: both are picked by the amount.
 """
 
 from modules.gl import Style, SwapFbo, Texture
@@ -11,10 +12,10 @@ from .shaders import LargerAmount
 
 class CaptureMax:
     """`hold` keeps the first capture's output, `take` keeps per pixel the larger of what it holds and the next
-    capture's; `texture` is the result. `by_alpha`: the amount is a density's alpha, else a temperature's size."""
+    capture's; `texture` is the result. The amount is the size of the output's red, or of the amounts `take` is
+    given, which the color of an amount is picked by."""
 
-    def __init__(self, by_alpha: bool) -> None:
-        self._by_alpha: bool = by_alpha
+    def __init__(self) -> None:
         self._held: SwapFbo = SwapFbo()
         self._larger_shader: LargerAmount = LargerAmount()
 
@@ -48,12 +49,14 @@ class CaptureMax:
         self._held.end()
         Style.pop_style()
 
-    def take(self, source: Texture) -> None:
-        """Keep, per pixel, the larger of what it holds and `source`."""
+    def take(self, source: Texture, amounts: tuple[Texture, Texture] | None = None) -> None:
+        """Keep, per pixel, the larger of what it holds and `source`: by `amounts`, the held one's and the
+        source's, or by the textures themselves without them."""
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
         self._held.swap()
+        held_amount, source_amount = amounts if amounts is not None else (self._held.back, source)
         self._held.begin()
-        self._larger_shader.use(self._held.back, source, self._by_alpha)
+        self._larger_shader.use(self._held.back, source, held_amount, source_amount)
         self._held.end()
         Style.pop_style()

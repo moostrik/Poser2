@@ -24,7 +24,7 @@ class Bridge3DLayer(BridgeLayer):
     def output(self) -> BridgeOutput:
         bridge: Bridge3D = self._bridge_3d
         return BridgeOutput(
-            bridge.velocity, bridge.density, bridge.temperature, bridge.acceleration,
+            bridge.velocity, bridge.density, bridge.color, bridge.temperature, bridge.acceleration,
             bridge.velocity_z_position, bridge.density_z_position, bridge.temperature_z_position,
             bridge.acceleration_z_position, bridge.expansion, bridge.expansion_z_position)
 
@@ -45,5 +45,5 @@ class Bridge3DLayer(BridgeLayer):
     # ========== The bridge ==========
 
     def _bridge(self, input: BridgeInput) -> None:
-        self._bridge_3d.update(input.velocity, input.dt, input.z_position, input.mask, input.image, input.color,
+        self._bridge_3d.update(input.velocity, input.dt, input.z_position, input.mask, input.image, input.tint,
                                input.same_tick)

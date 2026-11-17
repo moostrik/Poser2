@@ -84,7 +84,7 @@ class Fluid2DLayer(FluidLayer):
     def _update(self) -> None:
         input: FluidInput | None = self._input
         if input is not None:
-            self._colors = [(*injection.color, 1.0) for injection in input.injections[:CHANNELS]]
+            self._colors = [(*injection.tint, 1.0) for injection in input.injections[:CHANNELS]]
             self._colors += [(0.0, 0.0, 0.0, 0.0)] * (CHANNELS - len(self._colors))
             if len(input.injections) > CHANNELS and not self._warned_channels:
                 self._warned_channels = True

@@ -55,10 +55,11 @@ class DensityCarrier(ABC):
         """No density anywhere."""
 
     @abstractmethod
-    def add(self, texture: Texture, gain: float, dt: float, spread: float, mode: InjectMode = InjectMode.FILL,
-            target_gain: float = 1.0, z_position: Texture | None = None, release: float = 0.0) -> None:
-        """A source, `texture` (RGBA: the dye, its color times its presence, the presence as alpha, 0 to 1), into
-        the gaussian slab at each pixel's `z_position` (red over green), nothing where it has none or without
+    def add(self, amount: Texture, color: Texture, gain: float, dt: float, spread: float,
+            mode: InjectMode = InjectMode.FILL, target_gain: float = 1.0, z_position: Texture | None = None,
+            release: float = 0.0) -> None:
+        """A source, the bridge's `amount` (red, capped at 1) times its `color` (RGBA, premultiplied by its alpha,
+        the coverage), the dye, into the gaussian slab at each pixel's `z_position` (red over green), nothing where it has none or without
         one, with sigma `spread`: by `mode`, added × gain × dt (ADD), or the water dragged toward it times
         `target_gain` (at most fully dyed), never past it, up by the share `gain` and down by the share
         `release` (FILL)."""

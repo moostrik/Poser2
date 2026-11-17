@@ -1,4 +1,4 @@
-"""InjectAmount3D - a 2D source's amount into a one-channel volume, in the injection's gaussian slab."""
+"""InjectAmount3D - a density's amount into a one-channel volume, in the injection's gaussian slab."""
 from __future__ import annotations
 
 from OpenGL.GL import GL_R16F, glUniform1f, glUniform1i, glUniform3i, glUseProgram
@@ -8,19 +8,21 @@ from .z_position_binding import bind_z_position
 
 
 class InjectAmount3D(ComputeShader):
-    """Add the source's alpha × strength into the volume's slab at each pixel's z position."""
+    """Add the amount (red, capped at 1) × its color's alpha × strength into the volume's slab at each pixel's z
+    position."""
 
     WORKGROUP_SIZE_X = 16
     WORKGROUP_SIZE_Y = 16
     WORKGROUP_SIZE_Z = 1
 
-    def use(self, source: Texture, volume: Texture3D, spread: float, strength: float,
+    def use(self, amount: Texture, color: Texture, volume: Texture3D, spread: float, strength: float,
             cubic: bool = False, mode: int = 0, gain: float = 1.0, z_position: Texture | None = None,
             release: float = 0.0) -> None:
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
-        self.bind_texture(0, source, "uInput")
+        self.bind_texture(0, amount, "uInput")
+        self.bind_texture(2, color, "uColor")
         self.bind_image_3d_readwrite(0, volume, GL_R16F)
         bind_z_position(self, 1, z_position)
         glUniform1f(self.get_uniform_loc("uSpread"), spread)

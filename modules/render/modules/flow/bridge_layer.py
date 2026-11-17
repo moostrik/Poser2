@@ -23,17 +23,18 @@ from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 @dataclass
 class BridgeInput:
     """One camera's velocity for the bridge stage, built by the app for each step. `velocity` is the
-    motion output; `dt` the time the step covers (s); `image`, or None, the picture whose RGB colors the
-    density; `color` an RGB tint on it, white by default, the color alone without an image; `mask`
-    the player's mask on the view, or None, which gates the image and is a share of the 3D bridge's amounts;
+    motion output; `dt` the time the step covers (s); `image`, or None, the picture that colors the
+    density; `tint` an RGB tint on it, white by default, the color alone without an image; `mask`
+    the player's mask on the view, or None, which gates the 2D bridge's image and is a share of the 3D bridge's
+    amounts;
     `z_position` the motion's, or None.
     `same_tick`: this step is another capture in the render tick of the step before, so the fluid, which
-    steps once a tick, takes per pixel the density and the temperature of the step whose amount is larger
-    (the 3D bridge's), and the velocity of this one."""
+    steps once a tick, takes per pixel the density, its color and the temperature of the step whose amount is
+    larger (the 3D bridge's), and the velocity of this one."""
     velocity: Annotated[Texture, TextureKind.VELOCITY]
     dt: float
     image: Annotated[Texture | None, TextureKind.IMAGE] = None
-    color: tuple[float, float, float] = (1.0, 1.0, 1.0)
+    tint: tuple[float, float, float] = (1.0, 1.0, 1.0)
     mask: Annotated[Texture | None, TextureKind.SCALAR] = None
     z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
     same_tick: bool = False
@@ -42,13 +43,14 @@ class BridgeInput:
 @dataclass
 class BridgeOutput(StageOutput):
     """The bridge stage's textures, what the fluid injects, in two systems. The boundary, what the water is
-    dragged toward: `velocity`, widths/s; `density`, in 2D the amount alone, in 3D RGBA,
-    the amount times the color, with the amount as alpha; `temperature`. The body force, what is
+    dragged toward: `velocity`, widths/s; `density`, the amount; `color`, the density's color, RGBA,
+    premultiplied by its alpha, the coverage; `temperature`. The body force, what is
     added × dt, the 3D bridge's only: `acceleration`, widths/s², None while the bridge gives none.
     The 3D bridge's `expansion`, where the water swells, a presence 0 to 1, or None. Where each goes in depth,
     the 3D bridge's only: each output's `_z_position`, its readings' z positions; None without."""
     velocity: Annotated[Texture, TextureKind.VELOCITY]
-    density: Annotated[Texture, TextureKind.IMAGE]
+    density: Annotated[Texture, TextureKind.SCALAR]
+    color: Annotated[Texture, TextureKind.IMAGE]
     temperature: Annotated[Texture, TextureKind.SCALAR]
     acceleration: Annotated[Texture | None, TextureKind.ACCELERATION] = None
     velocity_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None

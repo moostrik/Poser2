@@ -304,7 +304,7 @@
         "offset": 0.0,
         "gamma": 0.8,
         "contrast": 1.24,
-        "saturation": 1.01,
+        "saturation": 1.19,
         "sharpen": 0.82,
         "use_mask": true,
         "erode": 0,
@@ -430,9 +430,7 @@
         "bow": 0.05,
         "stop": 1.0,
         "wake": 0.0,
-        "mask": 0.0,
-        "saturation": 1.18,
-        "brightness": 1.0
+        "mask": 0.0
       },
       "temperature": {
         "trail": 1.0,

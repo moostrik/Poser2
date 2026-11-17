@@ -100,7 +100,7 @@ class Side:
         self.bridge.set_input(BridgeInput(velocity, delta_time, None, mask=mask, z_position=z_position))
         self.bridge.update()
         out = self.bridge.output
-        injection = Injection(out.velocity, out.density, out.temperature,
+        injection = Injection(out.velocity, out.density, out.color, out.temperature,
                               out.acceleration,
                               velocity_z_position=out.velocity_z_position,
                               density_z_position=out.density_z_position,

@@ -129,35 +129,39 @@ Navier–Stokes force term, what is added: an acceleration, which the water keep
 stop can throw the water on. The panel shows `readings` (`lowpass`, `bandpass`), then one subpanel per output,
 named as the output, in the order the bridge makes them. Each output's group holds the six shares as knobs on
 the first row (`MixSettings`: `trail`, `change`, `start`, `bow`, `stop`, `wake`), an amount's (the density's,
-the temperature's, the expansion's) a seventh, `mask` (`AmountMixSettings`), and the density's own settings on
-the second (`saturation`, `brightness`).
+the temperature's, the expansion's) a seventh, `mask` (`AmountMixSettings`).
 
 | Subpanel       | Readings enter as | Goes in as     | Output, its unit                                                                                     | Default       |
 |----------------|-------------------|----------------|------------------------------------------------------------------------------------------------------|---------------|
 | `readings`     |                   |                | the filters' settings, `lowpass` and `bandpass`                                                      |               |
 | `velocity`     | velocities        | boundary       | widths/s, the body's velocity; with its `peak` ([The peak](#the-peak))                               | the trail 1   |
 | `acceleration` | accelerations     | body force     | widths/s², a Δv added once over a change                                                             | all 0: `None` |
-| `density`      | velocities        | boundary value | the dye, RGBA: the color times its presence, the presence as alpha, 0 to 1                           | the trail 1   |
+| `density`      | velocities        | boundary value | the dye's amount, widths/s; its `color` the view's, RGBA, premultiplied by its alpha                 | the trail 1   |
 | `temperature`  | velocities        | boundary value | the warmth, −1 cold to 1 hot, its presence folded in                                                 | the trail 1   |
 | `expansion`    | velocities        | source         | where the water swells, a presence 0 to 1, capped there; the newest capture's in a tick of several   | all 0: `None` |
 
 The five outputs (`BridgeOutput`, `Injection`) are the subpanels' names, each named by what the fluid gets,
-in a unit of the body; how it goes in, as the boundary or the body force, is in the column beside it.
+in a unit of the body; how it goes in, as the boundary or the body force, is in the column beside it. The
+density's `color` goes with it, an output of its own beside the amount.
 
-The presence is the mix's speed in widths/s, the sum of its readings' sizes (the length of each, at
-its share), capped at 1: a part moving at 1 width/s or faster is fully there, a slower one partly,
-and a still body leaves no dye. The `mask` share adds the view's mask (`BridgeInput.mask`, 0 to 1 where the
+An amount is the mix's speed in widths/s, the sum of its readings' sizes (the length of each, at
+its share). The temperature's and the expansion's presence is it capped at 1, and the fluid caps the
+density's amount the same way ([FLUID_3D.md](FLUID_3D.md#the-inputs)): a part moving at 1 width/s or faster
+is fully there, a slower one partly, and a still body leaves no dye. The `mask` share adds the view's mask (`BridgeInput.mask`, 0 to 1 where the
 player is) at the share, a presence 0 to 1 by being there: at share 1 a still
 body is fully there. Widths/s is the velocity's own unit, so no reference speed is chosen.
-The density's color is the picture's (`DensityColor`, `modules/flow/density_color.py`, the 2D bridge's too:
-the image, or white, times the tint, gated by the mask) through `saturation` and `brightness`; the warmth is (warm − cold) × (1 − neutral × 0.5) ×
-the presence, from the same color's red, blue and green. The readings of one unit share the mix, so
+The density's color is the picture's as it comes (`DensityColor`, `modules/flow/density_color.py`: the image,
+or white, times the tint), its alpha kept: the view grades it, keys it and premultiplies it by its own feathered
+mask ([VIEW.md](VIEW.md#the-stage)), so alpha is the color's coverage (Porter and Duff 1984), and the bridge
+gates it by no mask of its own; the 2D bridge gates its color by the mask. The amount and the color stay apart,
+as the fluid takes them; a capture's color goes with its amount wherever captures are picked by it. The warmth
+is (warm − cold) × (1 − neutral × 0.5) × the presence, from the same color's red, blue and green. The readings of one unit share the mix, so
 the mix has no gain: the motion's gains balance the axes and the fluid's gains set how the water
 follows; a weight is a share. The acceleration and the expansion are `None` while their shares are
 all 0. The ports follow the outputs, a group each, named as the output, in the order the bridge makes
 them: `velocity.velocity`, `acceleration.acceleration`, `density.amount`, `temperature.amount` and
-`expansion.expansion`, each with its `z_position`; the density's and the temperature's groups then hold
-their bridges' own (`density.input`, `density.output`, ...).
+`expansion.expansion`, each with its `z_position`; the temperature's group then holds its bridge's own
+(`temperature.input`, `temperature.output`, ...). The density's color is the first port, `color`.
 
 A wake may drag (its share in `velocity`: the water behind a leaving limb is pulled to the
 speed it left with, and let go when the pulse dies), kick (its share in `acceleration`),

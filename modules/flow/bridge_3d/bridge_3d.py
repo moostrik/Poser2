@@ -2,8 +2,8 @@
 velocity and as an acceleration; one mix per output makes what the fluid takes from them: the boundary's velocity,
 density and temperature from the readings as velocities, the body force's acceleration from the readings as
 accelerations, and the expansion, where the water swells, a presence from the readings as velocities and the mask.
-The density and the temperature are 0 to 1 (±1 warm): a presence, the readings' speed in widths/s, capped at 1, the
-density the fluid drags the water toward.
+The density is its amount, the readings' speeds in widths/s and the mask, and its color, the image's with its
+alpha; the temperature ±1 warm, a presence, the readings' speed capped at 1.
 
 Each trail holds where its motion was, a z position; every output mixes its readings' z positions by the readings'
 sizes at its shares (`ZPositionMix`), so the fluid takes each at the depth it was made at, and a density or a
@@ -18,7 +18,6 @@ from ..density_color import DensityColor
 from ..port import HasPorts, Port, Ports, TextureKind, prefixed
 from .bridge_settings import AmountMixSettings, Bridge3DSettings, MixSettings
 from .capture_max import CaptureMax
-from .density_bridge import DensityBridge
 from .shaders import Change, WeightedSum, ZPositionMix
 from .temperature_bridge import TemperatureBridge
 from .velocity_bandpass import VelocityBandpass
@@ -37,7 +36,7 @@ class Bridge3D:
     the light renderer mixes its layers; the readings of one unit share it, so the mix has no gain.
         velocity      the readings as velocities: the boundary, dragged toward
         acceleration  the readings as accelerations: the body force, added; None while its shares are all 0
-        density       the readings' speeds and the mask, colored by a density bridge
+        density       the readings' speeds and the mask, the amount; its color the image's, with its alpha
         temperature   the readings' speeds and the mask, warmed by a temperature bridge
         expansion     the readings' speeds and the mask: a presence, capped at 1; None while its
                       shares are all 0, and the newest capture's in a tick of several
@@ -48,7 +47,8 @@ class Bridge3D:
     writes its accelerations while the acceleration takes one of its readings or a monitor shows it.
 
     With several captures in one render tick (`update`'s `same_tick`) the densities and the temperatures it
-    hands out are, per pixel, those of the capture with the larger amount (`CaptureMax`); the rest the newest's."""
+    hands out are, per pixel, those of the capture with the larger amount (`CaptureMax`), the density's color with
+    its amount; the rest the newest's."""
 
     def __init__(self, settings: Bridge3DSettings | None = None) -> None:
         self.settings: Bridge3DSettings = settings or Bridge3DSettings()
@@ -72,15 +72,13 @@ class Bridge3D:
         self._peak: VelocityPeak = VelocityPeak(settings.velocity.peak)    # the velocity's p99 speed
         self._mix_shader: WeightedSum = WeightedSum()
         self._z_position_mix_shader: ZPositionMix = ZPositionMix()
-        self._density: DensityBridge = DensityBridge(settings.density)
         self._temperature: TemperatureBridge = TemperatureBridge(settings.temperature)
         self._gpu_timer: GpuTimer = GpuTimer("GPU bridge")
         self._lowpass_timer: GpuTimer = GpuTimer("GPU bridge lowpass")
         self._bandpass_timer: GpuTimer = GpuTimer("GPU bridge bandpass")
-        self._mix_timer: GpuTimer = GpuTimer("GPU bridge mix")      # the outputs' mixes, the density and the temperature
-        # The density and the temperature over a tick's captures
-        self._capture_max: dict[str, CaptureMax] = {name: CaptureMax(by_alpha=name.endswith('density'))
-                                                    for name in ('density', 'temperature')}
+        self._mix_timer: GpuTimer = GpuTimer("GPU bridge mix")      # the outputs' mixes and the temperature
+        # The density, its color and the temperature over a tick's captures
+        self._capture_max: dict[str, CaptureMax] = {name: CaptureMax() for name in ('density', 'color', 'temperature')}
         self._merging: bool = False     # the outputs are the larger of this tick's captures
 
     # ========== Outputs ==========
@@ -105,9 +103,15 @@ class Bridge3D:
 
     @property
     def density(self) -> Texture:
-        """The density, RGBA, the amount times the color with the amount as alpha; the larger of this tick's
-        captures while it had several."""
+        """The density's amount, the readings' speeds (widths/s) and the mask; the larger of this tick's captures
+        while it had several."""
         return self._merged()['density']
+
+    @property
+    def color(self) -> Texture:
+        """The density's color, RGBA, premultiplied by its alpha, the coverage; the one of the capture with the
+        larger amount while this tick had several."""
+        return self._merged()['color']
 
     @property
     def density_z_position(self) -> Fbo:
@@ -133,25 +137,27 @@ class Bridge3D:
 
     @property
     def ports(self) -> dict[str, Port]:
-        """The density's color, then the readings, then the outputs' mixes, the density and the temperature, each
-        under its settings group's name."""
+        """The density's color, then the readings, then the outputs' mixes and the temperature, each under its
+        settings group's name."""
         ports: dict[str, Port] = dict(self._density_color.ports)
         for name, part in self._parts().items():
             ports.update(prefixed(name, part.ports))
         return ports
 
     def _outputs(self) -> dict[str, Texture]:
-        """The density and the temperature as the last step made them."""
-        return {'density': self._density.density, 'temperature': self._temperature.temperature}
+        """The density, its color and the temperature as the last step made them."""
+        return {'density': self._density_amount, 'color': self._density_color.color,
+                'temperature': self._temperature.temperature}
 
     def _merged(self) -> dict[str, Texture]:
-        """The density and the temperature the fluid takes: the larger of this tick's captures while it had several."""
+        """The density, its color and the temperature the fluid takes: the larger of this tick's captures while it
+        had several."""
         if self._merging:
             return {name: capture_max.texture for name, capture_max in self._capture_max.items()}
         return self._outputs()
 
     def _parts(self) -> dict[str, HasPorts]:
-        """The readings, then the outputs' mixes, the density and the temperature."""
+        """The readings, then the outputs' mixes and the temperature."""
         return {'lowpass': self._shown_ports(self._lowpass.ports, self._show_lowpass),
                 'bandpass': self._shown_ports(self._bandpass.ports, self._show_bandpass),
                 'velocity': Ports({'velocity': Port(self._velocity, TextureKind.VELOCITY),
@@ -159,8 +165,7 @@ class Bridge3D:
                 'acceleration': Ports({'acceleration': Port(self._acceleration, TextureKind.ACCELERATION),
                                        'z_position': Port(self._acceleration_z_position, TextureKind.Z_POSITION)}),
                 'density': Ports({'amount': Port(self._density_amount, TextureKind.SCALAR),
-                                  'z_position': Port(self._density_z_position, TextureKind.Z_POSITION),
-                                  **self._density.ports}),
+                                  'z_position': Port(self._density_z_position, TextureKind.Z_POSITION)}),
                 'temperature': Ports({'amount': Port(self._temperature_amount, TextureKind.SCALAR),
                                       'z_position': Port(self._temperature_z_position, TextureKind.Z_POSITION),
                                       **self._temperature.ports}),
@@ -194,14 +199,13 @@ class Bridge3D:
     # ========== Lifecycle ==========
 
     def allocate(self, width: int, height: int, output_width: int, output_height: int) -> None:
-        """The filters and the mixes at the velocity's size, `width` by `height`; the density's color and the
-        density at `output_width` by `output_height`."""
+        """The filters and the mixes at the velocity's size, `width` by `height`; the density's color at
+        `output_width` by `output_height`."""
         self._density_color.allocate(output_width, output_height)
         self._lowpass.allocate(width, height, output_width, output_height)
         self._bandpass.allocate(width, height)
         for fbo, internal_format in self._mix_fbos():
             fbo.allocate(width, height, internal_format)
-        self._density.allocate(output_width, output_height)
         self._temperature.allocate(width, height)
         self._mix_shader.allocate()
         self._z_position_mix_shader.allocate()
@@ -213,8 +217,7 @@ class Bridge3D:
         self._bandpass.deallocate()
         for fbo, _ in self._mix_fbos():
             fbo.deallocate()
-        for stage in (self._density, self._temperature):
-            stage.deallocate()
+        self._temperature.deallocate()
         self._peak.deallocate()
         self._mix_shader.deallocate()
         self._z_position_mix_shader.deallocate()
@@ -233,11 +236,10 @@ class Bridge3D:
                 self._density_z_position, self._temperature_z_position, self._expansion_z_position)
 
     def reset(self) -> None:
-        """Start the filters and the density from rest."""
+        """Start the filters from rest."""
         self._merging = False
         self._lowpass.reset()
         self._bandpass.reset()
-        self._density.reset()
 
     # ========== Processing ==========
 
@@ -245,16 +247,16 @@ class Bridge3D:
                image: Texture | None = None, tint: tuple[float, float, float] = (1.0, 1.0, 1.0),
                same_tick: bool = False) -> None:
         """One step on the motion's `velocity` and `z_position`, `dt` the time it covers (s): the density's color
-        from `image` (or white) times `tint`, gated by `mask`, then the filters and the mixes; `mask` is also a
-        share of the amounts. `same_tick`: another capture in the render tick of the step before."""
-        self._density_color.update(image, tint, mask)
-        color: Texture = self._density_color.color
-
-        self._gpu_timer.begin()
-        if same_tick and not self._merging:      # the tick's second capture: keep the first's
+        from `image` (or white) times `tint`, as it comes, its alpha kept, then the filters and the mixes; `mask`
+        is a share of the amounts. `same_tick`: another capture in the render tick of the step before."""
+        if same_tick and not self._merging:      # the tick's second capture: keep the first's, its color included
             for name, texture in self._outputs().items():
                 self._capture_max[name].hold(texture)
         self._merging = same_tick
+        self._density_color.update(image, tint, None)
+        color: Texture = self._density_color.color
+
+        self._gpu_timer.begin()
         settings: Bridge3DSettings = self.settings
         acceleration: MixSettings = settings.acceleration
 
@@ -278,14 +280,16 @@ class Bridge3D:
             self._mix(self._acceleration, self._accelerations(), acceleration)
             self._mix_z_position(self._acceleration_z_position, self._accelerations(), acceleration)
         self._mix_amount(self._density_amount, self._density_z_position, mask, z_position, settings.density)
-        self._update_density(self._density, self._density_amount, color)
         self._mix_amount(self._temperature_amount, self._temperature_z_position, mask, z_position, settings.temperature)
         self._update_temperature(self._temperature, self._temperature_amount, color)
         if self._mixed(settings.expansion):
             self._mix_amount(self._expansion, self._expansion_z_position, mask, z_position, settings.expansion, capped=True)
         if self._merging:
-            for name, texture in self._outputs().items():
-                self._capture_max[name].take(texture)
+            outputs: dict[str, Texture] = self._outputs()
+            capture_max: dict[str, CaptureMax] = self._capture_max
+            capture_max['color'].take(outputs['color'], (capture_max['density'].texture, outputs['density']))
+            capture_max['density'].take(outputs['density'])
+            capture_max['temperature'].take(outputs['temperature'])
         self._mix_timer.end()
         self._gpu_timer.end()
 
@@ -331,13 +335,6 @@ class Bridge3D:
         self._mix_shader.use(sources, lengths=True, capped=capped)
         amount.end()
         self._mix_z_position(z_position, readings, mix, masked)
-
-    @staticmethod
-    def _update_density(density: DensityBridge, amount: Texture, color: Texture) -> None:
-        """The density from its amount, with the color."""
-        density.set_color(color)
-        density.set_alpha(amount)
-        density.update()
 
     @staticmethod
     def _update_temperature(temperature: TemperatureBridge, amount: Texture, color: Texture) -> None:

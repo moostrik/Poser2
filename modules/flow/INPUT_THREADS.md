@@ -117,8 +117,8 @@ the last of its parts), the motion, and the bridge stepping over the time since 
 none of them, so no stage works on a frame twice; the fluid runs every tick on the tick's `dt`.
 
 With two captures in one tick the 3D bridge hands the fluid, per pixel, the density and the temperature of the
-capture with the larger amount (`CaptureMax`: a density's alpha, a temperature's size, with its own color or
-warmth), and the newest capture's velocity and z position: a lost frame would show as a gap in the density,
+capture with the larger amount (`CaptureMax`: a density's amount, with its own color, a temperature's size,
+with its own warmth), and the newest capture's velocity and z position: a lost frame would show as a gap in the density,
 hardly in the velocity. The fluid takes nothing from a bridge that has not stepped yet.
 
 The render takes a CUDA tensor into GL by a copy into a PBO queued on its own stream (`Tensor._update_with_pbo`,

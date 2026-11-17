@@ -97,7 +97,7 @@ class Fluid3DLayer(FluidLayer):
         fluid.drag_velocity(injection.velocity, injection.weight, injection.velocity_z_position)
         if injection.acceleration is not None:
             fluid.add_acceleration(injection.acceleration, injection.weight, injection.acceleration_z_position)
-        fluid.add_density(injection.density, injection.weight, injection.density_z_position)
+        fluid.add_density(injection.density, injection.color, injection.weight, injection.density_z_position)
         fluid.add_temperature(injection.temperature, injection.weight, injection.temperature_z_position)
         if injection.expansion is not None:
             fluid.add_expansion(injection.expansion, injection.weight, injection.expansion_z_position)

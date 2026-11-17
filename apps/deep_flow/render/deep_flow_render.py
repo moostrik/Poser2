@@ -323,7 +323,7 @@ class DeepFlowRender(RenderBase):
             injections: list[render.Injection] = []
             for bridge in bridges.values():
                 output: render.BridgeOutput = bridge.output
-                injections.append(render.Injection(output.velocity, output.density, output.temperature,
+                injections.append(render.Injection(output.velocity, output.density, output.color, output.temperature,
                                                output.acceleration,
                                                velocity_z_position=output.velocity_z_position,
                                                density_z_position=output.density_z_position,

@@ -1,16 +1,18 @@
 #version 460 core
 
 /*
- * InjectAmount3D - a 2D source's amount (its alpha) into a one-channel volume, in the gaussian slab around
- * each pixel's z position (nothing without one), as Inject3D adds the whole RGBA, one invocation a column. The source is read by uv, so the volume may be finer: then
- * uCubic enlarges it by a cubic B-spline, smooth through the source's texel corners, where a bilinear read keeps
- * them as steps a source texel apart; four bilinear reads (Sigg and Hadwiger, GPU Gems 2).
+ * InjectAmount3D - a density's amount into a one-channel volume, in the gaussian slab around each pixel's z
+ * position (nothing without one), as Inject3D adds the whole RGBA, one invocation a column: the bridge's amount
+ * (uInput's red), capped at 1, times its color's alpha, the coverage. The amount is read by uv, so the volume
+ * may be finer: then uCubic enlarges it by a cubic B-spline, smooth through the amount's texel corners, where a
+ * bilinear read keeps them as steps a texel apart; four bilinear reads (Sigg and Hadwiger, GPU Gems 2).
  */
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;   // a column of cells each
 
-layout(binding = 0) uniform sampler2D uInput;      // RGBA: the amount times the color, the amount as alpha
+layout(binding = 0) uniform sampler2D uInput;      // the amount, red
 layout(binding = 1) uniform sampler2D uZPosition;  // its z position, red over green
+layout(binding = 2) uniform sampler2D uColor;      // the amount's color, premultiplied by its alpha
 layout(r16f, binding = 0) uniform image3D uVolume;
 
 uniform bool  uHasZPosition;
@@ -22,7 +24,7 @@ uniform float uGain;         // FILL: the source's amount times this, at most 1,
 uniform float uRelease;      // FILL: the share where the target is below the amount; 0 = never down
 uniform ivec3 uSize;
 
-float bspline_alpha(vec2 uv) {
+float bspline_amount(vec2 uv) {
     vec2 size = vec2(textureSize(uInput, 0));
     vec2 position = uv * size - 0.5;
     vec2 base = floor(position);
@@ -35,8 +37,8 @@ float bspline_alpha(vec2 uv) {
     vec2 s1 = w2 + w3;
     vec2 t0 = (base - 1.0 + w1 / s0 + 0.5) / size;
     vec2 t1 = (base + 1.0 + w3 / s1 + 0.5) / size;
-    return s0.x * s0.y * texture(uInput, t0).a + s1.x * s0.y * texture(uInput, vec2(t1.x, t0.y)).a
-         + s0.x * s1.y * texture(uInput, vec2(t0.x, t1.y)).a + s1.x * s1.y * texture(uInput, t1).a;
+    return s0.x * s0.y * texture(uInput, t0).r + s1.x * s0.y * texture(uInput, vec2(t1.x, t0.y)).r
+         + s0.x * s1.y * texture(uInput, vec2(t0.x, t1.y)).r + s1.x * s1.y * texture(uInput, t1).r;
 }
 
 #include "slab.glsl"
@@ -45,7 +47,8 @@ void main() {
     ivec2 column = ivec2(gl_GlobalInvocationID.xy);
     if (any(greaterThanEqual(column, uSize.xy))) return;
     vec2 uv = (vec2(column) + 0.5) / vec2(uSize.xy);
-    float source = uCubic ? bspline_alpha(uv) : texture(uInput, uv).a;
+    float amount = uCubic ? bspline_amount(uv) : texture(uInput, uv).r;
+    float source = min(abs(amount), 1.0) * texture(uColor, uv).a;
     if (source == 0.0) return;      // nothing to add or fill: the column stays as it is, unread and unwritten
     float center = slab_center(uv);
     if (center == NO_Z_POSITION) return;

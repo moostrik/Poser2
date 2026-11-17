@@ -30,8 +30,10 @@ class Bridge2DLayer(BridgeLayer):
 
     @property
     def output(self) -> BridgeOutput:
-        """The density is the amount alone, the smoothed velocity's speed (R); the 2D fluid colors it at its output."""
-        return BridgeOutput(self._trail.velocity, self._velocity_magnitude.magnitude, self._temperature_bridge.temperature)
+        """The density is the amount alone, the smoothed velocity's speed (R); the 2D fluid colors it at its output
+        with its injection's tint."""
+        return BridgeOutput(self._trail.velocity, self._velocity_magnitude.magnitude, self._density_color.color,
+                            self._temperature_bridge.temperature)
 
     def _components(self) -> dict[str, HasPorts]:
         """The density's color, made first, then the bridges."""
@@ -61,7 +63,7 @@ class Bridge2DLayer(BridgeLayer):
     # ========== The bridges ==========
 
     def _bridge(self, input: BridgeInput) -> None:
-        self._density_color.update(input.image, input.color, input.mask)
+        self._density_color.update(input.image, input.tint, input.mask)
         color: Texture = self._density_color.color
 
         self._trail.set_velocity(input.velocity)
