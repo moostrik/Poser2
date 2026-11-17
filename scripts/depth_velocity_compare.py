@@ -175,10 +175,20 @@ class Frames:
         if self.capture.get('recording'):                # the recording's own, written once for all its captures
             own = RECORDINGS / self.capture['recording'] / 'segments.json'
             given = own if own.exists() else given
+        self.excluded: np.ndarray | None = None          # the pixels of surfaces that are not the player, measured in no region
         if given.exists():
             parts = json.loads(given.read_text())
             self.still: tuple[float, float] = tuple(parts['still'])
             self.moves: list[tuple[float, ...]] = [tuple(move) for move in parts['moves']]
+            shapes = parts.get('exclude', [])      # a box [u0, v0, u1, v1] or a polygon [[u, v], ...]; v from the frame's first row
+            if shapes:
+                drawn = np.zeros((self.height, self.width), np.uint8)
+                for shape in shapes:
+                    corners = shape if isinstance(shape[0], list) else \
+                        [[shape[0], shape[1]], [shape[2], shape[1]], [shape[2], shape[3]], [shape[0], shape[3]]]
+                    points = np.array([[u * self.width, v * self.height] for u, v in corners], np.int32)
+                    cv2.fillPoly(drawn, [points], 1)
+                self.excluded = drawn.astype(bool)
         else:
             self.still, self.moves = split_moves(self.t, motion)
 
@@ -261,11 +271,15 @@ def split_moves(t: np.ndarray, motion: np.ndarray) -> tuple[tuple[float, float],
     return (WARM_UP, still_end), moves
 
 
-def frame_regions(segment: str, depth: np.ndarray, mask: np.ndarray, luminance: np.ndarray | None) -> dict:
+def frame_regions(segment: str, depth: np.ndarray, mask: np.ndarray, luminance: np.ndarray | None,
+                  excluded: np.ndarray | None = None) -> dict:
     """A frame's regions, the same for every flow that measures it: `core` (the mask's pixels with depth, 12 px
     and more inside), `edge` (0 to 6 px inside), `table` (outside, 16 px and more, no further than 0.8 m behind
     the body), `near` (the core's median depth) and `fit` (the image's brightness gradient along the mask's edge,
-    in the still part, else None)."""
+    in the still part, else None). `excluded` (the recording's boxes of surfaces that are not the player) is in
+    none of them."""
+    if excluded is not None:
+        depth = np.where(excluded, 0.0, depth)
     fit: float | None = None
     if segment == 'still' and luminance is not None and mask.any():
         cut = mask.astype(np.uint8)
@@ -572,7 +586,7 @@ def measure(captures: list[Path], specs: list[tuple[str, dict[str, object]]], ou
             lum, depth, mask = frames.load(k)
             upload(luminance, lum); upload(depth_texture, depth); upload(mask_texture, mask)
             segment = frames.segment(k)
-            regions = frame_regions(segment, depth, mask > 0.5, lum)
+            regions = frame_regions(segment, depth, mask > 0.5, lum, frames.excluded)
             for side in sides:
                 glFinish()
                 began = time.perf_counter()

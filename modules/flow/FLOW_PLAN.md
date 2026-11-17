@@ -82,6 +82,9 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
   - The outcome, a table a recording into MOTION.md, and a proposal: the values quiet at rest (still noise near
     0 after the cut) with the most z kept at the least lag on all four; a value that holds on one recording only
     is named so. Matthias judges it in the app before a default changes.
+  Measured 2026-11-17, the tables in MOTION.md; the defaults wait for Matthias at the PC (proposed: `levels` 5,
+  `xy_halving` 0.25, `max_speed` 8, z's `threshold` 0.5 or 1 by eye). `z_smooth` on makes x/y noisy at rest on
+  hands, not explained yet.
 - **C3.** The range. `edge`, `max_speed` and the thresholds are in metres or px, tuned at 0.65–1.5 m; stereo
   noise grows with the square of the distance, so at 2–3.5 m they may need to be in disparity, and a depth's
   noise from frame to frame may come near `max_speed`'s 12 cm and start the track over at rest **(deduction)**.

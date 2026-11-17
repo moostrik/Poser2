@@ -241,6 +241,142 @@ larger on show). A level doubles the motion the solve follows, about 2 × 2^(lev
   let more of the surface behind in; its still stretch is a hand not quite still. Without `max_speed`'s checks the
   sideways arm on measure reads 2.5 times the z (0.97 against 0.39 fast), a sliding surface read as z.
 
+- The values, a result, 2026-11-17, one run on one capture of each recording (three captures agreed within 0.1 before): each row one change from the defaults (`levels` 4, the windows 7×7, `damping` 0.03,
+  x/y's `threshold` 0.5, `edge` 0.1 m, `max_speed` 6 m/s, `smooth` 100 ms, `xy_rest` 0.5, `xy_halving` 0.5,
+  `dead_zone` 0, z's `threshold` 0.5), on one capture of each recording, the surfaces in the mask that are not
+  the player left out (`exclude` in each recording's `segments.json`: the desk and the curtain in hands, the
+  sloping ceiling and the window at 1.6 m in the others). Still noise inside / at the edge and x/y's in px per
+  frame, kept and lag against the raw row; measure's and edges' arm moves sideways, so their z kept and lag say
+  little, hands' and show's are the ones for z. The read: `levels` 5 takes hands' z lag from 17 to 7 ms with
+  the same noise and x/y following 9 to 22% more; `xy_halving` 0.25 takes it to 6 ms for a little more noise at
+  the edge; `max_speed` 8 restarts less with nothing worse; `smooth` 50 is not quiet, 200 lags; `edge` 0.05
+  cleans the edge but costs z and lag; `z_smooth` on makes x/y noisy at rest on hands (6 against 0.7), not
+  explained yet. The two best were each measured alone, not together.
+
+  measure (`measure_1`, 2026-11-17 23:34, commit 4f72f124+):
+
+  | Row                        | z still noise | z kept        | z lag         | x/y kept      | x/y still noise | restarts at rest | ms            |
+  |----------------------------|---------------|---------------|---------------|---------------|-----------------|------------------|---------------|
+  | raw                        | 12.34 / 5.51  | 1.00          | 0 ms          | 1.00          | 0.22 / 1.52     | 0.00%            | 1.2           |
+  | defaults                   | 0.00 / 0.09   | 0.24          | 3 ms          | 0.80          | 0.00 / 1.03     | 0.14%            | 1.4           |
+  | smooth 50 halving 0.25     | 0.35 / 0.84   | 0.42          | 1 ms          | 0.80          | 0.00 / 1.03     | 0.14%            | 1.5           |
+  | smooth 50 halving 0.5      | 0.35 / 0.67   | 0.34          | 2 ms          | 0.80          | 0.00 / 1.03     | 0.14%            | 1.4           |
+  | smooth 50 halving 1        | 0.35 / 0.55   | 0.27          | 3 ms          | 0.80          | 0.00 / 1.03     | 0.14%            | 1.2           |
+  | smooth 100 halving 0.25    | 0.00 / 0.24   | 0.32          | 2 ms          | 0.80          | 0.00 / 1.03     | 0.14%            | 1.7           |
+  | smooth 100 halving 1       | 0.00 / 0.02   | 0.17          | 5 ms          | 0.80          | 0.00 / 1.03     | 0.14%            | 1.2           |
+  | smooth 200 halving 0.25    | 0.00 / 0.00   | 0.23          | 3 ms          | 0.80          | 0.00 / 1.03     | 0.14%            | 1.5           |
+  | smooth 200 halving 0.5     | 0.00 / 0.00   | 0.16          | 5 ms          | 0.80          | 0.00 / 1.03     | 0.14%            | 1.4           |
+  | smooth 200 halving 1       | 0.00 / 0.00   | 0.11          | 9 ms          | 0.80          | 0.00 / 1.03     | 0.14%            | 1.2           |
+  | xy_rest 0.25               | 0.00 / 0.17   | 0.25          | 3 ms          | 0.80          | 0.00 / 1.03     | 0.14%            | 1.5           |
+  | xy_rest 1                  | 0.00 / 0.01   | 0.23          | 3 ms          | 0.80          | 0.00 / 1.03     | 0.14%            | 1.2           |
+  | z threshold 0.25           | 0.12 / 0.34   | 0.25          | 3 ms          | 0.80          | 0.00 / 1.03     | 0.14%            | 1.5           |
+  | z threshold 1              | 0.00 / 0.00   | 0.23          | 2 ms          | 0.80          | 0.00 / 1.03     | 0.14%            | 1.4           |
+  | z threshold 2              | 0.00 / 0.00   | 0.19          | 2 ms          | 0.80          | 0.00 / 1.03     | 0.14%            | 1.2           |
+  | edge 0.05                  | 0.00 / 0.00   | 0.23          | 3 ms          | 0.80          | 0.00 / 1.03     | 0.09%            | 1.5           |
+  | z window 9x9               | 0.00 / 0.00   | 0.24          | 3 ms          | 0.80          | 0.00 / 1.03     | 0.15%            | 1.2           |
+  | max_speed 4                | 0.00 / 0.06   | 0.24          | 3 ms          | 0.80          | 0.00 / 1.03     | 0.22%            | 1.5           |
+  | max_speed 8                | 0.00 / 0.10   | 0.24          | 3 ms          | 0.80          | 0.00 / 1.03     | 0.09%            | 1.4           |
+  | levels 5                   | 0.00 / 0.09   | 0.26          | 2 ms          | 0.98          | 0.00 / 1.03     | 0.14%            | 1.2           |
+  | xy window 9x9              | 0.00 / 0.09   | 0.25          | 2 ms          | 0.87          | 0.00 / 1.04     | 0.14%            | 1.7           |
+  | damping 0.02               | 0.00 / 0.10   | 0.25          | 3 ms          | 0.87          | 0.00 / 1.04     | 0.14%            | 1.2           |
+  | damping 0.045              | 0.00 / 0.09   | 0.23          | 3 ms          | 0.73          | 0.00 / 1.00     | 0.14%            | 1.5           |
+  | xy threshold 0.25          | 0.00 / 0.09   | 0.24          | 3 ms          | 0.89          | 0.00 / 1.27     | 0.14%            | 1.4           |
+  | xy threshold 0.4           | 0.00 / 0.09   | 0.24          | 3 ms          | 0.83          | 0.00 / 1.12     | 0.14%            | 1.2           |
+  | z_smooth on                | 0.00 / 0.09   | 0.24          | 3 ms          | 0.82          | 0.00 / 1.03     | 0.14%            | 1.7           |
+
+  hands (`hands_1`, 2026-11-17 23:28, commit 4f72f124+):
+
+  | Row                        | z still noise | z kept        | z lag         | x/y kept      | x/y still noise | restarts at rest | ms            |
+  |----------------------------|---------------|---------------|---------------|---------------|-----------------|------------------|---------------|
+  | raw                        | 16.49 / 7.76  | 1.00          | 0 ms          | 1.00          | 1.17 / 1.78     | 0.00%            | 1.3           |
+  | defaults                   | 4.19 / 2.22   | 0.83          | 17 ms         | 0.84          | 0.67 / 1.29     | 0.00%            | 1.5           |
+  | smooth 50 halving 0.25     | 2.57 / 3.60   | 0.85          | 4 ms          | 0.84          | 0.67 / 1.29     | 0.00%            | 1.6           |
+  | smooth 50 halving 0.5      | 2.03 / 2.87   | 0.84          | 5 ms          | 0.84          | 0.67 / 1.29     | 0.00%            | 1.5           |
+  | smooth 50 halving 1        | 1.77 / 2.31   | 0.83          | 9 ms          | 0.84          | 0.67 / 1.29     | 0.00%            | 1.4           |
+  | smooth 100 halving 0.25    | 4.16 / 2.95   | 0.85          | 6 ms          | 0.84          | 0.67 / 1.29     | 0.00%            | 1.7           |
+  | smooth 100 halving 1       | 4.11 / 1.64   | 0.81          | 45 ms         | 0.84          | 0.67 / 1.29     | 0.00%            | 1.5           |
+  | smooth 200 halving 0.25    | 7.12 / 2.46   | 0.83          | 25 ms         | 0.84          | 0.67 / 1.29     | 0.01%            | 1.6           |
+  | smooth 200 halving 0.5     | 7.14 / 1.70   | 0.80          | 56 ms         | 0.84          | 0.67 / 1.29     | 0.01%            | 1.5           |
+  | smooth 200 halving 1       | 7.20 / 2.52   | 0.74          | 88 ms         | 0.84          | 0.67 / 1.29     | 0.00%            | 1.5           |
+  | xy_rest 0.25               | 3.90 / 2.25   | 0.83          | 11 ms         | 0.84          | 0.67 / 1.29     | 0.00%            | 1.6           |
+  | xy_rest 1                  | 4.45 / 2.07   | 0.83          | 29 ms         | 0.84          | 0.67 / 1.29     | 0.00%            | 1.5           |
+  | z threshold 0.25           | 4.44 / 2.47   | 0.85          | 17 ms         | 0.84          | 0.67 / 1.29     | 0.00%            | 1.7           |
+  | z threshold 1              | 3.69 / 1.73   | 0.80          | 16 ms         | 0.84          | 0.67 / 1.29     | 0.00%            | 1.5           |
+  | z threshold 2              | 2.70 / 0.76   | 0.74          | 15 ms         | 0.84          | 0.67 / 1.29     | 0.00%            | 1.4           |
+  | edge 0.05                  | 4.17 / 1.02   | 0.81          | 22 ms         | 0.84          | 0.67 / 1.29     | 0.00%            | 1.6           |
+  | z window 9x9               | 4.10 / 2.23   | 0.83          | 19 ms         | 0.84          | 0.67 / 1.29     | 0.00%            | 1.5           |
+  | max_speed 4                | 4.13 / 2.22   | 0.84          | 18 ms         | 0.84          | 0.67 / 1.29     | 0.02%            | 1.7           |
+  | max_speed 8                | 4.21 / 2.22   | 0.83          | 17 ms         | 0.84          | 0.67 / 1.29     | 0.00%            | 1.5           |
+  | levels 5                   | 3.16 / 2.20   | 0.83          | 7 ms          | 1.09          | 0.76 / 1.30     | 0.00%            | 1.5           |
+  | xy window 9x9              | 3.78 / 2.09   | 0.83          | 9 ms          | 0.95          | 0.67 / 1.42     | 0.00%            | 1.8           |
+  | damping 0.02               | 4.20 / 2.19   | 0.83          | 11 ms         | 0.88          | 0.69 / 1.36     | 0.00%            | 1.5           |
+  | damping 0.045              | 4.23 / 2.20   | 0.83          | 24 ms         | 0.78          | 0.64 / 1.19     | 0.00%            | 1.6           |
+  | xy threshold 0.25          | 4.19 / 2.22   | 0.83          | 17 ms         | 0.90          | 0.92 / 1.54     | 0.00%            | 1.5           |
+  | xy threshold 0.4           | 4.19 / 2.22   | 0.83          | 17 ms         | 0.86          | 0.77 / 1.39     | 0.00%            | 1.4           |
+  | z_smooth on                | 4.19 / 2.22   | 0.83          | 17 ms         | 1.02          | 6.11 / 2.52     | 0.00%            | 1.8           |
+
+  edges (`edges_1`, 2026-11-17 23:45, commit 4f72f124+):
+
+  | Row                        | z still noise | z kept        | z lag         | x/y kept      | x/y still noise | restarts at rest | ms            |
+  |----------------------------|---------------|---------------|---------------|---------------|-----------------|------------------|---------------|
+  | raw                        | 11.15 / 5.22  | 1.00          | 0 ms          | 1.00          | 0.27 / 0.25     | 0.00%            | 0.6           |
+  | defaults                   | 0.05 / 0.10   | 0.08          | 7 ms          | 0.73          | 0.00 / 0.00     | 0.10%            | 0.6           |
+  | smooth 50 halving 0.25     | 0.38 / 0.35   | 0.23          | 1 ms          | 0.73          | 0.00 / 0.00     | 0.10%            | 0.7           |
+  | smooth 50 halving 0.5      | 0.38 / 0.35   | 0.16          | 3 ms          | 0.73          | 0.00 / 0.00     | 0.10%            | 0.6           |
+  | smooth 50 halving 1        | 0.38 / 0.35   | 0.10          | 6 ms          | 0.73          | 0.00 / 0.00     | 0.10%            | 0.6           |
+  | smooth 100 halving 0.25    | 0.05 / 0.11   | 0.14          | 3 ms          | 0.73          | 0.00 / 0.00     | 0.10%            | 0.7           |
+  | smooth 100 halving 1       | 0.05 / 0.10   | 0.05          | 15 ms         | 0.73          | 0.00 / 0.00     | 0.10%            | 0.5           |
+  | smooth 200 halving 0.25    | 0.00 / 0.01   | 0.07          | 7 ms          | 0.73          | 0.00 / 0.00     | 0.10%            | 0.7           |
+  | smooth 200 halving 0.5     | 0.00 / 0.00   | 0.04          | 16 ms         | 0.73          | 0.00 / 0.00     | 0.10%            | 0.6           |
+  | smooth 200 halving 1       | 0.00 / 0.00   | 0.03          | 154 ms        | 0.73          | 0.00 / 0.00     | 0.10%            | 0.6           |
+  | xy_rest 0.25               | 0.05 / 0.11   | 0.09          | 6 ms          | 0.73          | 0.00 / 0.00     | 0.10%            | 0.6           |
+  | xy_rest 1                  | 0.05 / 0.11   | 0.06          | 7 ms          | 0.73          | 0.00 / 0.00     | 0.10%            | 0.5           |
+  | z threshold 0.25           | 0.30 / 0.35   | 0.09          | 7 ms          | 0.73          | 0.00 / 0.00     | 0.10%            | 0.7           |
+  | z threshold 1              | 0.00 / 0.00   | 0.06          | 6 ms          | 0.73          | 0.00 / 0.00     | 0.10%            | 0.6           |
+  | z threshold 2              | 0.00 / 0.00   | 0.03          | 5 ms          | 0.73          | 0.00 / 0.00     | 0.10%            | 0.6           |
+  | edge 0.05                  | 0.04 / 0.02   | 0.07          | 7 ms          | 0.73          | 0.00 / 0.00     | 0.05%            | 0.6           |
+  | z window 9x9               | 0.02 / 0.05   | 0.08          | 7 ms          | 0.73          | 0.00 / 0.00     | 0.11%            | 0.5           |
+  | max_speed 4                | 0.05 / 0.11   | 0.08          | 7 ms          | 0.73          | 0.00 / 0.00     | 0.16%            | 0.7           |
+  | max_speed 8                | 0.05 / 0.11   | 0.08          | 7 ms          | 0.73          | 0.00 / 0.00     | 0.06%            | 0.6           |
+  | levels 5                   | 0.05 / 0.10   | 0.08          | 6 ms          | 0.76          | 0.00 / 0.00     | 0.10%            | 0.6           |
+  | xy window 9x9              | 0.05 / 0.10   | 0.08          | 6 ms          | 0.74          | 0.00 / 0.00     | 0.10%            | 0.7           |
+  | damping 0.02               | 0.05 / 0.10   | 0.08          | 6 ms          | 0.74          | 0.00 / 0.00     | 0.10%            | 0.5           |
+  | damping 0.045              | 0.05 / 0.11   | 0.08          | 7 ms          | 0.70          | 0.00 / 0.00     | 0.10%            | 0.7           |
+  | xy threshold 0.25          | 0.05 / 0.10   | 0.08          | 7 ms          | 0.85          | 0.02 / 0.00     | 0.10%            | 0.6           |
+  | xy threshold 0.4           | 0.05 / 0.10   | 0.08          | 7 ms          | 0.77          | 0.00 / 0.00     | 0.10%            | 0.6           |
+  | z_smooth on                | 0.05 / 0.10   | 0.08          | 7 ms          | 0.74          | 0.00 / 0.00     | 0.10%            | 0.6           |
+
+  show (`show_1`, 2026-11-17 23:46, commit 4f72f124+):
+
+  | Row                        | z still noise | z kept        | z lag         | x/y kept      | x/y still noise | restarts at rest | ms            |
+  |----------------------------|---------------|---------------|---------------|---------------|-----------------|------------------|---------------|
+  | raw                        | 13.33 / 5.24  | 1.00          | 0 ms          | 1.00          | 0.43 / 0.68     | 0.00%            | 0.6           |
+  | defaults                   | 0.71 / 0.74   | 0.59          | 2 ms          | 0.92          | 0.00 / 0.19     | 0.01%            | 0.6           |
+  | smooth 50 halving 0.25     | 0.90 / 0.92   | 0.69          | 1 ms          | 0.92          | 0.00 / 0.19     | 0.01%            | 0.7           |
+  | smooth 50 halving 0.5      | 0.88 / 0.79   | 0.65          | 1 ms          | 0.92          | 0.00 / 0.19     | 0.01%            | 0.6           |
+  | smooth 50 halving 1        | 0.87 / 0.73   | 0.60          | 2 ms          | 0.92          | 0.00 / 0.19     | 0.01%            | 0.6           |
+  | smooth 100 halving 0.25    | 0.73 / 0.81   | 0.64          | 1 ms          | 0.92          | 0.00 / 0.19     | 0.01%            | 0.7           |
+  | smooth 100 halving 1       | 0.71 / 0.75   | 0.54          | 5 ms          | 0.92          | 0.00 / 0.19     | 0.01%            | 0.6           |
+  | smooth 200 halving 0.25    | 1.46 / 1.63   | 0.59          | 2 ms          | 0.92          | 0.00 / 0.19     | 0.01%            | 0.7           |
+  | smooth 200 halving 0.5     | 1.54 / 1.64   | 0.53          | 5 ms          | 0.92          | 0.00 / 0.19     | 0.01%            | 0.6           |
+  | smooth 200 halving 1       | 1.52 / 1.58   | 0.46          | 17 ms         | 0.92          | 0.00 / 0.19     | 0.01%            | 0.6           |
+  | xy_rest 0.25               | 0.70 / 0.73   | 0.60          | 2 ms          | 0.92          | 0.00 / 0.19     | 0.01%            | 0.7           |
+  | xy_rest 1                  | 0.71 / 0.76   | 0.58          | 2 ms          | 0.92          | 0.00 / 0.19     | 0.01%            | 0.6           |
+  | z threshold 0.25           | 0.96 / 0.99   | 0.61          | 2 ms          | 0.92          | 0.00 / 0.19     | 0.01%            | 0.7           |
+  | z threshold 1              | 0.21 / 0.25   | 0.56          | 2 ms          | 0.92          | 0.00 / 0.19     | 0.01%            | 0.6           |
+  | z threshold 2              | 0.00 / 0.00   | 0.51          | 2 ms          | 0.92          | 0.00 / 0.19     | 0.01%            | 0.6           |
+  | edge 0.05                  | 0.69 / 0.52   | 0.52          | 3 ms          | 0.92          | 0.00 / 0.19     | 0.00%            | 0.7           |
+  | z window 9x9               | 0.70 / 0.81   | 0.59          | 2 ms          | 0.92          | 0.00 / 0.19     | 0.01%            | 0.6           |
+  | max_speed 4                | 0.72 / 0.74   | 0.54          | 2 ms          | 0.92          | 0.00 / 0.19     | 0.01%            | 0.7           |
+  | max_speed 8                | 0.71 / 0.74   | 0.61          | 2 ms          | 0.92          | 0.00 / 0.19     | 0.00%            | 0.6           |
+  | levels 5                   | 0.71 / 0.75   | 0.56          | 2 ms          | 1.09          | 0.00 / 0.21     | 0.01%            | 0.6           |
+  | xy window 9x9              | 0.71 / 0.74   | 0.58          | 2 ms          | 1.01          | 0.00 / 0.13     | 0.01%            | 0.7           |
+  | damping 0.02               | 0.71 / 0.74   | 0.58          | 2 ms          | 0.98          | 0.00 / 0.20     | 0.01%            | 0.5           |
+  | damping 0.045              | 0.72 / 0.75   | 0.60          | 2 ms          | 0.84          | 0.00 / 0.16     | 0.01%            | 0.7           |
+  | xy threshold 0.25          | 0.71 / 0.74   | 0.59          | 2 ms          | 0.96          | 0.18 / 0.43     | 0.01%            | 0.6           |
+  | xy threshold 0.4           | 0.71 / 0.74   | 0.59          | 2 ms          | 0.93          | 0.03 / 0.29     | 0.01%            | 0.6           |
+  | z_smooth on                | 0.71 / 0.74   | 0.59          | 2 ms          | 0.95          | 0.00 / 0.16     | 0.01%            | 0.7           |
+
 Beside the velocity the 3D motion hands out where the body is now in the box's depth, `z_position`
 (`ZPosition`): from the depth track's disparity, (depth − near) / (far − near) over the player's depth
 range, the depth source's `near` and `far` (`DepthView`), 0 front to 1 back, times its weight in red and
