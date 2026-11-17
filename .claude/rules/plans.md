@@ -11,3 +11,4 @@ paths:
 - A plan has main topics, lettered (A, B), each with its steps, numbered (A1, A2)
 - What is not decided yet is a question, not a step
 - A change that is already worked out is costly to get: keep it
+- A plan is committed when the user agrees to it, not while it is discussed
