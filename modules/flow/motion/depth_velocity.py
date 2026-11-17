@@ -46,7 +46,7 @@ class DepthVelocity(FlowBase):
     Pipeline, on each new flow frame:
         1. Take the depth → the raw Fbo (R32F, metres, at the flow's size, nearest), and without
            its edges → the input SwapFbo
-        2. Correct the track carried from the last one → the track SwapFbo (RGBA32F: z, disparity, rate, anchor),
+        2. Correct the track carried from the last one → the estimate SwapFbo (RGBA32F: z, disparity, rate, anchor),
            and in a second run of the same shader its catch-up → the catch-up SwapFbo (RG32F)
         3. Take the noise floor off z → output_fbo (R16F)
     """
@@ -64,7 +64,7 @@ class DepthVelocity(FlowBase):
         self._threshold_shader: DepthThreshold = DepthThreshold()
 
         self._raw: Fbo = Fbo()                   # the depth as it came, before its edges are taken off
-        self._track: SwapFbo = SwapFbo()
+        self._estimate: SwapFbo = SwapFbo()
         self._catch_up: SwapFbo = SwapFbo()      # the Emas of the miss of the prediction, signed and its size (RG32F, m)
 
     @property
@@ -74,22 +74,22 @@ class DepthVelocity(FlowBase):
 
     @property
     def difference(self) -> Texture:
-        """The track (RGBA32F): z before the threshold in red (view widths per frame), its disparity
+        """The estimate (RGBA32F): z before the threshold in red (view widths per frame), its disparity
         (1/m) in green, the disparity's rate (1/m per second) in blue and the dead zone's anchor (m) in alpha."""
-        return self._track
+        return self._estimate
 
     @property
     def ports(self) -> dict[str, Port]:
         """`input` is the depth with its edges taken off, `raw` as it came."""
         return {'raw': Port(self._raw, TextureKind.SCALAR), **super().ports,
-                'track': Port(self._track, TextureKind.SCALAR),
+                'estimate': Port(self._estimate, TextureKind.SCALAR),
                 'catch_up': Port(self._catch_up, TextureKind.SCALAR)}
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         super().allocate(width, height, output_width, output_height)
         self._raw.allocate(width, height, GL_R32F)
-        self._track.allocate(width, height, GL_RGBA32F)
-        self._track.clear_all()
+        self._estimate.allocate(width, height, GL_RGBA32F)
+        self._estimate.clear_all()
         self._catch_up.allocate(width, height, GL_RG32F)
         self._catch_up.clear_all()
         self._step_filter_shader.allocate()
@@ -99,7 +99,7 @@ class DepthVelocity(FlowBase):
     def deallocate(self) -> None:
         super().deallocate()
         self._raw.deallocate()
-        self._track.deallocate()
+        self._estimate.deallocate()
         self._catch_up.deallocate()
         self._step_filter_shader.deallocate()
         self._velocity_shader.deallocate()
@@ -107,7 +107,7 @@ class DepthVelocity(FlowBase):
 
     def reset(self) -> None:
         super().reset()
-        self._track.clear_all()
+        self._estimate.clear_all()
         self._catch_up.clear_all()
 
     def update_depth(self, depth: Texture, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
@@ -147,17 +147,17 @@ class DepthVelocity(FlowBase):
         self._input_fbo.end()
 
         # one pass reads the track and the catch-up of the frame before, and writes both
-        self._track.swap()
+        self._estimate.swap()
         self._catch_up.swap()
-        self._track.begin()
-        self._velocity_shader.use(self._input_fbo, self._track.back, self._catch_up.back, self._catch_up,
+        self._estimate.begin()
+        self._velocity_shader.use(self._input_fbo, self._estimate.back, self._catch_up.back, self._catch_up,
                                   float(alpha), smooth, catch_up_smooth, float(alpha), motion_floor, max(delta_time, 1e-6), view_span,
                                   step, window, tolerance, dead_zone, displacement, max_speed, guard)
-        self._track.end()
+        self._estimate.end()
         glMemoryBarrier(int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT))
 
         self._output_fbo.begin()
-        self._threshold_shader.use(self._track, threshold / max(width, 1))     # px as view widths
+        self._threshold_shader.use(self._estimate, threshold / max(width, 1))     # px as view widths
         self._output_fbo.end()
 
 

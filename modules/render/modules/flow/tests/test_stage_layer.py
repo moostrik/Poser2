@@ -109,8 +109,8 @@ class PortsTest(unittest.TestCase):
 
     def test_prefixed_names_a_part_and_leaves_no_prefix_alone(self) -> None:
         port = Port(Texture(), TextureKind.SCALAR)
-        self.assertEqual(list(prefixed('z', {'track': port})), ['z.track'])
-        self.assertEqual(list(prefixed('', {'track': port})), ['track'])
+        self.assertEqual(list(prefixed('z', {'estimate': port})), ['z.estimate'])
+        self.assertEqual(list(prefixed('', {'estimate': port})), ['estimate'])
 
 
 if __name__ == '__main__':

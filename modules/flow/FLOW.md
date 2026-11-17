@@ -121,7 +121,7 @@ on the field (`velocity: Annotated[Texture, TextureKind.VELOCITY]`), in inputs a
 once (`_components`), by their settings group, and its `ports`, what the monitors show, is one list in
 the order the data runs, the prefix its group, as a frame debugger lists a render's passes: `input.*`
 first, each component's in the order the stage runs them (`lowpass.trail`, `bandpass.fast`, `xy.solve`,
-`z.track`), `output.*` last; `input` and `output` name the same textures as the components, not copies.
+`z.estimate`), `output.*` last; `input` and `output` name the same textures as the components, not copies.
 The dotted path is the step, which the monitor's path select shows as one list, a step expanding in place. A texture not
 allocated is left out, so a part the stage does not run gives none. Not by
 reflection over attributes: it would find the FBOs, not their kinds, and a swap's back buffer would be a
