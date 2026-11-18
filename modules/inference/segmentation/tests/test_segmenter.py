@@ -5,7 +5,9 @@ cleared each `reset_interval` batches."""
 import threading
 import unittest
 
-from modules.inference import ModelType, segmentation
+import torch
+
+from modules.inference import ModelType, crop, segmentation
 from modules.pose import BBox, Frame
 from modules.utils import Rect
 
@@ -25,19 +27,19 @@ class FakeModel:
         self.running = threading.Event()
         self.release = threading.Event()
 
-    def infer(self, gpu_images, track_ids, ready):
+    def infer(self, images: list[torch.Tensor], track_ids: list[int],
+              ready: torch.cuda.Event | None) -> tuple[torch.Tensor, torch.Tensor, torch.cuda.Event]:
         self.running.set()
         self.release.wait(2.0)
-        n = len(gpu_images)
-        return [f'mask{i}' for i in range(n)], [f'fgr{i}' for i in range(n)], WRITTEN
+        n = len(images)
+        return torch.zeros((n, 1, 1)), torch.zeros((n, 3, 1, 1)), WRITTEN
 
 
-WRITTEN = object()      # the model's event, recorded after its last step
+WRITTEN = torch.cuda.Event()      # the model's event, recorded after its last step
 
 
-class Crop:
-    crop = object()
-    ready = None
+def crop_image() -> crop.Image:
+    return crop.Image(crop=torch.zeros(1))
 
 
 class SegmenterTest(unittest.TestCase):
@@ -69,10 +71,10 @@ class SegmenterTest(unittest.TestCase):
                     break
                 threading.Event().wait(0.01)
             frame = Frame(track_id=0, cam_id=0, timestamp=1.0, features={BBox: BBox.from_rect(Rect(0.0, 0.0, 1.0, 1.0))})
-            segmenter.submit({0: frame}, {0: Crop()})           # runs
+            segmenter.submit({0: frame}, {0: crop_image()})           # runs
             self.assertTrue(runner.running.wait(2.0))
-            segmenter.submit({1: frame}, {1: Crop()})           # waits
-            segmenter.submit({2: frame}, {2: Crop()})           # replaces it
+            segmenter.submit({1: frame}, {1: crop_image()})           # waits
+            segmenter.submit({2: frame}, {2: crop_image()})           # replaces it
             runner.release.set()
             self.assertTrue(done.wait(2.0))
         finally:

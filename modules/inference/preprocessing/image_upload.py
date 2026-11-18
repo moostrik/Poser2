@@ -257,6 +257,7 @@ class ImageUpload:
     def _staging_buffer(self, key: tuple[int, ...], shape: tuple[int, ...], dtype: torch.dtype) -> torch.Tensor:
         """The stack's next pinned buffer, (re)made at its shape. From pinned memory the copy to the GPU is queued and
         the caller goes on; from the frame's own pageable memory it would wait until the GPU had taken it."""
+        events: list[torch.cuda.Event | None]
         buffers, events, slot = self._staging.get(key, ([], [], -1))
         if not buffers or tuple(buffers[0].shape) != shape or buffers[0].dtype != dtype:
             buffers = [torch.empty(shape, dtype=dtype, pin_memory=True) for _ in range(STAGING_COUNT)]

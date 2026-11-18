@@ -5,8 +5,9 @@ import threading
 import unittest
 
 import numpy as np
+import torch
 
-from modules.inference import ModelType, pose
+from modules.inference import ModelType, crop, pose
 from modules.pose import BBox, Frame, Points2D
 from modules.utils import Rect
 
@@ -22,10 +23,10 @@ class FakeModel:
         self.running = threading.Event()
         self.release = threading.Event()
 
-    def infer(self, gpu_images, ready):
+    def infer(self, images: list[torch.Tensor], ready: torch.cuda.Event | None) -> tuple[np.ndarray, np.ndarray]:
         self.running.set()
         self.release.wait(2.0)
-        n = len(gpu_images)
+        n = len(images)
         simcc_x = np.zeros((n, NUM_KEYPOINTS, self.model_width * 2), np.float32)
         simcc_y = np.zeros((n, NUM_KEYPOINTS, self.model_height * 2), np.float32)
         simcc_x[:, :, 96] = 0.9         # x 48 of 192
@@ -33,9 +34,8 @@ class FakeModel:
         return simcc_x, simcc_y
 
 
-class Crop:
-    crop = object()
-    ready = None
+def crop_image() -> crop.Image:
+    return crop.Image(crop=torch.zeros(1))
 
 
 class PoseEstimatorTest(unittest.TestCase):
@@ -64,10 +64,10 @@ class PoseEstimatorTest(unittest.TestCase):
                     break
                 threading.Event().wait(0.01)
             frame = Frame(track_id=0, cam_id=0, timestamp=1.0, features={BBox: BBox.from_rect(Rect(0.0, 0.0, 1.0, 1.0))})
-            estimator.submit({0: frame}, {0: Crop()})           # runs
+            estimator.submit({0: frame}, {0: crop_image()})           # runs
             self.assertTrue(runner.running.wait(2.0))
-            estimator.submit({1: frame}, {1: Crop()})           # waits
-            estimator.submit({2: frame}, {2: Crop()})           # replaces it
+            estimator.submit({1: frame}, {1: crop_image()})           # waits
+            estimator.submit({2: frame}, {2: crop_image()})           # replaces it
             runner.release.set()
             self.assertTrue(done.wait(2.0))
         finally:

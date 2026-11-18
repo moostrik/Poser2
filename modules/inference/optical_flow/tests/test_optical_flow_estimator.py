@@ -5,7 +5,9 @@ crop is left out."""
 import threading
 import unittest
 
-from modules.inference import ModelType, optical_flow
+import torch
+
+from modules.inference import ModelType, crop, optical_flow
 from modules.pose import BBox, Frame
 from modules.utils import Rect
 
@@ -16,17 +18,14 @@ class FakeModel:
         self.running = threading.Event()
         self.release = threading.Event()
 
-    def infer(self, pairs, ready):
+    def infer(self, pairs: list[tuple[torch.Tensor, torch.Tensor]], ready: torch.cuda.Event | None) -> torch.Tensor:
         self.running.set()
         self.release.wait(2.0)
-        return [f'flow{i}' for i in range(len(pairs))]
+        return torch.zeros((len(pairs), 2, 1, 1))
 
 
-class Crop:
-    def __init__(self, prev_crop: object | None = object()) -> None:
-        self.crop = object()
-        self.prev_crop = prev_crop
-        self.ready = None
+def crop_image(with_previous: bool = True) -> crop.Image:
+    return crop.Image(crop=torch.zeros(1), prev_crop=torch.zeros(1) if with_previous else None)
 
 
 class OpticalFlowEstimatorTest(unittest.TestCase):
@@ -53,10 +52,10 @@ class OpticalFlowEstimatorTest(unittest.TestCase):
                     break
                 threading.Event().wait(0.01)
             frame = Frame(track_id=0, cam_id=0, timestamp=1.0, features={BBox: BBox.from_rect(Rect(0.0, 0.0, 1.0, 1.0))})
-            estimator.submit({0: frame}, {0: Crop()})                               # runs
+            estimator.submit({0: frame}, {0: crop_image()})                               # runs
             self.assertTrue(runner.running.wait(2.0))
-            estimator.submit({1: frame}, {1: Crop()})                               # waits
-            estimator.submit({2: frame, 3: frame}, {2: Crop(), 3: Crop(None)})      # replaces it; 3 has no previous crop
+            estimator.submit({1: frame}, {1: crop_image()})                               # waits
+            estimator.submit({2: frame, 3: frame}, {2: crop_image(), 3: crop_image(False)})      # replaces it; 3 has no previous crop
             runner.release.set()
             self.assertTrue(done.wait(2.0))
         finally:

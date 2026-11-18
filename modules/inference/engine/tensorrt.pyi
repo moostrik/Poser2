@@ -10,6 +10,9 @@ class DataType(Enum):
     INT8 = ...
 
 
+def nptype(trt_type: DataType) -> type: ...
+
+
 class TensorIOMode(Enum):
     INPUT = ...
 

@@ -47,7 +47,8 @@ def _pose_output(frames: FrameDict) -> dict[str, np.ndarray]:
 def _segmentation_output(images: segmentation.ImageDict) -> dict[str, np.ndarray]:
     ordered = [images[track_id] for track_id in sorted(images)]
     for image in ordered:       # written on the segmentation's stream
-        torch.cuda.current_stream().wait_event(image.ready)
+        if image.ready is not None:
+            torch.cuda.current_stream().wait_event(image.ready)
     return {'mask': torch.stack([i.mask for i in ordered]).float().cpu().numpy(),
             'fgr': torch.stack([i.foreground for i in ordered]).float().cpu().numpy()}
 

@@ -40,7 +40,9 @@ def uploaded(image: np.ndarray, timestamp: float = 1.0) -> GpuImage:
 class FaceDetectorTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.image = cv2.imread(str(DATA / 'face.jpg'))
+        image = cv2.imread(str(DATA / 'face.jpg'))
+        assert image is not None, 'face.jpg is missing'
+        cls.image: np.ndarray = image
         cls.expected = json.loads((DATA / 'face_expected.json').read_text())['faces']
 
     def check(self, frame: FaceFrame) -> None:
@@ -62,6 +64,8 @@ class FaceDetectorTest(unittest.TestCase):
         self.assertEqual(len(frame.faces), len(self.expected))
         self.check(frame)
         self.assertEqual((frame.width, frame.height), (512, 640))
+        self.assertIsNotNone(frame.image.frame)
+        assert frame.image.frame is not None
         self.assertIs(frame.image.frame.image, self.image)                 # the CPU frame of the moment comes along
         # two faces side by side: both found, and the landmarks of both in one batch as of each alone
         pair: np.ndarray = np.ascontiguousarray(np.hstack([self.image, self.image]))

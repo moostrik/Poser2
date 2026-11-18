@@ -134,7 +134,7 @@ class SerialUploader(Thread):
                     return
                 if self._tracklets:
                     cam_tracklets, queued = self._tracklets.popleft()
-                    straightening: tuple[np.ndarray | None, bool] = self._straightening_at(cam_tracklets)
+                    homography, flip_h = self._straightening_at(cam_tracklets)
                     frame: CameraFrame | None = None
                     wait: PerformanceTimer = self._tracklet_wait
                 else:
@@ -142,7 +142,7 @@ class SerialUploader(Thread):
                     wait = self._frame_wait
             wait.add_time((time.perf_counter() - queued) * 1000.0, report=False)
             if frame is None:
-                self._hand_on_tracklets(cam_tracklets, *straightening)
+                self._hand_on_tracklets(cam_tracklets, homography, flip_h)
                 continue
             try:
                 if frame.kind == FrameType.VIDEO:
@@ -256,6 +256,7 @@ class SerialUploader(Thread):
         GPU is queued and this thread goes on; from the frame's own pageable memory it would wait until the
         GPU had taken it. A buffer is reused once the copy queued from it has run, its event passed; only a GPU
         `STAGING_COUNT` frames behind makes the thread wait."""
+        events: list[torch.cuda.Event | None]
         buffers, events, index = self._staging.get(key, ([], [], -1))
         if not buffers or buffers[0].shape != image.shape or buffers[0].dtype != torch.from_numpy(image[:0]).dtype:
             buffers = [torch.empty(image.shape, dtype=torch.from_numpy(image[:0]).dtype, pin_memory=True) for _ in range(STAGING_COUNT)]

@@ -47,8 +47,12 @@ class CropStepTest(unittest.TestCase):
         pose_crop, segmentation_crop = crop_settings(192, 256), crop_settings(768, 1024)
         crops = CropExtractor(pose_crop, segmentation_crop)
         cut: dict[str, tuple] = {}
-        crops.add_image_callback(lambda frames, images: cut.setdefault('pose', (frames, images)))
-        crops.add_image_callback(lambda frames, images: cut.setdefault('segmentation', (frames, images)), segmentation_crop)
+        def cut_as(size: str):
+            def on_cut(frames, images) -> None:
+                cut.setdefault(size, (frames, images))
+            return on_cut
+        crops.add_image_callback(cut_as('pose'))
+        crops.add_image_callback(cut_as('segmentation'), segmentation_crop)
         crops.submit({0: self.pose}, self.upload_two())
         self.assertEqual(tuple(cut['pose'][1][0].crop.shape), (3, 256, 192))
         self.assertEqual(tuple(cut['segmentation'][1][0].crop.shape), (3, 1024, 768))

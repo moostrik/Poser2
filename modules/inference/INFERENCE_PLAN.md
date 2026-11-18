@@ -153,11 +153,11 @@ G2 (2026-11-18) made the capture an `InferenceFrame`, its results keyed by type 
 `InferenceFrameSync` made with the types its app runs; against E3's run on the frames whose inputs were equal, every
 output equal (the pose 529, the masks 916, the flows 876), and the view ran 2973 frames in 60 s **(seen)**. G3:
 `INFERENCE.md` names the frame, its result types, `preprocessing` and `person`; the glossary takes none.
+G4: pyright on the package, 30 errors to none: annotations (the staging events, the TensorRT stub's `nptype`, the
+straightening's two values), narrowings (the tests' image and frame), the tests' fakes as the types they stand in
+for, and one `cast`: a worker's settings read as their fields' values (`ModelWorkerSettings`), which pyright's
+protocols cannot see through a `Field` descriptor **(seen)**. The scripts' own errors outside the package stay.
 
-- G4. The type errors Pylance shows in `modules/inference` cleared, once G1 to G3 are built, fixed in `CLAUDE.md`'s
-  order (the annotation, a narrowing where the code guarantees the type, a `cast`, a suppression only for a wrong
-  stub). The type checker is pyright, in both venvs from the project's dependencies (`python -m pyright`), the same
-  rules as Pylance (`[tool.pyright]`, basic). Checked by a clean run of it on the package
 - G5. The benchmark, once the refactor is finished: `scripts/model_benchmark.py` with the face models and YOLO too,
   on ONNX and TensorRT, the outputs against the run before. The before run is the same script on a copy of 916ff89a
   (E1) outside the repository, as A1 ran e754ddee; the script reads both the old names and the new ones, as the probe

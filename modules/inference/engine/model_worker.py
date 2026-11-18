@@ -2,9 +2,11 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from threading import Event, Lock, Thread
-from typing import Generic, Protocol, TypeVar
+from typing import Generic, Protocol, TypeVar, cast
 
 import torch
+
+from modules.settings import BaseSettings
 
 logger = logging.getLogger(__name__)
 
@@ -12,12 +14,12 @@ Item = TypeVar('Item')
 
 
 class ModelWorkerSettings(Protocol):
-    """What a model worker needs from its settings."""
+    """What a model worker needs from its settings, as their fields read on an instance."""
     dropped: int        # items replaced by a newer one before the model ran them
     verbose: bool
 
 
-Settings = TypeVar('Settings', bound=ModelWorkerSettings)
+Settings = TypeVar('Settings', bound=BaseSettings)       # with the fields of `ModelWorkerSettings`
 
 
 class ModelWorker(ABC, Generic[Item, Settings]):
@@ -69,8 +71,9 @@ class ModelWorker(ABC, Generic[Item, Settings]):
             replaced: tuple[Item, float] | None = self._pending.get(key)
             self._pending[key] = (item, now)
         if replaced is not None:
-            self.settings.dropped += 1
-            if self.settings.verbose:
+            fields: ModelWorkerSettings = cast(ModelWorkerSettings, self.settings)     # a Field reads as its value
+            fields.dropped += 1
+            if fields.verbose:
                 logger.info(f"{self.name}: dropped an item with lag {int((now - replaced[1]) * 1000)} ms")
         self._wake.set()
 
