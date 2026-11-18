@@ -4,22 +4,64 @@ What is not built in `modules/inference`, apart from the threads the app refacto
 ([apps/APPS_PLAN.md](../../apps/APPS_PLAN.md)). How the input works is in
 [INPUT_THREADS.md](../flow/INPUT_THREADS.md). **(deduction)** marks what is inferred.
 
-## A. The color in one kernel
+## The check
 
-- A1. The uploader's color conversion, straightening and mirroring as one CUDA kernel, as the depth's alignment is
-  (`depth_align.py`), for both of `ImageUpload`'s inputs: the OAK4's NV12 and the depthai 2 cameras' BGR
-  (white_space, hd_trio). From NV12 23 GPU ops become 2, about 0.4 ms less GPU a frame **(deduction)**. Measured per
-  step by `scripts/gpu_input_timing.py` before and after, on a recording here and then on the camera at the next live
-  session.
+The models' outputs are checked on a known good video in the app, with the fewest runs that show a step: deep_flow
+`-sim` on `20261112-125832_measure` (still, then an arm sideways, slow then fast), the fluid off. A probe, not
+committed, adds what deep_flow lacks for the run alone: the segmentation and its crop, and `enable_prev_crop` on so
+the optical flow runs. It saves every model's outputs (points, scores, masks, foregrounds, flows) by the frame's
+capture time, and the models' timers, from the one run, and reads both settings names (before and after the
+refactor's). `-sim` drops other frames each run, so two runs are compared on the frames both have, and the count is
+given. The same engine on the same input gives the same numbers, so a difference beyond two baseline runs' own is a
+fault **(deduction)**. Each run lasts the recording, only while you are away.
+
+| Step | Model        | Frames matched | Mean / p99 (ms) | Lock wait mean (ms) | Max difference |
+|------|--------------|----------------|-----------------|---------------------|----------------|
+| A1   | pose         |                |                 |                     |                |
+| A1   | segmentation |                |                 |                     |                |
+| A1   | optical flow |                |                 |                     |                |
+
+## A. The baseline
+
+- A1. The refactor confirmed: the probe at e754ddee (before it) twice, which gives the noise and the tolerance (at
+  least 1e-4), and on the current code once against it; the numbers in the table
 
 ## B. The crops' event
 
 - B1. Every predictor hands its crops' event to its runner, which waits for it on its stream, as the pose does: the
   segmentation (live in hd_trio; its crops are cut on their own stream and read without a wait **(seen)**) and the
-  optical flow (`enable_prev_crop` off, so it runs nothing). Checked by the tests and an hd_trio check in the app.
+  optical flow (`enable_prev_crop` off, so it runs nothing). Checked by the tests and one probe run against A1.
 
 Question: does the optical flow pair the current and the previous image of the same camera frame? To check when it
 is used.
+
+## C. The TensorRT models side by side
+
+Every TensorRT runner (pose, segmentation, optical flow, person detector, face) runs `execute_async_v3` and its
+stream's `synchronize()` under one global lock (`trt_runtime.get_exec_lock`), and loads under another
+(`get_init_lock`) **(seen)**: the GPU runs one TensorRT model at a time, start to end. TensorRT 11's documentation
+(we run 11.4) has each thread run its own context on its own stream, in parallel, with no lock; deserializing and
+creating contexts are thread-safe **(site fact:
+[Threading](https://docs.nvidia.com/deeplearning/tensorrt/latest/architecture/how-trt-works.html),
+[multi-streaming](https://docs.nvidia.com/deeplearning/tensorrt/latest/performance/optimization.html))**. The locks'
+reason, "Myelin graph conflicts", is in no NVIDIA page; likely an older TensorRT's **(deduction)**. Without the exec
+lock a model starts while another runs: less wait for the pose, each model's own time likely longer **(deduction)**.
+
+- C1. Both locks removed from all five runners. Checked by the package's tests and one probe run against A1: the
+  outputs at the tolerance, each model's time and lock wait in the table
+
+Questions:
+- CUDA graphs: capture each model's `execute_async_v3` per batch size and replay it, to cut the launch time on the
+  CPU. Worth it once C1 shows how much of a model's time is launch?
+- The pose's stream at a higher priority than the others', as the model on the critical path?
+
+## D. The color in one kernel
+
+- D1. The uploader's color conversion, straightening and mirroring as one CUDA kernel, as the depth's alignment is
+  (`depth_align.py`), for both of `ImageUpload`'s inputs: the OAK4's NV12 and the depthai 2 cameras' BGR
+  (white_space, hd_trio). From NV12 23 GPU ops become 2, about 0.4 ms less GPU a frame **(deduction)**. Checked by
+  one probe run against A1 (the recording plays as BGR **(deduction)**), and one run of `scripts/gpu_input_timing.py`
+  before and after for NV12's time per step and image difference; the camera's time at the next live session.
 
 ## The package held up to the rules (the apps' plan F, agreed 2026-11-17)
 
@@ -29,5 +71,7 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 
 ## The rules it touches
 
-- `CLAUDE.md` Performance, prefer the design with the lower latency, measured in the context of the app: A1
+- `CLAUDE.md` Running code, run a GPU harness only on the user's go, and only what the plan names: A1, B1, C1, D1
 - `CLAUDE.md` Composition, fix a problem where it is made: B1, each predictor at the crops' hand-over
+- `CLAUDE.md` Performance, prefer the design with the lower latency, measured in the context of the app: C1, D1
+- `CLAUDE.md` API evolution, remove obsolete pathways: C1, the locks
