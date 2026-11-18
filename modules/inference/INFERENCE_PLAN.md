@@ -127,25 +127,30 @@ segmentation 14.63 / 36.49 against 15.03 / 39.17, the flow 18.87 / 43.53 against
 dropped 395, 239 and 540 against 454, 266 and 632 **(seen, one run each)**. The engine stays the worker's own, not the
 base's: the face detector runs two.
 
+F1, the pose's SimCC decode on the GPU (two max with their indices, a minimum, 17 points and scores a player back to
+the CPU), against the numpy decode on the real model's outputs (crops of three photos and noise, 330 batches a size):
+the same points and scores in every batch, on TensorRT and ONNX **(seen)**. From the model's end to the poses on the
+CPU, mean / p99 ms, the GPU otherwise idle (`f1_decode.py`, not committed, 2026-11-18):
+
+| Players | numpy, TensorRT (hd_trio) | GPU, TensorRT (hd_trio) | numpy, ONNX   | GPU, ONNX     |
+|---------|---------------------------|-------------------------|---------------|---------------|
+| 1       | 0.124 / 0.190             | 0.226 / 0.393           | 0.136 / 0.226 | 0.240 / 0.503 |
+| 2       | 0.146 / 0.217             | 0.232 / 0.411           | 0.152 / 0.233 | 0.241 / 0.458 |
+| 3       | 0.164 / 0.211             | 0.242 / 0.456           | 0.168 / 0.232 | 0.251 / 0.487 |
+| 4       |                           |                         | 0.178 / 0.248 | 0.232 / 0.421 |
+| 8       |                           |                         | 0.241 / 0.388 | 0.234 / 0.668 |
+
+The GPU way is slower up to 7 players and as fast at 8, with a worse p99 at every size **(seen)**: copying both SimCC
+outputs costs less than the decode's kernel launches and its own copy **(deduction)**. So F2 is not built: the decode
+stays on the CPU. On a busy GPU the decode's kernels would also queue behind the other models' work **(deduction)**.
+deep_flow's TensorRT engine takes one player only (a static batch of 1), so its row is hd_trio's engine.
+
 ## C. The TensorRT models side by side
 
 Questions:
 - CUDA graphs: capture each model's `execute_async_v3` per batch size and replay it, to cut the launch time on the
   CPU. Worth it, now the models run side by side?
 - The pose's stream at a higher priority than the others', as the model on the critical path?
-
-## F. The pose's decode on the GPU
-
-The pose's thread copies RTMPose's whole SimCC output to the CPU, (N, 17, 384) and (N, 17, 512) at 192x256, and
-decodes it there with numpy (`pose/decode.py`) **(seen)**. On the GPU the decode is two argmax and two max over those
-outputs, and only 17 points and scores a player come back **(deduction)**.
-
-- F1. A proof of concept, not committed: `decode_simcc` as torch ops on the GPU, against the numpy decode on recorded
-  outputs (the same points and scores, exact: argmax and max on the same numbers), and the time from the model's end
-  to the poses on the CPU, both ways, for 1 to 8 players, on the GPU otherwise idle and in deep_flow as it is
-- F2. If F1 shows the same numbers and less time: the pose's decode on its stream before its one `synchronize()`,
-  `pose/decode.py` one decode, the numpy one gone. Checked by the package's tests and the check's run (the outputs
-  exact, the times)
 
 ## The package held up to the rules (the apps' plan F, agreed 2026-11-17)
 
@@ -162,4 +167,4 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 - `CLAUDE.md` API evolution, remove obsolete pathways: E6
 - `CLAUDE.md` Naming, the domain's term, one everywhere (class, setting, panel label): E3, the workers, their settings
   and timers; `glossary.md` follows: E4
-- `CLAUDE.md` Performance, prefer the design with the lower latency, measured in the context of the app: F1, F2
+- `CLAUDE.md` Performance, prefer the design with the lower latency, measured in the context of the app: F1, the decode kept on the CPU
