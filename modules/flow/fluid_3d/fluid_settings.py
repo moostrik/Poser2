@@ -107,7 +107,7 @@ class InputSettings(BaseSettings):
     boundary's velocity and temperature, each the water dragged toward the body's value times a gain (capped at
     ±1 warm) over a time; the body force's acceleration added × dt times a gain, and gravity's direction, which
     the density's weight and the warmth's lift act along; the density, its dye over the water's, added, or the
-    water drawn toward it; the expansion's rate."""
+    water drawn toward it."""
     spread: Field[float]            = Field(0.2,    min=0.0,    max=1.0,    step=0.001,             description="The body's thickness in z, widths, where it is at least half there; 0 = none")
     velocity_drag: Field[float]     = Field(50.0,   min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Time the water takes to close the gap to the body's velocity (ms); 0 = at once")
     velocity_gain: Field[float]     = Field(1.0,    min=-10.0,  max=10.0,   color="teal",           description="The body's velocity times this is what the water is dragged toward; 1 = as fast as the body")
@@ -121,7 +121,6 @@ class InputSettings(BaseSettings):
     density_blend: Field[DensityBlend] = Field(DensityBlend.OVER,                                  description="The body's dye over the water's, added to it, or the water drawn toward it")
     temperature_drag: Field[float]  = Field(200.0,  min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Time the water takes to take on the body's warmth (ms); 0 = at once")
     temperature_gain: Field[float]  = Field(1.0,    min=-10.0,  max=10.0,   color="teal",           description="The body's presence times this, at most ±1, is its warmth; below 0 cold; 1 = fully warm at 1 width/s")
-    expansion_rate: Field[float]    = Field(0.0,    min=-5.0,   max=5.0,    step=0.01, color="teal", newline=True, description="Volume the water gains per second where the body is (1/s); below 0 it shrinks; 0 = off")
 
 
 class VelocitySettings(BaseSettings):
@@ -132,14 +131,20 @@ class VelocitySettings(BaseSettings):
     fade_time: Field[float]         = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the velocity fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds 1 width/s takes to brake well above the knee, a saturating loss; 0 = off")
     evaporation_knee: Field[float]  = Field(0.1,    min=0.001,  max=1.0,    widget=Widget.log_slider, color="grey", description="Speed (widths/s) below which the braking turns from a fixed amount to a share")
+
+
+class ViscositySettings(BaseSettings):
+    """The viscosity: the velocity's implicit diffusion on the faces, after its advection."""
+    enabled: Field[bool]            = Field(False,                                      description="The viscosity on while it is above 0; off, skipped")
     viscosity: Field[float]         = Field(0.0,    min=0.0,    max=0.01,   step=0.0001, color="indigo", description="Kinematic viscosity (widths² per second); 0 = water at this scale")
-    viscosity_iter: Field[int]      = Field(20,     min=1,      max=60,     color="orange",         description="Viscosity solver iterations at 60 fps; fewer at a higher rate, never more")
+    iterations: Field[int]          = Field(20,     min=1,      max=60,     color="orange",         description="Solver iterations at 60 fps; fewer at a higher rate, never more")
 
 
 class VorticitySettings(BaseSettings):
     """The vorticity confinements (Fedkiw 2001), each keeping swirls of one size alive: the strengths on a row,
     each radius under its strength."""
-    strength_1: Field[float]  = Field(0.0,    min=0.0,    max=100.0,  color="purple",         description="Confinement 1's epsilon, the force epsilon × cell × (N × curl); 0 = off")
+    enabled: Field[bool]      = Field(False,                                      description="The confinements on, each while its strength is above 0; off, skipped")
+    strength_1: Field[float]  = Field(0.0,    min=0.0,    max=100.0,  color="purple", newline=True, description="Confinement 1's epsilon, the force epsilon × cell × (N × curl); 0 = off")
     strength_2: Field[float]  = Field(0.0,    min=0.0,    max=100.0,  color="purple",         description="Confinement 2's epsilon; 0 = off")
     strength_3: Field[float]  = Field(0.0,    min=0.0,    max=100.0,  color="purple",         description="Confinement 3's epsilon; 0 = off")
     radius_1: Field[float]    = Field(0.004,  min=0.001,  max=0.1,    newline=True, widget=Widget.log_slider, color="deep-purple", description="The size of the swirls confinement 1 keeps, widths; at least one cell")
@@ -181,6 +186,13 @@ class TemperatureSettings(BaseSettings):
     fade_time: Field[float]         = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", newline=True, description="Seconds until the warmth fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds full warmth (±1) takes to fall well above the knee, a saturating loss; 0 = off")
     evaporation_knee: Field[float]  = Field(0.1,    min=0.001,  max=1.0,    widget=Widget.log_slider, color="grey", description="Warmth below which the fall turns from a fixed amount to a share")
+
+
+class ExpansionSettings(BaseSettings):
+    """The expansion: the water swelling where the body is, the divergence the projection makes (Nguyen, Fedkiw
+    and Jensen 2002)."""
+    enabled: Field[bool]            = Field(False,                                      description="The expansion on while its rate is not 0; off, skipped")
+    rate: Field[float]              = Field(0.0,    min=-5.0,   max=5.0,    step=0.01, color="teal", description="Volume the water gains per second where the body is (1/s); below 0 it shrinks; 0 = none")
 
 
 class PressureSettings(BaseSettings):
@@ -246,10 +258,13 @@ class Fluid3DSettings(BaseSettings):
     # ---- The groups ----
     time: Group[TimeSettings]               = Group(TimeSettings)
     input: Group[InputSettings]             = Group(InputSettings)
-    # the fluid's passes in their order: the velocity, its confinement, the temperature's buoyancy, the projection, the density
+    # the fluid's passes in their order: the velocity, its viscosity, its confinement, the temperature's buoyancy,
+    # the projection with the expansion, the density
     velocity: Group[VelocitySettings]       = Group(VelocitySettings)
+    viscosity: Group[ViscositySettings]     = Group(ViscositySettings)
     vorticity: Group[VorticitySettings]     = Group(VorticitySettings)
     temperature: Group[TemperatureSettings] = Group(TemperatureSettings)
+    expansion: Group[ExpansionSettings]     = Group(ExpansionSettings)
     pressure: Group[PressureSettings]       = Group(PressureSettings)
     density: Group[DensitySettings]         = Group(DensitySettings)
     fine_density: Group[FineDensitySettings] = Group(FineDensitySettings)

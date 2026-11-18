@@ -57,7 +57,7 @@ def rms(values: np.ndarray) -> float:
 
 
 def fluid_at(wall: str, rate: float, overrides: list[str]) -> Fluid3D:
-    fluid = Fluid3D(mc.fluid_settings(Advection.SEMI_LAGRANGIAN, [f'wall={wall}', f'input.expansion_rate={rate}', *overrides]))
+    fluid = Fluid3D(mc.fluid_settings(Advection.SEMI_LAGRANGIAN, [f'wall={wall}', 'expansion.enabled=1', f'expansion.rate={rate}', *overrides]))
     fluid.allocate(2160, 3840)
     fluid.update(1.0 / mc.FPS)      # the deferred walls applied
     fluid.reset()

@@ -36,8 +36,8 @@ A step (`Fluid3D.update`), in order, at the code's defaults:
 | Pass        | What                                                                                                                                                                                                                                                                    | On                  | Depends on the input |
 |-------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|----------------------|
 | advect_vel  | self-advection on the faces by `velocity.advection`, each face traced on its own ([The staggered velocity](#the-staggered-velocity)), `velocity.advection_scale` 1, no fade; on its result the guard ([The guard](#the-guard)) and the slip | velocity's faces    | the trace distance   |
-| viscosity   | Jacobi diffusion on the faces, off (`viscosity` 0)                                                                                                                                                                                                                      | velocity's faces    | no                   |
-| vorticity   | the confinements (`vorticity.strength_1` to `_3`, each at its `vorticity.radius_1` to `_3`): every running one's curl at the cells from the faces in one pass, their forces summed at the cells in one, each face given its two cells' mean | faces, curl         | no                   |
+| viscosity   | Jacobi diffusion on the faces, while `viscosity.enabled` is on and the viscosity above 0; off by default                                                                                                                                                                | velocity's faces    | no                   |
+| vorticity   | the confinements while `vorticity.enabled` is on (`vorticity.strength_1` to `_3`, each above 0, at its `vorticity.radius_1` to `_3`): every running one's curl at the cells from the faces in one pass, their forces summed, each face given its two cells' mean | faces, curl         | no                   |
 | buoyancy    | gravity × (sink × the density's amount − buoyancy × the warmth, 0 the room's), kept as an acceleration at the cells, each face given its two cells' mean × dt; gravity down the screen (`gravity_y` −1, y up)                                                          | acceleration        | no                   |
 | incompress  | the divergence per cell from its six faces, the pressure by `pressure.solver` ([The pressure](#the-pressure)), the gradient per face from its two cells, on the walls ([The walls](#the-walls))                                                                         | pressure, faces     | no                   |
 | centers     | the faces averaged to the cells' centers, which the densities, the particles and the monitors read                                                                                                                                                                      | velocity            | no                   |
@@ -111,7 +111,7 @@ panel in the order the layer injects them, says how the water follows each; the 
 | `acceleration` | widths/s²                         | the body force: adds it × dt (`add_to_faces_3d`)                                                                                              | `input.acceleration_gain` | a Δv added once                   |
 | `density`      | widths/s, with its `color`        | the dye, the color × the amount × `density_gain`, blended in by `density_blend`: over the water's by `density_drag`'s share, added × dt, or the water drawn toward it (fill) | `input.density_gain` | fully dyed at 1 width/s |
 | `temperature`  | presence, 0 to 1                  | drags the water toward it × `temperature_gain`, its sign and size, at most ±1, in the slab where the body is, over `temperature_drag`         | `input.temperature_gain`  | fully warm or cold at 1 width/s   |
-| `expansion`    | presence, 0 to 1                  | the projection makes the divergence the rate × it, not 0 ([The expansion](#the-expansion))                                                    | `input.expansion_rate`    | its volume gained per second, 1/s |
+| `expansion`    | presence, 0 to 1                  | the projection makes the divergence the rate × it, not 0 ([The expansion](#the-expansion))                                                    | `expansion.rate`          | its volume gained per second, 1/s |
 
 The boundary and the body force are the two systems every solver distinguishes: a moving boundary,
 whose values the water takes, and the body force, which adds to it. The boundary's density and
@@ -283,12 +283,12 @@ widths/s in the mean against Jacobi's 0.134.
 ### The expansion
 
 The water swelling where the body is (Nguyen, Fedkiw and Jensen 2002; Feldman et al. 2003): the projection
-makes the divergence φ, not 0, φ = `input.expansion_rate` × the expansion, in 1/s, signed. The expansion, a
+makes the divergence φ, not 0, φ = `expansion.rate` × the expansion, in 1/s, signed, while `expansion.enabled` is on. The expansion, a
 presence 0 to 1 from the bridge ([BRIDGE_3D.md](BRIDGE_3D.md#the-mix)), goes into its slab at its z position
 (`add_expansion`, `inject_3d`'s `ADD`), summed over a tick's injections into a volume at the cells (R16F), which
 the tick's first injection clears; the divergence pass takes φ off before the solve (`divergence_3d`), and the
 solvers and the gradient stay. A source of volume is neither a velocity nor a force: the water flows out of it
-by itself, or into it below 0. Rate 0, the default, is the textbook's ∇·u = 0, and nothing is injected.
+by itself, or into it below 0. Off or rate 0, the default, is the textbook's ∇·u = 0, and nothing is injected.
 
 With every wall closed the water cannot swell, and the solve with closed walls needs the divergence to sum to 0
 (Neumann's compatibility): there the expansion's mean over the water's cells is taken off first
@@ -459,12 +459,12 @@ as a tuning:
 
 The fields' physics take the textbook's water, with no artificial decay or thickness, as defaults: the
 fields' `fade_time` and `evaporation_time` 0 (off: the water keeps its momentum, the density and the warmth
-stay until the water carries them away), `viscosity` 0 (water at this scale), `pressure.iterations` 40
+stay until the water carries them away), `viscosity` off and 0 (water at this scale), `expansion` off and 0, `pressure.iterations` 40
 (GPU Gems' 40 to 80 for a Jacobi solve), `temperature.enabled` off, `density.sink` and
 `temperature.buoyancy` 0 (the density as heavy as the water, no lift, the buoyancy pass skipped), gravity
 (0, −1, 0), down the screen in the grid's frame, y up as OpenGL's textures (Bridson
 2015), every wall closed; the top speed off, a failsafe; the bridge's mix the boundary's trail alone and its lowpass's `smooth` its default
-160 ms, since the coast is the fluid's; the three confinements off (`vorticity.strength_1` to `_3` 0), each over its neighbors
+160 ms, since the coast is the fluid's; the three confinements off (`vorticity.enabled` off, `strength_1` to `_3` 0), each over its neighbors
 (`vorticity.radius_1` to `_3` one cell) where it runs, Fedkiw's ε 0.3 the textbook's start; in z, `input.spread` 0.2 widths, a body's thickness at
 the camera's crop (from its `view_span` of 0.76 m, **(deduction)**) where it is at least half there. Kept as tuned: the composite's look (`emission`, `opacity`,
 `tint`, `fog`).

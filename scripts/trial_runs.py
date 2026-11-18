@@ -5,7 +5,7 @@ runs `launcher.py -app deep_flow -sim -ni -timing 60 -warmup 10` and puts the po
 they were, so the operator's presets are never written. The reports land in `logs/` as every timing run's do;
 the script prints their names and the fluid's timers side by side.
 
-    python scripts/trial_runs.py --run base --run "visc:fluid.velocity.viscosity=0.0001" [--seconds 60]
+    python scripts/trial_runs.py --run base --run "visc:fluid.viscosity.viscosity=0.0001" [--seconds 60]
 """
 
 import json

@@ -15,7 +15,7 @@ operator saw.
 | B   | [The view](#b-the-view)                                                      | built                             | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; C2 the values, C3 range    | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; D6 the checks              | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
-| E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | E6 the app's check; E8 the panels | [FLUID_3D.md](FLUID_3D.md)                         |
+| E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | built; E6 the app's check         | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | F1, F2 white                      | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                       | [FLOW.md](FLOW.md)                                 |
 | I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | not started                       | [FLOW.md](FLOW.md)                                 |
@@ -102,22 +102,11 @@ warmth and the dye passive scalars carried by the same projected velocity; the b
 buoyancy × warmth) along gravity, at the faces, added before the projection; the heat leaves by mixing and by
 cooling toward the room's. Built (2026-11-18): the order, the density's weight by its amount, the warmth from
 the room's, the warmth from the motion alone; checked in the GPU harness ([FLUID_3D.md](FLUID_3D.md#the-buoyancy)).
+Built (2026-11-18): gravity under `input`, the sink the density's, the temperature carried as the density is; an
+`enabled` in every fluid step that can be off, a step running while enabled and its strength above 0.
 
 - **E6.** Checked in the app, in its own panel: what the temperature does to the water and whether it works,
   with `buoyancy` above 0.
-- **E8.** An `enabled`, first in its panel, for every fluid step that can be off, as `fine_density`, `particles`
-  and `temperature` have: a step runs only while it is enabled and its strength is above 0; either
-  off skips the pass, and the switch, for comparing, keeps the values. The steps whose off is a 0 today:
-  - `vorticity`: `enabled` first; off, the curl is still made while the fine density's turbulence reads it.
-  - The viscosity: a group of its own, `viscosity` (`enabled`, the viscosity, its iterations), out of
-    `velocity`, in the step's place after the velocity's advection.
-  - The expansion: a group of its own, `expansion` (`enabled`, the rate), out of `input`.
-  - The fine density's `turbulence` stays 0 = off: it is no pass of its own but the fine density's advection
-    with the swirls (`FineDensity._turbulent_step` in place of the plain step).
-
-  Presets: `enabled` on where the step runs now (its strength above 0).
-
-E8 is a commit.
 
 ## F. The 3D fluid's look at 4K
 
@@ -236,7 +225,5 @@ The cameras:
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
 - Ask to measure a time again when its pass's code or size changes: D6.
-- A settings class mirrors the code it configures, a group per step; an on/off switch is `enabled`: E8.
-- Keep presets and settings schemas in sync with code changes: E8.
 
 Not designed yet, so their rules are not named: C3, F1, F2, H1, I1 to I4.

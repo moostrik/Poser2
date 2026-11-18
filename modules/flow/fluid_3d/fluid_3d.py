@@ -537,11 +537,13 @@ class Fluid3D:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _apply_viscosity(self) -> None:
-        """The viscosity on the faces: Jacobi iterations of the implicit diffusion, `viscosity_iter` at 60 fps."""
-        if self.settings.velocity.viscosity <= 0.0:
+        """The viscosity on the faces: Jacobi iterations of the implicit diffusion, `viscosity.iterations` at 60 fps;
+        while `viscosity.enabled` is on and the viscosity above 0."""
+        viscosity = self.settings.viscosity
+        if not viscosity.enabled or viscosity.viscosity <= 0.0:
             return
-        viscosity_dt = self.settings.velocity.viscosity * self._dt       # widths² per second × s
-        for iterations in self._viscosity_faces_shader.dispatches(viscosity_iterations(self.settings.velocity.viscosity_iter, self._dt)):
+        viscosity_dt = viscosity.viscosity * self._dt       # widths² per second × s
+        for iterations in self._viscosity_faces_shader.dispatches(viscosity_iterations(viscosity.iterations, self._dt)):
             self._faces.swap()
             self._viscosity_faces_shader.use(self._faces.back, self._faces.volume, self._obstacle,
                                              self._cells, self._cell, viscosity_dt, iterations, self._closed,
@@ -551,14 +553,15 @@ class Fluid3D:
     def _confine_vorticity(self) -> None:
         """Vorticity confinement, each of the three (`vorticity.strength_1` to `_3` at `vorticity.radius_1` to `_3`) keeping swirls of its own
         size alive: every curl in one pass, their forces summed at the cells in one, added to the faces once, each
-        face its two cells' mean. The first running confinement's curl is the one the fine density's turbulence reads; the
-        curl alone while only it does."""
+        face its two cells' mean, while `vorticity.enabled` is on, each confinement while its strength is above 0. The
+        first running confinement's curl is the one the fine density's turbulence reads; the curl alone while only it
+        does."""
         vorticity = self.settings.vorticity
         running: list[tuple[float, float]] = [(strength, radius) for strength, radius in
                                               ((vorticity.strength_1, vorticity.radius_1),
                                                (vorticity.strength_2, vorticity.radius_2),
                                                (vorticity.strength_3, vorticity.radius_3))
-                                              if strength > 0.0 and radius > 0.0]
+                                              if vorticity.enabled and strength > 0.0 and radius > 0.0]
         if not running:
             if self._needs_curl:
                 self._vorticity_curl_shader.use(self._faces.volume, self._obstacle, [self._curl_vol], self._cell, [self._cell[0]],
@@ -586,6 +589,12 @@ class Fluid3D:
         self._add_to_faces_shader.add_force(self._faces.volume, self._vorticity_force_vol, 1.0, self._obstacle,
                                             self._closed, self._has_obstacles)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+
+    @property
+    def _expansion_rate(self) -> float:
+        """The expansion's rate (1/s at full presence) while `expansion.enabled` is on, else 0."""
+        expansion = self.settings.expansion
+        return expansion.rate if expansion.enabled else 0.0
 
     @property
     def _temperature_runs(self) -> bool:
@@ -650,7 +659,7 @@ class Fluid3D:
         closed: tuple[bool, bool, bool] = self._closed
         # a. The divergence, per cell from its six faces, less φ; in a closed box less φ's mean first
         expansion: tuple[Texture3D, float, StorageBuffer | None] | None = None
-        rate: float = self.settings.input.expansion_rate
+        rate: float = self._expansion_rate
         if self._expansion_fresh and rate != 0.0:
             mean: StorageBuffer | None = None
             if all(closed):
@@ -1033,9 +1042,9 @@ class Fluid3D:
 
     def add_expansion(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
         """The expansion (a presence, 0 to 1) added into the expansion's slab at `z_position`, summed over this
-        tick's injections; the projection makes the divergence input.expansion_rate (1/s at full presence) times
-        it. The first injection of a tick clears the last tick's."""
-        if not self._allocated or self.settings.input.expansion_rate == 0.0:
+        tick's injections; the projection makes the divergence expansion.rate (1/s at full presence) times it, while
+        `expansion.enabled` is on and the rate not 0. The first injection of a tick clears the last tick's."""
+        if not self._allocated or self._expansion_rate == 0.0:
             return
         if not self._expansion_fresh:
             self._expansion_vol.clear()

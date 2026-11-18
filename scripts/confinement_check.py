@@ -52,7 +52,7 @@ def main() -> None:
     e, r, small = args.strength, args.radius, args.small
 
     def config(e1: float, r1: float, e2: float, r2: float, e3: float = 0.0, r3: float = 0.02) -> list[str]:
-        return [f'vorticity.strength_1={e1}', f'vorticity.radius_1={r1}',
+        return ['vorticity.enabled=1', f'vorticity.strength_1={e1}', f'vorticity.radius_1={r1}',
                 f'vorticity.strength_2={e2}', f'vorticity.radius_2={r2}',
                 f'vorticity.strength_3={e3}', f'vorticity.radius_3={r3}']
 

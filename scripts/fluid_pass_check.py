@@ -73,7 +73,8 @@ def main() -> None:
     args = parser.parse_args()
     mh.context()
     query = glGenQueries(1)[0]
-    on = ['velocity.viscosity=0.0001', 'vorticity.strength_1=1', 'temperature.enabled=1', 'temperature.buoyancy=1']
+    on = ['viscosity.enabled=1', 'viscosity.viscosity=0.0001', 'vorticity.enabled=1', 'vorticity.strength_1=1',
+          'temperature.enabled=1', 'temperature.buoyancy=1']
     fluid = fluid_at(on + args.set, args.warmup)
     w, h, d = fluid._simulation_width, fluid._simulation_height, fluid._depth
     cells = w * h * d

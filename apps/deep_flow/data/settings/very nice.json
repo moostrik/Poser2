@@ -504,8 +504,7 @@
         "density_gain": 5.0,
         "density_blend": "OVER",
         "temperature_drag": 200.0,
-        "temperature_gain": 5.0,
-        "expansion_rate": 0.0
+        "temperature_gain": 5.0
       },
       "velocity": {
         "advection": "SEMI_LAGRANGIAN",
@@ -513,11 +512,15 @@
         "advection_scale": 1.0,
         "fade_time": 0.0,
         "evaporation_time": 0.0,
-        "evaporation_knee": 0.1,
+        "evaporation_knee": 0.1
+      },
+      "viscosity": {
+        "enabled": true,
         "viscosity": 0.001,
-        "viscosity_iter": 20
+        "iterations": 20
       },
       "vorticity": {
+        "enabled": true,
         "strength_1": 32.83,
         "strength_2": 0.0,
         "strength_3": 0.0,
@@ -531,6 +534,10 @@
         "fade_time": 0.0,
         "evaporation_time": 10.0,
         "evaporation_knee": 0.1
+      },
+      "expansion": {
+        "enabled": false,
+        "rate": 0.0
       },
       "pressure": {
         "solver": "MULTIGRID",
