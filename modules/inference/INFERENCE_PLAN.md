@@ -151,10 +151,9 @@ G1 (2026-11-18) sorted the root: `preprocessing/` (the upload and the crop step)
 stub into `engine/`, `recorded_poses` into `pose/`, `detection/` named `person/`; the capture sync stays at the root.
 G2 (2026-11-18) made the capture an `InferenceFrame`, its results keyed by type as the pose `Frame`'s features, and
 `InferenceFrameSync` made with the types its app runs; against E3's run on the frames whose inputs were equal, every
-output equal (the pose 529, the masks 916, the flows 876), and the view ran 2973 frames in 60 s **(seen)**.
+output equal (the pose 529, the masks 916, the flows 876), and the view ran 2973 frames in 60 s **(seen)**. G3:
+`INFERENCE.md` names the frame, its result types, `preprocessing` and `person`; the glossary takes none.
 
-- G3. `INFERENCE.md` names the frame and its result types, `preprocessing` and `person`, where it describes them; the
-  glossary takes none: it holds only names more than one package uses (the rules thread, agreed 2026-11-18)
 - G4. The type errors Pylance shows in `modules/inference` cleared, once G1 to G3 are built, fixed in `CLAUDE.md`'s
   order (the annotation, a narrowing where the code guarantees the type, a `cast`, a suppression only for a wrong
   stub). The type checker is pyright, in both venvs from the project's dependencies (`python -m pyright`), the same
