@@ -151,8 +151,18 @@ streams behind the events before them, and a thread waits once, the pose model's
 **(seen)**. The crop cannot join the upload: it cuts the RAW stage's smoothed and predicted box
 (`BBoxEuroSmoother`, `BBoxPredictor`, on the frame source's thread before the async step) **(seen)**.
 
-Question: the pose's SimCC decode on the GPU (the argmax), so its thread copies 17 points to the CPU rather than the
-whole output before it hands the poses on? Small **(deduction)**; for when the pose's latency matters more.
+## F. The pose's decode on the GPU
+
+The pose's thread copies RTMPose's whole SimCC output to the CPU, (N, 17, 384) and (N, 17, 512) at 192x256, and
+decodes it there with numpy (`pose/decode.py`) **(seen)**. On the GPU the decode is two argmax and two max over those
+outputs, and only 17 points and scores a player come back **(deduction)**.
+
+- F1. A proof of concept, not committed: `decode_simcc` as torch ops on the GPU, against the numpy decode on recorded
+  outputs (the same points and scores, exact: argmax and max on the same numbers), and the time from the model's end
+  to the poses on the CPU, both ways, for 1 to 8 players, on the GPU otherwise idle and in deep_flow as it is
+- F2. If F1 shows the same numbers and less time: the pose's decode on its stream before its one `synchronize()`,
+  `pose/decode.py` one decode, the numpy one gone. Checked by the package's tests and the check's run (the outputs
+  exact, the times)
 
 ## The package held up to the rules (the apps' plan F, agreed 2026-11-17)
 
@@ -170,3 +180,4 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 - `CLAUDE.md` API evolution, remove obsolete pathways: E6
 - `CLAUDE.md` Naming, the domain's term, one everywhere (class, setting, panel label): E3, the workers, their settings
   and timers; `glossary.md` follows: E4
+- `CLAUDE.md` Performance, prefer the design with the lower latency, measured in the context of the app: F1, F2
