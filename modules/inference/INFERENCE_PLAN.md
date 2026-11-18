@@ -257,7 +257,8 @@ Its preset is yours to save; an FP16 engine needs a setting to name its file, wh
 
 Questions:
 - The licence of the Body8 training data (AI Challenger and others) is unresolved, for ours as for every candidate
-- The SimCC distribution's width as each keypoint's uncertainty for the One Euro filter: cheap, untested
+- The SimCC distribution's width as each keypoint's uncertainty for the One Euro filter: in the pose package's plan
+  ([POSE_PLAN.md](../pose/POSE_PLAN.md))
 
 ## I. The models kept, a clean LFS, hd_trio's files tracked (2026-11-18, built)
 
