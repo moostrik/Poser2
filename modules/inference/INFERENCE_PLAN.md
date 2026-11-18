@@ -193,8 +193,8 @@ render takes, and the models' shared parts **(seen)**. A folder of one or two fi
   - deep_flow alone uses it, with `Depth` and `Poses`; the other apps keep their own ways (decided 2026-11-18).
     Checked by the sync's tests (each type waited for or not, the empties, the asked mark), the import and guard
     tests, the package's and the apps' tests, and the check's run
-- G3. The new names to the rules thread for the glossary: `InferenceFrame` (not "capture" for it), its result
-  types, `preprocessing`, `person`
+- G3. `INFERENCE.md` names the frame and its result types, `preprocessing` and `person`, where it describes them; the
+  glossary takes none: it holds only names more than one package uses (the rules thread, agreed 2026-11-18)
 - G4. The benchmark, once the refactor is finished: `scripts/model_benchmark.py` with the face models and YOLO too,
   on ONNX and TensorRT, the outputs against the run before. The before run is the same script on a copy of 916ff89a
   (E1) outside the repository, as A1 ran e754ddee; the script reads both the old names and the new ones, as the probe
@@ -261,9 +261,9 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 - `CLAUDE.md` Docstrings, reasons sit in the package's document: E5
 - `CLAUDE.md` API evolution, remove obsolete pathways: E6
 - `CLAUDE.md` Naming, the domain's term, one everywhere (class, setting, panel label): E3, the workers, their settings
-  and timers; `glossary.md` follows: E4
+  and timers
 - `CLAUDE.md` Packages, a package is one thing; its files each hold one subject: G1
-- `CLAUDE.md` Naming, one term everywhere, rename it everywhere in the same change: G2; `glossary.md` follows: G3
+- `CLAUDE.md` Naming, one term everywhere, rename it everywhere in the same change: G2
 - `CLAUDE.md` Composition, fixed structure through constructors: G2, the sync's result types
 - `pose-data.md`, a read never raises, missing data reads empty: G2 takes the pose frame's contract
 - `CLAUDE.md` Performance, measured in the context of the app: H5 chooses the model under the fluid
