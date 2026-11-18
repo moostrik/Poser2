@@ -16,7 +16,6 @@ dependencies = [
     "OneEuroFilter>=0.2.1",
     "onnx>=1.21",                   # model export tools
     "onnx_simplifier>=0.5",         # model export tools, optional there
-    "onnxconverter-common>=1.14",   # model export tools: an FP32 model made FP16 (tools/models/convert_onnx_to_fp16.py)
     "onnxruntime-gpu>=1.27",        # the ONNX runners, to benchmark TensorRT against; 1.27+ is a CUDA 13 build like torch
     "opencv-python>=4.13",
     "psutil>=7.2",

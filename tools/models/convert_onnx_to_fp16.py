@@ -1,5 +1,8 @@
 """Convert FP32 ONNX model to FP16 with selective precision control.
 
+A tool run once a model is added; its library is not one of the project's, so it runs with it:
+    uv run --with onnxconverter-common python tools/models/convert_onnx_to_fp16.py ...
+
 Usage:
     # Inspect model ops
     python tools/models/convert_onnx_to_fp16.py --input models/rtmpose-l_256x192_fp32.onnx --inspect
@@ -11,7 +14,7 @@ Usage:
     python tools/models/convert_onnx_to_fp16.py --input models/rtmpose-l_256x192_fp32.onnx --output models/rtmpose-l_256x192_test.onnx --fp16-ops Conv Mul Sigmoid
 
     # RTMPose all FP16 but its head's ScaleNorms, whose sum of squares can overflow FP16's 65504; inputs and outputs FP32
-    python tools/models/convert_onnx_to_fp16.py --input data/models/rtmpose-l_256x192.onnx --output data/models/rtmpose-l_256x192_fp16.onnx --fp32-norms --keep-io-types
+    uv run --with onnxconverter-common python tools/models/convert_onnx_to_fp16.py --input data/models/rtmpose-l_256x192.onnx --output data/models/rtmpose-l_256x192_fp16.onnx --fp32-norms --keep-io-types
 """
 
 import argparse

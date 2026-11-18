@@ -259,7 +259,7 @@ Questions:
 - The licence of the Body8 training data (AI Challenger and others) is unresolved, for ours as for every candidate
 - The SimCC distribution's width as each keypoint's uncertainty for the One Euro filter: cheap, untested
 
-## I. The models kept, a clean LFS, hd_trio's files tracked (2026-11-18)
+## I. The models kept, a clean LFS, hd_trio's files tracked (2026-11-18, built)
 
 LFS keeps every ONNX file an engine is built from, and the original each FP16 file is made from; a PC's setup only
 builds engines, and the FP16 converter is a tool run once a model is added (decided 2026-11-18). The pose runs FP16 in
@@ -273,14 +273,15 @@ I1 (2026-11-18): the pose names its FP16 files (`rtmpose-l_256x192_fp16`, `rtmpo
 from OpenMMLab's 384x288 file, 55.6 MB, its fourteen norm nodes FP32); the FP32 originals stay; RTMPose-x is deleted;
 `INFERENCE.md` says FP16 **(seen)**.
 
-- I2. The converter out of the project's dependencies: `onnxconverter-common` leaves `pyproject.toml` and `uv.lock`,
-  and `convert_onnx_to_fp16.py` runs as the YOLO export does, `uv run --with onnxconverter-common python
-  tools/models/convert_onnx_to_fp16.py ... --fp32-norms --keep-io-types` (its docstring and the README say so);
-  `scripts/makemodels.bat` builds the pose's FP16 engines per app at its batches from the files in LFS, skipping what
-  exists as it does now; the README's setup says to run it after a pull that changes the models, as a PC's old
-  engines are not the ones the pose then names **(deduction)**. Checked by running it for deep_flow; one benchmark
-  on hd_trio's batch of 3, FP16 against FP32's points (H2 measured batch 1 only **(seen)**) and FP16 on ONNX
-  Runtime, about a minute; and deep_flow as it is on HIGH, 60 s, that it starts and poses and the pose's time
+I2 (2026-11-18): `onnxconverter-common` is out of `pyproject.toml`, `uv.lock` and both venvs (the sync removed that
+alone); `convert_onnx_to_fp16.py` runs with `uv run --with onnxconverter-common` and makes the same file, byte for
+byte; `makemodels.bat` builds the pose's FP16 engines per app (deep_flow's and hd_trio's built), and the README says
+to run it after a pull that changes the models **(seen)**. hd_trio's batch of 3, the same 300 crops, idle: FP32
+3.90 / 7.07 ms, FP16 1.79 / 5.16 ms, 97.4% of the visible points within one bin (batch 1: 97.0%); FP16 on ONNX Runtime
+4.04 / 7.06 ms; deep_flow as it is on HIGH FP16, 60 s: the pose 21.0 / 43.5 ms, 1498 posed, none dropped **(seen,
+one run each)**. The workers log the engine's input type as its precision, FP32 for these FP16 models with FP32 inputs
+and outputs **(seen)**.
+
 I3 (2026-11-18): `.gitignore`'s `temp*` is `/temp/`; it hid only hd_trio's `temperature_bridge.py` and its shader
 (`.py`, `.frag`), now committed; hd_trio's tests pass **(seen)**.
 
