@@ -57,7 +57,7 @@ class ViewDepth:
     def upscale(self, depth: Texture | None, crop: Rect, mask: Texture) -> None:
         """`depth` upscaled into the view across `crop`, where it is the player's and `mask` is, then filled across
         `mask`; none without a depth."""
-        self.clear()                    # without a depth: none, not the last capture's
+        self.clear()                    # without a depth: none, not the last frame's
         if depth is None:
             return
         self._upscaled.begin()

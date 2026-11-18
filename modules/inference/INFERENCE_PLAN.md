@@ -149,35 +149,10 @@ deep_flow's TensorRT engine takes one player only (a static batch of 1), so its 
 
 G1 (2026-11-18) sorted the root: `preprocessing/` (the upload and the crop step), `model_worker` and the TensorRT
 stub into `engine/`, `recorded_poses` into `pose/`, `detection/` named `person/`; the capture sync stays at the root.
+G2 (2026-11-18) made the capture an `InferenceFrame`, its results keyed by type as the pose `Frame`'s features, and
+`InferenceFrameSync` made with the types its app runs; against E3's run on the frames whose inputs were equal, every
+output equal (the pose 529, the masks 916, the flows 876), and the view ran 2973 frames in 60 s **(seen)**.
 
-- G2. `Capture` becomes `InferenceFrame`, made as the pose `Frame` is (decided 2026-11-18), in one step, so each call
-  site changes once:
-  - the name: one camera moment's image with what the models found in it. "Capture" also names the camera's moment
-    of capture (`capture_time`, `HasCaptureTime`), the recorder's captures (`RecordedCapture`, `CaptureStream`),
-    `ScreenCapture` and smile's photo capture **(seen)**; those keep it
-  - the frame: identity slots (`cam_id`, `timestamp`, the image) and the results keyed by their type, read as
-    `frame[Poses]`, which never raises; a type the frame does not carry reads as its empty one (no players). Today
-    it holds two results in fixed fields, assumes a depth, and the sync has a near copy per result (a stream, a
-    submit, a wait) **(seen)**. The types built now are the ones deep_flow has: `Depth`, `Poses` and `Masks` (the
-    sync takes masks today); `Flows` and `Faces` come when an app hands them to the frame. Each result carries its
-    `cam_id`, its `timestamp` (its image's capture time) and its `synced` (this moment's, or the newest from before):
-    today the sync finds the poses' camera from each pose and the masks' from the poses **(seen)**, and a flow
-    carries neither **(seen: `FlowDict` is keyed by track id only)**
-  - the sync, `InferenceFrameSync`: made with the result types its app runs (fixed structure, through the
-    constructor), one stream per type and one `submit`. A frame is complete with its image and, where given, its
-    depth, as today; it waits for each model's result by that type's setting (`pose_wait`, `mask_wait`), and a type
-    it was not given is never waited for. The "asked" mark (`expect_poses`: no poses were asked for this image, so
-    neither poses nor the masks cut for them are waited for **(seen)**) becomes `expect(cam_id, timestamp, asked)`
-    for the types that depend on the poses
-  - with it, one term everywhere: `InferenceFrameCallback`, the board's `HasInferenceFrames` /
-    `InferenceFrameStoreMixin` / `take_inference_frames`, the cadence panel's drops, the render's image, depth and
-    monitor layers and the monitor's settings, the bridge's `CaptureMax` as `FrameMax` (it keeps per pixel the larger
-    of a tick's frames' outputs **(seen)**; decided 2026-11-18), deep_flow's
-    `_run_capture`, and the flow documents **(seen: 28 files outside the package)**; the presets follow where a
-    settings group is renamed
-  - deep_flow alone uses it, with `Depth` and `Poses`; the other apps keep their own ways (decided 2026-11-18).
-    Checked by the sync's tests (each type waited for or not, the empties, the asked mark), the import and guard
-    tests, the package's and the apps' tests, and the check's run
 - G3. `INFERENCE.md` names the frame and its result types, `preprocessing` and `person`, where it describes them; the
   glossary takes none: it holds only names more than one package uses (the rules thread, agreed 2026-11-18)
 - G4. The type errors Pylance shows in `modules/inference` cleared, once G1 to G3 are built, fixed in `CLAUDE.md`'s

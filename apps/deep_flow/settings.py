@@ -43,7 +43,7 @@ class Stage(IntEnum):
 
 class Layers(IntEnum):
     """What a panel can show, in the chain's order: each stage's monitor, the show, the timings and the pose."""
-    capture =       0
+    inference_frame = 0
     view =          auto()
     motion =        auto()
     bridge =        auto()
@@ -173,7 +173,7 @@ class PoseGroup(BaseSettings):
     optical_flow   : Group[inference.optical_flow.OpticalFlowEstimatorSettings]  = Group(inference.optical_flow.OpticalFlowEstimatorSettings, share=_batch_share)
     frame_source   : Group[TrackerFrameSourceSettings]       = Group(TrackerFrameSourceSettings)
     pose_crop      : Group[inference.crop.CropExtractorSettings]          = Group(inference.crop.CropExtractorSettings, share=[max_players])
-    capture_sync   : Group[inference.CaptureSyncSettings]    = Group(inference.CaptureSyncSettings)
+    inference_frame_sync   : Group[inference.InferenceFrameSyncSettings]    = Group(inference.InferenceFrameSyncSettings)
     angle_extractor: Group[nodes.AngleExtractorSettings]     = Group(nodes.AngleExtractorSettings)
     bbox           : Group[BboxFeature]                      = Group(BboxFeature, share=_feature_share)
     point          : Group[PointFeature]                     = Group(PointFeature, share=_feature_share)
@@ -252,16 +252,16 @@ class ViewLayerSettings(render.StageLayerSettings):
     monitor_debug: Group[render.Monitor2DLayerSettings] = Group(render.Monitor2DLayerSettings, last=True, tint=render.DEBUG_TINT)
 
 
-class CaptureView(IntEnum):
-    """What the capture's monitor shows."""
-    COLOR = 0       # the capture's color image
+class InferenceFrameView(IntEnum):
+    """What the frame's monitor shows."""
+    COLOR = 0       # the frame's color image
     DEPTH = 1       # its depth, in the colormap
     BOTH = 2        # its depth in the colormap over its color image
 
 
-class CaptureSettings(BaseSettings):
-    """The capture's monitor: the color, the depth or both, the depth in `colormap` from the view's near to its far."""
-    show:     Field[CaptureView] = Field(CaptureView.BOTH, description="What is shown: the color, the depth or both")
+class InferenceFrameMonitorSettings(BaseSettings):
+    """The frame's monitor: the color, the depth or both, the depth in `colormap` from the view's near to its far."""
+    show:     Field[InferenceFrameView] = Field(InferenceFrameView.BOTH, description="What is shown: the color, the depth or both")
     colormap: Field[Colormap]    = Field(Colormap.JET, description="The depth's colors, from the view's near to its far")
 
 
@@ -293,11 +293,11 @@ class PoseMonitorSettings(BaseSettings):
 
 class RenderSettings(BaseSettings):
     debug: Field[bool]                           = Field(True, description="The main and the debug panel; off, the main panel alone, as on a second screen")
-    pause: Field[bool]                           = Field(False, description="Hold the last capture; the view is made again on it when a setting changes")
+    pause: Field[bool]                           = Field(False, description="Hold the last frame; the view is made again on it when a setting changes")
     input_fps: Field[float]                      = Field(60.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
     layer  : Group[LayerSettings]                = Group(LayerSettings)
     # the chain, in its order, then the pose beside it
-    capture: Group[CaptureSettings]              = Group(CaptureSettings)
+    inference_frame: Group[InferenceFrameMonitorSettings] = Group(InferenceFrameMonitorSettings)
     view   : Group[ViewLayerSettings]            = Group(ViewLayerSettings)
     motion : Group[render.Motion3DLayerSettings] = Group(render.Motion3DLayerSettings, share=[input_fps.as_('fps')])
     bridge : Group[render.Bridge3DLayerSettings] = Group(render.Bridge3DLayerSettings)
@@ -312,19 +312,19 @@ class RenderSettings(BaseSettings):
 
 class CadenceSettings(BaseSettings):
     """Pinned beside the camera's video rates: the frames that get past the camera, so a frame lost on its
-    way to the flow shows where (the sync's captures, then the motion's measures), with the drops counted where they happen."""
-    capture_fps:     Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Captures", unit="fps",
-                                          description="Captures the sync hands on, average")
-    capture_min_fps: Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Captures min", unit="fps",
-                                          description="Captures: 1 / the worst gap between two")
+    way to the flow shows where (the sync's frames, then the motion's measures), with the drops counted where they happen."""
+    inference_frame_fps:     Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Inference frames", unit="fps",
+                                          description="Inference frames the sync hands on, average")
+    inference_frame_min_fps: Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Inference frames min", unit="fps",
+                                          description="Inference frames: 1 / the worst gap between two")
     motion_fps:      Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Motion", unit="fps",
                                           description="Frames the motion measures, average")
     motion_min_fps:  Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Motion min", unit="fps",
                                           description="Motion: 1 / the worst gap between two measures")
     upload_drops:    Field[int]   = Field(0, access=Field.READ, pinned=True, label="Upload drops",
                                           description="Camera frames the uploader dropped, its queue full")
-    capture_drops:   Field[int]   = Field(0, access=Field.READ, pinned=True, label="Capture drops",
-                                          description="Captures dropped before the render took them")
+    inference_frame_drops:   Field[int]   = Field(0, access=Field.READ, pinned=True, label="Inference frame drops",
+                                          description="Inference frames dropped before the render took them")
     pose_drops:      Field[int]   = Field(0, access=Field.READ, pinned=True, label="Pose drops",
                                           description="Pose model results dropped before the stages after it took them")
 

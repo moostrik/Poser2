@@ -1,24 +1,24 @@
-"""The capture's monitor: the capture's color, its depth in a colormap, or the depth over the color."""
+"""The frame's monitor: the frame's color, its depth in a colormap, or the depth over the color."""
 
 from OpenGL.GL import GL_RGBA16F
 
 from modules import render
 from modules.gl import Fbo, Style, Texture, clear_color
-from ....settings import CaptureSettings, CaptureView, ViewCropSettings
+from ....settings import InferenceFrameMonitorSettings, InferenceFrameView, ViewCropSettings
 
-DRAW_MODES: dict[CaptureView, render.DepthDrawMode] = {CaptureView.DEPTH: render.DepthDrawMode.COLOR,
-                                                       CaptureView.BOTH: render.DepthDrawMode.OVER_IMAGE}
+DRAW_MODES: dict[InferenceFrameView, render.DepthDrawMode] = {InferenceFrameView.DEPTH: render.DepthDrawMode.COLOR,
+                                                       InferenceFrameView.BOTH: render.DepthDrawMode.OVER_IMAGE}
 
 
-class CaptureMonitorLayer(render.LayerBase):
-    """The capture's `image` and `depth` as `settings.show` says, the depth on a log scale from the view's `near` to
-    its `far` (`band`, the view's crop, its front and back); drawn again with each new capture."""
+class InferenceFrameMonitorLayer(render.LayerBase):
+    """The frame's `image` and `depth` as `settings.show` says, the depth on a log scale from the view's `near` to
+    its `far` (`band`, the view's crop, its front and back); drawn again with each new frame."""
 
-    def __init__(self, image: render.CaptureImageLayer, depth: render.CaptureDepthLayer, settings: CaptureSettings,
+    def __init__(self, image: render.InferenceFrameImageLayer, depth: render.InferenceFrameDepthLayer, settings: InferenceFrameMonitorSettings,
                  band: ViewCropSettings) -> None:
-        self._image: render.CaptureImageLayer = image
-        self._depth: render.CaptureDepthLayer = depth
-        self.settings: CaptureSettings = settings
+        self._image: render.InferenceFrameImageLayer = image
+        self._depth: render.InferenceFrameDepthLayer = depth
+        self.settings: InferenceFrameMonitorSettings = settings
         self._band: ViewCropSettings = band
         self._fbo: Fbo = Fbo()
         self._depth_colormap: render.DepthColormap = render.DepthColormap()
@@ -38,8 +38,8 @@ class CaptureMonitorLayer(render.LayerBase):
         self._depth_colormap.deallocate()
 
     def update(self) -> None:
-        s: CaptureSettings = self.settings
-        show: CaptureView = CaptureView(s.show)
+        s: InferenceFrameMonitorSettings = self.settings
+        show: InferenceFrameView = InferenceFrameView(s.show)
         near, far = self._band.near, self._band.far
         drawn: tuple = (self._image.timestamp, show, s.colormap, near, far)
         if drawn == self._drawn or not self._fbo.allocated:
@@ -49,7 +49,7 @@ class CaptureMonitorLayer(render.LayerBase):
         Style.set_blend_mode(Style.BlendMode.DISABLED)
         self._fbo.begin()
         clear_color()
-        if show == CaptureView.COLOR:
+        if show == InferenceFrameView.COLOR:
             if self._image.texture.allocated:
                 self._image.texture.draw()
         else:

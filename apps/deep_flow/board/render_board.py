@@ -5,17 +5,17 @@ from modules.board import (
     TimeSeriesStoreMixin,
 )
 
-from .captures import CaptureStoreMixin
+from .inference_frames import InferenceFrameStoreMixin
 
 
-class RenderBoard(FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CaptureStoreMixin, CropImageStoreMixin,
+class RenderBoard(FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, InferenceFrameStoreMixin, CropImageStoreMixin,
                  CameraTrackletStoreMixin, TimeSeriesStoreMixin):
 
     def __init__(self) -> None:
         FrameStoreMixin.__init__(self)
         WindowStoreMixin.__init__(self)
         CameraImageStoreMixin.__init__(self)
-        CaptureStoreMixin.__init__(self)
+        InferenceFrameStoreMixin.__init__(self)
         CropImageStoreMixin.__init__(self)
         CameraTrackletStoreMixin.__init__(self)
         TimeSeriesStoreMixin.__init__(self)

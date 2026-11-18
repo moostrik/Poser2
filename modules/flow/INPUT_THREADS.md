@@ -24,7 +24,7 @@ Per thread, the callbacks in the order they are registered (`apps/deep_flow/main
 | the pose model's (`pose.PoseEstimator`)           | RTMPose on the crops, queues the poses for the pipeline        | its own model                              |
 | the pipeline's (`PosePipeline raw`)               | the RAW stage after the model, CLEAN, SMOOTH, their users      | nothing                                    |
 | the detector's (-sim)                             | YOLOv8n on the uploaded image, boxes to the replay camera      | its own model                              |
-| the capture sync's (`CaptureSync`)                | matches the image, depth and poses, hands the capture on       | the next part, or `pose_wait` (0 here)     |
+| the inference frame sync's (`InferenceFrameSync`) | matches the image, depth and poses, hands the frame on         | the next part, or `pose_wait` (0 here)     |
 | the render                                        | every capture since the last tick, then the fluid              | the GPU, in a copy while its queue is full |
 
 ### The uploader
@@ -41,7 +41,7 @@ only; what only the flow needs (the view's crop and size, the depth's read into 
 
 When an image is on the GPU, the uploader hands it to four others, each of which only takes note and returns:
 
-- the capture sync, which queues the image for its own thread;
+- the inference frame sync, which queues the image for its own thread;
 - the detector (-sim), which keeps the newest image for its own thread;
 - the camera-interval time sample;
 - through the snapshot callback, the frame source, which queues the frame bang with exactly that image and its
@@ -60,10 +60,10 @@ With one camera the frames' and the tracklets' `CameraSync` only throttle: they 
 of the last, an uncounted drop. deep_flow runs the pose step on every uploaded image and `tracker.update` on every
 tracklet message; `CameraSync` is for the apps with several cameras.
 
-### The capture sync
+### The inference frame sync
 
-`CaptureSync` ([INFERENCE.md](../inference/INFERENCE.md#the-capture-sync)) matches an image, its depth and the
-poses of one moment. With `pose_wait` 0 a capture carries the poses of the frame before, which with the view's crop
+`InferenceFrameSync` ([INFERENCE.md](../inference/INFERENCE.md#the-inference-frame-sync)) matches an image, its depth and the
+poses of one moment. With `pose_wait` 0 a frame carries the poses of the frame before, which with the view's crop
 fixed only puts the pose's points drawn over the view a frame behind.
 
 ### The hand-overs' waits
@@ -71,28 +71,28 @@ fixed only puts the pose's points drawn over the view a frame behind.
 How long an item waits in a queue for its receiver, the `Wait …` timers in the time series (`measure` 9–19 s,
 -sim, the recorded tracklets, the pose model in the app, `scripts/cadence_probe.py`):
 
-| Queue                         | Mean     | p95      | Max      |
-|-------------------------------|----------|----------|----------|
-| the uploader's frames         | 4.2 ms   | 17.8 ms  | 23.7 ms  |
-| the uploader's tracklets      | 3.2 ms   | 15.6 ms  | 23.3 ms  |
-| the pose step's bangs         | 0.16 ms  | 0.47 ms  | 1.4 ms   |
-| the capture sync's parts      | 0.30 ms  | 0.80 ms  | 2.6 ms   |
-| the pipeline's poses          | 0.09 ms  | 0.17 ms  | 1.0 ms   |
+| Queue                            | Mean     | p95      | Max      |
+|----------------------------------|----------|----------|----------|
+| the uploader's frames            | 4.2 ms   | 17.8 ms  | 23.7 ms  |
+| the uploader's tracklets         | 3.2 ms   | 15.6 ms  | 23.3 ms  |
+| the pose step's bangs            | 0.16 ms  | 0.47 ms  | 1.4 ms   |
+| the inference frame sync's parts | 0.30 ms  | 0.80 ms  | 2.6 ms   |
+| the pipeline's poses             | 0.09 ms  | 0.17 ms  | 1.0 ms   |
 
 The uploader's wait is its own work on the frame before it, not the hand-over **(deduction)**: a color frame takes
 it 6.4 ms on average to upload.
 
 ### The render: every capture
 
-The board keeps each camera's captures until the render takes them (`CaptureStoreMixin.take_captures`, at most
+The board keeps each camera's inference frames until the render takes them (`InferenceFrameStoreMixin.take_inference_frames`, at most
 4; beyond that the oldest is dropped and counted). Each tick the render runs every capture since the last, in
-order (`_run_capture` in `apps/deep_flow/render/deep_flow_render.py`): its image and depth into GL, the view stage (its color grade
-the last of its parts), the motion, and the bridge stepping over the time since the capture before. A tick without a capture runs
+order (`_run_inference_frame` in `apps/deep_flow/render/deep_flow_render.py`): its image and depth into GL, the view stage (its color grade
+the last of its parts), the motion, and the bridge stepping over the time since the frame before. A tick without a frame runs
 none of them, so no stage works on a frame twice; the fluid runs every tick on the tick's `dt`.
 
-With two captures in one tick the 3D bridge hands the fluid, per pixel, the density and the temperature of the
-capture with the larger amount (`CaptureMax`: a density's amount, with its own color, a temperature's size,
-with its own warmth), and the newest capture's velocity and z position: a lost frame would show as a gap in the density,
+With two inference frames in one tick the 3D bridge hands the fluid, per pixel, the density and the temperature of the
+frame with the larger amount (`FrameMax`: a density's amount, with its own color, a temperature's size,
+with its own warmth), and the newest frame's velocity and z position: a lost frame would show as a gap in the density,
 hardly in the velocity. The fluid takes nothing from a bridge that has not stepped yet.
 
 The render takes a CUDA tensor into GL by a copy into a PBO queued on its own stream (`Tensor._update_with_pbo`,
@@ -102,7 +102,7 @@ the uploader would move the wait to the uploader, not shrink it.
 ### Counted
 
 Every drop is counted where it happens and shown on the panel beside the cadence (`CadenceSettings`): the
-uploader's queue (`Upload drops`) and the board's captures (`Capture drops`), with the captures the sync hands on
+uploader's queue (`Upload drops`) and the board's inference frames (`Inference frame drops`), with the frames the sync hands on
 and the frames the motion measures, each as an average and a minimum (1 / the worst gap). At start the uploader
 drops about ten frames of each kind in the first 0.3 s, while the panel is built **(site fact)**; none after.
 
@@ -151,7 +151,7 @@ only the newest capture per tick:
 | without the poses' crops and model | 1989 of 1989 (100%)          | 114/s        | 0.17 ms    |
 | all on, `pose_wait` 0              | 1769 of 1987 (89%)           | 82/s         | 13 ms      |
 
-Checked without the app: the uploader's queue and its depth (`test_uploader`), the capture sync (`test_capture_sync`),
+Checked without the app: the uploader's queue and its depth (`test_uploader`), the inference frame sync (`test_inference_frame_sync`),
 the crops cut without `synchronize` (`test_crop_extractor`), the alignment's two paths on known geometry
 (`test_depth_align`), the view's geometry and the depth's read (`test_view_window`), the board's captures
-(`test_captures`); in GL, by the scripts above and `scripts/capture_max_check.py`.
+(`test_inference_frames`); in GL, by the scripts above and `scripts/frame_max_check.py`.

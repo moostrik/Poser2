@@ -9,10 +9,10 @@ from ..settings import Layers, PoseFrame
 
 class ChainLayers(IntEnum):
     """Every layer the renderer runs, in the chain's order, each stage with its monitor; the pose last."""
-    # the capture
-    capture_image = 0
-    capture_depth = auto()
-    capture_monitor = auto()
+    # the inference frame
+    inference_frame_image = 0
+    inference_frame_depth = auto()
+    inference_frame_monitor = auto()
     # the view
     view =          auto()
     view_monitor =  auto()
@@ -44,44 +44,44 @@ class Size(IntEnum):
 @dataclass(frozen=True)
 class ChainLayer:
     """A layer of the chain: its size, the layer whose texture is its panel's shape (None: the output's), whether
-    it runs every tick (else only while a panel shows it), and whether once per capture."""
+    it runs every tick (else only while a panel shows it), and whether once per frame."""
     layer: ChainLayers
     size: Size = Size.OUTPUT
     shape: ChainLayers | None = None
     tick: bool = False
-    capture: bool = False
+    per_inference_frame: bool = False
 
 
 # Each stage with its layers, the outputs it hands on and its display layers
 CHAIN: tuple[ChainLayer, ...] = (
-    # the capture: the camera's image and its crop, the capture's image and depth into GL
-    ChainLayer(ChainLayers.cam_image,       shape=ChainLayers.cam_image, tick=True),
-    ChainLayer(ChainLayers.cam_crop,        shape=ChainLayers.cam_crop, tick=True),
-    ChainLayer(ChainLayers.capture_image,   shape=ChainLayers.capture_image, tick=True, capture=True),
-    ChainLayer(ChainLayers.capture_depth,   shape=ChainLayers.capture_image, tick=True, capture=True),   # on the image's view, at the depth's own grid
-    ChainLayer(ChainLayers.capture_monitor, shape=ChainLayers.capture_image, tick=True),
+    # the frame: the camera's image and its crop, the frame's image and depth into GL
+    ChainLayer(ChainLayers.cam_image,               shape=ChainLayers.cam_image, tick=True),
+    ChainLayer(ChainLayers.cam_crop,                shape=ChainLayers.cam_crop, tick=True),
+    ChainLayer(ChainLayers.inference_frame_image,   shape=ChainLayers.inference_frame_image, tick=True, per_inference_frame=True),
+    ChainLayer(ChainLayers.inference_frame_depth,   shape=ChainLayers.inference_frame_image, tick=True, per_inference_frame=True),   # on the image's view, at the depth's own grid
+    ChainLayer(ChainLayers.inference_frame_monitor, shape=ChainLayers.inference_frame_image, tick=True),
     # the view: the window cut, the depth read, the masks, the foreground, the color
-    ChainLayer(ChainLayers.view,            Size.VIEW, ChainLayers.view, tick=True, capture=True),
-    ChainLayer(ChainLayers.view_monitor,    Size.VIEW, ChainLayers.view, tick=True),
+    ChainLayer(ChainLayers.view,                    Size.VIEW, ChainLayers.view, tick=True, per_inference_frame=True),
+    ChainLayer(ChainLayers.view_monitor,            Size.VIEW, ChainLayers.view, tick=True),
     # the motion, the bridge, the fluid
-    ChainLayer(ChainLayers.motion,          Size.LARGE, tick=True, capture=True),
-    ChainLayer(ChainLayers.motion_monitor,  Size.LARGE, tick=True),
-    ChainLayer(ChainLayers.bridge,          Size.LARGE, tick=True, capture=True),
-    ChainLayer(ChainLayers.bridge_monitor,  Size.LARGE, tick=True),
-    ChainLayer(ChainLayers.fluid,           Size.LARGE, tick=True),
-    ChainLayer(ChainLayers.fluid_monitor,   Size.LARGE, tick=True),
+    ChainLayer(ChainLayers.motion,                  Size.LARGE, tick=True, per_inference_frame=True),
+    ChainLayer(ChainLayers.motion_monitor,          Size.LARGE, tick=True),
+    ChainLayer(ChainLayers.bridge,                  Size.LARGE, tick=True, per_inference_frame=True),
+    ChainLayer(ChainLayers.bridge_monitor,          Size.LARGE, tick=True),
+    ChainLayer(ChainLayers.fluid,                   Size.LARGE, tick=True),
+    ChainLayer(ChainLayers.fluid_monitor,           Size.LARGE, tick=True),
     # the pose, beside the chain: its shape its frame's (`DeepFlowRender._layer_size`)
-    ChainLayer(ChainLayers.pose_monitor,    Size.PANEL, tick=True),
+    ChainLayer(ChainLayers.pose_monitor,            Size.PANEL, tick=True),
 )
 LAYERS: dict[ChainLayers, ChainLayer] = {chain_layer.layer: chain_layer for chain_layer in CHAIN}
 POSE_SHAPES: dict[PoseFrame, ChainLayers] = {PoseFrame.CROP: ChainLayers.cam_crop, PoseFrame.CAMERA: ChainLayers.cam_image, PoseFrame.VIEW: ChainLayers.view}
 MONITORS: tuple[ChainLayers, ...] = (ChainLayers.view_monitor, ChainLayers.motion_monitor, ChainLayers.bridge_monitor, ChainLayers.fluid_monitor)   # the flow's
 TICK_LAYERS: list[ChainLayers] = [chain_layer.layer for chain_layer in CHAIN if chain_layer.tick]
-CAPTURE_LAYERS: list[ChainLayers] = [chain_layer.layer for chain_layer in CHAIN if chain_layer.capture]
+INFERENCE_FRAME_LAYERS: list[ChainLayers] = [chain_layer.layer for chain_layer in CHAIN if chain_layer.per_inference_frame]
 
 # What a panel can show, the select's `Layers`, and the chain's layer that draws it
 SHOWN: dict[Layers, ChainLayers] = {
-    Layers.capture:     ChainLayers.capture_monitor,
+    Layers.inference_frame: ChainLayers.inference_frame_monitor,
     Layers.view:        ChainLayers.view_monitor,
     Layers.motion:      ChainLayers.motion_monitor,
     Layers.bridge:      ChainLayers.bridge_monitor,

@@ -176,7 +176,7 @@ instead of 20; the mean is right, and the trails and the fluid smooth it **(dedu
 
 The render runs on the display's vsync (`WindowManager._render_loop`, `swap_interval(1)`); the
 camera runs at 50 fps, the mains rate **(site fact)**, against a 60 Hz display. The board holds
-one latest capture per camera (`CaptureStoreMixin.set_capture`), which `CaptureImageLayer.update`
+one latest capture per camera (`InferenceFrameStoreMixin.set_inference_frame`), which `InferenceFrameImageLayer.update`
 takes once per tick. At these rates every frame gets a tick of its own and none is lost; a frame
 waits for the next vsync, up to one 60 Hz tick, before it is measured. That wait is a limit of
 the design: every stage runs on the render tick, so measuring on arrival, on a thread and GL
@@ -247,12 +247,12 @@ The apps' render is a layer graph of `LayerBase` layers updated by one loop call
 on each (`apps/deep_flow/render/deep_flow_render.py`, `apps/hd_trio/render/hd_trio_render.py`). hd_trio builds a motion and a
 bridge input per camera and a fluid input per fluid layer in a wiring pass before the loop
 (`_wire_flow`), which `UPDATE_LAYERS` orders motion, bridge, fluid. deep_flow runs its stages per
-capture: each tick it takes the captures that came since the last (`take_captures`) and runs each,
+inference frame: each tick it takes the frames that came since the last (`take_inference_frames`) and runs each,
 in order, through the view stage, the motion and the bridge, each input built right before its
-stage (`_run_capture`), the bridge stepping over the time since the capture before; a tick without
-a capture runs none of them, and the fluid, which steps every tick, gets its input right before it
-runs. With two captures in one tick the 3D bridge hands the fluid, per pixel, the density, its color and the
-temperature of the capture with the larger amount (`CaptureMax`), the rest the newest's. Which
+stage (`_run_inference_frame`), the bridge stepping over the time since the frame before; a tick without
+a frame runs none of them, and the fluid, which steps every tick, gets its input right before it
+runs. With two frames in one tick the 3D bridge hands the fluid, per pixel, the density, its color and the
+temperature of the frame with the larger amount (`FrameMax`), the rest the newest's. Which
 layers feed the inputs is app policy: hd_trio wires fixed layers, measures on its centered mask,
 gives each bridge the centered foreground as the picture behind its density and temperature, each
 injection the camera's track color, and weights the own camera's injection by the player's motion
@@ -263,7 +263,7 @@ motion, bridge, fluid) has two monitors, their settings last in the stage's pane
 `monitor_debug`), one entry in the panels' lists, the stage's name: the main panel shows the stage's main monitor,
 the debug panel its debug monitor; a view's depth is drawn in its colormap from its near to its far. The render's
 `debug` switch shows both panels, or, off, the main panel alone, as a second screen shows it.
-The capture's monitor is a simple one: the color, the depth or both.
+The inference frame's monitor is a simple one: the color, the depth or both.
 
 ## Packages
 

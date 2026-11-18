@@ -298,7 +298,7 @@ whatever blob is in use. The input size is read off the blob, so a file name and
 
 The package's `__init__.py` exports what other packages use; a backend takes the geometry from `geometry`'s.
 Recording and playback, the replay camera among them, are `modules/recording`, which uses a camera; the cameras'
-sync (`CameraSync`) is `modules/inference`'s, beside `CaptureSync`.
+sync (`CameraSync`) is `modules/inference`'s, beside `InferenceFrameSync`.
 
 ## What no preset runs
 

@@ -17,7 +17,7 @@ from modules.gl import Fbo, GpuTimer, Texture
 from ..density_color import DensityColor
 from ..port import HasPorts, Port, Ports, TextureKind, prefixed
 from .bridge_settings import AmountMixSettings, Bridge3DSettings, MixSettings
-from .capture_max import CaptureMax
+from .frame_max import FrameMax
 from .shaders import Change, WeightedSum, ZPositionMix
 from .temperature_bridge import TemperatureBridge
 from .velocity_bandpass import VelocityBandpass
@@ -39,15 +39,15 @@ class Bridge3D:
         density       the readings' speeds and the mask, the amount; its color the image's, with its alpha
         temperature   the readings' speeds and the mask, warmed by a temperature bridge
         expansion     the readings' speeds and the mask: a presence, capped at 1; None while its
-                      shares are all 0, and the newest capture's in a tick of several
+                      shares are all 0, and the newest frame's in a tick of several
     The defaults are the trail alone in the velocity, the density and the temperature.
 
     The bandpass runs while a share of one of its readings is above 0, or a monitor shows one of its ports
     (a port's `prepare` says it is shown, and the next update runs it), from rest when it starts; a filter
     writes its accelerations while the acceleration takes one of its readings or a monitor shows it.
 
-    With several captures in one render tick (`update`'s `same_tick`) the densities and the temperatures it
-    hands out are, per pixel, those of the capture with the larger amount (`CaptureMax`), the density's color with
+    With several frames in one render tick (`update`'s `same_tick`) the densities and the temperatures it
+    hands out are, per pixel, those of the frame with the larger amount (`FrameMax`), the density's color with
     its amount; the rest the newest's."""
 
     def __init__(self, settings: Bridge3DSettings | None = None) -> None:
@@ -77,9 +77,9 @@ class Bridge3D:
         self._lowpass_timer: GpuTimer = GpuTimer("GPU bridge lowpass")
         self._bandpass_timer: GpuTimer = GpuTimer("GPU bridge bandpass")
         self._mix_timer: GpuTimer = GpuTimer("GPU bridge mix")      # the outputs' mixes and the temperature
-        # The density, its color and the temperature over a tick's captures
-        self._capture_max: dict[str, CaptureMax] = {name: CaptureMax() for name in ('density', 'color', 'temperature')}
-        self._merging: bool = False     # the outputs are the larger of this tick's captures
+        # The density, its color and the temperature over a tick's frames
+        self._frame_max: dict[str, FrameMax] = {name: FrameMax() for name in ('density', 'color', 'temperature')}
+        self._merging: bool = False     # the outputs are the larger of this tick's frames
 
     # ========== Outputs ==========
 
@@ -103,13 +103,13 @@ class Bridge3D:
 
     @property
     def density(self) -> Texture:
-        """The density's amount, the readings' speeds (widths/s) and the mask; the larger of this tick's captures
+        """The density's amount, the readings' speeds (widths/s) and the mask; the larger of this tick's frames
         while it had several."""
         return self._merged()['density']
 
     @property
     def color(self) -> Texture:
-        """The density's color, RGBA, premultiplied by its alpha, the coverage; the one of the capture with the
+        """The density's color, RGBA, premultiplied by its alpha, the coverage; the one of the frame with the
         larger amount while this tick had several."""
         return self._merged()['color']
 
@@ -119,7 +119,7 @@ class Bridge3D:
 
     @property
     def temperature(self) -> Texture:
-        """The temperature, ±1 warm; the larger of this tick's captures while it had several."""
+        """The temperature, ±1 warm; the larger of this tick's frames while it had several."""
         return self._merged()['temperature']
 
     @property
@@ -150,10 +150,10 @@ class Bridge3D:
                 'temperature': self._temperature.temperature}
 
     def _merged(self) -> dict[str, Texture]:
-        """The density, its color and the temperature the fluid takes: the larger of this tick's captures while it
+        """The density, its color and the temperature the fluid takes: the larger of this tick's frames while it
         had several."""
         if self._merging:
-            return {name: capture_max.texture for name, capture_max in self._capture_max.items()}
+            return {name: frame_max.texture for name, frame_max in self._frame_max.items()}
         return self._outputs()
 
     def _parts(self) -> dict[str, HasPorts]:
@@ -223,8 +223,8 @@ class Bridge3D:
         self._z_position_mix_shader.deallocate()
         for timer in (self._gpu_timer, self._lowpass_timer, self._bandpass_timer, self._mix_timer):
             timer.deallocate()
-        for capture_max in self._capture_max.values():
-            capture_max.deallocate()
+        for frame_max in self._frame_max.values():
+            frame_max.deallocate()
 
     def _mix_fbos(self) -> tuple[tuple[Fbo, int], ...]:
         return ((self._velocity, GL_RGBA16F), (self._acceleration, GL_RGBA16F),
@@ -248,10 +248,10 @@ class Bridge3D:
                same_tick: bool = False) -> None:
         """One step on the motion's `velocity` and `z_position`, `dt` the time it covers (s): the density's color
         from `image` (or white) times `tint`, as it comes, its alpha kept, then the filters and the mixes; `mask`
-        is a share of the amounts. `same_tick`: another capture in the render tick of the step before."""
-        if same_tick and not self._merging:      # the tick's second capture: keep the first's, its color included
+        is a share of the amounts. `same_tick`: another frame in the render tick of the step before."""
+        if same_tick and not self._merging:      # the tick's second frame: keep the first's, its color included
             for name, texture in self._outputs().items():
-                self._capture_max[name].hold(texture)
+                self._frame_max[name].hold(texture)
         self._merging = same_tick
         self._density_color.update(image, tint, None)
         color: Texture = self._density_color.color
@@ -286,10 +286,10 @@ class Bridge3D:
             self._mix_amount(self._expansion, self._expansion_z_position, mask, z_position, settings.expansion, capped=True)
         if self._merging:
             outputs: dict[str, Texture] = self._outputs()
-            capture_max: dict[str, CaptureMax] = self._capture_max
-            capture_max['color'].take(outputs['color'], (capture_max['density'].texture, outputs['density']))
-            capture_max['density'].take(outputs['density'])
-            capture_max['temperature'].take(outputs['temperature'])
+            frame_max: dict[str, FrameMax] = self._frame_max
+            frame_max['color'].take(outputs['color'], (frame_max['density'].texture, outputs['density']))
+            frame_max['density'].take(outputs['density'])
+            frame_max['temperature'].take(outputs['temperature'])
         self._mix_timer.end()
         self._gpu_timer.end()
 

@@ -17,7 +17,7 @@ white_space (four mono OAK-D cameras at 23 fps, the panoramic tracker, the light
 `oak` backend), no depth. Its cameras send no keypoints, so the camera-keypoint path
 deep_flow has reaches it only when they do. Every receiver works on its own thread, as in deep_flow
 ([INPUT_THREADS.md](../modules/flow/INPUT_THREADS.md)), but its input is a different model: deep_flow uploads frame
-by frame, color first to start the pose and depth after it, paired by `CaptureSync`; white_space's four cameras'
+by frame, color first to start the pose and depth after it, paired by `InferenceFrameSync`; white_space's four cameras'
 frames of a moment travel together, synced first and uploaded as one set, cropped as one batch. So the uploader is
 two, named by how they upload: deep_flow's `SerialUploader`, each frame on its own as it comes, and white_space's
 `BatchUploader`, a moment's frames as one batch, which hd_trio takes too in G (its input is the same model). They
@@ -104,8 +104,8 @@ sequencer takes the panel's start, stop, skip and playlist changes as requests c
 callbacks under their own lock and logged with their traceback, and the intro player plays on the tick's time;
 both, and `main`, unbind on stop what they bind; 8, the render's constructor writes no settings (its `data.b`
 values are the presets'); 9, `HD_TRIO.md` holds the app's reasons, its render's names say what they hold; 10,
-`CameraSync`, `CaptureSync`, `RecordingSync`, `TrackerFrameSource` and `PosePipeline` work on their own thread only:
-a part before `start` is an error, one after `stop` dropped (deep_flow starts its capture sync before its uploader
+`CameraSync`, `InferenceFrameSync`, `RecordingSync`, `TrackerFrameSource` and `PosePipeline` work on their own thread only:
+a part before `start` is an error, one after `stop` dropped (deep_flow starts its inference frame sync before its uploader
 and cameras); every app starts and runs without an error.
 
 Parked for [the flow's line H](../modules/flow/FLOW_PLAN.md#i-the-2d-flow-follows-the-3d), which rebuilds the 2D
@@ -120,11 +120,11 @@ running; they reach the fluid and the color mask through their inputs once those
   capture time: open.
 
 - One line per stream, average and 1% low: the panel's rates as frame-time analysis gives them (RTSS,
-  CapFrameX), one pinned line per stream, Render, Video, Captures and Motion,
+  CapFrameX), one pinned line per stream, Render, Video, Inference frames and Motion,
   `<name>  <average> fps  low <1% low>`, both from one record of each stream's frame times. The average says how
   many frames came (a count for the cadence: 50 when none is lost); the 1% low, the rate over the slowest 1% of
   frames, says how steady, catching hitches without being set for a whole window by one, as the minimum (1 / the
-  worst gap) is. It replaces the minimums (`Video min`, `Captures min`, `Motion min`) and gives the render the
+  worst gap) is. It replaces the minimums (`Video min`, `Inference frames min`, `Motion min`) and gives the render the
   same two numbers, in deep_flow and white_space alike; a frame-time line beside it only if asked.
 
 ## Rules it touches

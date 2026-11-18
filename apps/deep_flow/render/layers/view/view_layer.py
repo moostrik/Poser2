@@ -1,6 +1,6 @@
-"""The view stage: the flow's view of a capture, the stage before the motion.
+"""The view stage: the flow's view of a frame, the stage before the motion.
 
-`ViewInput` is the capture as the app hands it each tick: its color image and its depth on the camera image's view
+`ViewInput` is the frame as the app hands it each tick: its color image and its depth on the camera image's view
 (the uploader's, taken into GL by the capture's source layers), its capture time and the pose of its player.
 `ViewOutput` is what the motion and the bridge read. The view runs its steps in order, each once, each a part with
 its own textures: `ViewCrop`, the box in 3D and who (the image inside its sides, and the camera's depth inside the
@@ -34,9 +34,9 @@ from .view_mask import ViewMask
 
 @dataclass
 class ViewInput:
-    """One camera's capture for the view stage: `image` its color, `depth` its metres (0 for none, None without a
+    """One camera's frame for the view stage: `image` its color, `depth` its metres (0 for none, None without a
     depth camera), both on the camera image's view; `timestamp` its capture time, the capture's identity (None: no
-    capture yet); `pose` its player's, whose points the view places in its crop, or None."""
+    frame yet); `pose` its player's, whose points the view places in its crop, or None."""
     image: Annotated[Texture, TextureKind.IMAGE]
     depth: Annotated[Texture | None, TextureKind.DEPTH]
     timestamp: float | None
@@ -73,7 +73,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
 
         self._window: Rect = Rect(0.0, 0.0, 1.0, 1.0)  # the box's sides, uv on the camera image, rows down
         self._grid_size: tuple[int, int] = (0, 0)       # the depth's grid, its samples on the camera image
-        self._made: tuple | None = None                 # the capture and the settings the view was made from
+        self._made: tuple | None = None                 # the frame and the settings the view was made from
         self._timestamp: float | None = None
         self._pose_points: Points2D | None = None
 
@@ -115,7 +115,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
 
     @property
     def crop_pose_points(self) -> Points2D | None:
-        """The capture's pose's points in the view, uv with rows down; None without a pose."""
+        """The frame's pose's points in the view, uv with rows down; None without a pose."""
         return self._pose_points
 
     # ========== Lifecycle ==========

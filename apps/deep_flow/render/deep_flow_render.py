@@ -8,15 +8,15 @@ from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 from modules.gl import GpuTimer, RenderBase, ScreenCapture, Shader, Style, clear_color, fill, fit, Texture, MonitorId, MouseButton, shaders
 from modules.video import ScreenRecorder, ScreenRecorderSettings
 from modules.flow import Port, hold_tick
-from modules.inference import Capture
-from modules.pose import Frame
+from modules.inference import InferenceFrame, Poses
+from modules.pose import Frame, FrameDict
 from modules import render
 from modules.utils import FPS, Color, Rect, Point2f
 
 from ..board import RenderBoard
 from ..settings import PoseFrame, RenderSettings
-from .layers import CaptureMonitorLayer, ViewInput, ViewOutput, ViewLayer, PoseMonitorCompositor
-from .chain import ChainLayers, Size, TICK_LAYERS, CAPTURE_LAYERS, MONITORS, POSE_SHAPES, shown, size_of, layers_of, shape_of
+from .layers import InferenceFrameMonitorLayer, ViewInput, ViewOutput, ViewLayer, PoseMonitorCompositor
+from .chain import ChainLayers, Size, TICK_LAYERS, INFERENCE_FRAME_LAYERS, MONITORS, POSE_SHAPES, shown, size_of, layers_of, shape_of
 
 
 OUTPUT_WIDTH: int = 1080
@@ -47,8 +47,8 @@ class DeepFlowRender(RenderBase):
         for i in range(self.num_cams):
             cam_image =     self.L[ChainLayers.cam_image][i] =   render.CameraImageLayer(    i, self.board)
             cam_crop =      self.L[ChainLayers.cam_crop][i] =    render.CropImageLayer(      i, self.board)
-            self.L[ChainLayers.capture_image][i] =               render.CaptureImageLayer()
-            self.L[ChainLayers.capture_depth][i] =               render.CaptureDepthLayer()
+            self.L[ChainLayers.inference_frame_image][i] =               render.InferenceFrameImageLayer()
+            self.L[ChainLayers.inference_frame_depth][i] =               render.InferenceFrameDepthLayer()
 
             # The stages, each with its monitor, and the pose's monitor
             view =          self.L[ChainLayers.view][i] =        ViewLayer(           settings.view, fov)
@@ -56,9 +56,9 @@ class DeepFlowRender(RenderBase):
             self.L[ChainLayers.motion][i] =                      render.Motion3DLayer(       i, settings.motion)
             self.L[ChainLayers.bridge][i] =                      render.Bridge3DLayer(       settings.bridge)
             fluid =         self.L[ChainLayers.fluid][i] =       render.Fluid3DLayer(        settings.fluid)
-            self.L[ChainLayers.capture_monitor][i] = CaptureMonitorLayer(cast(render.CaptureImageLayer, self.L[ChainLayers.capture_image][i]),
-                                                                    cast(render.CaptureDepthLayer, self.L[ChainLayers.capture_depth][i]),
-                                                                    settings.capture, settings.view.crop)
+            self.L[ChainLayers.inference_frame_monitor][i] = InferenceFrameMonitorLayer(cast(render.InferenceFrameImageLayer, self.L[ChainLayers.inference_frame_image][i]),
+                                                                    cast(render.InferenceFrameDepthLayer, self.L[ChainLayers.inference_frame_depth][i]),
+                                                                    settings.inference_frame, settings.view.crop)
             # each stage's main monitor in self.L, shown in the main panel; its debug monitor in self._debug_monitors,
             # shown in the debug panel; the flat stages' flat, the fluid's 3D
             for key, stage, flat in ((ChainLayers.view_monitor, render.FlowStage.VIEW, settings.view),
@@ -94,9 +94,9 @@ class DeepFlowRender(RenderBase):
             ChainLayers.view_monitor: self._wire_monitors,
         }
 
-        # Each camera's captures the motion measures, for the panel's cadence (read on any thread)
+        # Each camera's frames the motion measures, for the panel's cadence (read on any thread)
         self.motion_rates: dict[int, FPS] = {}
-        self._capture_timestamps: dict[int, float] = {}     # each camera's capture run last
+        self._inference_frame_timestamps: dict[int, float] = {}     # each camera's frame run last
 
         # The border around each layer in the main window
         self._border: shaders.StrokeRect = shaders.StrokeRect()
@@ -255,9 +255,9 @@ class DeepFlowRender(RenderBase):
         for layer_type in TICK_LAYERS + self._main_layers + self._debug_layers:
             if layer_type in seen:
                 continue
-            if layer_type in CAPTURE_LAYERS:
-                seen.update(CAPTURE_LAYERS)
-                self._run_captures()
+            if layer_type in INFERENCE_FRAME_LAYERS:
+                seen.update(INFERENCE_FRAME_LAYERS)
+                self._run_inference_frames()
                 continue
             seen.add(layer_type)
             wiring: Callable[[], None] | None = self._wirings.get(layer_type)
@@ -271,44 +271,45 @@ class DeepFlowRender(RenderBase):
     # ========== The flow's wiring ==========
 
 
-    def _run_captures(self) -> None:
-        """Every capture since the last tick, each camera's in order, through the capture layers (`_run_capture`).
-        A tick without a capture runs none of them, so no stage works on a frame twice. Paused, the captures are
-        taken and dropped and only the view runs, on the last capture, made again when one of its settings changes."""
+    def _run_inference_frames(self) -> None:
+        """Every frame since the last tick, each camera's in order, through the frame layers (`_run_inference_frame`).
+        A tick without a frame runs none of them, so no stage works on a frame twice. Paused, the frames are
+        taken and dropped and only the view runs, on the last frame, made again when one of its settings changes."""
         for i in self.L[ChainLayers.view]:
-            captures: list[Capture] = self.board.take_captures(i)
+            frames: list[InferenceFrame] = self.board.take_inference_frames(i)
             if self.settings.pause:
                 self.L[ChainLayers.view][i].update()
                 continue
-            for index, capture in enumerate(captures):
-                self._run_capture(i, capture, same_tick=index > 0)
+            for index, frame in enumerate(frames):
+                self._run_inference_frame(i, frame, same_tick=index > 0)
 
-    def _run_capture(self, i: int, capture: Capture, same_tick: bool) -> None:
-        """One capture: its image and depth into GL, the view of it with its player's pose and its color, the
-        motion on the view's image, and the bridge stepping over the time since the capture before, the density's
-        color the view's. `same_tick`: another capture in this tick, whose bridge outputs the fluid takes with the
+    def _run_inference_frame(self, i: int, frame: InferenceFrame, same_tick: bool) -> None:
+        """One frame: its image and depth into GL, the view of it with its player's pose and its color, the
+        motion on the view's image, and the bridge stepping over the time since the frame before, the density's
+        color the view's. `same_tick`: another frame in this tick, whose bridge outputs the fluid takes with the
         last's."""
-        image = cast(render.CaptureImageLayer, self.L[ChainLayers.capture_image][i])
-        depth = cast(render.CaptureDepthLayer, self.L[ChainLayers.capture_depth][i])
+        image = cast(render.InferenceFrameImageLayer, self.L[ChainLayers.inference_frame_image][i])
+        depth = cast(render.InferenceFrameDepthLayer, self.L[ChainLayers.inference_frame_depth][i])
         view = cast(ViewLayer, self.L[ChainLayers.view][i])
         motion = cast(render.Motion3DLayer, self.L[ChainLayers.motion][i])
         bridge = cast(render.Bridge3DLayer, self.L[ChainLayers.bridge][i])
 
-        image.set_capture(capture)
+        image.set_inference_frame(frame)
         image.update()
-        depth.set_capture(capture)
+        depth.set_inference_frame(frame)
         depth.update()
-        pose: Frame | None = capture.poses[min(capture.poses)] if capture.poses else None
-        view.set_input(ViewInput(image.texture, depth.texture, capture.timestamp, pose))
+        poses: FrameDict = frame[Poses].poses
+        pose: Frame | None = poses[min(poses)] if poses else None
+        view.set_input(ViewInput(image.texture, depth.texture, frame.timestamp, pose))
         self._view_timer.begin()
         view.update()
         self._view_timer.end()
 
-        interval: float = render.frame_interval(capture.timestamp, self._capture_timestamps.get(i), self.settings.motion.fps, self._dt, self._dt)
-        self._capture_timestamps[i] = capture.timestamp
+        interval: float = render.frame_interval(frame.timestamp, self._inference_frame_timestamps.get(i), self.settings.motion.fps, self._dt, self._dt)
+        self._inference_frame_timestamps[i] = frame.timestamp
         self.motion_rates.setdefault(i, FPS()).processed()
         output: ViewOutput = view.output
-        motion.set_input(render.MotionInput(output.image, capture.timestamp, interval, output.depth, output.mask))
+        motion.set_input(render.MotionInput(output.image, frame.timestamp, interval, output.depth, output.mask))
         motion.update()
         bridge.set_input(render.BridgeInput(motion.output.velocity, interval, output.color,
                                         mask=output.mask, z_position=motion.output.z_position, same_tick=same_tick))

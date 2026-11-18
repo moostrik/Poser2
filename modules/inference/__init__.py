@@ -4,5 +4,5 @@ from .preprocessing import (crop, source, GpuDepth, GpuImage, ImageSnapshot, Ima
                             SerialUploader, SerialUploaderSettings, BatchUploader, DepthAligner, depth_metres, CameraSync,
                             CameraSyncSettings, SyncMessage, SyncSetCallback)
 from .pose import has_points, RecordedPoses, RecordedPosesSettings, frame_poses
-from .capture import Capture
-from .capture_sync import CaptureSync, CaptureSyncSettings
+from .inference_frame import Depth, InferenceFrame, InferenceFrameCallback, InferenceResult, Masks, Poses
+from .inference_frame_sync import InferenceFrameSync, InferenceFrameSyncSettings

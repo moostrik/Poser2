@@ -1,9 +1,9 @@
-"""Does `CaptureMax` keep, per pixel, the output of the capture with the larger amount?
+"""Does `FrameMax` keep, per pixel, the output of the frame with the larger amount?
 
-Three captures' densities (RGBA, the amount in alpha) and temperatures (±, the amount its size) with known values
+Three frames' densities (RGBA, the amount in alpha) and temperatures (±, the amount its size) with known values
 per pixel; the result is compared with numpy's pick. Needs a GL context (a hidden window).
 
-    python scripts/capture_max_check.py
+    python scripts/frame_max_check.py
 """
 import sys
 from pathlib import Path
@@ -14,7 +14,7 @@ import numpy as np  # noqa: E402
 from OpenGL.GL import GL_FLOAT, GL_R16F, GL_RED, GL_RGBA, GL_RGBA16F, GL_TEXTURE_2D, glBindTexture, glFinish, glGetTexImage, glTexSubImage2D  # noqa: E402
 
 import monitor_harness as mh  # noqa: E402
-from modules.flow import CaptureMax  # noqa: E402
+from modules.flow import FrameMax  # noqa: E402
 from modules.gl import Texture  # noqa: E402
 
 SIZE = (16, 8)
@@ -45,13 +45,13 @@ def main() -> int:
     failed = 0
     for name, values, by_alpha, internal_format, channels in (('density', densities, True, GL_RGBA16F, 4),
                                                               ('temperature', temperatures, False, GL_R16F, 1)):
-        capture_max = CaptureMax(by_alpha)
+        frame_max = FrameMax(by_alpha)
         textures = [texture(v, internal_format) for v in values]
         uploaded = [read(t, channels) for t in textures]             # as 16-bit floats hold them
-        capture_max.hold(textures[0])
+        frame_max.hold(textures[0])
         for t in textures[1:]:
-            capture_max.take(t)
-        got = read(capture_max.texture, channels)
+            frame_max.take(t)
+        got = read(frame_max.texture, channels)
         amounts = np.stack([u[..., 3] if by_alpha else np.abs(u) for u in uploaded])
         pick = np.argmax(amounts, axis=0)
         stacked = np.stack(uploaded)
@@ -59,7 +59,7 @@ def main() -> int:
             np.take_along_axis(stacked, pick[None], axis=0)[0]
         off = np.abs(got - want) > 1e-3
         wrong = int((off.any(axis=-1) if by_alpha else off).sum())
-        print(f'{name}: {wrong} of {pick.size} pixels not the larger capture\'s')
+        print(f'{name}: {wrong} of {pick.size} pixels not the larger frame\'s')
         failed += wrong
     return 1 if failed else 0
 

@@ -12,7 +12,7 @@ from .port import Port, Ports, TextureKind, ColorSpace, HasPorts, OnDemand, Ligh
 from .flow_base import FlowBase
 from .flow_util import FlowUtil
 
-# View: the flow's view of the capture, before the motion
+# View: the flow's view of the frame, before the motion
 from .view import fixed_window, view_span, depth_step, view_per_depth_pixel, place_points, pyramid_sizes, DepthFill, DepthCrop, DepthUpscale
 
 # Motion: the optical flow
@@ -27,7 +27,7 @@ from .bridge_3d import  Bridge3D, Bridge3DSettings, \
                         decay_weight, \
                         VelocityLowpass, VelocityLowpassSettings, gaussian_weights, blur_sigma, blur_dispatches, ZPositionMix, \
                         VelocityBandpass, VelocityBandpassSettings, Change, WeightedSum, step_peak, band_width, \
-                        TemperatureBridge, TemperatureBridgeSettings, CaptureMax, \
+                        TemperatureBridge, TemperatureBridgeSettings, FrameMax, \
                         VelocityPeak, VelocityPeakSettings, speed_percentile
 
 # Visualization

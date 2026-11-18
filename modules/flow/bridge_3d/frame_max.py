@@ -1,8 +1,8 @@
-"""The larger of several captures' outputs, per pixel, when more than one capture comes in one render tick.
+"""The larger of several frames' outputs, per pixel, when more than one frame comes in one render tick.
 
-The bridge steps once per capture; the fluid steps once per tick. With two captures in one tick the fluid takes,
-for a density and a temperature, per pixel the output of the capture whose amount there is larger, with its own
-color or warmth, so a capture's dye is not lost to the next one's; a velocity is the newest's alone. The density's
+The bridge steps once per frame; the fluid steps once per tick. With two frames in one tick the fluid takes,
+for a density and a temperature, per pixel the output of the frame whose amount there is larger, with its own
+color or warmth, so a frame's dye is not lost to the next one's; a velocity is the newest's alone. The density's
 color goes with its amount: both are picked by the amount.
 """
 
@@ -10,9 +10,9 @@ from modules.gl import Style, SwapFbo, Texture
 from .shaders import LargerAmount
 
 
-class CaptureMax:
-    """`hold` keeps the first capture's output, `take` keeps per pixel the larger of what it holds and the next
-    capture's; `texture` is the result. The amount is the size of the output's red, or of the amounts `take` is
+class FrameMax:
+    """`hold` keeps the first frame's output, `take` keeps per pixel the larger of what it holds and the next
+    frame's; `texture` is the result. The amount is the size of the output's red, or of the amounts `take` is
     given, which the color of an amount is picked by."""
 
     def __init__(self) -> None:
@@ -40,7 +40,7 @@ class CaptureMax:
             self.allocate(source.width, source.height, source.internal_format)
 
     def hold(self, source: Texture) -> None:
-        """Keep `source`, the first capture's output."""
+        """Keep `source`, the first frame's output."""
         self.follow(source)
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)

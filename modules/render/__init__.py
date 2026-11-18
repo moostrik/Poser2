@@ -15,7 +15,7 @@ from .modules.tracker import    TrackerCompositor, TrackerCompositorSettings, Tr
                                 GridRenderer, LabelRenderer, MarkRenderer, SeamRenderer, \
                                 StitchRenderer, Mark, MarkContext, build_marks, strip_spans
 from .modules.inference import  CropLayer, CropLayerSettings, CropImageLayer, SegmentationMaskLayer, SegmentationForegroundLayer, \
-                                CaptureImageLayer, CaptureDepthLayer
+                                InferenceFrameImageLayer, InferenceFrameDepthLayer
 from .modules.flow import       StageLayer, StageLayerSettings, StageOutput, \
                                 MotionInput, MotionOutput, MotionLayer, MotionLayerSettings, frame_interval, \
                                 BridgeInput, BridgeOutput, BridgeLayer, BridgeLayerSettings, \

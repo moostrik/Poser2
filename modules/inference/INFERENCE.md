@@ -10,7 +10,7 @@ every app uses them together, and the crop step and the detectors read the uploa
 ## The parts
 
 `preprocessing/` makes the input ready for the models, the upload and the crop step; `engine/` holds what the
-models share; each model has its package; the capture sync, which comes after the models, sits at the root.
+models share; each model has its package; the inference frame and its sync, which come after the models, sit at the root.
 
 | Part                                 | File                                                | Its thread     | Does                                                               |
 |--------------------------------------|-----------------------------------------------------|----------------|--------------------------------------------------------------------|
@@ -27,7 +27,7 @@ models share; each model has its package; the capture sync, which comes after th
 | `FaceDetector`                       | `face/`                                             | its own        | SCRFD and the 106 landmarks, the faces (smile)                     |
 | `ModelWorker`                        | `engine/model_worker.py`                            |                | the five workers' base                                             |
 | `Engine` (`OnnxEngine`, `TrtEngine`) | `engine/`                                           | the worker's   | a model file run on GPU tensors, ONNX Runtime or TensorRT          |
-| `CaptureSync`                        | `capture_sync.py`, `capture.py`                     | its own        | an image, its depth, poses and masks of one moment, as a `Capture` |
+| `InferenceFrameSync`                        | `inference_frame_sync.py`, `inference_frame.py`                     | its own        | an image and the results of one moment, as an `InferenceFrame`    |
 
 ## From the frame to the model
 
@@ -106,12 +106,18 @@ holds both to the GL `DepthAlign` shader on recorded frames.
 | GL `DepthAlign`                 | 0.13 ms             | the reference                         |
 | torch ops                       | 0.6 to 1.3 ms       | under 2 a frame, at borders           |
 
-## The capture sync
+## The inference frame sync
 
-`CaptureSync` matches an image, its depth and the poses of one moment by capture time. Its submits queue the parts,
-at most 8 of a stream per camera (the oldest dropped, `dropped` on the panel), and its own thread matches them and
-hands every complete capture, in the order of capture, on. With `pose_wait` 0 a capture never waits for its poses:
-it carries the poses of the frame before.
+`InferenceFrameSync` matches an image and its results of one moment by capture time, as an `InferenceFrame`
+(`inference_frame.py`): its identity (`cam_id`, `timestamp`, the image) and its results keyed by their type
+(`Depth`, `Poses`, `Masks`), read as `frame[Poses]`, which never raises; a type the frame does not carry reads as
+its empty one (no players), as the pose `Frame` reads its features. Each result carries its camera, its image's
+capture time and `synced`: this moment's own, or the newest from before. The sync is made with the types its app
+runs (deep_flow: `Depth`, `Poses`), so each app's frames carry what it needs; a frame is complete with its image
+and, where the app has depth, its depth, and it waits for each model's result by that type's setting (`pose_wait`,
+`mask_wait`). Its submits queue the parts, at most 8 of a stream per camera (the oldest dropped, `dropped` on the
+panel), and its own thread matches them and hands every complete frame, in the order of capture, on. With
+`pose_wait` 0 a frame never waits for its poses: it carries the poses of the frame before.
 
 ## Checks
 

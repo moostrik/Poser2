@@ -7,7 +7,7 @@ the one its ports need: the view, the motion and the bridge the flat one, the fl
 flow's stages has its own (`FlowStage`:
 `VIEW`, `MOTION`, `BRIDGE`, `FLUID`), two in deep_flow, one for the main panel and one for the debug panel, their
 settings last in the stage's panel (`<stage>.monitor_main`, `monitor_debug`); deep_flow's capture has
-a simple one of its own (`CaptureMonitorLayer`: the color, the depth or both). The stages and their ports are in
+a simple one of its own (`InferenceFrameMonitorLayer`: the color, the depth or both). The stages and their ports are in
 [FLOW.md](FLOW.md#the-stages-and-their-layers). "Code" is what the files show; **(deduction)**
 marks what is inferred from them.
 

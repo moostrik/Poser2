@@ -17,7 +17,7 @@ from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, TrackerFrameSource
 from modules.pose import configure_features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import optical_flow, pose, person, CropExtractor, GpuImage, ImageSnapshot, has_points, RecordedPoses, Capture, CaptureSync, SerialUploader, frame_poses
+from modules.inference import optical_flow, pose, person, CropExtractor, GpuDepth, GpuImage, ImageSnapshot, has_points, RecordedPoses, Depth, InferenceFrame, InferenceFrameSync, Poses, SerialUploader, frame_poses
 from modules.pose import FrameDict
 from modules.utils import FPS, PerformanceTimer
 
@@ -97,8 +97,8 @@ class DeepFlowMain:
             self.player.add_jump_callback(self.recorded_poses.clear_waiting)
             poses = self.recorded_poses
         self.crops.add_image_callback(poses.submit)
-        self.capture_sync = CaptureSync(p.capture_sync)                  # the color, depth and poses of one moment, for the render
-        self.capture_rate: FPS = FPS()                                # the captures it hands on, for the panel's cadence
+        self.inference_frame_sync = InferenceFrameSync(p.inference_frame_sync, (Depth, Poses))    # the color, depth and poses of one moment, for the render
+        self.inference_frame_rate: FPS = FPS()                                # the frames it hands on, for the panel's cadence
 
         # The camera's thread only hands its frames and tracklets over: to the recorder as they came, to the uploader
         # for the rest, which straightens the tracklets with their frame and hands them to the tracker and the board
@@ -107,7 +107,7 @@ class DeepFlowMain:
             camera.add_tracklet_callback(self.uploader.submit_tracklets)
             camera.add_frame_callback(self.recorder.submit_frame)
             camera.add_tracklet_callback(self.recorder.submit_tracklets)
-        # What each camera's captures wait for from the first: live, a camera with a model sends tracklets (a replay's
+        # What each camera's frames wait for from the first: live, a camera with a model sends tracklets (a replay's
         # come or not with the recording); the frame source says per image whether it asked poses (`_on_asked`)
         live_tracklets: bool = not self.settings.camera.sim_enabled and self.settings.camera.cam_0.model_chain != ModelChain.OFF
         for i in range(num_cams):
@@ -139,20 +139,20 @@ class DeepFlowMain:
         self.pipeline.add_frames_callback(Stage.RAW, self._record_poses)     # the RAW stage's poses, with the video
         self.pipeline.add_frames_callback(Stage.SMOOTH, partial(self._on_pose_frames, Series.POSE_LATENCY_SMOOTH))
 
-        # THE UPLOADER'S HAND-OFFS, in order on its thread: each uploaded image to the detector (-sim), the capture
-        # sync, the board and the camera's interval, then its snapshot to the frame source; each uploaded depth to the
-        # capture sync
+        # THE UPLOADER'S HAND-OFFS, in order on its thread: each uploaded image to the detector (-sim), the inference
+        # frame sync, the board and the camera's interval, then its snapshot to the frame source; each uploaded depth to
+        # the inference frame sync
         if self.person_detector is not None:
             self.uploader.add_gpu_image_callback(self.person_detector.submit)
-        self.uploader.add_gpu_image_callback(self.capture_sync.submit_image)
+        self.uploader.add_gpu_image_callback(self.inference_frame_sync.submit_image)
         self.uploader.add_gpu_image_callback(self.board.set_camera_image)
         self.uploader.add_gpu_image_callback(self._on_image)
         self.uploader.add_snapshot_callback(self._on_snapshot)
-        self.uploader.add_gpu_depth_callback(self.capture_sync.submit_depth)
+        self.uploader.add_gpu_depth_callback(self._on_depth)
 
-        # CAPTURE SYNC — each uploaded image, its depth and its SMOOTH poses, as one capture on the board
-        self.pipeline.add_frames_callback(Stage.SMOOTH, self.capture_sync.submit_poses)
-        self.capture_sync.add_capture_callback(self._on_capture)
+        # INFERENCE FRAME SYNC — each uploaded image, its depth and its SMOOTH poses, as one frame on the board
+        self.pipeline.add_frames_callback(Stage.SMOOTH, self._on_smooth_poses)
+        self.inference_frame_sync.add_frame_callback(self._on_inference_frame)
 
         # CAMERA HEALTH — the camera's IMU reading and frame rate against the preset, as pinned indicators
         self.camera_health = CameraHealth(self.settings.camera.cameras, self.settings.camera.camera_health)
@@ -181,7 +181,7 @@ class DeepFlowMain:
             self.person_detector.start()
         self.pipeline.start()
         self.frame_source.start()
-        self.capture_sync.start()
+        self.inference_frame_sync.start()
         self.uploader.start()
         for camera in self.cameras:
             camera.start()
@@ -216,13 +216,13 @@ class DeepFlowMain:
             self.board.set_time_sample(Series.CAMERA_INTERVAL, (image.timestamp - last) * 1000.0, image.timestamp)
 
     def _on_asked(self, timestamp: float, cam_id: int, asked: FrameDict) -> None:
-        """A frame bang's poses, on the frame source's thread: the recorder and the capture sync hear whether poses
+        """A frame bang's poses, on the frame source's thread: the recorder and the inference frame sync hear whether poses
         come for the image (the pose model asked, the recording's played, or the camera's own keypoints handed on),
         so a frame without a player, or passed by `pose_interval`, does not wait."""
         modelled: bool = (self.recorded_poses is not None and self.settings.camera.recorded_poses.enabled) or self.settings.pose.pose.enabled
         posing: bool = modelled or any(has_points(frame) for frame in asked.values())
         self.recorder.expect_poses(cam_id, timestamp, bool(asked) and posing)
-        self.capture_sync.expect_poses(cam_id, timestamp, bool(asked) and posing)
+        self.inference_frame_sync.expect(cam_id, timestamp, bool(asked) and posing)
 
     def _record_poses(self, frames: FrameDict) -> None:
         """The RAW stage's poses, on the pose model's thread, to the recorder as they are: their hand-over, stamped
@@ -233,13 +233,22 @@ class DeepFlowMain:
         """The camera's tracklets have reached the tracker's queue: its update, at their capture time."""
         self.tracker.update(cam_tracklets.timestamp)
 
-    def _on_capture(self, capture: Capture) -> None:
-        self.capture_rate.processed()
-        self.board.set_capture(capture)
-        now: float = time.perf_counter()        # when the capture reaches the board: the end of the latency
-        self.board.set_time_sample(Series.CAPTURE_LATENCY, (now - capture.timestamp) * 1000.0, now)
-        if capture.poses:
-            self.board.set_time_sample(Series.POSES_UNSYNCED, 0.0 if capture.poses_synced else 1.0, now)
+    def _on_depth(self, depth: GpuDepth) -> None:
+        """An uploaded depth, on the uploader's thread, to the inference frame sync."""
+        self.inference_frame_sync.submit(Depth.of(depth))
+
+    def _on_smooth_poses(self, poses: FrameDict) -> None:
+        """The SMOOTH stage's poses, on the pipeline's thread, to the inference frame sync, one result a camera."""
+        self.inference_frame_sync.submit(*Poses.by_camera(poses))
+
+    def _on_inference_frame(self, frame: InferenceFrame) -> None:
+        self.inference_frame_rate.processed()
+        self.board.set_inference_frame(frame)
+        now: float = time.perf_counter()        # when the frame reaches the board: the end of the latency
+        self.board.set_time_sample(Series.CAPTURE_LATENCY, (now - frame.timestamp) * 1000.0, now)
+        poses: Poses = frame[Poses]
+        if poses.poses:
+            self.board.set_time_sample(Series.POSES_UNSYNCED, 0.0 if poses.synced else 1.0, now)
 
     def _on_pose_frames(self, series: Series, poses: FrameDict) -> None:
         """A stage's poses as they come out: how long after their capture."""
@@ -255,15 +264,15 @@ class DeepFlowMain:
             self.board.set_time_sample(series, time_ms, timestamp)
 
     def _update_cadence(self, now: float) -> None:
-        """The panel's cadence: the captures the sync hands on and the frames the motion measures, the slowest camera's, and the drops."""
+        """The panel's cadence: the frames the sync hands on and the frames the motion measures, the slowest camera's, and the drops."""
         cadence = self.settings.cadence
-        cadence.capture_fps = round(self.capture_rate.get_rate_average(), 1)
-        cadence.capture_min_fps = round(self.capture_rate.get_rate_minimum(), 1)
+        cadence.inference_frame_fps = round(self.inference_frame_rate.get_rate_average(), 1)
+        cadence.inference_frame_min_fps = round(self.inference_frame_rate.get_rate_minimum(), 1)
         rates = list(self.render.motion_rates.values())
         cadence.motion_fps = round(min((rate.get_rate_average() for rate in rates), default=0.0), 1)
         cadence.motion_min_fps = round(min((rate.get_rate_minimum() for rate in rates), default=0.0), 1)
         cadence.upload_drops = self.uploader.dropped
-        cadence.capture_drops = self.board.get_dropped_captures()
+        cadence.inference_frame_drops = self.board.get_dropped_inference_frames()
         cadence.pose_drops = self.pipeline.dropped
 
     def _update_poses(self, now: float) -> None:
@@ -296,7 +305,7 @@ class DeepFlowMain:
             self.recorded_poses.stop()          # stops the pose model with it
         else:
             self.pose_estimator.stop()
-        self.capture_sync.stop()
+        self.inference_frame_sync.stop()
         if self.person_detector is not None:
             self.person_detector.stop()
         self.optical_flow_estimator.stop()

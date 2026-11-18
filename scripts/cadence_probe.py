@@ -5,12 +5,12 @@ measures while the playhead is between `--start` and `--end` (seconds of the rec
 recording's metadata, `scripts/recording_motion.py`):
 - the camera's hand-over: the gaps between video frames, and the camera thread's time per frame (the frame's
   callbacks, which only queue);
-- the captures the capture sync hands on, and the frames the motion measures, as counts and gaps;
+- the inference frames the sync hands on, and the frames the motion measures, as counts and gaps;
 - the render's tick (rate, p95, max);
-- the latencies: from a capture's stamp to the capture on the board, and to the poses out of RAW and of SMOOTH;
+- the latencies: from a frame's stamp to the frame on the board, and to the poses out of RAW and of SMOOTH;
 - every hand-over's wait: how long an item waits in a queue for its receiver (the timers named `Wait …`);
 - the uploader's time per color and per depth frame;
-- the drops: the uploader's queue, the board's captures, the capture sync's depth frames without an image and its
+- the drops: the uploader's queue, the board's inference frames, the sync's depth frames without an image and its
   inbox's.
 Writes the report as JSON in `--out` and prints it. The app is stopped in a `finally`, and the run is given up at
 twice the time it should take.
@@ -87,7 +87,7 @@ def main() -> int:
     on = threading.Event()
     handover: list[float] = []
     camera_thread: list[float] = []                     # ms
-    captures: list[float] = []
+    frames: list[float] = []
     latency: dict[str, list[float]] = {'capture': [], 'pose_raw': [], 'pose_smooth': []}     # ms
     motion: list[float] = []
     ticks: list[float] = []
@@ -116,12 +116,12 @@ def main() -> int:
     app.uploader._upload = timed('color', app.uploader._upload)
     app.uploader._upload_depth = timed('depth', app.uploader._upload_depth)
 
-    def on_capture(capture) -> None:
-        if on.is_set() and capture.cam_id == 0:
+    def on_frame(frame) -> None:
+        if on.is_set() and frame.cam_id == 0:
             now = time.perf_counter()
-            captures.append(now)
-            latency['capture'].append((now - capture.timestamp) * 1000.0)
-    app.capture_sync.add_capture_callback(on_capture)
+            frames.append(now)
+            latency['capture'].append((now - frame.timestamp) * 1000.0)
+    app.inference_frame_sync.add_frame_callback(on_frame)
 
     def on_poses(name: str, poses: FrameDict) -> None:
         if on.is_set() and poses:
@@ -171,11 +171,11 @@ def main() -> int:
             if ended >= deadline:
                 print(f'given up at twice the time it should take ({2.0 * (STARTUP + args.end):.0f} s)', flush=True)
             report = dict(label=args.label, folder=args.folder, stretch=[args.start, args.end], seconds=round(ended - began, 2),
-                          handover=gaps(handover), captures=gaps(captures), motion=gaps(motion), ticks=gaps(ticks),
+                          handover=gaps(handover), frames=gaps(frames), motion=gaps(motion), ticks=gaps(ticks),
                           camera_thread_ms=spread(camera_thread), latency_ms={k: spread(v) for k, v in latency.items()},
                           waits_ms={k: spread(v) for k, v in sorted(waits.items())}, uploads_ms={k: spread(v) for k, v in uploads.items()},
-                          drops=dict(uploader=app.uploader.dropped, board=app.board.get_dropped_captures(),
-                                     depth_without_image=app.capture_sync.settings.misses, capture_sync=app.capture_sync.settings.dropped,
+                          drops=dict(uploader=app.uploader.dropped, board=app.board.get_dropped_inference_frames(),
+                                     depth_without_image=app.inference_frame_sync.settings.misses, inference_frame_sync=app.inference_frame_sync.settings.dropped,
                                      pose_step=app.settings.pose.frame_source.dropped, pose_pipeline=app.pipeline.dropped,
                                      pose_model=app.settings.pose.pose.dropped, optical_flow=app.settings.pose.optical_flow.dropped))
             if args.record:
