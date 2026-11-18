@@ -259,7 +259,7 @@ Questions:
 - The licence of the Body8 training data (AI Challenger and others) is unresolved, for ours as for every candidate
 - The SimCC distribution's width as each keypoint's uncertainty for the One Euro filter: cheap, untested
 
-## I. The models kept, a clean LFS and a setup that builds what an app needs (proposed 2026-11-18)
+## I. The models kept, a clean LFS, hd_trio's files tracked (2026-11-18)
 
 LFS keeps every ONNX file an engine is built from, and the original each FP16 file is made from; a PC's setup only
 builds engines, and the FP16 converter is a tool run once a model is added (decided 2026-11-18). The pose runs FP16 in
@@ -281,12 +281,10 @@ from its ONNX file (strongly typed), so an FP16 engine is built from an FP16 ONN
   tools/models/convert_onnx_to_fp16.py ... --fp32-norms --keep-io-types` (its docstring and the README say so);
   `scripts/makemodels.bat` builds the pose's FP16 engines per app at its batches from the files in LFS, skipping what
   exists as it does now. Checked by running it for deep_flow, and one deep_flow run on HIGH
-- I3. A clean clone sets up as the README says: the `.gitignore` line `temp*` ignores every file whose name starts
-  with "temp", `apps/hd_trio/flow/bridge_2d/temperature_bridge.py` and its shader among them, which hd_trio imports, so
-  a fresh clone of hd_trio does not start **(seen)**; it becomes `/temp/`, the scratch folder it is for, and those three
-  files are committed (decided 2026-11-18). The README's setup (`install.bat`, `install.bat oak4`, `makemodels.bat <app>`) then brings a
-  fresh PC to a running app; `makemodels.bat` names what it built and what it skipped. Checked by a clean clone of
-  the branch outside the repository: install, models for deep_flow, the guard tests and deep_flow's start
+- I3. hd_trio's files tracked: the `.gitignore` line `temp*` ignores every file whose name starts with "temp",
+  `apps/hd_trio/flow/bridge_2d/temperature_bridge.py` and its shader among them, which hd_trio imports, so a fresh
+  clone of hd_trio does not start **(seen)**; it becomes `/temp/`, the scratch folder it is for, and those three files
+  are committed (decided 2026-11-18). Checked by `git status` showing nothing else newly tracked, and hd_trio's tests
 
 ## C. The TensorRT models side by side
 
