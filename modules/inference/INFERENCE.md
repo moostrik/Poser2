@@ -123,6 +123,6 @@ panel), and its own thread matches them and hands every complete frame, in the o
 
 - The package's tests (`tests/` and each model's `tests/`): the queues of the workers with a fake model, the crop
   step, the uploaders, the syncs, the depth alignment, the detectors on stub and real models.
-- `scripts/model_benchmark.py`: an app's models without cameras, their times and their outputs against an earlier
-  run, on ONNX or TensorRT.
+- `scripts/model_benchmark.py`: an app's models without cameras, the crop models on seeded crops and the detectors on
+  one uploaded photo, their times and their outputs against an earlier run, on ONNX or TensorRT.
 - `scripts/gpu_input_timing.py` and `scripts/depth_align_check.py`: the upload's kernels against torch ops and GL.

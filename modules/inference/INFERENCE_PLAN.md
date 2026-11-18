@@ -145,7 +145,7 @@ outputs costs less than the decode's kernel launches and its own copy **(deducti
 stays on the CPU. On a busy GPU the decode's kernels would also queue behind the other models' work **(deduction)**.
 deep_flow's TensorRT engine takes one player only (a static batch of 1), so its row is hd_trio's engine.
 
-## G. The package's root and the inference frame (2026-11-18)
+## G. The package's root and the inference frame (2026-11-18, built)
 
 G1 (2026-11-18) sorted the root: `preprocessing/` (the upload and the crop step), `model_worker` and the TensorRT
 stub into `engine/`, `recorded_poses` into `pose/`, `detection/` named `person/`; the capture sync stays at the root.
@@ -158,10 +158,23 @@ straightening's two values), narrowings (the tests' image and frame), the tests'
 for, and one `cast`: a worker's settings read as their fields' values (`ModelWorkerSettings`), which pyright's
 protocols cannot see through a `Field` descriptor **(seen)**. The scripts' own errors outside the package stay.
 
-- G5. The benchmark, once the refactor is finished: `scripts/model_benchmark.py` with the face models and YOLO too,
-  on ONNX and TensorRT, the outputs against the run before. The before run is the same script on a copy of 916ff89a
-  (E1) outside the repository, as A1 ran e754ddee; the script reads both the old names and the new ones, as the probe
-  does
+G5, the refactor's benchmark (`scripts/model_benchmark.py`, now with the person and face detectors on one uploaded
+photo, `face.jpg`), 2026-11-18, 300 runs after 50, each model alone on the GPU: E1 (916ff89a, a copy outside the
+repository) against G4 (5650faf1), mean / p99 ms, the outputs against E1's **(seen)**:
+
+| Model                          | TensorRT E1   | TensorRT G4   | ONNX E1       | ONNX G4       | Outputs G4 against E1  |
+|--------------------------------|---------------|---------------|---------------|---------------|------------------------|
+| pose (hd_trio, batch 3)        | 3.23 / 4.31   | 3.34 / 4.69   | 3.55 / 5.27   | 3.69 / 5.11   | exact                  |
+| segmentation (EXTREME, b. 3)   | 5.60 / 6.75   | 5.61 / 6.88   | 22.56 / 24.33 | 22.69 / 24.28 | exact (1)              |
+| optical flow (deep_flow, b. 1) | 5.39 / 6.25   | 5.61 / 6.70   | (2)           | 13.30 / 14.79 | exact                  |
+| person (deep_flow, 640x512)    | 1.34 / 2.57   | 1.42 / 2.97   | (2)           | 2.89 / 4.15   | exact                  |
+| face (smile, SCRFD + 106)      | 4.16 / 6.22   | 4.77 / 6.18   | 5.08 / 6.49   | 5.24 / 6.67   | exact                  |
+
+(1) ONNX's foreground is the crops times the mask since E2, as TensorRT's; the mask is exact. (2) At E1 the person
+detector's ONNX runner refused the model's symbolic output size (`['batch', 84, 'anchors']`) and loaded nothing, so
+the ONNX run stopped there; the engine since E2 takes it **(seen)**. A second face run on TensorRT gave 3.66 / 5.17
+(G4) against 3.68 / 5.07 (E1): one run is no measure of a 0.6 ms difference **(seen)**. The refactor leaves every
+model's output as it was, and its time within a run's spread.
 
 ## H. A better pose model, after G (2026-11-18)
 

@@ -2,10 +2,13 @@
 
     python scripts/model_benchmark.py --app white_space
     python scripts/model_benchmark.py --app hd_trio --model-type onnx --reference logs/<earlier>.npz
+    python scripts/model_benchmark.py --app deep_flow --models person face
 
 Loads the app's startup preset for the models it enables, their resolutions and its batch size
 (the players), feeds the same seeded crops (or `--image`) at the app's crop size one batch at a time,
-and times every batch: the worker's own process time and the latency from submit to callback. Writes
+and times every batch: the worker's own process time and the latency from submit to callback. The
+detectors (`person`, `face`, named with `--models`) take one uploaded camera image a run, `--detector-image`
+(the face test's photo by default). Writes
 `logs/inference_<app>_<type>_<date>_<time>.json` in the timing report's format, so
 `scripts/timing_compare.py` compares two of them, with the GPU memory each model takes, and an
 `.npz` of the last batch's outputs; `--reference` compares those with an earlier `.npz`.
@@ -27,7 +30,9 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from modules.inference import ModelType, crop, optical_flow, pose, segmentation  # noqa: E402
+import modules.inference as inference  # noqa: E402
+from modules.camera import CameraFrame, FrameType  # noqa: E402
+from modules.inference import GpuImage, ImageUpload, ModelType, crop, optical_flow, pose, segmentation  # noqa: E402
 from modules.pose import BBox, Frame, FrameDict, Points2D  # noqa: E402
 from modules.settings import BaseSettings, presets  # noqa: E402
 from modules.utils import PerformanceTimer, Rect, timing  # noqa: E402
@@ -57,12 +62,38 @@ def _flow_output(flows: optical_flow.FlowDict) -> dict[str, np.ndarray]:
     return {'flow': torch.stack([flows[track_id] for track_id in sorted(flows)]).float().cpu().numpy()}
 
 
+def _person_output(detection: Any) -> dict[str, np.ndarray]:
+    return {'boxes': np.array([[b.x, b.y, b.width, b.height] for b in detection.boxes], np.float32).reshape(-1, 4),
+            'scores': np.array(detection.scores, np.float32)}
+
+
+def _face_output(frame: Any) -> dict[str, np.ndarray]:
+    return {'boxes': np.array([f.bbox for f in frame.faces], np.float32).reshape(-1, 4),
+            'landmarks': np.array([f.landmarks for f in frame.faces], np.float32).reshape(-1, 106, 2)}
+
+
+def _worker(package: Any, *names: str) -> type:
+    """The worker class by its name after E3, or before it, so the script times either commit."""
+    for name in names:
+        if hasattr(package, name):
+            return getattr(package, name)
+    raise AttributeError(names)
+
+
+_person_package: Any = getattr(inference, 'person', None) or getattr(inference, 'detection')
+
 # name (the settings group), the worker class, how its results are registered and read
 MODELS: list[tuple[str, type, Callable[[Any, Callable[[Any], None]], None], Callable[[Any], dict[str, np.ndarray]]]] = [
-    ('pose', pose.PoseEstimator, lambda p, cb: p.add_frames_callback(cb), _pose_output),
-    ('segmentation', segmentation.Segmenter, lambda p, cb: p.add_segmentation_callback(lambda _poses, images: cb(images)), _segmentation_output),
-    ('optical_flow', optical_flow.OpticalFlowEstimator, lambda p, cb: p.add_flow_callback(cb), _flow_output),
+    ('pose', _worker(pose, 'PoseEstimator', 'Predictor'), lambda p, cb: p.add_frames_callback(cb), _pose_output),
+    ('segmentation', _worker(segmentation, 'Segmenter', 'Predictor'), lambda p, cb: p.add_segmentation_callback(lambda _poses, images: cb(images)), _segmentation_output),
+    ('optical_flow', _worker(optical_flow, 'OpticalFlowEstimator', 'Predictor'), lambda p, cb: p.add_flow_callback(cb), _flow_output),
 ]
+# name (the camera's settings group), the worker class, how its results are registered and read; on a whole image
+DETECTORS: list[tuple[str, str, type, Callable[[Any, Callable[[Any], None]], None], Callable[[Any], dict[str, np.ndarray]]]] = [
+    ('person', 'person_detector', _person_package.PersonDetector, lambda p, cb: p.add_detection_callback(cb), _person_output),
+    ('face', 'face_detector', inference.face.FaceDetector, lambda p, cb: p.add_face_callback(cb), _face_output),
+]
+DETECTOR_IMAGE: Path = Path('modules/inference/face/tests/data/face.jpg')
 
 
 def load_app_settings(app: str) -> BaseSettings:
@@ -171,6 +202,74 @@ def run_model(name: str, worker_class: type, add_callback: Callable, read_output
     return outputs, memory_mb, PerformanceTimer.stop_session()
 
 
+def detector_settings(app_group: BaseSettings, model_type: ModelType) -> BaseSettings:
+    """A standalone copy of a detector's settings with the requested model type: its model files as the app's, its
+    thresholds as the preset's, on."""
+    copy = type(app_group)()
+    for name in ('resolution', 'model_path', 'engine_path', 'confidence', 'overlap', 'threshold', 'pitch_zero'):
+        if hasattr(app_group, name):
+            setattr(copy, name, getattr(app_group, name))
+    copy.model_type = model_type
+    if hasattr(copy, 'enabled'):
+        copy.enabled = True
+    copy.initialize()
+    return copy
+
+
+def uploaded_image(path: Path) -> GpuImage:
+    """A camera image as the uploader hands it on, on the GPU with its written event."""
+    import cv2
+    bgr = cv2.imread(str(path))
+    if bgr is None:
+        raise FileNotFoundError(path)
+    frame = CameraFrame(0, FrameType.VIDEO, bgr, 1.0)
+    images, ready = ImageUpload().upload([frame], torch.cuda.Stream())
+    torch.cuda.synchronize()
+    return GpuImage(0, 1.0, images[0], ready, frame)
+
+
+def run_detector(name: str, worker_class: type, add_callback: Callable, read_output: Callable, settings: BaseSettings,
+                 warmup: int, iterations: int, image_path: Path) -> tuple[dict[str, np.ndarray], float, dict[str, dict[str, float]]]:
+    """Time one detector on one uploaded image a run, as `run_model` times a crop model."""
+    label = f"{name} {settings.model_type.name} image"
+    latency_timer = PerformanceTimer(name=f"{label} latency")
+    memory_before = gpu_used_mb()
+    worker = worker_class(settings)
+    result: dict[str, Any] = {}
+    done = Event()
+
+    def on_output(output: Any) -> None:
+        result['output'] = output
+        done.set()
+
+    add_callback(worker, on_output)
+    worker.start()
+    outputs: dict[str, np.ndarray] = {}
+    try:
+        deadline = time.perf_counter() + READY_TIMEOUT
+        while not worker.is_ready:
+            if time.perf_counter() > deadline:
+                raise RuntimeError(f"{label}: model not ready")
+            time.sleep(0.05)
+        memory_mb = gpu_used_mb() - memory_before
+        image: GpuImage = uploaded_image(image_path)
+        for i in range(warmup + iterations):
+            done.clear()
+            start = time.perf_counter()
+            worker.submit(image)
+            if not done.wait(RESULT_TIMEOUT):
+                raise RuntimeError(f"{label}: no result for image {i + 1}")
+            latency_ms = (time.perf_counter() - start) * 1000.0
+            if i == warmup:
+                PerformanceTimer.start_session()
+            if i >= warmup:
+                latency_timer.add_time(latency_ms, report=False)
+        outputs = {f"{name}/{k}": v for k, v in read_output(result['output']).items()}
+    finally:
+        worker.stop()
+    return outputs, memory_mb, PerformanceTimer.stop_session()
+
+
 def compare_outputs(outputs: dict[str, np.ndarray], reference: dict[str, np.ndarray]) -> dict[str, dict[str, float]]:
     """Max and mean absolute difference per output that both have."""
     agreement: dict[str, dict[str, float]] = {}
@@ -186,13 +285,14 @@ def compare_outputs(outputs: dict[str, np.ndarray], reference: dict[str, np.ndar
 def main() -> None:
     assert __doc__ is not None
     parser = ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--app', required=True, choices=['white_space', 'hd_trio', 'deep_flow'])
+    parser.add_argument('--app', required=True, choices=['white_space', 'hd_trio', 'deep_flow', 'smile'])
     parser.add_argument('--model-type', default='trt', choices=['trt', 'onnx'])
     parser.add_argument('--iterations', type=int, default=1000, help='timed batches per model')
     parser.add_argument('--warmup', type=int, default=100, help='untimed batches per model first')
     parser.add_argument('--image', type=Path, default=None, help='a photo to crop from instead of seeded noise')
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--models', nargs='*', default=None, help='the models to run, enabled or not (pose, segmentation, optical_flow); default the enabled ones')
+    parser.add_argument('--models', nargs='*', default=None, help='the models to run, enabled or not (pose, segmentation, optical_flow, person, face); default the enabled crop models')
+    parser.add_argument('--detector-image', type=Path, default=DETECTOR_IMAGE, help='the photo the detectors run on')
     parser.add_argument('--reference', type=Path, default=None, help='an earlier .npz to compare the outputs with')
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)-7s %(name)s %(message)s")
@@ -203,7 +303,7 @@ def main() -> None:
     memory: dict[str, float] = {}
     outputs: dict[str, np.ndarray] = {}
     for name, worker_class, add_callback, read_output in MODELS:
-        group = getattr(app_settings.pose, name, None)
+        group = getattr(getattr(app_settings, 'pose', None), name, None)
         if group is None or (args.models is None and not group.enabled) or (args.models is not None and name not in args.models):
             continue
         # the segmentation's own crops where the app cuts them, else the pose model's
@@ -214,6 +314,18 @@ def main() -> None:
         model_outputs, memory_mb, model_stats = run_model(name, worker_class, add_callback, read_output, settings,
                                                           crop_settings.output_width, crop_settings.output_height,
                                                           args.warmup, args.iterations, args.image, args.seed)
+        stats.update(model_stats)
+        memory[name] = memory_mb
+        outputs.update(model_outputs)
+
+    for name, group_name, worker_class, add_callback, read_output in DETECTORS:
+        group = getattr(getattr(app_settings, 'camera', None), group_name, None)
+        if group is None or args.models is None or name not in args.models:
+            continue
+        settings = detector_settings(group, model_type)
+        logger.info("%s: %s, image %s", name, type(settings).__name__, args.detector_image)
+        model_outputs, memory_mb, model_stats = run_detector(name, worker_class, add_callback, read_output, settings,
+                                                             args.warmup, args.iterations, args.detector_image)
         stats.update(model_stats)
         memory[name] = memory_mb
         outputs.update(model_outputs)
