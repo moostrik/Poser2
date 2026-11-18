@@ -21,7 +21,7 @@ operator saw.
 | I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | not started                       | [FLOW.md](FLOW.md)                                 |
 | J   | [Every setting and its description](#j-every-setting-and-its-description)    | last, after the refactor          | `CLAUDE.md`, `.claude/rules`                       |
 
-E2 needs the operator at the screen; the other lines go on meanwhile.
+E6 needs the operator at the screen; the other lines go on meanwhile.
 
 The apps on deep_flow's input have their own plan, [apps/APPS_PLAN.md](../../apps/APPS_PLAN.md); recording and
 -sim, deep_flow's live checks among them, theirs, [RECORDING_PLAN.md](../recording/RECORDING_PLAN.md). The
@@ -97,11 +97,41 @@ coverage); the luma matte in the view ([VIEW.md](VIEW.md#the-stage)), the bridge
 
 ## E. The 3D fluid's physics
 
-- **E1.** The temperature fixed: its advection moves to the density's, carried by the projected velocity (Fedkiw
-  2001, Bridson), where today it is carried mid-step, after the confinement and before the projection, by a
-  velocity not yet free of divergence; the buoyancy reads the temperature of the step before.
-- **E2.** The temperature checked in the app, in its own panel: what it does to the water and whether it works.
-  After E1, with `buoyancy` above 0.
+The temperature as the textbook has it (Fedkiw, Stam, Jensen 2001; Bridson 2015; GPU Gems 3 ch. 30): the
+warmth and the dye passive scalars carried by the same projected velocity; the buoyancy (sink × amount −
+buoyancy × warmth) along gravity, at the faces, added before the projection; the heat leaves by mixing and by
+cooling toward the room's. The buoyancy's formula is that already (`buoyancy_3d.comp`); the steps below are
+where the code differs.
+
+- **E1.** The order: the temperature advected after the projection, beside the density, carried by the faces as
+  now, where today it is advected mid-step, after the confinement and before the projection, by faces not yet
+  free of divergence; the buoyancy reads the temperature the step before made. `FLUID_PASSES`' order,
+  FLUID_3D.md's pass table and TIMING.md's `advect temperature` row follow, its time measured again.
+- **E2.** The density's weight reads its amount (`.a`), where today it reads max(r, g, b), the color × the
+  amount, and in Oklab a and b, which may be negative. Checked with `sink` > 0: a dense blob sinks at `sink` ×
+  its `.a`, in RGB and in Oklab (E5's script).
+- **E3.** The warmth is the difference from the room's (Boussinesq), as the injection makes it, −1 to 1, 0 =
+  the room's: `temperature.ambient` goes, and the fade and the evaporation take the warmth toward 0, which is
+  then the cooling toward the room's (Newton's law). It goes from `TemperatureSettings`, `buoyancy_3d.py`
+  (`ambient_temperature`), `buoyancy_3d.comp`'s `uAmbientTemperature`, `_apply_buoyancy`'s docstring, both
+  deep_flow presets (`settings.json`, `very nice.json`), and FLUID_3D.md's buoyancy row and defaults; the 2D
+  fluid keeps its `ambient` until line I.
+- **E4.** The warmth from the motion alone: the temperature's mix, an amount capped at 1 (`capped=True`, as the
+  expansion's), times `temperature_gain`, its sign and size, where today the `TemperatureBridge` reads it from
+  the image's color (R warm, B cold, G damps; ofxFlowTools'), which ties the lift to the player's clothes. The
+  3D bridge's color step goes: `bridge_3d/temperature_bridge.py` and its shaders, `TemperatureBridgeSettings` as
+  `TemperatureMixSettings`' base, its names in `bridge_3d/__init__.py` and `modules/flow/__init__.py`, the
+  temperature bridge's ports and monitors; the temperature keeps its own mix, the trail by default as the
+  density's; BRIDGE_3D.md follows. The 2D bridge is untouched (I3).
+- **E5.** Checked in the GPU harness, a new script in `scripts/`: a warm blob in a closed box at rest, one step.
+  The buoyancy before the projection is `buoyancy` × the warmth × gravity, exactly; the blob's first-step rise
+  after the projection about 2/3 of it (a sphere's added mass) **(deduction)**; and E2's dense blob sinking at
+  `sink` × its `.a`, in RGB and Oklab. The result in FLUID_3D.md, with its kind, date, commit and settings.
+- **E6.** Checked in the app, in its own panel: what the temperature does to the water and whether it works,
+  with `buoyancy` above 0.
+
+E1 to E4 are a commit each, checked by the tests they touch and their shaders' compile; E5 a commit with its
+script and result.
 
 ## F. The 3D fluid's look at 4K
 
@@ -134,8 +164,8 @@ Once the 3D is finished, the 2D rebuilt in `modules/flow` on the 3D's principles
 - **I1.** The 2D fluid takes the boundary by a drag and the body force's acceleration times dt, as the 3D does
   ([FLUID_3D.md](FLUID_3D.md#the-inputs)), in place of adding the bridge's velocity as a source times dt.
 - **I2.** The 2D motion on the Lucas–Kanade solve, in widths/s with its velocity gate, in place of `GradientFlow`.
-- **I3.** The 2D bridge rebuilt on the 3D bridge's filters, the two copied classes (`TemperatureBridge`,
-  `VelocityMagnitude`) shared again.
+- **I3.** The 2D bridge rebuilt on the 3D bridge's filters, `VelocityMagnitude` shared again and the warmth
+  from the motion as the 3D's (E4), its `TemperatureBridge` gone.
 - **I4.** Each 2D stage its document as it is rebuilt (`BRIDGE_2D.md`, `FLUID_2D.md`); `fluid_2d.py`'s 21-line
   pipeline docstring goes with it.
 
@@ -148,6 +178,11 @@ Once the 3D is finished, the 2D rebuilt in `modules/flow` on the 3D's principles
 ## Parked
 
 Not worked on until asked for; each with what is known.
+
+The 3D fluid's physics:
+
+- The heat's diffusion: ∂T/∂t = k∇²T, solved implicitly as the viscosity is (Bridson 2015); left out, as Fedkiw
+  2001 has none and the advection already blurs; added if it is missed.
 
 The 3D fluid's look:
 
@@ -215,5 +250,9 @@ The cameras:
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
 - Ask to measure a time again when its pass's code or size changes: D6.
+- Name the fluid's things by the textbook word; prefer the flow's textbook units: E3.
+- Shaders get checked in a GPU harness; a measured result names its kind, date, commit and settings: E5.
+- Remove obsolete pathways instead of leaving parallel legacy ones: E4 (the color's warmth).
+- Keep presets and settings schemas in sync with code changes: E3 (`ambient` out of the presets).
 
-Not designed yet, so their rules are not named: C3, E1, E2, F1, F2, H1, I1 to I4.
+Not designed yet, so their rules are not named: C3, F1, F2, H1, I1 to I4.
