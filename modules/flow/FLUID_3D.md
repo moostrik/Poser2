@@ -399,7 +399,7 @@ Tests go through the harness, `scripts/fluid_compare.py` beside `bridge_compare.
 the bridge's outputs, so it chains the saved frames of a recording (`depth_velocity_capture`)
 through the flow, a `Bridge3DLayer` and a `Fluid3DLayer` per side, A against B, with deep_flow's
 preset and one setting changed by its panel path (`fluid.input.velocity_drag=0`,
-`bridge.readings.lowpass.smooth=300`), and reads the fluid's velocity and density on the injection
+`bridge.filters.lowpass.smooth=300`), and reads the fluid's velocity and density on the injection
 layer's slice (`VolumeCut`). `--every N` steps the bridge and the fluid once per N frames with the
 summed dt, a frame-rate check. The drag's share, set on the CPU, is tested as a formula (`test_drag.py`).
 

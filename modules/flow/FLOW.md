@@ -242,7 +242,7 @@ grid (its density is at the size the app allocates). On the fluid layer `blend_m
 stage runs one component is that component's settings too (`Motion2DLayerSettings` is a
 `GradientFlowSettings`, `Motion3DLayerSettings` a `LucasKanadeFlow3DSettings`, `Bridge3DLayerSettings` a
 `Bridge3DSettings`, the fluid layers' a `Fluid2DSettings` and a `Fluid3DSettings`), so the component's
-fields and groups sit on the stage's panel (the 3D bridge's: `readings`, with `lowpass` and `bandpass`;
+fields and groups sit on the stage's panel (the 3D bridge's: `filters`, with `lowpass` and `bandpass`;
 then one per output, each with its mix: `velocity`, `acceleration`, `density`, `temperature`,
 `expansion`); the 2D bridge layer, running several bridges, holds them in groups. No `draw_mode`,
 `visualization`, `stage`, `max_players` or `fps`: the stages draw nothing, read no poses and take

@@ -54,8 +54,8 @@ class Bridge3D:
         self.settings: Bridge3DSettings = settings or Bridge3DSettings()
         settings = self.settings
         self._color: Fbo = Fbo()        # the density's color this step: the image copied, held when a tick has several
-        self._lowpass: VelocityLowpass = VelocityLowpass(settings.readings.lowpass)
-        self._bandpass: VelocityBandpass = VelocityBandpass(settings.readings.bandpass)
+        self._lowpass: VelocityLowpass = VelocityLowpass(settings.filters.lowpass)
+        self._bandpass: VelocityBandpass = VelocityBandpass(settings.filters.bandpass)
         self._lowpass_shown: bool = False       # a monitor read one of its ports since the last update
         self._bandpass_shown: bool = False
         self._bandpass_running: bool = False    # it ran the update before
@@ -136,7 +136,7 @@ class Bridge3D:
 
     @property
     def ports(self) -> dict[str, Port]:
-        """The readings, then the outputs' mixes, each under its settings group's name."""
+        """The filters' readings, then the outputs' mixes, each under its settings group's name."""
         ports: dict[str, Port] = {}
         for name, part in self._parts().items():
             ports.update(prefixed(name, part.ports))

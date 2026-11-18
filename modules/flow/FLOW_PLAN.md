@@ -88,20 +88,13 @@ coverage); the luma matte in the view ([VIEW.md](VIEW.md#the-stage)), the bridge
 ([BRIDGE_3D.md](BRIDGE_3D.md#the-mix)); the density's blend, over or added, and its color space, RGB or Oklab
 ([FLUID_3D.md](FLUID_3D.md#the-densitys-blend)), committed before the app's check on Matthias's word. Built
 (2026-11-18): the view's white balance; the density's color a stage of its own between the view and the motion
-([COLOR.md](COLOR.md)).
+([COLOR.md](COLOR.md)); the bridge's `readings` group named `filters`.
 
 - **D6.** The checks. In the app: no dark rim at any gain; the luma matte from 0 to 1; `over` leaves no patches
   where the input meets older density; `fill` against `over`; `add` builds up without going white; `oklab`
   mixes without turning muddy; the monitor's `IMAGE` shows what the composite shows; `color.white_balance`
   pulls a warm room light to white. The injection's and the march's times measured again, with -sim while
   Matthias is away; the preset saved after.
-- **D9.** The bridge's `readings` group renamed `filters` (`Bridge3DFiltersSettings`, `filters` → `lowpass`,
-  `bandpass`): a group is named by what its modules do, a reading by what it is, and the trail, change, start,
-  bow, stop and wake stay "the readings". `Bridge3D`'s `settings.readings` reads, both presets, the scripts'
-  paths (`fluid_compare.py`'s `bridge.readings.lowpass.smooth`) and BRIDGE_3D.md follow. Checked by the tests
-  and both presets loading with no unknown key.
-
-D9 is a commit.
 
 ## E. The 3D fluid's physics
 
@@ -226,6 +219,5 @@ The cameras:
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
 - Ask to measure a time again when its pass's code or size changes: D6.
-- Keep presets and settings schemas in sync with code changes: D9.
 
 Not designed yet, so their rules are not named: C3, F1, F2, H1, I1 to I4.

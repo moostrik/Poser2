@@ -390,7 +390,7 @@
     "bridge": {
       "width": 448,
       "height": 800,
-      "readings": {
+      "filters": {
         "lowpass": {
           "advect": 0.5,
           "attack": 1.0,

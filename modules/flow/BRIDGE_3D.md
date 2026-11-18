@@ -28,8 +28,8 @@ short, sharp one, so two filters, named by what they do, read the same velocity 
 
 | Filter             | Reads                                                                  | Gives                                    | Panel group         |
 |--------------------|------------------------------------------------------------------------|------------------------------------------|---------------------|
-| `VelocityLowpass`  | the flow's velocity through one trail: advect, attack/smooth, blur     | `trail`                                  | `readings.lowpass`  |
-| `VelocityBandpass` | the flow's velocity through a fast and a slow trail, and their regions | `change`, `start`, `bow`, `stop`, `wake` | `readings.bandpass` |
+| `VelocityLowpass`  | the flow's velocity through one trail: advect, attack/smooth, blur     | `trail`                                  | `filters.lowpass`   |
+| `VelocityBandpass` | the flow's velocity through a fast and a slow trail, and their regions | `change`, `start`, `bow`, `stop`, `wake` | `filters.bandpass`  |
 
 A reading is what a filter makes from the motion. Each of the six comes as a velocity (widths/s)
 and as an acceleration (widths/s²):
@@ -126,14 +126,14 @@ each output mixing the six readings, each reading at a share, 0 to 1, as the lig
 (`Bridge3D`, `WeightedSum`). The boundary is the body in the water, what the water is dragged toward: its
 velocity, and its dye and warmth, which have no force and are held at the body. The body force is the
 Navier–Stokes force term, what is added: an acceleration, which the water keeps after the body is gone, so a
-stop can throw the water on. The panel shows `readings` (`lowpass`, `bandpass`), then one subpanel per output,
+stop can throw the water on. The panel shows `filters` (`lowpass`, `bandpass`), then one subpanel per output,
 named as the output, in the order the bridge makes them. Each output's group holds the six shares as knobs on
 the first row (`MixSettings`: `trail`, `change`, `start`, `bow`, `stop`, `wake`), an amount's (the density's,
 the temperature's, the expansion's) a seventh, `mask` (`AmountMixSettings`).
 
 | Subpanel       | Readings enter as | Goes in as     | Output, its unit                                                                                     | Default       |
 |----------------|-------------------|----------------|------------------------------------------------------------------------------------------------------|---------------|
-| `readings`     |                   |                | the filters' settings, `lowpass` and `bandpass`                                                      |               |
+| `filters`      |                   |                | the filters' settings, `lowpass` and `bandpass`                                                      |               |
 | `velocity`     | velocities        | boundary       | widths/s, the body's velocity; with its `peak` ([The peak](#the-peak))                               | the trail 1   |
 | `acceleration` | accelerations     | body force     | widths/s², a Δv added once over a change                                                             | all 0: `None` |
 | `density`      | velocities        | boundary value | the dye's amount, widths/s; its `color` the view's, RGBA, premultiplied by its alpha                 | the trail 1   |

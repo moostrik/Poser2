@@ -44,8 +44,8 @@ class TemperatureMixSettings(TrailAmountMixSettings):
     fluid's `temperature_gain` makes it the warmth."""
 
 
-class Bridge3DReadingsSettings(BaseSettings):
-    """What the bridge reads from the motion: the lowpass and the bandpass."""
+class Bridge3DFiltersSettings(BaseSettings):
+    """The bridge's filters, which make the readings from the motion: the lowpass and the bandpass."""
     lowpass  = Group(VelocityLowpassSettings)
     bandpass = Group(VelocityBandpassSettings)
 
@@ -55,11 +55,11 @@ class ExpansionSettings(AmountMixSettings):
 
 
 class Bridge3DSettings(BaseSettings):
-    """Configuration for Bridge3D: the readings, then one group per output, named as the output, in the order the
+    """Configuration for Bridge3D: the filters, then one group per output, named as the output, in the order the
     bridge makes them: the velocity, the boundary the water is dragged toward (the readings mixed as velocities),
     the acceleration, the body force added × dt (the readings mixed as accelerations), the density and the
     temperature, held at the body as boundary values, and the expansion."""
-    readings     = Group(Bridge3DReadingsSettings)
+    filters      = Group(Bridge3DFiltersSettings)
     velocity     = Group(VelocityMixSettings)
     acceleration = Group(MixSettings)
     density      = Group(DensityMixSettings)
