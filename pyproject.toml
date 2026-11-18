@@ -22,6 +22,7 @@ dependencies = [
     "PyOpenGL>=3.1.10",
     "PyOpenGL-accelerate>=3.1.10",
     "python-osc>=1.10",
+    "pyright[nodejs]>=1.1.414",     # Pylance's type check from the command line, `[tool.pyright]` below
     "pytweening>=1.2",
     "requests>=2.34",               # SMILE: ComfyUI's HTTP API
     "stupidArtnet>=1.6",
