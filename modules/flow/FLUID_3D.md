@@ -109,7 +109,7 @@ panel in the order the layer injects them, says how the water follows each; the 
 |----------------|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|---------------------------|-----------------------------------|
 | `velocity`     | widths/s                          | the boundary: drags the water toward it where it is non-zero, over `velocity_drag`, never past it (`add_to_faces_3d`, [The drag](#the-drag)) | `input.velocity_gain`     | the water as fast as the body     |
 | `acceleration` | widths/s²                         | the body force: adds it × dt (`add_to_faces_3d`)                                                                                              | `input.acceleration_gain` | a Δv added once                   |
-| `density`      | widths/s, with its `color`        | the dye, the color × the amount × `density_gain`, blended in by `density_blend`: over the water's by `density_drag`'s share, or added × dt | `input.density_gain` | fully dyed at 1 width/s |
+| `density`      | widths/s, with its `color`        | the dye, the color × the amount × `density_gain`, blended in by `density_blend`: over the water's by `density_drag`'s share, added × dt, or the water drawn toward it (fill) | `input.density_gain` | fully dyed at 1 width/s |
 | `temperature`  | warmth, -1 to 1                   | drags the water toward it × `temperature_gain` (at most ±1) in the slab where the body is, over `temperature_drag`                            | `input.temperature_gain`  | fully warm or cold at 1 width/s   |
 | `expansion`    | presence, 0 to 1                  | the projection makes the divergence the rate × it, not 0 ([The expansion](#the-expansion))                                                    | `input.expansion_rate`    | its volume gained per second, 1/s |
 
@@ -420,6 +420,7 @@ as a tuning:
 | `input.acceleration_gain`                                                      | 1             | a Δv added once                                                                              |
 | `input.density_drag`, `temperature_drag`; `density_gain`, `temperature_gain`   | 200 ms; 1     | the water takes the dye in a fifth of a second, fully dyed where the body moves at 1 width/s |
 | `input.density_blend`                                                          | over          | the dye held at the body, a boundary value, never falling there                              |
+| `input.density_release`                                                        | 0 ms          | the water's dye never falls toward the body's                                               |
 | `density.color_space`                                                          | RGB           | the colors stored as the camera gives them                                                   |
 | `density.advection_scale`, `temperature.advection_scale`                       | 1             | the density moves with the water                                                             |
 | `velocity.advection_scale`                                                     | 1             | the velocity carries itself the full step                                                    |
@@ -553,17 +554,31 @@ density's amount and the particles (`density_blend.glsl`):
 
 | `density_blend` | A cell                                                                                         | The amount                                  | The color                               |
 |-----------------|------------------------------------------------------------------------------------------------|---------------------------------------------|-----------------------------------------|
-| `OVER`          | becomes the source + the cell × (1 − the source's amount), by `density_drag`'s share each tick | never falls, never passes 1                 | the amount-weighted mix                 |
+| `OVER`          | becomes the source + the cell × (1 − the source's amount), by `density_drag`'s share each tick | never passes 1; falls only by the release   | the amount-weighted mix                 |
 | `ADD`           | the source × dt added (Stam 2003; Bridson 2015)                                                | past 1, all four channels scaled down to it | the amount-weighted mix of what went in |
+| `FILL`          | drawn toward the source, by `density_drag`'s share where its amount is above the cell's, else by `density_release`'s | toward the source's, at most 1; 0 release = never falls | drawn toward the source's |
 
 `OVER` is the default: the density is a boundary value, held at the body, and over is that hold without a
 fall, so where the body meets older dye the two mix instead of leaving its edge as a patch, and a fading body
 does not pull the water clear. The gain amplifies the speed, a slow player putting in more; the coverage comes
 in as given. The particles take over's share as that share of fully dyed added, as the grid's first tick from
-clear water does; a particle keeps its own color, RGB, and mixes with none.
+clear water does, and fill's the same, its target at most 1; a particle keeps its own color, RGB, and mixes
+with none.
+
+`FILL` is the injection as it was before the blend, kept to compare with `OVER`: the target is the source
+capped at fully dyed, its color kept, and the cell is drawn toward it, color and amount alike, so where the body
+meets older dye the cell takes the body's color by the drag's share whatever it held.
+
+`input.density_release` is the fall, in all three, there to test: where the body is and the water holds more
+dye than it, the cell falls toward it by the release's share each tick, 0 never. In `FILL` the cell is drawn
+toward the target, color and amount. In `OVER` and `ADD`, after the blend, all four channels are scaled down
+together toward the body's level, its amount × `density_gain` capped at 1 (in `ADD` the level, not the rate),
+so the cell keeps its own color mix; the coverage weights the release's share, as it weights over's, and is not
+part of the level, so a feathered or matted edge falls less, not further. Above 0 it brings back what over is chosen for not doing:
+a fading body pulls the water clear. The particles are only born and do not fall.
 
 `density.color_space` stores the color as RGB, as the camera gives it, or as Oklab (Ottosson 2020), (L × the
-amount, a × the amount, b × the amount, the amount), so the advection and both blends mix colors as the eye
+amount, a × the amount, b × the amount, the amount), so the advection and the blends mix colors as the eye
 sees them, without a muddy middle **(deduction)**. The injection turns the bridge's color into Oklab
 (`InjectDensity3D`), as the particles read the bridge's color as it is; the composite turns each sample back to
 RGB, divided by its amount, turned, multiplied again (`Composite3D`), as the fine density's composite does with

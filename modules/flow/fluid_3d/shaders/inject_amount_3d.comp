@@ -4,9 +4,9 @@
  * InjectAmount3D - a density's amount into a one-channel volume, in the gaussian slab around each pixel's z
  * position (nothing without one), as InjectDensity3D blends the whole density, one invocation a column: the
  * bridge's amount (uInput's red, density_blend.glsl) times its color's alpha, the coverage, blended in by the
- * body's share of the cell × uStrength. The amount is read by uv, so the volume may be finer: then uCubic
- * enlarges it by a cubic B-spline, smooth through the amount's texel corners, where a bilinear read keeps them
- * as steps a texel apart; four bilinear reads (Sigg and Hadwiger, GPU Gems 2).
+ * body's share of the cell × uStrength (× uRelease where it falls). The amount is read by uv, so the volume
+ * may be finer: then uCubic enlarges it by a cubic B-spline, smooth through the amount's texel corners, where
+ * a bilinear read keeps them as steps a texel apart; four bilinear reads (Sigg and Hadwiger, GPU Gems 2).
  */
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;   // a column of cells each
@@ -18,8 +18,9 @@ layout(r16f, binding = 0) uniform image3D uVolume;
 
 uniform bool  uHasZPosition;
 uniform float uSpread;       // the gaussian's sigma in normalized depth
-uniform float uStrength;     // over: the drag's share this step; add: dt
-uniform bool  uCubic;        // the source enlarged by a cubic B-spline, else bilinearly
+uniform float uStrength;     // over, fill: the drag's share this step; add: dt
+uniform float uRelease;      // the release's share this step where the cell falls; 0 = never falls
+uniform bool  uCubic;       // the source enlarged by a cubic B-spline, else bilinearly
 uniform ivec3 uSize;
 
 #include "density_blend.glsl"
@@ -48,17 +49,22 @@ void main() {
     if (any(greaterThanEqual(column, uSize.xy))) return;
     vec2 uv = (vec2(column) + 0.5) / vec2(uSize.xy);
     float amount = uCubic ? bspline_amount(uv) : texture(uInput, uv).r;
-    float source = density_amount(amount) * texture(uColor, uv).a;
+    float coverage = texture(uColor, uv).a;
+    float source = density_amount(amount) * coverage;
+    float level = density_level(amount);     // over and add: what the release falls toward
     if (source <= 0.0) return;      // nothing to blend in: the column stays as it is, unread and unwritten
     float center = slab_center(uv);
     if (center == NO_Z_POSITION) return;
     ivec2 cells = slab_cells(center, uSize.z);
     for (int z = cells.x; z <= cells.y; z++) {
-        float share = slab_cell(z, center, uSize.z) * uStrength;     // the body's share of this cell (slab.glsl)
-        if (share < 0.001) continue;
+        float slab = slab_cell(z, center, uSize.z);     // the body's share of this cell (slab.glsl)
+        float share = slab * uStrength;
+        float release = release_share(slab * uRelease, coverage);
+        if (max(share, release) < 0.001) continue;
         ivec3 gid = ivec3(column, z);
         float current = imageLoad(uVolume, gid).r;
-        current = blend_density(vec4(0.0, 0.0, 0.0, current), vec4(0.0, 0.0, 0.0, source), share).a;
+        current = blend_density(vec4(0.0, 0.0, 0.0, current), vec4(0.0, 0.0, 0.0, source), level, share,
+                                release).a;
         imageStore(uVolume, gid, vec4(current, 0.0, 0.0, 0.0));
     }
 }

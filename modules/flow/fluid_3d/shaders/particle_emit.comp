@@ -4,7 +4,7 @@
  * ParticleEmit - new particles from a density source, into the ring.
  *
  * Per texel of the color (premultiplied by its alpha, the coverage), its amount the bridge's (read by uv,
- * density_blend.glsl) times the color's alpha: its expected
+ * density_blend.glsl) times the color's alpha, fill's capped at 1: its expected
  * count this step is rate × dt × g, g = min(amount / floor, 1), rounded by a hash so faint density still
  * spawns now and then; each new particle takes amount × uStrength × slab / expected as its mass, so
  * the texel's mass is the grid's in expectation (slab: the gaussian's sum over the grid's layers)
@@ -26,7 +26,7 @@ layout(binding = 0) uniform sampler2D uColor;      // the color, premultiplied b
 layout(binding = 1) uniform sampler2D uZPosition;   // the amount's z position, red over green
 layout(binding = 2) uniform sampler2D uAmount;      // the amount, red
 
-uniform float uStrength;    // the share of the amount added this step: over, the drag's; add, dt; × the injection's weight
+uniform float uStrength;    // the share of the amount added this step: over, fill, the drag's; add, dt; × the injection's weight
 uniform float uDt;          // s
 uniform float uRate;        // particles per texel per second where density is
 uniform float uFloor;       // the amount below which a texel spawns fewer
@@ -61,6 +61,7 @@ void main() {
     vec4 source = texelFetch(uColor, gid, 0);
     vec2 texel = (vec2(gid) + 0.5) / vec2(size);
     float amount = density_amount(texture(uAmount, texel).r) * source.a;
+    if (uBlend == BLEND_FILL) amount = min(amount, 1.0);    // fill's target, at most fully dyed
     if (amount <= 0.0) return;
     float center = slab_center(texel);
     if (center == NO_Z_POSITION) return;        // no place in the depth: no particle

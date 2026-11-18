@@ -993,14 +993,18 @@ class Fluid3D:
     def add_density(self, amount: Texture, color: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
         """The boundary's dye, the bridge's `amount` (red) times input.density_gain times its `color` (RGBA,
         premultiplied by its alpha, the coverage), into the carriers by input.density_blend: over the water's dye
-        by input.density_drag's share, the amount capped at 1, or added × dt."""
+        by input.density_drag's share, the amount capped at 1; added × dt; or the water drawn toward it, at most
+        fully dyed, over input.density_drag; where the water holds more than the body, down over
+        input.density_release (0 = never down)."""
         if not self._allocated:
             return
         input = self.settings.input
         blend: DensityBlend = input.density_blend
-        strength: float = (drag_share(self._dt, input.density_drag) if blend == DensityBlend.OVER else self._dt) * weight
+        strength: float = (self._dt if blend == DensityBlend.ADD else drag_share(self._dt, input.density_drag)) * weight
+        release: float = drag_share(self._dt, input.density_release) * weight if input.density_release > 0.0 else 0.0
         for carrier in self._densities:
-            carrier.add(amount, color, strength, self._dt, self._spread(), blend, input.density_gain, z_position)
+            carrier.add(amount, color, strength, self._dt, self._spread(), blend, input.density_gain, release,
+                        z_position)
 
     def add_temperature(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
         """The boundary's warmth (-1 cold to 1 hot, its presence folded in): the water in the slab dragged toward

@@ -300,6 +300,7 @@
       },
       "color": {
         "enabled": true,
+        "white_balance": 6500.0,
         "exposure": 1.0,
         "offset": 0.0,
         "gamma": 0.8,
@@ -421,15 +422,15 @@
         "change": 0.0,
         "start": 0.0,
         "bow": 0.0,
-        "stop": 1.0,
-        "wake": 0.0
+        "stop": 0.0,
+        "wake": 1.0
       },
       "density": {
         "trail": 1.0,
         "change": 0.0,
         "start": 0.0,
         "bow": 0.05,
-        "stop": 1.0,
+        "stop": 0.0,
         "wake": 0.0,
         "mask": 0.0
       },
@@ -493,10 +494,10 @@
       "input": {
         "spread": 0.237,
         "velocity_drag": 75.0,
-        "velocity_gain": 0.78,
-        "acceleration_gain": 4.0,
+        "velocity_gain": 1.0,
+        "acceleration_gain": 10.0,
         "density_blend": "OVER",
-        "density_drag": 75.0,
+        "density_drag": 229.0,
         "density_release": 0.0,
         "density_gain": 5.0,
         "temperature_drag": 200.0,

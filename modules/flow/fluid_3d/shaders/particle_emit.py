@@ -25,12 +25,13 @@ class ParticleEmit(ComputeShader):
 
         Args:
             amount: The bridge's amount, red; times the gain (over: capped at 1), times the color's alpha
+                (fill: capped at 1)
             color: The color, premultiplied by its alpha
             particles: The particles' buffer
             ring: The ring's head (one uint)
             count: The ring's size
-            strength: The share of the amount added this step (over: the drag's, add: dt) × the injection's weight
-            blend: `DensityBlend`, which caps the amount at 1 (over) or not (add)
+            strength: The share of the amount added this step (over, fill: the drag's, add: dt) × the injection's weight
+            blend: `DensityBlend`, which caps the amount at 1 (over, fill) or not (add)
             gain: The bridge's amount times this
             dt: The step (s)
             rate: Particles per texel per second where density is

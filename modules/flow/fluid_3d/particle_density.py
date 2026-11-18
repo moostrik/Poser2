@@ -142,10 +142,11 @@ class ParticleDensity(DensityCarrier):
         return slab_sum(REFERENCE_Z_POSITION, spread, self._layers) / max(self.settings.particles.rate, 1e-6)
 
     def add(self, amount: Texture, color: Texture, strength: float, dt: float, spread: float, blend: DensityBlend,
-            gain: float, z_position: Texture | None = None) -> None:
+            gain: float, release: float, z_position: Texture | None = None) -> None:
         """Particles born where the dye is, as many as its amount × the rate, their mass the share of it the blend
-        adds this step: over's share counted as that share of fully dyed added, as the grid's first step from
-        clear water does, so a particle look sees over and add alike. Their color is RGB, as the bridge's: a
+        adds this step: over's and fill's share counted as that share of fully dyed added, as the grid's first
+        step from clear water does, so a particle look sees the three alike; particles are only born, so the
+        `release` has nothing to take. Their color is RGB, as the bridge's: a
         particle mixes with none."""
         if not self.allocated or not amount.allocated or not color.allocated or strength <= 0.0:
             return

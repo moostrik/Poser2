@@ -62,7 +62,7 @@ def main() -> None:
     volume = Texture3D()
     volume.allocate(w, h, layers, GL_RGBA16F)
     volume.clear()
-    inject.use(source, source, volume, spread, 1.0, add, 1.0, False, z_position)
+    inject.use(source, source, volume, spread, 1.0, add, 1.0, 0.0, False, z_position)
     glFinish()
     got = volume.read_to_numpy()
     assert got is not None
@@ -75,7 +75,7 @@ def main() -> None:
     finer = Texture3D()
     finer.allocate(w, h, layers, GL_R16F)
     finer.clear()
-    amount.use(source, source, finer, spread, 1.0, add, 1.0, z_position=z_position)
+    amount.use(source, source, finer, spread, 1.0, add, 1.0, 0.0, z_position=z_position)
     glFinish()
     got = finer.read_to_numpy()
     assert got is not None
@@ -84,7 +84,7 @@ def main() -> None:
     print(f"inject amount at each column's z position: max diff {diff:.2e} {'ok' if diff < 5e-3 else 'FAIL'}")
 
     volume.clear()
-    inject.use(source, source, volume, spread, 1.0, add, 1.0, False)
+    inject.use(source, source, volume, spread, 1.0, add, 1.0, 0.0, False)
     glFinish()
     got = volume.read_to_numpy()
     assert got is not None

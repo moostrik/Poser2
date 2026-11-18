@@ -92,10 +92,10 @@ class FineDensity(DensityCarrier):
         self._amount.clear_all()
 
     def add(self, amount: Texture, color: Texture, strength: float, dt: float, spread: float, blend: DensityBlend,
-            gain: float, z_position: Texture | None = None) -> None:
+            gain: float, release: float, z_position: Texture | None = None) -> None:
         if not self.allocated:
             return
-        self._inject_shader.use(amount, color, self._amount, spread, strength, int(blend), gain,
+        self._inject_shader.use(amount, color, self._amount, spread, strength, int(blend), gain, release,
                                 cubic=self.settings.fine_density.cubic, z_position=z_position)
         glMemoryBarrier(_BARRIER)
 

@@ -56,11 +56,13 @@ class DensityCarrier(ABC):
 
     @abstractmethod
     def add(self, amount: Texture, color: Texture, strength: float, dt: float, spread: float, blend: DensityBlend,
-            gain: float, z_position: Texture | None = None) -> None:
+            gain: float, release: float, z_position: Texture | None = None) -> None:
         """A source, the bridge's `amount` (red) times `gain` times its `color` (RGBA, premultiplied by its alpha,
         the coverage), the dye, into the gaussian slab at each pixel's `z_position` (red over green), nothing
         where it has none or without one, with sigma `spread`, by `blend` (`density_blend.glsl`): over the water's
-        by the share `strength`, the amount capped at 1, or added × `strength` (dt); `dt` the step."""
+        by the share `strength`, the amount capped at 1, added × `strength` (dt), or drawn toward it, at most
+        fully dyed, by the share `strength`; where the water holds more than the body, down by the share
+        `release`; `dt` the step."""
 
     @abstractmethod
     def update(self, step: CarrierStep) -> None:

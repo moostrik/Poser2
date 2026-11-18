@@ -16,9 +16,10 @@ class InjectAmount3D(ComputeShader):
     WORKGROUP_SIZE_Z = 1
 
     def use(self, amount: Texture, color: Texture, volume: Texture3D, spread: float, strength: float, blend: int,
-            gain: float, cubic: bool = False, z_position: Texture | None = None) -> None:
-        """`strength` over's drag share this step, or add's dt; `blend` `DensityBlend`; `gain` the amount times
-        this; `cubic` the amount enlarged by a cubic B-spline."""
+            gain: float, release: float, cubic: bool = False, z_position: Texture | None = None) -> None:
+        """`strength` over's and fill's drag share this step, or add's dt; `release` the release's share where
+        the cell falls (0 = never falls); `blend` `DensityBlend`; `gain` the amount times this; `cubic` the
+        amount enlarged by a cubic B-spline."""
         if not self.allocated or not self.shader_program or not amount.allocated or not color.allocated:
             return
         glUseProgram(self.shader_program)
@@ -31,5 +32,6 @@ class InjectAmount3D(ComputeShader):
         glUniform1i(self.get_uniform_loc("uCubic"), int(cubic))
         glUniform1i(self.get_uniform_loc("uBlend"), blend)
         glUniform1f(self.get_uniform_loc("uGain"), gain)
+        glUniform1f(self.get_uniform_loc("uRelease"), release)
         glUniform3i(self.get_uniform_loc("uSize"), volume.width, volume.height, volume.depth)
         self.dispatch(volume.width, volume.height)     # a column each
