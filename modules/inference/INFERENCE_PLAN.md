@@ -281,10 +281,8 @@ from OpenMMLab's 384x288 file, 55.6 MB, its fourteen norm nodes FP32); the FP32 
   engines are not the ones the pose then names **(deduction)**. Checked by running it for deep_flow; one benchmark
   on hd_trio's batch of 3, FP16 against FP32's points (H2 measured batch 1 only **(seen)**) and FP16 on ONNX
   Runtime, about a minute; and deep_flow as it is on HIGH, 60 s, that it starts and poses and the pose's time
-- I3. hd_trio's files tracked: the `.gitignore` line `temp*` ignores every file whose name starts with "temp",
-  `apps/hd_trio/flow/bridge_2d/temperature_bridge.py` and its shader among them, which hd_trio imports, so a fresh
-  clone of hd_trio does not start **(seen)**; it becomes `/temp/`, the scratch folder it is for, and those three files
-  are committed (decided 2026-11-18). Checked by `git status` showing nothing else newly tracked, and hd_trio's tests
+I3 (2026-11-18): `.gitignore`'s `temp*` is `/temp/`; it hid only hd_trio's `temperature_bridge.py` and its shader
+(`.py`, `.frag`), now committed; hd_trio's tests pass **(seen)**.
 
 ## C. The TensorRT models side by side
 
