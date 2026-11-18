@@ -176,7 +176,7 @@ the ONNX run stopped there; the engine since E2 takes it **(seen)**. A second fa
 (G4) against 3.68 / 5.07 (E1): one run is no measure of a 0.6 ms difference **(seen)**. The refactor leaves every
 model's output as it was, and its time within a run's spread.
 
-## H. A better pose model, after G (2026-11-18)
+## H. A better pose model, after G (2026-11-18, measured; the choice is yours)
 
 The pose model costs 2.8 ms for one player on an idle GPU **(seen)**, so there is room for a better one. The research
 ([`reports/Higher quality pose models.md`](../../reports/Higher%20quality%20pose%20models.md), online sources) ranks
@@ -231,13 +231,29 @@ At one player the larger input costs 5% more time: the GPU is not filled by one 
 models disagree by a quarter of the width they find another point, not the same one more exactly **(deduction)**; the
 AP says which is more often right: 78.3 against 76.7 **(site fact)**.
 
-- H4. RTMPose-x 384x288 (78.8 AP, about 8 ms **(deduction: a FLOP ratio)**), only if H2 and H3 leave room
-- H5. The choice in the app: ours, H2, H3 and H4 in deep_flow as it is (`20261112-125832_measure`, -sim, the probe's
-  as-is run, 60 s each, about 1.5 minutes a model), with the fluid on the GPU, where sharing the GPU sets most of
-  the pose's 20 ms **(seen)**. It measures the pose's time (mean, p99) and its dropped batches; the table names its
-  kind (a time), date, commit, recording and settings. With G5's benchmark. Each candidate, FP32 and FP16, with its
-  AP, its points' difference and its time side by side; the choice is yours, and its preset is yours to save (a
-  preset is written only by Save)
+H4 (2026-11-18): RTMPose-x 384x288 Body8 (OpenMMLab's file, 197.7 MB, in `data/models`, not committed), on the
+same crops, batch 1, idle: 4.31 / 5.55 ms FP32, 1.68 / 2.77 ms FP16 (95% of the points within one of its bins of its
+FP32's); RTMPose-l 384x288 FP32 3.35 / 4.82 ms in the same run **(seen)**.
+
+H5 (2026-11-18), the time: deep_flow as it is, `20261112-125832_measure` in -sim, the pose every other frame, the
+fluid on the GPU, 60 s a model, one run each, at 61d1ab9c (`inference_probe.py --as-is
+--pose-resolution --pose-engine`, not committed) **(seen)**:
+
+| Pose model, batch 1        | COCO AP | Pose estimation mean / p99 ms | Posed / dropped | Render interval mean / p99 ms |
+|----------------------------|---------|-------------------------------|-----------------|-------------------------------|
+| RTMPose-l 256x192 FP32     | 76.7    | 21.85 / 39.00                 | 1497 / 0        | 12.93 / 39.73                 |
+| RTMPose-l 256x192 FP16     | 76.7    | 20.56 / 36.15                 | 1496 / 0        | 12.39 / 38.85                 |
+| RTMPose-l 384x288 FP32     | 78.3    | 21.57 / 38.13                 | 1496 / 0        | 13.14 / 40.12                 |
+| RTMPose-l 384x288 FP16     | 78.3    | 20.14 / 35.95                 | 1497 / 0        | 12.39 / 39.57                 |
+| RTMPose-x 384x288 FP32     | 78.8    | 23.26 / 40.44                 | 1498 / 0        | 13.58 / 40.27                 |
+| RTMPose-x 384x288 FP16     | 78.8    | 20.76 / 38.08                 | 1497 / 0        | 12.45 / 39.44                 |
+
+Under the fluid the pose takes 20 to 23 ms whichever model: most of it is waiting for its turn on the GPU, not the
+model's own 1.3 to 4.3 ms **(deduction: the idle times above)**. Every model posed every frame it was asked, none
+dropped. FP16 saves 1.3 to 2.5 ms in the app; the larger models cost at most 1.4 ms in FP32 and under 0.7 in FP16; a
+run's spread is about a millisecond **(seen: G5's repeat)**. The choice is yours: RTMPose-l 384x288 FP16 is as fast as
+ours in the app at 1.6 AP more, RTMPose-x 384x288 FP16 0.6 ms slower at 2.1 AP more **(deduction from one run each)**.
+Its preset is yours to save; an FP16 engine needs a setting to name its file, which follows the choice.
 
 Questions:
 - The licence of the Body8 training data (AI Challenger and others) is unresolved, for ours as for every candidate
