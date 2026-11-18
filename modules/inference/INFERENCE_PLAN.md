@@ -119,6 +119,12 @@ Questions:
 - E4. The leftovers: `Resolution` and `RESOLUTION_DIMS` out of the package's exports (no user outside **(seen)**); the
   empty `tools/` folder
 
+Question: the crops cut in the upload's kernel, with the tracker's latest box? The crop uses the latched box anyway,
+not the frame's own **(seen: `TrackerFrameSource.process`)**; it would save the hop to the frame source ("Wait pose
+step", 0.24 ms mean, up to 1 ms p99 in deep_flow) and the crops' launches (about 0.1 ms a player) **(deduction from
+those)**, but the upload would decide who is cropped (the tracks, a box's age, the OAK4 keypoint window,
+`pose_interval`), which the frame source decides now. For when the pose's latency is the bottleneck.
+
 ## The package held up to the rules (the apps' plan F, agreed 2026-11-17)
 
 No code in the package is one app's: the face model is smile's alone, the segmentation hd_trio's, the optical flow,
