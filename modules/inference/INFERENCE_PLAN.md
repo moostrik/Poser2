@@ -197,9 +197,9 @@ render takes, and the models' shared parts **(seen)**. A folder of one or two fi
   glossary takes none: it holds only names more than one package uses (the rules thread, agreed 2026-11-18)
 - G4. The type errors Pylance shows in `modules/inference` cleared, once G1 to G3 are built, fixed in `CLAUDE.md`'s
   order (the annotation, a narrowing where the code guarantees the type, a `cast`, a suppression only for a wrong
-  stub). The type checker is to run from the command line, the same rules as Pylance (`[tool.pyright]`, basic): no
-  pyright is installed in the venvs **(seen)**, so it is a download, asked for first. Checked by a clean run of it
-  on the package
+  stub). The type checker runs as before, `uvx --from "pyright[nodejs]" pyright`, the same rules as Pylance
+  (`[tool.pyright]`, basic), out of uv's cache, not the venvs **(seen: the session of 2026-10-30)**. Checked by a
+  clean run of it on the package
 - G5. The benchmark, once the refactor is finished: `scripts/model_benchmark.py` with the face models and YOLO too,
   on ONNX and TensorRT, the outputs against the run before. The before run is the same script on a copy of 916ff89a
   (E1) outside the repository, as A1 ran e754ddee; the script reads both the old names and the new ones, as the probe
