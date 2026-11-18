@@ -50,10 +50,10 @@ them, from 7 November, the preset then, its grid
 | fluid, advect velocity    | `GPU fluid advect velocity`    | 0.29 / 0.44           | 0.29 / 0.47           | 1.90 / 5.79           | 0.86 / 1.21            |
 | fluid, viscosity          | `GPU fluid viscosity`          | 0                     | 0                     | 0                     | 0                      |
 | fluid, vorticity          | `GPU fluid vorticity`          | 0.82 / 1.16           | 0.86 / 1.30           | 2.00 / 2.64           | 1.28 / 1.59            |
-| fluid, advect temperature | `GPU fluid advect temperature` | 0                     | 0                     | 0.45 / 0.86           | 0.23 / 0.23            |
 | fluid, buoyancy           | `GPU fluid buoyancy`           | 0                     | 0                     | 0                     | 0                      |
 | fluid, pressure           | `GPU fluid pressure`           | 1.48 / 2.19           | 1.49 / 2.17           | 6.74 / 8.09           | 4.40 / 5.91            |
 | fluid, faces to centers   | `GPU fluid faces to centers`   | 0.16 / 0.34           | 0.13 / 0.14           |                       |                        |
+| fluid, advect temperature | `GPU fluid advect temperature` | 0                     | 0                     | 0.45 / 0.86           | 0.23 / 0.23            |
 | fluid, density            | `GPU fluid density`            | 5.70 / 7.58           | 5.67 / 7.59           | 2.04 / 5.29           | 1.10 / 1.76            |
 | fluid, light              | `GPU fluid light`              | 0                     | 0                     |                       |                        |
 | fluid, composite          | `GPU fluid composite`          | 1.21 / 1.69           | 1.19 / 1.60           | 1.16 / 1.45           | 2.44 / 3.53            |

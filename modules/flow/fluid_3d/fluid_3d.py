@@ -46,8 +46,8 @@ _WALL_GL: dict = {
     WallMode.CLOSED: (GL_CLAMP_TO_EDGE,   (0.0, 0.0, 0.0, 0.0)),
 }
 
-FLUID_PASSES: tuple[str, ...] = ('advect velocity', 'viscosity', 'vorticity', 'advect temperature', 'buoyancy', 'pressure',
-                                 'faces to centers', 'density', 'light', 'composite')     # a step's passes, each a GPU timer
+FLUID_PASSES: tuple[str, ...] = ('advect velocity', 'viscosity', 'vorticity', 'buoyancy', 'pressure', 'faces to centers',
+                                 'advect temperature', 'density', 'light', 'composite')     # a step's passes, each a GPU timer
 FULL_WIDTH_HALF_MAXIMUM: float = 2.0 * math.sqrt(2.0 * math.log(2.0))   # a gaussian's width at half its height, in sigmas
 CAUSTIC_NET_SIZE: int = 256   # the caustic net's texels across its tile
 DRAG_FLOOR: float = 0.02    # widths/s: the body's speed below which it drags nothing, so a dead trail pulls nothing toward 0
@@ -462,10 +462,10 @@ class Fluid3D:
         self._timed('advect velocity', self._advect_velocity)
         self._timed('viscosity', self._apply_viscosity)
         self._timed('vorticity', self._confine_vorticity)
-        self._timed('advect temperature', self._advect_temperature)
         self._timed('buoyancy', self._apply_buoyancy)
         self._timed('pressure', self._enforce_incompressibility)
         self._timed('faces to centers', self._faces_to_centers)
+        self._timed('advect temperature', self._advect_temperature)
         self._timed('density', self._advect_density)
         self._timed('light', self._update_light)
         self._timed('composite', self._composite_output)
@@ -588,7 +588,8 @@ class Fluid3D:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _advect_temperature(self) -> None:
-        """Advect & dissipate the temperature scalar field."""
+        """The temperature carried one step by the projected faces, beside the density, faded and evaporated; the
+        buoyancy reads it the next step."""
         if self.settings.temperature.buoyancy == 0.0:
             if not self._temperature_clear:     # cleared once; nothing adds to it while buoyancy is 0
                 self._temperature.clear_all()
