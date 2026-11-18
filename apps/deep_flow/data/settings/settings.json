@@ -42,7 +42,7 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 3862,
+        "balance": 3836,
         "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
@@ -277,7 +277,7 @@
         "fluid"
       ],
       "debug": [
-        "bridge"
+        "fluid"
       ]
     },
     "inference_frame": {
@@ -501,7 +501,7 @@
         "density_gain": 5.0,
         "density_blend": "OVER",
         "temperature_drag": 200.0,
-        "temperature_gain": 10.0,
+        "temperature_gain": 5.0,
         "expansion_rate": 0.0
       },
       "velocity": {
@@ -511,11 +511,11 @@
         "fade_time": 0.0,
         "evaporation_time": 0.0,
         "evaporation_knee": 0.1,
-        "viscosity": 0.0,
+        "viscosity": 0.001,
         "viscosity_iter": 20
       },
       "vorticity": {
-        "strength_1": 10.0,
+        "strength_1": 32.83,
         "strength_2": 0.0,
         "strength_3": 0.0,
         "radius_1": 0.1,
@@ -527,14 +527,14 @@
         "advection": "MACCORMACK",
         "limiter": "CLAMP",
         "advection_scale": 2.0,
-        "fade_time": 9.0,
-        "evaporation_time": 0.0,
+        "fade_time": 0.0,
+        "evaporation_time": 10.0,
         "evaporation_knee": 0.1,
-        "buoyancy": 10.0,
+        "buoyancy": 0.0,
         "sink": 1.0,
         "gravity_x": 0.0,
-        "gravity_y": -1.0,
-        "gravity_z": 0.0
+        "gravity_y": 0.0,
+        "gravity_z": 0.02
       },
       "pressure": {
         "solver": "MULTIGRID",
@@ -551,7 +551,7 @@
         "limiter": "CLAMP",
         "advection_scale": 2.0,
         "fade_time": 0.0,
-        "evaporation_time": 30.0,
+        "evaporation_time": 0.0,
         "evaporation_knee": 0.1
       },
       "fine_density": {
@@ -582,9 +582,9 @@
         "opacity": 1.2,
         "fog": 0.269,
         "tint": {
-          "r": 1.0,
-          "g": 1.0,
-          "b": 1.0,
+          "r": 0.8588235294117647,
+          "g": 0.8470588235294118,
+          "b": 0.9098039215686274,
           "a": 1.0
         },
         "clear_below": 0.0,
@@ -640,13 +640,13 @@
           "orbit": {
             "yaw": 0.0,
             "pitch": 0.0,
-            "zoom": 0.4441741953873573
+            "zoom": 0.6450280089106346
           }
         }
       },
       "monitor_debug": {
         "texture": "density",
-        "view": "COLORMAP",
+        "view": "IMAGE",
         "advanced": {
           "channel": "ALL",
           "scale": 2.0,
@@ -662,7 +662,7 @@
           "orbit": {
             "yaw": 52.59975975870282,
             "pitch": 4.846153846153827,
-            "zoom": 0.4
+            "zoom": 0.5808784171697464
           }
         }
       }

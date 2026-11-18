@@ -30,8 +30,8 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 2499,
-        "auto_exposure": false,
+        "iso": 5832,
+        "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
         "auto_iso_limit": 16585,
@@ -42,8 +42,8 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 3933,
-        "auto_balance": false,
+        "balance": 3832,
+        "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
         "contrast": 0,
@@ -91,6 +91,9 @@
       "overlap": 0.5,
       "verbose": false
     },
+    "recorded_poses": {
+      "enabled": false
+    },
     "control": {
       "output_path": "recordings",
       "name": ""
@@ -99,11 +102,13 @@
       "temp_path": "temp",
       "video_encoder": "iGPU",
       "video_format": "H264",
+      "container": "MKV",
       "video_quality": 24,
       "video_frame_types": [
         "VIDEO",
         "DEPTH"
       ],
+      "mirrored": false,
       "enabled": true,
       "output_path": "recordings",
       "name": ""
@@ -135,7 +140,8 @@
     "frame_source": {
       "detection_timeout": 2.0,
       "crop_aspect": 0.75,
-      "crop_padding": 0.0
+      "crop_padding": 0.0,
+      "pose_interval": 2
     },
     "pose_crop": {
       "padding": 0.1,
@@ -264,55 +270,21 @@
     }
   },
   "render": {
-    "debug": false,
+    "debug": true,
+    "pause": false,
     "layer": {
       "main": [
-        "show"
+        "fluid"
       ],
       "debug": [
         "fluid"
       ]
-    },
-    "pose": {
-      "stage": "LERP",
-      "frame": "CAMERA",
-      "features": "NONE",
-      "crop": {
-        "line_width": 2.0,
-        "line_smooth": 0.0,
-        "use_gpu_crop": true
-      },
-      "camera": {
-        "pose_line_width": 2.0,
-        "bbox_line_width": 2,
-        "image": false
-      },
-      "view": {
-        "line_width": 3.0,
-        "line_smooth": 0.0,
-        "use_scores": false,
-        "draw_anchors": false
-      },
-      "data": {
-        "mode": "WINDOW",
-        "feature_field": "AngleMotion",
-        "line_width": 3.0,
-        "line_smooth": 1.0,
-        "use_scores": false,
-        "render_labels": true,
-        "use_history_color": false,
-        "angle_offset": "NONE"
-      }
     },
     "inference_frame": {
       "show": "BOTH",
       "colormap": "JET"
     },
     "view": {
-      "monitor_main": {
-        "texture": "output.depth",
-        "view": "COLORMAP"
-      },
       "width": 448,
       "height": 800,
       "crop": {
@@ -323,34 +295,49 @@
         "far": 1.7
       },
       "mask": {
-        "guided_radius": 2.0,
+        "guided_radius": 3.0,
         "edge_contrast": 0.03
       },
       "color": {
         "enabled": true,
-        "exposure": 0.99,
+        "white_balance": 6500.0,
+        "exposure": 1.0,
         "offset": 0.0,
         "gamma": 0.8,
-        "contrast": 1.24,
-        "saturation": 1.19,
-        "sharpen": 0.82,
+        "contrast": 1.25,
+        "saturation": 1.2,
+        "sharpen": 1.0,
+        "luma_matte": 0.0,
         "use_mask": true,
         "erode": 0,
-        "feather": 0.0
-      }
-    },
-    "motion": {
+        "feather": 4.0
+      },
       "monitor_main": {
-        "texture": "output.velocity",
-        "view": "GLYPHS",
+        "texture": "depth.filled",
+        "view": "COLORMAP",
         "advanced": {
           "channel": "ALL",
           "scale": 1.0,
-          "glyph_spacing": "SPACING_16",
-          "legend": true,
-          "blend_mode": "ADD"
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
         }
       },
+      "monitor_debug": {
+        "texture": "depth.filled",
+        "view": "IMAGE",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
+      }
+    },
+    "motion": {
       "guard": true,
       "width": 448,
       "height": 800,
@@ -359,7 +346,7 @@
       "y_gain": 1.0,
       "z_gain": 0.4,
       "xy": {
-        "levels": 4,
+        "levels": 5,
         "window": "SEVEN",
         "damping": 0.03,
         "smooth_like_z": false,
@@ -368,10 +355,36 @@
       "z": {
         "edge": 0.1,
         "window": "SEVEN",
-        "smooth": 100.0,
-        "dead_zone": 0.02,
         "max_speed": 6.0,
-        "threshold": 5.0
+        "smooth": 100.0,
+        "rest_speed": 0.5,
+        "halving_speed": 0.5,
+        "dead_zone": 0.05,
+        "threshold": 0.5
+      },
+      "monitor_main": {
+        "texture": "output.velocity",
+        "view": "IMAGE",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 58.9,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_16",
+          "colormap": "JET",
+          "legend": true
+        }
+      },
+      "monitor_debug": {
+        "texture": "output.velocity",
+        "view": "IMAGE",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 100.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
       }
     },
     "bridge": {
@@ -398,8 +411,11 @@
         "change": 0.0,
         "start": 0.0,
         "bow": 0.0,
-        "stop": 1.0,
-        "wake": 0.0
+        "stop": 0.0,
+        "wake": 0.0,
+        "peak": {
+          "enabled": true
+        }
       },
       "acceleration": {
         "trail": 0.0,
@@ -407,15 +423,16 @@
         "start": 0.0,
         "bow": 0.0,
         "stop": 0.0,
-        "wake": 0.0
+        "wake": 1.0
       },
       "density": {
         "trail": 1.0,
         "change": 0.0,
         "start": 0.0,
-        "bow": 0.0,
-        "stop": 1.0,
-        "wake": 0.0
+        "bow": 0.05,
+        "stop": 0.0,
+        "wake": 0.0,
+        "mask": 0.0
       },
       "temperature": {
         "trail": 1.0,
@@ -423,31 +440,44 @@
         "start": 0.0,
         "bow": 0.0,
         "stop": 0.0,
-        "wake": 0.0
-      }
-    },
-    "fluid": {
-      "monitor_debug": {
-        "texture": "density",
+        "wake": 0.0,
+        "mask": 0.0
+      },
+      "expansion": {
+        "trail": 0.0,
+        "change": 0.0,
+        "start": 0.0,
+        "bow": 0.0,
+        "stop": 1.0,
+        "wake": 0.0,
+        "mask": 0.05
+      },
+      "monitor_main": {
+        "texture": "output.density",
         "view": "COLORMAP",
         "advanced": {
           "channel": "ALL",
-          "scale": 2.0,
-          "opacity": 3.0,
-          "depth_fade": 0.0,
-          "slice": true,
-          "slice_position": 0.48,
-          "slice_focus": 0.36,
-          "glyph_spacing": "SPACING_32",
-          "legend": true,
+          "scale": 1.0,
           "blend_mode": "ADD",
-          "orbit": {
-            "yaw": 98.2195514253695,
-            "pitch": 0.5412382166660393,
-            "zoom": 0.7184107424569811
-          }
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
         }
       },
+      "monitor_debug": {
+        "texture": "density.amount",
+        "view": "IMAGE",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
+      }
+    },
+    "fluid": {
       "guard": true,
       "wall": "OPEN",
       "slip_time": 60.0,
@@ -463,13 +493,16 @@
       },
       "input": {
         "spread": 0.237,
-        "velocity_drag": 75.0,
-        "velocity_gain": 3.0,
-        "acceleration_gain": 1.0,
-        "density_drag": 300.0,
-        "density_gain": 10.0,
+        "velocity_drag": 76.0,
+        "velocity_gain": 1.0,
+        "acceleration_gain": 10.0,
+        "density_drag": 200.0,
+        "density_release": 0.0,
+        "density_gain": 5.0,
+        "density_blend": "OVER",
         "temperature_drag": 200.0,
-        "temperature_gain": 1.0
+        "temperature_gain": 5.0,
+        "expansion_rate": 0.0
       },
       "velocity": {
         "advection": "SEMI_LAGRANGIAN",
@@ -477,11 +510,12 @@
         "advection_scale": 1.0,
         "fade_time": 0.0,
         "evaporation_time": 0.0,
-        "viscosity": 0.0,
+        "evaporation_knee": 0.1,
+        "viscosity": 0.001,
         "viscosity_iter": 20
       },
       "vorticity": {
-        "strength_1": 1.0,
+        "strength_1": 32.83,
         "strength_2": 0.0,
         "strength_3": 0.0,
         "radius_1": 0.1,
@@ -489,17 +523,18 @@
         "radius_3": 0.025
       },
       "temperature": {
-        "enabled": false,
-        "advection": "SEMI_LAGRANGIAN",
+        "enabled": true,
+        "advection": "MACCORMACK",
         "limiter": "CLAMP",
-        "advection_scale": 1.0,
-        "fade_time": 12.0,
-        "evaporation_time": 0.0,
+        "advection_scale": 2.0,
+        "fade_time": 0.0,
+        "evaporation_time": 10.0,
+        "evaporation_knee": 0.1,
         "buoyancy": 0.0,
-        "sink": 0.0,
+        "sink": 1.0,
         "gravity_x": 0.0,
-        "gravity_y": -1.0,
-        "gravity_z": 0.0
+        "gravity_y": 0.0,
+        "gravity_z": 0.02
       },
       "pressure": {
         "solver": "MULTIGRID",
@@ -511,11 +546,13 @@
         "width": 448,
         "height": 800,
         "depth": 64,
+        "color_space": "OKLAB",
         "advection": "MACCORMACK",
         "limiter": "CLAMP",
-        "advection_scale": 0.88,
+        "advection_scale": 2.0,
         "fade_time": 0.0,
-        "evaporation_time": 60.0
+        "evaporation_time": 0.0,
+        "evaporation_knee": 0.1
       },
       "fine_density": {
         "enabled": true,
@@ -541,41 +578,128 @@
         "smooth": 3
       },
       "composite": {
-        "lut": {
-          "folder": "data/luts",
-          "file": "Blockbuster.cube",
-          "strength": 0.0
-        },
-        "emission": 16.77,
-        "opacity": 1.0,
-        "fog": 0.347,
+        "emission": 10.0,
+        "opacity": 1.2,
+        "fog": 0.269,
         "tint": {
-          "r": 1.0,
-          "g": 1.0,
-          "b": 1.0,
+          "r": 0.8588235294117647,
+          "g": 0.8470588235294118,
+          "b": 0.9098039215686274,
           "a": 1.0
         },
+        "clear_below": 0.0,
         "blend_mode": "ADD",
         "light": {
           "enabled": false,
           "source": "DIRECTIONAL",
           "x": 0.07,
           "y": 0.2,
-          "z": -0.29,
+          "z": -0.14,
           "grid": "FULL",
-          "intensity": 10.7,
+          "intensity": 10.4,
           "fog_scattering": 0.11,
           "caustics": 0.0,
           "caustic_size": 0.25,
           "caustic_depth": 0.8,
           "caustic_speed": 0.15,
           "scattering_model": "BLUR",
-          "scattering": 0.67,
-          "powder": 0.04,
+          "scattering": 0.72,
+          "powder": 0.0,
           "sky_fill": 1.0,
-          "anisotropy": 0.41,
-          "back_scattering": 0.0
+          "anisotropy": 0.13,
+          "back_scattering": 0.46
+        },
+        "lut": {
+          "folder": "data/luts",
+          "files": [
+            "",
+            "Blockbuster.cube",
+            "Cityscape.cube",
+            "Frosted.cube",
+            "Vibrance.cube"
+          ],
+          "file": "",
+          "strength": 1.0
         }
+      },
+      "monitor_main": {
+        "texture": "output.density",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true,
+          "opacity": 6.0,
+          "depth_fade": 0.0,
+          "slice": false,
+          "slice_position": 0.5859375,
+          "slice_focus": 0.5,
+          "orbit": {
+            "yaw": 0.0,
+            "pitch": 0.0,
+            "zoom": 0.6450280089106346
+          }
+        }
+      },
+      "monitor_debug": {
+        "texture": "density",
+        "view": "IMAGE",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 2.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true,
+          "opacity": 3.0,
+          "depth_fade": 0.0,
+          "slice": true,
+          "slice_position": 0.5546875,
+          "slice_focus": 0.36,
+          "orbit": {
+            "yaw": 52.59975975870282,
+            "pitch": 4.846153846153827,
+            "zoom": 0.5808784171697464
+          }
+        }
+      }
+    },
+    "pose": {
+      "stage": "LERP",
+      "frame": "CAMERA",
+      "features": "NONE",
+      "crop": {
+        "back_stage": "CLEAN",
+        "middle_stage": "SMOOTH",
+        "front_stage": "LERP",
+        "line_width": 2.0,
+        "line_smooth": 0.0,
+        "use_gpu_crop": true
+      },
+      "camera": {
+        "box_stage": "RAW",
+        "pose_line_width": 2.0,
+        "bbox_line_width": 2,
+        "image": false
+      },
+      "view": {
+        "line_width": 3.0,
+        "line_smooth": 0.0,
+        "use_scores": false,
+        "draw_anchors": false
+      },
+      "data": {
+        "mode": "WINDOW",
+        "feature_field": "AngleMotion",
+        "line_width": 3.0,
+        "line_smooth": 1.0,
+        "use_scores": false,
+        "render_labels": true,
+        "use_history_color": false,
+        "angle_offset": "NONE"
       }
     },
     "time_series": {
@@ -658,6 +782,20 @@
         "b": 0.5,
         "a": 1.0
       }
+    },
+    "screen_recorder": {
+      "look_back": false,
+      "name": "",
+      "main_window": false,
+      "fill": false,
+      "size": "UHD",
+      "portrait": true,
+      "width": 2160,
+      "height": 3840,
+      "frame_step": 1,
+      "duration": 0.0,
+      "reserve": 1.0,
+      "quality": 18
     },
     "window": {
       "title": "Poser",
