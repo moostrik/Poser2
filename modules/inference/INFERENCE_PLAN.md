@@ -187,7 +187,8 @@ render takes, and the models' shared parts **(seen)**. A folder of one or two fi
     for the types that depend on the poses
   - with it, one term everywhere: `InferenceFrameCallback`, the board's `HasInferenceFrames` /
     `InferenceFrameStoreMixin` / `take_inference_frames`, the cadence panel's drops, the render's image, depth and
-    monitor layers and the monitor's settings, the bridge's `CaptureMax` (its name is a question below), deep_flow's
+    monitor layers and the monitor's settings, the bridge's `CaptureMax` as `FrameMax` (it keeps per pixel the larger
+    of a tick's frames' outputs **(seen)**; decided 2026-11-18), deep_flow's
     `_run_capture`, and the flow documents **(seen: 28 files outside the package)**; the presets follow where a
     settings group is renamed
   - deep_flow alone uses it, with `Depth` and `Poses`; the other apps keep their own ways (decided 2026-11-18).
@@ -204,10 +205,6 @@ render takes, and the models' shared parts **(seen)**. A folder of one or two fi
   (E1) outside the repository, as A1 ran e754ddee; the script reads both the old names and the new ones, as the probe
   does
 
-Questions:
-- The bridge's `CaptureMax` (`modules/flow/bridge_3d`) keeps per pixel the larger of the frames' outputs **(seen)**;
-  the flow rules name a module by what it does, so its new name is the flow's to agree with you, not a word swap
-
 ## H. A better pose model, after G (2026-11-18)
 
 The pose model costs 2.8 ms for one player on an idle GPU **(seen)**, so there is room for a better one. The research
@@ -217,7 +214,8 @@ to 76.7 for ours **(site fact)**, at about 1.75x the time on an idle GPU, about 
 another GPU)**. ViTPose costs several times as much for a like gain, the one-stage models (RTMO, YOLO-pose) score
 below ours, Sapiens is too heavy and non-commercial, and the video models need future frames (33 to 67 ms more)
 **(site fact)**. Only `rtmpose-l_256x192.onnx` is in `data/models` **(seen)**: every other model file is a download,
-asked for with its name, source and size before it is fetched.
+asked for with its name, source and size before it is fetched (the five RTMPose ONNX files from OpenMMLab's
+download server agreed 2026-11-18, each logged with its name and size).
 
 - H1. Which checkpoint ours is: `rtmpose-l_256x192.onnx` (110.7 MB, May 2026) has no source in the repository
   **(seen)**; its outputs against the official COCO-only, AIC+COCO and Body8 ONNX files on the same crops tell. It
@@ -226,8 +224,10 @@ asked for with its name, source and size before it is fetched.
   the precision, and the time it saves is the room H3 needs). A public report has the norm's sum of squares overflow
   in FP16 **(site fact)**, likely the precision RTMPose lost here in FP16 **(deduction)**. Under TensorRT's strongly
   typed build the ONNX file sets the precision **(seen: `export_rtm_onnx_to_trt.py`)**, so FP16 is a conversion of
-  the file, `tools/models/convert_onnx_to_fp16.py` **(seen)** with the norm's nodes kept FP32. Checked against the
-  FP32 engine's points on the same crops; the models after it reuse the conversion
+  the file, `tools/models/convert_onnx_to_fp16.py` **(seen)** with the norm's nodes kept FP32. Measured against the
+  FP32 engine's points on the same crops (the difference in SimCC bins and in score) and in time; no fixed threshold:
+  FP16 is a balance of speed and quality, weighed in H5 (decided 2026-11-18). The models after it reuse the
+  conversion
 - H3. RTMPose-l 384x288, Body8: the official ONNX file, its engines in `scripts/makemodels.bat` per app (deep_flow's
   at a static batch of 1 **(seen)**), the pose's `HIGH` resolution in the presets; the crop follows the model's size
   (each app sets it from the pose settings **(seen: `apps/deep_flow/main.py`)**), the SimCC bins follow the output,
@@ -238,7 +238,9 @@ asked for with its name, source and size before it is fetched.
 - H5. The choice in the app: ours, H2, H3 and H4 in deep_flow as it is (`20261112-125832_measure`, -sim, the probe's
   as-is run, 60 s each, about 1.5 minutes a model), with the fluid on the GPU, where sharing the GPU sets most of
   the pose's 20 ms **(seen)**. It measures the pose's time (mean, p99) and its dropped batches; the table names its
-  kind (a time), date, commit, recording and settings. With G5's benchmark
+  kind (a time), date, commit, recording and settings. With G5's benchmark. Each candidate, FP32 and FP16, with its
+  AP, its points' difference and its time side by side; the choice is yours, and its preset is yours to save (a
+  preset is written only by Save)
 
 Questions:
 - The licence of the Body8 training data (AI Challenger and others) is unresolved, for ours as for every candidate
