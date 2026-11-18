@@ -53,22 +53,33 @@ before their crop was written **(deduction)**. The refactor (398ca410 to 4f72f12
 these rows and your look at its diff. The optical flow pairs each frame with the camera's frame just before it: 673
 of 674 flows, the other across the recording's loop **(seen)**.
 
+D1, the color in one kernel, against C1 (the image differs from torch ops' by at most one float16 step):
+
+| Step            | Model        | Mean / p99 as it is (ms) | Frames matched | Frames that differ | Max difference   |
+|-----------------|--------------|--------------------------|----------------|--------------------|------------------|
+| D1 one kernel   | pose         | 25.19 / 38.46            | 472            | 70                 | 0.003, one 0.648 |
+| D1 one kernel   | segmentation |                          | 445            | (2 masks NaN)      | foreground 0.038 |
+| D1 one kernel   | optical flow |                          | 414            |                    | 0.028 px         |
+
+`scripts/gpu_input_timing.py` on a 992x800 recording, straightened and mirrored, against torch ops: NV12 23 GPU ops
+to 2, 0.922 to 0.571 ms; BGR 8 to 2, 0.353 to 0.240 ms; the image's largest difference 0.000488 for both, an eighth
+of 1/255 **(seen)**. In deep_flow as it is the upload's time (`GPU Image Upload`) went from 5.00 / 23.71 to 2.95 /
+17.84 ms, its wait (`Wait upload`) from 3.33 / 23.15 to 2.02 / 17.72 **(seen)**. A pose point that differs moves one
+SimCC bin (0.003); one frame's point moved 0.648, a keypoint whose two peaks were nearly equal **(deduction)**.
+
+## B. The segmentation's output
+
+- B2. The segmentation hands on its masks and foregrounds while its stream still writes them: the TensorRT runner
+  resizes the mask and multiplies the crops after its last `synchronize()`, and nothing waits for that **(seen)**. D1's
+  run read 2 masks of NaN, the foregrounds of the same frames whole **(seen)**, so a reader saw them unwritten
+  **(deduction)**. The runner synchronizes after its last step, as the others do. Checked by the check's run: no NaN
+
 ## C. The TensorRT models side by side
 
 Questions:
 - CUDA graphs: capture each model's `execute_async_v3` per batch size and replay it, to cut the launch time on the
   CPU. Worth it, now the models run side by side?
 - The pose's stream at a higher priority than the others', as the model on the critical path?
-
-## D. The color in one kernel
-
-- D1. The uploader's color conversion, straightening and mirroring as one CUDA kernel, as the depth's alignment is
-  (`depth_align.py`), for both of `ImageUpload`'s inputs: the OAK4's NV12 and the depthai 2 cameras' BGR
-  (white_space, hd_trio). From NV12 23 GPU ops become 2, about 0.4 ms less GPU a frame **(deduction)**. The kernel
-  rounds otherwise, so its image is held to at most 1/255 per pixel from the old one, one step of the camera's 8 bits,
-  not to the models' exactness. Checked by the check's two runs for NV12 (deep_flow's `-sim` decodes to NV12 **(seen)**), and one run of
-  `scripts/gpu_input_timing.py` before and after for BGR's time per step and image difference; the camera's time at
-  the next live session.
 
 ## The package held up to the rules (the apps' plan F, agreed 2026-11-17)
 
@@ -78,5 +89,5 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 
 ## The rules it touches
 
-- `CLAUDE.md` Running code, run a GPU harness only on the user's go, and only what the plan names: D1
-- `CLAUDE.md` Performance, prefer the design with the lower latency, measured in the context of the app: D1
+- `CLAUDE.md` Composition, fix a problem where it is made: B2, the runner that queues the last step
+- `CLAUDE.md` Concurrency, an item handed to a callback is not changed afterwards: B2

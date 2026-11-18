@@ -17,8 +17,9 @@ import numpy as np  # noqa: E402
 import torch  # noqa: E402
 import torch.nn.functional as F  # noqa: E402
 
-from modules.camera import FrameType, TiltCorrection, TiltCorrectionSettings  # noqa: E402
+from modules.camera import CameraFrame, FrameType, TiltCorrection, TiltCorrectionSettings  # noqa: E402
 from modules.recording import read_metadata  # noqa: E402
+from modules.inference import ImageUpload  # noqa: E402
 from modules.inference.image_upload import nv12_to_rgb, warp_grid  # noqa: E402
 from modules.video import StreamReader  # noqa: E402
 
@@ -113,6 +114,22 @@ def main() -> int:
     live = timed('copy from pinned memory (NV12)', lambda: pinned_nv12.cuda(non_blocking=True), args.runs)
     live += timed('NV12 to RGB half', convert_nv12, args.runs)
     print(f'  {"live (NV12), with straighten and mirror":44} {live + total - timed("(BGR copy and convert, again)", lambda: (pinned_bgr.cuda(non_blocking=True), convert_bgr()), args.runs):6.3f} ms')
+
+    # The upload as one kernel against its torch ops: the same frames, straightened and mirrored, the image's
+    # largest difference (1/255 is one step of the camera's 8 bits) and each one's GPU time from the staging copy on
+    upload = ImageUpload()
+    stream = torch.cuda.current_stream()
+    print('the upload, one kernel against torch ops (straightened, mirrored)')
+    for name, image, nv12_layout in (('BGR', bgr, False), ('NV12', nv12, True)):
+        frame = CameraFrame(cam_id=0, kind=FrameType.VIDEO, image=image, timestamp=0.0, nv12=nv12_layout, flip_h=True,
+                            homography=homography)
+        kernel_image = upload.upload([frame], stream, kernel=True)[0][0].float()
+        torch_image = upload.upload([frame], stream, kernel=False)[0][0].float()
+        difference = float((kernel_image - torch_image).abs().max())
+        kernel_ms = timed(f'{name}: one kernel', lambda: upload.upload([frame], stream, kernel=True), args.runs)
+        torch_ms = timed(f'{name}: torch ops', lambda: upload.upload([frame], stream, kernel=False), args.runs)
+        print(f'  {name}: largest difference {difference:.6f} ({difference * 255.0:.3f} of 1/255), '
+              f'{"within" if difference <= 1.0 / 255.0 else "BEYOND"} 1/255; {torch_ms - kernel_ms:.3f} ms less GPU')
 
     # A player about a third of the frame wide and most of its height, padded as the preset pads
     roi = (width * 0.30, height * 0.05, width * 0.40, height * 0.90)

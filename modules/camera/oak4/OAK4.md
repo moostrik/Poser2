@@ -350,7 +350,7 @@ Depth pixels move by `H`, and their values change too. Depth is measured along t
 | Part  | Where it happens                          |
 |-------|-------------------------------------------|
 | `H`   | `TiltCorrection`, at the IMU's 5 Hz       |
-| Color | `ImageUpload`, `grid_sample`              |
+| Color | `ImageUpload`, one CUDA kernel            |
 | Depth | `DepthAlign` compute shader               |
 | Boxes | `corrected_roi` and `corrected_keypoints` |
 
