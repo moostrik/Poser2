@@ -269,14 +269,10 @@ every app, hd_trio and white_space included: the speed is worth the 3% of points
 from its ONNX file (strongly typed), so an FP16 engine is built from an FP16 ONNX file **(seen:
 `export_rtm_onnx_to_trt.py`)**.
 
-- I1. The pose's files: the originals keep their names (`rtmpose-l_256x192.onnx`, `rtmpose-l_384x288.onnx`, FP32,
-  the converter's input), and what the pose runs is named for it: `rtmpose-l_256x192_fp16.onnx` (in fc910bb7) and
-  `rtmpose-l_384x288_fp16.onnx` (made by the converter, about 56 MB), their engines `_fp16.trt`. The pose's settings
-  name the FP16 files (`PoseEstimatorSettings.model`), on ONNX Runtime as on TensorRT; no setting picks a precision.
-  `data/models/rtmpose-x_384x288.onnx`, untracked, deleted. With them: the pose test `ModelFileTest` (it names
-  `rtmpose-l_384x288.trt` **(seen)**), `INFERENCE.md`'s "the pose model stays FP32" and its model table (FP32 for the
-  pose **(seen)**) become FP16 with the head's norms FP32. Checked by `git lfs ls-files`, the settings' test (each
-  resolution its file) and the guard tests
+I1 (2026-11-18): the pose names its FP16 files (`rtmpose-l_256x192_fp16`, `rtmpose-l_384x288_fp16`, the latter made
+from OpenMMLab's 384x288 file, 55.6 MB, its fourteen norm nodes FP32); the FP32 originals stay; RTMPose-x is deleted;
+`INFERENCE.md` says FP16 **(seen)**.
+
 - I2. The converter out of the project's dependencies: `onnxconverter-common` leaves `pyproject.toml` and `uv.lock`,
   and `convert_onnx_to_fp16.py` runs as the YOLO export does, `uv run --with onnxconverter-common python
   tools/models/convert_onnx_to_fp16.py ... --fp32-norms --keep-io-types` (its docstring and the README say so);

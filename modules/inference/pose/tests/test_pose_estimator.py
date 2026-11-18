@@ -95,7 +95,7 @@ class DecodeTest(unittest.TestCase):
 class ModelFileTest(unittest.TestCase):
     def test_each_resolution_rtmpose_comes_in_has_its_file_and_the_others_none(self) -> None:
         settings = pose.PoseEstimatorSettings(model_type=ModelType.TRT, resolution=Resolution.HIGH)
-        self.assertEqual(settings.model, 'rtmpose-l_384x288.trt')
+        self.assertEqual(settings.model, 'rtmpose-l_384x288_fp16.trt')
         self.assertEqual((settings.width, settings.height), (288, 384))
         settings.resolution = Resolution.ULTRA
         with self.assertRaises(ValueError):

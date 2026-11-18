@@ -66,13 +66,15 @@ at and cuts the outputs back.
 
 | Model               | Worker                 | Input (width x height)  | Precision  | Batch, ONNX / TensorRT |
 |---------------------|------------------------|-------------------------|------------|------------------------|
-| RTMPose-l           | `PoseEstimator`        | 192x256 or 288x384      | FP32       | players, up to 8       |
+| RTMPose-l           | `PoseEstimator`        | 192x256 or 288x384      | FP16 (1)   | players, up to 8       |
 | RVM MobileNetV3     | `Segmenter`            | 192x256 to 768x1024     | FP16       | players, up to 4       |
 | RAFT Sintel, 12 it. | `OpticalFlowEstimator` | 192x256                 | FP32       | players, up to 8 / 4   |
 | YOLOv8n             | `PersonDetector`       | 480x384 to 640x512      | the file's | one image per camera   |
 | SCRFD 10G, 2d106det | `FaceDetector`         | 640x640, 192x192        | the file's | an image, its faces    |
 
-The pose model stays FP32: it loses precision in FP16. The times, before and after each step and on both backends,
+(1) The pose runs FP16 with its head's two ScaleNorms in FP32, made from the FP32 original by
+`tools/models/convert_onnx_to_fp16.py --fp32-norms --keep-io-types`; half the time of FP32, 97% of its points within
+one SimCC bin of FP32's ([INFERENCE_PLAN.md](INFERENCE_PLAN.md), H2). The times, before and after each step and on both backends,
 are in the plan's results ([INFERENCE_PLAN.md](INFERENCE_PLAN.md#the-check)).
 
 ## The upload

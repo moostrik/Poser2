@@ -1,10 +1,11 @@
 from ..engine import ModelType, Resolution, RESOLUTION_DIMS
 from modules.settings import BaseSettings, Field
 
-# The model of each resolution RTMPose comes in; a resolution without one has no pose model
+# The model of each resolution RTMPose comes in, run in FP16 with its head's norms in FP32 (made from the FP32 original,
+# `rtmpose-l_256x192.onnx`, by `tools/models/convert_onnx_to_fp16.py`); a resolution without one has no pose model
 _MODELS: dict[Resolution, str] = {
-    Resolution.STANDARD: "rtmpose-l_256x192",
-    Resolution.HIGH:     "rtmpose-l_384x288",
+    Resolution.STANDARD: "rtmpose-l_256x192_fp16",
+    Resolution.HIGH:     "rtmpose-l_384x288_fp16",
 }
 
 
