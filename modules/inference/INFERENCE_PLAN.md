@@ -188,6 +188,33 @@ render takes, and the models' shared parts **(seen)**. A folder of one or two fi
 - G5. The benchmark, once the refactor is finished: `scripts/model_benchmark.py` with the face models and YOLO too,
   before (916ff89a, E1) and after, on ONNX and TensorRT, the outputs against the run before
 
+## H. A better pose model, after G (2026-11-18)
+
+The pose model costs 2.8 ms for one player on an idle GPU **(seen)**, so there is room for a better one. The research
+([`reports/Higher quality pose models.md`](../../reports/Higher%20quality%20pose%20models.md), online sources) ranks
+staying in the RTMPose family at 384x288 first: RTMPose-l 384x288 trained on Body8 reaches 78.3 COCO AP against 75.8
+to 76.7 for ours **(site fact)**, at about 1.75x the time on an idle GPU, about 4.9 ms **(deduction: MMPose's ratio on
+another GPU)**. ViTPose costs several times as much for a like gain, the one-stage models (RTMO, YOLO-pose) score
+below ours, Sapiens is too heavy and non-commercial, and the video models need future frames (33 to 67 ms more)
+**(site fact)**. The settings already name `rtmpose-l_384x288` for `HIGH` and up, but only the 256x192 file is in
+`data/models` **(seen)**.
+
+- H1. Which checkpoint ours is: `rtmpose-l_256x192.onnx` (110.7 MB, May 2026) has no source in the repository
+  **(seen)**; its outputs against the official COCO-only, AIC+COCO and Body8 ONNX files on the same crops tell. It
+  sets the gain of every step after it
+- H2. RTMPose-l 384x288, Body8: the official ONNX file, its TensorRT engines per app, the pose's `HIGH` resolution;
+  the crop and the SimCC bins follow the settings, the decode stays **(seen: the decode reads the output's size)**
+- H3. An FP16 engine with the head's ScaleNorm kept FP32: a public report has the norm's sum of squares overflow in
+  FP16 **(site fact)**, likely the precision RTMPose lost here in FP16 **(deduction)**. Checked against the FP32
+  engine's points on recorded crops
+- H4. RTMPose-x 384x288 (78.8 AP, about 8 ms **(deduction: a FLOP ratio)**), only if H2 and H3 leave room
+- H5. The choice in the app: H2 to H4 against ours in deep_flow as it is, with the fluid on the GPU, where sharing the
+  GPU sets most of the pose's 20 ms **(seen)**; with G5's benchmark
+
+Questions:
+- The licence of the Body8 training data (AI Challenger and others) is unresolved, for ours as for every candidate
+- The SimCC distribution's width as each keypoint's uncertainty for the One Euro filter: cheap, untested
+
 ## C. The TensorRT models side by side
 
 Questions:
@@ -214,4 +241,5 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 - `CLAUDE.md` Naming, one term everywhere, rename it everywhere in the same change: G2; `glossary.md` follows: G4
 - `CLAUDE.md` Composition, fixed structure through constructors: G3, the sync's result types
 - `pose-data.md`, a read never raises, missing data reads empty: G3 takes the pose frame's contract
+- `CLAUDE.md` Performance, measured in the context of the app: H5 chooses the model under the fluid
 - `CLAUDE.md` Performance, prefer the design with the lower latency, measured in the context of the app: F1, the decode kept on the CPU
