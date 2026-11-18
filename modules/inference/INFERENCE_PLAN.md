@@ -94,8 +94,10 @@ Questions:
 - E1. `PoseInference` goes: it holds three jobs under a pose name **(seen)**: the crop extractors (the pose model's
   size, and hd_trio's segmentation size), whose crops the flow, the board and the segmentation subscribe to through
   it; the pose model; and the rule that, with the pose model off, the poses carrying the camera's keypoints pass. The
-  app holds its crop extractors (one per size), and every consumer subscribes to one: the pose model, the flow, the
-  board, the segmentation; the pose model holds the rule. The pose pipeline's async step (`AsyncNode`: `submit` with
+  app holds one crop step that cuts every size it is given (the pose model's; in hd_trio the segmentation's too) from
+  the one image and box in one pass, and every consumer subscribes to its size: the pose model, the flow, the board,
+  the segmentation; one pass now in torch ops, so one kernel later changes only this class. The pose model holds the
+  rule. The pose pipeline's async step (`AsyncNode`: `submit` with
   the images, `add_frames_callback`) is the crop and the pose model together today **(seen: `modules/pose/pipeline/spec.py`)**:
   it becomes the crop extractor's `submit` and the pose model's frames callback, given apart; `RecordedPoses`, which
   wraps `PoseInference`, takes the two the same way. What runs, and on which threads, stays. Checked by the package's
