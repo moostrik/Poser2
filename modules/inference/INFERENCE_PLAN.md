@@ -145,6 +145,38 @@ outputs costs less than the decode's kernel launches and its own copy **(deducti
 stays on the CPU. On a busy GPU the decode's kernels would also queue behind the other models' work **(deduction)**.
 deep_flow's TensorRT engine takes one player only (a static batch of 1), so its row is hd_trio's engine.
 
+## G. The package's root and the inference frame (proposed 2026-11-18)
+
+The root holds 13 files and a stub of four jobs side by side: the input's preparation, the crops, the frame the
+render takes, and the models' shared parts **(seen)**. A folder of one or two files is ceremony (decided
+2026-11-18), so only the preparation gets one.
+
+- G1. The root sorted, names and files only:
+  - `preprocessing/`, the input made ready for the models, as inference textbooks name it: `serial_uploader`,
+    `batch_uploader`, `image_upload`, `camera_sync`, `depth_align`, `cuda_kernels`, `shaders/`, `source`, `crop`,
+    `crop_extractor`. The crop belongs with the upload: it reads only the upload's images and makes the models'
+    input **(seen)**
+  - `model_worker` into `engine/`; `recorded_poses` into `pose/` (it stands in for the pose estimator);
+    `tensorrt.pyi` into `engine/`, beside its only users, with pyright's `stubPath` there (`tools/models`, which also
+    imports tensorrt, is excluded from pyright **(seen)**)
+  - `detection/` named `person/`, as `face/`: every model detects; the class stays `PersonDetector`
+  - the root keeps `capture.py` and `capture_sync.py` (renamed in G2): they come after the models, not before
+  - the call sites follow: the apps, `modules/recording`, `modules/render`, the scripts, `INFERENCE.md`,
+    `INPUT_THREADS.md`, `OAK4.md`, `RECORDING.md`. Checked by the import and guard tests and the package's tests
+- G2. `Capture` named `InferenceFrame` (decided 2026-11-18): one camera moment's image and depth with what the models
+  found in it, the poses and the masks. "Capture" also names the camera's moment of capture (`capture_time`,
+  `HasCaptureTime`), the recorder's captures (`RecordedCapture`, `CaptureStream`), `ScreenCapture` and smile's photo
+  capture **(seen)**; those keep it. With it, one term everywhere: `InferenceFrameSync` and its settings,
+  `InferenceFrameCallback`, the board's `HasInferenceFrames` / `InferenceFrameStoreMixin` / `take_inference_frames`,
+  the cadence panel's drops, the render's image, depth and monitor layers and the monitor's settings, the bridge's
+  `CaptureMax`, deep_flow's `_run_capture`, and the flow documents **(seen: 28 files outside the package)**. The
+  presets follow where a settings group is renamed. Checked by the import and guard tests, the package's and the
+  apps' tests
+- G3. The new names to the rules thread for the glossary: `InferenceFrame` (not "capture" for it), `preprocessing`,
+  `person`
+- G4. The benchmark, once the refactor is finished: `scripts/model_benchmark.py` with the face models and YOLO too,
+  before (916ff89a, E1) and after, on ONNX and TensorRT, the outputs against the run before
+
 ## C. The TensorRT models side by side
 
 Questions:
@@ -167,4 +199,6 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 - `CLAUDE.md` API evolution, remove obsolete pathways: E6
 - `CLAUDE.md` Naming, the domain's term, one everywhere (class, setting, panel label): E3, the workers, their settings
   and timers; `glossary.md` follows: E4
+- `CLAUDE.md` Packages, a package is one thing; its files each hold one subject: G1
+- `CLAUDE.md` Naming, one term everywhere, rename it everywhere in the same change: G2; `glossary.md` follows: G3
 - `CLAUDE.md` Performance, prefer the design with the lower latency, measured in the context of the app: F1, the decode kept on the CPU
