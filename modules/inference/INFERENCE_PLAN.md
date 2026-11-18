@@ -179,7 +179,7 @@ model's output as it was, and its time within a run's spread.
 ## H. A better pose model, after G (2026-11-18, measured; the choice is yours)
 
 The pose model costs 2.8 ms for one player on an idle GPU **(seen)**, so there is room for a better one. The research
-([`reports/Higher quality pose models.md`](../../reports/Higher%20quality%20pose%20models.md), online sources) ranks
+(online sources, 2026-11-18, its sources in the report sent in the thread) ranks
 staying in the RTMPose family at 384x288 first: RTMPose-l 384x288 trained on Body8 reaches 78.3 COCO AP against 75.8
 to 76.7 for ours **(site fact)**, at about 1.75x the time on an idle GPU, about 4.9 ms **(deduction: MMPose's ratio on
 another GPU)**. ViTPose costs several times as much for a like gain, the one-stage models (RTMO, YOLO-pose) score
@@ -258,6 +258,35 @@ Its preset is yours to save; an FP16 engine needs a setting to name its file, wh
 Questions:
 - The licence of the Body8 training data (AI Challenger and others) is unresolved, for ours as for every candidate
 - The SimCC distribution's width as each keypoint's uncertainty for the One Euro filter: cheap, untested
+
+## I. The models kept, a clean LFS and a setup that builds what an app needs (proposed 2026-11-18)
+
+LFS keeps every ONNX file an engine is built from, and the original each FP16 file is made from; a PC's setup only
+builds engines, and the FP16 converter is a tool run once a model is added (decided 2026-11-18). The pose runs FP16 in
+every app, hd_trio and white_space included: the speed is worth the 3% of points that move more than a bin (decided
+2026-11-18, over the rule that hd_trio looks exactly as before). It keeps RTMPose-l at 256x192 (`STANDARD`) and
+384x288 (`HIGH`); RTMPose-x is not kept **(decided 2026-11-18)**. A TensorRT 11 engine takes each layer's precision
+from its ONNX file (strongly typed), so an FP16 engine is built from an FP16 ONNX file **(seen:
+`export_rtm_onnx_to_trt.py`)**.
+
+- I1. The pose's files: the originals keep their names (`rtmpose-l_256x192.onnx`, `rtmpose-l_384x288.onnx`, FP32,
+  the converter's input), and what the pose runs is named for it: `rtmpose-l_256x192_fp16.onnx` (in fc910bb7) and
+  `rtmpose-l_384x288_fp16.onnx` (made by the converter, about 56 MB), their engines `_fp16.trt`. The pose's settings
+  name the FP16 files (`PoseEstimatorSettings.model`), on ONNX Runtime as on TensorRT; no setting picks a precision.
+  `data/models/rtmpose-x_384x288.onnx`, untracked, deleted. `INFERENCE.md`'s "the pose model stays FP32" becomes FP16
+  with the head's norms FP32. Checked by `git lfs ls-files`, the settings' test (each resolution its file) and the
+  guard tests
+- I2. The converter out of the project's dependencies: `onnxconverter-common` leaves `pyproject.toml` and `uv.lock`,
+  and `convert_onnx_to_fp16.py` runs as the YOLO export does, `uv run --with onnxconverter-common python
+  tools/models/convert_onnx_to_fp16.py ... --fp32-norms --keep-io-types` (its docstring and the README say so);
+  `scripts/makemodels.bat` builds the pose's FP16 engines per app at its batches from the files in LFS, skipping what
+  exists as it does now. Checked by running it for deep_flow, and one deep_flow run on HIGH
+- I3. A clean clone sets up as the README says: the `.gitignore` line `temp*` ignores every file whose name starts
+  with "temp", `apps/hd_trio/flow/bridge_2d/temperature_bridge.py` and its shader among them, which hd_trio imports, so
+  a fresh clone of hd_trio does not start **(seen)**; it becomes `/temp/`, the scratch folder it is for, and those three
+  files are committed (decided 2026-11-18). The README's setup (`install.bat`, `install.bat oak4`, `makemodels.bat <app>`) then brings a
+  fresh PC to a running app; `makemodels.bat` names what it built and what it skipped. Checked by a clean clone of
+  the branch outside the repository: install, models for deep_flow, the guard tests and deep_flow's start
 
 ## C. The TensorRT models side by side
 
