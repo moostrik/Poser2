@@ -36,6 +36,7 @@ goto endofscript
 echo.
 echo hd_trio
 call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192.onnx --output apps\hd_trio\data\models\rtmpose-l_256x192.trt --opt-batch 3 --max-batch 3"
+call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_384x288.onnx --output apps\hd_trio\data\models\rtmpose-l_384x288.trt --opt-batch 3 --max-batch 3"
 call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_256x192.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_256x192.trt --opt-batch 3 --max-batch 3"
 call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_384x288.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_384x288.trt --opt-batch 3 --max-batch 3"
 call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_512x384.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_512x384.trt --opt-batch 3 --max-batch 3"
@@ -48,6 +49,7 @@ exit /b 0
 echo.
 echo white_space
 call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192.onnx --output apps\white_space\data\models\rtmpose-l_256x192.trt --opt-batch 6 --max-batch 8"
+call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_384x288.onnx --output apps\white_space\data\models\rtmpose-l_384x288.trt --opt-batch 6 --max-batch 8"
 
 call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_512x448.onnx --output apps\white_space\data\models\yolov8n_coco_512x448.trt --opt-batch 4 --max-batch 4"
 exit /b 0
@@ -56,6 +58,7 @@ exit /b 0
 echo.
 echo deep_flow
 call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192.onnx --output apps\deep_flow\data\models\rtmpose-l_256x192.trt --opt-batch 1 --max-batch 1"
+call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_384x288.onnx --output apps\deep_flow\data\models\rtmpose-l_384x288.trt --opt-batch 1 --max-batch 1"
 
 call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_256x192.onnx --output apps\deep_flow\data\models\rvm_mobilenetv3_256x192.trt --opt-batch 1 --max-batch 1"
 call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_384x288.onnx --output apps\deep_flow\data\models\rvm_mobilenetv3_384x288.trt --opt-batch 1 --max-batch 1"

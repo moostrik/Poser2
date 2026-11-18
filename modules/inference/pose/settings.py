@@ -1,19 +1,10 @@
 from ..engine import ModelType, Resolution, RESOLUTION_DIMS
 from modules.settings import BaseSettings, Field
 
-_MODELS = {
-    'onnx': {
-        Resolution.STANDARD: "rtmpose-l_256x192.onnx",
-        Resolution.HIGH: "rtmpose-l_384x288.onnx",
-        Resolution.ULTRA: "rtmpose-l_384x288.onnx",        # Fallback
-        Resolution.EXTREME: "rtmpose-l_384x288.onnx",      # Fallback
-    },
-    'tensorrt': {
-        Resolution.STANDARD: "rtmpose-l_256x192",
-        Resolution.HIGH:     "rtmpose-l_384x288",
-        Resolution.ULTRA:    "rtmpose-l_384x288",           # Fallback
-        Resolution.EXTREME:  "rtmpose-l_384x288",           # Fallback
-    }
+# The model of each resolution RTMPose comes in; a resolution without one has no pose model
+_MODELS: dict[Resolution, str] = {
+    Resolution.STANDARD: "rtmpose-l_256x192",
+    Resolution.HIGH:     "rtmpose-l_384x288",
 }
 
 
@@ -42,8 +33,12 @@ class PoseEstimatorSettings(BaseSettings):
 
     @property
     def model(self) -> str:
+        """The model file of the resolution; a resolution RTMPose does not come in is an error."""
+        name: str | None = _MODELS.get(self.resolution)
+        if name is None:
+            raise ValueError(f"Pose: no model at {self.resolution.name}; RTMPose comes in {', '.join(r.name for r in _MODELS)}")
         if self.model_type == ModelType.ONNX:
-            return f"data/models/{_MODELS['onnx'][self.resolution]}"
+            return f"data/models/{name}.onnx"
         elif self.model_type == ModelType.TRT:
-            return f"{_MODELS['tensorrt'][self.resolution]}.trt"
+            return f"{name}.trt"
         return ""

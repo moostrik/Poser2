@@ -196,9 +196,9 @@ ONNX downloads: the COCO-only and the AIC+COCO ones are `.pth` files **(seen: MM
 H3 is 78.3 - 76.7 = 1.6 AP, and of H4 2.1 AP **(site fact)**. The 384x288 files (111.1 MB, the zip 103.7 MB) and
 RTMPose-x (197.7 MB, the zip 184.3 MB) are in `data/models` as `rtmpose-l_384x288.onnx` and `rtmpose-x_384x288.onnx`.
 
-H2 (2026-11-18): `tools/models/convert_onnx_to_fp16.py --fp32-scopes /mlp/mlp.0/ /gau/ln/ --keep-io-types` makes RTMPose FP16 but
-the head's two ScaleNorms
-(`/mlp/mlp.0/`, `/gau/ln/`, ten nodes), its inputs and outputs FP32 (`onnxconverter-common`, now in the project's
+H2 (2026-11-18): `tools/models/convert_onnx_to_fp16.py --fp32-norms --keep-io-types` makes RTMPose FP16 but the head's two
+ScaleNorms, found by their structure (ten nodes in ours, fourteen in OpenMMLab's export, which squares and sums where
+ours has `ReduceL2`), its inputs and outputs FP32 (`onnxconverter-common`, now in the project's
 dependencies), `data/models/rtmpose-l_256x192_fp16.onnx`, 55.4 MB. Its TensorRT engine at batch 1 (deep_flow's) against
 the FP32 engine, 300 crops of three photos, the time on an idle GPU (`h2_fp16.py`, not committed) **(seen)**:
 
@@ -214,12 +214,23 @@ FP16 engine whose norms are FP16 too does not collapse: TensorRT does not overfl
 **(seen)**, as its reductions accumulate in FP32 **(deduction)**; the norms stay FP32 as the safe way. The weighing is
 H5's.
 
-- H3. RTMPose-l 384x288, Body8: the official ONNX file, its engines in `scripts/makemodels.bat` per app (deep_flow's
-  at a static batch of 1 **(seen)**), the pose's `HIGH` resolution in the presets; the crop follows the model's size
-  (each app sets it from the pose settings **(seen: `apps/deep_flow/main.py`)**), the SimCC bins follow the output,
-  the decode stays **(seen: it reads the output's size)**. The pose settings' `ULTRA` and `EXTREME` load the
-  384x288 file at a 384x512 and 768x1024 input **(seen)**, a size the engine refuses **(deduction)**: those fallbacks
-  go, and a pose resolution without its own file is refused when the settings are initialized
+H3 (2026-11-18): RTMPose-l 384x288 Body8 is the pose's `HIGH` resolution: `data/models/rtmpose-l_384x288.onnx`
+(OpenMMLab's file), its engines in `scripts/makemodels.bat` for the three apps at their batches, and `ULTRA` and
+`EXTREME`, which had no file of their own, refused (`PoseEstimatorSettings.model`); every preset is `STANDARD`
+**(seen)**. On the same 300 crops, each model at its input size, deep_flow's engines at batch 1, an idle GPU
+(`h3_models.py`, not committed) **(seen)**:
+
+| Engine, batch 1            | Mean / p99 ms | Points against RTMPose-l 384x288 FP32, in the crop's width (median / 95%) |
+|----------------------------|---------------|-----------------------------------------------------------------------------|
+| RTMPose-l 384x288 FP32     | 3.03 / 4.08   | the reference                                                               |
+| RTMPose-l 384x288 FP16     | 1.45 / 2.57   | 0 / 0.0026 (88% within one of its bins, a 576th of the width)               |
+| RTMPose-l 256x192 FP32     | 2.89 / 3.91   | 0.0061 / 0.27                                                               |
+| RTMPose-l 256x192 FP16     | 1.34 / 2.45   | 0.0061 / 0.27                                                               |
+
+At one player the larger input costs 5% more time: the GPU is not filled by one crop **(deduction)**. Where the two
+models disagree by a quarter of the width they find another point, not the same one more exactly **(deduction)**; the
+AP says which is more often right: 78.3 against 76.7 **(site fact)**.
+
 - H4. RTMPose-x 384x288 (78.8 AP, about 8 ms **(deduction: a FLOP ratio)**), only if H2 and H3 leave room
 - H5. The choice in the app: ours, H2, H3 and H4 in deep_flow as it is (`20261112-125832_measure`, -sim, the probe's
   as-is run, 60 s each, about 1.5 minutes a model), with the fluid on the GPU, where sharing the GPU sets most of

@@ -8,6 +8,7 @@ import numpy as np
 import torch
 
 from modules.inference import ModelType, crop, pose
+from modules.inference.engine import Resolution
 from modules.pose import BBox, Frame, Points2D
 from modules.utils import Rect
 
@@ -89,6 +90,16 @@ class DecodeTest(unittest.TestCase):
         self.assertTrue(np.allclose(keypoints[0], [3.0, 1.0]))
         self.assertTrue(np.allclose(scores[0], 0.7))
 
+
+
+class ModelFileTest(unittest.TestCase):
+    def test_each_resolution_rtmpose_comes_in_has_its_file_and_the_others_none(self) -> None:
+        settings = pose.PoseEstimatorSettings(model_type=ModelType.TRT, resolution=Resolution.HIGH)
+        self.assertEqual(settings.model, 'rtmpose-l_384x288.trt')
+        self.assertEqual((settings.width, settings.height), (288, 384))
+        settings.resolution = Resolution.ULTRA
+        with self.assertRaises(ValueError):
+            _ = settings.model
 
 if __name__ == '__main__':
     unittest.main()
