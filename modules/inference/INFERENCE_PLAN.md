@@ -9,11 +9,15 @@ What is not built in `modules/inference`, apart from the threads the app refacto
 The models' outputs are checked on a known good video in the app, with the fewest runs that show a step: deep_flow
 `-sim` on `20261112-125832_measure` (still, then an arm sideways, slow then fast), the fluid off. A probe, not
 committed, adds what deep_flow lacks for the run alone: the segmentation and its crop, and `enable_prev_crop` on so
-the optical flow runs. It saves every model's outputs (points, scores, masks, foregrounds, flows) by the frame's
-capture time, and the models' timers, from the one run, and reads both settings names (before and after the
-refactor's). `-sim` drops other frames each run, so two runs are compared on the frames both have, and the count is
-given. The same engine on the same input gives the same numbers, so a difference beyond two baseline runs' own is a
-fault **(deduction)**. Each run lasts the recording, only while you are away.
+the optical flow runs. It saves every model's outputs (points, scores, masks, foregrounds, flows) and the pose's box by
+the frame's capture time, and the models' timers, from the one run, and reads both settings names (before and after
+the refactor's). `-sim` drops other frames each run, so two runs are compared on the frames both have with the same
+box (the boxes come from the detector and its tracker, which follow the frames that ran **(deduction)**), and the
+count is given. The segmentation's `reset_interval` is 1 in the probe: its recurrent state would carry the run's own
+drops into every mask. The same engine on the same input gives the same numbers, so a difference beyond two baseline
+runs' own is a fault **(deduction)**. e754ddee runs from a copy of that commit outside the repository, with
+`apps/deep_flow/data` linked into it, so the working folder the other threads use stays as it is. Each run lasts the
+recording, only while you are away and the GPU runs nothing else: the table's times hold only then.
 
 | Step | Model        | Frames matched | Mean / p99 (ms) | Lock wait mean (ms) | Max difference |
 |------|--------------|----------------|-----------------|---------------------|----------------|
@@ -59,9 +63,11 @@ Questions:
 
 - D1. The uploader's color conversion, straightening and mirroring as one CUDA kernel, as the depth's alignment is
   (`depth_align.py`), for both of `ImageUpload`'s inputs: the OAK4's NV12 and the depthai 2 cameras' BGR
-  (white_space, hd_trio). From NV12 23 GPU ops become 2, about 0.4 ms less GPU a frame **(deduction)**. Checked by
-  one probe run against A1 (the recording plays as BGR **(deduction)**), and one run of `scripts/gpu_input_timing.py`
-  before and after for NV12's time per step and image difference; the camera's time at the next live session.
+  (white_space, hd_trio). From NV12 23 GPU ops become 2, about 0.4 ms less GPU a frame **(deduction)**. The kernel
+  rounds otherwise, so its image is held to a bound of its own (to agree before it is built), not to A1's noise.
+  Checked by one probe run against A1 for NV12 (deep_flow's `-sim` decodes to NV12 **(seen)**), and one run of
+  `scripts/gpu_input_timing.py` before and after for BGR's time per step and image difference; the camera's time at
+  the next live session.
 
 ## The package held up to the rules (the apps' plan F, agreed 2026-11-17)
 
