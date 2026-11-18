@@ -188,9 +188,14 @@ below ours, Sapiens is too heavy and non-commercial, and the video models need f
 asked for with its name, source and size before it is fetched (the five RTMPose ONNX files from OpenMMLab's
 download server agreed 2026-11-18, each logged with its name and size).
 
-- H1. Which checkpoint ours is: `rtmpose-l_256x192.onnx` (110.7 MB, May 2026) has no source in the repository
-  **(seen)**; its outputs against the official COCO-only, AIC+COCO and Body8 ONNX files on the same crops tell. It
-  sets the gain of every step after it
+H1 (2026-11-18): ours is the Body8 checkpoint (76.7 COCO AP). Against OpenMMLab's
+`rtmpose-l_simcc-body7_pt-body7_420e-256x192-4dba18fc_20230504` ONNX file (110.6 MB, the zip 103.2 MB): the same 177
+weights to within 1e-6, 92 of them bit for bit, and outputs within 6.1e-7 on the same input, every argmax equal; ours
+is that file exported again (302 nodes against 306, the batch named `batch_size`) **(seen)**. Only the Body8 models have
+ONNX downloads: the COCO-only and the AIC+COCO ones are `.pth` files **(seen: MMPose's RTMPose README)**. So the gain of
+H3 is 78.3 - 76.7 = 1.6 AP, and of H4 2.1 AP **(site fact)**. The 384x288 files (111.1 MB, the zip 103.7 MB) and
+RTMPose-x (197.7 MB, the zip 184.3 MB) are in `data/models` as `rtmpose-l_384x288.onnx` and `rtmpose-x_384x288.onnx`.
+
 - H2. An FP16 engine of our model, with the head's ScaleNorm kept FP32 (first, decided 2026-11-18: it changes only
   the precision, and the time it saves is the room H3 needs). A public report has the norm's sum of squares overflow
   in FP16 **(site fact)**, likely the precision RTMPose lost here in FP16 **(deduction)**. Under TensorRT's strongly
