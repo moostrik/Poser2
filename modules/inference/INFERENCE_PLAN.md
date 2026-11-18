@@ -72,7 +72,16 @@ SimCC bin (0.003); one frame's point moved 0.648, a keypoint whose two peaks wer
 - B2. The segmentation hands on its masks and foregrounds while its stream still writes them: the TensorRT runner
   resizes the mask and multiplies the crops after its last `synchronize()`, and nothing waits for that **(seen)**. D1's
   run read 2 masks of NaN, the foregrounds of the same frames whole **(seen)**, so a reader saw them unwritten
-  **(deduction)**. The runner synchronizes after its last step, as the others do. Checked by the check's run: no NaN
+  **(deduction)**. As the upload's and the crops' images are handed on: `segmentation.Image` gets a `ready` event,
+  recorded on the runner's stream after its last step; its readers, the render's `SegmentationMaskLayer` and
+  `SegmentationForegroundLayer`, wait for it on their stream and mark the tensor used there (`record_stream`), as
+  `CameraImageLayer` does. The GPU waits, not a thread. PyTorch: streams run "in any relative order" unless
+  synchronized, the user's responsibility; `Event.wait` orders a stream without blocking the CPU; `record_stream`
+  keeps the caching allocator from reusing a tensor another stream still reads **(site fact:
+  [CUDA streams](https://docs.pytorch.org/docs/stable/notes/cuda.html#cuda-streams),
+  [record_stream](https://docs.pytorch.org/docs/stable/generated/torch.Tensor.record_stream.html),
+  [Event](https://docs.pytorch.org/docs/stable/generated/torch.cuda.Event.html))**. Checked by the tests and the
+  check's run, no NaN; the probe's reader waits as the layers do
 
 ## C. The TensorRT models side by side
 
