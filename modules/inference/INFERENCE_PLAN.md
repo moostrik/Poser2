@@ -273,14 +273,18 @@ from its ONNX file (strongly typed), so an FP16 engine is built from an FP16 ONN
   the converter's input), and what the pose runs is named for it: `rtmpose-l_256x192_fp16.onnx` (in fc910bb7) and
   `rtmpose-l_384x288_fp16.onnx` (made by the converter, about 56 MB), their engines `_fp16.trt`. The pose's settings
   name the FP16 files (`PoseEstimatorSettings.model`), on ONNX Runtime as on TensorRT; no setting picks a precision.
-  `data/models/rtmpose-x_384x288.onnx`, untracked, deleted. `INFERENCE.md`'s "the pose model stays FP32" becomes FP16
-  with the head's norms FP32. Checked by `git lfs ls-files`, the settings' test (each resolution its file) and the
-  guard tests
+  `data/models/rtmpose-x_384x288.onnx`, untracked, deleted. With them: the pose test `ModelFileTest` (it names
+  `rtmpose-l_384x288.trt` **(seen)**), `INFERENCE.md`'s "the pose model stays FP32" and its model table (FP32 for the
+  pose **(seen)**) become FP16 with the head's norms FP32. Checked by `git lfs ls-files`, the settings' test (each
+  resolution its file) and the guard tests
 - I2. The converter out of the project's dependencies: `onnxconverter-common` leaves `pyproject.toml` and `uv.lock`,
   and `convert_onnx_to_fp16.py` runs as the YOLO export does, `uv run --with onnxconverter-common python
   tools/models/convert_onnx_to_fp16.py ... --fp32-norms --keep-io-types` (its docstring and the README say so);
   `scripts/makemodels.bat` builds the pose's FP16 engines per app at its batches from the files in LFS, skipping what
-  exists as it does now. Checked by running it for deep_flow, and one deep_flow run on HIGH
+  exists as it does now; the README's setup says to run it after a pull that changes the models, as a PC's old
+  engines are not the ones the pose then names **(deduction)**. Checked by running it for deep_flow; one benchmark
+  on hd_trio's batch of 3, FP16 against FP32's points (H2 measured batch 1 only **(seen)**) and FP16 on ONNX
+  Runtime, about a minute; and deep_flow as it is on HIGH, 60 s, that it starts and poses and the pose's time
 - I3. hd_trio's files tracked: the `.gitignore` line `temp*` ignores every file whose name starts with "temp",
   `apps/hd_trio/flow/bridge_2d/temperature_bridge.py` and its shader among them, which hd_trio imports, so a fresh
   clone of hd_trio does not start **(seen)**; it becomes `/temp/`, the scratch folder it is for, and those three files
