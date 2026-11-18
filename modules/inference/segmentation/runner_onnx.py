@@ -76,9 +76,12 @@ class RunnerONNX:
         """Every player starts again without memory."""
         self._states.clear()
 
-    def infer(self, gpu_images: list[torch.Tensor], track_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float]:
+    def infer(self, gpu_images: list[torch.Tensor], track_ids: list[int],
+              ready: torch.cuda.Event | None) -> tuple[torch.Tensor, torch.Tensor, float]:
         """The alpha matte (N, H, W) and the foreground (N, 3, H, W) at the model's size for the crops (3, h, w) RGB in
-        [0, 1] of the players `track_ids`; and the time waited for the GPU's lock, 0: ONNX Runtime takes none."""
+        [0, 1] of the players `track_ids`, read once `ready` is recorded; and the time waited for the GPU's lock, 0: ONNX Runtime takes none."""
+        if ready is not None:
+            self._stream.wait_event(ready)      # the crops are written on the crop stream
         batch_size = len(gpu_images)
         input_h, input_w = gpu_images[0].shape[1], gpu_images[0].shape[2]
         h, w = self.model_height, self.model_width
@@ -126,7 +129,7 @@ class RunnerONNX:
         """The CUDA kernels made for the fixed batch size, so none is compiled while running."""
         try:
             dummy = torch.zeros((3, self.model_height, self.model_width), dtype=torch.float32, device='cuda')
-            self.infer([dummy] * self.max_batch, list(range(self.max_batch)))
+            self.infer([dummy] * self.max_batch, list(range(self.max_batch)), None)
         except Exception as e:
             logger.info(f"Segmentation: Warmup failed (non-critical) - {str(e)}")
         self._states.clear()

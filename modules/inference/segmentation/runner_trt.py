@@ -74,9 +74,12 @@ class RunnerTRT:
         """Every player starts again without memory."""
         self._states.clear()
 
-    def infer(self, gpu_images: list[torch.Tensor], track_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float]:
+    def infer(self, gpu_images: list[torch.Tensor], track_ids: list[int],
+              ready: torch.cuda.Event | None) -> tuple[torch.Tensor, torch.Tensor, float]:
         """The alpha matte (N, h, w) and the foreground (N, 3, h, w), the crops multiplied by it, for the crops (3, h, w)
-        RGB in [0, 1] of the players `track_ids`; and the time waited for the shared execution lock (ms)."""
+        RGB in [0, 1] of the players `track_ids`, read once `ready` is recorded; and the time waited for the shared execution lock (ms)."""
+        if ready is not None:
+            self._stream.wait_event(ready)      # the crops are written on the crop stream
         batch_size = len(gpu_images)
         input_h, input_w = gpu_images[0].shape[1], gpu_images[0].shape[2]
         h, w = self.model_height, self.model_width

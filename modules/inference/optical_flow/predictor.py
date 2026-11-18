@@ -48,7 +48,7 @@ class Predictor:
         self._ready: Event = Event()
 
         self._lock: Lock = Lock()
-        self._pending: tuple[list[int], list[tuple[torch.Tensor, torch.Tensor]]] | None = None
+        self._pending: tuple[list[int], list[tuple[torch.Tensor, torch.Tensor]], torch.cuda.Event | None] | None = None
         self._pending_timestamp: float = 0.0
 
         self._callback_lock: Lock = Lock()
@@ -80,12 +80,14 @@ class Predictor:
 
         track_ids: list[int] = []
         pairs: list[tuple[torch.Tensor, torch.Tensor]] = []
+        ready: torch.cuda.Event | None = None      # the crops' event, one for the batch
         for track_id in poses.keys():
             if track_id in crops:
                 crop_image = crops[track_id]
                 if crop_image.prev_crop is not None:        # both frames needed
                     track_ids.append(track_id)
                     pairs.append((crop_image.prev_crop, crop_image.crop))
+                    ready = crop_image.ready
 
         if not pairs:       # no pairs: an empty dict keeps the flow going
             self._notify_callbacks({})
@@ -103,7 +105,7 @@ class Predictor:
                 if self.settings.verbose:
                     lag = int((time.perf_counter() - self._pending_timestamp) * 1000)
                     logger.info(f"Optical Flow: dropped a batch with lag {lag} ms")
-            self._pending = (track_ids, pairs)
+            self._pending = (track_ids, pairs, ready)
             self._pending_timestamp = time.perf_counter()
         if dropped:
             self.settings.dropped += 1
@@ -152,7 +154,7 @@ class Predictor:
             except Exception:
                 logger.exception("Optical Flow: error processing a batch")
 
-    def _claim(self) -> tuple[list[int], list[tuple[torch.Tensor, torch.Tensor]]] | None:
+    def _claim(self) -> tuple[list[int], list[tuple[torch.Tensor, torch.Tensor]], torch.cuda.Event | None] | None:
         with self._lock:
             pending = self._pending
             self._pending = None
@@ -162,10 +164,10 @@ class Predictor:
         pending = self._claim()
         if pending is None:
             return
-        track_ids, pairs = pending
+        track_ids, pairs, ready = pending
 
         start: float = time.perf_counter()
-        flows, lock_wait_ms = self._runner.infer(pairs)
+        flows, lock_wait_ms = self._runner.infer(pairs, ready)
         self._process_timer.add_time((time.perf_counter() - start) * 1000.0 - lock_wait_ms, report=self.settings.verbose)
         self._wait_timer.add_time(lock_wait_ms, report=self.settings.verbose)
 

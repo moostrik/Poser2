@@ -28,7 +28,7 @@ class FakeRunner:
     def reset_states(self) -> None:
         self.resets += 1
 
-    def infer(self, gpu_images, track_ids):
+    def infer(self, gpu_images, track_ids, ready):
         self.running.set()
         self.release.wait(2.0)
         n = len(gpu_images)

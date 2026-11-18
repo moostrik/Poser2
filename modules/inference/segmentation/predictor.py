@@ -49,7 +49,7 @@ class Predictor:
         self._ready: Event = Event()
 
         self._lock: Lock = Lock()
-        self._pending: tuple[FrameDict, list[int], list[torch.Tensor]] | None = None
+        self._pending: tuple[FrameDict, list[int], list[torch.Tensor], torch.cuda.Event | None] | None = None
         self._pending_timestamp: float = 0.0
 
         self._callback_lock: Lock = Lock()
@@ -79,10 +79,12 @@ class Predictor:
 
         track_ids: list[int] = []
         images: list[torch.Tensor] = []
+        ready: torch.cuda.Event | None = None      # the crops' event, one for the batch
         for track_id in poses.keys():
             if track_id in crops:
                 track_ids.append(track_id)
                 images.append(crops[track_id].crop)
+                ready = crops[track_id].ready
 
         if not images:      # no crops: the poses go on without masks
             self._notify_callbacks(poses, {})
@@ -100,7 +102,7 @@ class Predictor:
                 if self.settings.verbose:
                     lag = int((time.perf_counter() - self._pending_timestamp) * 1000)
                     logger.info(f"Segmentation: dropped a batch with lag {lag} ms")
-            self._pending = (poses, track_ids, images)
+            self._pending = (poses, track_ids, images, ready)
             self._pending_timestamp = time.perf_counter()
         if dropped:
             self.settings.dropped += 1
@@ -149,7 +151,7 @@ class Predictor:
             except Exception:
                 logger.exception("Segmentation: error processing a batch")
 
-    def _claim(self) -> tuple[FrameDict, list[int], list[torch.Tensor]] | None:
+    def _claim(self) -> tuple[FrameDict, list[int], list[torch.Tensor], torch.cuda.Event | None] | None:
         with self._lock:
             pending = self._pending
             self._pending = None
@@ -159,7 +161,7 @@ class Predictor:
         pending = self._claim()
         if pending is None:
             return
-        poses, track_ids, images = pending
+        poses, track_ids, images, ready = pending
 
         # Every player's memory cleared now and then, a failsafe against a state gone wrong
         self._batch_count += 1
@@ -167,7 +169,7 @@ class Predictor:
             self._runner.reset_states()
 
         start: float = time.perf_counter()
-        masks, foregrounds, lock_wait_ms = self._runner.infer(images, track_ids)
+        masks, foregrounds, lock_wait_ms = self._runner.infer(images, track_ids, ready)
         self._process_timer.add_time((time.perf_counter() - start) * 1000.0 - lock_wait_ms, report=self.settings.verbose)
 
         results: ImageDict = {}

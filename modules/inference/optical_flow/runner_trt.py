@@ -68,9 +68,11 @@ class RunnerTRT:
         self._context.set_tensor_address(self._input_names[0], self._img1_buffer.data_ptr())
         self._context.set_tensor_address(self._input_names[1], self._img2_buffer.data_ptr())
 
-    def infer(self, pairs: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, float]:
+    def infer(self, pairs: list[tuple[torch.Tensor, torch.Tensor]], ready: torch.cuda.Event | None) -> tuple[torch.Tensor, float]:
         """The flow (N, 2, H, W), x and y in the model's pixels, from each previous to current crop (3, h, w) RGB in
-        [0, 1]; and the time waited for the shared execution lock (ms)."""
+        [0, 1], read once `ready` is recorded; and the time waited for the shared execution lock (ms)."""
+        if ready is not None:
+            self._stream.wait_event(ready)      # the crops are written on the crop stream
         batch_size = len(pairs)
         input_h, input_w = pairs[0][0].shape[1], pairs[0][0].shape[2]
         h, w = self.model_height, self.model_width

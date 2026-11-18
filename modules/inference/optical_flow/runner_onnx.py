@@ -66,9 +66,11 @@ class RunnerONNX:
         self._stream.synchronize()
         self._warmup()
 
-    def infer(self, pairs: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, float]:
+    def infer(self, pairs: list[tuple[torch.Tensor, torch.Tensor]], ready: torch.cuda.Event | None) -> tuple[torch.Tensor, float]:
         """The flow (N, 2, H, W), x and y in the model's pixels, from each previous to current crop (3, h, w) RGB in
-        [0, 1]; and the time waited for the GPU's lock, 0: ONNX Runtime takes none."""
+        [0, 1], read once `ready` is recorded; and the time waited for the GPU's lock, 0: ONNX Runtime takes none."""
+        if ready is not None:
+            self._stream.wait_event(ready)      # the crops are written on the crop stream
         batch_size = len(pairs)
         input_h, input_w = pairs[0][0].shape[1], pairs[0][0].shape[2]
         h, w = self.model_height, self.model_width
@@ -103,6 +105,6 @@ class RunnerONNX:
         """The CUDA kernels made for the fixed batch size, so none is compiled while running."""
         try:
             dummy = torch.zeros((3, self.model_height, self.model_width), dtype=torch.float32, device='cuda')
-            self.infer([(dummy, dummy)] * self.max_batch)
+            self.infer([(dummy, dummy)] * self.max_batch, None)
         except Exception as e:
             logger.info(f"Optical Flow: Warmup failed (non-critical) - {str(e)}")

@@ -6,24 +6,24 @@ What is not built in `modules/inference`, apart from the threads the app refacto
 
 ## The check
 
-The models' outputs are checked on a known good video in the app, with the fewest runs that show a step: deep_flow
-`-sim` on `20261112-125832_measure` (still, then an arm sideways, slow then fast), the fluid off. A probe, not
-committed, adds what deep_flow lacks for the run alone: the segmentation and its crop, and `enable_prev_crop` on so
-the optical flow runs. It saves every model's outputs (points, scores, masks, foregrounds, flows) and the pose's box by
-the frame's capture time, and the models' timers, from the one run, and reads both settings names (before and after
-the refactor's). `-sim` drops other frames each run, so two runs are compared on the frames both have with the same
-box (the boxes come from the detector and its tracker, which follow the frames that ran **(deduction)**), and the
-count is given; a flow is compared only when both runs paired the same two frames, by the previous frame's capture
-time the probe keeps per camera (the snapshot carries only the current one's **(seen)**). The probe stops the app in a
-`finally`. The segmentation's `reset_interval` is 1 in the probe: its recurrent state would carry the run's own
-drops into every mask. The same engine on the same input gives the same numbers, so a difference beyond two baseline
-runs' own is a fault **(deduction)**. e754ddee runs from a copy of that commit outside the repository, with
-`apps/deep_flow/data` linked into it, so the working folder the other threads use stays as it is. Each run lasts the
-recording, only while you are away and the GPU runs nothing else: the table's times hold only then.
+The models' outputs are checked on a known good video in the app: deep_flow `-sim` on `20261112-125832_measure`
+(still, then an arm sideways, slow then fast), 30 s a run, two runs a step, only while you are away and the GPU runs
+nothing else.
 
-Measured 2026-11-18, 30 s of the recording a run. Times from deep_flow as it is (its preset: the pose every other
-frame, the person detector; no segmentation or optical flow); outputs from the probe's run. A difference is the
-largest over the frames both runs have with the same box (and frame pair), against e754ddee's first run.
+- The times: deep_flow as it is (its preset: the pose every other frame, the person detector; no segmentation or
+  optical flow)
+- The outputs: a probe, not committed, adds the segmentation and its crop (`reset_interval` 1, so no run's drops
+  carry into its masks), the previous crop and the optical flow, and the pose on every frame (`pose_interval` 1: at
+  2, which half of the frames is posed differs per run **(seen)**). It keys every output by the recording's frame
+  (a recording without metadata is stamped on the play's clock, other each run **(seen)**), and crops every frame
+  with the first baseline run's box (the detector's tracker gives each run slightly other boxes **(seen)**). Two runs
+  are compared on the frames both have, a flow only when both paired the same two frames. It stops the app in a
+  `finally`, and reads both settings names (before and after the refactor's)
+- e754ddee runs from a copy of that commit outside the repository, with the models and recordings linked in, so the
+  working folder the other threads use stays as it is
+
+The same engine on the same input gives the same numbers, so any difference is a fault **(deduction)**. A difference
+is the largest over the frames compared, against e754ddee's first run.
 
 | Step            | Model        | Mean / p99 as it is (ms) | Frames matched | Frames that differ | Max difference |
 |-----------------|--------------|--------------------------|----------------|--------------------|----------------|
@@ -33,25 +33,16 @@ largest over the frames both runs have with the same box (and frame pair), again
 | A1 refactor     | pose         | 25.17 / 39.73            | 168            | 0                  | 0              |
 | A1 refactor     | segmentation |                          | 43             | 2                  | 1.0            |
 | A1 refactor     | optical flow |                          | 51             | 5                  | 7.34 px        |
+| B1 crops' event | pose         | 25.17 / 39.27            | 144            | 0                  | 0              |
+| B1 crops' event | segmentation |                          | 44             | 2                  | 1.0            |
+| B1 crops' event | optical flow |                          | 56             | 0                  | 0              |
 
-The frames that differ are whole frames, the rest exact, in the two models that read their crops without waiting
-for them (B1); the pose, which waits, never differs **(deduction: the race B1 removes)**.
-
-## A. The baseline
-
-- A1. The refactor confirmed: the probe at e754ddee (before it) twice, which gives the noise and the tolerance (at
-  least 1e-4), and on the current code once against it; the numbers in the table. The refactor (398ca410 to
-  4f72f124, one commit per model and one for the small breaks) was built without a go: this comparison and your look
-  at its diff judge it, and a model that differs is fixed or its commit reverted
-
-## B. The crops' event
-
-- B1. Every predictor hands its crops' event to its runner, which waits for it on its stream, as the pose does: the
-  segmentation (live in hd_trio; its crops are cut on their own stream and read without a wait **(seen)**) and the
-  optical flow (`enable_prev_crop` off, so it runs nothing). Checked by the tests and one probe run against A1.
-
-Question: does the optical flow pair each frame with the camera's frame just before it? A1's runs show it, by the
-capture times the probe keeps.
+A frame that differs is a whole frame, the rest exact. Before B1 the segmentation and the optical flow read their
+crops without waiting for them; the pose, which waited, never differed. After B1 the flow is exact, and two runs after
+it agree on every frame (26 masks, 35 flows): the segmentation's frames that still differ are e754ddee's own, read
+before their crop was written **(deduction)**. The refactor (398ca410 to 4f72f124, built without a go) is judged by
+these rows and your look at its diff. The optical flow pairs each frame with the camera's frame just before it: 673
+of 674 flows, the other across the recording's loop **(seen)**.
 
 ## C. The TensorRT models side by side
 
@@ -65,7 +56,7 @@ creating contexts are thread-safe **(site fact:
 reason, "Myelin graph conflicts", is in no NVIDIA page; likely an older TensorRT's **(deduction)**. Without the exec
 lock a model starts while another runs: less wait for the pose, each model's own time likely longer **(deduction)**.
 
-- C1. Both locks removed from all five runners. Checked by the package's tests and one probe run against A1: the
+- C1. Both locks removed from all five runners. Checked by the package's tests and the check's two runs: the
   outputs at the tolerance, each model's time and lock wait in the table
 
 Questions:
@@ -79,7 +70,7 @@ Questions:
   (`depth_align.py`), for both of `ImageUpload`'s inputs: the OAK4's NV12 and the depthai 2 cameras' BGR
   (white_space, hd_trio). From NV12 23 GPU ops become 2, about 0.4 ms less GPU a frame **(deduction)**. The kernel
   rounds otherwise, so its image is held to at most 1/255 per pixel from the old one, one step of the camera's 8 bits,
-  not to A1's noise. Checked by one probe run against A1 for NV12 (deep_flow's `-sim` decodes to NV12 **(seen)**), and one run of
+  not to the models' exactness. Checked by the check's two runs for NV12 (deep_flow's `-sim` decodes to NV12 **(seen)**), and one run of
   `scripts/gpu_input_timing.py` before and after for BGR's time per step and image difference; the camera's time at
   the next live session.
 
