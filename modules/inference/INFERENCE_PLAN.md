@@ -145,7 +145,7 @@ outputs costs less than the decode's kernel launches and its own copy **(deducti
 stays on the CPU. On a busy GPU the decode's kernels would also queue behind the other models' work **(deduction)**.
 deep_flow's TensorRT engine takes one player only (a static batch of 1), so its row is hd_trio's engine.
 
-## G. The package's root and the inference frame (proposed 2026-11-18)
+## G. The package's root and the inference frame (2026-11-18)
 
 The root holds 13 files and a stub of four jobs side by side: the input's preparation, the crops, the frame the
 render takes, and the models' shared parts **(seen)**. A folder of one or two files is ceremony (decided
@@ -155,38 +155,54 @@ render takes, and the models' shared parts **(seen)**. A folder of one or two fi
   - `preprocessing/`, the input made ready for the models, as inference textbooks name it: `serial_uploader`,
     `batch_uploader`, `image_upload`, `camera_sync`, `depth_align`, `cuda_kernels`, `shaders/`, `source`, `crop`,
     `crop_extractor`. The crop belongs with the upload: it reads only the upload's images and makes the models'
-    input **(seen)**
+    input **(seen)**. The package exports `crop` from there, so `inference.crop` stays its one public name
+    (deep_flow's settings use `inference.crop.CropExtractorSettings` **(seen)**); the models import it from
+    `..preprocessing`
   - `model_worker` into `engine/`; `recorded_poses` into `pose/` (it stands in for the pose estimator);
     `tensorrt.pyi` into `engine/`, beside its only users, with pyright's `stubPath` there (`tools/models`, which also
     imports tensorrt, is excluded from pyright **(seen)**)
   - `detection/` named `person/`, as `face/`: every model detects; the class stays `PersonDetector`
-  - the root keeps `capture.py` and `capture_sync.py` (renamed in G2): they come after the models, not before
-  - the call sites follow: the apps, `modules/recording`, `modules/render`, the scripts, `INFERENCE.md`,
-    `INPUT_THREADS.md`, `OAK4.md`, `RECORDING.md`. Checked by the import and guard tests and the package's tests
-- G2. `Capture` named `InferenceFrame` (decided 2026-11-18): one camera moment's image and depth with what the models
-  found in it, the poses and the masks. "Capture" also names the camera's moment of capture (`capture_time`,
-  `HasCaptureTime`), the recorder's captures (`RecordedCapture`, `CaptureStream`), `ScreenCapture` and smile's photo
-  capture **(seen)**; those keep it. With it, one term everywhere: `InferenceFrameSync` and its settings,
-  `InferenceFrameCallback`, the board's `HasInferenceFrames` / `InferenceFrameStoreMixin` / `take_inference_frames`,
-  the cadence panel's drops, the render's image, depth and monitor layers and the monitor's settings, the bridge's
-  `CaptureMax`, deep_flow's `_run_capture`, and the flow documents **(seen: 28 files outside the package)**. The
-  presets follow where a settings group is renamed. Checked by the import and guard tests, the package's and the
-  apps' tests
-- G3. The inference frame as the pose `Frame` is made (decided 2026-11-18): identity slots (`cam_id`, `timestamp`,
-  the image) and the results keyed by their type, read as `frame[Poses]`, `frame[Masks]`, which never raises; a
-  result type the frame does not carry reads as its empty one (no players). Today it holds two results in fixed
-  fields, assumes a depth, and the sync has a near copy per result (a stream, a submit, a wait) **(seen)**. The result
-  types: `Depth`, `Poses`, `Masks`, `Flows`, `Faces`, each with its `synced` (this moment's, or the newest from
-  before). `InferenceFrameSync` is made with the result types its app runs (fixed structure, through the
-  constructor), keeps one stream per type and one `submit`. A frame is complete with its image and, where given, its
-  depth, as today; it waits for each model's result by its own setting (`pose_wait`, `mask_wait` and one per new
-  type), and a type it was not given is never waited for. deep_flow alone uses it, with
-  `Depth` and `Poses`; the other apps keep their own ways (decided 2026-11-18). Checked by the sync's tests (each
-  type waited for or not, the empties) and the check's run
-- G4. The new names to the rules thread for the glossary: `InferenceFrame` (not "capture" for it), its result
+  - the root keeps `capture.py` and `capture_sync.py` (made over in G2): they come after the models, not before
+  - the call sites follow: the apps, `modules/recording`, `modules/render`, the scripts (`depth_align_check.py`
+    imports the GL `DepthAlign` from `inference.shaders` **(seen)**), `INFERENCE.md`, `INPUT_THREADS.md`, `OAK4.md`,
+    `RECORDING.md`. Checked by the import and guard tests and the package's tests
+- G2. `Capture` becomes `InferenceFrame`, made as the pose `Frame` is (decided 2026-11-18), in one step, so each call
+  site changes once:
+  - the name: one camera moment's image with what the models found in it. "Capture" also names the camera's moment
+    of capture (`capture_time`, `HasCaptureTime`), the recorder's captures (`RecordedCapture`, `CaptureStream`),
+    `ScreenCapture` and smile's photo capture **(seen)**; those keep it
+  - the frame: identity slots (`cam_id`, `timestamp`, the image) and the results keyed by their type, read as
+    `frame[Poses]`, which never raises; a type the frame does not carry reads as its empty one (no players). Today
+    it holds two results in fixed fields, assumes a depth, and the sync has a near copy per result (a stream, a
+    submit, a wait) **(seen)**. The types built now are the ones deep_flow has: `Depth`, `Poses` and `Masks` (the
+    sync takes masks today); `Flows` and `Faces` come when an app hands them to the frame. Each result carries its
+    `cam_id`, its `timestamp` (its image's capture time) and its `synced` (this moment's, or the newest from before):
+    today the sync finds the poses' camera from each pose and the masks' from the poses **(seen)**, and a flow
+    carries neither **(seen: `FlowDict` is keyed by track id only)**
+  - the sync, `InferenceFrameSync`: made with the result types its app runs (fixed structure, through the
+    constructor), one stream per type and one `submit`. A frame is complete with its image and, where given, its
+    depth, as today; it waits for each model's result by that type's setting (`pose_wait`, `mask_wait`), and a type
+    it was not given is never waited for. The "asked" mark (`expect_poses`: no poses were asked for this image, so
+    neither poses nor the masks cut for them are waited for **(seen)**) becomes `expect(cam_id, timestamp, asked)`
+    for the types that depend on the poses
+  - with it, one term everywhere: `InferenceFrameCallback`, the board's `HasInferenceFrames` /
+    `InferenceFrameStoreMixin` / `take_inference_frames`, the cadence panel's drops, the render's image, depth and
+    monitor layers and the monitor's settings, the bridge's `CaptureMax` (its name is a question below), deep_flow's
+    `_run_capture`, and the flow documents **(seen: 28 files outside the package)**; the presets follow where a
+    settings group is renamed
+  - deep_flow alone uses it, with `Depth` and `Poses`; the other apps keep their own ways (decided 2026-11-18).
+    Checked by the sync's tests (each type waited for or not, the empties, the asked mark), the import and guard
+    tests, the package's and the apps' tests, and the check's run
+- G3. The new names to the rules thread for the glossary: `InferenceFrame` (not "capture" for it), its result
   types, `preprocessing`, `person`
-- G5. The benchmark, once the refactor is finished: `scripts/model_benchmark.py` with the face models and YOLO too,
-  before (916ff89a, E1) and after, on ONNX and TensorRT, the outputs against the run before
+- G4. The benchmark, once the refactor is finished: `scripts/model_benchmark.py` with the face models and YOLO too,
+  on ONNX and TensorRT, the outputs against the run before. The before run is the same script on a copy of 916ff89a
+  (E1) outside the repository, as A1 ran e754ddee; the script reads both the old names and the new ones, as the probe
+  does
+
+Questions:
+- The bridge's `CaptureMax` (`modules/flow/bridge_3d`) keeps per pixel the larger of the frames' outputs **(seen)**;
+  the flow rules name a module by what it does, so its new name is the flow's to agree with you, not a word swap
 
 ## H. A better pose model, after G (2026-11-18)
 
@@ -196,20 +212,29 @@ staying in the RTMPose family at 384x288 first: RTMPose-l 384x288 trained on Bod
 to 76.7 for ours **(site fact)**, at about 1.75x the time on an idle GPU, about 4.9 ms **(deduction: MMPose's ratio on
 another GPU)**. ViTPose costs several times as much for a like gain, the one-stage models (RTMO, YOLO-pose) score
 below ours, Sapiens is too heavy and non-commercial, and the video models need future frames (33 to 67 ms more)
-**(site fact)**. The settings already name `rtmpose-l_384x288` for `HIGH` and up, but only the 256x192 file is in
-`data/models` **(seen)**.
+**(site fact)**. Only `rtmpose-l_256x192.onnx` is in `data/models` **(seen)**: every other model file is a download,
+asked for with its name, source and size before it is fetched.
 
 - H1. Which checkpoint ours is: `rtmpose-l_256x192.onnx` (110.7 MB, May 2026) has no source in the repository
   **(seen)**; its outputs against the official COCO-only, AIC+COCO and Body8 ONNX files on the same crops tell. It
   sets the gain of every step after it
-- H2. RTMPose-l 384x288, Body8: the official ONNX file, its TensorRT engines per app, the pose's `HIGH` resolution;
-  the crop and the SimCC bins follow the settings, the decode stays **(seen: the decode reads the output's size)**
-- H3. An FP16 engine with the head's ScaleNorm kept FP32: a public report has the norm's sum of squares overflow in
-  FP16 **(site fact)**, likely the precision RTMPose lost here in FP16 **(deduction)**. Checked against the FP32
-  engine's points on recorded crops
+- H2. An FP16 engine of our model, with the head's ScaleNorm kept FP32 (first, decided 2026-11-18: it changes only
+  the precision, and the time it saves is the room H3 needs). A public report has the norm's sum of squares overflow
+  in FP16 **(site fact)**, likely the precision RTMPose lost here in FP16 **(deduction)**. Under TensorRT's strongly
+  typed build the ONNX file sets the precision **(seen: `export_rtm_onnx_to_trt.py`)**, so FP16 is a conversion of
+  the file, `tools/models/convert_onnx_to_fp16.py` **(seen)** with the norm's nodes kept FP32. Checked against the
+  FP32 engine's points on the same crops; the models after it reuse the conversion
+- H3. RTMPose-l 384x288, Body8: the official ONNX file, its engines in `scripts/makemodels.bat` per app (deep_flow's
+  at a static batch of 1 **(seen)**), the pose's `HIGH` resolution in the presets; the crop follows the model's size
+  (each app sets it from the pose settings **(seen: `apps/deep_flow/main.py`)**), the SimCC bins follow the output,
+  the decode stays **(seen: it reads the output's size)**. The pose settings' `ULTRA` and `EXTREME` load the
+  384x288 file at a 384x512 and 768x1024 input **(seen)**, a size the engine refuses **(deduction)**: those fallbacks
+  go, and a pose resolution without its own file is refused when the settings are initialized
 - H4. RTMPose-x 384x288 (78.8 AP, about 8 ms **(deduction: a FLOP ratio)**), only if H2 and H3 leave room
-- H5. The choice in the app: H2 to H4 against ours in deep_flow as it is, with the fluid on the GPU, where sharing the
-  GPU sets most of the pose's 20 ms **(seen)**; with G5's benchmark
+- H5. The choice in the app: ours, H2, H3 and H4 in deep_flow as it is (`20261112-125832_measure`, -sim, the probe's
+  as-is run, 60 s each, about 1.5 minutes a model), with the fluid on the GPU, where sharing the GPU sets most of
+  the pose's 20 ms **(seen)**. It measures the pose's time (mean, p99) and its dropped batches; the table names its
+  kind (a time), date, commit, recording and settings. With G4's benchmark
 
 Questions:
 - The licence of the Body8 training data (AI Challenger and others) is unresolved, for ours as for every candidate
@@ -238,8 +263,10 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 - `CLAUDE.md` Naming, the domain's term, one everywhere (class, setting, panel label): E3, the workers, their settings
   and timers; `glossary.md` follows: E4
 - `CLAUDE.md` Packages, a package is one thing; its files each hold one subject: G1
-- `CLAUDE.md` Naming, one term everywhere, rename it everywhere in the same change: G2; `glossary.md` follows: G4
-- `CLAUDE.md` Composition, fixed structure through constructors: G3, the sync's result types
-- `pose-data.md`, a read never raises, missing data reads empty: G3 takes the pose frame's contract
+- `CLAUDE.md` Naming, one term everywhere, rename it everywhere in the same change: G2; `glossary.md` follows: G3
+- `CLAUDE.md` Composition, fixed structure through constructors: G2, the sync's result types
+- `pose-data.md`, a read never raises, missing data reads empty: G2 takes the pose frame's contract
 - `CLAUDE.md` Performance, measured in the context of the app: H5 chooses the model under the fluid
+- `CLAUDE.md` Running code, a run on the user's go, said what it measures and how long: H5
+- `flow.md` Flow measurements, a table names its kind, date, commit, recording and settings: H5
 - `CLAUDE.md` Performance, prefer the design with the lower latency, measured in the context of the app: F1, the decode kept on the CPU
