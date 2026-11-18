@@ -95,12 +95,20 @@ Questions:
   `PersonDetector` and `FaceDetector` each set up their model on their own thread, wake on work, take the newest
   waiting (a batch, or an image per camera), run it, hand it on, catch per item and stop **(seen)**, written two ways:
   three hold a thread and count drops in their settings, two are a `Thread` and count them in a property. The base
-  holds the thread, the wake, the newest-wins queue (by batch or by camera), the drop count in the settings, the setup
-  and the stop; each keeps its model's step. The workers take their task's name, as textbook vision names them:
-  `PoseEstimator`, `Segmenter`, `FlowEstimator`, `PersonDetector`, `FaceDetector`, and the base `ModelWorker`; the
-  glossary's wording goes to the rules thread. The uploaders, `CameraSync`, `CaptureSync` and `RecordedPoses` keep
-  their own queues (in order, sets, parts) **(deduction: they share less)**. Checked by the package's tests (the fake
-  runners) and the check's run
+  holds the thread, the wake, one queue that keeps the newest per key (the camera for the detectors, one key for the
+  others), the drop count in the settings (a new read-only field on the detectors' panels), the setup and the stop;
+  each keeps its model's step. The workers take their task's name, as textbook vision names them: `PoseEstimator`,
+  `Segmenter`, `OpticalFlowEstimator` (not `FlowEstimator`: `modules/flow` is the fluid's), `PersonDetector`,
+  `FaceDetector`, and the base `ModelWorker`; with them their settings (`PoseEstimatorSettings`, `SegmenterSettings`,
+  `OpticalFlowEstimatorSettings`; the presets keep their group names) and their timers ("Pose Estimation",
+  "Segmentation", "Optical Flow Estimation", "Person Detection", "Face Detection"). The call sites follow: deep_flow,
+  hd_trio, white_space and smile (main, settings, smile's face finder, scripts and tests), `modules/recording/replay`,
+  `scripts/model_benchmark.py`, and `SMILE.md`, `OAK4.md`, `RECORDING.md` **(seen: 19 files outside the package)**.
+  The uploaders, `CameraSync`, `CaptureSync` and `RecordedPoses` keep their own queues (in order, sets, parts)
+  **(deduction: they share less)**. Checked by the package's tests (the fake runners), the apps' tests and the
+  check's run
+- E2. The new names to the rules thread for the glossary: the five workers and `ModelWorker`, what they replace
+  (`Predictor`, "RTM Pose Detection"), for its wording
 - E3. `INFERENCE.md`: the package is one thing, the camera frames on the GPU and the models on them; the upload and
   the models stay one package, as every app uses them together and the crops and detectors take the upload's images
   **(seen)**. It says what the package's parts are and why (each model's thread, the crops' and outputs' events, the
@@ -123,4 +131,5 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 - `CLAUDE.md` Packages, a package is one thing, and its name is that thing: E3 states the one thing
 - `CLAUDE.md` Docstrings, reasons sit in the package's document: E3
 - `CLAUDE.md` API evolution, remove obsolete pathways: E4
-- `CLAUDE.md` Naming, the domain's term, one everywhere: E1, the workers' names; `glossary.md` follows
+- `CLAUDE.md` Naming, the domain's term, one everywhere (class, setting, panel label): E1, the workers, their settings
+  and timers; `glossary.md` follows: E2
