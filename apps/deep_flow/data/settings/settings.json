@@ -523,6 +523,7 @@
         "radius_3": 0.025
       },
       "temperature": {
+        "enabled": true,
         "advection": "MACCORMACK",
         "limiter": "CLAMP",
         "advection_scale": 2.0,

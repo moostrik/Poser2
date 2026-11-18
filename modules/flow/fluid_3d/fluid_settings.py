@@ -170,6 +170,7 @@ class FineDensitySettings(BaseSettings):
 
 class TemperatureSettings(BaseSettings):
     """The temperature: how it is carried, fades, and lifts or sinks the water."""
+    enabled: Field[bool]            = Field(False,                                      description="The temperature on: the warmth carried and lifting, the density sinking; off, all skipped")
     advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the warmth is carried; only its buoyancy is seen")
     limiter: Field[Limiter]         = Field(Limiter.CLAMP,                              description="Where MacCormack overshoots: clamped to the step's bounds, or the plain step")
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey",      description="How far the temperature is carried per step; 1 = with the water, above it runs ahead")

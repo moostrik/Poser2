@@ -64,7 +64,7 @@ def distance(size: tuple[int, int, int], box: tuple[float, float, float]) -> np.
 
 
 def fluid_at(overrides: list[str]) -> Fluid3D:
-    fluid = Fluid3D(mc.fluid_settings(Advection.SEMI_LAGRANGIAN, ['wall=CLOSED', 'fine_density.enabled=0',
+    fluid = Fluid3D(mc.fluid_settings(Advection.SEMI_LAGRANGIAN, ['wall=CLOSED', 'temperature.enabled=1', 'fine_density.enabled=0',
                                                                     'particles.enabled=0', 'composite.light.enabled=0',
                                                                     *overrides]))
     fluid.allocate(*OUTPUT)

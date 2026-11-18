@@ -127,7 +127,7 @@ class Fluid3D:
         # Velocity always uses Dirichlet (v=0 at walls); others configurable via _apply_wall_modes().
         self._velocity: SwapTexture3D = SwapTexture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         self._temperature: SwapTexture3D = SwapTexture3D()
-        self._temperature_clear: bool = False      # both buffers 0 since buoyancy went to 0
+        self._temperature_clear: bool = False      # both buffers 0 since the temperature went off
         self._pressure: SwapTexture3D = SwapTexture3D()
         # The MacCormack predictors, one per carried field, allocated at its first MacCormack step
         self._temperature_scratch: Texture3D = Texture3D()
@@ -589,9 +589,9 @@ class Fluid3D:
 
     def _advect_temperature(self) -> None:
         """The temperature carried one step by the projected faces, beside the density, faded and evaporated; the
-        buoyancy reads it the next step."""
-        if self.settings.temperature.buoyancy == 0.0:
-            if not self._temperature_clear:     # cleared once; nothing adds to it while buoyancy is 0
+        buoyancy reads it the next step; while `temperature.enabled` is off, cleared once and skipped."""
+        if not self.settings.temperature.enabled:
+            if not self._temperature_clear:     # cleared once; nothing adds to it while it is off
                 self._temperature.clear_all()
                 self._temperature_clear = True
             return
@@ -609,12 +609,12 @@ class Fluid3D:
         amount, T the warmth, the difference from the room's (Boussinesq), kept as it is in `buoyancy`, added × dt
         like every body force (Fedkiw 2001).
 
-        Dense density sinks along gravity; hot (fresh) density rises against it.
-        The weight term acts wherever density is, so it stays active even
-        with thermal buoyancy at 0.
+        Dense density sinks along gravity; hot (fresh) density rises against it. The weight term acts wherever
+        density is, so it stays active with `buoyancy` at 0; the pass, the weight included, runs while
+        `temperature.enabled` is on.
         """
         temp = self.settings.temperature
-        if temp.buoyancy == 0.0 and temp.sink == 0.0:
+        if not temp.enabled:
             return
 
         sigma = temp.buoyancy
@@ -1013,7 +1013,7 @@ class Fluid3D:
         most ±1, the water in the slab dragged toward it over input.temperature_drag where the body is warmer (or
         colder) than the water; never back toward a fainter body: as the density's, held at the body, cooled by the
         fade alone."""
-        if not self._allocated or self.settings.temperature.buoyancy == 0.0:      # nothing reads it
+        if not self._allocated or not self.settings.temperature.enabled:      # nothing reads it
             return
         input = self.settings.input
         share: float = drag_share(self._dt, input.temperature_drag) * weight

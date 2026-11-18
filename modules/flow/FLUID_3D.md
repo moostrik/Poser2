@@ -41,7 +41,7 @@ A step (`Fluid3D.update`), in order, at the code's defaults:
 | buoyancy    | gravity × (sink × the density's amount − buoyancy × the warmth, 0 the room's), kept as an acceleration at the cells, each face given its two cells' mean × dt; gravity down the screen (`gravity_y` −1, y up)                                                          | acceleration        | no                   |
 | incompress  | the divergence per cell from its six faces, the pressure by `pressure.solver` ([The pressure](#the-pressure)), the gradient per face from its two cells, on the walls ([The walls](#the-walls))                                                                         | pressure, faces     | no                   |
 | centers     | the faces averaged to the cells' centers, which the densities, the particles and the monitors read                                                                                                                                                                      | velocity            | no                   |
-| advect_temp | the temperature carried by the projected faces, as the density is by their centers, so the buoyancy reads the step before's; off: `buoyancy` 0 clears it once, and nothing is injected into it                                                                          | temperature         | the trace distance   |
+| advect_temp | the temperature carried by the projected faces, as the density is by their centers, so the buoyancy reads the step before's; off: `enabled` off clears it once, and nothing is injected into it                                                                         | temperature         | the trace distance   |
 | advect_den  | semi-Lagrangian advection, one trilinear read per texel, the evaporation taking the alpha down, the color with it                                                                                                                                                       | density 448×800×24  | the trace distance   |
 | composite   | front-to-back march, one step per layer                                                                                                                                                                                                                                 | output 2160×3840    | no                   |
 
@@ -326,8 +326,8 @@ the divergence's one more read among it, and 0.09 for each injection. With an op
 
 ### The buoyancy
 
-An acceleration at the cells, gravity × (`sink` × the density's amount − `buoyancy` × the warmth)
-(`buoyancy_3d.comp`), each face given its two cells' mean × dt before the projection (Fedkiw, Stam and Jensen
+While `temperature.enabled` is on, an acceleration at the cells, gravity × (`sink` × the density's amount −
+`buoyancy` × the warmth) (`buoyancy_3d.comp`), each face given its two cells' mean × dt before the projection (Fedkiw, Stam and Jensen
 2001). The density's amount is its alpha, in RGB and in Oklab alike. The projection takes the part the water
 around cannot let through: a uniform push on a sphere in still water moves it at 2/3 of the push, the rest moving
 the water around it, its added mass, half the sphere's **(deduction)**.
@@ -458,8 +458,9 @@ as a tuning:
 The fields' physics take the textbook's water, with no artificial decay or thickness, as defaults: the
 fields' `fade_time` and `evaporation_time` 0 (off: the water keeps its momentum, the density and the warmth
 stay until the water carries them away), `viscosity` 0 (water at this scale), `pressure.iterations` 40
-(GPU Gems' 40 to 80 for a Jacobi solve), `temperature.sink` and `buoyancy` 0 (the density as heavy as the
-water, no lift), gravity (0, −1, 0), down the screen in the grid's frame, y up as OpenGL's textures (Bridson
+(GPU Gems' 40 to 80 for a Jacobi solve), `temperature.enabled` off, its injection, advection and buoyancy
+pass skipped, the weight's sink with them, and `sink` and `buoyancy` 0 (the density as heavy as the water, no
+lift), gravity (0, −1, 0), down the screen in the grid's frame, y up as OpenGL's textures (Bridson
 2015), every wall closed; the top speed off, a failsafe; the bridge's mix the boundary's trail alone and its lowpass's `smooth` its default
 160 ms, since the coast is the fluid's; the three confinements off (`vorticity.strength_1` to `_3` 0), each over its neighbors
 (`vorticity.radius_1` to `_3` one cell) where it runs, Fedkiw's ε 0.3 the textbook's start; in z, `input.spread` 0.2 widths, a body's thickness at

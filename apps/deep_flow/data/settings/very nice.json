@@ -489,6 +489,7 @@
         "radius_3": 0.025
       },
       "temperature": {
+        "enabled": false,
         "advection": "SEMI_LAGRANGIAN",
         "limiter": "CLAMP",
         "advection_scale": 1.0,
