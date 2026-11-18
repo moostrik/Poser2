@@ -605,8 +605,9 @@ class Fluid3D:
                            guard='temperature', limiter=self.settings.temperature.limiter)
 
     def _apply_buoyancy(self) -> None:
-        """Apply buoyancy to velocity: the acceleration f = gravity * (κρ − σ(T − T_ambient)) (widths/s²),
-        kept as it is in `buoyancy`, added × dt like every body force (Fedkiw 2001).
+        """Apply buoyancy to velocity: the acceleration f = gravity * (κρ − σT) (widths/s²), ρ the density's
+        amount, T the warmth, the difference from the room's (Boussinesq), kept as it is in `buoyancy`, added × dt
+        like every body force (Fedkiw 2001).
 
         Dense density sinks along gravity; hot (fresh) density rises against it.
         The weight term acts wherever density is, so it stays active even
@@ -626,7 +627,7 @@ class Fluid3D:
             weight if weight is not None else self._no_density,
             self._obstacle,
             self._buoyancy_force_vol,
-            sigma, kappa, temp.ambient,
+            sigma, kappa,
             gravity=gravity,
             has_obstacles=self._has_obstacles
         )

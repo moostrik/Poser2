@@ -38,7 +38,7 @@ A step (`Fluid3D.update`), in order, at the code's defaults:
 | advect_vel  | self-advection on the faces by `velocity.advection`, each face traced on its own ([The staggered velocity](#the-staggered-velocity)), `velocity.advection_scale` 1, no fade; on its result the guard ([The guard](#the-guard)) and the slip | velocity's faces    | the trace distance   |
 | viscosity   | Jacobi diffusion on the faces, off (`viscosity` 0)                                                                                                                                                                                                                      | velocity's faces    | no                   |
 | vorticity   | the confinements (`vorticity.strength_1` to `_3`, each at its `vorticity.radius_1` to `_3`): every running one's curl at the cells from the faces in one pass, their forces summed at the cells in one, each face given its two cells' mean | faces, curl         | no                   |
-| buoyancy    | gravity × (sink × the density's amount − buoyancy × ΔT), kept as an acceleration at the cells, each face given its two cells' mean × dt; gravity down the screen (`gravity_y` 1)                                                                                        | acceleration        | no                   |
+| buoyancy    | gravity × (sink × the density's amount − buoyancy × the warmth, 0 the room's), kept as an acceleration at the cells, each face given its two cells' mean × dt; gravity down the screen (`gravity_y` 1)                                                                  | acceleration        | no                   |
 | incompress  | the divergence per cell from its six faces, the pressure by `pressure.solver` ([The pressure](#the-pressure)), the gradient per face from its two cells, on the walls ([The walls](#the-walls))                                                                         | pressure, faces     | no                   |
 | centers     | the faces averaged to the cells' centers, which the densities, the particles and the monitors read                                                                                                                                                                      | velocity            | no                   |
 | advect_temp | the temperature carried by the projected faces, as the density is by their centers, so the buoyancy reads the step before's; off: `buoyancy` 0 clears it once, and nothing is injected into it                                                                          | temperature         | the trace distance   |
@@ -432,9 +432,8 @@ as a tuning:
 The fields' physics take the textbook's water, with no artificial decay or thickness, as defaults: the
 fields' `fade_time` and `evaporation_time` 0 (off: the water keeps its momentum, the density and the warmth
 stay until the water carries them away), `viscosity` 0 (water at this scale), `pressure.iterations` 40
-(GPU Gems' 40 to 80 for a Jacobi solve), `temperature.sink` 0 and `ambient`
-0 (the density as heavy as the water, no buoyancy), gravity down the screen, every wall closed; the top
-speed off, a failsafe; the bridge's mix the boundary's trail alone and its lowpass's `smooth` its default
+(GPU Gems' 40 to 80 for a Jacobi solve), `temperature.sink` and `buoyancy` 0 (the density as heavy as the
+water, no lift), gravity down the screen, every wall closed; the top speed off, a failsafe; the bridge's mix the boundary's trail alone and its lowpass's `smooth` its default
 160 ms, since the coast is the fluid's; the three confinements off (`vorticity.strength_1` to `_3` 0), each over its neighbors
 (`vorticity.radius_1` to `_3` one cell) where it runs, Fedkiw's ε 0.3 the textbook's start; in z, `input.spread` 0.2 widths, a body's thickness at
 the camera's crop (from its `view_span` of 0.76 m, **(deduction)**) where it is at least half there. Kept as tuned: the composite's look (`emission`, `opacity`,
@@ -734,7 +733,9 @@ off at a moving edge as a fixed amount does. Each step takes ρ × exp(−dt / (
 `evaporation_knee`))), never below 0 at any step. It takes the alpha of a density, the length of a velocity, |r|
 of the temperature, and scales every channel with it, so a color keeps its hue, a velocity its direction and a
 warmth its sign (`evaporate` in `advect_3d.comp` and `maccormack_3d.comp`; the faces', the fine density's and the
-particles' mass the same). `temperature.buoyancy` is per unit of warmth.
+particles' mass the same). The warmth is the difference from the room's (Boussinesq), −1 to 1, 0 the room's,
+so the fade and the evaporation, taking it toward 0, are its cooling toward the room's (Newton's law of
+cooling); `temperature.buoyancy` is per unit of warmth.
 
 ## The look
 

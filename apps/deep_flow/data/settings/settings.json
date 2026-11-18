@@ -30,8 +30,8 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 2499,
-        "auto_exposure": false,
+        "iso": 5832,
+        "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
         "auto_iso_limit": 16585,
@@ -42,8 +42,8 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 3933,
-        "auto_balance": false,
+        "balance": 3865,
+        "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
         "contrast": 0,
@@ -496,10 +496,10 @@
         "velocity_drag": 75.0,
         "velocity_gain": 1.0,
         "acceleration_gain": 10.0,
-        "density_blend": "OVER",
         "density_drag": 229.0,
         "density_release": 0.0,
         "density_gain": 5.0,
+        "density_blend": "OVER",
         "temperature_drag": 200.0,
         "temperature_gain": 1.0,
         "expansion_rate": 5.0
@@ -519,7 +519,7 @@
         "strength_2": 0.0,
         "strength_3": 0.0,
         "radius_1": 0.1,
-        "radius_2": 0.006,
+        "radius_2": 0.01,
         "radius_3": 0.025
       },
       "temperature": {
@@ -533,8 +533,7 @@
         "sink": 0.0,
         "gravity_x": 0.0,
         "gravity_y": 1.0,
-        "gravity_z": 0.0,
-        "ambient": 0.0
+        "gravity_z": 0.0
       },
       "pressure": {
         "solver": "MULTIGRID",
@@ -549,9 +548,9 @@
         "color_space": "OKLAB",
         "advection": "MACCORMACK",
         "limiter": "CLAMP",
-        "advection_scale": 0.88,
+        "advection_scale": 2.0,
         "fade_time": 0.0,
-        "evaporation_time": 159.0,
+        "evaporation_time": 30.0,
         "evaporation_knee": 0.1
       },
       "fine_density": {

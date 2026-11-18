@@ -103,12 +103,6 @@ buoyancy × warmth) along gravity, at the faces, added before the projection; th
 cooling toward the room's. The buoyancy's formula is that already (`buoyancy_3d.comp`); the steps below are
 where the code differs.
 
-- **E3.** The warmth is the difference from the room's (Boussinesq), as the injection makes it, −1 to 1, 0 =
-  the room's: `temperature.ambient` goes, and the fade and the evaporation take the warmth toward 0, which is
-  then the cooling toward the room's (Newton's law). It goes from `TemperatureSettings`, `buoyancy_3d.py`
-  (`ambient_temperature`), `buoyancy_3d.comp`'s `uAmbientTemperature`, `_apply_buoyancy`'s docstring, both
-  deep_flow presets (`settings.json`, `very nice.json`), and FLUID_3D.md's buoyancy row and defaults; the 2D
-  fluid keeps its `ambient` until line I.
 - **E4.** The warmth from the motion alone: the temperature's mix, an amount capped at 1 (`capped=True`, as the
   expansion's), times `temperature_gain`, its sign and size, where today the `TemperatureBridge` reads it from
   the image's color (R warm, B cold, G damps; ofxFlowTools'), which ties the lift to the player's clothes. The
@@ -124,7 +118,7 @@ where the code differs.
 - **E6.** Checked in the app, in its own panel: what the temperature does to the water and whether it works,
   with `buoyancy` above 0.
 
-E3 and E4 are a commit each, checked by the tests they touch and their shaders' compile; E5 a commit with its
+E4 is a commit, checked by the tests it touches and its shaders' compile; E5 a commit with its
 script and result.
 
 ## F. The 3D fluid's look at 4K
@@ -244,9 +238,7 @@ The cameras:
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
 - Ask to measure a time again when its pass's code or size changes: D6.
-- Name the fluid's things by the textbook word; prefer the flow's textbook units: E3.
 - Shaders get checked in a GPU harness; a measured result names its kind, date, commit and settings: E5.
 - Remove obsolete pathways instead of leaving parallel legacy ones: E4 (the color's warmth).
-- Keep presets and settings schemas in sync with code changes: E3 (`ambient` out of the presets).
 
 Not designed yet, so their rules are not named: C3, F1, F2, H1, I1 to I4.

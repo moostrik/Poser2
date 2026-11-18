@@ -176,12 +176,11 @@ class TemperatureSettings(BaseSettings):
     fade_time: Field[float]         = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the warmth fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds full warmth (±1) takes to fall well above the knee, a saturating loss; 0 = off")
     evaporation_knee: Field[float]  = Field(0.1,    min=0.001,  max=1.0,    widget=Widget.log_slider, color="grey", description="Warmth below which the fall turns from a fixed amount to a share")
-    buoyancy: Field[float]          = Field(0.0,    min=0.0,    max=10.0,   color="deep-orange",    description="Lift per unit of temperature above ambient (widths/s²) against gravity; 0 = none")
+    buoyancy: Field[float]          = Field(0.0,    min=0.0,    max=10.0,   color="deep-orange",    description="Lift per unit of warmth (widths/s²) against gravity; 0 = none")
     sink: Field[float]              = Field(0.0,    min=0.0,    max=20.0,   color="red",            description="Weight per unit of density (widths/s²) along gravity; 0 = as heavy as the water")
     gravity_x: Field[float]         = Field(0.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity direction X")
     gravity_y: Field[float]         = Field(1.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity direction Y; 1 = down the screen")
     gravity_z: Field[float]         = Field(0.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity direction Z; 1 = away from viewer")
-    ambient: Field[float]           = Field(0.0,    min=0.0,    max=1.0,    color="brown",          description="Reference temperature (buoyancy = 0 at this temp)")
 
 
 class PressureSettings(BaseSettings):

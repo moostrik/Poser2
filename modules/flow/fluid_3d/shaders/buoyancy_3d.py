@@ -7,7 +7,7 @@ from modules.gl import Texture3D, ComputeShader
 
 
 class Buoyancy3D(ComputeShader):
-    """Compute the 3D buoyancy force: F = gravity * (κ·density − σ(T − T_ambient))."""
+    """Compute the 3D buoyancy force: F = gravity * (κ·density − σ·T), T the warmth, 0 the room's."""
 
     WORKGROUP_SIZE_X = 8
     WORKGROUP_SIZE_Y = 8
@@ -18,19 +18,18 @@ class Buoyancy3D(ComputeShader):
 
     def use(self, temperature: Texture3D, density: Texture3D,
             obstacle: Texture3D, force_out: Texture3D,
-            sigma: float, kappa: float, ambient_temperature: float,
+            sigma: float, kappa: float,
             gravity: tuple[float, float, float] = (0.0, 1.0, 0.0),
             has_obstacles: bool = True) -> None:
         """Compute the buoyancy force.
 
         Args:
-            temperature: 3D temperature field (R16F)
+            temperature: 3D warmth field (R16F), −1 to 1, 0 the room's
             density: 3D density field (RGBA16F; its weight is its amount, alpha)
             obstacle: 3D obstacle mask (R8)
             force_out: Output force volume (RGBA16F)
-            sigma: Thermal buoyancy (widths/s² per unit of temperature)
+            sigma: Thermal buoyancy (widths/s² per unit of warmth)
             kappa: Density weight (widths/s² per unit of density)
-            ambient_temperature: Reference temperature
             gravity: Gravity direction — (0,1,0) down-screen, (0,0,1) away from viewer
             has_obstacles: Whether obstacle logic is active
         """
@@ -46,7 +45,6 @@ class Buoyancy3D(ComputeShader):
 
         glUniform1f(self.get_uniform_loc("uSigma"), sigma)
         glUniform1f(self.get_uniform_loc("uKappa"), kappa)
-        glUniform1f(self.get_uniform_loc("uAmbientTemperature"), ambient_temperature)
         glUniform3f(self.get_uniform_loc("uGravity"), gravity[0], gravity[1], gravity[2])
         glUniform3i(self.get_uniform_loc("uSize"),
                     force_out.width, force_out.height, force_out.depth)
