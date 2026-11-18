@@ -21,7 +21,7 @@ Per thread, the callbacks in the order they are registered (`apps/deep_flow/main
 | the tracklets' (depthai)                          | queues them for the tracker, the board; `tracker.update`       | nothing                                    |
 | the tracker's                                     | associates the tracklets, to the frame source and the board    | nothing                                    |
 | the frame source's (`TrackerFrameSource`)         | a pose per player, the RAW box steps, the crops, the submit    | nothing                                    |
-| the pose model's (`pose.PoseEstimator`)               | RTMPose on the crops, queues the poses for the pipeline        | its own model                              |
+| the pose model's (`pose.PoseEstimator`)           | RTMPose on the crops, queues the poses for the pipeline        | its own model                              |
 | the pipeline's (`PosePipeline raw`)               | the RAW stage after the model, CLEAN, SMOOTH, their users      | nothing                                    |
 | the detector's (-sim)                             | YOLOv8n on the uploaded image, boxes to the replay camera      | its own model                              |
 | the capture sync's (`CaptureSync`)                | matches the image, depth and poses, hands the capture on       | the next part, or `pose_wait` (0 here)     |
@@ -29,32 +29,10 @@ Per thread, the callbacks in the order they are registered (`apps/deep_flow/main
 
 ### The uploader
 
-The camera's one hand-off, the `SerialUploader` (`modules/inference/serial_uploader.py`): each frame onto the GPU
-on its own, the moment it comes, so the color goes up at once to start the pose. `submit_frame` queues the frame
-and returns: two frames of a kind per camera wait, and a third drops the oldest, counted (`dropped`). Its own
-thread makes the corrected camera frame, which every user of the camera needs:
-
-- the color: `ImageUpload` (`modules/inference/image_upload.py`, the GPU work white_space's `BatchUploader` shares)
-  copies it from a pinned staging buffer (`STAGING_COUNT` 3, reused once the copy queued from it has run),
-  converts it (BGR, NV12 or mono) to RGB half, straightens it by the tilt's homography and mirrors it; it is handed
-  on as a `GpuImage` with the `ready` event its readers wait on, and as an `ImageSnapshot` of one (the image, its
-  camera's previous one, its capture time, the event) to the snapshot callbacks;
-- the depth: copied the same way, turned into metres and moved onto the color's view at a grid as fine as the
-  depth itself (`aligned_depth_size`), the nearest kept where two land on one cell and 0 where nothing lands,
-  straightened and mirrored as the color, handed on as a `GpuDepth` (`modules/inference/depth_align.py`).
-
-The depth's alignment runs as two CUDA kernels compiled at runtime by the NVRTC torch ships
-(`modules/inference/cuda_kernels.py`, through ctypes, no extra package), the GL `DepthAlign` shader's two stages.
-`camera.uploader.depth_kernels` off, or kernels that cannot be compiled or loaded (logged once), run the same in
-torch ops captured as one CUDA graph per lens, homography and size. The torch ops are about a hundred small
-kernels; launched one by one they held the uploader 12 ms a frame while the GPU's queue was full, as each launch
-waits there. `scripts/depth_align_check.py` holds both to the shader on recorded frames.
-
-| Depth alignment, P800 recording | GPU a frame         | Pixels off the GL shader by over 1 mm |
-|---------------------------------|---------------------|---------------------------------------|
-| CUDA kernels (the default)      | 0.07 ms, with copy  | about 1 a frame, at borders           |
-| GL `DepthAlign`                 | 0.13 ms             | the reference                         |
-| torch ops                       | 0.6 to 1.3 ms       | under 2 a frame, at borders           |
+The camera's one hand-off, the `SerialUploader`: each frame onto the GPU on its own, the moment it comes, two
+frames of a kind per camera waiting at most (the oldest dropped, `dropped`). Its own thread makes the corrected
+camera frame, the color and the depth aligned onto it, as [INFERENCE.md](../inference/INFERENCE.md#the-upload)
+describes.
 
 The line between the uploader and the flow: what every user of the camera needs (the color's conversion and
 straightening, the depth's alignment by the camera's calibration) is the uploader's and reads camera settings
@@ -75,7 +53,6 @@ When an image is on the GPU, the uploader hands it to four others, each of which
   (`pose.enabled`), the poses carrying the camera's own keypoints (an OAK4 pose chain) go on as they are. Then the
   recorder hears whether poses come for the image. The uploader knows nothing of poses.
 
-The pose model stays FP32: it loses precision in FP16.
 
 ### No camera sync
 
@@ -85,11 +62,9 @@ tracklet message; `CameraSync` is for the apps with several cameras.
 
 ### The capture sync
 
-`CaptureSync` (`modules/inference/capture_sync.py`) matches an image, its depth and the poses of one moment by
-capture time. With `pose_wait` 0 a capture never waits for its poses: it carries the poses of the frame before,
-which with the view's crop fixed only puts the pose's points drawn over the view a frame behind. Its submits
-queue the parts, at most 8 of a stream per camera (the oldest dropped, `dropped` on the panel), and its own thread
-matches them and hands every complete capture, in the order of capture, to the board.
+`CaptureSync` ([INFERENCE.md](../inference/INFERENCE.md#the-capture-sync)) matches an image, its depth and the
+poses of one moment. With `pose_wait` 0 a capture carries the poses of the frame before, which with the view's crop
+fixed only puts the pose's points drawn over the view a frame behind.
 
 ### The hand-overs' waits
 

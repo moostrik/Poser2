@@ -2,7 +2,7 @@
 
 The flow's view of a capture, the stage before the motion: a box cropped in 3D from the camera image and the
 aligned depth at the motion's size, the player's outline, and the player's depth wherever that outline is. What
-comes before it, the uploader's corrected camera frame, is in [INPUT_THREADS.md](INPUT_THREADS.md#the-uploader);
+comes before it, the uploader's corrected camera frame, is in [INFERENCE.md](../inference/INFERENCE.md#the-upload);
 the sizes it works at and why are in [RESOLUTION.md](RESOLUTION.md). **(deduction)** marks what is inferred.
 
 The stage is `ViewLayer` (settings `view`, deep_flow's own, `apps/deep_flow/render/layers/view/view_layer.py`); its geometry and the

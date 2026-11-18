@@ -1,8 +1,8 @@
 # The inference package's plan
 
 What is not built in `modules/inference`, apart from the threads the app refactor moves
-([apps/APPS_PLAN.md](../../apps/APPS_PLAN.md)). How the input works is in
-[INPUT_THREADS.md](../flow/INPUT_THREADS.md). **(deduction)** marks what is inferred.
+([apps/APPS_PLAN.md](../../apps/APPS_PLAN.md)). What is built is in [INFERENCE.md](INFERENCE.md), how
+the input's threads hand on in [INPUT_THREADS.md](../flow/INPUT_THREADS.md). **(deduction)** marks what is inferred.
 
 ## The check
 
@@ -136,23 +136,9 @@ Questions:
 
 ## E. The package held up again (2026-11-18)
 
-- E4. The new names to the rules thread for the glossary's wording (the names are decided): the five workers and
-  `ModelWorker`, what they replace (`Predictor`, "RTM Pose Detection")
-- E5. `INFERENCE.md`: the package is one thing, the camera frames on the GPU and the models on them; the upload and
-  the models stay one package, as every app uses them together and the crops and detectors take the upload's images
-  **(seen)**. It says what the package's parts are and why (each model's thread, the crops' and outputs' events, the
-  streams, no TensorRT lock), linking the plan's measurements, and takes in what `modules/flow/INPUT_THREADS.md`
-  says of this package. `CameraSync` stays here: it groups one moment's frames of several cameras for the upload
-  (`BatchUploader.submit_set`) **(seen)**, the input's first step, and left the camera package as not a camera
-  (b5ab4515)
 - E6. The leftovers: `Resolution` and `RESOLUTION_DIMS` out of the package's exports (no user outside **(seen)**); the
   empty `tools/` folder; the output types in one pattern, a file named after its type (`detection/io.py`,
   `face/io.py`, `segmentation/image.py`, `optical_flow`'s `FlowDict` in its estimator today **(seen)**)
-
-No thread waits for the GPU between the upload, the crop and the model: the upload and the crop are queued on their
-streams behind the events before them, and a thread waits once, the pose model's at its end, to decode on the CPU
-**(seen)**. The crop cannot join the upload: it cuts the RAW stage's smoothed and predicted box
-(`BBoxEuroSmoother`, `BBoxPredictor`, on the frame source's thread before the async step) **(seen)**.
 
 ## F. The pose's decode on the GPU
 
