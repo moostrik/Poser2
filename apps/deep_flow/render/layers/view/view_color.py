@@ -3,6 +3,7 @@ a matte from its brightness, then premultiplied by the mask. As compositing does
 them, eroded and feathered where the picture is made, so the mask the motion and the depth use stays as it is."""
 
 # Third-party imports
+import numpy as np
 from OpenGL.GL import GL_R16F
 
 # Local application imports
@@ -10,11 +11,12 @@ from modules.flow import Port, TextureKind
 from modules.gl import Fbo, SwapFbo, Style, Texture, shaders
 from ....settings import ViewColorSettings
 from .shaders import Feather, Grade
+from .white_balance import white_balance_matrix
 
 
 class ViewColor:
-    """`process` grades an image (`Grade`) and sharpens it where `sharpen`, while `enabled`, sets its alpha by its
-    brightness where `luma_matte` (`LumaMatte`), then premultiplies it by the mask where `use_mask` (RGB and alpha alike, as the render blends), into its own buffer; the mask's copy
+    """`process` white balances and grades an image (`Grade`) and sharpens it where `sharpen`, while `enabled`,
+    sets its alpha by its brightness where `luma_matte` (`LumaMatte`), then premultiplies it by the mask where `use_mask` (RGB and alpha alike, as the render blends), into its own buffer; the mask's copy
     first eroded by `erode` pixels, then feathered inward over `feather` pixels. `texture` holds the result."""
 
     def __init__(self, settings: ViewColorSettings) -> None:
@@ -23,6 +25,7 @@ class ViewColor:
         self._matte: SwapFbo = SwapFbo()                    # the mask's copy, eroded and blurred in turn
         self._feathered: Fbo = Fbo()                        # the mask's copy feathered, the premultiply's
         self._grade_shader: Grade = Grade()
+        self._white_balance: tuple[float, np.ndarray] | None = None     # the kelvin and its matrix, made when it changes
         self._sharpen_shader: shaders.Sharpen = shaders.Sharpen()
         self._luma_matte_shader: shaders.LumaMatte = shaders.LumaMatte()
         self._erode_shader: shaders.Erode = shaders.Erode()
@@ -42,8 +45,8 @@ class ViewColor:
     def made_with(self) -> tuple:
         """The settings the result is made with, so its owner makes it again when one changes."""
         s: ViewColorSettings = self.settings
-        return (s.enabled, s.exposure, s.offset, s.gamma, s.contrast, s.saturation, s.sharpen, s.luma_matte, s.use_mask,
-                s.erode, s.feather)
+        return (s.enabled, s.white_balance, s.exposure, s.offset, s.gamma, s.contrast, s.saturation, s.sharpen,
+                s.luma_matte, s.use_mask, s.erode, s.feather)
 
     def _shaders(self) -> tuple:
         return (self._grade_shader, self._sharpen_shader, self._luma_matte_shader, self._erode_shader, self._blur_shader, self._feather_shader,
@@ -72,7 +75,8 @@ class ViewColor:
         self._fbo.swap()
         self._fbo.begin()
         if s.enabled:
-            self._grade_shader.use(image, s.exposure, s.offset, s.gamma, s.contrast, s.saturation)
+            self._grade_shader.use(image, self._white_balance_matrix(s.white_balance), s.exposure, s.offset, s.gamma,
+                                   s.contrast, s.saturation)
         else:
             image.draw()
         self._fbo.end()
@@ -93,6 +97,12 @@ class ViewColor:
             self._mask_shader.use(self._fbo.back, matte)
             self._fbo.end()
         Style.pop_style()
+
+    def _white_balance_matrix(self, kelvin: float) -> np.ndarray:
+        """The white balance's matrix for `kelvin`, made again only when it changes."""
+        if self._white_balance is None or self._white_balance[0] != kelvin:
+            self._white_balance = (kelvin, white_balance_matrix(kelvin))
+        return self._white_balance[1]
 
     def _matte_of(self, mask: Texture, erode: int, feather: float) -> Texture:
         """`mask`'s copy, its edge moved inward by `erode` pixels (one 3 × 3 minimum each), then faded in inward over

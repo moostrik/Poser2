@@ -300,15 +300,16 @@
       },
       "color": {
         "enabled": true,
-        "exposure": 0.99,
+        "exposure": 1.0,
         "offset": 0.0,
         "gamma": 0.8,
-        "contrast": 1.24,
-        "saturation": 1.19,
-        "sharpen": 0.82,
+        "contrast": 1.25,
+        "saturation": 1.2,
+        "sharpen": 1.0,
+        "luma_matte": 0.0,
         "use_mask": true,
         "erode": 0,
-        "feather": 0.0
+        "feather": 4.0
       },
       "monitor_main": {
         "texture": "depth.filled",
@@ -344,7 +345,7 @@
       "y_gain": 1.0,
       "z_gain": 0.4,
       "xy": {
-        "levels": 4,
+        "levels": 5,
         "window": "SEVEN",
         "damping": 0.03,
         "smooth_like_z": false,
@@ -494,8 +495,10 @@
         "velocity_drag": 75.0,
         "velocity_gain": 0.78,
         "acceleration_gain": 4.0,
-        "density_drag": 245.0,
-        "density_gain": 10.0,
+        "density_blend": "OVER",
+        "density_drag": 75.0,
+        "density_release": 0.0,
+        "density_gain": 5.0,
         "temperature_drag": 200.0,
         "temperature_gain": 1.0,
         "expansion_rate": 5.0
@@ -542,6 +545,7 @@
         "width": 448,
         "height": 800,
         "depth": 64,
+        "color_space": "OKLAB",
         "advection": "MACCORMACK",
         "limiter": "CLAMP",
         "advection_scale": 0.88,

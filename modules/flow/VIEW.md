@@ -27,7 +27,7 @@ its textures, ports and settings group, and the monitor lists each part's textur
 | `crop` (`ViewCrop`)          | the box in 3D: `image`, the camera image inside its sides (`center_x`, `center_y`, `height`) at the view's `width` × `height`; who: `depth`, the camera's depth inside its front and back (`near`, `far`) on the depth's own pixels, unblended, 0 outside (`DepthCrop`) |
 | `mask` (`ViewMask`)          | where: `mask`, the crop's depth's outline moved onto the image's ([The mask](#the-mask)) |
 | `depth` (`ViewDepth`)        | how far: `upscaled`, the aligned depth upscaled to the view once where it is the player's and the mask is; `filled`, that filled across the mask, the view's depth ([The depth](#the-depth)), a `DepthView` ([MOTION.md](MOTION.md#when-it-measures)) |
-| `color` (`ViewColor`)        | `color`, the player's color for the density: the image graded (`exposure`, `offset`, `gamma`, `contrast`, `saturation`) and sharpened (`sharpen`), its alpha a matte from its brightness (`luma_matte`), premultiplied last by the mask's copy (`use_mask`), its edge eroded by `erode` and feathered inward over `feather` view pixels |
+| `color` (`ViewColor`)        | `color`, the player's color for the density: the image white balanced (`white_balance`) and graded (`exposure`, `offset`, `gamma`, `contrast`, `saturation`) and sharpened (`sharpen`), its alpha a matte from its brightness (`luma_matte`), premultiplied last by the mask's copy (`use_mask`), its edge eroded by `erode` and feathered inward over `feather` view pixels |
 | the pose                     | the pose's points placed in the crop, for the pose drawn over the view               |
 
 ```mermaid
@@ -67,6 +67,14 @@ The color part works on the straight image and premultiplies it by the mask last
 compositing does and as the render blends (Porter and Duff 1984; Brinkmann): grading or sharpening a cut image
 changes its half-masked edge apart from the rest and pulls the cut's black into the edge. With `color.enabled` off
 the color is the image as it is, matted and masked as set.
+
+The white balance is the grade's first step, before the exposure, as a camera's: `white_balance` is the light
+the image is corrected for, in kelvin, lower cooler and higher warmer, 6500 K unchanged. The color is decoded to
+linear light, its white adapted from that light's (a blackbody's, on the Planckian locus by Kim et al. 2002) to
+the 6500 K blackbody's by Bradford's chromatic adaptation, its brightness kept, and encoded again (`Grade`); the
+matrix is made on the CPU when the setting changes (`white_balance.py`). It colors only the density: the
+camera's own `balance` and `auto_balance` change the whole image, which the pose sees too, and with
+`auto_balance` on the camera's colors move under it. Named white balance, as temperature is the fluid's.
 
 The luma matte, after the grading and the sharpening and before the premultiply, is a matte from the color's
 brightness, its brightest channel (HSV's value), as video compositing mattes a picture by its brightness: darkness

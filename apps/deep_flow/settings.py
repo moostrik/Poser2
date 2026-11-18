@@ -223,10 +223,11 @@ class ViewMaskSettings(BaseSettings):
 
 
 class ViewColorSettings(BaseSettings):
-    """ViewColor: the image graded, in the order applied, then sharpened, its alpha a matte from its brightness;
+    """ViewColor: the image white balanced and graded, in the order applied, then sharpened, its alpha a matte from its brightness;
     then premultiplied by the mask's copy, eroded and feathered."""
     enabled:    Field[bool]  = Field(True, description="The color graded; off, the image as it is")
-    exposure:   Field[float] = Field(1.0, min=0.1, max=3.0, newline=True, description="The color times this")
+    white_balance: Field[float] = Field(6500.0, min=2000.0, max=12000.0, step=50.0, newline=True, description="The light the color is corrected for (K); lower cools, higher warms; 6500 = unchanged")
+    exposure:   Field[float] = Field(1.0, min=0.1, max=3.0, description="The color times this")
     offset:     Field[float] = Field(0.0, min=-0.5, max=0.5, description="Added to the color, after the exposure")
     gamma:      Field[float] = Field(1.0, min=0.5, max=2.0, description="Gamma")
     contrast:   Field[float] = Field(1.0, min=0.5, max=2.0, description="Contrast around mid grey")

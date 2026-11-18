@@ -1,6 +1,7 @@
 #version 460 core
 
 uniform sampler2D src;
+uniform mat3 white_balance;     // on linear sRGB: the chosen light's white to 6500 K's
 uniform float exposure;
 uniform float offset;
 uniform float gamma;
@@ -14,7 +15,8 @@ out vec4 fragColor;
 
 void main() {
     vec4 color = texture(src, texCoord);
-    vec3 graded = color.rgb * exposure + offset;
+    vec3 balanced = linear_to_srgb(white_balance * srgb_to_linear(color.rgb));
+    vec3 graded = balanced * exposure + offset;
     graded = pow(max(graded, 0.0), vec3(1.0 / gamma));
     graded = clamp((graded - 0.5) * contrast + 0.5, 0.0, 1.0);
     vec3 hsv = rgb2hsv(graded);

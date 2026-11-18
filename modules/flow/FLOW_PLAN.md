@@ -86,12 +86,14 @@ the same water **(site fact)**.
 Built (2026-11-17): the density's color with its coverage, and its amount apart (Porter and Duff 1984: alpha is
 coverage); the luma matte in the view ([VIEW.md](VIEW.md#the-stage)), the bridge's two outputs
 ([BRIDGE_3D.md](BRIDGE_3D.md#the-mix)); the density's blend, over or added, and its color space, RGB or Oklab
-([FLUID_3D.md](FLUID_3D.md#the-densitys-blend)), committed before the app's check on Matthias's word.
+([FLUID_3D.md](FLUID_3D.md#the-densitys-blend)), committed before the app's check on Matthias's word. Built (2026-11-18): the view's white balance
+([VIEW.md](VIEW.md#the-stage)).
 
 - **D6.** The checks. In the app: no dark rim at any gain; the luma matte from 0 to 1; `over` leaves no patches
   where the input meets older density; `add` builds up without going white; `oklab` mixes without turning
   muddy; the monitor's `IMAGE` shows what the composite shows. The injection's and the march's times measured
-  again, with -sim while Matthias is away; the preset saved after.
+  again, with -sim while Matthias is away; the preset saved after. The view's `white_balance` pulls a warm room
+  light to white.
 
 ## E. The 3D fluid's physics
 
