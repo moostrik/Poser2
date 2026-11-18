@@ -351,7 +351,8 @@ frame. How a frame gets there, thread by thread, and what costs frames are in
   one per bridge output); a 0 to 1 share in a mix is a `weight`. The gains sit at the two ends: the motion's
   `x_gain`, `y_gain`, `z_gain` say how much of each axis is the body's motion, the fluid's how strongly the
   water takes it; the bridge has none **(site fact)**, it translates and holds; the density's sinking along gravity
-  in the buoyancy is `temperature.sink`, which both fluids read (`Fluid2D._apply_buoyancy`).
+  in the buoyancy is the 2D fluid's `temperature.sink` (`Fluid2D._apply_buoyancy`) and the 3D fluid's
+  `density.sink`.
 - `modules/render/modules/flow/tests/test_flow_systems.py` loads each app preset into its system's stage
   settings and fails on an unknown key, and fails on a field of the flow's settings that no code
   in `modules/flow` or `modules/render/modules/flow` names: such a field is dead **(deduction)**.

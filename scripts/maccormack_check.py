@@ -66,7 +66,7 @@ def fluid_settings(advection: Advection, overrides: list[str]) -> Fluid3DSetting
     """deep_flow's preset fluid, every field carried by `advection`, and the settings changed by path."""
     settings = Fluid3DSettings()
     settings.update_from_dict(preset_fluid())
-    for field in (settings.velocity, settings.density, settings.temperature):
+    for field in (settings.velocity, settings.density):      # the temperature is carried as the density is
         field.advection = advection
     for item in overrides:
         path, value = item.split('=', 1)

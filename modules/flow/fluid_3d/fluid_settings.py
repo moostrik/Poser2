@@ -105,12 +105,16 @@ class TimeSettings(BaseSettings):
 class InputSettings(BaseSettings):
     """The bridge's input, in the order the layer injects it: how thick the body is in the box's depth; the
     boundary's velocity and temperature, each the water dragged toward the body's value times a gain (capped at
-    ±1 warm) over a time; the body force's acceleration added × dt times a gain; the density, its dye over the
-    water's, added, or the water drawn toward it; the expansion's rate."""
+    ±1 warm) over a time; the body force's acceleration added × dt times a gain, and gravity's direction, which
+    the density's weight and the warmth's lift act along; the density, its dye over the water's, added, or the
+    water drawn toward it; the expansion's rate."""
     spread: Field[float]            = Field(0.2,    min=0.0,    max=1.0,    step=0.001,             description="The body's thickness in z, widths, where it is at least half there; 0 = none")
     velocity_drag: Field[float]     = Field(50.0,   min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Time the water takes to close the gap to the body's velocity (ms); 0 = at once")
     velocity_gain: Field[float]     = Field(1.0,    min=-10.0,  max=10.0,   color="teal",           description="The body's velocity times this is what the water is dragged toward; 1 = as fast as the body")
     acceleration_gain: Field[float] = Field(1.0,    min=-10.0,  max=10.0,   color="teal",           description="The body force's acceleration times this is added × dt; 1 = its Δv added once")
+    gravity_x: Field[float]         = Field(0.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity's direction, x right")
+    gravity_y: Field[float]         = Field(-1.0,   min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity's direction, y up; -1 = down the screen")
+    gravity_z: Field[float]         = Field(0.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity's direction, z; 1 = away from the viewer")
     density_drag: Field[float]      = Field(200.0,  min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Over, fill: time the water takes to take on the body's dye (ms); 0 = at once")
     density_release: Field[float]   = Field(0.0,    min=0.0,    max=1000.0, step=1.0, color="cyan", description="Time the water's dye takes to fall to the body's where it is less (ms); 0 = never falls")
     density_gain: Field[float]      = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's amount times this; over, fill: at most fully dyed; 1 = fully dyed at 1 width/s")
@@ -144,14 +148,16 @@ class VorticitySettings(BaseSettings):
 
 
 class DensitySettings(BaseSettings):
-    """The density: its size, its color space, how it is carried, fades and evaporates."""
+    """The density: its size, its color space, its weight, how it and the temperature are carried, how it fades and
+    evaporates."""
     width: Field[int]               = Field(448,    min=32,     max=4096,   step=8,                 description="The density's width; the dye's is the bridge's width")
     height: Field[int]              = Field(800,    min=32,     max=4096,   step=8,                 description="The density's height; the dye's is the bridge's height")
     depth: Field[int]               = Field(24,     min=4,      max=256,    step=4,                 description="The density's depth in z")
     color_space: Field[ColorSpace]  = Field(ColorSpace.RGB,                                         description="The color stored as RGB, or as Oklab, mixing as the eye sees; a switch clears the density")
-    advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,  newline=True,   description="How the density and the fine density are carried: MacCormack keeps their edges sharp")
+    sink: Field[float]              = Field(0.0,    min=0.0,    max=20.0,   color="red", newline=True, description="Weight per unit of amount (widths/s²) along gravity; 0 = as heavy as the water")
+    advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,  newline=True,   description="How the density, the fine density and the temperature are carried: MacCormack keeps edges sharp")
     limiter: Field[Limiter]         = Field(Limiter.CLAMP,                              description="Where MacCormack overshoots: clamped to the step's bounds, or the plain step")
-    advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey",      description="How far the density is carried per step; 1 = with the water, above it runs ahead")
+    advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey",      description="How far the density and the temperature are carried per step; 1 = with the water")
     fade_time: Field[float]         = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the density fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds fully dyed water takes to clear well above the knee, a saturating loss; 0 = off")
     evaporation_knee: Field[float]  = Field(0.1,    min=0.001,  max=1.0,    widget=Widget.log_slider, color="grey", description="Dye (0 to 1) below which the clearing turns from a fixed amount to a share")
@@ -169,19 +175,12 @@ class FineDensitySettings(BaseSettings):
 
 
 class TemperatureSettings(BaseSettings):
-    """The temperature: how it is carried, fades, and lifts or sinks the water."""
-    enabled: Field[bool]            = Field(False,                                      description="The temperature on: the warmth carried and lifting, the density sinking; off, all skipped")
-    advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the warmth is carried; only its buoyancy is seen")
-    limiter: Field[Limiter]         = Field(Limiter.CLAMP,                              description="Where MacCormack overshoots: clamped to the step's bounds, or the plain step")
-    advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey",      description="How far the temperature is carried per step; 1 = with the water, above it runs ahead")
-    fade_time: Field[float]         = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the warmth fades to 1%, a share at a time; 0 = off")
+    """The temperature: its lift and how it cools; carried as the density is."""
+    enabled: Field[bool]            = Field(False,                                      description="The warmth on: injected, carried and lifting while buoyancy is above 0; off, skipped")
+    buoyancy: Field[float]          = Field(0.0,    min=0.0,    max=10.0,   color="deep-orange",    description="Lift per unit of warmth (widths/s²) against gravity; 0 = none")
+    fade_time: Field[float]         = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", newline=True, description="Seconds until the warmth fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds full warmth (±1) takes to fall well above the knee, a saturating loss; 0 = off")
     evaporation_knee: Field[float]  = Field(0.1,    min=0.001,  max=1.0,    widget=Widget.log_slider, color="grey", description="Warmth below which the fall turns from a fixed amount to a share")
-    buoyancy: Field[float]          = Field(0.0,    min=0.0,    max=10.0,   color="deep-orange",    description="Lift per unit of warmth (widths/s²) against gravity; 0 = none")
-    sink: Field[float]              = Field(0.0,    min=0.0,    max=20.0,   color="red",            description="Weight per unit of density (widths/s²) along gravity; 0 = as heavy as the water")
-    gravity_x: Field[float]         = Field(0.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity direction X")
-    gravity_y: Field[float]         = Field(-1.0,   min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity direction Y, y up; -1 = down the screen")
-    gravity_z: Field[float]         = Field(0.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity direction Z; 1 = away from viewer")
 
 
 class PressureSettings(BaseSettings):

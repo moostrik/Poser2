@@ -587,39 +587,48 @@ class Fluid3D:
                                             self._closed, self._has_obstacles)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
+    @property
+    def _temperature_runs(self) -> bool:
+        """Whether the temperature is injected, carried and lifts: `temperature.enabled` and its `buoyancy` above 0."""
+        temperature = self.settings.temperature
+        return temperature.enabled and temperature.buoyancy > 0.0
+
     def _advect_temperature(self) -> None:
-        """The temperature carried one step by the projected faces, beside the density, faded and evaporated; the
-        buoyancy reads it the next step; while `temperature.enabled` is off, cleared once and skipped."""
-        if not self.settings.temperature.enabled:
-            if not self._temperature_clear:     # cleared once; nothing adds to it while it is off
+        """The temperature carried one step by the projected faces, beside the density and as it is (the density's
+        `advection`, `limiter` and `advection_scale`), faded and evaporated by its own; the buoyancy reads it the next
+        step; while it does not run, cleared once and skipped."""
+        if not self._temperature_runs:
+            if not self._temperature_clear:     # cleared once; nothing adds to it while it does not run
                 self._temperature.clear_all()
                 self._temperature_clear = True
             return
         self._temperature_clear = False
 
-        advect_step = self._dt * self.settings.temperature.advection_scale
-        dissipation = self._calculate_dissipation(self._dt, self.settings.temperature.fade_time)
-        self._advect_field(self._temperature, self._temperature_scratch, self._velocity, self.settings.temperature.advection, advect_step, dissipation, GL_R16F,
-                           evaporation=self._evaporation(self._dt, self.settings.temperature.evaporation_time),
-                           evaporation_knee=self.settings.temperature.evaporation_knee, measure=2,
-                           guard='temperature', limiter=self.settings.temperature.limiter)
+        temperature = self.settings.temperature
+        density = self.settings.density
+        advect_step = self._dt * density.advection_scale
+        dissipation = self._calculate_dissipation(self._dt, temperature.fade_time)
+        self._advect_field(self._temperature, self._temperature_scratch, self._velocity, density.advection, advect_step, dissipation, GL_R16F,
+                           evaporation=self._evaporation(self._dt, temperature.evaporation_time),
+                           evaporation_knee=temperature.evaporation_knee, measure=2,
+                           guard='temperature', limiter=density.limiter)
 
     def _apply_buoyancy(self) -> None:
         """Apply buoyancy to velocity: the acceleration f = gravity * (κρ − σT) (widths/s²), ρ the density's
         amount, T the warmth, the difference from the room's (Boussinesq), kept as it is in `buoyancy`, added × dt
         like every body force (Fedkiw 2001).
 
-        Dense density sinks along gravity; hot (fresh) density rises against it. The weight term acts wherever
-        density is, so it stays active with `buoyancy` at 0; the pass, the weight included, runs while
-        `temperature.enabled` is on.
+        Dense density sinks along gravity (`density.sink`); warm water rises against it (`temperature.buoyancy`,
+        while the temperature runs). The pass runs while either is above 0; gravity is `input`'s.
         """
-        temp = self.settings.temperature
-        if not temp.enabled:
+        lift: float = self.settings.temperature.buoyancy if self._temperature_runs else 0.0
+        kappa: float = self.settings.density.sink
+        if lift <= 0.0 and kappa <= 0.0:
             return
 
-        sigma = temp.buoyancy
-        kappa = temp.sink
-        gravity = (temp.gravity_x, temp.gravity_y, temp.gravity_z)
+        sigma = lift
+        input = self.settings.input
+        gravity = (input.gravity_x, input.gravity_y, input.gravity_z)
 
         weight: Texture3D | None = self._density.weight
         self._buoyancy_shader.use(
@@ -1013,7 +1022,7 @@ class Fluid3D:
         most ±1, the water in the slab dragged toward it over input.temperature_drag where the body is warmer (or
         colder) than the water; never back toward a fainter body: as the density's, held at the body, cooled by the
         fade alone."""
-        if not self._allocated or not self.settings.temperature.enabled:      # nothing reads it
+        if not self._allocated or not self._temperature_runs:      # nothing reads it
             return
         input = self.settings.input
         share: float = drag_share(self._dt, input.temperature_drag) * weight

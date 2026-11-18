@@ -2,7 +2,7 @@
 
 The fluid at deep_flow's preset, every wall closed, the water at rest. A sphere `--radius` widths across at the
 box's middle holds a uniform warmth (`--warmth`, `temperature.buoyancy` `--buoyancy`), or, with the warmth 0, a
-uniform density of amount `--amount` (`temperature.sink` `--sink`), its color in RGB or in Oklab (a and b
+uniform density of amount `--amount` (`density.sink` `--sink`, the temperature off), its color in RGB or in Oklab (a and b
 negative). One buoyancy pass, then one projection. It prints:
 
 - the force at the cells against the textbook's, gravity × (sink × amount − buoyancy × warmth): its largest
@@ -87,14 +87,14 @@ def first_step(fluid: Fluid3D, inside: np.ndarray, expected: float) -> float:
     fluid._enforce_incompressibility()
     fluid._faces_to_centers()
     velocity = read(fluid._velocity)
-    t = fluid.settings.temperature
+    t = fluid.settings.input
     gravity = (t.gravity_x, t.gravity_y, t.gravity_z)
     along = sum(velocity[..., i] * g for i, g in enumerate(gravity)) / max(sum(g * g for g in gravity), 1e-12)
     return float(along[inside].mean()) / (expected * fluid._dt)
 
 
 def warm(args, overrides: list[str]) -> None:
-    fluid = fluid_at([f'temperature.buoyancy={args.buoyancy}', 'temperature.sink=0', *overrides])
+    fluid = fluid_at(['temperature.enabled=1', f'temperature.buoyancy={args.buoyancy}', 'density.sink=0', *overrides])
     try:
         cells = fluid._cells
         r = distance(cells, box_of(fluid))
@@ -102,7 +102,7 @@ def warm(args, overrides: list[str]) -> None:
         upload(fluid._temperature, warmth)
         fluid._apply_buoyancy()
         force = read(fluid._buoyancy_force_vol)[..., :3]
-        t = fluid.settings.temperature
+        t = fluid.settings.input
         gravity = np.array((t.gravity_x, t.gravity_y, t.gravity_z))
         textbook = -args.buoyancy * warmth[..., None] * gravity
         error = float(np.abs(force - textbook).max())
@@ -120,7 +120,7 @@ def warm(args, overrides: list[str]) -> None:
 
 
 def dense(args, color_space: str, overrides: list[str]) -> None:
-    fluid = fluid_at(['temperature.buoyancy=0', f'temperature.sink={args.sink}', f'density.color_space={color_space}',
+    fluid = fluid_at(['temperature.enabled=0', f'density.sink={args.sink}', f'density.color_space={color_space}',
                       *overrides])
     try:
         density = fluid._density._density
@@ -136,7 +136,7 @@ def dense(args, color_space: str, overrides: list[str]) -> None:
         upload(density, values)
         fluid._apply_buoyancy()
         force = read(fluid._buoyancy_force_vol)[..., :3]
-        t = fluid.settings.temperature
+        t = fluid.settings.input
         gravity = np.array((t.gravity_x, t.gravity_y, t.gravity_z))
         r = distance(fluid._cells, box)
         texel = max(b / n for b, n in zip(box, density_size))

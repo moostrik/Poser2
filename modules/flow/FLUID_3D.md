@@ -159,7 +159,7 @@ the frame rate: it leaves the fluid at most as fast as the body × `gain`; what 
 does with the velocity, the projection and the confinement, is its own. w = −z. `share` is set on the CPU (`drag_share`, tested in
 `test_drag.py`).
 
-`density.advection_scale` and `temperature.advection_scale` are 1: the density moves with the water.
+`density.advection_scale` is 1, the temperature's too: the density moves with the water.
 `velocity.advection_scale` is 1: the velocity carries itself the full step, the physics; viscosity and
 the confinement are the calming knobs. The lowpass's `smooth` makes the trail coast after a stop; with
 the drag that is the body still dragging after it stopped, while the coast is the fluid's own inertia
@@ -326,8 +326,10 @@ the divergence's one more read among it, and 0.09 for each injection. With an op
 
 ### The buoyancy
 
-While `temperature.enabled` is on, an acceleration at the cells, gravity × (`sink` × the density's amount −
-`buoyancy` × the warmth) (`buoyancy_3d.comp`), each face given its two cells' mean × dt before the projection (Fedkiw, Stam and Jensen
+An acceleration at the cells, gravity (`input.gravity_x`/`_y`/`_z`) × (`density.sink` × the density's amount −
+`temperature.buoyancy` × the warmth) (`buoyancy_3d.comp`), while the sink is above 0 or the temperature runs
+(`temperature.enabled` and its `buoyancy` above 0, else the warmth is cleared once and neither injected nor
+carried), each face given its two cells' mean × dt before the projection (Fedkiw, Stam and Jensen
 2001). The density's amount is its alpha, in RGB and in Oklab alike. The projection takes the part the water
 around cannot let through: a uniform push on a sphere in still water moves it at 2/3 of the push, the rest moving
 the water around it, its added mass, half the sphere's **(deduction)**.
@@ -448,7 +450,7 @@ as a tuning:
 | `input.density_blend`                                                          | over          | the dye held at the body, a boundary value, never falling there                              |
 | `input.density_release`                                                        | 0 ms          | the water's dye never falls toward the body's                                               |
 | `density.color_space`                                                          | RGB           | the colors stored as the camera gives them                                                   |
-| `density.advection_scale`, `temperature.advection_scale`                       | 1             | the density moves with the water                                                             |
+| `density.advection_scale`, the temperature's too                               | 1             | the density moves with the water                                                             |
 | `velocity.advection_scale`                                                     | 1             | the velocity carries itself the full step                                                    |
 | `width`, `height`, `depth`                                                     | 256, 448, 128 | half a width deep, within 60 fps                                                             |
 | `fine_density.enabled`, `particles.enabled`                                    | off, off      | the density drawn                                                                            |
@@ -458,9 +460,9 @@ as a tuning:
 The fields' physics take the textbook's water, with no artificial decay or thickness, as defaults: the
 fields' `fade_time` and `evaporation_time` 0 (off: the water keeps its momentum, the density and the warmth
 stay until the water carries them away), `viscosity` 0 (water at this scale), `pressure.iterations` 40
-(GPU Gems' 40 to 80 for a Jacobi solve), `temperature.enabled` off, its injection, advection and buoyancy
-pass skipped, the weight's sink with them, and `sink` and `buoyancy` 0 (the density as heavy as the water, no
-lift), gravity (0, −1, 0), down the screen in the grid's frame, y up as OpenGL's textures (Bridson
+(GPU Gems' 40 to 80 for a Jacobi solve), `temperature.enabled` off, `density.sink` and
+`temperature.buoyancy` 0 (the density as heavy as the water, no lift, the buoyancy pass skipped), gravity
+(0, −1, 0), down the screen in the grid's frame, y up as OpenGL's textures (Bridson
 2015), every wall closed; the top speed off, a failsafe; the bridge's mix the boundary's trail alone and its lowpass's `smooth` its default
 160 ms, since the coast is the fluid's; the three confinements off (`vorticity.strength_1` to `_3` 0), each over its neighbors
 (`vorticity.radius_1` to `_3` one cell) where it runs, Fedkiw's ε 0.3 the textbook's start; in z, `input.spread` 0.2 widths, a body's thickness at
@@ -503,8 +505,8 @@ recordings. Judge on: slow against fast reads; a stop coasts; the burst's fps; t
 
 ## The advection
 
-Each field's `advection` (`velocity.advection`, `density.advection` for the density and the fine
-density, `temperature.advection`) carries it: `SEMI_LAGRANGIAN`, the default,
+Each field's `advection` (`velocity.advection`, `density.advection` for the density, the fine density and
+the temperature, the passive scalars carried by one scheme) carries it: `SEMI_LAGRANGIAN`, the default,
 or `MACCORMACK` (Selle 2008, `maccormack_3d.comp`). The semi-Lagrangian step writes a predictor into
 a scratch volume per field (allocated at its first MacCormack step); traced forward again, it gives
 back the source up to the step's error, half of which is added back, bounded by the source's eight
@@ -543,8 +545,8 @@ The revert keeps MacCormack's detail and decays as the plain step does. Above ab
 grows the water in both advections, after the body stopped: the confinement adds energy every step,
 which the step's own loss balances only at a small epsilon.
 
-Each field chooses its limiter beside its advection (`velocity.limiter`, `density.limiter`,
-`temperature.limiter`), both Selle 2008's: CLAMP, the default, the corrected value cut to the bounds, or
+Each field chooses its limiter beside its advection (`velocity.limiter`, `density.limiter`, the
+temperature's too), both Selle 2008's: CLAMP, the default, the corrected value cut to the bounds, or
 REVERT, the paper's recommendation, the predictor where the correction overshoots. The correction overshoots
 at the sharpest features: the revert gives up the whole correction there, the clamp keeps the edge steep and
 flattens only its top; it keeps more of what the step lost, energy in a velocity, and clamps each channel on
@@ -843,7 +845,7 @@ The step, pass by pass:
 | the slip                  | the tangential faces along a closed wall braked by k                                                                                                                                                                                                                    |
 | the viscosity             | each component's Laplacian on its own faces                                                                                                                                                                                                                             |
 | the curl, the confinement | the curl at the centers straight from the faces, each derivative a difference of two face averages, so the step needs no centers' volume midway; the force averaged to the faces (Fedkiw, Stam and Jensen 2001)                                                         |
-| the buoyancy              | the temperature and the density averaged to each face, x, y and z, since gravity has all three (`gravity_x`, `gravity_y`, `gravity_z`)                                                                                                                                  |
+| the buoyancy              | the temperature and the density averaged to each face, x, y and z, since gravity has all three (`input.gravity_x`, `_y`, `_z`)                                                                                                                                         |
 | the drag, the body force  | the bridge's textures read at each face's place                                                                                                                                                                                                                         |
 | the divergence            | per cell, its six faces' one-cell differences                                                                                                                                                                                                                           |
 | the gradient              | per face, its two cells' pressures                                                                                                                                                                                                                                      |

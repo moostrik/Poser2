@@ -15,7 +15,7 @@ operator saw.
 | B   | [The view](#b-the-view)                                                      | built                             | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; C2 the values, C3 range    | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; D6 the checks              | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
-| E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | E6 the app's check; E7, E8 panels | [FLUID_3D.md](FLUID_3D.md)                         |
+| E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | E6 the app's check; E8 the panels | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | F1, F2 white                      | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                       | [FLOW.md](FLOW.md)                                 |
 | I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | not started                       | [FLOW.md](FLOW.md)                                 |
@@ -105,19 +105,8 @@ the room's, the warmth from the motion alone; checked in the GPU harness ([FLUID
 
 - **E6.** Checked in the app, in its own panel: what the temperature does to the water and whether it works,
   with `buoyancy` above 0.
-- **E7.** Gravity and the weights by what they are. `gravity_x`/`_y`/`_z` under `input`, beside
-  `acceleration_gain`: gravity is a body force. `sink` in `density`: the dye's weight per amount, 0 = as heavy as
-  the water. The temperature keeps `enabled`, `buoyancy`, `fade_time`, `evaporation_time` and its knee, and is
-  carried by the density's `advection`, `limiter` and `advection_scale`, its own three gone: one scheme for the
-  two passive scalars, so the lift sits where the dye is. The temperature runs (its injection, its advection,
-  its lift) while it is enabled and `buoyancy` > 0, else it is cleared once and skipped; the buoyancy pass runs
-  while `sink` > 0, or the temperature is enabled and `buoyancy` > 0. `temperature.enabled` switches the warmth
-  and its lift, not the sink. Both presets keep their values in the new places; FLUID_3D.md (the pass table,
-  the defaults, the buoyancy) and the scripts' setting paths follow. Checked by the tests, `buoyancy_check.py` (the same numbers, the dense blob
-  with the temperature off) and `fluid_pass_check.py` (the temperature's advection timed again, MacCormack in
-  the preset).
-- **E8.** An `enabled`, first in its panel, for every fluid step that can be off, as `light`, `fine_density`,
-  `particles` and `temperature` have: a step runs only while it is enabled and its strength is above 0; either
+- **E8.** An `enabled`, first in its panel, for every fluid step that can be off, as `fine_density`, `particles`
+  and `temperature` have: a step runs only while it is enabled and its strength is above 0; either
   off skips the pass, and the switch, for comparing, keeps the values. The steps whose off is a 0 today:
   - `vorticity`: `enabled` first; off, the curl is still made while the fine density's turbulence reads it.
   - The viscosity: a group of its own, `viscosity` (`enabled`, the viscosity, its iterations), out of
@@ -125,12 +114,10 @@ the room's, the warmth from the motion alone; checked in the GPU harness ([FLUID
   - The expansion: a group of its own, `expansion` (`enabled`, the rate), out of `input`.
   - The fine density's `turbulence` stays 0 = off: it is no pass of its own but the fine density's advection
     with the swirls (`FineDensity._turbulent_step` in place of the plain step).
-  - The light's five parts (`fog_scattering`, `caustics`, `scattering`, `sky_fill`, `powder`) stay 0 = off,
-    looked at again in line F.
 
   Presets: `enabled` on where the step runs now (its strength above 0).
 
-E7 and E8 are a commit each.
+E8 is a commit.
 
 ## F. The 3D fluid's look at 4K
 
@@ -248,8 +235,8 @@ The cameras:
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
-- Ask to measure a time again when its pass's code or size changes: D6, E7.
-- A settings class mirrors the code it configures, a group per step; an on/off switch is `enabled`: E7, E8.
-- Keep presets and settings schemas in sync with code changes: E7, E8.
+- Ask to measure a time again when its pass's code or size changes: D6.
+- A settings class mirrors the code it configures, a group per step; an on/off switch is `enabled`: E8.
+- Keep presets and settings schemas in sync with code changes: E8.
 
 Not designed yet, so their rules are not named: C3, F1, F2, H1, I1 to I4.
