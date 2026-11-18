@@ -67,21 +67,20 @@ of 1/255 **(seen)**. In deep_flow as it is the upload's time (`GPU Image Upload`
 17.84 ms, its wait (`Wait upload`) from 3.33 / 23.15 to 2.02 / 17.72 **(seen)**. A pose point that differs moves one
 SimCC bin (0.003); one frame's point moved 0.648, a keypoint whose two peaks were nearly equal **(deduction)**.
 
-## B. The segmentation's output
-
-- B2. The segmentation hands on its masks and foregrounds while its stream still writes them: the TensorRT runner
-  resizes the mask and multiplies the crops after its last `synchronize()`, and nothing waits for that **(seen)**. D1's
-  run read 2 masks of NaN, the foregrounds of the same frames whole **(seen)**, so a reader saw them unwritten
-  **(deduction)**. As the upload's and the crops' images are handed on: `segmentation.Image` gets a `ready` event,
-  recorded on the runner's stream after its last step; its readers, the render's `SegmentationMaskLayer` and
-  `SegmentationForegroundLayer`, wait for it on their stream and mark the tensor used there (`record_stream`), as
-  `CameraImageLayer` does. The GPU waits, not a thread. PyTorch: streams run "in any relative order" unless
-  synchronized, the user's responsibility; `Event.wait` orders a stream without blocking the CPU; `record_stream`
-  keeps the caching allocator from reusing a tensor another stream still reads **(site fact:
-  [CUDA streams](https://docs.pytorch.org/docs/stable/notes/cuda.html#cuda-streams),
-  [record_stream](https://docs.pytorch.org/docs/stable/generated/torch.Tensor.record_stream.html),
-  [Event](https://docs.pytorch.org/docs/stable/generated/torch.cuda.Event.html))**. Checked by the tests and the
-  check's run, no NaN; the probe's reader waits as the layers do
+B2, the segmentation's output: D1's run read 2 masks of NaN with whole foregrounds **(seen)**. The runners made their
+outputs on the default stream and wrote them on their own, and the segmentation handed on its foreground while its
+stream still wrote it **(seen)**. Now each runner makes its outputs on its own stream, and `segmentation.Image`
+carries a `ready` event its readers (the render's mask and foreground layers) wait for, marking the tensor used there
+(`record_stream`), as the camera's and the crops' images are read; PyTorch: streams run "in any relative order" unless
+synchronized; `Event.wait` orders a stream without blocking the CPU; `record_stream` keeps the cache from reusing a
+tensor another stream still reads **(site fact:
+[CUDA streams](https://docs.pytorch.org/docs/stable/notes/cuda.html#cuda-streams),
+[record_stream](https://docs.pytorch.org/docs/stable/generated/torch.Tensor.record_stream.html),
+[Event](https://docs.pytorch.org/docs/stable/generated/torch.cuda.Event.html))**. Two 2-minute runs before and after
+had no NaN mask, so the runs do not show the fix; it rests on the documentation. Two runs after it, pairing each
+crop by the object: no crop changed between its hand-over and the model (0 of 2964), and the masks of the crops
+equal in both runs were equal (469 of 469) **(seen)**. Two runs differ only where the probe cropped another box,
+looked up by the tracklet's time rather than the image's **(deduction)**.
 
 ## C. The TensorRT models side by side
 
@@ -98,5 +97,4 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 
 ## The rules it touches
 
-- `CLAUDE.md` Composition, fix a problem where it is made: B2, the runner that queues the last step
-- `CLAUDE.md` Concurrency, an item handed to a callback is not changed afterwards: B2
+- None: the plan's steps are built; C holds questions only

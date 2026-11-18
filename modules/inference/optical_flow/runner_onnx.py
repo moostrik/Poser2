@@ -74,9 +74,8 @@ class RunnerONNX:
         batch_size = len(pairs)
         input_h, input_w = pairs[0][0].shape[1], pairs[0][0].shape[2]
         h, w = self.model_height, self.model_width
-        flow_out = torch.empty((self.max_batch, 2, h, w), dtype=self._torch_dtype, device='cuda')
-
-        with torch.cuda.stream(self._stream):
+        with torch.cuda.stream(self._stream):       # the output made on the stream that waits for it
+            flow_out = torch.empty((self.max_batch, 2, h, w), dtype=self._torch_dtype, device='cuda')
             prev_chw = torch.stack([p[0] for p in pairs], dim=0).mul(255.0).to(self._torch_dtype)     # RAFT reads 0..255
             curr_chw = torch.stack([p[1] for p in pairs], dim=0).mul(255.0).to(self._torch_dtype)
             if input_h != h or input_w != w:

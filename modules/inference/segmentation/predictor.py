@@ -169,11 +169,12 @@ class Predictor:
             self._runner.reset_states()
 
         start: float = time.perf_counter()
-        masks, foregrounds = self._runner.infer(images, track_ids, ready)
+        masks, foregrounds, written = self._runner.infer(images, track_ids, ready)
         self._process_timer.add_time((time.perf_counter() - start) * 1000.0, report=self.settings.verbose)
 
         results: ImageDict = {}
         for i, track_id in enumerate(track_ids):
             if track_id in poses:
-                results[track_id] = Image(mask=masks[i], foreground=foregrounds[i], timestamp=poses[track_id].timestamp)
+                results[track_id] = Image(mask=masks[i], foreground=foregrounds[i], timestamp=poses[track_id].timestamp,
+                                           ready=written)
         self._notify_callbacks(poses, results)

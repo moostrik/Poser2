@@ -32,7 +32,10 @@ class FakeRunner:
         self.running.set()
         self.release.wait(2.0)
         n = len(gpu_images)
-        return [f'mask{i}' for i in range(n)], [f'fgr{i}' for i in range(n)]
+        return [f'mask{i}' for i in range(n)], [f'fgr{i}' for i in range(n)], WRITTEN
+
+
+WRITTEN = object()      # the runner's event, recorded after its last step
 
 
 class Crop:
@@ -50,8 +53,11 @@ class PredictorTest(unittest.TestCase):
         told: list[tuple[list[int], str]] = []
         done = threading.Event()
 
+        events: list[object] = []
+
         def on_masks(poses, masks) -> None:
             told.append((sorted(masks), threading.current_thread().name))
+            events.extend(image.ready for image in masks.values())
             if len(told) == 2:
                 done.set()
 
@@ -75,6 +81,7 @@ class PredictorTest(unittest.TestCase):
         self.assertEqual(settings.dropped, 1)
         self.assertEqual([ids for ids, _ in told], [[0], [2]])
         self.assertTrue(all(name == 'SegmentationPredictor' for _, name in told))
+        self.assertTrue(events and all(event is WRITTEN for event in events))    # every image carries the runner's event
         self.assertEqual(runner.resets, 1)                     # at the second batch
 
 

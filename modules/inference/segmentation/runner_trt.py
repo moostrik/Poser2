@@ -71,9 +71,9 @@ class RunnerTRT:
         self._states.clear()
 
     def infer(self, gpu_images: list[torch.Tensor], track_ids: list[int],
-              ready: torch.cuda.Event | None) -> tuple[torch.Tensor, torch.Tensor]:
+              ready: torch.cuda.Event | None) -> tuple[torch.Tensor, torch.Tensor, torch.cuda.Event]:
         """The alpha matte (N, h, w) and the foreground (N, 3, h, w), the crops multiplied by it, for the crops (3, h, w)
-        RGB in [0, 1] of the players `track_ids`, read once `ready` is recorded."""
+        RGB in [0, 1] of the players `track_ids`, read once `ready` is recorded; and the event recorded after they are written."""
         if ready is not None:
             self._stream.wait_event(ready)      # the crops are written on the crop stream
         batch_size = len(gpu_images)
@@ -83,11 +83,10 @@ class RunnerTRT:
         src_buffer = self._src_buffer[:batch_size]
         state_buffers = [buffer[:batch_size] for buffer in self._state_buffers]
 
-        outputs = [torch.empty((batch_size, 3, h, w), dtype=self._torch_dtype, device='cuda'),
-                   torch.empty((batch_size, 1, h, w), dtype=self._torch_dtype, device='cuda')]
-        outputs += [torch.empty((batch_size, c, h // s, w // s), dtype=self._torch_dtype, device='cuda') for c, s in RECURRENT_CHANNELS]
-
-        with torch.cuda.stream(self._stream):
+        with torch.cuda.stream(self._stream):       # the outputs made on the stream that writes them
+            outputs = [torch.empty((batch_size, 3, h, w), dtype=self._torch_dtype, device='cuda'),
+                       torch.empty((batch_size, 1, h, w), dtype=self._torch_dtype, device='cuda')]
+            outputs += [torch.empty((batch_size, c, h // s, w // s), dtype=self._torch_dtype, device='cuda') for c, s in RECURRENT_CHANNELS]
             batch_chw = torch.stack(gpu_images, dim=0).to(self._torch_dtype)
             original = batch_chw
             if needs_resize:
@@ -117,4 +116,6 @@ class RunnerTRT:
             if needs_resize:
                 mask = torch.nn.functional.interpolate(mask.unsqueeze(1), size=(input_h, input_w), mode='bilinear', align_corners=False).squeeze(1)
             foreground = original * mask.unsqueeze(1)
-        return mask, foreground
+        written: torch.cuda.Event = torch.cuda.Event()
+        written.record(self._stream)        # after the last step: the readers wait for it on their streams
+        return mask, foreground, written

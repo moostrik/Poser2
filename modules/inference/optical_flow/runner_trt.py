@@ -75,9 +75,8 @@ class RunnerTRT:
         h, w = self.model_height, self.model_width
         img1_buffer = self._img1_buffer[:batch_size]
         img2_buffer = self._img2_buffer[:batch_size]
-        flow_out = torch.empty((batch_size, 2, h, w), dtype=self._torch_dtype, device='cuda')
-
-        with torch.cuda.stream(self._stream):
+        with torch.cuda.stream(self._stream):       # the output made on the stream that writes it
+            flow_out = torch.empty((batch_size, 2, h, w), dtype=self._torch_dtype, device='cuda')
             prev_chw = torch.stack([p[0] for p in pairs], dim=0).mul(255.0).to(self._torch_dtype)     # RAFT reads 0..255
             curr_chw = torch.stack([p[1] for p in pairs], dim=0).mul(255.0).to(self._torch_dtype)
             if input_h != h or input_w != w:

@@ -77,9 +77,9 @@ class RunnerONNX:
         self._states.clear()
 
     def infer(self, gpu_images: list[torch.Tensor], track_ids: list[int],
-              ready: torch.cuda.Event | None) -> tuple[torch.Tensor, torch.Tensor]:
+              ready: torch.cuda.Event | None) -> tuple[torch.Tensor, torch.Tensor, torch.cuda.Event]:
         """The alpha matte (N, H, W) and the foreground (N, 3, H, W) at the model's size for the crops (3, h, w) RGB in
-        [0, 1] of the players `track_ids`, read once `ready` is recorded."""
+        [0, 1] of the players `track_ids`, read once `ready` is recorded; and the event recorded after they are written."""
         if ready is not None:
             self._stream.wait_event(ready)      # the crops are written on the crop stream
         batch_size = len(gpu_images)
@@ -93,11 +93,10 @@ class RunnerONNX:
             images += [torch.zeros((3, input_h, input_w), dtype=torch.float32, device='cuda')] * (self.max_batch - batch_size)
             states += [None] * (self.max_batch - batch_size)
 
-        fgr_out = torch.empty((self.max_batch, 3, h, w), dtype=self._torch_dtype, device='cuda')
-        pha_out = torch.empty((self.max_batch, 1, h, w), dtype=self._torch_dtype, device='cuda')
-        state_outs = [torch.empty((self.max_batch, c, h // s, w // s), dtype=self._torch_dtype, device='cuda') for c, s in RECURRENT_CHANNELS]
-
-        with torch.cuda.stream(self._stream):
+        with torch.cuda.stream(self._stream):       # the outputs made on the stream that waits for them
+            fgr_out = torch.empty((self.max_batch, 3, h, w), dtype=self._torch_dtype, device='cuda')
+            pha_out = torch.empty((self.max_batch, 1, h, w), dtype=self._torch_dtype, device='cuda')
+            state_outs = [torch.empty((self.max_batch, c, h // s, w // s), dtype=self._torch_dtype, device='cuda') for c, s in RECURRENT_CHANNELS]
             batch_chw = torch.stack(images, dim=0).to(self._torch_dtype)
             if input_h != h or input_w != w:
                 batch_chw = torch.nn.functional.interpolate(batch_chw, size=(h, w), mode='bilinear', align_corners=False)
@@ -123,7 +122,9 @@ class RunnerONNX:
         r1o, r2o, r3o, r4o = state_outs
         self._states = {track_id: RecurrentState(r1o[i:i + 1], r2o[i:i + 1], r3o[i:i + 1], r4o[i:i + 1])
                         for i, track_id in enumerate(track_ids)}
-        return pha_out[:batch_size].squeeze(1), fgr_out[:batch_size]
+        written: torch.cuda.Event = torch.cuda.Event()
+        written.record(self._stream)
+        return pha_out[:batch_size].squeeze(1), fgr_out[:batch_size], written
 
     def _warmup(self) -> None:
         """The CUDA kernels made for the fixed batch size, so none is compiled while running."""

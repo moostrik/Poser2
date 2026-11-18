@@ -84,10 +84,9 @@ class RunnerTRT:
         needs_resize = (input_h != self.model_height or input_w != self.model_width)
         input_buffer = self._input_buffer[:batch_size]
 
-        simcc_x_out = torch.empty((batch_size, NUM_KEYPOINTS, self.model_width * 2), dtype=self._torch_dtype, device='cuda')
-        simcc_y_out = torch.empty((batch_size, NUM_KEYPOINTS, self.model_height * 2), dtype=self._torch_dtype, device='cuda')
-
-        with torch.cuda.stream(self._stream):
+        with torch.cuda.stream(self._stream):       # the outputs made on the stream that writes them
+            simcc_x_out = torch.empty((batch_size, NUM_KEYPOINTS, self.model_width * 2), dtype=self._torch_dtype, device='cuda')
+            simcc_y_out = torch.empty((batch_size, NUM_KEYPOINTS, self.model_height * 2), dtype=self._torch_dtype, device='cuda')
             batch_chw = torch.stack(gpu_images, dim=0).to(self._torch_dtype)
             if needs_resize:
                 batch_chw = torch.nn.functional.interpolate(
