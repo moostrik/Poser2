@@ -107,17 +107,23 @@ Questions:
   the ONNX session is set up five times, two ways (memory limit and exhaustive cuDNN search in three, not in the face
   and person detector) **(seen)**. The face and person detector's runners are already a generic backend: a file loaded,
   a batch run, the outputs back **(seen)**. `OnnxEngine` and `TrtEngine`, one interface (load a file; run named GPU
-  tensors on a stream), with `ort_runtime`, `trt_runtime`, `model_types` and `cuda_kernels` in an `engine` subpackage;
-  each model's own steps go to its worker (the pose's normalization and SimCC decode, the segmentation's recurrent
-  states, RAFT's x255), about 350 lines for 945 **(deduction)**. Checked by the package's tests, the ONNX and TensorRT
-  outputs compared as on 2026-11-18, and the check's run
+  tensors on a stream), with `ort_runtime`, `trt_runtime` and `model_types` in an `engine` subpackage
+  (`cuda_kernels` stays at the root: only the upload and the depth alignment use it **(seen)**). ONNX Runtime runs on
+  the worker's stream (the CUDA provider's `user_compute_stream`), so its engine waits no more than TensorRT's: today
+  each ONNX run synchronizes first, as ONNX Runtime runs on its own stream **(seen)**; that the option works in ONNX
+  Runtime 1.31.1 is to confirm **(deduction)**. Padding the batch to the size it was warmed up at is `OnnxEngine`'s,
+  unseen by the workers. Each model's own steps go to its worker (the pose's normalization and SimCC decode, the
+  segmentation's recurrent states, RAFT's x255), about 350 lines for 945 **(deduction)**. Checked by the package's
+  tests; `scripts/model_benchmark.py` before and after, for each model on ONNX and on TensorRT: the outputs against
+  the run before (`--reference`), the times, and ONNX against TensorRT; and the check's run
 - E3. One base for the five model workers: `pose.Predictor`, `segmentation.Predictor`, `optical_flow.Predictor`,
   `PersonDetector` and `FaceDetector` each set up their model on their own thread, wake on work, take the newest
   waiting (a batch, or an image per camera), run it, hand it on, catch per item and stop **(seen)**, written two ways:
   three hold a thread and count drops in their settings, two are a `Thread` and count them in a property. The base
   holds the thread, the wake, one queue that keeps the newest per key (the camera for the detectors, one key for the
   others), around E2's engine, the drop count in the settings (a new read-only field on the detectors' panels), the setup and the stop;
-  each keeps its model's step. The workers take their task's name, as textbook vision names them: `PoseEstimator`,
+  each keeps its model's step. The workers take their task's name, as textbook vision names them (decided
+  2026-11-18): `PoseEstimator`,
   `Segmenter`, `OpticalFlowEstimator` (not `FlowEstimator`: `modules/flow` is the fluid's), `PersonDetector`,
   `FaceDetector`, and the base `ModelWorker`; with them their settings (`PoseEstimatorSettings`, `SegmenterSettings`,
   `OpticalFlowEstimatorSettings`; the presets keep their group names) and their timers ("Pose Estimation",
@@ -127,8 +133,8 @@ Questions:
   The uploaders, `CameraSync`, `CaptureSync` and `RecordedPoses` keep their own queues (in order, sets, parts)
   **(deduction: they share less)**. Checked by the package's tests (the fake runners), the apps' tests and the
   check's run
-- E4. The new names to the rules thread for the glossary: the five workers and `ModelWorker`, what they replace
-  (`Predictor`, "RTM Pose Detection"), for its wording
+- E4. The new names to the rules thread for the glossary's wording (the names are decided): the five workers and
+  `ModelWorker`, what they replace (`Predictor`, "RTM Pose Detection")
 - E5. `INFERENCE.md`: the package is one thing, the camera frames on the GPU and the models on them; the upload and
   the models stay one package, as every app uses them together and the crops and detectors take the upload's images
   **(seen)**. It says what the package's parts are and why (each model's thread, the crops' and outputs' events, the
