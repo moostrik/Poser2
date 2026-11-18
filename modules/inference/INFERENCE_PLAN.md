@@ -98,7 +98,7 @@ Questions:
   the one image and box in one pass, and every consumer subscribes to its size: the pose model, the flow, the board,
   the segmentation; one pass now in torch ops, so one kernel later changes only this class. The pose model holds the
   rule. The pose pipeline's async step (`AsyncNode`: `submit` with
-  the images, `add_frames_callback`) is the crop and the pose model together today **(seen: `modules/pose/pipeline/spec.py`)**:
+  the images, `add_frames_callback`; the three apps' `pose/pipeline.py`) is the crop and the pose model together today **(seen: `modules/pose/pipeline/spec.py`)**:
   it becomes the crop extractor's `submit` and the pose model's frames callback, given apart; `RecordedPoses`, which
   wraps `PoseInference`, takes the two the same way. What runs, and on which threads, stays. Checked by the package's
   and the pose pipeline's tests and the check's run
@@ -130,20 +130,13 @@ Questions:
 - E5. The leftovers: `Resolution` and `RESOLUTION_DIMS` out of the package's exports (no user outside **(seen)**); the
   empty `tools/` folder
 
-## F. The crop with the upload
+No thread waits for the GPU between the upload, the crop and the model: the upload and the crop are queued on their
+streams behind the events before them, and a thread waits once, the pose model's at its end, to decode on the CPU
+**(seen)**. The crop cannot join the upload: it cuts the RAW stage's smoothed and predicted box
+(`BBoxEuroSmoother`, `BBoxPredictor`, on the frame source's thread before the async step) **(seen)**.
 
-The crop cuts the tracker's latched box, not the frame's own **(seen: `TrackerFrameSource.process`)**, so it can be
-cut at the upload. It waits now for a hop to the frame source's thread ("Wait pose step", 0.24 ms mean, up to 1 ms
-p99 in deep_flow) and launches of its own (about 0.1 ms a player) **(seen)**.
-
-- F1. The uploader asks the frame source who is cropped at the upload, on its own thread: the frame source keeps the
-  decision (the tracks, a box's age, the OAK4 keypoint window, `pose_interval`) and is called there, a little CPU
-  work, instead of woken; E1's crop step cuts in the same pass as the upload, and the poses go on with their crops.
-  The frame source's thread and queue go; the pose pipeline starts on the uploader's thread. Touches all three apps'
-  wiring and `modules/tracker`'s frame source. About 0.3 ms mean, up to 1 ms p99 less from camera frame to pose
-  **(deduction from the hop and the launches)**; from frame to model input one GPU step, the crop then one kernel
-  with the upload. Checked by the tests of the frame source and the package, the check's run (the outputs as E's, the
-  times), and your app checks
+Question: the pose's SimCC decode on the GPU (the argmax), so its thread copies 17 points to the CPU rather than the
+whole output before it hands the poses on? Small **(deduction)**; for when the pose's latency matters more.
 
 ## The package held up to the rules (the apps' plan F, agreed 2026-11-17)
 
@@ -160,6 +153,3 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 - `CLAUDE.md` API evolution, remove obsolete pathways: E5
 - `CLAUDE.md` Naming, the domain's term, one everywhere (class, setting, panel label): E2, the workers, their settings
   and timers; `glossary.md` follows: E3
-- `CLAUDE.md` Performance, prefer the design with the lower latency, measured in the context of the app: F1
-- `CLAUDE.md` Concurrency, a part that only needs the latest value reads it at its own tick: F1, the uploader reads
-  the frame source's latest tracks
