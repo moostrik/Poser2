@@ -91,9 +91,39 @@ coverage); the luma matte in the view ([VIEW.md](VIEW.md#the-stage)), the bridge
 
 - **D6.** The checks. In the app: no dark rim at any gain; the luma matte from 0 to 1; `over` leaves no patches
   where the input meets older density; `fill` against `over`; `add` builds up without going white; `oklab`
-  mixes without turning muddy; the monitor's `IMAGE` shows what the composite shows; the view's `white_balance`
+  mixes without turning muddy; the monitor's `IMAGE` shows what the composite shows; `color.white_balance`
   pulls a warm room light to white. The injection's and the march's times measured again, with -sim while
   Matthias is away; the preset saved after.
+- **D8.** The density's color a stage of its own, `color`, between the view and the motion: the view sees the
+  player (who, where, how far), the color makes what the dye looks like, the bridge translates the motion.
+  - The part: `DensityColor` in `modules/flow/color` (with `DensityColorSettings` and `white_balance.py`, its
+    test with it), from the view's image and mask: white balance, grade (exposure, offset, gamma, contrast,
+    saturation), sharpen, luma matte, then the mask's copy eroded and feathered, and the premultiply, as
+    compositing does it (Porter and Duff 1984). The `Grade` and `Feather` shaders to `modules/gl` beside
+    `LumaMatte`, `Sharpen` and `Erode`. The bridge's tint step, today's `DensityColor`, is renamed `TintColor`
+    (its shader too), the 2D bridge's until line I.
+  - The stage: `ColorLayer` in `modules/render/modules/flow`, its own input (image, mask, capture time) and
+    output (`color`), made again on a new capture or a changed setting, while paused too, as the view is.
+    `ColorLayerSettings`: `reset`, the fields as `view.color` has them, its monitors last.
+  - The chain: `ChainLayers.color` and `color_monitor` after the view's (at the view's size), `FlowStage.COLOR`,
+    `Layers.color`, the monitors' wiring; deep_flow_render runs it per capture between the view and the motion,
+    and while paused after the view. The panel `render.color` between `render.view` and `render.motion`.
+  - The view keeps crop, mask and depth (`ViewColor`, `ViewColorSettings` and `ViewOutput.color` go); the motion
+    keeps reading the view's image and mask; the 3D bridge takes the stage's color as its image, its tint step
+    gone, so it starts with the filters. The tint, never set in deep_flow, leaves the 3D chain; `BridgeInput.tint`
+    stays for the 2D.
+  - Both presets: `render.view.color.*` to `render.color.*`. Docs: COLOR.md for the stage from VIEW.md's color
+    (its text, settings and white balance), which goes; VIEW.md's, `view_layer.py`'s and `ViewLayerSettings`'
+    "the color"; BRIDGE_3D.md's color and FLOW.md's chain and packages follow.
+  - Checked: `view_check.py`'s color saved as a reference at the commit before, then the stage's color on the
+    same captures equal to it within 1/255.
+- **D9.** The bridge's `readings` group renamed `filters` (`Bridge3DFiltersSettings`, `filters` → `lowpass`,
+  `bandpass`): a group is named by what its modules do, a reading by what it is, and the trail, change, start,
+  bow, stop and wake stay "the readings". `Bridge3D`'s `settings.readings` reads, both presets, the scripts'
+  paths (`fluid_compare.py`'s `bridge.readings.lowpass.smooth`) and BRIDGE_3D.md follow. Checked by the tests
+  and both presets loading with no unknown key.
+
+D8 and D9 are a commit each.
 
 ## E. The 3D fluid's physics
 
@@ -195,13 +225,6 @@ The body in the fluid:
   face holding the obstacle's velocity instead of 0 (Bridson 2015, ch. 5), so a moving body pushes the water
   aside ahead of it and draws it in behind.
 
-The density's color:
-
-- The color grading moves from the view to the bridge, the luma matte with it: the view sees the player, the bridge
-  makes what the fluid takes. The view then hands over the image with its feathered mask as alpha (erode and
-  feather are the mask's work and stay); the bridge divides by the alpha, grades, mattes and multiplies back, as
-  compositing does. Weighed against the point below that the color, deep_flow's look, stays in the app.
-
 The cameras:
 
 - The view's crop, mask and depth move to `modules/flow` when a second app takes the 3D flow; the color, deep_flow's
@@ -225,5 +248,8 @@ The cameras:
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
 - Ask to measure a time again when its pass's code or size changes: D6.
+- Shaders get checked in a GPU harness: D8.
+- Keep presets and settings schemas in sync with code changes: D8, D9.
+- A component's monitors come last in its settings; a module's layer sits in `modules/render/modules/<module>`: D8.
 
 Not designed yet, so their rules are not named: C3, F1, F2, H1, I1 to I4.
