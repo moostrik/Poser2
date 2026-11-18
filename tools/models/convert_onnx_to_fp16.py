@@ -9,6 +9,9 @@ Usage:
 
     # Add more ops to FP16
     python tools/models/convert_onnx_to_fp16.py --input models/rtmpose-l_256x192_fp32.onnx --output models/rtmpose-l_256x192_test.onnx --fp16-ops Conv Mul Sigmoid
+
+    # RTMPose all FP16 but its head's ScaleNorms, whose sum of squares can overflow FP16's 65504; inputs and outputs FP32
+    python tools/models/convert_onnx_to_fp16.py --input data/models/rtmpose-l_256x192.onnx --output data/models/rtmpose-l_256x192_fp16.onnx --fp32-scopes /mlp/mlp.0/ /gau/ln/ --keep-io-types
 """
 
 import argparse
@@ -39,7 +42,8 @@ def inspect_model(input_path: str) -> None:
     print("\n💡 Copy op names for --fp16-ops argument")
 
 
-def convert_selective_fp16(input_path: str, output_path: str, fp16_ops: list) -> bool:
+def convert_selective_fp16(input_path: str, output_path: str, fp16_ops: list, fp32_scopes: tuple[str, ...] = (),
+                           keep_io_types: bool = False) -> bool:
     """Convert only specified op types to FP16, keep everything else FP32.
     
     Uses onnxconverter-common with op_block_list containing all ops EXCEPT the ones we want in FP16.
@@ -64,6 +68,13 @@ def convert_selective_fp16(input_path: str, output_path: str, fp16_ops: list) ->
     
     # Block list = all ops EXCEPT the ones we want in FP16
     op_block_list = [op for op in all_ops if op not in fp16_ops]
+    # and the nodes under the scopes kept FP32, whatever their op
+    node_block_list = [node.name for node in model.graph.node if fp32_scopes and node.name.startswith(fp32_scopes)]
+    if fp32_scopes:
+        print(f"🔒 Keeping in FP32 by scope: {len(node_block_list)} nodes ({', '.join(node_block_list)})")
+        if not node_block_list:
+            print(f"❌ No nodes under {list(fp32_scopes)}")
+            return False
     
     print(f"🔧 Converting to FP16: {fp16_ops}")
     print(f"🔒 Keeping in FP32: {len(op_block_list)} op types")
@@ -72,8 +83,9 @@ def convert_selective_fp16(input_path: str, output_path: str, fp16_ops: list) ->
     try:
         model_fp16 = float16.convert_float_to_float16(
             model,
-            keep_io_types=False,
-            op_block_list=op_block_list
+            keep_io_types=keep_io_types,
+            op_block_list=op_block_list,
+            node_block_list=node_block_list
         )
     except Exception as e:
         print(f"❌ Conversion failed: {e}")
@@ -97,6 +109,8 @@ if __name__ == '__main__':
     parser.add_argument('--inspect', action='store_true', help='Inspect model ops')
     parser.add_argument('--fp16-ops', nargs='+', default=[], help='Ops to convert to FP16 (default: all)')
     parser.add_argument('--all', action='store_true', help='Convert all ops to FP16 (default behavior)')
+    parser.add_argument('--fp32-scopes', nargs='+', default=[], help='Node name prefixes kept FP32, whatever their op')
+    parser.add_argument('--keep-io-types', action='store_true', help='Inputs and outputs stay FP32')
 
     args = parser.parse_args()
 
@@ -116,8 +130,8 @@ if __name__ == '__main__':
         model = onnx.load(args.input)
         all_ops = list(set(node.op_type for node in model.graph.node))
         print(f"🔄 Converting ALL operations to FP16 ({len(all_ops)} op types)")
-        success = convert_selective_fp16(args.input, args.output, all_ops)
+        success = convert_selective_fp16(args.input, args.output, all_ops, tuple(args.fp32_scopes), args.keep_io_types)
     else:
-        success = convert_selective_fp16(args.input, args.output, args.fp16_ops)
+        success = convert_selective_fp16(args.input, args.output, args.fp16_ops, tuple(args.fp32_scopes), args.keep_io_types)
 
     sys.exit(0 if success else 1)

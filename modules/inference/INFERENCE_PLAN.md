@@ -196,14 +196,24 @@ ONNX downloads: the COCO-only and the AIC+COCO ones are `.pth` files **(seen: MM
 H3 is 78.3 - 76.7 = 1.6 AP, and of H4 2.1 AP **(site fact)**. The 384x288 files (111.1 MB, the zip 103.7 MB) and
 RTMPose-x (197.7 MB, the zip 184.3 MB) are in `data/models` as `rtmpose-l_384x288.onnx` and `rtmpose-x_384x288.onnx`.
 
-- H2. An FP16 engine of our model, with the head's ScaleNorm kept FP32 (first, decided 2026-11-18: it changes only
-  the precision, and the time it saves is the room H3 needs). A public report has the norm's sum of squares overflow
-  in FP16 **(site fact)**, likely the precision RTMPose lost here in FP16 **(deduction)**. Under TensorRT's strongly
-  typed build the ONNX file sets the precision **(seen: `export_rtm_onnx_to_trt.py`)**, so FP16 is a conversion of
-  the file, `tools/models/convert_onnx_to_fp16.py` **(seen)** with the norm's nodes kept FP32. Measured against the
-  FP32 engine's points on the same crops (the difference in SimCC bins and in score) and in time; no fixed threshold:
-  FP16 is a balance of speed and quality, weighed in H5 (decided 2026-11-18). The models after it reuse the
-  conversion
+H2 (2026-11-18): `tools/models/convert_onnx_to_fp16.py --fp32-scopes /mlp/mlp.0/ /gau/ln/ --keep-io-types` makes RTMPose FP16 but
+the head's two ScaleNorms
+(`/mlp/mlp.0/`, `/gau/ln/`, ten nodes), its inputs and outputs FP32 (`onnxconverter-common`, now in the project's
+dependencies), `data/models/rtmpose-l_256x192_fp16.onnx`, 55.4 MB. Its TensorRT engine at batch 1 (deep_flow's) against
+the FP32 engine, 300 crops of three photos, the time on an idle GPU (`h2_fp16.py`, not committed) **(seen)**:
+
+| Engine, batch 1                | Mean / p99 ms | Visible points within one bin | Median / 99% / max bins | Score diff mean / max |
+|--------------------------------|---------------|-------------------------------|-------------------------|-----------------------|
+| FP32 (ours)                    | 2.89 / 3.96   | the reference                 |                         |                       |
+| FP16, the norms FP32           | 1.34 / 2.43   | 97.0% (of 1182)               | 0 / 3.0 / 160           | 0.0025 / 0.023        |
+| FP16, every node               | 1.43 / 2.67   | 98.4%                         | 0 / 2.2 / 383           | 0.0025 / 0.026        |
+
+A bin is half a pixel of the model's 192x256 input. FP16 takes half the time; 3% of the visible points move more than
+one bin, 1% more than three, and the largest are a point jumping to another peak of its distribution **(seen)**. The
+FP16 engine whose norms are FP16 too does not collapse: TensorRT does not overflow where the LiteRT report did
+**(seen)**, as its reductions accumulate in FP32 **(deduction)**; the norms stay FP32 as the safe way. The weighing is
+H5's.
+
 - H3. RTMPose-l 384x288, Body8: the official ONNX file, its engines in `scripts/makemodels.bat` per app (deep_flow's
   at a static batch of 1 **(seen)**), the pose's `HIGH` resolution in the presets; the crop follows the model's size
   (each app sets it from the pose settings **(seen: `apps/deep_flow/main.py`)**), the SimCC bins follow the output,
