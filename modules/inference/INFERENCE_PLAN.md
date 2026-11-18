@@ -130,11 +130,20 @@ Questions:
 - E5. The leftovers: `Resolution` and `RESOLUTION_DIMS` out of the package's exports (no user outside **(seen)**); the
   empty `tools/` folder
 
-Question: the crops cut in the upload's kernel, with the tracker's latest box? The crop uses the latched box anyway,
-not the frame's own **(seen: `TrackerFrameSource.process`)**; it would save the hop to the frame source ("Wait pose
-step", 0.24 ms mean, up to 1 ms p99 in deep_flow) and the crops' launches (about 0.1 ms a player) **(deduction from
-those)**, but the upload would decide who is cropped (the tracks, a box's age, the OAK4 keypoint window,
-`pose_interval`), which the frame source decides now. For when the pose's latency is the bottleneck.
+## F. The crop with the upload
+
+The crop cuts the tracker's latched box, not the frame's own **(seen: `TrackerFrameSource.process`)**, so it can be
+cut at the upload. It waits now for a hop to the frame source's thread ("Wait pose step", 0.24 ms mean, up to 1 ms
+p99 in deep_flow) and launches of its own (about 0.1 ms a player) **(seen)**.
+
+- F1. The uploader asks the frame source who is cropped at the upload, on its own thread: the frame source keeps the
+  decision (the tracks, a box's age, the OAK4 keypoint window, `pose_interval`) and is called there, a little CPU
+  work, instead of woken; E1's crop step cuts in the same pass as the upload, and the poses go on with their crops.
+  The frame source's thread and queue go; the pose pipeline starts on the uploader's thread. Touches all three apps'
+  wiring and `modules/tracker`'s frame source. About 0.3 ms mean, up to 1 ms p99 less from camera frame to pose
+  **(deduction from the hop and the launches)**; from frame to model input one GPU step, the crop then one kernel
+  with the upload. Checked by the tests of the frame source and the package, the check's run (the outputs as E's, the
+  times), and your app checks
 
 ## The package held up to the rules (the apps' plan F, agreed 2026-11-17)
 
@@ -151,3 +160,6 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 - `CLAUDE.md` API evolution, remove obsolete pathways: E5
 - `CLAUDE.md` Naming, the domain's term, one everywhere (class, setting, panel label): E2, the workers, their settings
   and timers; `glossary.md` follows: E3
+- `CLAUDE.md` Performance, prefer the design with the lower latency, measured in the context of the app: F1
+- `CLAUDE.md` Concurrency, a part that only needs the latest value reads it at its own tick: F1, the uploader reads
+  the frame source's latest tracks
