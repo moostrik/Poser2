@@ -65,7 +65,9 @@ readings, so its row then is from a run with `acceleration` taking `change`, `st
 `stop` and `wake` at 1. The image upload's timer spans the CUDA work between its timestamps, so its p95
 holds the pose model's; the motion's p95 under its mean is a mean pulled up by a few long frames (max
 10 ms). The viscosity is 0, and the buoyancy and the light are off in the preset, so they skip their
-dispatches. On 15 November the density is the step's largest pass, the fine density's 2160 × 3840 × 24
+dispatches. With the buoyancy on, each pass alone (`fluid_pass_check.py`, a time, 18 November, commit 1b60f186,
+the preset's 288 × 512 × 64, the median of 40), the temperature's advection after the projection takes 0.082 ms
+and the buoyancy 0.152. On 15 November the density is the step's largest pass, the fine density's 2160 × 3840 × 24
 among it; the pressure, multigrid since, is a quarter of what its 40 Jacobi iterations took on
 7 November. The composite marches one step per layer over the 2160 × 3840 output, so it grows with
 `layers`, not with the grid's x and y. On 16 November the view takes 0.21 ms against 0.09, its fill

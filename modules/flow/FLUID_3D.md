@@ -322,6 +322,30 @@ Its GPU time, `expansion_check.py --time`, the same box closed, the median of 40
 The expansion costs a tick about 0.26 ms in a closed box with one injection: 0.17 in the projection, the mean and
 the divergence's one more read among it, and 0.09 for each injection. With an open wall the mean does not run.
 
+### The buoyancy
+
+An acceleration at the cells, gravity × (`sink` × the density's amount − `buoyancy` × the warmth)
+(`buoyancy_3d.comp`), each face given its two cells' mean × dt before the projection (Fedkiw, Stam and Jensen
+2001). The density's amount is its alpha, in RGB and in Oklab alike. The projection takes the part the water
+around cannot let through: a uniform push on a sphere in still water moves it at 2/3 of the push, the rest moving
+the water around it, its added mass, half the sphere's **(deduction)**.
+
+Measured with `scripts/buoyancy_check.py`, a result, 18 November 2026, commit 1b60f186, deep_flow's preset
+(288 × 512 × 64, the multigrid), every wall closed: a sphere 0.15 widths in radius at the box's middle, the water
+at rest, one buoyancy pass and one projection, one run (the passes are deterministic). The force's largest error
+against the formula over the cells (for the density, on its own grid, the cells two of its texels or more from
+the sphere's surface), and the velocity at the sphere's middle along gravity over the force × dt:
+
+| Blob                                       | Force, widths/s² | Largest error | Kept, 1 cycle | Kept, 8 cycles |
+|--------------------------------------------|------------------|---------------|---------------|----------------|
+| warm: `buoyancy` 2, warmth 0.75            | −1.5             | 0             | 0.6938        | 0.6565         |
+| dense: `sink` 3, amount 0.5, RGB           | +1.5             | 0             | 0.6940        | 0.6567         |
+| dense: the same, Oklab, a and b below 0    | +1.5             | 0             | 0.6940        | 0.6567         |
+
+At 8 cycles the solve is near exact, and the closed box keeps the sphere a little under 2/3, the water it pushes
+aside having to come back within the walls **(deduction)**; one cycle leaves the solve short, more of the push in
+the sphere.
+
 ### The guard
 
 A guard on the advection of each field, at the step's first pass, so a bad value stops where it was made

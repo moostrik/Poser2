@@ -15,7 +15,7 @@ operator saw.
 | B   | [The view](#b-the-view)                                                      | built                             | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; C2 the values, C3 range    | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; D6 the checks              | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
-| E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | the temperature                   | [FLUID_3D.md](FLUID_3D.md)                         |
+| E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | built; E6 the app's check         | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | F1, F2 white                      | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                       | [FLOW.md](FLOW.md)                                 |
 | I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | not started                       | [FLOW.md](FLOW.md)                                 |
@@ -100,18 +100,11 @@ coverage); the luma matte in the view ([VIEW.md](VIEW.md#the-stage)), the bridge
 The temperature as the textbook has it (Fedkiw, Stam, Jensen 2001; Bridson 2015; GPU Gems 3 ch. 30): the
 warmth and the dye passive scalars carried by the same projected velocity; the buoyancy (sink × amount −
 buoyancy × warmth) along gravity, at the faces, added before the projection; the heat leaves by mixing and by
-cooling toward the room's. The buoyancy's formula is that already (`buoyancy_3d.comp`); the steps below are
-where the code differs.
+cooling toward the room's. Built (2026-11-18): the order, the density's weight by its amount, the warmth from
+the room's, the warmth from the motion alone; checked in the GPU harness ([FLUID_3D.md](FLUID_3D.md#the-buoyancy)).
 
-- **E5.** Checked in the GPU harness, a new script in `scripts/`: a warm blob in a closed box at rest, one step.
-  The buoyancy before the projection is `buoyancy` × the warmth × gravity, exactly; the blob's first-step rise
-  after the projection about 2/3 of it (a sphere's added mass) **(deduction)**; and a dense blob sinking at
-  `sink` × its amount (`.a`), in RGB and Oklab. The result in FLUID_3D.md, with its kind, date, commit and settings. The
-  temperature's advection, after the projection since E1, timed again (`fluid_pass_check.py`), TIMING.md's row.
 - **E6.** Checked in the app, in its own panel: what the temperature does to the water and whether it works,
   with `buoyancy` above 0.
-
-E5 is a commit with its script and result.
 
 ## F. The 3D fluid's look at 4K
 
@@ -230,6 +223,5 @@ The cameras:
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
 - Ask to measure a time again when its pass's code or size changes: D6.
-- Shaders get checked in a GPU harness; a measured result names its kind, date, commit and settings: E5.
 
 Not designed yet, so their rules are not named: C3, F1, F2, H1, I1 to I4.
