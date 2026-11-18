@@ -89,6 +89,28 @@ Questions:
   CPU. Worth it, now the models run side by side?
 - The pose's stream at a higher priority than the others', as the model on the critical path?
 
+## E. The package held up again (2026-11-18)
+
+- E1. One base for the five model workers: `pose.Predictor`, `segmentation.Predictor`, `optical_flow.Predictor`,
+  `PersonDetector` and `FaceDetector` each set up their model on their own thread, wake on work, take the newest
+  waiting (a batch, or an image per camera), run it, hand it on, catch per item and stop **(seen)**, written two ways:
+  three hold a thread and count drops in their settings, two are a `Thread` and count them in a property. The base
+  holds the thread, the wake, the newest-wins queue (by batch or by camera), the drop count in the settings, the setup
+  and the stop; each keeps its model's step. The workers take their task's name, as textbook vision names them:
+  `PoseEstimator`, `Segmenter`, `FlowEstimator`, `PersonDetector`, `FaceDetector`, and the base `ModelWorker`; the
+  glossary's wording goes to the rules thread. The uploaders, `CameraSync`, `CaptureSync` and `RecordedPoses` keep
+  their own queues (in order, sets, parts) **(deduction: they share less)**. Checked by the package's tests (the fake
+  runners) and the check's run
+- E3. `INFERENCE.md`: the package is one thing, the camera frames on the GPU and the models on them; the upload and
+  the models stay one package, as every app uses them together and the crops and detectors take the upload's images
+  **(seen)**. It says what the package's parts are and why (each model's thread, the crops' and outputs' events, the
+  streams, no TensorRT lock), linking the plan's measurements, and takes in what `modules/flow/INPUT_THREADS.md`
+  says of this package. `CameraSync` stays here: it groups one moment's frames of several cameras for the upload
+  (`BatchUploader.submit_set`) **(seen)**, the input's first step, and left the camera package as not a camera
+  (b5ab4515)
+- E4. The leftovers: `Resolution` and `RESOLUTION_DIMS` out of the package's exports (no user outside **(seen)**); the
+  empty `tools/` folder
+
 ## The package held up to the rules (the apps' plan F, agreed 2026-11-17)
 
 No code in the package is one app's: the face model is smile's alone, the segmentation hd_trio's, the optical flow,
@@ -97,4 +119,8 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 
 ## The rules it touches
 
-- None: the plan's steps are built; C holds questions only
+- `CLAUDE.md` Types, an ABC for a family of classes that share code: E1
+- `CLAUDE.md` Packages, a package is one thing, and its name is that thing: E3 states the one thing
+- `CLAUDE.md` Docstrings, reasons sit in the package's document: E3
+- `CLAUDE.md` API evolution, remove obsolete pathways: E4
+- `CLAUDE.md` Naming, the domain's term, one everywhere: E1, the workers' names; `glossary.md` follows
