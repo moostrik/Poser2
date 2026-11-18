@@ -32,7 +32,7 @@ from modules.flow.visualization.shaders import ColormapKey  # noqa: E402
 from modules.gl import Bloom, Colormap, Context, DistanceField, Fbo, Style, Text, Texture, shaders  # noqa: E402
 from modules.gl.shaders.filter import KERNEL_SIGMA  # noqa: E402
 from modules.pose import PointLandmark, Points2D  # noqa: E402
-from modules.inference.shaders import DepthAlign  # noqa: E402
+from modules.inference.preprocessing.shaders import DepthAlign  # noqa: E402
 from modules.render import PosePointLines  # noqa: E402
 from modules.render.modules.board.shaders import TimeSeries  # noqa: E402
 from modules.render.modules.pose.shaders import AddMix, Feature, LayerComposite, Window  # noqa: E402

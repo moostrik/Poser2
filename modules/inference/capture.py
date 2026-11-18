@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Callable, TypeAlias
 
 from modules.pose import FrameDict
 
-from .source import GpuDepth, GpuImage
+from .preprocessing import GpuDepth, GpuImage
 
 if TYPE_CHECKING:
     from .segmentation import ImageDict

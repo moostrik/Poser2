@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 class Detection(Protocol):
-    """What the detector reports for one frame: `modules.inference.detection.Detection`."""
+    """What the detector reports for one frame: `modules.inference.person.Detection`."""
     cam_id: int
     timestamp: float
     boxes: list[Rect]
@@ -44,7 +44,7 @@ class Detection(Protocol):
 
 class PersonDetector(Protocol):
     """A person detector the camera hears back from, on the detector's thread:
-    `modules.inference.detection.PersonDetector`. The app feeds it the uploaded images, straightened and
+    `modules.inference.person.PersonDetector`. The app feeds it the uploaded images, straightened and
     mirrored, so its boxes are too. Named here so the contract does not import the inference package."""
     @property
     def enabled(self) -> bool: ...

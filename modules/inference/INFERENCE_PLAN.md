@@ -147,25 +147,9 @@ deep_flow's TensorRT engine takes one player only (a static batch of 1), so its 
 
 ## G. The package's root and the inference frame (2026-11-18)
 
-The root holds 13 files and a stub of four jobs side by side: the input's preparation, the crops, the frame the
-render takes, and the models' shared parts **(seen)**. A folder of one or two files is ceremony (decided
-2026-11-18), so only the preparation gets one.
+G1 (2026-11-18) sorted the root: `preprocessing/` (the upload and the crop step), `model_worker` and the TensorRT
+stub into `engine/`, `recorded_poses` into `pose/`, `detection/` named `person/`; the capture sync stays at the root.
 
-- G1. The root sorted, names and files only:
-  - `preprocessing/`, the input made ready for the models, as inference textbooks name it: `serial_uploader`,
-    `batch_uploader`, `image_upload`, `camera_sync`, `depth_align`, `cuda_kernels`, `shaders/`, `source`, `crop`,
-    `crop_extractor`. The crop belongs with the upload: it reads only the upload's images and makes the models'
-    input **(seen)**. The package exports `crop` from there, so `inference.crop` stays its one public name
-    (deep_flow's settings use `inference.crop.CropExtractorSettings` **(seen)**); the models import it from
-    `..preprocessing`
-  - `model_worker` into `engine/`; `recorded_poses` into `pose/` (it stands in for the pose estimator);
-    `tensorrt.pyi` into `engine/`, beside its only users, with pyright's `stubPath` there (`tools/models`, which also
-    imports tensorrt, is excluded from pyright **(seen)**)
-  - `detection/` named `person/`, as `face/`: every model detects; the class stays `PersonDetector`
-  - the root keeps `capture.py` and `capture_sync.py` (made over in G2): they come after the models, not before
-  - the call sites follow: the apps, `modules/recording`, `modules/render`, the scripts (`depth_align_check.py`
-    imports the GL `DepthAlign` from `inference.shaders` **(seen)**), `INFERENCE.md`, `INPUT_THREADS.md`, `OAK4.md`,
-    `RECORDING.md`. Checked by the import and guard tests and the package's tests
 - G2. `Capture` becomes `InferenceFrame`, made as the pose `Frame` is (decided 2026-11-18), in one step, so each call
   site changes once:
   - the name: one camera moment's image with what the models found in it. "Capture" also names the camera's moment

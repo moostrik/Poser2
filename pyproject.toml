@@ -58,5 +58,5 @@ explicit = true
 
 [tool.pyright]
 typeCheckingMode = "basic"      # this block overrides the VS Code setting
-stubPath = "modules/inference"  # holds tensorrt.pyi
+stubPath = "modules/inference/engine"  # holds tensorrt.pyi
 exclude = ["**/__pycache__", "**/.*", "apps/smile/ComfyUI", "apps/smile/data/comfy", "data/models", "modules/camera/vimba/vimbapython", "modules/camera/oak4", "apps/deep_flow", "scripts/test/multicam_barrier.py", "tools/models"]

@@ -18,9 +18,8 @@ import torch.nn.functional as F
 
 from modules.utils import PerformanceTimer, Rect
 
-from ..engine import Engine, make_engine
-from ..model_worker import ModelWorker
-from ..source import GpuImage
+from ..engine import Engine, ModelWorker, make_engine
+from ..preprocessing import GpuImage
 from .decode import PERSON_ROWS, normalise, person_boxes
 from .detection import Detection, DetectionCallback
 from .settings import PersonDetectorSettings

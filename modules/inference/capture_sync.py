@@ -36,7 +36,7 @@ from modules.settings import BaseSettings, Field
 from modules.utils import PerformanceTimer
 
 from .capture import Capture, CaptureCallback
-from .source import GpuDepth, GpuImage
+from .preprocessing import GpuDepth, GpuImage
 
 if TYPE_CHECKING:
     from .segmentation import ImageDict

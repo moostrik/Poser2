@@ -9,22 +9,25 @@ every app uses them together, and the crop step and the detectors read the uploa
 
 ## The parts
 
-| Part                                 | File                                  | Its thread     | Does                                                               |
-|--------------------------------------|---------------------------------------|----------------|--------------------------------------------------------------------|
-| `SerialUploader`                     | `serial_uploader.py`                  | its own        | each frame of one camera onto the GPU, the moment it comes         |
-| `CameraSync`, `BatchUploader`        | `camera_sync.py`, `batch_uploader.py` | its own, each  | several cameras' frames of one moment, as one set, onto the GPU    |
-| `ImageUpload`                        | `image_upload.py`                     | the uploader's | the GPU work both uploaders share                                  |
-| `DepthAligner`                       | `depth_align.py`, `cuda_kernels.py`   | the uploader's | the depth moved onto the color's view                              |
-| `CropExtractor`                      | `crop_extractor.py`, `crop.py`        | the caller's   | every player's box cut at every size, in one pass                  |
-| `PoseEstimator`                      | `pose/`                               | its own        | RTMPose, 17 points a player                                        |
-| `Segmenter`                          | `segmentation/`                       | its own        | Robust Video Matting, a mask a player                              |
-| `OpticalFlowEstimator`               | `optical_flow/`                       | its own        | RAFT, the flow from a player's previous crop to this one           |
-| `PersonDetector`                     | `detection/`                          | its own        | YOLOv8n, the players' boxes on the host (replay)                   |
-| `FaceDetector`                       | `face/`                               | its own        | SCRFD and the 106 landmarks, the faces (smile)                     |
-| `ModelWorker`                        | `model_worker.py`                     |                | the five workers' base                                             |
-| `Engine` (`OnnxEngine`, `TrtEngine`) | `engine/`                             | the worker's   | a model file run on GPU tensors, ONNX Runtime or TensorRT          |
-| `CaptureSync`                        | `capture_sync.py`, `capture.py`       | its own        | an image, its depth, poses and masks of one moment, as a `Capture` |
-| `RecordedPoses`                      | `recorded_poses.py`                   | the caller's   | the recorded poses, in place of the pose model in -sim             |
+`preprocessing/` makes the input ready for the models, the upload and the crop step; `engine/` holds what the
+models share; each model has its package; the capture sync, which comes after the models, sits at the root.
+
+| Part                                 | File                                                | Its thread     | Does                                                               |
+|--------------------------------------|-----------------------------------------------------|----------------|--------------------------------------------------------------------|
+| `SerialUploader`                     | `preprocessing/serial_uploader.py`                  | its own        | each frame of one camera onto the GPU, the moment it comes         |
+| `CameraSync`, `BatchUploader`        | `preprocessing/camera_sync.py`, `batch_uploader.py` | its own, each  | several cameras' frames of one moment, as one set, onto the GPU    |
+| `ImageUpload`                        | `preprocessing/image_upload.py`                     | the uploader's | the GPU work both uploaders share                                  |
+| `DepthAligner`                       | `preprocessing/depth_align.py`, `cuda_kernels.py`   | the uploader's | the depth moved onto the color's view                              |
+| `CropExtractor`                      | `preprocessing/crop_extractor.py`, `crop.py`        | the caller's   | every player's box cut at every size, in one pass                  |
+| `PoseEstimator`                      | `pose/`                                             | its own        | RTMPose, 17 points a player                                        |
+| `RecordedPoses`                      | `pose/recorded_poses.py`                            | the caller's   | the recorded poses, in place of the pose model in -sim             |
+| `Segmenter`                          | `segmentation/`                                     | its own        | Robust Video Matting, a mask a player                              |
+| `OpticalFlowEstimator`               | `optical_flow/`                                     | its own        | RAFT, the flow from a player's previous crop to this one           |
+| `PersonDetector`                     | `person/`                                           | its own        | YOLOv8n, the players' boxes on the host (replay)                   |
+| `FaceDetector`                       | `face/`                                             | its own        | SCRFD and the 106 landmarks, the faces (smile)                     |
+| `ModelWorker`                        | `engine/model_worker.py`                            |                | the five workers' base                                             |
+| `Engine` (`OnnxEngine`, `TrtEngine`) | `engine/`                                           | the worker's   | a model file run on GPU tensors, ONNX Runtime or TensorRT          |
+| `CaptureSync`                        | `capture_sync.py`, `capture.py`                     | its own        | an image, its depth, poses and masks of one moment, as a `Capture` |
 
 ## From the frame to the model
 
@@ -36,7 +39,7 @@ in any order unless they are synchronized so
 **(site fact: [CUDA streams](https://docs.pytorch.org/docs/stable/notes/cuda.html#cuda-streams))**.
 
 - The uploader hands each image on as a `GpuImage` with its `ready` event, and as an `ImageSnapshot`: each
-  camera's image and its previous one, their capture times, the event (`source.py`).
+  camera's image and its previous one, their capture times, the event (`preprocessing/source.py`).
 - The crop step takes the poses with the snapshot they are for and cuts from exactly those images, never a newer
   one, at each size it was made with (the pose model's, and where a segmentation runs, its own), from one box per
   player. All sizes share one `crops_ready` event; each size has its own callbacks. It cuts the RAW stage's smoothed
@@ -90,7 +93,7 @@ which every user of the camera needs:
 GPU as one stack (one copy, one round of kernels, when the frames share a size). It stays in this package: it
 groups the frames for the upload, the input's first step, and holds nothing of a camera.
 
-The kernels are CUDA C compiled at runtime by the NVRTC torch ships (`cuda_kernels.py`, through ctypes, no extra
+The kernels are CUDA C compiled at runtime by the NVRTC torch ships (`preprocessing/cuda_kernels.py`, through ctypes, no extra
 package). `camera.uploader.depth_kernels` off, or kernels that cannot be compiled or loaded (logged once), run the
 same in torch ops, the reference the tests and the harness hold the kernels to; the depth's then run as one CUDA
 graph per lens, homography and size. The torch ops are about a hundred small kernels; launched one by one they held

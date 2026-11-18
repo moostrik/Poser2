@@ -146,7 +146,7 @@ class OakGroup(BaseSettings):
     cam_2        : Group[OakCameraSettings]            = Group(OakCameraSettings, share=_cam_share)
     camera_health: Group[CameraHealthSettings]      = Group(CameraHealthSettings)
     simulator    : Group[PlayerSettings]         = Group(PlayerSettings, share=[num_cams, fps])
-    person_detector     : Group[inference.detection.PersonDetectorSettings] = Group(inference.detection.PersonDetectorSettings)     # the replay backend's person detector
+    person_detector     : Group[inference.person.PersonDetectorSettings] = Group(inference.person.PersonDetectorSettings)     # the replay backend's person detector
     tracker      : Group[OnePerCamTrackerSettings]  = Group(OnePerCamTrackerSettings)
     frame_sync   : Group[inference.CameraSyncSettings]      = Group(inference.CameraSyncSettings, share=[num_cams, fps])
     tracklet_sync: Group[inference.CameraSyncSettings]      = Group(inference.CameraSyncSettings, share=[num_cams, fps])

@@ -11,7 +11,7 @@ the design and its reasons; how each part works is in its module's docstring:
 | writing                      | `recorder/recorder.py`, `modules/video/stream_writer.py`             |
 | playing                      | `player/player.py` and [its parts](#the-players-parts)               |
 | the camera of a recording    | `replay/camera.py`, `replay/tracker.py`                              |
-| the poses of a recording     | `modules/inference/recorded_poses.py`                                |
+| the poses of a recording     | `modules/inference/pose/recorded_poses.py`                           |
 
 The threads a frame goes through after it are deep_flow's ([INPUT_THREADS.md](../flow/INPUT_THREADS.md)). What is
 next is in [RECORDING_PLAN.md](RECORDING_PLAN.md).

@@ -1,4 +1,4 @@
-"""Does the torch depth alignment (`modules.inference.depth_align`) give what the GL `DepthAlign` gives?
+"""Does the torch depth alignment (`modules.inference.preprocessing.depth_align`) give what the GL `DepthAlign` gives?
 
 Takes depth frames of a recording with their recorded alignment, mirrored as the replay mirrors it, runs each through
 both, level and straightened by the recorded tilt (and once by a steeper one), and compares them pixel for pixel; then
@@ -22,8 +22,8 @@ import monitor_harness as mh  # noqa: E402
 from modules.camera import (DepthAlignment, FrameType, TiltCorrection, TiltCorrectionSettings, aligned_depth_size, depth_projection)  # noqa: E402
 from modules.recording import read_metadata  # noqa: E402
 from modules.gl import Image, Texture  # noqa: E402
-from modules.inference.depth_align import DepthAligner, depth_metres  # noqa: E402
-from modules.inference.shaders import DepthAlign  # noqa: E402
+from modules.inference.preprocessing import DepthAligner, depth_metres  # noqa: E402
+from modules.inference.preprocessing.shaders import DepthAlign  # noqa: E402
 from modules.video import StreamReader  # noqa: E402
 
 RECORDINGS = Path('apps/deep_flow/data/recordings')

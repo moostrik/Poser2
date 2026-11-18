@@ -13,7 +13,7 @@ import torch
 from onnx import TensorProto, helper, numpy_helper
 
 from modules.inference import GpuImage, ModelType
-from modules.inference.detection import PersonDetector, Resolution, PersonDetectorSettings
+from modules.inference.person import PersonDetector, Resolution, PersonDetectorSettings
 from modules.utils import Rect
 
 WIDTH, HEIGHT = 512, 448
@@ -136,7 +136,7 @@ class MissingModelTest(unittest.TestCase):
         settings = PersonDetectorSettings(model_path=tempfile.mkdtemp())
         settings.initialize()
         detector = PersonDetector(settings)
-        with self.assertLogs('modules.inference.model_worker', level='ERROR') as logs:
+        with self.assertLogs('modules.inference.engine.model_worker', level='ERROR') as logs:
             detector.start()
             detector._thread.join(timeout=5.0)
         self.assertFalse(detector.is_ready)

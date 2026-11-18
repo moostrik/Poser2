@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.inference.detection import person_boxes, nms, normalise
+from modules.inference.person import person_boxes, nms, normalise
 
 
 def output(candidates: list[tuple[float, float, float, float, float, float]], classes: int = 80) -> np.ndarray:

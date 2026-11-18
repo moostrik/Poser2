@@ -44,7 +44,7 @@ class TrackerFrameSourceSettings(BaseSettings):
                                             description="Seconds after the last detection a person still gets a pose")
     # A camera that runs the pose model itself (OAK4) hands its keypoints over in the frame; the pose
     # carries them in the host crop's convention, normalised to a window of this aspect around the
-    # box, padded like the host crop, and the box becomes that window (`modules.inference.crop`).
+    # box, padded like the host crop, and the box becomes that window (`modules.inference.preprocessing.crop`).
     crop_aspect:       Field[float] = Field(0.75, min=0.25, max=4.0, step=0.05,
                                             description="Width over height of the window the camera's keypoints are normalised to (the host crop's 384/512)")
     crop_padding:      Field[float] = Field(0.0, min=0.0, max=1.0, step=0.05,

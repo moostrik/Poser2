@@ -8,9 +8,8 @@ import torch
 from modules.pose import FrameDict
 from modules.utils import PerformanceTimer
 
-from .. import crop, ModelType
-from ..engine import Engine, make_engine
-from ..model_worker import ModelWorker
+from ..engine import Engine, ModelType, ModelWorker, make_engine
+from ..preprocessing import crop
 from .flow import FlowDict, FlowCallback
 from .settings import OpticalFlowEstimatorSettings
 

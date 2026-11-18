@@ -3,7 +3,7 @@ from typing import Callable, TypeAlias
 
 import numpy as np
 
-from ..source import GpuImage
+from ..preprocessing import GpuImage
 from .measures import HeadPose
 
 

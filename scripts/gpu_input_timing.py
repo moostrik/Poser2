@@ -20,7 +20,7 @@ import torch.nn.functional as F  # noqa: E402
 from modules.camera import CameraFrame, FrameType, TiltCorrection, TiltCorrectionSettings  # noqa: E402
 from modules.recording import read_metadata  # noqa: E402
 from modules.inference import ImageUpload  # noqa: E402
-from modules.inference.image_upload import nv12_to_rgb, warp_grid  # noqa: E402
+from modules.inference.preprocessing.image_upload import nv12_to_rgb, warp_grid  # noqa: E402
 from modules.video import StreamReader  # noqa: E402
 
 RECORDINGS = Path('apps/deep_flow/data/recordings')

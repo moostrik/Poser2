@@ -17,7 +17,7 @@ from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, TrackerFrameSource
 from modules.pose import configure_features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import optical_flow, pose, detection, CropExtractor, GpuImage, ImageSnapshot, has_points, RecordedPoses, Capture, CaptureSync, SerialUploader, frame_poses
+from modules.inference import optical_flow, pose, person, CropExtractor, GpuImage, ImageSnapshot, has_points, RecordedPoses, Capture, CaptureSync, SerialUploader, frame_poses
 from modules.pose import FrameDict
 from modules.utils import FPS, PerformanceTimer
 
@@ -71,12 +71,12 @@ class DeepFlowMain:
         # Live and in -sim: a recording played can be recorded again, with what the app found in it (its poses)
         self.recorder: Recorder = Recorder(self.settings.camera.recorder, frame_poses, data_path=DATA_PATH)
         self.session = Session(self.settings.camera.control)       # splits the recording into chunks
-        self.person_detector: detection.PersonDetector | None = None      # the replay backend's, shared by its cameras
+        self.person_detector: person.PersonDetector | None = None      # the replay backend's, shared by its cameras
         if self.settings.camera.sim_enabled:
             self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH, nv12=True)     # as the camera hands its frames
             # the recordings on the host, without a device: the people found and followed here
             if self.settings.camera.cam_0.model_chain != ModelChain.OFF:
-                self.person_detector = detection.PersonDetector(self.settings.camera.person_detector)
+                self.person_detector = person.PersonDetector(self.settings.camera.person_detector)
             for i in range(num_cams):
                 cam = self.settings.camera.cameras[i]
                 self.cameras.append(replay.Camera(self.player, cam, self.person_detector, replay.Tracker(), i, cam.tilt))

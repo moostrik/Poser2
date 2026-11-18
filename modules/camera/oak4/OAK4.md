@@ -294,7 +294,7 @@ That gives a view of about 79.6° by 67.6° **(deduction)**, and `readings.fov_f
 
 ## Depth
 
-Neural Depth runs on the camera off 640x400 mono frames and arrives as 480x300 uint16 millimeters on the left mono camera's view, with 0 for no depth. Each depth frame carries its `DepthAlignment`: both lenses and the move from the left camera to the color camera, 3.76 cm sideways, read once from the calibration the frames carry. The uploader puts depth on the color view on the GPU (`DepthAligner` in `modules/inference/depth_align.py`), together with the tilt correction and the mirror: each depth pixel goes to its point in space and into the color frame, the nearest point wins where two land on one pixel, and a pixel nothing lands on stays 0. The output is 374x300, the depth's rows at the color frame's aspect (`aligned_depth_size`).
+Neural Depth runs on the camera off 640x400 mono frames and arrives as 480x300 uint16 millimeters on the left mono camera's view, with 0 for no depth. Each depth frame carries its `DepthAlignment`: both lenses and the move from the left camera to the color camera, 3.76 cm sideways, read once from the calibration the frames carry. The uploader puts depth on the color view on the GPU (`DepthAligner` in `modules/inference/preprocessing/depth_align.py`), together with the tilt correction and the mirror: each depth pixel goes to its point in space and into the color frame, the nearest point wins where two land on one pixel, and a pixel nothing lands on stays 0. The output is 374x300, the depth's rows at the color frame's aspect (`aligned_depth_size`).
 
 Next to a near object the color camera sees background the left camera could not, so that band has no depth. It is about `538 px × 3.76 cm × (1/Z_near − 1/Z_far)` wide, 12 px for a player at 1 m before a wall at 2.5 m. The black shadow bands beside near objects are this band and the stereo occlusion.
 
@@ -408,7 +408,7 @@ The iGPU decodes both `P720` streams together at more than 670 fps color and 170
 
 ### Detector in replay
 
-Replay finds players on the PC with [`PersonDetector`](../../inference/detection/person_detector.py). Its `resolution` is set to match `PERSON_DETECTOR_ARCHIVE` on the camera, and its `model_type` picks ONNX Runtime or TensorRT. It takes the uploaded images (`GpuImage`), so a frame goes to the GPU once: both runtimes stretch it into the model on the GPU and hand back only the box and person rows. The uploaded image is straightened, so the boxes are found in the straightened frame and need no `corrected_roi`, where the camera's detector looks at the frame before the correction.
+Replay finds players on the PC with [`PersonDetector`](../../inference/person/person_detector.py). Its `resolution` is set to match `PERSON_DETECTOR_ARCHIVE` on the camera, and its `model_type` picks ONNX Runtime or TensorRT. It takes the uploaded images (`GpuImage`), so a frame goes to the GPU once: both runtimes stretch it into the model on the GPU and hand back only the box and person rows. The uploaded image is straightened, so the boxes are found in the straightened frame and need no `corrected_roi`, where the camera's detector looks at the frame before the correction.
 
 Time per frame on an empty `P1080` frame, 500 runs each, batch 1, FP32, GPU otherwise idle, with the frame resized and converted on the CPU:
 

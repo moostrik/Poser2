@@ -16,7 +16,7 @@ from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, TrackerFrameSource
 from modules.pose import FrameDict, features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import pose, detection, BatchUploader, CameraSync, CropExtractor, ImageSnapshot, SyncMessage, frame_poses, has_points
+from modules.inference import pose, person, BatchUploader, CameraSync, CropExtractor, ImageSnapshot, SyncMessage, frame_poses, has_points
 from modules.session import Session
 
 from .board import RenderBoard
@@ -79,7 +79,7 @@ class WhiteSpaceMain:
         # CAMERA
         self.cameras: list[CameraSource] = []
         self.player: Player | None = None
-        self.person_detector: detection.PersonDetector | None = None      # the replay backend's, shared by its cameras
+        self.person_detector: person.PersonDetector | None = None      # the replay backend's, shared by its cameras
         if self.settings.camera.sim_enabled:
             # The rig is uniform: mono cameras decode their clips straight to gray
             gray = not self.settings.camera.cameras[0].color
@@ -87,7 +87,7 @@ class WhiteSpaceMain:
             if self.settings.camera.simulator.replay:
                 # the recordings on the host, without a device: the people found and followed here
                 if self.settings.camera.yolo:
-                    self.person_detector = detection.PersonDetector(self.settings.camera.person_detector)
+                    self.person_detector = person.PersonDetector(self.settings.camera.person_detector)
                 for i in range(num_cams):
                     self.cameras.append(replay.Camera(self.player, self.settings.camera.cameras[i], self.person_detector, replay.Tracker(), i))
             else:

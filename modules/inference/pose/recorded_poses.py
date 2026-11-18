@@ -27,7 +27,8 @@ from modules.pose import BBox, Frame, FrameDict, FrameDictCallbackMixin, Points2
 from modules.settings import BaseSettings, Field
 from modules.utils import Rect
 
-from . import crop, pose
+from ..preprocessing import crop
+from .pose_estimator import PoseEstimator
 
 logger = logging.getLogger(__name__)
 
@@ -68,10 +69,10 @@ def recorded_pose(frame: Frame, box: np.ndarray, points: np.ndarray) -> Frame:
 class RecordedPoses(FrameDictCallbackMixin):
     """See the module docstring."""
 
-    def __init__(self, settings: RecordedPosesSettings, pose_estimator: pose.PoseEstimator) -> None:
+    def __init__(self, settings: RecordedPosesSettings, pose_estimator: PoseEstimator) -> None:
         super().__init__()
         self.settings: RecordedPosesSettings = settings
-        self._pose: pose.PoseEstimator = pose_estimator
+        self._pose: PoseEstimator = pose_estimator
         self._pose.add_frames_callback(self._on_model)
         self._lock: Lock = Lock()
         self._recorded: dict[int, CaptureStream[FrameMetadata]] = defaultdict(lambda: CaptureStream(KEPT))
