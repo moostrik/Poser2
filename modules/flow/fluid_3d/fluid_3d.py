@@ -1010,14 +1010,16 @@ class Fluid3D:
 
     def add_temperature(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
         """The boundary's warmth: the bridge's presence (0 to 1) times input.temperature_gain, its sign and size, at
-        most ±1, the water in the slab dragged toward it over input.temperature_drag where the body is."""
+        most ±1, the water in the slab dragged toward it over input.temperature_drag where the body is warmer (or
+        colder) than the water; never back toward a fainter body: as the density's, held at the body, cooled by the
+        fade alone."""
         if not self._allocated or self.settings.temperature.buoyancy == 0.0:      # nothing reads it
             return
         input = self.settings.input
         share: float = drag_share(self._dt, input.temperature_drag) * weight
         self._inject_shader.use(texture, self._temperature, self._spread(), share,
                                 internal_format=GL_R16F, mode=int(InjectMode.FILL), gain=input.temperature_gain,
-                                z_position=z_position, release=share)
+                                z_position=z_position)
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def add_expansion(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:

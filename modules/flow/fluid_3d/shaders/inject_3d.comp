@@ -5,9 +5,9 @@
  * position (nothing without one): weight = the body's share of the cell (slab.glsl) × uStrength. One invocation a
  * column: the input and its z position read once, then the cells the slab reaches. By uMode:
  *   0 ADD     the input × weight added
- *   1 FILL    the field dragged toward the input times uGain (capped at ±1), never past it: up by weight, down
- *             by the body's share × uRelease; only where the input is not 0, so where the body is not nothing
- *             is pulled toward 0
+ *   1 FILL    the field dragged toward the input times uGain (capped at ±1) by weight, never past it, only
+ *             where the target is further from 0 than the field on its side: a warm target only warms, a cold
+ *             one only cools, so the field never falls toward a fainter body; only where the input is not 0
  * The density goes in by InjectDensity3D.
  */
 
@@ -16,12 +16,11 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;   // a column
 layout(binding = 0) uniform sampler2D uInput;     // the scalar, red
 layout(binding = 1) uniform sampler2D uZPosition; // its z position, red over green
 
-layout(rgba16f, binding = 0) uniform image3D uVolume;  // Read-write
+layout(r16f, binding = 0) uniform image3D uVolume;  // Read-write, the format the volume is bound with (R16F)
 
 uniform bool  uHasZPosition;
 uniform float uSpread;       // Gaussian sigma in normalized depth units
 uniform float uStrength;     // Injection strength multiplier: × dt for ADD, the drag's share for FILL
-uniform float uRelease;      // FILL: the share where the target is below the field; 0 = never down
 uniform int   uMode;         // 0 ADD, 1 FILL
 uniform float uGain;         // FILL: the input times this, at most ±1, is the target
 uniform ivec3 uSize;
@@ -45,14 +44,12 @@ void main() {
         // The body's share of this cell's depth (slab.glsl)
         float slab = slab_cell(z, center, uSize.z);
         float weight = slab * uStrength;
-        float release = slab * uRelease;
-        if (max(weight, uMode == 1 ? release : 0.0) < 0.001) continue;  // Skip negligible contributions
+        if (weight < 0.001) continue;  // Skip negligible contributions
         ivec3 gid = ivec3(column, z);
         float current = imageLoad(uVolume, gid).r;
         if (uMode == 1) {
-            float share = source > current ? weight : release;
-            if (share < 0.001) continue;
-            current += (source - current) * min(share, 1.0);
+            if (source > 0.0 ? source <= current : source >= current) continue;     // held, never toward a fainter body
+            current += (source - current) * min(weight, 1.0);
         } else {
             current += source * weight;
         }

@@ -42,7 +42,7 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 3866,
+        "balance": 3862,
         "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
@@ -501,7 +501,7 @@
         "density_gain": 5.0,
         "density_blend": "OVER",
         "temperature_drag": 200.0,
-        "temperature_gain": 1.0,
+        "temperature_gain": 10.0,
         "expansion_rate": 0.0
       },
       "velocity": {
@@ -523,13 +523,13 @@
         "radius_3": 0.025
       },
       "temperature": {
-        "advection": "SEMI_LAGRANGIAN",
+        "advection": "MACCORMACK",
         "limiter": "CLAMP",
-        "advection_scale": 1.0,
-        "fade_time": 1.0,
+        "advection_scale": 2.0,
+        "fade_time": 9.0,
         "evaporation_time": 0.0,
         "evaporation_knee": 0.1,
-        "buoyancy": 2.0,
+        "buoyancy": 10.0,
         "sink": 1.0,
         "gravity_x": 0.0,
         "gravity_y": -1.0,

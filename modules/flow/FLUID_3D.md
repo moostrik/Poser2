@@ -116,7 +116,9 @@ panel in the order the layer injects them, says how the water follows each; the 
 The boundary and the body force are the two systems every solver distinguishes: a moving boundary,
 whose values the water takes, and the body force, which adds to it. The boundary's density and
 temperature are held at the body: the temperature is dragged toward as its velocity is, over its own time and
-never past the body's value; the density is laid over the water's. The density comes as its amount and its
+never past the body's value, and only where the body is warmer (or colder) than the water: never back toward a
+fainter body, whose dying trail is above 0 behind every move, so the warmth leaves the body warm and its fade
+alone cools it; the density is laid over the water's. The density comes as its amount and its
 color apart (`Injection.density`, `Injection.color`): the color is premultiplied by its alpha, the coverage, so
 the dye a pixel brings is the color times the amount, color and coverage alike, and a pixel the view matted out
 brings none ([VIEW.md](VIEW.md#the-stage)). The acceleration takes no drag: it has no target to close on, and its timing is the bandpass's

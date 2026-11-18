@@ -12,7 +12,7 @@ from .z_position_binding import bind_z_position
 class InjectMode(IntEnum):
     """How a scalar source goes into a field."""
     ADD = 0         # added × dt, unbounded
-    FILL = 1        # the field dragged toward the source, never past it: up by the drag's share, down by the release's
+    FILL = 1        # the field dragged toward the source by the drag's share, never past it, only where the source is further from 0
 
 
 class Inject3D(ComputeShader):
@@ -29,7 +29,7 @@ class Inject3D(ComputeShader):
     def use(self, input_2d: Texture, volume: Texture3D,
             spread: float, strength: float = 1.0,
             internal_format: int = GL_R16F, mode: int = 0, gain: float = 1.0,
-            z_position: Texture | None = None, release: float = 0.0) -> None:
+            z_position: Texture | None = None) -> None:
         """Add the 2D input into the 3D volume.
 
         Args:
@@ -38,12 +38,10 @@ class Inject3D(ComputeShader):
             spread: Gaussian sigma in normalized depth units
             strength: Injection strength multiplier
             internal_format: Image format for volume binding
-            mode: 0 ADD, 1 FILL (dragged toward the input, never past it)
+            mode: 0 ADD, 1 FILL (dragged toward the input, never past it, only where it is further from 0)
             gain: FILL: the input times this, at most ±1, is the target
             z_position: The input's z position (red over green); a pixel without one, or every pixel without
                 it, puts nothing in
-            release: FILL: the share where the target is below the field (`strength` where it is above);
-                0 = never down
         """
         if not self.allocated or not self.shader_program:
             return
@@ -64,7 +62,6 @@ class Inject3D(ComputeShader):
         glUniform1f(self.get_uniform_loc("uStrength"), strength)
         glUniform1i(self.get_uniform_loc("uMode"), mode)
         glUniform1f(self.get_uniform_loc("uGain"), gain)
-        glUniform1f(self.get_uniform_loc("uRelease"), release)
         glUniform3i(self.get_uniform_loc("uSize"),
                     volume.width, volume.height, volume.depth)
 
