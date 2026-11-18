@@ -3,7 +3,7 @@
 /*
  * Buoyancy3D - the buoyancy on the velocity grid, an acceleration (widths/s²) the fluid adds × dt.
  *
- * F = uGravity * (κ·density - σ(T - T_ambient)):
+ * F = uGravity * (κ·density - σ(T - T_ambient)), the density its amount (alpha):
  *   dense density sinks along gravity; hot density rises against it.
  * The weight term acts wherever density is (not gated by temperature),
  * so accumulated old density settles even after it has cooled.
@@ -13,7 +13,7 @@
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick of cells, so z neighbors share the cache
 
 layout(binding = 0) uniform sampler3D uTemperature;  // Temperature (R16F)
-layout(binding = 1) uniform sampler3D uDensity;      // Density (RGBA16F)
+layout(binding = 1) uniform sampler3D uDensity;      // Density (RGBA16F, premultiplied; its amount in alpha)
 layout(binding = 2) uniform sampler3D uObstacle;     // Obstacle mask (R8)
 
 layout(rgba16f, binding = 0) writeonly uniform image3D uForce;
@@ -45,8 +45,7 @@ void main() {
 
     // Thermal lift where warm; the density's weight wherever density is
     float lift = (abs(dtemp) > 0.0001) ? dtemp * uSigma : 0.0;
-    vec4 d = texture(uDensity, st);
-    float density = max(d.r, max(d.g, d.b));
+    float density = texture(uDensity, st).a;       // its amount, in RGB and in Oklab alike
     float force = density * uKappa - lift;
 
     vec3 buoyancy = (abs(force) > 0.00001) ? uGravity * force : vec3(0.0);

@@ -25,7 +25,7 @@ class Buoyancy3D(ComputeShader):
 
         Args:
             temperature: 3D temperature field (R16F)
-            density: 3D density field (RGBA16F; its weight is the max of r, g, b)
+            density: 3D density field (RGBA16F; its weight is its amount, alpha)
             obstacle: 3D obstacle mask (R8)
             force_out: Output force volume (RGBA16F)
             sigma: Thermal buoyancy (widths/s² per unit of temperature)

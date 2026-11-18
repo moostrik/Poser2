@@ -103,9 +103,6 @@ buoyancy × warmth) along gravity, at the faces, added before the projection; th
 cooling toward the room's. The buoyancy's formula is that already (`buoyancy_3d.comp`); the steps below are
 where the code differs.
 
-- **E2.** The density's weight reads its amount (`.a`), where today it reads max(r, g, b), the color × the
-  amount, and in Oklab a and b, which may be negative. Checked with `sink` > 0: a dense blob sinks at `sink` ×
-  its `.a`, in RGB and in Oklab (E5's script).
 - **E3.** The warmth is the difference from the room's (Boussinesq), as the injection makes it, −1 to 1, 0 =
   the room's: `temperature.ambient` goes, and the fade and the evaporation take the warmth toward 0, which is
   then the cooling toward the room's (Newton's law). It goes from `TemperatureSettings`, `buoyancy_3d.py`
@@ -121,13 +118,13 @@ where the code differs.
   density's; BRIDGE_3D.md follows. The 2D bridge is untouched (I3).
 - **E5.** Checked in the GPU harness, a new script in `scripts/`: a warm blob in a closed box at rest, one step.
   The buoyancy before the projection is `buoyancy` × the warmth × gravity, exactly; the blob's first-step rise
-  after the projection about 2/3 of it (a sphere's added mass) **(deduction)**; and E2's dense blob sinking at
-  `sink` × its `.a`, in RGB and Oklab. The result in FLUID_3D.md, with its kind, date, commit and settings. The
+  after the projection about 2/3 of it (a sphere's added mass) **(deduction)**; and a dense blob sinking at
+  `sink` × its amount (`.a`), in RGB and Oklab. The result in FLUID_3D.md, with its kind, date, commit and settings. The
   temperature's advection, after the projection since E1, timed again (`fluid_pass_check.py`), TIMING.md's row.
 - **E6.** Checked in the app, in its own panel: what the temperature does to the water and whether it works,
   with `buoyancy` above 0.
 
-E2 to E4 are a commit each, checked by the tests they touch and their shaders' compile; E5 a commit with its
+E3 and E4 are a commit each, checked by the tests they touch and their shaders' compile; E5 a commit with its
 script and result.
 
 ## F. The 3D fluid's look at 4K
