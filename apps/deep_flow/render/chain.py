@@ -16,6 +16,9 @@ class ChainLayers(IntEnum):
     # the view
     view =          auto()
     view_monitor =  auto()
+    # the density's color
+    color =         auto()
+    color_monitor = auto()
     # the motion
     motion =        auto()
     motion_monitor = auto()
@@ -60,9 +63,11 @@ CHAIN: tuple[ChainLayer, ...] = (
     ChainLayer(ChainLayers.inference_frame_image,   shape=ChainLayers.inference_frame_image, tick=True, per_inference_frame=True),
     ChainLayer(ChainLayers.inference_frame_depth,   shape=ChainLayers.inference_frame_image, tick=True, per_inference_frame=True),   # on the image's view, at the depth's own grid
     ChainLayer(ChainLayers.inference_frame_monitor, shape=ChainLayers.inference_frame_image, tick=True),
-    # the view: the window cut, the depth read, the masks, the foreground, the color
+    # the view: the window cut, the depth read, the mask; then the density's color from them
     ChainLayer(ChainLayers.view,                    Size.VIEW, ChainLayers.view, tick=True, per_inference_frame=True),
     ChainLayer(ChainLayers.view_monitor,            Size.VIEW, ChainLayers.view, tick=True),
+    ChainLayer(ChainLayers.color,                   Size.VIEW, ChainLayers.view, tick=True, per_inference_frame=True),
+    ChainLayer(ChainLayers.color_monitor,           Size.VIEW, ChainLayers.view, tick=True),
     # the motion, the bridge, the fluid
     ChainLayer(ChainLayers.motion,                  Size.LARGE, tick=True, per_inference_frame=True),
     ChainLayer(ChainLayers.motion_monitor,          Size.LARGE, tick=True),
@@ -75,7 +80,7 @@ CHAIN: tuple[ChainLayer, ...] = (
 )
 LAYERS: dict[ChainLayers, ChainLayer] = {chain_layer.layer: chain_layer for chain_layer in CHAIN}
 POSE_SHAPES: dict[PoseFrame, ChainLayers] = {PoseFrame.CROP: ChainLayers.cam_crop, PoseFrame.CAMERA: ChainLayers.cam_image, PoseFrame.VIEW: ChainLayers.view}
-MONITORS: tuple[ChainLayers, ...] = (ChainLayers.view_monitor, ChainLayers.motion_monitor, ChainLayers.bridge_monitor, ChainLayers.fluid_monitor)   # the flow's
+MONITORS: tuple[ChainLayers, ...] = (ChainLayers.view_monitor, ChainLayers.color_monitor, ChainLayers.motion_monitor, ChainLayers.bridge_monitor, ChainLayers.fluid_monitor)   # the flow's
 TICK_LAYERS: list[ChainLayers] = [chain_layer.layer for chain_layer in CHAIN if chain_layer.tick]
 INFERENCE_FRAME_LAYERS: list[ChainLayers] = [chain_layer.layer for chain_layer in CHAIN if chain_layer.per_inference_frame]
 
@@ -83,6 +88,7 @@ INFERENCE_FRAME_LAYERS: list[ChainLayers] = [chain_layer.layer for chain_layer i
 SHOWN: dict[Layers, ChainLayers] = {
     Layers.inference_frame: ChainLayers.inference_frame_monitor,
     Layers.view:        ChainLayers.view_monitor,
+    Layers.color:       ChainLayers.color_monitor,
     Layers.motion:      ChainLayers.motion_monitor,
     Layers.bridge:      ChainLayers.bridge_monitor,
     Layers.fluid:       ChainLayers.fluid_monitor,

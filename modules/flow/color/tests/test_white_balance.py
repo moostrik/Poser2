@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from apps.deep_flow.render.layers.view.white_balance import REFERENCE_KELVIN, RGB_TO_XYZ, planckian_white, white_balance_matrix
+from modules.flow.color.white_balance import REFERENCE_KELVIN, RGB_TO_XYZ, planckian_white, white_balance_matrix
 
 
 class TestWhiteBalance(unittest.TestCase):

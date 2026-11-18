@@ -45,5 +45,4 @@ class Bridge3DLayer(BridgeLayer):
     # ========== The bridge ==========
 
     def _bridge(self, input: BridgeInput) -> None:
-        self._bridge_3d.update(input.velocity, input.dt, input.z_position, input.mask, input.image, input.tint,
-                               input.same_tick)
+        self._bridge_3d.update(input.velocity, input.dt, input.z_position, input.mask, input.image, input.same_tick)

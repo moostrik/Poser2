@@ -1,14 +1,16 @@
-"""What does the view stage (`ViewLayer`) make from recorded captures, and how long do its passes take?
+"""What do the view stage (`ViewLayer`) and the color stage after it (`ColorLayer`) make from recorded captures, and
+how long do their passes take?
 
 Plays a recording's color and depth frames through the `SerialUploader` (the color straightened, the depth aligned, as the
-app does), takes them into GL and runs the view stage at the preset's settings. Prints the share of the mask without
-depth, upscaled and filled (0), and the share of the view that is the player. Saves the last frame's image, the
-crop's depth, the mask, the upscaled depth, the filled depth and the color side by side as a PNG, the depths from the
-box's front (white) to its back (black).
+app does), takes them into GL and runs the view stage and the color stage at the preset's settings. Prints the share
+of the mask without depth, upscaled and filled (0), and the share of the view that is the player. Saves the last frame's
+image, the crop's depth, the mask, the upscaled depth, the filled depth and the color side by side as a PNG, the depths
+from the box's front (white) to its back (black).
 
-With `--time`, then each of the view's passes on the last capture, the median of 40 runs, and the whole view.
+With `--time`, then each of the view's passes on the last capture, the median of 40 runs, and the whole view. With
+`--npy`, the last capture's color saved as float RGBA; with `--compare`, its largest difference from such a file.
 
-    python apps/deep_flow/scripts/view_check.py [RECORDING] [--frames 40] [--png PATH] [--time]
+    python apps/deep_flow/scripts/view_check.py [RECORDING] [--frames 40] [--png PATH] [--time] [--npy PATH] [--compare PATH]
 """
 import OpenGL
 OpenGL.ERROR_CHECKING = False  # as launcher.py runs the app; a glGetError per call would time the CPU
@@ -32,6 +34,7 @@ from modules.gl import Style, Tensor, Texture  # noqa: E402
 from modules.inference import GpuDepth, GpuImage, SerialUploader, SerialUploaderSettings  # noqa: E402
 from apps.deep_flow.render.layers import EDGE, ViewInput, ViewLayer  # noqa: E402
 from apps.deep_flow.settings import ViewLayerSettings  # noqa: E402
+from modules.render import ColorInput, ColorLayer, ColorLayerSettings  # noqa: E402
 from modules.video import StreamReader  # noqa: E402
 
 RECORDINGS = Path('apps/deep_flow/data/recordings')
@@ -64,11 +67,11 @@ def read(texture: Texture, channels: int = 1) -> np.ndarray:
     return np.frombuffer(data, np.float32).reshape(shape)[::-1]
 
 
-def time_view(view: ViewLayer, image: Texture, depth: Texture) -> None:
-    """Each of the view's passes on the last capture, the median of 40 runs (ms), as `ViewLayer._update` runs them;
-    then the whole view made again."""
+def time_view(view: ViewLayer, color_stage: ColorLayer, image: Texture, depth: Texture) -> None:
+    """Each of the view's passes on the last capture, the median of 40 runs (ms), as `ViewLayer._update` runs them,
+    and the color stage's; then the whole view made again."""
     roi = view._window
-    crop, mask, view_depth, color = view._crop, view._mask, view._depth, view._color
+    crop, mask, view_depth, color = view._crop, view._mask, view._depth, color_stage._color
 
     def whole() -> None:
         view._made = None
@@ -98,6 +101,8 @@ def main() -> int:
     parser.add_argument('--time', action='store_true', help='also time each pass on the last capture')
     parser.add_argument('--erode', type=int, help="the color's erode, where not the preset's")
     parser.add_argument('--feather', type=float, help="the color's feather, where not the preset's")
+    parser.add_argument('--npy', default='', help="save the last capture's color, float RGBA, as .npy")
+    parser.add_argument('--compare', default='', help="a .npy of the color to compare the last capture's with (largest difference)")
     args = parser.parse_args()
     chunk = RECORDINGS / args.recording / '0_000.mkv'
     info = read_metadata(chunk).info
@@ -112,13 +117,18 @@ def main() -> int:
     settings = ViewLayerSettings()
     settings.initialize()
     settings.update_from_dict(preset['view'])
+    color_settings = ColorLayerSettings()
+    color_settings.initialize()
+    color_settings.update_from_dict(preset['color'])
     if args.erode is not None:
-        settings.color.erode = args.erode
+        color_settings.erode = args.erode
     if args.feather is not None:
-        settings.color.feather = args.feather
+        color_settings.feather = args.feather
     band = settings.crop
     view = ViewLayer(settings, json.loads(PRESET.read_text(encoding='utf-8'))['camera']['fov'])
     view.allocate(preset['view']['width'], preset['view']['height'])
+    color_stage = ColorLayer(color_settings)
+    color_stage.allocate(preset['view']['width'], preset['view']['height'])
 
     uploader = SerialUploader(SerialUploaderSettings())
     images: list[GpuImage] = []
@@ -149,6 +159,8 @@ def main() -> int:
         view.set_input(ViewInput(image_texture, depth_texture, t))
         view.update()
         output = view.output
+        color_stage.set_input(ColorInput(output.image, output.mask, view.timestamp, view.made))
+        color_stage.update()
 
         mask = read(output.mask)
         upscaled = read(view._depth._upscaled)
@@ -162,11 +174,19 @@ def main() -> int:
             def near_white(metres: np.ndarray) -> np.ndarray:
                 return np.where(metres > 0.0, 1.0 - (metres - band.near) / max(band.far - band.near, 1e-6), 0.0)
             last = {'image': read(output.image, 4), 'crop depth': near_white(read(view._crop.depth)), 'mask': mask,
-                    'upscaled': near_white(upscaled), 'filled': near_white(filled), 'color': read(output.color, 4)}
+                    'upscaled': near_white(upscaled), 'filled': near_white(filled), 'color': read(color_stage.output.color, 4)}
 
     uploader.stop()
+    if args.npy and last:
+        np.save(args.npy, last['color'])
+        print(f'saved {args.npy}')
+    if args.compare and last:
+        reference = np.load(args.compare)
+        difference = np.abs(last['color'].astype(np.float64) - reference.astype(np.float64))
+        print(f'the color against {args.compare}: largest difference {difference.max() * 255.0:.3f} of 255, '
+              f'mean {difference.mean() * 255.0:.4f}')
     if args.time:
-        time_view(view, image_texture, depth_texture)
+        time_view(view, color_stage, image_texture, depth_texture)
     if empty_upscaled:
         print(f'the mask without depth: {np.mean(empty_upscaled) * 100:.2f}% upscaled, {np.mean(empty_filled) * 100:.2f}% filled; '
               f'the player {np.mean(shares) * 100:.1f}% of the view')

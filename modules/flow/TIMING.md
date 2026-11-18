@@ -80,7 +80,9 @@ recording on 7 November); every other stage runs every frame.
 
 ### The view
 
-The view stage is made once per capture, before the motion. Each pass alone on the measure recording's last of
+The view stage is made once per capture, before the motion; the color, measured here as the view's last pass, is
+the color stage's since 18 November, the same shaders after the view, so `GPU view` in the app no longer holds it.
+Each pass alone on the measure recording's last of
 40 captures (`20261112-125832_measure`, the view 448 × 800, the preset's view settings), 2026-11-16, the GPU
 otherwise idle, the median of 40 runs (`apps/deep_flow/scripts/view_check.py --time`), ms, commit fdf8f8de; the
 color at the preset's `erode` 0 and `feather` 0, which skip their passes, and at 2 and 4 (`--erode 2 --feather 4`):

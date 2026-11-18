@@ -3,9 +3,9 @@
 The flow's monitor (`modules/flow/visualization/`): a layer that shows one port of its stage, picked on the
 panel, drawn only while it is shown. `Monitor2DLayer` draws flat ports; `Monitor3DLayer` extends it with volumes
 (the cube, the glyphs in 3D, the flat front for the strip) and the mouse, and with their settings. A stage takes
-the one its ports need: the view, the motion and the bridge the flat one, the fluid the 3D one. Each of the
-flow's stages has its own (`FlowStage`:
-`VIEW`, `MOTION`, `BRIDGE`, `FLUID`), two in deep_flow, one for the main panel and one for the debug panel, their
+the one its ports need: the view, the color, the motion and the bridge the flat one, the fluid the 3D one. Each of
+the flow's stages has its own (`FlowStage`:
+`VIEW`, `COLOR`, `MOTION`, `BRIDGE`, `FLUID`), two in deep_flow, one for the main panel and one for the debug panel, their
 settings last in the stage's panel (`<stage>.monitor_main`, `monitor_debug`); deep_flow's capture has
 a simple one of its own (`InferenceFrameMonitorLayer`: the color, the depth or both). The stages and their ports are in
 [FLOW.md](FLOW.md#the-stages-and-their-layers). "Code" is what the files show; **(deduction)**

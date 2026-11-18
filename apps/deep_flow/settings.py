@@ -45,6 +45,7 @@ class Layers(IntEnum):
     """What a panel can show, in the chain's order: each stage's monitor, the show, the timings and the pose."""
     inference_frame = 0
     view =          auto()
+    color =         auto()
     motion =        auto()
     bridge =        auto()
     fluid =         auto()
@@ -222,31 +223,13 @@ class ViewMaskSettings(BaseSettings):
     edge_contrast: Field[float] = Field(0.03, min=0.001, max=0.3, step=0.001, description="The image's brightness spread (0 to 1) above which the mask's edge follows the image's")
 
 
-class ViewColorSettings(BaseSettings):
-    """ViewColor: the image white balanced and graded, in the order applied, then sharpened, its alpha a matte from its brightness;
-    then premultiplied by the mask's copy, eroded and feathered."""
-    enabled:    Field[bool]  = Field(True, description="The color graded; off, the image as it is")
-    white_balance: Field[float] = Field(6500.0, min=2000.0, max=12000.0, step=50.0, newline=True, description="The light the color is corrected for (K); lower cools, higher warms; 6500 = unchanged")
-    exposure:   Field[float] = Field(1.0, min=0.1, max=3.0, description="The color times this")
-    offset:     Field[float] = Field(0.0, min=-0.5, max=0.5, description="Added to the color, after the exposure")
-    gamma:      Field[float] = Field(1.0, min=0.5, max=2.0, description="Gamma")
-    contrast:   Field[float] = Field(1.0, min=0.5, max=2.0, description="Contrast around mid grey")
-    saturation: Field[float] = Field(1.0, min=0.0, max=2.0, description="Saturation, times this")
-    sharpen:    Field[float] = Field(0.0, min=0.0, max=2.0, description="Sharpen (0 = off)")
-    luma_matte: Field[float] = Field(1.0, min=0.0, max=1.0, description="Alpha from the color's brightness: darkness made transparency (0 = off)")
-    use_mask:  Field[bool]  = Field(True, newline=True, description="The color cut by the mask, premultiplied")
-    erode:      Field[int]   = Field(0, min=0, max=4, step=1, description="Pixels the color's edge moves inside the mask's (view pixels)")
-    feather:    Field[float] = Field(0.0, min=0.0, max=16.0, step=0.5, description="Width the color fades in over inside its edge (view pixels); 0 = hard")
-
-
 class ViewLayerSettings(render.StageLayerSettings):
-    """The view's size; its crop, mask and color in their panels, in the order the view runs them; the depth,
-    between the mask and the color, has no settings."""
+    """The view's size; its crop and mask in their panels, in the order the view runs them; the depth, after the
+    mask, has no settings."""
     width:         Field[int]   = Field(448, min=32, max=4096, step=32, description="The view's width (pixels)")
     height:        Field[int]   = Field(800, min=32, max=4096, step=32, description="The view's height (pixels)")
     crop:        Group[ViewCropSettings]      = Group(ViewCropSettings)
     mask:        Group[ViewMaskSettings]      = Group(ViewMaskSettings, description="The player's mask: the crop's depth, its edge guided onto the image's")
-    color:       Group[ViewColorSettings]     = Group(ViewColorSettings)
 
     monitor_main:  Group[render.Monitor2DLayerSettings] = Group(render.Monitor2DLayerSettings, last=True, tint=render.MAIN_TINT)
     monitor_debug: Group[render.Monitor2DLayerSettings] = Group(render.Monitor2DLayerSettings, last=True, tint=render.DEBUG_TINT)
@@ -293,12 +276,13 @@ class PoseMonitorSettings(BaseSettings):
 
 class RenderSettings(BaseSettings):
     debug: Field[bool]                           = Field(True, description="The main and the debug panel; off, the main panel alone, as on a second screen")
-    pause: Field[bool]                           = Field(False, description="Hold the last frame; the view is made again on it when a setting changes")
+    pause: Field[bool]                           = Field(False, description="Hold the last frame; the view and the color are made again on it when a setting changes")
     input_fps: Field[float]                      = Field(60.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
     layer  : Group[LayerSettings]                = Group(LayerSettings)
     # the chain, in its order, then the pose beside it
     inference_frame: Group[InferenceFrameMonitorSettings] = Group(InferenceFrameMonitorSettings)
     view   : Group[ViewLayerSettings]            = Group(ViewLayerSettings)
+    color  : Group[render.ColorLayerSettings]    = Group(render.ColorLayerSettings)
     motion : Group[render.Motion3DLayerSettings] = Group(render.Motion3DLayerSettings, share=[input_fps.as_('fps')])
     bridge : Group[render.Bridge3DLayerSettings] = Group(render.Bridge3DLayerSettings)
     fluid  : Group[render.Fluid3DLayerSettings]  = Group(render.Fluid3DLayerSettings)

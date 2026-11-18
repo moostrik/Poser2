@@ -2,7 +2,7 @@
 
 # Local application imports
 from modules.gl import Texture
-from modules.flow import DensityColor, bridge_2d, HasPorts
+from modules.flow import TintColor, bridge_2d, HasPorts
 from modules.settings import Group
 from .bridge_layer import BridgeLayer, BridgeLayerSettings, BridgeInput, BridgeOutput
 
@@ -22,7 +22,7 @@ class Bridge2DLayer(BridgeLayer):
     def __init__(self, settings: Bridge2DLayerSettings) -> None:
         super().__init__(settings)
         self.settings: Bridge2DLayerSettings = settings
-        self._density_color: DensityColor = DensityColor()
+        self._density_color: TintColor = TintColor()
         self._trail: bridge_2d.VelocitySmoothTrail = bridge_2d.VelocitySmoothTrail(settings.trail)
         self._velocity_magnitude: bridge_2d.VelocityMagnitude = bridge_2d.VelocityMagnitude()
         self._density_bridge: bridge_2d.DensityBridge = bridge_2d.DensityBridge(settings.density)

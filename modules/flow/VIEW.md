@@ -1,6 +1,6 @@
 # The view
 
-The flow's view of a capture, the stage before the motion: a box cropped in 3D from the camera image and the
+The flow's view of a capture, the stage before the color and the motion: a box cropped in 3D from the camera image and the
 aligned depth at the motion's size, the player's outline, and the player's depth wherever that outline is. What
 comes before it, the uploader's corrected camera frame, is in [INFERENCE.md](../inference/INFERENCE.md#the-upload);
 the sizes it works at and why are in [RESOLUTION.md](RESOLUTION.md). **(deduction)** marks what is inferred.
@@ -26,9 +26,7 @@ its textures, ports and settings group, and the monitor lists each part's textur
 |------------------------------|--------------------------------------------------------------------------------------|
 | `crop` (`ViewCrop`)          | the box in 3D: `image`, the camera image inside its sides (`center_x`, `center_y`, `height`) at the view's `width` × `height`; who: `depth`, the camera's depth inside its front and back (`near`, `far`) on the depth's own pixels, unblended, 0 outside (`DepthCrop`) |
 | `mask` (`ViewMask`)          | where: `mask`, the crop's depth's outline moved onto the image's ([The mask](#the-mask)) |
-| `depth` (`ViewDepth`)        | how far: `upscaled`, the aligned depth upscaled to the view once where it is the player's and the mask is; `filled`, that filled across the mask, the view's depth ([The depth](#the-depth)), a `DepthView` ([MOTION.md](MOTION.md#when-it-measures)) |
-| `color` (`ViewColor`)        | `color`, the player's color for the density: the image white balanced (`white_balance`) and graded (`exposure`, `offset`, `gamma`, `contrast`, `saturation`) and sharpened (`sharpen`), its alpha a matte from its brightness (`luma_matte`), premultiplied last by the mask's copy (`use_mask`), its edge eroded by `erode` and feathered inward over `feather` view pixels |
-| the pose                     | the pose's points placed in the crop, for the pose drawn over the view               |
+| `depth` (`ViewDepth`)        | how far: `upscaled`, the aligned depth upscaled to the view once where it is the player's and the mask is; `filled`, that filled across the mask, the view's depth ([The depth](#the-depth)), a `DepthView` ([MOTION.md](MOTION.md#when-it-measures)) || the pose                     | the pose's points placed in the crop, for the pose drawn over the view               |
 
 ```mermaid
 flowchart TB
@@ -39,7 +37,7 @@ flowchart TB
   M["mask → mask: where<br/>guided filter; 448 × 800"]
   R["depth → upscaled: how far<br/>the player's depth where the mask is, else 0"]
   F["depth → filled<br/>push-pull inside the mask; 448 × 800"]
-  G["color → color<br/>graded, matted, then premultiplied by the mask's copy, eroded and feathered"]
+  G["The color stage<br/>the density's color from the image and the mask (COLOR.md)"]
   MO["Motion, 448 × 800<br/>x/y from the image, z from the depth,<br/>each pixel weighted by the mask"]
   I --> C
   D --> K
@@ -59,41 +57,9 @@ matting model, where the foreground layer, its color and its depth, is defined w
 2004 store color, depth and alpha per layer). So the motion weights each pixel by the mask and needs no second
 mask.
 
-Its outputs, in the order it makes them, are the image, the mask, the depth and the color, each the texture of
-the part that makes it; the input's depth is a depth in the box's range, drawn in its colormap. The image and the
-color are both a color picture of the player at the view's size, as cut and as graded; the bridge takes the color
-as its `image`, the density's color, its alpha kept as the color's coverage ([BRIDGE_3D.md](BRIDGE_3D.md#the-mix)).
-The color part works on the straight image and premultiplies it by the mask last, RGB and alpha alike, as
-compositing does and as the render blends (Porter and Duff 1984; Brinkmann): grading or sharpening a cut image
-changes its half-masked edge apart from the rest and pulls the cut's black into the edge. With `color.enabled` off
-the color is the image as it is, matted and masked as set.
-
-The white balance is the grade's first step, before the exposure, as a camera's: `white_balance` is the light
-the image is corrected for, in kelvin, lower cooler and higher warmer, 6500 K unchanged. The color is decoded to
-linear light, its white adapted from that light's (a blackbody's, on the Planckian locus by Kim et al. 2002) to
-the 6500 K blackbody's by Bradford's chromatic adaptation, its brightness kept, and encoded again (`Grade`); the
-matrix is made on the CPU when the setting changes (`white_balance.py`). It colors only the density: the
-camera's own `balance` and `auto_balance` change the whole image, which the pose sees too, and with
-`auto_balance` on the camera's colors move under it. Named white balance, as temperature is the fluid's.
-
-The luma matte, after the grading and the sharpening and before the premultiply, is a matte from the color's
-brightness, its brightest channel (HSV's value), as video compositing mattes a picture by its brightness: darkness
-becomes transparency. The alpha becomes 1 − `luma_matte` + `luma_matte` × that brightness, the RGB as it is
-(`shaders.LumaMatte`). The premultiply then multiplies both by the mask's copy, so the stored alpha is the feather
-times the matte. At 1, the default, a half-dark red is full red at half the
-alpha and black brings in nothing, so dark clothes and shadows leave no dark patches in the fluid **(site
-fact)**; at 0 the alpha is the feather's alone. With `use_mask` off the color has no edge.
-
-The premultiply takes a copy of the mask, worked as compositing works a matte where the picture is made, so the
-mask the motion and the depth use stays as it is:
-- `erode` moves the copy's edge inward by whole pixels, one 3 × 3 minimum each (`Erode`), dropping the outermost
-  pixels, whose color the camera mixed with the background's;
-- `feather` then fades it in inward over its width: the copy blurred by a Gaussian of half the width is 0.5 on
-  its edge, and 2 × it − 1, clamped (`Feather`), is 0 on and outside the edge and rises to 1 inside, so nothing
-  reaches past the eroded edge.
-
-The color is resampled twice, straightened in the uploader and cut to the view here, a little softer than one
-resample **(deduction)**, for keeping the camera's work and the flow's apart.
+Its outputs, in the order it makes them, are the image, the mask and the depth, each the texture of the part that
+makes it; the input's depth is a depth in the box's range, drawn in its colormap. The color stage after it makes
+the density's color from the image and the mask ([COLOR.md](COLOR.md)); the motion reads all three.
 
 | Setting                              | Preset        | Is                                                                        |
 |--------------------------------------|---------------|---------------------------------------------------------------------------|
@@ -168,18 +134,18 @@ the image has no edge the filter only averages the presence, and the threshold m
 depth's own, within about a depth pixel. `guided_radius` is in the depth's pixels, how far its edge may be off,
 turned into the view's each frame from the crop; at 0 the filter gives the presence itself. `edge_contrast` is
 squared inside as the filter's ε. The mask weights x/y and z in the motion with `use_mask`, is the z position's
-weight, and gates the dye's color in the bridge.
+weight, and gates the dye's color in the color stage.
 
 The dye's outline is the mask's: its color and the x/y and z of its amount stop at the guided edge.
 
 The mask has no erosion, as one pulls the guided edge off the image's; the color's own copy of it can be eroded
-([The stage](#the-stage)).
+([COLOR.md](COLOR.md#the-stage)).
 
 ## Checked
 
 Shaders are checked in a GPU harness. `apps/deep_flow/scripts/view_check.py` plays a recording's captures through
-the uploader and the view stage, prints the share of the mask without depth, times each pass (`--time`) and saves
-the last capture's textures side by side (`--png`).
+the uploader, the view stage and the color stage, prints the share of the mask without depth, times each pass
+(`--time`) and saves the last capture's textures side by side (`--png`).
 
 The mask without depth is 1.62% of the mask upscaled, 0.00% after the fill. The passes on the GPU, the median
 of 40, are in [TIMING.md](TIMING.md#the-view). Without the app: `modules/flow/tests/test_view_window.py`, the

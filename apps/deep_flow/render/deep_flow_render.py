@@ -1,4 +1,4 @@
-"""Deep Flow render — split-view layer graph with the 3D flow: motion, bridge and the volumetric fluid."""
+"""Deep Flow render — split-view layer graph with the 3D flow: view, color, motion, bridge and the volumetric fluid."""
 
 from threading import Event
 from typing import Callable, cast
@@ -53,6 +53,7 @@ class DeepFlowRender(RenderBase):
             # The stages, each with its monitor, and the pose's monitor
             view =          self.L[ChainLayers.view][i] =        ViewLayer(           settings.view, fov)
             self.L[ChainLayers.pose_monitor][i] =                PoseMonitorCompositor(i, self.board, cam_image, cam_crop, view, settings.pose, settings.colors)
+            self.L[ChainLayers.color][i] =                       render.ColorLayer(          settings.color)
             self.L[ChainLayers.motion][i] =                      render.Motion3DLayer(       i, settings.motion)
             self.L[ChainLayers.bridge][i] =                      render.Bridge3DLayer(       settings.bridge)
             fluid =         self.L[ChainLayers.fluid][i] =       render.Fluid3DLayer(        settings.fluid)
@@ -62,6 +63,7 @@ class DeepFlowRender(RenderBase):
             # each stage's main monitor in self.L, shown in the main panel; its debug monitor in self._debug_monitors,
             # shown in the debug panel; the flat stages' flat, the fluid's 3D
             for key, stage, flat in ((ChainLayers.view_monitor, render.FlowStage.VIEW, settings.view),
+                                     (ChainLayers.color_monitor, render.FlowStage.COLOR, settings.color),
                                      (ChainLayers.motion_monitor, render.FlowStage.MOTION, settings.motion),
                                      (ChainLayers.bridge_monitor, render.FlowStage.BRIDGE, settings.bridge)):
                 self.L[key][i] = render.Monitor2DLayer(stage, flat.monitor_main)
@@ -274,20 +276,23 @@ class DeepFlowRender(RenderBase):
     def _run_inference_frames(self) -> None:
         """Every frame since the last tick, each camera's in order, through the frame layers (`_run_inference_frame`).
         A tick without a frame runs none of them, so no stage works on a frame twice. Paused, the frames are
-        taken and dropped and only the view runs, on the last frame, made again when one of its settings changes."""
+        taken and dropped and only the view and the color run, on the last frame, made again when one of their
+        settings changes."""
         for i in self.L[ChainLayers.view]:
             frames: list[InferenceFrame] = self.board.take_inference_frames(i)
             if self.settings.pause:
-                self.L[ChainLayers.view][i].update()
+                view = cast(ViewLayer, self.L[ChainLayers.view][i])
+                view.update()
+                self._run_color(i, view)
                 continue
             for index, frame in enumerate(frames):
                 self._run_inference_frame(i, frame, same_tick=index > 0)
 
     def _run_inference_frame(self, i: int, frame: InferenceFrame, same_tick: bool) -> None:
-        """One frame: its image and depth into GL, the view of it with its player's pose and its color, the
-        motion on the view's image, and the bridge stepping over the time since the frame before, the density's
-        color the view's. `same_tick`: another frame in this tick, whose bridge outputs the fluid takes with the
-        last's."""
+        """One frame: its image and depth into GL, the view of it with its player's pose, the density's color from
+        the view, the motion on the view's image, and the bridge stepping over the time since the frame before, the
+        density's color the color stage's. `same_tick`: another frame in this tick, whose bridge outputs the fluid
+        takes with the last's."""
         image = cast(render.InferenceFrameImageLayer, self.L[ChainLayers.inference_frame_image][i])
         depth = cast(render.InferenceFrameDepthLayer, self.L[ChainLayers.inference_frame_depth][i])
         view = cast(ViewLayer, self.L[ChainLayers.view][i])
@@ -304,6 +309,7 @@ class DeepFlowRender(RenderBase):
         self._view_timer.begin()
         view.update()
         self._view_timer.end()
+        color: render.ColorLayer = self._run_color(i, view)
 
         interval: float = render.frame_interval(frame.timestamp, self._inference_frame_timestamps.get(i), self.settings.motion.fps, self._dt, self._dt)
         self._inference_frame_timestamps[i] = frame.timestamp
@@ -311,9 +317,17 @@ class DeepFlowRender(RenderBase):
         output: ViewOutput = view.output
         motion.set_input(render.MotionInput(output.image, frame.timestamp, interval, output.depth, output.mask))
         motion.update()
-        bridge.set_input(render.BridgeInput(motion.output.velocity, interval, output.color,
+        bridge.set_input(render.BridgeInput(motion.output.velocity, interval, color.output.color,
                                         mask=output.mask, z_position=motion.output.z_position, same_tick=same_tick))
         bridge.update()
+
+    def _run_color(self, i: int, view: ViewLayer) -> render.ColorLayer:
+        """The density's color from camera `i`'s view, made again when the view was or one of its settings changed."""
+        color = cast(render.ColorLayer, self.L[ChainLayers.color][i])
+        output: ViewOutput = view.output
+        color.set_input(render.ColorInput(output.image, output.mask, view.timestamp, view.made))
+        color.update()
+        return color
 
     def _wire_fluid(self) -> None:
         """Each fluid's input, one injection per bridge, at full weight."""
@@ -340,6 +354,7 @@ class DeepFlowRender(RenderBase):
                 continue
             ports: dict[render.FlowStage, dict[str, Port]] = {
                 render.FlowStage.VIEW: cast(ViewLayer, self.L[ChainLayers.view][i]).ports,
+                render.FlowStage.COLOR: cast(render.ColorLayer, self.L[ChainLayers.color][i]).ports,
                 render.FlowStage.MOTION: cast(render.Motion3DLayer, _motion).ports,
                 render.FlowStage.BRIDGE: cast(render.Bridge3DLayer, self.L[ChainLayers.bridge][i]).ports,
                 render.FlowStage.FLUID: cast(render.Fluid3DLayer, self.L[ChainLayers.fluid][i]).ports,

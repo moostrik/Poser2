@@ -1,36 +1,52 @@
-"""ViewColor: the view's last pass, the player's color for the density: its image graded and sharpened, its alpha
-a matte from its brightness, then premultiplied by the mask. As compositing does it: the corrections on the straight image, the matte applied after
-them, eroded and feathered where the picture is made, so the mask the motion and the depth use stays as it is."""
+"""DensityColor: the density's color, the `color` stage's work: the view's image graded and sharpened, its alpha a
+matte from its brightness, then premultiplied by the mask. As compositing does it: the corrections on the straight
+image, the matte applied after them, eroded and feathered where the picture is made, so the mask the motion and the
+depth use stays as it is."""
 
-# Third-party imports
 import numpy as np
 from OpenGL.GL import GL_R16F
 
-# Local application imports
-from modules.flow import Port, TextureKind
 from modules.gl import Fbo, SwapFbo, Style, Texture, shaders
-from ....settings import ViewColorSettings
-from .shaders import Feather, Grade
+from modules.settings import BaseSettings, Field
+from ..port import Port, TextureKind
 from .white_balance import white_balance_matrix
 
 
-class ViewColor:
-    """`process` white balances and grades an image (`Grade`) and sharpens it where `sharpen`, while `enabled`,
-    sets its alpha by its brightness where `luma_matte` (`LumaMatte`), then premultiplies it by the mask where `use_mask` (RGB and alpha alike, as the render blends), into its own buffer; the mask's copy
-    first eroded by `erode` pixels, then feathered inward over `feather` pixels. `texture` holds the result."""
+class DensityColorSettings(BaseSettings):
+    """The image white balanced and graded, in the order applied, then sharpened, its alpha a matte from its
+    brightness; then premultiplied by the mask's copy, eroded and feathered."""
+    enabled:    Field[bool]  = Field(True, description="The color graded; off, the image as it is")
+    white_balance: Field[float] = Field(6500.0, min=2000.0, max=12000.0, step=50.0, newline=True, description="The light the color is corrected for (K); lower cools, higher warms; 6500 = unchanged")
+    exposure:   Field[float] = Field(1.0, min=0.1, max=3.0, description="The color times this")
+    offset:     Field[float] = Field(0.0, min=-0.5, max=0.5, description="Added to the color, after the exposure")
+    gamma:      Field[float] = Field(1.0, min=0.5, max=2.0, description="Gamma")
+    contrast:   Field[float] = Field(1.0, min=0.5, max=2.0, description="Contrast around mid grey")
+    saturation: Field[float] = Field(1.0, min=0.0, max=2.0, description="Saturation, times this")
+    sharpen:    Field[float] = Field(0.0, min=0.0, max=2.0, description="Sharpen (0 = off)")
+    luma_matte: Field[float] = Field(1.0, min=0.0, max=1.0, description="Alpha from the color's brightness: darkness made transparency (0 = off)")
+    use_mask:  Field[bool]  = Field(True, newline=True, description="The color cut by the mask, premultiplied")
+    erode:      Field[int]   = Field(0, min=0, max=4, step=1, description="Pixels the color's edge moves inside the mask's (view pixels)")
+    feather:    Field[float] = Field(0.0, min=0.0, max=16.0, step=0.5, description="Width the color fades in over inside its edge (view pixels); 0 = hard")
 
-    def __init__(self, settings: ViewColorSettings) -> None:
-        self.settings: ViewColorSettings = settings
+
+class DensityColor:
+    """`process` white balances and grades an image (`Grade`) and sharpens it where `sharpen`, while `enabled`,
+    sets its alpha by its brightness where `luma_matte` (`LumaMatte`), then premultiplies it by the mask where
+    `use_mask` (RGB and alpha alike, as the render blends), into its own buffer; the mask's copy first eroded by
+    `erode` pixels, then feathered inward over `feather` pixels. `texture` holds the result."""
+
+    def __init__(self, settings: DensityColorSettings) -> None:
+        self.settings: DensityColorSettings = settings
         self._fbo: SwapFbo = SwapFbo()
         self._matte: SwapFbo = SwapFbo()                    # the mask's copy, eroded and blurred in turn
         self._feathered: Fbo = Fbo()                        # the mask's copy feathered, the premultiply's
-        self._grade_shader: Grade = Grade()
+        self._grade_shader: shaders.Grade = shaders.Grade()
         self._white_balance: tuple[float, np.ndarray] | None = None     # the kelvin and its matrix, made when it changes
         self._sharpen_shader: shaders.Sharpen = shaders.Sharpen()
         self._luma_matte_shader: shaders.LumaMatte = shaders.LumaMatte()
         self._erode_shader: shaders.Erode = shaders.Erode()
         self._blur_shader: shaders.Blur = shaders.Blur()
-        self._feather_shader: Feather = Feather()
+        self._feather_shader: shaders.Feather = shaders.Feather()
         self._mask_shader: shaders.MaskMultiply = shaders.MaskMultiply()     # the premultiply: RGB and alpha by the mask
 
     @property
@@ -44,7 +60,7 @@ class ViewColor:
     @property
     def made_with(self) -> tuple:
         """The settings the result is made with, so its owner makes it again when one changes."""
-        s: ViewColorSettings = self.settings
+        s: DensityColorSettings = self.settings
         return (s.enabled, s.white_balance, s.exposure, s.offset, s.gamma, s.contrast, s.saturation, s.sharpen,
                 s.luma_matte, s.use_mask, s.erode, s.feather)
 
@@ -69,7 +85,7 @@ class ViewColor:
         self._fbo.clear()
 
     def process(self, image: Texture, mask: Texture) -> None:
-        s: ViewColorSettings = self.settings
+        s: DensityColorSettings = self.settings
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
         self._fbo.swap()

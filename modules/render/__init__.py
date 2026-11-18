@@ -17,6 +17,7 @@ from .modules.tracker import    TrackerCompositor, TrackerCompositorSettings, Tr
 from .modules.inference import  CropLayer, CropLayerSettings, CropImageLayer, SegmentationMaskLayer, SegmentationForegroundLayer, \
                                 InferenceFrameImageLayer, InferenceFrameDepthLayer
 from .modules.flow import       StageLayer, StageLayerSettings, StageOutput, \
+                                ColorInput, ColorOutput, ColorLayer, ColorLayerSettings, \
                                 MotionInput, MotionOutput, MotionLayer, MotionLayerSettings, frame_interval, \
                                 BridgeInput, BridgeOutput, BridgeLayer, BridgeLayerSettings, \
                                 Injection, FluidInput, FluidOutput, FluidLayer, FluidLayerSettings, \

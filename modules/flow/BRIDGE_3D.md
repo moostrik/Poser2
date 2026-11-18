@@ -150,17 +150,17 @@ density's amount the same way ([FLUID_3D.md](FLUID_3D.md#the-inputs)): a part mo
 is fully there, a slower one partly, and a still body leaves no dye. The `mask` share adds the view's mask (`BridgeInput.mask`, 0 to 1 where the
 player is) at the share, a presence 0 to 1 by being there: at share 1 a still
 body is fully there. Widths/s is the velocity's own unit, so no reference speed is chosen.
-The density's color is the picture's as it comes (`DensityColor`, `modules/flow/density_color.py`: the image,
-or white, times the tint), its alpha kept: the view grades it, keys it and premultiplies it by its own feathered
-mask ([VIEW.md](VIEW.md#the-stage)), so alpha is the color's coverage (Porter and Duff 1984), and the bridge
-gates it by no mask of its own; the 2D bridge gates its color by the mask. The amount and the color stay apart,
+The density's color is the `color` stage's as it comes, copied each step so a tick of several captures holds each
+one's (white without one): the stage grades it, mattes it and premultiplies it by its own feathered mask
+([COLOR.md](COLOR.md)), so alpha is the color's coverage (Porter and Duff 1984), and the bridge gates it by no mask
+of its own; the 2D bridge tints its color and gates it by the mask (`TintColor`). The amount and the color stay apart,
 as the fluid takes them; a capture's color goes with its amount wherever captures are picked by it. The warmth
 comes from the motion alone, its presence, so the lift does not follow the player's clothes. The readings of one unit share the mix, so
 the mix has no gain: the motion's gains balance the axes and the fluid's gains set how the water
 follows; a weight is a share. The acceleration and the expansion are `None` while their shares are
 all 0. The ports follow the outputs, a group each, named as the output, in the order the bridge makes
 them: `velocity.velocity`, `acceleration.acceleration`, `density.amount`, `temperature.amount` and
-`expansion.expansion`, each with its `z_position`. The density's color is the first port, `color`.
+`expansion.expansion`, each with its `z_position`. The density's color is the stage's output `color`.
 
 A wake may drag (its share in `velocity`: the water behind a leaving limb is pulled to the
 speed it left with, and let go when the pulse dies), kick (its share in `acceleration`),

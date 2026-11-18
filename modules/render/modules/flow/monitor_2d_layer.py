@@ -26,6 +26,7 @@ DEBUG_TINT: str = "#5e4b4b"     # the debug monitor's panel: a grey with a littl
 class FlowStage(IntEnum):
     """A stage of a flow system, as a monitor names it."""
     VIEW = 0
+    COLOR = auto()
     MOTION = auto()
     BRIDGE = auto()
     FLUID = auto()

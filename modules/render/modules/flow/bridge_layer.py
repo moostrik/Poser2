@@ -24,7 +24,8 @@ from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 class BridgeInput:
     """One camera's velocity for the bridge stage, built by the app for each step. `velocity` is the
     motion output; `dt` the time the step covers (s); `image`, or None, the picture that colors the
-    density; `tint` an RGB tint on it, white by default, the color alone without an image; `mask`
+    density (the 3D's the `color` stage's, taken as it comes); `tint`, the 2D bridge's, an RGB tint on it, white by
+    default, the color alone without an image; `mask`
     the player's mask on the view, or None, which gates the 2D bridge's image and is a share of the 3D bridge's
     amounts;
     `z_position` the motion's, or None.

@@ -2,8 +2,8 @@
 velocity and as an acceleration; one mix per output makes what the fluid takes from them: the boundary's velocity,
 density and temperature from the readings as velocities, the body force's acceleration from the readings as
 accelerations, and the expansion, where the water swells, a presence from the readings as velocities and the mask.
-The density is its amount, the readings' speeds in widths/s and the mask, and its color, the image's with its
-alpha; the temperature a presence, the readings' speeds and the mask capped at 1, which the fluid's gain makes
+The density is its amount, the readings' speeds in widths/s and the mask, and its color, the `color` stage's as it
+comes, its alpha the coverage; the temperature a presence, the readings' speeds and the mask capped at 1, which the fluid's gain makes
 the warmth.
 
 Each trail holds where its motion was, a z position; every output mixes its readings' z positions by the readings'
@@ -15,7 +15,7 @@ from collections.abc import Callable
 from OpenGL.GL import GL_R32F, GL_RG16F, GL_RGBA16F
 
 from modules.gl import Fbo, GpuTimer, Texture
-from ..density_color import DensityColor
+from ..flow_util import FlowUtil
 from ..port import HasPorts, Port, Ports, TextureKind, prefixed
 from .bridge_settings import AmountMixSettings, Bridge3DSettings, MixSettings
 from .frame_max import FrameMax
@@ -36,7 +36,7 @@ class Bridge3D:
     the light renderer mixes its layers; the readings of one unit share it, so the mix has no gain.
         velocity      the readings as velocities: the boundary, dragged toward
         acceleration  the readings as accelerations: the body force, added; None while its shares are all 0
-        density       the readings' speeds and the mask, the amount; its color the image's, with its alpha
+        density       the readings' speeds and the mask, the amount; its color the image's as it comes
         temperature   the readings' speeds and the mask: a presence, capped at 1
         expansion     the readings' speeds and the mask: a presence, capped at 1; None while its
                       shares are all 0, and the newest frame's in a tick of several
@@ -53,7 +53,7 @@ class Bridge3D:
     def __init__(self, settings: Bridge3DSettings | None = None) -> None:
         self.settings: Bridge3DSettings = settings or Bridge3DSettings()
         settings = self.settings
-        self._density_color: DensityColor = DensityColor()
+        self._color: Fbo = Fbo()        # the density's color this step: the image copied, held when a tick has several
         self._lowpass: VelocityLowpass = VelocityLowpass(settings.readings.lowpass)
         self._bandpass: VelocityBandpass = VelocityBandpass(settings.readings.bandpass)
         self._lowpass_shown: bool = False       # a monitor read one of its ports since the last update
@@ -136,15 +136,15 @@ class Bridge3D:
 
     @property
     def ports(self) -> dict[str, Port]:
-        """The density's color, then the readings, then the outputs' mixes, each under its settings group's name."""
-        ports: dict[str, Port] = dict(self._density_color.ports)
+        """The readings, then the outputs' mixes, each under its settings group's name."""
+        ports: dict[str, Port] = {}
         for name, part in self._parts().items():
             ports.update(prefixed(name, part.ports))
         return ports
 
     def _outputs(self) -> dict[str, Texture]:
         """The density, its color and the temperature as the last step made them."""
-        return {'density': self._density_amount, 'color': self._density_color.color,
+        return {'density': self._density_amount, 'color': self._color,
                 'temperature': self._temperature_amount}
 
     def _merged(self) -> dict[str, Texture]:
@@ -196,9 +196,9 @@ class Bridge3D:
     # ========== Lifecycle ==========
 
     def allocate(self, width: int, height: int, output_width: int, output_height: int) -> None:
-        """The filters and the mixes at the velocity's size, `width` by `height`; the density's color at
+        """The filters and the mixes at the velocity's size, `width` by `height`; the density's color's copy at
         `output_width` by `output_height`."""
-        self._density_color.allocate(output_width, output_height)
+        self._color.allocate(output_width, output_height, GL_RGBA16F)
         self._lowpass.allocate(width, height, output_width, output_height)
         self._bandpass.allocate(width, height)
         for fbo, internal_format in self._mix_fbos():
@@ -208,7 +208,7 @@ class Bridge3D:
         self._peak.allocate()
 
     def deallocate(self) -> None:
-        self._density_color.deallocate()
+        self._color.deallocate()
         self._lowpass.deallocate()
         self._bandpass.deallocate()
         for fbo, _ in self._mix_fbos():
@@ -239,16 +239,18 @@ class Bridge3D:
     # ========== Processing ==========
 
     def update(self, velocity: Texture, dt: float, z_position: Texture | None = None, mask: Texture | None = None,
-               image: Texture | None = None, tint: tuple[float, float, float] = (1.0, 1.0, 1.0),
-               same_tick: bool = False) -> None:
-        """One step on the motion's `velocity` and `z_position`, `dt` the time it covers (s): the density's color
-        from `image` (or white) times `tint`, as it comes, its alpha kept, then the filters and the mixes; `mask`
-        is a share of the amounts. `same_tick`: another frame in the render tick of the step before."""
+               image: Texture | None = None, same_tick: bool = False) -> None:
+        """One step on the motion's `velocity` and `z_position`, `dt` the time it covers (s): the density's color,
+        `image` (the `color` stage's) copied as it comes, or white without one, then the filters and the mixes;
+        `mask` is a share of the amounts. `same_tick`: another frame in the render tick of the step before."""
         if same_tick and not self._merging:      # the tick's second frame: keep the first's, its color included
             for name, texture in self._outputs().items():
                 self._frame_max[name].hold(texture)
         self._merging = same_tick
-        self._density_color.update(image, tint, None)
+        if image is not None and image.allocated:
+            FlowUtil.blit(self._color, image)
+        else:
+            self._color.clear(1.0, 1.0, 1.0, 1.0)
 
         self._gpu_timer.begin()
         settings: Bridge3DSettings = self.settings

@@ -298,20 +298,6 @@
         "guided_radius": 3.0,
         "edge_contrast": 0.03
       },
-      "color": {
-        "enabled": true,
-        "white_balance": 6500.0,
-        "exposure": 1.0,
-        "offset": 0.0,
-        "gamma": 0.8,
-        "contrast": 1.25,
-        "saturation": 1.2,
-        "sharpen": 1.0,
-        "luma_matte": 0.0,
-        "use_mask": true,
-        "erode": 0,
-        "feather": 4.0
-      },
       "monitor_main": {
         "texture": "depth.filled",
         "view": "COLORMAP",
@@ -336,6 +322,20 @@
           "legend": true
         }
       }
+    },
+    "color": {
+      "enabled": true,
+      "white_balance": 6500.0,
+      "exposure": 1.0,
+      "offset": 0.0,
+      "gamma": 0.8,
+      "contrast": 1.25,
+      "saturation": 1.2,
+      "sharpen": 1.0,
+      "luma_matte": 0.0,
+      "use_mask": true,
+      "erode": 0,
+      "feather": 4.0
     },
     "motion": {
       "guard": true,

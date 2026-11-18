@@ -4,7 +4,7 @@ import logging
 
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUseProgram
 
-from modules.gl import Shader, draw_quad, Texture
+from ... import Shader, draw_quad, Texture
 
 logger = logging.getLogger(__name__)
 

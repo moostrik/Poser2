@@ -7,7 +7,7 @@ import numpy as np
 from OpenGL.GL import (GL_TEXTURE0, GL_TEXTURE_2D, GL_TRUE, glActiveTexture, glBindTexture, glUniform1f, glUniform1i,
                        glUniformMatrix3fv, glUseProgram)
 
-from modules.gl import Shader, draw_quad, Texture
+from ... import Shader, draw_quad, Texture
 
 logger = logging.getLogger(__name__)
 

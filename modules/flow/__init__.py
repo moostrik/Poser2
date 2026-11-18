@@ -19,8 +19,11 @@ from .view import fixed_window, view_span, depth_step, view_per_depth_pixel, pla
 from .motion import DepthView, DepthVelocity, DepthVelocitySettings, GradientFlow, GradientFlowSettings, Patch, \
                     LucasKanadeFlow, LucasKanadeFlowSettings, LucasKanadeFlow3D, LucasKanadeFlow3DSettings
 
-# Bridges: the density's color both make, the 3D bridge by name, the 2D bridge as `bridge_2d` (bridge_2d.DensityBridge, ...)
-from .density_color import DensityColor
+# The density's color: the 3D chain's `color` stage, and the 2D bridge's tint
+from .color import DensityColor, DensityColorSettings, white_balance_matrix
+from .tint_color import TintColor
+
+# Bridges: the 3D bridge by name, the 2D bridge as `bridge_2d` (bridge_2d.DensityBridge, ...)
 from . import bridge_2d
 from .bridge_3d import  Bridge3D, Bridge3DSettings, \
                         Magnitude, VelocityMagnitude, \

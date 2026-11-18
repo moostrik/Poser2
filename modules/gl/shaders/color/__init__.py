@@ -12,3 +12,4 @@ from .color_matrix import ColorMatrix, saturation_matrix
 from .posterize import Posterize
 from .dither import Dither, DitherPattern
 from .vignette import Vignette
+from .grade import Grade

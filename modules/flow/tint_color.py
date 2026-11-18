@@ -1,4 +1,4 @@
-"""The color a bridge's density carries, made once a step for the 2D and the 3D bridge alike."""
+"""The 2D bridge's density color: the image, or white, times a tint, gated by the mask."""
 
 from OpenGL.GL import GL_RGBA16F
 
@@ -7,13 +7,14 @@ from . import shaders
 from .port import Port, TextureKind
 
 
-class DensityColor:
-    """The density's color: the image's RGB, or white without one, times the tint, gated by the mask's red,
-    RGBA16F at the bridge's output size; its port `color`."""
+class TintColor:
+    """The 2D bridge's density color: the image's RGB, or white without one, times the tint, gated by the mask's
+    red, RGBA16F at the bridge's output size; its port `color`. The 3D chain's color is the `color` stage's
+    (`DensityColor`)."""
 
     def __init__(self) -> None:
         self._color: Fbo = Fbo()
-        self._shader: shaders.DensityColor = shaders.DensityColor()
+        self._shader: shaders.TintColor = shaders.TintColor()
 
     @property
     def color(self) -> Fbo:

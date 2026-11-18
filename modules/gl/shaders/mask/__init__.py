@@ -10,3 +10,4 @@ from .chroma_key import ChromaKey
 from .luma_key import LumaKey
 from .luma_matte import LumaMatte
 from .jump_flood import JumpFlood
+from .feather import Feather
