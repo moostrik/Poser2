@@ -1,14 +1,13 @@
 """RTMPose through TensorRT: the crops normalized into a preallocated batch on its stream, the SimCC outputs back
-to the CPU. It takes turns with the other TensorRT models on the shared execution lock."""
+to the CPU."""
 
 import logging
-import time
 
 import numpy as np
 import tensorrt as trt
 import torch
 
-from ..trt_runtime import get_tensorrt_runtime, get_init_lock, get_exec_lock
+from ..trt_runtime import get_tensorrt_runtime
 from .decode import NUM_KEYPOINTS
 from .settings import PosePredictorSettings
 
@@ -43,14 +42,12 @@ class RunnerTRT:
 
     def setup(self) -> None:
         """Load the engine, on the thread that will run it."""
-        with get_init_lock():       # one Myelin graph loads at a time
-            runtime = get_tensorrt_runtime()
-            with open(self.model_file, 'rb') as f:
-                engine_data = f.read()
-            self._engine = runtime.deserialize_cuda_engine(engine_data)
-            if self._engine is None:
-                raise RuntimeError(f"Failed to load engine {self.model_file}")
-            self._context = self._engine.create_execution_context()
+        with open(self.model_file, 'rb') as f:
+            engine_data = f.read()
+        self._engine = get_tensorrt_runtime().deserialize_cuda_engine(engine_data)
+        if self._engine is None:
+            raise RuntimeError(f"Failed to load engine {self.model_file}")
+        self._context = self._engine.create_execution_context()
 
         for i in range(self._engine.num_io_tensors):
             name = self._engine.get_tensor_name(i)
@@ -77,9 +74,9 @@ class RunnerTRT:
         # The input's address stays (a slice keeps the base pointer); the outputs' are set per call
         self._context.set_tensor_address(self._input_name, self._input_buffer.data_ptr())
 
-    def infer(self, gpu_images: list[torch.Tensor], ready: torch.cuda.Event | None) -> tuple[np.ndarray, np.ndarray, float]:
+    def infer(self, gpu_images: list[torch.Tensor], ready: torch.cuda.Event | None) -> tuple[np.ndarray, np.ndarray]:
         """The SimCC outputs (N, K, W) and (N, K, H) for the crops (3, H, W) RGB in [0, 1], read once `ready` is
-        recorded; and the time waited for the shared execution lock (ms)."""
+        recorded."""
         if ready is not None:
             self._stream.wait_event(ready)      # the crops are written on the crop stream
         batch_size = len(gpu_images)
@@ -98,13 +95,9 @@ class RunnerTRT:
             torch.sub(batch_chw, self._mean_gpu, out=self._resize_buffer[:batch_size])
             torch.div(self._resize_buffer[:batch_size], self._std_gpu, out=input_buffer)
 
-        lock_wait_start: float = time.perf_counter()
-        with get_exec_lock():
-            lock_acquired: float = time.perf_counter()
-            self._context.set_input_shape(self._input_name, tuple(input_buffer.shape))
-            self._context.set_tensor_address(self._output_names[0], simcc_x_out.data_ptr())
-            self._context.set_tensor_address(self._output_names[1], simcc_y_out.data_ptr())
-            self._context.execute_async_v3(stream_handle=self._stream.cuda_stream)
-            self._stream.synchronize()
-
-        return simcc_x_out.cpu().numpy(), simcc_y_out.cpu().numpy(), (lock_acquired - lock_wait_start) * 1000.0
+        self._context.set_input_shape(self._input_name, tuple(input_buffer.shape))
+        self._context.set_tensor_address(self._output_names[0], simcc_x_out.data_ptr())
+        self._context.set_tensor_address(self._output_names[1], simcc_y_out.data_ptr())
+        self._context.execute_async_v3(stream_handle=self._stream.cuda_stream)
+        self._stream.synchronize()
+        return simcc_x_out.cpu().numpy(), simcc_y_out.cpu().numpy()

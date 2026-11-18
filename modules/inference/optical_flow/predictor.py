@@ -55,7 +55,6 @@ class Predictor:
         self._callbacks: list[FlowCallback] = []        # run in registration order
 
         self._process_timer = PerformanceTimer(name="RAFT Optical Flow", sample_count=1000, report_interval=100, color='magenta', omit_init=25)
-        self._wait_timer =    PerformanceTimer(name="RAFT Wait        ", sample_count=1000, report_interval=100, color='magenta', omit_init=25)
 
     @property
     def is_ready(self) -> bool:
@@ -167,8 +166,7 @@ class Predictor:
         track_ids, pairs, ready = pending
 
         start: float = time.perf_counter()
-        flows, lock_wait_ms = self._runner.infer(pairs, ready)
-        self._process_timer.add_time((time.perf_counter() - start) * 1000.0 - lock_wait_ms, report=self.settings.verbose)
-        self._wait_timer.add_time(lock_wait_ms, report=self.settings.verbose)
+        flows = self._runner.infer(pairs, ready)
+        self._process_timer.add_time((time.perf_counter() - start) * 1000.0, report=self.settings.verbose)
 
         self._notify_callbacks({track_id: flows[i] for i, track_id in enumerate(track_ids)})

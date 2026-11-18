@@ -138,11 +138,11 @@ class Predictor(FrameDictCallbackMixin):
             return
 
         start: float = time.perf_counter()
-        simcc_x, simcc_y, lock_wait_ms = self._runner.infer(images, ready)
+        simcc_x, simcc_y = self._runner.infer(images, ready)
         keypoints, scores = decode_simcc(simcc_x, simcc_y)
         keypoints[:, :, 0] /= self._runner.model_width
         keypoints[:, :, 1] /= self._runner.model_height
-        self._process_timer.add_time((time.perf_counter() - start) * 1000.0 - lock_wait_ms, report=self.settings.verbose)
+        self._process_timer.add_time((time.perf_counter() - start) * 1000.0, report=self.settings.verbose)
 
         results: FrameDict = {}
         for i, track_id in enumerate(track_ids):

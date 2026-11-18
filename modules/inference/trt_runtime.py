@@ -1,42 +1,19 @@
-"""Shared TensorRT resources to prevent Myelin graph conflicts between multiple models."""
+"""The TensorRT runtime and logger the models share. Each model loads its engine and runs its own execution context on
+its own thread and stream: TensorRT's thread-safety model, which needs no lock between contexts."""
 from threading import Lock
 import tensorrt as trt
 
-# Suppress the mismatched logger warning - it's harmless
-# TensorRT will use whichever logger was created first
+# One logger for every runtime: TensorRT warns about a second, and uses the first anyway
 _trt_logger: trt.Logger = trt.Logger(trt.Logger.ERROR)
 
-# Global TensorRT runtime singleton
 _trt_runtime: trt.Runtime | None = None
 _trt_runtime_lock = Lock()
 
-# Global initialization lock prevents concurrent engine/context creation
-# This prevents TensorRT Myelin graph conflicts when multiple models load simultaneously
-_trt_init_lock = Lock()
-
-# Global execution lock - all TensorRT inference calls are serialized
-# This prevents Myelin graph conflicts during concurrent inference
-_trt_exec_lock = Lock()
-
 
 def get_tensorrt_runtime() -> trt.Runtime:
-    """Get or create shared TensorRT runtime singleton.
-
-    All TensorRT models should use this shared runtime to avoid resource conflicts.
-    Uses a shared logger to prevent TensorRT warning about mismatched loggers.
-    """
+    """The shared TensorRT runtime, made at the first call."""
     global _trt_runtime
     with _trt_runtime_lock:
         if _trt_runtime is None:
             _trt_runtime = trt.Runtime(_trt_logger)
         return _trt_runtime
-
-
-def get_init_lock() -> Lock:
-    """Get the global TensorRT initialization lock."""
-    return _trt_init_lock
-
-
-def get_exec_lock() -> Lock:
-    """Get the global TensorRT execution lock."""
-    return _trt_exec_lock

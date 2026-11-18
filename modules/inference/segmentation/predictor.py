@@ -169,8 +169,8 @@ class Predictor:
             self._runner.reset_states()
 
         start: float = time.perf_counter()
-        masks, foregrounds, lock_wait_ms = self._runner.infer(images, track_ids, ready)
-        self._process_timer.add_time((time.perf_counter() - start) * 1000.0 - lock_wait_ms, report=self.settings.verbose)
+        masks, foregrounds = self._runner.infer(images, track_ids, ready)
+        self._process_timer.add_time((time.perf_counter() - start) * 1000.0, report=self.settings.verbose)
 
         results: ImageDict = {}
         for i, track_id in enumerate(track_ids):

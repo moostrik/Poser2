@@ -77,9 +77,9 @@ class RunnerONNX:
         self._states.clear()
 
     def infer(self, gpu_images: list[torch.Tensor], track_ids: list[int],
-              ready: torch.cuda.Event | None) -> tuple[torch.Tensor, torch.Tensor, float]:
+              ready: torch.cuda.Event | None) -> tuple[torch.Tensor, torch.Tensor]:
         """The alpha matte (N, H, W) and the foreground (N, 3, H, W) at the model's size for the crops (3, h, w) RGB in
-        [0, 1] of the players `track_ids`, read once `ready` is recorded; and the time waited for the GPU's lock, 0: ONNX Runtime takes none."""
+        [0, 1] of the players `track_ids`, read once `ready` is recorded."""
         if ready is not None:
             self._stream.wait_event(ready)      # the crops are written on the crop stream
         batch_size = len(gpu_images)
@@ -123,7 +123,7 @@ class RunnerONNX:
         r1o, r2o, r3o, r4o = state_outs
         self._states = {track_id: RecurrentState(r1o[i:i + 1], r2o[i:i + 1], r3o[i:i + 1], r4o[i:i + 1])
                         for i, track_id in enumerate(track_ids)}
-        return pha_out[:batch_size].squeeze(1), fgr_out[:batch_size], 0.0
+        return pha_out[:batch_size].squeeze(1), fgr_out[:batch_size]
 
     def _warmup(self) -> None:
         """The CUDA kernels made for the fixed batch size, so none is compiled while running."""

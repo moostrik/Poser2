@@ -36,6 +36,15 @@ is the largest over the frames compared, against e754ddee's first run.
 | B1 crops' event | pose         | 25.17 / 39.27            | 144            | 0                  | 0              |
 | B1 crops' event | segmentation |                          | 44             | 2                  | 1.0            |
 | B1 crops' event | optical flow |                          | 56             | 0                  | 0              |
+| C1 no locks     | pose         | 25.00 / 39.34            | 245 (B1's)     | 0                  | 0              |
+| C1 no locks     | segmentation |                          | 122 (B1's)     | 0                  | 0              |
+| C1 no locks     | optical flow |                          | 142 (B1's)     | 0                  | 0              |
+
+C1 is compared with B1's run, which has the fix C1 keeps. With the probe's four models running together (pose,
+segmentation, optical flow, person detector), the TensorRT models no longer take turns: in 30 s the pose ran 1441
+batches against 675, the batches dropped fell from 1604 to 472 (pose), 1604 to 106 (segmentation), 1612 to 584
+(flow), and the pose's mean and p99 from 20.9 / 51.2 to 15.7 / 38.4 ms, the segmentation's from 16.4 / 35.2 to
+9.8 / 19.7 **(seen)**. deep_flow as it is runs one TensorRT model beside the detector, so its pose stays as it was.
 
 A frame that differs is a whole frame, the rest exact. Before B1 the segmentation and the optical flow read their
 crops without waiting for them; the pose, which waited, never differed. After B1 the flow is exact, and two runs after
@@ -46,22 +55,9 @@ of 674 flows, the other across the recording's loop **(seen)**.
 
 ## C. The TensorRT models side by side
 
-Every TensorRT runner (pose, segmentation, optical flow, person detector, face) runs `execute_async_v3` and its
-stream's `synchronize()` under one global lock (`trt_runtime.get_exec_lock`), and loads under another
-(`get_init_lock`) **(seen)**: the GPU runs one TensorRT model at a time, start to end. TensorRT 11's documentation
-(we run 11.4) has each thread run its own context on its own stream, in parallel, with no lock; deserializing and
-creating contexts are thread-safe **(site fact:
-[Threading](https://docs.nvidia.com/deeplearning/tensorrt/latest/architecture/how-trt-works.html),
-[multi-streaming](https://docs.nvidia.com/deeplearning/tensorrt/latest/performance/optimization.html))**. The locks'
-reason, "Myelin graph conflicts", is in no NVIDIA page; likely an older TensorRT's **(deduction)**. Without the exec
-lock a model starts while another runs: less wait for the pose, each model's own time likely longer **(deduction)**.
-
-- C1. Both locks removed from all five runners. Checked by the package's tests and the check's two runs: the
-  outputs at the tolerance, each model's time and lock wait in the table
-
 Questions:
 - CUDA graphs: capture each model's `execute_async_v3` per batch size and replay it, to cut the launch time on the
-  CPU. Worth it once C1 shows how much of a model's time is launch?
+  CPU. Worth it, now the models run side by side?
 - The pose's stream at a higher priority than the others', as the model on the critical path?
 
 ## D. The color in one kernel
@@ -82,7 +78,5 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 
 ## The rules it touches
 
-- `CLAUDE.md` Running code, run a GPU harness only on the user's go, and only what the plan names: A1, B1, C1, D1
-- `CLAUDE.md` Composition, fix a problem where it is made: B1, each predictor at the crops' hand-over
-- `CLAUDE.md` Performance, prefer the design with the lower latency, measured in the context of the app: C1, D1
-- `CLAUDE.md` API evolution, remove obsolete pathways: C1, the locks
+- `CLAUDE.md` Running code, run a GPU harness only on the user's go, and only what the plan names: D1
+- `CLAUDE.md` Performance, prefer the design with the lower latency, measured in the context of the app: D1

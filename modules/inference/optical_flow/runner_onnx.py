@@ -66,9 +66,9 @@ class RunnerONNX:
         self._stream.synchronize()
         self._warmup()
 
-    def infer(self, pairs: list[tuple[torch.Tensor, torch.Tensor]], ready: torch.cuda.Event | None) -> tuple[torch.Tensor, float]:
+    def infer(self, pairs: list[tuple[torch.Tensor, torch.Tensor]], ready: torch.cuda.Event | None) -> torch.Tensor:
         """The flow (N, 2, H, W), x and y in the model's pixels, from each previous to current crop (3, h, w) RGB in
-        [0, 1], read once `ready` is recorded; and the time waited for the GPU's lock, 0: ONNX Runtime takes none."""
+        [0, 1], read once `ready` is recorded."""
         if ready is not None:
             self._stream.wait_event(ready)      # the crops are written on the crop stream
         batch_size = len(pairs)
@@ -99,7 +99,7 @@ class RunnerONNX:
                                element_type=self._model_dtype, shape=tuple(flow_out.shape), buffer_ptr=flow_out.data_ptr())
         self._session.run_with_iobinding(io_binding)
         self._stream.synchronize()
-        return flow_out[:batch_size], 0.0
+        return flow_out[:batch_size]
 
     def _warmup(self) -> None:
         """The CUDA kernels made for the fixed batch size, so none is compiled while running."""

@@ -32,7 +32,7 @@ class FakeRunner:
         self.running.set()
         self.release.wait(2.0)
         n = len(gpu_images)
-        return [f'mask{i}' for i in range(n)], [f'fgr{i}' for i in range(n)], 0.0
+        return [f'mask{i}' for i in range(n)], [f'fgr{i}' for i in range(n)]
 
 
 class Crop:

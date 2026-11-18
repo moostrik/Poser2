@@ -75,13 +75,12 @@ class RunnerONNX:
         self._stream.synchronize()
         self._warmup()
 
-    def infer(self, gpu_images: list[torch.Tensor], ready: torch.cuda.Event | None) -> tuple[np.ndarray, np.ndarray, float]:
+    def infer(self, gpu_images: list[torch.Tensor], ready: torch.cuda.Event | None) -> tuple[np.ndarray, np.ndarray]:
         """The SimCC outputs (N, K, W) and (N, K, H) for the crops (3, H, W) RGB in [0, 1], read once `ready` is
-        recorded; and the time waited for the GPU's lock, 0: ONNX Runtime takes none."""
+        recorded."""
         if ready is not None:
             self._stream.wait_event(ready)      # the crops are written on the crop stream
-        simcc_x, simcc_y = self._infer(gpu_images)
-        return simcc_x, simcc_y, 0.0
+        return self._infer(gpu_images)
 
     def _infer(self, gpu_images: list[torch.Tensor]) -> tuple[np.ndarray, np.ndarray]:
         batch_size = len(gpu_images)

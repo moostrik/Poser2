@@ -35,7 +35,7 @@ class FakeRunner:
         simcc_y = np.zeros((n, NUM_KEYPOINTS, self.model_height * 2), np.float32)
         simcc_x[:, :, 96] = 0.9         # x 48 of 192
         simcc_y[:, :, 256] = 0.8        # y 128 of 256
-        return simcc_x, simcc_y, 0.0
+        return simcc_x, simcc_y
 
 
 class Crop:

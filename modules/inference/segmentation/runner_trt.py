@@ -1,14 +1,12 @@
 """Robust Video Matting through TensorRT: the crops and each player's recurrent states into a preallocated batch on
-its stream; out on the GPU the alpha matte at the crops' size and the crops multiplied by it. It takes
-turns with the other TensorRT models on the shared execution lock."""
+its stream; out on the GPU the alpha matte at the crops' size and the crops multiplied by it."""
 
 import logging
-import time
 
 import tensorrt as trt
 import torch
 
-from ..trt_runtime import get_tensorrt_runtime, get_init_lock, get_exec_lock
+from ..trt_runtime import get_tensorrt_runtime
 from .recurrent_state import RecurrentState
 from .settings import SegmentationPredictorSettings
 
@@ -40,14 +38,12 @@ class RunnerTRT:
 
     def setup(self) -> None:
         """Load the engine, on the thread that will run it."""
-        with get_init_lock():       # one Myelin graph loads at a time
-            runtime = get_tensorrt_runtime()
-            with open(self.model_file, 'rb') as f:
-                engine_data = f.read()
-            self._engine = runtime.deserialize_cuda_engine(engine_data)
-            if self._engine is None:
-                raise RuntimeError(f"Failed to load engine {self.model_file}")
-            self._context = self._engine.create_execution_context()
+        with open(self.model_file, 'rb') as f:
+            engine_data = f.read()
+        self._engine = get_tensorrt_runtime().deserialize_cuda_engine(engine_data)
+        if self._engine is None:
+            raise RuntimeError(f"Failed to load engine {self.model_file}")
+        self._context = self._engine.create_execution_context()
 
         names = [self._engine.get_tensor_name(i) for i in range(self._engine.num_io_tensors)]
         inputs = [n for n in names if self._engine.get_tensor_mode(n) == trt.TensorIOMode.INPUT]
@@ -75,9 +71,9 @@ class RunnerTRT:
         self._states.clear()
 
     def infer(self, gpu_images: list[torch.Tensor], track_ids: list[int],
-              ready: torch.cuda.Event | None) -> tuple[torch.Tensor, torch.Tensor, float]:
+              ready: torch.cuda.Event | None) -> tuple[torch.Tensor, torch.Tensor]:
         """The alpha matte (N, h, w) and the foreground (N, 3, h, w), the crops multiplied by it, for the crops (3, h, w)
-        RGB in [0, 1] of the players `track_ids`, read once `ready` is recorded; and the time waited for the shared execution lock (ms)."""
+        RGB in [0, 1] of the players `track_ids`, read once `ready` is recorded."""
         if ready is not None:
             self._stream.wait_event(ready)      # the crops are written on the crop stream
         batch_size = len(gpu_images)
@@ -103,15 +99,12 @@ class RunnerTRT:
                 for buffer, source in zip(state_buffers, sources):
                     buffer[i:i + 1].copy_(source)
 
-        lock_wait_start: float = time.perf_counter()
-        with get_exec_lock():
-            lock_acquired: float = time.perf_counter()
-            for name, tensor in zip(INPUT_NAMES, [src_buffer, *state_buffers]):
-                self._context.set_input_shape(name, tuple(tensor.shape))
-            for name, tensor in zip(OUTPUT_NAMES, outputs):
-                self._context.set_tensor_address(name, tensor.data_ptr())
-            self._context.execute_async_v3(stream_handle=self._stream.cuda_stream)
-            self._stream.synchronize()
+        for name, tensor in zip(INPUT_NAMES, [src_buffer, *state_buffers]):
+            self._context.set_input_shape(name, tuple(tensor.shape))
+        for name, tensor in zip(OUTPUT_NAMES, outputs):
+            self._context.set_tensor_address(name, tensor.data_ptr())
+        self._context.execute_async_v3(stream_handle=self._stream.cuda_stream)
+        self._stream.synchronize()
 
         # The new states are views into this call's outputs
         _, pha_out, r1o, r2o, r3o, r4o = outputs
@@ -124,4 +117,4 @@ class RunnerTRT:
             if needs_resize:
                 mask = torch.nn.functional.interpolate(mask.unsqueeze(1), size=(input_h, input_w), mode='bilinear', align_corners=False).squeeze(1)
             foreground = original * mask.unsqueeze(1)
-        return mask, foreground, (lock_acquired - lock_wait_start) * 1000.0
+        return mask, foreground

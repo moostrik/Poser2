@@ -1,13 +1,12 @@
 """RAFT through TensorRT: the previous and current crops into preallocated batches on its stream, the flow out on the
-GPU. It takes turns with the other TensorRT models on the shared execution lock."""
+GPU."""
 
 import logging
-import time
 
 import tensorrt as trt
 import torch
 
-from ..trt_runtime import get_tensorrt_runtime, get_init_lock, get_exec_lock
+from ..trt_runtime import get_tensorrt_runtime
 from .settings import OpticalFlowPredictorSettings
 
 logger = logging.getLogger(__name__)
@@ -35,14 +34,12 @@ class RunnerTRT:
 
     def setup(self) -> None:
         """Load the engine, on the thread that will run it."""
-        with get_init_lock():       # one Myelin graph loads at a time
-            runtime = get_tensorrt_runtime()
-            with open(self.model_file, 'rb') as f:
-                engine_data = f.read()
-            self._engine = runtime.deserialize_cuda_engine(engine_data)
-            if self._engine is None:
-                raise RuntimeError(f"Failed to load engine {self.model_file}")
-            self._context = self._engine.create_execution_context()
+        with open(self.model_file, 'rb') as f:
+            engine_data = f.read()
+        self._engine = get_tensorrt_runtime().deserialize_cuda_engine(engine_data)
+        if self._engine is None:
+            raise RuntimeError(f"Failed to load engine {self.model_file}")
+        self._context = self._engine.create_execution_context()
 
         for i in range(self._engine.num_io_tensors):
             name = self._engine.get_tensor_name(i)
@@ -68,9 +65,9 @@ class RunnerTRT:
         self._context.set_tensor_address(self._input_names[0], self._img1_buffer.data_ptr())
         self._context.set_tensor_address(self._input_names[1], self._img2_buffer.data_ptr())
 
-    def infer(self, pairs: list[tuple[torch.Tensor, torch.Tensor]], ready: torch.cuda.Event | None) -> tuple[torch.Tensor, float]:
+    def infer(self, pairs: list[tuple[torch.Tensor, torch.Tensor]], ready: torch.cuda.Event | None) -> torch.Tensor:
         """The flow (N, 2, H, W), x and y in the model's pixels, from each previous to current crop (3, h, w) RGB in
-        [0, 1], read once `ready` is recorded; and the time waited for the shared execution lock (ms)."""
+        [0, 1], read once `ready` is recorded."""
         if ready is not None:
             self._stream.wait_event(ready)      # the crops are written on the crop stream
         batch_size = len(pairs)
@@ -89,12 +86,9 @@ class RunnerTRT:
             img1_buffer.copy_(prev_chw)
             img2_buffer.copy_(curr_chw)
 
-        lock_wait_start: float = time.perf_counter()
-        with get_exec_lock():
-            lock_acquired: float = time.perf_counter()
-            self._context.set_input_shape(self._input_names[0], tuple(img1_buffer.shape))
-            self._context.set_input_shape(self._input_names[1], tuple(img2_buffer.shape))
-            self._context.set_tensor_address(self._output_name, flow_out.data_ptr())
-            self._context.execute_async_v3(stream_handle=self._stream.cuda_stream)
-            self._stream.synchronize()
-        return flow_out, (lock_acquired - lock_wait_start) * 1000.0
+        self._context.set_input_shape(self._input_names[0], tuple(img1_buffer.shape))
+        self._context.set_input_shape(self._input_names[1], tuple(img2_buffer.shape))
+        self._context.set_tensor_address(self._output_name, flow_out.data_ptr())
+        self._context.execute_async_v3(stream_handle=self._stream.cuda_stream)
+        self._stream.synchronize()
+        return flow_out

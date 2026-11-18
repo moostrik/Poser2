@@ -27,7 +27,7 @@ class FakeRunner:
     def infer(self, pairs, ready):
         self.running.set()
         self.release.wait(2.0)
-        return [f'flow{i}' for i in range(len(pairs))], 0.0
+        return [f'flow{i}' for i in range(len(pairs))]
 
 
 class Crop:

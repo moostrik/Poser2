@@ -1,11 +1,10 @@
-"""The person detector's model through TensorRT, one engine per input size. It takes turns with the
-other TensorRT models on the shared execution lock."""
+"""The person detector's model through TensorRT, one engine per input size."""
 
 import numpy as np
 import tensorrt as trt
 import torch
 
-from ..trt_runtime import get_exec_lock, get_init_lock, get_tensorrt_runtime
+from ..trt_runtime import get_tensorrt_runtime
 from .decode import PERSON_ROWS
 
 
@@ -24,9 +23,8 @@ class RunnerTRT:
         """Load the engine, on the thread that will run it."""
         with open(self.model_file, 'rb') as f:
             engine_data: bytes = f.read()
-        with get_init_lock():
-            self._engine = get_tensorrt_runtime().deserialize_cuda_engine(engine_data)
-            self._context = self._engine.create_execution_context()
+        self._engine = get_tensorrt_runtime().deserialize_cuda_engine(engine_data)
+        self._context = self._engine.create_execution_context()
         for i in range(self._engine.num_io_tensors):
             name: str = self._engine.get_tensor_name(i)
             if self._engine.get_tensor_mode(name) == trt.TensorIOMode.INPUT:
@@ -44,12 +42,11 @@ class RunnerTRT:
         with torch.cuda.stream(stream):
             model_input: torch.Tensor = batch.to(self._input_dtype).contiguous()
             output: torch.Tensor = torch.empty((batch.shape[0], *self._output_shape), dtype=self._output_dtype, device='cuda')
-        with get_exec_lock():
-            self._context.set_input_shape(self._input_name, tuple(model_input.shape))
-            self._context.set_tensor_address(self._input_name, model_input.data_ptr())
-            self._context.set_tensor_address(self._output_name, output.data_ptr())
-            self._context.execute_async_v3(stream_handle=stream.cuda_stream)
-            stream.synchronize()
+        self._context.set_input_shape(self._input_name, tuple(model_input.shape))
+        self._context.set_tensor_address(self._input_name, model_input.data_ptr())
+        self._context.set_tensor_address(self._output_name, output.data_ptr())
+        self._context.execute_async_v3(stream_handle=stream.cuda_stream)
+        stream.synchronize()
         with torch.cuda.stream(stream):
             return output[:, :PERSON_ROWS].float().cpu().numpy()
 
