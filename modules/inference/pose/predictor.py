@@ -1,7 +1,6 @@
 import logging
 import time
 from threading import Event, Lock, Thread
-from typing import TYPE_CHECKING, TypeAlias
 
 import numpy as np
 import torch
@@ -10,16 +9,15 @@ from modules.pose import Frame, Points2D, FrameDictCallbackMixin, replace, Frame
 from modules.utils import PerformanceTimer
 
 from .. import crop, ModelType
+from ..engine import Engine, make_engine
 from .decode import decode_simcc
-from .runner_onnx import RunnerONNX
 from .settings import PosePredictorSettings
-
-if TYPE_CHECKING:
-    from .runner_trt import RunnerTRT
 
 logger = logging.getLogger(__name__)
 
-PoseRunner: TypeAlias = "RunnerONNX | RunnerTRT"
+# ImageNet normalization (RGB), for inputs in [0, 1]
+IMAGENET_MEAN = torch.tensor([0.485, 0.456, 0.406], dtype=torch.float32).view(1, 3, 1, 1)
+IMAGENET_STD = torch.tensor([0.229, 0.224, 0.225], dtype=torch.float32).view(1, 3, 1, 1)
 
 
 def has_points(frame: Frame) -> bool:
@@ -40,13 +38,13 @@ class Predictor(FrameDictCallbackMixin):
         super().__init__()
         self.settings: PosePredictorSettings = settings
 
-        # One runner per model type; TensorRT is imported only when it is used.
-        self._runner: PoseRunner
-        if settings.model_type is ModelType.ONNX:
-            self._runner = RunnerONNX(settings)
-        else:
-            from .runner_trt import RunnerTRT
-            self._runner = RunnerTRT(settings)
+        self.max_batch: int = min(settings.max_players, 8)
+        self._model_size: tuple[int, int] = (settings.width, settings.height)
+        self._engine: Engine = make_engine(settings.model_type, f"{settings.model_path}/{settings.model}",
+                                           self.max_batch if settings.model_type is ModelType.ONNX else None)
+        self._stream: torch.cuda.Stream             # made on this thread, in `_run`
+        self._mean: torch.Tensor
+        self._std: torch.Tensor
 
         self._thread: Thread = Thread(target=self._run, daemon=True, name="PosePredictor")
         self._shutdown: Event = Event()
@@ -93,7 +91,7 @@ class Predictor(FrameDictCallbackMixin):
                 images.append(crops[track_id].crop)
                 ready = crops[track_id].ready
 
-        max_batch: int = self._runner.max_batch
+        max_batch: int = self.max_batch
         if len(images) > max_batch:
             logger.warning(f"Pose: batch size {len(images)} exceeds max {max_batch}, only the first {max_batch} run")
             track_ids, images = track_ids[:max_batch], images[:max_batch]
@@ -118,12 +116,13 @@ class Predictor(FrameDictCallbackMixin):
 
     def _run(self) -> None:
         try:
-            self._runner.setup()
+            self._setup()
         except Exception:
-            logger.exception(f"Pose: failed to load {self._runner.model_file}")
+            logger.exception(f"Pose: failed to load {self._engine.model_file}")
             return
         self._ready.set()
-        logger.info(f"Pose: {self.settings.resolution.name} model ready: {self._runner.model_width}x{self._runner.model_height} {self._runner.model_precision}")
+        width, height = self._model_size
+        logger.info(f"Pose: {self.settings.resolution.name} model ready: {width}x{height} {self._engine.precision}")
 
         while not self._shutdown.is_set():
             self._wake.wait()
@@ -151,10 +150,10 @@ class Predictor(FrameDictCallbackMixin):
             return
 
         start: float = time.perf_counter()
-        simcc_x, simcc_y = self._runner.infer(images, ready)
+        simcc_x, simcc_y = self._infer(images, ready)
         keypoints, scores = decode_simcc(simcc_x, simcc_y)
-        keypoints[:, :, 0] /= self._runner.model_width
-        keypoints[:, :, 1] /= self._runner.model_height
+        keypoints[:, :, 0] /= self._model_size[0]
+        keypoints[:, :, 1] /= self._model_size[1]
         self._process_timer.add_time((time.perf_counter() - start) * 1000.0, report=self.settings.verbose)
 
         results: FrameDict = {}
@@ -162,3 +161,32 @@ class Predictor(FrameDictCallbackMixin):
             if i < len(keypoints) and track_id in poses:
                 results[track_id] = replace(poses[track_id], {Points2D: Points2D(values=keypoints[i], scores=scores[i])})
         self._notify_frames_callbacks(results)
+
+    def _setup(self) -> None:
+        """The model loaded on this thread, bound to its stream, and run once at its largest batch, so no kernel is
+        made while running."""
+        self._stream = torch.cuda.Stream()
+        self._engine.setup(self._stream)
+        dtype: torch.dtype = self._engine.dtype(self._engine.input_names[0])
+        with torch.cuda.stream(self._stream):
+            self._mean = IMAGENET_MEAN.to(device='cuda', dtype=dtype)
+            self._std = IMAGENET_STD.to(device='cuda', dtype=dtype)
+            warm_up = torch.zeros((3, self._model_size[1], self._model_size[0]), dtype=torch.float32, device='cuda')
+        self._infer([warm_up] * self.max_batch, None)
+
+    def _infer(self, images: list[torch.Tensor], ready: torch.cuda.Event | None) -> tuple[np.ndarray, np.ndarray]:
+        """RTMPose's SimCC outputs (N, K, W) and (N, K, H) for the crops (3, h, w) RGB in [0, 1], read once `ready`
+        is recorded: the crops resized to the model's input if they differ, normalized as ImageNet, run, and copied
+        back to the CPU."""
+        width, height = self._model_size
+        with torch.cuda.stream(self._stream):
+            if ready is not None:
+                self._stream.wait_event(ready)      # the crops are written on the crop stream
+            batch: torch.Tensor = torch.stack(images, dim=0).to(self._mean.dtype)
+            if batch.shape[2] != height or batch.shape[3] != width:
+                batch = torch.nn.functional.interpolate(batch, size=(height, width), mode='bilinear', align_corners=False)
+            batch = (batch - self._mean) / self._std
+            outputs: dict[str, torch.Tensor] = self._engine.run({self._engine.input_names[0]: batch})
+        self._stream.synchronize()
+        simcc_x, simcc_y = (outputs[name] for name in self._engine.output_names)
+        return simcc_x.float().cpu().numpy(), simcc_y.float().cpu().numpy()

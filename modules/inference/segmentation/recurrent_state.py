@@ -10,3 +10,6 @@ class RecurrentState:
     r2: torch.Tensor
     r3: torch.Tensor
     r4: torch.Tensor
+
+    def tensors(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        return self.r1, self.r2, self.r3, self.r4

@@ -1,7 +1,7 @@
 import logging
 import time
 from threading import Event, Lock, Thread
-from typing import TYPE_CHECKING, Callable, TypeAlias
+from typing import Callable, TypeAlias
 
 import torch
 
@@ -9,15 +9,10 @@ from modules.pose import FrameDict
 from modules.utils import PerformanceTimer
 
 from .. import crop, ModelType
-from .runner_onnx import RunnerONNX
+from ..engine import Engine, make_engine
 from .settings import OpticalFlowPredictorSettings
 
-if TYPE_CHECKING:
-    from .runner_trt import RunnerTRT
-
 logger = logging.getLogger(__name__)
-
-OpticalFlowRunner: TypeAlias = "RunnerONNX | RunnerTRT"
 
 FlowDict: TypeAlias = dict[int, torch.Tensor]
 FlowCallback: TypeAlias = Callable[[FlowDict], None]
@@ -34,13 +29,12 @@ class Predictor:
     def __init__(self, settings: OpticalFlowPredictorSettings) -> None:
         self.settings: OpticalFlowPredictorSettings = settings
 
-        # One runner per model type; TensorRT is imported only when it is used.
-        self._runner: OpticalFlowRunner
-        if settings.model_type is ModelType.TRT:
-            from .runner_trt import RunnerTRT
-            self._runner = RunnerTRT(settings)
-        else:
-            self._runner = RunnerONNX(settings)
+        onnx: bool = settings.model_type is ModelType.ONNX
+        self.max_batch: int = min(settings.max_players, 8 if onnx else 4)
+        self._model_size: tuple[int, int] = (settings.width, settings.height)
+        self._engine: Engine = make_engine(settings.model_type, f"{settings.model_path}/{settings.model}",
+                                           self.max_batch if onnx else None)
+        self._stream: torch.cuda.Stream             # made on this thread, in `_run`
 
         self._thread: Thread = Thread(target=self._run, daemon=True, name="OpticalFlowPredictor")
         self._shutdown: Event = Event()
@@ -92,7 +86,7 @@ class Predictor:
             self._notify_callbacks({})
             return
 
-        max_batch: int = self._runner.max_batch
+        max_batch: int = self.max_batch
         if len(pairs) > max_batch:
             logger.warning(f"Optical Flow: batch size {len(pairs)} exceeds max {max_batch}, only the first {max_batch} run")
             track_ids, pairs = track_ids[:max_batch], pairs[:max_batch]
@@ -136,12 +130,12 @@ class Predictor:
 
     def _run(self) -> None:
         try:
-            self._runner.setup()
+            self._setup()
         except Exception:
-            logger.exception(f"Optical Flow: failed to load {self._runner.model_file}")
+            logger.exception(f"Optical Flow: failed to load {self._engine.model_file}")
             return
         self._ready.set()
-        logger.info(f"Optical Flow: {self.settings.resolution.name} model ready: {self._runner.model_width}x{self._runner.model_height} {self._runner.model_precision}")
+        logger.info(f"Optical Flow: {self.settings.resolution.name} model ready: {self._model_size[0]}x{self._model_size[1]} {self._engine.precision}")
 
         while not self._shutdown.is_set():
             self._wake.wait()
@@ -166,7 +160,36 @@ class Predictor:
         track_ids, pairs, ready = pending
 
         start: float = time.perf_counter()
-        flows = self._runner.infer(pairs, ready)
+        flows = self._infer(pairs, ready)
         self._process_timer.add_time((time.perf_counter() - start) * 1000.0, report=self.settings.verbose)
 
         self._notify_callbacks({track_id: flows[i] for i, track_id in enumerate(track_ids)})
+
+    def _setup(self) -> None:
+        """The model loaded on this thread, bound to its stream, and run once at its largest batch, so no kernel is
+        made while running."""
+        self._stream = torch.cuda.Stream()
+        self._engine.setup(self._stream)
+        width, height = self._model_size
+        with torch.cuda.stream(self._stream):
+            warm_up = torch.zeros((3, height, width), dtype=torch.float32, device='cuda')
+        self._infer([(warm_up, warm_up)] * self.max_batch, None)
+        self._stream.synchronize()
+
+    def _infer(self, pairs: list[tuple[torch.Tensor, torch.Tensor]], ready: torch.cuda.Event | None) -> torch.Tensor:
+        """The flow (N, 2, H, W), x and y in the model's pixels, from each previous to current crop (3, h, w) RGB in
+        [0, 1], read once `ready` is recorded: RAFT reads 0..255 at its input size."""
+        width, height = self._model_size
+        first, second = self._engine.input_names[0], self._engine.input_names[1]
+        dtype: torch.dtype = self._engine.dtype(first)
+        with torch.cuda.stream(self._stream):
+            if ready is not None:
+                self._stream.wait_event(ready)      # the crops are written on the crop stream
+            previous: torch.Tensor = torch.stack([p[0] for p in pairs], dim=0).mul(255.0).to(dtype)
+            current: torch.Tensor = torch.stack([p[1] for p in pairs], dim=0).mul(255.0).to(dtype)
+            if previous.shape[2] != height or previous.shape[3] != width:
+                previous = torch.nn.functional.interpolate(previous, size=(height, width), mode='bilinear', align_corners=False)
+                current = torch.nn.functional.interpolate(current, size=(height, width), mode='bilinear', align_corners=False)
+            flows: torch.Tensor = self._engine.run({first: previous, second: current})[self._engine.output_names[0]]
+        self._stream.synchronize()
+        return flows

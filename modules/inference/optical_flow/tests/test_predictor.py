@@ -1,4 +1,4 @@
-"""The optical-flow predictor's queue on its own thread, with a fake runner: a batch replaced while the model runs is
+"""The optical-flow predictor's queue on its own thread, with a fake model: a batch replaced while the model runs is
 counted and reaches no callback; the batches it ran reach the callbacks from its thread; a pose without a previous
 crop is left out."""
 
@@ -10,19 +10,11 @@ from modules.pose import BBox, Frame
 from modules.utils import Rect
 
 
-class FakeRunner:
-    model_file = 'fake'
-    model_width = 192
-    model_height = 256
-    model_precision = 'FP32'
-    max_batch = 4
-
+class FakeModel:
+    """The predictor's model steps without a GPU: its `_infer`, blocking until released."""
     def __init__(self) -> None:
         self.running = threading.Event()
         self.release = threading.Event()
-
-    def setup(self) -> None:
-        pass
 
     def infer(self, pairs, ready):
         self.running.set()
@@ -42,8 +34,9 @@ class PredictorTest(unittest.TestCase):
         settings = optical_flow.OpticalFlowPredictorSettings(model_type=ModelType.ONNX)
         settings.initialize()
         predictor = optical_flow.Predictor(settings)
-        runner = FakeRunner()
-        predictor._runner = runner
+        runner = FakeModel()
+        predictor._setup = lambda: None
+        predictor._infer = runner.infer
         told: list[tuple[list[int], str]] = []
         done = threading.Event()
 

@@ -42,6 +42,9 @@ is the largest over the frames compared, against e754ddee's first run.
 | E1 crop step    | pose         | 20.75 / 34.48            | 521 (B2's)     | 0                  | 0              |
 | E1 crop step    | segmentation |                          | 982 equal crops| 1, B2's run's      | 1.0            |
 | E1 crop step    | optical flow |                          | 952 equal pairs| 0                  | 0              |
+| E2 two engines  | pose         | 20.84 / 34.66            | 547 (E1's)     | 0                  | 0              |
+| E2 two engines  | segmentation |                          | 1000 eq. crops | 0                  | 0              |
+| E2 two engines  | optical flow |                          | 951 equal pairs| 0                  | 0              |
 
 C1 is compared with B1's run, which has the fix C1 keeps. With the probe's four models running together (pose,
 segmentation, optical flow, person detector), the TensorRT models no longer take turns: in 30 s the pose ran 1441
@@ -93,6 +96,29 @@ against D1's 25.19 / 38.46, the upload 1.65 / 17.03 against 2.95 / 17.84, the ho
 step") 0.40 / 2.51 against 0.28 / 0.97 **(seen, one run each)**; nothing in E1 explains a faster pose, so it is not
 claimed **(deduction)**.
 
+E2 (`OnnxEngine` and `TrtEngine` in the `engine` subpackage, each model's own steps in its worker, the runners gone;
+2026-11-18) is compared with E1's run on the frames whose crops were byte-equal in both runs: every output equal
+**(seen)**. A frame whose crops differ while its box is the same is one with two players: the probe keys a frame's
+crop by its time, so it keeps one player's, not always the same one's **(deduction)**. deep_flow as it is: the pose
+20.84 / 34.66 ms against E1's 20.75 / 34.48, the upload 1.59 / 16.83 against 1.65 / 17.03 **(seen, one run each)**.
+
+`scripts/model_benchmark.py`, 300 batches after 50, each model alone on the GPU, before and after E2, its outputs
+against the run before (`--reference`):
+
+| Model                          | TensorRT before | TensorRT after | ONNX before   | ONNX after       | Outputs after          |
+|--------------------------------|-----------------|----------------|---------------|------------------|------------------------|
+| pose (hd_trio, batch 3)        | 3.64 / 3.97     | 3.52 / 3.97    | 3.26 / 3.94   | 3.34 / 4.15 (1)  | exact                  |
+| segmentation (EXTREME, b. 3)   | 5.38 / 5.87     | 5.29 / 6.14    | 21.02 / 22.82 | 21.15 / 24.37    | exact (2)              |
+| optical flow (deep_flow, b. 1) | 4.98 / 5.42     | 5.07 / 5.57    | 22.36 / 25.53 | 17.69 / 31.64    | exact                  |
+
+(1) 5.05 / 5.85 in two other runs. (2) ONNX's foreground differs by design, its mask is exact.
+
+Mean / p99 in ms **(seen)**. The pose on ONNX ran 3.3 or 5.1 ms from one run to the next on the same code (two runs
+each), so a single ONNX row is no measure **(seen)**; cuDNN's exhaustive search choosing another algorithm per load
+is the likely cause **(deduction)**. ONNX's segmentation hands on the crops times the mask as its foreground, as
+TensorRT's did, not the model's own foreground output: its mask is exact, its foreground differs by design. ONNX
+against TensorRT: the pose is as fast; the segmentation and the flow take four times as long on ONNX **(seen)**.
+
 ## C. The TensorRT models side by side
 
 Questions:
@@ -102,26 +128,12 @@ Questions:
 
 ## E. The package held up again (2026-11-18)
 
-- E2. Two engines for the backends: the ten runners are five models times ONNX and TensorRT (945 lines), and the
-  pose's, segmentation's and flow's each load, bind and run their backend and do their model's input in one class;
-  the ONNX session is set up five times, two ways (memory limit and exhaustive cuDNN search in three, not in the face
-  and person detector) **(seen)**. The face and person detector's runners are already a generic backend: a file loaded,
-  a batch run, the outputs back **(seen)**. `OnnxEngine` and `TrtEngine`, one interface (load a file; run named GPU
-  tensors on a stream), with `ort_runtime`, `trt_runtime` and `model_types` in an `engine` subpackage
-  (`cuda_kernels` stays at the root: only the upload and the depth alignment use it **(seen)**). ONNX Runtime runs on
-  the worker's stream (the CUDA provider's `user_compute_stream`), so its engine waits no more than TensorRT's: today
-  each ONNX run synchronizes first, as ONNX Runtime runs on its own stream **(seen)**; that the option works in ONNX
-  Runtime 1.31.1 is to confirm **(deduction)**. Padding the batch to the size it was warmed up at is `OnnxEngine`'s,
-  unseen by the workers. Each model's own steps go to its worker (the pose's normalization and SimCC decode, the
-  segmentation's recurrent states, RAFT's x255), about 350 lines for 945 **(deduction)**. Checked by the package's
-  tests; `scripts/model_benchmark.py` before and after, for each model on ONNX and on TensorRT: the outputs against
-  the run before (`--reference`), the times, and ONNX against TensorRT; and the check's run
 - E3. One base for the five model workers: `pose.Predictor`, `segmentation.Predictor`, `optical_flow.Predictor`,
   `PersonDetector` and `FaceDetector` each set up their model on their own thread, wake on work, take the newest
   waiting (a batch, or an image per camera), run it, hand it on, catch per item and stop **(seen)**, written two ways:
   three hold a thread and count drops in their settings, two are a `Thread` and count them in a property. The base
   holds the thread, the wake, one queue that keeps the newest per key (the camera for the detectors, one key for the
-  others), around E2's engine, the drop count in the settings (a new read-only field on the detectors' panels), the setup and the stop;
+  others), around its engine (`engine.Engine`), the drop count in the settings (a new read-only field on the detectors' panels), the setup and the stop;
   each keeps its model's step. The workers take their task's name, as textbook vision names them (decided
   2026-11-18): `PoseEstimator`,
   `Segmenter`, `OpticalFlowEstimator` (not `FlowEstimator`: `modules/flow` is the fluid's), `PersonDetector`,
@@ -131,7 +143,7 @@ Questions:
   hd_trio, white_space and smile (main, settings, smile's face finder, scripts and tests), `modules/recording/replay`,
   `scripts/model_benchmark.py`, and `SMILE.md`, `OAK4.md`, `RECORDING.md` **(seen: 19 files outside the package)**.
   The uploaders, `CameraSync`, `CaptureSync` and `RecordedPoses` keep their own queues (in order, sets, parts)
-  **(deduction: they share less)**. Checked by the package's tests (the fake runners), the apps' tests and the
+  **(deduction: they share less)**. Checked by the package's tests (the fake models), the apps' tests and the
   check's run
 - E4. The new names to the rules thread for the glossary's wording (the names are decided): the five workers and
   `ModelWorker`, what they replace (`Predictor`, "RTM Pose Detection")
@@ -172,7 +184,7 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 
 ## The rules it touches
 
-- `CLAUDE.md` Composition, prefer composition: E2, a worker holds an engine and its model's steps
+- `CLAUDE.md` Composition, prefer composition: E2 (built), E3, a worker holds an engine and its model's steps
 - `CLAUDE.md` Types, an ABC for a family of classes that share code: E3
 - `CLAUDE.md` Packages, a package is one thing, and its name is that thing: E5 states the one thing
 - `CLAUDE.md` Docstrings, reasons sit in the package's document: E5

@@ -3,7 +3,7 @@ the pitch zero the head pose is measured from."""
 
 from modules.settings import BaseSettings, Field
 
-from ..model_types import ModelType
+from ..engine import ModelType
 
 DETECTION_MODEL: str = 'scrfd_10g_bnkps'
 LANDMARKS_MODEL: str = '2d106det'

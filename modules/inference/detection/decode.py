@@ -8,7 +8,7 @@ class 0.
 import numpy as np
 
 PERSON: int = 0
-PERSON_ROWS: int = 4 + PERSON + 1      # the rows a runner hands back: the box and the person's score
+PERSON_ROWS: int = 4 + PERSON + 1      # the rows the detector reads back: the box and the person's score
 
 
 def person_boxes(output: np.ndarray, confidence: float, overlap: float) -> tuple[np.ndarray, np.ndarray]:

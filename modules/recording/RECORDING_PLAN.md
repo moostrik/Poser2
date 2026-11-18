@@ -36,7 +36,7 @@ With the apps' refactors ([APPS_PLAN.md](../../apps/APPS_PLAN.md)), each tested 
 
 In -sim, with the recorded tracklets and the pose model on, about one frame in six with a player gets no poses (107
 of 596 on `hands`, [RECORDING.md](RECORDING.md#measured)): the pose model's TensorRT runner keeps one batch in
-flight and one waiting (`pose/runner_trt.py`), and a batch that comes while one waits replaces it. At 50 fps a frame
+flight and one waiting (`pose/predictor.py`), and a batch that comes while one waits replaces it. At 50 fps a frame
 comes every 20 ms, so the host's 34 ms keeps up only while batches overlap, and drops when one runs long. With the
 recorded tracklets -sim loads the GPU as live does, its one addition, the decoding, on the iGPU and the CPU, so live
 drops about as many **(deduction)**; no live number exists.

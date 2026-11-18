@@ -21,7 +21,7 @@ Per thread, the callbacks in the order they are registered (`apps/deep_flow/main
 | the tracklets' (depthai)                          | queues them for the tracker, the board; `tracker.update`       | nothing                                    |
 | the tracker's                                     | associates the tracklets, to the frame source and the board    | nothing                                    |
 | the frame source's (`TrackerFrameSource`)         | a pose per player, the RAW box steps, the crops, the submit    | nothing                                    |
-| the pose model's (`pose.RunnerTRT`)               | RTMPose on the crops, queues the poses for the pipeline        | its own model                              |
+| the pose model's (`pose.Predictor`)               | RTMPose on the crops, queues the poses for the pipeline        | its own model                              |
 | the pipeline's (`PosePipeline raw`)               | the RAW stage after the model, CLEAN, SMOOTH, their users      | nothing                                    |
 | the detector's (-sim)                             | YOLOv8n on the uploaded image, boxes to the replay camera      | its own model                              |
 | the capture sync's (`CaptureSync`)                | matches the image, depth and poses, hands the capture on       | the next part, or `pose_wait` (0 here)     |

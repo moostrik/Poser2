@@ -46,6 +46,8 @@ def _pose_output(frames: FrameDict) -> dict[str, np.ndarray]:
 
 def _segmentation_output(images: segmentation.ImageDict) -> dict[str, np.ndarray]:
     ordered = [images[track_id] for track_id in sorted(images)]
+    for image in ordered:       # written on the segmentation's stream
+        torch.cuda.current_stream().wait_event(image.ready)
     return {'mask': torch.stack([i.mask for i in ordered]).float().cpu().numpy(),
             'fgr': torch.stack([i.foreground for i in ordered]).float().cpu().numpy()}
 
@@ -189,6 +191,7 @@ def main() -> None:
     parser.add_argument('--warmup', type=int, default=100, help='untimed batches per model first')
     parser.add_argument('--image', type=Path, default=None, help='a photo to crop from instead of seeded noise')
     parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--models', nargs='*', default=None, help='the models to run, enabled or not (pose, segmentation, optical_flow); default the enabled ones')
     parser.add_argument('--reference', type=Path, default=None, help='an earlier .npz to compare the outputs with')
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)-7s %(name)s %(message)s")
@@ -200,7 +203,7 @@ def main() -> None:
     outputs: dict[str, np.ndarray] = {}
     for name, predictor_class, add_callback, read_output in MODELS:
         group = getattr(app_settings.pose, name, None)
-        if group is None or not group.enabled:
+        if group is None or (args.models is None and not group.enabled) or (args.models is not None and name not in args.models):
             continue
         # the segmentation's own crops where the app cuts them, else the pose model's
         crop_settings = getattr(app_settings.pose, f"{name}_crop", None) or app_settings.pose.pose_crop

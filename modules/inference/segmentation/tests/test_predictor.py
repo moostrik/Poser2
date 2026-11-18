@@ -1,4 +1,4 @@
-"""The segmentation predictor's queue on its own thread, with a fake runner: a batch replaced while the model runs is
+"""The segmentation predictor's queue on its own thread, with a fake model: a batch replaced while the model runs is
 counted and reaches no callback; the batches it ran reach the callbacks from its thread; every player's memory is
 cleared each `reset_interval` batches."""
 
@@ -10,23 +10,20 @@ from modules.pose import BBox, Frame
 from modules.utils import Rect
 
 
-class FakeRunner:
-    model_file = 'fake'
-    model_width = 192
-    model_height = 256
-    model_precision = 'FP32'
-    max_batch = 4
+class States(dict):
+    """The predictor's recurrent states, its clears counted."""
+    resets: int = 0
 
+    def clear(self) -> None:
+        self.resets += 1
+        super().clear()
+
+
+class FakeModel:
+    """The predictor's model steps without a GPU: its `_infer`, blocking until released."""
     def __init__(self) -> None:
         self.running = threading.Event()
         self.release = threading.Event()
-        self.resets: int = 0
-
-    def setup(self) -> None:
-        pass
-
-    def reset_states(self) -> None:
-        self.resets += 1
 
     def infer(self, gpu_images, track_ids, ready):
         self.running.set()
@@ -35,7 +32,7 @@ class FakeRunner:
         return [f'mask{i}' for i in range(n)], [f'fgr{i}' for i in range(n)], WRITTEN
 
 
-WRITTEN = object()      # the runner's event, recorded after its last step
+WRITTEN = object()      # the model's event, recorded after its last step
 
 
 class Crop:
@@ -48,8 +45,11 @@ class PredictorTest(unittest.TestCase):
         settings = segmentation.SegmentationPredictorSettings(model_type=ModelType.ONNX, reset_interval=2)
         settings.initialize()
         predictor = segmentation.Predictor(settings)
-        runner = FakeRunner()
-        predictor._runner = runner
+        runner = FakeModel()
+        states = States()
+        predictor._setup = lambda: None
+        predictor._infer = runner.infer
+        predictor._states = states
         told: list[tuple[list[int], str]] = []
         done = threading.Event()
 
@@ -82,7 +82,7 @@ class PredictorTest(unittest.TestCase):
         self.assertEqual([ids for ids, _ in told], [[0], [2]])
         self.assertTrue(all(name == 'SegmentationPredictor' for _, name in told))
         self.assertTrue(events and all(event is WRITTEN for event in events))    # every image carries the runner's event
-        self.assertEqual(runner.resets, 1)                     # at the second batch
+        self.assertEqual(states.resets, 1)                     # at the second batch
 
 
 if __name__ == '__main__':

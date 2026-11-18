@@ -10,7 +10,6 @@ found in, carried unread. A newer image of a camera replaces one still waiting: 
 import logging
 import time
 from threading import Event, Lock, Thread
-from typing import TYPE_CHECKING, TypeAlias
 
 import cv2
 import numpy as np
@@ -19,20 +18,14 @@ import torch.nn.functional as F
 
 from modules.utils import PerformanceTimer
 
-from ..model_types import ModelType
+from ..engine import Engine, make_engine
 from ..source import GpuImage
 from .decode import INPUT_SIZE, decode
 from .io import Face, FaceFrame, FaceFrameCallback
 from .measures import eye_distance, eye_openness, head_pose
-from .runner_onnx import RunnerONNX
 from .settings import DETECTION_MODEL, LANDMARKS_MODEL, FaceDetectorSettings
 
-if TYPE_CHECKING:
-    from .runner_trt import RunnerTRT
-
 logger = logging.getLogger(__name__)
-
-FaceRunner: TypeAlias = "RunnerONNX | RunnerTRT"
 
 INPUT_MEAN: float = 127.5
 INPUT_STD: float = 128.0
@@ -56,16 +49,8 @@ class FaceDetector(Thread):
     def __init__(self, settings: FaceDetectorSettings) -> None:
         super().__init__(daemon=True, name='FaceDetector')
         self.settings: FaceDetectorSettings = settings
-        # One runner per model and type; TensorRT is imported only when it is used.
-        self._detection: FaceRunner
-        self._landmarks: FaceRunner
-        if settings.model_type is ModelType.ONNX:
-            self._detection = RunnerONNX(settings.model_file(DETECTION_MODEL))
-            self._landmarks = RunnerONNX(settings.model_file(LANDMARKS_MODEL))
-        else:
-            from .runner_trt import RunnerTRT
-            self._detection = RunnerTRT(settings.model_file(DETECTION_MODEL))
-            self._landmarks = RunnerTRT(settings.model_file(LANDMARKS_MODEL))
+        self._detection: Engine = make_engine(settings.model_type, settings.model_file(DETECTION_MODEL))
+        self._landmarks: Engine = make_engine(settings.model_type, settings.model_file(LANDMARKS_MODEL))
         self._stream: torch.cuda.Stream | None = None      # made on this thread, in `_setup`
 
         self._shutdown: Event = Event()
@@ -142,14 +127,14 @@ class FaceDetector(Thread):
                         logger.exception("Error in a face callback")
 
     def _setup(self) -> None:
-        self._detection.setup()
-        self._landmarks.setup()
         self._stream = torch.cuda.Stream()
+        self._detection.setup(self._stream)
+        self._landmarks.setup(self._stream)
         with torch.cuda.stream(self._stream):
             warm_up: torch.Tensor = torch.zeros((1, 3, INPUT_SIZE, INPUT_SIZE), dtype=torch.float32, device='cuda')
             warm_up_landmarks: torch.Tensor = torch.zeros((1, 3, LANDMARKS_SIZE, LANDMARKS_SIZE), dtype=torch.float32, device='cuda')
-        self._detection.infer(warm_up, self._stream)
-        self._landmarks.infer(warm_up_landmarks, self._stream)
+        self._infer(self._detection, warm_up)
+        self._infer(self._landmarks, warm_up_landmarks)
         self._ready.set()
         logger.info("Face detector: %s and %s ready (%s)", DETECTION_MODEL, LANDMARKS_MODEL, self.settings.model_type.name)
 
@@ -168,7 +153,7 @@ class FaceDetector(Thread):
             detection_input: torch.Tensor = torch.zeros((1, 3, INPUT_SIZE, INPUT_SIZE), dtype=torch.float32, device='cuda')
             detection_input[:, :, :fitted.shape[2], :fitted.shape[3]] = fitted
             detection_input = (detection_input - INPUT_MEAN) / INPUT_STD
-        found = decode(self._detection.infer(detection_input, self._stream), scale, self.settings.threshold)
+        found = decode(self._infer(self._detection, detection_input), scale, self.settings.threshold)
 
         faces: list[Face] = []
         if found:
@@ -198,9 +183,18 @@ class FaceDetector(Thread):
                                               (2.0 * source[..., 1] + 1.0) / height - 1.0), dim=-1).reshape(-1, size, size, 2)
             crops: torch.Tensor = F.grid_sample(pixels.expand(len(matrices), -1, -1, -1), grid, mode='bilinear',
                                                 padding_mode='zeros', align_corners=False)
-        predictions: np.ndarray = self._landmarks.infer(crops, self._stream)[0]
+        predictions: np.ndarray = self._infer(self._landmarks, crops)[0]
         points: list[np.ndarray] = []
         for prediction, inverse_matrix in zip(predictions, inverses):
             crop_points: np.ndarray = (prediction.reshape((-1, 2)) + 1.0) * (size // 2)
             points.append(cv2.transform(crop_points[None, :, :].astype(np.float64), inverse_matrix)[0])
         return points
+
+    def _infer(self, engine: Engine, batch: torch.Tensor) -> list[np.ndarray]:
+        """A model's outputs, in its order, back on the CPU, for a float32 batch on this detector's stream."""
+        assert self._stream is not None
+        name: str = engine.input_names[0]
+        with torch.cuda.stream(self._stream):
+            outputs: dict[str, torch.Tensor] = engine.run({name: batch.to(engine.dtype(name))})
+            on_cpu: list[torch.Tensor] = [outputs[output].float().cpu() for output in engine.output_names]    # waits for the stream
+        return [output.numpy() for output in on_cpu]

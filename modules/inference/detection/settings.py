@@ -5,7 +5,7 @@ from enum import IntEnum, auto
 
 from modules.settings import BaseSettings, Field
 
-from ..model_types import ModelType
+from ..engine import ModelType
 
 
 class Resolution(IntEnum):

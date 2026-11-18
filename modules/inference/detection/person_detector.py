@@ -5,13 +5,12 @@ It takes the uploaded images (`GpuImage`), so a frame goes to the GPU once and n
 on the CPU: each image is stretched whole into the model's input on the GPU, as the device manip does
 (nothing cropped, nobody lost at the edges, boxes map 1:1 onto the frame), and only the person rows
 come back. The image is straightened and mirrored, so are its boxes. A newer image of a camera replaces
-one still waiting: the latest wins, as in the other runners.
+one still waiting: the latest wins, as in the other workers.
 """
 
 import logging
 import time
 from threading import Event, Lock, Thread
-from typing import TYPE_CHECKING, TypeAlias
 
 import numpy as np
 import torch
@@ -19,19 +18,13 @@ import torch.nn.functional as F
 
 from modules.utils import PerformanceTimer, Rect
 
-from ..model_types import ModelType
+from ..engine import Engine, make_engine
 from ..source import GpuImage
-from .decode import normalise, person_boxes
+from .decode import PERSON_ROWS, normalise, person_boxes
 from .io import Detection, DetectionCallback
-from .runner_onnx import RunnerONNX
 from .settings import PersonDetectorSettings
 
-if TYPE_CHECKING:
-    from .runner_trt import RunnerTRT
-
 logger = logging.getLogger(__name__)
-
-DetectionRunner: TypeAlias = "RunnerONNX | RunnerTRT"
 
 
 class PersonDetector(Thread):
@@ -41,13 +34,7 @@ class PersonDetector(Thread):
         self.width: int = settings.width
         self.height: int = settings.height
 
-        # One runner per model type; TensorRT is imported only when it is used.
-        self._runner: DetectionRunner
-        if settings.model_type is ModelType.ONNX:
-            self._runner = RunnerONNX(settings.model_file)
-        else:
-            from .runner_trt import RunnerTRT
-            self._runner = RunnerTRT(settings.model_file)
+        self._engine: Engine = make_engine(settings.model_type, settings.model_file)
         self._stream: torch.cuda.Stream | None = None      # made on this thread, in `_setup`
 
         self._shutdown: Event = Event()
@@ -118,11 +105,11 @@ class PersonDetector(Thread):
                 logger.exception("Person detector error")
 
     def _setup(self) -> None:
-        self._runner.setup()
         self._stream = torch.cuda.Stream()
+        self._engine.setup(self._stream)
         with torch.cuda.stream(self._stream):
             warm_up: torch.Tensor = torch.zeros((1, 3, self.height, self.width), dtype=torch.float32, device='cuda')
-        self._runner.infer(warm_up, self._stream)
+        self._infer(warm_up)
         self._ready.set()
         logger.info("Person detector: %s ready", self.settings.model)
 
@@ -133,7 +120,7 @@ class PersonDetector(Thread):
             return pending
 
     def _process(self) -> None:
-        """The pending images as one batch. They are held until the runner has synchronized its stream,
+        """The pending images as one batch. They are held until the model has synchronized its stream,
         so the upload's memory is not reused while this stream reads it."""
         pending: dict[int, GpuImage] = self._claim()
         if not pending:
@@ -142,7 +129,7 @@ class PersonDetector(Thread):
         start: float = time.perf_counter()
         cam_ids: list[int] = list(pending.keys())
         batch: torch.Tensor = self._batch([pending[cam_id] for cam_id in cam_ids])
-        output: np.ndarray = self._runner.infer(batch, self._stream)
+        output: np.ndarray = self._infer(batch)
         confidence: float = self.settings.confidence
         overlap: float = self.settings.overlap
         detections: list[Detection] = []
@@ -172,3 +159,13 @@ class PersonDetector(Thread):
                 resized.append(F.interpolate(image.image.unsqueeze(0).float(), size=(self.height, self.width),
                                              mode='bilinear', align_corners=False)[0])
             return torch.stack(resized)
+
+    def _infer(self, batch: torch.Tensor) -> np.ndarray:
+        """The person rows (N, `PERSON_ROWS`, candidates) of an RGB batch (N, 3, height, width) in [0, 1] on this
+        detector's stream; only those rows come back to the CPU."""
+        assert self._stream is not None
+        name: str = self._engine.input_names[0]
+        with torch.cuda.stream(self._stream):
+            output: torch.Tensor = self._engine.run({name: batch.to(self._engine.dtype(name))})[self._engine.output_names[0]]
+            rows: torch.Tensor = output[:, :PERSON_ROWS].float().cpu()      # waits for the stream
+        return rows.numpy()

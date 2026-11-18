@@ -1,4 +1,4 @@
-"""The pose predictor's queue on its own thread, with a fake runner: a batch replaced while the model runs is counted,
+"""The pose predictor's queue on its own thread, with a fake model: a batch replaced while the model runs is counted,
 not run; the batches it ran reach the callbacks from its thread, normalized to the model's input."""
 
 import threading
@@ -13,19 +13,14 @@ from modules.utils import Rect
 from ..decode import NUM_KEYPOINTS, decode_simcc
 
 
-class FakeRunner:
-    model_file = 'fake'
+class FakeModel:
+    """The predictor's model steps without a GPU: its `_infer`, blocking until released."""
     model_width = 192
     model_height = 256
-    model_precision = 'FP32'
-    max_batch = 8
 
     def __init__(self) -> None:
         self.running = threading.Event()
         self.release = threading.Event()
-
-    def setup(self) -> None:
-        pass
 
     def infer(self, gpu_images, ready):
         self.running.set()
@@ -48,8 +43,9 @@ class PredictorTest(unittest.TestCase):
         settings = pose.PosePredictorSettings(model_type=ModelType.ONNX)
         settings.initialize()
         predictor = pose.Predictor(settings)
-        runner = FakeRunner()
-        predictor._runner = runner
+        runner = FakeModel()
+        predictor._setup = lambda: None
+        predictor._infer = runner.infer
         told: list[tuple[list[int], str]] = []
         points: list[np.ndarray] = []
         done = threading.Event()

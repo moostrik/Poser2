@@ -94,7 +94,7 @@ class PersonDetectorTest(unittest.TestCase):
             self.assertAlmostEqual(d.scores[0], 0.9, places=5)
 
     def test_the_batch_is_the_images_at_the_model_s_size_lying_in_memory_as_its_shape_says(self) -> None:
-        """The runners take the buffer's address, so a tensor that is only a view of another order
+        """The engines take the buffer's address, so a tensor that is only a view of another order
         reaches the model scrambled."""
         batch = self.detector._batch([uploaded(0, 600, 800, 0.0), uploaded(1, 720, 896, 0.0)])
         torch.cuda.synchronize()

@@ -1,7 +1,6 @@
 import logging
 import time
 from threading import Event, Lock, Thread
-from typing import TYPE_CHECKING, TypeAlias
 
 import torch
 
@@ -9,16 +8,16 @@ from modules.pose import FrameDict
 from modules.utils import PerformanceTimer
 
 from .. import crop, ModelType
+from ..engine import Engine, make_engine
 from .image import Image, ImageDict, ImageCallback
-from .runner_onnx import RunnerONNX
+from .recurrent_state import RecurrentState
 from .settings import SegmentationPredictorSettings
-
-if TYPE_CHECKING:
-    from .runner_trt import RunnerTRT
 
 logger = logging.getLogger(__name__)
 
-SegmentationRunner: TypeAlias = "RunnerONNX | RunnerTRT"
+RECURRENT_CHANNELS: tuple[tuple[int, int], ...] = ((16, 2), (20, 4), (40, 8), (64, 16))     # (channels, downscale) of r1..r4
+STATE_INPUTS: tuple[str, ...] = ('r1i', 'r2i', 'r3i', 'r4i')
+STATE_OUTPUTS: tuple[str, ...] = ('r1o', 'r2o', 'r3o', 'r4o')
 
 
 class Predictor:
@@ -33,13 +32,13 @@ class Predictor:
     def __init__(self, settings: SegmentationPredictorSettings) -> None:
         self.settings: SegmentationPredictorSettings = settings
 
-        # One runner per model type; TensorRT is imported only when it is used.
-        self._runner: SegmentationRunner
-        if settings.model_type is ModelType.TRT:
-            from .runner_trt import RunnerTRT
-            self._runner = RunnerTRT(settings)
-        else:
-            self._runner = RunnerONNX(settings)
+        self.max_batch: int = min(settings.max_players, 4)
+        self._model_size: tuple[int, int] = (settings.width, settings.height)
+        self._engine: Engine = make_engine(settings.model_type, f"{settings.model_path}/{settings.model}",
+                                           self.max_batch if settings.model_type is ModelType.ONNX else None)
+        self._stream: torch.cuda.Stream             # made on this thread, in `_run`
+        self._states: dict[int, RecurrentState] = {}    # per track id: each player's memory of the earlier frames
+        self._zero_states: list[torch.Tensor] = []      # (1, C, h, w) per recurrent input, for a new player
         self._reset_interval: int = settings.reset_interval
         self._batch_count: int = 0
 
@@ -90,7 +89,7 @@ class Predictor:
             self._notify_callbacks(poses, {})
             return
 
-        max_batch: int = self._runner.max_batch
+        max_batch: int = self.max_batch
         if len(images) > max_batch:
             logger.warning(f"Segmentation: batch size {len(images)} exceeds max {max_batch}, only the first {max_batch} run")
             track_ids, images = track_ids[:max_batch], images[:max_batch]
@@ -134,12 +133,12 @@ class Predictor:
 
     def _run(self) -> None:
         try:
-            self._runner.setup()
+            self._setup()
         except Exception:
-            logger.exception(f"Segmentation: failed to load {self._runner.model_file}")
+            logger.exception(f"Segmentation: failed to load {self._engine.model_file}")
             return
         self._ready.set()
-        logger.info(f"Segmentation: {self.settings.resolution.name} model ready: {self._runner.model_width}x{self._runner.model_height} {self._runner.model_precision}")
+        logger.info(f"Segmentation: {self.settings.resolution.name} model ready: {self._model_size[0]}x{self._model_size[1]} {self._engine.precision}")
 
         while not self._shutdown.is_set():
             self._wake.wait()
@@ -166,10 +165,10 @@ class Predictor:
         # Every player's memory cleared now and then, a failsafe against a state gone wrong
         self._batch_count += 1
         if self._reset_interval > 0 and self._batch_count % self._reset_interval == 0:
-            self._runner.reset_states()
+            self._states.clear()
 
         start: float = time.perf_counter()
-        masks, foregrounds, written = self._runner.infer(images, track_ids, ready)
+        masks, foregrounds, written = self._infer(images, track_ids, ready)
         self._process_timer.add_time((time.perf_counter() - start) * 1000.0, report=self.settings.verbose)
 
         results: ImageDict = {}
@@ -178,3 +177,48 @@ class Predictor:
                 results[track_id] = Image(mask=masks[i], foreground=foregrounds[i], timestamp=poses[track_id].timestamp,
                                            ready=written)
         self._notify_callbacks(poses, results)
+
+    def _setup(self) -> None:
+        """The model loaded on this thread, bound to its stream, and run once at its largest batch, so no kernel is
+        made while running."""
+        self._stream = torch.cuda.Stream()
+        self._engine.setup(self._stream)
+        width, height = self._model_size
+        dtype: torch.dtype = self._engine.dtype('src')
+        with torch.cuda.stream(self._stream):
+            self._zero_states = [torch.zeros((1, c, height // s, width // s), dtype=dtype, device='cuda') for c, s in RECURRENT_CHANNELS]
+            warm_up = torch.zeros((3, height, width), dtype=torch.float32, device='cuda')
+        self._infer([warm_up] * self.max_batch, list(range(self.max_batch)), None)
+        self._stream.synchronize()
+        self._states.clear()
+
+    def _infer(self, images: list[torch.Tensor], track_ids: list[int],
+               ready: torch.cuda.Event | None) -> tuple[torch.Tensor, torch.Tensor, torch.cuda.Event]:
+        """The alpha matte (N, h, w) and the foreground (N, 3, h, w), the crops multiplied by it, for the crops (3, h, w)
+        RGB in [0, 1] of the players `track_ids`, read once `ready` is recorded; and the event recorded after they are
+        written. Each player's recurrent state goes in with its crop and comes out for its next."""
+        width, height = self._model_size
+        src_dtype: torch.dtype = self._engine.dtype('src')
+        with torch.cuda.stream(self._stream):
+            if ready is not None:
+                self._stream.wait_event(ready)      # the crops are written on the crop stream
+            original: torch.Tensor = torch.stack(images, dim=0).to(src_dtype)
+            crop_h, crop_w = original.shape[2], original.shape[3]
+            needs_resize: bool = crop_h != height or crop_w != width
+            src: torch.Tensor = original
+            if needs_resize:
+                src = torch.nn.functional.interpolate(original, size=(height, width), mode='bilinear', align_corners=False)
+            inputs: dict[str, torch.Tensor] = {'src': src}
+            for k, name in enumerate(STATE_INPUTS):
+                sources = [self._states[t].tensors()[k] if t in self._states else self._zero_states[k] for t in track_ids]
+                inputs[name] = torch.cat(sources, dim=0)
+            outputs: dict[str, torch.Tensor] = self._engine.run(inputs)
+            self._stream.synchronize()
+            self._states = {t: RecurrentState(*(outputs[name][i:i + 1] for name in STATE_OUTPUTS)) for i, t in enumerate(track_ids)}
+            mask: torch.Tensor = outputs['pha'].squeeze(1)
+            if needs_resize:
+                mask = torch.nn.functional.interpolate(mask.unsqueeze(1), size=(crop_h, crop_w), mode='bilinear', align_corners=False).squeeze(1)
+            foreground: torch.Tensor = original * mask.unsqueeze(1)
+            written: torch.cuda.Event = torch.cuda.Event()
+            written.record(self._stream)        # after the last step: the readers wait for it on their streams
+        return mask, foreground, written

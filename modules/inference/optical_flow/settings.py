@@ -1,4 +1,4 @@
-from ..model_types import ModelType, Resolution, RESOLUTION_DIMS
+from ..engine import ModelType, Resolution, RESOLUTION_DIMS
 from modules.settings import BaseSettings, Field
 
 _MODELS = {
