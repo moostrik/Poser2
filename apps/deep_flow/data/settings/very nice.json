@@ -497,7 +497,7 @@
         "buoyancy": 0.0,
         "sink": 0.0,
         "gravity_x": 0.0,
-        "gravity_y": 1.0,
+        "gravity_y": -1.0,
         "gravity_z": 0.0
       },
       "pressure": {

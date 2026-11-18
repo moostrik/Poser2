@@ -21,7 +21,7 @@ layout(rgba16f, binding = 0) writeonly uniform image3D uForce;
 
 uniform float uSigma;               // Thermal buoyancy (widths/s² per unit of warmth)
 uniform float uKappa;               // Density weight (widths/s² per unit of density)
-uniform vec3  uGravity;             // Gravity direction: (0,1,0) down-screen, (0,0,1) away from viewer
+uniform vec3  uGravity;             // Gravity direction, the grid's frame, y up: (0,-1,0) down the screen, (0,0,1) away from viewer
 uniform ivec3 uSize;
 uniform bool  uHasObstacles;
 

@@ -19,7 +19,7 @@ class Buoyancy3D(ComputeShader):
     def use(self, temperature: Texture3D, density: Texture3D,
             obstacle: Texture3D, force_out: Texture3D,
             sigma: float, kappa: float,
-            gravity: tuple[float, float, float] = (0.0, 1.0, 0.0),
+            gravity: tuple[float, float, float] = (0.0, -1.0, 0.0),
             has_obstacles: bool = True) -> None:
         """Compute the buoyancy force.
 
@@ -30,7 +30,7 @@ class Buoyancy3D(ComputeShader):
             force_out: Output force volume (RGBA16F)
             sigma: Thermal buoyancy (widths/s² per unit of warmth)
             kappa: Density weight (widths/s² per unit of density)
-            gravity: Gravity direction — (0,1,0) down-screen, (0,0,1) away from viewer
+            gravity: Gravity direction in the grid's frame, y up — (0,-1,0) down the screen, (0,0,1) away from viewer
             has_obstacles: Whether obstacle logic is active
         """
         if not self.allocated or not self.shader_program:

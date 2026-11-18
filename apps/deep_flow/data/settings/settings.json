@@ -42,7 +42,7 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 3865,
+        "balance": 3866,
         "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
@@ -493,16 +493,16 @@
       },
       "input": {
         "spread": 0.237,
-        "velocity_drag": 75.0,
+        "velocity_drag": 76.0,
         "velocity_gain": 1.0,
         "acceleration_gain": 10.0,
-        "density_drag": 229.0,
+        "density_drag": 200.0,
         "density_release": 0.0,
         "density_gain": 5.0,
         "density_blend": "OVER",
         "temperature_drag": 200.0,
         "temperature_gain": 1.0,
-        "expansion_rate": 5.0
+        "expansion_rate": 0.0
       },
       "velocity": {
         "advection": "SEMI_LAGRANGIAN",
@@ -526,13 +526,13 @@
         "advection": "SEMI_LAGRANGIAN",
         "limiter": "CLAMP",
         "advection_scale": 1.0,
-        "fade_time": 12.0,
+        "fade_time": 1.0,
         "evaporation_time": 0.0,
         "evaporation_knee": 0.1,
-        "buoyancy": 0.0,
-        "sink": 0.0,
+        "buoyancy": 2.0,
+        "sink": 1.0,
         "gravity_x": 0.0,
-        "gravity_y": 1.0,
+        "gravity_y": -1.0,
         "gravity_z": 0.0
       },
       "pressure": {
