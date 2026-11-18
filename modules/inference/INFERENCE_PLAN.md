@@ -102,12 +102,21 @@ Questions:
   it becomes the crop extractor's `submit` and the pose model's frames callback, given apart; `RecordedPoses`, which
   wraps `PoseInference`, takes the two the same way. What runs, and on which threads, stays. Checked by the package's
   and the pose pipeline's tests and the check's run
-- E2. One base for the five model workers: `pose.Predictor`, `segmentation.Predictor`, `optical_flow.Predictor`,
+- E2. Two engines for the backends: the ten runners are five models times ONNX and TensorRT (945 lines), and the
+  pose's, segmentation's and flow's each load, bind and run their backend and do their model's input in one class;
+  the ONNX session is set up five times, two ways (memory limit and exhaustive cuDNN search in three, not in the face
+  and person detector) **(seen)**. The face and person detector's runners are already a generic backend: a file loaded,
+  a batch run, the outputs back **(seen)**. `OnnxEngine` and `TrtEngine`, one interface (load a file; run named GPU
+  tensors on a stream), with `ort_runtime`, `trt_runtime`, `model_types` and `cuda_kernels` in an `engine` subpackage;
+  each model's own steps go to its worker (the pose's normalization and SimCC decode, the segmentation's recurrent
+  states, RAFT's x255), about 350 lines for 945 **(deduction)**. Checked by the package's tests, the ONNX and TensorRT
+  outputs compared as on 2026-11-18, and the check's run
+- E3. One base for the five model workers: `pose.Predictor`, `segmentation.Predictor`, `optical_flow.Predictor`,
   `PersonDetector` and `FaceDetector` each set up their model on their own thread, wake on work, take the newest
   waiting (a batch, or an image per camera), run it, hand it on, catch per item and stop **(seen)**, written two ways:
   three hold a thread and count drops in their settings, two are a `Thread` and count them in a property. The base
   holds the thread, the wake, one queue that keeps the newest per key (the camera for the detectors, one key for the
-  others), the drop count in the settings (a new read-only field on the detectors' panels), the setup and the stop;
+  others), around E2's engine, the drop count in the settings (a new read-only field on the detectors' panels), the setup and the stop;
   each keeps its model's step. The workers take their task's name, as textbook vision names them: `PoseEstimator`,
   `Segmenter`, `OpticalFlowEstimator` (not `FlowEstimator`: `modules/flow` is the fluid's), `PersonDetector`,
   `FaceDetector`, and the base `ModelWorker`; with them their settings (`PoseEstimatorSettings`, `SegmenterSettings`,
@@ -118,17 +127,18 @@ Questions:
   The uploaders, `CameraSync`, `CaptureSync` and `RecordedPoses` keep their own queues (in order, sets, parts)
   **(deduction: they share less)**. Checked by the package's tests (the fake runners), the apps' tests and the
   check's run
-- E3. The new names to the rules thread for the glossary: the five workers and `ModelWorker`, what they replace
+- E4. The new names to the rules thread for the glossary: the five workers and `ModelWorker`, what they replace
   (`Predictor`, "RTM Pose Detection"), for its wording
-- E4. `INFERENCE.md`: the package is one thing, the camera frames on the GPU and the models on them; the upload and
+- E5. `INFERENCE.md`: the package is one thing, the camera frames on the GPU and the models on them; the upload and
   the models stay one package, as every app uses them together and the crops and detectors take the upload's images
   **(seen)**. It says what the package's parts are and why (each model's thread, the crops' and outputs' events, the
   streams, no TensorRT lock), linking the plan's measurements, and takes in what `modules/flow/INPUT_THREADS.md`
   says of this package. `CameraSync` stays here: it groups one moment's frames of several cameras for the upload
   (`BatchUploader.submit_set`) **(seen)**, the input's first step, and left the camera package as not a camera
   (b5ab4515)
-- E5. The leftovers: `Resolution` and `RESOLUTION_DIMS` out of the package's exports (no user outside **(seen)**); the
-  empty `tools/` folder
+- E6. The leftovers: `Resolution` and `RESOLUTION_DIMS` out of the package's exports (no user outside **(seen)**); the
+  empty `tools/` folder; the output types in one pattern, a file named after its type (`detection/io.py`,
+  `face/io.py`, `segmentation/image.py`, `optical_flow`'s `FlowDict` in its predictor today **(seen)**)
 
 No thread waits for the GPU between the upload, the crop and the model: the upload and the crop are queued on their
 streams behind the events before them, and a thread waits once, the pose model's at its end, to decode on the CPU
@@ -147,9 +157,10 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 ## The rules it touches
 
 - `CLAUDE.md` Naming, a concept named after what it is: E1, `PoseInference` is three things under one name
-- `CLAUDE.md` Types, an ABC for a family of classes that share code: E2
-- `CLAUDE.md` Packages, a package is one thing, and its name is that thing: E4 states the one thing
-- `CLAUDE.md` Docstrings, reasons sit in the package's document: E4
-- `CLAUDE.md` API evolution, remove obsolete pathways: E5
-- `CLAUDE.md` Naming, the domain's term, one everywhere (class, setting, panel label): E2, the workers, their settings
-  and timers; `glossary.md` follows: E3
+- `CLAUDE.md` Composition, prefer composition: E2, a worker holds an engine and its model's steps
+- `CLAUDE.md` Types, an ABC for a family of classes that share code: E3
+- `CLAUDE.md` Packages, a package is one thing, and its name is that thing: E5 states the one thing
+- `CLAUDE.md` Docstrings, reasons sit in the package's document: E5
+- `CLAUDE.md` API evolution, remove obsolete pathways: E6
+- `CLAUDE.md` Naming, the domain's term, one everywhere (class, setting, panel label): E3, the workers, their settings
+  and timers; `glossary.md` follows: E4
