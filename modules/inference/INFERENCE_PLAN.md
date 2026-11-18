@@ -91,7 +91,16 @@ Questions:
 
 ## E. The package held up again (2026-11-18)
 
-- E1. One base for the five model workers: `pose.Predictor`, `segmentation.Predictor`, `optical_flow.Predictor`,
+- E1. `PoseInference` goes: it holds three jobs under a pose name **(seen)**: the crop extractors (the pose model's
+  size, and hd_trio's segmentation size), whose crops the flow, the board and the segmentation subscribe to through
+  it; the pose model; and the rule that, with the pose model off, the poses carrying the camera's keypoints pass. The
+  app holds its crop extractors (one per size), and every consumer subscribes to one: the pose model, the flow, the
+  board, the segmentation; the pose model holds the rule. The pose pipeline's async step (`AsyncNode`: `submit` with
+  the images, `add_frames_callback`) is the crop and the pose model together today **(seen: `modules/pose/pipeline/spec.py`)**:
+  it becomes the crop extractor's `submit` and the pose model's frames callback, given apart; `RecordedPoses`, which
+  wraps `PoseInference`, takes the two the same way. What runs, and on which threads, stays. Checked by the package's
+  and the pose pipeline's tests and the check's run
+- E2. One base for the five model workers: `pose.Predictor`, `segmentation.Predictor`, `optical_flow.Predictor`,
   `PersonDetector` and `FaceDetector` each set up their model on their own thread, wake on work, take the newest
   waiting (a batch, or an image per camera), run it, hand it on, catch per item and stop **(seen)**, written two ways:
   three hold a thread and count drops in their settings, two are a `Thread` and count them in a property. The base
@@ -107,16 +116,16 @@ Questions:
   The uploaders, `CameraSync`, `CaptureSync` and `RecordedPoses` keep their own queues (in order, sets, parts)
   **(deduction: they share less)**. Checked by the package's tests (the fake runners), the apps' tests and the
   check's run
-- E2. The new names to the rules thread for the glossary: the five workers and `ModelWorker`, what they replace
+- E3. The new names to the rules thread for the glossary: the five workers and `ModelWorker`, what they replace
   (`Predictor`, "RTM Pose Detection"), for its wording
-- E3. `INFERENCE.md`: the package is one thing, the camera frames on the GPU and the models on them; the upload and
+- E4. `INFERENCE.md`: the package is one thing, the camera frames on the GPU and the models on them; the upload and
   the models stay one package, as every app uses them together and the crops and detectors take the upload's images
   **(seen)**. It says what the package's parts are and why (each model's thread, the crops' and outputs' events, the
   streams, no TensorRT lock), linking the plan's measurements, and takes in what `modules/flow/INPUT_THREADS.md`
   says of this package. `CameraSync` stays here: it groups one moment's frames of several cameras for the upload
   (`BatchUploader.submit_set`) **(seen)**, the input's first step, and left the camera package as not a camera
   (b5ab4515)
-- E4. The leftovers: `Resolution` and `RESOLUTION_DIMS` out of the package's exports (no user outside **(seen)**); the
+- E5. The leftovers: `Resolution` and `RESOLUTION_DIMS` out of the package's exports (no user outside **(seen)**); the
   empty `tools/` folder
 
 Question: the crops cut in the upload's kernel, with the tracker's latest box? The crop uses the latched box anyway,
@@ -133,9 +142,10 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 
 ## The rules it touches
 
-- `CLAUDE.md` Types, an ABC for a family of classes that share code: E1
-- `CLAUDE.md` Packages, a package is one thing, and its name is that thing: E3 states the one thing
-- `CLAUDE.md` Docstrings, reasons sit in the package's document: E3
-- `CLAUDE.md` API evolution, remove obsolete pathways: E4
-- `CLAUDE.md` Naming, the domain's term, one everywhere (class, setting, panel label): E1, the workers, their settings
-  and timers; `glossary.md` follows: E2
+- `CLAUDE.md` Naming, a concept named after what it is: E1, `PoseInference` is three things under one name
+- `CLAUDE.md` Types, an ABC for a family of classes that share code: E2
+- `CLAUDE.md` Packages, a package is one thing, and its name is that thing: E4 states the one thing
+- `CLAUDE.md` Docstrings, reasons sit in the package's document: E4
+- `CLAUDE.md` API evolution, remove obsolete pathways: E5
+- `CLAUDE.md` Naming, the domain's term, one everywhere (class, setting, panel label): E2, the workers, their settings
+  and timers; `glossary.md` follows: E3
