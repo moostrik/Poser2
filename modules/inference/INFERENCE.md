@@ -4,8 +4,11 @@ The camera frames on the GPU and the models that run on them. An app's cameras h
 which puts them on the GPU once; the crop step cuts each player's box from those images, and the model workers run
 on the crops or the whole images, each on its own thread and CUDA stream. The upload and the models are one package:
 every app uses them together, and the crop step and the detectors read the upload's images. What is not built is in
-[INFERENCE_PLAN.md](INFERENCE_PLAN.md); how the threads of an app hand on is in
-[INPUT_THREADS.md](../flow/INPUT_THREADS.md). **(deduction)** marks what is inferred.
+[INFERENCE_PLAN.md](INFERENCE_PLAN.md), the models' times in [TIMING.md](TIMING.md); how the threads of an app hand
+on is in [INPUT_THREADS.md](../flow/INPUT_THREADS.md). **(deduction)** marks what is inferred.
+
+No code in the package is one app's: the face model is smile's alone, the segmentation hd_trio's, the optical flow
+and `RecordedPoses` deep_flow's, but each is general code with one user, as the camera's backends are.
 
 ## The parts
 
@@ -27,7 +30,7 @@ models share; each model has its package; the inference frame and its sync, whic
 | `FaceDetector`                       | `face/`                                             | its own        | SCRFD and the 106 landmarks, the faces (smile)                     |
 | `ModelWorker`                        | `engine/model_worker.py`                            |                | the five workers' base                                             |
 | `Engine` (`OnnxEngine`, `TrtEngine`) | `engine/`                                           | the worker's   | a model file run on GPU tensors, ONNX Runtime or TensorRT          |
-| `InferenceFrameSync`                        | `inference_frame_sync.py`, `inference_frame.py`                     | its own        | an image and the results of one moment, as an `InferenceFrame`    |
+| `InferenceFrameSync`                 | `inference_frame_sync.py`, `inference_frame.py`     | its own        | an image and the results of one moment, as an `InferenceFrame`     |
 
 ## From the frame to the model
 
@@ -46,7 +49,9 @@ in any order unless they are synchronized so
   and predicted box, so it runs after that stage, on the frame source's thread, not in the upload.
 - Each model worker waits for the crops' event on its stream and runs there. The pose estimator synchronizes once,
   at the end, to decode its points on the CPU; the segmentation's masks stay on the GPU with an event of their own
-  (`segmentation.Image.ready`), as do the flows.
+  (`segmentation.Image.ready`), as do the flows. The decode stays on the CPU: on the GPU it gives the same points
+  but takes longer, its kernel launches costing more than copying the model's outputs
+  ([TIMING.md](TIMING.md#the-poses-decode)).
 
 ### The model workers
 
@@ -72,10 +77,30 @@ at and cuts the outputs back.
 | YOLOv8n             | `PersonDetector`       | 480x384 to 640x512      | the file's | one image per camera   |
 | SCRFD 10G, 2d106det | `FaceDetector`         | 640x640, 192x192        | the file's | an image, its faces    |
 
-(1) The pose runs FP16 with its head's two ScaleNorms in FP32, made from the FP32 original by
-`tools/models/convert_onnx_to_fp16.py --fp32-norms --keep-io-types`; half the time of FP32, 97% of its points within
-one SimCC bin of FP32's ([INFERENCE_PLAN.md](INFERENCE_PLAN.md), H2). The times, before and after each step and on both backends,
-are in the plan's results ([INFERENCE_PLAN.md](INFERENCE_PLAN.md#the-check)).
+(1) The pose runs FP16 in every app, with its head's two ScaleNorms, its input and its output in FP32: half the time
+of FP32, 97% of its points within one SimCC bin of FP32's ([TIMING.md](TIMING.md#the-pose-models)).
+
+### The models and their files
+
+The models' ONNX files sit in `data/models`, in LFS; an engine is built from one on each PC by `scripts/makemodels.bat`,
+per app at its batch, as an engine runs only on the TensorRT version and the GPU that built it. TensorRT 11 builds
+strongly typed: each layer's precision is its ONNX file's, so an FP16 engine is built from an FP16 ONNX file
+(`tools/models/export_rtm_onnx_to_trt.py`). LFS therefore keeps what an engine is built from and the original it was
+made from: the pose's FP32 originals (`rtmpose-l_256x192.onnx`, `rtmpose-l_384x288.onnx`) and the FP16 files the
+pose runs (`rtmpose-l_<size>_fp16.onnx`), made once per model by
+`uv run --with onnxconverter-common python tools/models/convert_onnx_to_fp16.py --fp32-norms --keep-io-types`. Its
+library is not one of the project's: it runs only when a model is added. `--fp32-norms` finds each L2 norm by its
+structure, as either export writes it (`ReduceL2`, or a square, `ReduceSum` and `Sqrt`), and keeps it FP32: its sum of
+squares can overflow FP16's 65504 in other runtimes **(site fact: a LiteRT port of RTMPose)**.
+
+The pose is RTMPose-l trained on Body8, OpenMMLab's own checkpoint (76.7 COCO AP at 256x192, 78.3 at 384x288)
+**(seen: its weights against OpenMMLab's file; site fact: the AP)**. The resolutions are the ones it comes in:
+`STANDARD` 192x256 and `HIGH` 288x384; another is refused (`PoseEstimatorSettings.model`). What else was weighed
+(2026-11-18, online sources) sets these limits **(site fact)**: ViTPose gains as much for several times the time and
+needs a heatmap decode; the one-stage models (RTMO, YOLO-pose) score below RTMPose-l; Sapiens is too heavy and its
+weights non-commercial; the video models need future frames, 33 to 67 ms more; RTMPose-x gains 0.5 AP over
+RTMPose-l at 384x288 for nearly twice the file and the time. The licence of the Body8 training data is unresolved, a
+question in the plan.
 
 ## The upload
 
