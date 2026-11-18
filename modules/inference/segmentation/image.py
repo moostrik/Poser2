@@ -11,7 +11,7 @@ from modules.pose import FrameDict
 class Image:
     """GPU-resident segmentation result for a single tracked pose.
 
-    Produced by MaskBatchExtractor after RVM inference.
+    Made by the `Segmenter`, Robust Video Matting's alpha matte.
     Format: CHW float16 RGB [0,1] for foreground; HW float16 [0,1] for mask.
 
     Attributes:

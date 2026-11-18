@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Callable, TypeAlias
 
 from modules.utils import Rect
 
@@ -14,4 +14,4 @@ class Detection:
     scores: list[float] = field(default_factory=list)
 
 
-DetectionCallback = Callable[[Detection], None]
+DetectionCallback: TypeAlias = Callable[[Detection], None]

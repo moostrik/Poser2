@@ -1,5 +1,5 @@
 
-from .engine import Engine, ModelType, Resolution, RESOLUTION_DIMS, make_engine
+from .engine import ModelType
 from . import crop, detection, face, optical_flow, pose, segmentation, source
 from .source import GpuDepth, GpuImage, ImageSnapshot, ImageSnapshotCallback
 from .crop_extractor import CropExtractor

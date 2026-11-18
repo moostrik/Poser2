@@ -1,7 +1,7 @@
 import logging
 import time
 from threading import Lock
-from typing import Callable, TypeAlias
+from typing import TypeAlias
 
 import torch
 
@@ -11,12 +11,11 @@ from modules.utils import PerformanceTimer
 from .. import crop, ModelType
 from ..engine import Engine, make_engine
 from ..model_worker import ModelWorker
+from .flow import FlowDict, FlowCallback
 from .settings import OpticalFlowEstimatorSettings
 
 logger = logging.getLogger(__name__)
 
-FlowDict: TypeAlias = dict[int, torch.Tensor]
-FlowCallback: TypeAlias = Callable[[FlowDict], None]
 Batch: TypeAlias = tuple[list[int], list[tuple[torch.Tensor, torch.Tensor]], torch.cuda.Event | None]    # ids, crop pairs, their event
 
 

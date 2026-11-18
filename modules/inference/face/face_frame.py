@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, TypeAlias
 
 import numpy as np
 
@@ -40,4 +40,4 @@ class FaceFrame:
     image: GpuImage
 
 
-FaceFrameCallback = Callable[[FaceFrame], None]
+FaceFrameCallback: TypeAlias = Callable[[FaceFrame], None]

@@ -22,7 +22,7 @@ from ..engine import Engine, make_engine
 from ..model_worker import ModelWorker
 from ..source import GpuImage
 from .decode import PERSON_ROWS, normalise, person_boxes
-from .io import Detection, DetectionCallback
+from .detection import Detection, DetectionCallback
 from .settings import PersonDetectorSettings
 
 logger = logging.getLogger(__name__)

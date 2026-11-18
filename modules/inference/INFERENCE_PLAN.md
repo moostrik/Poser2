@@ -134,12 +134,6 @@ Questions:
   CPU. Worth it, now the models run side by side?
 - The pose's stream at a higher priority than the others', as the model on the critical path?
 
-## E. The package held up again (2026-11-18)
-
-- E6. The leftovers: `Resolution` and `RESOLUTION_DIMS` out of the package's exports (no user outside **(seen)**); the
-  empty `tools/` folder; the output types in one pattern, a file named after its type (`detection/io.py`,
-  `face/io.py`, `segmentation/image.py`, `optical_flow`'s `FlowDict` in its estimator today **(seen)**)
-
 ## F. The pose's decode on the GPU
 
 The pose's thread copies RTMPose's whole SimCC output to the CPU, (N, 17, 384) and (N, 17, 512) at 192x256, and
