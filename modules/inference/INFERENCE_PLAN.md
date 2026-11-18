@@ -21,11 +21,21 @@ runs' own is a fault **(deduction)**. e754ddee runs from a copy of that commit o
 `apps/deep_flow/data` linked into it, so the working folder the other threads use stays as it is. Each run lasts the
 recording, only while you are away and the GPU runs nothing else: the table's times hold only then.
 
-| Step | Model        | Frames matched | Mean / p99 (ms) | Lock wait mean (ms) | Max difference |
-|------|--------------|----------------|-----------------|---------------------|----------------|
-| A1   | pose         |                |                 |                     |                |
-| A1   | segmentation |                |                 |                     |                |
-| A1   | optical flow |                |                 |                     |                |
+Measured 2026-11-18, 30 s of the recording a run. Times from deep_flow as it is (its preset: the pose every other
+frame, the person detector; no segmentation or optical flow); outputs from the probe's run. A difference is the
+largest over the frames both runs have with the same box (and frame pair), against e754ddee's first run.
+
+| Step            | Model        | Mean / p99 as it is (ms) | Frames matched | Frames that differ | Max difference |
+|-----------------|--------------|--------------------------|----------------|--------------------|----------------|
+| A1 e754ddee ×2  | pose         | 25.07 / 39.23            | 163            | 0                  | 0              |
+| A1 e754ddee ×2  | segmentation |                          | 39             | 0                  | 0              |
+| A1 e754ddee ×2  | optical flow |                          | 45             | 1                  | 2.05 px        |
+| A1 refactor     | pose         | 25.17 / 39.73            | 168            | 0                  | 0              |
+| A1 refactor     | segmentation |                          | 43             | 2                  | 1.0            |
+| A1 refactor     | optical flow |                          | 51             | 5                  | 7.34 px        |
+
+The frames that differ are whole frames, the rest exact, in the two models that read their crops without waiting
+for them (B1); the pose, which waits, never differs **(deduction: the race B1 removes)**.
 
 ## A. The baseline
 
