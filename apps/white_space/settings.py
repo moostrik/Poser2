@@ -247,7 +247,7 @@ class PoseGroup(BaseSettings):
 
     _feature_share: list = [frequency, output_frequency]
 
-    pose            : Group[inference.pose.PosePredictorSettings]         = Group(inference.pose.PosePredictorSettings, share=[max_players, model_type, model_path, verbose])
+    pose            : Group[inference.pose.PoseEstimatorSettings]         = Group(inference.pose.PoseEstimatorSettings, share=[max_players, model_type, model_path, verbose])
     frame_source    : Group[TrackerFrameSourceSettings]      = Group(TrackerFrameSourceSettings)
     pose_crop       : Group[inference.crop.CropExtractorSettings]         = Group(inference.crop.CropExtractorSettings, share=[max_players])
     angle_extractor : Group[nodes.AngleExtractorSettings]    = Group(nodes.AngleExtractorSettings)

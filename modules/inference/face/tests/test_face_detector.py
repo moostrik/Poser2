@@ -86,7 +86,7 @@ class FaceDetectorTest(unittest.TestCase):
         faces = detector(ModelType.ONNX)
         faces.submit(uploaded(self.image, 1.0))
         faces.submit(uploaded(self.image, 2.0))
-        self.assertEqual(faces.dropped, 1)
+        self.assertEqual(faces.settings.dropped, 1)
         frames: list[FaceFrame] = []
         faces.add_face_callback(frames.append)
         faces.start()

@@ -1,11 +1,11 @@
-"""Inference benchmark: an app's models through their predictors, without cameras or the app.
+"""Inference benchmark: an app's models through their model workers, without cameras or the app.
 
     python scripts/model_benchmark.py --app white_space
     python scripts/model_benchmark.py --app hd_trio --model-type onnx --reference logs/<earlier>.npz
 
 Loads the app's startup preset for the models it enables, their resolutions and its batch size
 (the players), feeds the same seeded crops (or `--image`) at the app's crop size one batch at a time,
-and times every batch: the predictor's own process time and the latency from submit to callback. Writes
+and times every batch: the worker's own process time and the latency from submit to callback. Writes
 `logs/inference_<app>_<type>_<date>_<time>.json` in the timing report's format, so
 `scripts/timing_compare.py` compares two of them, with the GPU memory each model takes, and an
 `.npz` of the last batch's outputs; `--reference` compares those with an earlier `.npz`.
@@ -56,11 +56,11 @@ def _flow_output(flows: optical_flow.FlowDict) -> dict[str, np.ndarray]:
     return {'flow': torch.stack([flows[track_id] for track_id in sorted(flows)]).float().cpu().numpy()}
 
 
-# name (the settings group), the predictor class, how its results are registered and read
+# name (the settings group), the worker class, how its results are registered and read
 MODELS: list[tuple[str, type, Callable[[Any, Callable[[Any], None]], None], Callable[[Any], dict[str, np.ndarray]]]] = [
-    ('pose', pose.Predictor, lambda p, cb: p.add_frames_callback(cb), _pose_output),
-    ('segmentation', segmentation.Predictor, lambda p, cb: p.add_segmentation_callback(lambda _poses, images: cb(images)), _segmentation_output),
-    ('optical_flow', optical_flow.Predictor, lambda p, cb: p.add_flow_callback(cb), _flow_output),
+    ('pose', pose.PoseEstimator, lambda p, cb: p.add_frames_callback(cb), _pose_output),
+    ('segmentation', segmentation.Segmenter, lambda p, cb: p.add_segmentation_callback(lambda _poses, images: cb(images)), _segmentation_output),
+    ('optical_flow', optical_flow.OpticalFlowEstimator, lambda p, cb: p.add_flow_callback(cb), _flow_output),
 ]
 
 
@@ -121,11 +121,11 @@ def gpu_used_mb() -> float:
     return (total - free) / 1024 / 1024
 
 
-def run_model(name: str, predictor_class: type, add_callback: Callable, read_output: Callable, settings: BaseSettings,
+def run_model(name: str, worker_class: type, add_callback: Callable, read_output: Callable, settings: BaseSettings,
               crop_w: int, crop_h: int, warmup: int, iterations: int, image: Path | None,
               seed: int) -> tuple[dict[str, np.ndarray], float, dict[str, dict[str, float]]]:
-    """Time one model; returns the last batch's outputs, the GPU memory its predictor took (MB) and the timers' stats
-    (the predictor's own and the latency).
+    """Time one model; returns the last batch's outputs, the GPU memory its worker took (MB) and the timers' stats
+    (the worker's own and the latency).
 
     The stats are read here, while the timers live: the session holds them weakly.
     """
@@ -133,7 +133,7 @@ def run_model(name: str, predictor_class: type, add_callback: Callable, read_out
     latency_timer = PerformanceTimer(name=f"{label} latency")
 
     memory_before = gpu_used_mb()
-    predictor = predictor_class(settings)
+    worker = worker_class(settings)
     result: dict[str, Any] = {}
     done = Event()
 
@@ -141,12 +141,12 @@ def run_model(name: str, predictor_class: type, add_callback: Callable, read_out
         result['output'] = output
         done.set()
 
-    add_callback(predictor, on_output)
-    predictor.start()
+    add_callback(worker, on_output)
+    worker.start()
     outputs: dict[str, np.ndarray] = {}
     try:
         deadline = time.perf_counter() + READY_TIMEOUT
-        while not predictor.is_ready:
+        while not worker.is_ready:
             if time.perf_counter() > deadline:
                 raise RuntimeError(f"{label}: model not ready ({settings.model_path}/{settings.model})")
             time.sleep(0.05)
@@ -156,7 +156,7 @@ def run_model(name: str, predictor_class: type, add_callback: Callable, read_out
         for i in range(warmup + iterations):
             done.clear()
             start = time.perf_counter()
-            predictor.submit(poses, crops)
+            worker.submit(poses, crops)
             if not done.wait(RESULT_TIMEOUT):
                 raise RuntimeError(f"{label}: no result for batch {i + 1}")
             latency_ms = (time.perf_counter() - start) * 1000.0
@@ -166,7 +166,7 @@ def run_model(name: str, predictor_class: type, add_callback: Callable, read_out
                 latency_timer.add_time(latency_ms, report=False)
         outputs = {f"{name}/{k}": v for k, v in read_output(result['output']).items()}
     finally:
-        predictor.stop()
+        worker.stop()
     return outputs, memory_mb, PerformanceTimer.stop_session()
 
 
@@ -201,7 +201,7 @@ def main() -> None:
     stats: dict[str, dict[str, float]] = {}
     memory: dict[str, float] = {}
     outputs: dict[str, np.ndarray] = {}
-    for name, predictor_class, add_callback, read_output in MODELS:
+    for name, worker_class, add_callback, read_output in MODELS:
         group = getattr(app_settings.pose, name, None)
         if group is None or (args.models is None and not group.enabled) or (args.models is not None and name not in args.models):
             continue
@@ -210,7 +210,7 @@ def main() -> None:
         settings = model_settings(group, model_type)
         logger.info("%s: %s, batch %d, crop %dx%d", name, settings.model, settings.max_players,
                     crop_settings.output_width, crop_settings.output_height)
-        model_outputs, memory_mb, model_stats = run_model(name, predictor_class, add_callback, read_output, settings,
+        model_outputs, memory_mb, model_stats = run_model(name, worker_class, add_callback, read_output, settings,
                                                           crop_settings.output_width, crop_settings.output_height,
                                                           args.warmup, args.iterations, args.image, args.seed)
         stats.update(model_stats)

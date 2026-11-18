@@ -17,7 +17,7 @@ _MODELS = {
 }
 
 
-class OpticalFlowPredictorSettings(BaseSettings):
+class OpticalFlowEstimatorSettings(BaseSettings):
     """The optical flow's settings (RAFT)."""
 
     max_players:  Field[int]        = Field(1, min=1, max=16, access=Field.INIT)

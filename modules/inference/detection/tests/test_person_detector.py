@@ -136,9 +136,9 @@ class MissingModelTest(unittest.TestCase):
         settings = PersonDetectorSettings(model_path=tempfile.mkdtemp())
         settings.initialize()
         detector = PersonDetector(settings)
-        with self.assertLogs('modules.inference.detection.person_detector', level='ERROR') as logs:
+        with self.assertLogs('modules.inference.model_worker', level='ERROR') as logs:
             detector.start()
-            detector.join(timeout=5.0)
+            detector._thread.join(timeout=5.0)
         self.assertFalse(detector.is_ready)
         self.assertIn(MODEL_FILE, logs.output[0])
 

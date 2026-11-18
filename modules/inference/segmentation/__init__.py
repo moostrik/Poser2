@@ -1,3 +1,3 @@
-from .settings import SegmentationPredictorSettings
-from .predictor import Predictor
+from .settings import SegmenterSettings
+from .segmenter import Segmenter
 from .image import Image, ImageDict, ImageCallback

@@ -87,12 +87,12 @@ class DeepFlowMain:
         self.uploader = SerialUploader(self.settings.camera.uploader)    # the camera's hand-off: each frame onto the GPU as it comes, on its own thread
         # The frame domain's async step: the crop step in, the pose model out
         self.crops = CropExtractor(p.pose_crop)
-        self.pose_predictor = pose.Predictor(p.pose)
+        self.pose_estimator = pose.PoseEstimator(p.pose)
         # -sim plays the recording's poses in place of the pose model, between the crops and it (`recorded_poses.enabled`)
         self.recorded_poses: RecordedPoses | None = None
-        poses: pose.Predictor | RecordedPoses = self.pose_predictor
+        poses: pose.PoseEstimator | RecordedPoses = self.pose_estimator
         if self.player is not None:
-            self.recorded_poses = RecordedPoses(self.settings.camera.recorded_poses, self.pose_predictor)
+            self.recorded_poses = RecordedPoses(self.settings.camera.recorded_poses, self.pose_estimator)
             self.player.add_frame_callback(self.recorded_poses.set_clip_frame)
             self.player.add_jump_callback(self.recorded_poses.clear_waiting)
             poses = self.recorded_poses
@@ -118,14 +118,14 @@ class DeepFlowMain:
 
         # DETECTION
         self.frame_source = TrackerFrameSource(p.frame_source, max_players)
-        self.optical_flow_predictor  = optical_flow.Predictor(p.optical_flow)
+        self.optical_flow_estimator  = optical_flow.OpticalFlowEstimator(p.optical_flow)
 
         self.tracker.add_tracklet_callback(self.frame_source.set_tracklets)
         # The frame source's thread: each bang's poses with its images to the pipeline, then the poses asked
         self.frame_source.add_asked_callback(self._on_asked)
 
         # The optical flow reads the same crops the pose model gets.
-        self.crops.add_image_callback(self.optical_flow_predictor.submit)
+        self.crops.add_image_callback(self.optical_flow_estimator.submit)
 
         # POSE PIPELINE — the stages are declared in pose/pipeline.py. Each uploaded image drives the frame domain
         # through the tracklet poses (`_on_snapshot`); the render tick drives the output domain (LERP). Every stage's frames
@@ -190,8 +190,8 @@ class DeepFlowMain:
         if self.recorded_poses is not None:
             self.recorded_poses.start()         # starts the pose model with it
         else:
-            self.pose_predictor.start()
-        self.optical_flow_predictor.start()
+            self.pose_estimator.start()
+        self.optical_flow_estimator.start()
 
         self.osc_sound.start()
 
@@ -295,11 +295,11 @@ class DeepFlowMain:
         if self.recorded_poses is not None:
             self.recorded_poses.stop()          # stops the pose model with it
         else:
-            self.pose_predictor.stop()
+            self.pose_estimator.stop()
         self.capture_sync.stop()
         if self.person_detector is not None:
             self.person_detector.stop()
-        self.optical_flow_predictor.stop()
+        self.optical_flow_estimator.stop()
 
         for camera in self.cameras:
             camera.join(timeout=10)

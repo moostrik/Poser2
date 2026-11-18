@@ -1,6 +1,7 @@
 import logging
 import time
-from threading import Event, Lock, Thread
+from threading import Lock
+from typing import TypeAlias
 
 import torch
 
@@ -9,9 +10,10 @@ from modules.utils import PerformanceTimer
 
 from .. import crop, ModelType
 from ..engine import Engine, make_engine
+from ..model_worker import ModelWorker
 from .image import Image, ImageDict, ImageCallback
 from .recurrent_state import RecurrentState
-from .settings import SegmentationPredictorSettings
+from .settings import SegmenterSettings
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +21,10 @@ RECURRENT_CHANNELS: tuple[tuple[int, int], ...] = ((16, 2), (20, 4), (40, 8), (6
 STATE_INPUTS: tuple[str, ...] = ('r1i', 'r2i', 'r3i', 'r4i')
 STATE_OUTPUTS: tuple[str, ...] = ('r1o', 'r2o', 'r3o', 'r4o')
 
+Batch: TypeAlias = tuple[FrameDict, list[int], list[torch.Tensor], torch.cuda.Event | None]     # poses, ids, crops, their event
 
-class Predictor:
+
+class Segmenter(ModelWorker[Batch, SegmenterSettings]):
     """Person masks (Robust Video Matting) for the crops of a batch of poses, on its own thread, kept on the GPU.
 
     A single-slot queue: a batch still waiting when a newer one comes is dropped and counted in `settings.dropped`.
@@ -29,47 +33,22 @@ class Predictor:
     the masks from this thread.
     """
 
-    def __init__(self, settings: SegmentationPredictorSettings) -> None:
-        self.settings: SegmentationPredictorSettings = settings
+    def __init__(self, settings: SegmenterSettings) -> None:
+        super().__init__(settings, "Segmenter")
 
         self.max_batch: int = min(settings.max_players, 4)
         self._model_size: tuple[int, int] = (settings.width, settings.height)
         self._engine: Engine = make_engine(settings.model_type, f"{settings.model_path}/{settings.model}",
                                            self.max_batch if settings.model_type is ModelType.ONNX else None)
-        self._stream: torch.cuda.Stream             # made on this thread, in `_run`
         self._states: dict[int, RecurrentState] = {}    # per track id: each player's memory of the earlier frames
         self._zero_states: list[torch.Tensor] = []      # (1, C, h, w) per recurrent input, for a new player
         self._reset_interval: int = settings.reset_interval
         self._batch_count: int = 0
 
-        self._thread: Thread = Thread(target=self._run, daemon=True, name="SegmentationPredictor")
-        self._shutdown: Event = Event()
-        self._wake: Event = Event()
-        self._ready: Event = Event()
-
-        self._lock: Lock = Lock()
-        self._pending: tuple[FrameDict, list[int], list[torch.Tensor], torch.cuda.Event | None] | None = None
-        self._pending_timestamp: float = 0.0
-
         self._callback_lock: Lock = Lock()
         self._callbacks: list[ImageCallback] = []       # run in registration order
 
-        self._process_timer = PerformanceTimer(name="RVM Segmentation  ", sample_count=1000, report_interval=100, color='cyan', omit_init=25)
-
-    @property
-    def is_ready(self) -> bool:
-        return self._ready.is_set() and not self._shutdown.is_set() and self._thread.is_alive()
-
-    def start(self) -> None:
-        self._thread.start()
-
-    def stop(self) -> None:
-        self._shutdown.set()
-        self._wake.set()
-        if self._thread.is_alive():
-            self._thread.join(timeout=2.0)
-        if self._thread.is_alive():
-            logger.warning("Segmentation: predictor thread did not stop cleanly")
+        self._process_timer = PerformanceTimer(name="Segmentation", sample_count=1000, report_interval=100, color='cyan', omit_init=25)
 
     def submit(self, poses: FrameDict, crops: crop.CropImageDict) -> None:
         """The poses and their crops on the GPU, keyed by track id, to run; the results go to the callbacks."""
@@ -93,24 +72,7 @@ class Predictor:
         if len(images) > max_batch:
             logger.warning(f"Segmentation: batch size {len(images)} exceeds max {max_batch}, only the first {max_batch} run")
             track_ids, images = track_ids[:max_batch], images[:max_batch]
-
-        dropped: bool = False
-        with self._lock:
-            if self._pending is not None:
-                dropped = True
-                if self.settings.verbose:
-                    lag = int((time.perf_counter() - self._pending_timestamp) * 1000)
-                    logger.info(f"Segmentation: dropped a batch with lag {lag} ms")
-            self._pending = (poses, track_ids, images, ready)
-            self._pending_timestamp = time.perf_counter()
-        if dropped:
-            self.settings.dropped += 1
-        self._wake.set()
-
-    def reset(self) -> None:
-        """The waiting batch dropped."""
-        with self._lock:
-            self._pending = None
+        self._put(0, (poses, track_ids, images, ready))
 
     def add_segmentation_callback(self, callback: ImageCallback) -> None:
         with self._callback_lock:
@@ -131,36 +93,8 @@ class Predictor:
             except Exception:
                 logger.exception("Segmentation: error in a mask callback")
 
-    def _run(self) -> None:
-        try:
-            self._setup()
-        except Exception:
-            logger.exception(f"Segmentation: failed to load {self._engine.model_file}")
-            return
-        self._ready.set()
-        logger.info(f"Segmentation: {self.settings.resolution.name} model ready: {self._model_size[0]}x{self._model_size[1]} {self._engine.precision}")
-
-        while not self._shutdown.is_set():
-            self._wake.wait()
-            if self._shutdown.is_set():
-                break
-            self._wake.clear()
-            try:
-                self._process()
-            except Exception:
-                logger.exception("Segmentation: error processing a batch")
-
-    def _claim(self) -> tuple[FrameDict, list[int], list[torch.Tensor], torch.cuda.Event | None] | None:
-        with self._lock:
-            pending = self._pending
-            self._pending = None
-            return pending
-
-    def _process(self) -> None:
-        pending = self._claim()
-        if pending is None:
-            return
-        poses, track_ids, images, ready = pending
+    def _process(self, items: dict[int, Batch]) -> None:
+        poses, track_ids, images, ready = items[0]
 
         # Every player's memory cleared now and then, a failsafe against a state gone wrong
         self._batch_count += 1
@@ -179,9 +113,7 @@ class Predictor:
         self._notify_callbacks(poses, results)
 
     def _setup(self) -> None:
-        """The model loaded on this thread, bound to its stream, and run once at its largest batch, so no kernel is
-        made while running."""
-        self._stream = torch.cuda.Stream()
+        assert self._stream is not None
         self._engine.setup(self._stream)
         width, height = self._model_size
         dtype: torch.dtype = self._engine.dtype('src')
@@ -191,12 +123,14 @@ class Predictor:
         self._infer([warm_up] * self.max_batch, list(range(self.max_batch)), None)
         self._stream.synchronize()
         self._states.clear()
+        logger.info(f"Segmentation: {self.settings.resolution.name} model ready: {width}x{height} {self._engine.precision}")
 
     def _infer(self, images: list[torch.Tensor], track_ids: list[int],
                ready: torch.cuda.Event | None) -> tuple[torch.Tensor, torch.Tensor, torch.cuda.Event]:
         """The alpha matte (N, h, w) and the foreground (N, 3, h, w), the crops multiplied by it, for the crops (3, h, w)
         RGB in [0, 1] of the players `track_ids`, read once `ready` is recorded; and the event recorded after they are
         written. Each player's recurrent state goes in with its crop and comes out for its next."""
+        assert self._stream is not None
         width, height = self._model_size
         src_dtype: torch.dtype = self._engine.dtype('src')
         with torch.cuda.stream(self._stream):

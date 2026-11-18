@@ -68,10 +68,10 @@ def recorded_pose(frame: Frame, box: np.ndarray, points: np.ndarray) -> Frame:
 class RecordedPoses(FrameDictCallbackMixin):
     """See the module docstring."""
 
-    def __init__(self, settings: RecordedPosesSettings, pose_predictor: pose.Predictor) -> None:
+    def __init__(self, settings: RecordedPosesSettings, pose_estimator: pose.PoseEstimator) -> None:
         super().__init__()
         self.settings: RecordedPosesSettings = settings
-        self._pose: pose.Predictor = pose_predictor
+        self._pose: pose.PoseEstimator = pose_estimator
         self._pose.add_frames_callback(self._on_model)
         self._lock: Lock = Lock()
         self._recorded: dict[int, CaptureStream[FrameMetadata]] = defaultdict(lambda: CaptureStream(KEPT))

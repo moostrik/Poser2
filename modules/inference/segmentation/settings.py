@@ -17,7 +17,7 @@ _MODELS = {
 }
 
 
-class SegmentationPredictorSettings(BaseSettings):
+class SegmenterSettings(BaseSettings):
     """The person segmentation's settings (RVM)."""
 
     max_players:      Field[int]        = Field(1, min=1, max=16, access=Field.INIT)

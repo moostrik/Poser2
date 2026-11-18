@@ -36,6 +36,7 @@ class PersonDetectorSettings(BaseSettings):
     confidence:  Field[float] = Field(0.5, min=0.0, max=1.0, step=0.05, description="Minimum person score")
     overlap:     Field[float] = Field(0.5, min=0.0, max=1.0, step=0.05, description="Boxes overlapping more than this (IoU) are one person")
     verbose:     Field[bool]  = Field(False, access=Field.INIT)
+    dropped:     Field[int]   = Field(0, access=Field.READ, description="Images replaced by a newer one before the model ran them")
 
     @property
     def width(self) -> int:

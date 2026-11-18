@@ -102,8 +102,8 @@ class WhiteSpaceMain:
         self.tracklet_sync = CameraSync(self.settings.camera.tracklet_sync, 'tracklet_sync')
         # The frame domain's async step: the crop step in, the pose model out
         self.crops = CropExtractor(ps.pose_crop)
-        self.pose_predictor = pose.Predictor(ps.pose)
-        self.crops.add_image_callback(self.pose_predictor.submit)
+        self.pose_estimator = pose.PoseEstimator(ps.pose)
+        self.crops.add_image_callback(self.pose_estimator.submit)
 
         # The camera's thread only hands its frames and tracklets over: the frames to the recorder and the frames'
         # sync, the tracklets as they come to the tracker, the board and the tracklets' sync (the journal's below)
@@ -163,7 +163,7 @@ class WhiteSpaceMain:
         # through the tracklet poses (`_on_snapshot`); the light tick drives the output domain (LERP, where the dummy joins).
         # Every stage's frames and group record go to the board, which also reads each stage's window; the sound
         # reads LERP, and so do the instrument and the state machine (the group sync on the LERP record).
-        self.pipeline = PosePipeline(pipeline_spec(ps, self.settings.light, self.frame_source, self.crops, self.pose_predictor,
+        self.pipeline = PosePipeline(pipeline_spec(ps, self.settings.light, self.frame_source, self.crops, self.pose_estimator,
                                                    self.dummy, self._column_to_azimuth, self.board.get_playhead_phase,
                                                    self.board.get_playhead_bars))
         for stage in Stage:
@@ -231,7 +231,7 @@ class WhiteSpaceMain:
             camera.start()
 
         self.tracker.start()
-        self.pose_predictor.start()
+        self.pose_estimator.start()
         self.conductor.start()
         self.osc_light_sender.start()
         self.osc_sound_receiver.start()
@@ -341,7 +341,7 @@ class WhiteSpaceMain:
         self.udp_light_receiver.stop()
         self.conductor.stop()
 
-        self.pose_predictor.stop()
+        self.pose_estimator.stop()
         if self.person_detector is not None:
             self.person_detector.stop()
 

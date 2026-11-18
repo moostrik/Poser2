@@ -105,8 +105,8 @@ class HDTrioMain:
         # The frame domain's async step: the crop step in (the pose model's crops and the segmentation's, in one pass,
         # from the same images and boxes), the pose model out
         self.crops = CropExtractor(ps.pose_crop, ps.segmentation_crop)
-        self.pose_predictor = pose.Predictor(ps.pose)
-        self.crops.add_image_callback(self.pose_predictor.submit)
+        self.pose_estimator = pose.PoseEstimator(ps.pose)
+        self.crops.add_image_callback(self.pose_estimator.submit)
 
         # The camera's thread only hands its frames and tracklets over: the frames to the frames' sync and the
         # recorder, the tracklets as they come to the tracker, the board, the tracklets' sync and the recorder
@@ -128,7 +128,7 @@ class HDTrioMain:
         features.configure_features(max_players)
 
         self.frame_source = TrackerFrameSource(ps.frame_source, max_players)
-        self.segmentation_predictor = segmentation.Predictor(ps.segmentation)
+        self.segmenter = segmentation.Segmenter(ps.segmentation)
 
         self.tracker.add_tracklet_callback(self.frame_source.set_tracklets)
         # The frame source's thread: each set's poses with its images to the pipeline, then the poses asked per camera
@@ -146,16 +146,16 @@ class HDTrioMain:
         self.uploader.add_snapshot_callback(self._on_snapshot)
 
         # The segmentation and the board read the segmentation's crops, cut from the same images and boxes as the pose model's
-        self.crops.add_image_callback(self.segmentation_predictor.submit, ps.segmentation_crop)
+        self.crops.add_image_callback(self.segmenter.submit, ps.segmentation_crop)
         self.crops.add_image_callback(lambda _f, crops: self.board.set_crop_images(crops), ps.segmentation_crop)
-        self.segmentation_predictor.add_segmentation_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
+        self.segmenter.add_segmentation_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
 
         # POSE PIPELINE — the stages are declared in pose/pipeline.py. Each uploaded set drives the frame domain
         # through the tracklet poses (`_on_snapshot`); the render tick drives the output domain (LERP). Every stage's
         # frames go to the board, the pose recorders and the sound; the board also reads each stage's window; the RAW
         # stage's poses go to the video recorder with their frames.
         self.similarity_hold = nodes.SimilarityResultHold()              # the threaded analytics' way back into SMOOTH
-        self.pipeline = PosePipeline(pipeline_spec(ps, self.frame_source, self.crops, self.pose_predictor, self.similarity_hold))
+        self.pipeline = PosePipeline(pipeline_spec(ps, self.frame_source, self.crops, self.pose_estimator, self.similarity_hold))
         for stage in Stage:
             self.pipeline.add_frames_callback(stage, partial(self.board.set_frames, stage))
             self.pipeline.add_frames_callback(stage, partial(self.pose_recorder.submit_frames, stage))
@@ -199,8 +199,8 @@ class HDTrioMain:
             camera.start()
 
         self.tracker.start()
-        self.pose_predictor.start()
-        self.segmentation_predictor.start()
+        self.pose_estimator.start()
+        self.segmenter.start()
         self.window_similarity.start()
         self.window_correlator.start()
 
@@ -283,10 +283,10 @@ class HDTrioMain:
 
         self.session_osc.stop()
 
-        self.pose_predictor.stop()
+        self.pose_estimator.stop()
         if self.person_detector is not None:
             self.person_detector.stop()
-        self.segmentation_predictor.stop()
+        self.segmenter.stop()
         self.window_similarity.stop()
         self.window_correlator.stop()
 

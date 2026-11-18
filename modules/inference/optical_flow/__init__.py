@@ -1,2 +1,2 @@
-from .settings import OpticalFlowPredictorSettings
-from .predictor import Predictor, FlowDict, FlowCallback
+from .settings import OpticalFlowEstimatorSettings
+from .optical_flow_estimator import OpticalFlowEstimator, FlowDict, FlowCallback

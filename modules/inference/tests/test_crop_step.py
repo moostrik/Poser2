@@ -65,14 +65,14 @@ class CropStepTest(unittest.TestCase):
             CropExtractor(crop_settings()).submit({0: self.pose}, None)
 
     def test_with_the_host_model_off_the_cameras_keypoints_come_out(self) -> None:
-        pose_settings = pose.PosePredictorSettings()
+        pose_settings = pose.PoseEstimatorSettings()
         pose_settings.initialize()
         pose_settings.enabled = False
-        predictor = pose.Predictor(pose_settings)
+        estimator = pose.PoseEstimator(pose_settings)
         crops = CropExtractor(crop_settings())
-        crops.add_image_callback(predictor.submit)
+        crops.add_image_callback(estimator.submit)
         out: list = []
-        predictor.add_frames_callback(out.append)
+        estimator.add_frames_callback(out.append)
         self.uploader._upload(CameraFrame(0, FrameType.VIDEO, np.zeros((48, 64, 3), np.uint8), 1.0))
         n: int = len(PointLandmark)
         keypoints = Points2D.from_xy_arrays(np.full(n, 0.5), np.full(n, 0.5), np.full(n, 0.9, np.float32))

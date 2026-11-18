@@ -17,7 +17,7 @@ _MODELS = {
 }
 
 
-class PosePredictorSettings(BaseSettings):
+class PoseEstimatorSettings(BaseSettings):
     """The pose model's settings (RTMPose)."""
 
     enabled:    Field[bool]       = Field(True)

@@ -10,7 +10,7 @@ one still waiting: the latest wins, as in the other workers.
 
 import logging
 import time
-from threading import Event, Lock, Thread
+from threading import Lock
 
 import numpy as np
 import torch
@@ -19,6 +19,7 @@ import torch.nn.functional as F
 from modules.utils import PerformanceTimer, Rect
 
 from ..engine import Engine, make_engine
+from ..model_worker import ModelWorker
 from ..source import GpuImage
 from .decode import PERSON_ROWS, normalise, person_boxes
 from .io import Detection, DetectionCallback
@@ -27,45 +28,17 @@ from .settings import PersonDetectorSettings
 logger = logging.getLogger(__name__)
 
 
-class PersonDetector(Thread):
+class PersonDetector(ModelWorker[GpuImage, PersonDetectorSettings]):
     def __init__(self, settings: PersonDetectorSettings) -> None:
-        super().__init__(daemon=True)
-        self.settings: PersonDetectorSettings = settings
+        super().__init__(settings, "PersonDetector")
         self.width: int = settings.width
         self.height: int = settings.height
-
         self._engine: Engine = make_engine(settings.model_type, settings.model_file)
-        self._stream: torch.cuda.Stream | None = None      # made on this thread, in `_setup`
-
-        self._shutdown: Event = Event()
-        self._wake: Event = Event()
-        self._ready: Event = Event()
-
-        self._lock: Lock = Lock()
-        self._pending: dict[int, GpuImage] = {}     # the newest image per camera, waiting
-        self._dropped: int = 0
 
         self._callback_lock: Lock = Lock()
         self._callbacks: list[DetectionCallback] = []   # run in registration order, on this thread
 
-        self._timer: PerformanceTimer = PerformanceTimer(name="Person Detection  ", sample_count=1000, report_interval=100, color='magenta', omit_init=25)
-
-    @property
-    def is_ready(self) -> bool:
-        return self._ready.is_set() and not self._shutdown.is_set() and self.is_alive()
-
-    @property
-    def dropped(self) -> int:
-        """Images replaced by a newer one before they were looked at."""
-        return self._dropped
-
-    def stop(self) -> None:
-        self._shutdown.set()
-        self._wake.set()
-        if self.is_alive():
-            self.join(timeout=2.0)
-        if self.is_alive():
-            logger.warning("Person detector thread did not stop cleanly")
+        self._timer: PerformanceTimer = PerformanceTimer(name="Person Detection", sample_count=1000, report_interval=100, color='magenta', omit_init=25)
 
     def add_detection_callback(self, callback: DetectionCallback) -> None:
         with self._callback_lock:
@@ -82,53 +55,22 @@ class PersonDetector(Thread):
         Disabled, it looks at nothing."""
         if not self.is_ready or not self.settings.enabled:
             return
-        with self._lock:
-            if image.cam_id in self._pending:
-                self._dropped += 1
-            self._pending[image.cam_id] = image
-        self._wake.set()
-
-    def run(self) -> None:
-        try:
-            self._setup()
-        except Exception as e:
-            logger.error("Person detector: failed to load %s: %s", self.settings.model_file, e)
-            return
-        while not self._shutdown.is_set():
-            self._wake.wait()
-            if self._shutdown.is_set():
-                break
-            self._wake.clear()
-            try:
-                self._process()
-            except Exception:
-                logger.exception("Person detector error")
+        self._put(image.cam_id, image)
 
     def _setup(self) -> None:
-        self._stream = torch.cuda.Stream()
+        assert self._stream is not None
         self._engine.setup(self._stream)
         with torch.cuda.stream(self._stream):
             warm_up: torch.Tensor = torch.zeros((1, 3, self.height, self.width), dtype=torch.float32, device='cuda')
         self._infer(warm_up)
-        self._ready.set()
         logger.info("Person detector: %s ready", self.settings.model)
 
-    def _claim(self) -> dict[int, GpuImage]:
-        with self._lock:
-            pending = self._pending
-            self._pending = {}
-            return pending
-
-    def _process(self) -> None:
-        """The pending images as one batch. They are held until the model has synchronized its stream,
-        so the upload's memory is not reused while this stream reads it."""
-        pending: dict[int, GpuImage] = self._claim()
-        if not pending:
-            return
-        assert self._stream is not None
+    def _process(self, items: dict[int, GpuImage]) -> None:
+        """The waiting images, one per camera, as one batch. They are held until the model has synchronized its
+        stream, so the upload's memory is not reused while this stream reads it."""
         start: float = time.perf_counter()
-        cam_ids: list[int] = list(pending.keys())
-        batch: torch.Tensor = self._batch([pending[cam_id] for cam_id in cam_ids])
+        cam_ids: list[int] = list(items.keys())
+        batch: torch.Tensor = self._batch([items[cam_id] for cam_id in cam_ids])
         output: np.ndarray = self._infer(batch)
         confidence: float = self.settings.confidence
         overlap: float = self.settings.overlap
@@ -136,7 +78,7 @@ class PersonDetector(Thread):
         for i, cam_id in enumerate(cam_ids):
             boxes, scores = person_boxes(output[i], confidence, overlap)
             rects: np.ndarray = normalise(boxes, self.width, self.height)
-            detections.append(Detection(cam_id=cam_id, timestamp=pending[cam_id].timestamp, boxes=[Rect(*map(float, r)) for r in rects],
+            detections.append(Detection(cam_id=cam_id, timestamp=items[cam_id].timestamp, boxes=[Rect(*map(float, r)) for r in rects],
                                         scores=[float(s) for s in scores]))
         self._timer.add_time((time.perf_counter() - start) * 1000.0, report=self.settings.verbose)
         with self._callback_lock:

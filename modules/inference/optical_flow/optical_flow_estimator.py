@@ -1,6 +1,6 @@
 import logging
 import time
-from threading import Event, Lock, Thread
+from threading import Lock
 from typing import Callable, TypeAlias
 
 import torch
@@ -10,15 +10,17 @@ from modules.utils import PerformanceTimer
 
 from .. import crop, ModelType
 from ..engine import Engine, make_engine
-from .settings import OpticalFlowPredictorSettings
+from ..model_worker import ModelWorker
+from .settings import OpticalFlowEstimatorSettings
 
 logger = logging.getLogger(__name__)
 
 FlowDict: TypeAlias = dict[int, torch.Tensor]
 FlowCallback: TypeAlias = Callable[[FlowDict], None]
+Batch: TypeAlias = tuple[list[int], list[tuple[torch.Tensor, torch.Tensor]], torch.cuda.Event | None]    # ids, crop pairs, their event
 
 
-class Predictor:
+class OpticalFlowEstimator(ModelWorker[Batch, OpticalFlowEstimatorSettings]):
     """Dense optical flow (RAFT) from each pose's previous to its current crop, on its own thread, kept on the GPU.
 
     A single-slot queue: a batch still waiting when a newer one comes is dropped and counted in `settings.dropped`,
@@ -26,44 +28,19 @@ class Predictor:
     come from this thread.
     """
 
-    def __init__(self, settings: OpticalFlowPredictorSettings) -> None:
-        self.settings: OpticalFlowPredictorSettings = settings
+    def __init__(self, settings: OpticalFlowEstimatorSettings) -> None:
+        super().__init__(settings, "OpticalFlowEstimator")
 
         onnx: bool = settings.model_type is ModelType.ONNX
         self.max_batch: int = min(settings.max_players, 8 if onnx else 4)
         self._model_size: tuple[int, int] = (settings.width, settings.height)
         self._engine: Engine = make_engine(settings.model_type, f"{settings.model_path}/{settings.model}",
                                            self.max_batch if onnx else None)
-        self._stream: torch.cuda.Stream             # made on this thread, in `_run`
-
-        self._thread: Thread = Thread(target=self._run, daemon=True, name="OpticalFlowPredictor")
-        self._shutdown: Event = Event()
-        self._wake: Event = Event()
-        self._ready: Event = Event()
-
-        self._lock: Lock = Lock()
-        self._pending: tuple[list[int], list[tuple[torch.Tensor, torch.Tensor]], torch.cuda.Event | None] | None = None
-        self._pending_timestamp: float = 0.0
 
         self._callback_lock: Lock = Lock()
         self._callbacks: list[FlowCallback] = []        # run in registration order
 
-        self._process_timer = PerformanceTimer(name="RAFT Optical Flow", sample_count=1000, report_interval=100, color='magenta', omit_init=25)
-
-    @property
-    def is_ready(self) -> bool:
-        return self._ready.is_set() and not self._shutdown.is_set() and self._thread.is_alive()
-
-    def start(self) -> None:
-        self._thread.start()
-
-    def stop(self) -> None:
-        self._shutdown.set()
-        self._wake.set()
-        if self._thread.is_alive():
-            self._thread.join(timeout=2.0)
-        if self._thread.is_alive():
-            logger.warning("Optical Flow: predictor thread did not stop cleanly")
+        self._process_timer = PerformanceTimer(name="Optical Flow Estimation", sample_count=1000, report_interval=100, color='magenta', omit_init=25)
 
     def submit(self, poses: FrameDict, crops: crop.CropImageDict) -> None:
         """The poses and their previous and current crops on the GPU, keyed by track id, to run; the flows go to the
@@ -90,24 +67,7 @@ class Predictor:
         if len(pairs) > max_batch:
             logger.warning(f"Optical Flow: batch size {len(pairs)} exceeds max {max_batch}, only the first {max_batch} run")
             track_ids, pairs = track_ids[:max_batch], pairs[:max_batch]
-
-        dropped: bool = False
-        with self._lock:
-            if self._pending is not None:
-                dropped = True
-                if self.settings.verbose:
-                    lag = int((time.perf_counter() - self._pending_timestamp) * 1000)
-                    logger.info(f"Optical Flow: dropped a batch with lag {lag} ms")
-            self._pending = (track_ids, pairs, ready)
-            self._pending_timestamp = time.perf_counter()
-        if dropped:
-            self.settings.dropped += 1
-        self._wake.set()
-
-    def reset(self) -> None:
-        """The waiting batch dropped."""
-        with self._lock:
-            self._pending = None
+        self._put(0, (track_ids, pairs, ready))
 
     def add_flow_callback(self, callback: FlowCallback) -> None:
         with self._callback_lock:
@@ -128,36 +88,8 @@ class Predictor:
             except Exception:
                 logger.exception("Optical flow: error in a flow callback")
 
-    def _run(self) -> None:
-        try:
-            self._setup()
-        except Exception:
-            logger.exception(f"Optical Flow: failed to load {self._engine.model_file}")
-            return
-        self._ready.set()
-        logger.info(f"Optical Flow: {self.settings.resolution.name} model ready: {self._model_size[0]}x{self._model_size[1]} {self._engine.precision}")
-
-        while not self._shutdown.is_set():
-            self._wake.wait()
-            if self._shutdown.is_set():
-                break
-            self._wake.clear()
-            try:
-                self._process()
-            except Exception:
-                logger.exception("Optical Flow: error processing a batch")
-
-    def _claim(self) -> tuple[list[int], list[tuple[torch.Tensor, torch.Tensor]], torch.cuda.Event | None] | None:
-        with self._lock:
-            pending = self._pending
-            self._pending = None
-            return pending
-
-    def _process(self) -> None:
-        pending = self._claim()
-        if pending is None:
-            return
-        track_ids, pairs, ready = pending
+    def _process(self, items: dict[int, Batch]) -> None:
+        track_ids, pairs, ready = items[0]
 
         start: float = time.perf_counter()
         flows = self._infer(pairs, ready)
@@ -166,19 +98,19 @@ class Predictor:
         self._notify_callbacks({track_id: flows[i] for i, track_id in enumerate(track_ids)})
 
     def _setup(self) -> None:
-        """The model loaded on this thread, bound to its stream, and run once at its largest batch, so no kernel is
-        made while running."""
-        self._stream = torch.cuda.Stream()
+        assert self._stream is not None
         self._engine.setup(self._stream)
         width, height = self._model_size
         with torch.cuda.stream(self._stream):
             warm_up = torch.zeros((3, height, width), dtype=torch.float32, device='cuda')
         self._infer([(warm_up, warm_up)] * self.max_batch, None)
         self._stream.synchronize()
+        logger.info(f"Optical Flow: {self.settings.resolution.name} model ready: {width}x{height} {self._engine.precision}")
 
     def _infer(self, pairs: list[tuple[torch.Tensor, torch.Tensor]], ready: torch.cuda.Event | None) -> torch.Tensor:
         """The flow (N, 2, H, W), x and y in the model's pixels, from each previous to current crop (3, h, w) RGB in
         [0, 1], read once `ready` is recorded: RAFT reads 0..255 at its input size."""
+        assert self._stream is not None
         width, height = self._model_size
         first, second = self._engine.input_names[0], self._engine.input_names[1]
         dtype: torch.dtype = self._engine.dtype(first)

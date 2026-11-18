@@ -246,8 +246,8 @@ class PoseGroup(BaseSettings):
     _batch_share  : list = [max_players, model_type, model_path, verbose]
     _feature_share: list = [frequency, output_frequency]
 
-    pose            : Group[inference.pose.PosePredictorSettings]          = Group(inference.pose.PosePredictorSettings, share=_batch_share)
-    segmentation    : Group[inference.segmentation.SegmentationPredictorSettings]  = Group(inference.segmentation.SegmentationPredictorSettings, share=_batch_share)
+    pose            : Group[inference.pose.PoseEstimatorSettings]          = Group(inference.pose.PoseEstimatorSettings, share=_batch_share)
+    segmentation    : Group[inference.segmentation.SegmenterSettings]  = Group(inference.segmentation.SegmenterSettings, share=_batch_share)
     frame_source    : Group[TrackerFrameSourceSettings]       = Group(TrackerFrameSourceSettings)
     pose_crop       : Group[inference.crop.CropExtractorSettings]          = Group(inference.crop.CropExtractorSettings, share=[max_players])
     segmentation_crop: Group[inference.crop.CropExtractorSettings]         = Group(inference.crop.CropExtractorSettings, share=[max_players])

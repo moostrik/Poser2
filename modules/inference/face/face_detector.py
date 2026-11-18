@@ -9,7 +9,7 @@ found in, carried unread. A newer image of a camera replaces one still waiting: 
 
 import logging
 import time
-from threading import Event, Lock, Thread
+from threading import Lock
 
 import cv2
 import numpy as np
@@ -19,6 +19,7 @@ import torch.nn.functional as F
 from modules.utils import PerformanceTimer
 
 from ..engine import Engine, make_engine
+from ..model_worker import ModelWorker
 from ..source import GpuImage
 from .decode import INPUT_SIZE, decode
 from .io import Face, FaceFrame, FaceFrameCallback
@@ -45,40 +46,14 @@ def landmark_matrix(face_box: np.ndarray, roll: float) -> np.ndarray:
     return matrix
 
 
-class FaceDetector(Thread):
+class FaceDetector(ModelWorker[GpuImage, FaceDetectorSettings]):
     def __init__(self, settings: FaceDetectorSettings) -> None:
-        super().__init__(daemon=True, name='FaceDetector')
-        self.settings: FaceDetectorSettings = settings
+        super().__init__(settings, "FaceDetector")
         self._detection: Engine = make_engine(settings.model_type, settings.model_file(DETECTION_MODEL))
         self._landmarks: Engine = make_engine(settings.model_type, settings.model_file(LANDMARKS_MODEL))
-        self._stream: torch.cuda.Stream | None = None      # made on this thread, in `_setup`
-
-        self._shutdown: Event = Event()
-        self._wake: Event = Event()
-        self._ready: Event = Event()
-        self._lock: Lock = Lock()
-        self._pending: dict[int, GpuImage] = {}     # the newest image per camera, waiting
-        self._dropped: int = 0
         self._callback_lock: Lock = Lock()
         self._callbacks: list[FaceFrameCallback] = []   # run in registration order, on this thread
         self._timer: PerformanceTimer = PerformanceTimer(name="Face Detection", sample_count=200, report_interval=100, color='magenta', omit_init=10)
-
-    @property
-    def is_ready(self) -> bool:
-        return self._ready.is_set() and not self._shutdown.is_set() and self.is_alive()
-
-    @property
-    def dropped(self) -> int:
-        """Images replaced by a newer one before they were looked at."""
-        return self._dropped
-
-    def stop(self) -> None:
-        self._shutdown.set()
-        self._wake.set()
-        if self.is_alive():
-            self.join(timeout=2.0)
-        if self.is_alive():
-            logger.warning("Face detector thread did not stop cleanly")
 
     def add_face_callback(self, callback: FaceFrameCallback) -> None:
         with self._callback_lock:
@@ -92,42 +67,25 @@ class FaceDetector(Thread):
 
     def submit(self, image: GpuImage) -> None:
         """An uploaded image to look at; the newest per camera is kept."""
-        with self._lock:
-            if image.cam_id in self._pending:
-                self._dropped += 1
-            self._pending[image.cam_id] = image
-        self._wake.set()
+        self._put(image.cam_id, image)
 
-    def run(self) -> None:
-        try:
-            self._setup()
-        except Exception as e:
-            logger.error("Face detector: failed to load its models: %s", e)
-            return
-        while not self._shutdown.is_set():
-            self._wake.wait()
-            if self._shutdown.is_set():
-                break
-            self._wake.clear()
-            with self._lock:
-                pending: dict[int, GpuImage] = self._pending
-                self._pending = {}
-            for image in pending.values():
+    def _process(self, items: dict[int, GpuImage]) -> None:
+        for image in items.values():
+            try:
+                frame: FaceFrame = self.detect(image)
+            except Exception:
+                logger.exception("Face detector error")
+                continue
+            with self._callback_lock:
+                callbacks: list[FaceFrameCallback] = list(self._callbacks)
+            for callback in callbacks:
                 try:
-                    frame: FaceFrame = self.detect(image)
+                    callback(frame)
                 except Exception:
-                    logger.exception("Face detector error")
-                    continue
-                with self._callback_lock:
-                    callbacks: list[FaceFrameCallback] = list(self._callbacks)
-                for callback in callbacks:
-                    try:
-                        callback(frame)
-                    except Exception:
-                        logger.exception("Error in a face callback")
+                    logger.exception("Error in a face callback")
 
     def _setup(self) -> None:
-        self._stream = torch.cuda.Stream()
+        assert self._stream is not None
         self._detection.setup(self._stream)
         self._landmarks.setup(self._stream)
         with torch.cuda.stream(self._stream):
@@ -135,13 +93,12 @@ class FaceDetector(Thread):
             warm_up_landmarks: torch.Tensor = torch.zeros((1, 3, LANDMARKS_SIZE, LANDMARKS_SIZE), dtype=torch.float32, device='cuda')
         self._infer(self._detection, warm_up)
         self._infer(self._landmarks, warm_up_landmarks)
-        self._ready.set()
         logger.info("Face detector: %s and %s ready (%s)", DETECTION_MODEL, LANDMARKS_MODEL, self.settings.model_type.name)
 
     def detect(self, image: GpuImage) -> FaceFrame:
         """The faces of one uploaded image, on this thread (or a caller's, before `start`, for a test)."""
         if self._stream is None:
-            self._setup()
+            self._prepare()
         assert self._stream is not None
         start: float = time.perf_counter()
         height, width = int(image.image.shape[1]), int(image.image.shape[2])

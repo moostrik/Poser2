@@ -119,6 +119,14 @@ is the likely cause **(deduction)**. ONNX's segmentation hands on the crops time
 TensorRT's did, not the model's own foreground output: its mask is exact, its foreground differs by design. ONNX
 against TensorRT: the pose is as fast; the segmentation and the flow take four times as long on ONNX **(seen)**.
 
+E3 (`ModelWorker`, the one base of `PoseEstimator`, `Segmenter`, `OpticalFlowEstimator`, `PersonDetector` and
+`FaceDetector`: the thread, the newest item per key, the drops in the settings, the stream and the stop; 2026-11-18)
+against E2's run, on the frames whose inputs were equal: the pose 512, the masks 914, the flows 875, every output
+equal **(seen)**. The probe's run, all four models together: the pose 12.32 / 30.93 ms against 12.40 / 31.79, the
+segmentation 14.63 / 36.49 against 15.03 / 39.17, the flow 18.87 / 43.53 against 19.14 / 45.63, and the batches
+dropped 395, 239 and 540 against 454, 266 and 632 **(seen, one run each)**. The engine stays the worker's own, not the
+base's: the face detector runs two.
+
 ## C. The TensorRT models side by side
 
 Questions:
@@ -128,23 +136,6 @@ Questions:
 
 ## E. The package held up again (2026-11-18)
 
-- E3. One base for the five model workers: `pose.Predictor`, `segmentation.Predictor`, `optical_flow.Predictor`,
-  `PersonDetector` and `FaceDetector` each set up their model on their own thread, wake on work, take the newest
-  waiting (a batch, or an image per camera), run it, hand it on, catch per item and stop **(seen)**, written two ways:
-  three hold a thread and count drops in their settings, two are a `Thread` and count them in a property. The base
-  holds the thread, the wake, one queue that keeps the newest per key (the camera for the detectors, one key for the
-  others), around its engine (`engine.Engine`), the drop count in the settings (a new read-only field on the detectors' panels), the setup and the stop;
-  each keeps its model's step. The workers take their task's name, as textbook vision names them (decided
-  2026-11-18): `PoseEstimator`,
-  `Segmenter`, `OpticalFlowEstimator` (not `FlowEstimator`: `modules/flow` is the fluid's), `PersonDetector`,
-  `FaceDetector`, and the base `ModelWorker`; with them their settings (`PoseEstimatorSettings`, `SegmenterSettings`,
-  `OpticalFlowEstimatorSettings`; the presets keep their group names) and their timers ("Pose Estimation",
-  "Segmentation", "Optical Flow Estimation", "Person Detection", "Face Detection"). The call sites follow: deep_flow,
-  hd_trio, white_space and smile (main, settings, smile's face finder, scripts and tests), `modules/recording/replay`,
-  `scripts/model_benchmark.py`, and `SMILE.md`, `OAK4.md`, `RECORDING.md` **(seen: 19 files outside the package)**.
-  The uploaders, `CameraSync`, `CaptureSync` and `RecordedPoses` keep their own queues (in order, sets, parts)
-  **(deduction: they share less)**. Checked by the package's tests (the fake models), the apps' tests and the
-  check's run
 - E4. The new names to the rules thread for the glossary's wording (the names are decided): the five workers and
   `ModelWorker`, what they replace (`Predictor`, "RTM Pose Detection")
 - E5. `INFERENCE.md`: the package is one thing, the camera frames on the GPU and the models on them; the upload and
@@ -156,7 +147,7 @@ Questions:
   (b5ab4515)
 - E6. The leftovers: `Resolution` and `RESOLUTION_DIMS` out of the package's exports (no user outside **(seen)**); the
   empty `tools/` folder; the output types in one pattern, a file named after its type (`detection/io.py`,
-  `face/io.py`, `segmentation/image.py`, `optical_flow`'s `FlowDict` in its predictor today **(seen)**)
+  `face/io.py`, `segmentation/image.py`, `optical_flow`'s `FlowDict` in its estimator today **(seen)**)
 
 No thread waits for the GPU between the upload, the crop and the model: the upload and the crop are queued on their
 streams behind the events before them, and a thread waits once, the pose model's at its end, to decode on the CPU
@@ -184,7 +175,7 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 
 ## The rules it touches
 
-- `CLAUDE.md` Composition, prefer composition: E2 (built), E3, a worker holds an engine and its model's steps
+- `CLAUDE.md` Composition, prefer composition: E2 and E3 (built), a worker holds an engine and its model's steps
 - `CLAUDE.md` Types, an ABC for a family of classes that share code: E3
 - `CLAUDE.md` Packages, a package is one thing, and its name is that thing: E5 states the one thing
 - `CLAUDE.md` Docstrings, reasons sit in the package's document: E5

@@ -1,2 +1,2 @@
-from .settings import PosePredictorSettings
-from .predictor import Predictor, has_points
+from .settings import PoseEstimatorSettings
+from .pose_estimator import PoseEstimator, has_points

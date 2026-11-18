@@ -1,4 +1,4 @@
-"""The pose predictor's queue on its own thread, with a fake model: a batch replaced while the model runs is counted,
+"""The pose estimator's queue on its own thread, with a fake model: a batch replaced while the model runs is counted,
 not run; the batches it ran reach the callbacks from its thread, normalized to the model's input."""
 
 import threading
@@ -14,7 +14,7 @@ from ..decode import NUM_KEYPOINTS, decode_simcc
 
 
 class FakeModel:
-    """The predictor's model steps without a GPU: its `_infer`, blocking until released."""
+    """The estimator's model steps without a GPU: its `_infer`, blocking until released."""
     model_width = 192
     model_height = 256
 
@@ -38,14 +38,14 @@ class Crop:
     ready = None
 
 
-class PredictorTest(unittest.TestCase):
+class PoseEstimatorTest(unittest.TestCase):
     def test_a_batch_replaced_while_the_model_runs_is_counted_not_run(self) -> None:
-        settings = pose.PosePredictorSettings(model_type=ModelType.ONNX)
+        settings = pose.PoseEstimatorSettings(model_type=ModelType.ONNX)
         settings.initialize()
-        predictor = pose.Predictor(settings)
+        estimator = pose.PoseEstimator(settings)
         runner = FakeModel()
-        predictor._setup = lambda: None
-        predictor._infer = runner.infer
+        estimator._setup = lambda: None
+        estimator._infer = runner.infer
         told: list[tuple[list[int], str]] = []
         points: list[np.ndarray] = []
         done = threading.Event()
@@ -56,26 +56,26 @@ class PredictorTest(unittest.TestCase):
             if len(told) == 2:
                 done.set()
 
-        predictor.add_frames_callback(on_frames)
-        predictor.start()
+        estimator.add_frames_callback(on_frames)
+        estimator.start()
         try:
             for _ in range(200):
-                if predictor.is_ready:
+                if estimator.is_ready:
                     break
                 threading.Event().wait(0.01)
             frame = Frame(track_id=0, cam_id=0, timestamp=1.0, features={BBox: BBox.from_rect(Rect(0.0, 0.0, 1.0, 1.0))})
-            predictor.submit({0: frame}, {0: Crop()})           # runs
+            estimator.submit({0: frame}, {0: Crop()})           # runs
             self.assertTrue(runner.running.wait(2.0))
-            predictor.submit({1: frame}, {1: Crop()})           # waits
-            predictor.submit({2: frame}, {2: Crop()})           # replaces it
+            estimator.submit({1: frame}, {1: Crop()})           # waits
+            estimator.submit({2: frame}, {2: Crop()})           # replaces it
             runner.release.set()
             self.assertTrue(done.wait(2.0))
         finally:
-            predictor.stop()
+            estimator.stop()
 
         self.assertEqual(settings.dropped, 1)
         self.assertEqual([ids for ids, _ in told], [[0], [2]])
-        self.assertTrue(all(name == 'PosePredictor' for _, name in told))
+        self.assertTrue(all(name == 'PoseEstimator' for _, name in told))
         self.assertTrue(np.allclose(points[0], [0.25, 0.5]))   # 48 of 192, 128 of 256
 
 
