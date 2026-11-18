@@ -137,7 +137,7 @@ the temperature's, the expansion's) a seventh, `mask` (`AmountMixSettings`).
 | `velocity`     | velocities        | boundary       | widths/s, the body's velocity; with its `peak` ([The peak](#the-peak))                               | the trail 1   |
 | `acceleration` | accelerations     | body force     | widths/s², a Δv added once over a change                                                             | all 0: `None` |
 | `density`      | velocities        | boundary value | the dye's amount, widths/s; its `color` the view's, RGBA, premultiplied by its alpha                 | the trail 1   |
-| `temperature`  | velocities        | boundary value | the warmth, −1 cold to 1 hot, its presence folded in                                                 | the trail 1   |
+| `temperature`  | velocities        | boundary value | the warmth's presence, 0 to 1, capped there; the fluid's `temperature_gain` its sign and size        | the trail 1   |
 | `expansion`    | velocities        | source         | where the water swells, a presence 0 to 1, capped there; the newest capture's in a tick of several   | all 0: `None` |
 
 The five outputs (`BridgeOutput`, `Injection`) are the subpanels' names, each named by what the fluid gets,
@@ -155,13 +155,12 @@ or white, times the tint), its alpha kept: the view grades it, keys it and premu
 mask ([VIEW.md](VIEW.md#the-stage)), so alpha is the color's coverage (Porter and Duff 1984), and the bridge
 gates it by no mask of its own; the 2D bridge gates its color by the mask. The amount and the color stay apart,
 as the fluid takes them; a capture's color goes with its amount wherever captures are picked by it. The warmth
-is (warm − cold) × (1 − neutral × 0.5) × the presence, from the same color's red, blue and green. The readings of one unit share the mix, so
+comes from the motion alone, its presence, so the lift does not follow the player's clothes. The readings of one unit share the mix, so
 the mix has no gain: the motion's gains balance the axes and the fluid's gains set how the water
 follows; a weight is a share. The acceleration and the expansion are `None` while their shares are
 all 0. The ports follow the outputs, a group each, named as the output, in the order the bridge makes
 them: `velocity.velocity`, `acceleration.acceleration`, `density.amount`, `temperature.amount` and
-`expansion.expansion`, each with its `z_position`; the temperature's group then holds its bridge's own
-(`temperature.input`, `temperature.output`, ...). The density's color is the first port, `color`.
+`expansion.expansion`, each with its `z_position`. The density's color is the first port, `color`.
 
 A wake may drag (its share in `velocity`: the water behind a leaving limb is pulled to the
 speed it left with, and let go when the pulse dies), kick (its share in `acceleration`),

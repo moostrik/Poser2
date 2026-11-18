@@ -1,7 +1,6 @@
 """The 3D bridge's settings: the readings, then one group per output, each with its mix."""
 
 from modules.settings import BaseSettings, Field, Group, Widget
-from .temperature_bridge import TemperatureBridgeSettings
 from .velocity_bandpass import VelocityBandpassSettings
 from .velocity_lowpass import VelocityLowpassSettings
 from .velocity_peak import VelocityPeakSettings
@@ -40,8 +39,9 @@ class DensityMixSettings(TrailAmountMixSettings):
     """The density, held at the body as a boundary value: its amount's mix; its color is the image's."""
 
 
-class TemperatureMixSettings(TemperatureBridgeSettings, TrailAmountMixSettings):
-    """The temperature, held at the body as a boundary value: its amount's mix, then its warmth."""
+class TemperatureMixSettings(TrailAmountMixSettings):
+    """The temperature, held at the body as a boundary value: its amount's mix, a presence capped at 1; the
+    fluid's `temperature_gain` makes it the warmth."""
 
 
 class Bridge3DReadingsSettings(BaseSettings):

@@ -103,13 +103,6 @@ buoyancy × warmth) along gravity, at the faces, added before the projection; th
 cooling toward the room's. The buoyancy's formula is that already (`buoyancy_3d.comp`); the steps below are
 where the code differs.
 
-- **E4.** The warmth from the motion alone: the temperature's mix, an amount capped at 1 (`capped=True`, as the
-  expansion's), times `temperature_gain`, its sign and size, where today the `TemperatureBridge` reads it from
-  the image's color (R warm, B cold, G damps; ofxFlowTools'), which ties the lift to the player's clothes. The
-  3D bridge's color step goes: `bridge_3d/temperature_bridge.py` and its shaders, `TemperatureBridgeSettings` as
-  `TemperatureMixSettings`' base, its names in `bridge_3d/__init__.py` and `modules/flow/__init__.py`, the
-  temperature bridge's ports and monitors; the temperature keeps its own mix, the trail by default as the
-  density's; BRIDGE_3D.md follows. The 2D bridge is untouched (I3).
 - **E5.** Checked in the GPU harness, a new script in `scripts/`: a warm blob in a closed box at rest, one step.
   The buoyancy before the projection is `buoyancy` × the warmth × gravity, exactly; the blob's first-step rise
   after the projection about 2/3 of it (a sphere's added mass) **(deduction)**; and a dense blob sinking at
@@ -118,8 +111,7 @@ where the code differs.
 - **E6.** Checked in the app, in its own panel: what the temperature does to the water and whether it works,
   with `buoyancy` above 0.
 
-E4 is a commit, checked by the tests it touches and its shaders' compile; E5 a commit with its
-script and result.
+E5 is a commit with its script and result.
 
 ## F. The 3D fluid's look at 4K
 
@@ -153,7 +145,7 @@ Once the 3D is finished, the 2D rebuilt in `modules/flow` on the 3D's principles
   ([FLUID_3D.md](FLUID_3D.md#the-inputs)), in place of adding the bridge's velocity as a source times dt.
 - **I2.** The 2D motion on the Lucas–Kanade solve, in widths/s with its velocity gate, in place of `GradientFlow`.
 - **I3.** The 2D bridge rebuilt on the 3D bridge's filters, `VelocityMagnitude` shared again and the warmth
-  from the motion as the 3D's (E4), its `TemperatureBridge` gone.
+  from the motion as the 3D's, its mix capped at 1 times the gain, its `TemperatureBridge` gone.
 - **I4.** Each 2D stage its document as it is rebuilt (`BRIDGE_2D.md`, `FLUID_2D.md`); `fluid_2d.py`'s 21-line
   pipeline docstring goes with it.
 
@@ -239,6 +231,5 @@ The cameras:
 - Compare a result only with rows of the same recording, settings and code paths: C2.
 - Ask to measure a time again when its pass's code or size changes: D6.
 - Shaders get checked in a GPU harness; a measured result names its kind, date, commit and settings: E5.
-- Remove obsolete pathways instead of leaving parallel legacy ones: E4 (the color's warmth).
 
 Not designed yet, so their rules are not named: C3, F1, F2, H1, I1 to I4.

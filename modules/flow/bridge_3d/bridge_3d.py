@@ -3,7 +3,8 @@ velocity and as an acceleration; one mix per output makes what the fluid takes f
 density and temperature from the readings as velocities, the body force's acceleration from the readings as
 accelerations, and the expansion, where the water swells, a presence from the readings as velocities and the mask.
 The density is its amount, the readings' speeds in widths/s and the mask, and its color, the image's with its
-alpha; the temperature ±1 warm, a presence, the readings' speed capped at 1.
+alpha; the temperature a presence, the readings' speeds and the mask capped at 1, which the fluid's gain makes
+the warmth.
 
 Each trail holds where its motion was, a z position; every output mixes its readings' z positions by the readings'
 sizes at its shares (`ZPositionMix`), so the fluid takes each at the depth it was made at, and a density or a
@@ -19,7 +20,6 @@ from ..port import HasPorts, Port, Ports, TextureKind, prefixed
 from .bridge_settings import AmountMixSettings, Bridge3DSettings, MixSettings
 from .frame_max import FrameMax
 from .shaders import Change, WeightedSum, ZPositionMix
-from .temperature_bridge import TemperatureBridge
 from .velocity_bandpass import VelocityBandpass
 from .velocity_lowpass import VelocityLowpass
 from .velocity_peak import VelocityPeak
@@ -37,7 +37,7 @@ class Bridge3D:
         velocity      the readings as velocities: the boundary, dragged toward
         acceleration  the readings as accelerations: the body force, added; None while its shares are all 0
         density       the readings' speeds and the mask, the amount; its color the image's, with its alpha
-        temperature   the readings' speeds and the mask, warmed by a temperature bridge
+        temperature   the readings' speeds and the mask: a presence, capped at 1
         expansion     the readings' speeds and the mask: a presence, capped at 1; None while its
                       shares are all 0, and the newest frame's in a tick of several
     The defaults are the trail alone in the velocity, the density and the temperature.
@@ -72,11 +72,10 @@ class Bridge3D:
         self._peak: VelocityPeak = VelocityPeak(settings.velocity.peak)    # the velocity's p99 speed
         self._mix_shader: WeightedSum = WeightedSum()
         self._z_position_mix_shader: ZPositionMix = ZPositionMix()
-        self._temperature: TemperatureBridge = TemperatureBridge(settings.temperature)
         self._gpu_timer: GpuTimer = GpuTimer("GPU bridge")
         self._lowpass_timer: GpuTimer = GpuTimer("GPU bridge lowpass")
         self._bandpass_timer: GpuTimer = GpuTimer("GPU bridge bandpass")
-        self._mix_timer: GpuTimer = GpuTimer("GPU bridge mix")      # the outputs' mixes and the temperature
+        self._mix_timer: GpuTimer = GpuTimer("GPU bridge mix")      # the outputs' mixes
         # The density, its color and the temperature over a tick's frames
         self._frame_max: dict[str, FrameMax] = {name: FrameMax() for name in ('density', 'color', 'temperature')}
         self._merging: bool = False     # the outputs are the larger of this tick's frames
@@ -119,7 +118,7 @@ class Bridge3D:
 
     @property
     def temperature(self) -> Texture:
-        """The temperature, ±1 warm; the larger of this tick's frames while it had several."""
+        """The temperature, a presence 0 to 1; the larger of this tick's frames while it had several."""
         return self._merged()['temperature']
 
     @property
@@ -137,8 +136,7 @@ class Bridge3D:
 
     @property
     def ports(self) -> dict[str, Port]:
-        """The density's color, then the readings, then the outputs' mixes and the temperature, each under its
-        settings group's name."""
+        """The density's color, then the readings, then the outputs' mixes, each under its settings group's name."""
         ports: dict[str, Port] = dict(self._density_color.ports)
         for name, part in self._parts().items():
             ports.update(prefixed(name, part.ports))
@@ -147,7 +145,7 @@ class Bridge3D:
     def _outputs(self) -> dict[str, Texture]:
         """The density, its color and the temperature as the last step made them."""
         return {'density': self._density_amount, 'color': self._density_color.color,
-                'temperature': self._temperature.temperature}
+                'temperature': self._temperature_amount}
 
     def _merged(self) -> dict[str, Texture]:
         """The density, its color and the temperature the fluid takes: the larger of this tick's frames while it
@@ -157,7 +155,7 @@ class Bridge3D:
         return self._outputs()
 
     def _parts(self) -> dict[str, HasPorts]:
-        """The readings, then the outputs' mixes and the temperature."""
+        """The readings, then the outputs' mixes."""
         return {'lowpass': self._shown_ports(self._lowpass.ports, self._show_lowpass),
                 'bandpass': self._shown_ports(self._bandpass.ports, self._show_bandpass),
                 'velocity': Ports({'velocity': Port(self._velocity, TextureKind.VELOCITY),
@@ -167,8 +165,7 @@ class Bridge3D:
                 'density': Ports({'amount': Port(self._density_amount, TextureKind.SCALAR),
                                   'z_position': Port(self._density_z_position, TextureKind.Z_POSITION)}),
                 'temperature': Ports({'amount': Port(self._temperature_amount, TextureKind.SCALAR),
-                                      'z_position': Port(self._temperature_z_position, TextureKind.Z_POSITION),
-                                      **self._temperature.ports}),
+                                      'z_position': Port(self._temperature_z_position, TextureKind.Z_POSITION)}),
                 'expansion': Ports({'expansion': Port(self._expansion, TextureKind.SCALAR),
                                     'z_position': Port(self._expansion_z_position, TextureKind.Z_POSITION)})}
 
@@ -206,7 +203,6 @@ class Bridge3D:
         self._bandpass.allocate(width, height)
         for fbo, internal_format in self._mix_fbos():
             fbo.allocate(width, height, internal_format)
-        self._temperature.allocate(width, height)
         self._mix_shader.allocate()
         self._z_position_mix_shader.allocate()
         self._peak.allocate()
@@ -217,7 +213,6 @@ class Bridge3D:
         self._bandpass.deallocate()
         for fbo, _ in self._mix_fbos():
             fbo.deallocate()
-        self._temperature.deallocate()
         self._peak.deallocate()
         self._mix_shader.deallocate()
         self._z_position_mix_shader.deallocate()
@@ -254,7 +249,6 @@ class Bridge3D:
                 self._frame_max[name].hold(texture)
         self._merging = same_tick
         self._density_color.update(image, tint, None)
-        color: Texture = self._density_color.color
 
         self._gpu_timer.begin()
         settings: Bridge3DSettings = self.settings
@@ -280,8 +274,8 @@ class Bridge3D:
             self._mix(self._acceleration, self._accelerations(), acceleration)
             self._mix_z_position(self._acceleration_z_position, self._accelerations(), acceleration)
         self._mix_amount(self._density_amount, self._density_z_position, mask, z_position, settings.density)
-        self._mix_amount(self._temperature_amount, self._temperature_z_position, mask, z_position, settings.temperature)
-        self._update_temperature(self._temperature, self._temperature_amount, color)
+        self._mix_amount(self._temperature_amount, self._temperature_z_position, mask, z_position, settings.temperature,
+                         capped=True)
         if self._mixed(settings.expansion):
             self._mix_amount(self._expansion, self._expansion_z_position, mask, z_position, settings.expansion, capped=True)
         if self._merging:
@@ -335,13 +329,6 @@ class Bridge3D:
         self._mix_shader.use(sources, lengths=True, capped=capped)
         amount.end()
         self._mix_z_position(z_position, readings, mix, masked)
-
-    @staticmethod
-    def _update_temperature(temperature: TemperatureBridge, amount: Texture, color: Texture) -> None:
-        """The temperature from its amount, with the color."""
-        temperature.set_color(color)
-        temperature.set_mask(amount)
-        temperature.update()
 
     def _update_bandpass(self, velocity: Texture, z_position: Texture | None, dt: float, run: bool,
                          acceleration: bool) -> None:

@@ -5,7 +5,6 @@ from .velocity_lowpass import VelocityLowpass, VelocityLowpassSettings, gaussian
 from .shaders import Change, WeightedSum, ZPositionMix
 from .velocity_bandpass import VelocityBandpass, VelocityBandpassSettings, step_peak, band_width, change_acceleration_scale
 from .magnitude import Magnitude, VelocityMagnitude
-from .temperature_bridge import TemperatureBridge, TemperatureBridgeSettings
 from .frame_max import FrameMax
 from .velocity_peak import VelocityPeak, VelocityPeakSettings, speed_percentile
 from .bridge_settings import Bridge3DSettings

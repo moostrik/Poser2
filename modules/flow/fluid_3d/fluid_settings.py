@@ -116,7 +116,7 @@ class InputSettings(BaseSettings):
     density_gain: Field[float]      = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's amount times this; over, fill: at most fully dyed; 1 = fully dyed at 1 width/s")
     density_blend: Field[DensityBlend] = Field(DensityBlend.OVER,                                  description="The body's dye over the water's, added to it, or the water drawn toward it")
     temperature_drag: Field[float]  = Field(200.0,  min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Time the water takes to take on the body's warmth (ms); 0 = at once")
-    temperature_gain: Field[float]  = Field(1.0,    min=-10.0,  max=10.0,   color="teal",           description="The body's warmth times this, at most ±1, is the target; 1 = fully warm at 1 width/s")
+    temperature_gain: Field[float]  = Field(1.0,    min=-10.0,  max=10.0,   color="teal",           description="The body's presence times this, at most ±1, is its warmth; below 0 cold; 1 = fully warm at 1 width/s")
     expansion_rate: Field[float]    = Field(0.0,    min=-5.0,   max=5.0,    step=0.01, color="teal", newline=True, description="Volume the water gains per second where the body is (1/s); below 0 it shrinks; 0 = off")
 
 

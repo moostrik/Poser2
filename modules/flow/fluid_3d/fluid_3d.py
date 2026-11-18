@@ -1009,8 +1009,8 @@ class Fluid3D:
                         z_position)
 
     def add_temperature(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
-        """The boundary's warmth (-1 cold to 1 hot, its presence folded in): the water in the slab dragged toward
-        it times input.temperature_gain (at most ±1) over input.temperature_drag where the body is."""
+        """The boundary's warmth: the bridge's presence (0 to 1) times input.temperature_gain, its sign and size, at
+        most ±1, the water in the slab dragged toward it over input.temperature_drag where the body is."""
         if not self._allocated or self.settings.temperature.buoyancy == 0.0:      # nothing reads it
             return
         input = self.settings.input

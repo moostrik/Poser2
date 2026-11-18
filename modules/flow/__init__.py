@@ -27,7 +27,7 @@ from .bridge_3d import  Bridge3D, Bridge3DSettings, \
                         decay_weight, \
                         VelocityLowpass, VelocityLowpassSettings, gaussian_weights, blur_sigma, blur_dispatches, ZPositionMix, \
                         VelocityBandpass, VelocityBandpassSettings, Change, WeightedSum, step_peak, band_width, \
-                        TemperatureBridge, TemperatureBridgeSettings, FrameMax, \
+                        FrameMax, \
                         VelocityPeak, VelocityPeakSettings, speed_percentile
 
 # Visualization
