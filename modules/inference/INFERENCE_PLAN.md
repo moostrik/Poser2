@@ -195,7 +195,12 @@ render takes, and the models' shared parts **(seen)**. A folder of one or two fi
     tests, the package's and the apps' tests, and the check's run
 - G3. `INFERENCE.md` names the frame and its result types, `preprocessing` and `person`, where it describes them; the
   glossary takes none: it holds only names more than one package uses (the rules thread, agreed 2026-11-18)
-- G4. The benchmark, once the refactor is finished: `scripts/model_benchmark.py` with the face models and YOLO too,
+- G4. The type errors Pylance shows in `modules/inference` cleared, once G1 to G3 are built, fixed in `CLAUDE.md`'s
+  order (the annotation, a narrowing where the code guarantees the type, a `cast`, a suppression only for a wrong
+  stub). The type checker is to run from the command line, the same rules as Pylance (`[tool.pyright]`, basic): no
+  pyright is installed in the venvs **(seen)**, so it is a download, asked for first. Checked by a clean run of it
+  on the package
+- G5. The benchmark, once the refactor is finished: `scripts/model_benchmark.py` with the face models and YOLO too,
   on ONNX and TensorRT, the outputs against the run before. The before run is the same script on a copy of 916ff89a
   (E1) outside the repository, as A1 ran e754ddee; the script reads both the old names and the new ones, as the probe
   does
@@ -234,7 +239,7 @@ asked for with its name, source and size before it is fetched.
 - H5. The choice in the app: ours, H2, H3 and H4 in deep_flow as it is (`20261112-125832_measure`, -sim, the probe's
   as-is run, 60 s each, about 1.5 minutes a model), with the fluid on the GPU, where sharing the GPU sets most of
   the pose's 20 ms **(seen)**. It measures the pose's time (mean, p99) and its dropped batches; the table names its
-  kind (a time), date, commit, recording and settings. With G4's benchmark
+  kind (a time), date, commit, recording and settings. With G5's benchmark
 
 Questions:
 - The licence of the Body8 training data (AI Challenger and others) is unresolved, for ours as for every candidate
@@ -266,6 +271,7 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 - `CLAUDE.md` Naming, one term everywhere, rename it everywhere in the same change: G2
 - `CLAUDE.md` Composition, fixed structure through constructors: G2, the sync's result types
 - `pose-data.md`, a read never raises, missing data reads empty: G2 takes the pose frame's contract
+- `CLAUDE.md` Types, fix a type error in this order, suppress only as a last resort: G4
 - `CLAUDE.md` Performance, measured in the context of the app: H5 chooses the model under the fluid
 - `CLAUDE.md` Running code, a run on the user's go, said what it measures and how long: H5
 - `flow.md` Flow measurements, a table names its kind, date, commit, recording and settings: H5
