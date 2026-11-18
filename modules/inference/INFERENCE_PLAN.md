@@ -28,7 +28,9 @@ recording, only while you are away and the GPU runs nothing else: the table's ti
 ## A. The baseline
 
 - A1. The refactor confirmed: the probe at e754ddee (before it) twice, which gives the noise and the tolerance (at
-  least 1e-4), and on the current code once against it; the numbers in the table
+  least 1e-4), and on the current code once against it; the numbers in the table. The refactor (398ca410 to
+  4f72f124, one commit per model and one for the small breaks) was built without a go: this comparison and your look
+  at its diff judge it, and a model that differs is fixed or its commit reverted
 
 ## B. The crops' event
 
