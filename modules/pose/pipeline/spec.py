@@ -63,11 +63,15 @@ class TickSource(Protocol):
 
 
 @runtime_checkable
-class AsyncNode(Protocol):
-    """A step that emits later, on its own thread, and may drop frames (the crop and pose predictor); it is handed
-    the images the source pushed with the poses."""
+class AsyncInput(Protocol):
+    """Where an async step's frames go in, with the images the source pushed with the poses (the crop step)."""
 
     def submit(self, frames: FrameDict, images: Any) -> None: ...
+
+
+@runtime_checkable
+class AsyncOutput(Protocol):
+    """What an async step's frames come out of later, on its own thread, frames dropped under load (the pose model)."""
 
     def add_frames_callback(self, callback: FrameDictCallback) -> None: ...
 
@@ -103,15 +107,17 @@ class GroupStep:
 
 
 class AsyncStep:
-    """An ``AsyncNode`` instance, built once: the stage goes on from what the node emits, on its thread."""
+    """An async step, built once: the stage's frames go into ``input``, and the stage goes on from what ``output``
+    emits, on its thread. The two may be one object."""
 
-    __slots__ = ('node',)
+    __slots__ = ('input', 'output')
 
-    def __init__(self, node: AsyncNode) -> None:
-        self.node = node
+    def __init__(self, input: AsyncInput, output: AsyncOutput) -> None:
+        self.input = input
+        self.output = output
 
     def __repr__(self) -> str:
-        return f"AsyncStep({type(self.node).__name__})"
+        return f"AsyncStep({type(self.input).__name__}, {type(self.output).__name__})"
 
 
 Step = PoseStep | GroupStep | AsyncStep

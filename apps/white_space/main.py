@@ -16,7 +16,7 @@ from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, TrackerFrameSource
 from modules.pose import FrameDict, features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import detection, BatchUploader, CameraSync, ImageSnapshot, PoseInference, SyncMessage, frame_poses, has_points
+from modules.inference import pose, detection, BatchUploader, CameraSync, CropExtractor, ImageSnapshot, SyncMessage, frame_poses, has_points
 from modules.session import Session
 
 from .board import RenderBoard
@@ -100,7 +100,10 @@ class WhiteSpaceMain:
         self.uploader = BatchUploader()          # a synced set of the cameras' frames onto the GPU as one batch, on its own thread
         self.tracker = PanoramicTracker(self.settings.tracker, max_players, num_cams)
         self.tracklet_sync = CameraSync(self.settings.camera.tracklet_sync, 'tracklet_sync')
-        self.pose_inference = PoseInference(ps.pose_crop, ps.pose)      # the crop and the pose model, the frame domain's async step
+        # The frame domain's async step: the crop step in, the pose model out
+        self.crops = CropExtractor(ps.pose_crop)
+        self.pose_predictor = pose.Predictor(ps.pose)
+        self.crops.add_image_callback(self.pose_predictor.submit)
 
         # The camera's thread only hands its frames and tracklets over: the frames to the recorder and the frames'
         # sync, the tracklets as they come to the tracker, the board and the tracklets' sync (the journal's below)
@@ -154,13 +157,13 @@ class WhiteSpaceMain:
         self.tracker.add_observation_callback(self.tracker_journal.submit_observations)
         self.tracker.add_tracklet_callback(self.tracker_journal.submit_tracklets)
 
-        self.pose_inference.add_crop_callback(lambda _f, gpu: self.board.set_crop_images(gpu))
+        self.crops.add_image_callback(lambda _f, gpu: self.board.set_crop_images(gpu))
 
         # POSE PIPELINE — the stages are declared in pose/pipeline.py. Each uploaded set drives the frame domain
         # through the tracklet poses (`_on_snapshot`); the light tick drives the output domain (LERP, where the dummy joins).
         # Every stage's frames and group record go to the board, which also reads each stage's window; the sound
         # reads LERP, and so do the instrument and the state machine (the group sync on the LERP record).
-        self.pipeline = PosePipeline(pipeline_spec(ps, self.settings.light, self.frame_source, self.pose_inference,
+        self.pipeline = PosePipeline(pipeline_spec(ps, self.settings.light, self.frame_source, self.crops, self.pose_predictor,
                                                    self.dummy, self._column_to_azimuth, self.board.get_playhead_phase,
                                                    self.board.get_playhead_bars))
         for stage in Stage:
@@ -228,7 +231,7 @@ class WhiteSpaceMain:
             camera.start()
 
         self.tracker.start()
-        self.pose_inference.start()
+        self.pose_predictor.start()
         self.conductor.start()
         self.osc_light_sender.start()
         self.osc_sound_receiver.start()
@@ -338,7 +341,7 @@ class WhiteSpaceMain:
         self.udp_light_receiver.stop()
         self.conductor.stop()
 
-        self.pose_inference.stop()
+        self.pose_predictor.stop()
         if self.person_detector is not None:
             self.person_detector.stop()
 

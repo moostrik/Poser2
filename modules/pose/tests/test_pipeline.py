@@ -217,7 +217,7 @@ class BuildTest(unittest.TestCase):
         source = _Source([0])
         node = _Async()
         pipeline = PosePipeline(PipelineSpec([
-            StageSpec(S.RAW, source, [PoseStep(_Tag, 'before', log), AsyncStep(node), PoseStep(_Tag, 'after', log)]),
+            StageSpec(S.RAW, source, [PoseStep(_Tag, 'before', log), AsyncStep(node, node), PoseStep(_Tag, 'after', log)]),
         ]))
         out = _Collect()
         pipeline.add_frames_callback(S.RAW, partial(out, 'raw'))
@@ -239,7 +239,7 @@ class BuildTest(unittest.TestCase):
         source = _Source([0])
         node = _Async()
         PosePipeline(PipelineSpec([
-            StageSpec(S.RAW, source, [PoseStep(_Tag, 'before', []), AsyncStep(node)]),
+            StageSpec(S.RAW, source, [PoseStep(_Tag, 'before', []), AsyncStep(node, node)]),
         ]))
         images: object = object()
         source.emit(_frames(0), images)
@@ -378,7 +378,7 @@ class GroupRecordTest(unittest.TestCase):
         source = _Source([0])
         node = _Async()
         pipeline = PosePipeline(PipelineSpec([
-            StageSpec(S.RAW, source, [GroupStep(_Count([])), AsyncStep(node)]),
+            StageSpec(S.RAW, source, [GroupStep(_Count([])), AsyncStep(node, node)]),
         ]))
         groups: list[GroupRecord] = []
         pipeline.add_group_callback(S.RAW, groups.append)
@@ -396,7 +396,7 @@ class GroupRecordTest(unittest.TestCase):
     def test_a_result_before_start_is_an_error_and_one_after_stop_is_dropped(self) -> None:
         source = _Source([0])
         node = _Async()
-        pipeline = PosePipeline(PipelineSpec([StageSpec(S.RAW, source, [AsyncStep(node)])]))
+        pipeline = PosePipeline(PipelineSpec([StageSpec(S.RAW, source, [AsyncStep(node, node)])]))
         out = _Collect()
         pipeline.add_frames_callback(S.RAW, partial(out, 'raw'))
         source.emit(_frames(0))
@@ -458,7 +458,7 @@ class RefusalTest(unittest.TestCase):
 
     def test_an_async_step_runs_in_the_frame_domain(self) -> None:
         self._refuses(StageSpec(S.RAW, _Source([0]), []),
-                      StageSpec(S.LERP, S.RAW, [AsyncStep(_Async())], domain=Domain.OUTPUT, interpolators=[PoseStep(_Hold)]))
+                      StageSpec(S.LERP, S.RAW, [AsyncStep(*[_Async()] * 2)], domain=Domain.OUTPUT, interpolators=[PoseStep(_Hold)]))
 
     def test_a_window_is_only_where_it_is_declared(self) -> None:
         pipeline = PosePipeline(PipelineSpec([StageSpec(S.RAW, _Source([0]), [])]))
@@ -475,7 +475,7 @@ class AsyncThreadTest(unittest.TestCase):
         self.source = _Source([0])
         self.node = _Async()
         self.pipeline = PosePipeline(PipelineSpec([
-            StageSpec(S.RAW, self.source, [AsyncStep(self.node)]),
+            StageSpec(S.RAW, self.source, [AsyncStep(self.node, self.node)]),
             StageSpec(S.CLEAN, S.RAW, []),
         ]))
         self.threads: list[str] = []

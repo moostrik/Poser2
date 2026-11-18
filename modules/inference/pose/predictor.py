@@ -3,9 +3,10 @@ import time
 from threading import Event, Lock, Thread
 from typing import TYPE_CHECKING, TypeAlias
 
+import numpy as np
 import torch
 
-from modules.pose import Points2D, FrameDictCallbackMixin, replace, FrameDict
+from modules.pose import Frame, Points2D, FrameDictCallbackMixin, replace, FrameDict
 from modules.utils import PerformanceTimer
 
 from .. import crop, ModelType
@@ -21,11 +22,18 @@ logger = logging.getLogger(__name__)
 PoseRunner: TypeAlias = "RunnerONNX | RunnerTRT"
 
 
+def has_points(frame: Frame) -> bool:
+    """Whether a pose carries keypoints: any point with a score."""
+    return bool(np.any(frame[Points2D].scores > 0.0))
+
+
 class Predictor(FrameDictCallbackMixin):
     """2D pose points (RTMPose) for the crops of a batch of poses, on its own thread.
 
     A single-slot queue: a batch still waiting when a newer one comes is dropped and counted in `settings.dropped`;
-    only the batches the model ran reach the callbacks, from this thread.
+    only the batches the model ran reach the callbacks, from this thread. With the model off (`enabled`), the poses
+    that already carry the camera's own keypoints (an OAK4 pose chain, put on by the frame source) are handed on as
+    they are, from the submitting thread, and the others are not posed.
     """
 
     def __init__(self, settings: PosePredictorSettings) -> None:
@@ -68,6 +76,11 @@ class Predictor(FrameDictCallbackMixin):
 
     def submit(self, poses: FrameDict, crops: crop.CropImageDict) -> None:
         """The poses and their crops on the GPU, keyed by track id, to run; the results go to the callbacks."""
+        if not self.settings.enabled:
+            posed: FrameDict = {track_id: frame for track_id, frame in poses.items() if has_points(frame)}
+            if posed:
+                self._notify_frames_callbacks(posed)
+            return
         if not self.is_ready:
             return
 

@@ -69,9 +69,8 @@ When an image is on the GPU, the uploader hands it to four others, each of which
 - through the snapshot callback, the frame source, which queues the frame bang with exactly that image and its
   previous one, two waiting at most (the oldest dropped, `dropped` on the panel). On its own thread `TrackerFrameSource.process`
   makes a pose per player from the tracker's newest boxes and pushes them with those images; the RAW stage's two
-  box filters smooth them, and the pipeline hands the images to `PoseInference.submit(frames, images)`, which cuts
-  the crops from exactly those, this very image and not a newer one (`CropExtractor`), at the pose model's input
-  size, queued on the GPU and not waited for; it records a "crops ready" event and hands crops, poses and event to
+  box filters smooth them, and the pipeline hands the images to the crop step, `CropExtractor.submit(frames, images)`,
+  which cuts the crops from exactly those, this very image and not a newer one, at the pose model's input size, queued on the GPU and not waited for; it records a "crops ready" event and hands crops, poses and event to
   the pose model, whose thread has RTMPose wait for that event on its own stream; with the pose model off
   (`pose.enabled`), the poses carrying the camera's own keypoints (an OAK4 pose chain) go on as they are. Then the
   recorder hears whether poses come for the image. The uploader knows nothing of poses.

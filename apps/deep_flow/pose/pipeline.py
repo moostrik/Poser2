@@ -8,19 +8,20 @@ predict interpolators show each feature where its fit puts it at the tick's time
 from __future__ import annotations
 
 from modules.pose import nodes
-from modules.pose.pipeline import AsyncNode, AsyncStep, Domain, FrameSource, GroupStep, PipelineSpec, PoseStep, StageSpec
+from modules.pose.pipeline import AsyncInput, AsyncOutput, AsyncStep, Domain, FrameSource, GroupStep, PipelineSpec, PoseStep, StageSpec
 
 from ..settings import PoseGroup, Stage
 
 
-def pipeline_spec(ps: PoseGroup, frame_source: FrameSource, pose_inference: AsyncNode) -> PipelineSpec:
+def pipeline_spec(ps: PoseGroup, frame_source: FrameSource, crops: AsyncInput, poses: AsyncOutput) -> PipelineSpec:
     """The pipeline on the app's pose settings ``ps``; ``frame_source`` is the tracker's frame source and
-    ``pose_inference`` the crop and pose model."""
+    ``crops`` the crop step and ``poses`` the pose model
+    it feeds."""
     return PipelineSpec([
         StageSpec(Stage.RAW, frame_source, [
             PoseStep(nodes.BBoxEuroSmoother, ps.bbox.smoother),
             PoseStep(nodes.BBoxPredictor, ps.bbox.prediction),
-            AsyncStep(pose_inference),
+            AsyncStep(crops, poses),
         ], window=ps.window_raw),
 
         StageSpec(Stage.CLEAN, Stage.RAW, [

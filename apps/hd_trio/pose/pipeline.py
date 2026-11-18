@@ -9,20 +9,20 @@ the similarity hold, a group step of SMOOTH.
 from __future__ import annotations
 
 from modules.pose import nodes
-from modules.pose.pipeline import AsyncNode, AsyncStep, Domain, FrameSource, GroupStep, PipelineSpec, PoseStep, StageSpec
+from modules.pose.pipeline import AsyncInput, AsyncOutput, AsyncStep, Domain, FrameSource, GroupStep, PipelineSpec, PoseStep, StageSpec
 
 from ..settings import PoseGroup, Stage
 
 
-def pipeline_spec(ps: PoseGroup, frame_source: FrameSource, pose_inference: AsyncNode,
+def pipeline_spec(ps: PoseGroup, frame_source: FrameSource, crops: AsyncInput, poses: AsyncOutput,
                   similarity_hold: nodes.SimilarityResultHold) -> PipelineSpec:
-    """The pipeline on the app's pose settings ``ps``; ``frame_source`` is the tracker's frame source, ``pose_inference``
-    the crop and pose model and ``similarity_hold`` the step the threaded analytics write their result to."""
+    """The pipeline on the app's pose settings ``ps``; ``frame_source`` is the tracker's frame source, ``crops``
+    the crop step, ``poses`` the pose model it feeds and ``similarity_hold`` the step the threaded analytics write their result to."""
     return PipelineSpec([
         StageSpec(Stage.RAW, frame_source, [
             PoseStep(nodes.BBoxEuroSmoother, ps.bbox.smoother),
             PoseStep(nodes.BBoxPredictor, ps.bbox.prediction),
-            AsyncStep(pose_inference),
+            AsyncStep(crops, poses),
         ], window=ps.window_raw),
 
         StageSpec(Stage.CLEAN, Stage.RAW, [

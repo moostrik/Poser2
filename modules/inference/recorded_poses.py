@@ -5,12 +5,13 @@ per camera: each pose's crop box and the model's points with their scores, by tr
 arrival, the one clock read for them: the poses come from the host's pipeline, not from a camera backend. An app
 hands it to its recorder, which runs it on its own thread.
 
-Playback: `RecordedPoses` is the RAW stage's async step in -sim, around `PoseInference`. It hears the player's
-frames (`set_clip_frame`, a `ClipFrameCallback`) and keeps each frame's recorded poses by its capture on the play's
-clock, the stamp the crops give the stage's poses. With `enabled` on, it cuts the crops without the pose model
-(`PoseInference.cut_crops`), sets each pose's box and points from the recording by track_id, and hands them on after the
-recorded latency, from its own thread; a frame the recording has no poses for sends none, and a pose it has no
-track_id for goes on without points, counted. With `enabled` off, the pose model runs as live.
+Playback: `RecordedPoses` is the RAW stage's async output in -sim, between the crop step and the pose model: it
+takes the crop step's poses with their crops (`submit`, an `ImageCallback`) and emits the stage's poses. It hears the
+player's frames (`set_clip_frame`, a `ClipFrameCallback`) and keeps each frame's recorded poses by its capture on the
+play's clock, the stamp the crops give the stage's poses. With `enabled` on, it sets each cropped pose's box and points
+from the recording by track_id, without the pose model, and hands them on after the recorded latency, from its own
+thread; a frame the recording has no poses for sends none, and a pose it has no track_id for goes on without points,
+counted. With `enabled` off, the crops go to the pose model, as live.
 """
 
 import heapq
@@ -18,8 +19,6 @@ import logging
 import time
 from collections import defaultdict
 from threading import Condition, Lock, Thread
-from typing import Any
-
 import numpy as np
 
 from modules.camera import CaptureStream, FrameType, MissedParts
@@ -28,7 +27,7 @@ from modules.pose import BBox, Frame, FrameDict, FrameDictCallbackMixin, Points2
 from modules.settings import BaseSettings, Field
 from modules.utils import Rect
 
-from .pose_inference import PoseInference
+from . import crop, pose
 
 logger = logging.getLogger(__name__)
 
@@ -69,11 +68,11 @@ def recorded_pose(frame: Frame, box: np.ndarray, points: np.ndarray) -> Frame:
 class RecordedPoses(FrameDictCallbackMixin):
     """See the module docstring."""
 
-    def __init__(self, settings: RecordedPosesSettings, pose_inference: PoseInference) -> None:
+    def __init__(self, settings: RecordedPosesSettings, pose_predictor: pose.Predictor) -> None:
         super().__init__()
         self.settings: RecordedPosesSettings = settings
-        self._inference: PoseInference = pose_inference
-        self._inference.add_frames_callback(self._on_model)
+        self._pose: pose.Predictor = pose_predictor
+        self._pose.add_frames_callback(self._on_model)
         self._lock: Lock = Lock()
         self._recorded: dict[int, CaptureStream[FrameMetadata]] = defaultdict(lambda: CaptureStream(KEPT))
         self.missed: MissedParts = MissedParts('Recorded poses')       # poses whose track_id the recording has not
@@ -86,7 +85,7 @@ class RecordedPoses(FrameDictCallbackMixin):
         self._thread: Thread | None = None
 
     def start(self) -> None:
-        self._inference.start()
+        self._pose.start()
         self._running = True
         self._thread = Thread(target=self._send, daemon=True, name='RecordedPoses')
         self._thread.start()
@@ -98,12 +97,12 @@ class RecordedPoses(FrameDictCallbackMixin):
             self._wake.notify()
         if self._thread is not None:
             self._thread.join(timeout=2.0)
-        self._inference.stop()
+        self._pose.stop()
 
     def reset(self) -> None:
         with self._wake:
             self._waiting.clear()
-        self._inference.reset()
+        self._pose.reset()
 
     # ── The player's frames ────────────────────────────────────────────
 
@@ -127,13 +126,12 @@ class RecordedPoses(FrameDictCallbackMixin):
 
     # ── The async step ─────────────────────────────────────────────────
 
-    def submit(self, frames: FrameDict, images: Any) -> None:
-        """The stage's poses with the images they are for: with `enabled`, the crops cut from them without the pose
-        model and the recorded poses played; without, the crops and the pose model, as live."""
+    def submit(self, cropped: FrameDict, crops: crop.CropImageDict) -> None:
+        """The crop step's poses with their crops: with `enabled`, the recorded poses played in place of the pose
+        model; without, the crops to the pose model, as live."""
         if not self.settings.enabled:
-            self._inference.submit(frames, images)
+            self._pose.submit(cropped, crops)
             return
-        cropped, _ = self._inference.cut_crops(frames, images)
         by_cam: dict[int, FrameDict] = defaultdict(dict)
         for track_id, frame in cropped.items():
             by_cam[frame.cam_id][track_id] = frame

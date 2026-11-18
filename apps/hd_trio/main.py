@@ -13,7 +13,7 @@ from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker, TrackerFrameSource
 from modules.pose import nodes, features, analytics, FrameDict, Recorder as PoseRecorder, RecorderSettings as PoseRecorderSettings
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import segmentation, detection, BatchUploader, CameraSync, ImageSnapshot, PoseInference, SyncMessage, \
+from modules.inference import pose, segmentation, detection, BatchUploader, CameraSync, CropExtractor, ImageSnapshot, SyncMessage, \
     frame_poses, has_points
 from modules.session import Session, SessionSettings, SequencerState
 from modules.gl import WindowSettings
@@ -102,8 +102,11 @@ class HDTrioMain:
         self.uploader = BatchUploader()          # a synced set of the cameras' frames onto the GPU as one batch, on its own thread
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
         self.tracklet_sync = CameraSync(self.settings.camera.tracklet_sync, 'tracklet_sync')
-        # the crops and the pose model, the frame domain's async step; the segmentation's crops cut beside the pose model's
-        self.pose_inference = PoseInference(ps.pose_crop, ps.pose, ps.segmentation_crop)
+        # The frame domain's async step: the crop step in (the pose model's crops and the segmentation's, in one pass,
+        # from the same images and boxes), the pose model out
+        self.crops = CropExtractor(ps.pose_crop, ps.segmentation_crop)
+        self.pose_predictor = pose.Predictor(ps.pose)
+        self.crops.add_image_callback(self.pose_predictor.submit)
 
         # The camera's thread only hands its frames and tracklets over: the frames to the frames' sync and the
         # recorder, the tracklets as they come to the tracker, the board, the tracklets' sync and the recorder
@@ -143,8 +146,8 @@ class HDTrioMain:
         self.uploader.add_snapshot_callback(self._on_snapshot)
 
         # The segmentation and the board read the segmentation's crops, cut from the same images and boxes as the pose model's
-        self.pose_inference.add_segmentation_crop_callback(self.segmentation_predictor.submit)
-        self.pose_inference.add_segmentation_crop_callback(lambda _f, crops: self.board.set_crop_images(crops))
+        self.crops.add_image_callback(self.segmentation_predictor.submit, ps.segmentation_crop)
+        self.crops.add_image_callback(lambda _f, crops: self.board.set_crop_images(crops), ps.segmentation_crop)
         self.segmentation_predictor.add_segmentation_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
 
         # POSE PIPELINE — the stages are declared in pose/pipeline.py. Each uploaded set drives the frame domain
@@ -152,7 +155,7 @@ class HDTrioMain:
         # frames go to the board, the pose recorders and the sound; the board also reads each stage's window; the RAW
         # stage's poses go to the video recorder with their frames.
         self.similarity_hold = nodes.SimilarityResultHold()              # the threaded analytics' way back into SMOOTH
-        self.pipeline = PosePipeline(pipeline_spec(ps, self.frame_source, self.pose_inference, self.similarity_hold))
+        self.pipeline = PosePipeline(pipeline_spec(ps, self.frame_source, self.crops, self.pose_predictor, self.similarity_hold))
         for stage in Stage:
             self.pipeline.add_frames_callback(stage, partial(self.board.set_frames, stage))
             self.pipeline.add_frames_callback(stage, partial(self.pose_recorder.submit_frames, stage))
@@ -196,7 +199,7 @@ class HDTrioMain:
             camera.start()
 
         self.tracker.start()
-        self.pose_inference.start()
+        self.pose_predictor.start()
         self.segmentation_predictor.start()
         self.window_similarity.start()
         self.window_correlator.start()
@@ -280,7 +283,7 @@ class HDTrioMain:
 
         self.session_osc.stop()
 
-        self.pose_inference.stop()
+        self.pose_predictor.stop()
         if self.person_detector is not None:
             self.person_detector.stop()
         self.segmentation_predictor.stop()

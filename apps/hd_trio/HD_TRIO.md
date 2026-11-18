@@ -11,7 +11,7 @@ hd_trio's input is white_space's: the cameras' frames of one moment travel as on
 ([INPUT_THREADS.md](../../modules/flow/INPUT_THREADS.md)). The tracker is `OnePerCamTracker`: one player per
 camera. The camera's thread only hands its frames and tracklets over; every receiver works on its own thread.
 
-The crops are two, cut by `PoseInference` from the same images and boxes: `pose_crop` at the pose model's input
+The crops are two, cut by the crop step (`CropExtractor`) in one pass from the same images and boxes: `pose_crop` at the pose model's input
 size (192 × 256), one antialiased resample from the camera frame rather than a larger crop the runner scales down
 again, and `segmentation_crop` at RVM's (768 × 1024), for the segmentation and the board. Both are 3:4, so they
 cover one region, and the mask lines up with the pose's box (`SourceSpace.CROP`). The previous crop is not cut: no

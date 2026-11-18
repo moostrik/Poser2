@@ -10,7 +10,7 @@ dropped. The stage's synchronous steps
 are timed as ``Pose <stage>``; the crossing's ``InterpolatorTracker`` as ``Pose interpolate``.
 
 A frame source pushes its poses with the images they are for; the stage's chain carries them, unread, to its
-async step (``AsyncNode.submit(frames, images)``), and a stage's other entries (a reading stage, the tick) carry
+async step (its ``AsyncInput.submit(frames, images)``), and a stage's other entries (a reading stage, the tick) carry
 none. The group record travels with the poses: a source's stage starts a fresh one on every push, a stage that reads
 another gets that stage's record, and the latest record is held across an async step and across the crossing,
 where the tick re-stamps it. Frames leave a stage in one order: the app's callbacks (board, recorders, OSC),
@@ -78,7 +78,7 @@ class _AsyncSplit:
     that the oldest is dropped and counted. A result before `start` is an error, one after `stop` dropped."""
 
     def __init__(self, step: AsyncStep, then: StageCallback, name: str) -> None:
-        self._node = step.node
+        self._input = step.input
         self._then = then
         self._name: str = name
         self._group = GroupRecord()
@@ -89,7 +89,7 @@ class _AsyncSplit:
         self._thread: Thread | None = None
         self._wait: PerformanceTimer = PerformanceTimer(name="Wait pose pipeline")
         self.dropped: int = 0
-        step.node.add_frames_callback(self._emitted)
+        step.output.add_frames_callback(self._emitted)
 
     def start(self) -> None:
         with self._wake:
@@ -115,7 +115,7 @@ class _AsyncSplit:
 
     def submit(self, frames: FrameDict, group: GroupRecord, images: Any = None) -> None:
         self._group = group
-        self._node.submit(frames, images)
+        self._input.submit(frames, images)
 
     def _emitted(self, frames: FrameDict) -> None:
         """The node's frames, on its thread: queued for the split's thread, the oldest dropped beyond `WAITING`."""

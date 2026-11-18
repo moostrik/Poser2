@@ -34,7 +34,7 @@ The frame source's call already takes a set (`TrackerFrameSource.submit(cam_time
 its own camera's capture time, the poses asked told per camera).
 
 The core is built (`ImageUpload`, for one frame or a stack of one size), deep_flow's `SerialUploader` uses it and
-hands each color image on as an `ImageSnapshot` of one (`add_snapshot_callback`), and `PoseInference` takes no
+hands each color image on as an `ImageSnapshot` of one (`add_snapshot_callback`), and the crop step takes no
 uploader. white_space's `BatchUploader` is built beside it: a set in (`submit_set`), queued whole, two at most, the
 oldest set dropped whole and counted; uploaded as one stack per frame size; each image to its image callbacks and
 the set as its `ImageSnapshot` to its snapshot callbacks. `CameraSync` hands on a set

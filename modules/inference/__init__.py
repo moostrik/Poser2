@@ -7,7 +7,7 @@ from .image_upload import ImageUpload
 from .serial_uploader import SerialUploader, SerialUploaderSettings
 from .batch_uploader import BatchUploader
 from .depth_align import DepthAligner, depth_metres
-from .pose_inference import PoseInference, has_points
+from .pose import has_points
 from .recorded_poses import RecordedPoses, RecordedPosesSettings, frame_poses
 from .capture import Capture
 from .capture_sync import CaptureSync, CaptureSyncSettings

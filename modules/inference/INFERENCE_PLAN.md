@@ -39,6 +39,9 @@ is the largest over the frames compared, against e754ddee's first run.
 | C1 no locks     | pose         | 25.00 / 39.34            | 245 (B1's)     | 0                  | 0              |
 | C1 no locks     | segmentation |                          | 122 (B1's)     | 0                  | 0              |
 | C1 no locks     | optical flow |                          | 142 (B1's)     | 0                  | 0              |
+| E1 crop step    | pose         | 20.75 / 34.48            | 521 (B2's)     | 0                  | 0              |
+| E1 crop step    | segmentation |                          | 982 equal crops| 1, B2's run's      | 1.0            |
+| E1 crop step    | optical flow |                          | 952 equal pairs| 0                  | 0              |
 
 C1 is compared with B1's run, which has the fix C1 keeps. With the probe's four models running together (pose,
 segmentation, optical flow, person detector), the TensorRT models no longer take turns: in 30 s the pose ran 1441
@@ -82,6 +85,14 @@ crop by the object: no crop changed between its hand-over and the model (0 of 29
 equal in both runs were equal (469 of 469) **(seen)**. Two runs differ only where the probe cropped another box,
 looked up by the tracklet's time rather than the image's **(deduction)**.
 
+E1 (`PoseInference` gone; one crop step, every size in one pass, the pose model behind it in the pipeline's async
+step; 2026-11-18) is compared with B2's run where both runs cut the same crop (each crop's fingerprint as handed to the
+model): the one mask that differs is the odd one in B2's run, unlike its neighbours (0.024 against 0.002 mean
+difference), while E1's matches its own (0.001 to 0.004) **(seen)**. deep_flow as it is: the pose 20.75 / 34.48 ms
+against D1's 25.19 / 38.46, the upload 1.65 / 17.03 against 2.95 / 17.84, the hop to the frame source ("Wait pose
+step") 0.40 / 2.51 against 0.28 / 0.97 **(seen, one run each)**; nothing in E1 explains a faster pose, so it is not
+claimed **(deduction)**.
+
 ## C. The TensorRT models side by side
 
 Questions:
@@ -91,17 +102,6 @@ Questions:
 
 ## E. The package held up again (2026-11-18)
 
-- E1. `PoseInference` goes: it holds three jobs under a pose name **(seen)**: the crop extractors (the pose model's
-  size, and hd_trio's segmentation size), whose crops the flow, the board and the segmentation subscribe to through
-  it; the pose model; and the rule that, with the pose model off, the poses carrying the camera's keypoints pass. The
-  app holds one crop step that cuts every size it is given (the pose model's; in hd_trio the segmentation's too) from
-  the one image and box in one pass, and every consumer subscribes to its size: the pose model, the flow, the board,
-  the segmentation; one pass now in torch ops, so one kernel later changes only this class. The pose model holds the
-  rule. The pose pipeline's async step (`AsyncNode`: `submit` with
-  the images, `add_frames_callback`; the three apps' `pose/pipeline.py`) is the crop and the pose model together today **(seen: `modules/pose/pipeline/spec.py`)**:
-  it becomes the crop extractor's `submit` and the pose model's frames callback, given apart; `RecordedPoses`, which
-  wraps `PoseInference`, takes the two the same way. What runs, and on which threads, stays. Checked by the package's
-  and the pose pipeline's tests and the check's run
 - E2. Two engines for the backends: the ten runners are five models times ONNX and TensorRT (945 lines), and the
   pose's, segmentation's and flow's each load, bind and run their backend and do their model's input in one class;
   the ONNX session is set up five times, two ways (memory limit and exhaustive cuDNN search in three, not in the face
@@ -172,7 +172,6 @@ backends do). The package has no rules file; nothing it keeps needs one beyond `
 
 ## The rules it touches
 
-- `CLAUDE.md` Naming, a concept named after what it is: E1, `PoseInference` is three things under one name
 - `CLAUDE.md` Composition, prefer composition: E2, a worker holds an engine and its model's steps
 - `CLAUDE.md` Types, an ABC for a family of classes that share code: E3
 - `CLAUDE.md` Packages, a package is one thing, and its name is that thing: E5 states the one thing

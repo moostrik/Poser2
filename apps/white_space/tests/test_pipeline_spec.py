@@ -42,7 +42,7 @@ class PipelineSpecTest(unittest.TestCase):
         configure_features(self.players)                     # the track features' width, as main.py sets it
         self.dummy = Dummy(self.settings.pose_instrument.dummy, ps.angle_extractor, ps.angle_calibrator,
                            dummy_id(self.players), Path(self.tmp.name) / 'poses.json')
-        self.pipeline = PosePipeline(pipeline_spec(ps, self.settings.light, _Source(list(range(self.players))), _Async(),
+        self.pipeline = PosePipeline(pipeline_spec(ps, self.settings.light, _Source(list(range(self.players))), *[_Async()] * 2,
                                                    self.dummy, lambda _cam, x: x, lambda: 0.25, lambda: 0.0))
 
     def tearDown(self) -> None:

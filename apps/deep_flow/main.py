@@ -17,7 +17,7 @@ from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, TrackerFrameSource
 from modules.pose import configure_features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import optical_flow, detection, GpuImage, ImageSnapshot, PoseInference, has_points, RecordedPoses, Capture, CaptureSync, SerialUploader, frame_poses
+from modules.inference import optical_flow, pose, detection, CropExtractor, GpuImage, ImageSnapshot, has_points, RecordedPoses, Capture, CaptureSync, SerialUploader, frame_poses
 from modules.pose import FrameDict
 from modules.utils import FPS, PerformanceTimer
 
@@ -85,14 +85,18 @@ class DeepFlowMain:
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
         self.uploader = SerialUploader(self.settings.camera.uploader)    # the camera's hand-off: each frame onto the GPU as it comes, on its own thread
-        self.pose_inference = PoseInference(p.pose_crop, p.pose)       # the crop and the pose model, the frame domain's async step
-        # -sim plays the recording's poses in place of the pose model, around it (`recorded_poses.enabled`)
+        # The frame domain's async step: the crop step in, the pose model out
+        self.crops = CropExtractor(p.pose_crop)
+        self.pose_predictor = pose.Predictor(p.pose)
+        # -sim plays the recording's poses in place of the pose model, between the crops and it (`recorded_poses.enabled`)
         self.recorded_poses: RecordedPoses | None = None
+        poses: pose.Predictor | RecordedPoses = self.pose_predictor
         if self.player is not None:
-            self.recorded_poses = RecordedPoses(self.settings.camera.recorded_poses, self.pose_inference)
+            self.recorded_poses = RecordedPoses(self.settings.camera.recorded_poses, self.pose_predictor)
             self.player.add_frame_callback(self.recorded_poses.set_clip_frame)
             self.player.add_jump_callback(self.recorded_poses.clear_waiting)
-        pose_step: PoseInference | RecordedPoses = self.recorded_poses if self.recorded_poses is not None else self.pose_inference
+            poses = self.recorded_poses
+        self.crops.add_image_callback(poses.submit)
         self.capture_sync = CaptureSync(p.capture_sync)                  # the color, depth and poses of one moment, for the render
         self.capture_rate: FPS = FPS()                                # the captures it hands on, for the panel's cadence
 
@@ -121,12 +125,12 @@ class DeepFlowMain:
         self.frame_source.add_asked_callback(self._on_asked)
 
         # The optical flow reads the same crops the pose model gets.
-        self.pose_inference.add_crop_callback(self.optical_flow_predictor.submit)
+        self.crops.add_image_callback(self.optical_flow_predictor.submit)
 
         # POSE PIPELINE — the stages are declared in pose/pipeline.py. Each uploaded image drives the frame domain
         # through the tracklet poses (`_on_snapshot`); the render tick drives the output domain (LERP). Every stage's frames
         # go to the board and the sound; the board also reads each stage's window.
-        self.pipeline = PosePipeline(pipeline_spec(p, self.frame_source, pose_step))
+        self.pipeline = PosePipeline(pipeline_spec(p, self.frame_source, self.crops, poses))
         for stage in Stage:
             self.pipeline.add_frames_callback(stage, partial(self.board.set_frames, stage))
             self.pipeline.add_frames_callback(stage, partial(self.osc_sound.submit_frames, stage))
@@ -186,7 +190,7 @@ class DeepFlowMain:
         if self.recorded_poses is not None:
             self.recorded_poses.start()         # starts the pose model with it
         else:
-            self.pose_inference.start()
+            self.pose_predictor.start()
         self.optical_flow_predictor.start()
 
         self.osc_sound.start()
@@ -291,7 +295,7 @@ class DeepFlowMain:
         if self.recorded_poses is not None:
             self.recorded_poses.stop()          # stops the pose model with it
         else:
-            self.pose_inference.stop()
+            self.pose_predictor.stop()
         self.capture_sync.stop()
         if self.person_detector is not None:
             self.person_detector.stop()
