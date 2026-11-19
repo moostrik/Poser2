@@ -1,4 +1,4 @@
-"""The pose monitor: the pose on the crop or the camera's frame, and its features over it."""
+"""The pose monitor: the pose on the crop, the camera's frame or the view, and its features over it."""
 
 from typing import Any
 
@@ -9,15 +9,17 @@ from ....settings import PoseFeatures, PoseFrame, PoseMonitorSettings
 
 class PoseMonitorCompositor(render.LayerBase):
     """The pose of camera `cam_id`'s player as `settings.frame` says: on the crop with its image
-    (`PoseCompositor`) or on the camera's frame with its boxes (`TrackerCompositor`, no image);
-    `settings.features` the features over it. Without an image it lies over any layer of its frame."""
+    (`PoseCompositor`), on the camera's frame with its boxes (`TrackerCompositor`, no image), or on the view
+    (`ViewPoseLayer`); `settings.features` the features over it. Without an image it lies over any layer of its
+    frame."""
 
     def __init__(self, cam_id: int, board: Any, cam_image: render.LayerBase, cam_crop: render.CropImageLayer,
-                 settings: PoseMonitorSettings, color_settings: render.ColorSettings) -> None:
+                 view: render.PosePlacement, settings: PoseMonitorSettings, color_settings: render.ColorSettings) -> None:
         self.settings: PoseMonitorSettings = settings
         self._frames: dict[PoseFrame, render.LayerBase] = {
             PoseFrame.CROP:   render.PoseCompositor(cam_id, board, cam_image.texture, cam_crop, settings.crop, color_settings),
             PoseFrame.CAMERA: render.TrackerCompositor(cam_id, board, cam_image.texture, settings.camera, color_settings),
+            PoseFrame.VIEW:   render.ViewPoseLayer(cam_id, view, settings.view, color_settings),
         }
         self._features: dict[PoseFeatures, render.LayerBase] = {
             PoseFeatures.FRAME:  render.FeatureFrameLayer(cam_id, board, settings.data, color_settings),

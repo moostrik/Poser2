@@ -43,11 +43,6 @@ color), one fluid per screen. Until then hd_trio runs its own copy, unchanged.
 
 ## A. The app
 
-- **A2.** The 2D view and the color: the view, the app's own, deep_flow's fixed window on the camera image
-  (`crop.center_x`, `center_y`, `height`) without the depth's `near` and `far`, a full mask until A5, its monitor;
-  the window stays put, so the motion measures the player, not the window. It hands the flow what `MotionInput`
-  and `BridgeInput` hold; those dataclasses are the contract (no view `Protocol`). The color stage as deep_flow's.
-  Checked: superficial_flow in -sim, the view and color monitors showing.
 - **A3.** The boxes every frame, the poses at their interval: `pose_interval` moves from the frame source
   (`TrackerFrameSource`) to the pose model's input. The frame source feeds `RAW` every frame, so its box steps
   (`BBoxEuroSmoother`, `BBoxPredictor`) and the crop step run every frame; the crop step hands the pose model
@@ -133,7 +128,6 @@ Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 
 | Step     | Check                                                                                               |
 |----------|-----------------------------------------------------------------------------------------------------|
-| A2       | -sim: the view and color monitors                                                                   |
 | A3       | pose and tracker tests; deep_flow in -sim, its poses as before (25 fps)                             |
 | A4       | RVM alone (`model_benchmark.py`); -sim: a mask every frame; its time from its lane                  |
 | A5       | -sim: the mask on the player, the color cut by it                                                   |

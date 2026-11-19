@@ -42,8 +42,10 @@ class Stage(IntEnum):
 # ---------------------------------------------------------------------------
 
 class Layers(IntEnum):
-    """What a panel can show, in the chain's order: the inference frame's monitor, the timings and the pose."""
+    """What a panel can show, in the chain's order: each stage's monitor, the timings and the pose."""
     inference_frame = 0
+    view =          auto()
+    color =         auto()
     time_series =   auto()     # the app's timings, over time
     pose =          auto()
 
@@ -200,10 +202,29 @@ class _PoseCompositorSettings(render.PoseCompositorSettings):
     front_stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage of the front line (track color)")
 
 
+# The view's layer's settings (render/layers/view)
+class ViewCropSettings(BaseSettings):
+    """ViewCrop, the window the view cuts from the camera image: its center and its height."""
+    center_x: Field[float] = Field(0.5, min=0.0, max=1.0, description="The crop's center across the camera image, a share of its width")
+    center_y: Field[float] = Field(0.5, min=0.0, max=1.0, description="The crop's center down the camera image, a share of its height")
+    height:   Field[float] = Field(1.0, min=0.05, max=2.0, description="The crop's height, a share of the camera image's")
+
+
+class ViewLayerSettings(render.StageLayerSettings):
+    """The view's size and its crop."""
+    width:         Field[int]   = Field(448, min=32, max=4096, step=32, description="The view's width (pixels)")
+    height:        Field[int]   = Field(800, min=32, max=4096, step=32, description="The view's height (pixels)")
+    crop:        Group[ViewCropSettings]      = Group(ViewCropSettings)
+
+    monitor_main:  Group[render.Monitor2DLayerSettings] = Group(render.Monitor2DLayerSettings, last=True, tint=render.MAIN_TINT)
+    monitor_debug: Group[render.Monitor2DLayerSettings] = Group(render.Monitor2DLayerSettings, last=True, tint=render.DEBUG_TINT)
+
+
 class PoseFrame(IntEnum):
     """Where the pose monitor draws the pose."""
     CROP = 0        # on the crop, with the crop's image: the pose model's input
     CAMERA = 1      # on the camera's frame, with its boxes; no image
+    VIEW = 2        # on the view; no image
 
 
 class PoseFeatures(IntEnum):
@@ -222,12 +243,16 @@ class PoseMonitorSettings(BaseSettings):
 
     crop    : Group[_PoseCompositorSettings]    = Group(_PoseCompositorSettings, share=[stage])
     camera  : Group[_TrackerCompositorSettings] = Group(_TrackerCompositorSettings, share=[stage])
+    view    : Group[render.ViewPoseLayerSettings] = Group(render.ViewPoseLayerSettings)
     data    : Group[_DataLayerSettings]         = Group(_DataLayerSettings, share=[stage])
 
 class RenderSettings(BaseSettings):
     debug: Field[bool]                           = Field(True, description="The main and the debug panel; off, the main panel alone, as on a second screen")
+    pause: Field[bool]                           = Field(False, description="Hold the last frame; the view and the color are made again on it when a setting changes")
     layer  : Group[LayerSettings]                = Group(LayerSettings)
-    # the chain, then the pose beside it
+    # the chain, in its order, then the pose beside it
+    view   : Group[ViewLayerSettings]            = Group(ViewLayerSettings)
+    color  : Group[render.ColorLayerSettings]    = Group(render.ColorLayerSettings)
     pose   : Group[PoseMonitorSettings]          = Group(PoseMonitorSettings)
     # the display
     time_series: Group[render.TimeSeriesLayerSettings] = Group(render.TimeSeriesLayerSettings)

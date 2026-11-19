@@ -265,13 +265,85 @@
   },
   "render": {
     "debug": true,
+    "pause": false,
     "layer": {
       "main": [
-        "inference_frame"
+        "color"
       ],
       "debug": [
-        "pose"
+        "view"
       ]
+    },
+    "view": {
+      "width": 448,
+      "height": 800,
+      "crop": {
+        "center_x": 0.5,
+        "center_y": 0.5,
+        "height": 1.0
+      },
+      "monitor_main": {
+        "texture": "depth.filled",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
+      },
+      "monitor_debug": {
+        "texture": "depth.filled",
+        "view": "IMAGE",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
+      }
+    },
+    "color": {
+      "enabled": true,
+      "white_balance": 6500.0,
+      "exposure": 1.0,
+      "offset": 0.0,
+      "gamma": 0.8,
+      "contrast": 1.25,
+      "saturation": 1.2,
+      "sharpen": 1.0,
+      "luma_matte": 0.0,
+      "use_mask": true,
+      "erode": 0,
+      "feather": 4.0,
+      "monitor_main": {
+        "texture": "output.velocity",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
+      },
+      "monitor_debug": {
+        "texture": "output.velocity",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
+      }
     },
     "pose": {
       "stage": "LERP",
@@ -290,6 +362,12 @@
         "pose_line_width": 2.0,
         "bbox_line_width": 2,
         "image": false
+      },
+      "view": {
+        "line_width": 3.0,
+        "line_smooth": 0.0,
+        "use_scores": false,
+        "draw_anchors": false
       },
       "data": {
         "mode": "WINDOW",

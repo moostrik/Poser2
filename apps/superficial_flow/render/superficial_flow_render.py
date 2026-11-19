@@ -1,19 +1,21 @@
-"""Superficial Flow render — split-view layer graph: the inference frame's monitor, the timings and the pose."""
+"""Superficial Flow render — split-view layer graph with the 2D flow: view and color."""
 
 from typing import Callable, cast
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import RenderBase, ScreenCapture, Shader, Style, clear_color, fill, fit, Texture, shaders
+from modules.gl import GpuTimer, RenderBase, ScreenCapture, Shader, Style, clear_color, fill, fit, Texture, shaders
 from modules.video import ScreenRecorder, ScreenRecorderSettings
-from modules.inference import InferenceFrame
+from modules.flow import Port
+from modules.inference import InferenceFrame, Poses
+from modules.pose import Frame, FrameDict
 from modules import render
 from modules.utils import Color, Rect, Point2f
 
 from ..board import RenderBoard
 from ..settings import PoseFrame, RenderSettings
-from .layers import InferenceFrameMonitorLayer, PoseMonitorCompositor
-from .chain import ChainLayers, Size, TICK_LAYERS, INFERENCE_FRAME_LAYERS, POSE_SHAPES, shown, size_of, layers_of, shape_of
+from .layers import InferenceFrameMonitorLayer, ViewInput, ViewOutput, ViewLayer, PoseMonitorCompositor
+from .chain import ChainLayers, Size, TICK_LAYERS, INFERENCE_FRAME_LAYERS, MONITORS, POSE_SHAPES, shown, size_of, layers_of, shape_of
 
 
 OUTPUT_WIDTH: int = 1080
@@ -38,13 +40,24 @@ class SuperficialFlowRender(RenderBase):
         self._debug_layers: list[ChainLayers] = shown(settings.layer.debug)
 
         self.L: dict[ChainLayers, dict[int, render.LayerBase]] = {layer: {} for layer in ChainLayers}
+        self._debug_monitors: dict[ChainLayers, dict[int, render.Monitor2DLayer]] = {}     # each stage's debug monitor
 
         for i in range(self.num_cams):
             cam_image =     self.L[ChainLayers.cam_image][i] =   render.CameraImageLayer(    i, self.board)
             cam_crop =      self.L[ChainLayers.cam_crop][i] =    render.CropImageLayer(      i, self.board)
-            image = self.L[ChainLayers.inference_frame_image][i] = render.InferenceFrameImageLayer()
+            image =         self.L[ChainLayers.inference_frame_image][i] = render.InferenceFrameImageLayer()
             self.L[ChainLayers.inference_frame_monitor][i] =     InferenceFrameMonitorLayer(image)
-            self.L[ChainLayers.pose_monitor][i] =                PoseMonitorCompositor(i, self.board, cam_image, cam_crop, settings.pose, settings.colors)
+
+            # The stages, each with its monitor, and the pose's monitor
+            view =          self.L[ChainLayers.view][i] =        ViewLayer(           settings.view)
+            self.L[ChainLayers.pose_monitor][i] =                PoseMonitorCompositor(i, self.board, cam_image, cam_crop, view, settings.pose, settings.colors)
+            self.L[ChainLayers.color][i] =                       render.ColorLayer(   settings.color)
+            # each stage's main monitor in self.L, shown in the main panel; its debug monitor in self._debug_monitors,
+            # shown in the debug panel
+            for key, stage, flat in ((ChainLayers.view_monitor, render.FlowStage.VIEW, settings.view),
+                                     (ChainLayers.color_monitor, render.FlowStage.COLOR, settings.color)):
+                self.L[key][i] = render.Monitor2DLayer(stage, flat.monitor_main)
+                self._debug_monitors.setdefault(key, {})[i] = render.Monitor2DLayer(stage, flat.monitor_debug)
         self.L[ChainLayers.time_series][0] = render.TimeSeriesLayer(self.board, settings.time_series)      # the board's series, one for all cameras
 
         # Split view: the left and right panels side by side or stacked, whichever shows what they hold larger
@@ -52,8 +65,13 @@ class SuperficialFlowRender(RenderBase):
         self._panel_aspect_ratios: list[float] = self._read_panel_aspect_ratios()
         self.subdivision: render.Subdivision = self._make_layout()
 
-        # The layers' input, built right before they run, from what ran before them this tick
-        self._wirings: dict[ChainLayers, Callable[[], None]] = {}
+        self._view_timer: GpuTimer = GpuTimer("GPU view")
+        self._view_size: tuple[int, int] = (0, 0)       # the view layers' size, set in allocate
+
+        # The monitors' input, built right before they run, from what ran before them this tick
+        self._wirings: dict[ChainLayers, Callable[[], None]] = {
+            ChainLayers.view_monitor: self._wire_monitors,
+        }
 
         # The border around each layer in the main window
         self._border: shaders.StrokeRect = shaders.StrokeRect()
@@ -93,10 +111,17 @@ class SuperficialFlowRender(RenderBase):
         self.allocate_window_renders()
 
     def allocate(self) -> None:
+        self._view_size = (self.settings.view.width, self.settings.view.height)
         for layer_type, cam_dict in self.L.items():
             for layer in cam_dict.values():
-                if size_of(layer_type) == Size.OUTPUT:
+                size: Size = size_of(layer_type)
+                if size == Size.VIEW:
+                    layer.allocate(*self._view_size, GL_RGBA16F)
+                elif size == Size.OUTPUT:
                     layer.allocate(OUTPUT_WIDTH, OUTPUT_HEIGHT, GL_RGBA16F)
+        for monitors in self._debug_monitors.values():
+            for monitor in monitors.values():
+                monitor.allocate(OUTPUT_WIDTH * 2, OUTPUT_HEIGHT * 2, GL_RGBA16F)     # a monitor renders at the size it is drawn at
         self.allocate_window_renders()
         self._border.allocate()
         self.screen_recorder.start()
@@ -109,6 +134,17 @@ class SuperficialFlowRender(RenderBase):
                 w, h = self.subdivision.get_allocation_size('panels', 0)
                 self.L[layer_type][i].allocate(w, h, GL_RGBA)
 
+    def _follow_view_size(self) -> None:
+        """Reallocate the view layers when the view's size changed."""
+        size: tuple[int, int] = (self.settings.view.width, self.settings.view.height)
+        if size == self._view_size:
+            return
+        self._view_size = size
+        for layer_type in layers_of(Size.VIEW):
+            for layer in self.L[layer_type].values():
+                layer.deallocate()
+                layer.allocate(*size, GL_RGBA16F)
+
     def deallocate(self) -> None:
         # the recording ends first: its encode finishes and frees its CUDA memory, then its GL objects go
         self.settings.screen_recorder.unbind(ScreenRecorderSettings.snap, self._on_snap)
@@ -117,7 +153,15 @@ class SuperficialFlowRender(RenderBase):
         for cam_dict in self.L.values():
             for layer in cam_dict.values():
                 layer.deallocate()
+        for monitors in self._debug_monitors.values():
+            for monitor in monitors.values():
+                monitor.deallocate()
         self._border.deallocate()
+        self._view_timer.deallocate()
+
+    def _monitors(self) -> list[render.Monitor2DLayer]:
+        return [cast(render.Monitor2DLayer, layer) for key in MONITORS
+                for layer in (*self.L[key].values(), *self._debug_monitors.get(key, {}).values())]
 
     def update(self) -> None:
         self._notify_update()
@@ -125,6 +169,7 @@ class SuperficialFlowRender(RenderBase):
         self._main_layers = shown(self.settings.layer.main)
         self._debug_layers = shown(self.settings.layer.debug)
         self._update_layout()
+        self._follow_view_size()
 
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         seen: set[ChainLayers] = set()
@@ -141,21 +186,60 @@ class SuperficialFlowRender(RenderBase):
                 wiring()
             for layer in self.L[layer_type].values():
                 layer.update()
+            for monitor in self._debug_monitors.get(layer_type, {}).values():
+                monitor.update()
 
-    # ========== The inference frames ==========
+    # ========== The flow's wiring ==========
 
     def _run_inference_frames(self) -> None:
         """Every frame since the last tick, each camera's in order, through the frame layers (`_run_inference_frame`).
-        A tick without a frame runs none of them, so no stage works on a frame twice."""
-        for i in self.L[ChainLayers.inference_frame_image]:
-            for frame in self.board.take_inference_frames(i):
+        A tick without a frame runs none of them, so no stage works on a frame twice. Paused, the frames are
+        taken and dropped and only the view and the color run, on the last frame, made again when one of their
+        settings changes."""
+        for i in self.L[ChainLayers.view]:
+            frames: list[InferenceFrame] = self.board.take_inference_frames(i)
+            if self.settings.pause:
+                view = cast(ViewLayer, self.L[ChainLayers.view][i])
+                view.update()
+                self._run_color(i, view)
+                continue
+            for frame in frames:
                 self._run_inference_frame(i, frame)
 
     def _run_inference_frame(self, i: int, frame: InferenceFrame) -> None:
-        """One frame: its image into GL."""
+        """One frame: its image into GL, the view of it with its player's pose, the density's color from the view."""
         image = cast(render.InferenceFrameImageLayer, self.L[ChainLayers.inference_frame_image][i])
+        view = cast(ViewLayer, self.L[ChainLayers.view][i])
+
         image.set_inference_frame(frame)
         image.update()
+        poses: FrameDict = frame[Poses].poses
+        pose: Frame | None = poses[min(poses)] if poses else None
+        view.set_input(ViewInput(image.texture, frame.timestamp, pose))
+        self._view_timer.begin()
+        view.update()
+        self._view_timer.end()
+        self._run_color(i, view)
+
+    def _run_color(self, i: int, view: ViewLayer) -> render.ColorLayer:
+        """The density's color from camera `i`'s view, made again when the view was or one of its settings changed."""
+        color = cast(render.ColorLayer, self.L[ChainLayers.color][i])
+        output: ViewOutput = view.output
+        color.set_input(render.ColorInput(output.image, output.mask, view.timestamp, view.made))
+        color.update()
+        return color
+
+    def _wire_monitors(self) -> None:
+        """The monitors' input, every stage's ports; each monitor shows its own stage's."""
+        for i, _view in self.L[ChainLayers.view].items():
+            if i not in self.L[ChainLayers.color]:
+                continue
+            ports: dict[render.FlowStage, dict[str, Port]] = {
+                render.FlowStage.VIEW: cast(ViewLayer, _view).ports,
+                render.FlowStage.COLOR: cast(render.ColorLayer, self.L[ChainLayers.color][i]).ports,
+            }
+            for monitor in self._monitors():
+                monitor.set_input(render.MonitorInput(ports))
 
     # ========== Drawing ==========
 
@@ -215,7 +299,8 @@ class SuperficialFlowRender(RenderBase):
         self._draw_fit(self._main_layers, main_rect.x, height - main_rect.y - main_rect.height, main_rect.width, main_rect.height, True)
 
         debug_rect: Rect = self.subdivision.get_rect('panels', 1)
-        self._draw_fit(self._debug_layers, debug_rect.x, height - debug_rect.y - debug_rect.height, debug_rect.width, debug_rect.height, True)
+        self._draw_fit(self._debug_layers, debug_rect.x, height - debug_rect.y - debug_rect.height, debug_rect.width, debug_rect.height,
+                       True, debug=True)
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         self._draw_show(width, height)
@@ -232,13 +317,16 @@ class SuperficialFlowRender(RenderBase):
 
         Style.pop_style()
 
-    def _draw_fit(self, layer_types: list[ChainLayers], x: float, y: float, width: float, height: float, border: bool = False) -> None:
+    def _draw_fit(self, layer_types: list[ChainLayers], x: float, y: float, width: float, height: float, border: bool = False,
+                  debug: bool = False) -> None:
         """Draw each layer into a GL rect (origin bottom left) at its own shape, centered; with `border`, a border around
-        each."""
+        each; in the debug panel (`debug`) a stage's debug monitor, else its main monitor."""
         if width <= 0 or height <= 0:
             return
         for layer_type in layer_types:
             layers: dict[int, render.LayerBase] = self.L[layer_type]
+            if debug and layer_type in self._debug_monitors:
+                layers = dict(self._debug_monitors[layer_type])
             if 0 in layers:
                 fit_x, fit_y, fit_width, fit_height = fit(*self._layer_size(layer_type), width, height)
                 glViewport(int(x + fit_x), int(y + fit_y), int(fit_width), int(fit_height))
