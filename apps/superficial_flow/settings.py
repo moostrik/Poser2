@@ -48,6 +48,8 @@ class Layers(IntEnum):
     color =         auto()
     motion =        auto()
     bridge =        auto()
+    fluid =         auto()
+    show =          auto()     # the fluid's output, its look
     time_series =   auto()     # the app's timings, over time
     pose =          auto()
 
@@ -260,6 +262,7 @@ class RenderSettings(BaseSettings):
     color  : Group[render.ColorLayerSettings]    = Group(render.ColorLayerSettings)
     motion : Group[render.Motion2DLayerSettings] = Group(render.Motion2DLayerSettings, share=[input_fps.as_('fps')])
     bridge : Group[render.Bridge2DLayerSettings] = Group(render.Bridge2DLayerSettings)
+    fluid  : Group[render.Fluid2DLayerSettings]  = Group(render.Fluid2DLayerSettings)
     pose   : Group[PoseMonitorSettings]          = Group(PoseMonitorSettings)
     # the display
     time_series: Group[render.TimeSeriesLayerSettings] = Group(render.TimeSeriesLayerSettings)

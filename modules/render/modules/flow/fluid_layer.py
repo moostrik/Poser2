@@ -23,8 +23,8 @@ class Injection:
     """One bridge output as one fluid takes it: the boundary's `velocity`, `density` (the amount) and its
     `color`, `temperature`, the body force's `acceleration` and the 3D bridge's `expansion` from the
     bridge output, at `weight`, 0 to 1, the injection's share of the fluid's velocity, density and temperature, as a layer's weight in a mix. The app
-    sets the weight from whatever it reads; the fluid never knows why. `tint` is the color the 2D fluid gives
-    the injection's density at its output; the 3D fluid takes the density's `color` and ignores it."""
+    sets the weight from whatever it reads; the fluid never knows why. Both fluids take the density's `color`; the
+    `_z_position`s are the 3D's."""
     velocity: Texture
     density: Texture
     color: Texture
@@ -37,7 +37,6 @@ class Injection:
     acceleration_z_position: Texture | None = None
     expansion: Texture | None = None
     expansion_z_position: Texture | None = None
-    tint: tuple[float, float, float] = (1.0, 1.0, 1.0)
 
 
 @dataclass

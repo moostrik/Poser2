@@ -1,4 +1,4 @@
-"""Superficial Flow render — split-view layer graph with the 2D flow: view, color, motion and bridge."""
+"""Superficial Flow render — split-view layer graph with the 2D flow: view, color, motion, bridge and fluid."""
 
 from threading import Event
 from typing import Callable, cast
@@ -55,12 +55,14 @@ class SuperficialFlowRender(RenderBase):
             self.L[ChainLayers.color][i] =                       render.ColorLayer(   settings.color)
             self.L[ChainLayers.motion][i] =                      render.Motion2DLayer(settings.motion)
             self.L[ChainLayers.bridge][i] =                      render.Bridge2DLayer(settings.bridge)
+            self.L[ChainLayers.fluid][i] =                       render.Fluid2DLayer(settings.fluid)
             # each stage's main monitor in self.L, shown in the main panel; its debug monitor in self._debug_monitors,
             # shown in the debug panel
             for key, stage, flat in ((ChainLayers.view_monitor, render.FlowStage.VIEW, settings.view),
                                      (ChainLayers.color_monitor, render.FlowStage.COLOR, settings.color),
                                      (ChainLayers.motion_monitor, render.FlowStage.MOTION, settings.motion),
-                                     (ChainLayers.bridge_monitor, render.FlowStage.BRIDGE, settings.bridge)):
+                                     (ChainLayers.bridge_monitor, render.FlowStage.BRIDGE, settings.bridge),
+                                     (ChainLayers.fluid_monitor, render.FlowStage.FLUID, settings.fluid)):
                 self.L[key][i] = render.Monitor2DLayer(stage, flat.monitor_main)
                 self._debug_monitors.setdefault(key, {})[i] = render.Monitor2DLayer(stage, flat.monitor_debug)
         self.L[ChainLayers.time_series][0] = render.TimeSeriesLayer(self.board, settings.time_series)      # the board's series, one for all cameras
@@ -86,8 +88,9 @@ class SuperficialFlowRender(RenderBase):
         self.motion_rates: dict[int, FPS] = {}
         self._inference_frame_timestamps: dict[int, float] = {}     # each camera's frame run last
 
-        # The monitors' input, built right before they run, from what ran before them this tick
+        # The fluid's and the monitors' input, built right before they run, from what ran before them this tick
         self._wirings: dict[ChainLayers, Callable[[], None]] = {
+            ChainLayers.fluid: self._wire_fluid,
             ChainLayers.view_monitor: self._wire_monitors,
         }
 
@@ -185,7 +188,7 @@ class SuperficialFlowRender(RenderBase):
         self._last_tick = now
 
     def reset_flow(self) -> None:
-        """Clear the motion and the bridge at the next update; any thread."""
+        """Clear the motion, the bridge and the fluid at the next update; any thread."""
         self._reset_flow.set()
 
     def _monitors(self) -> list[render.Monitor2DLayer]:
@@ -197,7 +200,7 @@ class SuperficialFlowRender(RenderBase):
 
         if self._reset_flow.is_set():
             self._reset_flow.clear()
-            for layer_type in [ChainLayers.motion, ChainLayers.bridge]:
+            for layer_type in [ChainLayers.motion, ChainLayers.bridge, ChainLayers.fluid]:
                 for layer in self.L[layer_type].values():
                     cast(render.StageLayer, layer).reset()
 
@@ -282,6 +285,17 @@ class SuperficialFlowRender(RenderBase):
         color.update()
         return color
 
+    def _wire_fluid(self) -> None:
+        """Each fluid's input, one injection per bridge, at full weight."""
+        bridges: dict[int, render.Bridge2DLayer] = {i: cast(render.Bridge2DLayer, layer) for i, layer in self.L[ChainLayers.bridge].items()}
+        for _fluid in self.L[ChainLayers.fluid].values():
+            injections: list[render.Injection] = []
+            for bridge in bridges.values():
+                output: render.BridgeOutput = bridge.output
+                injections.append(render.Injection(output.velocity, output.density, output.color, output.temperature,
+                                                   output.acceleration, expansion=output.expansion))
+            cast(render.Fluid2DLayer, _fluid).set_input(render.FluidInput(self._dt, injections))
+
     def _wire_monitors(self) -> None:
         """The monitors' input, every stage's ports; each monitor shows its own stage's."""
         for i, _view in self.L[ChainLayers.view].items():
@@ -292,6 +306,7 @@ class SuperficialFlowRender(RenderBase):
                 render.FlowStage.COLOR: cast(render.ColorLayer, self.L[ChainLayers.color][i]).ports,
                 render.FlowStage.MOTION: cast(render.Motion2DLayer, self.L[ChainLayers.motion][i]).ports,
                 render.FlowStage.BRIDGE: cast(render.Bridge2DLayer, self.L[ChainLayers.bridge][i]).ports,
+                render.FlowStage.FLUID: cast(render.Fluid2DLayer, self.L[ChainLayers.fluid][i]).ports,
             }
             for monitor in self._monitors():
                 monitor.set_input(render.MonitorInput(ports))

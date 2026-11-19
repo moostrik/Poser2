@@ -219,9 +219,11 @@ amount and its color apart. `Bridge2DLayer` and `Bridge3DLayer` turn the `Bridge
 
 `FluidLayer`'s `_update()`: `_inject` each injection's velocity, density and temperature at its
 weight, then `_step(dt)`. It knows injections, not cameras, and reads no poses; the stage's reset is
-the fluid's only one. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into
-channel i of the density, four at most, and the output colors each channel with its injection's
-color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's.
+the fluid's only one. `Fluid2DLayer` takes each injection as the 3D does, on the plane: the velocity dragged
+toward, the acceleration added × dt, the density blended in with its color, the temperature dragged toward, the
+expansion into the projection (`Fluid2D.drag_velocity`, `add_acceleration`, `add_density`, `add_temperature`,
+`add_expansion`, each its own fragment shader); it draws the density's picture, RGB premultiplied, through its
+LUT at its panel's blend.
 `Fluid3DLayer` drags the fluid toward the velocity, the boundary, adds the acceleration, the body force, ×
 dt and drags it toward the density, the color times the amount, and the temperature, each velocity's z as the volume's w (its
 sign turned: w points away from the viewer); how the fluid takes each is in
@@ -305,15 +307,10 @@ frame. How a frame gets there, thread by thread, and what costs frames are in
 - Each pipeline stage is one package and one layer; a 2D and a 3D version of a stage sit side by
   side inside the package. Nothing is grouped by app or by camera.
 - The 2D system measures on the Lucas–Kanade solve as the 3D does (`LucasKanadeFlow2D`), its velocity in widths/s,
-  gated by the mask, and bridges on its own kernels as the 3D does (`Bridge2D`); its fluid stays as on `main`
-  (`Fluid2D`) until superficial_flow's plan rebuilds it. hd_trio runs its own copy of the gradient flow (`apps/hd_trio/flow`).
-- The fluid knows injections, not cameras. The 2D fluid keeps its injections apart until its
-  output, one density channel each, so a 2D fluid takes four injections at most, and colors them
-  there with each injection's color, as `main` colored its cameras: where two meet the brightness
-  is capped at white and the opacity is the stronger one's. hd_trio looks as it did on `main`
-  **(deduction)**: the fluid receives the same velocity at the same weight, the same amount per
-  channel, the same temperature and the same colors. The 3D fluid takes the density colored by
-  the bridge, any number of injections.
+  gated by the mask, bridges on its own kernels as the 3D does (`Bridge2D`), and its fluid takes the 3D's inputs,
+  its velocity in widths/s, its advection and projection in widths (`Fluid2D`). hd_trio runs its own copy of the gradient flow (`apps/hd_trio/flow`).
+- The fluid knows injections, not cameras. Both fluids take the density colored by the bridge, any number of
+  injections; hd_trio runs its own copy of the 2D fluid, its injections apart in the density's channels.
 - The inputs and outputs are the contract and the base classes hold the two kinds to one shape;
   there are no `Protocol`s for the boundaries. Shared code lives in the base, never in a shared
   concrete class.

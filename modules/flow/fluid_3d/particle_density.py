@@ -16,7 +16,8 @@ from modules.gl import GpuTimer, LayeredFbo, StorageBuffer, Style, Texture, Text
 from ..port import Port
 from ..wall_mode import WallMode
 from .density_carrier import CarrierStep, DensityCarrier
-from .fluid_settings import DensityBlend, Fluid3DSettings, Overlap, ParticleDraw
+from ..density_blend import DensityBlend
+from .fluid_settings import Fluid3DSettings, Overlap, ParticleDraw
 from .shaders import (RING_BYTES, MarchLook, CompositeLight, ParticleAdvect, ParticleComposite, ParticleEmit, ParticleRing, ParticleSprites, ParticleSurface, ParticleWeighted,
                       ParticleSurfaceShade, ParticleSurfaceSmooth)
 

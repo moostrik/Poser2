@@ -11,7 +11,8 @@ from dataclasses import dataclass
 from modules.gl import Texture, Texture3D
 from ..finite_guard import GuardSlot
 from ..port import Port
-from .fluid_settings import Advection, DensityBlend, Limiter
+from ..density_blend import DensityBlend
+from .fluid_settings import Advection, Limiter
 from .shaders import CompositeLight, MarchLook
 
 

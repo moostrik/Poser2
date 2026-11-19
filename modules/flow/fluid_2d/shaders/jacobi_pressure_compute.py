@@ -42,8 +42,7 @@ class JacobiPressureCompute(ComputeShader):
         pressure_out: Texture,
         divergence: Texture,
         obstacle: Texture,
-        grid_scale: float,
-        aspect: float,
+        cell: tuple[float, float],
         iterations: int = DEFAULT_ITERATIONS_PER_DISPATCH,
         has_obstacles: bool = True
     ) -> None:
@@ -54,8 +53,7 @@ class JacobiPressureCompute(ComputeShader):
             pressure_out: Output pressure field (R32F) - write via image
             divergence: Velocity divergence (R32F) - read via sampler
             obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1) - read via sampler
-            grid_scale: Grid scaling factor
-            aspect: Aspect ratio (width/height)
+            cell: A cell's width and height, widths
             iterations: Number of Jacobi iterations to perform in this dispatch
             has_obstacles: When False, skip obstacle texture reads for performance
 
@@ -72,9 +70,8 @@ class JacobiPressureCompute(ComputeShader):
             logger.warning("input texture(s) not allocated.")
             return
 
-        # Compute Jacobi parameters (same as fragment shader version)
-        dx = grid_scale
-        dy = grid_scale * aspect
+        # The Laplacian over the cell, widths (as the fragment shader version)
+        dx, dy = cell
 
         # Laplacian weights
         alpha_x = 1.0 / (dx * dx)
@@ -114,8 +111,7 @@ class JacobiPressureCompute(ComputeShader):
         pressure_b: Texture,
         divergence: Texture,
         obstacle: Texture,
-        grid_scale: float,
-        aspect: float,
+        cell: tuple[float, float],
         total_iterations: int = 40,
         iterations_per_dispatch: int = DEFAULT_ITERATIONS_PER_DISPATCH,
         has_obstacles: bool = True
@@ -129,8 +125,7 @@ class JacobiPressureCompute(ComputeShader):
             pressure_b: Second pressure buffer (R32F) - used for ping-pong
             divergence: Velocity divergence (R32F)
             obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1)
-            grid_scale: Grid scaling factor
-            aspect: Aspect ratio
+            cell: A cell's width and height, widths
             total_iterations: Total Jacobi iterations to perform
             iterations_per_dispatch: Iterations per compute dispatch
             has_obstacles: When False, skip obstacle texture reads for performance
@@ -152,7 +147,7 @@ class JacobiPressureCompute(ComputeShader):
             self.use(
                 src, dst,
                 divergence, obstacle,
-                grid_scale, aspect,
+                cell,
                 iters,
                 has_obstacles
             )

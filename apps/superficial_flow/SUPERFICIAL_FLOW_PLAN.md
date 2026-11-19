@@ -40,13 +40,6 @@ color), one fluid per screen. Until then hd_trio runs its own copy, unchanged.
 
 ## D. The 2D fluid
 
-- **D1.** The 2D fluid in the app, wired on the motion and the bridge (one injection per bridge, its monitors, the
-  flow's lanes in the time series), and taking the 3D's inputs ([FLUID_3D.md](../../modules/flow/FLUID_3D.md#the-inputs)): the boundary by a drag
-  (`velocity_drag`), the body force's acceleration × dt, the density over, added or filled with its color, in RGB
-  or Oklab, its release, the temperature by a drag, the expansion as a source in the pressure solve; the density
-  held as its color times its coverage and drawn through the LUT at the panel's blend, as the 3D's. The injection
-  passes are its own 2D fragment shaders. Checked: the injection passes in the GPU harness, then superficial_flow in
-  -sim on `measure`, the fluid moving with the player.
 - **D2.** The 2D fluid's panel as the 3D's, for what the 2D has: `guard`, `wall`, `width`, `height` (rounded up to a multiple of 8, not 32); `time`
   (`time_scale` added); `input` (gravity in it); `velocity` (`advection_scale` for `self_advection`, `evaporation_time` and
   `evaporation_knee` for `dampen_*`, the viscosity in widths²/s); `vorticity`; `temperature` (`enabled` first);
@@ -74,18 +67,17 @@ Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 
 | Step     | Check                                                                                               |
 |----------|-----------------------------------------------------------------------------------------------------|
-| D1       | GPU harness for the injection passes; -sim, the fluid moving with the player                        |
 | D2       | the settings test: shared settings with deep_flow's values                                          |
 | D3 to D7 | GPU harness for each new kernel; -sim                                                               |
 | End      | the full suite once; the inference at 50 fps, the render at 60; deep_flow's times                |
 
 ## Rules it touches
 
-- Remove obsolete pathways; no parallel legacy ones: D1, D2.
+- Remove obsolete pathways; no parallel legacy ones: D2.
 - One term everywhere; when a term changes, rename it everywhere in the same change: D2.
 - Keep presets and settings schemas in sync with code changes: D2 to D7.
 - A settings class mirrors the code it configures; a stage's ports follow its steps: D2.
-- Shaders get checked in a GPU harness: D1, D3 to D7.
-- Prefer the design with the lower latency, measured in the context of the app: D1 to D7.
+- Shaders get checked in a GPU harness: D3 to D7.
+- Prefer the design with the lower latency, measured in the context of the app: D2 to D7.
 - A document describes what is built: D2 (FLUID_2D.md).
 - A plan is named after the package, app or folder it is for, and sits in it: this plan, in `apps/superficial_flow`.

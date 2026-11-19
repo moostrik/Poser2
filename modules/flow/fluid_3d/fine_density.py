@@ -17,7 +17,8 @@ from ..port import ColorSpace, Port, TextureKind
 from .density import Density
 from .density_carrier import CarrierStep, DensityCarrier
 from .field_advection import FieldAdvection
-from .fluid_settings import DensityBlend, DensitySample, Fluid3DSettings
+from ..density_blend import DensityBlend
+from .fluid_settings import DensitySample, Fluid3DSettings
 from .shaders import MarchLook, Composite3D, CompositeLight, InjectAmount3D, NoiseCoordinates3D, TurbulentAdvect3D, VelocityAverage3D
 from .swirl_noise import swirl_noise
 

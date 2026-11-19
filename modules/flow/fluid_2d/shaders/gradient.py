@@ -13,7 +13,7 @@ class Gradient(Shader):
     def __init__(self) -> None:
         super().__init__()
 
-    def use(self, velocity: Texture, pressure: Texture, obstacle: Texture, grid_scale: float, aspect: float,
+    def use(self, velocity: Texture, pressure: Texture, obstacle: Texture, cell: tuple[float, float],
             has_obstacles: bool = True) -> None:
         """Apply pressure gradient subtraction.
 
@@ -21,8 +21,7 @@ class Gradient(Shader):
             velocity: Current velocity field (RG32F)
             pressure: Pressure field (R32F)
             obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1)
-            grid_scale: Grid scaling factor (derived from settings width / output width)
-            aspect: Aspect ratio (width/height) for isotropic derivatives
+            cell: A cell's width and height, widths
             has_obstacles: When False, skip obstacle texture reads for performance
         """
         if not self.allocated or not self.shader_program:
@@ -50,9 +49,9 @@ class Gradient(Shader):
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
         glUniform1i(self.get_uniform_loc("uObstacle"), 2)
 
-        # Set uniforms (aspect-corrected grid scales)
-        half_rdx_x = 0.5 / grid_scale
-        half_rdx_y = (0.5 / grid_scale) / aspect
+        # 1 / (2 × the cell), widths: a central difference over two cells
+        half_rdx_x = 0.5 / cell[0]
+        half_rdx_y = 0.5 / cell[1]
         glUniform2f(self.get_uniform_loc("uHalfRdxInv"), half_rdx_x, half_rdx_y)
 
         draw_quad()

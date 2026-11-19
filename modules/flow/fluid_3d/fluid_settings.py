@@ -7,6 +7,7 @@ from modules.settings import Field, BaseSettings, Group, Widget
 from modules.utils import Color
 
 from ..port import ColorSpace
+from ..density_blend import DensityBlend
 from ..wall_mode import WallMode
 from ..time_step import TimeStepMode
 
@@ -68,14 +69,6 @@ class Overlap(IntEnum):
     OCCLUDED = 0            # depth slices marched front to back: near density covers far density
     ADDITIVE = 1            # one sum, the depth as fog per particle
     WEIGHTED = 2            # weighted blended order-independent transparency: one pass, near density over far by a depth weight (McGuire, Bavoil 2013)
-
-
-class DensityBlend(IntEnum):
-    """How the body's dye goes into the water, premultiplied: over it, compositing (Porter and Duff 1984),
-    added to it, a source (Stam 2003), or the water drawn toward it, kept to compare."""
-    OVER = 0        # the dye over the water's by the drag's share: the amount never falls and never passes 1
-    ADD = 1         # the dye × the gain × dt added; at more than fully dyed all four channels scaled down to it
-    FILL = 2        # the water drawn toward the dye, at most fully dyed, its color too: up by the drag's share, down by the release's
 
 
 class ParticleSettings(BaseSettings):

@@ -23,7 +23,7 @@ uniform float uRelease;      // the release's share this step where the cell fal
 uniform bool  uCubic;       // the source enlarged by a cubic B-spline, else bilinearly
 uniform ivec3 uSize;
 
-#include "density_blend.glsl"
+#include "../../shaders/density_blend.glsl"
 
 float bspline_amount(vec2 uv) {
     vec2 size = vec2(textureSize(uInput, 0));

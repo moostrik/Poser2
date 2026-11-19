@@ -38,7 +38,7 @@ uniform uint  uSeed;        // the frame
 
 const int MAX_PER_TEXEL = 16;
 
-#include "density_blend.glsl"
+#include "../../shaders/density_blend.glsl"
 #include "slab.glsl"
 
 uint hash(uint x) {

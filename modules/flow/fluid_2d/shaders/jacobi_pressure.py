@@ -13,7 +13,7 @@ class JacobiPressure(Shader):
     def __init__(self) -> None:
         super().__init__()
 
-    def use(self, source: Texture, divergence: Texture, obstacle: Texture, grid_scale: float, aspect: float,
+    def use(self, source: Texture, divergence: Texture, obstacle: Texture, cell: tuple[float, float],
             has_obstacles: bool = True) -> None:
         """Apply one Jacobi iteration.
 
@@ -21,8 +21,7 @@ class JacobiPressure(Shader):
             source: Previous pressure estimate (R32F)
             divergence: Velocity divergence (R32F)
             obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1)
-            grid_scale: Grid scaling factor (typically 1)
-            aspect: Aspect ratio (width/height)
+            cell: A cell's width and height, widths
             has_obstacles: When False, skip obstacle texture reads for performance
         """
         if not self.allocated or not self.shader_program:
@@ -32,10 +31,8 @@ class JacobiPressure(Shader):
             logger.warning("JacobiPressure shader: input texture(s) not allocated.")
             return
 
-        # Compute Jacobi parameters
-        # Anisotropic grid spacing
-        dx = grid_scale
-        dy = grid_scale * aspect
+        # The Laplacian over the cell, widths
+        dx, dy = cell
 
         # Laplacian weights
         alpha_x = 1.0 / (dx * dx)

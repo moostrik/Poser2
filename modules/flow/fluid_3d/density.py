@@ -10,7 +10,8 @@ from modules.gl import Texture, Texture3D, SwapTexture3D
 from ..port import ColorSpace, Port, TextureKind
 from .density_carrier import CarrierStep, DensityCarrier
 from .field_advection import FieldAdvection
-from .fluid_settings import DensityBlend, Fluid3DSettings
+from ..density_blend import DensityBlend
+from .fluid_settings import Fluid3DSettings
 from .shaders import MarchLook, InjectDensity3D, Composite3D, CompositeLight
 
 _BARRIER_IMAGE: int = int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)

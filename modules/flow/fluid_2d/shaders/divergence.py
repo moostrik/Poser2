@@ -1,6 +1,6 @@
 """Divergence shader - Compute divergence of velocity field."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging
@@ -13,16 +13,19 @@ class Divergence(Shader):
     def __init__(self) -> None:
         super().__init__()
 
-    def use(self, velocity: Texture, obstacle: Texture, grid_scale: float, aspect: float,
-            has_obstacles: bool = True) -> None:
+    def use(self, velocity: Texture, obstacle: Texture, cell: tuple[float, float],
+            has_obstacles: bool = True, expansion: Texture | None = None, rate: float = 0.0,
+            mean_lod: float | None = None) -> None:
         """Compute divergence.
 
         Args:
             velocity: Velocity field (RG32F)
             obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1)
-            grid_scale: Grid scaling factor (derived from settings width / output width)
-            aspect: Aspect ratio (width/height) for isotropic derivatives
+            cell: A cell's width and height, widths
             has_obstacles: When False, skip obstacle texture reads for performance
+            expansion: The expansion (R16F, with mipmaps), its rate × it taken off the divergence; None none
+            rate: The expansion's rate, 1/s
+            mean_lod: The expansion's mip level that is its mean, taken off first (closed walls); None none
         """
         if not self.allocated or not self.shader_program:
             logger.warning("Divergence shader not allocated or shader program missing.")
@@ -45,9 +48,19 @@ class Divergence(Shader):
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
         glUniform1i(self.get_uniform_loc("uObstacle"), 1)
 
-        # Set uniforms (aspect-corrected grid scales)
-        half_rdx_x = 0.5 / grid_scale
-        half_rdx_y = (0.5 / grid_scale) / aspect
+        # 1 / (2 × the cell), widths: a central difference over two cells
+        half_rdx_x = 0.5 / cell[0]
+        half_rdx_y = 0.5 / cell[1]
         glUniform2f(self.get_uniform_loc("uHalfRdxInv"), half_rdx_x, half_rdx_y)
+
+        has_expansion: bool = expansion is not None and expansion.allocated and rate != 0.0
+        glUniform1i(self.get_uniform_loc("uHasExpansion"), int(has_expansion))
+        if has_expansion:
+            assert expansion is not None
+            glActiveTexture(GL_TEXTURE2)
+            glBindTexture(GL_TEXTURE_2D, expansion.tex_id)
+            glUniform1i(self.get_uniform_loc("uExpansion"), 2)
+            glUniform1f(self.get_uniform_loc("uRate"), rate)
+            glUniform1f(self.get_uniform_loc("uMeanLod"), mean_lod if mean_lod is not None else -1.0)
 
         draw_quad()

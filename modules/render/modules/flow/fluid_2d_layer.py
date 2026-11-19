@@ -1,109 +1,95 @@
 """The 2D fluid layer: `Fluid2D`, the Navier–Stokes simulation on the plane, on its injections.
 
-The density keeps the injections apart: injection i's amount goes into channel i of the RGBA density,
-four at most, and the output colors each channel with its injection's color (`DensityColorize`),
-the brightness capped at white and the opacity the strongest channel's.
+Each injection goes in as the 3D fluid takes it: the boundary's velocity dragged toward, the body force added × dt,
+the density with its color by the blend, the temperature dragged toward, the expansion into the projection. The
+density is held as its color times its coverage, and drawn, its picture, through the LUT at the panel's blend.
 """
 
-# Standard library imports
-import logging
-
-# Third-party imports
-from OpenGL.GL import GL_RGBA16F
-
 # Local application imports
-from modules.gl import Fbo, Style, Texture
+from modules.gl import GpuTimer, Style, Texture
 from modules.settings import Field, Group
 from modules.flow import Fluid2D, Fluid2DSettings, HasPorts
-from .shaders import DensityColorize
-from .fluid_layer import FluidLayer, FluidLayerSettings, FluidInput, FluidOutput, Injection
+from ...general.grade import LutGrade, LutSettings
+from .fluid_layer import FluidLayer, FluidLayerSettings, FluidOutput, Injection
 from .monitor_2d_layer import DEBUG_TINT, MAIN_TINT, Monitor2DLayerSettings
-
-logger = logging.getLogger(__name__)
-
-CHANNELS: int = 4       # the density's channels, one injection each
 
 
 class Fluid2DLayerSettings(Fluid2DSettings, FluidLayerSettings):
-    """Configuration for Fluid2DLayer: the stage's settings and its fluid's own, one panel, the stage's
-    first; the stage's width and height are the fluid's simulation grid."""
+    """Configuration for Fluid2DLayer: the stage's settings and its fluid's own, one panel, the stage's first; the
+    stage's width and height are the fluid's simulation grid; how the picture is drawn over the layers before it, and
+    the LUT it is drawn through."""
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD, newline=True, description="How the show is drawn over the layers before it")
+    lut: Group[LutSettings] =               Group(LutSettings)
 
     monitor_main:  Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=MAIN_TINT)
     monitor_debug: Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=DEBUG_TINT)
 
 
 class Fluid2DLayer(FluidLayer):
-    """The 2D fluid layer: each injection's velocity and temperature into the fluid at its weight, its
-    density's amount into the injection's own channel; one step per tick; the channels colored at the
-    output, the show."""
+    """The 2D fluid layer: each injection's boundary velocity dragged toward and body force added, its density and
+    temperature at its weight, its expansion into the projection; one step per tick; the density's picture the
+    texture."""
 
     def __init__(self, settings: Fluid2DLayerSettings) -> None:
         super().__init__(settings)
         self.settings: Fluid2DLayerSettings = settings
         self._fluid: Fluid2D = Fluid2D(settings)
-        self._colors: list[tuple[float, float, float, float]] = [(0.0, 0.0, 0.0, 0.0)] * CHANNELS    # each channel's injection's color
-        self._colorized: Fbo = Fbo()
-        self._colorize_shader: DensityColorize = DensityColorize()
-        self._channel: int = 0      # the channel the next injection's amount goes into
-        self._warned_channels: bool = False
+        self._inject_timer: GpuTimer = GpuTimer("GPU fluid inject")     # an injection's drag, force and sources
+        self._grade: LutGrade = LutGrade(settings.lut)
 
     @property
     def blend_mode(self) -> Style.BlendMode:
-        return self.settings.blend_mode
+        """The panel's blend for a premultiplied picture: the density is its color times its coverage."""
+        return self.settings.blend_mode.premultiplied
 
     @property
     def texture(self) -> Texture:
-        return self._colorized
+        """The density's picture, RGB premultiplied (RGBA16F)."""
+        return self._fluid.picture
 
     @property
     def output(self) -> FluidOutput:
-        return FluidOutput(self._colorized)
+        return FluidOutput(self._fluid.picture)
 
     def _components(self) -> dict[str, HasPorts]:
-        return {'': self._fluid}    # its fields carry their groups' names: velocity, density, temperature, pressure
+        return {'': self._fluid}    # its fields carry their names: velocity, density, temperature, pressure
 
     # ========== Lifecycle ==========
 
     def allocate(self, width: int, height: int, internal_format: int | None = None) -> None:
         self._fluid.allocate(width, height)
-        self._colorized.allocate(width, height, GL_RGBA16F)
-        self._colorize_shader.allocate()
+        self._grade.allocate()
 
     def deallocate(self) -> None:
         self._fluid.deallocate()
-        self._colorized.deallocate()
-        self._colorize_shader.deallocate()
+        self._inject_timer.deallocate()
+        self._grade.deallocate()
         super().deallocate()
+
+    def draw(self) -> None:
+        """The show, through its LUT where one is picked."""
+        Style.push_style()
+        Style.set_blend_mode(self.blend_mode)
+        if self.texture.allocated:
+            self._grade.draw(self.texture)
+        Style.pop_style()
 
     def reset(self) -> None:
         self._fluid.reset()
 
     # ========== Processing ==========
 
-    def _update(self) -> None:
-        input: FluidInput | None = self._input
-        if input is not None:
-            self._colors = [(*injection.tint, 1.0) for injection in input.injections[:CHANNELS]]
-            self._colors += [(0.0, 0.0, 0.0, 0.0)] * (CHANNELS - len(self._colors))
-            if len(input.injections) > CHANNELS and not self._warned_channels:
-                self._warned_channels = True
-                logger.warning("Fluid2DLayer: %d injections, the density has %d channels; the rest add no density", len(input.injections), CHANNELS)
-        super()._update()
-
     def _inject(self, injection: Injection) -> None:
         fluid: Fluid2D = self._fluid
-        fluid.add_velocity(injection.velocity, injection.weight)
-        channel: int = self._channel
-        if channel < CHANNELS:
-            fluid.add_density_channel(injection.density, channel, injection.weight)
+        self._inject_timer.begin()
+        fluid.drag_velocity(injection.velocity, injection.weight)
+        if injection.acceleration is not None:
+            fluid.add_acceleration(injection.acceleration, injection.weight)
+        fluid.add_density(injection.density, injection.color, injection.weight)
         fluid.add_temperature(injection.temperature, injection.weight)
-        self._channel = channel + 1
+        if injection.expansion is not None:
+            fluid.add_expansion(injection.expansion, injection.weight)
+        self._inject_timer.end()
 
     def _step(self, dt: float) -> None:
-        self._channel = 0
         self._fluid.update(dt)      # reallocates itself on a size change
-        self._colorize_shader.reload()
-        self._colorized.begin()
-        self._colorize_shader.use(self._fluid.density, self._colors)
-        self._colorized.end()

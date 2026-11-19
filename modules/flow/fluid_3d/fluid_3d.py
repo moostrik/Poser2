@@ -11,7 +11,9 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_REPEA
 
 from modules.gl import ComputeShader, StorageBuffer, SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
 from ..wall_mode import WallMode
-from .fluid_settings import Advection, Light, Limiter, PressureSolver, ScatteringModel, DensityBlend, Fluid3DSettings, PressureSettings, ParticleSettings, DensitySettings, FineDensitySettings
+from ..density_blend import DensityBlend
+from ..drag import DRAG_FLOOR, drag_share
+from .fluid_settings import Advection, Light, Limiter, PressureSolver, ScatteringModel, Fluid3DSettings, PressureSettings, ParticleSettings, DensitySettings, FineDensitySettings
 from .multigrid_pressure import MultigridPressure
 from .face_velocity import FaceVelocity
 from ..shaders import AddBoolean
@@ -50,20 +52,9 @@ FLUID_PASSES: tuple[str, ...] = ('advect velocity', 'viscosity', 'vorticity', 'b
                                  'advect temperature', 'density', 'light', 'composite')     # a step's passes, each a GPU timer
 FULL_WIDTH_HALF_MAXIMUM: float = 2.0 * math.sqrt(2.0 * math.log(2.0))   # a gaussian's width at half its height, in sigmas
 CAUSTIC_NET_SIZE: int = 256   # the caustic net's texels across its tile
-DRAG_FLOOR: float = 0.02    # widths/s: the body's speed below which it drags nothing, so a dead trail pulls nothing toward 0
 
 import logging
 logger = logging.getLogger(__name__)
-
-
-# ── the drag's share ────────────────────────────────────────────────────
-
-def drag_share(delta_time: float, drag_time: float) -> float:
-    """The share of the gap to the body's velocity the water closes in one step of `delta_time` (s):
-    1 − exp(−dt / drag_time), `drag_time` in ms; 0 ms sets the velocity at once."""
-    if drag_time <= 0.0:
-        return 1.0
-    return 1.0 - math.exp(-delta_time * 1000.0 / drag_time)
 
 
 # ---------------------------------------------------------------------------

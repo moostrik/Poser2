@@ -3,9 +3,9 @@
 // Semi-Lagrangian advection with dissipation
 // Backward trace along velocity field and sample source
 //
-// Advection formula:  st_back = st - timestep * rdx * velocity
-//   timestep = dt * speed   (advection distance in UV-space per frame)
-//   rdx = vec2(1.0, 1.0/aspect)  for aspect-correct tracing on non-square grids
+// Advection formula:  st_back = st - timestep * rdx * velocity, the velocity in widths/s
+//   timestep = dt * speed
+//   rdx = vec2(1.0, aspect): uv per width, the field's width over its height on y
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -16,7 +16,7 @@ uniform sampler2D uObstacle;   // Obstacle mask (R8 or R32F)
 uniform bool uHasObstacles;    // Skip obstacle checks when false
 
 uniform float uTimestep;       // dt * speed — advection rate
-uniform vec2  uRdx;            // (1.0, 1.0/aspect) — aspect-corrected inverse grid scale
+uniform vec2  uRdx;            // (1, aspect): uv per width on x and y
 uniform float uDissipation;    // Energy loss multiplier per frame
 
 void main() {

@@ -23,7 +23,7 @@ uniform bool  uOklab;       // the volume holds Oklab
 uniform ivec3 uSize;
 
 #include "color.glsl"
-#include "density_blend.glsl"
+#include "../../shaders/density_blend.glsl"
 #include "slab.glsl"
 
 void main() {
