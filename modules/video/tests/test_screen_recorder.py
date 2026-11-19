@@ -7,7 +7,7 @@ from typing import Callable
 
 import numpy as np
 
-from modules.video import (ScreenRecorder, ScreenRecorderSettings, ScreenRecorderState, ScreenSize, even,
+from modules.video import (ScreenMemory, ScreenRecorder, ScreenRecorderSettings, ScreenRecorderState, ScreenSize, even,
                            frames_for, matching_preset, preset_size)
 
 FPS = 64.0      # ticks/s; 1/64 s and its multiples are exact in binary, so spans compare exactly
@@ -17,11 +17,12 @@ TIMEOUT = 5.0   # s a test waits for the recorder's thread
 class FakeRing:
     """A ring in host memory: each slot holds the number of the tick whose frame it got."""
 
-    def __init__(self, free: int = 1 << 40, fail_allocate: bool = False) -> None:
+    def __init__(self, fail_allocate: bool = False) -> None:
         self.allocated = False
         self.width = 0
         self.height = 0
-        self.free = free
+        self.host_memory = True
+        self.free: dict[bool, int] = {True: 1 << 40, False: 1 << 40}     # free bytes in RAM (True) and video memory
         self.fail_allocate = fail_allocate
         self.frame_on_screen = 0        # what the app drew into the screen frame this tick
         self._lock = Lock()
@@ -41,10 +42,10 @@ class FakeRing:
         with self._lock:
             return len(self._slots)
 
-    def allocate(self, width: int, height: int) -> None:
+    def allocate(self, width: int, height: int, host_memory: bool) -> None:
         if self.fail_allocate:
             raise OSError('no CUDA')
-        self.allocated, self.width, self.height = True, width, height
+        self.allocated, self.width, self.height, self.host_memory = True, width, height, host_memory
         self.allocations += 1
 
     def deallocate(self) -> None:
@@ -62,8 +63,9 @@ class FakeRing:
                 self._slots[slot] = frame
             self._pending = None
 
-    def free_memory(self) -> int:
-        return self.free - self.num_slots * self.frame_bytes
+    def free_memory(self, host_memory: bool) -> int:
+        held = self.num_slots * self.frame_bytes if host_memory == self.host_memory else 0
+        return self.free[host_memory] - held
 
     def add_block(self, slots: int) -> None:
         with self._lock:
@@ -260,13 +262,48 @@ class StateTest(unittest.TestCase):
         self.assertEqual(set(np.diff(frames).tolist()), {2})
         self.assertAlmostEqual(FakeClip.clips[0].fps, FPS / 2, places=3)
 
-    def test_memory_at_the_reserve_stops_the_recording(self) -> None:
+    def _memory_stops_the_recording(self, memory: ScreenMemory, reserve: float) -> None:
+        """Room for two blocks of 64 frames above `reserve` (GB) in `memory`: the take ends with the second."""
         frame = 8 * 4 * 3 // 2
-        self.ring.free = int(self.settings.reserve * (1 << 30)) + 150 * frame     # room for two blocks of 64
+        host_memory = memory is ScreenMemory.HOST
+        self.settings.memory = memory
+        self.ring.free[host_memory] = int(reserve * (1 << 30)) + 150 * frame
         ScreenRecorderSettings.start.fire(self.settings)
         self.tick_until(lambda: len(FakeClip.clips) == 1 and self.settings.state is ScreenRecorderState.IDLE)
+        self.assertEqual(self.ring.host_memory, host_memory)
         self.assertEqual(len(self.ring.blocks), 2)
         self.assertEqual(len(FakeClip.clips[0].frames), sum(self.ring.blocks))     # every slot of the two blocks
+
+    def test_ram_at_its_reserve_stops_the_recording(self) -> None:
+        self._memory_stops_the_recording(ScreenMemory.HOST, self.settings.ram_reserve)
+
+    def test_video_memory_at_its_reserve_stops_the_recording(self) -> None:
+        self._memory_stops_the_recording(ScreenMemory.VIDEO, self.settings.reserve)
+
+    def test_the_ring_is_in_ram_by_default(self) -> None:
+        self.assertIs(self.settings.memory, ScreenMemory.HOST)
+        ScreenRecorderSettings.start.fire(self.settings)
+        self.tick_until(lambda: self.ring.num_slots > 0)
+        self.assertTrue(self.ring.host_memory)
+
+    def test_a_memory_change_remakes_the_look_back_ring(self) -> None:
+        self.settings.look_back = True
+        self.tick_until(lambda: self.ring.num_slots > 0)
+        self.settings.memory = ScreenMemory.VIDEO
+        self.tick_until(lambda: not self.ring.host_memory and self.ring.num_slots > 0
+                        and self.settings.state is ScreenRecorderState.RECORDING)
+        self.assertEqual(self.ring.allocations, 2)
+
+    def test_max_duration_counts_the_memory_set(self) -> None:
+        frame = 8 * 4 * 3 // 2
+        self.ring.free[True] = int(self.settings.ram_reserve * (1 << 30)) + 640 * frame     # 10 s at 64 ticks/s
+        self.ring.free[False] = int(self.settings.reserve * (1 << 30)) + 320 * frame        # 5 s
+        # the rate measured settles from 60 to 64 ticks/s, so the estimate lies between the two
+        self.tick_until(lambda: 0.0 < self.settings.max_duration < 100.0)
+        self.assertTrue(640 / 64 - 0.1 <= self.settings.max_duration <= 640 / 60 + 0.1, self.settings.max_duration)
+        self.settings.memory = ScreenMemory.VIDEO
+        self.tick_until(lambda: self.settings.max_duration < 7.0)
+        self.assertTrue(320 / 64 - 0.1 <= self.settings.max_duration <= 320 / 60 + 0.1, self.settings.max_duration)
 
     def test_look_back_keeps_the_last_seconds_and_saves_them(self) -> None:
         self.settings.duration = 0.5

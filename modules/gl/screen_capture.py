@@ -1,8 +1,10 @@
-"""ScreenCapture: the recording's screen frame, converted to NV12 and copied into a ring of frames in CUDA memory.
+"""ScreenCapture: the recording's screen frame, converted to NV12 and copied into a ring of frames in RAM or in video
+memory.
 
 The render thread draws into `frame` (or copies the window into it with `copy_window`) and calls `capture`. The
-ring's blocks are plain `cudaMalloc` memory, added and freed by any thread; `download` reads a frame back into
-pinned host memory on a stream of its own. Only the render thread makes GL calls. See modules/video/VIDEO.md.
+ring's blocks are pinned host memory (`cudaMallocHost`) or plain `cudaMalloc` memory, added and freed by any thread;
+`download` hands a frame out of RAM as it is, or reads it back from video memory into pinned host memory on a stream
+of its own. Only the render thread makes GL calls. See modules/video/VIDEO.md.
 """
 
 import ctypes
@@ -11,6 +13,7 @@ from collections import deque
 from threading import Lock
 
 import numpy as np
+import psutil
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER, GL_LINEAR, GL_NEAREST,
                        GL_PACK_ALIGNMENT, GL_PIXEL_PACK_BUFFER, GL_R8, GL_READ_FRAMEBUFFER, GL_RED, GL_RG, GL_RG8,
                        GL_RGBA8, GL_STREAM_COPY, GL_UNSIGNED_BYTE, glBindBuffer, glBindFramebuffer, glBlitFramebuffer,
@@ -39,12 +42,13 @@ def nv12_bytes(width: int, height: int) -> int:
 
 
 class ScreenCapture:
-    """The screen frame (RGBA8) of the recording's size, its NV12 conversion, and the ring of NV12 frames in CUDA
-    memory it is copied into, one tick late."""
+    """The screen frame (RGBA8) of the recording's size, its NV12 conversion, and the ring of NV12 frames in RAM or in
+    video memory it is copied into, one tick late."""
 
     def __init__(self) -> None:
         self.width: int = 0
         self.height: int = 0
+        self.host_memory: bool = True       # the ring's blocks in pinned RAM; False: in video memory
         self.frame: Fbo = Fbo()
         self._y: Fbo = Fbo(GL_NEAREST)
         self._uv: Fbo = Fbo(GL_NEAREST)
@@ -56,7 +60,7 @@ class ScreenCapture:
         self._capture_stream: int = 0
         self._download_stream: int = 0
         self._lock: Lock = Lock()           # guards the block list
-        self._blocks: list[tuple[int, int]] = []    # (device pointer, slots)
+        self._blocks: list[tuple[int, int]] = []    # (pointer, slots): host pointers in RAM, device pointers in video memory
         self._host: list[int] = []          # pinned download buffers
         self._host_events: list[int] = []   # one per download buffer: its copy is done
         self._downloads: deque[int] = deque()   # host buffer indices queued, oldest first
@@ -72,15 +76,16 @@ class ScreenCapture:
 
     # RENDER THREAD
 
-    def allocate(self, width: int, height: int) -> None:
-        """GL objects for frames of `width` × `height` (even), and their CUDA registration; raises on failure, with
-        nothing left allocated."""
+    def allocate(self, width: int, height: int, host_memory: bool) -> None:
+        """GL objects for frames of `width` × `height` (even), and their CUDA registration, for a ring in RAM
+        (`host_memory`) or in video memory; raises on failure, with nothing left allocated. The ring is empty."""
         if width <= 0 or height <= 0 or width % 2 or height % 2:
             raise ValueError(f'NV12 needs an even size, got {width}x{height}')
         if not _CUDA_OK:
             raise OSError('screen capture needs torch with CUDA')
         self.deallocate()
         self.width, self.height = width, height
+        self.host_memory = host_memory
         try:
             self.frame.allocate(width, height, GL_RGBA8)
             self._y.allocate(width, height, GL_R8)
@@ -163,7 +168,8 @@ class ScreenCapture:
         self._turn = 1 - self._turn
 
     def flush(self) -> None:
-        """Copy the pending frame, written by GL on an earlier tick, into its slot."""
+        """Copy the pending frame, written by GL on an earlier tick, into its slot: device to host into RAM, device to
+        device into video memory; queued on the capture's stream, not waited for."""
         if self._pending is None:
             return
         slot, self._pending = self._pending, None
@@ -172,7 +178,10 @@ class ScreenCapture:
         cudart.map_resource(resource, self._capture_stream)
         try:
             source, _ = cudart.mapped_pointer(resource)
-            cudart.memcpy_device_to_device(pointer, source, self.frame_bytes, self._capture_stream)
+            if self.host_memory:
+                cudart.memcpy_device_to_host(pointer, source, self.frame_bytes, self._capture_stream)
+            else:
+                cudart.memcpy_device_to_device(pointer, source, self.frame_bytes, self._capture_stream)
         finally:
             cudart.unmap_resource(resource, self._capture_stream)
 
@@ -184,7 +193,8 @@ class ScreenCapture:
             return sum(slots for _, slots in self._blocks)
 
     def slot_pointer(self, slot: int) -> int:
-        """The device pointer of ring slot `slot`, counted over the blocks in the order they were added."""
+        """The pointer of ring slot `slot` (host or device, as the ring's memory), counted over the blocks in the order
+        they were added."""
         with self._lock:
             for pointer, slots in self._blocks:
                 if slot < slots:
@@ -193,23 +203,29 @@ class ScreenCapture:
         raise IndexError('screen capture slot outside the ring')
 
     @staticmethod
-    def free_memory() -> int:
-        """The device's free memory in bytes."""
+    def free_memory(host_memory: bool) -> int:
+        """Free bytes: the RAM available to processes (`host_memory`), or the device's free memory."""
+        if host_memory:
+            return int(psutil.virtual_memory().available)
         return cudart.mem_get_info()[0]
 
     def add_block(self, slots: int) -> None:
-        """Grow the ring by a block of `slots` frames; raises `cudart.CudaError` when the device has no room."""
-        pointer = cudart.malloc(slots * self.frame_bytes)
+        """Grow the ring by a block of `slots` frames; raises `cudart.CudaError` when there is no room."""
+        size = slots * self.frame_bytes
+        pointer = cudart.malloc_host(size) if self.host_memory else cudart.malloc(size)
         with self._lock:
             self._blocks.append((pointer, slots))
 
     def free_blocks(self) -> None:
-        """Free the ring's blocks and the download buffers; the memory goes back to the device."""
+        """Free the ring's blocks and the download buffers; the memory goes back to the system or the device."""
         self.synchronize()
         with self._lock:
             blocks, self._blocks = self._blocks, []
         for pointer, _ in blocks:
-            cudart.free(pointer)
+            if self.host_memory:
+                cudart.free_host(pointer)
+            else:
+                cudart.free(pointer)
         if self._download_stream:
             cudart.stream_synchronize(self._download_stream)
         for pointer in self._host:
@@ -226,10 +242,14 @@ class ScreenCapture:
             cudart.stream_synchronize(self._capture_stream)
 
     def queue_download(self, slot: int) -> None:
-        """Queue the copy of `slot` into the next of two pinned host buffers; `wait_download` returns it. With one
-        download queued, the next copy runs while the caller writes out the one before."""
+        """Queue `slot` for `wait_download`. In RAM the slot is handed out as it is, after `synchronize`; in video
+        memory its copy goes into the next of two pinned host buffers, so with one download queued the next copy runs
+        while the caller writes out the one before."""
         if len(self._downloads) >= 2:
             raise RuntimeError('two downloads are queued already')
+        if self.host_memory:
+            self._downloads.append(slot)
+            return
         if not self._host:
             self._host = [cudart.malloc_host(self.frame_bytes) for _ in range(2)]
             self._host_events = [cudart.event_create() for _ in range(2)]
@@ -240,9 +260,13 @@ class ScreenCapture:
         self._downloads.append(index)
 
     def wait_download(self) -> np.ndarray:
-        """The oldest queued download as a (height × 3/2, width) uint8 NV12 array, valid until the next
-        `queue_download` after this call."""
-        index = self._downloads.popleft()
-        cudart.event_synchronize(self._host_events[index])
-        data = (ctypes.c_uint8 * self.frame_bytes).from_address(self._host[index])
+        """The oldest queued download as a (height × 3/2, width) uint8 NV12 array: in RAM the slot itself, valid until
+        the ring is freed; in video memory a host buffer, valid until the next `queue_download` after this call."""
+        queued = self._downloads.popleft()
+        if self.host_memory:
+            address = self.slot_pointer(queued)
+        else:
+            cudart.event_synchronize(self._host_events[queued])
+            address = self._host[queued]
+        data = (ctypes.c_uint8 * self.frame_bytes).from_address(address)
         return np.ctypeslib.as_array(data).reshape(self.height * 3 // 2, self.width)

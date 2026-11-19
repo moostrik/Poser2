@@ -7,7 +7,8 @@ This document holds the screen recorder's design.
 ## Screen recorder
 
 Each render tick the layers an app records are drawn into the screen frame, an Fbo of the recording's size,
-and `ScreenCapture` (`modules/gl/screen_capture.py`) copies it as NV12 into a ring of frames in video memory.
+and `ScreenCapture` (`modules/gl/screen_capture.py`) copies it as NV12 into a ring of frames in RAM, or in video
+memory (`memory`).
 When the ring is full, the duration is reached or Stop is pressed, recording stops and the recorder's thread
 encodes the ring to an HEVC mp4 with NVENC, then frees the memory. The render thread never waits on the
 encoder.
@@ -56,17 +57,29 @@ range. The render loop is not locked to a rate, so the length follows the window
 | QHD, NV12              | 5.5 MB    | 332 MB     | 24.1 s          |
 | HD, NV12               | 3.1 MB    | 187 MB     | 42.9 s          |
 
-All four rows are **(deduction)**: computed from the frame sizes, not measured.
+All four rows are **(deduction)**: computed from the frame sizes, not measured. Per GB the rows scale
+alike: UHD NV12 at 60 ticks/s holds about 80 s in 60 GB of RAM **(deduction)**; the PC has 96 GB of RAM, 74 GB
+free with the app off, and a 4090 with 24 GB **(measured 2026-11-19)**.
+
+| `memory` | Where the ring is              | Copy per tick                    | Left free     |
+|----------|--------------------------------|----------------------------------|---------------|
+| HOST     | pinned RAM (`cudaMallocHost`)  | device to host, over PCIe        | `ram_reserve` |
+| VIDEO    | video memory (`cudaMalloc`)    | device to device                 | `reserve`     |
+
+HOST is the default: it holds the long takes. VIDEO keeps the copy on the card, for short takes. The memory is
+read at Start.
 
 The ring grows while it records, in blocks of one second. The recorder's thread adds the next block when
-half of the last one is left, after reading the free video memory (`cudaMemGetInfo`, so what the rest of the
-app holds is counted). When the next block would leave less than `reserve` free, the ring grows no more and
-the recording stops when it is full. The check runs once per recorded second, the reserve can be small
-(1 GB), and Start makes no large allocation. Windows pages video memory into system RAM when it runs short
-(WDDM), which shows as stutter; the reserve keeps clear of that.
+half of the last one is left, after reading the free memory where the ring is: the RAM available to processes
+(psutil) or the device's free memory (`cudaMemGetInfo`), so what the rest of the app holds is counted. When the
+next block would leave less than the reserve free (`ram_reserve`, default 8 GB, or `reserve`, default 1 GB), the
+ring grows no more and the recording stops when it is full. The check runs once per recorded second and Start
+makes no large allocation. One-second blocks keep each pinned allocation small, which Windows handles better than
+one very large one **(deduction)**. Windows pages video memory into system RAM when it runs short (WDDM), which
+shows as stutter; the reserve keeps clear of that.
 
-`max_duration` is the estimate (free + the ring's own − `reserve`) / (bytes per frame × measured ticks/s /
-`frame_step`), refreshed once a second. `duration` 0, or above `max_duration`, records until the memory
+`max_duration` is the estimate, for the memory set, (free + the ring's own there − its reserve) / (bytes per
+frame × measured ticks/s / `frame_step`), refreshed once a second. `duration` 0, or above `max_duration`, records until the memory
 stops it.
 
 `duration` is counted in time, by the frames' own tick times: a take ends at the first frame whose time is
@@ -82,8 +95,11 @@ as the take needs.
   matrix is plain code beside the shader (`bt709_video_range`).
 - `glReadPixels` reads both planes into one pixel buffer, Y then UV. The read stays on the GPU.
 - The pixel buffer is registered read-only with CUDA once (`modules/gl/cudart.py`). The capture maps it,
-  queues a device-to-device copy into the ring slot and unmaps it. The ring's blocks are plain `cudaMalloc`
-  memory, not torch's, so freeing them gives the memory straight back.
+  queues a copy into the ring slot on its own stream (device to host into RAM, device to device into video
+  memory) and unmaps it; the render thread does not wait for the copy, and the unmap orders it before GL writes
+  the buffer again. The ring's blocks are CUDA's own allocations, not torch's, so freeing them gives the memory
+  straight back. At 4K and 60 ticks/s the copy into RAM is about 750 MB/s over PCIe, on a link of about 25 GB/s,
+  and the CPU does not touch it **(deduction)**.
 - Two pixel buffers take turns: a tick converts into one while the copy maps the one written the tick before.
   GL has finished that one by then, so the map does not make the CPU wait for the GPU. This is the
   double-buffered pixel buffer readback, applied to a GPU-to-GPU copy. A frame enters the ring one tick after
@@ -99,10 +115,11 @@ as the take needs.
   `hevc_nvenc -preset p5 -tune hq -rc vbr -cq <quality> -b:v 0`, tagged BT.709 video range and `hvc1`, so
   Windows and QuickTime play it. HEVC because fine detail at 4K needs fewer bits than h264 for the same
   quality.
-- Each frame is copied from its slot into one of two pinned host buffers on a stream of its own; the next
-  copy runs while the last frame is written to the pipe.
-- After the last frame the pipe is closed, ffmpeg waited for and the ring freed (`cudaFree`).
-- The thread makes no GL call; it touches only CUDA memory and the pipe. NVENC is its own unit on the card,
+- In RAM a slot is written to the pipe as it is, after the capture's stream is done. In video memory each frame
+  is copied from its slot into one of two pinned host buffers on a stream of its own; the next copy runs while
+  the last frame is written to the pipe.
+- After the last frame the pipe is closed, ffmpeg waited for and the ring freed.
+- The thread makes no GL call; it touches only the ring's memory and the pipe. NVENC is its own unit on the card,
   so the show runs on while it encodes. Start is refused until the encode is done.
 
 Files go to the folder the app gives, named `<date-time>_<name>.mp4`.
@@ -114,8 +131,8 @@ With `look_back` on the ring records all the time, the newest frame replacing th
 it the last `duration` seconds; with `duration` 0 it holds what the memory holds. `save` encodes the frames
 whose times lie in the last `duration` seconds, oldest first. The ring pauses while
 the encode reads it and records on when the file is written; it is blind for that time, because recording on
-in a second ring would need the memory twice. It holds its video memory while the switch is on; a change of
-size or duration empties it and makes it again.
+in a second ring would need the memory twice. It holds its memory while the switch is on; a change of size,
+duration or `memory` empties it and makes it again.
 
 ### Time
 
@@ -158,8 +175,8 @@ CUDA memory freed; the render thread then frees the GL objects.
 
 ### Constraints from the alternatives
 
-- The ring is CUDA memory, not GL textures: a GL ring would be read back on the render thread while the show
-  runs, and the encode thread cannot touch GL.
+- The ring is CUDA's memory, not GL textures or buffers: a GL ring would be read back on the render thread while
+  the show runs, and the encode thread cannot touch GL.
 - The encode runs after the recording, not live: live it would pull ~750 MB/s **(deduction)** across PCIe
   and through a pipe while the show runs.
 - NV12 is made in a fragment shader, not a compute shader: GLSL has no byte arrays, and packing four pixels

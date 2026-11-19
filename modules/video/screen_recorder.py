@@ -40,6 +40,12 @@ class ScreenSize(Enum):
     CUSTOM = (0, 0)
 
 
+class ScreenMemory(Enum):
+    """Where the ring of recorded frames lives."""
+    HOST =  auto()      # pinned RAM: long takes
+    VIDEO = auto()      # video memory: short takes, nothing over PCIe while recording
+
+
 class ScreenRecorderState(Enum):
     IDLE =      auto()
     RECORDING = auto()
@@ -62,8 +68,10 @@ class ScreenRecorderSettings(BaseSettings):
     snap:         Field[bool]                = Field(False, widget=Widget.button, description="Set the size to the first source's")
     frame_step:   Field[int]                 = Field(1, min=1, max=2, step=1, description="Record every tick (1), or every other (2)")
     duration:     Field[float]               = Field(0.0, min=0.0, max=120.0, description="Recording length (s); 0 or above the maximum uses the maximum")
-    max_duration: Field[float]               = Field(0.0, access=Field.READ, description="Longest recording the free video memory holds (s)")
+    memory:       Field[ScreenMemory]        = Field(ScreenMemory.HOST, description="Where the recorded frames are held: RAM or video memory")
+    max_duration: Field[float]               = Field(0.0, access=Field.READ, description="Longest recording the free memory holds (s)")
     reserve:      Field[float]               = Field(1.0, min=0.0, max=8.0, description="Video memory left free for the rest of the app (GB)")
+    ram_reserve:  Field[float]               = Field(8.0, min=1.0, max=64.0, description="RAM left free for Windows and the app (GB)")
     quality:      Field[int]                 = Field(18, min=0, max=51, description="Constant quality, lower is better")
     state:        Field[ScreenRecorderState] = Field(ScreenRecorderState.IDLE, access=Field.READ, description="Idle, recording, encoding")
     recorded:     Field[float]               = Field(0.0, access=Field.READ, description="Seconds in the ring (s)")
@@ -110,11 +118,13 @@ class ScreenRing(Protocol):
     def frame_bytes(self) -> int: ...
     @property
     def num_slots(self) -> int: ...
-    def allocate(self, width: int, height: int) -> None: ...
+    @property
+    def host_memory(self) -> bool: ...
+    def allocate(self, width: int, height: int, host_memory: bool) -> None: ...
     def deallocate(self) -> None: ...
     def capture(self, slot: int) -> None: ...
     def flush(self) -> None: ...
-    def free_memory(self) -> int: ...
+    def free_memory(self, host_memory: bool) -> int: ...
     def add_block(self, slots: int) -> None: ...
     def free_blocks(self) -> None: ...
     def synchronize(self) -> None: ...
@@ -284,7 +294,8 @@ class ScreenRecorder:
             if self._look_back:
                 if not self.settings.look_back:
                     self._leave_look_back()
-                elif self._size_wanted() != self._size or self.settings.duration != self._duration:
+                elif (self._size_wanted() != self._size or self.settings.duration != self._duration
+                      or (self.settings.memory is ScreenMemory.HOST) != self._ring.host_memory):
                     self._leave_look_back()     # emptied, and made again at the new size or duration
                 elif self._save_requested.is_set():
                     self._save_requested.clear()
@@ -322,9 +333,11 @@ class ScreenRecorder:
     def _begin(self, look_back: bool) -> None:
         """Make the ring's GL objects at the size set now and start filling it; the thread adds its blocks."""
         size = self._size_wanted()
+        host_memory = self.settings.memory is ScreenMemory.HOST
         try:
-            if not self._ring.allocated or (self._ring.width, self._ring.height) != size:
-                self._ring.allocate(*size)
+            if (not self._ring.allocated or (self._ring.width, self._ring.height) != size
+                    or self._ring.host_memory != host_memory):
+                self._ring.allocate(*size, host_memory)
         except Exception as e:
             self._fail(f'could not allocate the screen capture at {size[0]}x{size[1]}: {e}')
             return
@@ -499,18 +512,24 @@ class ScreenRecorder:
         with self._lock:
             return self._take is not None or self._free
 
+    def _reserve(self, host_memory: bool) -> int:
+        """Bytes left free in the ring's memory: `ram_reserve` in RAM, `reserve` in video memory."""
+        return int((self.settings.ram_reserve if host_memory else self.settings.reserve) * GB)
+
     def _estimate(self) -> None:
-        """`max_duration`: what the free video memory, with the ring's own, holds above the reserve."""
+        """`max_duration`: what the free memory set in `memory`, with the ring's own there, holds above its reserve."""
         width, height = even(self.settings.width), even(self.settings.height)
         frame_bytes = width * height * 3 // 2
+        host_memory = self.settings.memory is ScreenMemory.HOST
         try:
-            free = self._ring.free_memory()
+            free = self._ring.free_memory(host_memory)
         except Exception as e:
             logger.debug('Screen recorder could not read the free memory: %s', e)
             return
         with self._lock:
-            held = self._ring.num_slots * self._ring.frame_bytes if self._ring.num_slots else 0
-        usable = max(0, free + held - int(self.settings.reserve * GB))
+            slots = self._ring.num_slots
+            held = slots * self._ring.frame_bytes if slots and self._ring.host_memory == host_memory else 0
+        usable = max(0, free + held - self._reserve(host_memory))
         rate = frame_bytes * self._fps / max(1, self.settings.frame_step)
         self.settings.max_duration = round(usable / rate, 1)
 
@@ -530,10 +549,12 @@ class ScreenRecorder:
                 with self._lock:
                     self._complete = True
                 return
+        host_memory = self._ring.host_memory
         try:
-            free = self._ring.free_memory()
-            if free - block * self._ring.frame_bytes < int(self.settings.reserve * GB):
-                logger.info('Screen recording ring full at %d frames: free video memory reached the reserve', slots)
+            free = self._ring.free_memory(host_memory)
+            if free - block * self._ring.frame_bytes < self._reserve(host_memory):
+                logger.info('Screen recording ring full at %d frames: free %s reached the reserve', slots,
+                            'RAM' if host_memory else 'video memory')
                 with self._lock:
                     self._complete = True
                 return
