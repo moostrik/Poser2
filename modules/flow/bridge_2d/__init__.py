@@ -1,7 +1,7 @@
-"""The 2D bridge, as on main: hd_trio's smooth trail, density and temperature on a 2D velocity (xy).
-Kept apart from the 3D bridge so the 3D work does not change hd_trio."""
+"""The 2D bridge: the velocity lowpass and bandpass and the outputs' mixes on a 2D velocity (xy), each its own 2D
+kernel."""
 
-from .smooth_trail import SmoothTrail, VelocitySmoothTrail, SmoothTrailSettings
-from .density_bridge import DensityBridge, DensityBridgeSettings
-from .temperature_bridge import TemperatureBridge, TemperatureBridgeSettings
-from .magnitude import Magnitude, VelocityMagnitude
+from .shaders import SpeedCount2D, WeightedSum2D
+from .velocity_lowpass_2d import VelocityLowpass2D
+from .velocity_bandpass_2d import VelocityBandpass2D
+from .bridge_2d import Bridge2D

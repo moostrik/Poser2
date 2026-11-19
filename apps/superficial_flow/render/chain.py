@@ -21,6 +21,9 @@ class ChainLayers(IntEnum):
     # the motion
     motion =        auto()
     motion_monitor = auto()
+    # the bridge
+    bridge =        auto()
+    bridge_monitor = auto()
     # the app's timings
     time_series =   auto()
     # the pose: the camera's image and its crop, and the pose's monitor
@@ -63,12 +66,16 @@ CHAIN: tuple[ChainLayer, ...] = (
     # the motion
     ChainLayer(ChainLayers.motion,                  Size.LARGE, tick=True, per_inference_frame=True),
     ChainLayer(ChainLayers.motion_monitor,          Size.LARGE, tick=True),
+    # the bridge
+    ChainLayer(ChainLayers.bridge,                  Size.LARGE, tick=True, per_inference_frame=True),
+    ChainLayer(ChainLayers.bridge_monitor,          Size.LARGE, tick=True),
     # the pose, beside the chain: its shape its frame's (`SuperficialFlowRender._layer_size`)
     ChainLayer(ChainLayers.pose_monitor,            Size.PANEL, tick=True),
 )
 LAYERS: dict[ChainLayers, ChainLayer] = {chain_layer.layer: chain_layer for chain_layer in CHAIN}
 POSE_SHAPES: dict[PoseFrame, ChainLayers] = {PoseFrame.CROP: ChainLayers.cam_crop, PoseFrame.CAMERA: ChainLayers.cam_image, PoseFrame.VIEW: ChainLayers.view}
-MONITORS: tuple[ChainLayers, ...] = (ChainLayers.view_monitor, ChainLayers.color_monitor, ChainLayers.motion_monitor)   # the flow's
+MONITORS: tuple[ChainLayers, ...] = (ChainLayers.view_monitor, ChainLayers.color_monitor, ChainLayers.motion_monitor,
+                                     ChainLayers.bridge_monitor)   # the flow's
 TICK_LAYERS: list[ChainLayers] = [chain_layer.layer for chain_layer in CHAIN if chain_layer.tick]
 INFERENCE_FRAME_LAYERS: list[ChainLayers] = [chain_layer.layer for chain_layer in CHAIN if chain_layer.per_inference_frame]
 
@@ -78,6 +85,7 @@ SHOWN: dict[Layers, ChainLayers] = {
     Layers.view:        ChainLayers.view_monitor,
     Layers.color:       ChainLayers.color_monitor,
     Layers.motion:      ChainLayers.motion_monitor,
+    Layers.bridge:      ChainLayers.bridge_monitor,
     Layers.time_series: ChainLayers.time_series,
     Layers.pose:        ChainLayers.pose_monitor,
 }

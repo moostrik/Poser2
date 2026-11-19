@@ -1,9 +1,11 @@
 """VelocityPeak: the 99th percentile of a velocity's speed over about a second, counted on the GPU into log bins
-and read back from two pixel buffers without waiting. How and why: BRIDGE_3D.md, "The peak"."""
+and read back from two pixel buffers without waiting; the count is the bridge's own kernel for its velocity's
+format. How and why: BRIDGE_3D.md, "The peak"."""
 
 from __future__ import annotations
 
 import ctypes
+from typing import Protocol
 
 import numpy as np
 from OpenGL.GL import (GL_ALREADY_SIGNALED, GL_CONDITION_SATISFIED, GL_NEAREST, GL_PIXEL_PACK_BUFFER, GL_R32UI,
@@ -14,7 +16,7 @@ from OpenGL.raw.GL.VERSION.GL_1_0 import glGetTexImage as raw_get_tex_image
 
 from modules.gl import Texture
 from modules.settings import BaseSettings, Field
-from ..visualization import HistogramCount, histogram_grid
+from ..visualization import histogram_grid
 
 BINS: int = 256
 SPEED_LOW: float = 0.01         # widths/s: the first bin's lower edge; below it is still
@@ -50,16 +52,25 @@ def speed_percentile(counts: np.ndarray, percentile: float = PERCENTILE, low: fl
     return low * (high / low) ** ((bin_ + share) / bins)
 
 
+class SpeedCount(Protocol):
+    """A kernel that counts a velocity's speeds into log bins: each sample's length from `speed[0]` to `speed[1]`
+    into the first row of `histogram`, on `samples` across and down."""
+    def allocate(self) -> None: ...
+    def deallocate(self) -> None: ...
+    def use(self, texture: Texture, histogram: Texture, scale: float, samples: tuple[int, int],
+            speed: tuple[float, float] | None = None) -> None: ...
+
+
 class VelocityPeak:
     """A velocity's p99 speed over the moving pixels (`VelocityPeakSettings.speed`), while `enabled`; render thread
-    only. `update` once per velocity: it counts the velocity's speeds into the bins, about once a second copies
-    them into a pixel buffer behind a fence and clears them, and writes the percentile of a copy the GPU has
-    finished; nothing waits. Off, nothing runs and `speed` is 0."""
+    only. `update` once per velocity: it counts the velocity's speeds into the bins with `count`, about once a
+    second copies them into a pixel buffer behind a fence and clears them, and writes the percentile of a copy the
+    GPU has finished; nothing waits. Off, nothing runs and `speed` is 0."""
 
-    def __init__(self, settings: VelocityPeakSettings) -> None:
+    def __init__(self, settings: VelocityPeakSettings, count: SpeedCount) -> None:
         self.settings: VelocityPeakSettings = settings
         self._bins: Texture = Texture(GL_NEAREST)       # an integer texture must not filter
-        self._count: HistogramCount = HistogramCount()
+        self._count: SpeedCount = count
         self._buffers: list[int] = []
         self._fences: list[object | None] = [None] * PIXEL_BUFFERS
         self._next: int = 0                             # the buffer the next copy goes into
@@ -89,7 +100,7 @@ class VelocityPeak:
         self._count.deallocate()
 
     def update(self, velocity: Texture, delta_time: float) -> None:
-        """Count `velocity`'s speeds (widths/s, xyz) over `delta_time` s; read what the GPU has finished."""
+        """Count `velocity`'s speeds (widths/s) over `delta_time` s; read what the GPU has finished."""
         if not self.allocated or not velocity.allocated:
             return
         if not self.settings.enabled:

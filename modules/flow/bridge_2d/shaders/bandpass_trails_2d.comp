@@ -1,0 +1,27 @@
+#version 460 core
+
+// Bandpass Trails 2D
+// One step of the 2D bandpass's fast and slow trail in one dispatch: each a unit-gain Ema of the velocity,
+// weight * previous + (1 - weight) * velocity, by its own weight.
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+uniform sampler2D uVelocity;        // the input velocity (xy widths/s)
+uniform sampler2D uFast;            // the fast trail before
+uniform sampler2D uSlow;            // the slow trail before
+uniform float uFastWeight;          // what remains of the fast trail a step
+uniform float uSlowWeight;          // and of the slow one
+uniform ivec2 uSize;
+
+layout(rg16f, binding = 0) writeonly uniform image2D uFastOut;
+layout(rg16f, binding = 1) writeonly uniform image2D uSlowOut;
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(pixel, uSize))) return;
+    vec2 uv = (vec2(pixel) + 0.5) / vec2(uSize);
+
+    vec2 velocity = texture(uVelocity, uv).xy;
+    imageStore(uFastOut, pixel, vec4(mix(velocity, texture(uFast, uv).xy, uFastWeight), 0.0, 0.0));
+    imageStore(uSlowOut, pixel, vec4(mix(velocity, texture(uSlow, uv).xy, uSlowWeight), 0.0, 0.0));
+}

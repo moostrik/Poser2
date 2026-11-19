@@ -18,17 +18,14 @@ kernels (in an ABC, as a family of classes that share code), and kernels that ho
 | bridge | `BridgeLayer`, its input and output; the ABC `Bridge` with the readings' mixing, the ports, the sizes; the settings; `FrameMax`, `decay_weight`, the blur's weights | `Bridge2D`: lowpass, bandpass, mix, peak kernels, RG, no z positions | `Bridge3D`: its kernels as they are |
 | fluid  | `FluidLayer`, its input and what each injection means; the panel's groups and names; `TimeStep`; the blend and LUT | `Fluid2D` and its injection kernels | `Fluid3D`, the march |
 
-What goes, from `modules` only (hd_trio's copies stay): `GradientFlow` and its shader; `bridge_2d`'s old classes
-(`SmoothTrail`, `DensityBridge`, `TemperatureBridge`, its `VelocityMagnitude` copy), replaced by `Bridge2D`; `TintColor` and
-`BridgeInput.tint`, as the 2D bridge takes the color stage's color as the 3D does; the 2D fluid's density channel per
-injection, `DensityColorize` and `Injection.tint`.
+What goes, from `modules` only (hd_trio's copies stay): the 2D fluid's density channel per injection,
+`DensityColorize` and `Injection.tint`.
 
 Latency is the first measure in both apps. The camera stays at 50 fps (the 50 Hz mains in Europe): the boxes and the
 segmentation keep up with it (20 ms a frame), the pose at its interval (25 fps), the render with the flow at HD
 aims at 60 fps (16.7 ms); falling short is no blocker for now; the inference moves to the camera later, out of this plan. A step adds no frame of delay: the motion and the bridge run once per
-capture, the fluid once per tick, as in deep_flow. deep_flow's kernels are not changed by any step; its bridge, whose
-Python moves into the ABC at C1, is timed before and after C1, back to back ([TIMING.md](../../modules/flow/TIMING.md)), and may not
-grow. superficial_flow's chain is timed once, when the plan is built, its rows in TIMING.md; that time sets the
+capture, the fluid once per tick, as in deep_flow. deep_flow's kernels are not changed by any step.
+superficial_flow's chain is timed once, when the plan is built, its rows in TIMING.md; that time sets the
 grid's size.
 
 The 2D fluid's grid is HD by default: 1080 × 1920 (9:16), half the output's 4K, so each cell holds 2 × 2 of the density's pixels; about 18 times the
@@ -40,19 +37,6 @@ hd_trio moves onto this 2D flow later, in a plan of its own, so the 2D stays bui
 injection per camera with its weight (the player's motion, the similarity) and its own color (the track
 color), one fluid per screen. Until then hd_trio runs its own copy, unchanged.
 
-
-## C. The 2D bridge
-
-- **C1.** The 2D bridge. A package `modules/flow/bridge/` holds what both bridges share: the ABC `Bridge` (the
-  readings' mixing, the frames' merge, the ports, the sizes), the filters' and mixes' settings, `FrameMax`,
-  `decay_weight` and the blur's weights, out of `bridge_3d`; `Bridge3D` on it with its kernels as they are.
-  `Bridge2D` in `bridge_2d`, on the same ABC: its own lowpass, bandpass, mix and peak kernels on an RG velocity,
-  no z positions, the density's color the color stage's; the outputs the 3D's (velocity, acceleration, density with its color, temperature, expansion), the
-  same groups and names on the panel. `Bridge2DLayer` on it. BRIDGE_2D.md written, BRIDGE_3D.md for what moved.
-  The old classes', `TintColor`'s and `BridgeInput.tint`'s call sites change with it: the flow layers' tests,
-  `scripts/shader_check.py`, the exports of `modules/flow` and `modules/render`.
-  Checked: the new kernels in the GPU harness; the tests; deep_flow's bridge timed and looking as before;
-  superficial_flow with the bridge wired, its monitor showing the readings.
 
 ## D. The 2D fluid
 
@@ -90,7 +74,6 @@ Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 
 | Step     | Check                                                                                               |
 |----------|-----------------------------------------------------------------------------------------------------|
-| C1       | GPU harness for the 2D kernels; deep_flow's bridge timed before and after, back to back            |
 | D1       | GPU harness for the injection passes; -sim, the fluid moving with the player                        |
 | D2       | the settings test: shared settings with deep_flow's values                                          |
 | D3 to D7 | GPU harness for each new kernel; -sim                                                               |
@@ -98,13 +81,11 @@ Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 
 ## Rules it touches
 
-- Use an `ABC` for a family of classes that share code: C1.
-- Similar things share the noun and differ by a qualifier (`Bridge2D`, `Bridge3D`): C1.
-- Remove obsolete pathways; no parallel legacy ones: C1, D1, D2.
+- Remove obsolete pathways; no parallel legacy ones: D1, D2.
 - One term everywhere; when a term changes, rename it everywhere in the same change: D2.
 - Keep presets and settings schemas in sync with code changes: D2 to D7.
-- A settings class mirrors the code it configures; a stage's ports follow its steps: C1, D2.
-- Shaders get checked in a GPU harness: C1, D1, D3 to D7.
-- Prefer the design with the lower latency, measured in the context of the app: C1, D1 to D7.
-- A document describes what is built: C1 (BRIDGE_2D.md), D2 (FLUID_2D.md).
+- A settings class mirrors the code it configures; a stage's ports follow its steps: D2.
+- Shaders get checked in a GPU harness: D1, D3 to D7.
+- Prefer the design with the lower latency, measured in the context of the app: D1 to D7.
+- A document describes what is built: D2 (FLUID_2D.md).
 - A plan is named after the package, app or folder it is for, and sits in it: this plan, in `apps/superficial_flow`.

@@ -24,18 +24,14 @@ from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 class BridgeInput:
     """One camera's velocity for the bridge stage, built by the app for each step. `velocity` is the
     motion output; `dt` the time the step covers (s); `image`, or None, the picture that colors the
-    density (the 3D's the `color` stage's, taken as it comes); `tint`, the 2D bridge's, an RGB tint on it, white by
-    default, the color alone without an image; `mask`
-    the player's mask on the view, or None, which gates the 2D bridge's image and is a share of the 3D bridge's
-    amounts;
-    `z_position` the motion's, or None.
+    density, the `color` stage's, taken as it comes; `mask` the player's mask on the view, or None, a share of the
+    amounts; `z_position` the motion's, the 3D's only, or None.
     `same_tick`: this step is another capture in the render tick of the step before, so the fluid, which
     steps once a tick, takes per pixel the density, its color and the temperature of the step whose amount is
-    larger (the 3D bridge's), and the velocity of this one."""
+    larger, and the velocity of this one."""
     velocity: Annotated[Texture, TextureKind.VELOCITY]
     dt: float
     image: Annotated[Texture | None, TextureKind.IMAGE] = None
-    tint: tuple[float, float, float] = (1.0, 1.0, 1.0)
     mask: Annotated[Texture | None, TextureKind.SCALAR] = None
     z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
     same_tick: bool = False
@@ -46,8 +42,8 @@ class BridgeOutput(StageOutput):
     """The bridge stage's textures, what the fluid injects, in two systems. The boundary, what the water is
     dragged toward: `velocity`, widths/s; `density`, the amount; `color`, the density's color, RGBA,
     premultiplied by its alpha, the coverage; `temperature`. The body force, what is
-    added × dt, the 3D bridge's only: `acceleration`, widths/s², None while the bridge gives none.
-    The 3D bridge's `expansion`, where the water swells, a presence 0 to 1, or None. Where each goes in depth,
+    added × dt: `acceleration`, widths/s², None while the bridge gives none.
+    The `expansion`, where the water swells, a presence 0 to 1, or None. Where each goes in depth,
     the 3D bridge's only: each output's `_z_position`, its readings' z positions; None without."""
     velocity: Annotated[Texture, TextureKind.VELOCITY]
     density: Annotated[Texture, TextureKind.SCALAR]

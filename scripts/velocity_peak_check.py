@@ -67,7 +67,7 @@ def main() -> None:
 
         settings = VelocityPeakSettings()
         settings.enabled = True
-        peak = VelocityPeak(settings)
+        peak = VelocityPeak(settings, HistogramCount())
         peak.allocate()
         frames = 0
         for _ in range(int(1.5 * FPS)):
@@ -96,7 +96,7 @@ def main() -> None:
         print(f'count on 448 x 800, {grid[0]} x {grid[1]} samples: {ms:.3f} ms', flush=True)
         settings = VelocityPeakSettings()
         settings.enabled = True
-        peak = VelocityPeak(settings)
+        peak = VelocityPeak(settings, HistogramCount())
         peak.allocate()
         ms = mh.gpu_ms(lambda: peak._copy(0) or peak._release(), 40)
         print(f'copy into a pixel buffer: {ms:.3f} ms', flush=True)

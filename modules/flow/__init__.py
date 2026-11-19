@@ -20,19 +20,16 @@ from .motion import DepthView, DepthVelocity, DepthVelocitySettings, Patch, \
                     LucasKanadeFlow, LucasKanadeFlowSettings, LucasKanadeFlow2D, LucasKanadeFlow2DSettings, \
                     LucasKanadeFlow3D, LucasKanadeFlow3DSettings
 
-# The density's color: the 3D chain's `color` stage, and the 2D bridge's tint
+# The density's color: the `color` stage
 from .color import DensityColor, DensityColorSettings, white_balance_matrix
-from .tint_color import TintColor
 
-# Bridges: the 3D bridge by name, the 2D bridge as `bridge_2d` (bridge_2d.DensityBridge, ...)
-from . import bridge_2d
-from .bridge_3d import  Bridge3D, Bridge3DSettings, \
-                        Magnitude, VelocityMagnitude, \
-                        decay_weight, \
-                        VelocityLowpass, VelocityLowpassSettings, gaussian_weights, blur_sigma, blur_dispatches, ZPositionMix, \
-                        VelocityBandpass, VelocityBandpassSettings, Change, WeightedSum, step_peak, band_width, \
-                        FrameMax, \
-                        VelocityPeak, VelocityPeakSettings, speed_percentile
+# Bridges: what both share, then the 2D's and the 3D's, each on its own kernels
+from .bridge import     Bridge, BridgeSettings, BridgeFiltersSettings, Lowpass, Bandpass, READINGS, \
+                        decay_weight, gaussian_weights, blur_sigma, blur_dispatches, step_peak, band_width, change_acceleration_scale, \
+                        Change, FrameMax, VelocityPeak, VelocityPeakSettings, SpeedCount, speed_percentile, \
+                        VelocityLowpassSettings, VelocityBandpassSettings
+from .bridge_2d import  Bridge2D, VelocityLowpass2D, VelocityBandpass2D, SpeedCount2D
+from .bridge_3d import  Bridge3D, Magnitude, VelocityMagnitude, VelocityLowpass, VelocityBandpass, ZPositionMix, WeightedSum
 
 # Visualization
 from .visualization import Visualizer, histogram_grid, histogram_volume_grid, Strip, ALL_CHANNELS, summary_grid, Legend, LegendKind, DrawnSize, \

@@ -1,0 +1,44 @@
+#version 460 core
+
+// Bandpass Accelerations 2D
+// The 2D bandpass's whole change and, with uAcceleration, every reading as an acceleration, in one dispatch (RG16F,
+// xy): the change (fast - slow) × uScale (1 / the step peak), signed; as an acceleration (fast - slow) ×
+// uAccelerationScale (1 / the band's width), and each part's velocity × uAccelerationScale × the step peak
+// (uPartScale), the same pulse over the band's width. The scales are the bridge's step_peak and
+// change_acceleration_scale
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+uniform sampler2D uFast;            // the fast trail (xy)
+uniform sampler2D uSlow;            // the slow trail
+uniform sampler2D uStart;           // the parts as velocities
+uniform sampler2D uBow;
+uniform sampler2D uStop;
+uniform sampler2D uWake;
+uniform float uScale;               // 1 / the trails' step peak
+uniform float uAccelerationScale;   // 1 / the band's width
+uniform float uPartScale;           // uAccelerationScale × the step peak
+uniform bool uAcceleration;
+uniform ivec2 uSize;
+
+layout(rg16f, binding = 0) writeonly uniform image2D uChange;
+layout(rg16f, binding = 1) writeonly uniform image2D uChangeAcceleration;
+layout(rg16f, binding = 2) writeonly uniform image2D uStartAcceleration;
+layout(rg16f, binding = 3) writeonly uniform image2D uBowAcceleration;
+layout(rg16f, binding = 4) writeonly uniform image2D uStopAcceleration;
+layout(rg16f, binding = 5) writeonly uniform image2D uWakeAcceleration;
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(pixel, uSize))) return;
+    vec2 uv = (vec2(pixel) + 0.5) / vec2(uSize);
+
+    vec2 difference = texture(uFast, uv).xy - texture(uSlow, uv).xy;
+    imageStore(uChange, pixel, vec4(difference * uScale, 0.0, 0.0));
+    if (!uAcceleration) return;
+    imageStore(uChangeAcceleration, pixel, vec4(difference * uAccelerationScale, 0.0, 0.0));
+    imageStore(uStartAcceleration, pixel, vec4(texture(uStart, uv).xy * uPartScale, 0.0, 0.0));
+    imageStore(uBowAcceleration, pixel, vec4(texture(uBow, uv).xy * uPartScale, 0.0, 0.0));
+    imageStore(uStopAcceleration, pixel, vec4(texture(uStop, uv).xy * uPartScale, 0.0, 0.0));
+    imageStore(uWakeAcceleration, pixel, vec4(texture(uWake, uv).xy * uPartScale, 0.0, 0.0));
+}

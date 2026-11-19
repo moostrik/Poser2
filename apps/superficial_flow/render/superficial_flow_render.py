@@ -1,4 +1,4 @@
-"""Superficial Flow render — split-view layer graph with the 2D flow: view, color and motion."""
+"""Superficial Flow render — split-view layer graph with the 2D flow: view, color, motion and bridge."""
 
 from threading import Event
 from typing import Callable, cast
@@ -54,11 +54,13 @@ class SuperficialFlowRender(RenderBase):
             self.L[ChainLayers.pose_monitor][i] =                PoseMonitorCompositor(i, self.board, cam_image, cam_crop, view, settings.pose, settings.colors)
             self.L[ChainLayers.color][i] =                       render.ColorLayer(   settings.color)
             self.L[ChainLayers.motion][i] =                      render.Motion2DLayer(settings.motion)
+            self.L[ChainLayers.bridge][i] =                      render.Bridge2DLayer(settings.bridge)
             # each stage's main monitor in self.L, shown in the main panel; its debug monitor in self._debug_monitors,
             # shown in the debug panel
             for key, stage, flat in ((ChainLayers.view_monitor, render.FlowStage.VIEW, settings.view),
                                      (ChainLayers.color_monitor, render.FlowStage.COLOR, settings.color),
-                                     (ChainLayers.motion_monitor, render.FlowStage.MOTION, settings.motion)):
+                                     (ChainLayers.motion_monitor, render.FlowStage.MOTION, settings.motion),
+                                     (ChainLayers.bridge_monitor, render.FlowStage.BRIDGE, settings.bridge)):
                 self.L[key][i] = render.Monitor2DLayer(stage, flat.monitor_main)
                 self._debug_monitors.setdefault(key, {})[i] = render.Monitor2DLayer(stage, flat.monitor_debug)
         self.L[ChainLayers.time_series][0] = render.TimeSeriesLayer(self.board, settings.time_series)      # the board's series, one for all cameras
@@ -183,7 +185,7 @@ class SuperficialFlowRender(RenderBase):
         self._last_tick = now
 
     def reset_flow(self) -> None:
-        """Clear the motion at the next update; any thread."""
+        """Clear the motion and the bridge at the next update; any thread."""
         self._reset_flow.set()
 
     def _monitors(self) -> list[render.Monitor2DLayer]:
@@ -195,7 +197,7 @@ class SuperficialFlowRender(RenderBase):
 
         if self._reset_flow.is_set():
             self._reset_flow.clear()
-            for layer_type in [ChainLayers.motion]:
+            for layer_type in [ChainLayers.motion, ChainLayers.bridge]:
                 for layer in self.L[layer_type].values():
                     cast(render.StageLayer, layer).reset()
 
@@ -236,12 +238,14 @@ class SuperficialFlowRender(RenderBase):
                 view.update()
                 self._run_color(i, view)
                 continue
-            for frame in frames:
-                self._run_inference_frame(i, frame)
+            for index, frame in enumerate(frames):
+                self._run_inference_frame(i, frame, same_tick=index > 0)
 
-    def _run_inference_frame(self, i: int, frame: InferenceFrame) -> None:
+    def _run_inference_frame(self, i: int, frame: InferenceFrame, same_tick: bool) -> None:
         """One frame: its image into GL, the view of it with its player's mask and, at this tick, the player's pose of
-        the pose monitor's stage; the density's color from the view."""
+        the pose monitor's stage; the density's color from the view, the motion on the view's image, and the bridge
+        stepping over the time since the frame before, the density's color the color stage's. `same_tick`: another
+        frame in this tick, whose bridge outputs the fluid takes with the last's."""
         image = cast(render.InferenceFrameImageLayer, self.L[ChainLayers.inference_frame_image][i])
         view = cast(ViewLayer, self.L[ChainLayers.view][i])
 
@@ -256,15 +260,19 @@ class SuperficialFlowRender(RenderBase):
         self._view_timer.begin()
         view.update()
         self._view_timer.end()
-        self._run_color(i, view)
+        color: render.ColorLayer = self._run_color(i, view)
 
         motion = cast(render.Motion2DLayer, self.L[ChainLayers.motion][i])
+        bridge = cast(render.Bridge2DLayer, self.L[ChainLayers.bridge][i])
         interval: float = render.frame_interval(frame.timestamp, self._inference_frame_timestamps.get(i), self.settings.motion.fps, self._dt, self._dt)
         self._inference_frame_timestamps[i] = frame.timestamp
         self.motion_rates.setdefault(i, FPS()).processed()
         output: ViewOutput = view.output
         motion.set_input(render.MotionInput(output.image, frame.timestamp, interval, mask=output.mask))
         motion.update()
+        bridge.set_input(render.BridgeInput(motion.output.velocity, interval, color.output.color, mask=output.mask,
+                                            same_tick=same_tick))
+        bridge.update()
 
     def _run_color(self, i: int, view: ViewLayer) -> render.ColorLayer:
         """The density's color from camera `i`'s view, made again when the view was or one of its settings changed."""
@@ -283,6 +291,7 @@ class SuperficialFlowRender(RenderBase):
                 render.FlowStage.VIEW: cast(ViewLayer, _view).ports,
                 render.FlowStage.COLOR: cast(render.ColorLayer, self.L[ChainLayers.color][i]).ports,
                 render.FlowStage.MOTION: cast(render.Motion2DLayer, self.L[ChainLayers.motion][i]).ports,
+                render.FlowStage.BRIDGE: cast(render.Bridge2DLayer, self.L[ChainLayers.bridge][i]).ports,
             }
             for monitor in self._monitors():
                 monitor.set_input(render.MonitorInput(ports))

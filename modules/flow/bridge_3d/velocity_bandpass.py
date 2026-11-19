@@ -12,58 +12,11 @@ import math
 from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R16F, GL_RG16F, GL_RG32F, GL_RGBA16F, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, glBindTexture, glGenerateMipmap, glTexParameteri
 
 from modules.gl import Fbo, SwapFbo, Texture, shaders
-from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil, Port, TextureKind
-from .trails import decay_weight
-from .shaders import BandpassAccelerations, BandpassChanges, BandpassTrails, Change, VelocityBandpassRegion, VelocityBandpassRegionMean, VelocityBandpassRegionSpeed
+from ..bridge import Change, VelocityBandpassSettings, change_acceleration_scale, decay_weight, step_peak
+from .shaders import BandpassAccelerations, BandpassChanges, BandpassTrails, VelocityBandpassRegion, VelocityBandpassRegionMean, VelocityBandpassRegionSpeed
 
 logger = logging.getLogger(__name__)
-
-
-def step_peak(fast_smooth: float, slow_smooth: float) -> float:
-    """The largest difference of a slow and a fast Ema (time constants in one unit) after a unit step: where
-    the slow one still holds what the fast one let go. 1 with an instant fast trail, 0 when the slow
-    trail is not slower. Continuous, as `decay_weight` is."""
-    if slow_smooth <= fast_smooth:
-        return 0.0
-    if fast_smooth <= 0.0:
-        return 1.0
-    t: float = fast_smooth * slow_smooth / (slow_smooth - fast_smooth) * math.log(slow_smooth / fast_smooth)
-    return math.exp(-t / slow_smooth) - math.exp(-t / fast_smooth)
-
-
-def band_width(fast_smooth: float, slow_smooth: float, delta_time: float) -> float:
-    """The band's width, s: what (fast − slow) adds up to over time, × dt, per unit of a change of speed. For the
-    two Emas stepped at `delta_time` it is dt × (w_slow / (1 − w_slow) − w_fast / (1 − w_fast)), w each one's
-    `decay_weight`; as dt shrinks it is (slow_smooth − fast_smooth), and it stays exact where a frame is longer
-    than the fast trail. 0 when the slow trail is not slower."""
-    if slow_smooth <= fast_smooth:
-        return 0.0
-    if delta_time <= 0.0:
-        return (slow_smooth - fast_smooth) / 1000.0
-
-    def memory(smooth: float) -> float:
-        weight: float = decay_weight(delta_time, smooth) if smooth > 0.0 else 0.0
-        return delta_time * weight / (1.0 - weight)
-    return memory(slow_smooth) - memory(fast_smooth)
-
-
-def change_acceleration_scale(fast_smooth: float, slow_smooth: float, delta_time: float) -> float:
-    """What (fast − slow) is multiplied by to read as an acceleration, widths/s²: 1 over the band's width
-    (`band_width`, s; the times in ms), so its sum × dt over a change of speed is that change; 0 when the slow
-    trail is not slower."""
-    width: float = band_width(fast_smooth, slow_smooth, delta_time)
-    return 1.0 / width if width > 0.0 else 0.0
-
-
-class VelocityBandpassSettings(BaseSettings):
-    """Configuration for the velocity bandpass: its two trails and the start and stop regions."""
-    fast_smooth = Field(25.0, min=0.0, max=500.0, step=1.0, description="Fast trail smoothing time, ms; 0 = the flow itself")
-    slow_smooth = Field(150.0, min=0.0, max=1000.0, step=1.0, description="Slow trail smoothing time, ms: what a change is read against")
-    start_region_weight = Field(1.0, min=0.0, max=1.0, step=0.05, newline=True, description="How much the region around a start must speed up too, the rest the bow; 0 = all start")
-    stop_region_weight = Field(1.0, min=0.0, max=1.0, step=0.05, description="How much the region around a stop must slow down too, the rest the wake; 0 = all stop")
-    start_region_size = Field(128.0, min=8.0, max=1024.0, step=8.0, newline=True, description="Size of the region around a start, pixels of the bridge")
-    stop_region_size = Field(128.0, min=8.0, max=1024.0, step=8.0, description="Size of the region around a stop, pixels of the bridge")
 
 
 class VelocityBandpass(FlowBase):

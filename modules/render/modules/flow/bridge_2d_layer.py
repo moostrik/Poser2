@@ -1,81 +1,45 @@
-"""The 2D bridge layer: main's smooth trail, density and temperature on a 2D velocity (xy)."""
+"""The 2D bridge layer: `Bridge2D`, the velocity lowpass and bandpass and the outputs' mixes, on the motion's velocity
+(xy)."""
 
 # Local application imports
-from modules.gl import Texture
-from modules.flow import TintColor, bridge_2d, HasPorts
-from modules.settings import Group
+from modules.flow import Bridge2D, BridgeSettings, HasPorts
 from .bridge_layer import BridgeLayer, BridgeLayerSettings, BridgeInput, BridgeOutput
 
 
-class Bridge2DLayerSettings(BridgeLayerSettings):
-    """Configuration for Bridge2DLayer: each bridge's group."""
-    trail       = Group(bridge_2d.SmoothTrailSettings)
-    density     = Group(bridge_2d.DensityBridgeSettings)
-    temperature = Group(bridge_2d.TemperatureBridgeSettings)
+class Bridge2DLayerSettings(BridgeSettings, BridgeLayerSettings):
+    """Configuration for Bridge2DLayer: the stage's settings and its bridge's own, one panel, the stage's first."""
 
 
 class Bridge2DLayer(BridgeLayer):
-    """The 2D bridge layer: the density's color, then the smooth trail for the fluid's velocity, its speed as
-    the density's amount, the temperature from the density's color where there is speed; the density bridge
-    colors the amount for its port only."""
+    """The 2D bridge layer: hands `Bridge2D` the input and hands out its outputs; the bridge is in
+    modules/flow/BRIDGE_2D.md."""
 
     def __init__(self, settings: Bridge2DLayerSettings) -> None:
         super().__init__(settings)
         self.settings: Bridge2DLayerSettings = settings
-        self._density_color: TintColor = TintColor()
-        self._trail: bridge_2d.VelocitySmoothTrail = bridge_2d.VelocitySmoothTrail(settings.trail)
-        self._velocity_magnitude: bridge_2d.VelocityMagnitude = bridge_2d.VelocityMagnitude()
-        self._density_bridge: bridge_2d.DensityBridge = bridge_2d.DensityBridge(settings.density)
-        self._temperature_bridge: bridge_2d.TemperatureBridge = bridge_2d.TemperatureBridge(settings.temperature)
+        self._bridge_2d: Bridge2D = Bridge2D(settings)
 
     @property
     def output(self) -> BridgeOutput:
-        """The density is the amount alone, the smoothed velocity's speed (R); the 2D fluid colors it at its output
-        with its injection's tint."""
-        return BridgeOutput(self._trail.velocity, self._velocity_magnitude.magnitude, self._density_color.color,
-                            self._temperature_bridge.temperature)
+        bridge: Bridge2D = self._bridge_2d
+        return BridgeOutput(bridge.velocity, bridge.density, bridge.color, bridge.temperature, bridge.acceleration,
+                            expansion=bridge.expansion)
 
     def _components(self) -> dict[str, HasPorts]:
-        """The density's color, made first, then the bridges."""
-        return {'': self._density_color, 'trail': self._trail, 'speed': self._velocity_magnitude,
-                'density': self._density_bridge, 'temperature': self._temperature_bridge}
+        return {'': self._bridge_2d}
 
     # ========== Lifecycle ==========
 
     def _allocate_stages(self, width: int, height: int, output_width: int, output_height: int) -> None:
-        self._density_color.allocate(output_width, output_height)
-        self._trail.allocate(width, height, output_width, output_height)
-        self._velocity_magnitude.allocate(width, height)
-        self._temperature_bridge.allocate(width, height)
-        self._density_bridge.allocate(output_width, output_height)
+        self._bridge_2d.allocate(width, height, output_width, output_height)
 
     def _deallocate_stages(self) -> None:
-        self._density_color.deallocate()
-        self._trail.deallocate()
-        self._velocity_magnitude.deallocate()
-        self._temperature_bridge.deallocate()
-        self._density_bridge.deallocate()
+        self._bridge_2d.deallocate()
 
     def _reset_stages(self) -> None:
-        self._trail.reset()
-        self._density_bridge.reset()
+        self._bridge_2d.reset()
 
-    # ========== The bridges ==========
+    # ========== The bridge ==========
 
     def _bridge(self, input: BridgeInput) -> None:
-        self._density_color.update(input.image, input.tint, input.mask)
-        color: Texture = self._density_color.color
-
-        self._trail.set_velocity(input.velocity)
-        self._trail.update(input.dt)
-
-        self._velocity_magnitude.set_input(self._trail.velocity)
-        self._velocity_magnitude.update()
-
-        self._density_bridge.set_color(color)
-        self._density_bridge.set_velocity(self._trail.velocity)
-        self._density_bridge.update()
-
-        self._temperature_bridge.set_color(color)
-        self._temperature_bridge.set_mask(self._velocity_magnitude.magnitude)
-        self._temperature_bridge.update()
+        self._bridge_2d.update(input.velocity, input.dt, input.mask, input.image, input.same_tick)

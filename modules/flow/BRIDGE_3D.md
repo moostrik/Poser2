@@ -6,11 +6,14 @@ The bridge turns the motion's velocity into what the fluid takes, in units of th
 moves, the dye it brings, its warmth. How the stages fit together is in [FLOW.md](FLOW.md), what
 the fluid does with each output in [FLUID_3D.md](FLUID_3D.md#the-inputs), what is next in
 [FLOW_PLAN.md](FLOW_PLAN.md). "Code" is what the files show; **(deduction)** marks what is
-inferred from them, **(site fact)** what the operator saw. The 2D bridge (`bridge_2d/`) gives the
-boundary only and stays as on `main` until it is rebuilt on the Lucas–Kanade flow.
+inferred from them, **(site fact)** what the operator saw. The 2D bridge is the same bridge on a 2D velocity,
+its own kernels ([BRIDGE_2D.md](BRIDGE_2D.md)).
 
-The bridge is `Bridge3D` (`bridge_3d/bridge_3d.py`), its settings `Bridge3DSettings` (`bridge_settings.py`);
-it takes the motion's textures as arguments and imports nothing of the render. Its layer, `Bridge3DLayer`,
+The bridge is `Bridge3D` (`bridge_3d/bridge_3d.py`), its kernels in `bridge_3d/`. What it shares with the 2D
+bridge is in `bridge/`: the `Bridge` it runs on (when each filter runs, the mixes' order, the merge of a tick's
+frames, the ports), the settings `BridgeSettings` (`bridge/bridge_settings.py`), the trails', the blur's and the
+band's math, `FrameMax` and the peak's Python; the 3D gives its filters, its mixes with the z positions and its
+speed count. It takes the motion's textures as arguments and imports nothing of the render. Its layer, `Bridge3DLayer`,
 hands it the input and hands out its outputs ([FLOW.md](FLOW.md#the-layers)).
 
 ## The goal
@@ -24,7 +27,7 @@ The bridge reads two things from a movement: the motion itself, a velocity in it
 is stronger for fast than for slow and coasts after a stop; and its changes, the velocity changes
 where a move starts and where it stops. The motion wants a long, soft reading, the changes a
 short, sharp one, so two filters, named by what they do, read the same velocity side by side
-(`bridge_3d/`):
+(`bridge_3d/`, their settings in `bridge/`):
 
 | Filter             | Reads                                                                  | Gives                                    | Panel group         |
 |--------------------|------------------------------------------------------------------------|------------------------------------------|---------------------|
@@ -153,7 +156,7 @@ body is fully there. Widths/s is the velocity's own unit, so no reference speed 
 The density's color is the `color` stage's as it comes, copied each step so a tick of several captures holds each
 one's (white without one): the stage grades it, mattes it and premultiplies it by its own feathered mask
 ([COLOR.md](COLOR.md)), so alpha is the color's coverage (Porter and Duff 1984), and the bridge gates it by no mask
-of its own; the 2D bridge tints its color and gates it by the mask (`TintColor`). The amount and the color stay apart,
+of its own, as the 2D bridge does. The amount and the color stay apart,
 as the fluid takes them; a capture's color goes with its amount wherever captures are picked by it. The warmth
 comes from the motion alone, its presence, so the lift does not follow the player's clothes. The readings of one unit share the mix, so
 the mix has no gain: the motion's gains balance the axes and the fluid's gains set how the water

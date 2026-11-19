@@ -6,8 +6,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import band_width, decay_weight, step_peak
-from modules.flow.bridge_3d import change_acceleration_scale
+from modules.flow import band_width, change_acceleration_scale, decay_weight, step_peak
 
 FAST, SLOW = 25.0, 150.0      # ms, the preset's bandpass
 DV: np.ndarray = np.array([[0.6, -0.3, 0.2]])   # widths/s

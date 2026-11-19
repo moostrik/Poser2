@@ -5,26 +5,12 @@ them (`LowpassStep`), one blurs them (`LowpassBlur`). How and why: modules/flow/
 "The z positions".
 """
 
-import math
-
-import numpy as np
 from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_RG32F, GL_RGBA16F
 
 from modules.gl import SwapFbo, Texture
-from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil, Port, TextureKind
-from .trails import decay_weight
+from ..bridge import VelocityLowpassSettings, blur_dispatches, blur_sigma, decay_weight, gaussian_weights
 from .shaders import LowpassBlur, LowpassStep
-
-FULL_WIDTH_HALF_MAXIMUM: float = 2.0 * math.sqrt(2.0 * math.log(2.0))     # a Gaussian's width at half its height, in sigmas
-
-
-class VelocityLowpassSettings(BaseSettings):
-    """Configuration for the velocity lowpass."""
-    advect = Field(0.0, min=0.0, max=1.0, step=0.05, description="How far the trail moves with its motion before each step; 0 = at a fixed pixel")
-    attack = Field(0.0, min=0.0, max=500.0, step=1.0, description="Smoothing time of a rising speed, ms; 0 = as smooth (lower: quicker flicks)")
-    smooth = Field(160.0, min=0.0, max=3000.0, step=1.0, description="Smoothing time of a falling speed, ms; 0 = none (higher: longer coast)")
-    blur = Field(0.0, min=0.0, max=0.3, step=0.001, newline=True, description="How far the trail spreads in 1 s, widths at half its height; 0 = off")
 
 
 class VelocityLowpass(FlowBase):
@@ -166,28 +152,3 @@ class VelocityLowpass(FlowBase):
                 self._blur_shader.use([fbo.back if fbo is not None else None for fbo in blurred], list(blurred), weights)
 
 
-# ── the blur's values ───────────────────────────────────────────────────
-
-def blur_sigma(blur: float, delta_time: float, width: int) -> float:
-    """One step's sigma in pixels: a spread of `blur` widths at half its height in one second, as diffusion
-    (σ² = 2 D dt), over a step of `delta_time` s, on a field `width` pixels wide; 0 without a spread or a step."""
-    if blur <= 0.0 or delta_time <= 0.0 or not math.isfinite(delta_time):
-        return 0.0
-    return blur / FULL_WIDTH_HALF_MAXIMUM * math.sqrt(delta_time) * width
-
-
-def blur_dispatches(sigma: float, max_radius: int) -> tuple[int, float]:
-    """How many blurs of which sigma make one of `sigma` with each reaching 3 sigmas within `max_radius` taps:
-    k blurs of sigma / sqrt(k) are one of sigma."""
-    count: int = max(1, math.ceil((3.0 * sigma / max_radius) ** 2))
-    return count, sigma / math.sqrt(count)
-
-
-def gaussian_weights(sigma: float) -> np.ndarray:
-    """The textbook Gaussian's taps k = 0..ceil(3 sigma): exp(-k² / 2σ²), normalized over both sides."""
-    if sigma <= 0.0:
-        return np.ones(1)
-    radius: int = math.ceil(3.0 * sigma)
-    k: np.ndarray = np.arange(radius + 1, dtype=np.float64)
-    weights: np.ndarray = np.exp(-k * k / (2.0 * sigma * sigma))
-    return weights / (weights[0] + 2.0 * weights[1:].sum())

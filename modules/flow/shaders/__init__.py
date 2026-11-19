@@ -8,7 +8,6 @@ from .channel_copy import ChannelCopy
 from .channel_set_region import ChannelSetRegion
 from .clamp import Clamp
 from .dampen import Dampen
-from .tint_color import TintColor
 from .magnitude_shader import MagnitudeShader
 from .normalize import Normalize
 from .set_region import SetRegion

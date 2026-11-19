@@ -47,6 +47,7 @@ class Layers(IntEnum):
     view =          auto()
     color =         auto()
     motion =        auto()
+    bridge =        auto()
     time_series =   auto()     # the app's timings, over time
     pose =          auto()
 
@@ -258,6 +259,7 @@ class RenderSettings(BaseSettings):
     view   : Group[ViewLayerSettings]            = Group(ViewLayerSettings)
     color  : Group[render.ColorLayerSettings]    = Group(render.ColorLayerSettings)
     motion : Group[render.Motion2DLayerSettings] = Group(render.Motion2DLayerSettings, share=[input_fps.as_('fps')])
+    bridge : Group[render.Bridge2DLayerSettings] = Group(render.Bridge2DLayerSettings)
     pose   : Group[PoseMonitorSettings]          = Group(PoseMonitorSettings)
     # the display
     time_series: Group[render.TimeSeriesLayerSettings] = Group(render.TimeSeriesLayerSettings)

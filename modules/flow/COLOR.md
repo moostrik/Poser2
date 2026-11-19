@@ -6,8 +6,7 @@ carries it beside the amount ([BRIDGE_3D.md](BRIDGE_3D.md#the-mix)). **(deductio
 
 The stage is `ColorLayer` (settings `color`, `modules/render/modules/flow/color_layer.py`); its work is
 `DensityColor` (`modules/flow/color`), its shaders `Grade`, `Sharpen`, `LumaMatte`, `Erode`, `Blur`, `Feather` and
-`MaskMultiply` (`modules/gl`), the white balance's matrix `white_balance.py`. The 2D bridge's tint is apart
-(`TintColor`).
+`MaskMultiply` (`modules/gl`), the white balance's matrix `white_balance.py`. Both bridges take its color.
 
 ## The stage
 

@@ -2,11 +2,11 @@
 velocity (xyz)."""
 
 # Local application imports
-from modules.flow import Bridge3D, Bridge3DSettings, HasPorts
+from modules.flow import Bridge3D, BridgeSettings, HasPorts
 from .bridge_layer import BridgeLayer, BridgeLayerSettings, BridgeInput, BridgeOutput
 
 
-class Bridge3DLayerSettings(Bridge3DSettings, BridgeLayerSettings):
+class Bridge3DLayerSettings(BridgeSettings, BridgeLayerSettings):
     """Configuration for Bridge3DLayer: the stage's settings and its bridge's own, one panel, the stage's
     first."""
 

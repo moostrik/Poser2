@@ -283,7 +283,7 @@
         "color"
       ],
       "debug": [
-        "motion"
+        "bridge"
       ]
     },
     "view": {
@@ -388,6 +388,96 @@
         "advanced": {
           "channel": "ALL",
           "scale": 100.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
+      }
+    },
+    "bridge": {
+      "width": 448,
+      "height": 800,
+      "filters": {
+        "lowpass": {
+          "advect": 0.5,
+          "attack": 1.0,
+          "smooth": 200.0,
+          "blur": 0.081
+        },
+        "bandpass": {
+          "fast_smooth": 25.0,
+          "slow_smooth": 150.0,
+          "start_region_weight": 1.0,
+          "stop_region_weight": 1.0,
+          "start_region_size": 128.0,
+          "stop_region_size": 128.0
+        }
+      },
+      "velocity": {
+        "trail": 1.0,
+        "change": 0.0,
+        "start": 0.0,
+        "bow": 0.0,
+        "stop": 0.0,
+        "wake": 0.0,
+        "peak": {
+          "enabled": true
+        }
+      },
+      "acceleration": {
+        "trail": 0.0,
+        "change": 0.0,
+        "start": 0.0,
+        "bow": 0.0,
+        "stop": 0.0,
+        "wake": 1.0
+      },
+      "density": {
+        "trail": 1.0,
+        "change": 0.0,
+        "start": 0.0,
+        "bow": 0.05,
+        "stop": 0.0,
+        "wake": 0.0,
+        "mask": 0.0
+      },
+      "temperature": {
+        "trail": 1.0,
+        "change": 0.0,
+        "start": 0.0,
+        "bow": 0.0,
+        "stop": 0.0,
+        "wake": 0.0,
+        "mask": 0.0
+      },
+      "expansion": {
+        "trail": 0.0,
+        "change": 0.0,
+        "start": 0.0,
+        "bow": 0.0,
+        "stop": 1.0,
+        "wake": 0.0,
+        "mask": 0.05
+      },
+      "monitor_main": {
+        "texture": "output.density",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
+      },
+      "monitor_debug": {
+        "texture": "density.amount",
+        "view": "IMAGE",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
           "blend_mode": "ADD",
           "glyph_spacing": "SPACING_32",
           "colormap": "JET",

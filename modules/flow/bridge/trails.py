@@ -1,4 +1,4 @@
-"""The 3D bridge's trail weight without GL: the Ema weight."""
+"""The bridges' trail weight without GL: the Ema weight."""
 
 import math
 

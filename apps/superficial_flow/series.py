@@ -11,6 +11,7 @@ class Series(IntEnum):
     CAPTURE_LATENCY =       auto()  # ms from a capture (color and mask of one moment) to the board
     MASKS_UNSYNCED =        auto()  # 1 where a capture with a player carried an older mask than its own
     RENDER_INTERVAL =       auto()  # ms between render ticks
+    GPU_BRIDGE =            auto()  # ms of GPU in the bridge
     WAIT_UPLOAD =           auto()  # ms a camera frame waits in the uploader's queue
     WAIT_UPLOAD_TRACKLETS = auto()  # ms a camera's tracklet message waits in the uploader's queue
     WAIT_CAPTURE_SYNC =     auto()  # ms an image, poses or masks wait in the capture sync's inbox
@@ -22,6 +23,7 @@ class Series(IntEnum):
 TIMER_SERIES: dict[str, Series] = {
     'Render interval':          Series.RENDER_INTERVAL,
     'Segmentation':             Series.SEGMENTATION,
+    'GPU bridge':               Series.GPU_BRIDGE,
     'Wait upload':              Series.WAIT_UPLOAD,
     'Wait upload tracklets':    Series.WAIT_UPLOAD_TRACKLETS,
     'Wait inference frame sync': Series.WAIT_CAPTURE_SYNC,

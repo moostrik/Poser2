@@ -495,6 +495,22 @@ the floats' last bits the solve amplifies. Not worth a pass of their own: the ba
 (0.117 ms against 0.140), and the lowpass's advect fused into its trail, at most 0.005 ms of its 0.076 (its blur,
 4 steps of 2 passes, is 0.064).
 
+### The bridges on one ABC
+
+deep_flow's bridge before and after its Python moved onto the `Bridge` both bridges share (superficial_flow's C1), a
+time, 19 November, commits 9bba4317 and the C1 commit, the hands recording, the preset, one run each, back to back,
+about 2990 steps, mean / p95 ms **(seen)**:
+
+| Timer               | Before        | After         |
+|---------------------|---------------|---------------|
+| GPU bridge lowpass  | 0.049 / 0.050 | 0.048 / 0.050 |
+| GPU bridge bandpass | 0.133 / 0.139 | 0.134 / 0.140 |
+| GPU bridge mix      | 0.082 / 0.093 | 0.082 / 0.093 |
+| GPU bridge          | 0.351 / 0.286 | 0.360 / 0.286 |
+
+The kernels and their order are unchanged; on one synthetic input the outputs are bit-equal before and after
+**(seen)**. The bridge's mean above its p95 is a few long frames **(deduction)**.
+
 ### The body at its own depth
 
 The z positions and the passes they ride in ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)), each pass alone on the

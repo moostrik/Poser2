@@ -1,0 +1,37 @@
+#version 460 core
+
+// Lowpass Step 2D
+// One step of the 2D lowpass's trail in one dispatch. The trail before is first moved with its own motion (uCarry,
+// uv per frame per unit of its velocity): each pixel takes it from where the trail says it came from, linear between
+// pixels, 0 outside. Then one unit-gain Ema step: weight * previous + (1 - weight) * input, the attack weight where
+// the speed rises above the trail's, else the release. With uAcceleration, the trail's rate: (new - moved) / dt.
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+uniform sampler2D uTrail;           // the trail before (RG16F, xy widths/s), 0 outside
+uniform sampler2D uVelocity;        // the input velocity (xy widths/s)
+uniform vec2 uCarry;                // uv per frame per unit of trail velocity, times the advect amount; 0 none
+uniform float uAttack;              // what remains of the trail where the speed rises
+uniform float uRelease;             // what remains elsewhere
+uniform bool uAcceleration;
+uniform float uRate;                // 1 / dt
+uniform ivec2 uSize;
+
+layout(rg16f, binding = 0) writeonly uniform image2D uTrailOut;
+layout(rg16f, binding = 1) writeonly uniform image2D uAccelerationOut;
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(pixel, uSize))) return;
+    vec2 uv = (vec2(pixel) + 0.5) / vec2(uSize);
+
+    vec2 from = uv - texture(uTrail, uv).xy * uCarry;
+    vec2 previous = texture(uTrail, from).xy;
+
+    vec2 velocity = texture(uVelocity, uv).xy;
+    float weight = length(velocity) > length(previous) ? uAttack : uRelease;
+    vec2 trail = mix(velocity, previous, weight);
+
+    imageStore(uTrailOut, pixel, vec4(trail, 0.0, 0.0));
+    if (uAcceleration) imageStore(uAccelerationOut, pixel, vec4((trail - previous) * uRate, 0.0, 0.0));
+}

@@ -1,0 +1,28 @@
+#version 460 core
+
+// Speed Count 2D Shader
+// The 2D velocity's speeds into log bins, for the peak: the length of each sample's xy, on a grid of samples, into
+// the first row's bins on a log scale from `speed_low` to `speed_high`; a length below `speed_low` is still and not
+// counted, one above `speed_high` lands in the end bin.
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+uniform sampler2D tex0;     // The velocity counted (xy)
+uniform float scale;        // Multiplier on the values
+uniform ivec2 samples;      // The grid of samples, across and down
+uniform float speed_low;    // The first bin's lower edge
+uniform float speed_high;   // The last bin's upper edge
+
+layout(r32ui, binding = 0) uniform uimage2D histogram;     // bins wide
+
+void main() {
+    ivec2 id = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(id, samples))) return;
+
+    int bins = imageSize(histogram).x;
+    vec2 uv = (vec2(id) + 0.5) / vec2(samples);
+    float length_ = length(textureLod(tex0, uv, 0.0).xy * scale);
+    if (!(length_ >= speed_low)) return;    // still, or not a number
+    int bin = clamp(int(floor(log(length_ / speed_low) / log(speed_high / speed_low) * float(bins))), 0, bins - 1);
+    imageAtomicAdd(histogram, ivec2(bin, 0), 1u);
+}
