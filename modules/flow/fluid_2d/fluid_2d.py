@@ -103,7 +103,8 @@ class Fluid2D:
         # Curl is sampled at neighbor offsets by VorticityForce: beyond the walls its edge, the cell's own, as the 3D's
         self._vorticity_curl_fbo: Fbo = Fbo(wrap=GL_CLAMP_TO_EDGE)
         self._vorticity_force_fbo: Fbo = Fbo()
-        self._buoyancy_fbo: Fbo = Fbo()
+        self._buoyancy_fbo: Fbo = Fbo()         # the buoyancy, for its monitor
+        self._buoyancy_shown: bool = False      # a monitor read the buoyancy since the last step
         # MacCormack's predictors, one per field, each allocated at its field's first MacCormack step
         self._velocity_scratch: Fbo = Fbo(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         self._temperature_scratch: Fbo = Fbo()
@@ -479,26 +480,32 @@ class Fluid2D:
     def _apply_buoyancy(self) -> None:
         """The buoyancy, an acceleration f = gravity × (κρ − σT) (widths/s²) added × dt: the density's amount ρ sinks
         along gravity (`density.sink`), the warmth T rises against it (`temperature.buoyancy`, while the temperature
-        runs). The pass runs while either is above 0; gravity is `input`'s."""
+        runs). The pass runs while either is above 0 and gravity, `input`'s, is not 0: one draw adds it straight to
+        the velocity; the force itself is made only for its monitor."""
+        shown: bool = self._buoyancy_shown
+        self._buoyancy_shown = False
         lift: float = self.settings.temperature.buoyancy if self._temperature_runs else 0.0
         kappa: float = self.settings.density.sink
-        if lift <= 0.0 and kappa <= 0.0:
+        input = self.settings.input
+        gravity: tuple[float, float] = (input.gravity_x, input.gravity_y)
+        if (lift <= 0.0 and kappa <= 0.0) or gravity == (0.0, 0.0):
             return
 
-        input = self.settings.input
-        self._buoyancy_fbo.begin()
-        self._buoyancy_shader.use(
-            self._temperature_fbo,
-            self._density_fbo,
-            self._simulation_obstacle_fbo,
-            lift,
-            kappa,
-            (input.gravity_x, input.gravity_y),
-            has_obstacles=self._has_obstacles
-        )
-        self._buoyancy_fbo.end()
+        velocity: SwapFbo = self._velocity_fbo
+        velocity.swap()
+        velocity.begin()
+        self._buoyancy_shader.use(self._temperature_fbo, self._density_fbo, self._simulation_obstacle_fbo, lift, kappa,
+                                  gravity, self._has_obstacles, velocity.back, self._dt)
+        velocity.end()
+        if shown:
+            self._buoyancy_fbo.begin()
+            self._buoyancy_shader.use(self._temperature_fbo, self._density_fbo, self._simulation_obstacle_fbo, lift,
+                                      kappa, gravity, self._has_obstacles)
+            self._buoyancy_fbo.end()
 
-        self._add_force_to_velocity(self._buoyancy_fbo, self._dt)
+    def _show_buoyancy(self) -> None:
+        """A monitor reads the buoyancy: the next step makes it."""
+        self._buoyancy_shown = True
 
     def _enforce_incompressibility(self) -> None:
         """Pressure projection (divergence, less the expansion's rate × it → the solve by `pressure.solver` →
@@ -954,7 +961,7 @@ class Fluid2D:
                 'velocity': Port(self._velocity_fbo, TextureKind.VELOCITY),
                 'vorticity': Port(self._vorticity_curl_fbo, TextureKind.SCALAR),
                 'vorticity_force': Port(self._vorticity_force_fbo, TextureKind.VELOCITY),
-                'buoyancy': Port(self._buoyancy_fbo, TextureKind.ACCELERATION),
+                'buoyancy': Port(self._buoyancy_fbo, TextureKind.ACCELERATION, prepare=self._show_buoyancy),
                 'expansion': Port(self._expansion_fbo, TextureKind.SCALAR),
                 'divergence': Port(self._divergence_fbo, TextureKind.SCALAR),
                 'pressure': Port(self._pressure_fbo, TextureKind.SCALAR),

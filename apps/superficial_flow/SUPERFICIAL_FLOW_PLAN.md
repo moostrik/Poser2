@@ -42,11 +42,10 @@ The 3D fluid's features that have a meaning on a plane, each as the 2D's own ker
 harness and seen in superficial_flow; the march's light, shadows and fog need a depth and stay 3D only:
 
 - **D7.** The particles.
-- **D8.** The buoyancy in one pass, as the 3D's (the flow plan's E7): its own 2D kernel adds dt × gravity ×
-  (sink × amount − buoyancy × warmth) straight into the velocity's swap, in place of `Buoyancy` into an RG16F force
-  and `FlowUtil.add`; the warmth is read only while the lift runs; the pass is skipped when the sink and the lift
-  are both 0 or gravity is 0. superficial_flow's preset has gravity (0, 0) with `sink` 1, so today the pass runs and
-  adds nothing.
+- **D8.** The one-pass buoyancy checked (built 2026-11-19, as the 3D's, the flow plan's E9: `Buoyancy` adds
+  dt × gravity × (sink × amount − buoyancy × warmth) straight into the velocity's swap, the warmth read only while
+  the lift runs, skipped when the sink and the lift are both 0 or gravity is 0, the force itself only for its
+  monitor). superficial_flow's preset has gravity (0, 0), so the pass is skipped there.
 
   Question: gravity in superficial_flow's preset. `gravity_x`/`_y` are a direction (−1 to 1), the sink and the
   buoyancy carry the unit (widths/s²); deep_flow's is 0.02 along z, which has no meaning on a plane. Down the screen
