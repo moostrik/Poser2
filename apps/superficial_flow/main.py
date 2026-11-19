@@ -17,7 +17,7 @@ from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, TrackerFrameSource
 from modules.pose import configure_features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import pose, person, CropExtractor, GpuImage, ImageSnapshot, has_points, RecordedPoses, InferenceFrame, InferenceFrameSync, Poses, SerialUploader, frame_poses
+from modules.inference import pose, person, segmentation, CropExtractor, GpuImage, ImageSnapshot, has_points, RecordedPoses, InferenceFrame, InferenceFrameSync, Poses, SerialUploader, frame_poses
 from modules.pose import FrameDict
 from modules.utils import FPS, PerformanceTimer
 
@@ -52,6 +52,10 @@ class SuperficialFlowMain:
         crop_settings = self.settings.pose.pose_crop
         crop_settings.output_width = self.settings.pose.pose.width
         crop_settings.output_height = self.settings.pose.pose.height
+        # The segmentation's crop likewise, at the segmentation model's size
+        segmentation_crop = self.settings.pose.segmentation_crop
+        segmentation_crop.output_width = self.settings.pose.segmentation.width
+        segmentation_crop.output_height = self.settings.pose.segmentation.height
         self.settings.initialize()
         self.panel_server = PanelServer(self.settings, self.settings.panel, on_exit=self.stop)
 
@@ -85,9 +89,13 @@ class SuperficialFlowMain:
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
         self.uploader = SerialUploader(self.settings.camera.uploader)    # the camera's hand-off: each frame onto the GPU as it comes, on its own thread
-        # The frame domain's async step: the crop step in, the pose model out
-        self.crops = CropExtractor(p.pose_crop)
+        # The frame domain's async step: the crop step in (the pose model's crops at their interval and the
+        # segmentation's every frame, in one pass, from the same images and boxes), the pose model out
+        self.crops = CropExtractor(p.pose_crop, p.segmentation_crop)
         self.pose_estimator = pose.PoseEstimator(p.pose)
+        # The segmentation, every frame, on its own crops
+        self.segmenter = segmentation.Segmenter(p.segmentation)
+        self.crops.add_image_callback(self.segmenter.submit, p.segmentation_crop)
         # -sim plays the recording's poses in place of the pose model, between the crops and it (`recorded_poses.enabled`)
         self.recorded_poses: RecordedPoses | None = None
         poses: pose.PoseEstimator | RecordedPoses = self.pose_estimator
@@ -182,6 +190,7 @@ class SuperficialFlowMain:
             self.recorded_poses.start()         # starts the pose model with it
         else:
             self.pose_estimator.start()
+        self.segmenter.start()
 
         self.osc_sound.start()
 
@@ -288,6 +297,7 @@ class SuperficialFlowMain:
             self.recorded_poses.stop()          # stops the pose model with it
         else:
             self.pose_estimator.stop()
+        self.segmenter.stop()
         self.inference_frame_sync.stop()
         if self.person_detector is not None:
             self.person_detector.stop()

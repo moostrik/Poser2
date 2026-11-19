@@ -285,7 +285,7 @@ def compare_outputs(outputs: dict[str, np.ndarray], reference: dict[str, np.ndar
 def main() -> None:
     assert __doc__ is not None
     parser = ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--app', required=True, choices=['white_space', 'hd_trio', 'deep_flow', 'smile'])
+    parser.add_argument('--app', required=True, choices=['white_space', 'hd_trio', 'deep_flow', 'superficial_flow', 'smile'])
     parser.add_argument('--model-type', default='trt', choices=['trt', 'onnx'])
     parser.add_argument('--iterations', type=int, default=1000, help='timed batches per model')
     parser.add_argument('--warmup', type=int, default=100, help='untimed batches per model first')

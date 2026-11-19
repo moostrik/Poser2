@@ -5,6 +5,7 @@ import torch
 
 from modules.pose import FrameDict
 from modules.settings import BaseSettings, Field
+from modules.utils import Rect
 
 
 @dataclass(frozen=True)
@@ -19,10 +20,13 @@ class Image:
                    or None if no previous frame is available.
         ready:     Recorded on the crop stream after the crops are written; a reader on another stream
                    waits on it (`stream.wait_event`) first. None for crops already written.
+        box:       The window the crop was cut at, uv on the camera image (rows down); None for a crop not cut
+                   by the crop step.
     """
     crop: torch.Tensor
     prev_crop: torch.Tensor | None = None
     ready: torch.cuda.Event | None = None
+    box: Rect | None = None
 
 
 CropImageDict: TypeAlias = dict[int, Image]

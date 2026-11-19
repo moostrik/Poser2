@@ -130,7 +130,7 @@ class CropExtractor:
                     prev_crop = self._crop(size, previous[cam_id], roi)
                 box = roi.scale(Point2f(1.0 / width, 1.0 / height))
                 cropped[track_id] = replace(pose, {BBox: BBox.from_rect(box)}, timestamps.get(cam_id, pose.timestamp))
-                crops[track_id] = Image(crop=crop, prev_crop=prev_crop, ready=crops_ready)
+                crops[track_id] = Image(crop=crop, prev_crop=prev_crop, ready=crops_ready, box=box)
             except Exception:
                 logger.exception(f"Error processing pose {track_id}")
         return cropped, crops

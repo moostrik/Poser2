@@ -6,7 +6,7 @@ from typing import TypeAlias
 import torch
 
 from modules.pose import FrameDict
-from modules.utils import PerformanceTimer
+from modules.utils import PerformanceTimer, Rect
 
 from ..engine import Engine, ModelType, ModelWorker, make_engine
 from ..preprocessing import crop
@@ -20,7 +20,7 @@ RECURRENT_CHANNELS: tuple[tuple[int, int], ...] = ((16, 2), (20, 4), (40, 8), (6
 STATE_INPUTS: tuple[str, ...] = ('r1i', 'r2i', 'r3i', 'r4i')
 STATE_OUTPUTS: tuple[str, ...] = ('r1o', 'r2o', 'r3o', 'r4o')
 
-Batch: TypeAlias = tuple[FrameDict, list[int], list[torch.Tensor], torch.cuda.Event | None]     # poses, ids, crops, their event
+Batch: TypeAlias = tuple[FrameDict, list[int], list[torch.Tensor], list[Rect | None], torch.cuda.Event | None]     # poses, ids, crops, their boxes, their event
 
 
 class Segmenter(ModelWorker[Batch, SegmenterSettings]):
@@ -56,11 +56,13 @@ class Segmenter(ModelWorker[Batch, SegmenterSettings]):
 
         track_ids: list[int] = []
         images: list[torch.Tensor] = []
+        boxes: list[Rect | None] = []
         ready: torch.cuda.Event | None = None      # the crops' event, one for the batch
         for track_id in poses.keys():
             if track_id in crops:
                 track_ids.append(track_id)
                 images.append(crops[track_id].crop)
+                boxes.append(crops[track_id].box)
                 ready = crops[track_id].ready
 
         if not images:      # no crops: the poses go on without masks
@@ -70,8 +72,8 @@ class Segmenter(ModelWorker[Batch, SegmenterSettings]):
         max_batch: int = self.max_batch
         if len(images) > max_batch:
             logger.warning(f"Segmentation: batch size {len(images)} exceeds max {max_batch}, only the first {max_batch} run")
-            track_ids, images = track_ids[:max_batch], images[:max_batch]
-        self._put(0, (poses, track_ids, images, ready))
+            track_ids, images, boxes = track_ids[:max_batch], images[:max_batch], boxes[:max_batch]
+        self._put(0, (poses, track_ids, images, boxes, ready))
 
     def add_segmentation_callback(self, callback: ImageCallback) -> None:
         with self._callback_lock:
@@ -93,7 +95,7 @@ class Segmenter(ModelWorker[Batch, SegmenterSettings]):
                 logger.exception("Segmentation: error in a mask callback")
 
     def _process(self, items: dict[int, Batch]) -> None:
-        poses, track_ids, images, ready = items[0]
+        poses, track_ids, images, boxes, ready = items[0]
 
         # Every player's memory cleared now and then, a failsafe against a state gone wrong
         self._batch_count += 1
@@ -108,7 +110,7 @@ class Segmenter(ModelWorker[Batch, SegmenterSettings]):
         for i, track_id in enumerate(track_ids):
             if track_id in poses:
                 results[track_id] = Image(mask=masks[i], foreground=foregrounds[i], timestamp=poses[track_id].timestamp,
-                                           ready=written)
+                                           ready=written, box=boxes[i])
         self._notify_callbacks(poses, results)
 
     def _setup(self) -> None:

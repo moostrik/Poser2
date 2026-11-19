@@ -103,6 +103,22 @@ ONNX runner refused the model's symbolic output size and loaded nothing, so that
 - ONNX Runtime against TensorRT: the pose is as fast; the segmentation and the flow take two to four times as long
   **(seen)**, as TensorRT fuses their many small steps **(deduction)**
 
+## The segmentation every frame
+
+RVM on one player, TensorRT FP16, at each size, mean / p50 / p99 ms, 2026-11-19, af0063c2 **(seen)**. Alone:
+`scripts/model_benchmark.py --app superficial_flow --models segmentation`, 1000 runs after 100, the crop at the
+model's size. In the app: superficial_flow `-sim` on `20261112-125832_measure`, 20 s, the segmentation on every frame
+(1000 of 1000), the pose (256x192) on every other, the view and the color on, its `Segmentation` timer.
+
+| Size      | Alone              | In the app          |
+|-----------|--------------------|---------------------|
+| 256x192   | 1.55 / 1.40 / 2.97 |                     |
+| 384x288   | 1.62 / 1.43 / 2.87 |                     |
+| 512x384   | 1.64 / 1.50 / 2.79 |                     |
+| 1024x768  | 2.75 / 2.37 / 4.38 | 7.96 / 7.83 / 12.73 |
+
+In the app the timer holds the wait for its crops and for the GPU the pose and the render share **(deduction)**.
+
 ## The pose models
 
 Idle GPU, TensorRT, 300 crops of three photos, each model at its input size (`h2_fp16.py`, `h3_models.py`, not
