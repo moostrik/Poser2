@@ -18,7 +18,7 @@ operator saw.
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | built; E6 the app's check         | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | F1, F2 white                      | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                       | [FLOW.md](FLOW.md)                                 |
-| I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | not started                       | [FLOW.md](FLOW.md)                                 |
+| I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | in superficial_flow's plan        | [FLOW.md](FLOW.md)                                 |
 | J   | [Every setting and its description](#j-every-setting-and-its-description)    | last, after the refactor          | `CLAUDE.md`, `.claude/rules`                       |
 
 E6 needs the operator at the screen; the other lines go on meanwhile.
@@ -134,16 +134,8 @@ What is built: [FLUID_3D.md](FLUID_3D.md#the-density).
 
 ## I. The 2D flow follows the 3D
 
-Once the 3D is finished, the 2D rebuilt in `modules/flow` on the 3D's principles. Until then the 2D runs as on
-`main` ([FLOW.md's constraints](FLOW.md#constraints)).
-
-- **I1.** The 2D fluid takes the boundary by a drag and the body force's acceleration times dt, as the 3D does
-  ([FLUID_3D.md](FLUID_3D.md#the-inputs)), in place of adding the bridge's velocity as a source times dt.
-- **I2.** The 2D motion on the Lucas–Kanade solve, in widths/s with its velocity gate, in place of `GradientFlow`.
-- **I3.** The 2D bridge rebuilt on the 3D bridge's filters, `VelocityMagnitude` shared again and the warmth
-  from the motion as the 3D's, its mix capped at 1 times the gain, its `TemperatureBridge` gone.
-- **I4.** Each 2D stage its document as it is rebuilt (`BRIDGE_2D.md`, `FLUID_2D.md`); `fluid_2d.py`'s 21-line
-  pipeline docstring goes with it.
+Its plan is superficial_flow's ([SUPERFICIAL_FLOW_PLAN.md](../../apps/superficial_flow/SUPERFICIAL_FLOW_PLAN.md)):
+the app on the 2D flow, the 2D motion, bridge and fluid as their own kernels beside the 3D's.
 
 ## J. Every setting and its description
 
@@ -220,4 +212,4 @@ The cameras:
 - Compare a result only with rows of the same recording, settings and code paths: C2.
 - Ask to measure a time again when its pass's code or size changes: D6.
 
-Not designed yet, so their rules are not named: C3, F1, F2, H1, I1 to I4.
+Not designed yet, so their rules are not named: C3, F1, F2, H1.
