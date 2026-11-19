@@ -7,7 +7,7 @@ from modules.gl import Texture3D, ComputeShader
 
 
 class ResidualRestrict3D(ComputeShader):
-    """Each coarse cell the mean of its fine cells' residuals, div - L p, worked out where they are read."""
+    """Each coarse cell the mean of its fine cells' residuals (past an odd level's edge 0), div - L p, worked out where they are read."""
 
     WORKGROUP_SIZE_X = 8
     WORKGROUP_SIZE_Y = 8

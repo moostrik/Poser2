@@ -29,8 +29,10 @@ float coarse(ivec2 cell) {
 void main() {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
     if (any(greaterThanEqual(gid, uFineSize))) return;
-    // The fine cell's center in coarse cells, centers at integers
-    vec2 position = (vec2(gid) + 0.5) * vec2(uCoarseSize) / vec2(uFineSize) - 0.5;
+    // The fine cell's center in coarse cells, centers at integers: a coarse cell is two fine cells from 0 along an
+    // axis the level halves, the last one reaching past the wall where the fine level is odd
+    vec2 factor = mix(vec2(1.0), vec2(2.0), lessThan(uCoarseSize, uFineSize));
+    vec2 position = (vec2(gid) + 0.5) / factor - 0.5;
     ivec2 base = ivec2(floor(position));
     vec2 f = position - vec2(base);
     float correction = 0.0;
