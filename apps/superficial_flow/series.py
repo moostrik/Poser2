@@ -8,8 +8,8 @@ class Series(IntEnum):
     POSE_LATENCY_RAW =      auto()  # ms from a pose's capture to its keypoints out of the model (RAW stage)
     POSE_LATENCY_SMOOTH =   auto()  # ms from a pose's capture to the SMOOTH stage
     SEGMENTATION =          auto()  # ms the segmentation model takes on a frame's crops
-    CAPTURE_LATENCY =       auto()  # ms from a capture (color and poses of one moment) to the board
-    POSES_UNSYNCED =        auto()  # 1 where a capture with a player carried older poses than its own
+    CAPTURE_LATENCY =       auto()  # ms from a capture (color and mask of one moment) to the board
+    MASKS_UNSYNCED =        auto()  # 1 where a capture with a player carried an older mask than its own
     RENDER_INTERVAL =       auto()  # ms between render ticks
     WAIT_UPLOAD =           auto()  # ms a camera frame waits in the uploader's queue
     WAIT_UPLOAD_TRACKLETS = auto()  # ms a camera's tracklet message waits in the uploader's queue

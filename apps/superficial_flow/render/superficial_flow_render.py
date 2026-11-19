@@ -7,7 +7,7 @@ from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 from modules.gl import GpuTimer, RenderBase, ScreenCapture, Shader, Style, clear_color, fill, fit, Texture, shaders
 from modules.video import ScreenRecorder, ScreenRecorderSettings
 from modules.flow import Port
-from modules.inference import InferenceFrame, Poses
+from modules.inference import InferenceFrame, Masks, segmentation
 from modules.pose import Frame, FrameDict
 from modules import render
 from modules.utils import Color, Rect, Point2f
@@ -207,15 +207,19 @@ class SuperficialFlowRender(RenderBase):
                 self._run_inference_frame(i, frame)
 
     def _run_inference_frame(self, i: int, frame: InferenceFrame) -> None:
-        """One frame: its image into GL, the view of it with its player's pose, the density's color from the view."""
+        """One frame: its image into GL, the view of it with its player's mask and, at this tick, the player's pose of
+        the pose monitor's stage; the density's color from the view."""
         image = cast(render.InferenceFrameImageLayer, self.L[ChainLayers.inference_frame_image][i])
         view = cast(ViewLayer, self.L[ChainLayers.view][i])
 
         image.set_inference_frame(frame)
         image.update()
-        poses: FrameDict = frame[Poses].poses
+        masks: segmentation.ImageDict = frame[Masks].masks
+        mask: segmentation.Image | None = masks[min(masks)] if masks else None
+        poses: FrameDict = {track_id: pose for track_id, pose in self.board.get_frames(self.settings.pose.stage).items()
+                            if pose.cam_id == i}
         pose: Frame | None = poses[min(poses)] if poses else None
-        view.set_input(ViewInput(image.texture, frame.timestamp, pose))
+        view.set_input(ViewInput(image.texture, frame.timestamp, mask, pose))
         self._view_timer.begin()
         view.update()
         self._view_timer.end()

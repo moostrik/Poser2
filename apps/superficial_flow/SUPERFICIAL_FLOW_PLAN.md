@@ -41,19 +41,6 @@ injection per camera with its weight (the player's motion, the similarity) and i
 color), one fluid per screen. Until then hd_trio runs its own copy, unchanged.
 
 
-## A. The app
-
-- **A5.** The mask in the view: the segmentation is the capture sync's base, made with `(Masks,)`: a frame is its
-  image with the mask and foreground made from it (`Masks.by_camera`). `mask_wait` (8 ms in deep_flow's preset) is
-  set from the segmentation's time in the app (p99 12.7 ms, mean 8.0 ms at 1024×768, 2026-11-19), so a frame
-  does not go out with an older mask. The poses are not in the sync: the
-  interpolated poses belong to the render's tick, not a capture, and go only to the pose monitor and the sound;
-  poses from the camera, once detection moves there, join the sync as `Poses`. The board's segmentation images
-  and hd_trio's mask and foreground layers are not used. The color stage takes the frame's foreground with its
-  mask, made together so they match pixel for pixel, placed in the fixed window at the box they were cut at,
-  where they are in the camera image; the motion takes the mask. Checked: superficial_flow in -sim on
-  `measure`, the mask on the player and the color cut by it.
-
 ## B. The 2D motion
 
 - **B1.** The 2D motion. `LucasKanadeFlow2D`, its own class and compose kernel: the x/y velocity in widths/s,
@@ -115,7 +102,6 @@ Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 
 | Step     | Check                                                                                               |
 |----------|-----------------------------------------------------------------------------------------------------|
-| A5       | -sim: the mask on the player, the color cut by it                                                   |
 | B1       | the flow tests; deep_flow in -sim once (`smooth_like_z` moved); superficial_flow's motion monitor   |
 | C1       | GPU harness for the 2D kernels; deep_flow's bridge timed before and after, back to back            |
 | D1       | GPU harness for the injection passes; -sim, the fluid moving with the player                        |
@@ -132,6 +118,6 @@ Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 - Keep presets and settings schemas in sync with code changes: B1, D2 to D7.
 - A settings class mirrors the code it configures; a stage's ports follow its steps: B1, C1, D2.
 - Shaders get checked in a GPU harness: C1, D1, D3 to D7.
-- Prefer the design with the lower latency, measured in the context of the app: A5, C1, D1 to D7.
+- Prefer the design with the lower latency, measured in the context of the app: C1, D1 to D7.
 - A document describes what is built: C1 (BRIDGE_2D.md), D2 (FLUID_2D.md).
 - A plan is named after the package, app or folder it is for, and sits in it: this plan, in `apps/superficial_flow`.

@@ -17,7 +17,7 @@ from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, TrackerFrameSource
 from modules.pose import configure_features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import pose, person, segmentation, CropExtractor, GpuImage, ImageSnapshot, has_points, RecordedPoses, InferenceFrame, InferenceFrameSync, Poses, SerialUploader, frame_poses
+from modules.inference import pose, person, segmentation, CropExtractor, GpuImage, ImageSnapshot, has_points, RecordedPoses, InferenceFrame, InferenceFrameSync, Masks, SerialUploader, frame_poses
 from modules.pose import FrameDict
 from modules.utils import FPS, PerformanceTimer
 
@@ -105,7 +105,9 @@ class SuperficialFlowMain:
             self.player.add_jump_callback(self.recorded_poses.clear_waiting)
             poses = self.recorded_poses
         self.crops.add_image_callback(poses.submit)
-        self.inference_frame_sync = InferenceFrameSync(p.inference_frame_sync, (Poses,))    # the color and poses of one moment, for the render
+        # the image and the mask of one moment, for the render; the poses are not in it: the render takes the
+        # interpolated poses at its tick
+        self.inference_frame_sync = InferenceFrameSync(p.inference_frame_sync, (Masks,))
         self.inference_frame_rate: FPS = FPS()                                # the frames it hands on, for the panel's cadence
 
         # The camera's thread only hands its frames and tracklets over: to the recorder as they came, to the uploader
@@ -129,8 +131,9 @@ class SuperficialFlowMain:
 
         self.tracker.add_tracklet_callback(self.frame_source.set_tracklets)
         # The frame source's thread: each bang's poses with its images to the pipeline; the crop step in it then
-        # tells the poses asked
+        # tells the poses asked (to the recorder) and the masks asked (to the inference frame sync)
         self.crops.add_asked_callback(self._on_asked)
+        self.crops.add_asked_callback(self._on_masks_asked, p.segmentation_crop)
 
         # POSE PIPELINE — the stages are declared in pose/pipeline.py. Each uploaded image drives the frame domain
         # through the tracklet poses (`_on_snapshot`); the render tick drives the output domain (LERP). Every stage's frames
@@ -153,8 +156,8 @@ class SuperficialFlowMain:
         self.uploader.add_gpu_image_callback(self._on_image)
         self.uploader.add_snapshot_callback(self._on_snapshot)
 
-        # INFERENCE FRAME SYNC — each uploaded image and its SMOOTH poses, as one frame on the board
-        self.pipeline.add_frames_callback(Stage.SMOOTH, self._on_smooth_poses)
+        # INFERENCE FRAME SYNC — each uploaded image and its masks, as one frame on the board
+        self.segmenter.add_segmentation_callback(self._on_masks)
         self.inference_frame_sync.add_frame_callback(self._on_inference_frame)
 
         # CAMERA HEALTH — the camera's IMU reading and frame rate against the preset, as pinned indicators
@@ -215,13 +218,21 @@ class SuperficialFlowMain:
             self.board.set_time_sample(Series.CAMERA_INTERVAL, (image.timestamp - last) * 1000.0, image.timestamp)
 
     def _on_asked(self, timestamp: float, cam_id: int, asked: FrameDict) -> None:
-        """A frame bang's poses, on the frame source's thread: the recorder and the inference frame sync hear whether poses
-        come for the image (the pose model asked, the recording's played, or the camera's own keypoints handed on),
-        so a frame without a player, or passed by the pose crop's `interval`, does not wait."""
+        """A frame bang's poses, on the frame source's thread: the recorder hears whether poses come for the image (the
+        pose model asked, the recording's played, or the camera's own keypoints handed on), so a frame without a
+        player, or passed by the pose crop's `interval`, does not wait."""
         modelled: bool = (self.recorded_poses is not None and self.settings.camera.recorded_poses.enabled) or self.settings.pose.pose.enabled
         posing: bool = modelled or any(has_points(frame) for frame in asked.values())
         self.recorder.expect_poses(cam_id, timestamp, bool(asked) and posing)
-        self.inference_frame_sync.expect(cam_id, timestamp, bool(asked) and posing)
+
+    def _on_masks_asked(self, timestamp: float, cam_id: int, asked: FrameDict) -> None:
+        """A frame bang's segmentation crops, on the frame source's thread: the inference frame sync hears whether masks
+        come for the image, so a frame without a player does not wait."""
+        self.inference_frame_sync.expect(cam_id, timestamp, bool(asked) and self.settings.pose.segmentation.enabled)
+
+    def _on_masks(self, poses: FrameDict, masks: segmentation.ImageDict) -> None:
+        """The segmentation's masks, on its thread, to the inference frame sync, one result a camera."""
+        self.inference_frame_sync.submit(*Masks.by_camera(poses, masks))
 
     def _record_poses(self, frames: FrameDict) -> None:
         """The RAW stage's poses, on the pose model's thread, to the recorder as they are: their hand-over, stamped
@@ -232,18 +243,14 @@ class SuperficialFlowMain:
         """The camera's tracklets have reached the tracker's queue: its update, at their capture time."""
         self.tracker.update(cam_tracklets.timestamp)
 
-    def _on_smooth_poses(self, poses: FrameDict) -> None:
-        """The SMOOTH stage's poses, on the pipeline's thread, to the inference frame sync, one result a camera."""
-        self.inference_frame_sync.submit(*Poses.by_camera(poses))
-
     def _on_inference_frame(self, frame: InferenceFrame) -> None:
         self.inference_frame_rate.processed()
         self.board.set_inference_frame(frame)
         now: float = time.perf_counter()        # when the frame reaches the board: the end of the latency
         self.board.set_time_sample(Series.CAPTURE_LATENCY, (now - frame.timestamp) * 1000.0, now)
-        poses: Poses = frame[Poses]
-        if poses.poses:
-            self.board.set_time_sample(Series.POSES_UNSYNCED, 0.0 if poses.synced else 1.0, now)
+        masks: Masks = frame[Masks]
+        if masks.masks:
+            self.board.set_time_sample(Series.MASKS_UNSYNCED, 0.0 if masks.synced else 1.0, now)
 
     def _on_pose_frames(self, series: Series, poses: FrameDict) -> None:
         """A stage's poses as they come out: how long after their capture."""

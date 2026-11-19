@@ -1,10 +1,11 @@
 """The view stage: the flow's view of a frame, the stage before the motion.
 
 `ViewInput` is the frame as the app hands it each tick: its color image on the camera image's view (taken into GL by
-the capture's source layer), its capture time and the pose of its player. `ViewOutput` is what the color stage and the
-motion read. The view cuts a fixed window from the camera image (`ViewCrop`), so the motion measures the player, not a
-moving window; `ViewMask` holds where the player is. The view is made again when a new capture comes in, told by its
-capture time, or when a setting it is made with changes (`made`).
+the capture's source layer), its capture time, its player's mask from the segmentation and its player's pose.
+`ViewOutput` is what the color stage and the motion read. The view cuts a fixed window from the camera image
+(`ViewCrop`), so the motion measures the player, not a moving window; `ViewMask` places the mask at the box its crop
+was cut at, in the same window, so the image and the mask of one capture lie on each other. The view is made again
+when a new capture comes in, told by its capture time, or when a setting it is made with changes (`made`).
 """
 
 # Standard library imports
@@ -17,6 +18,7 @@ import numpy as np
 # Local application imports
 from modules.flow import HasPorts, Port, TextureKind, fixed_window, place_points
 from modules.gl import Style, Texture
+from modules.inference import segmentation
 from modules.pose import BBox, Frame, Points2D
 from modules.render import StageLayer, StageOutput
 from modules.utils import Rect
@@ -28,10 +30,11 @@ from .view_mask import ViewMask
 @dataclass
 class ViewInput:
     """One camera's frame for the view stage: `image` its color on the camera image's view; `timestamp` its capture
-    time, the capture's identity (None: no frame yet); `pose` its player's, whose points the view places in its
-    crop, or None."""
+    time, the capture's identity (None: no frame yet); `mask` its player's segmentation, or None without a player;
+    `pose` its player's, whose points the view places in its crop, or None."""
     image: Annotated[Texture, TextureKind.IMAGE]
     timestamp: float | None
+    mask: segmentation.Image | None = None
     pose: Frame | None = None
 
 
@@ -144,6 +147,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         Style.set_blend_mode(Style.BlendMode.DISABLED)
         self._crop.crop(image, self._window)
         Style.pop_style()
+        self._mask.place(input.mask, self._window)
 
         self._pose_points = self._place_pose(input.pose)
 
