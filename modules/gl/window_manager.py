@@ -272,9 +272,6 @@ class WindowManager():
         for win in self._secondary_windows.values():
             glfw.focus_window(win)
 
-        if self.settings.fullscreen_mode != FullscreenMode.WINDOWED:
-            self.set_fullscreen_mode(self.settings.fullscreen_mode)
-
     def _make_current(self, window: glfw._GLFWwindowPointerT) -> None:
         """`window`'s GL context made current, and its `gl.Context` with it, made at its first use."""
         glfw.make_context_current(window)
@@ -297,6 +294,10 @@ class WindowManager():
         assert self._main_window is not None
         self._make_current(self._main_window)  # its context before allocate (shaders may use draw_quad)
         self.renderer.allocate()
+        # the starting fullscreen after the renderer is allocated: its resize reaches the renderer at once, in this
+        # context, which during the setup would be before the renderer and its context exist
+        if self.settings.fullscreen_mode != FullscreenMode.WINDOWED:
+            self.set_fullscreen_mode(self.settings.fullscreen_mode)
 
         next_frame_time: int = time_ns()
         try:

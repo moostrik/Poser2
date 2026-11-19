@@ -30,7 +30,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 1754,
+        "iso": 1604,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -42,7 +42,7 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 4178,
+        "balance": 4256,
         "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
@@ -552,7 +552,7 @@
         "iterations": 40,
         "relaxation": 1.85,
         "cycles": 1,
-        "reach": 0.053
+        "reach": 0.05
       },
       "density": {
         "color_space": "OKLAB",
@@ -734,9 +734,9 @@
     "window": {
       "title": "Poser",
       "v_sync": false,
-      "monitor": "M0",
-      "x": 377,
-      "y": 1056,
+      "monitor": "M2",
+      "x": 130,
+      "y": 128,
       "width": 1918,
       "height": 2080,
       "secondary_list": [],
