@@ -1,7 +1,8 @@
-"""The 2D fluid's settings: the bridge's input, then one group per field (velocity, density, temperature, the
-expansion, pressure), with the field's name as the group's, so the field names carry no prefix."""
+"""The 2D fluid's settings, as the 3D's for what a plane has: the grid, then one group per concern (time, input,
+velocity, viscosity, vorticity, temperature, expansion, pressure, density), with the concern's name as the group's,
+so the field names carry no prefix."""
 
-from modules.settings import Field, BaseSettings, Group
+from modules.settings import Field, BaseSettings, Group, Widget
 
 from ..density_blend import DensityBlend
 from ..port import ColorSpace
@@ -9,14 +10,24 @@ from ..wall_mode import WallMode
 from ..time_step import TimeStepMode
 
 
+class TimeSettings(BaseSettings):
+    """The fluid's time: how a step's length is taken, and the fluid's time against real time."""
+    time_step: Field[TimeStepMode]  = Field(TimeStepMode.MEASURED,                                  description="Step by the measured render rate, or by a fixed rate")
+    fixed_fps: Field[float]         = Field(60.0,   min=1.0,    max=240.0,                          description="Steps per second in fixed mode (fps)")
+    fps_smoothing: Field[float]     = Field(1.0,    min=0.0,    max=10.0,                           description="Smoothing of the measured rate in measured mode (s); 0 follows each frame")
+    time_scale: Field[float]        = Field(1.0,    min=0.05,   max=2.0,    step=0.05,              description="The fluid's time as a share of real time; 0.5 = everything at half speed, 1 = real time")
+
+
 class InputSettings(BaseSettings):
     """The bridge's input, in the order the layer injects it, as the 3D fluid takes it: the boundary's velocity and
     temperature, each the water dragged toward the body's value times a gain (capped at ±1 warm) over a time; the
-    body force's acceleration added × dt times a gain; the density, its dye over the water's, added, or the water
-    drawn toward it."""
+    body force's acceleration added × dt times a gain, and gravity's direction, which the density's weight and the
+    warmth's lift act along; the density, its dye over the water's, added, or the water drawn toward it."""
     velocity_drag: Field[float]     = Field(50.0,   min=0.0,    max=1000.0, step=1.0, color="cyan", description="Time the water takes to close the gap to the body's velocity (ms); 0 = at once")
     velocity_gain: Field[float]     = Field(1.0,    min=-10.0,  max=10.0,   color="teal",           description="The body's velocity times this is what the water is dragged toward; 1 = as fast as the body")
     acceleration_gain: Field[float] = Field(1.0,    min=-10.0,  max=10.0,   color="teal",           description="The body force's acceleration times this is added × dt; 1 = its Δv added once")
+    gravity_x: Field[float]         = Field(0.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity's direction, x right")
+    gravity_y: Field[float]         = Field(-1.0,   min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity's direction, y up; -1 = down the screen")
     density_drag: Field[float]      = Field(200.0,  min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Over, fill: time the water takes to take on the body's dye (ms); 0 = at once")
     density_release: Field[float]   = Field(0.0,    min=0.0,    max=1000.0, step=1.0, color="cyan", description="Time the water's dye takes to fall to the body's where it is less (ms); 0 = never falls")
     density_gain: Field[float]      = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's amount times this; over, fill: at most fully dyed; 1 = fully dyed at 1 width/s")
@@ -26,35 +37,34 @@ class InputSettings(BaseSettings):
 
 
 class VelocitySettings(BaseSettings):
-    """Velocity field parameters."""
-    self_advection: Field[float]    = Field(0.01,   min=0.0,    max=1.0,    color="blue-grey",      description="How much velocity advects itself. Keep low for stability.")
-    fade_time: Field[float]         = Field(30.0,   min=0.1,    max=60.0,   color="deep-blue",      description="Seconds until velocity fades to ~1%")
-    dampen_threshold: Field[float]  = Field(5.0,    min=0.1,    max=50.0,   color="cyan",           description="Magnitude above which velocity is dampened")
-    dampen_time: Field[float]       = Field(0.5,    min=0.0,    max=10.0,   color="light-blue",     description="Seconds for excess above threshold to decay to ~1%. 0=off")
-    vorticity: Field[float]         = Field(5.17,   min=0.0,    max=60.0,   color="purple",         description="Vortex confinement strength (adds turbulence)")
-    vorticity_radius: Field[float]  = Field(2.82,   min=1.0,    max=30.0,   color="deep-purple",    description="Curl sampling radius in texels")
-    viscosity: Field[float]         = Field(6.62,   min=0.0,    max=100.0,  color="indigo",         description="Fluid thickness/resistance to flow")
-    viscosity_iter: Field[int]      = Field(40,     min=1,      max=60,     color="orange",         description="Viscosity solver iterations at 60 fps; fewer at a higher rate, never more")
+    """The velocity: how it carries itself and fades."""
+    advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=1.0,    color="blue-grey",      description="How far the velocity carries itself per step; 1 = with the water, the physics")
+    fade_time: Field[float]         = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the velocity fades to 1%, a share at a time; 0 = off")
+    evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds 1 width/s takes to brake well above the knee, a saturating loss; 0 = off")
+    evaporation_knee: Field[float]  = Field(0.1,    min=0.001,  max=1.0,    widget=Widget.log_slider, color="grey", description="Speed (widths/s) below which the braking turns from a fixed amount to a share")
 
 
-class DensitySettings(BaseSettings):
-    """Density field parameters: the density held premultiplied, its color times its amount, and its amount."""
-    color_space: Field[ColorSpace]  = Field(ColorSpace.RGB,                                         description="The color stored as RGB, or as Oklab, mixing as the eye sees; a switch clears the density")
-    speed_offset: Field[float]      = Field(0.0,    min=-5.0,   max=5.0,    color="blue-grey",      description="Added to base speed for density only. 0 = physically coupled.")
-    fade_time: Field[float]         = Field(4.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until density fades to ~1%")
-    dampen_threshold: Field[float]  = Field(1.2,    min=0.1,    max=5.0,    color="cyan",           description="Magnitude above which density is dampened")
-    dampen_time: Field[float]       = Field(0.5,    min=0.0,    max=10.0,   color="light-blue",     description="Seconds for excess above threshold to decay to ~1%. 0=off")
-    wall: Field[WallMode]           = Field(WallMode.OPEN,                                          description="Open: density absorbed at the walls. Closed: density reflects")
+class ViscositySettings(BaseSettings):
+    """The viscosity: the velocity's implicit diffusion, after its advection."""
+    enabled: Field[bool]            = Field(False,                                      description="The viscosity on while it is above 0; off, skipped")
+    viscosity: Field[float]         = Field(0.0,    min=0.0,    max=0.01,   step=0.0001, color="indigo", description="Kinematic viscosity (widths² per second); 0 = water at this scale")
+    iterations: Field[int]          = Field(20,     min=1,      max=60,     color="orange",         description="Solver iterations at 60 fps; fewer at a higher rate, never more")
+
+
+class VorticitySettings(BaseSettings):
+    """The vorticity confinement (Fedkiw 2001), keeping swirls of one size alive."""
+    enabled: Field[bool]      = Field(False,                                      description="The confinement on while its strength is above 0; off, skipped")
+    strength_1: Field[float]  = Field(0.0,    min=0.0,    max=100.0,  color="purple", newline=True, description="The confinement's epsilon, the force epsilon × cell × (N × curl); 0 = off")
+    radius_1: Field[float]    = Field(0.004,  min=0.001,  max=0.1,    newline=True, widget=Widget.log_slider, color="deep-purple", description="The size of the swirls the confinement keeps, widths; at least one cell")
 
 
 class TemperatureSettings(BaseSettings):
-    """Temperature field parameters."""
-    speed_offset: Field[float]      = Field(0.0,    min=-5.0,   max=5.0,    color="blue-grey",      description="Added to base speed for temperature only. 0 = physically coupled.")
-    fade_time: Field[float]         = Field(3.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until temperature fades to ~1%")
-    buoyancy: Field[float]          = Field(0.0,    min=0.0,    max=10.0,   color="deep-orange",    description="Thermal buoyancy coefficient: hot (fresh) density rises against gravity")
-    sink: Field[float]              = Field(4.0,    min=0.0,    max=20.0,   color="red",            description="Weight of the density: it sinks along gravity")
-    ambient: Field[float]           = Field(0.2,    min=0.0,    max=1.0,    color="brown",          description="Reference temperature (buoyancy = 0 at this temp)")
-    wall: Field[WallMode]           = Field(WallMode.CLOSED,                                        description="Closed: insulated walls (reflects). Open: cold walls (0 at the walls)")
+    """The temperature: its lift and how it cools; carried as the density is."""
+    enabled: Field[bool]            = Field(False,                                      description="The warmth on: injected, carried and lifting while buoyancy is above 0; off, skipped")
+    buoyancy: Field[float]          = Field(0.0,    min=0.0,    max=10.0,   color="deep-orange",    description="Lift per unit of warmth (widths/s²) against gravity; 0 = none")
+    fade_time: Field[float]         = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", newline=True, description="Seconds until the warmth fades to 1%, a share at a time; 0 = off")
+    evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds full warmth (±1) takes to fall well above the knee, a saturating loss; 0 = off")
+    evaporation_knee: Field[float]  = Field(0.1,    min=0.001,  max=1.0,    widget=Widget.log_slider, color="grey", description="Warmth below which the fall turns from a fixed amount to a share")
 
 
 class ExpansionSettings(BaseSettings):
@@ -65,41 +75,45 @@ class ExpansionSettings(BaseSettings):
 
 
 class PressureSettings(BaseSettings):
-    """Pressure field parameters."""
-    speed: Field[float]             = Field(0.0,    min=0.0,    max=2.0,    color="blue-grey",      description="Pressure advection speed")
-    fade_time: Field[float]         = Field(8.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until pressure fades to ~1%")
+    """The pressure's solve."""
     iterations: Field[int]          = Field(40,     min=1,      max=60,     color="orange",         description="Pressure solver iterations per step")
-    wall: Field[WallMode]           = Field(WallMode.OPEN,                                          description="Open: pressure escapes at the walls (less sticky). Closed: pressure reflects")
+
+
+class DensitySettings(BaseSettings):
+    """The density: its color space, its weight, how it and the temperature are carried, how it fades and
+    evaporates. Its size is the output's."""
+    color_space: Field[ColorSpace]  = Field(ColorSpace.RGB,                                         description="The color stored as RGB, or as Oklab, mixing as the eye sees; a switch clears the density")
+    sink: Field[float]              = Field(0.0,    min=0.0,    max=20.0,   color="red", newline=True, description="Weight per unit of amount (widths/s²) along gravity; 0 = as heavy as the water")
+    advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey", newline=True, description="How far the density and the temperature are carried per step; 1 = with the water")
+    fade_time: Field[float]         = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the density fades to 1%, a share at a time; 0 = off")
+    evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds fully dyed water takes to clear well above the knee, a saturating loss; 0 = off")
+    evaporation_knee: Field[float]  = Field(0.1,    min=0.001,  max=1.0,    widget=Widget.log_slider, color="grey", description="Dye (0 to 1) below which the clearing turns from a fixed amount to a share")
 
 
 class Fluid2DSettings(BaseSettings):
-    """The 2D fluid's configuration.
-
-    Speed model:
-        One 'speed' parameter controls all passive scalar transport (density,
-        temperature, pressure). At speed=1.0, a velocity value of 1.0 moves
-        fluid across the full texture width in 1 second.
+    """The 2D fluid's configuration: the grid, then one group per concern.
 
     Fade_time model:
-        Exponential frame-rate-independent decay: multiplier = 0.01^(dt/fade_time).
-        fade_time=3.0 means the field retains ~1% after 3 seconds.
+        Exponential frame-rate-independent decay: multiplier = 0.01^(dt/fade_time), 0 = off.
+        fade_time=3.0 means the field retains ~1% after 3 seconds. The evaporation is a saturating loss:
+        dρ/dt = −ρ / (evaporation_time × (ρ + evaporation_knee)) on a field's size ρ (fully dyed, ±1 warm, 1 width/s).
     """
 
-    # ---- Profiling ----
-    profile: Field[bool] = Field(False, description="Enable per-pass GPU timing (uses glFinish; serializes pipeline)")
+    # ---- The guard, how the fields are walled, then the grid (multiples of 8) ----
+    guard: Field[bool]              = Field(True,                                       description="Set non-finite values to 0, count and log them; off once the fluid is stable")
+    wall: Field[WallMode]           = Field(WallMode.CLOSED,                            newline=True, description="Every side of every field. Closed: solid. Open: the water leaves")
+    width: Field[int]               = Field(1080,   min=32,     max=4096,   step=8,     newline=True, description="Simulation grid width")
+    height: Field[int]              = Field(1920,   min=32,     max=4096,   step=8,     description="Simulation grid height")
 
-    # ---- Grid dimensions (multiples of 32) ----
-    width: Field[int]               = Field(1024,   min=32,     max=4096,   step=32,    description="Simulation grid width")
-    height: Field[int]              = Field(576,    min=32,     max=4096,   step=32,    description="Simulation grid height")
-    time_step: Field[TimeStepMode]  = Field(TimeStepMode.MEASURED,                  description="Step by the measured render rate, or by a fixed rate")
-    fixed_fps: Field[float]         = Field(60.0,   min=1.0,    max=240.0,              description="Steps per second in fixed mode (fps)")
-    fps_smoothing: Field[float]     = Field(1.0,    min=0.0,    max=10.0,               description="Smoothing of the measured rate in measured mode (s); 0 follows each frame")
-    speed: Field[float]             = Field(1.0,    min=0.0,    max=5.0,    description="Base fluid transport rate")
-
-    # ---- The input, then the field groups ----
+    # ---- The groups ----
+    time: Group[TimeSettings]               = Group(TimeSettings)
     input: Group[InputSettings]             = Group(InputSettings)
+    # the fluid's passes in their order: the velocity, its viscosity, its confinement, the temperature's buoyancy,
+    # the projection with the expansion, the temperature and the density carried
     velocity: Group[VelocitySettings]       = Group(VelocitySettings)
-    density: Group[DensitySettings]         = Group(DensitySettings)
+    viscosity: Group[ViscositySettings]     = Group(ViscositySettings)
+    vorticity: Group[VorticitySettings]     = Group(VorticitySettings)
     temperature: Group[TemperatureSettings] = Group(TemperatureSettings)
     expansion: Group[ExpansionSettings]     = Group(ExpansionSettings)
     pressure: Group[PressureSettings]       = Group(PressureSettings)
+    density: Group[DensitySettings]         = Group(DensitySettings)

@@ -27,6 +27,7 @@ uniform float uBeta;      // 1 / (2*αx + 2*αy)
 uniform int uIterations;  // Number of iterations to perform in this dispatch
 uniform ivec2 uSize;      // Texture dimensions
 uniform bool uHasObstacles;  // Skip obstacle handling when false
+uniform bool uClosed;        // the walls: closed, the pressure beyond them this cell's (Neumann); open, 0 (Dirichlet)
 
 // Shared memory tile: 16x16 interior + 1-pixel halo on each side = 18x18
 shared float s_pressure[18][18];
@@ -142,6 +143,13 @@ void main() {
             float pR = s_pressure[sid.y][sid.x + 1];  // Right
             float pL = s_pressure[sid.y][sid.x - 1];  // Left
             float pC = s_pressure[sid.y][sid.x];      // Center
+
+            // Beyond the field the wall's ghost, as the fragment version's wrap: this cell's (closed) or 0 (open)
+            float ghost = uClosed ? pC : 0.0;
+            if (gid.y + 1 >= uSize.y) pT = ghost;
+            if (gid.y - 1 < 0)        pB = ghost;
+            if (gid.x + 1 >= uSize.x) pR = ghost;
+            if (gid.x - 1 < 0)        pL = ghost;
 
             if (uHasObstacles) {
                 // Neumann boundary conditions from shared obstacle tile

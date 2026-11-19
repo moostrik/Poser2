@@ -1,58 +1,34 @@
 #version 460 core
 
-precision highp float;
+// Buoyancy on the 2D velocity grid, an acceleration (widths/s²) the fluid adds × dt, as the 3D's:
+// F = uGravity * (κ·density − σ·T), the density its amount (alpha), T the warmth, the difference from the room's
+// (Boussinesq), 0 the room's: dense density sinks along gravity; warm water rises against it. The weight acts
+// wherever density is, not gated by the warmth. The density sits on a finer grid than the force; it is sampled by uv.
 
-// Fullscreen quad texture coordinates
 in vec2 texCoord;
-
-// Output
 out vec2 fragColor;
 
-// Input textures
-uniform sampler2D uVelocity;    // Current velocity field (RG32F) - not used but passed for consistency
-uniform sampler2D uTemperature; // Temperature field (R32F)
-uniform sampler2D uDensity;     // Density field (RGBA32F)
+uniform sampler2D uTemperature; // Temperature (R16F)
+uniform sampler2D uDensity;     // Density (RGBA16F, premultiplied; its amount in alpha)
 uniform sampler2D uObstacle;    // Obstacle mask (R8, CLAMP_TO_BORDER=1)
 uniform bool uHasObstacles;     // Skip obstacle checks when false
 
-// Parameters
-// F = sigma * (T - T_ambient) - kappa * density  (GPU Gems / Fedkiw et al.)
-// sigma = thermal buoyancy coefficient (hot rises)
-// kappa = density/gravity coefficient (dense falls), typically kappa = weight_ratio * sigma
-uniform float uSigma;              // Thermal buoyancy (already includes dt * scale)
-uniform float uKappa;              // Density weight (already includes dt * scale)
-uniform float uAmbientTemperature; // Reference temperature
+uniform float uSigma;           // Thermal buoyancy (widths/s² per unit of warmth)
+uniform float uKappa;           // Density weight (widths/s² per unit of density)
+uniform vec2  uGravity;         // Gravity's direction, the grid's frame, as the 3D's: (0, -1) down the screen
 
 void main() {
     vec2 st = texCoord;
 
-    // Early exit for obstacle pixels
     if (uHasObstacles && texture(uObstacle, st).r > 0.5) {
         fragColor = vec2(0.0);
         return;
     }
 
-    // Sample temperature
-    float temperature = texture(uTemperature, st).r;
+    float warmth = texture(uTemperature, st).r;
+    float lift = (abs(warmth) > 0.0001) ? warmth * uSigma : 0.0;
+    float density = texture(uDensity, st).a;       // its amount, in RGB and in Oklab alike
+    float force = density * uKappa - lift;
 
-    // Compute temperature difference from ambient
-    float dtemp = temperature - uAmbientTemperature;
-
-    // Initialize buoyancy force
-    vec2 buoyancy = vec2(0.0);
-
-    if (abs(dtemp) > 0.0001) {
-        // Sample density (R channel — R16F scalar density)
-        vec4 den = texture(uDensity, st);
-        float density = max(den.r, max(den.g, den.b)); // Use max of RGB channels for density
-
-        // Buoyancy force: F = sigma * (T - T_ambient) - kappa * density
-        // Hot air rises (positive dtemp), dense fluid falls (positive density)
-        float buoyancy_force = dtemp * uSigma - density * uKappa;
-
-        // Apply force in vertical direction (negative Y = up in screen space)
-        buoyancy = vec2(0.0, -1.0) * buoyancy_force;
-    }
-
-    fragColor = buoyancy;
+    fragColor = (abs(force) > 0.00001) ? uGravity * force : vec2(0.0);
 }

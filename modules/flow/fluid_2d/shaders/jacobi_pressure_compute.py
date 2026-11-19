@@ -44,7 +44,8 @@ class JacobiPressureCompute(ComputeShader):
         obstacle: Texture,
         cell: tuple[float, float],
         iterations: int = DEFAULT_ITERATIONS_PER_DISPATCH,
-        has_obstacles: bool = True
+        has_obstacles: bool = True,
+        closed: bool = True
     ) -> None:
         """Run multiple Jacobi iterations in a single dispatch.
 
@@ -56,6 +57,7 @@ class JacobiPressureCompute(ComputeShader):
             cell: A cell's width and height, widths
             iterations: Number of Jacobi iterations to perform in this dispatch
             has_obstacles: When False, skip obstacle texture reads for performance
+            closed: The walls closed (the pressure beyond them the cell's), else open (0 beyond them)
 
         Note:
             For 40 total iterations with iterations=5, call this 8 times,
@@ -82,6 +84,7 @@ class JacobiPressureCompute(ComputeShader):
 
         # Obstacle flag
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
+        glUniform1i(self.get_uniform_loc("uClosed"), int(closed))
 
         # Bind textures via samplers (for filtered access to divergence, obstacles)
         glActiveTexture(GL_TEXTURE0)
@@ -114,7 +117,8 @@ class JacobiPressureCompute(ComputeShader):
         cell: tuple[float, float],
         total_iterations: int = 40,
         iterations_per_dispatch: int = DEFAULT_ITERATIONS_PER_DISPATCH,
-        has_obstacles: bool = True
+        has_obstacles: bool = True,
+        closed: bool = True
     ) -> Texture:
         """Run full pressure solve with automatic ping-pong.
 
@@ -129,6 +133,7 @@ class JacobiPressureCompute(ComputeShader):
             total_iterations: Total Jacobi iterations to perform
             iterations_per_dispatch: Iterations per compute dispatch
             has_obstacles: When False, skip obstacle texture reads for performance
+            closed: The walls closed, else open
 
         Returns:
             The texture containing the final pressure result (either pressure_a or pressure_b)
@@ -149,7 +154,8 @@ class JacobiPressureCompute(ComputeShader):
                 divergence, obstacle,
                 cell,
                 iters,
-                has_obstacles
+                has_obstacles,
+                closed
             )
 
             # Swap buffers for next iteration

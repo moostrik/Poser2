@@ -19,17 +19,17 @@ next is in the one plan:
 | [VIEW.md](VIEW.md)                   | the view stage: the crop in 3D, the mask, the depth read and filled                         |
 | [COLOR.md](COLOR.md)                 | the color stage: the density's color graded, matted and premultiplied from the view         |
 | [MOTION.md](MOTION.md)               | the motion: when it measures, the Lucas–Kanade solve and the depth velocity, their settings |
+| [BRIDGE_2D.md](BRIDGE_2D.md)         | the 2D bridge: what it does differently from the 3D's                                       |
 | [BRIDGE_3D.md](BRIDGE_3D.md)         | the 3D bridge: the filters, the readings, the mix and its outputs' units                    |
+| [FLUID_2D.md](FLUID_2D.md)           | the 2D fluid: its settings as the 3D's, what it does differently                            |
 | [FLUID_3D.md](FLUID_3D.md)           | the 3D fluid: how it takes the bridge, its fields, density and look                         |
 | [RESOLUTION.md](RESOLUTION.md)       | every size the picture and the motion pass through, and why                                 |
 | [MONITOR.md](MONITOR.md)             | the monitors' views                                                                         |
 | [TIMING.md](TIMING.md)               | every stage's GPU time in deep_flow                                                         |
 
-The 2D bridge and the 2D fluid have no document yet; what holds for them is under
-[Constraints](#constraints), and they get theirs when they are rebuilt
-([FLOW_PLAN.md](FLOW_PLAN.md#i-the-2d-flow-follows-the-3d)). hd_trio runs its own copy of the 2D system
-(`apps/hd_trio/flow/`) and of its layers (`apps/hd_trio/render/layers/flow/`), taken as they were; the 2D in
-`modules/flow` and `render/modules/flow` is no app's until that rebuild.
+hd_trio runs its own copy of the 2D system (`apps/hd_trio/flow/`) and of its layers
+(`apps/hd_trio/render/layers/flow/`), taken as they were; the 2D in `modules/flow` and `render/modules/flow` is
+superficial_flow's.
 
 ## The goals
 
@@ -279,7 +279,7 @@ The inference frame's monitor is a simple one: the color, the depth or both.
 | `modules/flow/bridge_2d/`                                | the 2D bridge: `Bridge2D` on the shared `Bridge`, its own 2D kernels (RG); its document [BRIDGE_2D.md](BRIDGE_2D.md)                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `modules/flow/bridge_3d/`                                | `Bridge3D` on the shared `Bridge`, its own 3D kernels with the z positions; its document [BRIDGE_3D.md](BRIDGE_3D.md)                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `modules/flow/color/`                                    | `DensityColor`, `DensityColorSettings`, the color stage's work; `white_balance.py`; its document [COLOR.md](COLOR.md)                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `modules/flow/fluid_2d/`                                 | `Fluid2D`, `Fluid2DSettings` with its own `VelocitySettings`, `DensitySettings`, `TemperatureSettings`, `PressureSettings`; `shaders/`                                                                                                                                                                                                                                                                                                                                                                                           |
+| `modules/flow/fluid_2d/`                                 | `Fluid2D`, `Fluid2DSettings` with the grid and one group per concern, as the 3D's; `shaders/`; its document [FLUID_2D.md](FLUID_2D.md)                                                                                                                                                                                                                                                                                                                                                                                           |
 | `modules/flow/fluid_3d/`                                 | `Fluid3D`, `Fluid3DSettings` with the box and one group per concern (`TimeSettings`, `CompositeSettings`, `ParticleSettings`, ...); the density's carriers (`DensityCarrier`: `Density`, `FineDensity`, `ParticleDensity`), `FieldAdvection`; `shaders/`; its document [FLUID_3D.md](FLUID_3D.md)                                                                                                                                                                                                                  |
 | `modules/flow/shaders/`                                  | the shared fragment shaders, `AddBoolean` among them                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `modules/flow/time_step.py`, `modules/flow/wall_mode.py` | shared                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
@@ -343,13 +343,11 @@ frame. How a frame gets there, thread by thread, and what costs frames are in
 - An outside source gates an input through its weight: every injection carries `weight`, 1 by
   default, and the app sets it from whatever it reads (hd_trio: the pose's motion and the
   cross-camera similarity). The fluid never knows why.
-- A multiplier on an input is a `gain` (the 2D fluid's `velocity.gain`, `density.gain`,
-  `temperature.gain`; the 3D fluid's gains in `input`,
-  one per bridge output); a 0 to 1 share in a mix is a `weight`. The gains sit at the two ends: the motion's
+- A multiplier on an input is a `gain` (each fluid's gains in `input`, one per bridge output); a 0 to 1 share in
+  a mix is a `weight`. The gains sit at the two ends: the motion's
   `x_gain`, `y_gain`, `z_gain` say how much of each axis is the body's motion, the fluid's how strongly the
   water takes it; the bridge has none **(site fact)**, it translates and holds; the density's sinking along gravity
-  in the buoyancy is the 2D fluid's `temperature.sink` (`Fluid2D._apply_buoyancy`) and the 3D fluid's
-  `density.sink`.
+  in the buoyancy is each fluid's `density.sink`.
 - `modules/render/modules/flow/tests/test_flow_systems.py` loads each app preset into its system's stage
   settings and fails on an unknown key, and fails on a field of the flow's settings that no code
   in `modules/flow` or `modules/render/modules/flow` names: such a field is dead **(deduction)**.

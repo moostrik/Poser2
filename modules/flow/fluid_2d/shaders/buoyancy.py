@@ -1,57 +1,42 @@
-"""Buoyancy shader - Compute temperature-driven buoyancy forces."""
+"""Buoyancy shader - the density's weight and the warmth's lift along gravity, an acceleration (widths/s²)."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
 class Buoyancy(Shader):
-    """Compute buoyancy force from temperature and density."""
+    """The buoyancy F = gravity × (κ·density − σ·T), widths/s², from the temperature and the density's amount."""
 
-    def __init__(self) -> None:
-        super().__init__()
-
-    def use(self, velocity: Texture, temperature: Texture, density: Texture,
-            obstacle: Texture, sigma: float, kappa: float, ambient_temperature: float,
-            has_obstacles: bool = True) -> None:
-        """Compute buoyancy force: F = σ(T - T_ambient) - κρ
+    def use(self, temperature: Texture, density: Texture, obstacle: Texture, sigma: float, kappa: float,
+            gravity: tuple[float, float], has_obstacles: bool = True) -> None:
+        """Compute the buoyancy.
 
         Args:
-            velocity: Current velocity field (RG32F) - passed for consistency but not used
-            temperature: Temperature field (R32F)
-            density: Density field (RGBA32F)
+            temperature: Temperature field (R16F), the warmth
+            density: Density field (RGBA16F, premultiplied), its amount in alpha
             obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1)
-            sigma: Thermal buoyancy coefficient σ (already includes dt * scale)
-            kappa: Density weight coefficient κ (already includes dt * scale)
-            ambient_temperature: Reference temperature
+            sigma: Lift per unit of warmth (widths/s²)
+            kappa: Weight per unit of amount (widths/s²)
+            gravity: Gravity's direction on the grid, (0, -1) down the screen
             has_obstacles: When False, skip obstacle texture reads for performance
         """
-        # Bind shader program
+        if not self.allocated or not self.shader_program:
+            return
         glUseProgram(self.shader_program)
-
-        # Obstacle flag
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
 
-        # Bind textures
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, velocity.tex_id)
-        glUniform1i(self.get_uniform_loc("uVelocity"), 0)
-
-        glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, temperature.tex_id)
-        glUniform1i(self.get_uniform_loc("uTemperature"), 1)
-
-        glActiveTexture(GL_TEXTURE2)
+        glUniform1i(self.get_uniform_loc("uTemperature"), 0)
+        glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, density.tex_id)
-        glUniform1i(self.get_uniform_loc("uDensity"), 2)
-
-        glActiveTexture(GL_TEXTURE3)
+        glUniform1i(self.get_uniform_loc("uDensity"), 1)
+        glActiveTexture(GL_TEXTURE2)
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
-        glUniform1i(self.get_uniform_loc("uObstacle"), 3)
+        glUniform1i(self.get_uniform_loc("uObstacle"), 2)
 
-        # Set uniforms
         glUniform1f(self.get_uniform_loc("uSigma"), sigma)
         glUniform1f(self.get_uniform_loc("uKappa"), kappa)
-        glUniform1f(self.get_uniform_loc("uAmbientTemperature"), ambient_temperature)
+        glUniform2f(self.get_uniform_loc("uGravity"), *gravity)
 
-        # Draw fullscreen quad
         draw_quad()

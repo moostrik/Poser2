@@ -39,8 +39,7 @@ class JacobiDiffusionCompute(ComputeShader):
         velocity_in: Texture,
         velocity_out: Texture,
         obstacle: Texture,
-        grid_scale: float,
-        aspect: float,
+        cell: tuple[float, float],
         viscosity_dt: float,
         iterations: int = DEFAULT_ITERATIONS_PER_DISPATCH,
         has_obstacles: bool = True
@@ -51,8 +50,7 @@ class JacobiDiffusionCompute(ComputeShader):
             velocity_in: Input velocity field (RG32F) - read via image
             velocity_out: Output velocity field (RG32F) - write via image
             obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1) - read via sampler
-            grid_scale: Grid scaling factor
-            aspect: Aspect ratio (width/height)
+            cell: A cell's width and height, widths
             viscosity_dt: Viscosity * delta_time (diffusion rate)
             iterations: Number of Jacobi iterations to perform in this dispatch
             has_obstacles: When False, skip obstacle texture reads for performance
@@ -67,8 +65,7 @@ class JacobiDiffusionCompute(ComputeShader):
             return
 
         # Compute Jacobi parameters (same as fragment shader version)
-        dx = grid_scale
-        dy = grid_scale * aspect
+        dx, dy = cell
 
         # Laplacian weights
         alpha_x = 1.0 / (dx * dx)
@@ -109,8 +106,7 @@ class JacobiDiffusionCompute(ComputeShader):
         velocity_a: Texture,
         velocity_b: Texture,
         obstacle: Texture,
-        grid_scale: float,
-        aspect: float,
+        cell: tuple[float, float],
         viscosity_dt: float,
         total_iterations: int = 20,
         iterations_per_dispatch: int = DEFAULT_ITERATIONS_PER_DISPATCH,
@@ -122,8 +118,7 @@ class JacobiDiffusionCompute(ComputeShader):
             velocity_a: First velocity buffer (RG32F)
             velocity_b: Second velocity buffer (RG32F) - used for ping-pong
             obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1)
-            grid_scale: Grid scaling factor
-            aspect: Aspect ratio
+            cell: A cell's width and height, widths
             viscosity_dt: Viscosity * delta_time
             total_iterations: Total Jacobi iterations to perform
             iterations_per_dispatch: Iterations per compute dispatch
@@ -146,7 +141,7 @@ class JacobiDiffusionCompute(ComputeShader):
             self.use(
                 src, dst,
                 obstacle,
-                grid_scale, aspect,
+                cell,
                 viscosity_dt,
                 iters,
                 has_obstacles

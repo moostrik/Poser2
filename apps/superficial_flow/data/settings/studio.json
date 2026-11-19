@@ -629,18 +629,23 @@
       "fullscreen_mouse": false
     },
     "fluid": {
-      "profile": false,
+      "guard": true,
+      "wall": "OPEN",
       "width": 1080,
       "height": 1920,
-      "time_step": "MEASURED",
-      "fixed_fps": 60.0,
-      "fps_smoothing": 1.0,
-      "speed": 1.0,
       "blend_mode": "ADD",
+      "time": {
+        "time_step": "MEASURED",
+        "fixed_fps": 60.0,
+        "fps_smoothing": 1.0,
+        "time_scale": 1.0
+      },
       "input": {
         "velocity_drag": 76.0,
         "velocity_gain": 1.0,
         "acceleration_gain": 10.0,
+        "gravity_x": 0.0,
+        "gravity_y": 0.0,
         "density_drag": 200.0,
         "density_release": 0.0,
         "density_gain": 5.0,
@@ -649,40 +654,42 @@
         "temperature_gain": 5.0
       },
       "velocity": {
-        "self_advection": 0.01,
-        "fade_time": 30.0,
-        "dampen_threshold": 5.0,
-        "dampen_time": 0.5,
-        "vorticity": 5.17,
-        "vorticity_radius": 2.82,
-        "viscosity": 6.62,
-        "viscosity_iter": 40
+        "advection_scale": 1.0,
+        "fade_time": 0.0,
+        "evaporation_time": 0.0,
+        "evaporation_knee": 0.1
       },
-      "density": {
-        "color_space": "RGB",
-        "speed_offset": 0.0,
-        "fade_time": 4.0,
-        "dampen_threshold": 1.2,
-        "dampen_time": 0.5,
-        "wall": "OPEN"
+      "viscosity": {
+        "enabled": true,
+        "viscosity": 0.001,
+        "iterations": 20
+      },
+      "vorticity": {
+        "enabled": true,
+        "strength_1": 32.83,
+        "radius_1": 0.1
       },
       "temperature": {
-        "speed_offset": 0.0,
-        "fade_time": 3.0,
+        "enabled": true,
         "buoyancy": 0.0,
-        "sink": 4.0,
-        "ambient": 0.2,
-        "wall": "CLOSED"
+        "fade_time": 0.0,
+        "evaporation_time": 10.0,
+        "evaporation_knee": 0.1
       },
       "expansion": {
         "enabled": false,
         "rate": 0.0
       },
       "pressure": {
-        "speed": 0.0,
-        "fade_time": 8.0,
-        "iterations": 40,
-        "wall": "OPEN"
+        "iterations": 40
+      },
+      "density": {
+        "color_space": "OKLAB",
+        "sink": 1.0,
+        "advection_scale": 2.0,
+        "fade_time": 0.0,
+        "evaporation_time": 0.0,
+        "evaporation_knee": 0.1
       },
       "lut": {
         "folder": "data/luts",

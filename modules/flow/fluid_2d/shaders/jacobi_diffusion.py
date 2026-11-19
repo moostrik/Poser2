@@ -11,21 +11,19 @@ class JacobiDiffusion(Shader):
         super().__init__()
 
     def use(self, source: Texture, obstacle: Texture,
-            grid_scale: float, aspect: float, viscosity_dt: float,
+            cell: tuple[float, float], viscosity_dt: float,
             has_obstacles: bool = True) -> None:
         """Apply one Jacobi iteration for diffusion.
 
         Args:
             source: Previous iteration of field to diffuse (velocity RG32F)
             obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1)
-            grid_scale: Grid spacing (typically 1.0)
-            aspect: Aspect ratio (width/height)
+            cell: A cell's width and height, widths
             viscosity_dt: Viscosity * delta_time (diffusion rate)
             has_obstacles: When False, skip obstacle texture reads for performance
         """
         # Anisotropic grid spacing
-        dx = grid_scale
-        dy = grid_scale * aspect
+        dx, dy = cell
 
         # Laplacian weights: 1/dx², 1/dy²
         alpha_x = 1.0 / (dx * dx)

@@ -40,18 +40,6 @@ color), one fluid per screen. Until then hd_trio runs its own copy, unchanged.
 
 ## D. The 2D fluid
 
-- **D2.** The 2D fluid's panel as the 3D's, for what the 2D has: `guard`, `wall`, `width`, `height` (rounded up to a multiple of 8, not 32); `time`
-  (`time_scale` added); `input` (gravity in it); `velocity` (`advection_scale` for `self_advection`, `evaporation_time` and
-  `evaporation_knee` for `dampen_*`, the viscosity in widths²/s); `vorticity`; `temperature` (`enabled` first);
-  `pressure`; `density` (`color_space`, `sink`, `advection_scale` for `speed_offset`); each step's `enabled` as the
-  3D has. Each by the 3D's law where the 2D's differs. The pressure's advection (not in the textbook) and `profile`
-  go. The values, as defaults and in superficial_flow's preset: deep_flow's for every setting the two share (its
-  drags, gains, blend, color space, sink, viscosity, vorticity, temperature, pressure); a textbook default where
-  deep_flow has none or its value has no meaning on a plane (the sizes, the gravity along z). The 3D features'
-  settings take deep_flow's values as they come (D3 to D6). FLUID_2D.md written; `fluid_2d.py`'s pipeline docstring
-  goes. Checked: a test that each setting the 2D shares with the 3D has its path, name and unit, and in
-  superficial_flow's preset deep_flow's value, unless listed as a textbook default.
-
 The 3D fluid's features that have a meaning on a plane, each as the 2D's own kernels, each checked in the GPU
 harness and seen in superficial_flow; the march's light, shadows and fog need a depth and stay 3D only:
 
@@ -67,17 +55,12 @@ Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 
 | Step     | Check                                                                                               |
 |----------|-----------------------------------------------------------------------------------------------------|
-| D2       | the settings test: shared settings with deep_flow's values                                          |
 | D3 to D7 | GPU harness for each new kernel; -sim                                                               |
 | End      | the full suite once; the inference at 50 fps, the render at 60; deep_flow's times                |
 
 ## Rules it touches
 
-- Remove obsolete pathways; no parallel legacy ones: D2.
-- One term everywhere; when a term changes, rename it everywhere in the same change: D2.
-- Keep presets and settings schemas in sync with code changes: D2 to D7.
-- A settings class mirrors the code it configures; a stage's ports follow its steps: D2.
+- Keep presets and settings schemas in sync with code changes: D3 to D7.
 - Shaders get checked in a GPU harness: D3 to D7.
-- Prefer the design with the lower latency, measured in the context of the app: D2 to D7.
-- A document describes what is built: D2 (FLUID_2D.md).
+- Prefer the design with the lower latency, measured in the context of the app: D3 to D7.
 - A plan is named after the package, app or folder it is for, and sits in it: this plan, in `apps/superficial_flow`.

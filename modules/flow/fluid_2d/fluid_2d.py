@@ -1,43 +1,20 @@
-"""Fluid2D - 2D Navier-Stokes fluid simulation.
-
-All-fragment pipeline operating on GL_TEXTURE_2D FBOs with ping-pong
-buffers for iterative solvers.
-
-Inputs, before the step, as the 3D fluid takes them: the boundary's velocity dragged toward, the body force added
-× dt, the density over, added or filled with its color (RGB or Oklab), the temperature dragged toward, the expansion
-summed for the projection. The velocity is in widths/s; the advection and the projection work in widths.
-
-Pipeline:
-    1. Dampen velocity (magnitude clamping)
-    2. Advect velocity (self-advection)
-    3. Apply viscosity (Jacobi diffusion solver)
-    4. Confine vorticity (curl + confinement force)
-    5. Advect temperature
-    6. Apply buoyancy force
-    7. Advect pressure (optional, non-physical)
-    8. Enforce incompressibility (divergence, less the expansion's rate × it -> Jacobi solve -> gradient subtraction)
-    9. Advect density (semi-Lagrangian)
-   10. Dampen density (magnitude clamping)
-
-Boundary conditions via per-field wrap modes:
-    Velocity/density:  GL_CLAMP_TO_BORDER(0,0,0,0)  -> no-slip / Dirichlet
-    Pressure/temp:     GL_CLAMP_TO_EDGE              -> zero-gradient / Neumann
-    Obstacle:          GL_CLAMP_TO_BORDER(1,1,1,1)   -> OOB = obstacle
-"""
+"""Fluid2D - the 2D Navier-Stokes fluid, its passes and its fields on the plane, as the 3D's for what a plane has.
+How and why: modules/flow/FLUID_2D.md."""
 import math
 
 from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R16F, GL_R8, GL_RG16F, GL_RGBA16F, \
     GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, glBindTexture, glGenerateMipmap, glTexParameteri
 
-from modules.gl import Texture, SwapFbo, Fbo, GpuTimer, Profiler
+from modules.gl import Texture, SwapFbo, Fbo, GpuTimer
 from .. import FlowUtil, Port, TextureKind
 from ..density_blend import DensityBlend
 from ..drag import DRAG_FLOOR, drag_share
+from ..finite_guard import FiniteGuard, GuardSlot
 from ..port import ColorSpace
 from ..time_step import REFERENCE_STEP, TimeStep, viscosity_iterations
 from ..shaders import AddBoolean
 from ..wall_mode import WallMode
-from .fluid_settings import Fluid2DSettings, InputSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings
+from .fluid_settings import Fluid2DSettings, InputSettings
 from .shaders import (
     Advect, Divergence, Gradient,
     JacobiPressure, JacobiPressureCompute, JacobiDiffusion, JacobiDiffusionCompute,
@@ -85,7 +62,6 @@ class Fluid2D:
         self._simulation_height: int = 0
         self._density_width: int = 0
         self._density_height: int = 0
-        self._aspect: float = 1.0          # the simulation grid's width over its height, for the viscosity and the vorticity
         self._field_aspect: float = 1.0    # the field's width over its height, the density's: one width is this of the height
         self._cell: tuple[float, float] = (1.0, 1.0)   # a simulation cell's width and height, widths
 
@@ -98,9 +74,10 @@ class Fluid2D:
 
         self._reallocate_pending: bool = False
         self._wall_dirty: bool = False
+        self._temperature_clear: bool = True    # the temperature cleared since it last ran
 
         # ---- Simulation fields (SwapFbo for ping-pong) ----
-        # Velocity always uses Dirichlet (v=0 at walls); others configurable via _apply_wall_modes().
+        # Velocity always uses Dirichlet (v=0 at walls); others by `wall` via _apply_wall_modes().
         self._velocity_fbo: SwapFbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         self._density_fbo: SwapFbo = SwapFbo()
         self._temperature_fbo: SwapFbo = SwapFbo()
@@ -116,8 +93,8 @@ class Fluid2D:
         self._expansion_fresh: bool = False          # this tick's first injection has cleared it
         self._picture_fbo: Fbo = Fbo()               # the density as RGB, premultiplied, where it is held as Oklab
         self._oklab: bool = self.settings.density.color_space == ColorSpace.OKLAB
-        # Curl is sampled at neighbor offsets by VorticityForce — border must return zero
-        self._vorticity_curl_fbo: Fbo = Fbo(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
+        # Curl is sampled at neighbor offsets by VorticityForce: beyond the walls its edge, the cell's own, as the 3D's
+        self._vorticity_curl_fbo: Fbo = Fbo(wrap=GL_CLAMP_TO_EDGE)
         self._vorticity_force_fbo: Fbo = Fbo()
         self._buoyancy_fbo: Fbo = Fbo()
 
@@ -142,23 +119,12 @@ class Fluid2D:
         self._inject_scalar_shader: InjectScalar2D = InjectScalar2D()
         self._picture_shader: DensityToRgb2D = DensityToRgb2D()
         self._gpu_timer: GpuTimer = GpuTimer("GPU fluid")
-
-        # ---- GPU profiling ----
-        self._profiler: Profiler = Profiler(
-            lambda: f"Fluid2D {self._simulation_width}x{self._simulation_height}",
-            names=["dampen_vel", "advect_vel", "viscosity", "vorticity",
-                   "advect_temp", "buoyancy", "advect_pres", "incompress",
-                   "advect_den", "dampen_den"],
-        )
+        self._guard: FiniteGuard = FiniteGuard('fluid', ('velocity', 'density', 'temperature'))
 
         # Bind settings actions
         self.settings.bind(Fluid2DSettings.width, lambda _: self._request_reallocate())
         self.settings.bind(Fluid2DSettings.height, lambda _: self._request_reallocate())
-        self.settings.bind(Fluid2DSettings.profile, lambda v: setattr(self._profiler, 'enabled', v))
-        mark_wall = lambda _: setattr(self, '_wall_dirty', True)
-        self.settings.density.bind(DensitySettings.wall, mark_wall)
-        self.settings.temperature.bind(TemperatureSettings.wall, mark_wall)
-        self.settings.pressure.bind(PressureSettings.wall, mark_wall)
+        self.settings.bind(Fluid2DSettings.wall, lambda _: setattr(self, '_wall_dirty', True))
 
     # ========== Allocation ==========
 
@@ -190,15 +156,14 @@ class Fluid2D:
         self._add_boolean_shader.allocate()
         for shader in self._input_shaders():
             shader.allocate()
+        self._guard.allocate()
 
         self._allocated = True
 
     def _update_simulation_dimensions(self) -> None:
         """Recompute simulation dimensions from current settings."""
-        self._simulation_width = self._align32(self.settings.width)
-        self._simulation_height = self._align32(self.settings.height)
-        self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
-        self._grid_scale = self._simulation_width / self._density_width if self._density_width > 0 else 1.0
+        self._simulation_width = self._align8(self.settings.width)
+        self._simulation_height = self._align8(self.settings.height)
         self._field_aspect = self._density_width / self._density_height if self._density_height > 0 else 1.0
         # the field is one width across and 1 / field_aspect widths high, the grid's cells over it
         self._cell = (1.0 / max(self._simulation_width, 1), 1.0 / (self._field_aspect * max(self._simulation_height, 1)))
@@ -208,6 +173,7 @@ class Fluid2D:
         self._density_fbo.allocate(self._density_width, self._density_height, GL_RGBA16F)
         self._picture_fbo.allocate(self._density_width, self._density_height, GL_RGBA16F)
         self._density_obstacle_fbo.allocate(self._density_width, self._density_height, GL_R8)
+        self._apply_wall_modes()
 
     def _allocate_simulation_fields(self) -> None:
         """(Re)allocate simulation-resolution FBOs."""
@@ -217,6 +183,7 @@ class Fluid2D:
         # Primary simulation fields
         self._velocity_fbo.allocate(sim_w, sim_h, GL_RG16F)
         self._temperature_fbo.allocate(sim_w, sim_h, GL_R16F)
+        self._temperature_clear = True
         self._pressure_fbo.allocate(sim_w, sim_h, GL_R16F)
         self._simulation_obstacle_fbo.allocate(sim_w, sim_h, GL_R8)
         FlowUtil.blit(self._simulation_obstacle_fbo, self._density_obstacle_fbo)
@@ -267,6 +234,7 @@ class Fluid2D:
         for shader in self._input_shaders():
             shader.deallocate()
         self._gpu_timer.deallocate()
+        self._guard.deallocate()
 
         self._allocated = False
 
@@ -298,66 +266,29 @@ class Fluid2D:
         self._velocity_fbo.clear_all()
         self._density_fbo.clear_all()
         self._temperature_fbo.clear_all()
+        self._temperature_clear = True
         self._pressure_fbo.clear_all()
         self._expansion_fbo.clear_all()
         self._picture_fbo.clear()
 
     def update(self, dt: float) -> None:
-        """Run one frame of the 2D fluid simulation pipeline; `dt` is the tick's measured length (s)."""
+        """Run one step of the 2D fluid, in the 3D's order: the velocity carried, its viscosity, its confinement, the
+        buoyancy, the projection, then the temperature and the density carried; `dt` is the tick's measured length (s)."""
         if not self._allocated:
             return
 
         self._reload_shaders()
         self._handle_deferred_actions()
+        self._step_time(dt)
         self._gpu_timer.begin()
 
-        # Per-frame state
-        self._step_time(dt)
-
-        # Dampen velocity (clean input for all steps)
-        vel: VelocitySettings = self.settings.velocity
-        self._profiler.begin("dampen_vel")
-        self._dampen(self._velocity_fbo, vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
-        self._profiler.end("dampen_vel")
-
-        # Simulation steps
-        self._profiler.begin("advect_vel")
         self._advect_velocity()
-        self._profiler.end("advect_vel")
-
-        self._profiler.begin("viscosity")
         self._apply_viscosity()
-        self._profiler.end("viscosity")
-
-        self._profiler.begin("vorticity")
         self._confine_vorticity()
-        self._profiler.end("vorticity")
-
-        self._profiler.begin("advect_temp")
-        self._advect_temperature()
-        self._profiler.end("advect_temp")
-
-        self._profiler.begin("buoyancy")
         self._apply_buoyancy()
-        self._profiler.end("buoyancy")
-
-        self._profiler.begin("advect_pres")
-        self._advect_pressure()
-        self._profiler.end("advect_pres")
-
-        self._profiler.begin("incompress")
         self._enforce_incompressibility()
-        self._profiler.end("incompress")
-
-        self._profiler.begin("advect_den")
+        self._advect_temperature()
         self._advect_density()
-        self._profiler.end("advect_den")
-
-        # Dampen density (clean output)
-        den: DensitySettings = self.settings.density
-        self._profiler.begin("dampen_den")
-        self._dampen(self._density_fbo, den.dampen_threshold, den.dampen_time, self._dt, include_alpha=True)
-        self._profiler.end("dampen_den")
 
         self._follow_color_space()
         if self._oklab:
@@ -366,40 +297,42 @@ class Fluid2D:
             self._picture_fbo.end()
         self._expansion_fresh = False      # the next tick's first injection clears it
         self._gpu_timer.end()
-
-        self._profiler.report()
+        self._guard.update(dt)
 
     # ========== Pipeline Steps ==========
 
     def _add_force_to_velocity(self, force: Texture, strength: float = 1.0) -> None:
-        """Add force to velocity in-place (no gain or dt scaling)."""
+        """Add `force` × `strength` to the velocity in place."""
         FlowUtil.add(self._velocity_fbo, force, strength)
 
     def _advect_velocity(self) -> None:
-        """Self-advect & dissipate velocity field."""
-        advect_step = self._dt * self.settings.velocity.self_advection
-        dissipation = self._calculate_dissipation(self._dt, self.settings.velocity.fade_time)
-
+        """The velocity carried one step along itself (`velocity.advection_scale`), faded, evaporated and guarded."""
+        velocity = self.settings.velocity
         self._velocity_fbo.swap()
         self._velocity_fbo.begin()
         self._advect_shader.use(
             self._velocity_fbo.back,   # Source velocity (self-advection)
             self._velocity_fbo.back,   # Velocity
-            self._simulation_obstacle_fbo,     # Obstacles
+            self._simulation_obstacle_fbo,
             self._field_aspect,
-            advect_step,
-            dissipation,
-            has_obstacles=self._has_obstacles
+            self._dt * velocity.advection_scale,
+            self._calculate_dissipation(self._dt, velocity.fade_time),
+            has_obstacles=self._has_obstacles,
+            evaporation=self._evaporation(self._dt, velocity.evaporation_time),
+            evaporation_knee=velocity.evaporation_knee, measure=1,
+            guard=self._guard_slot('velocity')
         )
         self._velocity_fbo.end()
 
     def _apply_viscosity(self) -> None:
-        """Diffuse velocity via Jacobi viscosity solver."""
-        if self.settings.velocity.viscosity <= 0.0:
+        """The viscosity (widths² per second): Jacobi iterations of the implicit diffusion, `viscosity.iterations` at
+        60 fps; while `viscosity.enabled` is on and the viscosity above 0."""
+        viscosity = self.settings.viscosity
+        if not viscosity.enabled or viscosity.viscosity <= 0.0:
             return
 
-        viscosity_dt = self.settings.velocity.viscosity * (self._grid_scale ** 2) * self._dt
-        iterations = viscosity_iterations(self.settings.velocity.viscosity_iter, self._dt)
+        viscosity_dt = viscosity.viscosity * self._dt       # widths² per second × s
+        iterations = viscosity_iterations(viscosity.iterations, self._dt)
 
         if self._use_compute_diffusion:
             current: Texture = self._velocity_fbo
@@ -407,8 +340,7 @@ class Fluid2D:
                 current,
                 self._velocity_fbo.back,
                 self._simulation_obstacle_fbo,
-                self._grid_scale,
-                self._aspect,
+                self._cell,
                 viscosity_dt,
                 total_iterations=iterations,
                 iterations_per_dispatch=5,
@@ -423,41 +355,38 @@ class Fluid2D:
                 self._jacobi_diffusion_shader.use(
                     self._velocity_fbo.back,
                     self._simulation_obstacle_fbo,
-                    self._grid_scale,
-                    self._aspect,
+                    self._cell,
                     viscosity_dt,
                     has_obstacles=self._has_obstacles
                 )
                 self._velocity_fbo.end()
 
     def _confine_vorticity(self) -> None:
-        """Vorticity confinement (curl → force → add to velocity)."""
-        if self.settings.velocity.vorticity <= 0.0 or self.settings.velocity.vorticity_radius <= 0.0:
+        """Vorticity confinement (Fedkiw 2001), `vorticity.strength_1` at `vorticity.radius_1` (widths): the curl, the
+        force epsilon h (N × curl) × dt (h the cell's width), added to the velocity; while `vorticity.enabled` is on
+        and the strength above 0."""
+        vorticity = self.settings.vorticity
+        if not vorticity.enabled or vorticity.strength_1 <= 0.0 or vorticity.radius_1 <= 0.0:
             return
-
-        vorticity_radius = self.settings.velocity.vorticity_radius * self._grid_scale
-        vorticity_force = self.settings.velocity.vorticity * self._dt
 
         # a. Compute curl
         self._vorticity_curl_fbo.begin()
         self._vorticity_curl_shader.use(
             self._velocity_fbo,
             self._simulation_obstacle_fbo,
-            self._grid_scale,
-            self._aspect,
-            vorticity_radius,
+            self._cell,
+            vorticity.radius_1,
             has_obstacles=self._has_obstacles
         )
         self._vorticity_curl_fbo.end()
 
-        # b. Compute confinement force
+        # b. Compute confinement force × dt
         self._vorticity_force_fbo.begin()
         self._vorticity_force_shader.use(
             self._vorticity_curl_fbo,
             self._simulation_obstacle_fbo,
-            self._grid_scale,
-            self._aspect,
-            vorticity_force,
+            self._cell,
+            vorticity.strength_1 * self._cell[0] * self._dt,
             has_obstacles=self._has_obstacles
         )
         self._vorticity_force_fbo.end()
@@ -465,15 +394,24 @@ class Fluid2D:
         # c. Add force to velocity
         self._add_force_to_velocity(self._vorticity_force_fbo)
 
+    @property
+    def _temperature_runs(self) -> bool:
+        """Whether the temperature is injected, carried and lifts: `temperature.enabled` and its `buoyancy` above 0."""
+        temperature = self.settings.temperature
+        return temperature.enabled and temperature.buoyancy > 0.0
+
     def _advect_temperature(self) -> None:
-        """Advect & dissipate the temperature scalar field."""
-        if self.settings.temperature.buoyancy == 0.0:
-            self._temperature_fbo.clear_all()
+        """The temperature carried one step by the projected velocity, as the density is (its `advection_scale`),
+        faded and evaporated by its own; the buoyancy reads it the next step; while it does not run, cleared once and
+        skipped."""
+        if not self._temperature_runs:
+            if not self._temperature_clear:     # cleared once; nothing adds to it while it does not run
+                self._temperature_fbo.clear_all()
+                self._temperature_clear = True
             return
+        self._temperature_clear = False
 
-        advect_step = self._dt * self.settings.speed
-        dissipation = self._calculate_dissipation(self._dt, self.settings.temperature.fade_time)
-
+        temperature = self.settings.temperature
         self._temperature_fbo.swap()
         self._temperature_fbo.begin()
         self._advect_shader.use(
@@ -481,59 +419,43 @@ class Fluid2D:
             self._velocity_fbo,
             self._simulation_obstacle_fbo,
             self._field_aspect,
-            advect_step,
-            dissipation,
-            has_obstacles=self._has_obstacles
+            self._dt * self.settings.density.advection_scale,
+            self._calculate_dissipation(self._dt, temperature.fade_time),
+            has_obstacles=self._has_obstacles,
+            evaporation=self._evaporation(self._dt, temperature.evaporation_time),
+            evaporation_knee=temperature.evaporation_knee, measure=2,
+            guard=self._guard_slot('temperature')
         )
         self._temperature_fbo.end()
 
     def _apply_buoyancy(self) -> None:
-        """Apply buoyancy force to velocity: F = σ(T − T_ambient) − κρ."""
-        if self.settings.temperature.buoyancy == 0.0:
+        """The buoyancy, an acceleration f = gravity × (κρ − σT) (widths/s²) added × dt: the density's amount ρ sinks
+        along gravity (`density.sink`), the warmth T rises against it (`temperature.buoyancy`, while the temperature
+        runs). The pass runs while either is above 0; gravity is `input`'s."""
+        lift: float = self.settings.temperature.buoyancy if self._temperature_runs else 0.0
+        kappa: float = self.settings.density.sink
+        if lift <= 0.0 and kappa <= 0.0:
             return
 
-        sigma = self._dt * self._grid_scale * self.settings.temperature.buoyancy
-        kappa = self._dt * self._grid_scale * self.settings.temperature.sink
-
+        input = self.settings.input
         self._buoyancy_fbo.begin()
         self._buoyancy_shader.use(
-            self._velocity_fbo,
             self._temperature_fbo,
             self._density_fbo,
             self._simulation_obstacle_fbo,
-            sigma,
+            lift,
             kappa,
-            self.settings.temperature.ambient,
+            (input.gravity_x, input.gravity_y),
             has_obstacles=self._has_obstacles
         )
         self._buoyancy_fbo.end()
 
-        self._add_force_to_velocity(self._buoyancy_fbo)
-
-    def _advect_pressure(self) -> None:
-        """Advect & dissipate pressure (optional, non-physical)."""
-        if self.settings.pressure.speed <= 0.0:
-            return
-
-        advect_step = self._dt * self.settings.pressure.speed
-        dissipation = self._calculate_dissipation(self._dt, self.settings.pressure.fade_time)
-
-        self._pressure_fbo.swap()
-        self._pressure_fbo.begin()
-        self._advect_shader.use(
-            self._pressure_fbo.back,
-            self._velocity_fbo,
-            self._simulation_obstacle_fbo,
-            self._field_aspect,
-            advect_step,
-            dissipation,
-            has_obstacles=self._has_obstacles
-        )
-        self._pressure_fbo.end()
+        self._add_force_to_velocity(self._buoyancy_fbo, self._dt)
 
     def _enforce_incompressibility(self) -> None:
         """Pressure projection (divergence, less the expansion's rate × it → Jacobi solve → gradient subtraction), in
-        widths."""
+        widths, on the walls `wall` sets."""
+        closed: bool = self.settings.wall == WallMode.CLOSED
         # a. Compute divergence, the expansion's made by the projection (its mean off where the walls are closed)
         rate: float = self._expansion_rate()
         mean_lod: float | None = None
@@ -541,7 +463,7 @@ class Fluid2D:
             glBindTexture(GL_TEXTURE_2D, self._expansion_fbo.tex_id)
             glGenerateMipmap(GL_TEXTURE_2D)
             glBindTexture(GL_TEXTURE_2D, 0)
-            if self.settings.pressure.wall == WallMode.CLOSED:
+            if closed:
                 mean_lod = float(math.floor(math.log2(max(self._simulation_width, self._simulation_height))))
         self._divergence_fbo.begin()
         self._divergence_shader.use(
@@ -568,7 +490,8 @@ class Fluid2D:
                 self._cell,
                 total_iterations=iterations,
                 iterations_per_dispatch=5,
-                has_obstacles=self._has_obstacles
+                has_obstacles=self._has_obstacles,
+                closed=closed
             )
             if result is not current:          # the solve ended in the back buffer: make it the front
                 self._pressure_fbo.swap()
@@ -598,10 +521,9 @@ class Fluid2D:
         self._velocity_fbo.end()
 
     def _advect_density(self) -> None:
-        """Advect & dissipate density field."""
-        advect_step = self._dt * (self.settings.speed + self.settings.density.speed_offset)
-        dissipation = self._calculate_dissipation(self._dt, self.settings.density.fade_time)
-
+        """The density carried one step by the projected velocity (`density.advection_scale`), faded, evaporated and
+        guarded."""
+        density = self.settings.density
         self._density_fbo.swap()
         self._density_fbo.begin()
         self._advect_shader.use(
@@ -609,35 +531,28 @@ class Fluid2D:
             self._velocity_fbo,        # Velocity
             self._density_obstacle_fbo, # Obstacles (full density resolution)
             self._field_aspect,
-            advect_step,
-            dissipation,
-            has_obstacles=self._has_obstacles
+            self._dt * density.advection_scale,
+            self._calculate_dissipation(self._dt, density.fade_time),
+            has_obstacles=self._has_obstacles,
+            evaporation=self._evaporation(self._dt, density.evaporation_time),
+            evaporation_knee=density.evaporation_knee, measure=0,
+            guard=self._guard_slot('density')
         )
         self._density_fbo.end()
 
-    def _dampen(self, fbo: SwapFbo, threshold: float, dampen_time: float,
-               delta_time: float, include_alpha: bool) -> None:
-        """Exponential drag on magnitude excess above threshold.
-
-        Args:
-            fbo: Field to dampen (ping-pong swap handled by FlowUtil)
-            threshold: Magnitude below which values are untouched
-            dampen_time: Seconds for excess to decay to ~1%. 0=off
-            delta_time: Frame delta time for frame-rate independence
-            include_alpha: True for density (RGBA magnitude), False for velocity (RGB)
-        """
-        if dampen_time <= 0.0:
-            return
-        factor = pow(0.01, delta_time / dampen_time)
-        FlowUtil.dampen(fbo, threshold, factor, include_alpha)
+    def _guard_slot(self, field: str) -> GuardSlot | None:
+        """The field's slot in the fluid's guard, None while `guard` is off."""
+        return self._guard.slot(field) if self.settings.guard else None
 
     # ========== Deferred ==========
 
     def _apply_wall_modes(self) -> None:
-        """Apply the wall settings to all field FBOs (GL thread only)."""
-        self._density_fbo.set_wrap(*_WALL_GL[self.settings.density.wall])
-        self._temperature_fbo.set_wrap(*_WALL_GL[self.settings.temperature.wall])
-        self._pressure_fbo.set_wrap(*_WALL_GL[self.settings.pressure.wall])
+        """Apply `wall` to the density, the temperature and the pressure (GL thread only); the velocity stays 0 beyond
+        the walls."""
+        wall = _WALL_GL[self.settings.wall]
+        for fbo in (self._density_fbo, self._temperature_fbo, self._pressure_fbo):
+            if fbo.allocated:
+                fbo.set_wrap(*wall)
 
     def _handle_deferred_actions(self) -> None:
         """Process reset and reallocation requests queued from the UI thread."""
@@ -664,21 +579,29 @@ class Fluid2D:
         return self._dt
 
     def _step_time(self, dt: float) -> None:
-        s = self.settings
-        self._dt = self._time_step.update(s.time_step, dt, s.fixed_fps, s.fps_smoothing)
+        time = self.settings.time
+        # the fluid's own time: every pass steps by it, the injections' sources and the drag included, so at
+        # time_scale 0.5 the whole fluid runs at half speed and keeps its shapes
+        self._dt = self._time_step.update(time.time_step, dt, time.fixed_fps, time.fps_smoothing) * time.time_scale
 
     @staticmethod
-    def _align32(v: int) -> int:
-        """Round up to the nearest multiple of 32."""
-        return (v + 31) & ~31
+    def _align8(v: int) -> int:
+        """Round up to the nearest multiple of 8."""
+        return (v + 7) & ~7
 
     @staticmethod
     def _calculate_dissipation(delta_time: float, decay_time: float) -> float:
-        """Calculate frame-rate independent decay multiplier.
+        """The fade's multiplier this step, pow(0.01, dt / decay_time): the field at 1% after decay_time seconds;
+        1 at 0, off."""
+        if decay_time <= 0.0:
+            return 1.0
+        return pow(0.01, delta_time / decay_time)
 
-        Returns pow(0.01, dt / decay_time) -- field reaches 1% after decay_time seconds.
-        """
-        return pow(0.01, delta_time / max(0.001, decay_time))
+    @staticmethod
+    def _evaporation(delta_time: float, evaporation_time: float) -> float:
+        """The saturating loss's share this step, dt / evaporation_time: a full value well above the knee is gone in
+        evaporation_time; 0 off."""
+        return delta_time / evaporation_time if evaporation_time > 0.0 else 0.0
 
     # ========== Input Methods: what the bridge gives, as the 3D fluid takes it ==========
 
@@ -726,7 +649,7 @@ class Fluid2D:
         """The boundary's warmth: the bridge's presence (0 to 1) times input.temperature_gain, at most ±1, the water
         dragged toward it over input.temperature_drag where the body is warmer (or colder) than the water; never back
         toward a fainter body, as the density's, cooled by the fade alone."""
-        if not self._allocated or self.settings.temperature.buoyancy == 0.0:      # nothing reads it
+        if not self._allocated or not self._temperature_runs:      # nothing reads it
             return
         input: InputSettings = self.settings.input
         self._temperature_fbo.swap()
@@ -954,7 +877,7 @@ class Fluid2D:
 
     @property
     def buoyancy(self) -> Texture:
-        """RG16F buoyancy force field."""
+        """RG16F buoyancy, an acceleration (widths/s²)."""
         return self._buoyancy_fbo
 
     @property
@@ -969,7 +892,7 @@ class Fluid2D:
                 'velocity': Port(self._velocity_fbo, TextureKind.VELOCITY),
                 'vorticity': Port(self._vorticity_curl_fbo, TextureKind.SCALAR),
                 'vorticity_force': Port(self._vorticity_force_fbo, TextureKind.VELOCITY),
-                'buoyancy': Port(self._buoyancy_fbo, TextureKind.VELOCITY),
+                'buoyancy': Port(self._buoyancy_fbo, TextureKind.ACCELERATION),
                 'expansion': Port(self._expansion_fbo, TextureKind.SCALAR),
                 'divergence': Port(self._divergence_fbo, TextureKind.SCALAR),
                 'pressure': Port(self._pressure_fbo, TextureKind.SCALAR),
@@ -979,10 +902,10 @@ class Fluid2D:
 
     @property
     def sim_width(self) -> int:
-        """Current simulation resolution width (aligned to 16)."""
+        """Current simulation resolution width (aligned to 8)."""
         return self._simulation_width
 
     @property
     def sim_height(self) -> int:
-        """Current simulation resolution height (aligned to 16)."""
+        """Current simulation resolution height (aligned to 8)."""
         return self._simulation_height

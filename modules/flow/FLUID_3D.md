@@ -7,7 +7,7 @@ the bridge gives it ([BRIDGE_3D.md](BRIDGE_3D.md)), its density and its look, an
 is next is in [FLOW_PLAN.md](FLOW_PLAN.md). "Code" is what the files show;
 **(deduction)** marks what is inferred from them, **(site fact)** what the operator saw.
 
-The 2D fluid (`fluid_2d/`, `Fluid2DLayer`, hd_trio) is apart: nothing here changes it. The 3D
+The 2D fluid takes the laws here for what a plane has; what it does differently is in [FLUID_2D.md](FLUID_2D.md). The 3D
 fluid is `Fluid3D` (`fluid_3d/fluid_3d.py`), its layer `Fluid3DLayer`
 (`modules/render/modules/flow/fluid_3d_layer.py`), run by deep_flow alone.
 

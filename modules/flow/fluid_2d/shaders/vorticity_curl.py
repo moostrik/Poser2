@@ -10,19 +10,19 @@ class VorticityCurl(Shader):
     def __init__(self) -> None:
         super().__init__()
 
-    def use(self, velocity: Texture, obstacle: Texture, grid_scale: float, aspect: float, radius: float,
+    def use(self, velocity: Texture, obstacle: Texture, cell: tuple[float, float], radius: float,
             has_obstacles: bool = True) -> None:
         """Compute velocity curl.
 
         Args:
             velocity: Velocity field (RG32F)
             obstacle: Obstacle mask (R8/R32F)
-            grid_scale: Grid spacing (derived from settings width / output width)
-            aspect: Aspect ratio (width/height) for isotropic derivatives
+            cell: A cell's width and height, widths
+            radius: The sampling radius, widths; at least one cell
             has_obstacles: When False, skip obstacle texture reads for performance
         """
-        half_rdx_x = 0.5 / grid_scale
-        half_rdx_y = (0.5 / grid_scale) / aspect
+        # the radius in cells per axis, at least one: the curl cannot be measured closer
+        reach = (max(radius / cell[0], 1.0), max(radius / cell[1], 1.0))
 
         # Bind shader program
         glUseProgram(self.shader_program)
@@ -40,8 +40,8 @@ class VorticityCurl(Shader):
         glUniform1i(self.get_uniform_loc("uObstacle"), 1)
 
         # Set uniform
-        glUniform1f(self.get_uniform_loc("uRadius"), radius)
-        glUniform2f(self.get_uniform_loc("uHalfRdxInv"), half_rdx_x, half_rdx_y)
+        glUniform2f(self.get_uniform_loc("uRadius"), *reach)
+        glUniform2f(self.get_uniform_loc("uHalfRdxInv"), 0.5 / (cell[0] * reach[0]), 0.5 / (cell[1] * reach[1]))
 
         # Draw fullscreen quad
         draw_quad()
