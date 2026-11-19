@@ -173,3 +173,30 @@ numpy decode on the CPU, the real model's outputs, 330 batches a size: the same 
 
 The GPU decode is slower up to 7 players and as fast at 8, its p99 worse at every size: copying both outputs costs
 less than its kernel launches and its own copy **(deduction)**. The decode stays on the CPU.
+
+## The results handed on finished
+
+Each app `-sim` on `20261112-125832_measure`, 60 s after 3 s of play, its preset, before (0d842a69) and after
+(4af51883) the producers hand on finished items to the readers outside the package, 2026-11-19, mean / p95 ms
+(`c_probe.py`, not committed) **(seen)**. One run each.
+
+| What                          | low_flow before | low_flow after | deep_flow before | deep_flow after |
+|-------------------------------|-----------------|----------------|------------------|-----------------|
+| GPU view                      | 2.81 / 5.86     | 2.87 / 5.92    | 0.19 / 0.19      | 0.19 / 0.19     |
+| Capture latency               | 48.05 / 57.64   | 47.93 / 57.02  | 45.36 / 59.52    | 46.06 / 59.76   |
+| Pose latency RAW              | 47.15 / 55.29   | 47.30 / 55.31  | 71.70 / 91.93    | 69.07 / 80.79   |
+| Pose latency SMOOTH           | 49.95 / 58.43   | 50.05 / 58.36  | 74.99 / 96.42    | 72.22 / 84.55   |
+| Render update                 | 4.67 / 8.36     | 4.66 / 8.36    | 9.76 / 28.25     | 8.96 / 23.32    |
+| Wait pose step                | 0.24 / 0.43     | 0.04 / 0.18    | 0.55 / 1.37      | 0.04 / 0.11     |
+| Wait upload (a frame queued)  | 0.50 / 0.91     | 0.48 / 0.88    | 2.33 / 11.95     | 2.86 / 13.12    |
+| Wait upload finished          |                 | 0.48 / 0.90    |                  | 0.56 / 1.37     |
+| Masks unsynced (share)        | 0.09            | 0.05           |                  |                 |
+
+- low_flow's GPU view stays at 2.9 ms with the masks finished: the mask's wait is not what it costs **(seen)**
+- The capture latency grows by at most the uploader's new wait, as expected **(seen)**; a frame waits about 0.5 ms
+  longer in the uploader's queue, behind that wait **(seen)**
+- The frame source's queue wait falls to 0.04 ms now the bang carries only capture times **(seen)**; why it was
+  0.24 to 0.55 ms before is not known
+- deep_flow's pose latency and render update fall at p95 by 11 and 5 ms; whether that is the change or a run's
+  spread is not known from one run **(deduction)**
+
