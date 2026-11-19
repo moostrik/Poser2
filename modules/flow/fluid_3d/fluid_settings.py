@@ -8,6 +8,7 @@ from modules.utils import Color
 
 from ..port import ColorSpace
 from ..density_blend import DensityBlend
+from ..pressure_solver import PressureSolver
 from ..wall_mode import WallMode
 from ..time_step import TimeStepMode
 
@@ -22,13 +23,6 @@ class Limiter(IntEnum):
     """What MacCormack does where its correction leaves the eight texels the plain step read between (Selle 2008)."""
     CLAMP = 0       # the corrected value cut to those bounds: the edge kept steep, its top flat
     REVERT = 1      # the plain step's value there: what a step really made, softer at the sharpest features
-
-
-class PressureSolver(IntEnum):
-    """How the pressure's Poisson equation is solved each step, warm from the last step's pressure."""
-    JACOBI = 0              # every cell from its neighbors' last values; five iterations a dispatch in shared memory
-    SOR = 1                 # red-black Gauss–Seidel, over-relaxed: each color from the other's newest values
-    MULTIGRID = 2           # V-cycles over the grid halved to a few cells, red-black Gauss–Seidel smoothing each level
 
 
 class Light(IntEnum):

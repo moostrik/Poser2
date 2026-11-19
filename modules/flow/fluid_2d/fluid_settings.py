@@ -6,6 +6,7 @@ from modules.settings import Field, BaseSettings, Group, Widget
 
 from ..density_blend import DensityBlend
 from ..port import ColorSpace
+from ..pressure_solver import PressureSolver
 from ..wall_mode import WallMode
 from ..time_step import TimeStepMode
 
@@ -75,8 +76,11 @@ class ExpansionSettings(BaseSettings):
 
 
 class PressureSettings(BaseSettings):
-    """The pressure's solve."""
-    iterations: Field[int]          = Field(40,     min=1,      max=60,     color="orange",         description="Pressure solver iterations per step")
+    """The pressure's solve, by the solver picked."""
+    solver: Field[PressureSolver]   = Field(PressureSolver.JACOBI,                                  description="Jacobi, red-black SOR (Gauss–Seidel over-relaxed) or multigrid V-cycles")
+    iterations: Field[int]          = Field(40,     min=1,      max=60,     color="orange",         description="Pressure solver iterations per step; for SOR its red-black sweeps")
+    relaxation: Field[float]        = Field(1.8,    min=1.0,    max=1.85,   color="orange",         description="SOR's over-relaxation factor omega; 1 = Gauss–Seidel; 1.95 diverged")
+    cycles: Field[int]              = Field(1,      min=1,      max=8,      color="orange",         description="Multigrid V-cycles per step")
 
 
 class DensitySettings(BaseSettings):

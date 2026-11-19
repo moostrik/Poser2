@@ -2,8 +2,9 @@
 How and why: modules/flow/FLUID_2D.md."""
 import math
 
-from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R16F, GL_R8, GL_RG16F, GL_RGBA16F, \
-    GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, glBindTexture, glGenerateMipmap, glTexParameteri
+from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R16F, GL_R32F, GL_R8, GL_RG16F, GL_RGBA16F, \
+    GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_2D, GL_TEXTURE_FETCH_BARRIER_BIT, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, \
+    glBindTexture, glGenerateMipmap, glMemoryBarrier, glTexParameteri
 
 from modules.gl import Texture, SwapFbo, Fbo, GpuTimer
 from .. import FlowUtil, Port, TextureKind
@@ -11,16 +12,20 @@ from ..density_blend import DensityBlend
 from ..drag import DRAG_FLOOR, drag_share
 from ..finite_guard import FiniteGuard, GuardSlot
 from ..port import ColorSpace
+from ..pressure_solver import PressureSolver
 from ..time_step import REFERENCE_STEP, TimeStep, viscosity_iterations
 from ..shaders import AddBoolean
 from ..wall_mode import WallMode
-from .fluid_settings import Fluid2DSettings, InputSettings
+from .fluid_settings import Fluid2DSettings, InputSettings, PressureSettings
+from .multigrid_pressure_2d import MultigridPressure2D
 from .shaders import (
     Advect, Divergence, Gradient,
     JacobiPressure, JacobiPressureCompute, JacobiDiffusion, JacobiDiffusionCompute,
     VorticityCurl, VorticityForce, Buoyancy,
     InjectVelocity2D, InjectDensity2D, InjectScalar2D, ScalarInjection, DensityToRgb2D
 )
+
+_BARRIER_FETCH_AND_IMAGE: int = int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
 
 _WALL_GL: dict = {
     WallMode.OPEN:   (GL_CLAMP_TO_BORDER, (0.0, 0.0, 0.0, 0.0)),
@@ -43,7 +48,7 @@ class Fluid2D:
         velocity:             SwapFbo RG16F    (u, v)
         density:              SwapFbo RGBA16F   (r, g, b, a)
         temperature:          SwapFbo R16F
-        pressure:             SwapFbo R16F
+        pressure:             SwapFbo R32F
         simulation_obstacle:  SwapFbo R8        (sim resolution)
         density_obstacle:     SwapFbo R8        (density resolution)
 
@@ -77,7 +82,8 @@ class Fluid2D:
         self._temperature_clear: bool = True    # the temperature cleared since it last ran
 
         # ---- Simulation fields (SwapFbo for ping-pong) ----
-        # Velocity always uses Dirichlet (v=0 at walls); others by `wall` via _apply_wall_modes().
+        # Velocity always uses Dirichlet (v=0 at walls); the density and the temperature by `wall` via _apply_wall_modes(),
+        # the pressure's walls the solvers' and the gradient's own ghosts (walls_2d.glsl)
         self._velocity_fbo: SwapFbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         self._density_fbo: SwapFbo = SwapFbo()
         self._temperature_fbo: SwapFbo = SwapFbo()
@@ -106,6 +112,7 @@ class Fluid2D:
         self._jacobi_pressure_compute: JacobiPressureCompute = JacobiPressureCompute()
         self._jacobi_diffusion_shader: JacobiDiffusion = JacobiDiffusion()
         self._jacobi_diffusion_compute: JacobiDiffusionCompute = JacobiDiffusionCompute()
+        self._multigrid: MultigridPressure2D = MultigridPressure2D()     # SOR and the multigrid's levels
 
         # Use compute shaders for iterative solvers (faster)
         self._use_compute_pressure: bool = True
@@ -184,7 +191,8 @@ class Fluid2D:
         self._velocity_fbo.allocate(sim_w, sim_h, GL_RG16F)
         self._temperature_fbo.allocate(sim_w, sim_h, GL_R16F)
         self._temperature_clear = True
-        self._pressure_fbo.allocate(sim_w, sim_h, GL_R16F)
+        self._pressure_fbo.allocate(sim_w, sim_h, GL_R32F)
+        self._multigrid.allocate(sim_w, sim_h, self._cell)
         self._simulation_obstacle_fbo.allocate(sim_w, sim_h, GL_R8)
         FlowUtil.blit(self._simulation_obstacle_fbo, self._density_obstacle_fbo)
 
@@ -227,6 +235,7 @@ class Fluid2D:
         self._jacobi_pressure_compute.deallocate()
         self._jacobi_diffusion_shader.deallocate()
         self._jacobi_diffusion_compute.deallocate()
+        self._multigrid.deallocate()
         self._vorticity_curl_shader.deallocate()
         self._vorticity_force_shader.deallocate()
         self._buoyancy_shader.deallocate()
@@ -250,6 +259,7 @@ class Fluid2D:
         self._jacobi_pressure_compute.reload()
         self._jacobi_diffusion_shader.reload()
         self._jacobi_diffusion_compute.reload()
+        self._multigrid.reload()
         self._vorticity_curl_shader.reload()
         self._vorticity_force_shader.reload()
         self._buoyancy_shader.reload()
@@ -453,8 +463,8 @@ class Fluid2D:
         self._add_force_to_velocity(self._buoyancy_fbo, self._dt)
 
     def _enforce_incompressibility(self) -> None:
-        """Pressure projection (divergence, less the expansion's rate × it → Jacobi solve → gradient subtraction), in
-        widths, on the walls `wall` sets."""
+        """Pressure projection (divergence, less the expansion's rate × it → the solve by `pressure.solver` →
+        gradient subtraction), in widths, on the walls `wall` sets."""
         closed: bool = self.settings.wall == WallMode.CLOSED
         # a. Compute divergence, the expansion's made by the projection (its mean off where the walls are closed)
         rate: float = self._expansion_rate()
@@ -477,10 +487,17 @@ class Fluid2D:
         )
         self._divergence_fbo.end()
 
-        # b. Solve Poisson equation for pressure
-        iterations = self.settings.pressure.iterations     # the grid sets what it needs, not the step
+        # b. Solve Poisson equation for pressure, by the solver picked
+        pressure: PressureSettings = self.settings.pressure
+        iterations = pressure.iterations     # the grid sets what it needs, not the step
 
-        if self._use_compute_pressure:
+        if pressure.solver == PressureSolver.MULTIGRID:
+            self._multigrid.solve(self._pressure_fbo, self._divergence_fbo, self._simulation_obstacle_fbo, self._cell,
+                                  pressure.cycles, self._has_obstacles, closed)
+        elif pressure.solver == PressureSolver.SOR:
+            self._multigrid.sor(self._pressure_fbo, self._divergence_fbo, self._simulation_obstacle_fbo, self._cell,
+                                iterations, pressure.relaxation, self._has_obstacles, closed)
+        elif self._use_compute_pressure:
             current = self._pressure_fbo
             result = self._jacobi_pressure_compute.solve(
                 current,
@@ -504,9 +521,12 @@ class Fluid2D:
                     self._divergence_fbo,
                     self._simulation_obstacle_fbo,
                     self._cell,
-                    has_obstacles=self._has_obstacles
+                    has_obstacles=self._has_obstacles,
+                    closed=closed
                 )
                 self._pressure_fbo.end()
+
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)       # the compute solves' writes, before the gradient reads them
 
         # c. Subtract pressure gradient from velocity
         self._velocity_fbo.swap()
@@ -516,7 +536,8 @@ class Fluid2D:
             self._pressure_fbo,
             self._simulation_obstacle_fbo,
             self._cell,
-            has_obstacles=self._has_obstacles
+            has_obstacles=self._has_obstacles,
+            closed=closed
         )
         self._velocity_fbo.end()
 
@@ -547,10 +568,10 @@ class Fluid2D:
     # ========== Deferred ==========
 
     def _apply_wall_modes(self) -> None:
-        """Apply `wall` to the density, the temperature and the pressure (GL thread only); the velocity stays 0 beyond
-        the walls."""
+        """Apply `wall` to the density and the temperature (GL thread only); the velocity stays 0 beyond the walls,
+        the pressure's walls are the solvers' ghosts."""
         wall = _WALL_GL[self.settings.wall]
-        for fbo in (self._density_fbo, self._temperature_fbo, self._pressure_fbo):
+        for fbo in (self._density_fbo, self._temperature_fbo):
             if fbo.allocated:
                 fbo.set_wrap(*wall)
 
@@ -862,7 +883,7 @@ class Fluid2D:
 
     @property
     def pressure(self) -> Texture:
-        """R16F pressure field."""
+        """R32F pressure field."""
         return self._pressure_fbo
 
     @property

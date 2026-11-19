@@ -8,7 +8,7 @@ Uses 16x16 workgroups with 1-pixel halo (18x18 shared memory) for fast neighbor 
 """
 from __future__ import annotations
 
-from OpenGL.GL import GL_R16F, GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUniform2i, glUseProgram
+from OpenGL.GL import GL_R32F, GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUniform2i, glUseProgram
 
 from modules.gl import Texture, ComputeShader
 
@@ -57,7 +57,7 @@ class JacobiPressureCompute(ComputeShader):
             cell: A cell's width and height, widths
             iterations: Number of Jacobi iterations to perform in this dispatch
             has_obstacles: When False, skip obstacle texture reads for performance
-            closed: The walls closed (the pressure beyond them the cell's), else open (0 beyond them)
+            closed: The walls closed (the pressure beyond them the cell's), else open (its negative beyond them)
 
         Note:
             For 40 total iterations with iterations=5, call this 8 times,
@@ -96,8 +96,8 @@ class JacobiPressureCompute(ComputeShader):
         glUniform1i(self.get_uniform_loc("uObstacle"), 1)
 
         # Bind pressure textures as images for imageLoad/imageStore
-        self.bind_image_read(0, pressure_in, GL_R16F)
-        self.bind_image_write(1, pressure_out, GL_R16F)
+        self.bind_image_read(0, pressure_in, GL_R32F)
+        self.bind_image_write(1, pressure_out, GL_R32F)
 
         # Set uniforms
         glUniform2f(self.get_uniform_loc("uAlpha"), alpha_x, alpha_y)

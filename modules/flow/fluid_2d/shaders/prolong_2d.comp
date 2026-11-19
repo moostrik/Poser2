@@ -1,0 +1,43 @@
+#version 460 core
+
+/*
+ * Prolong2D - the coarser level's correction added to a level, read bilinearly at the fine cell's center, as
+ * Prolong3D on the plane. A coarse cell beyond the field is the wall's ghost (walls_2d.glsl), the correction a
+ * pressure: the same beyond a closed wall, its negative beyond an open one, so the correction is 0 on an open wall's
+ * face on every level.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(r32f, binding = 1) readonly uniform image2D uCoarse;
+layout(r32f, binding = 0) uniform image2D uFine;
+
+uniform ivec2 uFineSize;
+uniform ivec2 uCoarseSize;
+
+#include "walls_2d.glsl"
+
+// The coarse correction at `cell`, a ghost beyond the field mirrored from the cell inside
+float coarse(ivec2 cell) {
+    ivec2 inside = clamp(cell, ivec2(0), uCoarseSize - 1);
+    float value = imageLoad(uCoarse, inside).r;
+    if (cell.x != inside.x) value = wall_pressure(value);
+    if (cell.y != inside.y) value = wall_pressure(value);
+    return value;
+}
+
+void main() {
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(gid, uFineSize))) return;
+    // The fine cell's center in coarse cells, centers at integers
+    vec2 position = (vec2(gid) + 0.5) * vec2(uCoarseSize) / vec2(uFineSize) - 0.5;
+    ivec2 base = ivec2(floor(position));
+    vec2 f = position - vec2(base);
+    float correction = 0.0;
+    for (int k = 0; k < 4; k++) {
+        ivec2 corner = ivec2(k & 1, (k >> 1) & 1);
+        vec2 weight = mix(1.0 - f, f, vec2(corner));
+        correction += weight.x * weight.y * coarse(base + corner);
+    }
+    imageStore(uFine, gid, vec4(imageLoad(uFine, gid).r + correction, 0.0, 0.0, 0.0));
+}

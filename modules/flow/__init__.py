@@ -38,6 +38,7 @@ from .visualization import Visualizer, histogram_grid, histogram_volume_grid, St
 
 # Shared by the 2D and 3D fluid
 from .time_step import TimeStep, TimeStepMode, hold_tick, viscosity_iterations, MAX_STEP, REFERENCE_STEP
+from .pressure_solver import PressureSolver
 from .drag import DRAG_FLOOR, drag_share
 from .density_blend import DensityBlend
 from .finite_guard import guard_report

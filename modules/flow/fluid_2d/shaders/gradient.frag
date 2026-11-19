@@ -11,7 +11,9 @@ uniform sampler2D uPressure;   // Pressure field (R32F)
 uniform sampler2D uObstacle;   // Obstacle mask (R8, CLAMP_TO_BORDER=1)
 uniform bool uHasObstacles;    // Skip obstacle checks when false
 
-uniform vec2 uHalfRdxInv;  // (0.5/gridScale_x, 0.5/gridScale_y) for aspect correction
+uniform vec2 uHalfRdxInv;  // 0.5 / the cell, widths, on x and y
+
+#include "walls_2d.glsl"
 
 void main() {
     vec2 st = texCoord;
@@ -37,6 +39,14 @@ void main() {
     float pB = textureOffset(uPressure, st, ivec2(0, -1)).x;
     float pR = textureOffset(uPressure, st, ivec2(1, 0)).x;
     float pL = textureOffset(uPressure, st, ivec2(-1, 0)).x;
+    float pW = wall_pressure(texture(uPressure, st).x);
+    // Beyond the field the wall's ghost (walls_2d.glsl)
+    ivec2 cell = ivec2(gl_FragCoord.xy);
+    ivec2 size = textureSize(uPressure, 0);
+    if (cell.y + 1 >= size.y) pT = pW;
+    if (cell.y - 1 < 0)       pB = pW;
+    if (cell.x + 1 >= size.x) pR = pW;
+    if (cell.x - 1 < 0)       pL = pW;
 
     if (uHasObstacles) {
         float pC = texture(uPressure, st).x;

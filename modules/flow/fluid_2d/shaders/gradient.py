@@ -14,7 +14,7 @@ class Gradient(Shader):
         super().__init__()
 
     def use(self, velocity: Texture, pressure: Texture, obstacle: Texture, cell: tuple[float, float],
-            has_obstacles: bool = True) -> None:
+            has_obstacles: bool = True, closed: bool = True) -> None:
         """Apply pressure gradient subtraction.
 
         Args:
@@ -23,6 +23,7 @@ class Gradient(Shader):
             obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1)
             cell: A cell's width and height, widths
             has_obstacles: When False, skip obstacle texture reads for performance
+            closed: The walls closed (the pressure beyond them the cell's), else open (its negative beyond them)
         """
         if not self.allocated or not self.shader_program:
             logger.warning("Gradient shader not allocated or shader program missing.")
@@ -35,6 +36,7 @@ class Gradient(Shader):
 
         # Obstacle flag
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
+        glUniform1i(self.get_uniform_loc("uClosed"), int(closed))
 
         # Bind textures
         glActiveTexture(GL_TEXTURE0)

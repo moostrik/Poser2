@@ -1,0 +1,63 @@
+#version 460 core
+
+/*
+ * CoarsePressure2D - the 2D multigrid's coarsest level solved in one dispatch, as CoarsePressure3D on the plane:
+ * its red-black Gauss-Seidel sweeps (SorPressure2D's at omega 1, no obstacles) run in shared memory by one
+ * workgroup, a barrier between the colors, instead of a dispatch a color.
+ */
+
+layout(local_size_x = 1024) in;
+
+layout(binding = 0) uniform sampler2D uDivergence;   // the level's right-hand side (R32F)
+layout(r32f, binding = 0) uniform image2D uPressure;
+
+uniform vec2  uAlpha;        // 1 / h², per axis
+uniform float uBeta;         // 1 / (2 (ax + ay))
+uniform int   uSweeps;
+uniform ivec2 uSize;
+
+#include "walls_2d.glsl"
+
+const int MAX_CELLS = 4096;  // CoarsePressure2D.MAX_CELLS
+shared float s_pressure[MAX_CELLS];
+shared float s_divergence[MAX_CELLS];
+
+int index_of(ivec2 c) {
+    return c.y * uSize.x + c.x;
+}
+
+ivec2 cell_of(int i) {
+    return ivec2(i % uSize.x, i / uSize.x);
+}
+
+float neighbor(ivec2 c, float pC) {
+    if (any(lessThan(c, ivec2(0))) || any(greaterThanEqual(c, uSize))) return wall_pressure(pC);
+    return s_pressure[index_of(c)];
+}
+
+void main() {
+    int count = uSize.x * uSize.y;
+    int thread = int(gl_LocalInvocationIndex);
+    for (int i = thread; i < count; i += 1024) {
+        ivec2 c = cell_of(i);
+        s_pressure[i] = imageLoad(uPressure, c).r;
+        s_divergence[i] = texture(uDivergence, (vec2(c) + 0.5) / vec2(uSize)).r;
+    }
+    barrier();
+    for (int sweep = 0; sweep < uSweeps; sweep++) {
+        for (int color = 0; color < 2; color++) {
+            for (int i = thread; i < count; i += 1024) {
+                ivec2 c = cell_of(i);
+                if (((c.x + c.y) & 1) != color) continue;
+                float pC = s_pressure[i];
+                s_pressure[i] = uBeta * (uAlpha.x * (neighbor(c - ivec2(1, 0), pC) + neighbor(c + ivec2(1, 0), pC))
+                                       + uAlpha.y * (neighbor(c - ivec2(0, 1), pC) + neighbor(c + ivec2(0, 1), pC))
+                                       - s_divergence[i]);
+            }
+            barrier();
+        }
+    }
+    for (int i = thread; i < count; i += 1024) {
+        imageStore(uPressure, cell_of(i), vec4(s_pressure[i], 0.0, 0.0, 0.0));
+    }
+}

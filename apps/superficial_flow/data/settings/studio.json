@@ -681,7 +681,10 @@
         "rate": 0.0
       },
       "pressure": {
-        "iterations": 40
+        "solver": "MULTIGRID",
+        "iterations": 40,
+        "relaxation": 1.85,
+        "cycles": 1
       },
       "density": {
         "color_space": "OKLAB",

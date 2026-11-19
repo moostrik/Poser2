@@ -11,6 +11,8 @@ uniform sampler2D uDivergence;  // Velocity divergence (R32F)
 uniform sampler2D uObstacle;    // Obstacle mask (R8, CLAMP_TO_BORDER=1)
 uniform bool uHasObstacles;     // Skip obstacle checks when false
 
+#include "walls_2d.glsl"
+
 uniform vec2 uAlpha;  // -(gridScale²)
 uniform float uBeta;   // 0.25 (= 1/4 for 4 neighbors)
 
@@ -33,6 +35,14 @@ void main() {
     vec4 xB = textureOffset(uSource, st, ivec2(0, -1));
     vec4 xR = textureOffset(uSource, st, ivec2(1, 0));
     vec4 xL = textureOffset(uSource, st, ivec2(-1, 0));
+    vec4 xW = vec4(wall_pressure(texture(uSource, st).x));
+    // Beyond the field the wall's ghost (walls_2d.glsl)
+    ivec2 cell = ivec2(gl_FragCoord.xy);
+    ivec2 size = textureSize(uSource, 0);
+    if (cell.y + 1 >= size.y) xT = xW;
+    if (cell.y - 1 < 0)       xB = xW;
+    if (cell.x + 1 >= size.x) xR = xW;
+    if (cell.x - 1 < 0)       xL = xW;
 
     if (uHasObstacles) {
         vec4 xC = texture(uSource, st);
