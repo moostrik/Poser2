@@ -22,7 +22,8 @@ Questions:
 
 ## C. The results handed on finished (from superficial_flow's plan E, 2026-11-19)
 
-The segmenter waits for its model, then queues the mask's rescale to the crop and the foreground (crop x mask),
+A producer on its own thread hands on its GPU work finished (decided 2026-11-19); the pose and the flow do
+**(seen)**. The segmenter waits for its model, then queues the mask's rescale to the crop and the foreground (crop x mask),
 records `ready` and hands them on at once (`segmentation/segmenter.py`, `_infer`) **(seen)**. A GL reader cannot wait
 for a CUDA event on the GPU: its PBO copy's unmap makes the GL thread wait for that CUDA work
 (`modules/gl/tensor.py`, `_update_with_pbo`) **(seen)**. superficial_flow's view waits on the mask so (`ViewMask.place`):
@@ -38,9 +39,13 @@ when handed on (`image_upload.py` waits on its own thread) **(seen)**.
   frame source's thread behind the upload's and the crop's GPU queue. Their GL reader, `CropImageLayer`
   (`modules/render/modules/inference/crop_image_layer.py`), takes a crop only once its `ready.query()` is true and
   keeps the one before until then, so the render never waits on the crop stream
+- C3. The uploaders hand on finished images and depth: `ImageUpload.upload` records `ready` and returns, and the
+  `SerialUploader` and `BatchUploader` call their callbacks at once **(seen)**; their threads wait for their upload's
+  stream before the callbacks. It delays no one: the crop and the pose wait for the upload on the GPU anyway
+  **(deduction)**; the camera image layers no longer wait in GL, up to the color's 0.6 ms **(seen: its GPU time)**
 - Checked by superficial_flow `-sim` on `20261112-125832_measure` as it is, 60 s before and after, about 3 minutes:
-  the GPU view time and the masks' wait (`mask_wait`) and latency; hd_trio's tests; and by eye, hd_trio's
-  segmentation layers and the crop layer still show
+  the GPU view time and the masks' wait (`mask_wait`) and latency; hd_trio's and the inference package's tests; and by
+  eye, hd_trio's segmentation layers, the crop layer and the camera image still show
 
 ## The rules it touches
 
