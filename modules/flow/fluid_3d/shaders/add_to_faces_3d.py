@@ -1,8 +1,8 @@
 """AddToFaces3D - what is added to the velocity on the cells' faces, in place: a force at the cells, the
-boundary's drag, the body force."""
+boundary's drag, the body force, the buoyancy."""
 from __future__ import annotations
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform3f, glUseProgram
 
 from modules.gl import Texture, Texture3D, ComputeShader
 from .face_binding import UNSPACED, bind_faces, bind_face_writes
@@ -11,11 +11,12 @@ from .z_position_binding import bind_z_position
 FORCE: int = 0
 DRAG: int = 1
 BODY_FORCE: int = 2
+BUOYANCY: int = 3
 
 
 class AddToFaces3D(ComputeShader):
     """Each face its two cells' force × dt; or pulled toward the body's velocity; or the body's acceleration
-    added; a face held at 0 left."""
+    added; or its two cells' buoyancy × dt; a face held at 0 left."""
 
     WORKGROUP_SIZE_X = 8
     WORKGROUP_SIZE_Y = 8
@@ -28,6 +29,21 @@ class AddToFaces3D(ComputeShader):
         if not self._begin(FORCE, faces, (force.width, force.height, force.depth), obstacle, closed, has_obstacles):
             return
         self.bind_texture_3d(0, force, 'uForce')
+        glUniform1f(self.get_uniform_loc('uStrength'), strength)
+        self._dispatch()
+
+    def add_buoyancy(self, faces: Texture3D, cells: tuple[int, int, int], temperature: Texture3D, density: Texture3D,
+                     sigma: float, kappa: float, gravity: tuple[float, float, float], strength: float,
+                     obstacle: Texture3D, closed: tuple[bool, bool, bool], has_obstacles: bool) -> None:
+        """The buoyancy, gravity × (`kappa` × the density's amount − `sigma` × the warmth) (widths/s²) at the cells,
+        × `strength` (dt) added, each face its two cells' mean; the warmth read only while `sigma` is above 0."""
+        if not self._begin(BUOYANCY, faces, cells, obstacle, closed, has_obstacles):
+            return
+        self.bind_texture_3d(5, temperature, 'uTemperature')
+        self.bind_texture_3d(6, density, 'uDensity')
+        glUniform1f(self.get_uniform_loc('uSigma'), sigma)
+        glUniform1f(self.get_uniform_loc('uKappa'), kappa)
+        glUniform3f(self.get_uniform_loc('uGravity'), *gravity)
         glUniform1f(self.get_uniform_loc('uStrength'), strength)
         self._dispatch()
 

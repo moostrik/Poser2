@@ -173,7 +173,8 @@ class Fluid3D:
         self._curl_vol: Texture3D = Texture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         self._more_curls: list[Texture3D] = [Texture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
                                              for _ in range(VorticityForce3D.MAX_CONFINEMENTS - 1)]
-        self._buoyancy_force_vol: Texture3D = Texture3D()
+        self._buoyancy_force_vol: Texture3D = Texture3D()       # the buoyancy at the cells, for its monitor
+        self._buoyancy_shown: bool = False      # a monitor read the buoyancy since the last step
         self._vorticity_force_vol: Texture3D = Texture3D()     # the confinements' force × dt at the cells
 
         # ---- 2D composited output (for downstream render layers) ----
@@ -473,12 +474,6 @@ class Fluid3D:
 
     # ========== Pipeline Steps ==========
 
-    def _add_force_to_velocity(self, force: Texture3D, strength: float = 1.0) -> None:
-        """A force at the cells (widths/s²) × `strength` added to the faces, each its two cells' mean."""
-        self._add_to_faces_shader.add_force(self._faces.volume, force, strength, self._obstacle, self._closed,
-                                            self._has_obstacles)
-        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
-
     def _advect_field(self, field: SwapTexture3D, scratch: Texture3D, velocity: Texture3D, advection: Advection,
                       step: float, dissipation: float, internal_format: int,
                       evaporation: float = 0.0, evaporation_knee: float = 0.1, measure: int = 0, guard: str = '',
@@ -619,30 +614,32 @@ class Fluid3D:
         like every body force (Fedkiw 2001).
 
         Dense density sinks along gravity (`density.sink`); warm water rises against it (`temperature.buoyancy`,
-        while the temperature runs). The pass runs while either is above 0; gravity is `input`'s.
+        while the temperature runs). The pass runs while either is above 0 and gravity, `input`'s, is not 0: one
+        dispatch adds it straight to the faces; the force at the cells is made only for its monitor.
         """
-        lift: float = self.settings.temperature.buoyancy if self._temperature_runs else 0.0
+        shown: bool = self._buoyancy_shown
+        self._buoyancy_shown = False
+        sigma: float = self.settings.temperature.buoyancy if self._temperature_runs else 0.0
         kappa: float = self.settings.density.sink
-        if lift <= 0.0 and kappa <= 0.0:
+        input = self.settings.input
+        gravity: tuple[float, float, float] = (input.gravity_x, input.gravity_y, input.gravity_z)
+        if (sigma <= 0.0 and kappa <= 0.0) or gravity == (0.0, 0.0, 0.0):
             return
 
-        sigma = lift
-        input = self.settings.input
-        gravity = (input.gravity_x, input.gravity_y, input.gravity_z)
-
         weight: Texture3D | None = self._density.weight
-        self._buoyancy_shader.use(
-            self._temperature,
-            weight if weight is not None else self._no_density,
-            self._obstacle,
-            self._buoyancy_force_vol,
-            sigma, kappa,
-            gravity=gravity,
-            has_obstacles=self._has_obstacles
-        )
-        glMemoryBarrier(_BARRIER_IMAGE)
+        density: Texture3D = weight if weight is not None else self._no_density
+        self._add_to_faces_shader.add_buoyancy(self._faces.volume, self._cells, self._temperature, density,
+                                               sigma, kappa, gravity, self._dt,
+                                               self._obstacle, self._closed, self._has_obstacles)
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+        if shown:
+            self._buoyancy_shader.use(self._temperature, density, self._obstacle, self._buoyancy_force_vol,
+                                      sigma, kappa, gravity=gravity, has_obstacles=self._has_obstacles)
+            glMemoryBarrier(_BARRIER_IMAGE)
 
-        self._add_force_to_velocity(self._buoyancy_force_vol, self._dt)
+    def _show_buoyancy(self) -> None:
+        """A monitor reads the buoyancy: the next step makes it at the cells."""
+        self._buoyancy_shown = True
 
     def _enforce_incompressibility(self) -> None:
         """Pressure projection (divergence → Jacobi solve → gradient subtraction), the three passes on one set
@@ -1116,7 +1113,8 @@ class Fluid3D:
                 'velocity_faces': volume(self._faces.volume, TextureKind.VELOCITY),
                 'vorticity': volume(self._curl_vol, TextureKind.VELOCITY),
                 'temperature': volume(self._temperature, TextureKind.SCALAR),
-                'buoyancy': volume(self._buoyancy_force_vol, TextureKind.ACCELERATION),
+                'buoyancy': Port(self._buoyancy_force_vol, TextureKind.ACCELERATION, extent, self._show_buoyancy,
+                                 light=light),
                 'expansion': volume(self._expansion_vol, TextureKind.SCALAR),
                 'divergence': volume(self._divergence_vol, TextureKind.SCALAR),
                 'pressure': volume(self._pressure, TextureKind.SCALAR),

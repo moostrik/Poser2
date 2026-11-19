@@ -8,6 +8,8 @@ negative). One buoyancy pass, then one projection. It prints:
 - the force at the cells against the textbook's, gravity × (sink × amount − buoyancy × warmth): its largest
   error over every cell for the warmth, which is on the force's grid; for the density, on its own grid and read
   by uv, over the cells two density texels or more inside or outside the sphere's surface;
+- the faces the one buoyancy pass makes against those the force at the cells makes, added in a second pass (the
+  force held at half precision there): their largest difference;
 - the water's velocity at the sphere's middle (its cells within half the radius) along gravity, after the
   projection, over the force × dt it was given: a sphere in still water takes 2/3 of it, the rest pushing the
   water around it (its added mass, half its own) **(deduction)**; once at the preset's `pressure.cycles` and once
@@ -78,6 +80,22 @@ def box_of(fluid: Fluid3D) -> tuple[float, float, float]:
     return (1.0, 1.0 / fluid._aspect, fluid._z_extent)
 
 
+def one_pass(fluid: Fluid3D) -> tuple[np.ndarray, float]:
+    """The force at the cells (xyz), its monitor's, and the largest difference of the faces the one buoyancy pass
+    makes from the faces the force at the cells makes, added in a second pass as `add_force` does, from rest."""
+    fluid._faces.clear()
+    shown = fluid.ports['buoyancy'].prepare
+    assert shown is not None
+    shown()                                 # as its monitor: the force at the cells made too
+    fluid._apply_buoyancy()
+    faces = read(fluid._faces.volume)
+    fluid._faces.clear()
+    fluid._add_to_faces_shader.add_force(fluid._faces.volume, fluid._buoyancy_force_vol, fluid._dt, fluid._obstacle,
+                                         fluid._closed, fluid._has_obstacles)
+    two_pass = read(fluid._faces.volume)
+    return read(fluid._buoyancy_force_vol)[..., :3], float(np.abs(faces - two_pass).max())
+
+
 def first_step(fluid: Fluid3D, inside: np.ndarray, expected: float) -> float:
     """The projection's share of the force × dt the sphere's middle keeps along gravity, the faces at rest
     before the buoyancy."""
@@ -100,8 +118,7 @@ def warm(args, overrides: list[str]) -> None:
         r = distance(cells, box_of(fluid))
         warmth = np.where(r < args.radius, args.warmth, 0.0)
         upload(fluid._temperature, warmth)
-        fluid._apply_buoyancy()
-        force = read(fluid._buoyancy_force_vol)[..., :3]
+        force, faces_error = one_pass(fluid)
         t = fluid.settings.input
         gravity = np.array((t.gravity_x, t.gravity_y, t.gravity_z))
         textbook = -args.buoyancy * warmth[..., None] * gravity
@@ -109,6 +126,7 @@ def warm(args, overrides: list[str]) -> None:
         expected = -args.buoyancy * args.warmth
         print(f'warm    force  textbook {expected:+.4f} widths/s² along gravity  largest error {error:.2e} '
               f'over {force.shape[0] * force.shape[1] * force.shape[2]} cells', flush=True)
+        print(f'warm    faces  one pass against two  largest difference {faces_error:.2e} widths/s', flush=True)
         middle = r < 0.5 * args.radius
         cycles = fluid.settings.pressure.cycles
         for c in (cycles, args.cycles):
@@ -134,8 +152,7 @@ def dense(args, color_space: str, overrides: list[str]) -> None:
             values[..., i] = c * amount
         values[..., 3] = amount
         upload(density, values)
-        fluid._apply_buoyancy()
-        force = read(fluid._buoyancy_force_vol)[..., :3]
+        force, faces_error = one_pass(fluid)
         t = fluid.settings.input
         gravity = np.array((t.gravity_x, t.gravity_y, t.gravity_z))
         r = distance(fluid._cells, box)
@@ -147,6 +164,8 @@ def dense(args, color_space: str, overrides: list[str]) -> None:
         expected = args.sink * args.amount
         print(f'dense   {color_space:<5}  force  textbook {expected:+.4f} widths/s² along gravity  largest error '
               f'{error:.2e} over {int(kept.sum())} cells', flush=True)
+        print(f'dense   {color_space:<5}  faces  one pass against two  largest difference {faces_error:.2e} widths/s',
+              flush=True)
         middle = r < 0.5 * args.radius
         cycles = fluid.settings.pressure.cycles
         for c in (cycles, args.cycles):

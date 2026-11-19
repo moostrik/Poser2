@@ -105,17 +105,14 @@ cooling toward the room's. Built (2026-11-18): the order, the density's weight b
 the room's, the warmth from the motion alone; checked in the GPU harness ([FLUID_3D.md](FLUID_3D.md#the-buoyancy)).
 Built (2026-11-18): gravity under `input`, the sink the density's, the temperature carried as the density is; an
 `enabled` in every fluid step that can be off, a step running while enabled and its strength above 0.
+Built (2026-11-19): the buoyancy in one pass, `AddToFaces3D`'s buoyancy mode, the warmth read only while the lift
+is on, skipped at gravity 0 too, the force at the cells only for its monitor.
 
 - **E6.** Checked in the app, in its own panel: what the temperature does to the water and whether it works,
   with `buoyancy` above 0.
-- **E9.** The buoyancy in one pass. Now `Buoyancy3D` writes the force at the cells into an RGBA16F volume (about
-  75 MB at 288 × 512 × 64) and `AddToFaces3D.add_force` reads it back into the faces: two dispatches, the warmth
-  read with the lift at 0. A buoyancy mode in `AddToFaces3D` adds gravity × (sink × amount − buoyancy × warmth)
-  straight to each face, its two cells' mean × dt, the sum `add_force` makes now; the warmth read only while the
-  lift is on; `Buoyancy3D`'s volume made only while the `buoyancy` monitor shows. Skipped when the sink and the lift
-  are both 0, or gravity is (0, 0, 0) **(deduction: the force is 0 there, and the pass runs today)**. The settings,
-  names and look unchanged. Checked by the unit tests, the GPU harness (`scripts/buoyancy_check.py`, the faces
-  equal to today's), and a timing before and after, both with the operator away from the PC.
+- **E9.** The one-pass buoyancy checked, with the operator away from the PC: `scripts/buoyancy_check.py` (the
+  force and the first step as in FLUID_3D.md's table, the faces one pass against two within the force's half
+  precision), and `scripts/fluid_pass_check.py`'s buoyancy against its 0.152 ms of 18 November.
 
 ## F. The 3D fluid's look at 4K
 
@@ -219,6 +216,6 @@ The cameras:
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
 - Ask to measure a time again when its pass's code or size changes: D6, E9.
-- Prefer as few GL calls and state switches as possible; shaders get checked in a GPU harness: E9.
+- Shaders get checked in a GPU harness: E9.
 
 Not designed yet, so their rules are not named: C3, F1, F2, H1.

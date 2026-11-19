@@ -92,7 +92,7 @@ def main() -> None:
         ('viscosity, 20 iterations', fluid._apply_viscosity, 16.0 * faces * iterations / 5),
         ('vorticity: curl, force, add', fluid._confine_vorticity, 8.0 * faces + 8.0 * cells * 4 + 16.0 * faces),
         ('advect temperature', fluid._advect_temperature, (2.0 + 8.0 + 2.0) * cells),
-        ('buoyancy', fluid._apply_buoyancy, (2.0 + 8.0 + 8.0) * cells + 8.0 * cells + 16.0 * faces),
+        ('buoyancy', fluid._apply_buoyancy, (2.0 + 8.0) * cells + 16.0 * faces),
         ('pressure', fluid._enforce_incompressibility, 0.0),
         ('faces to centers', fluid._faces_to_centers, 8.0 * faces + 8.0 * cells),
         ('density', fluid._advect_density, (8.0 + 8.0 + 8.0) * cells + 4.0 * fine),

@@ -63,8 +63,8 @@ them, from 7 November, the preset then, its grid
 | the frame                 | `Render interval`              | 14.25 / 30.79, 70 fps | 12.36 / 22.56, 81 fps | 12.22 / 22.91, 82 fps | 17.93 / 25.34, 56 fps | 13.29 / 18.50, 75 fps  |
 
 On 19 November the step's 11.08 against 9.71 is the viscosity's 1.22 and the buoyancy timer's 0.34; without them
-it is 9.5, its other passes as on 16 November. The buoyancy timer reads 0.34 at the preset's `buoyancy` 0, not
-looked into. The pose model (`Pose Estimation`) takes 27.88 / 41.78 in this run, 19.5 to 20.4 / 32.6 in four
+it is 9.5, its other passes as on 16 November. The buoyancy timer reads 0.34 at the preset's `buoyancy` 0: its
+`density.sink` 1 runs the pass (the code: `Fluid3D._apply_buoyancy`), the pass then in two dispatches. The pose model (`Pose Estimation`) takes 27.88 / 41.78 in this run, 19.5 to 20.4 / 32.6 in four
 deep_flow runs the same morning at the same preset; no code it runs changed between them, so the GPU it shares
 with the fluid **(deduction)**.
 
