@@ -35,8 +35,11 @@ models share; each model has its package; the inference frame and its sync, whic
 ## From the frame to the model
 
 No thread waits for the GPU between the upload, the crop and the model. Each step queues its work on its own stream
-behind an event of the step before, and hands its results on with an event of its own, which every reader waits on
-(`Stream.wait_event`) before it reads; a tensor read on a stream other than the one that made it is marked there
+behind an event of the step before, and hands its results on with an event of its own, which every reader in the
+package waits on (`Stream.wait_event`) before it reads. A reader outside the package gets its items finished: a GL
+reader cannot wait for a CUDA event on the GPU, its PBO copy's unmap would hold the GL thread instead
+(`modules/gl/tensor.py`, `_update_with_pbo`). A producer with readers on both sides calls the ones in the package
+first, then waits for its stream and calls its finished callbacks, so none in the package waits for it; a tensor read on a stream other than the one that made it is marked there
 (`record_stream`), so the cache does not hand its memory out again before that stream has run. PyTorch's streams run
 in any order unless they are synchronized so
 **(site fact: [CUDA streams](https://docs.pytorch.org/docs/stable/notes/cuda.html#cuda-streams))**.
