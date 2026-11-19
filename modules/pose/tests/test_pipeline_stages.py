@@ -68,9 +68,9 @@ class _Source:
     def add_frames_callback(self, callback) -> None:
         self._callbacks.append(callback)
 
-    def emit(self, frames: FrameDict, images: object = None) -> None:
+    def emit(self, frames: FrameDict, cam_timestamps: dict[int, float] | None = None) -> None:
         for callback in self._callbacks:
-            callback(frames, images)
+            callback(frames, cam_timestamps)
 
 
 class _Settings:

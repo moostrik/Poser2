@@ -3,8 +3,8 @@
 A ``PipelineSpec`` is plain data: node classes with their settings objects, built node instances for the
 steps that are made once, and the sources the app owns. ``PosePipeline`` turns it into callback chains at
 startup. Every stage belongs to a clock domain: the frame domain runs on the camera's frame bang (the
-source pushes poses with the images they are for, the async step is handed those images and emits on its
-thread), an output domain runs on the consumer's tick
+source pushes poses with the capture times of the images they are for, the async step is handed those and emits on
+its thread), an output domain runs on the consumer's tick
 (``PosePipeline.update``). The interpolators of a stage are the one crossing from the frame domain to an
 output domain; a tick source joins at a stage the tick drives. A stage emits its poses and a group record
 (``GroupRecord``): the per-pose steps and the group steps stamp the poses, the group steps write the record.
@@ -21,8 +21,9 @@ from ..frame import FrameDict, FrameDictCallback
 from ..nodes import FilterNode, GroupNode, InterpolatorNode
 from ..window import WindowNodeSettings
 
-# A frame source's poses with the images they are for: the pipeline carries the images, unread, to the async step
-SourceFramesCallback: TypeAlias = Callable[[FrameDict, Any], None]
+# A frame source's poses with the capture times, by cam_id, of the images they are for: the pipeline carries them to
+# the async step
+SourceFramesCallback: TypeAlias = Callable[[FrameDict, dict[int, float]], None]
 
 
 class Domain(IntEnum):
@@ -32,8 +33,8 @@ class Domain(IntEnum):
 
 @runtime_checkable
 class FrameSource(Protocol):
-    """A source that pushes poses in the frame domain (``TrackerFrameSource``), each push with the images its poses
-    are for."""
+    """A source that pushes poses in the frame domain (``TrackerFrameSource``), each push with the capture times of
+    the images its poses are for."""
 
     @property
     def track_ids(self) -> list[int]:
@@ -64,9 +65,9 @@ class TickSource(Protocol):
 
 @runtime_checkable
 class AsyncInput(Protocol):
-    """Where an async step's frames go in, with the images the source pushed with the poses (the crop step)."""
+    """Where an async step's frames go in, with the capture times the source pushed with the poses (the crop step)."""
 
-    def submit(self, frames: FrameDict, images: Any) -> None: ...
+    def submit(self, frames: FrameDict, cam_timestamps: dict[int, float] | None) -> None: ...
 
 
 @runtime_checkable

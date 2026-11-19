@@ -9,9 +9,9 @@ run on the caller's thread, the steps after it on the split's own thread (the no
 dropped. The stage's synchronous steps
 are timed as ``Pose <stage>``; the crossing's ``InterpolatorTracker`` as ``Pose interpolate``.
 
-A frame source pushes its poses with the images they are for; the stage's chain carries them, unread, to its
-async step (its ``AsyncInput.submit(frames, images)``), and a stage's other entries (a reading stage, the tick) carry
-none. The group record travels with the poses: a source's stage starts a fresh one on every push, a stage that reads
+A frame source pushes its poses with the capture times of the images they are for, by cam_id; the stage's chain
+carries them to its async step (its ``AsyncInput.submit(frames, cam_timestamps)``), and a stage's other entries (a
+reading stage, the tick) carry none. The group record travels with the poses: a source's stage starts a fresh one on every push, a stage that reads
 another gets that stage's record, and the latest record is held across an async step and across the crossing,
 where the tick re-stamps it. Frames leave a stage in one order: the app's callbacks (board, recorders, OSC),
 the record's, then the stage's window tracker, then the stages that read it. ``update(domain, now)`` drives the
@@ -26,7 +26,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from threading import Condition, Thread
 from time import perf_counter
-from typing import Any, Callable
+from typing import Callable
 
 from modules.utils import Broadcast, PerformanceTimer
 
@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 WAITING: int = 4        # an async step's results waiting for the steps after it
 
 StageFunction = Callable[[FrameDict, GroupRecord], tuple[FrameDict, GroupRecord]]
-StageCallback = Callable[..., None]     # (frames, group, images=None): the images reach the async step, else none
+StageCallback = Callable[..., None]     # (frames, group, cam_timestamps=None): they reach the async step, else none
 
 
 def _stage_name(stage: int) -> str:
@@ -113,9 +113,9 @@ class _AsyncSplit:
             self._thread.join(timeout=2.0)
             self._thread = None
 
-    def submit(self, frames: FrameDict, group: GroupRecord, images: Any = None) -> None:
+    def submit(self, frames: FrameDict, group: GroupRecord, cam_timestamps: dict[int, float] | None = None) -> None:
         self._group = group
-        self._input.submit(frames, images)
+        self._input.submit(frames, cam_timestamps)
 
     def _emitted(self, frames: FrameDict) -> None:
         """The node's frames, on its thread: queued for the split's thread, the oldest dropped beyond `WAITING`."""
@@ -280,9 +280,9 @@ class PosePipeline:
         stage.entry = self._chain(stage, track_ids)
 
         if frame_source is not None:
-            def push(frames: FrameDict, images: Any, stage: _Stage = stage) -> None:
+            def push(frames: FrameDict, cam_timestamps: dict[int, float], stage: _Stage = stage) -> None:
                 assert stage.entry is not None
-                stage.entry(frames, GroupRecord(timestamp=_stamp(frames, 0.0)), images)
+                stage.entry(frames, GroupRecord(timestamp=_stamp(frames, 0.0)), cam_timestamps)
             frame_source.add_frames_callback(push)
         elif input_stage is not None and not crossing:
             input_stage.readers.append(stage.entry)
@@ -364,7 +364,7 @@ class PosePipeline:
                 raise ValueError(f"pose stage {stage.name}: {step!r} is not a step")
         close_run()
 
-        def emit(frames: FrameDict, group: GroupRecord, images: Any = None) -> None:
+        def emit(frames: FrameDict, group: GroupRecord, cam_timestamps: dict[int, float] | None = None) -> None:
             stage.outputs(frames)
             stage.group_outputs(group)
             if stage.window is not None:
@@ -379,12 +379,12 @@ class PosePipeline:
             if not functions:
                 return then
 
-            def run_segment(frames: FrameDict, group: GroupRecord, images: Any = None) -> None:
+            def run_segment(frames: FrameDict, group: GroupRecord, cam_timestamps: dict[int, float] | None = None) -> None:
                 start = perf_counter()
                 for function in functions:
                     frames, group = function(frames, group)
                 timer.add_time((perf_counter() - start) * 1000.0, report=False)
-                then(frames, group, images)
+                then(frames, group, cam_timestamps)
             return run_segment
 
         then: StageCallback = segment(segments[-1], emit)

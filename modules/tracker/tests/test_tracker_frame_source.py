@@ -124,59 +124,69 @@ class TestFrameContents(TrackerFrameSourceCase):
 
 
 class TestThread(TrackerFrameSourceCase):
-    """`submit` queues a frame bang for the thread: its poses with its images."""
+    """`submit` queues a frame bang for the thread: its poses with its capture times."""
 
     def setUp(self) -> None:
         super().setUp()
-        self.order: list[tuple[str, str, object]] = []
-        self.poses.add_frames_callback(lambda frames, images: self.order.append(('poses', threading.current_thread().name, images)))
+        self.now: float = time.perf_counter()
+        self.order: list[tuple[str, str, float]] = []
+        self.poses.add_frames_callback(lambda frames, cam_timestamps: self.order.append(
+            ('poses', threading.current_thread().name, cam_timestamps[0] - self.now)))
         self.poses.set_tracklets({0: tracklet(0)})
 
     def tearDown(self) -> None:
         self.poses.stop()
+
+    def bang(self, offset: float) -> dict[int, float]:
+        """A set of one: camera 0's image captured `offset` seconds after the test began, which names the bang."""
+        return {0: self.now + offset}
 
     def wait_for(self, count: int) -> None:
         end: float = time.perf_counter() + 1.0
         while len(self.order) < count and time.perf_counter() < end:
             time.sleep(0.001)
 
-    def test_a_bang_runs_on_the_thread_with_its_images(self) -> None:
+    def offsets(self) -> list[float]:
+        return [round(offset, 3) for kind, _, offset in self.order if kind == 'poses']
+
+    def test_a_bang_runs_on_the_thread_with_its_capture_times(self) -> None:
         self.poses.start()
-        self.poses.submit(camera_0_now(), 'images 1')
+        self.poses.submit(self.bang(0.001))
         self.wait_for(1)
-        self.assertEqual(self.order, [('poses', 'TrackerFrameSource', 'images 1')])
+        self.assertEqual([(kind, thread) for kind, thread, _ in self.order], [('poses', 'TrackerFrameSource')])
+        self.assertEqual(self.offsets(), [0.001])
 
     def test_beyond_two_waiting_the_oldest_is_dropped_and_counted(self) -> None:
         release: threading.Event = threading.Event()
         held: threading.Event = threading.Event()
 
-        def hold(frames: object, images: object) -> None:
-            if images == 'first':
+        def hold(frames: object, cam_timestamps: dict[int, float]) -> None:
+            if round(cam_timestamps[0] - self.now, 3) == 0.001:
                 held.set()
                 release.wait(2.0)
         self.poses.add_frames_callback(hold)
         self.poses.start()
-        self.poses.submit(camera_0_now(), 'first')
+        self.poses.submit(self.bang(0.001))
         self.assertTrue(held.wait(1.0))                     # the thread is held: what comes now waits
-        for name in ('a', 'b', 'c'):
-            self.poses.submit(camera_0_now(), name)
+        for offset in (0.002, 0.003, 0.004):
+            self.poses.submit(self.bang(offset))
         release.set()
         self.wait_for(3)
-        self.assertEqual([images for kind, _, images in self.order if kind == 'poses'], ['first', 'b', 'c'])
+        self.assertEqual(self.offsets(), [0.001, 0.003, 0.004])
         self.assertEqual(self.settings.dropped, 1)
 
     def test_a_bang_before_start_is_an_error_and_one_after_stop_is_dropped(self) -> None:
         with self.assertRaises(RuntimeError):
-            self.poses.submit(camera_0_now(), 'early')
+            self.poses.submit(self.bang(0.001))
         self.poses.start()
         self.poses.stop()
-        self.poses.submit(camera_0_now(), 'late')
+        self.poses.submit(self.bang(0.002))
         self.assertEqual(self.order, [])
 
     def test_every_bang_goes_to_the_pipeline(self) -> None:
-        for name in ('a', 'b', 'c'):
-            self.poses.process(camera_0_now(), name)
-        self.assertEqual([images for kind, _, images in self.order if kind == 'poses'], ['a', 'b', 'c'])
+        for offset in (0.001, 0.002, 0.003):
+            self.poses.process(self.bang(offset))
+        self.assertEqual(self.offsets(), [0.001, 0.002, 0.003])
 
 
 if __name__ == '__main__':

@@ -1,7 +1,7 @@
 import logging
 import time
+from collections import deque
 from threading import Lock
-from typing import Any
 
 import torch
 import torch.nn.functional as F
@@ -14,12 +14,16 @@ from modules.utils import PerformanceTimer, Rect, Point2f
 logger = logging.getLogger(__name__)
 
 
+KEPT: int = 3      # snapshots kept: the frame source's waiting bangs (`TrackerFrameSource`'s WAITING) and the one it runs
+
+
 class CropExtractor:
     """The crop step: every pose's box cut out of the images it is for, at each size it is given, in one pass.
 
-    `submit` takes the poses with the `ImageSnapshot` they are for (an uploader's, carried by the frame source and the
-    pipeline) and cuts each pose's box from exactly those images, at every size (`CropExtractorSettings`: the pose
-    model's, and, where a segmentation runs, its own), from the one image and box; with `enable_prev_crop` the
+    `submit_snapshot` takes each `ImageSnapshot` from the uploader and keeps the last `KEPT`, by their capture times.
+    `submit` takes the poses with the capture times they are for (carried by the frame source and the pipeline),
+    finds the snapshot of those times and cuts each pose's box from exactly its images, at every size
+    (`CropExtractorSettings`: the pose model's, and, where a segmentation runs, its own), from the one image and box; with `enable_prev_crop` the
     previous image is cut at the same box too, for the optical flow. Each size's consumers get the poses with their
     crops (`add_image_callback`): the pose leaves with its crop as its box and the image's capture time as its stamp,
     so its keypoints, box and time all belong to the one image. The crops are queued on the crop stream, not waited
@@ -28,8 +32,8 @@ class CropExtractor:
     is waited for, only when a size that is cut has such a callback.
 
     A size is cut every `interval`-th submit and handed on only then. After the crops, each size's asked callbacks
-    hear, per camera in the snapshot, its capture time and the poses cut for its image: none on a submit the
-    interval passes, so a consumer that waits for the results knows none come.
+    hear, per camera in the capture times, its capture time and the poses cut for its image: none on a submit the
+    interval passes or whose snapshot is no longer kept, so a consumer that waits for the results knows none come.
 
     All tensors are float16 RGB CHW [0, 1].
     """
@@ -43,6 +47,8 @@ class CropExtractor:
         self._asked_callbacks: dict[int, list[AskedCallback]] = {id(size): [] for size in self._sizes}
         self._finished_callbacks: dict[int, list[ImageCallback]] = {id(size): [] for size in self._sizes}
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
+        self._snapshot_lock: Lock = Lock()              # the uploader's thread keeps them, the frame source's takes them
+        self._snapshots: deque[ImageSnapshot] = deque(maxlen=KEPT)
         self._finish_timer: PerformanceTimer = PerformanceTimer(name="Wait crops finished")
 
     def add_image_callback(self, callback: ImageCallback, size: CropExtractorSettings | None = None) -> None:
@@ -75,19 +81,37 @@ class CropExtractor:
             raise ValueError("CropExtractor: no crops at that size; it cuts the sizes it was made with")
         return key
 
-    def submit(self, frames: FrameDict, images: Any) -> None:
-        """Cut the poses' boxes from `images` (an `ImageSnapshot`) at every size whose turn it is and hand each size's
-        crops on, then tell each size's asked callbacks, on the caller's thread and without waiting for the GPU. Poses
-        without their images are an error: every frame source hands its images on."""
-        if not isinstance(images, tuple) or len(images) != 4:
-            raise ValueError("CropExtractor: poses came without the images they are for (an ImageSnapshot)")
-        snapshot: ImageSnapshot = images
-        current, previous, timestamps, ready = snapshot
+    def submit_snapshot(self, snapshot: ImageSnapshot) -> None:
+        """An uploader's snapshot (its snapshot callback), kept for the poses of its capture times; the oldest of
+        `KEPT` goes."""
+        with self._snapshot_lock:
+            self._snapshots.append(snapshot)
+
+    def _snapshot(self, cam_timestamps: dict[int, float]) -> ImageSnapshot | None:
+        with self._snapshot_lock:
+            for snapshot in reversed(self._snapshots):
+                if snapshot[2] == cam_timestamps:
+                    return snapshot
+        return None
+
+    def submit(self, frames: FrameDict, cam_timestamps: dict[int, float] | None) -> None:
+        """Cut the poses' boxes from the snapshot of `cam_timestamps` at every size whose turn it is and hand each
+        size's crops on, then tell each size's asked callbacks, on the caller's thread and without waiting for the GPU
+        unless a finished callback is due. A snapshot no longer kept is logged, and its poses are cut from nothing."""
+        if cam_timestamps is None:
+            raise ValueError("CropExtractor: poses came without the capture times they are for")
+        snapshot: ImageSnapshot | None = self._snapshot(cam_timestamps)
         due: list[CropExtractorSettings] = [size for size in self._sizes if self._submits % size.interval == 0]
         self._submits += 1
+        timestamps: dict[int, float] = cam_timestamps
+        if snapshot is None:
+            logger.warning("CropExtractor: the images of %s are no longer kept; their poses are not cut", cam_timestamps)
+            due = []
+        else:
+            current, previous, timestamps, ready = snapshot
         crops_ready: torch.cuda.Event = torch.cuda.Event()      # recorded after the last crop, before anyone reads one
         cut: dict[int, tuple[FrameDict, CropImageDict]] = {}
-        if due:
+        if due and snapshot is not None:
             with torch.cuda.stream(self._stream):
                 if ready is not None:
                     self._stream.wait_event(ready)

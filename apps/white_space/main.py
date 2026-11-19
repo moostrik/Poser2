@@ -16,7 +16,7 @@ from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, TrackerFrameSource
 from modules.pose import FrameDict, features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import pose, person, BatchUploader, CameraSync, CropExtractor, ImageSnapshot, SyncMessage, frame_poses, has_points
+from modules.inference import pose, person, BatchUploader, CameraSync, CropExtractor, SyncMessage, frame_poses, has_points
 from modules.session import Session
 
 from .board import RenderBoard
@@ -144,7 +144,8 @@ class WhiteSpaceMain:
         if self.person_detector is not None:
             self.uploader.add_gpu_image_callback(self.person_detector.submit)
         self.uploader.add_finished_gpu_image_callback(self.board.set_camera_image)
-        self.uploader.add_snapshot_callback(self._on_snapshot)
+        self.uploader.add_snapshot_callback(self.crops.submit_snapshot)
+        self.uploader.add_capture_callback(self.frame_source.submit)
 
         # DIAGNOSIS — a subscribe-only journal of the tracker's inputs, observations and emitted
         # primaries (JSONL under data/diagnosis), for dissecting identity incidents offline.
@@ -161,7 +162,8 @@ class WhiteSpaceMain:
         self.crops.add_finished_image_callback(lambda _f, gpu: self.board.set_crop_images(gpu))
 
         # POSE PIPELINE — the stages are declared in pose/pipeline.py. Each uploaded set drives the frame domain
-        # through the tracklet poses (`_on_snapshot`); the light tick drives the output domain (LERP, where the dummy joins).
+        # through the tracklet poses (the uploader's capture times);
+        # the light tick drives the output domain (LERP, where the dummy joins).
         # Every stage's frames and group record go to the board, which also reads each stage's window; the sound
         # reads LERP, and so do the instrument and the state machine (the group sync on the LERP record).
         self.pipeline = PosePipeline(pipeline_spec(ps, self.settings.light, self.frame_source, self.crops, self.pose_estimator,
@@ -255,11 +257,6 @@ class WhiteSpaceMain:
     def _on_sound_level_right(self, level: float = 0.0, *_rest: object) -> None:
         """OSC callback for /WS/idle/blue/right — store the Max soundscape's right level."""
         self.board.set_sound_level_right(float(level))
-
-    def _on_snapshot(self, snapshot: ImageSnapshot) -> None:
-        """An uploaded set, on the uploader's thread: the frame source's bang for it, each player judged on its own
-        camera's capture time, with exactly those images for the crop."""
-        self.frame_source.submit(snapshot[2], snapshot)
 
     def _on_tracklet_set(self, items: dict[int, SyncMessage]) -> None:
         """A set of the cameras' tracklet messages, on the tracklets' sync's thread: the tracker's update, at the newest

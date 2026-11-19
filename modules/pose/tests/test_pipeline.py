@@ -23,7 +23,7 @@ class S(IntEnum):
 
 
 class _Source:
-    """A frame source: pushes what it is given, with the images it is for, to the stage that reads it."""
+    """A frame source: pushes what it is given, with the capture times it is for, to the stage that reads it."""
 
     def __init__(self, track_ids: list[int]) -> None:
         self.track_ids = track_ids
@@ -32,9 +32,9 @@ class _Source:
     def add_frames_callback(self, callback) -> None:
         self._callbacks.append(callback)
 
-    def emit(self, frames: FrameDict, images: object = None) -> None:
+    def emit(self, frames: FrameDict, cam_timestamps: dict[int, float] | None = None) -> None:
         for callback in self._callbacks:
-            callback(frames, images)
+            callback(frames, cam_timestamps)
 
 
 class _TickSource:
@@ -62,12 +62,12 @@ class _Async:
 
     def __init__(self) -> None:
         self.submitted: list[FrameDict] = []
-        self.images: list[object] = []
+        self.cam_timestamps: list[dict[int, float] | None] = []
         self._callbacks: list = []
 
-    def submit(self, frames: FrameDict, images: object) -> None:
+    def submit(self, frames: FrameDict, cam_timestamps: dict[int, float] | None) -> None:
         self.submitted.append(frames)
-        self.images.append(images)
+        self.cam_timestamps.append(cam_timestamps)
 
     def add_frames_callback(self, callback) -> None:
         self._callbacks.append(callback)
@@ -235,15 +235,15 @@ class BuildTest(unittest.TestCase):
         finally:
             pipeline.stop()
 
-    def test_the_images_a_source_pushes_reach_the_async_step_with_their_poses(self) -> None:
+    def test_the_capture_times_a_source_pushes_reach_the_async_step_with_their_poses(self) -> None:
         source = _Source([0])
         node = _Async()
         PosePipeline(PipelineSpec([
             StageSpec(S.RAW, source, [PoseStep(_Tag, 'before', []), AsyncStep(node, node)]),
         ]))
-        images: object = object()
-        source.emit(_frames(0), images)
-        self.assertIs(node.images[0], images)
+        cam_timestamps: dict[int, float] = {0: 1.5}
+        source.emit(_frames(0), cam_timestamps)
+        self.assertIs(node.cam_timestamps[0], cam_timestamps)
 
     def test_the_tick_enters_at_the_crossing_and_polls_the_sources(self) -> None:
         source = _Source([0, 1])

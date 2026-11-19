@@ -47,8 +47,9 @@ in any order unless they are synchronized so
   stream and hands the images and the depth on written (`add_finished_gpu_image_callback`,
   `add_finished_gpu_depth_callback`), only when such a callback is registered. The readers in the package are queued
   before that wait, so none of them waits for it.
-- The crop step takes the poses with the snapshot they are for and cuts from exactly those images, never a newer
-  one, at each size it was made with (the pose model's, and where a segmentation runs, its own), from one box per
+- The crop step keeps the uploader's last snapshots (`submit_snapshot`), takes the poses with the capture times
+  they are for, which the frame source and the pose pipeline carry without the images, and cuts from exactly the
+  images of those times, never a newer one, at each size it was made with (the pose model's, and where a segmentation runs, its own), from one box per
   player. All sizes share one `crops_ready` event; each size has its own callbacks, and its finished callbacks
   for readers outside the package, called after the crop stream has run. It cuts the RAW stage's smoothed
   and predicted box, so it runs after that stage, on the frame source's thread, not in the upload. A size is cut

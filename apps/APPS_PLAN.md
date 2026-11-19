@@ -30,7 +30,7 @@ CUDA launches, which block while the GPU's queue is full, and that grows with th
 set is one, and both cost one round after the last camera's frame, so the latency is about equal and the upload's
 load about a quarter.
 
-The frame source's call already takes a set (`TrackerFrameSource.submit(cam_times, images)`, each player judged on
+The frame source's call already takes a set (`TrackerFrameSource.submit(cam_timestamps)`, each player judged on
 its own camera's capture time, the poses asked told per camera).
 
 The core is built (`ImageUpload`, for one frame or a stack of one size), deep_flow's `SerialUploader` uses it and

@@ -17,7 +17,7 @@ from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, TrackerFrameSource
 from modules.pose import configure_features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import optical_flow, pose, person, CropExtractor, GpuDepth, GpuImage, ImageSnapshot, has_points, RecordedPoses, Depth, InferenceFrame, InferenceFrameSync, Poses, SerialUploader, frame_poses
+from modules.inference import optical_flow, pose, person, CropExtractor, GpuDepth, GpuImage, has_points, RecordedPoses, Depth, InferenceFrame, InferenceFrameSync, Poses, SerialUploader, frame_poses
 from modules.pose import FrameDict
 from modules.utils import FPS, PerformanceTimer
 
@@ -129,7 +129,8 @@ class DeepFlowMain:
         self.crops.add_image_callback(self.optical_flow_estimator.submit)
 
         # POSE PIPELINE — the stages are declared in pose/pipeline.py. Each uploaded image drives the frame domain
-        # through the tracklet poses (`_on_snapshot`); the render tick drives the output domain (LERP). Every stage's frames
+        # through the tracklet poses (the uploader's capture times);
+        # the render tick drives the output domain (LERP). Every stage's frames
         # go to the board and the sound; the board also reads each stage's window.
         self.pipeline = PosePipeline(pipeline_spec(p, self.frame_source, self.crops, poses))
         for stage in Stage:
@@ -148,7 +149,8 @@ class DeepFlowMain:
         self.uploader.add_finished_gpu_image_callback(self.inference_frame_sync.submit_image)
         self.uploader.add_finished_gpu_image_callback(self.board.set_camera_image)
         self.uploader.add_finished_gpu_image_callback(self._on_image)
-        self.uploader.add_snapshot_callback(self._on_snapshot)
+        self.uploader.add_snapshot_callback(self.crops.submit_snapshot)
+        self.uploader.add_capture_callback(self.frame_source.submit)
         self.uploader.add_finished_gpu_depth_callback(self._on_depth)
 
         # INFERENCE FRAME SYNC — each uploaded image, its depth and its SMOOTH poses, as one frame on the board
@@ -202,12 +204,6 @@ class DeepFlowMain:
 
         self.is_running = True
         self.render.start()
-
-    def _on_snapshot(self, snapshot: ImageSnapshot) -> None:
-        """An uploaded image as a set of one, on the uploader's thread: the frame source's bang for it, with exactly
-        those images for the crop. With one camera every image is a round, so the frame domain runs on each, at the
-        image's capture time."""
-        self.frame_source.submit(snapshot[2], snapshot)
 
     def _on_image(self, image: GpuImage) -> None:
         """An uploaded image, on the uploader's thread: the camera's interval."""

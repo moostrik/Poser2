@@ -1,12 +1,12 @@
 """TrackerFrameSource: the pose pipeline's frame source fed by the tracker, a pose per player from the tracker's
 newest boxes, at each frame bang.
 
-A frame bang is a set: each camera's capture time in it (`cam_times`, one camera's for a set of one) with the
-images of that moment. `submit(cam_times, images)` queues it for this one's own thread and returns: at most
+A frame bang is a set: each camera's capture time in it (`cam_timestamps`, one camera's for a set of one).
+`submit(cam_timestamps)` queues it for this one's own thread and returns: at most
 `WAITING` wait, beyond that the oldest is dropped, counted as `dropped`. The thread makes the poses (`process`): a
 player is posed when its camera is in the set and its last detection is within `detection_timeout` of that camera's
-capture time. It hands them with the images to the frames callbacks (the pipeline's push, which carries the images
-to the crop), every bang. The images are carried, never read: the tracker does not know the GPU's. A bang before
+capture time. It hands them with the capture times to the frames callbacks (the pipeline's push, which carries them
+to the crop, where they find the images), every bang. A bang before
 `start` is an error; one after `stop` is dropped."""
 
 import logging
@@ -14,7 +14,6 @@ import math
 import time
 from collections import deque
 from threading import Condition, Lock, Thread
-from typing import Any
 
 import numpy as np
 
@@ -69,10 +68,10 @@ class TrackerFrameSource(Thread):
         }
         self._lock = Lock()
         self._batch_id_counter = 0
-        # The bangs waiting for the thread: (cam_times, images, the moment it was queued)
+        # The bangs waiting for the thread: (cam_timestamps, the moment it was queued)
         self._wake: Condition = Condition()
         self._running: bool = False
-        self._bangs: deque[tuple[dict[int, float], Any, float]] = deque()
+        self._bangs: deque[tuple[dict[int, float], float]] = deque()
         self._dropped: int = 0
         self._wait: PerformanceTimer = PerformanceTimer(name="Wait pose step")
         self._stopped: bool = False
@@ -80,7 +79,7 @@ class TrackerFrameSource(Thread):
         self._frames_callbacks: list[SourceFramesCallback] = []     # run in registration order
 
     def add_frames_callback(self, callback: SourceFramesCallback) -> None:
-        """Each bang's poses with the images they are for (the pipeline's push)."""
+        """Each bang's poses with its capture times (the pipeline's push)."""
         with self._callback_lock:
             if callback not in self._frames_callbacks:
                 self._frames_callbacks.append(callback)
@@ -112,16 +111,16 @@ class TrackerFrameSource(Thread):
                     self._wake.wait()
                 if not self._running:
                     return
-                cam_times, images, queued = self._bangs.popleft()
+                cam_timestamps, queued = self._bangs.popleft()
             self._wait.add_time((time.perf_counter() - queued) * 1000.0, report=False)
             try:
-                self.process(cam_times, images)
+                self.process(cam_timestamps)
             except Exception:
                 logger.exception("TrackerFrameSource: a frame bang failed")
 
-    def submit(self, cam_times: dict[int, float], images: Any) -> None:
-        """A frame bang: each camera's capture time in the set, with the images of that moment the crop is to cut
-        (an uploader's `ImageSnapshot`), queued for the thread, the oldest dropped beyond `WAITING`."""
+    def submit(self, cam_timestamps: dict[int, float]) -> None:
+        """A frame bang: each camera's capture time in the set (an uploader's capture callback), queued for the
+        thread, the oldest dropped beyond `WAITING`."""
         dropped: int | None = None
         with self._wake:
             if not self._running:
@@ -132,7 +131,7 @@ class TrackerFrameSource(Thread):
                 self._bangs.popleft()
                 self._dropped += 1
                 dropped = self._dropped
-            self._bangs.append((dict(cam_times), images, time.perf_counter()))
+            self._bangs.append((dict(cam_timestamps), time.perf_counter()))
             self._wake.notify()
         if dropped is not None:
             self.settings.dropped = dropped
@@ -162,9 +161,10 @@ class TrackerFrameSource(Thread):
                 else:
                     self._tracklets[track_id] = None
 
-    def process(self, cam_times: dict[int, float], images: Any = None) -> FrameDict:
-        """Generate poses from all ready tracklets and hand them, with `images`, to the frames callbacks. A player is
-        posed when its camera is in `cam_times`, and its latched box's age is judged on that camera's capture time.
+    def process(self, cam_timestamps: dict[int, float]) -> FrameDict:
+        """Generate poses from all ready tracklets and hand them, with `cam_timestamps`, to the frames callbacks. A
+        player is posed when its camera is in `cam_timestamps`, and its latched box's age is judged on that camera's
+        capture time.
 
         Returns:
             Dictionary of track_id -> Frame for tracks with valid tracklets
@@ -180,9 +180,9 @@ class TrackerFrameSource(Thread):
         detection_timeout: float = self.settings.detection_timeout
 
         for track_id, tracklet in tracklets_snapshot.items():
-            if tracklet is None or tracklet.cam_id not in cam_times:
+            if tracklet is None or tracklet.cam_id not in cam_timestamps:
                 continue                    # its camera has no image in this set to crop it from
-            if tracklet.is_expired(cam_times[tracklet.cam_id], detection_timeout):
+            if tracklet.is_expired(cam_timestamps[tracklet.cam_id], detection_timeout):
                 continue
 
             try:
@@ -215,7 +215,7 @@ class TrackerFrameSource(Thread):
             frames_callbacks: list[SourceFramesCallback] = list(self._frames_callbacks)
         for frames_callback in frames_callbacks:
             try:
-                frames_callback(generated_poses, images)
+                frames_callback(generated_poses, cam_timestamps)
             except Exception:
                 logger.exception("TrackerFrameSource: a frames callback failed")
 
