@@ -25,8 +25,6 @@ Latency is the first measure in both apps. The camera stays at 50 fps (the 50 Hz
 segmentation keep up with it (20 ms a frame), the pose at its interval (25 fps), the render with the flow at HD
 aims at 60 fps (16.7 ms); falling short is no blocker for now; the inference moves to the camera later, out of this plan. A step adds no frame of delay: the motion and the bridge run once per
 capture, the fluid once per tick, as in deep_flow. deep_flow's kernels are not changed by any step.
-superficial_flow's chain is timed once, when the plan is built, its rows in TIMING.md; that time sets the
-grid's size.
 
 The 2D fluid's grid is HD by default: 1080 × 1920 (9:16), half the output's 4K, so each cell holds 2 × 2 of the density's pixels; about 18 times the
 3D's 256 × 448 cells per layer. Its density is at the output's 2160 × 3840, carried by the grid's velocity, as
@@ -52,7 +50,6 @@ Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 | Step     | Check                                                                                               |
 |----------|-----------------------------------------------------------------------------------------------------|
 | D7       | GPU harness for each new kernel; -sim                                                               |
-| End      | the full suite once; the inference at 50 fps, the render at 60; deep_flow's times                |
 
 ## Rules it touches
 

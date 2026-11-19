@@ -1,8 +1,9 @@
 # The flow's timing
 
 The GPU time of every stage of the 3D flow in deep_flow, pass by pass, and the defaults it sets: the
-fluid's grid and the particles' count. The design of each stage is in [FLOW.md](FLOW.md) and
-[FLUID_3D.md](FLUID_3D.md); this document holds their cost. **(deduction)** marks what is inferred
+fluid's grid and the particles' count; and the 2D flow's chain in superficial_flow ([The 2D flow](#the-2d-flow)).
+The design of each stage is in [FLOW.md](FLOW.md), [FLUID_3D.md](FLUID_3D.md) and [FLUID_2D.md](FLUID_2D.md);
+this document holds their cost. **(deduction)** marks what is inferred
 from the numbers.
 
 ## The configuration
@@ -29,36 +30,43 @@ two render ticks; its fps is 1000 over its mean.
 
 ## The stages
 
-On 16 November, a time, at the preset as saved (commit fdf8f8de, the hands recording
+On 19 November, a time, at the preset as saved (commit c796999b, the hands recording, the pose model running,
+one run), the preset's viscosity on (0.001) since 16 November. On 16 November, a time, at the preset as saved (commit fdf8f8de, the hands recording
 `20261112-124918_hands`, the pose model running, one run): the view with its fill, the motion without the
 depth mask. On 15 November, the same recording and grid at commit 802de71c: the velocity's grid
 288 × 512 × 64, the density 448 × 800 × 64 with the fine density at 2160 × 3840 × 24, MacCormack. Beside
 them, from 7 November, the preset then, its grid
 448 × 800 × 64 with the density on the grid, and the default this document set, 256 × 448 × 128:
 
-| Stage                     | Timer                          | 16 Nov                | 15 Nov                | 7 Nov, 448 × 800 × 64 | 7 Nov, 256 × 448 × 128 |
-|---------------------------|--------------------------------|-----------------------|-----------------------|-----------------------|------------------------|
-| image upload              | `GPU Image Upload`             | 4.80 / 19.61          | 4.62 / 18.52          |                       |                        |
-| view                      | `GPU view`                     | 0.21 / 0.21           | 0.09 / 0.09           |                       |                        |
-| motion                    | `GPU motion`                   | 0.29 / 0.19           | 0.30 / 0.19           | 0.40 / 0.63           | 0.43 / 0.65            |
-| bridge, lowpass           | `GPU bridge lowpass`           | 0.05 / 0.05           | 0.05 / 0.05           | 0.08 / 0.08           | 0.09 / 0.08            |
-| bridge, bandpass          | `GPU bridge bandpass`          | 0.13 / 0.13           | 0.12 / 0.12           | 0.39 / 0.71           |                        |
-| bridge, the mixes         | `GPU bridge mix`               | 0.10 / 0.11           | 0.09 / 0.11           | 0.07 / 0.06           | 0.07 / 0.06            |
-| bridge                    | `GPU bridge`                   | 0.30 / 0.32           | 0.29 / 0.31           |                       |                        |
-| fluid, inject             | `GPU fluid inject`             | 1.14 / 1.54           | 0.71 / 1.05           | 0.96 / 1.34           | 0.30 / 0.55            |
-| fluid, dampen             | `GPU fluid dampen`             |                       |                       | 0.52 / 0.83           | 0.35 / 0.60            |
-| fluid, advect velocity    | `GPU fluid advect velocity`    | 0.29 / 0.44           | 0.29 / 0.47           | 1.90 / 5.79           | 0.86 / 1.21            |
-| fluid, viscosity          | `GPU fluid viscosity`          | 0                     | 0                     | 0                     | 0                      |
-| fluid, vorticity          | `GPU fluid vorticity`          | 0.82 / 1.16           | 0.86 / 1.30           | 2.00 / 2.64           | 1.28 / 1.59            |
-| fluid, buoyancy           | `GPU fluid buoyancy`           | 0                     | 0                     | 0                     | 0                      |
-| fluid, pressure           | `GPU fluid pressure`           | 1.48 / 2.19           | 1.49 / 2.17           | 6.74 / 8.09           | 4.40 / 5.91            |
-| fluid, faces to centers   | `GPU fluid faces to centers`   | 0.16 / 0.34           | 0.13 / 0.14           |                       |                        |
-| fluid, advect temperature | `GPU fluid advect temperature` | 0                     | 0                     | 0.45 / 0.86           | 0.23 / 0.23            |
-| fluid, density            | `GPU fluid density`            | 5.70 / 7.58           | 5.67 / 7.59           | 2.04 / 5.29           | 1.10 / 1.76            |
-| fluid, light              | `GPU fluid light`              | 0                     | 0                     |                       |                        |
-| fluid, composite          | `GPU fluid composite`          | 1.21 / 1.69           | 1.19 / 1.60           | 1.16 / 1.45           | 2.44 / 3.53            |
-| fluid, the step           | `GPU fluid`                    | 9.71 / 12.06          | 9.67 / 12.07          | 14.86 / 21.64         | 10.68 / 12.09          |
-| the frame                 | `Render interval`              | 12.36 / 22.56, 81 fps | 12.22 / 22.91, 82 fps | 17.93 / 25.34, 56 fps | 13.29 / 18.50, 75 fps  |
+| Stage                     | Timer                          | 19 Nov                | 16 Nov                | 15 Nov                | 7 Nov, 448 × 800 × 64 | 7 Nov, 256 × 448 × 128 |
+|---------------------------|--------------------------------|-----------------------|-----------------------|-----------------------|-----------------------|------------------------|
+| image upload              | `GPU Image Upload`             | 3.63 / 17.36          | 4.80 / 19.61          | 4.62 / 18.52          |                       |                        |
+| view                      | `GPU view`                     | 0.19 / 0.19           | 0.21 / 0.21           | 0.09 / 0.09           |                       |                        |
+| motion                    | `GPU motion`                   | 0.30 / 0.19           | 0.29 / 0.19           | 0.30 / 0.19           | 0.40 / 0.63           | 0.43 / 0.65            |
+| bridge, lowpass           | `GPU bridge lowpass`           | 0.05 / 0.05           | 0.05 / 0.05           | 0.05 / 0.05           | 0.08 / 0.08           | 0.09 / 0.08            |
+| bridge, bandpass          | `GPU bridge bandpass`          | 0.13 / 0.14           | 0.13 / 0.13           | 0.12 / 0.12           | 0.39 / 0.71           |                        |
+| bridge, the mixes         | `GPU bridge mix`               | 0.09 / 0.09           | 0.10 / 0.11           | 0.09 / 0.11           | 0.07 / 0.06           | 0.07 / 0.06            |
+| bridge                    | `GPU bridge`                   | 0.48 / 0.29           | 0.30 / 0.32           | 0.29 / 0.31           |                       |                        |
+| fluid, inject             | `GPU fluid inject`             | 0.96 / 1.28           | 1.14 / 1.54           | 0.71 / 1.05           | 0.96 / 1.34           | 0.30 / 0.55            |
+| fluid, dampen             | `GPU fluid dampen`             |                       |                       |                       | 0.52 / 0.83           | 0.35 / 0.60            |
+| fluid, advect velocity    | `GPU fluid advect velocity`    | 0.32 / 0.71           | 0.29 / 0.44           | 0.29 / 0.47           | 1.90 / 5.79           | 0.86 / 1.21            |
+| fluid, viscosity          | `GPU fluid viscosity`          | 1.22 / 1.50           | 0                     | 0                     | 0                     | 0                      |
+| fluid, vorticity          | `GPU fluid vorticity`          | 0.74 / 0.99           | 0.82 / 1.16           | 0.86 / 1.30           | 2.00 / 2.64           | 1.28 / 1.59            |
+| fluid, buoyancy           | `GPU fluid buoyancy`           | 0.34 / 0.54           | 0                     | 0                     | 0                     | 0                      |
+| fluid, pressure           | `GPU fluid pressure`           | 1.42 / 1.83           | 1.48 / 2.19           | 1.49 / 2.17           | 6.74 / 8.09           | 4.40 / 5.91            |
+| fluid, faces to centers   | `GPU fluid faces to centers`   | 0.14 / 0.26           | 0.16 / 0.34           | 0.13 / 0.14           |                       |                        |
+| fluid, advect temperature | `GPU fluid advect temperature` | 0                     | 0                     | 0                     | 0.45 / 0.86           | 0.23 / 0.23            |
+| fluid, density            | `GPU fluid density`            | 5.57 / 8.78           | 5.70 / 7.58           | 5.67 / 7.59           | 2.04 / 5.29           | 1.10 / 1.76            |
+| fluid, light              | `GPU fluid light`              | 0                     | 0                     | 0                     |                       |                        |
+| fluid, composite          | `GPU fluid composite`          | 1.28 / 1.52           | 1.21 / 1.69           | 1.19 / 1.60           | 1.16 / 1.45           | 2.44 / 3.53            |
+| fluid, the step           | `GPU fluid`                    | 11.08 / 14.79         | 9.71 / 12.06          | 9.67 / 12.07          | 14.86 / 21.64         | 10.68 / 12.09          |
+| the frame                 | `Render interval`              | 14.25 / 30.79, 70 fps | 12.36 / 22.56, 81 fps | 12.22 / 22.91, 82 fps | 17.93 / 25.34, 56 fps | 13.29 / 18.50, 75 fps  |
+
+On 19 November the step's 11.08 against 9.71 is the viscosity's 1.22 and the buoyancy timer's 0.34; without them
+it is 9.5, its other passes as on 16 November. The buoyancy timer reads 0.34 at the preset's `buoyancy` 0, not
+looked into. The pose model (`Pose Estimation`) takes 27.88 / 41.78 in this run, 19.5 to 20.4 / 32.6 in four
+deep_flow runs the same morning at the same preset; no code it runs changed between them, so the GPU it shares
+with the fluid **(deduction)**.
 
 On 15 November the bandpass runs at the preset; on 7 November it ran only while a mix took one of its
 readings, so its row then is from a run with `acceleration` taking `change`, `start`, `bow`,
@@ -656,3 +664,37 @@ layers up the pressure solve is the largest pass (3.7–5.3 ms). The density's
 4K × 16 costs 1.3 ms to carry and 0.9 to march, under a quarter of a 16-layer look's 2 GB a step. MacCormack
 on the 4K density, timed without the depth scale, takes 9.1 ms a frame at 16 and 16 and is over the budget
 from 32 fluid layers up; its cost is in [FLOW_PLAN.md's Parked](FLOW_PLAN.md#parked).
+
+## The 2D flow
+
+superficial_flow's chain, a time, 19 November, commit c796999b, `launcher.py -app superficial_flow -sim -ni -timing 60
+-warmup 10`, the measure recording (`20261112-125832_measure`), the preset `studio.json` as saved: the view
+448 × 800, the fluid's grid 1080 × 1920 with its density at 2160 × 3840; the segmentation and the pose on, on the
+same GPU; one run, mean / p95 ms:
+
+| Stage                     | Timer                       | 19 Nov                |
+|---------------------------|-----------------------------|-----------------------|
+| image upload              | `GPU Image Upload`          | 0.73 / 1.70           |
+| segmentation              | `Segmentation`              | 7.67 / 11.86          |
+| pose model                | `Pose Estimation`           | 5.65 / 9.98           |
+| view                      | `GPU view`                  | 2.89 / 6.21           |
+| motion                    | `GPU motion`                | 0.21 / 0.14           |
+| bridge, lowpass           | `GPU bridge lowpass`        | 0.02 / 0.02           |
+| bridge, bandpass          | `GPU bridge bandpass`       | 0.12 / 0.12           |
+| bridge, the mixes         | `GPU bridge mix`            | 0.24 / 0.75           |
+| bridge                    | `GPU bridge`                | 0.40 / 0.97           |
+| fluid, inject             | `GPU fluid inject`          | 0.09 / 0.11           |
+| fluid, the step           | `GPU fluid`                 | 1.09 / 2.01           |
+| the frame                 | `Render interval`           | 5.14 / 9.09, 195 fps  |
+
+The inference keeps up with the camera: 2995 captures in 60 s, 49.9 a second, the segmentation's p99 15.73 under
+the 20 ms a frame; the pose 25 a second, at its interval. The render runs over three times the 60 fps it aims at.
+`GPU fluid` holds the whole step, its passes without timers of their own.
+
+`GPU view` brackets `ViewLayer.update`: the crop and `ViewMask.place`, which has the CUDA stream wait for the
+segmentation's `ready` event, copies the mask into a GL pixel buffer and unmaps it (`modules/gl/tensor.py`); the
+unmap has OpenGL wait for that stream, so the timer's end waits until the segmentation's GPU work is done. Its
+2.89 ms is mostly that wait. The view's own work, a crop and a mask drawn at 448 × 800, is under 0.1 ms
+**(deduction)**: deep_flow's view, a crop with its depth and a fill, takes 0.19, its crop alone 0.016
+([The view](#the-view)). The wait holds the GL queue, so the motion, the bridge and the fluid queued after it
+start later.
