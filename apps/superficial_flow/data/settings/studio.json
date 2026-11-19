@@ -670,7 +670,11 @@
       "vorticity": {
         "enabled": true,
         "strength_1": 32.83,
-        "radius_1": 0.1
+        "strength_2": 0.0,
+        "strength_3": 0.0,
+        "radius_1": 0.1,
+        "radius_2": 0.01,
+        "radius_3": 0.025
       },
       "temperature": {
         "enabled": true,

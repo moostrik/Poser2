@@ -37,7 +37,7 @@ its default, the sizes apart (`modules/flow/tests/test_fluid_2d_settings.py`). W
 | `input`       | the drags, the gains, the density's blend and release, gravity's `gravity_x` and `gravity_y`   | [the inputs](FLUID_3D.md#the-inputs)                                                             |
 | `velocity`    | `advection`, `limiter`, `advection_scale`, `fade_time`, `evaporation_time`, `evaporation_knee` | [the advection](FLUID_3D.md#the-advection), [the fade](FLUID_3D.md#the-fade-and-the-evaporation) |
 | `viscosity`   | `enabled`, `viscosity` (widths²/s), `iterations`                                               | implicit diffusion, Jacobi                                                                       |
-| `vorticity`   | `enabled`, `strength_1`, `radius_1` (widths)                                                   | the force ε h (N × ω) dt, h the cell's width (Fedkiw 2001)                                       |
+| `vorticity`   | `enabled`, `strength_1` to `_3`, `radius_1` to `_3` (widths)                                   | the force ε h (N × ω) dt, h the cell's width (Fedkiw 2001)                                       |
 | `temperature` | `enabled`, `buoyancy`, `fade_time`, `evaporation_time`, `evaporation_knee`                     | [the buoyancy](FLUID_3D.md#the-buoyancy)                                                         |
 | `expansion`   | `enabled`, `rate`                                                                              | [the expansion](FLUID_3D.md#the-expansion)                                                       |
 | `pressure`    | `solver`, `iterations`, `relaxation`, `cycles`                                                 | [the pressure](FLUID_3D.md#the-pressure)                                                         |
@@ -63,8 +63,16 @@ superficial_flow's preset holds deep_flow's value for every setting the two shar
   no curl at it and the viscosity takes nothing; at `slip_time` 2 the wall's cells keep 0.4773 of 0.5, the
   law's 0.4775, the inside 0.5; a flow of 1 width/s into the walls, projected, keeps a mean of 0.016 closed and
   1.000 open.
-- The confinement's curl is a scalar, ω along z, and N × ω is (N.y ω, −N.x ω). Beyond the walls the curl's
-  magnitude is the edge cell's, as the 3D's ghost: no slope toward a wall for the force to push along.
+- The confinements are the 3D's three ([FLUID_3D.md](FLUID_3D.md#the-fluid), its passes), each
+  its strength and its radius in widths, each running while its strength is above 0. On the plane the curl is a
+  scalar, ω along z, so the three fit one texture, a channel each: `VorticityCurl` writes them in one pass,
+  `VorticityForce` sums their forces ε h (N × ω) dt, N × ω = (N.y ω, −N.x ω), in one, added to the velocity once.
+  Beyond the walls the curl's magnitude is the edge cell's, as the 3D's ghost: no slope toward a wall for the
+  force to push along.
+
+  Checked in the GPU harness, 2026-11-19, superficial_flow plan D6, at 128 × 128: a rigid rotation's curl is 2Ω in
+  each channel at radii of 2, 5 and 9 cells; on a vortex, confinement 2 alone gives confinement 1's force to the
+  bit, two alike twice it.
 - The solvers are the 3D's on the plane, each its own 2D kernel ([FLUID_3D.md](FLUID_3D.md#the-pressure)):
   `JACOBI` five iterations a dispatch in shared memory (`JacobiPressureCompute`), `SOR` red-black over-relaxed
   (`SorPressure2D`), `MULTIGRID` V-cycles (`MultigridPressure2D`: `SorPressure2D` at omega 1 smoothing,

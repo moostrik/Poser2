@@ -55,7 +55,7 @@ class Fluid2D:
 
     Intermediate (single-buffer):
         divergence:       Fbo R16F
-        vorticity_curl:   Fbo R16F
+        vorticity_curl:   Fbo RGBA16F  (a curl per confinement)
         vorticity_force:  Fbo RG16F
         buoyancy:         Fbo RG16F
     """
@@ -205,7 +205,7 @@ class Fluid2D:
 
         # Intermediate FBOs
         self._divergence_fbo.allocate(sim_w, sim_h, GL_R16F)
-        self._vorticity_curl_fbo.allocate(sim_w, sim_h, GL_R16F)
+        self._vorticity_curl_fbo.allocate(sim_w, sim_h, GL_RGBA16F)     # each confinement's curl, one channel each
         self._vorticity_force_fbo.allocate(sim_w, sim_h, GL_RG16F)
         self._buoyancy_fbo.allocate(sim_w, sim_h, GL_RG16F)
         self._expansion_fbo.allocate(sim_w, sim_h, GL_R16F)
@@ -411,11 +411,17 @@ class Fluid2D:
                 self._velocity_fbo.end()
 
     def _confine_vorticity(self) -> None:
-        """Vorticity confinement (Fedkiw 2001), `vorticity.strength_1` at `vorticity.radius_1` (widths): the curl, the
-        force epsilon h (N × curl) × dt (h the cell's width), added to the velocity; while `vorticity.enabled` is on
-        and the strength above 0."""
+        """Vorticity confinement (Fedkiw 2001), each of the three (`vorticity.strength_1` to `_3` at `vorticity.radius_1`
+        to `_3`, widths) keeping swirls of its own size alive: every curl in one pass, one channel each, their forces
+        epsilon h (N × curl) × dt (h the cell's width) summed in one, added to the velocity once; while
+        `vorticity.enabled` is on, each confinement while its strength is above 0."""
         vorticity = self.settings.vorticity
-        if not vorticity.enabled or vorticity.strength_1 <= 0.0 or vorticity.radius_1 <= 0.0:
+        running: list[tuple[float, float]] = [(strength, radius) for strength, radius in
+                                              ((vorticity.strength_1, vorticity.radius_1),
+                                               (vorticity.strength_2, vorticity.radius_2),
+                                               (vorticity.strength_3, vorticity.radius_3))
+                                              if vorticity.enabled and strength > 0.0 and radius > 0.0]
+        if not running:
             return
 
         # a. Compute curl
@@ -424,7 +430,7 @@ class Fluid2D:
             self._velocity_fbo,
             self._simulation_obstacle_fbo,
             self._cell,
-            vorticity.radius_1,
+            [radius for _, radius in running],
             has_obstacles=self._has_obstacles,
             closed=self._closed,
             wall_keep=self._wall_keep
@@ -437,7 +443,7 @@ class Fluid2D:
             self._vorticity_curl_fbo,
             self._simulation_obstacle_fbo,
             self._cell,
-            vorticity.strength_1 * self._cell[0] * self._dt,
+            [strength * self._cell[0] * self._dt for strength, _ in running],
             has_obstacles=self._has_obstacles
         )
         self._vorticity_force_fbo.end()

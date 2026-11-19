@@ -56,10 +56,15 @@ class ViscositySettings(BaseSettings):
 
 
 class VorticitySettings(BaseSettings):
-    """The vorticity confinement (Fedkiw 2001), keeping swirls of one size alive."""
-    enabled: Field[bool]      = Field(False,                                      description="The confinement on while its strength is above 0; off, skipped")
-    strength_1: Field[float]  = Field(0.0,    min=0.0,    max=100.0,  color="purple", newline=True, description="The confinement's epsilon, the force epsilon × cell × (N × curl); 0 = off")
-    radius_1: Field[float]    = Field(0.004,  min=0.001,  max=0.1,    newline=True, widget=Widget.log_slider, color="deep-purple", description="The size of the swirls the confinement keeps, widths; at least one cell")
+    """The vorticity confinements (Fedkiw 2001), each keeping swirls of one size alive: the strengths on a row,
+    each radius under its strength."""
+    enabled: Field[bool]      = Field(False,                                      description="The confinements on, each while its strength is above 0; off, skipped")
+    strength_1: Field[float]  = Field(0.0,    min=0.0,    max=100.0,  color="purple", newline=True, description="Confinement 1's epsilon, the force epsilon × cell × (N × curl); 0 = off")
+    strength_2: Field[float]  = Field(0.0,    min=0.0,    max=100.0,  color="purple",         description="Confinement 2's epsilon; 0 = off")
+    strength_3: Field[float]  = Field(0.0,    min=0.0,    max=100.0,  color="purple",         description="Confinement 3's epsilon; 0 = off")
+    radius_1: Field[float]    = Field(0.004,  min=0.001,  max=0.1,    newline=True, widget=Widget.log_slider, color="deep-purple", description="The size of the swirls confinement 1 keeps, widths; at least one cell")
+    radius_2: Field[float]    = Field(0.004,  min=0.001,  max=0.1,    widget=Widget.log_slider, color="deep-purple", description="The size of the swirls confinement 2 keeps, widths")
+    radius_3: Field[float]    = Field(0.004,  min=0.001,  max=0.1,    widget=Widget.log_slider, color="deep-purple", description="The size of the swirls confinement 3 keeps, widths")
 
 
 class TemperatureSettings(BaseSettings):
