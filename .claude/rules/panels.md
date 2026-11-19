@@ -2,6 +2,7 @@
 description: Panels and monitors: settings mirror the code, a monitor shows the structure
 paths:
   - "apps/deep_flow/**"
+  - "apps/low_flow/**"
   - "modules/render/modules/flow/**"
   - "modules/flow/**"
 ---

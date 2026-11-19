@@ -6,6 +6,7 @@ paths:
   - "apps/hd_trio/flow/**"
   - "apps/hd_trio/render/layers/flow/**"
   - "apps/deep_flow/render/layers/view/**"
+  - "apps/low_flow/render/layers/view/**"
 ---
 # Flow naming
 
