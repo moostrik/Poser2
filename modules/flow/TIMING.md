@@ -1,7 +1,7 @@
 # The flow's timing
 
 The GPU time of every stage of the 3D flow in deep_flow, pass by pass, and the defaults it sets: the
-fluid's grid and the particles' count; and the 2D flow's chain in superficial_flow ([The 2D flow](#the-2d-flow)).
+fluid's grid and the particles' count; and the 2D flow's chain in low_flow ([The 2D flow](#the-2d-flow)).
 The design of each stage is in [FLOW.md](FLOW.md), [FLUID_3D.md](FLUID_3D.md) and [FLUID_2D.md](FLUID_2D.md);
 this document holds their cost. **(deduction)** marks what is inferred
 from the numbers.
@@ -505,7 +505,7 @@ the floats' last bits the solve amplifies. Not worth a pass of their own: the ba
 
 ### The bridges on one ABC
 
-deep_flow's bridge before and after its Python moved onto the `Bridge` both bridges share (superficial_flow's C1), a
+deep_flow's bridge before and after its Python moved onto the `Bridge` both bridges share (low_flow's C1), a
 time, 19 November, commits 9bba4317 and the C1 commit, the hands recording, the preset, one run each, back to back,
 about 2990 steps, mean / p95 ms **(seen)**:
 
@@ -667,7 +667,7 @@ from 32 fluid layers up; its cost is in [FLOW_PLAN.md's Parked](FLOW_PLAN.md#par
 
 ## The 2D flow
 
-superficial_flow's chain, a time, 19 November, commit c796999b, `launcher.py -app superficial_flow -sim -ni -timing 60
+low_flow's chain, a time, 19 November, commit c796999b, `launcher.py -app superficial_flow -sim -ni -timing 60
 -warmup 10`, the measure recording (`20261112-125832_measure`), the preset `studio.json` as saved: the view
 448 × 800, the fluid's grid 1080 × 1920 with its density at 2160 × 3840; the segmentation and the pose on, on the
 same GPU; one run, mean / p95 ms:

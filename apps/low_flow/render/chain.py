@@ -1,4 +1,4 @@
-"""superficial_flow's chain: every layer the renderer runs, in the order it runs, with its size, its panel's shape
+"""low_flow's chain: every layer the renderer runs, in the order it runs, with its size, its panel's shape
 and when it runs."""
 
 from dataclasses import dataclass
@@ -75,7 +75,7 @@ CHAIN: tuple[ChainLayer, ...] = (
     # the fluid, once a tick
     ChainLayer(ChainLayers.fluid,                   Size.LARGE, tick=True),
     ChainLayer(ChainLayers.fluid_monitor,           Size.LARGE, tick=True),
-    # the pose, beside the chain: its shape its frame's (`SuperficialFlowRender._layer_size`)
+    # the pose, beside the chain: its shape its frame's (`LowFlowRender._layer_size`)
     ChainLayer(ChainLayers.pose_monitor,            Size.PANEL, tick=True),
 )
 LAYERS: dict[ChainLayers, ChainLayer] = {chain_layer.layer: chain_layer for chain_layer in CHAIN}

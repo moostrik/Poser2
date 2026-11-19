@@ -1,4 +1,4 @@
-"""Superficial Flow — single-camera 2D fluid installation.
+"""Low Flow — single-camera 2D fluid installation.
 
 Runs in `.venv-oak4`, the depthai 3 venv (`scripts\\install.bat oak4`), on one OAK4, without depth. `-sim` plays the
 recordings' video on the host with the replay backend, with no camera attached.
@@ -25,13 +25,13 @@ from .board import RenderBoard
 from .series import Series, TIMER_SERIES
 from .pose.pipeline import pipeline_spec
 from .settings import Settings, Stage
-from .render import SuperficialFlowRender
+from .render import LowFlowRender
 
-APP_NAME = 'superficial_flow'
-DATA_PATH = 'apps/superficial_flow/data'
+APP_NAME = 'low_flow'
+DATA_PATH = 'apps/low_flow/data'
 
 
-class SuperficialFlowMain:
+class LowFlowMain:
     def __init__(self, simulation: bool = False, interface: bool = True) -> None:
 
         self.is_running: bool = False
@@ -164,7 +164,7 @@ class SuperficialFlowMain:
         self.camera_health = CameraHealth(self.settings.camera.cameras, self.settings.camera.camera_health)
 
         # RENDER
-        self.render = SuperficialFlowRender(self.board, self.settings.render, f'{DATA_PATH}/screen_recordings',
+        self.render = LowFlowRender(self.board, self.settings.render, f'{DATA_PATH}/screen_recordings',
                                             num_cams=len(self.cameras), max_players=max_players)
         self.render.add_exit_callback(self.stop)
         self.render.add_update_callback(self.camera_health.update)

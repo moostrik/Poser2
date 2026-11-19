@@ -107,7 +107,7 @@ ONNX runner refused the model's symbolic output size and loaded nothing, so that
 
 RVM on one player, TensorRT FP16, at each size, mean / p50 / p99 ms, 2026-11-19, af0063c2 **(seen)**. Alone:
 `scripts/model_benchmark.py --app superficial_flow --models segmentation`, 1000 runs after 100, the crop at the
-model's size. In the app: superficial_flow `-sim` on `20261112-125832_measure`, 20 s, the segmentation on every frame
+model's size. In the app: low_flow `-sim` on `20261112-125832_measure`, 20 s, the segmentation on every frame
 (1000 of 1000), the pose (256x192) on every other, the view and the color on, its `Segmentation` timer.
 
 | Size      | Alone              | In the app          |

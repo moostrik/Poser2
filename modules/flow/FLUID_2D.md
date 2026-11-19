@@ -4,10 +4,10 @@ Every quantity and setting here is in a meaningful unit ([FLOW.md](FLOW.md#the-2
 
 The 2D fluid is the 3D fluid on a plane: the same inputs, settings, names and laws for what a plane has, on its own
 fragment shaders. What each law is, and why, is in [FLUID_3D.md](FLUID_3D.md); this document holds what the 2D does
-differently. How the stages fit together is in [FLOW.md](FLOW.md), what is next in superficial_flow's plan
-([SUPERFICIAL_FLOW_PLAN.md](../../apps/superficial_flow/SUPERFICIAL_FLOW_PLAN.md)). The fluid is `Fluid2D`
+differently. How the stages fit together is in [FLOW.md](FLOW.md), what is next in low_flow's plan
+([LOW_FLOW_PLAN.md](../../apps/low_flow/LOW_FLOW_PLAN.md)). The fluid is `Fluid2D`
 (`fluid_2d/fluid_2d.py`), its layer `Fluid2DLayer` (`modules/render/modules/flow/fluid_2d_layer.py`), run by
-superficial_flow; hd_trio runs its own copy (`apps/hd_trio/flow/`).
+low_flow; hd_trio runs its own copy (`apps/hd_trio/flow/`).
 
 ## What it is
 
@@ -43,8 +43,8 @@ its default, the sizes apart (`modules/flow/tests/test_fluid_2d_settings.py`). W
 | `pressure`    | `solver`, `iterations`, `relaxation`, `cycles`                                                 | [the pressure](FLUID_3D.md#the-pressure)                                                         |
 | `density`     | `color_space`, `sink`, `advection`, `limiter`, `advection_scale`, `fade_time`, the evaporation | [the density's blend](FLUID_3D.md#the-densitys-blend), the buoyancy                              |
 
-superficial_flow's preset holds deep_flow's value for every setting the two share, the sizes a textbook default
-(`apps/superficial_flow/tests/test_fluid_preset.py`). deep_flow's gravity points along z, so on the plane it is
+low_flow's preset holds deep_flow's value for every setting the two share, the sizes a textbook default
+(`apps/low_flow/tests/test_fluid_preset.py`). deep_flow's gravity points along z, so on the plane it is
 (0, 0) and the density's `sink` moves nothing.
 
 ## What it does differently
@@ -59,7 +59,7 @@ superficial_flow's preset holds deep_flow's value for every setting the two shar
 - A closed wall slips as the 3D's: k = 0.01^(dt / `slip_time`), the velocity along the wall of the cells against
   it multiplied by k in the advection, 1 free-slip.
 
-  Checked in the GPU harness, 2026-11-19, superficial_flow plan D5, at 64 × 64: a flow along a closed wall shows
+  Checked in the GPU harness, 2026-11-19, low_flow plan D5, at 64 × 64: a flow along a closed wall shows
   no curl at it and the viscosity takes nothing; at `slip_time` 2 the wall's cells keep 0.4773 of 0.5, the
   law's 0.4775, the inside 0.5; a flow of 1 width/s into the walls, projected, keeps a mean of 0.016 closed and
   1.000 open.
@@ -70,7 +70,7 @@ superficial_flow's preset holds deep_flow's value for every setting the two shar
   Beyond the walls the curl's magnitude is the edge cell's, as the 3D's ghost: no slope toward a wall for the
   force to push along.
 
-  Checked in the GPU harness, 2026-11-19, superficial_flow plan D6, at 128 × 128: a rigid rotation's curl is 2Ω in
+  Checked in the GPU harness, 2026-11-19, low_flow plan D6, at 128 × 128: a rigid rotation's curl is 2Ω in
   each channel at radii of 2, 5 and 9 cells; on a vortex, confinement 2 alone gives confinement 1's force to the
   bit, two alike twice it.
 - The solvers are the 3D's on the plane, each its own 2D kernel ([FLUID_3D.md](FLUID_3D.md#the-pressure)):
@@ -86,7 +86,7 @@ superficial_flow's preset holds deep_flow's value for every setting the two shar
   coarse walls lie on the fine walls: read at half the fine position, an odd level's 0 of an open wall lay past the
   real wall, and the water drifted away from it with noise at that wall **(deduction)**.
 
-  Measured in the GPU harness, 2026-11-19, superficial_flow plan D3, a result: one centered velocity (three
+  Measured in the GPU harness, 2026-11-19, low_flow plan D3, a result: one centered velocity (three
   swirling sources, 0 at the walls) projected once from a pressure of 0 at 270 × 480, the residual |div − L p| over
   |div| by `ResidualRestrict2D` at (1, 1), its low frequencies the residual's 8 × 8 means, and the divergence after by
   the fluid's own pass; one run, closed walls (open alike, the multigrid's a little lower):
@@ -109,7 +109,7 @@ superficial_flow's preset holds deep_flow's value for every setting the two shar
   limited by the source's four texels around the backward trace. The temperature takes the density's `advection`
   and `limiter`.
 
-  Measured in the GPU harness, 2026-11-19, superficial_flow plan D4, a result: a 128 × 128 grid under a 256 × 256
+  Measured in the GPU harness, 2026-11-19, low_flow plan D4, a result: a 128 × 128 grid under a 256 × 256
   density, 50 steps of 0.02 s; one run each:
 
   | Measure                                                     | Semi-Lagrangian | MacCormack, clamp | MacCormack, revert |

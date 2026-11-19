@@ -3,7 +3,7 @@
 import time
 import unittest
 
-from apps.superficial_flow.settings import Settings
+from apps.low_flow.settings import Settings
 from modules.recording import RecorderSettings
 from modules.session import Session, SessionSettings
 

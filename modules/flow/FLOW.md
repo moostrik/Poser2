@@ -29,7 +29,7 @@ next is in the one plan:
 
 hd_trio runs its own copy of the 2D system (`apps/hd_trio/flow/`) and of its layers
 (`apps/hd_trio/render/layers/flow/`), taken as they were; the 2D in `modules/flow` and `render/modules/flow` is
-superficial_flow's.
+low_flow's.
 
 ## The goals
 

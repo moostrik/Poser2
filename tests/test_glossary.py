@@ -21,7 +21,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-APPS = ['white_space', 'hd_trio', 'deep_flow', 'superficial_flow', 'smile']
+APPS = ['white_space', 'hd_trio', 'deep_flow', 'low_flow', 'smile']
 ROOTS = [ROOT / 'modules'] + [ROOT / 'apps' / app for app in APPS]
 PRESET_DIRS = [ROOT / 'apps' / app / 'data' / 'settings' for app in APPS]
 SKIPPED_DIRS = {'vimbapython', '__pycache__'}
@@ -62,7 +62,7 @@ BANNED: list[tuple[str, str]] = [
 FLOW_ROOTS: tuple[Path, ...] = (ROOT / 'modules' / 'flow', ROOT / 'modules' / 'render' / 'modules' / 'flow',
                                 ROOT / 'apps' / 'hd_trio' / 'flow', ROOT / 'apps' / 'hd_trio' / 'render' / 'layers' / 'flow',
                                 ROOT / 'apps' / 'deep_flow' / 'render' / 'layers' / 'view',
-                                ROOT / 'apps' / 'superficial_flow' / 'render' / 'layers' / 'view')
+                                ROOT / 'apps' / 'low_flow' / 'render' / 'layers' / 'view')
 FLOW_BANNED: list[tuple[str, str]] = [
     ('the quantity or boundary, not body alone (the flow)', r'^body$|^bodies$'),
 ]

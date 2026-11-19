@@ -5,8 +5,8 @@ Every quantity and setting here is in a meaningful unit ([FLOW.md](FLOW.md#the-2
 The 2D bridge is the 3D bridge on a 2D velocity: it turns the motion's x/y velocity into what the 2D fluid takes,
 the same readings, outputs, settings and names, read on the image plane. What each reading and output is, and why,
 is in [BRIDGE_3D.md](BRIDGE_3D.md); this document holds what the 2D does differently. How the stages fit together is
-in [FLOW.md](FLOW.md), what is next in superficial_flow's plan
-([SUPERFICIAL_FLOW_PLAN.md](../../apps/superficial_flow/SUPERFICIAL_FLOW_PLAN.md)).
+in [FLOW.md](FLOW.md), what is next in low_flow's plan
+([LOW_FLOW_PLAN.md](../../apps/low_flow/LOW_FLOW_PLAN.md)).
 
 ## What it is
 

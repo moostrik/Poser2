@@ -18,7 +18,7 @@ operator saw.
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | built; E6 the app's check         | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | F1, F2 white                      | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                       | [FLOW.md](FLOW.md)                                 |
-| I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | in superficial_flow's plan        | [FLOW.md](FLOW.md)                                 |
+| I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | in low_flow's plan                | [FLOW.md](FLOW.md)                                 |
 | J   | [Every setting and its description](#j-every-setting-and-its-description)    | last, after the refactor          | `CLAUDE.md`, `.claude/rules`                       |
 
 E6 needs the operator at the screen; the other lines go on meanwhile.
@@ -137,7 +137,7 @@ What is built: [FLUID_3D.md](FLUID_3D.md#the-density).
 
 ## I. The 2D flow follows the 3D
 
-Its plan is superficial_flow's ([SUPERFICIAL_FLOW_PLAN.md](../../apps/superficial_flow/SUPERFICIAL_FLOW_PLAN.md)):
+Its plan is low_flow's ([LOW_FLOW_PLAN.md](../../apps/low_flow/LOW_FLOW_PLAN.md)):
 the app on the 2D flow, the 2D motion, bridge and fluid as their own kernels beside the 3D's.
 
 ## J. Every setting and its description

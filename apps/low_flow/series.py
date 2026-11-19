@@ -1,4 +1,4 @@
-"""The values Superficial Flow plots over time, in lane order, and the timers that feed some of them."""
+"""The values Low Flow plots over time, in lane order, and the timers that feed some of them."""
 
 from enum import IntEnum, auto
 

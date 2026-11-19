@@ -1,4 +1,4 @@
-"""Superficial Flow render board — thread-safe shared data store for the Superficial Flow app."""
+"""Low Flow render board — thread-safe shared data store for the Low Flow app."""
 
 from modules.board import (
     FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin, CameraTrackletStoreMixin,

@@ -1,4 +1,4 @@
-"""Superficial Flow's pose pipeline: the stages, their steps and their clock domains.
+"""Low Flow's pose pipeline: the stages, their steps and their clock domains.
 
 The frame domain (the camera's frame bang) smooths and predicts the tracklet boxes, runs the crops through
 the pose model and the RAW, CLEAN and SMOOTH stages on the model's thread; the render tick drives LERP, where the

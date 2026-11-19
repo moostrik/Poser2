@@ -1,4 +1,4 @@
-"""Superficial Flow's pipeline declaration builds: the stages, their ids, the box steps before the pose model."""
+"""Low Flow's pipeline declaration builds: the stages, their ids, the box steps before the pose model."""
 
 import unittest
 
@@ -6,8 +6,8 @@ from modules.pose import BBox, Frame, FrameDict, configure_features
 from modules.pose.pipeline import PosePipeline
 from modules.utils import Rect
 
-from apps.superficial_flow.pose.pipeline import pipeline_spec
-from apps.superficial_flow.settings import Settings, Stage
+from apps.low_flow.pose.pipeline import pipeline_spec
+from apps.low_flow.settings import Settings, Stage
 
 
 class _Source:

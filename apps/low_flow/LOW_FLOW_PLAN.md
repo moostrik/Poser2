@@ -1,6 +1,6 @@
-# superficial_flow's plan
+# low_flow's plan
 
-A new app, `superficial_flow`: equal to deep_flow, on the 2D flow, with a higher-resolution solver. The same camera
+A new app, `low_flow`: equal to deep_flow, on the 2D flow, with a higher-resolution solver. The same camera
 (one OAK4, `.venv-oak4`), view, pose, monitors and panels; the 2D motion, bridge and fluid in place of the 3D's.
 It is to the 2D flow what deep_flow is to the 3D, the place it is built and tried. The app comes first, without
 the flow, so each 2D stage is tried in it as it is built. Both apps take the flow plan's `color` stage and the
@@ -39,12 +39,12 @@ color), one fluid per screen. Until then hd_trio runs its own copy, unchanged.
 ## D. The 2D fluid
 
 The 3D fluid's features that have a meaning on a plane, each as the 2D's own kernels, each checked in the GPU
-harness and seen in superficial_flow; the march's light, shadows and fog need a depth and stay 3D only:
+harness and seen in low_flow; the march's light, shadows and fog need a depth and stay 3D only:
 
 - **D7.** The particles.
 - **D8.** The one-pass buoyancy in -sim: the GPU fluid time (built and checked on the GPU 2026-11-19, as the 3D's:
   one draw against the two it replaced within one step of the velocity's half precision, skipped at gravity 0).
-  superficial_flow's preset has gravity down the screen at deep_flow's length, (0, −0.02).
+  low_flow's preset has gravity down the screen at deep_flow's length, (0, −0.02).
 
 Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 
@@ -60,4 +60,4 @@ Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 - Keep presets and settings schemas in sync with code changes: D7.
 - Shaders get checked in a GPU harness: D7.
 - Prefer the design with the lower latency, measured in the context of the app: D7, D8.
-- A plan is named after the package, app or folder it is for, and sits in it: this plan, in `apps/superficial_flow`.
+- A plan is named after the package, app or folder it is for, and sits in it: this plan, in `apps/low_flow`.

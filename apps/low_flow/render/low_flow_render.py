@@ -1,4 +1,4 @@
-"""Superficial Flow render — split-view layer graph with the 2D flow: view, color, motion, bridge and fluid."""
+"""Low Flow render — split-view layer graph with the 2D flow: view, color, motion, bridge and fluid."""
 
 from threading import Event
 from typing import Callable, cast
@@ -26,7 +26,7 @@ BORDER: Color = Color(0.4, 0.4, 0.4)    # the border around each layer in the ma
 BORDER_WIDTH: float = 2.0       # px
 
 
-class SuperficialFlowRender(RenderBase):
+class LowFlowRender(RenderBase):
     def __init__(self, board: RenderBoard, settings: RenderSettings, screen_recordings: str,
                  num_cams: int = 1, max_players: int = 1) -> None:
         """`screen_recordings` the folder the screen recordings go to."""
