@@ -12,7 +12,8 @@ class MacCormack2D(Shader):
 
     def use(self, source: Texture, forward: Texture, velocity: Texture, obstacle: Texture, aspect: float, timestep: float,
             dissipation: float, has_obstacles: bool = True, evaporation: float = 0.0, evaporation_knee: float = 0.1,
-            measure: int = 0, guard: GuardSlot | None = None, clamp: bool = True) -> None:
+            measure: int = 0, guard: GuardSlot | None = None, clamp: bool = True, closed: bool = True,
+            wall_keep: float = 1.0) -> None:
         """Write the corrected step into the bound target.
 
         Args:
@@ -29,6 +30,8 @@ class MacCormack2D(Shader):
             measure: How the size is read: 0 a premultiplied density's alpha, 1 a vector's length, 2 |r|
             guard: The field's slot in its stage's FiniteGuard; None no guard
             clamp: Where the correction overshoots, cut it to the bounds instead of reverting to the predictor
+            closed: The walls closed, else open (walls_2d.glsl)
+            wall_keep: The velocity's share along a closed wall kept this step; 1 for every field but the velocity
         """
         if not self.allocated or not self.shader_program:
             return
@@ -39,6 +42,8 @@ class MacCormack2D(Shader):
             glBindTexture(GL_TEXTURE_2D, texture.tex_id)
             glUniform1i(self.get_uniform_loc(name), unit)
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
+        glUniform1i(self.get_uniform_loc("uClosed"), int(closed))
+        glUniform1f(self.get_uniform_loc("uWallKeep"), wall_keep)
         glUniform1f(self.get_uniform_loc("uTimestep"), timestep)
         glUniform2f(self.get_uniform_loc("uRdx"), 1.0, aspect if aspect > 0.0 else 1.0)
         glUniform1f(self.get_uniform_loc("uDissipation"), dissipation)

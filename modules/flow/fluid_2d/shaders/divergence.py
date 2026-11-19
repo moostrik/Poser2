@@ -15,7 +15,7 @@ class Divergence(Shader):
 
     def use(self, velocity: Texture, obstacle: Texture, cell: tuple[float, float],
             has_obstacles: bool = True, expansion: Texture | None = None, rate: float = 0.0,
-            mean_lod: float | None = None) -> None:
+            mean_lod: float | None = None, closed: bool = True, wall_keep: float = 1.0) -> None:
         """Compute divergence.
 
         Args:
@@ -26,6 +26,8 @@ class Divergence(Shader):
             expansion: The expansion (R16F, with mipmaps), its rate × it taken off the divergence; None none
             rate: The expansion's rate, 1/s
             mean_lod: The expansion's mip level that is its mean, taken off first (closed walls); None none
+            closed: The walls closed, else open (walls_2d.glsl)
+            wall_keep: The share of the velocity along a closed wall kept a step; 1 free-slip
         """
         if not self.allocated or not self.shader_program:
             logger.warning("Divergence shader not allocated or shader program missing.")
@@ -38,6 +40,8 @@ class Divergence(Shader):
 
         # Obstacle flag
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
+        glUniform1i(self.get_uniform_loc("uClosed"), int(closed))
+        glUniform1f(self.get_uniform_loc("uWallKeep"), wall_keep)
 
         # Bind textures
         glActiveTexture(GL_TEXTURE0)

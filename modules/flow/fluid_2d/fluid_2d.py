@@ -83,8 +83,8 @@ class Fluid2D:
         self._temperature_clear: bool = True    # the temperature cleared since it last ran
 
         # ---- Simulation fields (SwapFbo for ping-pong) ----
-        # Velocity always uses Dirichlet (v=0 at walls); the density and the temperature by `wall` via _apply_wall_modes(),
-        # the pressure's walls the solvers' and the gradient's own ghosts (walls_2d.glsl)
+        # The velocity, the density and the temperature read beyond the walls by `wall` (_apply_wall_modes()); every pass
+        # that reads a neighbor there reads the walls' ghosts (walls_2d.glsl) instead
         self._velocity_fbo: SwapFbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         self._density_fbo: SwapFbo = SwapFbo()
         self._temperature_fbo: SwapFbo = SwapFbo()
@@ -328,11 +328,12 @@ class Fluid2D:
 
     def _carry(self, field: SwapFbo, scratch: Fbo, velocity: Texture | None, obstacle: Texture, step: float,
                dissipation: float, advection: Advection, limiter: Limiter, evaporation: float, evaporation_knee: float,
-               measure: int, guard: GuardSlot | None) -> None:
+               measure: int, guard: GuardSlot | None, wall_keep: float = 1.0) -> None:
         """Carry `field` one step along `velocity` (None: along itself) by `advection`: semi-Lagrangian into the field;
         or its step into `scratch` as the predictor, allocated at its first MacCormack step at the field's size, and
         the MacCormack correction by `limiter` into the field; on the result the fade, the evaporation read by
-        `measure` (0 a density's alpha, 1 a vector's length, 2 |r|) and `guard`."""
+        `measure` (0 a density's alpha, 1 a vector's length, 2 |r|) and `guard`; the velocity's cells against a closed
+        wall braked along it by `wall_keep` (1 for every other field)."""
         field.swap()
         source: Texture = field.back
         along: Texture = velocity if velocity is not None else source
@@ -340,7 +341,8 @@ class Fluid2D:
             field.begin()
             self._advect_shader.use(source, along, obstacle, self._field_aspect, step, dissipation,
                                     has_obstacles=self._has_obstacles, evaporation=evaporation,
-                                    evaporation_knee=evaporation_knee, measure=measure, guard=guard)
+                                    evaporation_knee=evaporation_knee, measure=measure, guard=guard,
+                                    closed=self._closed, wall_keep=wall_keep)
             field.end()
             return
         if not scratch.allocated or (scratch.width, scratch.height) != (field.width, field.height):
@@ -354,7 +356,8 @@ class Fluid2D:
         self._maccormack_shader.use(source, scratch, along, obstacle, self._field_aspect, step, dissipation,
                                     has_obstacles=self._has_obstacles, evaporation=evaporation,
                                     evaporation_knee=evaporation_knee, measure=measure, guard=guard,
-                                    clamp=limiter == Limiter.CLAMP)
+                                    clamp=limiter == Limiter.CLAMP,
+                                    closed=self._closed, wall_keep=wall_keep)
         field.end()
 
     def _advect_velocity(self) -> None:
@@ -364,7 +367,7 @@ class Fluid2D:
         self._carry(self._velocity_fbo, self._velocity_scratch, None, self._simulation_obstacle_fbo,
                     self._dt * velocity.advection_scale, self._calculate_dissipation(self._dt, velocity.fade_time),
                     velocity.advection, velocity.limiter, self._evaporation(self._dt, velocity.evaporation_time),
-                    velocity.evaporation_knee, 1, self._guard_slot('velocity'))
+                    velocity.evaporation_knee, 1, self._guard_slot('velocity'), self._wall_keep)
 
     def _apply_viscosity(self) -> None:
         """The viscosity (widths² per second): Jacobi iterations of the implicit diffusion, `viscosity.iterations` at
@@ -386,7 +389,9 @@ class Fluid2D:
                 viscosity_dt,
                 total_iterations=iterations,
                 iterations_per_dispatch=5,
-                has_obstacles=self._has_obstacles
+                has_obstacles=self._has_obstacles,
+                closed=self._closed,
+                wall_keep=self._wall_keep
             )
             if result is not current:          # the solve ended in the back buffer: make it the front
                 self._velocity_fbo.swap()
@@ -399,7 +404,9 @@ class Fluid2D:
                     self._simulation_obstacle_fbo,
                     self._cell,
                     viscosity_dt,
-                    has_obstacles=self._has_obstacles
+                    has_obstacles=self._has_obstacles,
+                    closed=self._closed,
+                    wall_keep=self._wall_keep
                 )
                 self._velocity_fbo.end()
 
@@ -418,7 +425,9 @@ class Fluid2D:
             self._simulation_obstacle_fbo,
             self._cell,
             vorticity.radius_1,
-            has_obstacles=self._has_obstacles
+            has_obstacles=self._has_obstacles,
+            closed=self._closed,
+            wall_keep=self._wall_keep
         )
         self._vorticity_curl_fbo.end()
 
@@ -506,7 +515,9 @@ class Fluid2D:
             has_obstacles=self._has_obstacles,
             expansion=self._expansion_fbo if rate != 0.0 else None,
             rate=rate,
-            mean_lod=mean_lod
+            mean_lod=mean_lod,
+            closed=closed,
+            wall_keep=self._wall_keep
         )
         self._divergence_fbo.end()
 
@@ -573,6 +584,17 @@ class Fluid2D:
                     density.advection, density.limiter, self._evaporation(self._dt, density.evaporation_time),
                     density.evaporation_knee, 0, self._guard_slot('density'))
 
+    @property
+    def _closed(self) -> bool:
+        """Whether the walls are closed (`wall`), as every pass reading beyond the field takes them."""
+        return self.settings.wall == WallMode.CLOSED
+
+    @property
+    def _wall_keep(self) -> float:
+        """The velocity's share along a closed wall kept this step: 0.01 over `slip_time` seconds, 1 at 0 (free-slip)."""
+        slip_time: float = self.settings.slip_time
+        return pow(0.01, self._dt / slip_time) if slip_time > 0.0 else 1.0
+
     def _guard_slot(self, field: str) -> GuardSlot | None:
         """The field's slot in the fluid's guard, None while `guard` is off."""
         return self._guard.slot(field) if self.settings.guard else None
@@ -580,10 +602,11 @@ class Fluid2D:
     # ========== Deferred ==========
 
     def _apply_wall_modes(self) -> None:
-        """Apply `wall` to the density and the temperature (GL thread only); the velocity stays 0 beyond the walls,
-        the pressure's walls are the solvers' ghosts."""
+        """Apply `wall` to the velocity, the density and the temperature, and their predictors, read beyond the walls
+        (GL thread only): closed, the edge; open, still water, 0. The pressure's walls are the solvers' ghosts."""
         wall = _WALL_GL[self.settings.wall]
-        for fbo in (self._density_fbo, self._temperature_fbo, self._density_scratch, self._temperature_scratch):
+        for fbo in (self._velocity_fbo, self._density_fbo, self._temperature_fbo, self._velocity_scratch, self._density_scratch,
+                    self._temperature_scratch):
             if fbo.allocated:
                 fbo.set_wrap(*wall)
 

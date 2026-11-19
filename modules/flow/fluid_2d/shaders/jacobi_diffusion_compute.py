@@ -42,7 +42,9 @@ class JacobiDiffusionCompute(ComputeShader):
         cell: tuple[float, float],
         viscosity_dt: float,
         iterations: int = DEFAULT_ITERATIONS_PER_DISPATCH,
-        has_obstacles: bool = True
+        has_obstacles: bool = True,
+        closed: bool = True,
+        wall_keep: float = 1.0
     ) -> None:
         """Run multiple Jacobi diffusion iterations in a single dispatch.
 
@@ -81,6 +83,8 @@ class JacobiDiffusionCompute(ComputeShader):
 
         # Obstacle flag
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
+        glUniform1i(self.get_uniform_loc("uClosed"), int(closed))
+        glUniform1f(self.get_uniform_loc("uWallKeep"), wall_keep)
 
         # Bind textures via samplers
         glActiveTexture(GL_TEXTURE0)
@@ -110,7 +114,9 @@ class JacobiDiffusionCompute(ComputeShader):
         viscosity_dt: float,
         total_iterations: int = 20,
         iterations_per_dispatch: int = DEFAULT_ITERATIONS_PER_DISPATCH,
-        has_obstacles: bool = True
+        has_obstacles: bool = True,
+        closed: bool = True,
+        wall_keep: float = 1.0
     ) -> Texture:
         """Run full diffusion solve with automatic ping-pong.
 
@@ -144,7 +150,9 @@ class JacobiDiffusionCompute(ComputeShader):
                 cell,
                 viscosity_dt,
                 iters,
-                has_obstacles
+                has_obstacles,
+                closed,
+                wall_keep
             )
 
             # Swap buffers for next iteration

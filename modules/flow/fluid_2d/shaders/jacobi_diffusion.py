@@ -12,7 +12,7 @@ class JacobiDiffusion(Shader):
 
     def use(self, source: Texture, obstacle: Texture,
             cell: tuple[float, float], viscosity_dt: float,
-            has_obstacles: bool = True) -> None:
+            has_obstacles: bool = True, closed: bool = True, wall_keep: float = 1.0) -> None:
         """Apply one Jacobi iteration for diffusion.
 
         Args:
@@ -21,6 +21,8 @@ class JacobiDiffusion(Shader):
             cell: A cell's width and height, widths
             viscosity_dt: Viscosity * delta_time (diffusion rate)
             has_obstacles: When False, skip obstacle texture reads for performance
+            closed: The walls closed, else open (walls_2d.glsl)
+            wall_keep: The share of the velocity along a closed wall kept a step; 1 free-slip
         """
         # Anisotropic grid spacing
         dx, dy = cell
@@ -40,6 +42,8 @@ class JacobiDiffusion(Shader):
 
         # Obstacle flag
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
+        glUniform1i(self.get_uniform_loc("uClosed"), int(closed))
+        glUniform1f(self.get_uniform_loc("uWallKeep"), wall_keep)
 
         # Bind textures
         glActiveTexture(GL_TEXTURE0)

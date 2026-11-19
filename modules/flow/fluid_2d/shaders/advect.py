@@ -20,7 +20,7 @@ class Advect(Shader):
     def use(self, source: Texture, velocity: Texture, obstacle: Texture,
             aspect: float, timestep: float, dissipation: float,
             has_obstacles: bool = True, evaporation: float = 0.0, evaporation_knee: float = 0.1, measure: int = 0,
-            guard: GuardSlot | None = None) -> None:
+            guard: GuardSlot | None = None, closed: bool = True, wall_keep: float = 1.0) -> None:
         """Apply advection.
 
         Args:
@@ -35,6 +35,9 @@ class Advect(Shader):
             evaporation_knee: The size below which the loss turns from a fixed amount to a share
             measure: How the size is read: 0 a premultiplied density's alpha, 1 a vector's length, 2 |r|
             guard: The field's slot in its stage's FiniteGuard: a non-finite value 0 and counted; None no guard
+            closed: The walls closed, else open (walls_2d.glsl)
+            wall_keep: The velocity's share along a closed wall kept this step, its cells against the wall braked;
+                1 for every field but the velocity
         """
         if not self.allocated or not self.shader_program:
             logger.warning("Advect shader not allocated or shader program missing.")
@@ -47,6 +50,8 @@ class Advect(Shader):
 
         # Obstacle flag
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
+        glUniform1i(self.get_uniform_loc("uClosed"), int(closed))
+        glUniform1f(self.get_uniform_loc("uWallKeep"), wall_keep)
 
         # Bind textures
         glActiveTexture(GL_TEXTURE0)

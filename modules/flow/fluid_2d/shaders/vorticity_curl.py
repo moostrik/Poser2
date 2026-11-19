@@ -11,7 +11,7 @@ class VorticityCurl(Shader):
         super().__init__()
 
     def use(self, velocity: Texture, obstacle: Texture, cell: tuple[float, float], radius: float,
-            has_obstacles: bool = True) -> None:
+            has_obstacles: bool = True, closed: bool = True, wall_keep: float = 1.0) -> None:
         """Compute velocity curl.
 
         Args:
@@ -20,6 +20,8 @@ class VorticityCurl(Shader):
             cell: A cell's width and height, widths
             radius: The sampling radius, widths; at least one cell
             has_obstacles: When False, skip obstacle texture reads for performance
+            closed: The walls closed, else open (walls_2d.glsl)
+            wall_keep: The share of the velocity along a closed wall kept a step; 1 free-slip
         """
         # the radius in cells per axis, at least one: the curl cannot be measured closer
         reach = (max(radius / cell[0], 1.0), max(radius / cell[1], 1.0))
@@ -29,6 +31,8 @@ class VorticityCurl(Shader):
 
         # Obstacle flag
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
+        glUniform1i(self.get_uniform_loc("uClosed"), int(closed))
+        glUniform1f(self.get_uniform_loc("uWallKeep"), wall_keep)
 
         # Bind textures
         glActiveTexture(GL_TEXTURE0)

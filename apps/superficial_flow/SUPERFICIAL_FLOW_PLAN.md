@@ -43,7 +43,6 @@ color), one fluid per screen. Until then hd_trio runs its own copy, unchanged.
 The 3D fluid's features that have a meaning on a plane, each as the 2D's own kernels, each checked in the GPU
 harness and seen in superficial_flow; the march's light, shadows and fog need a depth and stay 3D only:
 
-- **D5.** The walls' slip (`slip_time`).
 - **D6.** The three vorticity confinements, each its strength and radius in widths.
 - **D7.** The particles.
 
@@ -53,12 +52,12 @@ Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 
 | Step     | Check                                                                                               |
 |----------|-----------------------------------------------------------------------------------------------------|
-| D5 to D7 | GPU harness for each new kernel; -sim                                                               |
+| D6, D7   | GPU harness for each new kernel; -sim                                                               |
 | End      | the full suite once; the inference at 50 fps, the render at 60; deep_flow's times                |
 
 ## Rules it touches
 
-- Keep presets and settings schemas in sync with code changes: D5 to D7.
-- Shaders get checked in a GPU harness: D5 to D7.
-- Prefer the design with the lower latency, measured in the context of the app: D5 to D7.
+- Keep presets and settings schemas in sync with code changes: D6, D7.
+- Shaders get checked in a GPU harness: D6, D7.
+- Prefer the design with the lower latency, measured in the context of the app: D6, D7.
 - A plan is named after the package, app or folder it is for, and sits in it: this plan, in `apps/superficial_flow`.

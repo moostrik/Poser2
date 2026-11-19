@@ -32,7 +32,7 @@ its default, the sizes apart (`modules/flow/tests/test_fluid_2d_settings.py`). W
 
 | Group         | The 2D's settings                                                                              | The 3D's law                                                                                     |
 |---------------|------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
-| root          | `guard`, `wall`, `width`, `height`                                                             | [the guard](FLUID_3D.md#the-guard), [the walls](FLUID_3D.md#the-walls)                           |
+| root          | `guard`, `wall`, `slip_time`, `width`, `height`                                                | [the guard](FLUID_3D.md#the-guard), [the walls](FLUID_3D.md#the-walls)                           |
 | `time`        | `time_step`, `fixed_fps`, `fps_smoothing`, `time_scale`                                        | every pass and input steps by the fluid's time                                                   |
 | `input`       | the drags, the gains, the density's blend and release, gravity's `gravity_x` and `gravity_y`   | [the inputs](FLUID_3D.md#the-inputs)                                                             |
 | `velocity`    | `advection`, `limiter`, `advection_scale`, `fade_time`, `evaporation_time`, `evaporation_knee` | [the advection](FLUID_3D.md#the-advection), [the fade](FLUID_3D.md#the-fade-and-the-evaporation) |
@@ -49,11 +49,20 @@ superficial_flow's preset holds deep_flow's value for every setting the two shar
 
 ## What it does differently
 
-- The velocity is 0 beyond every wall, open or closed (its texture's border): on a plane the cells carry no faces
-  to hold a wall's normal apart from its tangent. The density and the temperature follow `wall` by their
-  textures' wraps: closed, beyond it the edge cell's value; open, 0. The pressure's walls are the 3D's, written
-  once (`walls_2d.glsl`) and read by every solver, every multigrid level and the gradient: beyond a closed wall
-  the cell's own pressure (Neumann), beyond an open one its negative, 0 on the wall's face (Dirichlet).
+- The walls are the 3D's ([FLUID_3D.md](FLUID_3D.md#the-walls)), written once (`walls_2d.glsl`) and read by every
+  pass that reads a neighbor beyond the field: the divergence, the gradient, every pressure solver and multigrid
+  level, the curl and the viscosity. Beyond a closed wall the velocity's component through it is turned and along
+  it (2k − 1) of it, the pressure the cell's own; beyond an open wall the velocity the same, the pressure its
+  negative, 0 on the wall's face. The velocity sits at the cells' centers, so the wall's face is the mean of the
+  edge cell and its ghost: closed, nothing through it. A trace that reads beyond a wall reads the field's
+  texture: closed, the edge cell; open, still water, 0. The density and the temperature are read the same way.
+- A closed wall slips as the 3D's: k = 0.01^(dt / `slip_time`), the velocity along the wall of the cells against
+  it multiplied by k in the advection, 1 free-slip.
+
+  Checked in the GPU harness, 2026-11-19, superficial_flow plan D5, at 64 × 64: a flow along a closed wall shows
+  no curl at it and the viscosity takes nothing; at `slip_time` 2 the wall's cells keep 0.4773 of 0.5, the
+  law's 0.4775, the inside 0.5; a flow of 1 width/s into the walls, projected, keeps a mean of 0.016 closed and
+  1.000 open.
 - The confinement's curl is a scalar, ω along z, and N × ω is (N.y ω, −N.x ω). Beyond the walls the curl's
   magnitude is the edge cell's, as the 3D's ghost: no slope toward a wall for the force to push along.
 - The solvers are the 3D's on the plane, each its own 2D kernel ([FLUID_3D.md](FLUID_3D.md#the-pressure)):

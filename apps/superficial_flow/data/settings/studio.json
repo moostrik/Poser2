@@ -631,6 +631,7 @@
     "fluid": {
       "guard": true,
       "wall": "OPEN",
+      "slip_time": 60.0,
       "width": 1080,
       "height": 1920,
       "blend_mode": "ADD",

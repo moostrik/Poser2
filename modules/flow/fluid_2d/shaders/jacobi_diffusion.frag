@@ -18,6 +18,8 @@ uniform vec2 uAlpha;   // (1/dx², 1/dy²) Laplacian weights
 uniform float uGamma;  // 1/(ν·Δt) central coefficient
 uniform float uBeta;   // 1/(2*alpha_x + 2*alpha_y + gamma)
 
+#include "walls_2d.glsl"
+
 void main() {
     vec2 st = texCoord;
 
@@ -36,6 +38,14 @@ void main() {
     vec4 xR = textureOffset(uSource, st, ivec2(1, 0));
     vec4 xL = textureOffset(uSource, st, ivec2(-1, 0));
     vec4 xC = texture(uSource, st);
+
+    // Beyond the field the wall's ghost (walls_2d.glsl)
+    ivec2 cell = ivec2(gl_FragCoord.xy);
+    ivec2 size = textureSize(uSource, 0);
+    if (cell.y + 1 >= size.y) xT = vec4(wall_velocity(xC.xy, 1), 0.0, 0.0);
+    if (cell.y - 1 < 0)       xB = vec4(wall_velocity(xC.xy, 1), 0.0, 0.0);
+    if (cell.x + 1 >= size.x) xR = vec4(wall_velocity(xC.xy, 0), 0.0, 0.0);
+    if (cell.x - 1 < 0)       xL = vec4(wall_velocity(xC.xy, 0), 0.0, 0.0);
 
     if (uHasObstacles) {
         // Inline neighbor obstacle sampling

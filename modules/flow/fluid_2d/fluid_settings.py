@@ -108,9 +108,10 @@ class Fluid2DSettings(BaseSettings):
         dρ/dt = −ρ / (evaporation_time × (ρ + evaporation_knee)) on a field's size ρ (fully dyed, ±1 warm, 1 width/s).
     """
 
-    # ---- The guard, how the fields are walled, then the grid (multiples of 8) ----
+    # ---- The guard, how the fields are walled and slip, then the grid (multiples of 8) ----
     guard: Field[bool]              = Field(True,                                       description="Set non-finite values to 0, count and log them; off once the fluid is stable")
-    wall: Field[WallMode]           = Field(WallMode.CLOSED,                            newline=True, description="Every side of every field. Closed: solid. Open: the water leaves")
+    wall: Field[WallMode]           = Field(WallMode.CLOSED,                            newline=True, description="Every side of every field. Closed: solid, the water slides along. Open: it leaves")
+    slip_time: Field[float]         = Field(0.0,    min=0.0,    max=60.0,   step=0.1,   description="Seconds the water along a closed wall takes to slow to 1%; 0 = free-slip")
     width: Field[int]               = Field(1080,   min=32,     max=4096,   step=8,     newline=True, description="Simulation grid width")
     height: Field[int]              = Field(1920,   min=32,     max=4096,   step=8,     description="Simulation grid height")
 

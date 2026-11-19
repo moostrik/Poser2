@@ -34,6 +34,8 @@ uniform int uIterations;  // Number of iterations to perform in this dispatch
 uniform ivec2 uSize;      // Texture dimensions
 uniform bool uHasObstacles;  // Skip obstacle handling when false
 
+#include "walls_2d.glsl"
+
 // Shared memory tile: 16x16 interior + 1-pixel halo on each side = 18x18
 shared vec2 s_velocity[18][18];
 shared float s_obstacle[18][18];
@@ -138,11 +140,11 @@ void main() {
             vec2 vL = s_velocity[sid.y][sid.x - 1];  // Left
             vec2 vC = s_velocity[sid.y][sid.x];      // Center
 
-            // Beyond the field the velocity's wall, 0 (its border), as the fragment version samples it
-            if (gid.y + 1 >= uSize.y) vT = vec2(0.0);
-            if (gid.y - 1 < 0)        vB = vec2(0.0);
-            if (gid.x + 1 >= uSize.x) vR = vec2(0.0);
-            if (gid.x - 1 < 0)        vL = vec2(0.0);
+            // Beyond the field the wall's ghost (walls_2d.glsl)
+            if (gid.y + 1 >= uSize.y) vT = wall_velocity(vC, 1);
+            if (gid.y - 1 < 0)        vB = wall_velocity(vC, 1);
+            if (gid.x + 1 >= uSize.x) vR = wall_velocity(vC, 0);
+            if (gid.x - 1 < 0)        vL = wall_velocity(vC, 0);
 
             if (uHasObstacles) {
                 // No-slip boundary conditions from shared obstacle tile

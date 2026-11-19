@@ -19,6 +19,8 @@ uniform float uMeanLod;        // The mip level that is the expansion's mean; be
 
 uniform vec2 uHalfRdxInv;  // 1 / (2 × the cell), widths, on x and y
 
+#include "walls_2d.glsl"
+
 void main() {
     vec2 st = texCoord;
 
@@ -35,6 +37,15 @@ void main() {
     vec2 vB = textureOffset(uVelocity, st, ivec2(0, -1)).xy;
     vec2 vR = textureOffset(uVelocity, st, ivec2(1, 0)).xy;
     vec2 vL = textureOffset(uVelocity, st, ivec2(-1, 0)).xy;
+
+    // Beyond the field the wall's ghost (walls_2d.glsl): closed, nothing through the wall's face
+    ivec2 cell = ivec2(gl_FragCoord.xy);
+    ivec2 size = textureSize(uVelocity, 0);
+    vec2 vCell = texture(uVelocity, st).xy;
+    if (cell.y + 1 >= size.y) vT = wall_velocity(vCell, 1);
+    if (cell.y - 1 < 0)       vB = wall_velocity(vCell, 1);
+    if (cell.x + 1 >= size.x) vR = wall_velocity(vCell, 0);
+    if (cell.x - 1 < 0)       vL = wall_velocity(vCell, 0);
 
     if (uHasObstacles) {
         vec2 vC = texture(uVelocity, st).xy;

@@ -23,6 +23,8 @@ uniform float uEvaporationKnee; // the size below which the loss turns from a fi
 uniform int   uMeasure;        // how the evaporation reads a field's size: 0 its alpha, 1 its vector's length, 2 |r|
 uniform int   uGuardSlot;      // the field's slot in the stage's FiniteGuard; -1 no guard
 
+#include "walls_2d.glsl"
+
 // The stage's non-finite counts (FiniteGuard, GUARD_BINDING)
 layout(std430, binding = 7) buffer FiniteGuard { uint uNonFinite[]; };
 
@@ -75,6 +77,8 @@ void main() {
     if (uEvaporation > 0.0) {
         result = evaporate(result);
     }
+    // The velocity against a closed wall braked along it (walls_2d.glsl; uWallKeep 1 for every other field)
+    result.xy = slip(result.xy, ivec2(gl_FragCoord.xy), textureSize(uSource, 0));
     if (uGuardSlot >= 0 && non_finite(result)) {
         atomicAdd(uNonFinite[uGuardSlot], 1u);
         result = vec4(0.0);
