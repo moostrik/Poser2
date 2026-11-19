@@ -164,3 +164,7 @@ python -m unittest discover -s modules/<pkg>/tests -t .    # camera/oak4 in .ven
 - A finished plan is reported with the rules it touched, one line each
 - Push only on the user's word
 - Never delete or rewrite a plan without confirmation; propose the change first
+
+## Threads
+
+- A thread that finds a minor problem fixes it, and asks the thread the code belongs to for feedback
