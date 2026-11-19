@@ -14,9 +14,12 @@ encoder.
 
 ### What gets recorded
 
-The app chooses the sources and draws them into `ScreenCapture.frame`: in deep_flow the layer list
-`layer.record`, each fit and centered at its own shape and blended the way the show draws them (additive on
-black), so a recording of the composite is the show. With `main_window` the window's back buffer is copied
+The recorder's settings are the group `screen_recorder` at the root of an app's settings, so it has a tab
+of its own on the panel (deep_flow and low_flow).
+
+The app chooses the sources and draws them into `ScreenCapture.frame`: in deep_flow and low_flow the main
+panel's layers (`layer.main`), each fit and centered at its own shape and blended the way the show draws them
+(additive on black), so a recording is the show. With `main_window` the window's back buffer is copied
 into the frame instead (`ScreenCapture.copy_window`), right after the window is drawn and before it is shown.
 A module cannot know an app's layers, so the drawing is the app's and the capture is the module's.
 

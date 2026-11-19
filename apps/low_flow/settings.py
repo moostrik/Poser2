@@ -267,7 +267,6 @@ class RenderSettings(BaseSettings):
     # the display
     time_series: Group[render.TimeSeriesLayerSettings] = Group(render.TimeSeriesLayerSettings)
     colors : Group[render.ColorSettings]         = Group(render.ColorSettings)
-    screen_recorder: Group[ScreenRecorderSettings] = Group(ScreenRecorderSettings)
     window : Group[WindowSettings]               = Group(WindowSettings)
 
 
@@ -303,5 +302,6 @@ class Settings(BaseSettings):
     cadence: Group[CadenceSettings] = Group(CadenceSettings)
     pose  : Group[PoseGroup]      = Group(PoseGroup, share=[max_players, input_fps.as_('frequency')])
     render: Group[RenderSettings] = Group(RenderSettings, share=[input_fps])
+    screen_recorder: Group[ScreenRecorderSettings] = Group(ScreenRecorderSettings)
     inout : Group[InOutGroup]     = Group(InOutGroup)
     panel : Group[PanelSettings]  = Group(PanelSettings)

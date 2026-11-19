@@ -815,20 +815,6 @@
         "a": 1.0
       }
     },
-    "screen_recorder": {
-      "look_back": false,
-      "name": "",
-      "main_window": false,
-      "fill": false,
-      "size": "UHD",
-      "portrait": true,
-      "width": 2160,
-      "height": 3840,
-      "frame_step": 1,
-      "duration": 0.0,
-      "reserve": 1.0,
-      "quality": 18
-    },
     "window": {
       "title": "Poser",
       "v_sync": false,
@@ -842,6 +828,20 @@
       "fullscreen_mode": "WINDOWED_FULLSCREEN",
       "fullscreen_mouse": false
     }
+  },
+  "screen_recorder": {
+    "look_back": false,
+    "name": "",
+    "main_window": false,
+    "fill": false,
+    "size": "UHD",
+    "portrait": true,
+    "width": 2160,
+    "height": 3840,
+    "frame_step": 1,
+    "duration": 0.0,
+    "reserve": 1.0,
+    "quality": 18
   },
   "inout": {
     "osc_sound": {

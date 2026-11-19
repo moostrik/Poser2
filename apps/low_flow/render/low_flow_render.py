@@ -27,13 +27,14 @@ BORDER_WIDTH: float = 2.0       # px
 
 
 class LowFlowRender(RenderBase):
-    def __init__(self, board: RenderBoard, settings: RenderSettings, screen_recordings: str,
+    def __init__(self, board: RenderBoard, settings: RenderSettings, recorder_settings: ScreenRecorderSettings, screen_recordings: str,
                  num_cams: int = 1, max_players: int = 1) -> None:
-        """`screen_recordings` the folder the screen recordings go to."""
+        """`recorder_settings` the screen recorder's, `screen_recordings` the folder its recordings go to."""
         super().__init__(settings.window)
         self.max_players: int = max_players
         self.num_cams: int = num_cams
         self.settings: RenderSettings = settings
+        self._recorder_settings: ScreenRecorderSettings = recorder_settings
 
         self.board: RenderBoard = board
 
@@ -99,8 +100,8 @@ class LowFlowRender(RenderBase):
 
         # The screen recording: the main panel's layers, or the main window, drawn into the capture's screen frame
         self._screen_capture: ScreenCapture = ScreenCapture()
-        self.screen_recorder: ScreenRecorder = ScreenRecorder(settings.screen_recorder, self._screen_capture, screen_recordings)
-        settings.screen_recorder.bind(ScreenRecorderSettings.snap, self._on_snap)
+        self.screen_recorder: ScreenRecorder = ScreenRecorder(recorder_settings, self._screen_capture, screen_recordings)
+        recorder_settings.bind(ScreenRecorderSettings.snap, self._on_snap)
 
     def _make_layout(self) -> render.Subdivision:
         width, height = self._window_size
@@ -170,7 +171,7 @@ class LowFlowRender(RenderBase):
 
     def deallocate(self) -> None:
         # the recording ends first: its encode finishes and frees its CUDA memory, then its GL objects go
-        self.settings.screen_recorder.unbind(ScreenRecorderSettings.snap, self._on_snap)
+        self._recorder_settings.unbind(ScreenRecorderSettings.snap, self._on_snap)
         self.screen_recorder.stop()
         self.screen_recorder.deallocate()
         for cam_dict in self.L.values():
@@ -324,7 +325,7 @@ class LowFlowRender(RenderBase):
         """The screen frame, when the recorder records this tick: the main panel's layers, each fit and centered at its
         own shape and added on black as the show draws them, or the main window just drawn; then the recorder's
         tick, which copies it."""
-        recorder_settings: ScreenRecorderSettings = self.settings.screen_recorder
+        recorder_settings: ScreenRecorderSettings = self._recorder_settings
         if self.screen_recorder.capturing:
             capture: ScreenCapture = self._screen_capture
             if recorder_settings.main_window:
@@ -348,7 +349,7 @@ class LowFlowRender(RenderBase):
 
     def _on_snap(self, _: bool) -> None:
         """The recording's size: the main panel's first layer's, or the main window's when it is recorded."""
-        recorder_settings: ScreenRecorderSettings = self.settings.screen_recorder
+        recorder_settings: ScreenRecorderSettings = self._recorder_settings
         record: list[ChainLayers] = self._main_layers
         if recorder_settings.main_window:
             width, height = self._window_size
