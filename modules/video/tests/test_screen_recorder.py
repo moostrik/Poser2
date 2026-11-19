@@ -275,6 +275,25 @@ class StateTest(unittest.TestCase):
         self.assertEqual(self.settings.playhead[0], 0.5)    # where it was let go
         self.discard(ScreenRecorderState.IDLE)
 
+    def test_the_preview_is_the_frame_under_the_dragged_marker(self) -> None:
+        self.settings.duration = 1.0
+        ScreenRecorderSettings.start.fire(self.settings)
+        self.tick_until(lambda: self.settings.state is ScreenRecorderState.HELD)
+        self.assertIsNone(self.recorder.preview_slot)           # no marker dragged
+        whole = self.save_held().frames
+        self.settings.scrub = 0.5
+        slot = self.recorder.preview_slot
+        assert slot is not None
+        frame = self.ring._slots[slot]
+        self.assertEqual(self.times[frame] - self.times[whole[0]], 0.5)     # the frame half a second in
+        self.settings.scrub = 1.0
+        last = self.recorder.preview_slot
+        assert last is not None
+        self.assertEqual(self.ring._slots[last], whole[-1])
+        self.settings.scrub = -1.0
+        self.assertIsNone(self.recorder.preview_slot)           # let go
+        self.discard(ScreenRecorderState.IDLE)
+
     def test_duration_stops_the_recording(self) -> None:
         self.settings.duration = 0.5
         ScreenRecorderSettings.start.fire(self.settings)

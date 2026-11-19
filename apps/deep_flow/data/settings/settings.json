@@ -29,7 +29,7 @@
         "offset": 0.0
       },
       "sensor": {
-        "exposure": 19218,
+        "exposure": 7121,
         "iso": 2734,
         "auto_exposure": false,
         "auto_exposure_lock": false,
@@ -42,7 +42,7 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 3999,
+        "balance": 3995,
         "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
@@ -274,7 +274,7 @@
     "pause": false,
     "layer": {
       "main": [
-        "motion"
+        "show"
       ],
       "debug": [
         "fluid"
@@ -518,7 +518,7 @@
       "gravity": {
         "x": 0.0,
         "y": 0.0,
-        "z": 0.02
+        "z": -0.06
       },
       "input": {
         "spread": 0.237,
@@ -527,7 +527,7 @@
         "acceleration_gain": 10.0,
         "density_drag": 200.0,
         "density_release": 0.0,
-        "density_gain": 5.0,
+        "density_gain": 1.0,
         "density_blend": "OVER",
         "temperature_drag": 200.0,
         "temperature_gain": 5.0
@@ -547,7 +547,7 @@
       },
       "vorticity": {
         "enabled": true,
-        "strength_1": 32.83,
+        "strength_1": 50.0,
         "strength_2": 0.0,
         "strength_3": 0.0,
         "radius_1": 0.1,
@@ -610,9 +610,9 @@
         "smooth": 3
       },
       "composite": {
-        "emission": 10.0,
-        "opacity": 1.2,
-        "fog": 0.269,
+        "emission": 11.77,
+        "opacity": 0.195,
+        "fog": 0.214,
         "tint": {
           "r": 0.8588235294117647,
           "g": 0.8470588235294118,
@@ -817,10 +817,10 @@
     },
     "window": {
       "title": "Poser",
-      "v_sync": false,
-      "monitor": "M0",
-      "x": 678,
-      "y": 1431,
+      "v_sync": true,
+      "monitor": "M1",
+      "x": 569,
+      "y": 528,
       "width": 1277,
       "height": 1385,
       "secondary_list": [],
@@ -840,7 +840,9 @@
     "height": 3840,
     "frame_step": 1,
     "duration": 0.0,
+    "memory": "HOST",
     "reserve": 1.0,
+    "ram_reserve": 8.0,
     "quality": 18
   },
   "inout": {

@@ -29,8 +29,9 @@ class ScreenRecordingInput:
 
 class ScreenRecordingCompositor(LayerBase):
     """The screen frame of a recording: the sources, each fit (or filled) at its own shape and added on black as the
-    show draws them, or the main window just drawn; then the recorder's tick, which copies it. Owns the
-    `ScreenCapture` and the `ScreenRecorder`; `snap` sets the size to the first source's, or the window's."""
+    show draws them, or the main window just drawn; then the recorder's tick, which copies it, and while a marker of
+    a held take is dragged its frame over the main window. Owns the `ScreenCapture` and the `ScreenRecorder`; `snap`
+    sets the size to the first source's, or the window's."""
 
     def __init__(self, settings: ScreenRecorderSettings, folder: str) -> None:
         """`folder`: where the recordings go."""
@@ -81,6 +82,24 @@ class ScreenRecordingCompositor(LayerBase):
                 capture.frame.end()
             glViewport(0, 0, input.window_width, input.window_height)
         self.recorder.update(input.timestamp)
+        self._draw_preview(input.window_width, input.window_height)
+
+    def _draw_preview(self, window_width: int, window_height: int) -> None:
+        """While a marker of a held take is dragged, its frame over the main window, fit on black."""
+        slot = self.recorder.preview_slot
+        if slot is None or window_width <= 0 or window_height <= 0:
+            return
+        capture = self._capture
+        capture.show_preview(slot)
+        glViewport(0, 0, window_width, window_height)
+        clear_color(0.0, 0.0, 0.0, 1.0)
+        x, y, w, h = fit(capture.width, capture.height, window_width, window_height)
+        glViewport(round(x), round(y), round(w), round(h))
+        Style.push_style()
+        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        capture.preview.draw()
+        Style.pop_style()
+        glViewport(0, 0, window_width, window_height)
 
     def _on_snap(self, _: bool) -> None:
         """The recording's size: the first source's shape, or the main window's when it is recorded."""

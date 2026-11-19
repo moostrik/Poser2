@@ -29,7 +29,7 @@
         "offset": 0.0
       },
       "sensor": {
-        "exposure": 13463,
+        "exposure": 7000,
         "iso": 1511,
         "auto_exposure": false,
         "auto_exposure_lock": false,
@@ -42,7 +42,7 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 4225,
+        "balance": 3971,
         "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
@@ -667,7 +667,7 @@
           "opacity": 6.0,
           "depth_fade": 0.0,
           "slice": false,
-          "slice_position": 0.5859375,
+          "slice_position": 0.6015625,
           "slice_focus": 0.5,
           "orbit": {
             "yaw": 0.0,
@@ -689,7 +689,7 @@
           "opacity": 3.0,
           "depth_fade": 0.0,
           "slice": true,
-          "slice_position": 0.5546875,
+          "slice_position": 0.5703125,
           "slice_focus": 0.36,
           "orbit": {
             "yaw": 52.59975975870282,
@@ -818,9 +818,9 @@
     "window": {
       "title": "Poser",
       "v_sync": true,
-      "monitor": "M0",
-      "x": 678,
-      "y": 1431,
+      "monitor": "M1",
+      "x": 479,
+      "y": 887,
       "width": 1277,
       "height": 1385,
       "secondary_list": [],
@@ -840,7 +840,9 @@
     "height": 3840,
     "frame_step": 1,
     "duration": 0.0,
+    "memory": "HOST",
     "reserve": 1.0,
+    "ram_reserve": 8.0,
     "quality": 18
   },
   "inout": {

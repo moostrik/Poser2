@@ -7,6 +7,7 @@ tick acts on them. Design and reasons: modules/video/VIDEO.md.
 """
 
 import logging
+from bisect import bisect_left
 import time
 from datetime import datetime
 from enum import Enum, auto
@@ -239,6 +240,17 @@ class ScreenRecorder:
     def fps(self) -> float:
         """The render ticks per second, measured."""
         return self._fps
+
+    @property
+    def preview_slot(self) -> int | None:
+        """The ring slot of the held frame under the dragged marker, or None when no marker is dragged; render thread."""
+        if self._state is not ScreenRecorderState.HELD or not self._dragging or not self._held_stamps:
+            return None
+        moment = self._held_stamps[0] + self._position * self._held_length()
+        index = min(bisect_left(self._held_stamps, moment), len(self._held_stamps) - 1)
+        if index > 0 and moment - self._held_stamps[index - 1] < self._held_stamps[index] - moment:
+            index -= 1      # the nearer of the two frames around the moment
+        return self._held_slots[index]
 
     def start(self) -> None:
         self._thread.start()

@@ -30,7 +30,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 5832,
+        "iso": 1778,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -42,7 +42,7 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 3832,
+        "balance": 3951,
         "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
@@ -270,7 +270,7 @@
     }
   },
   "render": {
-    "debug": true,
+    "debug": false,
     "pause": false,
     "layer": {
       "main": [
@@ -335,7 +335,31 @@
       "luma_matte": 0.0,
       "use_mask": true,
       "erode": 0,
-      "feather": 4.0
+      "feather": 4.0,
+      "monitor_main": {
+        "texture": "output.velocity",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
+      },
+      "monitor_debug": {
+        "texture": "output.velocity",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
+      }
     },
     "motion": {
       "guard": true,
@@ -794,14 +818,14 @@
     "window": {
       "title": "Poser",
       "v_sync": false,
-      "monitor": "M0",
-      "x": 1921,
-      "y": 31,
+      "monitor": "M1",
+      "x": 107,
+      "y": 166,
       "width": 1918,
       "height": 2080,
       "secondary_list": [],
       "secondary_fullscreen": false,
-      "fullscreen_mode": "WINDOWED",
+      "fullscreen_mode": "WINDOWED_FULLSCREEN",
       "fullscreen_mouse": false
     }
   },
@@ -816,7 +840,9 @@
     "height": 3840,
     "frame_step": 1,
     "duration": 0.0,
+    "memory": "HOST",
     "reserve": 1.0,
+    "ram_reserve": 8.0,
     "quality": 18
   },
   "inout": {

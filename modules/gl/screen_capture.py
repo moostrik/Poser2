@@ -4,7 +4,8 @@ memory.
 The render thread draws into `frame` (or copies the window into it with `copy_window`) and calls `capture`. The
 ring's blocks are pinned host memory (`cudaMallocHost`) or plain `cudaMalloc` memory, added and freed by any thread;
 `download` hands a frame out of RAM as it is, or reads it back from video memory into pinned host memory on a stream
-of its own. Only the render thread makes GL calls. See modules/video/VIDEO.md.
+of its own. `show_preview` draws a slot's frame back into `preview`. Only the render thread makes GL calls. See
+modules/video/VIDEO.md.
 """
 
 import ctypes
@@ -15,10 +16,11 @@ from threading import Lock
 import numpy as np
 import psutil
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER, GL_LINEAR, GL_NEAREST,
-                       GL_PACK_ALIGNMENT, GL_PIXEL_PACK_BUFFER, GL_R8, GL_READ_FRAMEBUFFER, GL_RED, GL_RG, GL_RG8,
-                       GL_RGBA8, GL_STREAM_COPY, GL_UNSIGNED_BYTE, glBindBuffer, glBindFramebuffer, glBlitFramebuffer,
-                       glBufferData, glClear, glClearColor, glDeleteBuffers, glGenBuffers,
-                       glPixelStorei, glReadPixels)
+                       GL_PACK_ALIGNMENT, GL_PIXEL_PACK_BUFFER, GL_PIXEL_UNPACK_BUFFER, GL_R8, GL_READ_FRAMEBUFFER,
+                       GL_RED, GL_RG, GL_RG8, GL_RGBA8, GL_STREAM_COPY, GL_STREAM_DRAW, GL_TEXTURE_2D,
+                       GL_UNPACK_ALIGNMENT, GL_UNSIGNED_BYTE, glBindBuffer, glBindFramebuffer, glBindTexture,
+                       glBlitFramebuffer, glBufferData, glBufferSubData, glClear, glClearColor, glDeleteBuffers,
+                       glGenBuffers, glPixelStorei, glReadPixels, glTexSubImage2D)
 
 try:
     from . import cudart   # binds torch's CUDA runtime; fails without a CUDA torch
@@ -27,13 +29,15 @@ except (ImportError, OSError):
     _CUDA_OK = False
 from . import style
 from .fbo import Fbo
-from .shaders import Nv12, Nv12Plane
+from .shaders import Nv12, Nv12Plane, Nv12ToRgb
+from .texture import Texture
 from .utils import fill, fit
 
 logger = logging.getLogger(__name__)
 
 PIXEL_BUFFERS: int = 2      # one written by GL this tick, one copied by CUDA from last tick
 _PACK_ALIGNMENT: int = 4    # GL's default, which nothing else in the apps changes: set back after the capture's reads
+_UNPACK_ALIGNMENT: int = 4  # GL's default too: set back after the preview's uploads
 
 
 def nv12_bytes(width: int, height: int) -> int:
@@ -65,6 +69,14 @@ class ScreenCapture:
         self._host_events: list[int] = []   # one per download buffer: its copy is done
         self._downloads: deque[int] = deque()   # host buffer indices queued, oldest first
         self._next_host: int = 0
+        # the preview: a slot's frame back as RGB, its planes uploaded through one pixel buffer
+        self.preview: Fbo = Fbo()
+        self._preview_y: Texture = Texture()
+        self._preview_uv: Texture = Texture()
+        self._preview_shader: Nv12ToRgb = Nv12ToRgb()
+        self._preview_buffer: int = 0
+        self._preview_resource: int = 0
+        self._preview_slot: int | None = None   # the slot `preview` shows; None after any capture
 
     @property
     def allocated(self) -> bool:
@@ -101,6 +113,15 @@ class ScreenCapture:
                 self._resources.append(cudart.register_gl_buffer(buffer, cudart.REGISTER_FLAGS_READ_ONLY))
             self._capture_stream = cudart.stream_create()
             self._download_stream = cudart.stream_create()
+            self.preview.allocate(width, height, GL_RGBA8)
+            self._preview_y.allocate(width, height, GL_R8)
+            self._preview_uv.allocate(width // 2, height // 2, GL_RG8)
+            self._preview_shader.allocate()
+            self._preview_buffer = int(glGenBuffers(1))
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, self._preview_buffer)
+            glBufferData(GL_PIXEL_UNPACK_BUFFER, self.frame_bytes, None, GL_STREAM_DRAW)
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
+            self._preview_resource = cudart.register_gl_buffer(self._preview_buffer, cudart.REGISTER_FLAGS_WRITE_DISCARD)
         except Exception:
             self.deallocate()
             raise
@@ -118,6 +139,21 @@ class ScreenCapture:
         if self._pixel_buffers:
             glDeleteBuffers(len(self._pixel_buffers), self._pixel_buffers)
         self._pixel_buffers = []
+        if self._preview_resource:
+            try:
+                cudart.unregister_resource(self._preview_resource)
+            except cudart.CudaError as e:
+                logger.warning('Screen capture preview unregister failed: %s', e)
+            self._preview_resource = 0
+        if self._preview_buffer:
+            glDeleteBuffers(1, [self._preview_buffer])
+            self._preview_buffer = 0
+        if self._preview_shader.allocated:
+            self._preview_shader.deallocate()
+        for texture in (self.preview, self._preview_y, self._preview_uv):
+            if texture.allocated:
+                texture.deallocate()
+        self._preview_slot = None
         for stream in (self._capture_stream, self._download_stream):
             if stream:
                 cudart.stream_destroy(stream)
@@ -146,6 +182,7 @@ class ScreenCapture:
     def capture(self, slot: int) -> None:
         """Copy last tick's frame into its ring slot, and convert `frame` into the other pixel buffer, to go into
         `slot` on the next `capture` or `flush`."""
+        self._preview_slot = None       # a slot may be written over: the preview is drawn again when asked
         self.flush()
         buffer = self._pixel_buffers[self._turn]
         style.push_style()
@@ -184,6 +221,42 @@ class ScreenCapture:
                 cudart.memcpy_device_to_device(pointer, source, self.frame_bytes, self._capture_stream)
         finally:
             cudart.unmap_resource(resource, self._capture_stream)
+
+    def show_preview(self, slot: int) -> None:
+        """Draw slot `slot`'s frame into `preview`, upright, when it is not the one there: its planes go into the
+        preview's pixel buffer (uploaded from RAM, or copied on the device through CUDA in the `Tensor` texture's
+        way), into the Y and Cb Cr textures, and back to RGB. Waits for the copies into the ring first."""
+        if slot == self._preview_slot:
+            return
+        self.synchronize()
+        pointer = self.slot_pointer(slot)
+        if self.host_memory:
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, self._preview_buffer)
+            glBufferSubData(GL_PIXEL_UNPACK_BUFFER, 0, self.frame_bytes, ctypes.c_void_p(pointer))
+        else:
+            cudart.map_resource(self._preview_resource, self._capture_stream)
+            try:
+                target, _ = cudart.mapped_pointer(self._preview_resource)
+                cudart.memcpy_device_to_device(target, pointer, self.frame_bytes, self._capture_stream)
+            finally:
+                cudart.unmap_resource(self._preview_resource, self._capture_stream)
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, self._preview_buffer)
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)   # rows of any even width, unpadded
+        glBindTexture(GL_TEXTURE_2D, self._preview_y.tex_id)
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.width, self.height, GL_RED, GL_UNSIGNED_BYTE, ctypes.c_void_p(0))
+        glBindTexture(GL_TEXTURE_2D, self._preview_uv.tex_id)
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.width // 2, self.height // 2, GL_RG, GL_UNSIGNED_BYTE,
+                        ctypes.c_void_p(self.width * self.height))
+        glBindTexture(GL_TEXTURE_2D, 0)
+        glPixelStorei(GL_UNPACK_ALIGNMENT, _UNPACK_ALIGNMENT)
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
+        style.push_style()
+        style.set_blend_mode(style.BlendMode.DISABLED)
+        self.preview.begin()
+        self._preview_shader.use(self._preview_y, self._preview_uv)
+        self.preview.end()
+        style.pop_style()
+        self._preview_slot = slot
 
     # ANY THREAD: CUDA ONLY
 

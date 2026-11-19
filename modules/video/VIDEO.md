@@ -134,6 +134,14 @@ ring, or in look back empties it and records on. Start is refused while a take i
 dragged marker, or the place on the bar pressed, so it shows where the take is looked at. `scrub` and `seek` are
 bound, because the panel writes them back to −1 at once.
 
+While a marker is dragged, the main window shows the held frame nearest to it (`ScreenRecorder.preview_slot`), fit
+on black, so a cut is made on what is seen. `ScreenCapture.show_preview` puts the slot's planes into one unpack pixel
+buffer (from RAM a plain upload; in video memory a device-to-device copy through CUDA, as the `Tensor` texture
+uploads), into a Y and a Cb Cr texture, and the `Nv12ToRgb` shader (`modules/gl/shaders/video/nv12_to_rgb.py`) turns
+them back into RGB in `ScreenCapture.preview`, upright. It runs only when the slot under the marker changes. From
+RAM the upload copies a whole frame on the render thread, about 12 MB at UHD **(deduction)**, only while a marker is
+dragged. `scripts/screen_capture_check.py` checks the NV12 codes and the preview on the GPU, in both memories.
+
 ### Look back
 
 With `look_back` on the ring records all the time, the newest frame replacing the oldest. It holds 1.2 ×

@@ -30,7 +30,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 1604,
+        "iso": 1701,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -42,7 +42,7 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 4256,
+        "balance": 3985,
         "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
@@ -603,7 +603,7 @@
     },
     "pose": {
       "stage": "LERP",
-      "frame": "CAMERA",
+      "frame": "VIEW",
       "features": "NONE",
       "crop": {
         "back_stage": "CLEAN",
@@ -719,8 +719,8 @@
     },
     "window": {
       "title": "Poser",
-      "v_sync": false,
-      "monitor": "M2",
+      "v_sync": true,
+      "monitor": "M1",
       "x": 130,
       "y": 128,
       "width": 1918,
@@ -733,7 +733,7 @@
   },
   "screen_recorder": {
     "look_back": false,
-    "name": "",
+    "name": "Harry",
     "main_window": false,
     "fill": false,
     "size": "UHD",
@@ -742,7 +742,9 @@
     "height": 3840,
     "frame_step": 1,
     "duration": 0.0,
+    "memory": "VIDEO",
     "reserve": 1.0,
+    "ram_reserve": 8.0,
     "quality": 18
   },
   "inout": {
