@@ -19,8 +19,8 @@ class Image:
         mask: Segmentation mask on GPU (H, W) float16 [0,1]
         foreground: Masked foreground on GPU (3, H, W) float16 RGB CHW [0,1]
         timestamp: The capture time of the camera frame it was made from (the pose's), the frame's identity; nan when unknown
-        ready: Recorded on the segmentation's stream after the mask and the foreground are written: a reader on
-               another stream waits on it (`stream.wait_event(ready)`) first; None where nothing is queued
+        ready: Recorded on the segmentation's stream after the mask and the foreground are written, and passed when
+               handed on; None where nothing is queued
         box: The window its crop was cut at, uv on the camera image (rows down), where the mask lies in the camera
              image; None when its crop carried none
     """

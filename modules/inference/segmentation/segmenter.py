@@ -148,12 +148,12 @@ class Segmenter(ModelWorker[Batch, SegmenterSettings]):
                 sources = [self._states[t].tensors()[k] if t in self._states else self._zero_states[k] for t in track_ids]
                 inputs[name] = torch.cat(sources, dim=0)
             outputs: dict[str, torch.Tensor] = self._engine.run(inputs)
-            self._stream.synchronize()
             self._states = {t: RecurrentState(*(outputs[name][i:i + 1] for name in STATE_OUTPUTS)) for i, t in enumerate(track_ids)}
             mask: torch.Tensor = outputs['pha'].squeeze(1)
             if needs_resize:
                 mask = torch.nn.functional.interpolate(mask.unsqueeze(1), size=(crop_h, crop_w), mode='bilinear', align_corners=False).squeeze(1)
             foreground: torch.Tensor = original * mask.unsqueeze(1)
             written: torch.cuda.Event = torch.cuda.Event()
-            written.record(self._stream)        # after the last step: the readers wait for it on their streams
+            written.record(self._stream)
+        self._stream.synchronize()              # handed on written: its readers are outside the package
         return mask, foreground, written

@@ -53,8 +53,8 @@ in any order unless they are synchronized so
   (`crop.Image.box`), and the segmentation's mask takes it (`segmentation.Image.box`), where the mask lies in the
   camera image.
 - Each model worker waits for the crops' event on its stream and runs there. The pose estimator synchronizes once,
-  at the end, to decode its points on the CPU; the segmentation's masks stay on the GPU with an event of their own
-  (`segmentation.Image.ready`), as do the flows. The decode stays on the CPU: on the GPU it gives the same points
+  at the end, to decode its points on the CPU; the segmenter and the optical flow synchronize once at the end too,
+  so their masks and flows are written when handed on, for readers outside the package. The decode stays on the CPU: on the GPU it gives the same points
   but takes longer, its kernel launches costing more than copying the model's outputs
   ([TIMING.md](TIMING.md#the-poses-decode)).
 
