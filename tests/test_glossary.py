@@ -21,7 +21,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-APPS = ['white_space', 'hd_trio', 'deep_flow', 'smile']
+APPS = ['white_space', 'hd_trio', 'deep_flow', 'superficial_flow', 'smile']
 ROOTS = [ROOT / 'modules'] + [ROOT / 'apps' / app for app in APPS]
 PRESET_DIRS = [ROOT / 'apps' / app / 'data' / 'settings' for app in APPS]
 SKIPPED_DIRS = {'vimbapython', '__pycache__'}

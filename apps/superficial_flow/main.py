@@ -1,0 +1,297 @@
+"""Superficial Flow — single-camera 2D fluid installation.
+
+Runs in `.venv-oak4`, the depthai 3 venv (`scripts\\install.bat oak4`), on one OAK4, without depth. `-sim` plays the
+recordings' video on the host with the replay backend, with no camera attached.
+"""
+
+import time
+from functools import partial
+
+from modules.camera import CameraSource, CameraHealth, CameraTracklets
+from modules.camera.oak4 import Camera, ModelChain
+from modules.recording import Player, Recorder, replay
+from modules.session import Session
+from modules.settings import presets
+from modules.panel import PanelServer
+from modules.inout import OscSound
+from modules.tracker import OnePerCamTracker, TrackerFrameSource
+from modules.pose import configure_features
+from modules.pose.pipeline import Domain, PosePipeline
+from modules.inference import pose, person, CropExtractor, GpuImage, ImageSnapshot, has_points, RecordedPoses, InferenceFrame, InferenceFrameSync, Poses, SerialUploader, frame_poses
+from modules.pose import FrameDict
+from modules.utils import FPS, PerformanceTimer
+
+from .board import RenderBoard
+from .series import Series, TIMER_SERIES
+from .pose.pipeline import pipeline_spec
+from .settings import Settings, Stage
+from .render import SuperficialFlowRender
+
+APP_NAME = 'superficial_flow'
+DATA_PATH = 'apps/superficial_flow/data'
+
+
+class SuperficialFlowMain:
+    def __init__(self, simulation: bool = False, interface: bool = True) -> None:
+
+        self.is_running: bool = False
+        self.is_finished: bool = False
+
+        # SETTINGS
+        presets.set_app(APP_NAME)
+        self.settings = Settings()
+        preset_file = presets.startup_path()
+        if not presets.load(self.settings, preset_file):
+            raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
+        self.settings.camera.sim_enabled = simulation
+        if not interface:
+            self.settings.panel.browser = False  # launcher override; the preset cannot turn it back on
+        # The crop is the pose model's input, so it is cut at that size: one antialiased resample
+        # from the camera frame, rather than a larger crop the runner scales down again. Derived
+        # from the model so a change of pose resolution cannot silently reintroduce the second one.
+        crop_settings = self.settings.pose.pose_crop
+        crop_settings.output_width = self.settings.pose.pose.width
+        crop_settings.output_height = self.settings.pose.pose.height
+        self.settings.initialize()
+        self.panel_server = PanelServer(self.settings, self.settings.panel, on_exit=self.stop)
+
+        max_players: int = self.settings.max_players
+        num_cams: int = self.settings.num_cams
+        p = self.settings.pose
+
+        # BLACKBOARD
+        self.board = RenderBoard()
+        self.osc_sound = OscSound(self.settings.inout.osc_sound)
+
+        # CAMERA
+        configure_features(max_players)
+
+        self.cameras: list[CameraSource] = []
+        self.player: Player | None = None
+        # Live and in -sim: a recording played can be recorded again, with what the app found in it (its poses)
+        self.recorder: Recorder = Recorder(self.settings.camera.recorder, frame_poses, data_path=DATA_PATH)
+        self.session = Session(self.settings.camera.control)       # splits the recording into chunks
+        self.person_detector: person.PersonDetector | None = None      # the replay backend's, shared by its cameras
+        if self.settings.camera.sim_enabled:
+            self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH, nv12=True)     # as the camera hands its frames
+            # the recordings on the host, without a device: the people found and followed here
+            if self.settings.camera.cam_0.model_chain != ModelChain.OFF:
+                self.person_detector = person.PersonDetector(self.settings.camera.person_detector)
+            for i in range(num_cams):
+                cam = self.settings.camera.cameras[i]
+                self.cameras.append(replay.Camera(self.player, cam, self.person_detector, replay.Tracker(), i, cam.tilt))
+        else:
+            for i in range(num_cams):
+                self.cameras.append(Camera(self.settings.camera.cameras[i]))
+        self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
+        self.uploader = SerialUploader(self.settings.camera.uploader)    # the camera's hand-off: each frame onto the GPU as it comes, on its own thread
+        # The frame domain's async step: the crop step in, the pose model out
+        self.crops = CropExtractor(p.pose_crop)
+        self.pose_estimator = pose.PoseEstimator(p.pose)
+        # -sim plays the recording's poses in place of the pose model, between the crops and it (`recorded_poses.enabled`)
+        self.recorded_poses: RecordedPoses | None = None
+        poses: pose.PoseEstimator | RecordedPoses = self.pose_estimator
+        if self.player is not None:
+            self.recorded_poses = RecordedPoses(self.settings.camera.recorded_poses, self.pose_estimator)
+            self.player.add_frame_callback(self.recorded_poses.set_clip_frame)
+            self.player.add_jump_callback(self.recorded_poses.clear_waiting)
+            poses = self.recorded_poses
+        self.crops.add_image_callback(poses.submit)
+        self.inference_frame_sync = InferenceFrameSync(p.inference_frame_sync, (Poses,))    # the color and poses of one moment, for the render
+        self.inference_frame_rate: FPS = FPS()                                # the frames it hands on, for the panel's cadence
+
+        # The camera's thread only hands its frames and tracklets over: to the recorder as they came, to the uploader
+        # for the rest, which straightens the tracklets with their frame and hands them to the tracker and the board
+        for camera in self.cameras:
+            camera.add_frame_callback(self.uploader.submit_frame)           # the live path first, the recorder after it
+            camera.add_tracklet_callback(self.uploader.submit_tracklets)
+            camera.add_frame_callback(self.recorder.submit_frame)
+            camera.add_tracklet_callback(self.recorder.submit_tracklets)
+        # What each camera's frames wait for from the first: live, a camera with a model sends tracklets (a replay's
+        # come or not with the recording); the frame source says per image whether it asked poses (`_on_asked`)
+        live_tracklets: bool = not self.settings.camera.sim_enabled and self.settings.camera.cam_0.model_chain != ModelChain.OFF
+        for i in range(num_cams):
+            self.recorder.expect_parts(i, tracklets=live_tracklets, poses=True)
+        self.uploader.add_tracklet_callback(self.tracker.submit_cam_tracklets)
+        self.uploader.add_tracklet_callback(self.board.set_camera_tracklets)
+        self.uploader.add_tracklet_callback(self._on_tracklets)
+
+        # DETECTION
+        self.frame_source = TrackerFrameSource(p.frame_source, max_players)
+
+        self.tracker.add_tracklet_callback(self.frame_source.set_tracklets)
+        # The frame source's thread: each bang's poses with its images to the pipeline, then the poses asked
+        self.frame_source.add_asked_callback(self._on_asked)
+
+        # POSE PIPELINE — the stages are declared in pose/pipeline.py. Each uploaded image drives the frame domain
+        # through the tracklet poses (`_on_snapshot`); the render tick drives the output domain (LERP). Every stage's frames
+        # go to the board and the sound; the board also reads each stage's window.
+        self.pipeline = PosePipeline(pipeline_spec(p, self.frame_source, self.crops, poses))
+        for stage in Stage:
+            self.pipeline.add_frames_callback(stage, partial(self.board.set_frames, stage))
+            self.pipeline.add_frames_callback(stage, partial(self.osc_sound.submit_frames, stage))
+            self.board.set_window_source(stage, self.pipeline.window(stage))
+        self.pipeline.add_frames_callback(Stage.RAW, partial(self._on_pose_frames, Series.POSE_LATENCY_RAW))
+        self.pipeline.add_frames_callback(Stage.RAW, self._record_poses)     # the RAW stage's poses, with the video
+        self.pipeline.add_frames_callback(Stage.SMOOTH, partial(self._on_pose_frames, Series.POSE_LATENCY_SMOOTH))
+
+        # THE UPLOADER'S HAND-OFFS, in order on its thread: each uploaded image to the detector (-sim), the inference
+        # frame sync, the board and the camera's interval, then its snapshot to the frame source
+        if self.person_detector is not None:
+            self.uploader.add_gpu_image_callback(self.person_detector.submit)
+        self.uploader.add_gpu_image_callback(self.inference_frame_sync.submit_image)
+        self.uploader.add_gpu_image_callback(self.board.set_camera_image)
+        self.uploader.add_gpu_image_callback(self._on_image)
+        self.uploader.add_snapshot_callback(self._on_snapshot)
+
+        # INFERENCE FRAME SYNC — each uploaded image and its SMOOTH poses, as one frame on the board
+        self.pipeline.add_frames_callback(Stage.SMOOTH, self._on_smooth_poses)
+        self.inference_frame_sync.add_frame_callback(self._on_inference_frame)
+
+        # CAMERA HEALTH — the camera's IMU reading and frame rate against the preset, as pinned indicators
+        self.camera_health = CameraHealth(self.settings.camera.cameras, self.settings.camera.camera_health)
+
+        # RENDER
+        self.render = SuperficialFlowRender(self.board, self.settings.render, f'{DATA_PATH}/screen_recordings',
+                                            num_cams=len(self.cameras), max_players=max_players)
+        self.render.add_exit_callback(self.stop)
+        self.render.add_update_callback(self.camera_health.update)
+
+        self.render.add_update_callback(self._update_poses)
+        self.render.add_update_callback(self._update_cadence)
+
+        # TIME SERIES — the timings the time series layer plots
+        self._last_camera_frame: dict[int, float] = {}
+        PerformanceTimer.add_sample_callback(self._on_timer_sample)
+
+    def start(self) -> None:
+        self.panel_server.start()
+
+        if self.person_detector is not None:
+            self.person_detector.start()
+        self.pipeline.start()
+        self.frame_source.start()
+        self.inference_frame_sync.start()
+        self.uploader.start()
+        for camera in self.cameras:
+            camera.start()
+
+        self.tracker.start()
+        if self.recorded_poses is not None:
+            self.recorded_poses.start()         # starts the pose model with it
+        else:
+            self.pose_estimator.start()
+
+        self.osc_sound.start()
+
+        if self.player:
+            self.player.start()
+        self.recorder.start()
+
+        self.is_running = True
+        self.render.start()
+
+    def _on_snapshot(self, snapshot: ImageSnapshot) -> None:
+        """An uploaded image as a set of one, on the uploader's thread: the frame source's bang for it, with exactly
+        those images for the crop. With one camera every image is a round, so the frame domain runs on each, at the
+        image's capture time."""
+        self.frame_source.submit(snapshot[2], snapshot)
+
+    def _on_image(self, image: GpuImage) -> None:
+        """An uploaded image, on the uploader's thread: the camera's interval."""
+        last: float | None = self._last_camera_frame.get(image.cam_id)
+        self._last_camera_frame[image.cam_id] = image.timestamp
+        if last is not None:
+            self.board.set_time_sample(Series.CAMERA_INTERVAL, (image.timestamp - last) * 1000.0, image.timestamp)
+
+    def _on_asked(self, timestamp: float, cam_id: int, asked: FrameDict) -> None:
+        """A frame bang's poses, on the frame source's thread: the recorder and the inference frame sync hear whether poses
+        come for the image (the pose model asked, the recording's played, or the camera's own keypoints handed on),
+        so a frame without a player, or passed by `pose_interval`, does not wait."""
+        modelled: bool = (self.recorded_poses is not None and self.settings.camera.recorded_poses.enabled) or self.settings.pose.pose.enabled
+        posing: bool = modelled or any(has_points(frame) for frame in asked.values())
+        self.recorder.expect_poses(cam_id, timestamp, bool(asked) and posing)
+        self.inference_frame_sync.expect(cam_id, timestamp, bool(asked) and posing)
+
+    def _record_poses(self, frames: FrameDict) -> None:
+        """The RAW stage's poses, on the pose model's thread, to the recorder as they are: their hand-over, stamped
+        here; the recorder packs them on its own thread (`frame_poses`)."""
+        self.recorder.submit_poses(frames, time.perf_counter())
+
+    def _on_tracklets(self, cam_tracklets: CameraTracklets) -> None:
+        """The camera's tracklets have reached the tracker's queue: its update, at their capture time."""
+        self.tracker.update(cam_tracklets.timestamp)
+
+    def _on_smooth_poses(self, poses: FrameDict) -> None:
+        """The SMOOTH stage's poses, on the pipeline's thread, to the inference frame sync, one result a camera."""
+        self.inference_frame_sync.submit(*Poses.by_camera(poses))
+
+    def _on_inference_frame(self, frame: InferenceFrame) -> None:
+        self.inference_frame_rate.processed()
+        self.board.set_inference_frame(frame)
+        now: float = time.perf_counter()        # when the frame reaches the board: the end of the latency
+        self.board.set_time_sample(Series.CAPTURE_LATENCY, (now - frame.timestamp) * 1000.0, now)
+        poses: Poses = frame[Poses]
+        if poses.poses:
+            self.board.set_time_sample(Series.POSES_UNSYNCED, 0.0 if poses.synced else 1.0, now)
+
+    def _on_pose_frames(self, series: Series, poses: FrameDict) -> None:
+        """A stage's poses as they come out: how long after their capture."""
+        if not poses:
+            return
+        now: float = time.perf_counter()        # when the poses come out of the stage: the end of the latency
+        newest: float = max(frame.timestamp for frame in poses.values())
+        self.board.set_time_sample(series, (now - newest) * 1000.0, now)
+
+    def _on_timer_sample(self, name: str, time_ms: float, timestamp: float) -> None:
+        series: Series | None = TIMER_SERIES.get(name)
+        if series is not None:
+            self.board.set_time_sample(series, time_ms, timestamp)
+
+    def _update_cadence(self, now: float) -> None:
+        """The panel's cadence: the frames the sync hands on, and the drops."""
+        cadence = self.settings.cadence
+        cadence.inference_frame_fps = round(self.inference_frame_rate.get_rate_average(), 1)
+        cadence.inference_frame_min_fps = round(self.inference_frame_rate.get_rate_minimum(), 1)
+        cadence.upload_drops = self.uploader.dropped
+        cadence.inference_frame_drops = self.board.get_dropped_inference_frames()
+        cadence.pose_drops = self.pipeline.dropped
+
+    def _update_poses(self, now: float) -> None:
+        """The render tick drives the pipeline's output domain (LERP) at the frame's time."""
+        self.pipeline.update(Domain.OUTPUT, now)
+
+    def stop(self) -> None:
+        if not self.is_running:
+            return
+        self.is_running = False
+
+        PerformanceTimer.remove_sample_callback(self._on_timer_sample)
+        self.panel_server.stop()
+
+        self.render.stop()
+
+        if self.player:
+            self.player.stop()
+        for camera in self.cameras:
+            camera.stop()
+        self.uploader.stop()
+        self.frame_source.stop()
+        self.pipeline.stop()
+        self.recorder.stop()
+
+        self.tracker.stop()
+        self.osc_sound.stop()
+
+        if self.recorded_poses is not None:
+            self.recorded_poses.stop()          # stops the pose model with it
+        else:
+            self.pose_estimator.stop()
+        self.inference_frame_sync.stop()
+        if self.person_detector is not None:
+            self.person_detector.stop()
+
+        for camera in self.cameras:
+            camera.join(timeout=10)
+
+        self.is_finished = True
