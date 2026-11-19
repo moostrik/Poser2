@@ -41,18 +41,6 @@ injection per camera with its weight (the player's motion, the similarity) and i
 color), one fluid per screen. Until then hd_trio runs its own copy, unchanged.
 
 
-## B. The 2D motion
-
-- **B1.** The 2D motion. `LucasKanadeFlow2D`, its own class and compose kernel: the x/y velocity in widths/s,
-  RG16F, from the x/y solve, its threshold, `use_mask`, `x_gain`, `y_gain` and its guard; no z, no z position.
-  `Motion2DLayer` on it; `GradientFlow` goes. Both motions take the one x/y solve (`LucasKanadeFlow`): it reads
-  only the two luminance frames and holds no z. Its one tie to z is a setting, `smooth_like_z` (x/y through z's
-  smoothing), read only by the 3D's compose; it moves out of the shared `xy` group into the 3D's own (deep_flow's
-  preset: `xy.smooth_like_z` to `smooth_like_z`), so the 2D's panel shows no z. With it change the flow layers'
-  tests (`modules/render/modules/flow/tests`: `test_flow_systems`, `test_layer_names`), `scripts/shader_check.py`
-  and the exports of `modules/flow` and `modules/render`. Checked: those tests; superficial_flow with the motion
-  wired, its monitor showing the velocity.
-
 ## C. The 2D bridge
 
 - **C1.** The 2D bridge. A package `modules/flow/bridge/` holds what both bridges share: the ABC `Bridge` (the
@@ -102,7 +90,6 @@ Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 
 | Step     | Check                                                                                               |
 |----------|-----------------------------------------------------------------------------------------------------|
-| B1       | the flow tests; deep_flow in -sim once (`smooth_like_z` moved); superficial_flow's motion monitor   |
 | C1       | GPU harness for the 2D kernels; deep_flow's bridge timed before and after, back to back            |
 | D1       | GPU harness for the injection passes; -sim, the fluid moving with the player                        |
 | D2       | the settings test: shared settings with deep_flow's values                                          |
@@ -112,11 +99,11 @@ Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 ## Rules it touches
 
 - Use an `ABC` for a family of classes that share code: C1.
-- Similar things share the noun and differ by a qualifier (`Bridge2D`, `Bridge3D`): B1, C1.
-- Remove obsolete pathways; no parallel legacy ones: B1, C1, D1, D2.
-- One term everywhere; when a term changes, rename it everywhere in the same change: B1, D2.
-- Keep presets and settings schemas in sync with code changes: B1, D2 to D7.
-- A settings class mirrors the code it configures; a stage's ports follow its steps: B1, C1, D2.
+- Similar things share the noun and differ by a qualifier (`Bridge2D`, `Bridge3D`): C1.
+- Remove obsolete pathways; no parallel legacy ones: C1, D1, D2.
+- One term everywhere; when a term changes, rename it everywhere in the same change: D2.
+- Keep presets and settings schemas in sync with code changes: D2 to D7.
+- A settings class mirrors the code it configures; a stage's ports follow its steps: C1, D2.
 - Shaders get checked in a GPU harness: C1, D1, D3 to D7.
 - Prefer the design with the lower latency, measured in the context of the app: C1, D1 to D7.
 - A document describes what is built: C1 (BRIDGE_2D.md), D2 (FLUID_2D.md).

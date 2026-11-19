@@ -46,6 +46,7 @@ class Layers(IntEnum):
     inference_frame = 0
     view =          auto()
     color =         auto()
+    motion =        auto()
     time_series =   auto()     # the app's timings, over time
     pose =          auto()
 
@@ -251,10 +252,12 @@ class PoseMonitorSettings(BaseSettings):
 class RenderSettings(BaseSettings):
     debug: Field[bool]                           = Field(True, description="The main and the debug panel; off, the main panel alone, as on a second screen")
     pause: Field[bool]                           = Field(False, description="Hold the last frame; the view and the color are made again on it when a setting changes")
+    input_fps: Field[float]                      = Field(60.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
     layer  : Group[LayerSettings]                = Group(LayerSettings)
     # the chain, in its order, then the pose beside it
     view   : Group[ViewLayerSettings]            = Group(ViewLayerSettings)
     color  : Group[render.ColorLayerSettings]    = Group(render.ColorLayerSettings)
+    motion : Group[render.Motion2DLayerSettings] = Group(render.Motion2DLayerSettings, share=[input_fps.as_('fps')])
     pose   : Group[PoseMonitorSettings]          = Group(PoseMonitorSettings)
     # the display
     time_series: Group[render.TimeSeriesLayerSettings] = Group(render.TimeSeriesLayerSettings)
@@ -265,11 +268,15 @@ class RenderSettings(BaseSettings):
 
 class CadenceSettings(BaseSettings):
     """Pinned beside the camera's video rates: the frames that get past the camera, so a frame lost on its
-    way to the render shows where, with the drops counted where they happen."""
+    way to the flow shows where (the sync's frames, then the motion's measures), with the drops counted where they happen."""
     inference_frame_fps:     Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Inference frames", unit="fps",
                                           description="Inference frames the sync hands on, average")
     inference_frame_min_fps: Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Inference frames min", unit="fps",
                                           description="Inference frames: 1 / the worst gap between two")
+    motion_fps:      Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Motion", unit="fps",
+                                          description="Frames the motion measures, average")
+    motion_min_fps:  Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Motion min", unit="fps",
+                                          description="Motion: 1 / the worst gap between two measures")
     upload_drops:    Field[int]   = Field(0, access=Field.READ, pinned=True, label="Upload drops",
                                           description="Camera frames the uploader dropped, its queue full")
     inference_frame_drops:   Field[int]   = Field(0, access=Field.READ, pinned=True, label="Inference frame drops",
@@ -290,6 +297,6 @@ class Settings(BaseSettings):
     camera: Group[Oak4Group]      = Group(Oak4Group, share=[num_cams, input_fps.as_('fps')])
     cadence: Group[CadenceSettings] = Group(CadenceSettings)
     pose  : Group[PoseGroup]      = Group(PoseGroup, share=[max_players, input_fps.as_('frequency')])
-    render: Group[RenderSettings] = Group(RenderSettings)
+    render: Group[RenderSettings] = Group(RenderSettings, share=[input_fps])
     inout : Group[InOutGroup]     = Group(InOutGroup)
     panel : Group[PanelSettings]  = Group(PanelSettings)

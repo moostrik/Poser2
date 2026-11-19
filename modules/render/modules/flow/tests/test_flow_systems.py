@@ -1,6 +1,6 @@
-"""The two flow systems' settings: deep_flow's preset loads into the 3D system without an unknown key, and
-every field of the flow's settings classes is named somewhere in the flow's code. hd_trio's presets load
-into its own copy (apps/hd_trio/tests)."""
+"""The two flow systems' settings: deep_flow's preset loads into the 3D system and superficial_flow's into the 2D,
+each without an unknown key, and every field of the flow's settings classes is named somewhere in the flow's code.
+hd_trio's presets load into its own copy (apps/hd_trio/tests)."""
 
 import json
 import re
@@ -13,6 +13,7 @@ from modules.render import Motion2DLayerSettings, Bridge2DLayerSettings, Fluid2D
 
 ROOT: Path = Path(__file__).resolve().parents[5]
 PRESETS_3D: list[Path] = [ROOT / 'apps' / 'deep_flow' / 'data' / 'settings' / 'settings.json']
+PRESETS_2D: list[Path] = [ROOT / 'apps' / 'superficial_flow' / 'data' / 'settings' / 'studio.json']
 SOURCES: list[Path] = [ROOT / 'modules' / 'flow', ROOT / 'modules' / 'render' / 'modules' / 'flow',
                        ROOT / 'modules' / 'render' / 'general' / 'grade']     # the fluid's LUT
 STAGES: tuple[str, ...] = ('motion', 'bridge', 'fluid')
@@ -39,12 +40,16 @@ def flow_source() -> str:
 
 
 class PresetTest(unittest.TestCase):
-    """A preset's stage groups load into the system's settings classes with nothing left over."""
+    """A preset's stage groups load into the system's settings classes with nothing left over; a preset holds the
+    stages its app runs."""
 
     def _load(self, presets: list[Path], system: dict[str, type[BaseSettings]]) -> None:
         for preset in presets:
             render: dict = json.loads(preset.read_text(encoding='utf-8'))['render']
+            self.assertIn('motion', render, f'{preset.name} has no flow')
             for stage in STAGES:
+                if stage not in render:
+                    continue
                 with self.subTest(preset=preset.name, stage=stage):
                     settings: BaseSettings = system[stage]()
                     with self.assertNoLogs('modules.settings.base_settings', level='WARNING'):
@@ -52,6 +57,9 @@ class PresetTest(unittest.TestCase):
 
     def test_deep_flow_preset_loads_into_the_3d_system(self) -> None:
         self._load(PRESETS_3D, SYSTEMS['3D'])
+
+    def test_superficial_flow_preset_loads_into_the_2d_system(self) -> None:
+        self._load(PRESETS_2D, SYSTEMS['2D'])
 
 
 class DeadFieldTest(unittest.TestCase):

@@ -1,16 +1,17 @@
-"""Superficial Flow render — split-view layer graph with the 2D flow: view and color."""
+"""Superficial Flow render — split-view layer graph with the 2D flow: view, color and motion."""
 
+from threading import Event
 from typing import Callable, cast
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import GpuTimer, RenderBase, ScreenCapture, Shader, Style, clear_color, fill, fit, Texture, shaders
 from modules.video import ScreenRecorder, ScreenRecorderSettings
-from modules.flow import Port
+from modules.flow import Port, hold_tick
 from modules.inference import InferenceFrame, Masks, segmentation
 from modules.pose import Frame, FrameDict
 from modules import render
-from modules.utils import Color, Rect, Point2f
+from modules.utils import FPS, Color, Rect, Point2f
 
 from ..board import RenderBoard
 from ..settings import PoseFrame, RenderSettings
@@ -52,10 +53,12 @@ class SuperficialFlowRender(RenderBase):
             view =          self.L[ChainLayers.view][i] =        ViewLayer(           settings.view)
             self.L[ChainLayers.pose_monitor][i] =                PoseMonitorCompositor(i, self.board, cam_image, cam_crop, view, settings.pose, settings.colors)
             self.L[ChainLayers.color][i] =                       render.ColorLayer(   settings.color)
+            self.L[ChainLayers.motion][i] =                      render.Motion2DLayer(settings.motion)
             # each stage's main monitor in self.L, shown in the main panel; its debug monitor in self._debug_monitors,
             # shown in the debug panel
             for key, stage, flat in ((ChainLayers.view_monitor, render.FlowStage.VIEW, settings.view),
-                                     (ChainLayers.color_monitor, render.FlowStage.COLOR, settings.color)):
+                                     (ChainLayers.color_monitor, render.FlowStage.COLOR, settings.color),
+                                     (ChainLayers.motion_monitor, render.FlowStage.MOTION, settings.motion)):
                 self.L[key][i] = render.Monitor2DLayer(stage, flat.monitor_main)
                 self._debug_monitors.setdefault(key, {})[i] = render.Monitor2DLayer(stage, flat.monitor_debug)
         self.L[ChainLayers.time_series][0] = render.TimeSeriesLayer(self.board, settings.time_series)      # the board's series, one for all cameras
@@ -65,8 +68,21 @@ class SuperficialFlowRender(RenderBase):
         self._panel_aspect_ratios: list[float] = self._read_panel_aspect_ratios()
         self.subdivision: render.Subdivision = self._make_layout()
 
+        # The length of each tick, the flow's dt, held to twice the mean tick (`hold_tick`)
+        self._last_tick: float = 0.0
+        self._tick_mean: float | None = None
+        self._dt: float = 1.0 / 60.0
+        self.add_update_callback(self._measure_tick)
+
+        # A reset asked for from another thread, applied at the next update on the GL thread
+        self._reset_flow: Event = Event()
+
         self._view_timer: GpuTimer = GpuTimer("GPU view")
         self._view_size: tuple[int, int] = (0, 0)       # the view layers' size, set in allocate
+
+        # Each camera's frames the motion measures, for the panel's cadence (read on any thread)
+        self.motion_rates: dict[int, FPS] = {}
+        self._inference_frame_timestamps: dict[int, float] = {}     # each camera's frame run last
 
         # The monitors' input, built right before they run, from what ran before them this tick
         self._wirings: dict[ChainLayers, Callable[[], None]] = {
@@ -115,7 +131,9 @@ class SuperficialFlowRender(RenderBase):
         for layer_type, cam_dict in self.L.items():
             for layer in cam_dict.values():
                 size: Size = size_of(layer_type)
-                if size == Size.VIEW:
+                if size == Size.LARGE:
+                    layer.allocate(OUTPUT_WIDTH * 2, OUTPUT_HEIGHT * 2, GL_RGBA16F)
+                elif size == Size.VIEW:
                     layer.allocate(*self._view_size, GL_RGBA16F)
                 elif size == Size.OUTPUT:
                     layer.allocate(OUTPUT_WIDTH, OUTPUT_HEIGHT, GL_RGBA16F)
@@ -159,12 +177,27 @@ class SuperficialFlowRender(RenderBase):
         self._border.deallocate()
         self._view_timer.deallocate()
 
+    def _measure_tick(self, now: float) -> None:
+        if self._last_tick > 0.0:
+            self._dt, self._tick_mean = hold_tick(now - self._last_tick, self._tick_mean)
+        self._last_tick = now
+
+    def reset_flow(self) -> None:
+        """Clear the motion at the next update; any thread."""
+        self._reset_flow.set()
+
     def _monitors(self) -> list[render.Monitor2DLayer]:
         return [cast(render.Monitor2DLayer, layer) for key in MONITORS
                 for layer in (*self.L[key].values(), *self._debug_monitors.get(key, {}).values())]
 
     def update(self) -> None:
         self._notify_update()
+
+        if self._reset_flow.is_set():
+            self._reset_flow.clear()
+            for layer_type in [ChainLayers.motion]:
+                for layer in self.L[layer_type].values():
+                    cast(render.StageLayer, layer).reset()
 
         self._main_layers = shown(self.settings.layer.main)
         self._debug_layers = shown(self.settings.layer.debug)
@@ -225,6 +258,14 @@ class SuperficialFlowRender(RenderBase):
         self._view_timer.end()
         self._run_color(i, view)
 
+        motion = cast(render.Motion2DLayer, self.L[ChainLayers.motion][i])
+        interval: float = render.frame_interval(frame.timestamp, self._inference_frame_timestamps.get(i), self.settings.motion.fps, self._dt, self._dt)
+        self._inference_frame_timestamps[i] = frame.timestamp
+        self.motion_rates.setdefault(i, FPS()).processed()
+        output: ViewOutput = view.output
+        motion.set_input(render.MotionInput(output.image, frame.timestamp, interval, mask=output.mask))
+        motion.update()
+
     def _run_color(self, i: int, view: ViewLayer) -> render.ColorLayer:
         """The density's color from camera `i`'s view, made again when the view was or one of its settings changed."""
         color = cast(render.ColorLayer, self.L[ChainLayers.color][i])
@@ -241,6 +282,7 @@ class SuperficialFlowRender(RenderBase):
             ports: dict[render.FlowStage, dict[str, Port]] = {
                 render.FlowStage.VIEW: cast(ViewLayer, _view).ports,
                 render.FlowStage.COLOR: cast(render.ColorLayer, self.L[ChainLayers.color][i]).ports,
+                render.FlowStage.MOTION: cast(render.Motion2DLayer, self.L[ChainLayers.motion][i]).ports,
             }
             for monitor in self._monitors():
                 monitor.set_input(render.MonitorInput(ports))

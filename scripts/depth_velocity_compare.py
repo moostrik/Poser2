@@ -60,7 +60,7 @@ SWITCHED: dict[str, str] = {'x': 'x_gain', 'y': 'y_gain', 'z': 'z_gain'}   # in 
 GROUPED: dict[str, str] = {'xy_levels': 'xy.levels', 'xy_window': 'xy.window', 'xy_damping': 'xy.damping',
                            'xy_same_surface': 'xy.same_surface', 'xy_threshold': 'xy.threshold',
                            'z_edge': 'z.edge', 'z_window': 'z.window', 'z_tolerance': 'z.tolerance',
-                           'z_smooth': 'z.smooth', 'xy_smooth': 'xy.smooth_like_z',
+                           'z_smooth': 'z.smooth', 'xy_smooth': 'smooth_like_z',
                            'z_catch_up': 'z.catch_up', 'z_dead_zone': 'z.dead_zone', 'z_threshold': 'z.threshold'}   # in frames saved flat, before the groups
 MOVED: float = 0.05          # luminance change of a pixel that moves
 MOVED_FRAMES: int = 5         # frames it changes that much in, over the loop
@@ -125,6 +125,10 @@ def recorded_settings(recorded: dict) -> dict:
         names = {'xy_rest': 'rest_speed', 'xy_halving': 'halving_speed', 'z_smooth': 'smooth_like_z'}
         recorded = {**recorded, 'z': {names.get(k, k): v for k, v in z_group.items()},
                     'xy': {names.get(k, k): v for k, v in xy_group.items()}}
+    xy_group = recorded.get('xy')
+    if isinstance(xy_group, dict) and 'smooth_like_z' in xy_group:      # nested in x/y, before it moved to the 3D's own
+        recorded = {**recorded, 'xy': {k: v for k, v in xy_group.items() if k != 'smooth_like_z'},
+                    'smooth_like_z': xy_group['smooth_like_z']}
     for key, value in recorded.items():
         key = RENAMED.get(key, key)
         if key in SWITCHED and isinstance(value, bool):     # the old axis switches; a "z" group is a dict

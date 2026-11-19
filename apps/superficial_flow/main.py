@@ -172,6 +172,10 @@ class SuperficialFlowMain:
         self.render.add_update_callback(self._update_poses)
         self.render.add_update_callback(self._update_cadence)
 
+        # Every loop of a recording starts the flow from rest, so two runs of one clip compare
+        if self.player:
+            self.player.add_loop_callback(self.render.reset_flow)
+
         # TIME SERIES — the timings the time series layer plots
         self._last_camera_frame: dict[int, float] = {}
         PerformanceTimer.add_sample_callback(self._on_timer_sample)
@@ -266,10 +270,13 @@ class SuperficialFlowMain:
             self.board.set_time_sample(series, time_ms, timestamp)
 
     def _update_cadence(self, now: float) -> None:
-        """The panel's cadence: the frames the sync hands on, and the drops."""
+        """The panel's cadence: the frames the sync hands on and the frames the motion measures, the slowest camera's, and the drops."""
         cadence = self.settings.cadence
         cadence.inference_frame_fps = round(self.inference_frame_rate.get_rate_average(), 1)
         cadence.inference_frame_min_fps = round(self.inference_frame_rate.get_rate_minimum(), 1)
+        rates = list(self.render.motion_rates.values())
+        cadence.motion_fps = round(min((rate.get_rate_average() for rate in rates), default=0.0), 1)
+        cadence.motion_min_fps = round(min((rate.get_rate_minimum() for rate in rates), default=0.0), 1)
         cadence.upload_drops = self.uploader.dropped
         cadence.inference_frame_drops = self.board.get_dropped_inference_frames()
         cadence.pose_drops = self.pipeline.dropped

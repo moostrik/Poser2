@@ -10,8 +10,8 @@ from them, **(site fact)** what the operator saw.
 
 The x/y solve is `LucasKanadeFlow` (`motion/lucas_kanade_flow.py`), z the depth velocity
 (`DepthVelocity`, `motion/depth_velocity.py`), and `LucasKanadeFlow3D` (`motion/lucas_kanade_flow_3d.py`)
-composes them; the layer is `MotionLayer` (`modules/render/modules/flow/motion_layer.py`) with `Motion3DLayer`
-and `Motion2DLayer`.
+composes them; `LucasKanadeFlow2D` (`motion/lucas_kanade_flow_2d.py`) composes the x/y solve alone. The layer is
+`MotionLayer` (`modules/render/modules/flow/motion_layer.py`) with `Motion3DLayer` and `Motion2DLayer`.
 
 ## The goal
 
@@ -80,6 +80,14 @@ as z. With `smooth_like_z`, x/y goes through z's filter over z's `smooth`, so bo
 of position, so with a steady frame interval and a full z window x/y answers a change of speed exactly as z does. The settings in flow
 pixels go with the flow's resolution; those in metres and milliseconds do not.
 
+### The 2D velocity
+
+`LucasKanadeFlow2D` turns the displacement after `xy.threshold` into one velocity in widths per second (RG16F),
+times `x_gain` and `y_gain`, gated by the mask with `use_mask`, its non-finite values set to 0 by the guard. It
+holds no z and no z position, so it costs only the x/y solve and its compose (`ComposeVelocity2D`); its panel holds
+no z. The 2D and the 3D share the solve and the rate from a displacement per frame to one per second
+(`per_second`).
+
 ## When it measures
 
 The motion layer measures once per camera frame: when `timestamp` differs from the one it last
@@ -137,9 +145,11 @@ The measure recording's arm moves sideways, so it says little about z kept or it
 |------------------------|---------|-----------|-----|---------------------------------------------|
 | use_mask               | on      | on/off    | C   | no x/y spill onto the background            |
 | x_gain, y_gain, z_gain | 1       | −10 to 10 | –   | 1 = true speed, 0 = axis off, < 0 inverted  |
+| smooth_like_z          | off     | on/off    | B   | x/y without extra lag                       |
 
 The flow's velocity is in image widths per second times its gains. `z_gain` is the motion's one
-knob on z's size; the depth velocity's settings set z's noise and lag, not its scale.
+knob on z's size; the depth velocity's settings set z's noise and lag, not its scale. `smooth_like_z` is the 3D's
+own, as it reads z's filter; the 2D's panel has `use_mask`, `x_gain`, `y_gain` and the solve.
 
 ### solve (x/y)
 
@@ -148,7 +158,6 @@ knob on z's size; the depth velocity's settings set z's noise and lag, not its s
 | levels        | 3       | 1–5 (1)             | B   | follows fast motion                        |
 | window        | 7×7     | 3×3–9×9             | B   | follows more of the motion than 3×3 or 5×5 |
 | damping       | 0.03    | 0–0.1 (0.001)       | B   | x/y's noise a quarter of undamped          |
-| smooth_like_z | off     | on/off              | B   | x/y without extra lag                      |
 | threshold     | 0.5     | 0–5 px/frame (0.05) | B   | the still x/y noise 0                      |
 
 The x/y solve, on the raw output, with `levels` 4 (the preset) as the reference: x/y kept over the moves, and
@@ -222,11 +231,11 @@ larger on show). A level doubles the motion the solve follows, about 2 × 2^(lev
   image's, let the still noise up to 2 to 4 for no less lag: the copy follows the measurement's noise, where the
   track's own rate (below, C5) does not. The bridges read z as they read x/y; what z's smoothing does to them is in
   [BRIDGE_3D.md's Measured](BRIDGE_3D.md#measured).
-- smooth_like_z (in the x/y panel, between `damping` and `threshold`) puts x/y through the depth velocity's alpha–beta filter, carried along the motion, over z's time,
+- smooth_like_z (the 3D motion's own, after `z_gain`) puts x/y through the depth velocity's alpha–beta filter, carried along the motion, over z's time,
   the 1€ rule's, worked out per pixel from the larger of x/y's measured speed and its own filtered one. It is the only x/y state kept from frame to frame:
   the solve starts each frame from no motion. The motion's reset clears it.
 - C1's change (`tolerance` and `same_surface` gone, `max_speed` before and after the filter, `rest_speed` in place
-  of `xy.threshold`, `xy_smooth`, now `xy.smooth_like_z`, over z's time), 2026-11-17, one capture of hands and of measure, the defaults
+  of `xy.threshold`, `xy_smooth`, now `smooth_like_z`, over z's time), 2026-11-17, one capture of hands and of measure, the defaults
   with `dead_zone` 0, before and after:
 
   | Row                        | z still noise, measure | z still noise, hands | z kept / lag, hands | x/y noise, hands / kept, measure | restarts at rest, measure |

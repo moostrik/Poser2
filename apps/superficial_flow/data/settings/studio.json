@@ -283,7 +283,7 @@
         "color"
       ],
       "debug": [
-        "view"
+        "motion"
       ]
     },
     "view": {
@@ -350,6 +350,44 @@
         "advanced": {
           "channel": "ALL",
           "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
+      }
+    },
+    "motion": {
+      "guard": true,
+      "width": 448,
+      "height": 800,
+      "use_mask": true,
+      "x_gain": 1.0,
+      "y_gain": 1.0,
+      "xy": {
+        "levels": 5,
+        "window": "SEVEN",
+        "damping": 0.03,
+        "threshold": 0.5
+      },
+      "monitor_main": {
+        "texture": "output.velocity",
+        "view": "IMAGE",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 58.9,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_16",
+          "colormap": "JET",
+          "legend": true
+        }
+      },
+      "monitor_debug": {
+        "texture": "output.velocity",
+        "view": "IMAGE",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 100.0,
           "blend_mode": "ADD",
           "glyph_spacing": "SPACING_32",
           "colormap": "JET",

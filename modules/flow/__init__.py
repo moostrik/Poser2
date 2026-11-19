@@ -16,8 +16,9 @@ from .flow_util import FlowUtil
 from .view import fixed_window, view_span, depth_step, view_per_depth_pixel, place_points, pyramid_sizes, DepthFill, DepthCrop, DepthUpscale
 
 # Motion: the optical flow
-from .motion import DepthView, DepthVelocity, DepthVelocitySettings, GradientFlow, GradientFlowSettings, Patch, \
-                    LucasKanadeFlow, LucasKanadeFlowSettings, LucasKanadeFlow3D, LucasKanadeFlow3DSettings
+from .motion import DepthView, DepthVelocity, DepthVelocitySettings, Patch, \
+                    LucasKanadeFlow, LucasKanadeFlowSettings, LucasKanadeFlow2D, LucasKanadeFlow2DSettings, \
+                    LucasKanadeFlow3D, LucasKanadeFlow3DSettings
 
 # The density's color: the 3D chain's `color` stage, and the 2D bridge's tint
 from .color import DensityColor, DensityColorSettings, white_balance_matrix

@@ -345,11 +345,11 @@
       "x_gain": 1.0,
       "y_gain": 1.0,
       "z_gain": 0.4,
+      "smooth_like_z": false,
       "xy": {
         "levels": 5,
         "window": "SEVEN",
         "damping": 0.03,
-        "smooth_like_z": false,
         "threshold": 0.5
       },
       "z": {

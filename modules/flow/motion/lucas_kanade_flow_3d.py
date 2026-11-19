@@ -5,8 +5,6 @@ back, times its weight in red and the weight in green (RG16F). How and why: modu
 velocity" and "depth_velocity (z)".
 """
 
-import math
-
 from OpenGL.GL import GL_RG16F, GL_RG32F, GL_RGBA16F, GL_RGBA32F
 
 from modules.gl import Fbo, SwapFbo, Texture
@@ -15,19 +13,18 @@ from .. import FlowUtil, Port, TextureKind, prefixed
 from ..finite_guard import FiniteGuard, GuardSlot
 from .depth_velocity import DepthVelocity, DepthVelocitySettings
 from .solve_capture import SolveCapture
-from .lucas_kanade_flow import LucasKanadeFlow, LucasKanadeFlowSettings
+from .lucas_kanade_flow import LucasKanadeFlow, LucasKanadeFlowSettings, per_second
 from .shaders import ComposeVelocity, DisplacementFilter, DisplacementThreshold, ZPosition
-
-MIN_DELTA_TIME: float = 1e-3        # s: an interval at or below this is not a frame's
-FALLBACK_DELTA_TIME: float = 1.0 / 30.0     # s: the interval taken in its place
 
 
 class LucasKanadeFlow3DSettings(BaseSettings):
-    """Configuration for the 3D Lucas–Kanade flow: the mask and the axes, its x/y solve in `xy` and its depth velocity in `z`."""
+    """Configuration for the 3D Lucas–Kanade flow: the mask and the axes, x/y through z's smoothing, its x/y solve in
+    `xy` and its depth velocity in `z`."""
     use_mask:       Field[bool]  = Field(True, newline=True, width=48, description="Only the player moves the fluid (off: whole image)")
     x_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, step=0.05, widget=Widget.knob, description="1 = true speed, image widths per second")
     y_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, step=0.05, widget=Widget.knob, description="1 = true speed, image widths per second")
     z_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, step=0.05, widget=Widget.knob, description="1 = true speed, on the x/y scale")
+    smooth_like_z:  Field[bool]  = Field(False, newline=True, width=48, description="x/y smoothed over z's smoothing time, so both lag alike (on: less noise, more lag)")
 
     xy             = Group(LucasKanadeFlowSettings)
     z              = Group(DepthVelocitySettings)
@@ -166,7 +163,7 @@ class LucasKanadeFlow3D:
                                               self._slot('depth_velocity', guarded))
 
         xy: Texture = self._flow.displacement
-        if xy_s.smooth_like_z:
+        if s.smooth_like_z:
             if not self._following:
                 self._filtered.clear_all()                  # from no motion, not from when it was last on
                 self._following = True
@@ -184,13 +181,12 @@ class LucasKanadeFlow3D:
 
         # uv per frame as image widths per second: v is uv of the height, so a square motion stays square;
         # z is in view widths per frame already
-        # an interval that is not a frame's (0, negative, not finite) would scale every pixel at once
-        per_second: float = 1.0 / delta_time if math.isfinite(delta_time) and delta_time > MIN_DELTA_TIME else 1.0 / FALLBACK_DELTA_TIME
+        rate: float = per_second(delta_time)
         aspect: float = self._velocity.height / max(self._velocity.width, 1)
         mask: Texture | None = self._mask if s.use_mask and self._mask is not None and self._mask.allocated else None
         self._velocity.begin()
         self._compose_shader.use(xy, self._depth_velocity.depth_velocity if depth is not None else None,
-                                 (per_second * s.x_gain, per_second * aspect * s.y_gain, per_second * s.z_gain), mask,
+                                 (rate * s.x_gain, rate * aspect * s.y_gain, rate * s.z_gain), mask,
                                  self._slot('velocity', guarded))
         self._velocity.end()
 
