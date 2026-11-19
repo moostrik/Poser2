@@ -282,10 +282,11 @@ on the faces it is ([The staggered velocity](#the-staggered-velocity)), and the 
 leaves is the half float's rounding. With the solve exact the water keeps more of its speed, 0.150
 widths/s in the mean against Jacobi's 0.134.
 
-`pressure.reach` limits how far a push is felt, a share s from 0 to 1 of the reach L × s / (1 − s) widths, L the
-box's longest side (the largest of its width, height and depth; `pressure_reach.py`): 0 no pressure, the divergence,
-the solve and the gradient skipped and the water carried where it is pushed; 0.5 a reach of the box's longest side;
-1 everywhere, today's incompressible water. Below 1 every solver solves the screened Poisson
+`pressure.enabled` off is no pressure: the divergence, the solve and the gradient are skipped and the water is
+carried where it is pushed. `pressure.reach` limits how far a push is felt, a share s from 0.001 to 1 on a
+logarithmic slider, of the reach L × s / (1 − s) widths, L the box's longest side (the largest of its width, height
+and depth; `pressure_reach.py`): low near, 0.5 a reach of the box's longest side, 1 everywhere, today's
+incompressible water, at no cost (the term 0). Below 1 every solver solves the screened Poisson
 equation (∇² − 1/reach²) p = div, the term 1/reach² on the diagonal of each update and of the residual, in
 1/widths², so the same on every multigrid level. A point source's pressure then falls off as e^(−r/reach)/(4πr)
 in the box (K₀(r/reach)/(2π) on the 2D's plane) instead of reaching every cell at once. The water is then no

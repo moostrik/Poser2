@@ -41,7 +41,7 @@ its default, the sizes apart (`modules/flow/tests/test_fluid_2d_settings.py`). W
 | `vorticity`   | `enabled`, `strength_1` to `_3`, `radius_1` to `_3` (widths)                                   | the force ε h (N × ω) dt, h the cell's width (Fedkiw 2001)                                       |
 | `temperature` | `enabled`, `buoyancy`, `fade_time`, `evaporation_time`, `evaporation_knee`                     | [the buoyancy](FLUID_3D.md#the-buoyancy)                                                         |
 | `expansion`   | `enabled`, `rate`                                                                              | [the expansion](FLUID_3D.md#the-expansion)                                                       |
-| `pressure`    | `solver`, `iterations`, `relaxation`, `cycles`                                                 | [the pressure](FLUID_3D.md#the-pressure)                                                         |
+| `pressure`    | `enabled`, `solver`, `iterations`, `relaxation`, `cycles`, `reach`                             | [the pressure](FLUID_3D.md#the-pressure)                                                         |
 | `density`     | `color_space`, `sink`, `advection`, `limiter`, `advection_scale`, `fade_time`, the evaporation | [the density's blend](FLUID_3D.md#the-densitys-blend), the buoyancy                              |
 
 low_flow's preset holds deep_flow's value for every setting the two share, the sizes and the gravity a textbook

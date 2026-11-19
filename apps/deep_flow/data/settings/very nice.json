@@ -542,6 +542,7 @@
         "rate": 0.0
       },
       "pressure": {
+        "enabled": true,
         "solver": "MULTIGRID",
         "iterations": 40,
         "relaxation": 1.85,

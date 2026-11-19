@@ -513,10 +513,10 @@ class Fluid2D:
     def _enforce_incompressibility(self) -> None:
         """Pressure projection (divergence, less the expansion's rate × it → the solve by `pressure.solver` →
         gradient subtraction), in widths, on the walls `wall` sets; the screened equation (∇² − 1/reach²) p = div while
-        `pressure.reach` is under 1 (`pressure_reach.screening`, the field's longest side its scale); at 0 no pressure,
-        all three skipped."""
+        `pressure.reach` is under 1 (`pressure_reach.screening`, the field's longest side its scale); with
+        `pressure.enabled` off no pressure, all three skipped."""
         share: float = self.settings.pressure.reach
-        if share <= 0.0:
+        if not self.settings.pressure.enabled or share <= 0.0:
             return
         closed: bool = self.settings.wall == WallMode.CLOSED
         screening: float = pressure_reach.screening(share, max(1.0, 1.0 / self._field_aspect))

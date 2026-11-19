@@ -646,9 +646,9 @@ class Fluid3D:
         """Pressure projection (divergence → Jacobi solve → gradient subtraction), the three passes on one set
         of walls, closed or open by `wall`; with this tick's expansion the solve makes the divergence φ, not 0; the
         screened equation (∇² − 1/reach²) p = div while `pressure.reach` is under 1 (`pressure_reach.screening`, the
-        box's longest side its scale); at 0 no pressure, all three skipped."""
+        box's longest side its scale); with `pressure.enabled` off no pressure, all three skipped."""
         share: float = self.settings.pressure.reach
-        if share <= 0.0:
+        if not self.settings.pressure.enabled or share <= 0.0:
             self._expansion_fresh = False
             return
         closed: tuple[bool, bool, bool] = self._closed
