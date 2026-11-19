@@ -33,9 +33,6 @@ bandpass `BandpassTrails2D`, `BandpassChanges2D`, `BandpassAccelerations2D` and 
   RG and carry no third component, so they cost what x/y costs.
 - It has no z positions: no output's `_z_position`, no trail's z position, no `ZPositionMix`.
 - The mask's share in an amount needs only the mask; the 3D's needs the motion's z position too.
-- A scalar source in its mix (the mask) gives its red: a single-channel texture reads (r, r, r, 1), so the 2D's mix
-  reads its red alone. The 3D's mix takes the length of its RGB, the mask times √3 **(deduction, from the code:
-  `weighted_sum.frag`, `modules/gl/texture.py`'s swizzle)**.
 - The region of a start holds the moving velocity and its share in RGB of an RGBA16F texture, as RGB16F is not sure
   to be a render target.
 

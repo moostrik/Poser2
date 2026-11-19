@@ -4,7 +4,7 @@ The bridge's mix: up to seven sources, each times its weight, summed; or, for an
 each source's xyz times its weight, summed.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4, GL_TEXTURE5, GL_TEXTURE6, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1fv, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4, GL_TEXTURE5, GL_TEXTURE6, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1fv, glUniform1i, glUniform1iv, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 MAX_SOURCES: int = 7
@@ -13,15 +13,17 @@ UNITS: tuple[int, ...] = (GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL
 
 class WeightedSum(Shader):
     """Writes the sum of each source times its weight to RGB, or with `lengths` the sum of their lengths to all
-    three."""
+    three; a scalar source gives its red."""
 
-    def use(self, sources: list[tuple[Texture, float]], lengths: bool = False, capped: bool = False) -> None:
+    def use(self, sources: list[tuple[Texture, float]], lengths: bool = False, capped: bool = False,
+            scalars: int = 0) -> None:
         """Mix the sources.
 
         Args:
             sources: Up to seven (texture, weight) pairs; the RGB of each is taken times its weight
             lengths: Take each source's length of its RGB instead, for an amount
             capped: Hold the sum at 1, a presence
+            scalars: How many of the sources, the last ones, are scalars (the mask), each giving its red
         """
         if not self.allocated or not self.shader_program or not sources or len(sources) > MAX_SOURCES:
             return
@@ -31,13 +33,16 @@ class WeightedSum(Shader):
         glUseProgram(self.shader_program)
 
         weights: list[float] = [0.0] * MAX_SOURCES
+        scalar: list[int] = [0] * MAX_SOURCES
         for unit in range(MAX_SOURCES):
             texture, weight = sources[unit] if unit < len(sources) else (sources[0][0], 0.0)
             weights[unit] = weight
+            scalar[unit] = int(len(sources) - scalars <= unit < len(sources))
             glActiveTexture(UNITS[unit])
             glBindTexture(GL_TEXTURE_2D, texture.tex_id)
             glUniform1i(self.get_uniform_loc(f"tex{unit}"), unit)
         glUniform1fv(self.get_uniform_loc("weights"), MAX_SOURCES, weights)
+        glUniform1iv(self.get_uniform_loc("scalars"), MAX_SOURCES, scalar)
         glUniform1i(self.get_uniform_loc("lengths"), int(lengths))
         glUniform1i(self.get_uniform_loc("capped"), int(capped))
 

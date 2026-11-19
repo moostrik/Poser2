@@ -152,7 +152,8 @@ its share). The temperature's and the expansion's presence is it capped at 1, an
 density's amount the same way ([FLUID_3D.md](FLUID_3D.md#the-inputs)): a part moving at 1 width/s or faster
 is fully there, a slower one partly, and a still body leaves no dye. The `mask` share adds the view's mask (`BridgeInput.mask`, 0 to 1 where the
 player is) at the share, a presence 0 to 1 by being there: at share 1 a still
-body is fully there. Widths/s is the velocity's own unit, so no reference speed is chosen.
+body is fully there. The mask is a scalar, read by its red: a single-channel texture reads (r, r, r, 1), so the
+length the readings take would be the mask times √3. Widths/s is the velocity's own unit, so no reference speed is chosen.
 The density's color is the `color` stage's as it comes, copied each step so a tick of several captures holds each
 one's (white without one): the stage grades it, mattes it and premultiplies it by its own feathered mask
 ([COLOR.md](COLOR.md)), so alpha is the color's coverage (Porter and Duff 1984), and the bridge gates it by no mask

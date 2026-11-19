@@ -109,6 +109,6 @@ class Bridge3D(Bridge[VelocityLowpass, VelocityBandpass]):
             sources.append((mask, mix.mask))
         amount: Fbo = self._outputs[output]
         amount.begin()
-        self._mix_shader.use(sources, lengths=True, capped=capped)
+        self._mix_shader.use(sources, lengths=True, capped=capped, scalars=int(masked is not None))
         amount.end()
         self._mix_z_position(self._z_positions[output], readings, mix, masked)

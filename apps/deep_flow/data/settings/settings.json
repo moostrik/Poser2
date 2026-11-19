@@ -450,7 +450,7 @@
         "bow": 0.0,
         "stop": 1.0,
         "wake": 0.0,
-        "mask": 0.05
+        "mask": 0.0866
       },
       "monitor_main": {
         "texture": "output.density",
