@@ -108,7 +108,7 @@ class DeepFlowMain:
             camera.add_frame_callback(self.recorder.submit_frame)
             camera.add_tracklet_callback(self.recorder.submit_tracklets)
         # What each camera's frames wait for from the first: live, a camera with a model sends tracklets (a replay's
-        # come or not with the recording); the frame source says per image whether it asked poses (`_on_asked`)
+        # come or not with the recording); the crop step says per image whether it asked poses (`_on_asked`)
         live_tracklets: bool = not self.settings.camera.sim_enabled and self.settings.camera.cam_0.model_chain != ModelChain.OFF
         for i in range(num_cams):
             self.recorder.expect_parts(i, tracklets=live_tracklets, poses=True)
@@ -121,8 +121,9 @@ class DeepFlowMain:
         self.optical_flow_estimator  = optical_flow.OpticalFlowEstimator(p.optical_flow)
 
         self.tracker.add_tracklet_callback(self.frame_source.set_tracklets)
-        # The frame source's thread: each bang's poses with its images to the pipeline, then the poses asked
-        self.frame_source.add_asked_callback(self._on_asked)
+        # The frame source's thread: each bang's poses with its images to the pipeline; the crop step in it then
+        # tells the poses asked
+        self.crops.add_asked_callback(self._on_asked)
 
         # The optical flow reads the same crops the pose model gets.
         self.crops.add_image_callback(self.optical_flow_estimator.submit)
@@ -218,7 +219,7 @@ class DeepFlowMain:
     def _on_asked(self, timestamp: float, cam_id: int, asked: FrameDict) -> None:
         """A frame bang's poses, on the frame source's thread: the recorder and the inference frame sync hear whether poses
         come for the image (the pose model asked, the recording's played, or the camera's own keypoints handed on),
-        so a frame without a player, or passed by `pose_interval`, does not wait."""
+        so a frame without a player, or passed by the pose crop's `interval`, does not wait."""
         modelled: bool = (self.recorded_poses is not None and self.settings.camera.recorded_poses.enabled) or self.settings.pose.pose.enabled
         posing: bool = modelled or any(has_points(frame) for frame in asked.values())
         self.recorder.expect_poses(cam_id, timestamp, bool(asked) and posing)

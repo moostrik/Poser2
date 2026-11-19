@@ -6,18 +6,15 @@ images of that moment. `submit(cam_times, images)` queues it for this one's own 
 `WAITING` wait, beyond that the oldest is dropped, counted as `dropped`. The thread makes the poses (`process`): a
 player is posed when its camera is in the set and its last detection is within `detection_timeout` of that camera's
 capture time. It hands them with the images to the frames callbacks (the pipeline's push, which carries the images
-to the crop), then, per camera in the set, that camera's time and poses to the asked callbacks. With
-`pose_interval` above 1 only every so many bangs are posed; the others reach the asked callbacks with no poses
-and the pipeline not at all. The images are
-carried, never read: the tracker does not know the GPU's. A bang before `start` is an error; one after `stop` is
-dropped."""
+to the crop), every bang. The images are carried, never read: the tracker does not know the GPU's. A bang before
+`start` is an error; one after `stop` is dropped."""
 
 import logging
 import math
 import time
 from collections import deque
 from threading import Condition, Lock, Thread
-from typing import Any, Callable, TypeAlias
+from typing import Any
 
 import numpy as np
 
@@ -30,8 +27,6 @@ from .panoramic.annotation import Annotation as PanoramicAnnotation
 logger = logging.getLogger(__name__)
 
 WAITING: int = 2        # bangs waiting for the thread; a newer image makes an older one's poses late
-
-AskedCallback: TypeAlias = Callable[[float, int, FrameDict], None]      # (timestamp, cam_id, the poses asked)
 
 
 class TrackerFrameSourceSettings(BaseSettings):
@@ -49,7 +44,6 @@ class TrackerFrameSourceSettings(BaseSettings):
                                             description="Width over height of the window the camera's keypoints are normalised to (the host crop's 384/512)")
     crop_padding:      Field[float] = Field(0.0, min=0.0, max=1.0, step=0.05,
                                             description="Margin around the box before the window is fitted (fraction; the host crop's padding)")
-    pose_interval:     Field[int]   = Field(1, min=1, max=8, description="Frames from one posed frame to the next: 1 every frame, 2 every other")
     dropped:           Field[int]   = Field(0, access=Field.READ, description="Frame bangs dropped while the pose step fell behind")
 
 
@@ -75,7 +69,6 @@ class TrackerFrameSource(Thread):
         }
         self._lock = Lock()
         self._batch_id_counter = 0
-        self._bangs_taken: int = 0                  # the bangs this thread has taken, for `pose_interval`
         # The bangs waiting for the thread: (cam_times, images, the moment it was queued)
         self._wake: Condition = Condition()
         self._running: bool = False
@@ -85,19 +78,12 @@ class TrackerFrameSource(Thread):
         self._stopped: bool = False
         self._callback_lock: Lock = Lock()
         self._frames_callbacks: list[SourceFramesCallback] = []     # run in registration order
-        self._asked_callbacks: list[AskedCallback] = []
 
     def add_frames_callback(self, callback: SourceFramesCallback) -> None:
         """Each bang's poses with the images they are for (the pipeline's push)."""
         with self._callback_lock:
             if callback not in self._frames_callbacks:
                 self._frames_callbacks.append(callback)
-
-    def add_asked_callback(self, callback: AskedCallback) -> None:
-        """Per camera in each bang, its capture time and its poses asked, once the frames callbacks have taken them."""
-        with self._callback_lock:
-            if callback not in self._asked_callbacks:
-                self._asked_callbacks.append(callback)
 
     # ── Lifecycle ─────────────────────────────────────────────────────
 
@@ -129,7 +115,7 @@ class TrackerFrameSource(Thread):
                 cam_times, images, queued = self._bangs.popleft()
             self._wait.add_time((time.perf_counter() - queued) * 1000.0, report=False)
             try:
-                self._bang(cam_times, images)
+                self.process(cam_times, images)
             except Exception:
                 logger.exception("TrackerFrameSource: a frame bang failed")
 
@@ -150,22 +136,6 @@ class TrackerFrameSource(Thread):
             self._wake.notify()
         if dropped is not None:
             self.settings.dropped = dropped
-
-    def _bang(self, cam_times: dict[int, float], images: Any) -> None:
-        """A bang posed, or, between two posed ones (`pose_interval`), passed: nothing goes to the pipeline, which
-        would take a bang without poses as everyone gone, and each camera is told no poses were asked."""
-        posed: bool = self._bangs_taken % self.settings.pose_interval == 0
-        self._bangs_taken += 1
-        asked: FrameDict = self.process(cam_times, images) if posed else {}
-        with self._callback_lock:
-            asked_callbacks: list[AskedCallback] = list(self._asked_callbacks)
-        for cam_id, timestamp in cam_times.items():
-            cam_asked: FrameDict = {track_id: frame for track_id, frame in asked.items() if frame.cam_id == cam_id}
-            for asked_callback in asked_callbacks:
-                try:
-                    asked_callback(timestamp, cam_id, cam_asked)
-                except Exception:
-                    logger.exception("TrackerFrameSource: an asked callback failed")
 
     @property
     def track_ids(self) -> list[int]:

@@ -43,14 +43,6 @@ color), one fluid per screen. Until then hd_trio runs its own copy, unchanged.
 
 ## A. The app
 
-- **A3.** The boxes every frame, the poses at their interval: `pose_interval` moves from the frame source
-  (`TrackerFrameSource`) to the pose model's input. The frame source feeds `RAW` every frame, so its box steps
-  (`BBoxEuroSmoother`, `BBoxPredictor`) and the crop step run every frame; the crop step hands the pose model
-  every `pose_interval`-th crop, and what follows the pose model (the rest of `RAW`, `CLEAN`, `SMOOTH`) runs only
-  on a new pose. The asked callback, which tells the capture sync whether a frame's poses were asked, moves with
-  the interval; the dense optical flow (RAFT), also fed by the crop step, takes the pose's interval. No new stage;
-  the apps' pipeline specs stay as they are; the frame source's tests change with it. Checked: the pose and
-  tracker tests; deep_flow in -sim, its poses as before (25 fps at 50 fps and interval 2).
 - **A4.** The segmentation every frame (RVM, `modules/inference/segmentation`), before the pose: the crop step
   cuts a second size, `CropExtractor(pose_crop, segmentation_crop)` as hd_trio's, every frame, and the
   `Segmenter` runs on those crops. Its result carries the box it was cut at (added where the crop is cut; today
@@ -128,7 +120,6 @@ Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 
 | Step     | Check                                                                                               |
 |----------|-----------------------------------------------------------------------------------------------------|
-| A3       | pose and tracker tests; deep_flow in -sim, its poses as before (25 fps)                             |
 | A4       | RVM alone (`model_benchmark.py`); -sim: a mask every frame; its time from its lane                  |
 | A5       | -sim: the mask on the player, the color cut by it                                                   |
 | B1       | the flow tests; deep_flow in -sim once (`smooth_like_z` moved); superficial_flow's motion monitor   |
@@ -140,7 +131,6 @@ Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 
 ## Rules it touches
 
-- Update all affected call sites in the same change: A3.
 - Use an `ABC` for a family of classes that share code: C1.
 - Similar things share the noun and differ by a qualifier (`Bridge2D`, `Bridge3D`): B1, C1.
 - Remove obsolete pathways; no parallel legacy ones: B1, C1, D1, D2.

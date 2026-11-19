@@ -17,7 +17,7 @@ from them.
 
 On the recording in the app, a probe (`inference_probe.py`, not committed) adds the segmentation and its crop
 (`reset_interval` 1, so no run's drops carry into its masks), the previous crop and the optical flow, and the pose on
-every frame (`pose_interval` 1: at 2, which half of the frames is posed differs per run **(seen)**). It keys every
+every frame (`pose_crop.interval` 1: at 2, which half of the frames is posed differs per run **(seen)**). It keys every
 output by the recording's frame, crops every frame with one baseline run's boxes (the tracker gives each run slightly
 other boxes **(seen)**), and compares two runs on the frames whose inputs were byte-equal (each crop's fingerprint as
 handed to the model). The same engine on the same input gives the same numbers, so a difference is a fault

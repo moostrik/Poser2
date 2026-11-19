@@ -124,13 +124,12 @@ class TestFrameContents(TrackerFrameSourceCase):
 
 
 class TestThread(TrackerFrameSourceCase):
-    """`submit` queues a frame bang for the thread: its poses with its images, then the poses asked with its camera."""
+    """`submit` queues a frame bang for the thread: its poses with its images."""
 
     def setUp(self) -> None:
         super().setUp()
         self.order: list[tuple[str, str, object]] = []
         self.poses.add_frames_callback(lambda frames, images: self.order.append(('poses', threading.current_thread().name, images)))
-        self.poses.add_asked_callback(lambda now, cam_id, asked: self.order.append(('asked', threading.current_thread().name, (cam_id, set(asked)))))
         self.poses.set_tracklets({0: tracklet(0)})
 
     def tearDown(self) -> None:
@@ -144,8 +143,8 @@ class TestThread(TrackerFrameSourceCase):
     def test_a_bang_runs_on_the_thread_with_its_images(self) -> None:
         self.poses.start()
         self.poses.submit(camera_0_now(), 'images 1')
-        self.wait_for(2)
-        self.assertEqual(self.order, [('poses', 'TrackerFrameSource', 'images 1'), ('asked', 'TrackerFrameSource', (0, {0}))])
+        self.wait_for(1)
+        self.assertEqual(self.order, [('poses', 'TrackerFrameSource', 'images 1')])
 
     def test_beyond_two_waiting_the_oldest_is_dropped_and_counted(self) -> None:
         release: threading.Event = threading.Event()
@@ -162,7 +161,7 @@ class TestThread(TrackerFrameSourceCase):
         for name in ('a', 'b', 'c'):
             self.poses.submit(camera_0_now(), name)
         release.set()
-        self.wait_for(6)
+        self.wait_for(3)
         self.assertEqual([images for kind, _, images in self.order if kind == 'poses'], ['first', 'b', 'c'])
         self.assertEqual(self.settings.dropped, 1)
 
@@ -174,20 +173,10 @@ class TestThread(TrackerFrameSourceCase):
         self.poses.submit(camera_0_now(), 'late')
         self.assertEqual(self.order, [])
 
-    def test_the_poses_asked_are_told_per_camera_with_its_time(self) -> None:
-        now: float = time.perf_counter()
-        self.poses.set_tracklets({0: tracklet(0, cam_id=0), 1: tracklet(1, cam_id=1)})
-        times: list[tuple[int, float, set]] = []
-        self.poses.add_asked_callback(lambda timestamp, cam_id, asked: times.append((cam_id, timestamp, set(asked))))
-        self.poses._bang({0: now, 1: now + 0.01}, 'set')          # the thread's work, on the test's thread
-        self.assertEqual(times, [(0, now, {0}), (1, now + 0.01, {1})])
-
-    def test_with_interval_two_every_other_bang_is_posed_and_the_others_told_not_asked(self) -> None:
-        self.settings.pose_interval = 2
-        for name in ('a', 'b', 'c', 'd'):
-            self.poses._bang(camera_0_now(), name)
-        self.assertEqual([images for kind, _, images in self.order if kind == 'poses'], ['a', 'c'])
-        self.assertEqual([asked for kind, _, asked in self.order if kind == 'asked'], [(0, {0}), (0, set()), (0, {0}), (0, set())])
+    def test_every_bang_goes_to_the_pipeline(self) -> None:
+        for name in ('a', 'b', 'c'):
+            self.poses.process(camera_0_now(), name)
+        self.assertEqual([images for kind, _, images in self.order if kind == 'poses'], ['a', 'b', 'c'])
 
 
 if __name__ == '__main__':

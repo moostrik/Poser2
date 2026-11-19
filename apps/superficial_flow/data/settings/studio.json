@@ -134,14 +134,14 @@
     "frame_source": {
       "detection_timeout": 2.0,
       "crop_aspect": 0.75,
-      "crop_padding": 0.0,
-      "pose_interval": 2
+      "crop_padding": 0.0
     },
     "pose_crop": {
       "padding": 0.1,
       "output_width": 192,
       "output_height": 256,
-      "enable_prev_crop": false
+      "enable_prev_crop": false,
+      "interval": 2
     },
     "inference_frame_sync": {
       "pose_wait": 0.0,

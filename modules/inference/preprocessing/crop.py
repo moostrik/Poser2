@@ -27,6 +27,7 @@ class Image:
 
 CropImageDict: TypeAlias = dict[int, Image]
 ImageCallback: TypeAlias = Callable[[FrameDict, CropImageDict], None]
+AskedCallback: TypeAlias = Callable[[float, int, FrameDict], None]      # (timestamp, cam_id, the poses cut for that camera's image)
 
 
 class CropExtractorSettings(BaseSettings):
@@ -42,3 +43,4 @@ class CropExtractorSettings(BaseSettings):
     output_height:    Field[int]   = Field(512, access=Field.INIT)
     max_players:        Field[int]   = Field(4, min=1, max=16, access=Field.INIT)
     enable_prev_crop: Field[bool]  = Field(False, access=Field.INIT, description="Cut the previous frame at the box too, for the optical-flow model")
+    interval:         Field[int]   = Field(1, min=1, max=8, description="Frames from one cut to the next: 1 every frame, 2 every other")

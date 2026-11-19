@@ -43,7 +43,8 @@ left out). white_space is wired on them: the frames' sync hands its set to the `
 callback calls `TrackerFrameSource.submit`; the tracklets' sync hands its set to `tracker.update` at the newest of
 their times; the tracklets go as they come to the tracker, the board, the journal (which queues them raw) and the
 tracklets' sync; the threads start after the wiring, before the cameras. The recorder takes the frames and
-tracklets from each camera as they come, `expect_parts` per camera, `expect_poses` per camera and set (the frame
+tracklets from each camera as they come, `expect_parts` per camera, 
+
 source's asked callback) and the RAW stage's poses. The calibration layer reads the uploaded image (`CameraColumns`:
 its band reduced to one row on the GPU, read back a tick later without waiting); the board's video images are gone.
 The drops are pinned on the panel (`cadence`: the two syncs', the uploader's sets, the pipeline's; the frame

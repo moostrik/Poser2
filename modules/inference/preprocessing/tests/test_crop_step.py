@@ -1,5 +1,6 @@
 """The crop step with the pose model behind it: the crops cut from exactly the images handed with the poses, never a
-newer upload, at every size from the same images and boxes; with the host model off the camera's keypoints come out.
+newer upload, at every size from the same images and boxes, each size at its interval, the poses asked told per
+camera; with the host model off the camera's keypoints come out.
 Runs on a CUDA install; the pose model is built, not loaded."""
 
 import unittest
@@ -59,6 +60,32 @@ class CropStepTest(unittest.TestCase):
         self.assertEqual(cut['segmentation'][0][0].timestamp, 1.0)                                  # the same images
         self.assertEqual(cut['segmentation'][0][0][BBox].to_rect(), cut['pose'][0][0][BBox].to_rect())   # one region
         self.assertIs(cut['segmentation'][1][0].ready, cut['pose'][1][0].ready)                      # one pass
+
+    def test_the_poses_asked_are_told_per_camera_with_its_time(self) -> None:
+        crops = CropExtractor(crop_settings())
+        asked: list[tuple[int, float, set]] = []
+        crops.add_asked_callback(lambda timestamp, cam_id, poses: asked.append((cam_id, timestamp, set(poses))))
+        crops.submit({0: self.pose}, self.upload_two())
+        self.assertEqual(asked, [(0, 1.0, {0})])
+
+    def test_with_interval_two_every_other_submit_is_cut_and_the_others_told_not_asked(self) -> None:
+        pose_crop, segmentation_crop = crop_settings(192, 256), crop_settings(768, 1024)
+        pose_crop.interval = 2
+        crops = CropExtractor(pose_crop, segmentation_crop)
+        cut: dict[str, int] = {'pose': 0, 'segmentation': 0}
+        def count(size: str):
+            def on_cut(frames, images) -> None:
+                cut[size] += 1
+            return on_cut
+        crops.add_image_callback(count('pose'))
+        crops.add_image_callback(count('segmentation'), segmentation_crop)
+        asked: list[set] = []
+        crops.add_asked_callback(lambda timestamp, cam_id, poses: asked.append(set(poses)))
+        snapshot: ImageSnapshot = self.upload_two()
+        for _ in range(4):
+            crops.submit({0: self.pose}, snapshot)
+        self.assertEqual(cut, {'pose': 2, 'segmentation': 4})
+        self.assertEqual(asked, [{0}, set(), {0}, set()])
 
     def test_a_size_it_does_not_cut_is_an_error(self) -> None:
         with self.assertRaises(ValueError):
