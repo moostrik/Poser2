@@ -4,6 +4,7 @@ so the field names carry no prefix."""
 
 from modules.settings import Field, BaseSettings, Group, Widget
 
+from ..advection import Advection, Limiter
 from ..density_blend import DensityBlend
 from ..port import ColorSpace
 from ..pressure_solver import PressureSolver
@@ -39,6 +40,8 @@ class InputSettings(BaseSettings):
 
 class VelocitySettings(BaseSettings):
     """The velocity: how it carries itself and fades."""
+    advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the velocity carries itself: MacCormack keeps swirls, at about twice the reads")
+    limiter: Field[Limiter]         = Field(Limiter.CLAMP,                              description="Where MacCormack overshoots: clamped to the step's bounds, or the plain step")
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=1.0,    color="blue-grey",      description="How far the velocity carries itself per step; 1 = with the water, the physics")
     fade_time: Field[float]         = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the velocity fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds 1 width/s takes to brake well above the knee, a saturating loss; 0 = off")
@@ -88,7 +91,9 @@ class DensitySettings(BaseSettings):
     evaporates. Its size is the output's."""
     color_space: Field[ColorSpace]  = Field(ColorSpace.RGB,                                         description="The color stored as RGB, or as Oklab, mixing as the eye sees; a switch clears the density")
     sink: Field[float]              = Field(0.0,    min=0.0,    max=20.0,   color="red", newline=True, description="Weight per unit of amount (widths/s²) along gravity; 0 = as heavy as the water")
-    advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey", newline=True, description="How far the density and the temperature are carried per step; 1 = with the water")
+    advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,  newline=True,   description="How the density and the temperature are carried: MacCormack keeps edges sharp")
+    limiter: Field[Limiter]         = Field(Limiter.CLAMP,                              description="Where MacCormack overshoots: clamped to the step's bounds, or the plain step")
+    advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey",      description="How far the density and the temperature are carried per step; 1 = with the water")
     fade_time: Field[float]         = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the density fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds fully dyed water takes to clear well above the knee, a saturating loss; 0 = off")
     evaporation_knee: Field[float]  = Field(0.1,    min=0.001,  max=1.0,    widget=Widget.log_slider, color="grey", description="Dye (0 to 1) below which the clearing turns from a fixed amount to a share")

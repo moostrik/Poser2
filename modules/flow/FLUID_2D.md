@@ -30,18 +30,18 @@ carried by the projected velocity. The inputs come before the step, as the 3D ta
 The panel is the 3D's for what a plane has: each setting sits at the 3D's path, under its name, in its unit and with
 its default, the sizes apart (`modules/flow/tests/test_fluid_2d_settings.py`). What the 2D has of each group:
 
-| Group         | The 2D's settings                                                                             | The 3D's law                                                             |
-|---------------|-----------------------------------------------------------------------------------------------|--------------------------------------------------------------------------|
-| root          | `guard`, `wall`, `width`, `height`                                                            | [the guard](FLUID_3D.md#the-guard), [the walls](FLUID_3D.md#the-walls)   |
-| `time`        | `time_step`, `fixed_fps`, `fps_smoothing`, `time_scale`                                       | every pass and input steps by the fluid's time                           |
-| `input`       | the drags, the gains, the density's blend and release, gravity's `gravity_x` and `gravity_y`  | [the inputs](FLUID_3D.md#the-inputs)                                     |
-| `velocity`    | `advection_scale`, `fade_time`, `evaporation_time`, `evaporation_knee`                        | [the fade and the evaporation](FLUID_3D.md#the-fade-and-the-evaporation) |
-| `viscosity`   | `enabled`, `viscosity` (widths²/s), `iterations`                                              | implicit diffusion, Jacobi                                               |
-| `vorticity`   | `enabled`, `strength_1`, `radius_1` (widths)                                                  | the force ε h (N × ω) dt, h the cell's width (Fedkiw 2001)               |
-| `temperature` | `enabled`, `buoyancy`, `fade_time`, `evaporation_time`, `evaporation_knee`                    | [the buoyancy](FLUID_3D.md#the-buoyancy)                                 |
-| `expansion`   | `enabled`, `rate`                                                                             | [the expansion](FLUID_3D.md#the-expansion)                               |
-| `pressure`    | `solver`, `iterations`, `relaxation`, `cycles`                                                | [the pressure](FLUID_3D.md#the-pressure)                                 |
-| `density`     | `color_space`, `sink`, `advection_scale`, `fade_time`, `evaporation_time`, `evaporation_knee` | [the density's blend](FLUID_3D.md#the-densitys-blend), the buoyancy      |
+| Group         | The 2D's settings                                                                              | The 3D's law                                                                                     |
+|---------------|------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
+| root          | `guard`, `wall`, `width`, `height`                                                             | [the guard](FLUID_3D.md#the-guard), [the walls](FLUID_3D.md#the-walls)                           |
+| `time`        | `time_step`, `fixed_fps`, `fps_smoothing`, `time_scale`                                        | every pass and input steps by the fluid's time                                                   |
+| `input`       | the drags, the gains, the density's blend and release, gravity's `gravity_x` and `gravity_y`   | [the inputs](FLUID_3D.md#the-inputs)                                                             |
+| `velocity`    | `advection`, `limiter`, `advection_scale`, `fade_time`, `evaporation_time`, `evaporation_knee` | [the advection](FLUID_3D.md#the-advection), [the fade](FLUID_3D.md#the-fade-and-the-evaporation) |
+| `viscosity`   | `enabled`, `viscosity` (widths²/s), `iterations`                                               | implicit diffusion, Jacobi                                                                       |
+| `vorticity`   | `enabled`, `strength_1`, `radius_1` (widths)                                                   | the force ε h (N × ω) dt, h the cell's width (Fedkiw 2001)                                       |
+| `temperature` | `enabled`, `buoyancy`, `fade_time`, `evaporation_time`, `evaporation_knee`                     | [the buoyancy](FLUID_3D.md#the-buoyancy)                                                         |
+| `expansion`   | `enabled`, `rate`                                                                              | [the expansion](FLUID_3D.md#the-expansion)                                                       |
+| `pressure`    | `solver`, `iterations`, `relaxation`, `cycles`                                                 | [the pressure](FLUID_3D.md#the-pressure)                                                         |
+| `density`     | `color_space`, `sink`, `advection`, `limiter`, `advection_scale`, `fade_time`, the evaporation | [the density's blend](FLUID_3D.md#the-densitys-blend), the buoyancy                              |
 
 superficial_flow's preset holds deep_flow's value for every setting the two share, the sizes a textbook default
 (`apps/superficial_flow/tests/test_fluid_preset.py`). deep_flow's gravity points along z, so on the plane it is
@@ -79,5 +79,19 @@ superficial_flow's preset holds deep_flow's value for every setting the two shar
   From rest the error is the swirls' size, which Jacobi and Gauss–Seidel barely reach in 40 sweeps; SOR's
   over-relaxation reaches it and leaves the high frequencies worse **(deduction)**. Each V-cycle divides the
   residual by six or more.
+- MacCormack is the 3D's on the plane, its own kernel (`MacCormack2D`, [FLUID_3D.md](FLUID_3D.md#the-advection)):
+  the plain step into a predictor per field (`_velocity_scratch`, `_temperature_scratch`, `_density_scratch`, each
+  allocated at its field's first MacCormack step at its size), then half its error traced forward added back,
+  limited by the source's four texels around the backward trace. The temperature takes the density's `advection`
+  and `limiter`.
+
+  Measured in the GPU harness, 2026-11-19, superficial_flow plan D4, a result: a 128 × 128 grid under a 256 × 256
+  density, 50 steps of 0.02 s; one run each:
+
+  | Measure                                                     | Semi-Lagrangian | MacCormack, clamp | MacCormack, revert |
+  |-------------------------------------------------------------|-----------------|-------------------|--------------------|
+  | a square at (0.3, 0.2) widths/s: its edge, 99.5% gradient   | 0.153           | 0.184             | 0.184              |
+  | a swirl carried and projected: its mean speed, of its start | 0.947           |                   | 0.977              |
+
 - The guard counts the velocity, the density and the temperature in the advection, the one pass that writes each.
 - One GPU timer, `GPU fluid`, holds the step; the layer's `GPU fluid inject` the inputs.

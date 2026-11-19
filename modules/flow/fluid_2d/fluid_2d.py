@@ -11,6 +11,7 @@ from .. import FlowUtil, Port, TextureKind
 from ..density_blend import DensityBlend
 from ..drag import DRAG_FLOOR, drag_share
 from ..finite_guard import FiniteGuard, GuardSlot
+from ..advection import Advection, Limiter
 from ..port import ColorSpace
 from ..pressure_solver import PressureSolver
 from ..time_step import REFERENCE_STEP, TimeStep, viscosity_iterations
@@ -22,7 +23,7 @@ from .shaders import (
     Advect, Divergence, Gradient,
     JacobiPressure, JacobiPressureCompute, JacobiDiffusion, JacobiDiffusionCompute,
     VorticityCurl, VorticityForce, Buoyancy,
-    InjectVelocity2D, InjectDensity2D, InjectScalar2D, ScalarInjection, DensityToRgb2D
+    InjectVelocity2D, InjectDensity2D, InjectScalar2D, ScalarInjection, DensityToRgb2D, MacCormack2D
 )
 
 _BARRIER_FETCH_AND_IMAGE: int = int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
@@ -103,9 +104,14 @@ class Fluid2D:
         self._vorticity_curl_fbo: Fbo = Fbo(wrap=GL_CLAMP_TO_EDGE)
         self._vorticity_force_fbo: Fbo = Fbo()
         self._buoyancy_fbo: Fbo = Fbo()
+        # MacCormack's predictors, one per field, each allocated at its field's first MacCormack step
+        self._velocity_scratch: Fbo = Fbo(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
+        self._temperature_scratch: Fbo = Fbo()
+        self._density_scratch: Fbo = Fbo()
 
         # Shaders
         self._advect_shader: Advect = Advect()
+        self._maccormack_shader: MacCormack2D = MacCormack2D()
         self._divergence_shader: Divergence = Divergence()
         self._gradient_shader: Gradient = Gradient()
         self._jacobi_pressure_shader: JacobiPressure = JacobiPressure()
@@ -151,6 +157,7 @@ class Fluid2D:
 
         # Allocate shaders
         self._advect_shader.allocate()
+        self._maccormack_shader.allocate()
         self._divergence_shader.allocate()
         self._gradient_shader.allocate()
         self._jacobi_pressure_shader.allocate()
@@ -227,8 +234,11 @@ class Fluid2D:
         self._buoyancy_fbo.deallocate()
         self._expansion_fbo.deallocate()
         self._picture_fbo.deallocate()
+        for scratch in (self._velocity_scratch, self._temperature_scratch, self._density_scratch):
+            scratch.deallocate()
 
         self._advect_shader.deallocate()
+        self._maccormack_shader.deallocate()
         self._divergence_shader.deallocate()
         self._gradient_shader.deallocate()
         self._jacobi_pressure_shader.deallocate()
@@ -253,6 +263,7 @@ class Fluid2D:
     def _reload_shaders(self) -> None:
         """Hot-reload all shaders."""
         self._advect_shader.reload()
+        self._maccormack_shader.reload()
         self._divergence_shader.reload()
         self._gradient_shader.reload()
         self._jacobi_pressure_shader.reload()
@@ -315,24 +326,45 @@ class Fluid2D:
         """Add `force` × `strength` to the velocity in place."""
         FlowUtil.add(self._velocity_fbo, force, strength)
 
+    def _carry(self, field: SwapFbo, scratch: Fbo, velocity: Texture | None, obstacle: Texture, step: float,
+               dissipation: float, advection: Advection, limiter: Limiter, evaporation: float, evaporation_knee: float,
+               measure: int, guard: GuardSlot | None) -> None:
+        """Carry `field` one step along `velocity` (None: along itself) by `advection`: semi-Lagrangian into the field;
+        or its step into `scratch` as the predictor, allocated at its first MacCormack step at the field's size, and
+        the MacCormack correction by `limiter` into the field; on the result the fade, the evaporation read by
+        `measure` (0 a density's alpha, 1 a vector's length, 2 |r|) and `guard`."""
+        field.swap()
+        source: Texture = field.back
+        along: Texture = velocity if velocity is not None else source
+        if advection != Advection.MACCORMACK:
+            field.begin()
+            self._advect_shader.use(source, along, obstacle, self._field_aspect, step, dissipation,
+                                    has_obstacles=self._has_obstacles, evaporation=evaporation,
+                                    evaporation_knee=evaporation_knee, measure=measure, guard=guard)
+            field.end()
+            return
+        if not scratch.allocated or (scratch.width, scratch.height) != (field.width, field.height):
+            scratch.deallocate()
+            scratch.allocate(field.width, field.height, field.internal_format)
+            self._apply_wall_modes()
+        scratch.begin()
+        self._advect_shader.use(source, along, obstacle, self._field_aspect, step, 1.0, has_obstacles=self._has_obstacles)
+        scratch.end()
+        field.begin()
+        self._maccormack_shader.use(source, scratch, along, obstacle, self._field_aspect, step, dissipation,
+                                    has_obstacles=self._has_obstacles, evaporation=evaporation,
+                                    evaporation_knee=evaporation_knee, measure=measure, guard=guard,
+                                    clamp=limiter == Limiter.CLAMP)
+        field.end()
+
     def _advect_velocity(self) -> None:
-        """The velocity carried one step along itself (`velocity.advection_scale`), faded, evaporated and guarded."""
+        """The velocity carried one step along itself by `velocity.advection` (`velocity.advection_scale`), faded,
+        evaporated and guarded."""
         velocity = self.settings.velocity
-        self._velocity_fbo.swap()
-        self._velocity_fbo.begin()
-        self._advect_shader.use(
-            self._velocity_fbo.back,   # Source velocity (self-advection)
-            self._velocity_fbo.back,   # Velocity
-            self._simulation_obstacle_fbo,
-            self._field_aspect,
-            self._dt * velocity.advection_scale,
-            self._calculate_dissipation(self._dt, velocity.fade_time),
-            has_obstacles=self._has_obstacles,
-            evaporation=self._evaporation(self._dt, velocity.evaporation_time),
-            evaporation_knee=velocity.evaporation_knee, measure=1,
-            guard=self._guard_slot('velocity')
-        )
-        self._velocity_fbo.end()
+        self._carry(self._velocity_fbo, self._velocity_scratch, None, self._simulation_obstacle_fbo,
+                    self._dt * velocity.advection_scale, self._calculate_dissipation(self._dt, velocity.fade_time),
+                    velocity.advection, velocity.limiter, self._evaporation(self._dt, velocity.evaporation_time),
+                    velocity.evaporation_knee, 1, self._guard_slot('velocity'))
 
     def _apply_viscosity(self) -> None:
         """The viscosity (widths² per second): Jacobi iterations of the implicit diffusion, `viscosity.iterations` at
@@ -411,7 +443,8 @@ class Fluid2D:
         return temperature.enabled and temperature.buoyancy > 0.0
 
     def _advect_temperature(self) -> None:
-        """The temperature carried one step by the projected velocity, as the density is (its `advection_scale`),
+        """The temperature carried one step by the projected velocity, as the density is (its `advection`, `limiter`
+        and `advection_scale`),
         faded and evaporated by its own; the buoyancy reads it the next step; while it does not run, cleared once and
         skipped."""
         if not self._temperature_runs:
@@ -422,21 +455,11 @@ class Fluid2D:
         self._temperature_clear = False
 
         temperature = self.settings.temperature
-        self._temperature_fbo.swap()
-        self._temperature_fbo.begin()
-        self._advect_shader.use(
-            self._temperature_fbo.back,
-            self._velocity_fbo,
-            self._simulation_obstacle_fbo,
-            self._field_aspect,
-            self._dt * self.settings.density.advection_scale,
-            self._calculate_dissipation(self._dt, temperature.fade_time),
-            has_obstacles=self._has_obstacles,
-            evaporation=self._evaporation(self._dt, temperature.evaporation_time),
-            evaporation_knee=temperature.evaporation_knee, measure=2,
-            guard=self._guard_slot('temperature')
-        )
-        self._temperature_fbo.end()
+        density = self.settings.density
+        self._carry(self._temperature_fbo, self._temperature_scratch, self._velocity_fbo, self._simulation_obstacle_fbo,
+                    self._dt * density.advection_scale, self._calculate_dissipation(self._dt, temperature.fade_time),
+                    density.advection, density.limiter, self._evaporation(self._dt, temperature.evaporation_time),
+                    temperature.evaporation_knee, 2, self._guard_slot('temperature'))
 
     def _apply_buoyancy(self) -> None:
         """The buoyancy, an acceleration f = gravity × (κρ − σT) (widths/s²) added × dt: the density's amount ρ sinks
@@ -542,24 +565,13 @@ class Fluid2D:
         self._velocity_fbo.end()
 
     def _advect_density(self) -> None:
-        """The density carried one step by the projected velocity (`density.advection_scale`), faded, evaporated and
-        guarded."""
+        """The density carried one step by the projected velocity by `density.advection` (`density.advection_scale`),
+        faded, evaporated and guarded."""
         density = self.settings.density
-        self._density_fbo.swap()
-        self._density_fbo.begin()
-        self._advect_shader.use(
-            self._density_fbo.back,    # Source density
-            self._velocity_fbo,        # Velocity
-            self._density_obstacle_fbo, # Obstacles (full density resolution)
-            self._field_aspect,
-            self._dt * density.advection_scale,
-            self._calculate_dissipation(self._dt, density.fade_time),
-            has_obstacles=self._has_obstacles,
-            evaporation=self._evaporation(self._dt, density.evaporation_time),
-            evaporation_knee=density.evaporation_knee, measure=0,
-            guard=self._guard_slot('density')
-        )
-        self._density_fbo.end()
+        self._carry(self._density_fbo, self._density_scratch, self._velocity_fbo, self._density_obstacle_fbo,
+                    self._dt * density.advection_scale, self._calculate_dissipation(self._dt, density.fade_time),
+                    density.advection, density.limiter, self._evaporation(self._dt, density.evaporation_time),
+                    density.evaporation_knee, 0, self._guard_slot('density'))
 
     def _guard_slot(self, field: str) -> GuardSlot | None:
         """The field's slot in the fluid's guard, None while `guard` is off."""
@@ -571,7 +583,7 @@ class Fluid2D:
         """Apply `wall` to the density and the temperature (GL thread only); the velocity stays 0 beyond the walls,
         the pressure's walls are the solvers' ghosts."""
         wall = _WALL_GL[self.settings.wall]
-        for fbo in (self._density_fbo, self._temperature_fbo):
+        for fbo in (self._density_fbo, self._temperature_fbo, self._density_scratch, self._temperature_scratch):
             if fbo.allocated:
                 fbo.set_wrap(*wall)
 
