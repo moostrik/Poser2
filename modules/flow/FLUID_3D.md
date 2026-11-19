@@ -38,7 +38,7 @@ A step (`Fluid3D.update`), in order, at the code's defaults:
 | advect_vel  | self-advection on the faces by `velocity.advection`, each face traced on its own ([The staggered velocity](#the-staggered-velocity)), `velocity.advection_scale` 1, no fade; on its result the guard ([The guard](#the-guard)) and the slip | velocity's faces    | the trace distance   |
 | viscosity   | Jacobi diffusion on the faces, while `viscosity.enabled` is on and the viscosity above 0; off by default                                                                                                                                                                | velocity's faces    | no                   |
 | vorticity   | the confinements while `vorticity.enabled` is on (`vorticity.strength_1` to `_3`, each above 0, at its `vorticity.radius_1` to `_3`): every running one's curl at the cells from the faces in one pass, their forces summed, each face given its two cells' mean | faces, curl         | no                   |
-| buoyancy    | gravity × (sink × the density's amount − buoyancy × the warmth, 0 the room's), kept as an acceleration at the cells, each face given its two cells' mean × dt; gravity down the screen (`gravity_y` −1, y up)                                                          | acceleration        | no                   |
+| buoyancy    | gravity × (sink × the density's amount − buoyancy × the warmth, 0 the room's), each face given its two cells' mean × dt in one pass, the warmth read only while the lift is on; gravity down the screen (`gravity_y` −1, y up)                                          | acceleration        | no                   |
 | incompress  | the divergence per cell from its six faces, the pressure by `pressure.solver` ([The pressure](#the-pressure)), the gradient per face from its two cells, on the walls ([The walls](#the-walls))                                                                         | pressure, faces     | no                   |
 | centers     | the faces averaged to the cells' centers, which the densities, the particles and the monitors read                                                                                                                                                                      | velocity            | no                   |
 | advect_temp | the temperature carried by the projected faces, as the density is by their centers, so the buoyancy reads the step before's; off: `enabled` off clears it once, and nothing is injected into it                                                                         | temperature         | the trace distance   |
@@ -328,11 +328,12 @@ the divergence's one more read among it, and 0.09 for each injection. With an op
 
 ### The buoyancy
 
-An acceleration at the cells, gravity (`input.gravity_x`/`_y`/`_z`) × (`density.sink` × the density's amount −
-`temperature.buoyancy` × the warmth) (`buoyancy_3d.comp`), while the sink is above 0 or the temperature runs
-(`temperature.enabled` and its `buoyancy` above 0, else the warmth is cleared once and neither injected nor
-carried), each face given its two cells' mean × dt before the projection (Fedkiw, Stam and Jensen
-2001). The density's amount is its alpha, in RGB and in Oklab alike. The projection takes the part the water
+An acceleration, gravity (`input.gravity_x`/`_y`/`_z`) × (`density.sink` × the density's amount −
+`temperature.buoyancy` × the warmth), added to the faces in one pass (`add_to_faces_3d.comp`, its buoyancy mode),
+while the sink is above 0 or the temperature runs (`temperature.enabled` and its `buoyancy` above 0, else the warmth
+is cleared once and neither injected nor carried) and gravity is not 0, each face given its two cells' mean × dt
+before the projection (Fedkiw, Stam and Jensen 2001); the warmth is read only while the lift is on, and the
+acceleration at the cells (`buoyancy_3d.comp`) is made only for its monitor. The density's amount is its alpha, in RGB and in Oklab alike. The projection takes the part the water
 around cannot let through: a uniform push on a sphere in still water moves it at 2/3 of the push, the rest moving
 the water around it, its added mass, half the sphere's **(deduction)**.
 
@@ -347,6 +348,12 @@ the sphere's surface), and the velocity at the sphere's middle along gravity ove
 | warm: `buoyancy` 2, warmth 0.75            | −1.5             | 0             | 0.6938        | 0.6565         |
 | dense: `sink` 3, amount 0.5, RGB           | +1.5             | 0             | 0.6940        | 0.6567         |
 | dense: the same, Oklab, a and b below 0    | +1.5             | 0             | 0.6940        | 0.6567         |
+| warm, 19 November, commit 7232a6a3         | −1.5             | 1.2e-6        | 0.6936        | 0.6583         |
+| dense RGB, 19 November                     | +1.5             | 1.2e-6        | 0.6935        | 0.6582         |
+| dense Oklab, 19 November                   | +1.5             | 1.2e-6        | 0.6935        | 0.6582         |
+
+The 19 November rows run deep_flow's preset of that day, gravity (0, 0, 0.02): the force, 0.03 widths/s² along
+it, is not exact in half precision **(deduction)**.
 
 At 8 cycles the solve is near exact, and the closed box keeps the sphere a little under 2/3, the water it pushes
 aside having to come back within the walls **(deduction)**; one cycle leaves the solve short, more of the push in
