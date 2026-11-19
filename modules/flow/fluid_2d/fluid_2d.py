@@ -480,14 +480,14 @@ class Fluid2D:
     def _apply_buoyancy(self) -> None:
         """The buoyancy, an acceleration f = gravity × (κρ − σT) (widths/s²) added × dt: the density's amount ρ sinks
         along gravity (`density.sink`), the warmth T rises against it (`temperature.buoyancy`, while the temperature
-        runs). The pass runs while either is above 0 and gravity, `input`'s, is not 0: one draw adds it straight to
+        runs). The pass runs while either is above 0 and `gravity` is not 0: one draw adds it straight to
         the velocity; the force itself is made only for its monitor."""
         shown: bool = self._buoyancy_shown
         self._buoyancy_shown = False
         lift: float = self.settings.temperature.buoyancy if self._temperature_runs else 0.0
         kappa: float = self.settings.density.sink
-        input = self.settings.input
-        gravity: tuple[float, float] = (input.gravity_x, input.gravity_y)
+        g = self.settings.gravity
+        gravity: tuple[float, float] = (g.x, g.y)
         if (lift <= 0.0 and kappa <= 0.0) or gravity == (0.0, 0.0):
             return
 

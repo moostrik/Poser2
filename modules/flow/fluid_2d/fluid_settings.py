@@ -20,16 +20,20 @@ class TimeSettings(BaseSettings):
     time_scale: Field[float]        = Field(1.0,    min=0.05,   max=2.0,    step=0.05,              description="The fluid's time as a share of real time; 0.5 = everything at half speed, 1 = real time")
 
 
+class GravitySettings(BaseSettings):
+    """Gravity's direction, which the density's weight (`density.sink`) and the warmth's lift (`temperature.buoyancy`)
+    act along; its length scales both."""
+    x: Field[float]                 = Field(0.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity's direction, x right")
+    y: Field[float]                 = Field(-1.0,   min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity's direction, y up; -1 = down the screen")
+
+
 class InputSettings(BaseSettings):
     """The bridge's input, in the order the layer injects it, as the 3D fluid takes it: the boundary's velocity and
     temperature, each the water dragged toward the body's value times a gain (capped at ±1 warm) over a time; the
-    body force's acceleration added × dt times a gain, and gravity's direction, which the density's weight and the
-    warmth's lift act along; the density, its dye over the water's, added, or the water drawn toward it."""
+    body force's acceleration added × dt times a gain; the density, its dye over the water's, added, or the water drawn toward it."""
     velocity_drag: Field[float]     = Field(50.0,   min=0.0,    max=1000.0, step=1.0, color="cyan", description="Time the water takes to close the gap to the body's velocity (ms); 0 = at once")
     velocity_gain: Field[float]     = Field(1.0,    min=-10.0,  max=10.0,   color="teal",           description="The body's velocity times this is what the water is dragged toward; 1 = as fast as the body")
     acceleration_gain: Field[float] = Field(1.0,    min=-10.0,  max=10.0,   color="teal",           description="The body force's acceleration times this is added × dt; 1 = its Δv added once")
-    gravity_x: Field[float]         = Field(0.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity's direction, x right")
-    gravity_y: Field[float]         = Field(-1.0,   min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity's direction, y up; -1 = down the screen")
     density_drag: Field[float]      = Field(200.0,  min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Over, fill: time the water takes to take on the body's dye (ms); 0 = at once")
     density_release: Field[float]   = Field(0.0,    min=0.0,    max=1000.0, step=1.0, color="cyan", description="Time the water's dye takes to fall to the body's where it is less (ms); 0 = never falls")
     density_gain: Field[float]      = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's amount times this; over, fill: at most fully dyed; 1 = fully dyed at 1 width/s")
@@ -122,6 +126,7 @@ class Fluid2DSettings(BaseSettings):
 
     # ---- The groups ----
     time: Group[TimeSettings]               = Group(TimeSettings)
+    gravity: Group[GravitySettings]         = Group(GravitySettings)
     input: Group[InputSettings]             = Group(InputSettings)
     # the fluid's passes in their order: the velocity, its viscosity, its confinement, the temperature's buoyancy,
     # the projection with the expansion, the temperature and the density carried

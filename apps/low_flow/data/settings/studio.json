@@ -30,7 +30,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 5832,
+        "iso": 680,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -42,7 +42,7 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 3836,
+        "balance": 4541,
         "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
@@ -485,6 +485,120 @@
         }
       }
     },
+    "fluid": {
+      "guard": true,
+      "wall": "OPEN",
+      "slip_time": 60.0,
+      "width": 1080,
+      "height": 1920,
+      "blend_mode": "ADD",
+      "time": {
+        "time_step": "MEASURED",
+        "fixed_fps": 60.0,
+        "fps_smoothing": 1.0,
+        "time_scale": 1.0
+      },
+      "gravity": {
+        "x": 0.0,
+        "y": -0.02
+      },
+      "input": {
+        "velocity_drag": 76.0,
+        "velocity_gain": 1.0,
+        "acceleration_gain": 10.0,
+        "density_drag": 200.0,
+        "density_release": 0.0,
+        "density_gain": 5.0,
+        "density_blend": "OVER",
+        "temperature_drag": 200.0,
+        "temperature_gain": 5.0
+      },
+      "velocity": {
+        "advection": "SEMI_LAGRANGIAN",
+        "limiter": "CLAMP",
+        "advection_scale": 1.0,
+        "fade_time": 0.0,
+        "evaporation_time": 0.0,
+        "evaporation_knee": 0.1
+      },
+      "viscosity": {
+        "enabled": true,
+        "viscosity": 0.0,
+        "iterations": 20
+      },
+      "vorticity": {
+        "enabled": true,
+        "strength_1": 32.83,
+        "strength_2": 0.0,
+        "strength_3": 0.0,
+        "radius_1": 0.1,
+        "radius_2": 0.01,
+        "radius_3": 0.025
+      },
+      "temperature": {
+        "enabled": true,
+        "buoyancy": 3.8,
+        "fade_time": 0.0,
+        "evaporation_time": 10.0,
+        "evaporation_knee": 0.1
+      },
+      "expansion": {
+        "enabled": false,
+        "rate": 0.0
+      },
+      "pressure": {
+        "solver": "MULTIGRID",
+        "iterations": 40,
+        "relaxation": 1.85,
+        "cycles": 1
+      },
+      "density": {
+        "color_space": "OKLAB",
+        "sink": 1.36,
+        "advection": "MACCORMACK",
+        "limiter": "CLAMP",
+        "advection_scale": 2.0,
+        "fade_time": 0.0,
+        "evaporation_time": 0.0,
+        "evaporation_knee": 0.1
+      },
+      "lut": {
+        "folder": "data/luts",
+        "files": [
+          "",
+          "Blockbuster.cube",
+          "Cityscape.cube",
+          "Frosted.cube",
+          "Vibrance.cube"
+        ],
+        "file": "",
+        "strength": 1.0
+      },
+      "monitor_main": {
+        "texture": "output.velocity",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
+      },
+      "monitor_debug": {
+        "texture": "output.velocity",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
+      }
+    },
     "pose": {
       "stage": "LERP",
       "frame": "CAMERA",
@@ -627,118 +741,6 @@
       "secondary_fullscreen": false,
       "fullscreen_mode": "WINDOWED",
       "fullscreen_mouse": false
-    },
-    "fluid": {
-      "guard": true,
-      "wall": "OPEN",
-      "slip_time": 60.0,
-      "width": 1080,
-      "height": 1920,
-      "blend_mode": "ADD",
-      "time": {
-        "time_step": "MEASURED",
-        "fixed_fps": 60.0,
-        "fps_smoothing": 1.0,
-        "time_scale": 1.0
-      },
-      "input": {
-        "velocity_drag": 76.0,
-        "velocity_gain": 1.0,
-        "acceleration_gain": 10.0,
-        "gravity_x": 0.0,
-        "gravity_y": -0.02,
-        "density_drag": 200.0,
-        "density_release": 0.0,
-        "density_gain": 5.0,
-        "density_blend": "OVER",
-        "temperature_drag": 200.0,
-        "temperature_gain": 5.0
-      },
-      "velocity": {
-        "advection": "SEMI_LAGRANGIAN",
-        "limiter": "CLAMP",
-        "advection_scale": 1.0,
-        "fade_time": 0.0,
-        "evaporation_time": 0.0,
-        "evaporation_knee": 0.1
-      },
-      "viscosity": {
-        "enabled": true,
-        "viscosity": 0.001,
-        "iterations": 20
-      },
-      "vorticity": {
-        "enabled": true,
-        "strength_1": 32.83,
-        "strength_2": 0.0,
-        "strength_3": 0.0,
-        "radius_1": 0.1,
-        "radius_2": 0.01,
-        "radius_3": 0.025
-      },
-      "temperature": {
-        "enabled": true,
-        "buoyancy": 0.0,
-        "fade_time": 0.0,
-        "evaporation_time": 10.0,
-        "evaporation_knee": 0.1
-      },
-      "expansion": {
-        "enabled": false,
-        "rate": 0.0
-      },
-      "pressure": {
-        "solver": "MULTIGRID",
-        "iterations": 40,
-        "relaxation": 1.85,
-        "cycles": 1
-      },
-      "density": {
-        "color_space": "OKLAB",
-        "sink": 1.0,
-        "advection": "MACCORMACK",
-        "limiter": "CLAMP",
-        "advection_scale": 2.0,
-        "fade_time": 0.0,
-        "evaporation_time": 0.0,
-        "evaporation_knee": 0.1
-      },
-      "lut": {
-        "folder": "data/luts",
-        "files": [
-          "",
-          "Blockbuster.cube",
-          "Cityscape.cube",
-          "Frosted.cube",
-          "Vibrance.cube"
-        ],
-        "file": "",
-        "strength": 1.0
-      },
-      "monitor_main": {
-        "texture": "output.velocity",
-        "view": "COLORMAP",
-        "advanced": {
-          "channel": "ALL",
-          "scale": 1.0,
-          "blend_mode": "ADD",
-          "glyph_spacing": "SPACING_32",
-          "colormap": "JET",
-          "legend": true
-        }
-      },
-      "monitor_debug": {
-        "texture": "output.velocity",
-        "view": "COLORMAP",
-        "advanced": {
-          "channel": "ALL",
-          "scale": 1.0,
-          "blend_mode": "ADD",
-          "glyph_spacing": "SPACING_32",
-          "colormap": "JET",
-          "legend": true
-        }
-      }
     }
   },
   "inout": {

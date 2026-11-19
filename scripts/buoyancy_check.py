@@ -105,8 +105,8 @@ def first_step(fluid: Fluid3D, inside: np.ndarray, expected: float) -> float:
     fluid._enforce_incompressibility()
     fluid._faces_to_centers()
     velocity = read(fluid._velocity)
-    t = fluid.settings.input
-    gravity = (t.gravity_x, t.gravity_y, t.gravity_z)
+    t = fluid.settings.gravity
+    gravity = (t.x, t.y, t.z)
     along = sum(velocity[..., i] * g for i, g in enumerate(gravity)) / max(sum(g * g for g in gravity), 1e-12)
     return float(along[inside].mean()) / (expected * fluid._dt)
 
@@ -119,8 +119,8 @@ def warm(args, overrides: list[str]) -> None:
         warmth = np.where(r < args.radius, args.warmth, 0.0)
         upload(fluid._temperature, warmth)
         force, faces_error = one_pass(fluid)
-        t = fluid.settings.input
-        gravity = np.array((t.gravity_x, t.gravity_y, t.gravity_z))
+        t = fluid.settings.gravity
+        gravity = np.array((t.x, t.y, t.z))
         textbook = -args.buoyancy * warmth[..., None] * gravity
         error = float(np.abs(force - textbook).max())
         expected = -args.buoyancy * args.warmth
@@ -153,8 +153,8 @@ def dense(args, color_space: str, overrides: list[str]) -> None:
         values[..., 3] = amount
         upload(density, values)
         force, faces_error = one_pass(fluid)
-        t = fluid.settings.input
-        gravity = np.array((t.gravity_x, t.gravity_y, t.gravity_z))
+        t = fluid.settings.gravity
+        gravity = np.array((t.x, t.y, t.z))
         r = distance(fluid._cells, box)
         texel = max(b / n for b, n in zip(box, density_size))
         inside, outside = r < args.radius - DENSITY_EDGE * texel, r > args.radius + DENSITY_EDGE * texel

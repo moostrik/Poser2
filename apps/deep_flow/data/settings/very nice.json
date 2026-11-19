@@ -491,14 +491,16 @@
         "fps_smoothing": 1.0,
         "time_scale": 1.0
       },
+      "gravity": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.02
+      },
       "input": {
         "spread": 0.237,
         "velocity_drag": 76.0,
         "velocity_gain": 1.0,
         "acceleration_gain": 10.0,
-        "gravity_x": 0.0,
-        "gravity_y": 0.0,
-        "gravity_z": 0.02,
         "density_drag": 200.0,
         "density_release": 0.0,
         "density_gain": 5.0,

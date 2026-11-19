@@ -614,15 +614,15 @@ class Fluid3D:
         like every body force (Fedkiw 2001).
 
         Dense density sinks along gravity (`density.sink`); warm water rises against it (`temperature.buoyancy`,
-        while the temperature runs). The pass runs while either is above 0 and gravity, `input`'s, is not 0: one
+        while the temperature runs). The pass runs while either is above 0 and `gravity` is not 0: one
         dispatch adds it straight to the faces; the force at the cells is made only for its monitor.
         """
         shown: bool = self._buoyancy_shown
         self._buoyancy_shown = False
         sigma: float = self.settings.temperature.buoyancy if self._temperature_runs else 0.0
         kappa: float = self.settings.density.sink
-        input = self.settings.input
-        gravity: tuple[float, float, float] = (input.gravity_x, input.gravity_y, input.gravity_z)
+        g = self.settings.gravity
+        gravity: tuple[float, float, float] = (g.x, g.y, g.z)
         if (sigma <= 0.0 and kappa <= 0.0) or gravity == (0.0, 0.0, 0.0):
             return
 

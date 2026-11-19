@@ -11,8 +11,8 @@ ROOT: Path = Path(__file__).resolve().parents[3]
 LOW_FLOW: Path = ROOT / 'apps' / 'low_flow' / 'data' / 'settings' / 'studio.json'
 DEEP: Path = ROOT / 'apps' / 'deep_flow' / 'data' / 'settings' / 'settings.json'
 
-# A textbook default, not deep_flow's: a plane's sizes
-TEXTBOOK: set[tuple[str, ...]] = {('width',), ('height',)}
+# A textbook default, not deep_flow's: a plane's sizes, and gravity down the screen (deep_flow's points along z)
+TEXTBOOK: set[tuple[str, ...]] = {('width',), ('height',), ('gravity', 'y')}
 
 
 def leaves(node: dict, at: tuple[str, ...] = ()) -> dict[tuple[str, ...], object]:

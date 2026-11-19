@@ -328,7 +328,7 @@ the divergence's one more read among it, and 0.09 for each injection. With an op
 
 ### The buoyancy
 
-An acceleration, gravity (`input.gravity_x`/`_y`/`_z`) × (`density.sink` × the density's amount −
+An acceleration, gravity (`gravity.x`/`.y`/`.z`, its own group after `time`) × (`density.sink` × the density's amount −
 `temperature.buoyancy` × the warmth), added to the faces in one pass (`add_to_faces_3d.comp`, its buoyancy mode),
 while the sink is above 0 or the temperature runs (`temperature.enabled` and its `buoyancy` above 0, else the warmth
 is cleared once and neither injected nor carried) and gravity is not 0, each face given its two cells' mean × dt
@@ -854,7 +854,7 @@ The step, pass by pass:
 | the slip                  | the tangential faces along a closed wall braked by k                                                                                                                                                                                                                    |
 | the viscosity             | each component's Laplacian on its own faces                                                                                                                                                                                                                             |
 | the curl, the confinement | the curl at the centers straight from the faces, each derivative a difference of two face averages, so the step needs no centers' volume midway; the force averaged to the faces (Fedkiw, Stam and Jensen 2001)                                                         |
-| the buoyancy              | the temperature and the density averaged to each face, x, y and z, since gravity has all three (`input.gravity_x`, `_y`, `_z`)                                                                                                                                         |
+| the buoyancy              | the temperature and the density averaged to each face, x, y and z, since gravity has all three (`gravity.x`, `.y`, `.z`)                                                                                                                                                |
 | the drag, the body force  | the bridge's textures read at each face's place                                                                                                                                                                                                                         |
 | the divergence            | per cell, its six faces' one-cell differences                                                                                                                                                                                                                           |
 | the gradient              | per face, its two cells' pressures                                                                                                                                                                                                                                      |

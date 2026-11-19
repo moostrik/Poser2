@@ -34,7 +34,8 @@ its default, the sizes apart (`modules/flow/tests/test_fluid_2d_settings.py`). W
 |---------------|------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
 | root          | `guard`, `wall`, `slip_time`, `width`, `height`                                                | [the guard](FLUID_3D.md#the-guard), [the walls](FLUID_3D.md#the-walls)                           |
 | `time`        | `time_step`, `fixed_fps`, `fps_smoothing`, `time_scale`                                        | every pass and input steps by the fluid's time                                                   |
-| `input`       | the drags, the gains, the density's blend and release, gravity's `gravity_x` and `gravity_y`   | [the inputs](FLUID_3D.md#the-inputs)                                                             |
+| `gravity`     | `x`, `y`: gravity's direction, which the sink and the lift act along                           | [the buoyancy](FLUID_3D.md#the-buoyancy)                                                         |
+| `input`       | the drags, the gains, the density's blend and release                                          | [the inputs](FLUID_3D.md#the-inputs)                                                             |
 | `velocity`    | `advection`, `limiter`, `advection_scale`, `fade_time`, `evaporation_time`, `evaporation_knee` | [the advection](FLUID_3D.md#the-advection), [the fade](FLUID_3D.md#the-fade-and-the-evaporation) |
 | `viscosity`   | `enabled`, `viscosity` (widths²/s), `iterations`                                               | implicit diffusion, Jacobi                                                                       |
 | `vorticity`   | `enabled`, `strength_1` to `_3`, `radius_1` to `_3` (widths)                                   | the force ε h (N × ω) dt, h the cell's width (Fedkiw 2001)                                       |
@@ -43,9 +44,9 @@ its default, the sizes apart (`modules/flow/tests/test_fluid_2d_settings.py`). W
 | `pressure`    | `solver`, `iterations`, `relaxation`, `cycles`                                                 | [the pressure](FLUID_3D.md#the-pressure)                                                         |
 | `density`     | `color_space`, `sink`, `advection`, `limiter`, `advection_scale`, `fade_time`, the evaporation | [the density's blend](FLUID_3D.md#the-densitys-blend), the buoyancy                              |
 
-low_flow's preset holds deep_flow's value for every setting the two share, the sizes a textbook default
-(`apps/low_flow/tests/test_fluid_preset.py`). deep_flow's gravity points along z, so on the plane it is
-(0, 0) and the density's `sink` moves nothing.
+low_flow's preset holds deep_flow's value for every setting the two share, the sizes and the gravity a textbook
+default (`apps/low_flow/tests/test_fluid_preset.py`). deep_flow's gravity points along z, so on the plane it
+points down the screen at its length, (0, −0.02).
 
 ## What it does differently
 
