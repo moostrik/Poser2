@@ -13,13 +13,15 @@ TimestampDict: TypeAlias = dict[int, float]     # each camera's image's capture 
 # and the event recorded after them on the upload's stream, which a reader on another stream waits on first
 ImageSnapshot: TypeAlias = tuple[ImageDict, ImageDict, TimestampDict, torch.cuda.Event]
 ImageSnapshotCallback: TypeAlias = Callable[[ImageSnapshot], None]
+CaptureCallback: TypeAlias = Callable[[TimestampDict], None]     # an uploaded set's capture times, no images
 
 
 @dataclass(frozen=True)
 class GpuImage:
     """One camera frame on the GPU as an uploader made it: float16 RGB CHW [0, 1], straightened and
     mirrored, with the frame's capture time. `ready` is recorded on the upload's stream after the
-    image is written: a reader on another stream waits on it (`stream.wait_event(ready)`) first.
+    image is written: a reader on another stream waits on it (`stream.wait_event(ready)`) first; it has passed for
+    an image handed on finished.
     `frame` is the camera frame it was uploaded from, so the image and the CPU frame of one moment travel as
     one; None where nobody uploaded one."""
     cam_id: int

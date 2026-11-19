@@ -145,11 +145,11 @@ class DeepFlowMain:
         # the inference frame sync
         if self.person_detector is not None:
             self.uploader.add_gpu_image_callback(self.person_detector.submit)
-        self.uploader.add_gpu_image_callback(self.inference_frame_sync.submit_image)
-        self.uploader.add_gpu_image_callback(self.board.set_camera_image)
-        self.uploader.add_gpu_image_callback(self._on_image)
+        self.uploader.add_finished_gpu_image_callback(self.inference_frame_sync.submit_image)
+        self.uploader.add_finished_gpu_image_callback(self.board.set_camera_image)
+        self.uploader.add_finished_gpu_image_callback(self._on_image)
         self.uploader.add_snapshot_callback(self._on_snapshot)
-        self.uploader.add_gpu_depth_callback(self._on_depth)
+        self.uploader.add_finished_gpu_depth_callback(self._on_depth)
 
         # INFERENCE FRAME SYNC — each uploaded image, its depth and its SMOOTH poses, as one frame on the board
         self.pipeline.add_frames_callback(Stage.SMOOTH, self._on_smooth_poses)

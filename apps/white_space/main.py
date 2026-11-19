@@ -143,7 +143,7 @@ class WhiteSpaceMain:
         # then the set's snapshot to the frame source
         if self.person_detector is not None:
             self.uploader.add_gpu_image_callback(self.person_detector.submit)
-        self.uploader.add_gpu_image_callback(self.board.set_camera_image)
+        self.uploader.add_finished_gpu_image_callback(self.board.set_camera_image)
         self.uploader.add_snapshot_callback(self._on_snapshot)
 
         # DIAGNOSIS — a subscribe-only journal of the tracker's inputs, observations and emitted

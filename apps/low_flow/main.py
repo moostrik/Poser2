@@ -151,9 +151,9 @@ class LowFlowMain:
         # frame sync, the board and the camera's interval, then its snapshot to the frame source
         if self.person_detector is not None:
             self.uploader.add_gpu_image_callback(self.person_detector.submit)
-        self.uploader.add_gpu_image_callback(self.inference_frame_sync.submit_image)
-        self.uploader.add_gpu_image_callback(self.board.set_camera_image)
-        self.uploader.add_gpu_image_callback(self._on_image)
+        self.uploader.add_finished_gpu_image_callback(self.inference_frame_sync.submit_image)
+        self.uploader.add_finished_gpu_image_callback(self.board.set_camera_image)
+        self.uploader.add_finished_gpu_image_callback(self._on_image)
         self.uploader.add_snapshot_callback(self._on_snapshot)
 
         # INFERENCE FRAME SYNC — each uploaded image and its masks, as one frame on the board

@@ -42,7 +42,11 @@ in any order unless they are synchronized so
 **(site fact: [CUDA streams](https://docs.pytorch.org/docs/stable/notes/cuda.html#cuda-streams))**.
 
 - The uploader hands each image on as a `GpuImage` with its `ready` event, and as an `ImageSnapshot`: each
-  camera's image and its previous one, their capture times, the event (`preprocessing/source.py`).
+  camera's image and its previous one, their capture times, the event (`preprocessing/source.py`). Then it hands
+  the set's capture times to the capture callbacks, and then, for the readers outside the package, it waits for its
+  stream and hands the images and the depth on written (`add_finished_gpu_image_callback`,
+  `add_finished_gpu_depth_callback`), only when such a callback is registered. The readers in the package are queued
+  before that wait, so none of them waits for it.
 - The crop step takes the poses with the snapshot they are for and cuts from exactly those images, never a newer
   one, at each size it was made with (the pose model's, and where a segmentation runs, its own), from one box per
   player. All sizes share one `crops_ready` event; each size has its own callbacks, and its finished callbacks
