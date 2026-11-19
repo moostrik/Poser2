@@ -45,7 +45,8 @@ in any order unless they are synchronized so
   camera's image and its previous one, their capture times, the event (`preprocessing/source.py`).
 - The crop step takes the poses with the snapshot they are for and cuts from exactly those images, never a newer
   one, at each size it was made with (the pose model's, and where a segmentation runs, its own), from one box per
-  player. All sizes share one `crops_ready` event; each size has its own callbacks. It cuts the RAW stage's smoothed
+  player. All sizes share one `crops_ready` event; each size has its own callbacks, and its finished callbacks
+  for readers outside the package, called after the crop stream has run. It cuts the RAW stage's smoothed
   and predicted box, so it runs after that stage, on the frame source's thread, not in the upload. A size is cut
   every `interval`-th set (the pose's every other frame, the segmentation's every frame); after the crops it tells
   each size's asked callbacks per camera which poses were cut, none on a passed set, so the inference frame sync

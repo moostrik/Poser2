@@ -148,7 +148,7 @@ class HDTrioMain:
 
         # The segmentation and the board read the segmentation's crops, cut from the same images and boxes as the pose model's
         self.crops.add_image_callback(self.segmenter.submit, ps.segmentation_crop)
-        self.crops.add_image_callback(lambda _f, crops: self.board.set_crop_images(crops), ps.segmentation_crop)
+        self.crops.add_finished_image_callback(lambda _f, crops: self.board.set_crop_images(crops), ps.segmentation_crop)
         self.segmenter.add_segmentation_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
 
         # POSE PIPELINE — the stages are declared in pose/pipeline.py. Each uploaded set drives the frame domain

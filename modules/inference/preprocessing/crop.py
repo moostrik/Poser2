@@ -18,8 +18,9 @@ class Image:
         crop:      Resized crop on GPU (3, H, W) float16 RGB CHW [0, 1]
         prev_crop: Previous frame cropped at current bbox for optical flow,
                    or None if no previous frame is available.
-        ready:     Recorded on the crop stream after the crops are written; a reader on another stream
-                   waits on it (`stream.wait_event`) first. None for crops already written.
+        ready:     Recorded on the crop stream after the crops are written; a model waits on it
+                   (`stream.wait_event`) first, and it has passed for crops handed on finished. None for crops
+                   already written.
         box:       The window the crop was cut at, uv on the camera image (rows down); None for a crop not cut
                    by the crop step.
     """

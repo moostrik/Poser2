@@ -158,7 +158,7 @@ class WhiteSpaceMain:
         self.tracker.add_observation_callback(self.tracker_journal.submit_observations)
         self.tracker.add_tracklet_callback(self.tracker_journal.submit_tracklets)
 
-        self.crops.add_image_callback(lambda _f, gpu: self.board.set_crop_images(gpu))
+        self.crops.add_finished_image_callback(lambda _f, gpu: self.board.set_crop_images(gpu))
 
         # POSE PIPELINE — the stages are declared in pose/pipeline.py. Each uploaded set drives the frame domain
         # through the tracklet poses (`_on_snapshot`); the light tick drives the output domain (LERP, where the dummy joins).
