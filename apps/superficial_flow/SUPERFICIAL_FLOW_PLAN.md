@@ -45,11 +45,7 @@ harness and seen in superficial_flow; the march's light, shadows and fog need a 
 - **D8.** The one-pass buoyancy checked (built 2026-11-19, as the 3D's, the flow plan's E9: `Buoyancy` adds
   dt × gravity × (sink × amount − buoyancy × warmth) straight into the velocity's swap, the warmth read only while
   the lift runs, skipped when the sink and the lift are both 0 or gravity is 0, the force itself only for its
-  monitor). superficial_flow's preset has gravity (0, 0), so the pass is skipped there.
-
-  Question: gravity in superficial_flow's preset. `gravity_x`/`_y` are a direction (−1 to 1), the sink and the
-  buoyancy carry the unit (widths/s²); deep_flow's is 0.02 along z, which has no meaning on a plane. Down the screen
-  at deep_flow's length, (0, −0.02), or the 2D's default, (0, −1)?
+  monitor). superficial_flow's preset has gravity down the screen at deep_flow's length, (0, −0.02).
 
 Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 

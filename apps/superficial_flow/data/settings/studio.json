@@ -646,7 +646,7 @@
         "velocity_gain": 1.0,
         "acceleration_gain": 10.0,
         "gravity_x": 0.0,
-        "gravity_y": 0.0,
+        "gravity_y": -0.02,
         "density_drag": 200.0,
         "density_release": 0.0,
         "density_gain": 5.0,
