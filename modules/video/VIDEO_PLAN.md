@@ -6,24 +6,6 @@
 can read one short. The recording package counts each chunk's frames with it (`recording_folder.py`). Looked at when
 the apps' plan F reaches the video module.
 
-## B. The screen recorder's own panel, and one recording draw
-
-The panel gives every child of the root settings a tab, so the recorder gets one by sitting at the root. deep_flow
-and low_flow each hold their own copy of the recording draw (`_draw_screen_recording`, `_on_snap`); D2 would add a
-third piece to both, so the draw goes to one place first.
-
-- B1. Move `screen_recorder` from `RenderSettings` to the root `Settings` in deep_flow and low_flow. The recording
-  keeps recording each app's `layer.main`. Each render takes the group through its constructor and keeps its `snap`
-  bind and unbind. The keys move in both apps' `settings.json` in the same change, as the step's own preset change.
-  VIDEO.md says where the recorder's settings sit. Check: guard tests, deep_flow and low_flow tests, both presets
-  load with the moved keys. One commit.
-- B2. `ScreenRecordingCompositor` in `modules/render/general/screen_recording/`: it owns the `ScreenCapture` and the
-  `ScreenRecorder`, and draws the layers it is handed (layer objects, each fit or filled at its own shape, added on
-  black), or copies the window, then runs the recorder's tick; `snap` takes the first layer's size or the window's.
-  Each app hands it its `layer.main` layers and its window size at the end of its main draw, and calls its teardown
-  in `deallocate`. The two apps' copies go. VIDEO.md names the compositor. Check: guard tests, both apps' tests; C2's
-  run draws through it. One commit.
-
 ## C. The ring in RAM
 
 The ring holds 10 to 13 s of 4K in free video memory; this PC has 96 GB of RAM, 74 GB free (measured 2026-11-19),
@@ -40,8 +22,8 @@ which holds about 80 s at 60 fps in 60 GB (deduction).
   Check: the recorder's unit tests with the fake ring in both modes. One commit.
 - C2. One -sim run in deep_flow at 4K, 60 Hz with v_sync: tick time idle, recording in HOST, idle, and a 30 s take
   with its encode (encode time, frames, fps, the file plays); then one take that runs until `ram_reserve` stops it,
-  to show Windows grants the pinned blocks and the app runs on while it is held. Check of C1 and B2 in the app; a
-  fix found here is one more commit only if a test checks it.
+  to show Windows grants the pinned blocks and the app runs on while it is held. Check of C1, and of the drawing
+  through `ScreenRecordingCompositor`, in the app; a fix found here is one more commit only if a test checks it.
 
 Why one-second blocks also here: Windows handles many small pinned allocations better than one very large one
 (deduction). The copy is about 750 MB/s over PCIe at 4K60, on a link of about 25 GB/s, and the CPU does not touch it
@@ -69,12 +51,9 @@ The preview is there so a cut is made on what is seen, not on seconds alone.
 ## The rules it touches
 
 - Fix a problem where it is made: A.
-- Update all affected call sites in the same change: B1, B2, C1 in deep_flow and low_flow.
-- modules never import apps: B2, the compositor takes layer objects, not an app's `Layers`.
-- A layer kind by what it owns: B2, a Compositor owns its FBO and draws other layers into it.
-- Keep presets and settings schemas in sync: B1, C1.
-- Pass collaborators and settings through constructors: B1, B2.
-- Components that bind unbind on teardown: B1, B2 (snap), D1 (save, discard, in_out).
+- Update all affected call sites in the same change: C1 in deep_flow and low_flow.
+- Keep presets and settings schemas in sync: C1.
+- Components that bind unbind on teardown: D1 (save, discard, in_out).
 - Bound callbacks never write their own field: D1.
 - A setting follows the quantity it controls: C1, `ram_reserve` beside `reserve`.
 - Use a Protocol for what a consumer needs: C1, `ScreenRing`.
@@ -83,6 +62,6 @@ The preview is there so a cut is made on what is seen, not on seconds alone.
 - Avoid transient resource churn: D2, the preview made once with the capture.
 - Shaders get checked in a GPU harness: D2.
 - Name a shader's source after its `.py`: D2.
-- A document describes what is built: VIDEO.md in B1, B2, C1, D1, D2.
+- A document describes what is built: VIDEO.md in C1, D1, D2.
 - Prefer the design with the lower latency, measured in the app: C2.
-- One plan step checked by a run or test is one commit: B1, B2, C1, C2, D1, D2.
+- One plan step checked by a run or test is one commit: C1, C2, D1, D2.

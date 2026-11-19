@@ -6,7 +6,7 @@ This document holds the screen recorder's design.
 
 ## Screen recorder
 
-Each render tick the app draws the layers it records into the screen frame, an Fbo of the recording's size,
+Each render tick the layers an app records are drawn into the screen frame, an Fbo of the recording's size,
 and `ScreenCapture` (`modules/gl/screen_capture.py`) copies it as NV12 into a ring of frames in video memory.
 When the ring is full, the duration is reached or Stop is pressed, recording stops and the recorder's thread
 encodes the ring to an HEVC mp4 with NVENC, then frees the memory. The render thread never waits on the
@@ -17,11 +17,14 @@ encoder.
 The recorder's settings are the group `screen_recorder` at the root of an app's settings, so it has a tab
 of its own on the panel (deep_flow and low_flow).
 
-The app chooses the sources and draws them into `ScreenCapture.frame`: in deep_flow and low_flow the main
-panel's layers (`layer.main`), each fit and centered at its own shape and blended the way the show draws them
-(additive on black), so a recording is the show. With `main_window` the window's back buffer is copied
-into the frame instead (`ScreenCapture.copy_window`), right after the window is drawn and before it is shown.
-A module cannot know an app's layers, so the drawing is the app's and the capture is the module's.
+`ScreenRecordingCompositor` (`modules/render/general/screen_recording/`) owns the `ScreenCapture` and the
+`ScreenRecorder`. Each tick, right after the main window is drawn, the app hands it the layers to record with
+their shapes (`ScreenRecordingSource`), the window's size and the tick's time; deep_flow and low_flow hand it
+the main panel's layers (`layer.main`). It draws them into `ScreenCapture.frame`, each fit and centered at its
+own shape and blended the way the show draws them (additive on black), so a recording is the show. With
+`main_window` the window's back buffer is copied into the frame instead (`ScreenCapture.copy_window`), before
+the window is shown. A module cannot know an app's layer enum, so the app chooses the layers and the
+compositor takes them as layer objects.
 
 A source whose shape differs from the recording's is fit with black bars, or with `fill` fills the frame and
 its overhang is cut. It is never stretched.
@@ -31,7 +34,7 @@ its overhang is cut. It is never stretched.
 `width` and `height` are the recording's size. A preset (`size`) or the `portrait` switch writes them; when
 they change, the preset becomes the one that matches in either orientation, else CUSTOM, and `portrait`
 becomes height > width. Every write lands on the value already there, so the three never loop. `snap` sets
-the size to the first source's texture (the app wires it). Sizes are rounded down to even numbers, which
+the size to the first source's shape, or the window's with `main_window`. Sizes are rounded down to even numbers, which
 NV12 needs. The size is read at Start and holds for that recording.
 
 | Preset | Landscape   | Portrait    |
