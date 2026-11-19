@@ -50,8 +50,7 @@ class InferenceFrameDepthLayer(LayerBase):
         depth: GpuDepth | None = frame[Depth].depth
         if depth is None:
             return
-        stream.wait_event(depth.ready)
-        depth.depth.record_stream(stream)
+        depth.depth.record_stream(stream)       # handed on written; its memory kept until this stream's copy is done
         self._depth.set_tensor(depth.depth)
         self._depth.update()
         self._timestamp = frame.timestamp

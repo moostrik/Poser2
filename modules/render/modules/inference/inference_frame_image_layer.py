@@ -42,10 +42,8 @@ class InferenceFrameImageLayer(LayerBase):
         frame: "InferenceFrame | None" = self._frame
         if frame is None or frame.timestamp == self._timestamp:
             return
-        # The image was written on the uploader's stream: wait for it there, and keep its memory
-        # from being reused until this stream's copy is done.
+        # Handed on written; its memory is kept from being reused until this stream's copy is done
         stream: torch.cuda.Stream = torch.cuda.current_stream()
-        stream.wait_event(frame.image.ready)
         frame.image.image.record_stream(stream)
         self._image.set_tensor(frame.image.image)
         self._image.update()

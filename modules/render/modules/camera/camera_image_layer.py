@@ -40,10 +40,8 @@ class CameraImageLayer(LayerBase):
         if self._data_cache.idle or gpu_image is None:
             return
 
-        # Written on the uploader's stream: wait for it there, and keep its memory from being reused until this
-        # stream's copy is done
+        # Handed on written; its memory is kept from being reused until this stream's copy is done
         stream: torch.cuda.Stream = torch.cuda.current_stream()
-        stream.wait_event(gpu_image.ready)
         gpu_image.image.record_stream(stream)
         self._cuda_image.set_tensor(gpu_image.image)
         self._cuda_image.update()

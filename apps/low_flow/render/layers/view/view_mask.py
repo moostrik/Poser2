@@ -44,11 +44,8 @@ class ViewMask:
         self._mask.clear()
         if mask is None or mask.box is None:
             return
-        # The mask was written on the segmentation's stream: wait for it there, and keep its memory from being
-        # reused until this stream's copy is done
+        # Handed on written; its memory is kept from being reused until this stream's copy is done
         stream: torch.cuda.Stream = torch.cuda.current_stream()
-        if mask.ready is not None:
-            stream.wait_event(mask.ready)
         mask.mask.record_stream(stream)
         self._source.set_tensor(mask.mask)
         self._source.update()

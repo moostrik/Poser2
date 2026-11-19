@@ -47,8 +47,7 @@ class CameraColumns:
         self._collect(image.cam_id)
         if len(pending) >= PENDING:
             return                      # the GPU is behind: this image is skipped, the next one is taken
-        with torch.cuda.stream(self._stream):
-            self._stream.wait_event(image.ready)
+        with torch.cuda.stream(self._stream):        # the image is handed on written
             band: torch.Tensor = image.image[:, row_top:row_bottom].float().mean(dim=0)     # the luminance, rows × columns
             if method == SampleMethod.MAX:
                 row: torch.Tensor = band.amax(dim=0)

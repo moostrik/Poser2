@@ -55,12 +55,8 @@ class SegmentationMaskLayer(LayerBase):
         if self._data_cache.idle or mask_tensor is None or seg_image is None:
             return
 
-        # Written on the segmentation's stream: wait for it there, and keep its memory from being reused until this
-        # stream's copy is done
-        if seg_image.ready is not None:
-            stream: torch.cuda.Stream = torch.cuda.current_stream()
-            stream.wait_event(seg_image.ready)
-            mask_tensor.record_stream(stream)
+        # Handed on written; its memory is kept from being reused until this stream's copy is done
+        mask_tensor.record_stream(torch.cuda.current_stream())
         self._cuda_image.set_tensor(mask_tensor)
         self._cuda_image.update()
         self._timestamp = seg_image.timestamp
