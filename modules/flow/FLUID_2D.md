@@ -87,7 +87,7 @@ points down the screen at its length, (0, −0.02).
   coarse walls lie on the fine walls: read at half the fine position, an odd level's 0 of an open wall lay past the
   real wall, and the water drifted away from it with noise at that wall **(deduction)**.
 
-  Measured in the GPU harness, 2026-11-19, low_flow plan D3, at reach 0, a result: one centered velocity (three
+  Measured in the GPU harness, 2026-11-19, low_flow plan D3, at reach 1, a result: one centered velocity (three
   swirling sources, 0 at the walls) projected once from a pressure of 0 at 270 × 480, the residual |div − L p| over
   |div| by `ResidualRestrict2D` at (1, 1), its low frequencies the residual's 8 × 8 means, and the divergence after by
   the fluid's own pass; one run, closed walls (open alike, the multigrid's a little lower):
@@ -104,23 +104,24 @@ points down the screen at its length, (0, −0.02).
   From rest the error is the swirls' size, which Jacobi and Gauss–Seidel barely reach in 40 sweeps; SOR's
   over-relaxation reaches it and leaves the high frequencies worse **(deduction)**. Each V-cycle divides the
   residual by six or more.
-- The reach is the 3D's ([FLUID_3D.md](FLUID_3D.md#the-pressure)): `pressure.reach` above 0, every solver solves
+- The reach is the 3D's ([FLUID_3D.md](FLUID_3D.md#the-pressure)), L the field's longest side (the larger of its
+  width and height): `pressure.reach` under 1, every solver solves
   (∇² − 1/reach²) p = div, and a point source's pressure falls off as K₀(r/reach)/(2π) on the plane.
 
   Measured in the GPU harness, 2026-11-19, low_flow plan G2, a result: 512 × 512, the walls closed, a point source
-  at the middle, reach 0.05; one run each:
+  at the middle, a reach of 0.05 widths; one run each:
 
   | Measure                                                          | Multigrid, 30 cycles    | SOR 1.8, 1500 sweeps | Jacobi, 40000 |
   |------------------------------------------------------------------|-------------------------|----------------------|---------------|
   | the pressure against K₀(r/reach)/(2π), 4 cells to 4 reaches      | 0.3% at most, 0.0% mean | the same             | the same      |
-  | reach 0: a dipole's pressure, against the solvers before G2      | the same to the bit     | the same             | the same      |
+  | everywhere: a dipole's pressure, against the solvers before G2   | the same to the bit     | the same             | the same      |
 
   The source alone, its sum not 0, the multigrid cycled on: the pressure's mean
 
-  | Reach | After 10 cycles | After 40 cycles |
-  |-------|-----------------|-----------------|
-  | 0     | −1.7e-5         | −6.7e-5         |
-  | 0.05  | −9.5e-9         | −9.5e-9         |
+  | Reach        | After 10 cycles | After 40 cycles |
+  |--------------|-----------------|-----------------|
+  | everywhere   | −1.7e-5         | −6.7e-5         |
+  | 0.05 widths  | −9.5e-9         | −9.5e-9         |
 
   Jacobi takes about (reach / cell)² iterations to reach the falloff: at 4000 (25.6 cells a reach) it was 39% off on
   average.
@@ -138,7 +139,7 @@ points down the screen at its length, (0, −0.02).
   | a square at (0.3, 0.2) widths/s: its edge, 99.5% gradient   | 0.153           | 0.184             | 0.184              |
   | a swirl carried and projected: its mean speed, of its start | 0.947           |                   | 0.977              |
 
-- The expansion is the 3D's ([FLUID_3D.md](FLUID_3D.md#the-expansion)): with every wall closed, at reach 0, its mean
+- The expansion is the 3D's ([FLUID_3D.md](FLUID_3D.md#the-expansion)): with every wall closed, at reach 1, its mean
   over the water's cells comes off first, summed by `ExpansionMean2D` as `ExpansionMean3D` sums it (per workgroup
   into a buffer, then one group over the partials, a float, nothing read back; the obstacles' cells left out). A mip
   chain's top level is no mean at a size that is not a power of two.

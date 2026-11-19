@@ -546,7 +546,7 @@
         "iterations": 40,
         "relaxation": 1.85,
         "cycles": 1,
-        "reach": 0.0
+        "reach": 1.0
       },
       "density": {
         "width": 448,

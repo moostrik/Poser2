@@ -11,6 +11,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_REPEA
 
 from modules.gl import ComputeShader, StorageBuffer, SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
 from ..wall_mode import WallMode
+from .. import pressure_reach
 from ..density_blend import DensityBlend
 from ..drag import DRAG_FLOOR, drag_share
 from .fluid_settings import Advection, Light, Limiter, PressureSolver, ScatteringModel, Fluid3DSettings, PressureSettings, ParticleSettings, DensitySettings, FineDensitySettings
@@ -644,11 +645,15 @@ class Fluid3D:
     def _enforce_incompressibility(self) -> None:
         """Pressure projection (divergence → Jacobi solve → gradient subtraction), the three passes on one set
         of walls, closed or open by `wall`; with this tick's expansion the solve makes the divergence φ, not 0; the
-        screened equation (∇² − 1/reach²) p = div while `pressure.reach` is above 0."""
+        screened equation (∇² − 1/reach²) p = div while `pressure.reach` is under 1 (`pressure_reach.screening`, the
+        box's longest side its scale); at 0 no pressure, all three skipped."""
+        share: float = self.settings.pressure.reach
+        if share <= 0.0:
+            self._expansion_fresh = False
+            return
         closed: tuple[bool, bool, bool] = self._closed
-        reach: float = self.settings.pressure.reach
-        screening: float = 1.0 / (reach * reach) if reach > 0.0 else 0.0
-        # a. The divergence, per cell from its six faces, less φ; in a closed box at reach 0 less φ's mean first, as the
+        screening: float = pressure_reach.screening(share, max(1.0, 1.0 / self._aspect, self._z_extent))
+        # a. The divergence, per cell from its six faces, less φ; in a closed box at reach 1 less φ's mean first, as the
         # solve then needs the divergence to sum to 0
         expansion: tuple[Texture3D, float, StorageBuffer | None] | None = None
         rate: float = self._expansion_rate

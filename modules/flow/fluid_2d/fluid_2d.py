@@ -11,6 +11,7 @@ from ..finite_guard import FiniteGuard, GuardSlot
 from ..advection import Advection, Limiter
 from ..port import ColorSpace
 from ..pressure_solver import PressureSolver
+from .. import pressure_reach
 from ..time_step import REFERENCE_STEP, TimeStep, viscosity_iterations
 from ..shaders import AddBoolean
 from ..wall_mode import WallMode
@@ -512,12 +513,15 @@ class Fluid2D:
     def _enforce_incompressibility(self) -> None:
         """Pressure projection (divergence, less the expansion's rate × it → the solve by `pressure.solver` →
         gradient subtraction), in widths, on the walls `wall` sets; the screened equation (∇² − 1/reach²) p = div while
-        `pressure.reach` is above 0."""
+        `pressure.reach` is under 1 (`pressure_reach.screening`, the field's longest side its scale); at 0 no pressure,
+        all three skipped."""
+        share: float = self.settings.pressure.reach
+        if share <= 0.0:
+            return
         closed: bool = self.settings.wall == WallMode.CLOSED
-        reach: float = self.settings.pressure.reach
-        screening: float = 1.0 / (reach * reach) if reach > 0.0 else 0.0
+        screening: float = pressure_reach.screening(share, max(1.0, 1.0 / self._field_aspect))
         # a. Compute divergence, the expansion's made by the projection: its mean off where the walls are closed and the
-        # solve needs the divergence to sum to 0, at reach 0
+        # solve needs the divergence to sum to 0, at reach 1
         rate: float = self._expansion_rate()
         mean: StorageBuffer | None = None
         if rate != 0.0 and closed and screening == 0.0:

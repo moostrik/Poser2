@@ -251,7 +251,7 @@ pressure, each on the walls as [The walls](#the-walls) states:
 | `SOR`       | red-black Gauss–Seidel over-relaxed by `relaxation`: each color from the other's newest values (`sor_pressure_3d`); 1.95 diverged, so its range stops at 1.85                                                                                                                                                            | `iterations`, its sweeps |
 | `MULTIGRID` | V-cycles (`multigrid_pressure.py`): on each level two red-black Gauss–Seidel sweeps, the residual restricted to the level halved, its correction solved from 0 and added back trilinearly, two sweeps again; down to 8 × 14 × 4 at the default grid, 16 sweeps there in one dispatch; obstacles on the finest level only | `cycles`, 1              |
 
-Measured at reach 0 through the harness on stillslowfast (gone), the step's time with `glFinish` around it, the solve's
+Measured at reach 1 (everywhere) through the harness on stillslowfast (gone), the step's time with `glFinish` around it, the solve's
 residual |div − L p| over |div| (the mean and the p99, at four quarters of the loop), and the projected
 velocity's divergence, central differences, a cell's share:
 
@@ -282,31 +282,35 @@ on the faces it is ([The staggered velocity](#the-staggered-velocity)), and the 
 leaves is the half float's rounding. With the solve exact the water keeps more of its speed, 0.150
 widths/s in the mean against Jacobi's 0.134.
 
-`pressure.reach` (widths, 0 = off) limits how far a push is felt: every solver solves the screened Poisson
+`pressure.reach` limits how far a push is felt, a share s from 0 to 1 of the reach L × s / (1 − s) widths, L the
+box's longest side (the largest of its width, height and depth; `pressure_reach.py`): 0 no pressure, the divergence,
+the solve and the gradient skipped and the water carried where it is pushed; 0.5 a reach of the box's longest side;
+1 everywhere, today's incompressible water. Below 1 every solver solves the screened Poisson
 equation (∇² − 1/reach²) p = div, the term 1/reach² on the diagonal of each update and of the residual, in
 1/widths², so the same on every multigrid level. A point source's pressure then falls off as e^(−r/reach)/(4πr)
 in the box (K₀(r/reach)/(2π) on the 2D's plane) instead of reaching every cell at once. The water is then no
 longer incompressible: past the reach it gives a little instead of passing the push on, a choice for the look.
-Above 0 the solve with closed walls is no longer singular, so the expansion's mean is not taken off and the
-pressure's constant cannot drift. At 0 the solvers compute what they computed before, to the bit.
+Below 1 the solve with closed walls is no longer singular, so the expansion's mean is not taken off and the
+pressure's constant cannot drift. At 1 the solvers compute what they computed before, to the bit. A share, not a
+length, as a length has no end that means everywhere.
 
 Measured in the GPU harness, 2026-11-19, low_flow plan G2, a result: 128 × 128 × 128 cubic cells, the walls
 closed, a point source at the box's middle; one run each:
 
 | Measure                                                                   | Multigrid, 30 cycles     | SOR 1.8, 1500 sweeps | Jacobi, 4000 |
 |---------------------------------------------------------------------------|--------------------------|----------------------|--------------|
-| reach 0.05: the pressure against e^(−r/reach)/(4πr), 4 cells to 4 reaches | 3.4% at most, 0.9% mean  | the same             | the same     |
-| reach 0: a dipole's pressure, against the solvers before G2               | the same to the bit      | the same             | the same     |
+| a reach of 0.05 widths: against e^(−r/reach)/(4πr), 4 cells to 4 reaches  | 3.4% at most, 0.9% mean  | the same             | the same     |
+| everywhere: a dipole's pressure, against the solvers before G2            | the same to the bit      | the same             | the same     |
 
 The source alone, its sum not 0, the multigrid cycled on: the pressure's mean
 
-| Reach | After 10 cycles | After 40 cycles |
-|-------|-----------------|-----------------|
-| 0     | −1.4e-6         | −5.5e-6         |
-| 0.05  | −1.2e-9         | −1.2e-9         |
+| Reach        | After 10 cycles | After 40 cycles |
+|--------------|-----------------|-----------------|
+| everywhere   | −1.4e-6         | −5.5e-6         |
+| 0.05 widths  | −1.2e-9         | −1.2e-9         |
 
-At reach 0 a source whose sum is not 0 drifts the pressure's mean cycle by cycle, as the solve with closed walls
-has no solution; at reach 0.05 it holds.
+Reaching everywhere a source whose sum is not 0 drifts the pressure's mean cycle by cycle, as the solve with closed walls
+has no solution; at a reach of 0.05 widths it holds.
 
 ### The expansion
 
@@ -318,13 +322,13 @@ the tick's first injection clears; the divergence pass takes φ off before the s
 solvers and the gradient stay. A source of volume is neither a velocity nor a force: the water flows out of it
 by itself, or into it below 0. Off or rate 0, the default, is the textbook's ∇·u = 0, and nothing is injected.
 
-With every wall closed the water cannot swell, and at reach 0 the solve with closed walls needs the divergence to sum
+With every wall closed the water cannot swell, and at reach 1 the solve with closed walls needs the divergence to sum
 to 0 (Neumann's compatibility): there the expansion's mean over the water's cells is taken off first
 (`ExpansionMean3D`, a sum per workgroup into a buffer, then one group over the partials; nothing read back), so a
 push in one place is a slight pull everywhere else. Without an expansion the faces' differences cancel cell to
 cell and a closed wall's face is 0, so the divergence sums to 0 already; through an open wall the water leaves.
 
-Measured at reach 0 with `scripts/expansion_check.py`: a disc of full presence at the box's middle depth, rate 0.5/s, one
+Measured at reach 1 with `scripts/expansion_check.py`: a disc of full presence at the box's middle depth, rate 0.5/s, one
 projection from rest, deep_flow's preset (288 × 512 × 64, multigrid); the error is the RMS of the divergence less
 φ over φ's, the floor the same box without a source, the swinging body's velocity projected once, the RMS after
 over before:

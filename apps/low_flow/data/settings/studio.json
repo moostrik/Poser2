@@ -30,7 +30,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 799,
+        "iso": 929,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -42,7 +42,7 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 4492,
+        "balance": 4525,
         "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
@@ -487,8 +487,8 @@
     },
     "fluid": {
       "guard": true,
-      "wall": "OPEN",
-      "slip_time": 60.0,
+      "wall": "CLOSED",
+      "slip_time": 9.4,
       "width": 1080,
       "height": 1920,
       "blend_mode": "ADD",
@@ -551,7 +551,7 @@
         "iterations": 40,
         "relaxation": 1.85,
         "cycles": 1,
-        "reach": 0.0
+        "reach": 0.053
       },
       "density": {
         "color_space": "OKLAB",

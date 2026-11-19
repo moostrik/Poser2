@@ -93,7 +93,7 @@ class PressureSettings(BaseSettings):
     iterations: Field[int]          = Field(40,     min=1,      max=60,     color="orange",         description="Pressure solver iterations per step; for SOR its red-black sweeps")
     relaxation: Field[float]        = Field(1.8,    min=1.0,    max=1.85,   color="orange",         description="SOR's over-relaxation factor omega; 1 = Gauss–Seidel; 1.95 diverged")
     cycles: Field[int]              = Field(1,      min=1,      max=8,      color="orange",         description="Multigrid V-cycles per step")
-    reach: Field[float]             = Field(0.0,    min=0.0,    max=2.0,    step=0.01, color="orange", description="How far a push's pressure reaches (widths); 0 = everywhere, the water incompressible")
+    reach: Field[float]             = Field(1.0,    min=0.0,    max=1.0,    step=0.01, color="orange", description="How far a push's pressure reaches: 0 none, 0.5 the field's longest side, 1 everywhere")
 
 
 class DensitySettings(BaseSettings):
