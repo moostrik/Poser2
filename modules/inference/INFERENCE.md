@@ -48,9 +48,10 @@ in any order unless they are synchronized so
   player. All sizes share one `crops_ready` event; each size has its own callbacks. It cuts the RAW stage's smoothed
   and predicted box, so it runs after that stage, on the frame source's thread, not in the upload. A size is cut
   every `interval`-th set (the pose's every other frame, the segmentation's every frame); after the crops it tells
-  each size's asked callbacks per camera which poses were cut, none on a passed set, so the capture sync and the
-  recorder do not wait for poses that do not come. Each crop carries the box it was cut at (`crop.Image.box`), and
-  the segmentation's mask takes it (`segmentation.Image.box`), where the mask lies in the camera image.
+  each size's asked callbacks per camera which poses were cut, none on a passed set, so the inference frame sync
+  and the recorder do not wait for poses that do not come. Each crop carries the box it was cut at
+  (`crop.Image.box`), and the segmentation's mask takes it (`segmentation.Image.box`), where the mask lies in the
+  camera image.
 - Each model worker waits for the crops' event on its stream and runs there. The pose estimator synchronizes once,
   at the end, to decode its points on the CPU; the segmentation's masks stay on the GPU with an event of their own
   (`segmentation.Image.ready`), as do the flows. The decode stays on the CPU: on the GPU it gives the same points

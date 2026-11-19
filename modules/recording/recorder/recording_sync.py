@@ -1,6 +1,6 @@
 """RecordingSync: the color frame, its depth, the camera's tracklets and the host's poses of one capture, brought
 together for the recorder. Completeness first: every capture waits for its parts in the order of capture, and a
-newer capture never ends the wait; the live `CaptureSync` puts latency first instead.
+newer capture never ends the wait; the live `InferenceFrameSync` puts latency first instead.
 
 Each camera is matched apart, as live: one camera's parts never wait for another's. A capture is complete with its
 color frame and, when depth is recorded and the camera sends it, its depth, matched by capture time

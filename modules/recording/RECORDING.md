@@ -99,7 +99,7 @@ The rules the recorder keeps, each with its reason:
 
 | Rule                                                                 | Why                                                                                   |
 |----------------------------------------------------------------------|---------------------------------------------------------------------------------------|
-| Completeness first: a capture waits for its parts                    | a recording is played many times; the live `CaptureSync` puts latency first instead   |
+| Completeness first: a capture waits for its parts                    | a recording is played many times; the live `InferenceFrameSync` puts latency first    |
 | No wait is timed: a part of a later frame says this one's is missing | every stream comes in the order of capture, so the order settles it without a clock   |
 | At most `KEPT` captures wait per camera                              | the one case order cannot settle: a stream that stopped                               |
 | A part a camera never sent is not waited for                         | a camera without depth, tracklets or poses records beside one with them               |

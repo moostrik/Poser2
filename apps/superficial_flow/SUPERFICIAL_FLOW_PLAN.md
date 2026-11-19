@@ -64,9 +64,9 @@ once; the render's stream waits on the mask's `ready` event (`ViewMask.place`) a
 pose model **(deduction)**. With a heavier fluid or render the wait would cut the frame rate; it adds latency to the
 flow either way.
 
-- **E1.** `Segmenter` waits for its `written` event on its own thread before its callbacks, so the capture sync
-  hands over only masks that are finished on the GPU; the event stays, waiting on it costs nothing. The capture
-  sync's `mask_wait` grows by those steps, about what the GPU waits now, and the render stops waiting
+- **E1.** `Segmenter` waits for its `written` event on its own thread before its callbacks, so the inference
+  frame sync hands over only masks that are finished on the GPU; the event stays, waiting on it costs nothing. The
+  inference frame sync's `mask_wait` grows by those steps, about what the GPU waits now, and the render stops waiting
   **(deduction)**. hd_trio, which runs the same `Segmenter` (its mask and foreground layers), gets it too.
 - **E2.** `CropExtractor` waits for its `crops_ready` on its own thread before its callbacks, for the same reason (the
   crop debug layer waits on it in every app); the pose model and the segmentation wait on it on the GPU already.
@@ -80,7 +80,7 @@ its own thread (`image_upload.py`); smile hands GL no CUDA result.
 |----------|-----------------------------------------------------------------------------------------------------|
 | D7       | GPU harness for each new kernel; -sim                                                               |
 | D8       | GPU harness against the two-pass result; -sim, the GPU fluid time before and after                  |
-| E1, E2   | -sim: the GPU view timer, the capture sync's `mask_wait`, the flow's latency, before and after; hd_trio's segmentation layers still show |
+| E1, E2   | -sim: the GPU view timer, the inference frame sync's `mask_wait`, the flow's latency, before and after; hd_trio's segmentation layers still show |
 
 ## Rules it touches
 
