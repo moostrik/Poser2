@@ -266,9 +266,9 @@ velocity's divergence, central differences, a cell's share:
 | multigrid, 4 cycles | 0.0001         | 0.0004 | 0.0073           | 16.24    |
 
 The residual is worked out where the restriction reads it (`ResidualRestrict3D`), never written at the fine
-level; where a level is odd its last coarse cell reaches past the wall, the missing fine cells a residual of 0, so
-the restriction keeps the sum and a closed box's coarse right-hand side sums to 0 ([FLUID_2D.md](FLUID_2D.md)),
-and the prolongation reads at half the fine position; and the coarsest level's sweeps run in shared memory in one dispatch (`CoarsePressure3D`, up to 4096
+level; where a level is odd its last coarse cell's missing fine cells are a residual of 0, so the restriction
+keeps the sum and a closed box's coarse right-hand side sums to 0, and the prolongation reads the coarse level
+stretched over the fine, so the coarse walls lie on the fine walls ([FLUID_2D.md](FLUID_2D.md)); and the coarsest level's sweeps run in shared memory in one dispatch (`CoarsePressure3D`, up to 4096
 cells): a level of a few thousand cells cannot fill the GPU, so 32 half-sweep dispatches would be only
 their latency. At the preset (288 × 512 × 64) a cycle alone takes 0.77 ms against 0.98 as dispatches, the
 pressure in the app 1.44 ms against 1.61; the fused residual is the same to the bit, the coarse solve the same to a float's last bit (the

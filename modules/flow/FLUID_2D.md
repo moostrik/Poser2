@@ -78,11 +78,13 @@ superficial_flow's preset holds deep_flow's value for every setting the two shar
   (`SorPressure2D`), `MULTIGRID` V-cycles (`MultigridPressure2D`: `SorPressure2D` at omega 1 smoothing,
   `ResidualRestrict2D`, `Prolong2D`, the coarsest level in one workgroup by `CoarsePressure2D`), the pressure in R32F.
   At 1080 × 1920 the multigrid has 7 levels below the finest. A coarse cell is two fine cells from 0 along an axis
-  the level halves; where the fine level is odd the last reaches past the wall, its missing fine cells a residual of
-  0, and the prolongation reads it at half the fine position. The restriction so keeps the residual's sum: with every
-  wall closed the coarse right-hand side sums to 0 as the fine one does. Averaged over the fine cells there only, the
-  edge cells counted double, a coarse level's sum was not 0, the coarsest level's sweeps grew the pressure's constant
-  step after step and the closed walls blew up (JACOBI stayed calm) **(deduction)**.
+  the level halves; where the fine level is odd the last has one, its missing fine cell a residual of 0. The
+  restriction so keeps the residual's sum: with every wall closed the coarse right-hand side sums to 0 as the fine
+  one does. Averaged over the fine cells there only, the edge cells counted double, a coarse level's sum was not 0,
+  the coarsest level's sweeps grew the pressure's constant step after step and the closed walls blew up (JACOBI stayed
+  calm) **(deduction)**. The prolongation reads the coarse level stretched over the fine (the sizes' ratio), so the
+  coarse walls lie on the fine walls: read at half the fine position, an odd level's 0 of an open wall lay past the
+  real wall, and the water drifted away from it with noise at that wall **(deduction)**.
 
   Measured in the GPU harness, 2026-11-19, superficial_flow plan D3, a result: one centered velocity (three
   swirling sources, 0 at the walls) projected once from a pressure of 0 at 270 × 480, the residual |div − L p| over
