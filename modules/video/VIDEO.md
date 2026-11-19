@@ -9,9 +9,9 @@ This document holds the screen recorder's design.
 Each render tick the layers an app records are drawn into the screen frame, an Fbo of the recording's size,
 and `ScreenCapture` (`modules/gl/screen_capture.py`) copies it as NV12 into a ring of frames in RAM, or in video
 memory (`memory`).
-When the ring is full, the duration is reached or Stop is pressed, recording stops and the recorder's thread
-encodes the ring to an HEVC mp4 with NVENC, then frees the memory. The render thread never waits on the
-encoder.
+When the ring is full, the duration is reached or Stop is pressed, recording stops and the take is held: in
+and out are set on it, and each `save` has the recorder's thread encode the frames between them to an HEVC mp4
+with NVENC; `discard` frees the memory. The render thread never waits on the encoder.
 
 ### What gets recorded
 
@@ -118,20 +118,30 @@ as the take needs.
 - In RAM a slot is written to the pipe as it is, after the capture's stream is done. In video memory each frame
   is copied from its slot into one of two pinned host buffers on a stream of its own; the next copy runs while
   the last frame is written to the pipe.
-- After the last frame the pipe is closed, ffmpeg waited for and the ring freed.
+- After the last frame the pipe is closed and ffmpeg waited for; the ring stays held.
 - The thread makes no GL call; it touches only the ring's memory and the pipe. NVENC is its own unit on the card,
-  so the show runs on while it encodes. Start is refused until the encode is done.
+  so the show runs on while it encodes.
 
-Files go to the folder the app gives, named `<date-time>_<name>.mp4`.
+Files go to the folder the app gives, named `<date-time>_<name>.mp4`; a second part saved within the same second
+gets `_2`, and so on.
+
+### The held take
+
+A held take keeps its ring until `discard`. The `in_out` timeline (the player's `Widget.timeline`, with its
+`playhead`, `scrub` and `seek` fields) spans the take's length by its frames' times; `save` writes the frames whose
+times lie between in and out, and the take stays held, so a second part can be saved from it. `discard` frees the
+ring, or in look back empties it and records on. Start is refused while a take is held. The playhead follows the
+dragged marker, or the place on the bar pressed, so it shows where the take is looked at. `scrub` and `seek` are
+bound, because the panel writes them back to −1 at once.
 
 ### Look back
 
 With `look_back` on the ring records all the time, the newest frame replacing the oldest. It holds 1.2 ×
 `duration` at the rate measured when it is made (`LOOK_BACK_MARGIN`), so ticks faster than that still leave
-it the last `duration` seconds; with `duration` 0 it holds what the memory holds. `save` encodes the frames
-whose times lie in the last `duration` seconds, oldest first. The ring pauses while
-the encode reads it and records on when the file is written; it is blind for that time, because recording on
-in a second ring would need the memory twice. It holds its memory while the switch is on; a change of size,
+it the last `duration` seconds; with `duration` 0 it holds what the memory holds. `save` holds the frames whose
+times lie in the last `duration` seconds, oldest first (see the held take). The ring pauses while the take is
+held and records on after `discard`; it is blind for that time, because recording on in a second ring would need
+the memory twice. It holds its memory while the switch is on; a change of size,
 duration or `memory` empties it and makes it again.
 
 ### Time
@@ -147,12 +157,14 @@ back evened out. The mean and the worst gap go in the log line and the file's co
 |-----------|--------------------------------------------------------------|
 | IDLE      | nothing held; Start, or look back on, begins                 |
 | RECORDING | the ring is filled each tick                                 |
-| ENCODING  | the thread encodes, or frees the ring                        |
+| HELD      | the take waits for in, out, `save` and `discard`             |
+| ENCODING  | the thread encodes a part, or frees the ring                 |
 | ERROR     | a failed allocation, capture or encode; only Start retries   |
 
 A failure (no ffmpeg, no NVENC, a failed CUDA registration) is logged once, shown as ERROR, and the show
-runs on. At exit a recording in progress is encoded up to its last copied frame, the thread is joined and the
-CUDA memory freed; the render thread then frees the GL objects.
+runs on. At exit a recording in progress is written up to its last copied frame, and a held take none of whose
+parts is written yet is written whole; the thread is joined and the ring's memory freed, then the render thread
+frees the GL objects.
 
 ### Limits
 

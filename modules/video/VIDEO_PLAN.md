@@ -19,13 +19,6 @@ which holds about 80 s at 60 fps in 60 GB (deduction).
 
 ## D. In and out before saving
 
-- D1. A state HELD: after Stop, or Save in look back, the take stays in the ring instead of being encoded; Start
-  and the look-back recording wait until it is discarded. An `in_out` timeline on the recorder's panel
-  (`Widget.timeline` with its playhead, drag and seek fields, as the player's), over the held take's length by its
-  frames' times, and two buttons: `save` encodes the frames between in and out and keeps the take held, so a second
-  part can be saved; `discard` frees the ring (in look back: empties it and records on). The buttons set Events,
-  the render tick acts. VIDEO.md: the held take and its states. Check: unit tests of HELD, the in/out trim by time,
-  a second save and discard, with the fake ring. One commit.
 - D2. A preview: `ScreenCapture.preview`, an RGBA Fbo of the recording's size, filled on the render tick from the
   slot under the dragged handle through an unpack pixel buffer in the `Tensor` texture's way (registered
   write-discard, copied device to device; in HOST a plain upload from the pinned slot), then the NV12 planes back to
@@ -39,13 +32,11 @@ The preview is there so a cut is made on what is seen, not on seconds alone.
 ## The rules it touches
 
 - Fix a problem where it is made: A.
-- Components that bind unbind on teardown: D1 (save, discard, in_out).
-- Bound callbacks never write their own field: D1.
 - Minimize CPU-GPU syncs: D2.
 - All GL calls on the render thread: D2; the recorder's thread touches only CUDA memory, RAM and the pipe.
 - Avoid transient resource churn: D2, the preview made once with the capture.
 - Shaders get checked in a GPU harness: D2.
 - Name a shader's source after its `.py`: D2.
-- A document describes what is built: VIDEO.md in D1, D2.
+- A document describes what is built: VIDEO.md in D2.
 - Prefer the design with the lower latency, measured in the app: C2.
-- One plan step checked by a run or test is one commit: C2, D1, D2.
+- One plan step checked by a run or test is one commit: C2, D2.
