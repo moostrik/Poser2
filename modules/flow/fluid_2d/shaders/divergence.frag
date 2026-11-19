@@ -3,8 +3,8 @@
 // Compute divergence of velocity field
 // div(v) = ∂vx/∂x + ∂vy/∂y using central differences, the velocity in widths/s over the cell in widths.
 // With the expansion, its rate × the expansion is taken off (Nguyen, Fedkiw and Jensen 2002): the projection makes the
-// divergence that, not 0; with closed walls its mean first (uMeanLod, the expansion's top mip level), as the solve
-// with closed walls needs the divergence to sum to 0.
+// divergence that, not 0; with closed walls its mean over the water's cells first (uMean, ExpansionMean2D's), as the
+// solve with closed walls needs the divergence to sum to 0.
 
 in vec2 texCoord;
 out float fragColor;
@@ -12,10 +12,11 @@ out float fragColor;
 uniform sampler2D uVelocity;   // Velocity field (RG32F)
 uniform sampler2D uObstacle;   // Obstacle mask (R8, CLAMP_TO_BORDER=1)
 uniform bool uHasObstacles;    // Skip obstacle checks when false
-uniform sampler2D uExpansion;  // The expansion, a presence 0 to 1 (R16F), with mipmaps; read with uHasExpansion
+uniform sampler2D uExpansion;  // The expansion, a presence 0 to 1 (R16F); read with uHasExpansion
 uniform bool uHasExpansion;
 uniform float uRate;           // The expansion's rate, 1/s
-uniform float uMeanLod;        // The mip level that is the expansion's mean; below 0 = none taken off
+uniform bool uSubtractMean;    // The expansion's mean (uMean) taken off first
+layout(std430, binding = 1) readonly buffer Mean { float uMean; };
 
 uniform vec2 uHalfRdxInv;  // 1 / (2 × the cell), widths, on x and y
 
@@ -66,8 +67,7 @@ void main() {
     // Central difference divergence
     float divergence = uHalfRdxInv.x * (vR.x - vL.x) + uHalfRdxInv.y * (vT.y - vB.y);
     if (uHasExpansion) {
-        float expansion = textureLod(uExpansion, st, 0.0).r;
-        if (uMeanLod >= 0.0) expansion -= texelFetch(uExpansion, ivec2(0), int(uMeanLod)).r;     // the 1 × 1 level
+        float expansion = textureLod(uExpansion, st, 0.0).r - (uSubtractMean ? uMean : 0.0);
         divergence -= uRate * expansion;
     }
     fragColor = divergence;

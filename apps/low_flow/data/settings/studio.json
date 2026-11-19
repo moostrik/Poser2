@@ -30,7 +30,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 680,
+        "iso": 799,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -42,7 +42,7 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 4541,
+        "balance": 4492,
         "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,

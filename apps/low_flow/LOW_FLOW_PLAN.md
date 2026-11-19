@@ -55,15 +55,8 @@ in the other at once, as in the 3D. With the walls closed the water pushed away 
 box **(deduction)**. The solve then needs the divergence to sum to 0, and the velocity's own does, whatever the
 injections add to it: its differences cancel cell to cell and the walls' ghosts carry nothing through (FLUID_2D.md,
 FLUID_3D.md's "The expansion") **(deduction, from the divergence's code)**. The expansion is the one net source, its
-mean taken off first.
+mean taken off first, exactly in both (FLUID_2D.md).
 
-- **G1.** The 2D's expansion mean exact, as the 3D's: today it is the expansion's top mip level (`uMeanLod`,
-  `Fluid2D._enforce_incompressibility`), a half float that counts the obstacles' cells. A mip chain of a size that is
-  not a power of two (1080 × 1920) averages unevenly, so that level is not the mean and the source does not sum to 0
-  **(deduction, from OpenGL's mip rule; checked in G1's harness)**. `ExpansionMean2D`, the 2D's own twin of
-  `ExpansionMean3D` (no 2D sum exists to reuse): each workgroup sums its water cells' expansion and counts them into
-  a buffer, one group sums the partials into the mean, a float, nothing read back; the obstacles' cells left out. It
-  runs only while the expansion is on (off in low_flow's preset), so it is not what moves the far corner today.
 - **G2.** `pressure.reach` (widths, 0 to 2 by 0.01; 0 = off, the water incompressible, as now): the pressure solves
   the screened Poisson equation (∇² − 1/reach²) p = div, so a push's pressure falls off as K₀(r/reach) in the 2D and
   e^(−r/reach)/r in the 3D, the screened equation's Green's functions. The water is then no longer incompressible:
@@ -84,15 +77,13 @@ mean taken off first.
 |----------|-----------------------------------------------------------------------------------------------------|
 | D7       | GPU harness for each new kernel; -sim                                                               |
 | D8       | -sim, the GPU fluid time                                                                            |
-| G1       | GPU harness, the walls closed, the expansion on, 1080 × 1920: the mean in its float buffer against the expansion's sum; the divergence's sum within its half float's rounding, before and after |
 | G2       | GPU harness, the walls closed, 2D and 3D, each solver: a point source at the box's middle at reach 0.05, its pressure against K₀(r/reach) (2D) and e^(−r/reach)/r (3D) where it is a few reaches from every wall, at reach 0 the result the same to the bit before and after, no drift with the walls closed; the settings and preset tests; then in the app, the walls closed |
 
 ## Rules it touches
 
 - Keep presets and settings schemas in sync with code changes: D7, G2.
-- Shaders get checked in a GPU harness: D7, G1, G2.
-- Prefer the design with the lower latency, measured in the context of the app: D7, D8, G1, G2.
+- Shaders get checked in a GPU harness: D7, G2.
+- Prefer the design with the lower latency, measured in the context of the app: D7, D8, G2.
 - Prefer the textbook unit for a quantity: G2 (the reach in widths).
 - The 2D's panel is the 3D's, each setting at the 3D's path: G2.
-- Fix a problem where it is made, not where it shows: G1.
 - A plan is named after the package, app or folder it is for, and sits in it: this plan, in `apps/low_flow`.

@@ -1,12 +1,9 @@
 """Fluid2D - the 2D Navier-Stokes fluid, its passes and its fields on the plane, as the 3D's for what a plane has.
 How and why: modules/flow/FLUID_2D.md."""
-import math
+from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_R16F, GL_R32F, GL_R8, GL_RG16F, GL_RGBA16F, \
+    GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
 
-from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R16F, GL_R32F, GL_R8, GL_RG16F, GL_RGBA16F, \
-    GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_2D, GL_TEXTURE_FETCH_BARRIER_BIT, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, \
-    glBindTexture, glGenerateMipmap, glMemoryBarrier, glTexParameteri
-
-from modules.gl import Texture, SwapFbo, Fbo, GpuTimer
+from modules.gl import Texture, SwapFbo, Fbo, GpuTimer, StorageBuffer
 from .. import FlowUtil, Port, TextureKind
 from ..density_blend import DensityBlend
 from ..drag import DRAG_FLOOR, drag_share
@@ -23,7 +20,8 @@ from .shaders import (
     Advect, Divergence, Gradient,
     JacobiPressure, JacobiPressureCompute, JacobiDiffusion, JacobiDiffusionCompute,
     VorticityCurl, VorticityForce, Buoyancy,
-    InjectVelocity2D, InjectDensity2D, InjectScalar2D, ScalarInjection, DensityToRgb2D, MacCormack2D
+    InjectVelocity2D, InjectDensity2D, InjectScalar2D, ScalarInjection, DensityToRgb2D, MacCormack2D,
+    ExpansionMean2D, PARTIAL_BYTES
 )
 
 _BARRIER_FETCH_AND_IMAGE: int = int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
@@ -96,7 +94,10 @@ class Fluid2D:
 
         # Intermediate result FBOs (single buffer, no ping-pong)
         self._divergence_fbo: Fbo = Fbo()
-        self._expansion_fbo: SwapFbo = SwapFbo()     # the expansion over this tick's injections, mipmapped for its mean
+        self._expansion_fbo: SwapFbo = SwapFbo()     # the expansion over this tick's injections
+        # with closed walls its mean over the water's cells, per workgroup, then all (ExpansionMean2D)
+        self._expansion_partials: StorageBuffer = StorageBuffer()
+        self._expansion_mean: StorageBuffer = StorageBuffer()
         self._expansion_fresh: bool = False          # this tick's first injection has cleared it
         self._picture_fbo: Fbo = Fbo()               # the density as RGB, premultiplied, where it is held as Oklab
         self._oklab: bool = self.settings.density.color_space == ColorSpace.OKLAB
@@ -114,6 +115,7 @@ class Fluid2D:
         self._advect_shader: Advect = Advect()
         self._maccormack_shader: MacCormack2D = MacCormack2D()
         self._divergence_shader: Divergence = Divergence()
+        self._expansion_mean_shader: ExpansionMean2D = ExpansionMean2D()
         self._gradient_shader: Gradient = Gradient()
         self._jacobi_pressure_shader: JacobiPressure = JacobiPressure()
         self._jacobi_pressure_compute: JacobiPressureCompute = JacobiPressureCompute()
@@ -160,6 +162,7 @@ class Fluid2D:
         self._advect_shader.allocate()
         self._maccormack_shader.allocate()
         self._divergence_shader.allocate()
+        self._expansion_mean_shader.allocate()
         self._gradient_shader.allocate()
         self._jacobi_pressure_shader.allocate()
         self._jacobi_pressure_compute.allocate()
@@ -210,14 +213,9 @@ class Fluid2D:
         self._vorticity_force_fbo.allocate(sim_w, sim_h, GL_RG16F)
         self._buoyancy_fbo.allocate(sim_w, sim_h, GL_RG16F)
         self._expansion_fbo.allocate(sim_w, sim_h, GL_R16F)
-        for _ in range(2):      # both buffers mipmapped: its mips, its mean
-            glBindTexture(GL_TEXTURE_2D, self._expansion_fbo.tex_id)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-            glGenerateMipmap(GL_TEXTURE_2D)
-            self._expansion_fbo.swap()
-        glBindTexture(GL_TEXTURE_2D, 0)
         self._expansion_fbo.clear_all()
+        self._expansion_partials.allocate(ExpansionMean2D.groups((sim_w, sim_h)) * PARTIAL_BYTES)
+        self._expansion_mean.allocate(4)
 
         self._apply_wall_modes()
 
@@ -234,6 +232,8 @@ class Fluid2D:
         self._vorticity_force_fbo.deallocate()
         self._buoyancy_fbo.deallocate()
         self._expansion_fbo.deallocate()
+        self._expansion_partials.deallocate()
+        self._expansion_mean.deallocate()
         self._picture_fbo.deallocate()
         for scratch in (self._velocity_scratch, self._temperature_scratch, self._density_scratch):
             scratch.deallocate()
@@ -241,6 +241,7 @@ class Fluid2D:
         self._advect_shader.deallocate()
         self._maccormack_shader.deallocate()
         self._divergence_shader.deallocate()
+        self._expansion_mean_shader.deallocate()
         self._gradient_shader.deallocate()
         self._jacobi_pressure_shader.deallocate()
         self._jacobi_pressure_compute.deallocate()
@@ -266,6 +267,7 @@ class Fluid2D:
         self._advect_shader.reload()
         self._maccormack_shader.reload()
         self._divergence_shader.reload()
+        self._expansion_mean_shader.reload()
         self._gradient_shader.reload()
         self._jacobi_pressure_shader.reload()
         self._jacobi_pressure_compute.reload()
@@ -513,13 +515,11 @@ class Fluid2D:
         closed: bool = self.settings.wall == WallMode.CLOSED
         # a. Compute divergence, the expansion's made by the projection (its mean off where the walls are closed)
         rate: float = self._expansion_rate()
-        mean_lod: float | None = None
-        if rate != 0.0:
-            glBindTexture(GL_TEXTURE_2D, self._expansion_fbo.tex_id)
-            glGenerateMipmap(GL_TEXTURE_2D)
-            glBindTexture(GL_TEXTURE_2D, 0)
-            if closed:
-                mean_lod = float(math.floor(math.log2(max(self._simulation_width, self._simulation_height))))
+        mean: StorageBuffer | None = None
+        if rate != 0.0 and closed:
+            self._expansion_mean_shader.use(self._expansion_fbo, self._simulation_obstacle_fbo, self._has_obstacles,
+                                            self._expansion_partials, self._expansion_mean)
+            mean = self._expansion_mean
         self._divergence_fbo.begin()
         self._divergence_shader.use(
             self._velocity_fbo,
@@ -528,7 +528,7 @@ class Fluid2D:
             has_obstacles=self._has_obstacles,
             expansion=self._expansion_fbo if rate != 0.0 else None,
             rate=rate,
-            mean_lod=mean_lod,
+            mean=mean,
             closed=closed,
             wall_keep=self._wall_keep
         )

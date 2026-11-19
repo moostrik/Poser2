@@ -118,5 +118,20 @@ points down the screen at its length, (0, −0.02).
   | a square at (0.3, 0.2) widths/s: its edge, 99.5% gradient   | 0.153           | 0.184             | 0.184              |
   | a swirl carried and projected: its mean speed, of its start | 0.947           |                   | 0.977              |
 
+- The expansion is the 3D's ([FLUID_3D.md](FLUID_3D.md#the-expansion)): with every wall closed its mean over the
+  water's cells comes off first, summed by `ExpansionMean2D` as `ExpansionMean3D` sums it (per workgroup into a
+  buffer, then one group over the partials, a float, nothing read back; the obstacles' cells left out). A mip chain's
+  top level is no mean at a size that is not a power of two.
+
+  Measured in the GPU harness, 2026-11-19, low_flow plan G1, a result: 1080 × 1920, the walls closed, the water at
+  rest, a disc of full presence 0.15 widths in radius off the middle, rate 0.5/s, one projection; one run:
+
+  | Measure                                          | Value                  |
+  |--------------------------------------------------|------------------------|
+  | the mean by `ExpansionMean2D`, of numpy's        | 4.9e-8 off             |
+  | the top mip level (before G1), of numpy's        | 4.5e-4 off             |
+  | the divergence's target: its mean, of the source | −2.8e-6 against 2.0e-2 |
+
+  The target's mean is within its half float's rounding (2.3e-4 at its largest cell).
 - The guard counts the velocity, the density and the temperature in the advection, the one pass that writes each.
 - One GPU timer, `GPU fluid`, holds the step; the layer's `GPU fluid inject` the inputs.
