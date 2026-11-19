@@ -42,10 +42,9 @@ The 3D fluid's features that have a meaning on a plane, each as the 2D's own ker
 harness and seen in superficial_flow; the march's light, shadows and fog need a depth and stay 3D only:
 
 - **D7.** The particles.
-- **D8.** The one-pass buoyancy checked (built 2026-11-19, as the 3D's, the flow plan's E9: `Buoyancy` adds
-  dt × gravity × (sink × amount − buoyancy × warmth) straight into the velocity's swap, the warmth read only while
-  the lift runs, skipped when the sink and the lift are both 0 or gravity is 0, the force itself only for its
-  monitor). superficial_flow's preset has gravity down the screen at deep_flow's length, (0, −0.02).
+- **D8.** The one-pass buoyancy in -sim: the GPU fluid time (built and checked on the GPU 2026-11-19, as the 3D's:
+  one draw against the two it replaced within one step of the velocity's half precision, skipped at gravity 0).
+  superficial_flow's preset has gravity down the screen at deep_flow's length, (0, −0.02).
 
 Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 
@@ -74,13 +73,13 @@ its own thread (`image_upload.py`); smile hands GL no CUDA result.
 | Step     | Check                                                                                               |
 |----------|-----------------------------------------------------------------------------------------------------|
 | D7       | GPU harness for each new kernel; -sim                                                               |
-| D8       | GPU harness against the two-pass result; -sim, the GPU fluid time before and after                  |
+| D8       | -sim, the GPU fluid time                                                                            |
 | E1, E2   | -sim: the GPU view timer, the inference frame sync's `mask_wait`, the flow's latency, before and after; hd_trio's segmentation layers still show |
 
 ## Rules it touches
 
-- Keep presets and settings schemas in sync with code changes: D7, D8.
-- Shaders get checked in a GPU harness: D7, D8.
+- Keep presets and settings schemas in sync with code changes: D7.
+- Shaders get checked in a GPU harness: D7.
 - Prefer the design with the lower latency, measured in the context of the app: D7, D8, E1.
 - The part that works on the item has its own thread and does all its work there, its inner steps included: E1, E2.
 - An item handed to a callback is not changed afterwards: E1, E2.

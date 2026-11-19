@@ -75,7 +75,7 @@ holds the pose model's; the motion's p95 under its mean is a mean pulled up by a
 10 ms). The viscosity is 0, and the buoyancy and the light are off in the preset, so they skip their
 dispatches. With the buoyancy on, each pass alone (`fluid_pass_check.py`, a time, 18 November, commit 1b60f186,
 the preset's 288 × 512 × 64, the median of 40), the temperature's advection after the projection takes 0.082 ms
-and the buoyancy 0.152. Carried as the density is (18 November, the density's `advection` MacCormack, as in the
+and the buoyancy 0.152; in one pass (19 November, commit 71d7dd9d, the same run), 0.114. Carried as the density is (18 November, the density's `advection` MacCormack, as in the
 preset), the temperature's advection takes 0.222 ms. On 15 November the density is the step's largest pass, the fine density's 2160 × 3840 × 24
 among it; the pressure, multigrid since, is a quarter of what its 40 Jacobi iterations took on
 7 November. The composite marches one step per layer over the 2160 × 3840 output, so it grows with

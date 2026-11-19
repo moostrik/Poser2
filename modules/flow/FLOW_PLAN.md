@@ -15,7 +15,7 @@ operator saw.
 | B   | [The view](#b-the-view)                                                      | built                             | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; C2 the values, C3 range    | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; D6 the checks              | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
-| E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | built; E6 the app's check, E9     | [FLUID_3D.md](FLUID_3D.md)                         |
+| E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | built; E6 the app's check         | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | F1, F2 white                      | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                       | [FLOW.md](FLOW.md)                                 |
 | I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | in superficial_flow's plan        | [FLOW.md](FLOW.md)                                 |
@@ -106,13 +106,11 @@ the room's, the warmth from the motion alone; checked in the GPU harness ([FLUID
 Built (2026-11-18): gravity under `input`, the sink the density's, the temperature carried as the density is; an
 `enabled` in every fluid step that can be off, a step running while enabled and its strength above 0.
 Built (2026-11-19): the buoyancy in one pass, `AddToFaces3D`'s buoyancy mode, the warmth read only while the lift
-is on, skipped at gravity 0 too, the force at the cells only for its monitor.
+is on, skipped at gravity 0 too, the force at the cells only for its monitor; checked in the GPU harness, the faces
+the two passes' within the force's half precision, the pass 0.114 ms against 0.152 ms (`fluid_pass_check.py`).
 
 - **E6.** Checked in the app, in its own panel: what the temperature does to the water and whether it works,
   with `buoyancy` above 0.
-- **E9.** The one-pass buoyancy checked, with the operator away from the PC: `scripts/buoyancy_check.py` (the
-  force and the first step as in FLUID_3D.md's table, the faces one pass against two within the force's half
-  precision), and `scripts/fluid_pass_check.py`'s buoyancy against its 0.152 ms of 18 November.
 
 ## F. The 3D fluid's look at 4K
 
@@ -215,7 +213,6 @@ The cameras:
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
-- Ask to measure a time again when its pass's code or size changes: D6, E9.
-- Shaders get checked in a GPU harness: E9.
+- Ask to measure a time again when its pass's code or size changes: D6.
 
 Not designed yet, so their rules are not named: C3, F1, F2, H1.
