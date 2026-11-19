@@ -61,16 +61,18 @@ pressure") limits how far. The water gets a speed of sound too, so a push travel
   and swing back, ripples. Stepped explicitly it holds only while a front crosses less than a cell a step, c < 0.056
   widths/s at 60 fps and 1080 wide (the field crossed in 30 s). Stepped by Crank–Nicolson, the trapezoidal step, it
   holds at every speed (1 width/s crosses the field in 1.8 s, 10 in 0.18) and keeps a wave's energy, where backward
-  Euler would damp every ripple shorter than about 2π c dt within frames. Its new pressure is the screened solve the reach
-  already has, the term 1/(c dt / 2)² on the same diagonal as the reach's (the two add), the same multigrid: on the
-  right-hand side the divergence and the last step's pressure carried by the velocity (the advection's shader, one
-  pass) with its Laplacian; two passes more than today, no sub-steps. In the code's pressure, which is dt × the
+  Euler would damp every ripple shorter than about 2π c dt within frames. Its new pressure is the screened solve the
+  reach already has, the term 1/(c dt / 2)² on the same diagonal as the reach's (the two add), the same multigrid: on
+  the right-hand side the divergence and the last step's pressure carried by the velocity (the advection's shader,
+  one pass) with its Laplacian; two passes more than today, no sub-steps. In the code's pressure, which is dt × the
   physical one (the gradient subtracts ∇p with no dt, `gradient.frag`); the carried pressure is rescaled by dt /
   dt_last, as the measured step changes frame to frame. `pressure.fade_time` (s, to 1% as the other fade_times; 0 =
   never) settles the ripples, a term dt/τ on the diagonal, τ = fade_time / ln 100. At c → ∞ it is today's solve; at
-  the reach's 0 there is no pressure, so no sound either. Closed walls reflect a front; open walls (the pressure 0 on
-  the face) reflect it inverted. FLUID_2D.md says the setting is the 2D's alone for now. Questions: whether open
-  walls should let a front out (a non-reflecting wall); the default speed; the 3D's G4, after it is seen in low_flow.
+  the reach's 0 there is no pressure, so no sound either. Closed walls reflect a front; open walls let it out, the
+  textbook's absorbing wall (Engquist and Majda 1977, first order: ∂P/∂t + c ∂P/∂n = 0 on the face, in the solve's
+  wall ghost), where the pressure 0 on the face would reflect it inverted. The field's default 1 width/s (the field
+  crossed in 1.8 s), the presets 0, off. FLUID_2D.md says the setting is the 2D's alone for now. Question: the 3D's
+  G4, after it is seen in low_flow.
 
 ## Checks
 
@@ -78,7 +80,7 @@ pressure") limits how far. The water gets a speed of sound too, so a push travel
 |----------|-----------------------------------------------------------------------------------------------------|
 | D7       | GPU harness for each new kernel; -sim                                                               |
 | D8       | -sim, the GPU fluid time                                                                            |
-| G4       | GPU harness, the 2D, the walls closed and open: a point push's front at c × t (1 and 10 widths/s, no sub-steps), carried with a flow; its energy kept with `fade_time` 0, a ripple of 0.1 widths at 10 widths/s surviving; a closed wall reflecting it, an open one inverted; `fade_time` settling it; a dt changing frame to frame without a kick; c very large the same as today's solve; then in the app |
+| G4       | GPU harness, the 2D, the walls closed and open: a point push's front at c × t (1 and 10 widths/s, no sub-steps), carried with a flow; its energy kept with `fade_time` 0, a ripple of 0.1 widths at 10 widths/s surviving; a closed wall reflecting it, an open one letting it out; `fade_time` settling it; a dt changing frame to frame without a kick; c very large the same as today's solve; then in the app |
 
 ## Rules it touches
 

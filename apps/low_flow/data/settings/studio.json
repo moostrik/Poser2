@@ -30,7 +30,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 929,
+        "iso": 1754,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -42,7 +42,7 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 4525,
+        "balance": 4178,
         "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
@@ -276,7 +276,7 @@
     }
   },
   "render": {
-    "debug": true,
+    "debug": false,
     "pause": false,
     "layer": {
       "main": [
@@ -735,13 +735,13 @@
       "title": "Poser",
       "v_sync": false,
       "monitor": "M0",
-      "x": 1921,
-      "y": 31,
+      "x": 377,
+      "y": 1056,
       "width": 1918,
       "height": 2080,
       "secondary_list": [],
       "secondary_fullscreen": false,
-      "fullscreen_mode": "WINDOWED",
+      "fullscreen_mode": "WINDOWED_FULLSCREEN",
       "fullscreen_mouse": false
     }
   },

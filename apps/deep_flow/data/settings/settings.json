@@ -30,8 +30,8 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 5832,
-        "auto_exposure": true,
+        "iso": 2734,
+        "auto_exposure": false,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
         "auto_iso_limit": 16585,
@@ -42,7 +42,7 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 3836,
+        "balance": 3999,
         "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
@@ -270,11 +270,11 @@
     }
   },
   "render": {
-    "debug": true,
+    "debug": false,
     "pause": false,
     "layer": {
       "main": [
-        "fluid"
+        "motion"
       ],
       "debug": [
         "fluid"
@@ -292,7 +292,7 @@
         "center_y": 0.5,
         "height": 1.0,
         "near": 0.1,
-        "far": 1.7
+        "far": 3.0
       },
       "mask": {
         "guided_radius": 3.0,
@@ -335,7 +335,31 @@
       "luma_matte": 0.0,
       "use_mask": true,
       "erode": 0,
-      "feather": 4.0
+      "feather": 4.0,
+      "monitor_main": {
+        "texture": "output.velocity",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
+      },
+      "monitor_debug": {
+        "texture": "output.velocity",
+        "view": "COLORMAP",
+        "advanced": {
+          "channel": "ALL",
+          "scale": 1.0,
+          "blend_mode": "ADD",
+          "glyph_spacing": "SPACING_32",
+          "colormap": "JET",
+          "legend": true
+        }
+      }
     },
     "motion": {
       "guard": true,
@@ -809,13 +833,13 @@
       "title": "Poser",
       "v_sync": false,
       "monitor": "M0",
-      "x": 1921,
-      "y": 31,
-      "width": 1918,
-      "height": 2080,
+      "x": 678,
+      "y": 1431,
+      "width": 1277,
+      "height": 1385,
       "secondary_list": [],
       "secondary_fullscreen": false,
-      "fullscreen_mode": "WINDOWED",
+      "fullscreen_mode": "WINDOWED_FULLSCREEN",
       "fullscreen_mouse": false
     }
   },
