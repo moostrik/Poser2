@@ -48,39 +48,16 @@ harness and seen in superficial_flow; the march's light, shadows and fog need a 
 
 Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 
-## E. The mask finished when it is handed over
-
-The GPU waits up to about 8 ms of each capture on the segmentation before it starts the view, the motion, the
-bridge and the fluid (the GPU view timer about 2.9 ms; deep_flow's 0.19). `Segmenter` waits for the model on its own
-thread, then queues the mask's resize back to the crop and the foreground (crop × mask) and calls its callbacks at
-once; the render's stream waits on the mask's `ready` event (`ViewMask.place`) and the PBO's unmap
-(`modules/gl/tensor.py`) makes GL wait for that CUDA work. Those steps run when the GPU gets to them, behind the
-pose model **(deduction)**. With a heavier fluid or render the wait would cut the frame rate; it adds latency to the
-flow either way.
-
-- **E1.** `Segmenter` waits for its `written` event on its own thread before its callbacks, so the inference
-  frame sync hands over only masks that are finished on the GPU; the event stays, waiting on it costs nothing. The
-  inference frame sync's `mask_wait` grows by those steps, about what the GPU waits now, and the render stops waiting
-  **(deduction)**. hd_trio, which runs the same `Segmenter` (its mask and foreground layers), gets it too.
-- **E2.** `CropExtractor` waits for its `crops_ready` on its own thread before its callbacks, for the same reason (the
-  crop debug layer waits on it in every app); the pose model and the segmentation wait on it on the GPU already.
-
-deep_flow and white_space hand GL nothing unfinished: their images and depth come from the uploader, which waits on
-its own thread (`image_upload.py`); smile hands GL no CUDA result.
-
 ## Checks
 
 | Step     | Check                                                                                               |
 |----------|-----------------------------------------------------------------------------------------------------|
 | D7       | GPU harness for each new kernel; -sim                                                               |
 | D8       | -sim, the GPU fluid time                                                                            |
-| E1, E2   | -sim: the GPU view timer, the inference frame sync's `mask_wait`, the flow's latency, before and after; hd_trio's segmentation layers still show |
 
 ## Rules it touches
 
 - Keep presets and settings schemas in sync with code changes: D7.
 - Shaders get checked in a GPU harness: D7.
-- Prefer the design with the lower latency, measured in the context of the app: D7, D8, E1.
-- The part that works on the item has its own thread and does all its work there, its inner steps included: E1, E2.
-- An item handed to a callback is not changed afterwards: E1, E2.
+- Prefer the design with the lower latency, measured in the context of the app: D7, D8.
 - A plan is named after the package, app or folder it is for, and sits in it: this plan, in `apps/superficial_flow`.
