@@ -23,7 +23,7 @@ layout(r32f, binding = 1) uniform image2D uPressureOut;  // Output pressure
 
 // Solver parameters
 uniform vec2 uAlpha;      // Laplacian weights (1/dx², 1/dy²)
-uniform float uBeta;      // 1 / (2*αx + 2*αy)
+uniform float uBeta;      // 1 / (2*αx + 2*αy + s), s the screened equation's 1 / reach² (0 none)
 uniform int uIterations;  // Number of iterations to perform in this dispatch
 uniform ivec2 uSize;      // Texture dimensions
 uniform bool uHasObstacles;  // Skip obstacle handling when false

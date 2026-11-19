@@ -12,7 +12,7 @@ layout(binding = 0) uniform sampler2D uDivergence;   // the level's right-hand s
 layout(r32f, binding = 0) uniform image2D uPressure;
 
 uniform vec2  uAlpha;        // 1 / h², per axis
-uniform float uBeta;         // 1 / (2 (ax + ay))
+uniform float uBeta;         // 1 / (2 (ax + ay) + s), s the screened equation's 1 / reach² (0 none)
 uniform int   uSweeps;
 uniform ivec2 uSize;
 

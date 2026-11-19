@@ -15,6 +15,7 @@ layout(r32f, binding = 0) readonly uniform image3D uPressure;
 layout(r32f, binding = 1) writeonly uniform image3D uCoarse;
 
 uniform vec3  uAlpha;        // 1 / h², the fine level's, per axis
+uniform float uScreening;    // the screened equation's 1 / reach², 1/widths², the same on every level; 0 none
 uniform ivec3 uFactor;       // per axis, 2 where the coarse level halves the fine, 1 where it keeps it
 uniform ivec3 uSize;         // the fine level's cells
 uniform ivec3 uCoarseSize;
@@ -40,7 +41,7 @@ float residual(ivec3 gid) {
                     + uAlpha.y * (neighbor(gid - ivec3(0, 1, 0), pC, 1) + neighbor(gid + ivec3(0, 1, 0), pC, 1) - 2.0 * pC)
                     + uAlpha.z * (neighbor(gid - ivec3(0, 0, 1), pC, 2) + neighbor(gid + ivec3(0, 0, 1), pC, 2) - 2.0 * pC);
     float divergence = texture(uDivergence, (vec3(gid) + 0.5) / vec3(uSize)).r;
-    return divergence - laplacian;
+    return divergence - (laplacian - uScreening * pC);
 }
 
 void main() {

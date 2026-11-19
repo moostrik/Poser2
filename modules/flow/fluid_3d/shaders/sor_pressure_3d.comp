@@ -24,7 +24,7 @@ layout(binding = 1) uniform sampler3D uObstacle;    // R8
 layout(r32f, binding = 0) uniform image3D uPressure;
 
 uniform vec3  uAlpha;        // (1/dx², 1/dy², 1/dz²)
-uniform float uBeta;         // 1 / (2 ax + 2 ay + 2 az)
+uniform float uBeta;         // 1 / (2 ax + 2 ay + 2 az + s), s the screened equation's 1 / reach² (0 none)
 uniform float uOmega;        // the over-relaxation, 1 to 2
 uniform int   uColor;        // 0 red, 1 black
 uniform ivec3 uSize;

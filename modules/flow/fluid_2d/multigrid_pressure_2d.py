@@ -83,36 +83,36 @@ class MultigridPressure2D:
         return len(self._corrections)
 
     def sor(self, pressure: Texture, divergence: Texture, obstacle: Texture, cell: tuple[float, float], sweeps: int,
-            omega: float, has_obstacles: bool, closed: bool) -> None:
+            omega: float, has_obstacles: bool, closed: bool, screening: float = 0.0) -> None:
         """`sweeps` red-black SOR sweeps on `pressure` in place at `omega`, the solver `SOR` on its own."""
-        self._smoother.solve(pressure, divergence, obstacle, cell, sweeps, omega, has_obstacles, closed)
+        self._smoother.solve(pressure, divergence, obstacle, cell, sweeps, omega, has_obstacles, closed, screening)
         glMemoryBarrier(_BARRIER)
 
     def solve(self, pressure: Texture, divergence: Texture, obstacle: Texture, cell: tuple[float, float], cycles: int,
-              has_obstacles: bool, closed: bool) -> None:
+              has_obstacles: bool, closed: bool, screening: float = 0.0) -> None:
         """`cycles` V-cycles on `pressure` in place, `divergence` its right-hand side, `cell` the finest cell."""
         for _ in range(cycles):
-            self._cycle(0, pressure, divergence, obstacle, cell, has_obstacles, closed)
+            self._cycle(0, pressure, divergence, obstacle, cell, has_obstacles, closed, screening)
 
     def _cycle(self, level: int, x: Texture, b: Texture, obstacle: Texture, cell: tuple[float, float], has_obstacles: bool,
-               closed: bool) -> None:
+               closed: bool, screening: float) -> None:
         if level == len(self._corrections):
             if self._coarse_shader.fits(x):
-                self._coarse_shader.solve(x, b, cell, COARSEST_SWEEPS, closed)
+                self._coarse_shader.solve(x, b, cell, COARSEST_SWEEPS, closed, screening)
             else:
-                self._smoother.solve(x, b, obstacle, cell, COARSEST_SWEEPS, 1.0, False, closed)
+                self._smoother.solve(x, b, obstacle, cell, COARSEST_SWEEPS, 1.0, False, closed, screening)
             glMemoryBarrier(_BARRIER)
             return
-        self._smoother.solve(x, b, obstacle, cell, SMOOTHING, 1.0, has_obstacles, closed)
+        self._smoother.solve(x, b, obstacle, cell, SMOOTHING, 1.0, has_obstacles, closed, screening)
         glMemoryBarrier(_BARRIER)
         correction, source = self._corrections[level], self._sources[level]
         factor = self._factors[level]
-        self._residual_restrict_shader.use(x, b, obstacle, source, cell, factor, has_obstacles, closed)
+        self._residual_restrict_shader.use(x, b, obstacle, source, cell, factor, has_obstacles, closed, screening)
         correction.clear()
         glMemoryBarrier(_BARRIER)
         coarser = (cell[0] * factor[0], cell[1] * factor[1])
-        self._cycle(level + 1, correction, source, obstacle, coarser, False, closed)
+        self._cycle(level + 1, correction, source, obstacle, coarser, False, closed, screening)
         self._prolong_shader.use(correction, x, closed)
         glMemoryBarrier(_BARRIER)
-        self._smoother.solve(x, b, obstacle, cell, SMOOTHING, 1.0, has_obstacles, closed)
+        self._smoother.solve(x, b, obstacle, cell, SMOOTHING, 1.0, has_obstacles, closed, screening)
         glMemoryBarrier(_BARRIER)

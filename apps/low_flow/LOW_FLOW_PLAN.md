@@ -48,42 +48,16 @@ harness and seen in low_flow; the march's light, shadows and fog need a depth an
 
 Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 
-## G. The pressure's reach
-
-Since the multigrid (D3) the pressure is solved over the whole grid each step: a push in one corner moves the water
-in the other at once, as in the 3D. With the walls closed the water pushed away comes back round through the whole
-box **(deduction)**. The solve then needs the divergence to sum to 0, and the velocity's own does, whatever the
-injections add to it: its differences cancel cell to cell and the walls' ghosts carry nothing through (FLUID_2D.md,
-FLUID_3D.md's "The expansion") **(deduction, from the divergence's code)**. The expansion is the one net source, its
-mean taken off first, exactly in both (FLUID_2D.md).
-
-- **G2.** `pressure.reach` (widths, 0 to 2 by 0.01; 0 = off, the water incompressible, as now): the pressure solves
-  the screened Poisson equation (∇² − 1/reach²) p = div, so a push's pressure falls off as K₀(r/reach) in the 2D and
-  e^(−r/reach)/r in the 3D, the screened equation's Green's functions. The water is then no longer incompressible:
-  past the reach it gives a little instead of passing the push on, a knob for the look, not a fix. The term 1/reach²
-  goes on the diagonal of every solver and the residual, the same on every multigrid level (it is in widths): the
-  2D's `JacobiPressure`, `JacobiPressureCompute`, `SorPressure2D`, `CoarsePressure2D`, `ResidualRestrict2D`, and the
-  3D's `jacobi_pressure_3d`, `SorPressure3D`, `CoarsePressure3D`, `ResidualRestrict3D`, their `.py` wrappers (β =
-  1/(2αx + 2αy + 1/reach²)), `MultigridPressure2D` and `multigrid_pressure.py`, and `Fluid2D` and `Fluid3D`, which
-  pass the reach on and decide the expansion's mean; the gradient stays. Above 0 the solve with closed walls is no
-  longer singular: the pressure's constant cannot drift, and the expansion's mean comes off only at reach 0 with the
-  walls closed (else it adds a uniform sink). Both presets take 0; FLUID_2D.md and FLUID_3D.md's "The pressure"
-  describe it, FLUID_3D.md's divergence-after rows and both documents' "The expansion" numbers holding at reach 0.
-  The 3D's solvers are Flow Fluid's, asked for feedback.
-
 ## Checks
 
 | Step     | Check                                                                                               |
 |----------|-----------------------------------------------------------------------------------------------------|
 | D7       | GPU harness for each new kernel; -sim                                                               |
 | D8       | -sim, the GPU fluid time                                                                            |
-| G2       | GPU harness, the walls closed, 2D and 3D, each solver: a point source at the box's middle at reach 0.05, its pressure against K₀(r/reach) (2D) and e^(−r/reach)/r (3D) where it is a few reaches from every wall, at reach 0 the result the same to the bit before and after, no drift with the walls closed; the settings and preset tests; then in the app, the walls closed |
 
 ## Rules it touches
 
-- Keep presets and settings schemas in sync with code changes: D7, G2.
-- Shaders get checked in a GPU harness: D7, G2.
-- Prefer the design with the lower latency, measured in the context of the app: D7, D8, G2.
-- Prefer the textbook unit for a quantity: G2 (the reach in widths).
-- The 2D's panel is the 3D's, each setting at the 3D's path: G2.
+- Keep presets and settings schemas in sync with code changes: D7.
+- Shaders get checked in a GPU harness: D7.
+- Prefer the design with the lower latency, measured in the context of the app: D7, D8.
 - A plan is named after the package, app or folder it is for, and sits in it: this plan, in `apps/low_flow`.

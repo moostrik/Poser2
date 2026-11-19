@@ -14,7 +14,7 @@ uniform bool uHasObstacles;     // Skip obstacle checks when false
 #include "walls_2d.glsl"
 
 uniform vec2 uAlpha;  // -(gridScale²)
-uniform float uBeta;   // 0.25 (= 1/4 for 4 neighbors)
+uniform float uBeta;   // 1 / (2 αx + 2 αy + s), s the screened equation's 1 / reach² (0 none)
 
 void main() {
     vec2 st = texCoord;

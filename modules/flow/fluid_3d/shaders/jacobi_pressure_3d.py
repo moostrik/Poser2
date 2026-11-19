@@ -29,7 +29,8 @@ class JacobiPressure3D(ComputeShader):
             divergence: Texture3D, obstacle: Texture3D,
             cell: tuple[float, float, float],
             iterations: int = DEFAULT_ITERATIONS_PER_DISPATCH,
-            has_obstacles: bool = True, closed: tuple[bool, bool, bool] = (True, True, True)) -> None:
+            has_obstacles: bool = True, closed: tuple[bool, bool, bool] = (True, True, True),
+            screening: float = 0.0) -> None:
         """Run multiple 3D Jacobi pressure iterations.
 
         Args:
@@ -49,7 +50,7 @@ class JacobiPressure3D(ComputeShader):
         alpha_x = 1.0 / (dx * dx)
         alpha_y = 1.0 / (dy * dy)
         alpha_z = 1.0 / (dz * dz)
-        beta = 1.0 / (2.0 * alpha_x + 2.0 * alpha_y + 2.0 * alpha_z)
+        beta = 1.0 / (2.0 * alpha_x + 2.0 * alpha_y + 2.0 * alpha_z + screening)
 
         glUseProgram(self.shader_program)
 
@@ -77,7 +78,8 @@ class JacobiPressure3D(ComputeShader):
               cell: tuple[float, float, float],
               total_iterations: int = 40,
               iterations_per_dispatch: int = DEFAULT_ITERATIONS_PER_DISPATCH,
-              has_obstacles: bool = True, closed: tuple[bool, bool, bool] = (True, True, True)) -> Texture3D:
+              has_obstacles: bool = True, closed: tuple[bool, bool, bool] = (True, True, True),
+              screening: float = 0.0) -> Texture3D:
         """Full pressure solve with automatic ping-pong.
 
         Args:
@@ -102,7 +104,7 @@ class JacobiPressure3D(ComputeShader):
                         total_iterations - i * iterations_per_dispatch)
             self.use(src, dst, divergence, obstacle,
                      cell, iters,
-                     has_obstacles, closed)
+                     has_obstacles, closed, screening)
             src, dst = dst, src
 
         return pressure_a if (num_dispatches % 2 == 0) else pressure_b

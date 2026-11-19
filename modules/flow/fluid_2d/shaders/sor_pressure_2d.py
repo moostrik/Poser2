@@ -14,7 +14,7 @@ class SorPressure2D(ComputeShader):
     WORKGROUP_SIZE_Z = 1
 
     def solve(self, pressure: Texture, divergence: Texture, obstacle: Texture, cell: tuple[float, float], sweeps: int,
-              omega: float, has_obstacles: bool = True, closed: bool = True) -> None:
+              omega: float, has_obstacles: bool = True, closed: bool = True, screening: float = 0.0) -> None:
         """`sweeps` red-black sweeps on `pressure` in place, warm from its last values.
 
         Args:
@@ -26,6 +26,7 @@ class SorPressure2D(ComputeShader):
             omega: The over-relaxation, 1 (Gauss–Seidel) to under 2
             has_obstacles: Whether obstacle logic is active
             closed: The walls closed, else open
+            screening: The screened Poisson equation's 1/reach² (1/widths²), on the diagonal; 0 none
         """
         if not self.allocated or not self.shader_program:
             return
@@ -35,7 +36,7 @@ class SorPressure2D(ComputeShader):
         self.bind_texture(1, obstacle, "uObstacle")
         self.bind_image_readwrite(0, pressure, GL_R32F)
         glUniform2f(self.get_uniform_loc("uAlpha"), *alpha)
-        glUniform1f(self.get_uniform_loc("uBeta"), 1.0 / (2.0 * sum(alpha)))
+        glUniform1f(self.get_uniform_loc("uBeta"), 1.0 / (2.0 * sum(alpha) + screening))
         glUniform1f(self.get_uniform_loc("uOmega"), omega)
         glUniform2i(self.get_uniform_loc("uSize"), pressure.width, pressure.height)
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))

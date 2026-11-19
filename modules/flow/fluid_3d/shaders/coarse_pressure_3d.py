@@ -15,7 +15,7 @@ class CoarsePressure3D(ComputeShader):
         return pressure.width * pressure.height * pressure.depth <= self.MAX_CELLS
 
     def solve(self, pressure: Texture3D, divergence: Texture3D, cell: tuple[float, float, float], sweeps: int,
-              closed: tuple[bool, bool, bool]) -> None:
+              closed: tuple[bool, bool, bool], screening: float = 0.0) -> None:
         """`sweeps` red-black sweeps on `pressure` in place (R32F), `divergence` its right-hand side."""
         if not self.allocated or not self.shader_program:
             return
@@ -24,7 +24,7 @@ class CoarsePressure3D(ComputeShader):
         self.bind_texture_3d(0, divergence, "uDivergence")
         self.bind_image_3d_readwrite(0, pressure, GL_R32F)
         glUniform3f(self.get_uniform_loc("uAlpha"), *alpha)
-        glUniform1f(self.get_uniform_loc("uBeta"), 1.0 / (2.0 * sum(alpha)))
+        glUniform1f(self.get_uniform_loc("uBeta"), 1.0 / (2.0 * sum(alpha) + screening))
         glUniform1i(self.get_uniform_loc("uSweeps"), sweeps)
         glUniform3i(self.get_uniform_loc("uSize"), pressure.width, pressure.height, pressure.depth)
         glUniform3i(self.get_uniform_loc("uClosed"), *(int(c) for c in closed))

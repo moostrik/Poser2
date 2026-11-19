@@ -511,12 +511,16 @@ class Fluid2D:
 
     def _enforce_incompressibility(self) -> None:
         """Pressure projection (divergence, less the expansion's rate × it → the solve by `pressure.solver` →
-        gradient subtraction), in widths, on the walls `wall` sets."""
+        gradient subtraction), in widths, on the walls `wall` sets; the screened equation (∇² − 1/reach²) p = div while
+        `pressure.reach` is above 0."""
         closed: bool = self.settings.wall == WallMode.CLOSED
-        # a. Compute divergence, the expansion's made by the projection (its mean off where the walls are closed)
+        reach: float = self.settings.pressure.reach
+        screening: float = 1.0 / (reach * reach) if reach > 0.0 else 0.0
+        # a. Compute divergence, the expansion's made by the projection: its mean off where the walls are closed and the
+        # solve needs the divergence to sum to 0, at reach 0
         rate: float = self._expansion_rate()
         mean: StorageBuffer | None = None
-        if rate != 0.0 and closed:
+        if rate != 0.0 and closed and screening == 0.0:
             self._expansion_mean_shader.use(self._expansion_fbo, self._simulation_obstacle_fbo, self._has_obstacles,
                                             self._expansion_partials, self._expansion_mean)
             mean = self._expansion_mean
@@ -540,10 +544,10 @@ class Fluid2D:
 
         if pressure.solver == PressureSolver.MULTIGRID:
             self._multigrid.solve(self._pressure_fbo, self._divergence_fbo, self._simulation_obstacle_fbo, self._cell,
-                                  pressure.cycles, self._has_obstacles, closed)
+                                  pressure.cycles, self._has_obstacles, closed, screening)
         elif pressure.solver == PressureSolver.SOR:
             self._multigrid.sor(self._pressure_fbo, self._divergence_fbo, self._simulation_obstacle_fbo, self._cell,
-                                iterations, pressure.relaxation, self._has_obstacles, closed)
+                                iterations, pressure.relaxation, self._has_obstacles, closed, screening)
         elif self._use_compute_pressure:
             current = self._pressure_fbo
             result = self._jacobi_pressure_compute.solve(
@@ -555,7 +559,8 @@ class Fluid2D:
                 total_iterations=iterations,
                 iterations_per_dispatch=5,
                 has_obstacles=self._has_obstacles,
-                closed=closed
+                closed=closed,
+                screening=screening
             )
             if result is not current:          # the solve ended in the back buffer: make it the front
                 self._pressure_fbo.swap()
@@ -569,7 +574,8 @@ class Fluid2D:
                     self._simulation_obstacle_fbo,
                     self._cell,
                     has_obstacles=self._has_obstacles,
-                    closed=closed
+                    closed=closed,
+                    screening=screening
                 )
                 self._pressure_fbo.end()
 

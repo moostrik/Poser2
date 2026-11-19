@@ -643,14 +643,18 @@ class Fluid3D:
 
     def _enforce_incompressibility(self) -> None:
         """Pressure projection (divergence → Jacobi solve → gradient subtraction), the three passes on one set
-        of walls, closed or open by `wall`; with this tick's expansion the solve makes the divergence φ, not 0."""
+        of walls, closed or open by `wall`; with this tick's expansion the solve makes the divergence φ, not 0; the
+        screened equation (∇² − 1/reach²) p = div while `pressure.reach` is above 0."""
         closed: tuple[bool, bool, bool] = self._closed
-        # a. The divergence, per cell from its six faces, less φ; in a closed box less φ's mean first
+        reach: float = self.settings.pressure.reach
+        screening: float = 1.0 / (reach * reach) if reach > 0.0 else 0.0
+        # a. The divergence, per cell from its six faces, less φ; in a closed box at reach 0 less φ's mean first, as the
+        # solve then needs the divergence to sum to 0
         expansion: tuple[Texture3D, float, StorageBuffer | None] | None = None
         rate: float = self._expansion_rate
         if self._expansion_fresh and rate != 0.0:
             mean: StorageBuffer | None = None
-            if all(closed):
+            if all(closed) and screening == 0.0:
                 self._expansion_mean_shader.use(self._expansion_vol, self._obstacle, self._has_obstacles,
                                                 self._expansion_partials, self._expansion_mean)
                 mean = self._expansion_mean
@@ -665,11 +669,11 @@ class Fluid3D:
         iterations = pressure.iterations     # the grid sets what it needs, not the step
         if pressure.solver == PressureSolver.MULTIGRID:
             self._multigrid.solve(self._pressure, self._divergence_vol, self._obstacle, self._cell, pressure.cycles,
-                                  has_obstacles=self._has_obstacles, closed=closed)
+                                  has_obstacles=self._has_obstacles, closed=closed, screening=screening)
         elif pressure.solver == PressureSolver.SOR:
             self._sor_pressure_shader.solve(self._pressure, self._divergence_vol, self._obstacle, self._cell,
                                             iterations, pressure.relaxation,
-                                            has_obstacles=self._has_obstacles, closed=closed)
+                                            has_obstacles=self._has_obstacles, closed=closed, screening=screening)
         else:
             result = self._jacobi_pressure_shader.solve(
                 self._pressure,
@@ -679,7 +683,7 @@ class Fluid3D:
                 self._cell,
                 total_iterations=iterations,
                 iterations_per_dispatch=5,
-                has_obstacles=self._has_obstacles, closed=closed
+                has_obstacles=self._has_obstacles, closed=closed, screening=screening
             )
             if result is not self._pressure:
                 self._pressure.swap()

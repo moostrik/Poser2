@@ -14,7 +14,7 @@ class JacobiPressure(Shader):
         super().__init__()
 
     def use(self, source: Texture, divergence: Texture, obstacle: Texture, cell: tuple[float, float],
-            has_obstacles: bool = True, closed: bool = True) -> None:
+            has_obstacles: bool = True, closed: bool = True, screening: float = 0.0) -> None:
         """Apply one Jacobi iteration.
 
         Args:
@@ -38,7 +38,7 @@ class JacobiPressure(Shader):
         # Laplacian weights
         alpha_x = 1.0 / (dx * dx)
         alpha_y = 1.0 / (dy * dy)
-        beta = 1.0 / (2.0 * alpha_x + 2.0 * alpha_y)
+        beta = 1.0 / (2.0 * alpha_x + 2.0 * alpha_y + screening)
 
         glUseProgram(self.shader_program)
 

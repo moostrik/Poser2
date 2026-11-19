@@ -45,7 +45,8 @@ class JacobiPressureCompute(ComputeShader):
         cell: tuple[float, float],
         iterations: int = DEFAULT_ITERATIONS_PER_DISPATCH,
         has_obstacles: bool = True,
-        closed: bool = True
+        closed: bool = True,
+        screening: float = 0.0
     ) -> None:
         """Run multiple Jacobi iterations in a single dispatch.
 
@@ -78,7 +79,7 @@ class JacobiPressureCompute(ComputeShader):
         # Laplacian weights
         alpha_x = 1.0 / (dx * dx)
         alpha_y = 1.0 / (dy * dy)
-        beta = 1.0 / (2.0 * alpha_x + 2.0 * alpha_y)
+        beta = 1.0 / (2.0 * alpha_x + 2.0 * alpha_y + screening)
 
         glUseProgram(self.shader_program)
 
@@ -118,7 +119,8 @@ class JacobiPressureCompute(ComputeShader):
         total_iterations: int = 40,
         iterations_per_dispatch: int = DEFAULT_ITERATIONS_PER_DISPATCH,
         has_obstacles: bool = True,
-        closed: bool = True
+        closed: bool = True,
+        screening: float = 0.0
     ) -> Texture:
         """Run full pressure solve with automatic ping-pong.
 
@@ -155,7 +157,8 @@ class JacobiPressureCompute(ComputeShader):
                 cell,
                 iters,
                 has_obstacles,
-                closed
+                closed,
+                screening
             )
 
             # Swap buffers for next iteration
