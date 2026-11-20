@@ -150,10 +150,16 @@ dragged marker, or the place on the bar pressed, so it shows where the take is l
 bound, because the panel writes them back to −1 at once.
 
 While a marker is dragged, the main window shows the held frame nearest to it (`ScreenRecorder.preview_frame`), fit
-on black, so a cut is made on what is seen. `ScreenCapture.show_preview` uploads the frame's planes into a Y and a
-Cb Cr texture, and the `Nv12ToRgb` shader (`shaders/nv12_to_rgb.py`) turns them back into RGB in
-`ScreenCapture.preview`, upright. It runs only when the frame under the marker changes; the upload copies a whole
-frame on the render thread, about 12 MB at UHD **(deduction)**, only while a marker is dragged.
+on black, so a cut is made on what is seen. `ScreenPreview` (beside the capture) draws it without the render thread
+waiting: the render tick stores the frame under the marker (`set_screen_frame`, a held slot no one changes), and
+the preview's own thread copies it straight into one of two unpack pixel buffers, mapped once on the render thread
+(persistent and coherent), and marks it written. The render tick uploads the newest written buffer into a Y and a
+Cb Cr texture, turns them back into RGB in `ScreenPreview.fbo` with the `Nv12ToRgb` shader
+(`shaders/nv12_to_rgb.py`), upright, and sets a fence on the buffer; once the fence has passed, checked on a later
+tick without waiting, the buffer is free again. No CUDA. A drag shows its frames while a save runs, as the recorder's
+thread takes no part. In deep_flow (`-sim`, UHD portrait, 60 Hz with v_sync, commit 51145c73 with the preview)
+**(measured 2026-11-20)**: dragging over a held 10 s take for 3 s drew 142 pictures in 181 ticks, the ticks 16.66 ms
+on average (max 33 ms, 11 % over 25 ms, 8 % held without a drag).
 
 ### Look back
 

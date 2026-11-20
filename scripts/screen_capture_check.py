@@ -2,8 +2,8 @@
 
 1. A 64 × 32 frame of 8 × 8 blocks of known colors is drawn into `ScreenCapture.frame`, captured, and handed over once
    its fence has passed: the Y and Cb Cr codes at each block's middle against the BT.709 video-range codes of its
-   color (a table of numbers). `show_preview` then draws the frame back into `preview`: each block's middle holds
-   its color within 3 levels of 255, the top row of blocks still at the top.
+   color (a table of numbers). `ScreenPreview` then draws the frame back through its thread and its mapped buffers:
+   each block's middle holds its color within 3 levels of 255, the top row of blocks still at the top.
 2. The pool: with no frame given back, four captures go out and the fifth is left out; after one is given back,
    the next frame says one was skipped before it.
 3. The copy: one 2160 × 3840 frame copied out of its mapped buffer into plain RAM, as the recorder's thread does,
@@ -22,7 +22,7 @@ from OpenGL.GL import glFinish  # noqa: E402
 
 import monitor_harness as mh  # noqa: E402
 from modules.gl import Style  # noqa: E402
-from modules.render import ScreenCapture  # noqa: E402
+from modules.render import ScreenCapture, ScreenPreview  # noqa: E402
 from modules.video import ScreenFrame  # noqa: E402
 
 WIDTH, HEIGHT, BLOCK = 64, 32, 8
@@ -92,9 +92,19 @@ def check_codes(source) -> int:
             if any(abs(g - w) > 1 for g, w in zip(got, want)):
                 bad += 1
                 print(f'  NV12 {name} at row {r} col {c}: {got}, want {want}')
-    capture.show_preview(0, nv12)
+    preview = ScreenPreview()
+    preview.allocate(WIDTH, HEIGHT)
+    preview.set_screen_frame(0, nv12)
+    deadline = time.perf_counter() + 2.0
+    while preview.shown != 0 and time.perf_counter() < deadline:     # its thread copies, the next update draws
+        preview.update()
+        time.sleep(0.001)
+    if preview.shown != 0:
+        print('  the preview drew nothing')
+        return bad + 1
     glFinish()
-    shown = capture.preview.read_to_numpy(flip=False)
+    shown = preview.fbo.read_to_numpy(flip=False)
+    preview.deallocate()
     assert shown is not None
     top_first = shown[::-1]
     scale = 255.0 if shown.dtype != np.uint8 else 1.0

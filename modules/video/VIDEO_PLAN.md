@@ -6,12 +6,6 @@
 can read one short. The recording package counts each chunk's frames with it (`recording_folder.py`). Looked at when
 the apps' plan F reaches the video module.
 
-## D. In and out before saving
-
-- D2. A preview. `ScreenPreview` (beside the capture): `set_screen_frame` stores the latest frame to show (a held slot, which no one changes); two unpack pixel buffers, mapped once on the render thread (persistent and coherent); the preview's thread copies the frame straight into a free one and marks it written; the render tick uploads a written buffer into an RGBA Fbo, turns the planes back into RGB in a shader, and sets a fence on that pixel buffer; once that fence has passed, checked on a later tick without waiting, the render thread marks the buffer free. No CUDA in the preview. The drag stores the slot under the handle and the preview's thread picks it up, so a drag shows its frame while a save runs. `ScreenRecordingCompositor` draws it over the main window while a handle is dragged. D2's first code (in 49236068, its video-memory branch included, unchecked) is reworked onto this. VIDEO.md: the preview. Check: the shader in the GPU harness against a known frame; one `-sim` run, a held take trimmed by eye and saved, its frame count matching in..out. One commit.
-
-The preview is there so a cut is made on what is seen, not on seconds alone.
-
 ## E. Quality, playback and the panel
 
 Quality is traded against length; `max_duration` shows the length the chosen format gives. At 4K60 with about 60 GB of RAM: 4:2:0 8-bit ~80 s, 4:4:4 8-bit ~40 s (the default), 4:2:0 10-bit ~40 s, 4:4:4 10-bit ~20 s, or ~30 s if packed 10-bit RGB encodes as 4:4:4 (deduction, E2 probes it). Every other frame doubles each; HD is a quarter of 4K's bytes.
@@ -24,18 +18,13 @@ Quality is traded against length; `max_duration` shows the length the chosen for
 ## The rules it touches
 
 - Fix a problem where it is made: A
-- The part that works on the item has its own thread: D2 (the preview's)
-- A part that only needs the latest value reads it at its own tick: D2, E3
-- Prefer not to wait on the GPU inside a frame: D2
-- Create resources at setup, not per frame: D2 (the preview's buffers)
-- All GL calls on the render thread: D2 (buffers mapped and fences set and checked there; the other threads only read or write mapped memory); the recorder's thread touches only RAM and the pipe
+- A part that only needs the latest value reads it at its own tick: E3
 - Remove obsolete pathways, presets in sync: E1, E2, E4
 - When a term changes, rename it everywhere in the same change: E1, the NV12 names; E3, `pause` to `freeze_frame`
-- Shaders get checked in a GPU harness, named after their .py: D2, E1, E2
+- Shaders get checked in a GPU harness, named after their .py: E1, E2
 - A settings class mirrors the code, in the order it runs: E4
 - The show owns only what it does with it: E3, each app holds its own show
 - Settings connect the user and a component, not two components: E3, the apps read a property
-- A document describes what is built: VIDEO.md in D2, E1–E4
-- A package is one thing: D2, the preview in the screen recording's render package, not in modules/gl
+- A document describes what is built: VIDEO.md in E1–E4
 - Prefer the design with the lower latency, measured in the app: E2
-- One plan step checked by a run or test is one commit: D2, E1–E4
+- One plan step checked by a run or test is one commit: E1–E4

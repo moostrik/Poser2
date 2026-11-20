@@ -17,22 +17,20 @@ import numpy as np
 from OpenGL.GL import (GL_ALREADY_SIGNALED, GL_COLOR_BUFFER_BIT, GL_CONDITION_SATISFIED, GL_DRAW_FRAMEBUFFER,
                        GL_FRAMEBUFFER, GL_LINEAR, GL_MAP_COHERENT_BIT, GL_MAP_PERSISTENT_BIT, GL_MAP_READ_BIT,
                        GL_NEAREST, GL_PACK_ALIGNMENT, GL_PIXEL_PACK_BUFFER, GL_R8, GL_READ_FRAMEBUFFER, GL_RED, GL_RG,
-                       GL_RG8, GL_RGBA8, GL_SYNC_GPU_COMMANDS_COMPLETE, GL_TEXTURE_2D, GL_UNPACK_ALIGNMENT,
-                       GL_UNSIGNED_BYTE, glBindBuffer, glBindFramebuffer, glBindTexture, glBlitFramebuffer,
-                       glBufferStorage, glClear, glClearColor, glClientWaitSync, glDeleteBuffers, glDeleteSync,
-                       glFenceSync, glGenBuffers, glMapBufferRange, glPixelStorei, glReadPixels, glTexSubImage2D,
-                       glUnmapBuffer)
+                       GL_RG8, GL_RGBA8, GL_SYNC_GPU_COMMANDS_COMPLETE, GL_UNSIGNED_BYTE, glBindBuffer,
+                       glBindFramebuffer, glBlitFramebuffer, glBufferStorage, glClear, glClearColor, glClientWaitSync,
+                       glDeleteBuffers, glDeleteSync, glFenceSync, glGenBuffers, glMapBufferRange, glPixelStorei,
+                       glReadPixels, glUnmapBuffer)
 
-from modules.gl import Fbo, Style, Texture, fill, fit
+from modules.gl import Fbo, Style, fill, fit
 from modules.video import ScreenFrame, ScreenFrameCallback
 
-from .shaders import Nv12, Nv12Plane, Nv12ToRgb
+from .shaders import Nv12, Nv12Plane
 
 logger = logging.getLogger(__name__)
 
 POOL: int = 4               # pixel buffers: one being read back, the rest with the recorder or waiting for it
 _PACK_ALIGNMENT: int = 4    # GL's default, which nothing else in the apps changes: set back after the capture's reads
-_UNPACK_ALIGNMENT: int = 4  # GL's default too: set back after the preview's uploads
 _MAP_FLAGS: int = GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT
 
 
@@ -61,12 +59,6 @@ class ScreenCapture:
         self._skipped: int = 0                      # ticks left out since the last frame went out
         self._callbacks: list[ScreenFrameCallback] = []
         self._callback_lock: Lock = Lock()
-        # the preview: a held frame back as RGB
-        self.preview: Fbo = Fbo()
-        self._preview_y: Texture = Texture()
-        self._preview_uv: Texture = Texture()
-        self._preview_shader: Nv12ToRgb = Nv12ToRgb()
-        self._preview_slot: int | None = None       # the slot `preview` shows
 
     @property
     def allocated(self) -> bool:
@@ -117,10 +109,6 @@ class ScreenCapture:
             with self._lock:
                 self._free = deque(range(POOL))
                 self._skipped = 0
-            self.preview.allocate(width, height, GL_RGBA8)
-            self._preview_y.allocate(width, height, GL_R8)
-            self._preview_uv.allocate(width // 2, height // 2, GL_RG8)
-            self._preview_shader.allocate()
         except Exception:
             self.deallocate()
             raise
@@ -144,13 +132,11 @@ class ScreenCapture:
         self._buffers = []
         with self._lock:
             self._free.clear()
-        for shader in (self._shader, self._preview_shader):
-            if shader.allocated:
-                shader.deallocate()
-        for texture in (self.frame, self._y, self._uv, self.preview, self._preview_y, self._preview_uv):
+        if self._shader.allocated:
+            self._shader.deallocate()
+        for texture in (self.frame, self._y, self._uv):
             if texture.allocated:
                 texture.deallocate()
-        self._preview_slot = None
         self.width = self.height = 0
 
     def copy_window(self, window_width: int, window_height: int, fill_frame: bool = False) -> None:
@@ -175,7 +161,6 @@ class ScreenCapture:
                 self._skipped += 1
                 return
             skipped, self._skipped = self._skipped, 0
-        self._preview_slot = None
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
         self._y.begin()
@@ -212,27 +197,6 @@ class ScreenCapture:
                 frame.release()
             for callback in callbacks:
                 callback(frame)
-
-    def show_preview(self, slot: int, data: np.ndarray) -> None:
-        """Draw a held frame (NV12, as captured) into `preview`, upright, when it is not the one there."""
-        if slot == self._preview_slot:
-            return
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)   # rows of any even width, unpadded
-        glBindTexture(GL_TEXTURE_2D, self._preview_y.tex_id)
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.width, self.height, GL_RED, GL_UNSIGNED_BYTE,
-                        np.ascontiguousarray(data[:self.height]))
-        glBindTexture(GL_TEXTURE_2D, self._preview_uv.tex_id)
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.width // 2, self.height // 2, GL_RG, GL_UNSIGNED_BYTE,
-                        np.ascontiguousarray(data[self.height:]))
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glPixelStorei(GL_UNPACK_ALIGNMENT, _UNPACK_ALIGNMENT)
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
-        self.preview.begin()
-        self._preview_shader.use(self._preview_y, self._preview_uv)
-        self.preview.end()
-        Style.pop_style()
-        self._preview_slot = slot
 
     # ANY THREAD
 

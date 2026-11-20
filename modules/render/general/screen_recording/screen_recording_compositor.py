@@ -10,6 +10,7 @@ from modules.video import ScreenRecorder, ScreenRecorderSettings
 
 from ...layer_base import LayerBase
 from .screen_capture import ScreenCapture
+from .screen_preview import ScreenPreview
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ class ScreenRecordingCompositor(LayerBase):
         """`folder`: where the recordings go."""
         self.settings: ScreenRecorderSettings = settings
         self._capture: ScreenCapture = ScreenCapture()
+        self._preview: ScreenPreview = ScreenPreview()
         self.recorder: ScreenRecorder = ScreenRecorder(settings, folder)
         self._capture.add_screen_frame_callback(self.recorder.submit_screen_frame)
         self._input: ScreenRecordingInput = ScreenRecordingInput()
@@ -61,6 +63,8 @@ class ScreenRecordingCompositor(LayerBase):
         self.settings.unbind(ScreenRecorderSettings.snap, self._on_snap)
         self.recorder.stop()
         self._capture.remove_screen_frame_callback(self.recorder.submit_screen_frame)
+        if self._preview.allocated:
+            self._preview.deallocate()
         if self._capture.allocated:
             self._capture.deallocate()
 
@@ -98,34 +102,42 @@ class ScreenRecordingCompositor(LayerBase):
         """Make the capture at the recorder's size while it has a take, and free it after; never while a frame of it
         is lent or on its way."""
         size = self.recorder.capture_size
-        capture = self._capture
+        capture, preview = self._capture, self._preview
         if capture.lent:
             return
         if size is None:
             if capture.allocated:
                 capture.deallocate()
+            if preview.allocated:
+                preview.deallocate()
             return
         if capture.allocated and (capture.width, capture.height) == size:
             return
         try:
             capture.allocate(*size)
+            preview.allocate(*size)
         except Exception as e:
             self.recorder.fail(f'could not make the screen capture at {size[0]}x{size[1]}: {e}')
 
     def _draw_preview(self, window_width: int, window_height: int) -> None:
-        """While a marker of a held take is dragged, its frame over the main window, fit on black."""
-        shown = self.recorder.preview_frame
-        if shown is None or window_width <= 0 or window_height <= 0 or not self._capture.allocated:
+        """While a marker of a held take is dragged, its frame over the main window, fit on black: the frame under the
+        marker is stored for the preview's thread, and the picture shown is the newest one it has made."""
+        preview = self._preview
+        if not preview.allocated:
             return
-        capture = self._capture
-        capture.show_preview(*shown)
+        shown = self.recorder.preview_frame
+        if shown is not None:
+            preview.set_screen_frame(*shown)
+        preview.update()
+        if shown is None or preview.shown is None or window_width <= 0 or window_height <= 0:
+            return
         glViewport(0, 0, window_width, window_height)
         clear_color(0.0, 0.0, 0.0, 1.0)
-        x, y, w, h = fit(capture.width, capture.height, window_width, window_height)
+        x, y, w, h = fit(preview.width, preview.height, window_width, window_height)
         glViewport(round(x), round(y), round(w), round(h))
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
-        capture.preview.draw()
+        preview.fbo.draw()
         Style.pop_style()
         glViewport(0, 0, window_width, window_height)
 
