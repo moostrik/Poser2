@@ -85,7 +85,7 @@ def setup_camera(camera: Any, user_set: str | None) -> CameraSetup:
                         cmd.run()
 
                         while not cmd.is_done():
-                            pass
+                            time.sleep(0.001)
 
                     except VimbaFeatureError:
                         raise NoCamera(f'camera [{camera.get_id()}] failed to load {user_set} from flash')
@@ -95,7 +95,7 @@ def setup_camera(camera: Any, user_set: str | None) -> CameraSetup:
                     camera.GVSPAdjustPacketSize.run()
 
                     while not camera.GVSPAdjustPacketSize.is_done():
-                        pass
+                        time.sleep(0.001)
 
                 except (AttributeError, VimbaFeatureError):
                     raise NoCamera(f'camera [{camera.get_id()}] could not set its packet size')
@@ -261,7 +261,7 @@ class Camera(Thread):
             if self.running:
                 # with packets lost the buffer still holds part of an older image: not shown
                 complete: bool = frame.get_status() == FrameStatus.Complete
-                self.control.count_frame(complete)
+                self.control.count_frame(arrival, complete)
                 if complete:
                     image = frame.as_numpy_ndarray().copy()
         except Exception as e:
@@ -269,8 +269,8 @@ class Camera(Thread):
         finally:
             try:
                 cam.queue_frame(frame)
-            except Exception:
-                pass    # the stream is stopping
+            except Exception as e:
+                logger.debug('Vimba camera: the frame was not queued again (the stream is stopping?): %s', e)
         if image is None:
             return
         self._last_frame = arrival

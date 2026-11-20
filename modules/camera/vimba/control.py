@@ -51,16 +51,15 @@ class SensorControl:
         self._ratio_feature = None
         self._measure_end = None
 
-    def count_frame(self, complete: bool = True) -> None:
-        """A frame arrived from the camera (any thread): counted for the frame rate readout, or as
-        dropped when it is incomplete (network packets lost) and skipped."""
-        now: float = perf_counter()
+    def count_frame(self, arrival: float, complete: bool = True) -> None:
+        """A frame arrived from the camera at `arrival` (perf_counter, any thread): counted for the frame rate
+        readout, or as dropped when it is incomplete (network packets lost) and skipped."""
         with self._frames_lock:
             if complete:
                 self._frames += 1
                 if self._frame_at is not None:
-                    self._worst_gap = max(self._worst_gap, now - self._frame_at)
-                self._frame_at = now
+                    self._worst_gap = max(self._worst_gap, arrival - self._frame_at)
+                self._frame_at = arrival
             else:
                 self._dropped += 1
 

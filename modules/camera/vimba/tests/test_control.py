@@ -1,7 +1,7 @@
 """Tests for the Vimba sensor control against a fake camera (no Vimba)."""
 
+import time
 import unittest
-from unittest import mock
 
 from modules.camera.vimba import SensorControl, VimbaCameraSettings
 
@@ -135,9 +135,9 @@ class TestSensorControl(unittest.TestCase):
         self.control.update(self.camera)
         self.assertEqual(self.settings.readings.video_fps, 0.0)     # no interval yet
         for _ in range(15):
-            self.control.count_frame()
+            self.control.count_frame(time.perf_counter())
         for _ in range(3):
-            self.control.count_frame(False)                  # incomplete: skipped
+            self.control.count_frame(time.perf_counter(), False)    # incomplete: skipped
         self.control._frames_time -= 0.5                     # half a second ago
         self.control._read_next = 0.0
         self.control.update(self.camera)
@@ -145,9 +145,8 @@ class TestSensorControl(unittest.TestCase):
         self.assertEqual(self.settings.dropped_frames, 3)
 
     def test_the_worst_gap_between_frames_is_the_minimum_rate(self):
-        with mock.patch('modules.camera.vimba.control.perf_counter', side_effect=[0.0, 0.02, 0.12, 0.14]):
-            for _ in range(4):
-                self.control.count_frame()                   # gaps of 20, 100 and 20 ms
+        for arrival in (0.0, 0.02, 0.12, 0.14):
+            self.control.count_frame(arrival)                # gaps of 20, 100 and 20 ms
         self.control._frames_time = 0.0                      # a read interval has passed
         self.control._read_next = 0.0
         self.control.update(self.camera)
