@@ -1,9 +1,10 @@
-"""One recorded chunk: color, depth when recorded, and what the camera reported, as one `.mkv` or as the color
-`.mp4` with the metadata `.jsonl` beside it (`Container`).
+"""One recorded chunk: color, depth and its confidence when recorded, and what the camera reported, as one `.mkv`
+or as the color `.mp4` with the metadata `.jsonl` beside it (`Container`).
 
 The streams are recorded apart, in the temp folder, and for a `.mkv` merged by stream copy when the chunk ends,
 which re-encodes nothing and takes moments. The fixed info of the chunk goes into the file's tags,
-where any tool can read it; the per-frame lines go in as an attachment. Stream 0 is color, 1 depth.
+where any tool can read it; the per-frame lines go in as an attachment. The streams are `ChunkStream`'s: 0 color,
+1 depth, 2 the depth's confidence.
 
 Nothing in a chunk is straightened or mirrored: the frames and the tracklets are as the camera
 delivered them, and `flip_h` says the frames are still to be mirrored, as `CameraFrame.flip_h` does.
@@ -17,14 +18,14 @@ import subprocess
 import tempfile
 import time
 from dataclasses import asdict, dataclass
-from enum import Enum
+from enum import Enum, IntEnum
 from pathlib import Path
 from collections.abc import Sequence
 from typing import TypeAlias, overload
 
 import numpy as np
 
-from modules.camera import CameraTracklet, DepthAlignment, FrameReadings, FrameType, TrackingStatus
+from modules.camera import CameraTracklet, DepthAlignment, FrameReadings, TrackingStatus
 from modules.utils import Rect
 from modules.video import popen
 
@@ -32,12 +33,22 @@ logger = logging.getLogger(__name__)
 
 METADATA_MIMETYPE: str = 'application/x-ndjson'
 METADATA_SUFFIX: str = '.jsonl'
-FRAME_TYPE_LABELS: dict[FrameType, str] = {     # a stream's file while the chunk is recorded
-    FrameType.VIDEO: 'C',
-    FrameType.DEPTH: 'D',
-}
 METADATA_LABEL: str = 'M'
-DEPTH_SUFFIX: str = '.mkv'
+DEPTH_SUFFIX: str = '.mkv'      # the depth's and the confidence's file while the chunk is recorded
+
+
+class ChunkStream(IntEnum):
+    """The streams of a chunk, each its index in the `.mkv`: the color, the depth, and the depth's confidence."""
+    VIDEO = 0
+    DEPTH = 1
+    CONFIDENCE = 2
+
+
+CHUNK_STREAM_LABELS: dict[ChunkStream, str] = {     # a stream's letter in its file's name while the chunk is recorded
+    ChunkStream.VIDEO: 'C',
+    ChunkStream.DEPTH: 'D',
+    ChunkStream.CONFIDENCE: 'F',
+}
 
 
 class Container(Enum):
@@ -47,9 +58,9 @@ class Container(Enum):
     MP4 = '.mp4'
 
 
-def make_file_name(cam_id: int, frame_type: FrameType, chunk: int, suffix: str) -> str:
+def make_file_name(cam_id: int, stream: ChunkStream, chunk: int, suffix: str) -> str:
     """A stream's file while the chunk is recorded, and a color-only clip of before."""
-    return f"{cam_id}_{FRAME_TYPE_LABELS[frame_type]}_{chunk:03d}{suffix}"
+    return f"{cam_id}_{CHUNK_STREAM_LABELS[stream]}_{chunk:03d}{suffix}"
 
 
 def make_chunk_name(cam_id: int, chunk: int) -> str:
@@ -74,7 +85,8 @@ def make_folder_name(name: str = "", parent: Path | None = None) -> str:
 class ChunkInfo:
     """What stays the same through a chunk: the first line of its metadata, and its tags.
     `depth_alignment` is the depth's, as the camera gave it; None for depth recorded on the video's
-    view already. `depth` says the chunk holds a depth stream."""
+    view already. `depth` says the chunk holds a depth stream, `confidence` that it holds the depth's
+    confidence too."""
     width: int
     height: int
     intrinsics: list[list[float]] | None
@@ -82,6 +94,7 @@ class ChunkInfo:
     fps: float
     depth_alignment: DepthAlignment | None = None
     depth: bool = True
+    confidence: bool = False
 
 
 # A frame's poses by track_id: the box they were found in (x, y, width, height, float32 (4,)) and the
@@ -114,7 +127,8 @@ class ChunkMetadata:
 def info_line(info: ChunkInfo) -> str:
     alignment: dict | None = asdict(info.depth_alignment) if info.depth_alignment is not None else None
     return json.dumps({'width': info.width, 'height': info.height, 'intrinsics': info.intrinsics,
-                       'flip_h': info.flip_h, 'fps': info.fps, 'depth_alignment': alignment, 'depth': info.depth}) + '\n'
+                       'flip_h': info.flip_h, 'fps': info.fps, 'depth_alignment': alignment, 'depth': info.depth,
+                       'confidence': info.confidence}) + '\n'
 
 
 def chunk_info(values: dict) -> ChunkInfo:
@@ -223,23 +237,26 @@ def _run(args: list[str]) -> bool:
     return True
 
 
-def merge_chunk(video: Path, depth: Path | None, metadata: Path, output: Path) -> bool:
-    """`video`, and `depth` when the chunk has it, by stream copy into the `.mkv` at `output`,
-    `metadata` attached and its info line in the tags. The parts are removed only when the file is
-    there; False leaves them."""
+def merge_chunk(video: Path, depth: Path | None, confidence: Path | None, metadata: Path, output: Path) -> bool:
+    """`video`, and `depth` and its `confidence` when the chunk has them, by stream copy into the `.mkv` at
+    `output` in `ChunkStream`'s order, `metadata` attached and its info line in the tags. The parts are removed
+    only when the file is there; False leaves them."""
     info: ChunkInfo | None = parse_metadata(metadata.read_text(encoding='utf-8')).info
     tags: list[str] = []
     if info is not None:
         alignment: dict | None = asdict(info.depth_alignment) if info.depth_alignment is not None else None
         for key, value in (('width', info.width), ('height', info.height), ('fps', info.fps), ('flip_h', info.flip_h),
-                           ('intrinsics', json.dumps(info.intrinsics)), ('depth_alignment', json.dumps(alignment)), ('depth', info.depth)):
+                           ('intrinsics', json.dumps(info.intrinsics)), ('depth_alignment', json.dumps(alignment)), ('depth', info.depth),
+                           ('confidence', info.confidence)):
             tags += ['-metadata', f'{key}={value}']
-    inputs: list[str] = ['-i', str(video)] + (['-i', str(depth)] if depth is not None else [])
-    maps: list[str] = ['-map', '0:v:0'] + (['-map', '1:v:0'] if depth is not None else [])
+    streams: list[Path] = [video] + ([depth] if depth is not None else []) + \
+        ([confidence] if depth is not None and confidence is not None else [])     # no confidence without its depth
+    inputs: list[str] = [arg for path in streams for arg in ('-i', str(path))]
+    maps: list[str] = [arg for i in range(len(streams)) for arg in ('-map', f'{i}:v:0')]
     done: bool = _run(['-y', *inputs, *maps, '-c', 'copy',
                        '-attach', str(metadata), '-metadata:s:t:0', f'mimetype={METADATA_MIMETYPE}', *tags, str(output)])
     if done:
-        for part in (video, depth, metadata):
+        for part in (video, depth, confidence, metadata):
             if part is not None:
                 part.unlink(missing_ok=True)
     return done
@@ -278,24 +295,26 @@ def read_metadata(path: Path, cam_id: int = 0) -> ChunkMetadata:
 
 
 def finish_unmerged(temp_path: Path, output_path: Path, container: Container = Container.MKV) -> None:
-    """Finish what a crash left in the temp folder as `container`: a chunk with its color, its depth when it has
-    one, and its metadata. A stream cut off mid-write has no playable file, so its merge fails and its
-    parts stay."""
+    """Finish what a crash left in the temp folder as `container`: a chunk with its color, its depth and its
+    confidence when it has them, and its metadata. A stream cut off mid-write has no playable file, so its merge
+    fails and its parts stay."""
     if not temp_path.is_dir():
         return
     for folder in (entry for entry in temp_path.iterdir() if entry.is_dir()):
         for metadata in folder.glob(f'*_M_*{METADATA_SUFFIX}'):
             cam, _, chunk = metadata.stem.split('_')
-            video: Path | None = next(folder.glob(f'{cam}_C_{chunk}.*'), None)
-            depth: Path | None = next(folder.glob(f'{cam}_D_{chunk}.*'), None)
+            video, depth, confidence = (next(folder.glob(f'{cam}_{CHUNK_STREAM_LABELS[stream]}_{chunk}.*'), None)
+                                        for stream in ChunkStream)
             info: ChunkInfo | None = parse_metadata(metadata.read_text(encoding='utf-8')).info
-            if video is not None and (depth is not None or (info is not None and not info.depth)):
+            with_depth: bool = info is None or info.depth
+            with_confidence: bool = info is not None and info.confidence
+            if video is not None and (depth is not None or not with_depth) and (confidence is not None or not with_confidence):
                 target: Path = output_path / folder.name
                 target.mkdir(parents=True, exist_ok=True)
                 logger.info('Finishing chunk %s_%s of %s', cam, chunk, folder.name)
                 if container == Container.MP4:
                     keep_chunk(video, metadata, target)
                 else:
-                    merge_chunk(video, depth, metadata, target / f'{cam}_{chunk}.mkv')
+                    merge_chunk(video, depth, confidence, metadata, target / f'{cam}_{chunk}.mkv')
         if not any(folder.iterdir()):
             shutil.rmtree(folder, ignore_errors=True)

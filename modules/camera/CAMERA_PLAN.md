@@ -20,16 +20,6 @@ so it goes the depth's whole way: camera, alignment, recording, view, motion. It
 as a frame of its own, so it is never paired with another frame's depth. A step in another thread's package is told to
 that thread when it is built.
 
-- **A3. Recording it.** A chunk's `.mkv` holds the confidence as a third stream after the depth, written by
-  `StreamWriter` as grey 8-bit HEVC on the iGPU (`ClipWriter`, built), with the depth's keyframes. It is not in the depth
-  stream's empty chroma: the iGPU's `hevc_qsv` encodes 12 bits only as 4:2:0, which halves the confidence to 240 × 150,
-  and 4:4:4 only up to 10 bits, which would take the depth from 3 mm to 12 mm steps (checked 2026-11-18). The recording
-  names its streams itself, `ChunkStream` (`VIDEO`, `DEPTH`, `CONFIDENCE`, in `container`), since `FrameType` has no
-  confidence: the recorder's writers and temp files, `merge_chunk` and `finish_unmerged` go by it and take the third
-  part, `ChunkInfo` gets `confidence` beside `depth`, and `mirrored_capture` mirrors the confidence with its depth. The
-  player reads streams 0 and 1 as before, so the repository plays every recording after this step. Check:
-  `test_round_trip` records three streams (equal counts, the confidence back within a few levels by ffmpeg), `test_chunk`
-  merges and finishes three parts. RECORDING.md's chunk table.
 - **A4. Playing it.** The player goes by `ChunkStream` where it goes by `FrameType` now (its readers, its hand-over and
   the frames waiting to be paired), and reads stream 2 grey where `ChunkInfo.confidence` says it is there. Its
   hand-over hands the depth frame out with its confidence (`ClipFrameCallback`), which the replay camera puts on the
@@ -63,6 +53,5 @@ The recordings measured so far have no confidence, so the motion's A/B needs a n
 ## Rules it touches
 
 - Keep settings files in sync with code changes: A5, deep_flow's `video_codec`.
-- A step checked by a run or a test is one commit: A3–A6, A3 and A4 apart.
-- Name a concept after what it is: `ChunkStream`, the recording's streams, beside the camera's `FrameType`.
+- A step checked by a run or a test is one commit: A4–A6.
 - Separate what the code or a measurement shows from what is inferred: the probe, A5.

@@ -80,7 +80,10 @@ class RecordedCapture:
     @property
     def nbytes(self) -> int:
         """The bytes of its images: what it holds in a queue."""
-        return self.video.image.nbytes + (self.depth.image.nbytes if self.depth is not None else 0)
+        depth: int = 0
+        if self.depth is not None:
+            depth = self.depth.image.nbytes + (self.depth.confidence.nbytes if self.depth.confidence is not None else 0)
+        return self.video.image.nbytes + depth
 
 
 RecordedCaptureCallback: TypeAlias = Callable[[RecordedCapture], None]

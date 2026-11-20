@@ -9,10 +9,9 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from modules.camera import FrameType
 from modules.video import probe
 
-from .chunk import Container, make_chunk_name, make_file_name
+from .chunk import ChunkStream, Container, make_chunk_name, make_file_name
 
 logger = logging.getLogger(__name__)
 
@@ -73,13 +72,13 @@ class RecordingFolder:
                     folders[folder.name] = RecordingFolder(folder.name, folder, max_chunk)
         return folders
 
-    def frame_counts(self, frame_type: FrameType, suffix: str) -> list[int]:
+    def frame_counts(self, stream: ChunkStream, suffix: str) -> list[int]:
         """Each chunk's frame count (camera 0), by chunk number; 0 for a chunk that is missing or cannot be read."""
         frames: list[int] = []
         for chunk in range(self.chunks + 1):
             path: Path = self.path / make_chunk_name(0, chunk)
             if not path.is_file():
-                path = self.path / make_file_name(0, frame_type, chunk, suffix)
+                path = self.path / make_file_name(0, stream, chunk, suffix)
             frames.append(_frames(path) if path.is_file() else 0)
         return frames
 

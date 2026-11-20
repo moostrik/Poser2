@@ -1,4 +1,5 @@
-"""A chunk's metadata: its lines written and read back; a recording's folder name."""
+"""A chunk's metadata: its lines written and read back; its parts merged, and finished after a crash; a recording's
+folder name."""
 
 import math
 import tempfile
@@ -8,9 +9,12 @@ from unittest.mock import patch
 
 import numpy as np
 
+from modules import video
 from modules.camera import CameraTracklet, DepthAlignment, FrameReadings, TrackingStatus
-from modules.recording import ChunkInfo, FrameMetadata, make_folder_name
-from modules.recording.container.chunk import frame_line, info_line, parse_metadata
+from modules.recording import ChunkInfo, ChunkStream, FrameMetadata, finish_unmerged, make_chunk_name, make_file_name, make_folder_name, \
+    merge_chunk, read_metadata
+from modules.recording.container.chunk import METADATA_LABEL, METADATA_SUFFIX, frame_line, info_line, parse_metadata
+from modules.video import StreamWriter
 from modules.recording.tests.recordings import LENS
 from modules.utils import Rect
 
@@ -54,6 +58,70 @@ class MetadataTest(unittest.TestCase):
     def test_a_line_cut_off_by_a_crash_ends_the_list(self) -> None:
         text = info_line(ChunkInfo(900, 720, LENS, True, 60.0)) + frame_line(0, FrameMetadata(1.5)) + '{"frame": 1, "ti'
         self.assertEqual(len(parse_metadata(text).frames), 1)
+
+
+PARTS: int = 10         # frames in each part of a merged chunk
+
+
+def write_parts(folder: Path, confidence: bool = True) -> tuple[Path, Path, Path | None, Path]:
+    """A chunk's parts as the recorder leaves them in its temp folder: color, depth, the confidence when asked, and
+    the metadata, `PARTS` frames each."""
+    parts: dict[ChunkStream, Path] = {}
+    writers = {ChunkStream.VIDEO: StreamWriter(video.ClipCodec.H264, video.Hardware.iGPU, 1),
+               ChunkStream.DEPTH: StreamWriter(video.DEPTH_CODEC, video.DEPTH_HARDWARE, 1),
+               ChunkStream.CONFIDENCE: StreamWriter(video.DEPTH_CODEC, video.DEPTH_HARDWARE, 1, b_frames=False)}
+    if not confidence:
+        del writers[ChunkStream.CONFIDENCE]
+    for stream, writer in writers.items():
+        parts[stream] = folder / make_file_name(0, stream, 0, '.mkv')
+        writer.start(str(parts[stream]), 60.0)
+    for i in range(PARTS):
+        writers[ChunkStream.VIDEO].submit_frame(np.full((240, 320, 3), i * 20, np.uint8))
+        writers[ChunkStream.DEPTH].submit_frame(np.full((300, 480), 1000 + i * 30, np.uint16))
+        if confidence:
+            writers[ChunkStream.CONFIDENCE].submit_frame(np.full((300, 480), 100 + i * 10, np.uint8))
+    for writer in writers.values():
+        writer.stop()
+    metadata = folder / f'0_{METADATA_LABEL}_000{METADATA_SUFFIX}'
+    metadata.write_text(info_line(ChunkInfo(320, 240, LENS, True, 60.0, None, True, True))
+                        + ''.join(frame_line(i, FrameMetadata(i / 60.0)) for i in range(PARTS)), encoding='utf-8')
+    return parts[ChunkStream.VIDEO], parts[ChunkStream.DEPTH], parts.get(ChunkStream.CONFIDENCE), metadata
+
+
+@unittest.skipUnless(video.available() and video.encoder_works(video.Hardware.iGPU), 'no iGPU encoder')
+class MergeTest(unittest.TestCase):
+    def test_three_parts_merge_into_one_chunk_in_their_order(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            root = Path(folder)
+            color, depth, confidence, metadata = write_parts(root)
+            output = root / make_chunk_name(0, 0)
+            self.assertTrue(merge_chunk(color, depth, confidence, metadata, output))
+            for stream in ChunkStream:
+                self.assertEqual(video.probe(str(output), int(stream)).frames, PARTS)
+            self.assertEqual((video.probe(str(output), ChunkStream.CONFIDENCE).width, video.probe(str(output), ChunkStream.DEPTH).width), (480, 480))
+            info = read_metadata(output).info
+            assert info is not None
+            self.assertTrue(info.confidence)
+            self.assertEqual(sorted(p.name for p in root.iterdir()), [output.name])     # the parts gone
+
+    def test_what_a_crash_left_is_finished_with_its_three_parts(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            root = Path(folder)
+            (root / 'temp' / 'take').mkdir(parents=True)
+            write_parts(root / 'temp' / 'take')
+            finish_unmerged(root / 'temp', root / 'recordings')
+            chunk = root / 'recordings' / 'take' / make_chunk_name(0, 0)
+            self.assertTrue(chunk.is_file())
+            self.assertEqual(video.probe(str(chunk), ChunkStream.CONFIDENCE).frames, PARTS)
+
+    def test_a_chunk_whose_confidence_is_missing_is_left_as_it_is(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            root = Path(folder)
+            (root / 'temp' / 'take').mkdir(parents=True)
+            write_parts(root / 'temp' / 'take', confidence=False)        # its info line says it has one
+            finish_unmerged(root / 'temp', root / 'recordings')
+            self.assertFalse((root / 'recordings' / 'take' / make_chunk_name(0, 0)).exists())
+            self.assertEqual(len(list((root / 'temp' / 'take').iterdir())), 3)
 
 
 class FolderNameTest(unittest.TestCase):

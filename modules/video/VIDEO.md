@@ -29,7 +29,8 @@ the merge into the chunk refuses it.
 Every file is written by `ClipWriter`: raw frames of one pixel format (`ClipInput`) through the 8 MB pipe into one
 ffmpeg process, its error lines read while it writes, with the output options of one encode: `h264_encode` (smile's
 clips), `master_encode` (the screen recorder's HEVC master, below) or `stream_encode` (a camera recording's stream,
-live: the codec on its chip, its constant quality, an exact keyframe interval, no B-frames for depth).
+live: the codec on its chip, its constant quality, an exact keyframe interval, no B-frames for depth and for a
+stream that seeks with it, as the depth's confidence does).
 `StreamWriter` feeds one from a queue on its own thread: color as BGR, NV12 or gray, depth as P012. The chip each
 writer encodes on is its own, so the camera records on the iGPU while the screen recorder encodes on the GPU. In
 deep_flow live (the camera at 50 fps recording its color and depth on the iGPU, a 15 s UHD 4:4:4 screen take held and

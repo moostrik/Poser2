@@ -1,5 +1,6 @@
-"""Records every camera's frames to chunked clips: one ffmpeg stream per camera and frame kind,
-files named `<cam>_<kind>_<chunk>` in a folder named after the start time, written to a temp folder
+"""Records every camera's frames to chunked clips: one ffmpeg stream per camera and chunk stream (`ChunkStream`:
+the color, the depth, its confidence), files named `<cam>_<stream>_<chunk>` in a folder named after the start time,
+written to a temp folder
 and, when a chunk ends, merged into one `<cam>_<chunk>.mkv` per camera with the metadata attached
 (`chunk.merge_chunk`), or with `Container.MP4` kept as `<cam>_C_<chunk>.mp4` beside `<cam>_M_<chunk>.jsonl`:
 the chunk's info line and one line per frame.
@@ -17,8 +18,10 @@ the camera delivered, not straightened and not mirrored, so the correction can s
 `flip_h` says the frames are still to be mirrored. With `mirrored` a frame still to be mirrored is stored
 mirrored instead, with its depth, lens, alignment and tracklets to match, and `flip_h` off: the recording
 is the image as shown (the poses are found on it already). What a capture went without is counted on the panel
-and warned of. Both streams share `keyframe_interval`: a seek in a chunk goes to a color keyframe, so a
-depth stream with its keyframes elsewhere comes back with its references missing."""
+and warned of. Every stream shares `keyframe_interval`: a seek in a chunk goes to a color keyframe, so a
+depth stream with its keyframes elsewhere comes back with its references missing. The depth's confidence rides on
+its depth frame and goes into a stream of its own when the chunk's first depth has one (`ChunkInfo.confidence`), so
+every stream of a chunk holds the same frames: a later depth without one gets 255, sure."""
 
 from dataclasses import replace
 from threading import Thread, Lock, Event
@@ -28,14 +31,16 @@ from enum import Enum, auto
 from queue import Queue, Empty
 from typing import TextIO
 
+import numpy as np
+
 from modules.camera import CameraFrame, CameraTracklets, FrameType, mirrored_alignment, mirrored_image, mirrored_intrinsics, \
     mirrored_tracklets
 from modules.pose import FrameDict
 from modules.settings import BaseSettings, Field, Widget
 from modules.video import ClipCodec, DEPTH_CODEC, DEPTH_HARDWARE, Hardware, StreamWriter
 
-from ..container import DEPTH_SUFFIX, METADATA_LABEL, METADATA_SUFFIX, ChunkInfo, Container, FrameMetadata, finish_unmerged, \
-    frame_line, info_line, keep_chunk, make_chunk_name, make_file_name, make_folder_name, merge_chunk
+from ..container import DEPTH_SUFFIX, METADATA_LABEL, METADATA_SUFFIX, ChunkInfo, ChunkStream, Container, FrameMetadata, \
+    finish_unmerged, frame_line, info_line, keep_chunk, make_chunk_name, make_file_name, make_folder_name, merge_chunk
 from .recording_sync import FramePoses, RecordedCapture, RecordingSync
 
 import logging
@@ -77,11 +82,13 @@ class RecorderSettings(BaseSettings):
 STOP_WAIT: float = 1.0          # s a stopping recording waits for the parts its last captures wait for
 SPLIT_WAIT: float = 1.0         # s a split waits for a camera's first capture after its time, before it cuts that camera's chunk anyway
 HELD: int = 1 << 30             # bytes waiting for the encoders, queued here and in the writers: 1 GB, some 6 s of four cameras with depth
+SURE: int = 255                 # the confidence of a depth that came without one, in a chunk that records it
 
 
 def mirrored_capture(capture: RecordedCapture) -> RecordedCapture:
-    """A capture as shown: its frames flipped left to right with their lens and the depth's alignment, its
-    tracklets' boxes and keypoints mirrored, `flip_h` off; the poses as they are, found on the mirrored image."""
+    """A capture as shown: its frames flipped left to right with their lens and the depth's alignment and
+    confidence, its tracklets' boxes and keypoints mirrored, `flip_h` off; the poses as they are, found on the
+    mirrored image."""
     video: CameraFrame = capture.video
     width: int = video.image.shape[1]
     video = replace(video, image=mirrored_image(video), flip_h=False,
@@ -89,7 +96,8 @@ def mirrored_capture(capture: RecordedCapture) -> RecordedCapture:
     depth: CameraFrame | None = capture.depth
     if depth is not None:
         depth = replace(depth, image=mirrored_image(depth), flip_h=False,
-                        alignment=mirrored_alignment(depth.alignment, depth.image.shape[1]) if depth.alignment is not None else None)
+                        alignment=mirrored_alignment(depth.alignment, depth.image.shape[1]) if depth.alignment is not None else None,
+                        confidence=depth.confidence[:, ::-1].copy() if depth.confidence is not None else None)
     tracklets: CameraTracklets | None = mirrored_tracklets(capture.tracklets) if capture.tracklets is not None else None
     return replace(capture, video=video, depth=depth, tracklets=tracklets)
 
@@ -118,7 +126,8 @@ class Recorder(Thread):
             logger.warning("An mp4 chunk holds no depth: recording color only")
             self.types.remove(FrameType.DEPTH)
         self.with_depth: bool = FrameType.DEPTH in self.types
-        self.recorders: dict[int, dict[FrameType, StreamWriter]] = {}
+        self.streams: list[ChunkStream] = [ChunkStream.VIDEO] + ([ChunkStream.DEPTH, ChunkStream.CONFIDENCE] if self.with_depth else [])
+        self.recorders: dict[int, dict[ChunkStream, StreamWriter]] = {}
         self.frames: dict[int, Queue[RecordedCapture]] = {}
         self._held_lock: Lock = Lock()
         self._queued_bytes: int = 0                     # what the queues here hold
@@ -129,15 +138,18 @@ class Recorder(Thread):
         self.metadata: dict[int, TextIO] = {}
         self.metadata_frames: dict[int, int] = {}       # the frames of each camera's chunk so far
         self.chunks: dict[int, int] = {}                # each camera's chunk
+        self.with_confidence: dict[int, bool] = {}      # each camera's chunk records the depth's confidence
         self.folder_path: Path | None = None
 
         for c in range(settings.num_cams):
             self.recorders[c] = {}
             self.frames[c] = Queue()
-            for t in self.types:
-                codec, hardware = ((DEPTH_CODEC, DEPTH_HARDWARE) if t == FrameType.DEPTH
-                                   else (settings.video_codec, settings.video_encoder))
-                self.recorders[c][t] = StreamWriter(codec, hardware, settings.keyframe_interval, settings.video_quality)
+            self.recorders[c][ChunkStream.VIDEO] = StreamWriter(settings.video_codec, settings.video_encoder, settings.keyframe_interval,
+                                                                settings.video_quality)
+            if self.with_depth:
+                self.recorders[c][ChunkStream.DEPTH] = StreamWriter(DEPTH_CODEC, DEPTH_HARDWARE, settings.keyframe_interval)
+                self.recorders[c][ChunkStream.CONFIDENCE] = StreamWriter(DEPTH_CODEC, DEPTH_HARDWARE, settings.keyframe_interval,
+                                                                         b_frames=False)     # grey, seeks with the depth
 
         if self.with_depth and settings.keyframe_interval <= 0:
             logger.warning("keyframe_interval 0 with depth: each encoder picks its own keyframes, so seeking will show the wrong depth")
@@ -208,10 +220,10 @@ class Recorder(Thread):
             return
         self._set_state(RecState.REC)
 
-    def _stream_path(self, cam_id: int, frame_type: FrameType, chunk_index: int) -> Path:
+    def _stream_path(self, cam_id: int, stream: ChunkStream, chunk_index: int) -> Path:
         assert self.folder_path is not None
-        suffix: str = DEPTH_SUFFIX if frame_type == FrameType.DEPTH else self.suffix
-        return self.folder_path / make_file_name(cam_id, frame_type, chunk_index, suffix)
+        suffix: str = self.suffix if stream == ChunkStream.VIDEO else DEPTH_SUFFIX
+        return self.folder_path / make_file_name(cam_id, stream, chunk_index, suffix)
 
     def _metadata_path(self, cam_id: int, chunk_index: int) -> Path:
         assert self.folder_path is not None
@@ -256,7 +268,7 @@ class Recorder(Thread):
         self.split_requested.clear()
         for c in range(self.settings.num_cams):
             self.chunks[c] = 0
-            for t in self.types:
+            for t in self.streams:
                 self.recorders[c][t].start(str(self._stream_path(c, t, 0)), self.settings.fps)
             self._open_metadata(c)
 
@@ -272,7 +284,7 @@ class Recorder(Thread):
         self.sync.flush()
         self._write_queued()
         for c in range(self.settings.num_cams):
-            for t in self.types:
+            for t in self.streams:
                 self.recorders[c][t].stop()
 
         self._close_metadata()
@@ -293,7 +305,7 @@ class Recorder(Thread):
         in the next chunk together."""
         old_chunk: int = self.chunks[cam_id]
         self.chunks[cam_id] = old_chunk + 1
-        for t in self.types:
+        for t in self.streams:
             self.recorders[cam_id][t].split(str(self._stream_path(cam_id, t, old_chunk + 1)), self.settings.fps)
         self._close_metadata(cam_id)
         self._open_metadata(cam_id)
@@ -307,18 +319,18 @@ class Recorder(Thread):
         self.merges.append(merge)
 
     def _merge_chunk(self, cam_id: int, chunk_index: int) -> None:
-        video: Path = self._stream_path(cam_id, FrameType.VIDEO, chunk_index)
-        depth: Path = self._stream_path(cam_id, FrameType.DEPTH, chunk_index)
+        video, depth, confidence = (self._stream_path(cam_id, stream, chunk_index) for stream in ChunkStream)
         metadata: Path = self._metadata_path(cam_id, chunk_index)
         if not (video.exists() and metadata.exists()):
-            for part in (video, depth, metadata):
+            for part in (video, depth, confidence, metadata):
                 part.unlink(missing_ok=True)    # a chunk that never got a frame
             return
         if self.container == Container.MP4:
             keep_chunk(video, metadata, self.output_folder_path)
             return
-        # A camera that sent no depth has none: its depth writer never got a frame, and opened no file
-        merge_chunk(video, depth if depth.exists() else None, metadata, self.output_folder_path / make_chunk_name(cam_id, chunk_index))
+        # A camera that sent no depth or no confidence has none: its writer never got a frame, and opened no file
+        merge_chunk(video, depth if depth.exists() else None, confidence if confidence.exists() else None, metadata,
+                    self.output_folder_path / make_chunk_name(cam_id, chunk_index))
 
     def _remove_temp_folder(self) -> None:
         if self.folder_path is not None and self.folder_path.exists():
@@ -367,7 +379,7 @@ class Recorder(Thread):
             self.settings.dropped = dropped
 
     def _write_queued(self) -> None:
-        """Everything queued, on every pass: with depth two streams arrive per camera at the full frame rate, more
+        """Everything queued, on every pass: with depth three streams arrive per camera at the full frame rate, more
         than one frame per pass can keep up with. A camera's first capture after a split's time cuts its chunk."""
         split_from: int = self._split_from
         for c in range(self.settings.num_cams):
@@ -382,9 +394,15 @@ class Recorder(Thread):
                     self._split_camera(c)
                 if self.settings.mirrored and capture.video.flip_h:
                     capture = mirrored_capture(capture)
-                self.recorders[c][FrameType.VIDEO].submit_frame(capture.video.image, capture.video.nv12)
-                if capture.depth is not None:
-                    self.recorders[c][FrameType.DEPTH].submit_frame(capture.depth.image)
+                self.recorders[c][ChunkStream.VIDEO].submit_frame(capture.video.image, capture.video.nv12)
+                depth: CameraFrame | None = capture.depth
+                if self.metadata_frames.get(c, 0) == 0:     # the chunk's first capture says whether it records a confidence
+                    self.with_confidence[c] = depth is not None and depth.confidence is not None
+                if depth is not None:
+                    self.recorders[c][ChunkStream.DEPTH].submit_frame(depth.image)
+                    if self.with_confidence[c]:
+                        confidence = depth.confidence if depth.confidence is not None else np.full(depth.image.shape, SURE, np.uint8)
+                        self.recorders[c][ChunkStream.CONFIDENCE].submit_frame(confidence)
                 self._write_metadata(c, capture)
         if self._split_at is not None and all(chunk > split_from for chunk in self.chunks.values()):
             self._split_at = None           # every camera goes on in the new chunk
@@ -399,7 +417,7 @@ class Recorder(Thread):
             height: int = frame.image.shape[0] * 2 // 3 if frame.nv12 else frame.image.shape[0]
             alignment = capture.depth.alignment if capture.depth is not None else None
             file.write(info_line(ChunkInfo(frame.image.shape[1], height, frame.intrinsics, frame.flip_h, self.settings.fps,
-                                           alignment, capture.depth is not None)))
+                                           alignment, capture.depth is not None, self.with_confidence.get(cam_id, False))))
         tracklets: CameraTracklets | None = capture.tracklets
         poses: FramePoses | None = capture.poses
         file.write(frame_line(count, FrameMetadata(

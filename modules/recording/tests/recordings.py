@@ -44,8 +44,25 @@ def tracklets(timestamp: float) -> CameraTracklets:
     return CameraTracklets(0, timestamp, [tracklet], arrival=timestamp + 0.033)
 
 
-def depth_frame(value: int, timestamp: float) -> CameraFrame:
-    return CameraFrame(0, FrameType.DEPTH, np.full((300, 374), value, np.uint16), timestamp)
+def depth_frame(value: int, timestamp: float, confidence: int | None = None) -> CameraFrame:
+    """A depth frame of `value` mm, with a confidence of `confidence` where given."""
+    return CameraFrame(0, FrameType.DEPTH, np.full((300, 374), value, np.uint16), timestamp,
+                       confidence=np.full((300, 374), confidence, np.uint8) if confidence is not None else None)
+
+
+def stream_images(path: Path, stream: int) -> list[np.ndarray]:
+    """One gray stream of a chunk, decoded by ffmpeg, as its frames."""
+    images: list[np.ndarray] = []
+    reader = video.StreamReader(0, 'gray', lambda _c, _t, image, _chunk, _i: images.append(image.copy()), False, fps=1000.0,
+                                stream=stream)
+    reader.load(str(path), 0)
+    while not reader.is_loaded():
+        time.sleep(0.01)
+    reader.play()
+    while reader.is_playing():
+        time.sleep(0.01)
+    reader.join()
+    return images
 
 
 def recorder(types: list[FrameType], temp: str = 'temp', output: str = 'out', data_path: str = '', keyframe_interval: int = 1) -> Recorder:

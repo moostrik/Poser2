@@ -20,7 +20,7 @@ import numpy as np
 from modules.camera import CAPTURE_TOLERANCE, FrameType
 from modules.video import Hardware, StreamFrameCallback, StreamReader
 
-from ..container import ChunkInfo, ChunkMetadata, FrameMetadata, RecordingFolder, make_chunk_name, make_file_name, read_metadata
+from ..container import ChunkInfo, ChunkMetadata, ChunkStream, FrameMetadata, RecordingFolder, make_chunk_name, make_file_name, read_metadata
 from .play_clock import PlayClock
 
 # (cam_id, frame_type, frame, chunk_id, frame_id): a reader's frame, of the kind a chunk's readers read
@@ -71,7 +71,7 @@ class ChunkReaders:
                 if path.is_file():
                     self.metadata[c] = read_metadata(path, c)
                     continue
-                clip: Path = folder.path / make_file_name(c, FrameType.VIDEO, chunk, decoding.suffix)
+                clip: Path = folder.path / make_file_name(c, ChunkStream.VIDEO, chunk, decoding.suffix)
                 beside: ChunkMetadata = read_metadata(clip, c) if clip.is_file() else ChunkMetadata(None, [])
                 if beside.info is not None:         # an mp4 chunk with its metadata beside; an old clip has none
                     self.metadata[c] = beside
@@ -90,7 +90,7 @@ class ChunkReaders:
                         self._load(c, t, path, stream, first, end, frame_callback, decoding, self.clock)
                 continue
             for t in types:
-                path = folder.path / make_file_name(c, t, chunk, decoding.suffix)
+                path = folder.path / make_file_name(c, ChunkStream[t.name], chunk, decoding.suffix)
                 if path.is_file():
                     self._load(c, t, path, 0, first, end, frame_callback, decoding, self.clock)
                 elif t == FrameType.VIDEO:

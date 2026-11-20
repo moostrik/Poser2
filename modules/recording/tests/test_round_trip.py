@@ -13,7 +13,7 @@ from modules import video
 from modules.camera import CameraFrame, FrameReadings, FrameType
 from modules.recording import ChunkInfo, Player, PlayerSettings, Recorder, RecorderSettings, make_chunk_name, read_metadata
 from modules.recording.recorder.recorder import RecState
-from modules.recording.tests.recordings import LENS, video_frame, poses, depth_frame, recorder, stream_frames, \
+from modules.recording.tests.recordings import LENS, video_frame, poses, depth_frame, recorder, stream_frames, stream_images, \
     cam_frame, record, player, Played, collect, FPS
 
 
@@ -31,7 +31,7 @@ class RoundTripTest(unittest.TestCase):
             time.sleep(0.1)
             for i in range(30):
                 rec.submit_frame(video_frame(i))
-                rec.submit_frame(depth_frame(1000 + i * 30, float(i)))
+                rec.submit_frame(depth_frame(1000 + i * 30, float(i), 100 + i * 3))
                 time.sleep(0.002)
             RecorderSettings.split.fire(rec.settings)
             while rec.split_requested.is_set() and time.perf_counter() < deadline:
@@ -39,7 +39,7 @@ class RoundTripTest(unittest.TestCase):
             time.sleep(0.2)
             for i in range(30, 50):
                 rec.submit_frame(video_frame(i))
-                rec.submit_frame(depth_frame(1000 + i * 30, float(i)))
+                rec.submit_frame(depth_frame(1000 + i * 30, float(i), 100 + i * 3))
                 time.sleep(0.002)
             rec.settings.stop = True
             while rec._get_state() != RecState.IDLE and time.perf_counter() < deadline + 10.0:
@@ -48,11 +48,19 @@ class RoundTripTest(unittest.TestCase):
 
             recording = next((root / 'recordings').iterdir())
             self.assertEqual(sorted(p.name for p in recording.iterdir()), [make_chunk_name(0, 0), make_chunk_name(0, 1)])
-            for chunk, count in ((0, 30), (1, 20)):
+            for chunk, count, first in ((0, 30, 0), (1, 20, 30)):
                 path = recording / make_chunk_name(0, chunk)
                 self.assertEqual(stream_frames(path, 0), count)
                 self.assertEqual(stream_frames(path, 1), count)
-                self.assertEqual(len(read_metadata(path).frames), count)
+                self.assertEqual(stream_frames(path, 2), count)
+                metadata = read_metadata(path)
+                self.assertEqual(len(metadata.frames), count)
+                assert metadata.info is not None
+                self.assertTrue(metadata.info.confidence)
+                confidences = stream_images(path, 2)
+                self.assertEqual(len(confidences), count)
+                for i, image in enumerate(confidences):       # back within a few levels
+                    self.assertLess(abs(float(np.median(image)) - (100 + (first + i) * 3)), 4.0)
             readings = read_metadata(recording / make_chunk_name(0, 1)).frames[0].readings
             assert readings is not None
             self.assertEqual(readings.tilt, 0.0)     # frame 30 opens chunk 1

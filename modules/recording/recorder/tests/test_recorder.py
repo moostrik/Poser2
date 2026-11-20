@@ -13,9 +13,9 @@ import numpy as np
 
 from modules import video
 from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, FrameType, TrackingStatus
-from modules.recording import RecorderSettings
+from modules.recording import ChunkStream, RecorderSettings
 from modules.recording.recorder import RecordedCapture
-from modules.recording.recorder.recorder import RecState
+from modules.recording.recorder.recorder import RecState, mirrored_capture
 from modules.recording.tests.recordings import LENS, video_frame, recorder
 from modules.utils import Rect
 
@@ -116,7 +116,7 @@ class MirroredTest(unittest.TestCase):
         rec = recorder([FrameType.VIDEO])
         rec.settings.mirrored = mirrored
         writer = _Writer()
-        rec.recorders[0] = {FrameType.VIDEO: writer}
+        rec.recorders[0] = {ChunkStream.VIDEO: writer}
         lines = io.StringIO()
         rec.metadata[0] = lines
         rec.metadata_frames[0] = 0
@@ -143,6 +143,15 @@ class MirroredTest(unittest.TestCase):
         image, lines = self._written(mirrored=True, flip_h=False)
         self.assertTrue(np.all(image[:, :4] == 255))
         self.assertFalse(json.loads(lines[0])['flip_h'])
+
+    def test_the_depth_s_confidence_is_mirrored_with_its_depth(self) -> None:
+        confidence: np.ndarray = np.zeros((4, 8), np.uint8)
+        confidence[:, :4] = 200
+        depth = CameraFrame(0, FrameType.DEPTH, np.zeros((4, 8), np.uint16), 1.0, flip_h=True, confidence=confidence)
+        mirrored = mirrored_capture(RecordedCapture(_half_lit(True).video, depth, None))
+        assert mirrored.depth is not None and mirrored.depth.confidence is not None
+        self.assertTrue(np.all(mirrored.depth.confidence[:, 4:] == 200) and np.all(mirrored.depth.confidence[:, :4] == 0))
+        self.assertTrue(np.all(confidence[:, :4] == 200))      # the camera's frame as it was
 
 
 if __name__ == '__main__':

@@ -28,7 +28,7 @@ are stored as the camera gave them for the same reason: the uploader straightens
 frame they were found in (`SerialUploader.submit_tracklets`).
 
 With the recorder's `mirrored` on, a recording holds the image as shown instead: a frame still to be mirrored is
-stored mirrored, with its lens, its depth and the depth's alignment, and its tracklets' boxes and keypoints, and
+stored mirrored, with its lens, its depth, the depth's alignment and confidence, and its tracklets' boxes and keypoints, and
 `flip_h` is off, so a playback hands it on as stored. The poses are stored as they come, found on the uploaded,
 mirrored image already. hd_trio records so: its clips play mirrored in any player, as all its recordings have, and
 its research data holds video and poses in one image. Nothing is straightened in it (its tilt is 0); a camera that
@@ -44,7 +44,7 @@ recording of that second has the name already. Its chunks are in the recorder's 
 
 | `container` | Files per camera and chunk                        | Holds                                             |
 |-------------|---------------------------------------------------|---------------------------------------------------|
-| `MKV`       | `<cam>_<chunk>.mkv`                               | color, depth when recorded, the metadata attached |
+| `MKV`       | `<cam>_<chunk>.mkv`                               | color, depth, its confidence, metadata attached   |
 | `MP4`       | `<cam>_C_<chunk>.mp4` and `<cam>_M_<chunk>.jsonl` | color, and the metadata beside it; no depth       |
 
 An `MP4` chunk's clip plays in any player, h264 at a constant `fps`; a frame lost live is a frame missing from it, so
@@ -56,14 +56,23 @@ recordings, plays at `fps`, its frames as stored (`flip_h` False). An `MKV` chun
 |---------------|-------------------------------------------------------------------------------------------------|
 | stream 0      | color, the camera's encoder (`video_encoder`, `video_codec`)                                    |
 | stream 1      | depth when recorded, uint16 mm, `DEPTH_CODEC` on `DEPTH_HARDWARE`, the same `keyframe_interval` |
+| stream 2      | the depth's confidence when the camera gives one, grey 8-bit HEVC on the iGPU, no B-frames      |
 | tags          | the info line's values                                                                          |
 | attachment    | the metadata, one JSON line each (`.jsonl`)                                                     |
+
+The streams are `ChunkStream`'s, each its index in the file; `FrameType` is the camera's, which has no confidence.
+The confidence keeps its own stream, as the depth's empty chroma cannot hold it: `hevc_qsv` encodes 12 bits only as
+4:2:0, which halves it to 240 × 150, and 4:4:4 only up to 10 bits, which would take the depth from 3 mm to 12 mm
+steps. Its keyframes are the depth's, so a seek lands whole in all three. A chunk records it when its first depth
+frame has one (`confidence` in the info line); a later depth without one is written as 255, so every stream of a
+chunk holds the same frames.
 
 The metadata, attached or beside, is the same lines:
 
 | Where      | What                                                                                     |
 |------------|------------------------------------------------------------------------------------------|
-| info line  | width, height, the lens (`intrinsics`), `fps`, the depth's alignment, `depth`            |
+| info line  | width, height, the lens (`intrinsics`), `fps`, the depth's alignment                     |
+| info line  | `depth`, `confidence`: the chunk holds a depth stream, and its confidence                |
 | info line  | `flip_h`: the frames are still to be mirrored, as in `CameraFrame`                       |
 | per frame  | its number, `timestamp` (the capture)                                                    |
 | per frame  | tilt and roll (°), exposure (µs), ISO (`FrameReadings`), null without                    |

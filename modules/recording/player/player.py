@@ -23,7 +23,7 @@ from modules.camera import FrameType
 from modules.settings import BaseSettings, Field, Widget
 from modules.video import Hardware
 
-from ..container import ChunkInfo, Container, RecordingFolder, Timeline, locate
+from ..container import ChunkInfo, ChunkStream, Container, RecordingFolder, Timeline, locate
 from .chunk_readers import ChunkReaders, Decoding
 from .frame_hand_over import ClipFrameCallback, FrameHandOver
 
@@ -550,7 +550,7 @@ class Player(Thread):
     def _prepare_folder(self, name: str) -> None:
         """Probe every chunk's frame count and take up the recording's markers; the caller starts playback."""
         folder: RecordingFolder | None = self.folders.get(name)
-        chunk_frames: list[int] = folder.frame_counts(self.types[0], self.suffix) if folder is not None else []
+        chunk_frames: list[int] = folder.frame_counts(ChunkStream[self.types[0].name], self.suffix) if folder is not None else []
         with self.playback_lock:
             self.timeline = Timeline.of(chunk_frames, self.settings.in_out)
         self.settings.max_chunks = len(chunk_frames)

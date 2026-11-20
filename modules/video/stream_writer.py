@@ -20,9 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 class StreamWriter:
-    def __init__(self, codec: ClipCodec, hardware: Hardware, keyframe_interval: int = 0, quality: int = 0) -> None:
-        """``codec`` on ``hardware``; ``quality``: the encoder's constant quality, lower is better; 0 is its default.
-        Depth takes its own quality and no B-frames."""
+    def __init__(self, codec: ClipCodec, hardware: Hardware, keyframe_interval: int = 0, quality: int = 0,
+                 b_frames: bool = True) -> None:
+        """``codec`` on ``hardware``; ``quality``: the encoder's constant quality, lower is better; 0 is its default;
+        ``b_frames`` off for a stream that seeks with the depth. Depth takes its own quality and no B-frames."""
         self.output_file: str = ''
         self.fps: float = 30.0
         self.is_recording: bool = False
@@ -33,6 +34,7 @@ class StreamWriter:
         self.hardware: Hardware = hardware
         self.keyframe_interval: int = keyframe_interval
         self.quality: int = quality
+        self.b_frames: bool = b_frames
         self._lock: Lock = Lock()
         self._queued_bytes: int = 0
         self._failed: bool = False
@@ -85,7 +87,7 @@ class StreamWriter:
             sleep(0.01)
 
     def submit_frame(self, frame: np.ndarray, nv12: bool = False) -> None:
-        """Queue one frame: BGR (H, W, 3), gray (H, W), uint16 depth in millimetres (H, W), or with
+        """Queue one frame: BGR (H, W, 3), gray (H, W), uint16 depth in millimeters (H, W), or with
         `nv12` packed NV12 (H * 3 / 2, W), which needs saying because it is 2-D too."""
         if not self.is_receiving:
             return
@@ -126,10 +128,10 @@ class StreamWriter:
     def _open(self, frame: np.ndarray, nv12: bool, depth: bool) -> ClipWriter:
         clip_input: ClipInput = (ClipInput.P012 if depth else ClipInput.NV12 if nv12
                                  else ClipInput.GRAY if frame.ndim == 2 else ClipInput.BGR24)
+        # measured: with B-frames a seek in a merged chunk gave depth about 100 mm off, why is not settled
         encode: list[str] = stream_encode(self.codec, self.hardware, DEPTH_PIX_FMT if depth else 'yuv420p',
                                           DEPTH_QUALITY if depth else self.quality, self.keyframe_interval,
-                                          b_frames=not depth)   # measured: with B-frames a seek in a merged chunk gave
-                                                                # depth about 100 mm off, why is not settled
+                                          b_frames=self.b_frames and not depth)
         return ClipWriter(self.output_file, self.fps, encode, clip_input)
 
     def _clear(self) -> None:
