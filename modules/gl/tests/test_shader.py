@@ -9,6 +9,7 @@ from unittest import mock
 from modules.gl import ComputeShader, Shader
 
 SHADER = sys.modules['modules.gl.shader']
+ACTIVE_UNIFORMS = Shader._active_uniforms           # the real one; the tests' setUp mocks it
 
 
 class _Draw(Shader):
@@ -29,7 +30,9 @@ class ShaderTest(unittest.TestCase):
             self.compiles.append(cls)
             return None if self.failing else next(self.ids)
 
+        self.active: dict[str, int] = {}
         for patcher in (mock.patch.object(Shader, '_compile', classmethod(compile)),
+                        mock.patch.object(Shader, '_active_uniforms', staticmethod(lambda program: dict(self.active))),
                         mock.patch.object(SHADER, 'glDeleteProgram')):
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -113,6 +116,35 @@ class ShaderTest(unittest.TestCase):
         self.assertEqual(SHADER.name_error_lines(log, read).splitlines(),
                          ['common.glsl(2) : error C1008: undefined variable "oops"',
                           'main.frag(3) : error C1008: undefined variable "bad"', 'a line without a location'])
+
+    def test_the_uniforms_are_read_after_linking_and_a_misspelled_one_warns_once(self) -> None:
+        self.active = {'gain': 4}
+        draw = _Draw()
+        draw.allocate()
+        with mock.patch.object(SHADER, 'glGetUniformLocation', return_value=-1) as lookup:
+            self.assertEqual(draw.get_uniform_loc('gain'), 4)
+            lookup.assert_not_called()                     # read once, after linking
+            with self.assertLogs(SHADER.logger, 'WARNING') as logs:
+                self.assertEqual(draw.get_uniform_loc('gian'), -1)
+                self.assertEqual(draw.get_uniform_loc('gian'), -1)
+        self.assertEqual(len(logs.records), 1)
+        self.assertEqual(lookup.call_count, 1)
+
+    def test_an_array_element_is_looked_up_once_and_does_not_warn(self) -> None:
+        draw = _Draw()
+        draw.allocate()
+        with mock.patch.object(SHADER, 'glGetUniformLocation', return_value=9) as lookup,                 mock.patch.object(SHADER.logger, 'warning') as warning:
+            self.assertEqual(draw.get_uniform_loc('colors[2]'), 9)
+            self.assertEqual(draw.get_uniform_loc('colors[2]'), 9)
+        self.assertEqual(lookup.call_count, 1)
+        warning.assert_not_called()
+
+    def test_active_uniforms_name_an_array_by_its_first_element_and_leave_out_block_members(self) -> None:
+        names = {0: (b'gain', 1, 0), 1: (b'colors[0]', 4, 0), 2: (b'Block.member', 1, 0)}
+        locations = {'gain': 3, 'colors[0]': 5, 'Block.member': -1}
+        with mock.patch.object(SHADER, 'glGetProgramiv', return_value=3),                 mock.patch.object(SHADER, 'glGetActiveUniform', side_effect=lambda program, index: names[index]),                 mock.patch.object(SHADER, 'glGetUniformLocation', side_effect=lambda program, name: locations[name]):
+            uniforms = ACTIVE_UNIFORMS(7)
+        self.assertEqual(uniforms, {'gain': 3, 'colors[0]': 5, 'colors': 5})
 
     def test_a_compute_shader_has_one_stage_its_comp_file(self) -> None:
         stages = _Compute._stages()

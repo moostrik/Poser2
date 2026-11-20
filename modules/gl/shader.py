@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
-from OpenGL.GL import GL_COMPILE_STATUS, GL_FRAGMENT_SHADER, GL_LINK_STATUS, GL_VERTEX_SHADER, glAttachShader, glCompileShader, glCreateProgram, glCreateShader, glDeleteProgram, glDeleteShader, glGetProgramInfoLog, glGetProgramiv, glGetShaderInfoLog, glGetShaderiv, glGetUniformLocation, glLinkProgram, glShaderSource
+from OpenGL.GL import GL_ACTIVE_UNIFORMS, GL_COMPILE_STATUS, GL_FRAGMENT_SHADER, GL_LINK_STATUS, GL_VERTEX_SHADER, glAttachShader, glCompileShader, glCreateProgram, glCreateShader, glDeleteProgram, glDeleteShader, glGetActiveUniform, glGetProgramInfoLog, glGetProgramiv, glGetShaderInfoLog, glGetShaderiv, glGetUniformLocation, glLinkProgram, glShaderSource
 from watchdog.observers.api import BaseObserver
 
 from .file_watcher import monitor_path
@@ -33,7 +33,7 @@ class _Program:
     program: int | None = None
     users: int = 0
     files: set[Path] = field(default_factory=set)       # the files it was compiled from
-    uniforms: dict[str, int] = field(default_factory=dict)
+    uniforms: dict[str, int] = field(default_factory=dict)     # read after linking; an array element at its use
     marked: bool = False                                # a file changed: compiled again at the next reload point
 
 
@@ -93,12 +93,16 @@ class Shader():
             del Shader._programs[cls]
 
     def get_uniform_loc(self, name: str) -> int:
-        """A uniform's location in the class's program, looked up once."""
+        """A uniform's location in the class's program: read after linking, an array element (`colors[2]`) looked up
+        once; a name the program does not have warns once and is -1, which GL ignores."""
         entry: _Program = Shader._programs[type(self)]
         location: int | None = entry.uniforms.get(name)
         if location is None:
             location = int(glGetUniformLocation(entry.program, name))
             entry.uniforms[name] = location
+            if location < 0:
+                logger.warning("%s: no uniform %s in the program (misspelled, or unused and left out by the compiler)",
+                               type(self).__name__, name)
         return location
 
     # THE SOURCES
@@ -138,8 +142,24 @@ class Shader():
         if entry.program is not None:
             glDeleteProgram(entry.program)
         entry.program = program
-        entry.uniforms.clear()                          # locations may have changed
+        entry.uniforms = cls._active_uniforms(program)  # locations may have changed
         return True
+
+    @staticmethod
+    def _active_uniforms(program: int) -> dict[str, int]:
+        """The program's active uniforms and their locations, an array by its name and by its first element's; a
+        uniform in a block has none and is left out."""
+        uniforms: dict[str, int] = {}
+        for index in range(int(glGetProgramiv(program, GL_ACTIVE_UNIFORMS))):
+            raw_name, _size, _type = glGetActiveUniform(program, index)
+            name: str = raw_name.decode() if isinstance(raw_name, bytes) else str(raw_name)
+            location: int = int(glGetUniformLocation(program, name))
+            if location < 0:
+                continue
+            uniforms[name] = location
+            if name.endswith('[0]'):
+                uniforms[name[:-3]] = location
+        return uniforms
 
     @classmethod
     def _compile(cls, sources: list[tuple[int, Path, str, list[Path]]]) -> int | None:
