@@ -119,6 +119,7 @@ class StreamReaderTest(unittest.TestCase):
         reader.stop()
         self.assertTrue(wait_for(lambda: process is not None and process.poll() is not None))
         self.assertTrue(wait_for(lambda: not reader.is_playing()))       # the reader's thread ends too
+        reader.join()
 
     def test_a_stop_ends_a_reader_waiting_near_its_frames_moment_at_once(self) -> None:
         schedule = FixedSchedule(0.0, [0.0] * 30)
