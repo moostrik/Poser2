@@ -128,7 +128,7 @@
     "output_frequency": 60.0,
     "pose": {
       "enabled": true,
-      "resolution": "STANDARD"
+      "resolution": "HIGH"
     },
     "segmentation": {
       "resolution": "EXTREME",

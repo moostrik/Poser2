@@ -38,14 +38,10 @@ nothing.
 
 ## C. The pose model
 
-For one player `STANDARD` does not fill the GPU, so `HIGH` costs as much in the app (TIMING.md, "The pose
+deep_flow and low_flow run the pose at `HIGH` (2026-11-20). For one player `STANDARD` does not fill the GPU, so `HIGH` costs as much in the app (TIMING.md, "The pose
 models": 20 to 23 ms whichever model) **(seen)**; hd_trio (up to 3 players a set) and white_space (up to 8) batch
 several crops, where it may not.
 
-- C1. deep_flow and low_flow run the pose at `HIGH` (decided 2026-11-20): `pose.pose.resolution` from `STANDARD` to
-  `HIGH` in every preset that has it, deep_flow's `settings.json`, `close.json`, `mattijs.json`, `slow.json` and
-  `very nice.json`, and low_flow's `studio.json` **(seen: all `STANDARD` today)**. Checked by each app's `-sim` start:
-  the log's "Pose: HIGH model ready", and no drops
 - C2. hd_trio and white_space are measured at `STANDARD` and `HIGH`, FP16, before their resolution is chosen: alone,
   per batch size up to each app's engine's maximum (3 and 8), on their own engines (`scripts/model_benchmark.py
   --app <app> --models pose`, the resolution set); in the app, each app's `-sim` on a recording with several players,
