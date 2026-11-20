@@ -186,11 +186,23 @@ In the app: each app `-sim`, its preset with the resolution set, 60 s after the 
 | Dropped                | 2                    | 0                    | 0                    | 0                    |
 | Render interval (mean) | 21.5                 | 21.3                 | 12.5                 | 13.3                 |
 
+With every pose batch filled to the engine's maximum by repeating the real crops, the extra results dropped
+(`c2_app_probe.py --fill`), the same recordings, 60 s each, mean / p95 / p99 ms:
+
+| What                   | hd_trio STANDARD, 3  | hd_trio HIGH, 3      | white_space STANDARD, 8 | white_space HIGH, 8  |
+|------------------------|----------------------|----------------------|-------------------------|----------------------|
+| Pose                   | 8.29 / 12.05 / 13.87 | 10.91 / 15.15 / 17.33 | 10.41 / 15.89 / 23.43  | 12.04 / 16.50 / 19.47 |
+| Dropped                | 3                    | 1                    | 0                       | 0                    |
+| Render interval (mean) | 20.7                 | 21.5                 | 12.8                    | 13.3                 |
+
 - Alone the model barely grows with the batch: most of its time is fixed cost; `HIGH` adds 0.04 to 0.37 ms
   (white_space, one to eight players) **(deduction from the table)**
 - In the app `HIGH` adds 0.15 ms to hd_trio's pose and 0.5 ms (1.8 at p95) to white_space's, at two or three
   players; the pose's in-app time is mostly its wait for the GPU it shares with the render **(deduction)**
-- One run each: white_space's render interval, 0.8 ms longer at `HIGH`, may be the run's spread **(deduction)**
+- At full batches `HIGH` adds 2.6 ms to hd_trio's pose (3 players) and 1.6 ms to white_space's (8), no drops either
+  way **(seen)**
+- One run each: hd_trio's filled `STANDARD` run came out faster than its unfilled one, so a run's spread is about
+  1 ms; white_space's render interval, up to 0.8 ms longer at `HIGH`, may be that spread **(deduction)**
 
 ## The pose's decode
 
