@@ -61,7 +61,7 @@ PRESET: Path = Path(__file__).resolve().parent.parent / 'apps' / 'deep_flow' / '
 
 def depth_range() -> tuple[float, float]:
     """The player's depth range in the preset, the depth source's near and far (m), which the z position spans."""
-    depth: dict = json.loads(PRESET.read_text())['render']['depth']
+    depth: dict = json.loads(PRESET.read_text())['flow']['depth']
     return float(depth['near']), float(depth['far'])
 
 
@@ -92,7 +92,7 @@ class Side:
         self.name, rest = spec.split('=', 1)
         kind, _, items = rest.partition(':')
         self.kind = kind
-        preset = json.loads(PRESET.read_text())['render']['bridge']
+        preset = json.loads(PRESET.read_text())['flow']['bridge']
         self.changed: dict[str, object] = {}
         if kind == 'lowpass':
             self.settings: VelocityLowpassSettings | VelocityBandpassSettings = VelocityLowpassSettings()

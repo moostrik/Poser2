@@ -4,8 +4,8 @@
 
 FRAMES is what depth_velocity_capture saved from one loop of a recording. No app and no camera: a hidden window
 gives the GL context, one `LucasKanadeFlow3D` measures the saved frames with the settings they were saved with,
-and every side is a `Bridge3DLayer` and a `Fluid3DLayer` on its velocity, with deep_flow's preset (`render.bridge`,
-`render.fluid`); PATH=VALUE sets one setting by its panel path under `bridge.` or `fluid.`
+and every side is a `Bridge3DLayer` and a `Fluid3DLayer` on its velocity, with deep_flow's preset (`flow.bridge`,
+`flow.fluid`); PATH=VALUE sets one setting by its panel path under `bridge.` or `fluid.`
 (fluid.input.velocity_drag=50, bridge.filters.lowpass.smooth=300, fluid.input.velocity_gain=2). The bridge and the
 fluid step once per flow frame by the frame's saved interval; `--every N` steps them once per N frames with the
 frames' summed interval (the flow still measures every frame), a frame-rate check. `--save DIR` writes every side's
@@ -74,7 +74,7 @@ class Side:
     def __init__(self, spec: str, output: tuple[int, int], slice: float) -> None:
         self.slice: float = slice
         self.name, _, items = spec.partition(':')
-        preset = json.loads(PRESET.read_text())['render']
+        preset = json.loads(PRESET.read_text())['flow']
         self.bridge_settings = Bridge3DLayerSettings()
         self.bridge_settings.update_from_dict(preset['bridge'])
         self.fluid_settings = Fluid3DLayerSettings()

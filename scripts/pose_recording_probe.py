@@ -44,15 +44,15 @@ def percentiles(values: list[float]) -> str:
 
 
 def record(app: DeepFlowMain, seconds: float) -> None:
-    app.settings.camera.recorded_poses.enabled = False      # the pose model runs
-    app.settings.camera.recorder.name = NAME
+    app.settings.setup.camera.recorded_poses.enabled = False      # the pose model runs
+    app.settings.setup.camera.recorder.name = NAME
     time.sleep(3.0)                                         # the player loads and the model warms up
     before: set[str] = {p.name for p in RECORDINGS.iterdir()}
-    app.settings.camera.start = True
+    app.settings.setup.camera.start = True
     time.sleep(seconds)
-    app.settings.camera.stop = True
+    app.settings.setup.camera.stop = True
     time.sleep(3.0)                                         # the chunk merges
-    recorder = app.settings.camera.recorder
+    recorder = app.settings.setup.camera.recorder
     print(f'recorder counts: depth {recorder.missed_depth}, color {recorder.missed_color}, '
           f'tracklets {recorder.missed_tracklets}, poses {recorder.missed_poses}')
     new = sorted(p for p in RECORDINGS.iterdir() if p.name not in before)
@@ -67,7 +67,7 @@ def record(app: DeepFlowMain, seconds: float) -> None:
 
 
 def play(app: DeepFlowMain, seconds: float) -> None:
-    app.settings.camera.recorded_poses.enabled = True
+    app.settings.setup.camera.recorded_poses.enabled = True
     node = app.recorded_poses
     assert node is not None
     came: list[tuple[float, FrameDict, dict]] = []      # arrival, the RAW poses, the recording's of their frame then
@@ -114,7 +114,7 @@ def main() -> int:
         assert app.player is not None
         app.player.nv12 = False
     if args.folder:
-        app.settings.camera.simulator.folder = args.folder
+        app.settings.setup.camera.simulator.folder = args.folder
 
     def run() -> None:
         try:

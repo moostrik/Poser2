@@ -38,11 +38,11 @@ class PipelineSpecTest(unittest.TestCase):
 
     def setUp(self) -> None:
         self.settings = Settings()
-        self.players = self.settings.max_players
+        self.players = self.settings.setup.max_players
         configure_features(self.players)                     # the track features' width, as main.py sets it
         self.source = _Source(list(range(self.players)))
         self.pose_step = _Async()
-        self.pipeline = PosePipeline(pipeline_spec(self.settings.pose, self.source, self.pose_step, self.pose_step))
+        self.pipeline = PosePipeline(pipeline_spec(self.settings.setup.pose, self.source, self.pose_step, self.pose_step))
 
     def test_the_stages_are_the_apps_in_order(self) -> None:
         self.assertEqual(self.pipeline.stages, list(Stage))

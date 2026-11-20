@@ -84,7 +84,7 @@ def main() -> int:
     setup_logging(verbose=False, name='deep_flow')
     install_excepthooks()
     app = DeepFlowMain(simulation=True, interface=False)
-    settings = app.settings
+    settings = app.settings.setup
     settings.camera.simulator.folder = args.folder
     settings.camera.person_detector.enabled = False         # the recorded tracklets
     settings.camera.recorded_poses.enabled = False          # the pose model in the app
@@ -182,8 +182,8 @@ def main() -> int:
                           waits_ms={k: spread(v) for k, v in sorted(waits.items())}, uploads_ms={k: spread(v) for k, v in uploads.items()},
                           drops=dict(uploader=app.uploader.dropped, board=app.board.get_dropped_inference_frames(),
                                      depth_without_image=app.inference_frame_sync.settings.misses, inference_frame_sync=app.inference_frame_sync.settings.dropped,
-                                     pose_step=app.settings.pose.frame_source.dropped, pose_pipeline=app.pipeline.dropped,
-                                     pose_model=app.settings.pose.pose.dropped))
+                                     pose_step=app.settings.setup.pose.frame_source.dropped, pose_pipeline=app.pipeline.dropped,
+                                     pose_model=app.settings.setup.pose.pose.dropped))
             if args.record:
                 recorder = settings.camera.recorder
                 report['recorded'] = dict(missed_depth=recorder.missed_depth, missed_color=recorder.missed_color,

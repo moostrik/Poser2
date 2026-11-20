@@ -92,16 +92,17 @@ DETECTOR_IMAGE: Path = Path('modules/inference/face/tests/data/face.jpg')
 
 
 def load_app_settings(app: str) -> BaseSettings:
-    """The app's settings with its startup preset loaded, as the app's main builds them."""
+    """The app's setup with its startup preset loaded, as the app's main builds it."""
     presets.set_app(app)
     settings = importlib.import_module(f"apps.{app}.settings").Settings()
     if not presets.load(settings, presets.startup_path()):
         raise FileNotFoundError(f"No startup preset for '{app}' at {presets.startup_path()}")
+    setup: BaseSettings = settings.children.get('setup', settings)     # an app not yet moved under `setup`: its root
     if app in ('white_space', 'hd_trio'):   # they cut the pose model's crops at its size (their main.py)
-        settings.pose.pose_crop.output_width = settings.pose.pose.width
-        settings.pose.pose_crop.output_height = settings.pose.pose.height
+        setup.pose.pose_crop.output_width = setup.pose.pose.width
+        setup.pose.pose_crop.output_height = setup.pose.pose.height
     settings.initialize()
-    return settings
+    return setup
 
 
 def model_settings(app_group: BaseSettings, model_type: ModelType) -> BaseSettings:

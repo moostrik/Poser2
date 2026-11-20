@@ -62,7 +62,7 @@ def main() -> int:
     parser.add_argument('--name', default='', help='the capture\'s folder under OUT (default: the recording\'s name)')
     parser.add_argument('--seconds', type=float, default=0.0, help='stop this long after the loop starts (default: the whole loop)')
     parser.add_argument('--set', action='append', default=[], metavar='PATH=VALUE',
-                        help="an app setting by its path for this capture, e.g. render.view.mask.guided_radius=3")
+                        help="an app setting by its path for this capture, e.g. flow.view.mask.guided_radius=3")
     args = parser.parse_args()
     out_dir: Path = args.out / (args.name or args.recording)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -136,7 +136,7 @@ def main() -> int:
                 for group in groups:
                     owner = getattr(owner, group)
                 setattr(owner, name, parsed(value, getattr(owner, name)))
-            simulator = app.settings.camera.simulator
+            simulator = app.settings.setup.camera.simulator
             simulator.folder = args.recording
             time.sleep(0.5)
             simulator.start = True
@@ -162,7 +162,7 @@ def main() -> int:
             head = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True, cwd=root).stdout.strip()
             (out_dir / 'capture.json').write_text(json.dumps(dict(
                 recording=args.recording, commit=head, date=time.strftime('%Y-%m-%d %H:%M'), seconds=args.seconds,
-                set=args.set, view=app.settings.render.view.to_dict()), default=str))
+                set=args.set, view=app.settings.flow.view.to_dict()), default=str))
             print(f'{len(calls)} frames to {out_dir}', flush=True)
         finally:
             app.stop()                            # whatever happened, the app does not keep running

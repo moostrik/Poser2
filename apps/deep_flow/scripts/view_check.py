@@ -112,7 +112,7 @@ def main() -> int:
     count = min(len(colors), len(depths))
     alignment = info.depth_alignment
 
-    preset = json.loads(PRESET.read_text(encoding='utf-8'))['render']
+    preset = json.loads(PRESET.read_text(encoding='utf-8'))['flow']
     mh.context()
     settings = ViewLayerSettings()
     settings.initialize()

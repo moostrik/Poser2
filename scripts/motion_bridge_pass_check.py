@@ -63,7 +63,7 @@ def main() -> None:
     flow = LucasKanadeFlow3D(flow_settings)
     flow.allocate(frames.width, frames.height)
     bridge_settings = Bridge3DLayerSettings()
-    bridge_settings.update_from_dict(json.loads(PRESET.read_text())['render']['bridge'])
+    bridge_settings.update_from_dict(json.loads(PRESET.read_text())['flow']['bridge'])
     bridge = Bridge3DLayer(bridge_settings)
     bridge.allocate(2160, 3840)
 
