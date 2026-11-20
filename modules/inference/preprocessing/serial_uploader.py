@@ -30,7 +30,7 @@ class SerialUploaderSettings(BaseSettings):
     depth_kernels: Field[bool] = Field(True, description="Align the depth with CUDA kernels compiled at runtime; off, with torch ops as a CUDA graph")
 
 
-class SerialUploader(Thread):
+class SerialUploader:
     """Takes the camera's frames on the camera's thread (`submit_frame`) and does all the rest on its own: the color
     goes to the GPU (`ImageUpload`, one frame), converted, straightened and flipped there, and is handed on as a
     `GpuImage` with the event that says it is written, and as an `ImageSnapshot` of one (the image, its capture
@@ -53,7 +53,7 @@ class SerialUploader(Thread):
     """
 
     def __init__(self, settings: SerialUploaderSettings) -> None:
-        super().__init__(daemon=True, name='SerialUploader')
+        self._thread: Thread = Thread(target=self._run, daemon=True, name='SerialUploader')
         self.settings: SerialUploaderSettings = settings
         self._image_upload: ImageUpload = ImageUpload()
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
@@ -90,14 +90,14 @@ class SerialUploader(Thread):
 
     def start(self) -> None:
         self._running = True
-        super().start()
+        self._thread.start()
 
     def stop(self) -> None:
         with self._wake:
             self._running = False
             self._wake.notify()
-        if self.is_alive():
-            self.join(timeout=2.0)
+        if self._thread.is_alive():
+            self._thread.join(timeout=2.0)
 
     def submit_frame(self, frame: CameraFrame) -> None:
         """A camera frame callback, on the camera's thread: queues the frame and returns."""
@@ -125,7 +125,7 @@ class SerialUploader(Thread):
             if callback not in self._tracklet_callbacks:
                 self._tracklet_callbacks.append(callback)
 
-    def run(self) -> None:
+    def _run(self) -> None:
         while True:
             with self._wake:
                 while self._running and not self._queue and not self._tracklets:

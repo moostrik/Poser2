@@ -28,11 +28,11 @@ logger = logging.getLogger(__name__)
 WAITING: int = 2        # sets waiting for this thread; beyond that the oldest is dropped whole and counted
 
 
-class BatchUploader(Thread):
+class BatchUploader:
     """See the module docstring."""
 
     def __init__(self) -> None:
-        super().__init__(daemon=True, name='BatchUploader')
+        self._thread: Thread = Thread(target=self._run, daemon=True, name='BatchUploader')
         self._image_upload: ImageUpload = ImageUpload()
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
         self._wake: Condition = Condition()
@@ -83,7 +83,7 @@ class BatchUploader(Thread):
     def start(self) -> None:
         with self._wake:
             self._running = True
-        super().start()
+        self._thread.start()
 
     def stop(self) -> None:
         """The thread ends; the sets still waiting are dropped and logged."""
@@ -94,10 +94,10 @@ class BatchUploader(Thread):
             self._wake.notify()
         if waiting:
             logger.info("BatchUploader: %d sets dropped at stop", waiting)
-        if self.is_alive():
-            self.join(timeout=2.0)
+        if self._thread.is_alive():
+            self._thread.join(timeout=2.0)
 
-    def run(self) -> None:
+    def _run(self) -> None:
         while True:
             with self._wake:
                 while self._running and not self._sets:

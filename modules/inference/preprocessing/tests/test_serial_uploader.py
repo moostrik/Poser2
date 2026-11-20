@@ -191,7 +191,7 @@ class HandOffTest(unittest.TestCase):
         for t in range(10):
             self.uploader.submit_frame(_color(float(t)))
         self.uploader.stop()
-        self.assertFalse(self.uploader.is_alive())
+        self.assertFalse(self.uploader._thread.is_alive())
 
 
 @unittest.skipUnless(torch.cuda.is_available(), 'needs CUDA')

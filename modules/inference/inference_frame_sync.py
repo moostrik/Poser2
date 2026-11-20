@@ -73,13 +73,13 @@ class _Waiting:
     deadline: float
 
 
-class InferenceFrameSync(Thread):
+class InferenceFrameSync:
     """See the module docstring. Feed it with `submit_image` (the uploader's image callback) and `submit` (each result:
     `Depth.of` the uploader's depth, `Poses.by_camera` a pipeline stage's poses, `Masks.by_camera` the segmentation's
     masks)."""
 
     def __init__(self, settings: InferenceFrameSyncSettings, results: tuple[type[InferenceResult], ...]) -> None:
-        super().__init__(daemon=True, name='InferenceFrameSync')
+        self._thread: Thread = Thread(target=self._run, daemon=True, name='InferenceFrameSync')
         for kind in results:
             if kind is not Depth and kind not in WAITS:
                 raise ValueError(f"InferenceFrameSync: no wait for {kind.__name__}")
@@ -115,7 +115,7 @@ class InferenceFrameSync(Thread):
     def start(self) -> None:
         with self._lock:
             self._running = True
-        super().start()
+        self._thread.start()
 
     def stop(self) -> None:
         """The thread ends; what still waits in the inbox is dropped and logged."""
@@ -134,12 +134,12 @@ class InferenceFrameSync(Thread):
                 parts += 1
         if parts:
             logger.info("InferenceFrameSync: %d parts dropped at stop", parts)
-        if self.is_alive():
-            self.join(timeout=2.0)
-        if not self.is_alive():
+        if self._thread.is_alive():
+            self._thread.join(timeout=2.0)
+        if not self._thread.is_alive():
             self._waker.close()
 
-    def run(self) -> None:
+    def _run(self) -> None:
         """Match what came in, in the order it came, and send out a waiting frame whose deadline has passed."""
         while True:
             with self._lock:

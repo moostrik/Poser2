@@ -37,12 +37,13 @@ class CameraSyncSettings(BaseSettings):
     fps: Field[float] = Field(30.0, access=Field.INIT, visible=False)
 
 
-class CameraSync(Thread, Generic[M]):
+class CameraSync(Generic[M]):
     """The cameras' sync, see the module docstring. Frames and tracklet messages are two separate instances with the
     same rule (`frame_sync`, `tracklet_sync`)."""
 
     def __init__(self, settings: CameraSyncSettings, stream_name: str = '') -> None:
-        super().__init__(daemon=True, name=f'CameraSync {stream_name}'.strip())
+        self.name: str = f'CameraSync {stream_name}'.strip()
+        self._thread: Thread = Thread(target=self._run, daemon=True, name=self.name)
         self.stream_name: str = stream_name
         self._period: float = 1.0 / settings.fps
 
@@ -67,7 +68,7 @@ class CameraSync(Thread, Generic[M]):
     def start(self) -> None:
         with self._wake:
             self._running = True
-        super().start()
+        self._thread.start()
 
     def stop(self) -> None:
         """The thread ends; the messages still waiting are dropped and logged."""
@@ -80,10 +81,10 @@ class CameraSync(Thread, Generic[M]):
             self._wake.notify()
         if dropped:
             logger.info("%s: %d messages dropped at stop", self.name, dropped)
-        if self.is_alive():
-            self.join(timeout=2.0)
+        if self._thread.is_alive():
+            self._thread.join(timeout=2.0)
 
-    def run(self) -> None:
+    def _run(self) -> None:
         while True:
             with self._wake:
                 while self._running and not self._inbox:
