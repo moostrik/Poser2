@@ -45,7 +45,7 @@ def gl_state(units: int = 8) -> dict[str, Any]:
     active = int(glGetIntegerv(GL_ACTIVE_TEXTURE))
     bound: list[tuple[int, tuple[int, int] | None]] = []
     for unit in range(units):
-        glActiveTexture(GL_TEXTURE0 + unit)
+        glActiveTexture(int(GL_TEXTURE0) + unit)
         texture = int(glGetIntegerv(GL_TEXTURE_BINDING_2D))
         size = (int(glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH)),
                 int(glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT))) if texture else None

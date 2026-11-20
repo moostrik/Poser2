@@ -35,7 +35,7 @@ class Fbo(Texture):
             glBindRenderbuffer(GL_RENDERBUFFER, 0)
 
         glClearColor(0.0, 0.0, 0.0, 0.0)
-        glClear(GL_COLOR_BUFFER_BIT | (GL_DEPTH_BUFFER_BIT if self._depth else 0))
+        glClear(int(GL_COLOR_BUFFER_BIT) | (int(GL_DEPTH_BUFFER_BIT) if self._depth else 0))
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         self.unbind()

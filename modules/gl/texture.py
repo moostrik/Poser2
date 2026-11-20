@@ -1,5 +1,6 @@
 from OpenGL.GL import Constant, GL_BGR, GL_BGRA, GL_CLAMP_TO_EDGE, GL_FLOAT, GL_HALF_FLOAT, GL_LINEAR, GL_NONE, GL_ONE, GL_R16, GL_R16F, GL_R32F, GL_R32UI, GL_R8, GL_RED, GL_RED_INTEGER, GL_UNSIGNED_INT, GL_RG, GL_RG16, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB, GL_RGB10_A2, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNSIGNED_BYTE, GL_UNSIGNED_INT_2_10_10_10_REV, GL_UNSIGNED_SHORT, glBindTexture, glClearTexImage, glDeleteTextures, glGenTextures, glGetTexImage, glTexImage2D, glTexParameterf, glTexParameterfv, glTexParameteri
 import logging
+from typing import cast
 import numpy as np
 
 from modules.utils import Quad, Rect
@@ -45,7 +46,7 @@ def clear_value(data_type: Constant, channels: int, color: tuple[float, float, f
     values = color[:channels]
     if all(v == 0.0 for v in values):
         return None
-    key = (int(data_type), values)
+    key = (int(cast(int, data_type)), values)     # an IntConstant
     if key not in _CLEAR_VALUES:
         if data_type == GL_UNSIGNED_BYTE:
             _CLEAR_VALUES[key] = np.array([v * 255 for v in values], dtype=np.uint8)
