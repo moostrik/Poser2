@@ -6,12 +6,6 @@
 can read one short. The recording package counts each chunk's frames with it (`recording_folder.py`). Looked at when
 the apps' plan F reaches the video module.
 
-## B. low_flow's preset test
-
-`apps/low_flow/tests/test_fluid_preset.py` requires low_flow's fluid values to equal deep_flow's; each app is tuned on its own now, so it fails on 8 values (2026-11-20). Built first, so the steps after it check both apps' tests passing.
-
-- B3. The test checks what is code, not look: low_flow's `studio.json` holds every key of the 2D fluid's settings and loads; the value comparison and its docstring go. FLUID_2D.md: the line that the 2D takes deep_flow's values goes, and its settings test paragraph says keys, not values. Check: low_flow's tests pass. One commit.
-
 ## C. The frame handed over, the ring in RAM
 
 The ring lives in RAM only. Video memory held 10 to 13 s of 4K in deep_flow; this PC has 96 GB of RAM, 74 GB free (measured 2026-11-19), about 80 s at 4:2:0 60 fps in 60 GB (deduction). Video memory gave nothing back for its length: the render tick does the same work either way, and the encode copied every frame to RAM anyway.
@@ -56,8 +50,7 @@ Quality is traded against length; `max_duration` shows the length the chosen for
 - A settings class mirrors the code, in the order it runs: E4
 - The show owns only what it does with it: E3, each app holds its own show
 - Settings connect the user and a component, not two components: E3, the apps read a property
-- A document describes what is built: VIDEO.md in C2, D2, E1–E4; FLUID_2D.md in B3
+- A document describes what is built: VIDEO.md in C2, D2, E1–E4
 - A package is one thing: C2, D2, the capture and the preview in the screen recording's render package, not in modules/gl
 - Prefer the design with the lower latency, measured in the app: C3, E2
-- Unit-test infrastructure; test the look by running the system: B3
-- One plan step checked by a run or test is one commit: B3, C2, C3, D2, E1–E4
+- One plan step checked by a run or test is one commit: C2, C3, D2, E1–E4

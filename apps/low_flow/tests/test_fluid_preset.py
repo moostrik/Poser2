@@ -1,5 +1,5 @@
-"""Low Flow's fluid takes deep_flow's values: each setting the 2D fluid shares with the 3D holds, in the
-studio preset, deep_flow's value at the same path, the sizes apart."""
+"""Low Flow's studio preset holds the 2D fluid's settings: every key of `Fluid2DSettings` at the preset's fluid, and
+nothing the settings no longer have; the values are the app's own look."""
 
 import json
 import unittest
@@ -9,38 +9,31 @@ from modules.flow import Fluid2DSettings
 
 ROOT: Path = Path(__file__).resolve().parents[3]
 LOW_FLOW: Path = ROOT / 'apps' / 'low_flow' / 'data' / 'settings' / 'studio.json'
-DEEP: Path = ROOT / 'apps' / 'deep_flow' / 'data' / 'settings' / 'settings.json'
-
-# A textbook default, not deep_flow's: a plane's sizes, and gravity down the screen (deep_flow's points along z)
-TEXTBOOK: set[tuple[str, ...]] = {('width',), ('height',), ('gravity', 'y')}
 
 
-def leaves(node: dict, at: tuple[str, ...] = ()) -> dict[tuple[str, ...], object]:
-    found: dict[tuple[str, ...], object] = {}
+def leaves(node: dict, at: tuple[str, ...] = ()) -> set[tuple[str, ...]]:
+    found: set[tuple[str, ...]] = set()
     for key, value in node.items():
         if isinstance(value, dict):
-            found.update(leaves(value, at + (key,)))
+            found |= leaves(value, at + (key,))
         else:
-            found[at + (key,)] = value
+            found.add(at + (key,))
     return found
-
-
-def at(node: dict, path: tuple[str, ...]) -> object:
-    for key in path:
-        node = node[key]
-    return node
 
 
 class TestFluidPreset(unittest.TestCase):
 
-    def test_deep_flow_values(self) -> None:
-        low_flow = json.loads(LOW_FLOW.read_text(encoding='utf-8'))['render']['fluid']
-        deep = json.loads(DEEP.read_text(encoding='utf-8'))['render']['fluid']
-        for path in leaves(Fluid2DSettings().to_dict()):
-            if path in TEXTBOOK:
-                continue
-            with self.subTest(path='.'.join(path)):
-                self.assertEqual(at(low_flow, path), at(deep, path))
+    def setUp(self) -> None:
+        self.preset: dict = json.loads(LOW_FLOW.read_text(encoding='utf-8'))['render']['fluid']
+
+    def test_the_preset_holds_every_key_of_the_settings(self) -> None:
+        missing = leaves(Fluid2DSettings().to_dict()) - leaves(self.preset)
+        self.assertEqual(missing, set(), 'keys of Fluid2DSettings missing from the preset')
+
+    def test_the_preset_loads_into_the_settings(self) -> None:
+        settings = Fluid2DSettings()
+        settings.update_from_dict(self.preset)
+        self.assertEqual(leaves(settings.to_dict()), leaves(Fluid2DSettings().to_dict()))
 
 
 if __name__ == '__main__':
