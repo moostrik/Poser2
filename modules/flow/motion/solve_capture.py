@@ -78,5 +78,5 @@ class SolveCapture:
             return
         self._saved += 1
         path: Path = self._folder / f'solve_capture_{self._saved}.npz'
-        np.savez_compressed(path, allow_pickle=True, solved=values, **settings, **inputs)    # numpy's default, named
+        np.savez_compressed(path, allow_pickle=True, solved=values, **settings, **inputs)
         logger.warning('Solve capture: %d wrong values, saved to %s', wrong, path)
