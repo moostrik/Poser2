@@ -14,7 +14,16 @@ stores, else the packets counted, which reads an mkv or a raw stream without dec
 the first whose trial passes) and the codecs (`ClipCodec`); what ffmpeg calls an encoder follows from the two
 (`encoder_name`), and a hardware decode from the chip (`hwaccel_args`): d3d12va on the chip's DXGI adapter, which
 decoded a recording's chunk (2999 frames, 992 × 800 H.264) on the iGPU in 6.3 s against d3d11va's 8.3 s **(measured
-2026-11-20)**. A camera recording's color part is an `.mkv` whatever its codec: a raw `.hevc` has no timestamps, and
+2026-11-20)**. The player decodes on the iGPU: the CPU decodes a chunk faster (1.2 s), but the player needs only
+50 frames a second, and in deep_flow `-sim` both kept it on time while the CPU cost about half a core more
+**(measured 2026-11-20, 20 s at 50 fps)**:
+
+| Player's decoder | Frames late | Frame p95 (ms) | System CPU | Ticks over 25 ms |
+|------------------|-------------|----------------|------------|------------------|
+| iGPU (d3d12va)   | 0 of 1000   | 22.5           | 70.3 %     | 43 of 1195       |
+| CPU              | 0 of 1000   | 22.5           | 72.7 %     | 50 of 1197       |
+
+A camera recording's color part is an `.mkv` whatever its codec: a raw `.hevc` has no timestamps, and
 the merge into the chunk refuses it.
 
 Every file is written by `ClipWriter`: raw frames of one pixel format (`ClipInput`) through the 8 MB pipe into one
