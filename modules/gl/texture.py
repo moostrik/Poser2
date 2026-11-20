@@ -1,6 +1,5 @@
 from OpenGL.GL import Constant, GL_BGR, GL_BGRA, GL_CLAMP_TO_EDGE, GL_FLOAT, GL_HALF_FLOAT, GL_LINEAR, GL_NONE, GL_ONE, GL_R16, GL_R16F, GL_R32F, GL_R32UI, GL_R8, GL_RED, GL_RED_INTEGER, GL_UNSIGNED_INT, GL_RG, GL_RG16, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB, GL_RGB10_A2, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNSIGNED_BYTE, GL_UNSIGNED_INT_2_10_10_10_REV, GL_UNSIGNED_SHORT, glBindTexture, glClearTexImage, glDeleteTextures, glGenTextures, glGetTexImage, glTexImage2D, glTexParameterf, glTexParameterfv, glTexParameteri
 import logging
-from typing import cast
 import numpy as np
 
 from modules.utils import Quad, Rect
@@ -9,7 +8,7 @@ from .context import context
 logger = logging.getLogger(__name__)
 
 
-def get_numpy_dtype(data_type: Constant) -> type | None:
+def get_numpy_dtype(data_type: int) -> type | None:
     """Convert OpenGL data type to NumPy dtype.
 
     A 16-bit float texture is read and written as GL_FLOAT, which GL converts to and from half
@@ -40,13 +39,13 @@ def get_numpy_dtype(data_type: Constant) -> type | None:
 _CLEAR_VALUES: dict[tuple, np.ndarray] = {}
 
 
-def clear_value(data_type: Constant, channels: int, color: tuple[float, float, float, float]) -> np.ndarray | None:
+def clear_value(data_type: int, channels: int, color: tuple[float, float, float, float]) -> np.ndarray | None:
     """The clear color for glClearTexImage: None for zero (GL fills zeros without reading memory), else
     an array that is never freed, one per value."""
     values = color[:channels]
     if all(v == 0.0 for v in values):
         return None
-    key = (int(cast(int, data_type)), values)     # an IntConstant
+    key = (int(data_type), values)
     if key not in _CLEAR_VALUES:
         if data_type == GL_UNSIGNED_BYTE:
             _CLEAR_VALUES[key] = np.array([v * 255 for v in values], dtype=np.uint8)
@@ -110,27 +109,27 @@ def get_format(internal_format) -> Constant:
     return GL_RGB  # fallback
 
 
-def get_data_type(internal_format) -> Constant:
-    if internal_format == GL_RGB: return GL_UNSIGNED_BYTE
-    if internal_format == GL_RGB8: return GL_UNSIGNED_BYTE
-    if internal_format == GL_RGB16F: return GL_FLOAT
-    if internal_format == GL_RGB32F: return GL_FLOAT
-    if internal_format == GL_RGBA: return GL_UNSIGNED_BYTE
-    if internal_format == GL_RGBA8: return GL_UNSIGNED_BYTE
-    if internal_format == GL_RGB10_A2: return GL_UNSIGNED_INT_2_10_10_10_REV
-    if internal_format == GL_RGBA16F: return GL_FLOAT
-    if internal_format == GL_RGBA32F: return GL_FLOAT
-    if internal_format == GL_R8: return GL_UNSIGNED_BYTE
-    if internal_format == GL_R16: return GL_UNSIGNED_SHORT
-    if internal_format == GL_R16F: return GL_FLOAT
-    if internal_format == GL_R32F: return GL_FLOAT
-    if internal_format == GL_R32UI: return GL_UNSIGNED_INT
-    if internal_format == GL_RG8: return GL_UNSIGNED_BYTE
-    if internal_format == GL_RG16: return GL_UNSIGNED_SHORT
-    if internal_format == GL_RG16F: return GL_FLOAT
-    if internal_format == GL_RG32F: return GL_FLOAT
+def get_data_type(internal_format) -> int:
+    if internal_format == GL_RGB: return int(GL_UNSIGNED_BYTE)
+    if internal_format == GL_RGB8: return int(GL_UNSIGNED_BYTE)
+    if internal_format == GL_RGB16F: return int(GL_FLOAT)
+    if internal_format == GL_RGB32F: return int(GL_FLOAT)
+    if internal_format == GL_RGBA: return int(GL_UNSIGNED_BYTE)
+    if internal_format == GL_RGBA8: return int(GL_UNSIGNED_BYTE)
+    if internal_format == GL_RGB10_A2: return int(GL_UNSIGNED_INT_2_10_10_10_REV)
+    if internal_format == GL_RGBA16F: return int(GL_FLOAT)
+    if internal_format == GL_RGBA32F: return int(GL_FLOAT)
+    if internal_format == GL_R8: return int(GL_UNSIGNED_BYTE)
+    if internal_format == GL_R16: return int(GL_UNSIGNED_SHORT)
+    if internal_format == GL_R16F: return int(GL_FLOAT)
+    if internal_format == GL_R32F: return int(GL_FLOAT)
+    if internal_format == GL_R32UI: return int(GL_UNSIGNED_INT)
+    if internal_format == GL_RG8: return int(GL_UNSIGNED_BYTE)
+    if internal_format == GL_RG16: return int(GL_UNSIGNED_SHORT)
+    if internal_format == GL_RG16F: return int(GL_FLOAT)
+    if internal_format == GL_RG32F: return int(GL_FLOAT)
     logger.warning("internal format not supported")
-    return GL_NONE
+    return int(GL_NONE)
 
 
 
@@ -152,7 +151,7 @@ class Texture():
         self.height: int = 0
         self.internal_format: Constant = GL_NONE
         self.format: Constant = GL_NONE
-        self.data_type: Constant = GL_NONE
+        self.data_type: int = int(GL_NONE)
         self.tex_id = 0
         # Texture configuration
         self._interpolation: int = interpolation
@@ -167,7 +166,7 @@ class Texture():
             height: Texture height in pixels
             internal_format: OpenGL internal format (e.g., GL_RGB8, GL_RGBA8)
         """
-        data_type: Constant = get_data_type(internal_format)
+        data_type: int = get_data_type(internal_format)
         if data_type == GL_NONE: return
 
         self.width = width
@@ -215,7 +214,7 @@ class Texture():
         self.height = 0
         self.internal_format = GL_NONE
         self.format = GL_NONE
-        self.data_type = GL_NONE
+        self.data_type = int(GL_NONE)
         glDeleteTextures(1, [self.tex_id])
         self.tex_id = 0
 

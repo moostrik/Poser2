@@ -152,7 +152,7 @@ class Image(Fbo):
 
     def _allocate_source(self, width: int, height: int, internal_format) -> None:
         """Allocate the internal source texture with BGR channel order support."""
-        data_type: Constant = get_data_type(internal_format)
+        data_type: int = get_data_type(internal_format)
         if data_type == GL_NONE:
             return
 

@@ -98,7 +98,7 @@ class SwapFbo(Fbo):
         return self._fbos[self._swap_state].format
 
     @property
-    def data_type(self) -> Constant:
+    def data_type(self) -> int:
         return self._fbos[self._swap_state].data_type
 
     @property

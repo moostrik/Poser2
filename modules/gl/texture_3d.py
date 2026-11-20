@@ -42,7 +42,7 @@ class Texture3D:
         self.depth: int = 0
         self.internal_format: Constant = GL_NONE
         self.format: Constant = GL_NONE
-        self.data_type: Constant = GL_NONE
+        self.data_type: int = int(GL_NONE)
         self.tex_id: int = 0
         self._interpolation: int = interpolation
         self._wrap: int = wrap
@@ -130,7 +130,7 @@ class Texture3D:
         self.depth = 0
         self.internal_format: Constant = GL_NONE
         self.format: Constant = GL_NONE
-        self.data_type: Constant = GL_NONE
+        self.data_type: int = int(GL_NONE)
         glDeleteTextures(1, [self.tex_id])
         self.tex_id = 0
 
@@ -234,7 +234,7 @@ class SwapTexture3D(Texture3D):
         return self._textures[self._swap_state].format
 
     @property
-    def data_type(self) -> Constant:
+    def data_type(self) -> int:
         return self._textures[self._swap_state].data_type
 
     @property
