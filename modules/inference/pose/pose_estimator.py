@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from typing import TypeAlias
 
@@ -103,7 +104,7 @@ class PoseEstimator(ModelWorker[Batch, PoseEstimatorSettings], FrameDictCallback
             warm_up = torch.zeros((3, self._model_size[1], self._model_size[0]), dtype=torch.float32, device='cuda')
         self._infer([warm_up] * self.max_batch, None)
         width, height = self._model_size
-        logger.info(f"Pose: {self.settings.resolution.name} model ready: {width}x{height} {self._engine.precision}")
+        logger.info(f"Pose: {self.settings.resolution.name} model ready: {width}x{height} {os.path.basename(self._engine.model_file)}")
 
     def _infer(self, images: list[torch.Tensor], ready: torch.cuda.Event | None) -> tuple[np.ndarray, np.ndarray]:
         """RTMPose's SimCC outputs (N, K, W) and (N, K, H) for the crops (3, h, w) RGB in [0, 1], read once `ready`

@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from threading import Lock
 from typing import TypeAlias
@@ -124,7 +125,7 @@ class Segmenter(ModelWorker[Batch, SegmenterSettings]):
         self._infer([warm_up] * self.max_batch, list(range(self.max_batch)), None)
         self._stream.synchronize()
         self._states.clear()
-        logger.info(f"Segmentation: {self.settings.resolution.name} model ready: {width}x{height} {self._engine.precision}")
+        logger.info(f"Segmentation: {self.settings.resolution.name} model ready: {width}x{height} {os.path.basename(self._engine.model_file)}")
 
     def _infer(self, images: list[torch.Tensor], track_ids: list[int],
                ready: torch.cuda.Event | None) -> tuple[torch.Tensor, torch.Tensor, torch.cuda.Event]:

@@ -13,7 +13,6 @@ class Engine(ABC):
         self.model_file: str = model_file
         self.input_names: list[str] = []
         self.output_names: list[str] = []
-        self.precision: str = "UNKNOWN"        # the first input's: FP32, FP16
 
     @abstractmethod
     def setup(self, stream: torch.cuda.Stream) -> None:

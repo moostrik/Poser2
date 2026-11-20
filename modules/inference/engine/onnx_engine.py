@@ -14,7 +14,6 @@ from .ort_runtime import preload_cuda
 
 logger = logging.getLogger(__name__)
 
-PRECISIONS: dict[str, str] = {'tensor(float)': 'FP32', 'tensor(float16)': 'FP16', 'tensor(double)': 'FP64', 'tensor(int8)': 'INT8'}
 TYPES: dict[str, tuple[type, torch.dtype]] = {
     'tensor(float)': (np.float32, torch.float32), 'tensor(float16)': (np.float16, torch.float16),
     'tensor(double)': (np.float64, torch.float64), 'tensor(int8)': (np.int8, torch.int8)}
@@ -51,7 +50,6 @@ class OnnxEngine(Engine):
         self.input_names = [i.name for i in self._session.get_inputs()]
         self.output_names = [o.name for o in self._session.get_outputs()]
         self._types = {i.name: i.type for i in self._session.get_inputs()} | {o.name: o.type for o in self._session.get_outputs()}
-        self.precision = PRECISIONS.get(self._types[self.input_names[0]], "UNKNOWN")
 
     def dtype(self, name: str) -> torch.dtype:
         return TYPES[self._types[name]][1]

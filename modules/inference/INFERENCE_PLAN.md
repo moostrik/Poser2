@@ -4,16 +4,8 @@ What is not built in `modules/inference`, apart from the threads the app refacto
 ([REFACTOR_PLAN.md](../../REFACTOR_PLAN.md)). What is built is in [INFERENCE.md](INFERENCE.md), its times and how
 the refactor's steps were checked in [TIMING.md](TIMING.md). **(deduction)** marks what is inferred.
 
-## A. Each model's log names its file
+## A. Each model's file named for its precision
 
-- A2. The log names the model's file, not a wrong precision. `Engine.precision` is the first input's type
-  (`engine.py`; `trt_engine.py` and `onnx_engine.py`, `setup`), and the pose and the segmentation log it as the
-  model's precision (their `_setup`) **(seen)**; the pose's FP16 files keep FP32 inputs and outputs, so they log FP32
-  **(seen)**. TensorRT builds the engine strongly typed, its precision from the ONNX file **(seen: the export
-  scripts)**; reading each layer's precision from an engine needs it built with detailed profiling, which ours are
-  not **(site fact: TensorRT's `IEngineInspector`)**. `Engine.precision` and both engines' `PRECISIONS` go; the
-  workers log the file's name in its place (`os.path.basename(engine.model_file)`), e.g. "Pose: STANDARD model
-  ready: 192x256 rtmpose-l_256x192_fp16.trt". Checked by pyright and the inference tests
 - A3. The segmentation's files are named for their precision, as the pose's: RVM's ONNX files are FP16, all 159
   weight tensors but two of one value each, their inputs FP16 too, while their names say nothing **(seen: the
   weights' types, 2026-11-20)**. A name says `_fp16` when the file is FP16 and nothing when FP32, so
@@ -75,6 +67,5 @@ Questions:
 
 ## The rules it touches
 
-- `CLAUDE.md` API evolution, remove obsolete pathways: A2
-- `CLAUDE.md` Naming, name a concept after what it is: A2, A3
+- `CLAUDE.md` Naming, name a concept after what it is: A3
 - `CLAUDE.md` Time, pace a loop with `utils.wait_until`: B1, B2, B3

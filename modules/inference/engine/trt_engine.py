@@ -12,8 +12,6 @@ from .trt_runtime import get_tensorrt_runtime
 
 logger = logging.getLogger(__name__)
 
-PRECISIONS = {trt.DataType.FLOAT: "FP32", trt.DataType.HALF: "FP16", trt.DataType.INT8: "INT8"}
-
 
 class TrtEngine(Engine):
     def __init__(self, model_file: str) -> None:
@@ -36,7 +34,6 @@ class TrtEngine(Engine):
                 self.input_names.append(name)
             else:
                 self.output_names.append(name)
-        self.precision = PRECISIONS.get(self._engine.get_tensor_dtype(self.input_names[0]), "UNKNOWN")
 
     def dtype(self, name: str) -> torch.dtype:
         return torch.from_numpy(np.empty(0, dtype=trt.nptype(self._engine.get_tensor_dtype(name)))).dtype
