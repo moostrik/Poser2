@@ -5,16 +5,16 @@ A tool run once a model is added; its library is not one of the project's, so it
 
 Usage:
     # Inspect model ops
-    python tools/models/convert_onnx_to_fp16.py --input models/rtmpose-l_256x192_fp32.onnx --inspect
+    python tools/models/convert_onnx_to_fp16.py --input models/rtmpose-l_384x288_fp32.onnx --inspect
 
     # Convert only Conv to FP16, keep everything else FP32
-    python tools/models/convert_onnx_to_fp16.py --input models/rtmpose-l_256x192_fp32.onnx --output models/rtmpose-l_256x192_test.onnx --fp16-ops Conv
+    python tools/models/convert_onnx_to_fp16.py --input models/rtmpose-l_384x288_fp32.onnx --output models/rtmpose-l_384x288_test.onnx --fp16-ops Conv
 
     # Add more ops to FP16
-    python tools/models/convert_onnx_to_fp16.py --input models/rtmpose-l_256x192_fp32.onnx --output models/rtmpose-l_256x192_test.onnx --fp16-ops Conv Mul Sigmoid
+    python tools/models/convert_onnx_to_fp16.py --input models/rtmpose-l_384x288_fp32.onnx --output models/rtmpose-l_384x288_test.onnx --fp16-ops Conv Mul Sigmoid
 
     # RTMPose all FP16 but its head's ScaleNorms, whose sum of squares can overflow FP16's 65504; inputs and outputs FP32
-    uv run --with onnxconverter-common python tools/models/convert_onnx_to_fp16.py --input data/models/rtmpose-l_256x192.onnx --output data/models/rtmpose-l_256x192_fp16.onnx --fp32-norms --keep-io-types
+    uv run --with onnxconverter-common python tools/models/convert_onnx_to_fp16.py --input data/models/rtmpose-l_384x288.onnx --output data/models/rtmpose-l_384x288_fp16.onnx --fp32-norms --keep-io-types
 """
 
 import argparse

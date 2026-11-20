@@ -5,17 +5,16 @@ to identify precision-related divergence in RTMPose SimCC outputs.
 
 Usage:
     # Compare ONNX vs TRT
-    python tools/models/diagnostic_precision.py --model1 models/rtmpose-l_256x192.onnx --model2 models/rtmpose-l_256x192_b3.trt
     python tools/models/diagnostic_precision.py --model1 models/rtmpose-l_384x288.onnx --model2 models/rtmpose-l_384x288_b3.trt
 
     # Compare two ONNX models (e.g., FP32 vs FP16)
-    python tools/models/diagnostic_precision.py --model1 models/rtmpose-l_256x192.onnx --model2 models/rtmpose-l_384x288.onnx
+    python tools/models/diagnostic_precision.py --model1 models/rtmpose-l_384x288.onnx --model2 models/rtmpose-l_384x288_fp16.onnx
 
     # Compare two TRT engines
-    python tools/models/diagnostic_precision.py --model1 models/rtmpose-l_256x192_b3_fp32.trt --model2 models/rtmpose-l_256x192_b3_fp16.trt
+    python tools/models/diagnostic_precision.py --model1 models/rtmpose-l_384x288_b3_fp32.trt --model2 models/rtmpose-l_384x288_b3_fp16.trt
 
     # Legacy syntax (still supported)
-    python tools/models/diagnostic_precision.py --onnx models/rtmpose-l_256x192.onnx --trt models/rtmpose-l_256x192_b3.trt --batch 3
+    python tools/models/diagnostic_precision.py --onnx models/rtmpose-l_384x288.onnx --trt models/rtmpose-l_384x288_b3.trt --batch 3
 """
 
 import argparse

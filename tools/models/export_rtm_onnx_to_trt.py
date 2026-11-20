@@ -1,12 +1,9 @@
 """Convert RTMPose ONNX models to TensorRT engines.
 
 Usage:
-    # Convert RTMPose-L 256x192 (auto-detects dimensions and precision)
-    python tools/models/export_rtm_onnx_to_trt.py --onnx data/models/rtmpose-l_256x192.onnx --output data/models/rtmpose-l_256x192_b3.trt
-    python tools/models/export_rtm_onnx_to_trt.py --onnx data/models/rtmpose-l_256x192.onnx --output data/models/rtmpose-l_256x192_b8.trt --opt-batch 6 --max-batch 8
-
-    # Convert 384x288 model
+    # Convert RTMPose-L 384x288 (auto-detects dimensions and precision)
     python tools/models/export_rtm_onnx_to_trt.py --onnx data/models/rtmpose-l_384x288.onnx --output data/models/rtmpose-l_384x288_b3.trt
+    python tools/models/export_rtm_onnx_to_trt.py --onnx data/models/rtmpose-l_384x288.onnx --output data/models/rtmpose-l_384x288_b8.trt --opt-batch 6 --max-batch 8
 """
 
 import tensorrt as trt

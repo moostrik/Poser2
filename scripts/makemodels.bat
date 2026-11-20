@@ -8,7 +8,7 @@ set "VENV_DIR=%~dp0..\.venv"
 
 if "%APP%"=="" (
     echo Usage: %~nx0 APP [rebuild]
-    echo   APP      hd_trio, white_space, deep_flow, smile, all
+    echo   APP      hd_trio, white_space, deep_flow, low_flow, smile, all
     echo   rebuild  build the engines that exist again ^(after a TensorRT upgrade^)
     goto endofscript
 )
@@ -22,10 +22,12 @@ call "%VENV_DIR%\Scripts\activate"
 if /I "%APP%"=="hd_trio"      call :section_hd_trio
 if /I "%APP%"=="white_space"  call :section_white_space
 if /I "%APP%"=="deep_flow"    call :section_deep_flow
+if /I "%APP%"=="low_flow"     call :section_low_flow
 if /I "%APP%"=="smile"        call :section_smile
 if /I "%APP%"=="all"          call :section_hd_trio
 if /I "%APP%"=="all"          call :section_white_space
 if /I "%APP%"=="all"          call :section_deep_flow
+if /I "%APP%"=="all"          call :section_low_flow
 if /I "%APP%"=="all"          call :section_smile
 
 echo.
@@ -35,7 +37,6 @@ goto endofscript
 :section_hd_trio
 echo.
 echo hd_trio
-call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192_fp16.onnx --output apps\hd_trio\data\models\rtmpose-l_256x192_fp16.trt --opt-batch 3 --max-batch 3"
 call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_384x288_fp16.onnx --output apps\hd_trio\data\models\rtmpose-l_384x288_fp16.trt --opt-batch 3 --max-batch 3"
 call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_256x192_fp16.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_256x192_fp16.trt --opt-batch 3 --max-batch 3"
 call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_384x288_fp16.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_384x288_fp16.trt --opt-batch 3 --max-batch 3"
@@ -48,7 +49,6 @@ exit /b 0
 :section_white_space
 echo.
 echo white_space
-call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192_fp16.onnx --output apps\white_space\data\models\rtmpose-l_256x192_fp16.trt --opt-batch 6 --max-batch 8"
 call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_384x288_fp16.onnx --output apps\white_space\data\models\rtmpose-l_384x288_fp16.trt --opt-batch 6 --max-batch 8"
 
 call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_512x448.onnx --output apps\white_space\data\models\yolov8n_coco_512x448.trt --opt-batch 4 --max-batch 4"
@@ -57,7 +57,6 @@ exit /b 0
 :section_deep_flow
 echo.
 echo deep_flow
-call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192_fp16.onnx --output apps\deep_flow\data\models\rtmpose-l_256x192_fp16.trt --opt-batch 1 --max-batch 1"
 call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_384x288_fp16.onnx --output apps\deep_flow\data\models\rtmpose-l_384x288_fp16.trt --opt-batch 1 --max-batch 1"
 
 call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_256x192_fp16.onnx --output apps\deep_flow\data\models\rvm_mobilenetv3_256x192_fp16.trt --opt-batch 1 --max-batch 1"
@@ -68,6 +67,21 @@ call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rv
 call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_480x384.onnx --output apps\deep_flow\data\models\yolov8n_coco_480x384.trt --opt-batch 1 --max-batch 1"
 call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_512x416.onnx --output apps\deep_flow\data\models\yolov8n_coco_512x416.trt --opt-batch 1 --max-batch 1"
 call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_640x512.onnx --output apps\deep_flow\data\models\yolov8n_coco_640x512.trt --opt-batch 1 --max-batch 1 --fp16"
+exit /b 0
+
+:section_low_flow
+echo.
+echo low_flow
+call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_384x288_fp16.onnx --output apps\low_flow\data\models\rtmpose-l_384x288_fp16.trt --opt-batch 1 --max-batch 1"
+
+call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_256x192_fp16.onnx --output apps\low_flow\data\models\rvm_mobilenetv3_256x192_fp16.trt --opt-batch 1 --max-batch 1"
+call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_384x288_fp16.onnx --output apps\low_flow\data\models\rvm_mobilenetv3_384x288_fp16.trt --opt-batch 1 --max-batch 1"
+call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_512x384_fp16.onnx --output apps\low_flow\data\models\rvm_mobilenetv3_512x384_fp16.trt --opt-batch 1 --max-batch 1"
+call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_1024x768_fp16.onnx --output apps\low_flow\data\models\rvm_mobilenetv3_1024x768_fp16.trt --opt-batch 1 --max-batch 1"
+
+call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_480x384.onnx --output apps\low_flow\data\models\yolov8n_coco_480x384.trt --opt-batch 1 --max-batch 1"
+call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_512x416.onnx --output apps\low_flow\data\models\yolov8n_coco_512x416.trt --opt-batch 1 --max-batch 1"
+call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_640x512.onnx --output apps\low_flow\data\models\yolov8n_coco_640x512.trt --opt-batch 1 --max-batch 1 --fp16"
 exit /b 0
 
 :section_smile

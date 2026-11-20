@@ -100,21 +100,21 @@ strongly typed: each layer's precision is its ONNX file's, so an FP16 engine is 
 (`tools/models/export_rtm_onnx_to_trt.py`). A file's name says `_fp16` when it is FP16 and nothing when it is FP32,
 its engine's the same, and the workers log the file they load: the pose's and RVM's (`rvm_mobilenetv3_<size>_fp16`)
 are FP16. LFS therefore keeps what an engine is built from and the original it was
-made from: the pose's FP32 originals (`rtmpose-l_256x192.onnx`, `rtmpose-l_384x288.onnx`) and the FP16 files the
-pose runs (`rtmpose-l_<size>_fp16.onnx`), made once per model by
+made from: the pose's FP32 original (`rtmpose-l_384x288.onnx`) and the FP16 file the
+pose runs (`rtmpose-l_384x288_fp16.onnx`), made once by
 `uv run --with onnxconverter-common python tools/models/convert_onnx_to_fp16.py --fp32-norms --keep-io-types`. Its
 library is not one of the project's: it runs only when a model is added. `--fp32-norms` finds each L2 norm by its
 structure, as either export writes it (`ReduceL2`, or a square, `ReduceSum` and `Sqrt`), and keeps it FP32: its sum of
 squares can overflow FP16's 65504 in other runtimes **(site fact: a LiteRT port of RTMPose)**.
 
 The pose is RTMPose-l trained on Body8, OpenMMLab's own checkpoint (76.7 COCO AP at 256x192, 78.3 at 384x288)
-**(seen: its weights against OpenMMLab's file; site fact: the AP)**. The resolutions are the ones it comes in:
-`STANDARD` 192x256 and `HIGH` 288x384; another is refused (`PoseEstimatorSettings.model`). What else was weighed
+**(seen: its weights against OpenMMLab's file; site fact: the AP)**. Every app runs the one model, 288x384
+(`PoseEstimatorSettings`): in the app a full room costs 2 to 3 ms more than at 192x256
+([TIMING.md](TIMING.md), "The pose's resolution for several players"), for 1.6 AP. What else was weighed
 (2026-11-18, online sources) sets these limits **(site fact)**: ViTPose gains as much for several times the time and
 needs a heatmap decode; the one-stage models (RTMO, YOLO-pose) score below RTMPose-l; Sapiens is too heavy and its
 weights non-commercial; the video models need future frames, 33 to 67 ms more; RTMPose-x gains 0.5 AP over
-RTMPose-l at 384x288 for nearly twice the file and the time. The licence of the Body8 training data is unresolved, a
-question in the plan.
+RTMPose-l at 384x288 for nearly twice the file and the time.
 
 ## The upload
 

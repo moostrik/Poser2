@@ -387,8 +387,7 @@
     "model_path": "apps/white_space/data/models",
     "verbose": false,
     "pose": {
-      "enabled": true,
-      "resolution": "STANDARD"
+      "enabled": true
     },
     "frame_source": {
       "detection_timeout": 1.0

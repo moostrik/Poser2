@@ -8,7 +8,6 @@ import numpy as np
 import torch
 
 from modules.inference import ModelType, crop, pose
-from modules.inference.engine import Resolution
 from modules.pose import BBox, Frame, Points2D
 from modules.utils import Rect
 
@@ -17,8 +16,8 @@ from ..decode import NUM_KEYPOINTS, decode_simcc
 
 class FakeModel:
     """The estimator's model steps without a GPU: its `_infer`, blocking until released."""
-    model_width = 192
-    model_height = 256
+    model_width = 288
+    model_height = 384
 
     def __init__(self) -> None:
         self.running = threading.Event()
@@ -30,8 +29,8 @@ class FakeModel:
         n = len(images)
         simcc_x = np.zeros((n, NUM_KEYPOINTS, self.model_width * 2), np.float32)
         simcc_y = np.zeros((n, NUM_KEYPOINTS, self.model_height * 2), np.float32)
-        simcc_x[:, :, 96] = 0.9         # x 48 of 192
-        simcc_y[:, :, 256] = 0.8        # y 128 of 256
+        simcc_x[:, :, 144] = 0.9        # x 72 of 288
+        simcc_y[:, :, 384] = 0.8        # y 192 of 384
         return simcc_x, simcc_y
 
 
@@ -77,7 +76,7 @@ class PoseEstimatorTest(unittest.TestCase):
         self.assertEqual(settings.dropped, 1)
         self.assertEqual([ids for ids, _ in told], [[0], [2]])
         self.assertTrue(all(name == 'PoseEstimator' for _, name in told))
-        self.assertTrue(np.allclose(points[0], [0.25, 0.5]))   # 48 of 192, 128 of 256
+        self.assertTrue(np.allclose(points[0], [0.25, 0.5]))   # 72 of 288, 192 of 384
 
 
 class DecodeTest(unittest.TestCase):
@@ -93,13 +92,10 @@ class DecodeTest(unittest.TestCase):
 
 
 class ModelFileTest(unittest.TestCase):
-    def test_each_resolution_rtmpose_comes_in_has_its_file_and_the_others_none(self) -> None:
-        settings = pose.PoseEstimatorSettings(model_type=ModelType.TRT, resolution=Resolution.HIGH)
+    def test_the_one_model_and_its_size(self) -> None:
+        settings = pose.PoseEstimatorSettings(model_type=ModelType.TRT)
         self.assertEqual(settings.model, 'rtmpose-l_384x288_fp16.trt')
         self.assertEqual((settings.width, settings.height), (288, 384))
-        settings.resolution = Resolution.ULTRA
-        with self.assertRaises(ValueError):
-            _ = settings.model
 
 if __name__ == '__main__':
     unittest.main()

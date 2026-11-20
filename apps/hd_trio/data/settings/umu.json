@@ -206,8 +206,7 @@
     "model_path": "apps/hd_trio/data/models",
     "verbose": false,
     "pose": {
-      "enabled": true,
-      "resolution": "STANDARD"
+      "enabled": true
     },
     "segmentation": {
       "resolution": "EXTREME",

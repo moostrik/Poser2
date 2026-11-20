@@ -129,8 +129,7 @@
     "verbose": false,
     "output_frequency": 60.0,
     "pose": {
-      "enabled": true,
-      "resolution": "HIGH"
+      "enabled": true
     },
     "frame_source": {
       "detection_timeout": 2.0,
