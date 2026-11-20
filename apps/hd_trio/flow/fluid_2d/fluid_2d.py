@@ -22,7 +22,7 @@ Boundary conditions via per-field wrap modes:
 """
 from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_R16F, GL_R8, GL_RG16F, GL_RGBA16F
 
-from modules.gl import Texture, SwapFbo, Fbo, Profiler
+from modules.gl import Texture, SwapFbo, Fbo, GpuTimer
 from modules.flow import FlowUtil, Port, TextureKind
 from ..time_step import REFERENCE_STEP, TimeStep, viscosity_iterations
 from ..shaders import AddBoolean
@@ -121,18 +121,14 @@ class Fluid2D:
         self._buoyancy_shader: Buoyancy = Buoyancy()
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
-        # ---- GPU profiling ----
-        self._profiler: Profiler = Profiler(
-            lambda: f"Fluid2D {self._simulation_width}x{self._simulation_height}",
-            names=["dampen_vel", "advect_vel", "viscosity", "vorticity",
-                   "advect_temp", "buoyancy", "advect_pres", "incompress",
-                   "advect_den", "dampen_den"],
-        )
+        # Each pass's GPU time, during a timing session (GpuTimer)
+        self._timers: dict[str, GpuTimer] = {name: GpuTimer(f"GPU fluid 2D {name}") for name in (
+            "dampen_vel", "advect_vel", "viscosity", "vorticity", "advect_temp", "buoyancy", "advect_pres",
+            "incompress", "advect_den", "dampen_den")}
 
         # Bind settings actions
         self.settings.bind(Fluid2DSettings.width, lambda _: self._request_reallocate())
         self.settings.bind(Fluid2DSettings.height, lambda _: self._request_reallocate())
-        self.settings.bind(Fluid2DSettings.profile, lambda v: setattr(self._profiler, 'enabled', v))
         mark_wall = lambda _: setattr(self, '_wall_dirty', True)
         self.settings.density.bind(DensitySettings.wall, mark_wall)
         self.settings.temperature.bind(TemperatureSettings.wall, mark_wall)
@@ -203,6 +199,8 @@ class Fluid2D:
 
     def deallocate(self) -> None:
         """Release all GPU resources."""
+        for timer in self._timers.values():
+            timer.deallocate()
         self._velocity_fbo.deallocate()
         self._density_fbo.deallocate()
         self._temperature_fbo.deallocate()
@@ -251,50 +249,49 @@ class Fluid2D:
 
         # Dampen velocity (clean input for all steps)
         vel: VelocitySettings = self.settings.velocity
-        self._profiler.begin("dampen_vel")
+        self._timers["dampen_vel"].begin()
         self._dampen(self._velocity_fbo, vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
-        self._profiler.end("dampen_vel")
+        self._timers["dampen_vel"].end()
 
         # Simulation steps
-        self._profiler.begin("advect_vel")
+        self._timers["advect_vel"].begin()
         self._advect_velocity()
-        self._profiler.end("advect_vel")
+        self._timers["advect_vel"].end()
 
-        self._profiler.begin("viscosity")
+        self._timers["viscosity"].begin()
         self._apply_viscosity()
-        self._profiler.end("viscosity")
+        self._timers["viscosity"].end()
 
-        self._profiler.begin("vorticity")
+        self._timers["vorticity"].begin()
         self._confine_vorticity()
-        self._profiler.end("vorticity")
+        self._timers["vorticity"].end()
 
-        self._profiler.begin("advect_temp")
+        self._timers["advect_temp"].begin()
         self._advect_temperature()
-        self._profiler.end("advect_temp")
+        self._timers["advect_temp"].end()
 
-        self._profiler.begin("buoyancy")
+        self._timers["buoyancy"].begin()
         self._apply_buoyancy()
-        self._profiler.end("buoyancy")
+        self._timers["buoyancy"].end()
 
-        self._profiler.begin("advect_pres")
+        self._timers["advect_pres"].begin()
         self._advect_pressure()
-        self._profiler.end("advect_pres")
+        self._timers["advect_pres"].end()
 
-        self._profiler.begin("incompress")
+        self._timers["incompress"].begin()
         self._enforce_incompressibility()
-        self._profiler.end("incompress")
+        self._timers["incompress"].end()
 
-        self._profiler.begin("advect_den")
+        self._timers["advect_den"].begin()
         self._advect_density()
-        self._profiler.end("advect_den")
+        self._timers["advect_den"].end()
 
         # Dampen density (clean output)
         den: DensitySettings = self.settings.density
-        self._profiler.begin("dampen_den")
+        self._timers["dampen_den"].begin()
         self._dampen(self._density_fbo, den.dampen_threshold, den.dampen_time, self._dt, include_alpha=True)
-        self._profiler.end("dampen_den")
+        self._timers["dampen_den"].end()
 
-        self._profiler.report()
 
     # ========== Pipeline Steps ==========
 

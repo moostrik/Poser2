@@ -547,7 +547,6 @@
       },
       "fluid": {
         "blend_mode": "ADD",
-        "profile": false,
         "width": 1088,
         "height": 1920,
         "time_step": "MEASURED",

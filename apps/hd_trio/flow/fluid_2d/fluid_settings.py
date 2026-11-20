@@ -63,7 +63,6 @@ class Fluid2DSettings(BaseSettings):
     """
 
     # ---- Profiling ----
-    profile: Field[bool] = Field(False, description="Enable per-pass GPU timing (uses glFinish; serializes pipeline)")
 
     # ---- Grid dimensions (multiples of 32) ----
     width: Field[int]               = Field(1024,   min=32,     max=4096,   step=32,    description="Simulation grid width")

@@ -21,8 +21,6 @@ frame (deduction). G1 and G2 wait for the coordinator's call on whether that gai
 
 ## H. The package held to the rules
 
-- H4. `Profiler` goes: hd_trio's `fluid_2d` times its passes with `GpuTimer`, which does not wait on the GPU. Check:
-  hd_trio's tests and pyright.
 - H5. `frame_time` becomes `frame_timestamp` (glossary: a stamp is `timestamp`): `render_base.py`,
   `window_manager.py`, the low_flow and deep_flow renders, and `shaders.SimplexNoise.use` with its callers.
   `artnet_bars.py`'s `frame_time`, a duration, stays.
