@@ -11,16 +11,19 @@ from ...color_settings import ColorSettings
 
 
 class PoseRendererSettings(BaseSettings):
-    stage:      Field[int] = Field(0, description="Pipeline stage for pose data")
-    line_width: Field[float] = Field(1.0, min=0.5, max=10.0, description="Pose line width")
     line_smooth:Field[float] = Field(0.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
     use_scores: Field[bool]  = Field(False, description="Use confidence scores for line opacity")
     use_bbox:   Field[bool]  = Field(True, description="Transform points to image space using bbox")
 
 
 class PoseRenderer(LayerBase):
-    def __init__(self, cam_id: int, board: HasFrames, color_settings: ColorSettings | None = None, settings: PoseRendererSettings | None = None) -> None:
+    """The pose lines of a camera's tracks. `stage` and `line_width` (pixels) are inputs its owner sets."""
+
+    def __init__(self, cam_id: int, board: HasFrames, color_settings: ColorSettings | None = None, settings: PoseRendererSettings | None = None,
+                 *, stage: int = 0, line_width: float = 1.0) -> None:
         self.settings: PoseRendererSettings = settings or PoseRendererSettings()
+        self.stage: int = stage
+        self.line_width: float = line_width
         self._board: HasFrames = board
         self._cam_id: int = cam_id
         self._color_settings: ColorSettings | None = color_settings
@@ -38,7 +41,7 @@ class PoseRenderer(LayerBase):
         self._shader.deallocate()
 
     def draw(self) -> None:
-        line_width: float = 1.0 / self._height * self.settings.line_width
+        line_width: float = 1.0 / self._height * self.line_width
         line_smooth: float = 1.0 / self._height * self.settings.line_smooth
 
         for pose in self._cam_poses:
@@ -56,7 +59,7 @@ class PoseRenderer(LayerBase):
             self._shader.use(points, line_width, line_smooth, color=color, use_scores=self.settings.use_scores)
 
     def update(self) -> None:
-        self._cam_poses = {p for p in self._board.get_frames(self.settings.stage).values() if p.cam_id == self._cam_id}
+        self._cam_poses = {p for p in self._board.get_frames(self.stage).values() if p.cam_id == self._cam_id}
 
     @staticmethod
     def _transform_to_image_space(points: Points2D, bbox: Rect) -> Points2D:

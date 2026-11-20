@@ -93,11 +93,8 @@ class WhiteSpaceRender(RenderBase):
         # under the same data overlays as a player's. White: it is not a player.
         d = self.dummy_id
         self.L[Layers.dummy_pose][d] = render.PoseLineLayer(d, board, render.PoseLineLayerSettings(
-            stage=int(Stage.LERP),
-            line_width=settings.preview.pose.line_width,
-            line_smooth=settings.preview.pose.line_smooth,
             use_scores=True, use_bbox=False, color=Color(1.0, 1.0, 1.0),
-        ))
+        ), stage=int(Stage.LERP), line_width=settings.preview.pose.line_width, line_smooth=settings.preview.pose.line_smooth)
         self.L[Layers.data_W][d]    = render.FeatureWindowLayer(d, board, settings.data, settings.colors)
         self.L[Layers.data_F][d]    = render.FeatureFrameLayer( d, board, settings.data, settings.colors)
         self.L[Layers.data_time][d] = render.MotionTimeRenderer(d, board, settings.data_time)

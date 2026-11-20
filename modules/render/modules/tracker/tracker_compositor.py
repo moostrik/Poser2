@@ -8,7 +8,7 @@ from modules.gl import Fbo, Texture, clear_color
 from modules.utils import Rect
 from ...layer_base import LayerBase
 
-from ..pose import PoseBoxRenderer, PoseBoxRendererSettings, PoseRenderer, PoseRendererSettings
+from ..pose import PoseBoxRenderer, PoseRenderer, PoseRendererSettings
 from .tracklet_renderer import TrackletRenderer
 from ...color_settings import ColorSettings
 
@@ -31,14 +31,14 @@ class TrackerCompositor(LayerBase):
         self._cam_texture: Texture = cam_texture
         self._depth_track_renderer: TrackletRenderer = TrackletRenderer(cam_id, board)
 
-        # The boxes: the history color 2x wide under the track color; their stage and widths, and the pose's,
-        # come from `settings` each update (`_follow_settings`).
-        self._bbox_renderer_A: PoseBoxRenderer = PoseBoxRenderer(cam_id, board, PoseBoxRendererSettings(color=color_settings.history))
-        self._bbox_renderer_B: PoseBoxRenderer = PoseBoxRenderer(cam_id, board, PoseBoxRendererSettings(), color_settings=color_settings)
+        # The boxes: the history color 2x wide under the track color; their stage, widths and color, and the pose's
+        # stage and width, are inputs, handed on from the settings each update (`_set_inputs`).
+        self._bbox_renderer_A: PoseBoxRenderer = PoseBoxRenderer(cam_id, board)
+        self._bbox_renderer_B: PoseBoxRenderer = PoseBoxRenderer(cam_id, board, color_settings)
 
         pose_settings: PoseRendererSettings = PoseRendererSettings(line_smooth=0.0, use_scores=False, use_bbox=True)
         self._pose_renderer: PoseRenderer = PoseRenderer(cam_id, board, color_settings=None, settings=pose_settings)
-        self._follow_settings()
+        self._set_inputs()
 
     @property
     def texture(self) -> Texture:
@@ -58,18 +58,20 @@ class TrackerCompositor(LayerBase):
         self._bbox_renderer_B.deallocate()
         self._pose_renderer.deallocate()
 
-    def _follow_settings(self) -> None:
-        """The boxes' and the pose's stages and widths from `settings`, as the panel has them now."""
+    def _set_inputs(self) -> None:
+        """The boxes' and the pose's stages and widths, and the history box's color, from the settings as the panel
+        has them now."""
         s: TrackerCompositorSettings = self.settings
-        self._bbox_renderer_A.settings.stage = s.box_stage
-        self._bbox_renderer_A.settings.line_width = s.bbox_line_width * 2.0
-        self._bbox_renderer_B.settings.stage = s.box_stage
-        self._bbox_renderer_B.settings.line_width = s.bbox_line_width
-        self._pose_renderer.settings.stage = s.stage
-        self._pose_renderer.settings.line_width = s.pose_line_width
+        self._bbox_renderer_A.stage = s.box_stage
+        self._bbox_renderer_A.line_width = s.bbox_line_width * 2.0
+        self._bbox_renderer_A.color = self._color_settings.history
+        self._bbox_renderer_B.stage = s.box_stage
+        self._bbox_renderer_B.line_width = s.bbox_line_width
+        self._pose_renderer.stage = s.stage
+        self._pose_renderer.line_width = s.pose_line_width
 
     def update(self) -> None:
-        self._follow_settings()
+        self._set_inputs()
         self._depth_track_renderer.update()
         self._bbox_renderer_A.update()
         self._bbox_renderer_B.update()
@@ -82,7 +84,6 @@ class TrackerCompositor(LayerBase):
         else:
             clear_color()
         self._depth_track_renderer.draw()
-        self._bbox_renderer_A.settings.color = self._color_settings.history
         self._bbox_renderer_A.draw()
         self._bbox_renderer_B.draw()
         self._pose_renderer.draw()

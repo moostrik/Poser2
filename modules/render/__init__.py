@@ -5,7 +5,7 @@ from .layer_base import     LayerBase, DataCache, HasCaptureTime
 # modules: the layers that draw a module's data
 from .modules.pose import       DataLayerSettings, ScalarFeatureSelect, LayerMode, AngleOffset, FEATURE_MAP, TRACK_COLOR_FEATURES, \
                                 FeatureFrameLayer, FeatureWindowLayer, MotionTimeRenderer, MotionTimeRendererSettings, \
-                                PoseLineLayer, PoseLineLayerSettings, PoseBoxRenderer, PoseBoxRendererSettings, \
+                                PoseLineLayer, PoseLineLayerSettings, PoseBoxRenderer, \
                                 PoseRenderer, PoseRendererSettings, PoseCompositor, PoseCompositorSettings, \
                                 ViewPoseLayer, ViewPoseLayerSettings, PosePlacement, landmark_midpoint, \
                                 SimilaritySilhouetteLayer, SimilaritySilhouetteLayerSettings, PosePointLines
@@ -14,7 +14,7 @@ from .modules.tracker import    TrackerCompositor, TrackerCompositorSettings, Tr
                                 PanoramaCompositor, PanoramaLayerSettings, PanoramaBlend, Part, \
                                 GridRenderer, LabelRenderer, MarkRenderer, SeamRenderer, \
                                 StitchRenderer, Mark, MarkContext, build_marks, strip_spans
-from .modules.inference import  CropLayer, CropLayerSettings, CropImageLayer, SegmentationMaskLayer, SegmentationForegroundLayer, \
+from .modules.inference import  CropLayer, CropImageLayer, SegmentationMaskLayer, SegmentationForegroundLayer, \
                                 InferenceFrameImageLayer, InferenceFrameDepthLayer
 from .modules.flow import       StageLayer, StageLayerSettings, StageOutput, \
                                 ColorInput, ColorOutput, ColorLayer, ColorLayerSettings, \

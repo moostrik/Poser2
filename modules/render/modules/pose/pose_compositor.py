@@ -7,7 +7,7 @@ from modules.settings import Field, BaseSettings
 from modules.gl import Fbo, Texture
 from ...layer_base import LayerBase
 
-from ..inference import CropLayer, CropLayerSettings, CropImageLayer
+from ..inference import CropLayer, CropImageLayer
 from .pose_line_layer import PoseLineLayer, PoseLineLayerSettings
 from ...color_settings import ColorSettings
 from modules.utils import Color
@@ -34,18 +34,18 @@ class PoseCompositor(LayerBase):
         self._fbo: Fbo = Fbo()
 
         # Camera crop layers (one of these will be used based on settings)
-        self._cam_crop_layer: CropLayer = CropLayer(track_id, board, cam_texture, CropLayerSettings())
+        self._cam_crop_layer: CropLayer = CropLayer(track_id, board, cam_texture)
         self._gpu_crop_layer: CropImageLayer = gpu_crop
 
-        # Pose lines, back to front: black 3x wide, white 2x, the track color 1x. Their stages and widths come
-        # from `settings` each update (`_follow_settings`).
+        # Pose lines, back to front: black 3x wide, white 2x, the track color 1x. Their stages and widths are
+        # inputs, handed on from `settings` each update (`_set_inputs`).
         self._pose_back_layer: PoseLineLayer = PoseLineLayer(track_id, board, PoseLineLayerSettings(
             use_scores=True, use_bbox=False, color=Color(0.0, 0.0, 0.0)))
         self._pose_middle_layer: PoseLineLayer = PoseLineLayer(track_id, board, PoseLineLayerSettings(
             use_scores=True, use_bbox=False, color=Color(1.0, 1.0, 1.0)))
         self._pose_front_layer: PoseLineLayer = PoseLineLayer(track_id, board, PoseLineLayerSettings(
             use_scores=True, use_bbox=False, color=color_settings.track_colors[track_id]))
-        self._follow_settings()
+        self._set_inputs()
 
     @property
     def texture(self) -> Texture:
@@ -65,19 +65,19 @@ class PoseCompositor(LayerBase):
         self._pose_middle_layer.deallocate()
         self._pose_front_layer.deallocate()
 
-    def _follow_settings(self) -> None:
-        """The crop's and the lines' stages and widths from `settings`, as the panel has them now."""
+    def _set_inputs(self) -> None:
+        """The crop's and the lines' stages and widths, from `settings` as the panel has them now."""
         s: PoseCompositorSettings = self.settings
-        self._cam_crop_layer.settings.stage = s.stage
+        self._cam_crop_layer.stage = s.stage
         for layer, stage, scale in ((self._pose_back_layer, s.back_stage, 3.0),
                                     (self._pose_middle_layer, s.middle_stage, 2.0),
                                     (self._pose_front_layer, s.front_stage, 1.0)):
-            layer.settings.stage = stage
-            layer.settings.line_width = s.line_width * scale
-            layer.settings.line_smooth = s.line_smooth * scale
+            layer.stage = stage
+            layer.line_width = s.line_width * scale
+            layer.line_smooth = s.line_smooth * scale
 
     def update(self) -> None:
-        self._follow_settings()
+        self._set_inputs()
         crop_layer = self._gpu_crop_layer if self.settings.use_gpu_crop else self._cam_crop_layer
         if crop_layer is self._cam_crop_layer:
             crop_layer.update()     # its own; the shared GPU crop is updated by the app

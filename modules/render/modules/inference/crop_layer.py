@@ -1,7 +1,6 @@
 """ Draws camera image roi for a given pose frame """
 
 # Local application imports
-from modules.settings import Field, BaseSettings
 from modules.board import HasFrames
 from modules.gl import Fbo, Texture, clear_color
 from modules.utils import Rect
@@ -9,13 +8,11 @@ from modules.pose import Frame, BBox
 from ...layer_base import LayerBase, DataCache
 
 
-class CropLayerSettings(BaseSettings):
-    stage: Field[int] = Field(0, description="Pipeline stage for pose data")
-
-
 class CropLayer(LayerBase):
-    def __init__(self, track_id: int, board: HasFrames, cam_texture: Texture, settings: CropLayerSettings | None = None) -> None:
-        self.settings: CropLayerSettings = settings or CropLayerSettings()
+    """The camera image cut to a track's box. `stage` is an input its owner sets: the pipeline stage of the box."""
+
+    def __init__(self, track_id: int, board: HasFrames, cam_texture: Texture, stage: int = 0) -> None:
+        self.stage: int = stage
         self._track_id: int = track_id
         self._board: HasFrames = board
         self._fbo: Fbo = Fbo()
@@ -33,7 +30,7 @@ class CropLayer(LayerBase):
         self._fbo.deallocate()
 
     def update(self) -> None:
-        pose: Frame | None = self._board.get_frame(self.settings.stage, self._track_id)
+        pose: Frame | None = self._board.get_frame(self.stage, self._track_id)
         self._data_cache.set(pose)
 
         if self._data_cache.lost:

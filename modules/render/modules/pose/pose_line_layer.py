@@ -11,18 +11,20 @@ from modules.utils import Color, Rect
 
 
 class PoseLineLayerSettings(BaseSettings):
-    stage:      Field[int] = Field(0, description="Pipeline stage for pose data")
-    line_width: Field[float] = Field(4.0, min=0.5, max=20.0, description="Line width in pixels")
-    line_smooth:Field[float] = Field(2.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
     use_scores: Field[bool]  = Field(True, description="Use confidence scores for line opacity")
     use_bbox:   Field[bool]  = Field(False, description="Transform points to image space using bbox")
     color:      Field[Color] = Field(Color(1.0, 1.0, 1.0), description="Line color")
 
 
 class PoseLineLayer(LayerBase):
+    """A track's pose lines. `stage`, `line_width` and `line_smooth` (pixels) are inputs its owner sets."""
 
-    def __init__(self, track_id: int, board: HasFrames, settings: PoseLineLayerSettings | None = None) -> None:
+    def __init__(self, track_id: int, board: HasFrames, settings: PoseLineLayerSettings | None = None, *, stage: int = 0,
+                 line_width: float = 4.0, line_smooth: float = 2.0) -> None:
         self.settings: PoseLineLayerSettings = settings or PoseLineLayerSettings()
+        self.stage: int = stage
+        self.line_width: float = line_width
+        self.line_smooth: float = line_smooth
         self._track_id: int = track_id
         self._board: HasFrames = board
         self._fbo: Fbo = Fbo()
@@ -47,7 +49,7 @@ class PoseLineLayer(LayerBase):
             self._fbo.draw()
 
     def update(self) -> None:
-        pose: Frame | None = self._board.get_frame(self.settings.stage, self._track_id)
+        pose: Frame | None = self._board.get_frame(self.stage, self._track_id)
         self._data_cache.set(pose)
 
         if self._data_cache.lost:
@@ -61,8 +63,8 @@ class PoseLineLayer(LayerBase):
         if self.settings.use_bbox:
             points = PoseLineLayer._transform_to_image_space(points, pose[BBox].to_rect())
 
-        line_width: float = 1.0 / self._fbo.height * self.settings.line_width
-        line_smooth: float = 1.0 / self._fbo.height * self.settings.line_smooth
+        line_width: float = 1.0 / self._fbo.height * self.line_width
+        line_smooth: float = 1.0 / self._fbo.height * self.line_smooth
 
         self._fbo.begin()
         clear_color()
