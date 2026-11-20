@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from modules.camera import FrameType
-from modules.video import CoderFormat, StreamReader
+from modules.video import CoderFormat, probe
 
 from .chunk import make_chunk_name, make_file_name
 
@@ -39,6 +39,15 @@ def write_in_out(folder: Path, in_out: list[float]) -> None:
         logger.exception("Could not save the markers in %s", folder)
 
 
+def _frames(path: Path) -> int:
+    """The frames of a chunk's first video stream, 0 when it cannot be read."""
+    try:
+        return probe(str(path)).frames
+    except (RuntimeError, OSError, ValueError) as e:
+        logger.error('No frame count for %s: %s', path, e)
+        return 0
+
+
 @dataclass(frozen=True)
 class RecordingFolder:
     """One recording: its folder and its last chunk's number."""
@@ -65,13 +74,13 @@ class RecordingFolder:
         return folders
 
     def frame_counts(self, frame_type: FrameType, suffix: str) -> list[int]:
-        """Each chunk's frame count (camera 0), by chunk number; it decodes when a clip does not say."""
+        """Each chunk's frame count (camera 0), by chunk number; 0 for a chunk that is missing or cannot be read."""
         frames: list[int] = []
         for chunk in range(self.chunks + 1):
             path: Path = self.path / make_chunk_name(0, chunk)
             if not path.is_file():
                 path = self.path / make_file_name(0, frame_type, chunk, suffix)
-            frames.append(StreamReader.frame_count(str(path)) if path.is_file() else 0)
+            frames.append(_frames(path) if path.is_file() else 0)
         return frames
 
     def read_markers(self) -> list[float]:

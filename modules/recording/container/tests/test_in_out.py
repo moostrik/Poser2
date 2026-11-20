@@ -116,8 +116,9 @@ class PlaybackTest(unittest.TestCase):
         chunk = str(self.recording / make_chunk_name(0, 0))
 
         def packets(stream: int) -> list[tuple[int, bool]]:
-            lines = subprocess.run(['ffprobe', '-hide_banner', '-loglevel', 'error', '-select_streams', f'v:{stream}', '-show_entries', 'packet=pts,flags',
-                                    '-of', 'csv=p=0', chunk], capture_output=True, text=True).stdout.split()
+            args = ['-select_streams', f'v:{stream}', '-show_entries', 'packet=pts,flags', '-of', 'csv=p=0', chunk]
+            out, _ = video.popen(args, subprocess.DEVNULL, subprocess.PIPE, command=video.FFPROBE).communicate(timeout=20)
+            lines = out.decode().split()
             return [(int(line.split(',')[0]), 'K' in line) for line in lines]
         colour, depth = packets(0), packets(1)
         self.assertEqual(len(colour), self.COUNT)

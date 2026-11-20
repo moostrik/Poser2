@@ -5,7 +5,7 @@ import subprocess
 import numpy as np
 
 from .encoder import CODECS, Encoder
-from .probe import read_comment
+from .probe import probe
 from .process import error_text, popen
 
 
@@ -23,7 +23,7 @@ def make_share(video: str, overlays: list[tuple[str, str]], pcm: np.ndarray, rat
     shorter of the two; the video's comment tag is kept. Raises when ffmpeg fails."""
     codec, _, pix_fmt = CODECS[encoder]
     quality: list[str] = _SHARE_QUALITY[encoder]
-    comment: str | None = read_comment(video)
+    comment: str | None = probe(video).comment
     metadata: list[str] = ['-metadata', f'comment={comment}'] if comment else []
     inputs: list[str] = ['-i', video]
     chain: list[str] = []

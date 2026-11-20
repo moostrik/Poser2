@@ -9,6 +9,7 @@ from typing import Callable, Protocol
 import time
 
 from .depth_frame import DEPTH_PIX_FMT, depth_frame_bytes, p012_to_depth
+from .probe import probe
 
 import logging
 logger = logging.getLogger(__name__)
@@ -120,7 +121,8 @@ class StreamReader:
 
     def _load(self, video_file: str, chunk_id: int, start_frame: int = 0, end_frame: int | None = None) -> None:
         try:
-            self.frame_width, self.frame_height, fps = self._get_video_dimensions(video_file)
+            info = probe(video_file, self.stream)
+            self.frame_width, self.frame_height, fps = info.width, info.height, info.fps
             if self.fps == 0.0:
                 self.fps = fps
             # Half a frame early: the seek takes the first frame at or after it, and stamps are rounded.
@@ -225,45 +227,3 @@ class StreamReader:
             elif -remaining > frame_interval:
                 next_time = time.perf_counter()   # resync after a stall rather than bursting catch-up frames
         self._close()
-
-    @staticmethod
-    def frame_count(video_file: str) -> int:
-        """The number of frames in *video_file*'s first video stream: the container's ``nb_frames`` (mp4), else its
-        packets counted by ffprobe (mkv, raw hevc), which reads the file without decoding it; 0 when it has none or
-        cannot be read."""
-        try:
-            probe = ffmpeg.probe(video_file)
-        except ffmpeg.Error as e:
-            logger.error('Error probing frame count of %s: %s', video_file, e)
-            return 0
-        video_stream = next((s for s in probe['streams'] if s['codec_type'] == 'video'), None)
-        if video_stream is None:
-            return 0
-
-        nb_frames = video_stream.get('nb_frames')
-        if nb_frames is not None and str(nb_frames).isdigit() and int(nb_frames) > 0:
-            return int(nb_frames)
-
-        try:
-            probe = ffmpeg.probe(video_file, count_packets=None, select_streams='v:0')
-        except ffmpeg.Error as e:
-            logger.error('Error counting the packets of %s: %s', video_file, e)
-            return 0
-        streams = probe.get('streams', [])
-        packets = streams[0].get('nb_read_packets') if streams else None
-        return int(packets) if packets is not None and str(packets).isdigit() else 0
-
-    def _get_video_dimensions(self, video_file: str) -> tuple:
-        probe = ffmpeg.probe(video_file)
-        video_streams: list[dict] = [stream for stream in probe['streams'] if stream['codec_type'] == 'video']
-        if len(video_streams) <= self.stream:
-            raise Exception('No video stream found for file', video_file)
-        video_stream: dict = video_streams[self.stream]
-        width = int(video_stream['width'])
-        height = int(video_stream['height'])
-
-        frame_rate_str: str = video_stream.get('r_frame_rate', '30/1')
-        num, denom = map(int, frame_rate_str.split('/'))
-        fps: float = num / denom if denom != 0 else 0
-
-        return width, height, fps

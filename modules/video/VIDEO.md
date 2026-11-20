@@ -6,6 +6,10 @@ clip decode (`clip_decode.py`), audio (`audio.py`) and the share clip (`share.py
 (`stream_writer.py`, `stream_reader.py`, `depth_frame.py`); and the screen recorder (`screen_recorder.py`,
 `screen_format.py`, `screen_frame.py`, `screen_frame_ring.py`). This document holds the screen recorder's design.
 
+`probe` is the one question to ffprobe: a video stream's size, frame rate and exact frame count (the count an mp4
+stores, else the packets counted, which reads an mkv or a raw stream without decoding it) and the clip's comment
+(`StreamInfo`).
+
 ## Screen recorder
 
 Each render tick the layers an app records are drawn into the screen frame, an Fbo of the recording's size;

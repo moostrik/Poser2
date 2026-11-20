@@ -3,7 +3,7 @@ from .encoder import Encoder, encoder_works, pick_encoder
 from .clip_writer import ClipInput, ClipCodec, HEVC_QUALITY, ClipWriter
 from .audio import transcode_aac, read_audio
 from .share import make_share
-from .probe import probe, read_comment
+from .probe import StreamInfo, probe
 from .clip_decode import hwaccel_args, decode_clip
 from .codec import CoderType, CoderFormat, encoder_name, hwaccel
 from .depth_frame import DEPTH_ENCODER, DEPTH_PIX_FMT, DEPTH_QUALITY, depth_frame_bytes, depth_to_p012, p012_to_depth

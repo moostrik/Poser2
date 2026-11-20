@@ -1,7 +1,6 @@
 """What the recording tests share: frames, tracklets and poses to record, a recorder and a player
 set up for the tests, and a recording made in a folder."""
 
-import subprocess
 import time
 from pathlib import Path
 from typing import Callable
@@ -62,9 +61,7 @@ def recorder(types: list[FrameType], temp: str = 'temp', output: str = 'out', da
 
 def stream_frames(path: Path, stream: int) -> int:
     """The frames actually stored in one stream of a chunk."""
-    out = subprocess.run(['ffprobe', '-hide_banner', '-loglevel', 'error', '-count_packets', '-select_streams', f'v:{stream}',
-                          '-show_entries', 'stream=nb_read_packets', '-of', 'csv=p=0', str(path)], capture_output=True, text=True).stdout
-    return int(out.strip().strip(','))
+    return video.probe(str(path), stream).frames
 
 
 def cam_frame(cam_id: int, value: int, timestamp: float) -> CameraFrame:

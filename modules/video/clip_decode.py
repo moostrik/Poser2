@@ -36,7 +36,8 @@ def _read_exactly(file: BinaryIO, size: int) -> bytes:
 
 def decode_clip(path: str, size: tuple[int, int], hwaccel: int | None = None) -> tuple[np.ndarray, float]:
     """The whole clip as a (frames, height, width, 3) bgr uint8 array scaled to size (width, height), and its fps."""
-    frames, fps, _, _ = probe(path)
+    info = probe(path)
+    frames, fps = info.frames, info.fps
     width, height = size
     frame_bytes = width * height * 3
     args = ['-nostdin', '-threads', str(DECODE_THREADS), *hwaccel_args(hwaccel), '-i', path,

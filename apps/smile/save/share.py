@@ -36,7 +36,8 @@ def build_share(clip: str, track: str | None, offset: float, watermark: str | No
     """Write the share clip `out` from the players' clip: `track` from `offset` s (the point the room heard
     when the grin started) on the tape, or silence without one; the `watermark` PNG (or None) in the bottom
     right. Raises when it fails."""
-    frames, fps, width, height = video.probe(clip)
+    info = video.probe(clip)
+    frames, fps, width, height = info.frames, info.fps, info.width, info.height
     if frames <= 0 or fps <= 0:
         raise RuntimeError(f'{clip} does not say its length')
     duration: float = frames / fps

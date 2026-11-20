@@ -27,8 +27,10 @@ def feed(rec) -> None:
 
 
 def probe(path: Path, entry: str) -> str:
-    return subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', f'stream={entry}', '-of', 'csv=p=0',
-                           str(path)], capture_output=True, text=True).stdout.strip()
+    """One entry of the clip's first video stream, as ffprobe writes it."""
+    args = ['-select_streams', 'v:0', '-show_entries', f'stream={entry}', '-of', 'csv=p=0', str(path)]
+    out, _ = video.popen(args, subprocess.DEVNULL, subprocess.PIPE, command=video.FFPROBE).communicate(timeout=20)
+    return out.decode().strip()
 
 
 @unittest.skipUnless(video.available() and video.encoder_works(video.Encoder.QSV), 'no iGPU encoder')

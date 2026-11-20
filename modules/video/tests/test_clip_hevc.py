@@ -121,9 +121,9 @@ class TestClipHevc(unittest.TestCase):
                            else yuv_gray(luma_of(i), rows, dtype))
             self.assertTrue(writer.close())
 
-            frames, fps, width, height = video.probe(path)
-            self.assertEqual((frames, width, height), (FRAMES, SIZE, SIZE))
-            self.assertAlmostEqual(fps, FPS)
+            probed = video.probe(path)
+            self.assertEqual((probed.frames, probed.width, probed.height), (FRAMES, SIZE, SIZE))
+            self.assertAlmostEqual(probed.fps, FPS)
             info = stream_info(path)
             self.assertEqual((info['codec_name'], info['codec_tag_string']), ('hevc', 'hvc1'))
             self.assertEqual((info['color_space'], info['color_range']), ('bt709', 'tv'))

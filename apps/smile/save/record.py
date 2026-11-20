@@ -57,7 +57,7 @@ def read_jpeg(path: str) -> str | None:
 def read(path: str) -> dict | None:
     """The record in a clip or a portrait, or None when the file has none."""
     is_jpeg: bool = path.lower().endswith(JPEG_EXTENSIONS)
-    text: str | None = read_jpeg(path) if is_jpeg else video.read_comment(path)
+    text: str | None = read_jpeg(path) if is_jpeg else video.probe(path).comment
     if not text:
         return None
     try:

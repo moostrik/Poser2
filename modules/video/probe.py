@@ -1,37 +1,49 @@
-"""What ffprobe says about a clip: its first video stream, its comment."""
+"""What ffprobe says about a clip: one video stream's size, rate and exact frame count, and the clip's comment."""
 
 import json
 import subprocess
+from dataclasses import dataclass
 from fractions import Fraction
 
 from .process import FFPROBE, error_text, popen
 
 
-def probe(path: str) -> tuple[int, float, int, int]:
-    """(frames, fps, width, height) of the first video stream; frames is 0 when the file does not say."""
-    args = ['-select_streams', 'v:0', '-show_entries', 'stream=nb_frames,r_frame_rate,width,height',
-            '-of', 'json', path]
-    process = popen(args, subprocess.DEVNULL, subprocess.PIPE, command=FFPROBE)
-    out, err = process.communicate(timeout=20)
+@dataclass(frozen=True)
+class StreamInfo:
+    """A video stream of a clip: its size (px), its frame rate (frames/s, 0 when the file does not say), its frames,
+    and the clip's comment tag (ClipWriter.comment), None when it has none."""
+    width: int
+    height: int
+    fps: float
+    frames: int
+    comment: str | None
+
+
+def _ffprobe(args: list[str], path: str) -> dict:
+    process = popen([*args, '-of', 'json', path], subprocess.DEVNULL, subprocess.PIPE, command=FFPROBE)
+    out, err = process.communicate(timeout=60)
     if process.returncode != 0:
         raise RuntimeError(f'ffprobe failed on {path}: {error_text(err)}')
-    streams = json.loads(out).get('streams', [])
+    return json.loads(out)
+
+
+def probe(path: str, stream: int = 0) -> StreamInfo:
+    """Video stream `stream` of the clip at `path`. Its frames are the count the container stores (mp4), else its
+    packets counted (mkv, raw streams), which reads the file without decoding it. Raises when ffprobe fails or the
+    clip has no such stream."""
+    select = ['-select_streams', f'v:{stream}']
+    info = _ffprobe([*select, '-show_entries', 'stream=nb_frames,r_frame_rate,width,height:format_tags=comment'], path)
+    streams = info.get('streams', [])
     if not streams:
-        raise RuntimeError(f'no video stream in {path}')
-    stream = streams[0]
-    try:
-        frames = int(stream.get('nb_frames', 0))
-    except ValueError:
-        frames = 0
-    fps = float(Fraction(stream.get('r_frame_rate', '0/1')))
-    return frames, fps, int(stream['width']), int(stream['height'])
-
-
-def read_comment(path: str) -> str | None:
-    """The file's comment tag (ClipWriter.comment), or None when it has none."""
-    args = ['-show_entries', 'format_tags=comment', '-of', 'json', path]
-    process = popen(args, subprocess.DEVNULL, subprocess.PIPE, command=FFPROBE)
-    out, err = process.communicate(timeout=20)
-    if process.returncode != 0:
-        raise RuntimeError(f'ffprobe failed on {path}: {error_text(err)}')
-    return json.loads(out).get('format', {}).get('tags', {}).get('comment')
+        raise RuntimeError(f'no video stream {stream} in {path}')
+    found = streams[0]
+    stored = str(found.get('nb_frames', ''))
+    if stored.isdigit() and int(stored) > 0:
+        frames = int(stored)
+    else:
+        counted = _ffprobe([*select, '-count_packets', '-show_entries', 'stream=nb_read_packets'], path)
+        packets = str((counted.get('streams') or [{}])[0].get('nb_read_packets', ''))
+        frames = int(packets) if packets.isdigit() else 0
+    fps = float(Fraction(found.get('r_frame_rate', '0/1'))) if found.get('r_frame_rate', '0/1') != '0/0' else 0.0
+    comment = info.get('format', {}).get('tags', {}).get('comment')
+    return StreamInfo(int(found['width']), int(found['height']), fps, frames, comment)

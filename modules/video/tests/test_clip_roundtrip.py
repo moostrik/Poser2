@@ -54,8 +54,8 @@ class TestClipRoundTrip(unittest.TestCase):
             writer = video.ClipWriter(path, 15.0, video.Encoder.CPU)
             writer.add(np.full((33, 65, 3), 128, np.uint8))
             self.assertTrue(writer.close())
-            _, _, width, height = video.probe(path)
-            self.assertEqual((width, height), (64, 32))
+            probed = video.probe(path)
+            self.assertEqual((probed.width, probed.height), (64, 32))
 
     def test_size_change_raises(self):
         with tempfile.TemporaryDirectory() as folder:

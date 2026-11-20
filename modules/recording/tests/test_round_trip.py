@@ -80,7 +80,7 @@ class RoundTripTest(unittest.TestCase):
             chunks = list((root / 'recordings').glob('*/' + make_chunk_name(0, 0)))
             self.assertEqual(len(chunks), 1)
             self.assertEqual(sorted(p.name for p in chunks[0].parent.iterdir()), [make_chunk_name(0, 0)])
-            self.assertEqual(video.StreamReader.frame_count(str(chunks[0])), count)
+            self.assertEqual(video.probe(str(chunks[0])).frames, count)
             metadata = read_metadata(chunks[0])
             self.assertEqual(metadata.info, ChunkInfo(896, 720, LENS, False, 60.0))
             self.assertEqual(metadata.frames[3].readings, FrameReadings(-27.0, 1.0, 1000, 100))

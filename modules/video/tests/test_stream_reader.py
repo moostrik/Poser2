@@ -60,7 +60,7 @@ class StreamReaderTest(unittest.TestCase):
         for name in ('count.mp4', 'count.mkv', 'count.h264'):     # stored, counted by packets, a raw stream
             path = os.path.join(self.folder.name, name)
             make_clip(path, 37)
-            self.assertEqual(StreamReader.frame_count(path), 37, name)
+            self.assertEqual(video.probe(path).frames, 37, name)
 
     def reader(self, fps: float = 1000.0) -> StreamReader:
         return StreamReader(0, 'video', lambda _c, _t, _f, _chunk, frame_id: self.frames.append(frame_id), True, fps=fps)
