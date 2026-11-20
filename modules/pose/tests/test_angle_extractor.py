@@ -86,6 +86,31 @@ class AngleExtractorTest(unittest.TestCase):
         self.assertAlmostEqual(angles.get_score(A.left_shoulder), 0.6, places=6)   # elbow is its distal point
         self.assertAlmostEqual(angles.get_score(A.left_knee), 1.0, places=6)
 
+    def test_head_yaw_is_the_nose_offset_over_the_eye_width(self) -> None:
+        coords = skeleton_coords()
+        (lx, _), (rx, _) = coords[PointLandmark.left_eye], coords[PointLandmark.right_eye]
+        _, ny = coords[PointLandmark.nose]
+        coords[PointLandmark.nose] = ((lx + rx) / 2 + 0.01, ny)
+        self.assertAlmostEqual(_angles(points(coords))[A.head], math.atan(0.01 / (rx - lx)), places=5)
+
+    def test_a_too_close_pair_of_end_points_gives_nan(self) -> None:
+        # the two ends of the angle, not the vertex and an end
+        coords = skeleton_coords()
+        coords[PointLandmark.left_wrist] = coords[PointLandmark.left_shoulder]
+        angles = _angles(points(coords))
+        self.assertTrue(math.isnan(angles[A.left_elbow]))
+        self.assertEqual(angles.get_score(A.left_elbow), 0.0)
+        self.assertFalse(math.isnan(angles[A.left_shoulder]))
+
+    def test_an_angle_past_pi_wraps_to_minus_pi(self) -> None:
+        straight = _angles(skeleton())
+        bent = _angles(skeleton(left_elbow=0.1, right_elbow=0.1))
+        for joint in (A.left_elbow, A.right_elbow):
+            with self.subTest(joint=joint.name):
+                self.assertGreater(straight[joint] + 0.1, math.pi)
+                self.assertAlmostEqual(bent[joint], straight[joint] + 0.1 - 2 * math.pi, places=4)
+                self.assertGreaterEqual(bent[joint], -math.pi)
+
     def test_no_points_gives_dummy(self) -> None:
         angles = _angles(Points2D.create_dummy())
         self.assertEqual(angles.valid_count, 0)

@@ -3,7 +3,7 @@ import numpy as np
 from ...features import Angles, AngleLandmark, Points2D, PointLandmark
 
 """Maps angle joints to the point landmarks needed to compute them"""
-ANGLE_KEYPOINTS: dict[AngleLandmark, tuple[PointLandmark, ...]] = {
+ANGLE_KEYPOINTS: dict[AngleLandmark, tuple[PointLandmark, PointLandmark, PointLandmark]] = {
     # Standard 3-point angles
     AngleLandmark.left_shoulder:  (PointLandmark.left_hip,       PointLandmark.left_shoulder,  PointLandmark.left_elbow),
     AngleLandmark.right_shoulder: (PointLandmark.right_hip,      PointLandmark.right_shoulder, PointLandmark.right_elbow),
@@ -13,7 +13,7 @@ ANGLE_KEYPOINTS: dict[AngleLandmark, tuple[PointLandmark, ...]] = {
     AngleLandmark.right_hip:      (PointLandmark.right_shoulder, PointLandmark.right_hip,      PointLandmark.right_knee),
     AngleLandmark.left_knee:      (PointLandmark.left_hip,       PointLandmark.left_knee,      PointLandmark.left_ankle),
     AngleLandmark.right_knee:     (PointLandmark.right_hip,      PointLandmark.right_knee,     PointLandmark.right_ankle),
-    # Special 4-point measurements
+    # Special 3-point measurement: the head's yaw from the eyes and the nose
     AngleLandmark.head:           (PointLandmark.left_eye,       PointLandmark.right_eye,      PointLandmark.nose),
 }
 
@@ -24,6 +24,15 @@ _ANGLE_MIRRORED: set[AngleLandmark] = {
     AngleLandmark.right_hip,
     AngleLandmark.right_knee,
 }
+
+# The three points of every angle as index arrays, in AngleLandmark order, and the sign each angle gets
+_ORDER: list[AngleLandmark] = list(AngleLandmark)
+_P0: np.ndarray = np.array([ANGLE_KEYPOINTS[a][0] for a in _ORDER], dtype=np.intp)
+_P1: np.ndarray = np.array([ANGLE_KEYPOINTS[a][1] for a in _ORDER], dtype=np.intp)
+_P2: np.ndarray = np.array([ANGLE_KEYPOINTS[a][2] for a in _ORDER], dtype=np.intp)
+_SIGN: np.ndarray = np.array([-1.0 if a in _ANGLE_MIRRORED else 1.0 for a in _ORDER], dtype=np.float32)
+_HEAD: int = int(AngleLandmark.head)
+
 
 class AngleUtils:
 
@@ -55,88 +64,37 @@ class AngleUtils:
         # For a 192x256 crop (ar=0.75), y is stretched by 1/0.75 = 1.333 so that
         # equal normalized distances correspond to equal physical distances.
         ar_scale = np.array([1.0, 1.0 / aspect_ratio], dtype=np.float32)
+        P = points.values * ar_scale
+        a, b, c = P[_P0], P[_P1], P[_P2]
 
-        angle_values = np.full(len(AngleLandmark), np.nan, dtype=np.float32)
-        angle_scores = np.zeros(len(AngleLandmark), dtype=np.float32)
+        valid = points.valid_mask
+        ok = valid[_P0] & valid[_P1] & valid[_P2]
 
-        # Compute all angle measurements
-        for landmark, keypoints in ANGLE_KEYPOINTS.items():
-            if not points.are_valid(list(keypoints)):
-                continue  # Skip if any required keypoint is invalid
+        with np.errstate(invalid='ignore', divide='ignore'):
+            # every pair of an angle's points at least min_dist apart
+            d_ab = np.linalg.norm(a - b, axis=1)
+            ok &= (d_ab >= min_dist) & (np.linalg.norm(a - c, axis=1) >= min_dist) & (np.linalg.norm(b - c, axis=1) >= min_dist)
 
-            # Extract points and scale to isotropic space (guaranteed valid - no NaN)
-            P = [points[kp] * ar_scale for kp in keypoints]
-            if AngleUtils._points_too_close(P, min_dist):
-                continue  # Skip if any points are too close
+            # signed angle at the middle point, from the first to the third
+            v1 = a - b
+            v2 = c - b
+            dot = v1[:, 0] * v2[:, 0] + v1[:, 1] * v2[:, 1]
+            det = v1[:, 0] * v2[:, 1] - v1[:, 1] * v2[:, 0]
+            angles = np.arctan2(det, dot)
 
-            # Compute angle based on number of keypoints (no NaN checks needed)
-            if landmark == AngleLandmark.head:
-                angle = AngleUtils._calculate_head_yaw(P[0], P[1], P[2])
+            # the head: the nose's offset from the eyes' midpoint, over the eye width
+            eye_width = d_ab[_HEAD]
+            if eye_width > 0:
+                offset_x = (c[_HEAD, 0] - (a[_HEAD, 0] + b[_HEAD, 0]) / 2) / eye_width
+                angles[_HEAD] = np.arctan(offset_x)
             else:
-                angle = AngleUtils._calculate_angle(P[0], P[1], P[2])
+                angles[_HEAD] = np.nan
 
-            # Mirror right-side angles for symmetric representation
-            if landmark in _ANGLE_MIRRORED:
-                angle = -angle
+            angles = (((angles + np.pi) % (2 * np.pi)) - np.pi) * _SIGN
 
-            angle_values[landmark] = angle
-
-            scores = points.get_scores(list(keypoints))
-            angle_scores[landmark] = min(scores) if not np.isnan(angle) else 0.0
+        ok &= ~np.isnan(angles)
+        angle_values = np.where(ok, angles, np.nan).astype(np.float32)
+        scores = points.scores
+        angle_scores = np.where(ok, np.minimum(np.minimum(scores[_P0], scores[_P1]), scores[_P2]), 0.0).astype(np.float32)
 
         return Angles(values=angle_values, scores=angle_scores)
-
-    @staticmethod
-    def _points_too_close(points: list[np.ndarray], min_dist: float = 0.02) -> bool:
-        """Return True if any pair of points are closer than min_dist."""
-        for i in range(len(points)):
-            for j in range(i + 1, len(points)):
-                if np.linalg.norm(points[i] - points[j]) < min_dist:
-                    return True
-        return False
-
-    @staticmethod
-    def _calculate_angle(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray) -> float:
-        """Calculate signed angle between three points (assumes valid input).
-
-        Args:
-            p1: First point coordinates [x, y] (must be valid)
-            p2: Second point (vertex) coordinates [x, y] (must be valid)
-            p3: Third point coordinates [x, y] (must be valid)
-
-        Returns:
-            Angle in radians in range [-π, π)
-        """
-        v1: np.ndarray = p1 - p2
-        v2: np.ndarray = p3 - p2
-
-        dot: float = np.dot(v1, v2)
-        det: float = v1[0] * v2[1] - v1[1] * v2[0]
-        angle: float = np.arctan2(det, dot)
-        angle = ((angle + np.pi) % (2 * np.pi)) - np.pi
-
-        return float(angle)
-
-    @staticmethod
-    def _calculate_head_yaw(left_eye: np.ndarray, right_eye: np.ndarray, nose: np.ndarray) -> float:
-        """Calculate head yaw using eyes and nose (assumes valid input).
-
-        Args:
-            left_eye: Left eye coordinates [x, y] (must be valid)
-            right_eye: Right eye coordinates [x, y] (must be valid)
-            nose: Nose coordinates [x, y] (must be valid)
-
-        Returns:
-            Yaw angle in radians [-π, π), or NaN if eye_width is 0
-        """
-        eye_midpoint = (left_eye + right_eye) / 2
-        eye_width = float(np.linalg.norm(right_eye - left_eye))
-
-        if eye_width > 0:
-            offset_x = (nose[0] - eye_midpoint[0]) / eye_width
-            yaw = np.arctan(offset_x)
-            yaw = ((yaw + np.pi) % (2 * np.pi)) - np.pi
-
-            return float(yaw)
-
-        return np.nan  # Only case: eye_width == 0 (shouldn't happen with valid data)
