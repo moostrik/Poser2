@@ -21,8 +21,6 @@ frame (deduction). G1 and G2 wait for the coordinator's call on whether that gai
 
 ## H. The package held to the rules
 
-- H2. The default placement is read from `WindowSettings`' defaults: `WindowManager._DEFAULT_*` go, the button's
-  description drops the numbers.
 - H3. Tests for `Style`'s state (a repeated call skipped, buffer modes, push and pop), `clear_value`, and `fit` and
   `fill`.
 - H4. `Profiler` goes: hd_trio's `fluid_2d` times its passes with `GpuTimer`, which does not wait on the GPU. Check:

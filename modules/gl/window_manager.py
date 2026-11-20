@@ -26,11 +26,6 @@ class WindowManager:
     """The window loop on the main thread: GLFW's windows, monitors and events, the renderer's update once a frame
     and its draw in each shown window."""
     _MIN_VISIBLE_SHARE = 0.5    # share of a window that must be on the monitors at start, else the default placement
-    # The default placement: monitor 0, relative to it
-    _DEFAULT_X = 20
-    _DEFAULT_Y = 40
-    _DEFAULT_WIDTH = 1280
-    _DEFAULT_HEIGHT = 720
 
     def __init__(self, renderer: RenderBase, settings: WindowManagerSettings) -> None:
         """`settings` an app's `windows` group: the loop's fields and its declared windows."""
@@ -367,12 +362,13 @@ class WindowManager:
         return visible / (width * height)
 
     def _write_default_placement(self, settings: WindowSettings) -> None:
-        """The default placement into a window's settings: windowed, on its own monitor, its position and size."""
+        """The default placement into a window's settings: windowed, on its own monitor, at `WindowSettings`' default
+        position and size."""
         settings.fullscreen = False
-        settings.x = self._DEFAULT_X
-        settings.y = self._DEFAULT_Y
-        settings.width = self._DEFAULT_WIDTH
-        settings.height = self._DEFAULT_HEIGHT
+        settings.x = WindowSettings.x.default
+        settings.y = WindowSettings.y.default
+        settings.width = WindowSettings.width.default
+        settings.height = WindowSettings.height.default
 
     def _write_monitors(self) -> None:
         self.settings.monitors = ", ".join(f"M{i} {m.name} {m.width}×{m.height}" for i, m in enumerate(self._monitors))

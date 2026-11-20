@@ -26,7 +26,7 @@ class WindowManagerSettings(BaseSettings):
     fps_limit:         Field[int]  = Field(0, min=0, max=480, widget=Widget.number_field, unit="fps", description="The loop's rate when v-sync does not pace it; 0 = off")
     fullscreen_mouse:  Field[bool] = Field(False, description="Show the mouse pointer in fullscreen (a window always shows it)")
     gl_debug:          Field[bool] = Field(False, access=Field.INIT, description="Log each GL error at its call; slows every call")
-    default_placement: Field[bool] = Field(False, widget=Widget.button, description="Place every window on its monitor at 20, 40, 1280 × 720, windowed")
+    default_placement: Field[bool] = Field(False, widget=Widget.button, description="Place every window at its default place on its monitor, windowed")
 
     @property
     def windows(self) -> list[WindowSettings]:
