@@ -39,7 +39,7 @@ The window loop runs on the main thread: GLFW puts window creation, monitors and
 callbacks run there. The launcher calls `RenderBase.run()` after `app.start()`; the loop draws on the same thread, so
 nothing crosses a thread between the events and the draw. `stop()` works from any thread: it sets a close request,
 GLFW's should-close and an empty event, and from another thread waits up to 2 s for the loop to end. The structure
-follows Cinder (`window_systems_research.md`).
+is Cinder's: one update and a draw per window each frame, a context per window, the monitors as objects.
 
 There is one kind of window (`Window`, `window.py`), set by its own `WindowSettings`: `enabled`, its `monitor`,
 `fullscreen`, and its windowed place on that monitor (`x`, `y`, `width`, `height`). An app's root group `windows`
@@ -93,8 +93,8 @@ and switch interval, 30 s from 10 s, 2026-11-20), ms:
 | in the app, `fps_limit` 120   | 1.13 | 4.43 | 5.26 | 10.8 |
 
 The timer is on time; inside the app the main thread waits for the GIL behind the app's busy Python threads after it
-fires (**(deduction)**, agreed with the Waker's owner). A higher priority was tried in white_space's clock and made the
-app stutter. Less Python on the hot paths is what shortens it. The frame time in those runs is the app's own:
+fires (**(deduction)**). A higher thread priority does not shorten it: inside one process the GIL, not the OS priority,
+decides when a thread's Python runs. Less Python on the hot paths does. The frame time in those runs is the app's own:
 17.7 ms mean at 60 fps (p95 29.8, p99 38.2), its update 9.8 ms mean (p95 26.1).
 
 ### One frame in flight
@@ -141,7 +141,7 @@ out in pixels on the CPU (`text_layout`), from the size its caller gives, and ha
 ## Shaders
 
 `shaders/` groups its shaders by kind, one subpackage each: `draw`, `color`, `filter`, `mask`, `composite`,
-`transition`, `generate`, `video`. The package exports every one, so a caller writes `shaders.FillRect`; the kind
+`transition`, `generate`. The package exports every one, so a caller writes `shaders.FillRect`; the kind
 orders the files, the operation names the shader. The shared GLSL includes sit at the top of `shaders/`:
 `position.glsl` (below), `color.glsl` (Rec. 709 luminance, the HSV conversions), `blend_modes.glsl` (the textbook
 blend modes, which the `Blend` shader draws by `BlendShaderMode`; GL's own blending, `Style.BlendMode`, does normal,

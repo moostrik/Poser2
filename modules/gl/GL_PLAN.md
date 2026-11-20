@@ -23,9 +23,6 @@ frame (deduction). G1 and G2 wait for the coordinator's call on whether that gai
 
 - H8. `Style` gets the blend equation (min, max), and flow's `particle_density.py` sets it through `Style`;
   modules/flow's owner is told when it is built. Check: flow's GPU check of the particle density.
-- H9. GL.md: the `video` shader kind goes; `window_systems_research.md` leaves the repo for the scratchpad, and The
-  windows section's link to it becomes one line on Cinder as the model; the narrative traces in the pacing section
-  go; "frame time" for a duration stays apart from `frame_timestamp`.
 
 ## Rules this plan touches
 
