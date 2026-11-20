@@ -45,37 +45,61 @@ class TestVimbaCam(unittest.TestCase):
         self.cam = Camera(self.settings)
         self.cam.running = True
         self.camera = FakeCamera()
+        self.frames: list[CameraFrame] = []
+        self.cam.add_frame_callback(self.frames.append)
 
     def tearDown(self):
         self.cam.stop()
         self.cam.join()
 
-    def test_a_complete_frame_is_copied_and_given_back(self):
+    def test_a_complete_frame_is_copied_stamped_and_given_back(self):
         frame = FakeFrame(10)
+        before = time.perf_counter()
         self.cam._frame_handler(self.camera, frame)
         self.assertEqual(self.camera.queued, [frame])
         frame.buffer[:] = 99                                # the driver reuses the buffer
-        taken = self.cam._take_frame()
-        self.assertEqual(int(taken[0, 0, 0]), 10)
+        self.assertEqual(len(self.frames), 1)
+        self.assertEqual(int(self.frames[0].image[0, 0, 0]), 10)
+        self.assertGreaterEqual(self.frames[0].timestamp, before)
+        self.assertLessEqual(self.frames[0].timestamp, time.perf_counter())
 
-    def test_a_frame_is_taken_once(self):
-        self.cam._frame_handler(self.camera, FakeFrame(10))
-        self.assertIsNotNone(self.cam._take_frame())
-        self.assertIsNone(self.cam._take_frame())
+    def test_the_frame_is_rotated_and_flipped(self):
+        self.cam.rotate90 = True
+        self.settings.flip_h = True
+        buffer = FakeFrame(0)
+        buffer.buffer[0, 0] = 7                             # top left
+        self.cam._frame_handler(self.camera, buffer)
+        image = self.frames[0].image
+        self.assertEqual(image.shape, (6, 4, 3))
+        self.assertEqual(int(image[0, 3, 0]), 7)             # transposed: top left, then flipped: top right
 
     def test_an_incomplete_frame_is_skipped_counted_and_given_back(self):
         frame = FakeFrame(10, complete=False)
         self.cam._frame_handler(self.camera, frame)
         self.assertEqual(self.camera.queued, [frame])
-        self.assertIsNone(self.cam._take_frame())
+        self.assertEqual(self.frames, [])
         self.assertEqual(self.cam.control._dropped, 1)
 
-    def test_no_frame_is_kept_while_stopped(self):
+    def test_no_frame_goes_out_while_stopped(self):
         self.cam.running = False
         frame = FakeFrame(10)
         self.cam._frame_handler(self.camera, frame)
         self.assertEqual(self.camera.queued, [frame])
-        self.assertIsNone(self.cam._take_frame())
+        self.assertEqual(self.frames, [])
+
+    def test_a_failing_callback_does_not_stop_the_others(self):
+        def fail(frame: CameraFrame) -> None:
+            raise RuntimeError('a consumer failed')
+        self.cam.frame_callbacks.insert(0, fail)
+        with self.assertLogs('modules.camera.vimba.camera', 'ERROR'):
+            self.cam._frame_handler(self.camera, FakeFrame(10))
+        self.assertEqual(len(self.frames), 1)
+
+    def test_stop_ends_the_wait_at_once(self):
+        self.cam.stop()
+        start = time.perf_counter()
+        self.cam._waker.wait(start + 1.0)
+        self.assertLess(time.perf_counter() - start, 0.1)
 
 
 class StreamingCamera(FakeCamera):

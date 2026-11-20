@@ -2,7 +2,7 @@
 
 from queue import Queue, Empty
 from threading import Thread, Lock
-from time import time, sleep
+from time import perf_counter
 from typing import Any
 import logging
 
@@ -11,6 +11,7 @@ from pythonosc.osc_bundle import OscBundle
 from pythonosc import osc_bundle_builder, osc_message_builder
 
 from modules.settings import BaseSettings, Field, Widget
+from modules.utils import Waker
 from .net_probe import is_valid_ip
 
 logger = logging.getLogger(__name__)
@@ -32,8 +33,9 @@ def is_valid_port(port: int) -> bool:
 
 
 class OscSender(Thread):
-    """Sends what `submit` queued as one bundle per tick: of a state address only the newest value, of an
-    event address (`events`) every message, since each one counts."""
+    """Sends what `submit` queued as one bundle per tick, on a fixed-rate grid resynced after a late tick: of a
+    state address only the newest value, of an event address (`events`) every message, since each one counts. An
+    event goes out at once, with what else is queued; the grid keeps its phase."""
 
     def __init__(self, settings: OscSenderSettings, events: tuple[str, ...] = ()) -> None:
         super().__init__()
@@ -45,8 +47,9 @@ class OscSender(Thread):
         self.running: bool = False
         self.queue: Queue = Queue()
         self.mutex: Lock = Lock()
-        self.last_message_time: float = time()
+        self.last_message_time: float = perf_counter()
         self._error_time: float = 0.0       # when a failed send was last logged
+        self._waker: Waker = Waker()        # set by an event and by stop: the loop sends, or ends, at once
 
     def start(self) -> None:
         if self.running:
@@ -62,37 +65,45 @@ class OscSender(Thread):
             self.settings.unbind(OscSenderSettings.ip, self._on_address)
             self.settings.unbind(OscSenderSettings.port, self._on_address)
             self.running = False
+            self._waker.set()
             self.join()
+            self._waker.close()
 
     def run(self) -> None:
+        next_time: float = perf_counter()
         while self.running:
-            start_time = time()
-            data_list = []
-            try:
-                while True:
-                    data: Any = self.queue.get(False)
-                    data_list.append(data)
-            except Empty:
-                pass
+            self._send_queued()
+            interval: float = 1.0 / max(self.settings.fps, 1.0)
+            now: float = perf_counter()
+            if now - next_time > interval:          # fell behind: resync instead of bursting
+                next_time = now
+            if not self._waker.wait(next_time + interval):
+                next_time += interval
 
-            if data_list:
-                relevant_data = self.get_last_data(data_list)
-                with self.mutex:
-                    try:
-                        if self.client:
-                            bundle = self.build_bundle(relevant_data)
-                            self.client.send(bundle)
-                            self.last_message_time = time()
-                    except Exception:
-                        # this bundle is lost, the next one is sent: a sender that stopped here would
-                        # stay silent for the rest of the run while its queue grows
-                        if time() - self._error_time > ERROR_LOG_INTERVAL:
-                            self._error_time = time()
-                            logger.exception('osc error, bundle not sent')
+    def _send_queued(self) -> None:
+        """What was queued since the last send, as one bundle."""
+        data_list = []
+        try:
+            while True:
+                data: Any = self.queue.get(False)
+                data_list.append(data)
+        except Empty:
+            pass
 
-            elapsed_time: float = time() - start_time
-            update_interval: float = 1.0 / max(self.settings.fps, 1.0)
-            sleep(max(0, update_interval - elapsed_time))
+        if data_list:
+            relevant_data = self.get_last_data(data_list)
+            with self.mutex:
+                try:
+                    if self.client:
+                        bundle = self.build_bundle(relevant_data)
+                        self.client.send(bundle)
+                        self.last_message_time = perf_counter()
+                except Exception:
+                    # this bundle is lost, the next one is sent: a sender that stopped here would
+                    # stay silent for the rest of the run while its queue grows
+                    if perf_counter() - self._error_time > ERROR_LOG_INTERVAL:
+                        self._error_time = perf_counter()
+                        logger.exception('osc error, bundle not sent')
 
     def get_last_data(self, data_list: list[tuple[str, ArgValue]]) -> list[tuple[str, ArgValue]]:
         """The messages of a tick: every one of an event address, the newest value of the others."""
@@ -122,6 +133,8 @@ class OscSender(Thread):
         # only while the thread takes them: nothing empties the queue otherwise
         if self.settings.enabled and self.running:
             self.queue.put((address, args))
+            if address in self.events:
+                self._waker.set()
 
     def _on_address(self, _=None) -> None:
         self._update_client()

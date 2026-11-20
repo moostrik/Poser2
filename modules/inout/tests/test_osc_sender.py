@@ -18,6 +18,14 @@ class FailingClient:
         self.sent += 1
 
 
+class RecordingClient:
+    def __init__(self) -> None:
+        self.sent_at: list[float] = []
+
+    def send(self, bundle) -> None:
+        self.sent_at.append(time.perf_counter())
+
+
 class TestSender(unittest.TestCase):
     def setUp(self):
         self.settings = OscSenderSettings()
@@ -47,15 +55,37 @@ class TestSender(unittest.TestCase):
         self.sender.client = client
         with self.assertLogs('modules.inout.osc_sender', 'ERROR'):
             self.sender.submit('/progress', 0.1)
-            end = time.time() + 2.0
-            while client.failures and time.time() < end:
+            end = time.perf_counter() + 2.0
+            while client.failures and time.perf_counter() < end:
                 time.sleep(0.01)
         self.sender.submit('/progress', 0.2)
-        end = time.time() + 2.0
-        while not client.sent and time.time() < end:
+        end = time.perf_counter() + 2.0
+        while not client.sent and time.perf_counter() < end:
             time.sleep(0.01)
         self.assertEqual(client.sent, 1)
         self.assertTrue(self.sender.running)
+
+    def test_an_event_goes_out_at_once(self):
+        self.settings.fps = 1.0
+        self.sender.start()
+        client = RecordingClient()
+        self.sender.client = client
+        time.sleep(0.05)                                    # past the first tick
+        submitted = time.perf_counter()
+        self.sender.submit('/bang', 1)
+        end = submitted + 2.0
+        while not client.sent_at and time.perf_counter() < end:
+            time.sleep(0.005)
+        self.assertEqual(len(client.sent_at), 1)
+        self.assertLess(client.sent_at[0] - submitted, 0.1)
+
+    def test_stop_ends_the_wait_at_once(self):
+        self.settings.fps = 1.0
+        self.sender.start()
+        time.sleep(0.05)
+        start = time.perf_counter()
+        self.sender.stop()
+        self.assertLess(time.perf_counter() - start, 0.1)
 
 
 if __name__ == '__main__':

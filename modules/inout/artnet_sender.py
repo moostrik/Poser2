@@ -9,6 +9,7 @@ import time
 from stupidArtnet import StupidArtnet
 
 from modules.settings import BaseSettings, Field, Widget
+from modules.utils import Waker
 from .net_probe import is_valid_ip
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,9 @@ def is_valid_universe(value: int) -> bool:
 
 
 class ArtNetSender(Thread):
+    """Sends on a fixed-rate grid, resynced after a late tick. A flash (all channels full) goes out in place of the
+    packet on the next tick; stop ends with a flash, then a blackout one interval later."""
+
     def __init__(self, settings: ArtNetSenderSettings, channels: int, fill: Callable[[bytearray], None]) -> None:
         """`channels` DMX channels; `fill` writes the packet before each send, on the sender's thread."""
         super().__init__()
@@ -33,6 +37,8 @@ class ArtNetSender(Thread):
         self.fill: Callable[[bytearray], None] = fill
         self.mutex: Lock = Lock()
         self.running: bool = False
+        self._waker: Waker = Waker()            # set by stop: ends the wait for the next tick at once
+        self._flash: bool = False               # the next tick sends a flash in place of the packet
 
         # even: StupidArtnet rounds its own size up to even and refuses a packet of another length
         self.packet_size: int = channels + channels % 2
@@ -54,18 +60,37 @@ class ArtNetSender(Thread):
         self.settings.unbind(ArtNetSenderSettings.universe, self._on_address)
         self.settings.unbind(ArtNetSenderSettings.enabled, self._on_enabled)
         self.running = False
-
-        if self.sender:
-            self.sender.flash_all()
-            time.sleep(self._interval())
-            self.sender.blackout()
-
+        self._waker.set()
         self.join()
+        self._waker.close()
 
     def run(self) -> None:
+        next_time: float = time.perf_counter()
         while self.running:
-            self.update()
-            time.sleep(self._interval())
+            try:
+                self.update()
+            except Exception:
+                logger.exception('Art-Net send failed')
+            interval: float = self._interval()
+            now: float = time.perf_counter()
+            if now - next_time > interval:          # fell behind: resync instead of bursting
+                next_time = now
+            next_time += interval
+            self._waker.wait(next_time)
+        try:
+            self._end()
+        except Exception:
+            logger.exception('Art-Net flash and blackout at stop failed')
+
+    def _end(self) -> None:
+        """The flash, one interval, then the blackout."""
+        with self.mutex:
+            if self.sender:
+                self.sender.flash_all()
+        self._waker.wait(time.perf_counter() + self._interval())
+        with self.mutex:
+            if self.sender:
+                self.sender.blackout()
 
     def _interval(self) -> float:
         return 1.0 / max(self.settings.fps, 1.0)
@@ -74,7 +99,11 @@ class ArtNetSender(Thread):
         self.fill(self.packet)
         if self.sender and self.settings.enabled:
             with self.mutex:
-                self.sender.send(self.packet)
+                if self._flash:
+                    self._flash = False
+                    self.sender.flash_all()
+                else:
+                    self.sender.send(self.packet)
 
     def _on_address(self, _=None) -> None:
         self._update_sender()
@@ -98,8 +127,6 @@ class ArtNetSender(Thread):
         self.flash()
 
     def flash(self) -> None:
-        if not self.settings.enabled or not self.sender:
-            return
+        """All channels full for one tick: the next one sends the flash in place of the packet (any thread)."""
         with self.mutex:
-            self.sender.flash_all()
-            time.sleep(self._interval())
+            self._flash = True

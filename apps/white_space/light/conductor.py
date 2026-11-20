@@ -107,8 +107,10 @@ class Conductor(Thread):
     def stop(self) -> None:
         self._motor_controller.stop()
         self._stop_event.set()
+        self._clock.wake()
         if self.is_alive():
             self.join()
+        self._clock.close()
 
     def set_fall(self, *args: object) -> None:
         """A revolution's fall edge, stored by the motor controller at its moment.
@@ -123,7 +125,9 @@ class Conductor(Thread):
         # keeping the tick's work short; the clock's late_max/busy_max/overruns are the watchdog.
         while not self._stop_event.is_set():
             try:
-                tick = self._clock.next_tick()   # blocks until the next frame deadline
+                tick = self._clock.next_tick()   # blocks until the next frame deadline, or a stop
+                if self._stop_event.is_set():
+                    break
                 self._update(tick)
             except Exception:
                 logger.exception("Error in light conductor update")

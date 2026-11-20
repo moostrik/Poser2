@@ -1,6 +1,8 @@
-"""Tests for the light clock's rate: one live setting the tick is paced at and carries for the layers."""
+"""Tests for the light clock: its rate, one live setting the tick is paced at and carries for the layers, and its
+wait for the deadline."""
 
 import unittest
+from time import perf_counter
 
 from apps.white_space.light.clock import Clock, ClockSettings, Tick
 
@@ -41,6 +43,34 @@ class ClockRateTest(unittest.TestCase):
         second = clock.next_tick()
         self.assertAlmostEqual(second.deadline, first.deadline + 0.01, places=9)
         self.assertGreaterEqual(second.now, second.deadline)
+
+
+class ClockWaitTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.settings = ClockSettings()
+        self.settings.light_rate = 100.0
+        self.clock = Clock(self.settings)
+
+    def tearDown(self) -> None:
+        self.clock.close()
+
+    def test_a_tick_comes_well_within_the_system_tick_of_its_deadline(self) -> None:
+        # Windows' timed waits end on its 15.6 ms tick; the Waker's on the deadline
+        self.clock.next_tick()
+        late = []
+        for _ in range(50):
+            tick = self.clock.next_tick()
+            late.append(tick.now - tick.deadline)
+        self.assertLess(sum(late) / len(late), 0.002)
+        self.assertLess(max(late), 0.008)
+
+    def test_wake_ends_the_wait_at_once(self) -> None:
+        self.settings.light_rate = 1.0
+        self.clock.next_tick()
+        self.clock.wake()
+        start = perf_counter()
+        self.clock.next_tick()
+        self.assertLess(perf_counter() - start, 0.1)
 
 
 if __name__ == "__main__":

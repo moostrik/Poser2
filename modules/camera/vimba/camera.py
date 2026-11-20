@@ -4,11 +4,13 @@
 import logging
 import time
 from dataclasses import dataclass
-from threading import Thread, Lock, Event
+from threading import Thread, Lock
 from typing import Any
 
 import cv2
 import numpy as np
+
+from modules.utils import Waker
 
 from .. import CameraFrame, CameraReadings, FrameType, CameraFrameCallback, TrackletCallback
 
@@ -26,6 +28,7 @@ logger = logging.getLogger(__name__)
 FRAME_TIMEOUT: float = 5.0      # s without a complete frame while streaming: the camera is opened again
 RETRY_INTERVAL: float = 5.0     # s between two tries to find and open the camera
 STREAM_PAUSE: float = 1.0       # s after a stream that ended, before the camera is opened again
+CONTROL_INTERVAL: float = 0.1   # s between two sends of the settings to the camera while streaming
 GRAB_LOG_INTERVAL: float = 10.0 # s between the log lines of a frame grab that keeps failing
 SMALL_PACKET: int = 1500        # bytes: the packet size without jumbo frames on the path
 
@@ -118,10 +121,7 @@ class Camera(Thread):
         self.rotate90: bool = rotate90
         self.serial: str | None = None          # the camera's serial; None: the first camera found
 
-        # the newest frame as Vimba's thread copied it, until this thread takes it
-        self._frame: np.ndarray | None = None
-        self._frame_new: bool = False
-        self._frame_mutex: Lock = Lock()
+        self._last_frame: float = 0.0           # the arrival of the newest complete frame (perf_counter)
 
         self._callback_lock: Lock = Lock()
         self.frame_callbacks: list[CameraFrameCallback] = []
@@ -132,7 +132,7 @@ class Camera(Thread):
         self.camera: Any | None = None          # the Vimba camera; None while it is not found: the thread keeps looking
 
         self.running: bool = False
-        self._stop_event: Event = Event()       # (Thread has a _stop of its own)
+        self._waker: Waker = Waker()            # set by stop: ends the thread's waits at once
         self._problem: str = ''                 # why there are no frames, as logged; '' while they come
         self._packet_size: int = 0
         self._grab_error_time: float = 0.0
@@ -169,11 +169,13 @@ class Camera(Thread):
     def stop(self) -> None:
         self.control.close()
         self.running = False
-        self._stop_event.set()
+        self._waker.set()
 
     def join(self, timeout: float | None = None) -> None:
         if self.ident is not None:      # started
             super().join(timeout)
+        if not self.is_alive():
+            self._waker.close()
         self.camera = None
 
     def run(self) -> None:
@@ -184,7 +186,7 @@ class Camera(Thread):
             if camera is None:
                 camera = self._find()
                 if camera is None:
-                    self._stop_event.wait(RETRY_INTERVAL)
+                    self._waker.wait(time.perf_counter() + RETRY_INTERVAL)
                     continue
                 self.camera = camera
             try:
@@ -193,31 +195,30 @@ class Camera(Thread):
                 self._warn(f'the stream ended: {e}')
             if self.running:
                 self.camera = None
-                self._stop_event.wait(STREAM_PAUSE)
+                self._waker.wait(time.perf_counter() + STREAM_PAUSE)
 
     def _stream(self, camera: Any) -> None:
-        """Stream until the camera is stopped, or until no complete frame arrived for FRAME_TIMEOUT."""
+        """Stream until the camera is stopped, or until no complete frame arrived for FRAME_TIMEOUT. The frames go
+        out from Vimba's thread; this one sends the settings to the camera and watches that frames arrive."""
         with Vimba.get_instance():
             with camera:
+                start: float = time.perf_counter()
                 camera.start_streaming(handler=self._frame_handler, buffer_count=5, allocation_mode=AllocationMode.AllocAndAnnounceFrame)
                 try:
-                    last_frame: float = time.perf_counter()
                     while self.running:
-                        frame: np.ndarray | None = self._take_frame()
-                        if frame is not None:
-                            last_frame = time.perf_counter()
-                            if self._problem:
-                                logger.info('Vimba camera delivers frames again (packet size %d)', self._packet_size)
-                                self._problem = ''
-                            self._emit(frame)
-                        elif time.perf_counter() - last_frame > FRAME_TIMEOUT:
+                        self._waker.wait(time.perf_counter() + CONTROL_INTERVAL)
+                        if not self.running:
+                            return
+                        last_frame: float = max(self._last_frame, start)
+                        if last_frame > start and self._problem:
+                            logger.info('Vimba camera delivers frames again (packet size %d)', self._packet_size)
+                            self._problem = ''
+                        if time.perf_counter() - last_frame > FRAME_TIMEOUT:
                             self._warn(f'no complete frame for {FRAME_TIMEOUT:.0f} s, opening the camera again')
                             return
 
                         # also without frames: the readouts then show that none arrive
                         self.control.update(camera)
-
-                        time.sleep(0.01)
                 finally:
                     camera.stop_streaming()
 
@@ -252,48 +253,51 @@ class Camera(Thread):
 
     # FRAMES
     def _frame_handler(self, cam: Any, frame: Any) -> None:
-        # runs on Vimba's thread. The frame's buffer is the driver's and is reused once the frame
-        # is queued again, so the pixels are copied first; the frame always goes back
+        # runs on Vimba's thread, which hands the frame over. The frame's buffer is the driver's and is
+        # reused once the frame is queued again, so the pixels are copied first; the frame always goes back
+        arrival: float = time.perf_counter()
+        image: np.ndarray | None = None
         try:
-            if not self.running:
-                return
-            # with packets lost the buffer still holds part of an older image: not shown
-            complete: bool = frame.get_status() == FrameStatus.Complete
-            self.control.count_frame(complete)
-            if not complete:
-                return
-            image: np.ndarray = frame.as_numpy_ndarray().copy()
-            with self._frame_mutex:
-                self._frame = image
-                self._frame_new = True
+            if self.running:
+                # with packets lost the buffer still holds part of an older image: not shown
+                complete: bool = frame.get_status() == FrameStatus.Complete
+                self.control.count_frame(complete)
+                if complete:
+                    image = frame.as_numpy_ndarray().copy()
         except Exception as e:
-            if time.perf_counter() - self._grab_error_time > GRAB_LOG_INTERVAL:
-                self._grab_error_time = time.perf_counter()
-                logger.warning('Vimba camera: failed to grab a frame: %s', e)
+            self._grab_error(e)
         finally:
             try:
                 cam.queue_frame(frame)
             except Exception:
                 pass    # the stream is stopping
+        if image is None:
+            return
+        self._last_frame = arrival
+        try:
+            self._emit(image, arrival)
+        except Exception as e:
+            self._grab_error(e)
 
-    def _take_frame(self) -> np.ndarray | None:
-        """The newest camera frame, once: None until the next one arrives."""
-        with self._frame_mutex:
-            if not self._frame_new:
-                return None
-            self._frame_new = False
-            return self._frame
+    def _grab_error(self, e: Exception) -> None:
+        """A frame that could not be grabbed: logged, at most once per GRAB_LOG_INTERVAL."""
+        if time.perf_counter() - self._grab_error_time > GRAB_LOG_INTERVAL:
+            self._grab_error_time = time.perf_counter()
+            logger.warning('Vimba camera: failed to grab a frame: %s', e)
 
-    def _emit(self, image: np.ndarray) -> None:
-        """The frame becomes the contract's: rotated and flipped, with its host time."""
+    def _emit(self, image: np.ndarray, arrival: float) -> None:
+        """The frame becomes the contract's: rotated and flipped, stamped with its arrival."""
         if self.rotate90:
             image = cv2.transpose(image)
         if self.settings.flip_v:
             image = cv2.flip(image, 0)
         if self.settings.flip_h:
             image = cv2.flip(image, 1)
-        frame = CameraFrame(cam_id=self.cam_id, kind=FrameType.VIDEO, image=image, timestamp=time.perf_counter())
+        frame = CameraFrame(cam_id=self.cam_id, kind=FrameType.VIDEO, image=image, timestamp=arrival)
         with self._callback_lock:
             callbacks: list[CameraFrameCallback] = list(self.frame_callbacks)
         for callback in callbacks:
-            callback(frame)
+            try:
+                callback(frame)
+            except Exception:
+                logger.exception('Vimba camera: a frame callback failed')

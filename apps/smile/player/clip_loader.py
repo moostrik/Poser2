@@ -3,6 +3,9 @@ from threading import Thread, Lock, Event
 import time
 import numpy as np
 from typing import Callable
+
+from modules.utils import Waker
+
 from .clip_pool import ClipPool, Clip
 from .settings import WallsSettings
 
@@ -27,6 +30,7 @@ class ClipLoader(Thread):
         super().__init__()
         self._callback_mutex: Lock = Lock()
         self._stop_event: Event = Event()
+        self._waker: Waker = Waker()           # set by stop: ends the wait for a frame's moment at once
         self._message_callbacks: list[ImageCallback] = []
         self._loader_callbacks: list[LoaderCallback] = []
 
@@ -84,12 +88,14 @@ class ClipLoader(Thread):
             self._sleep_until(self._end_time)
 
     def _sleep_until(self, t: float) -> None:
-        while time.perf_counter() < t and not self._stop_event.is_set():
-            time.sleep(0.005)
+        if not self._stop_event.is_set():
+            self._waker.wait(t)
 
     def stop(self) -> None:
         self._stop_event.set()
+        self._waker.set()
         self.join()
+        self._waker.close()
 
     # CALLBACKS
     def _image_callback(self, image: np.ndarray, initial: bool = False) -> None:

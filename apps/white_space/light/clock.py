@@ -1,29 +1,29 @@
 """Master clock — paces and measures the render loop.
 
-`next_tick()` is the single authority for both timing and measurement: it blocks until the next
-frame deadline (high-resolution monotonic `perf_counter`, with a short busy-spin tail for
-sub-millisecond accuracy), then measures `dt` and returns the `Tick`.
+`next_tick()` is the single authority for both timing and measurement: it waits on a `utils.Waker`
+until `_SPIN_MARGIN` before the next frame deadline on `perf_counter`, busy-spins the rest, then
+measures `dt` and returns the `Tick`; `wake()` ends the wait at once, for a stop. The spin is there
+because the Waker alone wakes about 0.4 ms late with 0.3 ms of jitter, and the jitter moves the
+fixture's seam (3.5° at 1920 rpm): in white_space `-sim` the Waker alone came 0.42 ms late on average
+and 1.03 ms at p95, the spin 0.05 and 0.12 ms.
 
 Deliberately carries no musical time: the show's musical clock is the playhead bar (one
 revolution at `beam_rpm`) — states count bars, the sound side rides them. Debug patterns
 animate on plain seconds (`tick.time`) with their own rate knobs.
 
-Accuracy (measured ~40 µs mean lateness idle) depends on the calling thread's OS priority
-(the Conductor raises it) and on the GIL: a pure-Python thread holding it makes a sleeping
-thread up to one switch interval (5 ms) late. Lowering the switch interval process-wide is
-not an option — it starves the pose pipeline (see launcher.py). `late_max_ms` / `dt_max_ms`
-/ `busy_max_ms` / `overruns` report the real-world result.
+`late_max_ms` / `dt_max_ms` / `busy_max_ms` / `overruns` report how late the ticks really come.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from time import perf_counter, sleep
+from time import perf_counter
 
 from modules.settings import BaseSettings, Field
+from modules.utils import Waker
 
-# Seconds before each deadline to stop coarse-sleeping and busy-spin instead.
-# Trades a brief spin (~this long, per frame) for sub-100 µs deadline accuracy.
+# Seconds before each deadline the Waker's wait ends and the busy-spin takes over: a spin this long
+# per tick for sub-100 µs deadline accuracy.
 _SPIN_MARGIN: float = 0.001
 
 
@@ -76,6 +76,7 @@ class Clock:
 
     def __init__(self, settings: ClockSettings) -> None:
         self._settings  = settings
+        self._waker: Waker = Waker()
         self._start: float | None = None   # baselines set lazily on the first tick
         self._last:  float = 0.0
         self._next:  float = 0.0
@@ -150,11 +151,17 @@ class Clock:
         self._ticks    = 0
         self._stats_at = now
 
-    @staticmethod
-    def _wait_until(deadline: float) -> None:
-        """Sleep up to _SPIN_MARGIN before the deadline, then busy-spin the remainder."""
-        coarse = deadline - perf_counter() - _SPIN_MARGIN
-        if coarse > 0:
-            sleep(coarse)
+    def _wait_until(self, deadline: float) -> None:
+        """Wait on the Waker up to _SPIN_MARGIN before the deadline, then busy-spin the rest; a wake ends both."""
+        if self._waker.wait(deadline - _SPIN_MARGIN):
+            return
         while perf_counter() < deadline:
             pass
+
+    def wake(self) -> None:
+        """End the current wait at once (or the next one): a stop needs not wait for the deadline."""
+        self._waker.set()
+
+    def close(self) -> None:
+        """Free the Waker, once the thread that ticks has ended."""
+        self._waker.close()

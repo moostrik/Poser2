@@ -5,7 +5,7 @@ import logging
 from enum import IntEnum
 from queue import SimpleQueue
 from threading import Thread, Lock, current_thread
-from time import perf_counter, sleep, time_ns
+from time import perf_counter
 from typing import Callable, TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
@@ -89,7 +89,6 @@ class WindowManager():
         self._window_width: int = settings.width
         self._window_height: int = settings.height
         self._fullscreen_mode: FullscreenMode = FullscreenMode.WINDOWED
-        self.frame_interval: int | None = None
         self._current_vsync: bool | None = None
         logger.info("Initialized with width=%s, height=%s, fullscreen_mode=%s, v_sync=%s, fps=%s", settings.width, settings.height, settings.fullscreen_mode, settings.v_sync, settings.avg_fps)
         self._fps = FPS()
@@ -299,7 +298,6 @@ class WindowManager():
         if self.settings.fullscreen_mode != FullscreenMode.WINDOWED:
             self.set_fullscreen_mode(self.settings.fullscreen_mode)
 
-        next_frame_time: int = time_ns()
         try:
             while not glfw.window_should_close(self._main_window):
                 # the renderer's objects (FBOs, VAOs) live in the main context: drawing a secondary window
@@ -319,20 +317,6 @@ class WindowManager():
                 except Exception:
                     # Raised by one of the callbacks (key, mouse, window, monitor): it must not end the loop
                     logger.exception("Error in event callback")
-
-                # Frame timing control (active when v_sync is off and frame_interval is set)
-                if not self.settings.v_sync and self.frame_interval:
-                    next_frame_time += self.frame_interval
-                    now: int = time_ns()
-                    remaining: int = next_frame_time - now
-                    if remaining > 0:
-                        sleep_seconds: float = (remaining - 500_000) / 1_000_000_000
-                        if sleep_seconds > 0.002:
-                            sleep(sleep_seconds)
-                        while time_ns() < next_frame_time:
-                            pass
-                    elif -remaining > self.frame_interval:
-                        next_frame_time = time_ns()  # reset on spiral of death
         finally:
             self._make_current(self._main_window)
             self.renderer.deallocate()
