@@ -67,16 +67,19 @@ def popen(args: list[str], stdin, stdout, command: str = FFMPEG, background: boo
 PIPE_SIZE: int = 8 << 20     # the default Windows pipe holds 4 KB: reading a clip through it takes 6 times as long
 
 
-def _big_pipe() -> tuple[io.FileIO, int]:
-    """A pipe with a large buffer: (unbuffered read file, write descriptor to hand to the child)."""
+def _pipe() -> tuple[int, int]:
+    """A pipe with a large buffer: (read descriptor, write descriptor)."""
     if os.name == 'nt':
         import _winapi
         import msvcrt
         read_handle, write_handle = _winapi.CreatePipe(None, PIPE_SIZE)
-        read_fd = msvcrt.open_osfhandle(read_handle, os.O_RDONLY)
-        write_fd = msvcrt.open_osfhandle(write_handle, 0)
-    else:
-        read_fd, write_fd = os.pipe()
+        return msvcrt.open_osfhandle(read_handle, os.O_RDONLY), msvcrt.open_osfhandle(write_handle, 0)
+    return os.pipe()
+
+
+def _big_pipe() -> tuple[io.FileIO, int]:
+    """A pipe with a large buffer: (unbuffered read file, write descriptor to hand to the child)."""
+    read_fd, write_fd = _pipe()
     return os.fdopen(read_fd, 'rb', buffering=0), write_fd
 
 
@@ -126,8 +129,13 @@ MAX_COMMENT: int = 30000    # characters; a Windows command line holds 32767
 
 class ClipInput(Enum):
     """The pixel format of the frames a ClipWriter is given."""
-    BGR24 = 'bgr24'     # (height, width, 3) uint8
-    NV12  = 'nv12'      # (height × 3/2, width) uint8: Y, then Cb Cr at half size; BT.709 video range
+    BGR24   = 'bgr24'       # (height, width, 3) uint8
+    NV12    = 'nv12'        # (height × 3/2, width) uint8: Y, then Cb Cr at half size; BT.709 video range
+    YUV444P = 'yuv444p'     # (height × 3, width) uint8: Y, Cb and Cr planes at full size; BT.709 video range
+
+
+# the rows a YUV input's array holds per picture row
+_YUV_ROWS: dict[ClipInput, float] = {ClipInput.NV12: 1.5, ClipInput.YUV444P: 3.0}
 
 
 class ClipCodec(Enum):
@@ -139,19 +147,22 @@ HEVC_QUALITY: int = 18      # NVENC constant quality, lower is better
 
 
 def _hevc_args(quality: int) -> list[str]:
-    """hevc_nvenc at constant quality, tagged hvc1 so Windows and QuickTime play it."""
-    return ['-c:v', 'hevc_nvenc', '-preset', 'p5', '-tune', 'hq', '-rc', 'vbr', '-cq', str(quality), '-b:v', '0',
-            '-tag:v', 'hvc1']
+    """hevc_nvenc at constant quality, its slowest preset with a full-resolution second pass and spatial and temporal
+    adaptive quantization: the encode runs after a take, so its time goes to quality. Tagged hvc1 so Windows and
+    QuickTime play it."""
+    return ['-c:v', 'hevc_nvenc', '-preset', 'p7', '-tune', 'hq', '-multipass', 'fullres', '-rc', 'vbr',
+            '-cq', str(quality), '-b:v', '0', '-spatial-aq', '1', '-temporal-aq', '1', '-tag:v', 'hvc1']
 
 
-# what NV12 input is, told to the file: BT.709 in video range
+# what a YUV input is, told to the file: BT.709 in video range
 _BT709_TAGS: list[str] = ['-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709',
                           '-color_range', 'tv']
 
 
 class ClipWriter:
-    """Writes frames of one size to an mp4: bgr24 or NV12 in, h264 on `encoder` or HEVC on NVENC out; the process
-    starts with the first frame. comment, set before that frame, goes into the file's comment tag."""
+    """Writes frames of one size to an mp4: bgr24, NV12 or yuv444p in, h264 on `encoder` or HEVC on NVENC out, through
+    a pipe of `PIPE_SIZE`; the process starts with the first frame. comment, set before that frame, goes into the
+    file's comment tag."""
 
     def __init__(self, path: str, fps: float, encoder: Encoder, clip_input: ClipInput = ClipInput.BGR24,
                  codec: ClipCodec = ClipCodec.H264, quality: int = HEVC_QUALITY) -> None:
@@ -169,13 +180,16 @@ class ClipWriter:
         self.failed: bool = False
         self._size: tuple[int, int] = (0, 0)
         self._process: subprocess.Popen | None = None
+        self._stdin: BinaryIO | None = None
 
     def _frame_size(self, image: np.ndarray) -> tuple[int, int]:
-        """(width, height) of the picture in `image`; bgr24 is cropped to even, NV12 must be even already."""
-        if self.clip_input == ClipInput.NV12:
-            width, height = image.shape[1], image.shape[0] * 2 // 3
-            if image.ndim != 2 or width % 2 or height % 2 or height * 3 // 2 != image.shape[0]:
-                raise ValueError(f'NV12 frame of shape {image.shape} is not (even height × 3/2, even width)')
+        """(width, height) of the picture in `image`; bgr24 is cropped to even, a YUV input must be even already."""
+        rows = _YUV_ROWS.get(self.clip_input)
+        if rows is not None:
+            width, height = image.shape[1], round(image.shape[0] / rows)
+            if image.ndim != 2 or width % 2 or height % 2 or round(height * rows) != image.shape[0]:
+                raise ValueError(f'{self.clip_input.value} frame of shape {image.shape} is not '
+                                 f'(even height × {rows:g}, even width)')
             return width, height
         return image.shape[1] - image.shape[1] % 2, image.shape[0] - image.shape[0] % 2
 
@@ -188,17 +202,18 @@ class ClipWriter:
             self._start()
         elif (width, height) != self._size:
             raise ValueError(f'frame {width}x{height} does not match the clip {self._size[0]}x{self._size[1]}')
-        assert self._process is not None and self._process.stdin is not None
-        if self.clip_input == ClipInput.NV12:
+        assert self._stdin is not None
+        if self.clip_input in _YUV_ROWS:
             data = memoryview(np.ascontiguousarray(image)).cast('B')
         else:
             data = memoryview(np.ascontiguousarray(image[:height, :width])).cast('B')
         try:
-            self._process.stdin.write(data)
+            written = 0
+            while written < len(data):      # an unbuffered pipe takes what fits in one write
+                written += self._stdin.write(data[written:]) or 0
         except (BrokenPipeError, OSError) as e:
             self.failed = True
-            _, err = self._process.communicate()
-            logger.error('Encoder died on %s: %s %s', self.path, e, _stderr(err))
+            logger.error('Encoder died on %s: %s %s', self.path, e, self._end(timeout=30))
             return
         self.frames += 1
 
@@ -210,31 +225,52 @@ class ClipWriter:
         elif self.comment:
             metadata = ['-metadata', f'comment={self.comment}']
         if self.codec == ClipCodec.HEVC:
-            output = [*_hevc_args(self.quality), '-pix_fmt', 'nv12']
+            pix_fmt = self.clip_input.value if self.clip_input in _YUV_ROWS else 'nv12'
+            output = [*_hevc_args(self.quality), '-pix_fmt', pix_fmt]
         else:
             codec, quality, pix_fmt = _CODECS[self.encoder]
             output = ['-c:v', codec, *quality, '-pix_fmt', pix_fmt]
-        tags = _BT709_TAGS if self.clip_input == ClipInput.NV12 else []
+        tags = _BT709_TAGS if self.clip_input in _YUV_ROWS else []
         args = ['-y', '-f', 'rawvideo', '-pix_fmt', self.clip_input.value, '-s', f'{width}x{height}',
                 '-r', f'{self.fps:g}', '-i', 'pipe:0', *output, *tags, *metadata, self.path]
-        self._process = popen(args, subprocess.PIPE, subprocess.DEVNULL)
+        read_fd, write_fd = _pipe()
+        try:
+            self._process = popen(args, read_fd, subprocess.DEVNULL)
+        finally:
+            os.close(read_fd)       # the child has its own copy; ours must close for its read to reach the end
+        self._stdin = os.fdopen(write_fd, 'wb', buffering=0)
+
+    def _end(self, timeout: float) -> str:
+        """Close the pipe and wait for ffmpeg; its error output. Kills it after `timeout` s."""
+        process, self._process = self._process, None
+        if self._stdin is not None:
+            try:
+                self._stdin.close()
+            except OSError:
+                pass
+            self._stdin = None
+        if process is None:
+            return ''
+        try:
+            _, err = process.communicate(timeout=timeout)       # waits for the moov atom
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.communicate()
+            self.failed = True
+            return 'did not finish, killed'
+        if process.returncode != 0:
+            self.failed = True
+        return _stderr(err)
 
     def close(self) -> bool:
         """Finish the file. True when it is complete and has frames."""
         if self._process is None:
             return False
-        process, self._process = self._process, None
-        try:
-            _, err = process.communicate(timeout=30)     # closes stdin, waits for the moov atom
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.communicate()
-            logger.error('Encoder did not finish %s, killed', self.path)
+        err = self._end(timeout=30)
+        if self.failed:
+            logger.error('Encoder failed on %s: %s', self.path, err)
             return False
-        if process.returncode != 0:
-            logger.error('Encoder failed on %s: %s', self.path, _stderr(err))
-            return False
-        return not self.failed and self.frames > 0
+        return self.frames > 0
 
 
 def transcode_aac(src: str, dst: str, bitrate: str = '128k') -> None:

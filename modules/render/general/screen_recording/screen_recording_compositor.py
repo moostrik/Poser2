@@ -75,7 +75,7 @@ class ScreenRecordingCompositor(LayerBase):
         """The recording's tick; call it right after the main window is drawn, before it is shown."""
         input = self._input
         self.recorder.update(input.timestamp)
-        self._follow_capture_size()
+        self._follow_capture_format()
         self._capture.poll()
         if self.recorder.capturing and self._capture.allocated:
             capture = self._capture
@@ -98,26 +98,26 @@ class ScreenRecordingCompositor(LayerBase):
             glViewport(0, 0, input.window_width, input.window_height)
         self._draw_preview(input.window_width, input.window_height)
 
-    def _follow_capture_size(self) -> None:
-        """Make the capture at the recorder's size while it has a take, and free it after; never while a frame of it
+    def _follow_capture_format(self) -> None:
+        """Make the capture in the recorder's format while it has a take, and free it after; never while a frame of it
         is lent or on its way."""
-        size = self.recorder.capture_size
+        screen_format = self.recorder.capture_format
         capture, preview = self._capture, self._preview
         if capture.lent:
             return
-        if size is None:
+        if screen_format is None:
             if capture.allocated:
                 capture.deallocate()
             if preview.allocated:
                 preview.deallocate()
             return
-        if capture.allocated and (capture.width, capture.height) == size:
+        if capture.allocated and capture.format == screen_format:
             return
         try:
-            capture.allocate(*size)
-            preview.allocate(*size)
+            capture.allocate(screen_format)
+            preview.allocate(screen_format)
         except Exception as e:
-            self.recorder.fail(f'could not make the screen capture at {size[0]}x{size[1]}: {e}')
+            self.recorder.fail(f'could not make the screen capture at {screen_format}: {e}')
 
     def _draw_preview(self, window_width: int, window_height: int) -> None:
         """While a marker of a held take is dragged, its frame over the main window, fit on black: the frame under the

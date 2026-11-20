@@ -1,4 +1,5 @@
-"""NV12 frames through the writer as HEVC on NVENC, read back: count, size, codec, color tags and levels."""
+"""NV12 and yuv444p frames through the writer as HEVC on NVENC, read back: count, size, codec, pixel format, color
+tags and levels."""
 
 import json
 import os
@@ -13,11 +14,15 @@ from modules import video
 SIZE, FRAMES, FPS = 256, 10, 30.0     # NVENC refuses frames of 128 wide and less
 
 
-def nv12_gray(luma: int) -> np.ndarray:
-    """A flat gray NV12 frame: Y at `luma`, chroma neutral."""
-    frame = np.full((SIZE * 3 // 2, SIZE), 128, np.uint8)
+def yuv_gray(luma: int, rows: float) -> np.ndarray:
+    """A flat gray frame of `rows` × SIZE rows (1.5 NV12, 3 yuv444p): Y at `luma`, chroma neutral."""
+    frame = np.full((round(SIZE * rows), SIZE), 128, np.uint8)
     frame[:SIZE] = luma
     return frame
+
+
+def nv12_gray(luma: int) -> np.ndarray:
+    return yuv_gray(luma, 1.5)
 
 
 def luma_of(i: int) -> int:
@@ -25,8 +30,8 @@ def luma_of(i: int) -> int:
 
 
 def stream_info(path: str) -> dict:
-    args = ['-select_streams', 'v:0', '-show_entries', 'stream=codec_name,codec_tag_string,color_space,color_range',
-            '-of', 'json', path]
+    args = ['-select_streams', 'v:0', '-show_entries',
+            'stream=codec_name,codec_tag_string,color_space,color_range,pix_fmt', '-of', 'json', path]
     process = video.popen(args, subprocess.DEVNULL, subprocess.PIPE, command=video.FFPROBE)
     out, _ = process.communicate(timeout=20)
     return json.loads(out)['streams'][0]
@@ -48,11 +53,17 @@ def hevc_nvenc_works() -> bool:
 class TestClipHevc(unittest.TestCase):
 
     def test_nv12_frames_come_back_as_hevc(self) -> None:
+        self._round_trip(video.ClipInput.NV12, 1.5, 'yuv420p')
+
+    def test_yuv444p_frames_come_back_as_hevc_444(self) -> None:
+        self._round_trip(video.ClipInput.YUV444P, 3.0, 'yuv444p')
+
+    def _round_trip(self, clip_input: video.ClipInput, rows: float, pix_fmt: str) -> None:
         with tempfile.TemporaryDirectory() as folder:
             path = os.path.join(folder, 'clip.mp4')
-            writer = video.ClipWriter(path, FPS, video.Encoder.NVENC, video.ClipInput.NV12, video.ClipCodec.HEVC)
+            writer = video.ClipWriter(path, FPS, video.Encoder.NVENC, clip_input, video.ClipCodec.HEVC)
             for i in range(FRAMES):
-                writer.add(nv12_gray(luma_of(i)))
+                writer.add(yuv_gray(luma_of(i), rows))
             self.assertTrue(writer.close())
 
             frames, fps, width, height = video.probe(path)
@@ -61,6 +72,7 @@ class TestClipHevc(unittest.TestCase):
             info = stream_info(path)
             self.assertEqual((info['codec_name'], info['codec_tag_string']), ('hevc', 'hvc1'))
             self.assertEqual((info['color_space'], info['color_range']), ('bt709', 'tv'))
+            self.assertEqual(info['pix_fmt'], pix_fmt)
 
             decoded, _ = video.decode_clip(path, (SIZE, SIZE))
             self.assertEqual(decoded.shape[0], FRAMES)

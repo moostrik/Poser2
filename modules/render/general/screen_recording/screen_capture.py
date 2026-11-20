@@ -23,9 +23,9 @@ from OpenGL.GL import (GL_ALREADY_SIGNALED, GL_COLOR_BUFFER_BIT, GL_CONDITION_SA
                        glReadPixels, glUnmapBuffer)
 
 from modules.gl import Fbo, Style, fill, fit
-from modules.video import ScreenFrame, ScreenFrameCallback
+from modules.video import Chroma, ScreenFormat, ScreenFrame, ScreenFrameCallback
 
-from .shaders import Nv12, Nv12Plane
+from .shaders import RgbToYuv, YuvPlane
 
 logger = logging.getLogger(__name__)
 
@@ -34,24 +34,41 @@ _PACK_ALIGNMENT: int = 4    # GL's default, which nothing else in the apps chang
 _MAP_FLAGS: int = GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT
 
 
-def nv12_bytes(width: int, height: int) -> int:
-    """Bytes of one NV12 frame: the Y plane, then Cb Cr interleaved at half width and half height."""
-    return width * height * 3 // 2
+class _Plane:
+    """One YUV plane of the frame: the Fbo it is drawn into, which plane, and where it lies in the read-back."""
+
+    def __init__(self, plane: YuvPlane, width: int, height: int, internal_format: int, read_format: int,
+                 offset: int) -> None:
+        self.fbo: Fbo = Fbo(GL_NEAREST)
+        self.plane: YuvPlane = plane
+        self.width, self.height = width, height
+        self.internal_format, self.read_format = internal_format, read_format
+        self.offset: int = offset
+
+
+def yuv_planes(screen_format: ScreenFormat) -> list[_Plane]:
+    """The planes of a format, in the order the frame holds them: Y, then Cb Cr (4:2:0) or Cb and Cr (4:4:4)."""
+    width, height = screen_format.width, screen_format.height
+    planes = [_Plane(YuvPlane.Y, width, height, GL_R8, GL_RED, 0)]
+    if screen_format.chroma is Chroma.YUV420:
+        planes.append(_Plane(YuvPlane.CBCR, width // 2, height // 2, GL_RG8, GL_RG, width * height))
+    else:
+        planes.append(_Plane(YuvPlane.CB, width, height, GL_R8, GL_RED, width * height))
+        planes.append(_Plane(YuvPlane.CR, width, height, GL_R8, GL_RED, 2 * width * height))
+    return planes
 
 
 class ScreenCapture:
-    """The screen frame (RGBA8) of the recording's size, its NV12 conversion, and a pool of four pixel buffers in host
-    memory the conversion is read back into; each finished frame goes to the callbacks, lent until it is released."""
+    """The screen frame (RGBA8) of the recording's size, its YUV planes, and a pool of four pixel buffers in host
+    memory they are read back into; each finished frame goes to the callbacks, lent until it is released."""
 
     def __init__(self) -> None:
-        self.width: int = 0
-        self.height: int = 0
+        self.format: ScreenFormat | None = None
         self.frame: Fbo = Fbo()
-        self._y: Fbo = Fbo(GL_NEAREST)
-        self._uv: Fbo = Fbo(GL_NEAREST)
-        self._shader: Nv12 = Nv12()
+        self._planes: list[_Plane] = []
+        self._shader: RgbToYuv = RgbToYuv()
         self._buffers: list[int] = []
-        self._arrays: list[np.ndarray] = []         # each buffer's mapped memory, (height × 3/2, width) uint8
+        self._arrays: list[np.ndarray] = []         # each buffer's mapped memory, the format's shape, uint8
         self._in_flight: deque[tuple[int, object, float, int]] = deque()     # (buffer, fence, timestamp, skipped)
         self._lock: Lock = Lock()                   # guards the free list and the lent count
         self._free: deque[int] = deque()
@@ -63,6 +80,14 @@ class ScreenCapture:
     @property
     def allocated(self) -> bool:
         return self.frame.allocated
+
+    @property
+    def width(self) -> int:
+        return self.format.width if self.format else 0
+
+    @property
+    def height(self) -> int:
+        return self.format.height if self.format else 0
 
     @property
     def lent(self) -> bool:
@@ -82,18 +107,20 @@ class ScreenCapture:
 
     # RENDER THREAD
 
-    def allocate(self, width: int, height: int) -> None:
-        """GL objects for frames of `width` × `height` (even) and the pool, mapped once; raises on failure with nothing
-        left allocated, or when a buffer is still lent."""
+    def allocate(self, screen_format: ScreenFormat) -> None:
+        """GL objects for frames of `screen_format` (an even size) and the pool, mapped once; raises on failure with
+        nothing left allocated, or when a buffer is still lent."""
+        width, height = screen_format.width, screen_format.height
         if width <= 0 or height <= 0 or width % 2 or height % 2:
-            raise ValueError(f'NV12 needs an even size, got {width}x{height}')
+            raise ValueError(f'YUV planes need an even size, got {width}x{height}')
         self.deallocate()
-        self.width, self.height = width, height
-        size = nv12_bytes(width, height)
+        self.format = screen_format
+        size = screen_format.frame_bytes
         try:
             self.frame.allocate(width, height, GL_RGBA8)
-            self._y.allocate(width, height, GL_R8)
-            self._uv.allocate(width // 2, height // 2, GL_RG8)
+            self._planes = yuv_planes(screen_format)
+            for plane in self._planes:
+                plane.fbo.allocate(plane.width, plane.height, plane.internal_format)
             self._shader.allocate()
             self._buffers = [int(b) for b in np.atleast_1d(glGenBuffers(POOL))]
             for buffer in self._buffers:
@@ -104,7 +131,7 @@ class ScreenCapture:
                 if not address:
                     raise RuntimeError('a pixel buffer could not be mapped')
                 data = (ctypes.c_uint8 * size).from_address(address)
-                self._arrays.append(np.ctypeslib.as_array(data).reshape(height * 3 // 2, width))
+                self._arrays.append(np.ctypeslib.as_array(data).reshape(screen_format.shape))
             glBindBuffer(GL_PIXEL_PACK_BUFFER, 0)
             with self._lock:
                 self._free = deque(range(POOL))
@@ -134,10 +161,11 @@ class ScreenCapture:
             self._free.clear()
         if self._shader.allocated:
             self._shader.deallocate()
-        for texture in (self.frame, self._y, self._uv):
+        for texture in [self.frame] + [plane.fbo for plane in self._planes]:
             if texture.allocated:
                 texture.deallocate()
-        self.width = self.height = 0
+        self._planes = []
+        self.format = None
 
     def copy_window(self, window_width: int, window_height: int, fill_frame: bool = False) -> None:
         """Copy the window's back buffer into `frame`, fit with black bars, or filling it with the overhang cut."""
@@ -163,17 +191,15 @@ class ScreenCapture:
             skipped, self._skipped = self._skipped, 0
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
-        self._y.begin()
-        self._shader.use(self.frame, Nv12Plane.Y)
-        self._uv.begin()
-        self._shader.use(self.frame, Nv12Plane.UV)
+        for plane in self._planes:
+            plane.fbo.begin()
+            self._shader.use(self.frame, plane.plane)
         Style.pop_style()
         glPixelStorei(GL_PACK_ALIGNMENT, 1)     # rows of any even width, unpadded
         glBindBuffer(GL_PIXEL_PACK_BUFFER, self._buffers[buffer])
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, self._y.fbo_id)
-        glReadPixels(0, 0, self.width, self.height, GL_RED, GL_UNSIGNED_BYTE, 0)
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, self._uv.fbo_id)
-        glReadPixels(0, 0, self.width // 2, self.height // 2, GL_RG, GL_UNSIGNED_BYTE, self.width * self.height)
+        for plane in self._planes:
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, plane.fbo.fbo_id)
+            glReadPixels(0, 0, plane.width, plane.height, plane.read_format, GL_UNSIGNED_BYTE, plane.offset)
         glBindBuffer(GL_PIXEL_PACK_BUFFER, 0)
         glPixelStorei(GL_PACK_ALIGNMENT, _PACK_ALIGNMENT)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)

@@ -1,8 +1,9 @@
-"""ScreenPreview: a held screen frame (NV12, in RAM) drawn back as an RGB picture, without the render thread waiting.
+"""ScreenPreview: a held screen frame (its YUV planes, in RAM) drawn back as an RGB picture, without the render thread
+waiting.
 
 `set_screen_frame` stores the latest frame to show; the preview's own thread copies it straight into one of two
 unpack pixel buffers, mapped once on the render thread (persistent and coherent), and marks it written. `update`, on
-the render tick, uploads a written buffer into the Y and Cb Cr textures, turns them back into RGB in `fbo`, and sets
+the render tick, uploads a written buffer into the planes' textures, turns them back into RGB in `fbo`, and sets
 a fence on the buffer; once that fence has passed, checked on a later tick without waiting, the buffer is free
 again. Only the render thread makes GL calls. See modules/video/VIDEO.md.
 """
@@ -14,15 +15,16 @@ from threading import Condition, Thread
 
 import numpy as np
 from OpenGL.GL import (GL_ALREADY_SIGNALED, GL_CONDITION_SATISFIED, GL_MAP_COHERENT_BIT, GL_MAP_PERSISTENT_BIT,
-                       GL_MAP_WRITE_BIT, GL_PIXEL_UNPACK_BUFFER, GL_R8, GL_RED, GL_RG, GL_RG8, GL_RGBA8,
+                       GL_MAP_WRITE_BIT, GL_PIXEL_UNPACK_BUFFER, GL_RGBA8,
                        GL_SYNC_GPU_COMMANDS_COMPLETE, GL_TEXTURE_2D, GL_UNPACK_ALIGNMENT, GL_UNSIGNED_BYTE,
                        glBindBuffer, glBindTexture, glBufferStorage, glClientWaitSync, glDeleteBuffers, glDeleteSync,
                        glFenceSync, glGenBuffers, glMapBufferRange, glPixelStorei, glTexSubImage2D, glUnmapBuffer)
 
-from modules.gl import Fbo, Style, Texture
+from modules.gl import Fbo, Style
+from modules.video import ScreenFormat
 
-from .screen_capture import nv12_bytes
-from .shaders import Nv12ToRgb
+from .screen_capture import yuv_planes
+from .shaders import YuvToRgb
 
 logger = logging.getLogger(__name__)
 
@@ -32,17 +34,16 @@ _MAP_FLAGS: int = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT
 
 
 class ScreenPreview:
-    """A held NV12 frame of the recording's size, back as RGB in `fbo`, upright; the latest frame set is the one shown."""
+    """A held screen frame (its YUV planes, as captured), back as RGB in `fbo`, upright; the latest frame set is the
+    one shown."""
 
     def __init__(self) -> None:
-        self.width: int = 0
-        self.height: int = 0
+        self.format: ScreenFormat | None = None
         self.fbo: Fbo = Fbo()
-        self._y: Texture = Texture()
-        self._uv: Texture = Texture()
-        self._shader: Nv12ToRgb = Nv12ToRgb()
+        self._planes = yuv_planes(ScreenFormat(2, 2))   # the textures the planes are uploaded into, remade at allocate
+        self._shader: YuvToRgb = YuvToRgb()
         self._buffers: list[int] = []
-        self._arrays: list[np.ndarray] = []         # each buffer's mapped memory, (height × 3/2, width) uint8
+        self._arrays: list[np.ndarray] = []         # each buffer's mapped memory, the format's shape, uint8
         self._wake: Condition = Condition()         # guards what follows
         self._free: deque[int] = deque()
         self._written: deque[tuple[int, int]] = deque()     # (buffer, key), oldest first
@@ -56,17 +57,27 @@ class ScreenPreview:
     def allocated(self) -> bool:
         return self.fbo.allocated
 
+    @property
+    def width(self) -> int:
+        return self.format.width if self.format else 0
+
+    @property
+    def height(self) -> int:
+        return self.format.height if self.format else 0
+
     # RENDER THREAD
 
-    def allocate(self, width: int, height: int) -> None:
-        """GL objects for frames of `width` × `height` (even) and the two buffers, mapped once, and the thread."""
+    def allocate(self, screen_format: ScreenFormat) -> None:
+        """GL objects for frames of `screen_format` and the two buffers, mapped once, and the thread."""
         self.deallocate()
-        self.width, self.height = width, height
-        size = nv12_bytes(width, height)
+        self.format = screen_format
+        width, height = screen_format.width, screen_format.height
+        size = screen_format.frame_bytes
         try:
             self.fbo.allocate(width, height, GL_RGBA8)
-            self._y.allocate(width, height, GL_R8)
-            self._uv.allocate(width // 2, height // 2, GL_RG8)
+            self._planes = yuv_planes(screen_format)
+            for plane in self._planes:
+                plane.fbo.allocate(plane.width, plane.height, plane.internal_format)
             self._shader.allocate()
             self._buffers = [int(b) for b in np.atleast_1d(glGenBuffers(BUFFERS))]
             for buffer in self._buffers:
@@ -77,7 +88,7 @@ class ScreenPreview:
                 if not address:
                     raise RuntimeError('a pixel buffer could not be mapped')
                 data = (ctypes.c_uint8 * size).from_address(address)
-                self._arrays.append(np.ctypeslib.as_array(data).reshape(height * 3 // 2, width))
+                self._arrays.append(np.ctypeslib.as_array(data).reshape(screen_format.shape))
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
         except Exception:
             self.deallocate()
@@ -112,11 +123,11 @@ class ScreenPreview:
         self._buffers = []
         if self._shader.allocated:
             self._shader.deallocate()
-        for texture in (self.fbo, self._y, self._uv):
+        for texture in [self.fbo] + [plane.fbo for plane in self._planes]:
             if texture.allocated:
                 texture.deallocate()
         self.shown = None
-        self.width = self.height = 0
+        self.format = None
 
     def update(self) -> None:
         """Free the buffers whose upload has passed its fence, then upload the newest written one and draw it, without
@@ -139,11 +150,10 @@ class ScreenPreview:
             self._wake.notify()
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, self._buffers[buffer])
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1)   # rows of any even width, unpadded
-        glBindTexture(GL_TEXTURE_2D, self._y.tex_id)
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.width, self.height, GL_RED, GL_UNSIGNED_BYTE, ctypes.c_void_p(0))
-        glBindTexture(GL_TEXTURE_2D, self._uv.tex_id)
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.width // 2, self.height // 2, GL_RG, GL_UNSIGNED_BYTE,
-                        ctypes.c_void_p(self.width * self.height))
+        for plane in self._planes:
+            glBindTexture(GL_TEXTURE_2D, plane.fbo.tex_id)
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, plane.width, plane.height, plane.read_format, GL_UNSIGNED_BYTE,
+                            ctypes.c_void_p(plane.offset))
         glBindTexture(GL_TEXTURE_2D, 0)
         glPixelStorei(GL_UNPACK_ALIGNMENT, _UNPACK_ALIGNMENT)
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
@@ -151,7 +161,7 @@ class ScreenPreview:
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
         self.fbo.begin()
-        self._shader.use(self._y, self._uv)
+        self._shader.use(self._planes[0].fbo, self._planes[1].fbo, self._planes[2].fbo if len(self._planes) > 2 else None)
         self.fbo.end()
         Style.pop_style()
         self.shown = key
@@ -159,7 +169,7 @@ class ScreenPreview:
     # ANY THREAD
 
     def set_screen_frame(self, key: int, data: np.ndarray) -> None:
-        """Store the frame to show, (height × 3/2, width) NV12, under `key`; a frame nobody changes while it is shown,
+        """Store the frame to show, in the format's layout, under `key`; a frame nobody changes while it is shown,
         as a held slot. Only the latest frame set is shown."""
         with self._wake:
             if self.shown == key or (self._wanted is not None and self._wanted[0] == key):

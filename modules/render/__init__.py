@@ -32,4 +32,4 @@ from .modules.board import      TimeSeriesLayer, TimeSeriesLayerSettings
 # general: the layers that draw no module's data
 from .general.composite import  LayerCompositor, LayerCompositorSettings
 from .general.grade import      LutGrade, LutSettings
-from .general.screen_recording import ScreenCapture, ScreenPreview, ScreenRecordingCompositor, ScreenRecordingInput, ScreenRecordingSource, nv12_bytes
+from .general.screen_recording import ScreenCapture, ScreenPreview, ScreenRecordingCompositor, ScreenRecordingInput, ScreenRecordingSource

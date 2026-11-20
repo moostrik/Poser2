@@ -8,13 +8,13 @@ from typing import Callable
 
 import numpy as np
 
-from modules.video import (ScreenFrame, ScreenRecorder, ScreenRecorderSettings, ScreenRecorderState, ScreenSize, even,
-                           frames_for, matching_preset, preset_size)
+from modules.video import (Chroma, ScreenFormat, ScreenFrame, ScreenRecorder, ScreenRecorderSettings,
+                           ScreenRecorderState, ScreenSize, even, frames_for, matching_preset, preset_size)
 
 FPS = 64.0      # ticks/s; 1/64 s and its multiples are exact in binary, so spans compare exactly
 TIMEOUT = 5.0   # s a test waits for the recorder's thread
 WIDTH, HEIGHT = 8, 4
-FRAME_BYTES = WIDTH * HEIGHT * 3 // 2
+FRAME_BYTES = ScreenFormat(WIDTH, HEIGHT).frame_bytes      # 4:4:4, the default
 GB = 1 << 30
 
 
@@ -27,8 +27,8 @@ class FakeClip:
     """Keeps the tick number of each frame it is given."""
     clips: list['FakeClip'] = []
 
-    def __init__(self, path: str, fps: float, quality: int) -> None:
-        self.path, self.fps, self.quality = path, fps, quality
+    def __init__(self, path: str, fps: float, quality: int, chroma: Chroma) -> None:
+        self.path, self.fps, self.quality, self.chroma = path, fps, quality, chroma
         self.comment = ''
         self.frames: list[int] = []
         FakeClip.clips.append(self)
@@ -56,6 +56,14 @@ class SizeRulesTest(unittest.TestCase):
     def test_frames_for_a_duration(self) -> None:
         self.assertEqual(frames_for(10.0, 60.0, 1), 600)
         self.assertEqual(frames_for(10.0, 60.0, 2), 300)
+
+    def test_a_format_s_bytes_follow_its_chroma(self) -> None:
+        nv12 = ScreenFormat(2160, 3840, Chroma.YUV420)
+        full = ScreenFormat(2160, 3840, Chroma.YUV444)
+        self.assertEqual(nv12.shape, (3840 * 3 // 2, 2160))
+        self.assertEqual(full.shape, (3840 * 3, 2160))
+        self.assertEqual(nv12.frame_bytes, 2160 * 3840 * 3 // 2)
+        self.assertEqual(full.frame_bytes, 2 * nv12.frame_bytes)
 
 
 class SizeSettingsTest(unittest.TestCase):
@@ -116,8 +124,8 @@ class StateTest(unittest.TestCase):
 
     def frame(self, tick: int, timestamp: float) -> ScreenFrame:
         """A frame at the size the capture is made at, as a real capture hands it over."""
-        width, height = self.recorder.capture_size or (WIDTH, HEIGHT)
-        data = np.zeros((height * 3 // 2, width), np.uint8)
+        screen_format = self.recorder.capture_format or ScreenFormat(WIDTH, HEIGHT)
+        data = np.zeros(screen_format.shape, np.uint8)
         data.flat[0], data.flat[1] = tick & 0xFF, tick >> 8
         with self.lock:
             self.lent += 1
@@ -170,11 +178,11 @@ class StateTest(unittest.TestCase):
     def test_start_records_and_stop_holds_then_save_and_discard(self) -> None:
         self.ticks(3)
         self.assertIs(self.settings.state, ScreenRecorderState.IDLE)
-        self.assertIsNone(self.recorder.capture_size)
+        self.assertIsNone(self.recorder.capture_format)
         ScreenRecorderSettings.start.fire(self.settings)
         self.tick()
         self.assertIs(self.settings.state, ScreenRecorderState.RECORDING)
-        self.assertEqual(self.recorder.capture_size, (WIDTH, HEIGHT))
+        self.assertEqual(self.recorder.capture_format, ScreenFormat(WIDTH, HEIGHT, Chroma.YUV444))
         self.tick_until(lambda: self.stored() >= 20)
         ScreenRecorderSettings.stop.fire(self.settings)
         self.tick()
@@ -187,7 +195,7 @@ class StateTest(unittest.TestCase):
         self.assertAlmostEqual(clip.fps, FPS, places=3)
         self.assertEqual(clip.quality, 18)
         self.discard(ScreenRecorderState.IDLE)
-        self.assertIsNone(self.recorder.capture_size)
+        self.assertIsNone(self.recorder.capture_format)
         self.assertEqual(self.recorder._ring.num_slots, 0)
         self.tick_until(lambda: self.lent == 0)     # every frame given back
 
@@ -284,6 +292,21 @@ class StateTest(unittest.TestCase):
         self.settings.width, self.settings.height = WIDTH, HEIGHT
         self.tick_until(lambda: 0.0 < self.settings.max_duration < 100.0)
         self.assertTrue(640 / 64 - 0.1 <= self.settings.max_duration <= 640 / 60 + 0.1, self.settings.max_duration)
+        self.settings.chroma = Chroma.YUV420        # half the bytes a frame: twice the seconds
+        self.tick_until(lambda: self.settings.max_duration > 15.0)
+        self.assertTrue(1280 / 64 - 0.2 <= self.settings.max_duration <= 1280 / 60 + 0.2, self.settings.max_duration)
+
+    def test_the_chroma_is_read_at_start_and_goes_to_the_clip(self) -> None:
+        self.settings.chroma = Chroma.YUV420
+        self.settings.duration = 0.25
+        ScreenRecorderSettings.start.fire(self.settings)
+        self.tick()
+        self.assertEqual(self.recorder.capture_format, ScreenFormat(WIDTH, HEIGHT, Chroma.YUV420))
+        self.settings.chroma = Chroma.YUV444          # a change counts from the next Start
+        clip = self.save_held()
+        self.assertIs(clip.chroma, Chroma.YUV420)
+        self.assertEqual(self.recorder._ring.shape, ScreenFormat(WIDTH, HEIGHT, Chroma.YUV420).shape)
+        self.discard(ScreenRecorderState.IDLE)
 
     def test_look_back_keeps_the_last_seconds_and_saves_them(self) -> None:
         self.settings.duration = 0.5
@@ -324,7 +347,7 @@ class StateTest(unittest.TestCase):
         self.settings.look_back = True
         self.tick_until(lambda: self.recorder._ring.num_slots > 0)
         self.settings.width = 16
-        self.tick_until(lambda: self.recorder.capture_size == (16, HEIGHT) and self.stored() > 0)
+        self.tick_until(lambda: self.recorder.capture_format == ScreenFormat(16, HEIGHT) and self.stored() > 0)
 
     def test_a_failure_is_an_error_and_start_tries_again(self) -> None:
         ScreenRecorderSettings.start.fire(self.settings)
@@ -332,7 +355,7 @@ class StateTest(unittest.TestCase):
         with self.assertLogs('modules.video.screen_recorder', 'ERROR'):
             self.recorder.fail('no capture')
         self.assertIs(self.settings.state, ScreenRecorderState.ERROR)
-        self.assertIsNone(self.recorder.capture_size)
+        self.assertIsNone(self.recorder.capture_format)
         self.ticks(3)
         self.assertIs(self.settings.state, ScreenRecorderState.ERROR)
         ScreenRecorderSettings.start.fire(self.settings)
@@ -373,7 +396,7 @@ class QueueTest(unittest.TestCase):
         recorder.update(1.0)
         given_back: list[int] = []
         for n in range(6):
-            data = np.zeros((HEIGHT * 3 // 2, WIDTH), np.uint8)
+            data = np.zeros(ScreenFormat(WIDTH, HEIGHT).shape, np.uint8)
             recorder.submit_screen_frame(ScreenFrame(data, 1.0 + n / FPS, 0, lambda n=n: given_back.append(n)))
         self.assertEqual(given_back, [0, 1, 2])        # the three oldest, dropped
         self.assertEqual(len(recorder._queue), 3)

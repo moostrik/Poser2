@@ -7,7 +7,8 @@ The video package writes and reads clips through ffmpeg (`ffmpeg.py`), the camer
 ## Screen recorder
 
 Each render tick the layers an app records are drawn into the screen frame, an Fbo of the recording's size;
-`ScreenCapture` (`modules/render/general/screen_recording/`) converts it to NV12, reads it back into RAM and hands
+`ScreenCapture` (`modules/render/general/screen_recording/`) converts it to its YUV planes (`chroma`: 4:4:4 or 4:2:0),
+reads them back into RAM and hands
 each finished frame (`ScreenFrame`) to the `ScreenRecorder`, whose thread copies it into a ring in RAM. When the
 ring is full, the duration is reached or Stop is pressed, recording stops and the take is held: in and out are set
 on it, and each `save` has the recorder's thread encode the frames between them to an HEVC mp4 with NVENC;
@@ -36,7 +37,7 @@ its overhang is cut. It is never stretched.
 they change, the preset becomes the one that matches in either orientation, else CUSTOM, and `portrait`
 becomes height > width. Every write lands on the value already there, so the three never loop. `snap` sets
 the size to the first source's shape, or the window's with `main_window`. Sizes are rounded down to even numbers, which
-NV12 needs. The size is read at Start and holds for that recording.
+4:2:0 needs. The size and the chroma are read at Start and hold for that recording.
 
 | Preset | Landscape   | Portrait    |
 |--------|-------------|-------------|
@@ -47,19 +48,31 @@ NV12 needs. The size is read at Start and holds for that recording.
 
 ### How many seconds fit
 
-NV12 is 1.5 bytes per pixel: luma at full resolution, chroma at half width and half height, BT.709 video
-range. The render loop is not locked to a rate, so the length follows the window's measured tick rate.
+Quality is traded against length. `chroma` (`ScreenFormat`, `modules/video/screen_format.py`) picks the frame's
+layout, BT.709 video range either way, one (rows, width) array of planes, top row first:
 
-| Recording (60 ticks/s) | Per frame | Per second | Seconds in 8 GB |
-|------------------------|-----------|------------|-----------------|
-| UHD, NV12              | 12.4 MB   | 746 MB     | 10.7 s          |
-| UHD, RGBA8 (not used)  | 33.2 MB   | 1.99 GB    | 4.0 s           |
-| QHD, NV12              | 5.5 MB    | 332 MB     | 24.1 s          |
-| HD, NV12               | 3.1 MB    | 187 MB     | 42.9 s          |
+| `chroma`         | Planes                                 | Bytes/pixel | ffmpeg input | For                          |
+|------------------|----------------------------------------|-------------|--------------|------------------------------|
+| YUV444 (default) | Y, Cb, Cr, each at full size           | 3           | `yuv444p`    | sharp colored edges, masters |
+| YUV420           | Y, then Cb Cr interleaved at half size | 1.5         | `nv12`       | twice the length             |
 
-All four rows are **(deduction)**: computed from the frame sizes, not measured. Per GB the rows scale
-alike: UHD NV12 at 60 ticks/s holds about 80 s in 60 GB of RAM **(deduction)**; the PC has 96 GB of RAM, 74 GB
-free with the app off, and a 4090 with 24 GB **(measured 2026-11-19)**.
+4:2:0 halves the color resolution, which blurs sharp colored edges in graphic content; 4:4:4 keeps it. A 4:4:4 HEVC
+file is a master: edit software plays it, Windows' own player often does not. The render loop is not locked to a
+rate, so the length follows the window's measured tick rate; `frame_step` 2 doubles it, and a smaller size gives
+more (HD is a quarter of UHD's bytes).
+
+| Recording (60 ticks/s) | Per frame | Per second | Seconds in 8 GB | Seconds in 60 GB |
+|------------------------|-----------|------------|-----------------|------------------|
+| UHD, 4:4:4             | 24.9 MB   | 1.49 GB    | 5.4 s           | 40 s             |
+| UHD, 4:2:0             | 12.4 MB   | 746 MB     | 10.7 s          | 80 s             |
+| UHD, RGBA8 (not used)  | 33.2 MB   | 1.99 GB    | 4.0 s           | 30 s             |
+| QHD, 4:4:4             | 11.1 MB   | 664 MB     | 12.0 s          | 90 s             |
+| QHD, 4:2:0             | 5.5 MB    | 332 MB     | 24.1 s          | 181 s            |
+| HD, 4:4:4              | 6.2 MB    | 373 MB     | 21.4 s          | 161 s            |
+| HD, 4:2:0              | 3.1 MB    | 187 MB     | 42.9 s          | 322 s            |
+
+All rows are **(deduction)**: computed from the frame sizes, not measured. The PC has 96 GB of RAM, 74 GB free with
+the app off, and a 4090 with 24 GB **(measured 2026-11-19)**.
 
 The ring is plain RAM (`ScreenFrameRing`, numpy blocks): a block allocates without locking any page, and its
 memory goes back when the ring is cleared. It is not pinned: pinning a one-second block (about 750 MB at UHD60)
@@ -72,7 +85,7 @@ the last one is left, after reading the RAM available to processes (psutil), so 
 counted. When the next block would leave less than `ram_reserve` free (default 8 GB), the ring grows no more and
 the recording stops when it is full. The check runs once per recorded second and Start makes no large allocation.
 
-A run in deep_flow (`-sim`, 20261112-130105_show, UHD portrait, 60 Hz with v_sync, `ram_reserve` 10 GB,
+A run in deep_flow (`-sim`, 20261112-130105_show, UHD portrait at 4:2:0, 60 Hz with v_sync, `ram_reserve` 10 GB,
 commit 51145c73) **(measured 2026-11-20)**:
 
 | Phase                 | Ticks | Mean (ms) | p95 (ms) | Max (ms) | Over 25 ms | Dropped |
@@ -86,6 +99,17 @@ commit 51145c73) **(measured 2026-11-20)**:
 The long ticks come as often idle as while recording and at no once-a-second rhythm. The 30 s take held 1800 frames
 at 59.93 fps (worst gap 33.3 ms) and encoded in 20.1 s, 90 frames/s (118.6 MB). The take to the reserve held 6151
 frames, 103 s, and stopped with 10.3 GB free; the app ran on while it was held, and `discard` gave the RAM back.
+That encode used `-preset p5` without multipass or AQ.
+
+The same run at the default format, 4:4:4 with today's encode (commit 7e32c69a and E1) **(measured 2026-11-20)**:
+
+| Phase                 | Ticks | Mean (ms) | p95 (ms) | Max (ms) | Over 25 ms | Dropped |
+|-----------------------|-------|-----------|----------|----------|------------|---------|
+| Idle                  | 179   | 16.68     | 25.1     | 37.9     | 6 %        |         |
+| Recording 30 s        | 1803  | 16.85     | 26.3     | 43.4     | 7 %        | 0       |
+
+The 30 s take, 1782 frames at 59.34 fps (worst gap 36.1 ms), encoded in 48.7 s: 36.6 frames/s, under the show's
+58, so a take takes about 1.6 times its length to save (120.2 MB).
 
 `max_duration` is the estimate (free RAM + the ring's own − `ram_reserve`) / (bytes per frame × measured ticks/s /
 `frame_step`), refreshed once a second. `duration` 0, or above `max_duration`, records until the memory stops it.
@@ -97,11 +121,12 @@ as the take needs.
 
 ### Capture, on the render thread
 
-- The Nv12 shader (`shaders/nv12.py`, `nv12.frag` in the screen recording's package) converts the screen frame in
-  two passes: Y into a one-channel texture at full size, Cb Cr into a two-channel texture at half size, each chroma
-  sample from the average of its 2 × 2 pixels; flipped, so the first row read back is the picture's top. The
-  BT.709 matrix is plain code beside the shader (`bt709_video_range`).
-- `glReadPixels` reads both planes, Y then UV, into one of four pixel buffers in host memory, each mapped once
+- The RgbToYuv shader (`shaders/rgb_to_yuv.py`, `rgb_to_yuv.frag` in the screen recording's package) converts the
+  screen frame into its planes, one pass each (`YuvPlane`): Y into a one-channel texture at full size; at 4:2:0 Cb Cr
+  into a two-channel texture at half size, each chroma sample the average of its 2 × 2 pixels; at 4:4:4 Cb and Cr
+  each into a one-channel texture at full size. It samples through `position.glsl`'s `topLeft`, so the first row read
+  back is the picture's top. The BT.709 matrix is plain code beside the shader (`bt709_video_range`).
+- `glReadPixels` reads the planes, Y first, into one of four pixel buffers in host memory, each mapped once
   (persistent and coherent) when the capture is made, and a fence is set after it. The GPU writes the frame into
   RAM; the CPU does not wait.
 - `poll`, on every tick, checks the oldest fences without waiting; once one has passed, the frame goes to the
@@ -109,14 +134,14 @@ as the take needs.
   array, its tick's `timestamp`, and the ticks skipped before it. The buffer is lent until the frame's `release`.
   A frame enters the ring one to two ticks after it was drawn.
 - With all four buffers lent the capture leaves the tick out; the next frame carries the count (`skipped`).
-- The compositor makes the capture at the recorder's size when a take begins (`ScreenRecorder.capture_size`) and
+- The compositor makes the capture in the recorder's format when a take begins (`ScreenRecorder.capture_format`) and
   frees it after; never while a frame is lent or a read-back is on its way, as its memory would go under a reader.
 - The capture sets its own blend and viewport and leaves framebuffer 0 bound. Nothing is drawn or converted unless
   the recorder captures this tick (`ScreenRecorder.capturing`).
 - No CUDA: the read-back is GL's own, and a mapped buffer in host memory reads as plain RAM. `scripts/screen_capture_check.py`
-  checks the NV12 codes of known colors, the preview, the pool's lending and skipping, and times one UHD frame's copy
-  out of a mapped buffer: 0.31 ms over 20 copies **(measured 2026-11-20, 2160 × 3840, partly from the CPU's cache)**,
-  which says the mapped memory is cached.
+  checks the YUV codes of known colors and the preview in both chromas, the pool's lending and skipping, and times
+  one UHD frame's copy out of a mapped buffer: 0.31 ms for 4:2:0 and 0.70 ms for 4:4:4 over 20 copies
+  **(measured 2026-11-20, 2160 × 3840, partly from the CPU's cache)**, which says the mapped memory is cached.
 
 ### The hand-over, to the recorder's thread
 
@@ -128,10 +153,13 @@ as the take needs.
 
 ### Encode, on the recorder's thread
 
-- One ffmpeg process takes raw NV12 on stdin (`ClipWriter` with `ClipInput.NV12`, `ClipCodec.HEVC`):
-  `hevc_nvenc -preset p5 -tune hq -rc vbr -cq <quality> -b:v 0`, tagged BT.709 video range and `hvc1`, so
-  Windows and QuickTime play it. HEVC because fine detail at 4K needs fewer bits than h264 for the same
-  quality.
+- One ffmpeg process takes the raw planes on stdin (`ClipWriter` with `ClipInput.YUV444P` or `ClipInput.NV12`,
+  `ClipCodec.HEVC`) through a pipe of 8 MB (`PIPE_SIZE`; Windows' default pipe takes 4 KB a write):
+  `hevc_nvenc -preset p7 -tune hq -multipass fullres -rc vbr -cq <quality> -b:v 0 -spatial-aq 1 -temporal-aq 1`,
+  tagged BT.709 video range and `hvc1`, so Windows and QuickTime play the 4:2:0 files. The encode runs after a take,
+  so its time goes to quality: the slowest preset, a full-resolution second pass, and the bits put where the eye
+  sees them. 4:4:4 input is encoded as HEVC 4:4:4 (Range Extensions). HEVC because fine detail at 4K needs fewer
+  bits than h264 for the same quality.
 - Each slot of the ring is written to the pipe as it is.
 - After the last frame the pipe is closed and ffmpeg waited for; the ring stays held.
 - The thread makes no GL call; it touches only RAM and the pipe. NVENC is its own unit on the card, so the show
@@ -153,11 +181,11 @@ While a marker is dragged, the main window shows the held frame nearest to it (`
 on black, so a cut is made on what is seen. `ScreenPreview` (beside the capture) draws it without the render thread
 waiting: the render tick stores the frame under the marker (`set_screen_frame`, a held slot no one changes), and
 the preview's own thread copies it straight into one of two unpack pixel buffers, mapped once on the render thread
-(persistent and coherent), and marks it written. The render tick uploads the newest written buffer into a Y and a
-Cb Cr texture, turns them back into RGB in `ScreenPreview.fbo` with the `Nv12ToRgb` shader
-(`shaders/nv12_to_rgb.py`), upright, and sets a fence on the buffer; once the fence has passed, checked on a later
+(persistent and coherent), and marks it written. The render tick uploads the newest written buffer into the
+planes' textures, turns them back into RGB in `ScreenPreview.fbo` with the `YuvToRgb` shader
+(`shaders/yuv_to_rgb.py`), upright, and sets a fence on the buffer; once the fence has passed, checked on a later
 tick without waiting, the buffer is free again. No CUDA. A drag shows its frames while a save runs, as the recorder's
-thread takes no part. In deep_flow (`-sim`, UHD portrait, 60 Hz with v_sync, commit 51145c73 with the preview)
+thread takes no part. In deep_flow (`-sim`, UHD portrait at 4:2:0, 60 Hz with v_sync, commit 7e32c69a)
 **(measured 2026-11-20)**: dragging over a held 10 s take for 3 s drew 142 pictures in 181 ticks, the ticks 16.66 ms
 on average (max 33 ms, 11 % over 25 ms, 8 % held without a drag).
 
@@ -218,6 +246,6 @@ render thread frees the capture.
 - The ring is not pinned (above).
 - The encode runs after the recording, not live: live it would push ~750 MB/s **(deduction)** through a pipe and
   NVENC while the show runs.
-- NV12 is made in a fragment shader, not a compute shader: GLSL has no byte arrays, and packing four pixels
+- The planes are made in a fragment shader, not a compute shader: GLSL has no byte arrays, and packing four pixels
   per integer would force widths to multiples of 4.
-- The ring holds NV12, not RGBA: 2.7× the seconds, and the encoder makes 4:2:0 anyway.
+- The ring holds YUV planes, not RGBA: 4:4:4 is 3 bytes a pixel against 4, and 4:2:0 gives 2.7× the seconds.

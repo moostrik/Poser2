@@ -1,13 +1,15 @@
-"""Does the screen capture hand over the right NV12 frames from its mapped pool, and how fast is a frame copied out?
+"""Does the screen capture hand over the right YUV frames from its mapped pool, in each chroma, and how fast is a
+frame copied out?
 
-1. A 64 × 32 frame of 8 × 8 blocks of known colors is drawn into `ScreenCapture.frame`, captured, and handed over once
-   its fence has passed: the Y and Cb Cr codes at each block's middle against the BT.709 video-range codes of its
-   color (a table of numbers). `ScreenPreview` then draws the frame back through its thread and its mapped buffers:
-   each block's middle holds its color within 3 levels of 255, the top row of blocks still at the top.
+1. For 4:2:0 and 4:4:4: a 64 × 32 frame of 8 × 8 blocks of known colors is drawn into `ScreenCapture.frame`, captured
+   (`RgbToYuv`), and handed over once its fence has passed: the Y, Cb and Cr codes at each block's middle against the
+   BT.709 video-range codes of its color (a table of numbers). `ScreenPreview` then draws the frame back (`YuvToRgb`)
+   through its thread and its mapped buffers: each block's middle holds its color within 3 levels of 255, the top row
+   of blocks still at the top.
 2. The pool: with no frame given back, four captures go out and the fifth is left out; after one is given back,
    the next frame says one was skipped before it.
-3. The copy: one 2160 × 3840 frame copied out of its mapped buffer into plain RAM, as the recorder's thread does,
-   timed over 20 copies; 60 frames a second need it well under 16.7 ms.
+3. The copy: one 2160 × 3840 4:4:4 frame copied out of its mapped buffer into plain RAM, as the recorder's thread
+   does, timed over 20 copies; 60 frames a second need it well under 16.7 ms.
 
     python scripts/screen_capture_check.py
 """
@@ -23,7 +25,7 @@ from OpenGL.GL import glFinish  # noqa: E402
 import monitor_harness as mh  # noqa: E402
 from modules.gl import Style  # noqa: E402
 from modules.render import ScreenCapture, ScreenPreview  # noqa: E402
-from modules.video import ScreenFrame  # noqa: E402
+from modules.video import Chroma, ScreenFormat, ScreenFrame  # noqa: E402
 
 WIDTH, HEIGHT, BLOCK = 64, 32, 8
 
@@ -69,10 +71,20 @@ def wait_for(capture: ScreenCapture, frames: list[ScreenFrame], count: int) -> N
         glFinish()
 
 
-def check_codes(source) -> int:
+def codes_at(frame: np.ndarray, chroma: Chroma, y: int, x: int) -> tuple[int, int, int]:
+    """Y, Cb, Cr at a pixel of a frame in its format's layout."""
+    luma = int(frame[y, x])
+    if chroma is Chroma.YUV420:
+        cbcr = frame[HEIGHT:].reshape(HEIGHT // 2, WIDTH // 2, 2)[y // 2, x // 2]
+        return luma, int(cbcr[0]), int(cbcr[1])
+    return luma, int(frame[HEIGHT + y, x]), int(frame[2 * HEIGHT + y, x])
+
+
+def check_codes(source, chroma: Chroma) -> int:
     bad = 0
+    screen_format = ScreenFormat(WIDTH, HEIGHT, chroma)
     capture = ScreenCapture()
-    capture.allocate(WIDTH, HEIGHT)
+    capture.allocate(screen_format)
     frames: list[ScreenFrame] = []
     capture.add_screen_frame_callback(frames.append)
     draw(capture, source)
@@ -81,20 +93,19 @@ def check_codes(source) -> int:
     if not frames:
         print('  no frame handed over')
         return 1
-    nv12 = frames[0].data.copy()
+    yuv = frames[0].data.copy()
     frames[0].release()
-    luma, chroma = nv12[:HEIGHT], nv12[HEIGHT:].reshape(HEIGHT // 2, WIDTH // 2, 2)
     for r, names in enumerate(ROWS):
         for c, name in enumerate(names):
             y, x = r * BLOCK + BLOCK // 2, c * BLOCK + BLOCK // 2
-            got = (int(luma[y, x]), int(chroma[y // 2, x // 2, 0]), int(chroma[y // 2, x // 2, 1]))
+            got = codes_at(yuv, chroma, y, x)
             want = CODES[name][1]
             if any(abs(g - w) > 1 for g, w in zip(got, want)):
                 bad += 1
-                print(f'  NV12 {name} at row {r} col {c}: {got}, want {want}')
+                print(f'  {chroma.name} {name} at row {r} col {c}: {got}, want {want}')
     preview = ScreenPreview()
-    preview.allocate(WIDTH, HEIGHT)
-    preview.set_screen_frame(0, nv12)
+    preview.allocate(screen_format)
+    preview.set_screen_frame(0, yuv)
     deadline = time.perf_counter() + 2.0
     while preview.shown != 0 and time.perf_counter() < deadline:     # its thread copies, the next update draws
         preview.update()
@@ -115,7 +126,7 @@ def check_codes(source) -> int:
             want = CODES[name][0]
             if any(abs(g - w) > 3 for g, w in zip(got, want)):
                 bad += 1
-                print(f'  preview {name} at row {r} col {c}: {got}, want {want}')
+                print(f'  {chroma.name} preview {name} at row {r} col {c}: {got}, want {want}')
     capture.deallocate()
     return bad
 
@@ -123,7 +134,7 @@ def check_codes(source) -> int:
 def check_pool(source) -> int:
     bad = 0
     capture = ScreenCapture()
-    capture.allocate(WIDTH, HEIGHT)
+    capture.allocate(ScreenFormat(WIDTH, HEIGHT))
     frames: list[ScreenFrame] = []
     capture.add_screen_frame_callback(frames.append)
     for n in range(5):
@@ -152,9 +163,10 @@ def check_pool(source) -> int:
     return bad
 
 
-def time_copy() -> float:
+def time_copy() -> tuple[float, float]:
+    screen_format = ScreenFormat(2160, 3840, Chroma.YUV444)
     capture = ScreenCapture()
-    capture.allocate(2160, 3840)
+    capture.allocate(screen_format)
     frames: list[ScreenFrame] = []
     capture.add_screen_frame_callback(frames.append)
     capture.capture(0.0)
@@ -167,16 +179,18 @@ def time_copy() -> float:
     ms = (time.perf_counter() - started) / 20 * 1000.0
     frames[0].release()
     capture.deallocate()
-    return ms
+    return ms, screen_format.frame_bytes / 1e6
 
 
 window = mh.context()
 source = mh.texture_of(picture())
-codes = check_codes(source)
-print(f'NV12 codes and preview: {codes} wrong of {2 * len(ROWS) * len(TOP)}')
+codes = 0
+for chroma in (Chroma.YUV420, Chroma.YUV444):
+    wrong = check_codes(source, chroma)
+    codes += wrong
+    print(f'{chroma.name} codes and preview: {wrong} wrong of {2 * len(ROWS) * len(TOP)}')
 pool = check_pool(source)
 print(f'pool: {pool} wrong')
-ms = time_copy()
-mb = 2160 * 3840 * 3 // 2 / 1e6
-print(f'copy of one 2160x3840 NV12 frame ({mb:.1f} MB) out of a mapped buffer: {ms:.2f} ms ({mb / ms:.1f} GB/s)')
+ms, mb = time_copy()
+print(f'copy of one 2160x3840 4:4:4 frame ({mb:.1f} MB) out of a mapped buffer: {ms:.2f} ms ({mb / ms:.1f} GB/s)')
 print('PASS' if codes == 0 and pool == 0 and ms < 8.0 else 'FAIL')

@@ -1,4 +1,4 @@
-"""NV12 shader: one plane of NV12 (Y, or interleaved Cb Cr at half size) from an RGB texture, BT.709 video range."""
+"""RGB to YUV shader: one plane of a screen frame's YUV (BT.709 video range), at 4:2:0 or 4:4:4."""
 
 import logging
 from enum import IntEnum
@@ -31,21 +31,23 @@ def bt709_video_range() -> tuple[np.ndarray, np.ndarray]:
 MATRIX, OFFSET = bt709_video_range()
 
 
-class Nv12Plane(IntEnum):
-    Y =  0
-    UV = 1
+class YuvPlane(IntEnum):
+    Y =    0    # at the frame's size, one channel
+    CBCR = 1    # 4:2:0: Cb Cr interleaved at half width and half height, two channels
+    CB =   2    # 4:4:4: at the frame's size, one channel
+    CR =   3    # 4:4:4: at the frame's size, one channel
 
 
-class Nv12(Shader):
-    """Draws one NV12 plane of `src` into the bound target: Y at the texture's size, UV at half its width and
-    height; the target's first row is the picture's top row."""
+class RgbToYuv(Shader):
+    """Draws one YUV plane of `src` into the bound target, sized as the plane is (`YuvPlane`); the target's first row
+    is the picture's top row."""
 
-    def use(self, src: Texture, plane: Nv12Plane) -> None:
+    def use(self, src: Texture, plane: YuvPlane) -> None:
         if not self.allocated or not self.shader_program:
-            logger.warning("Nv12 shader not allocated or shader program missing.")
+            logger.warning("RgbToYuv shader not allocated or shader program missing.")
             return
         if not src.allocated:
-            logger.warning("Nv12 shader: input texture not allocated.")
+            logger.warning("RgbToYuv shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)
