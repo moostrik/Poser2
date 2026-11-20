@@ -34,7 +34,7 @@ REPLY_TIMEOUT = 5.0     # seconds a settings file's load or save waits for the a
 class AppLink:
     """The panel's end of the link: sends what the mirror is written, sets on it what the app sends.
 
-    It is the page's `PresetStore` too: a load or save waits for the app's answer, on the loop that
+    It is the page's `SettingsLink` too: a load or save waits for the app's answer, on the loop that
     called it, which the receiver thread does not need. *on_loop* runs a call on the page's loop from
     the receiver thread; *on_end* is called when the app stops the link or is gone."""
 
@@ -89,24 +89,24 @@ class AppLink:
 
     # -- the page's requests ------------------------------------------------------
 
-    def load(self, name: str) -> bool:
-        return self._request("load", name)
+    def load(self, group: str, name: str) -> bool:
+        return self._request("load", group, name)
 
-    def save(self, name: str) -> bool:
-        return self._request("save", name)
+    def save(self, group: str, name: str) -> bool:
+        return self._request("save", group, name)
 
     def exit(self) -> None:
         self.send(("exit",))
 
-    def _request(self, kind: str, name: str) -> bool:
+    def _request(self, kind: str, group: str, name: str) -> bool:
         with self._request_lock:
             self._next_request += 1
             request = self._next_request
         event, answer = threading.Event(), [False]
         self._replies[request] = (event, answer)
-        self.send((kind, request, name))
+        self.send((kind, request, group, name))
         if not event.wait(REPLY_TIMEOUT):
-            logger.warning("Preset %s of '%s': no answer from the app in %.0f s", kind, name, REPLY_TIMEOUT)
+            logger.warning("%s of %s file '%s': no answer from the app in %.0f s", kind, group, name, REPLY_TIMEOUT)
         self._replies.pop(request, None)
         return answer[0]
 

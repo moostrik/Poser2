@@ -8,7 +8,7 @@ What the link carries, as tuples of plain values:
 
     app → panel   ("init", description, values, config, log entries), ("values", changes),
                   ("log", entries), ("reply", request, ok), ("stop",)
-    panel → app   ("set", path, name, value), ("fire", path, name), ("load" | "save", request, file name),
+    panel → app   ("set", path, name, value), ("fire", path, name), ("load" | "save", request, root group, file name),
                   ("exit",), ("log", record)
 """
 
@@ -198,8 +198,8 @@ class PanelServer:
             except KeyError:
                 logger.warning("Panel: no action %s.%s", path, name)
         elif kind in ("load", "save"):
-            _, request, name = message
-            self._send(("reply", request, self._file(kind, "setup", name)))
+            _, request, group, name = message
+            self._send(("reply", request, self._file(kind, group, name)))
         elif kind == "exit":
             if self.on_exit is not None:
                 self.on_exit()
@@ -212,6 +212,8 @@ class PanelServer:
     def _file(self, kind: str, group: str, name: str) -> bool:
         """Load or save root group *group*'s file *name* on the tree; whether it worked."""
         try:
+            if group not in self.root.children:
+                raise ValueError(f"no root group '{group}'")
             self.store.validate_name(name)
             if kind == "load":
                 return self.store.load(self.root, group, name)
