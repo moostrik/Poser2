@@ -72,6 +72,21 @@ the last one is left, after reading the RAM available to processes (psutil), so 
 counted. When the next block would leave less than `ram_reserve` free (default 8 GB), the ring grows no more and
 the recording stops when it is full. The check runs once per recorded second and Start makes no large allocation.
 
+A run in deep_flow (`-sim`, 20261112-130105_show, UHD portrait, 60 Hz with v_sync, `ram_reserve` 10 GB,
+commit 51145c73) **(measured 2026-11-20)**:
+
+| Phase                 | Ticks | Mean (ms) | p95 (ms) | Max (ms) | Over 25 ms | Dropped |
+|-----------------------|-------|-----------|----------|----------|------------|---------|
+| Idle                  | 178   | 16.75     | 26.4     | 38.9     | 8 %        |         |
+| Recording 30 s        | 1821  | 16.69     | 25.8     | 42.8     | 7 %        | 0       |
+| Encoding the 30 s     | 2609  | 17.00     | 27.9     | 45.2     | 11 %       |         |
+| Recording to reserve  | 6171  | 16.74     | 25.8     | 62.3     | 7 %        | 0       |
+| Held, 60 GB in RAM    | 300   | 16.72     | 24.8     | 32.7     | 4 %        |         |
+
+The long ticks come as often idle as while recording and at no once-a-second rhythm. The 30 s take held 1800 frames
+at 59.93 fps (worst gap 33.3 ms) and encoded in 20.1 s, 90 frames/s (118.6 MB). The take to the reserve held 6151
+frames, 103 s, and stopped with 10.3 GB free; the app ran on while it was held, and `discard` gave the RAM back.
+
 `max_duration` is the estimate (free RAM + the ring's own − `ram_reserve`) / (bytes per frame × measured ticks/s /
 `frame_step`), refreshed once a second. `duration` 0, or above `max_duration`, records until the memory stops it.
 

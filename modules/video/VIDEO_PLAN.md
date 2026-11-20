@@ -6,12 +6,6 @@
 can read one short. The recording package counts each chunk's frames with it (`recording_folder.py`). Looked at when
 the apps' plan F reaches the video module.
 
-## C. The frame handed over, the ring in RAM
-
-The capture hands over finished frames to the recorder's RAM ring (C2, built; VIDEO.md holds the design).
-
-- C3. One `-sim` run in deep_flow at 4K, 60 Hz with v_sync: tick time idle, recording, idle, and a 30 s take with its encode (encode time, frames, dropped, the file plays); then one take that runs until `ram_reserve` stops it, showing the app runs on while it is held. The ticks while recording show no stall once a second, and 0 dropped. Check of C2 and the drawing through `ScreenRecordingCompositor`, in the app. A fix found here is one more commit only if a test checks it.
-
 ## D. In and out before saving
 
 - D2. A preview. `ScreenPreview` (beside the capture): `set_screen_frame` stores the latest frame to show (a held slot, which no one changes); two unpack pixel buffers, mapped once on the render thread (persistent and coherent); the preview's thread copies the frame straight into a free one and marks it written; the render tick uploads a written buffer into an RGBA Fbo, turns the planes back into RGB in a shader, and sets a fence on that pixel buffer; once that fence has passed, checked on a later tick without waiting, the render thread marks the buffer free. No CUDA in the preview. The drag stores the slot under the handle and the preview's thread picks it up, so a drag shows its frame while a save runs. `ScreenRecordingCompositor` draws it over the main window while a handle is dragged. D2's first code (in 49236068, its video-memory branch included, unchecked) is reworked onto this. VIDEO.md: the preview. Check: the shader in the GPU harness against a known frame; one `-sim` run, a held take trimmed by eye and saved, its frame count matching in..out. One commit.
@@ -43,5 +37,5 @@ Quality is traded against length; `max_duration` shows the length the chosen for
 - Settings connect the user and a component, not two components: E3, the apps read a property
 - A document describes what is built: VIDEO.md in D2, E1–E4
 - A package is one thing: D2, the preview in the screen recording's render package, not in modules/gl
-- Prefer the design with the lower latency, measured in the app: C3, E2
-- One plan step checked by a run or test is one commit: C3, D2, E1–E4
+- Prefer the design with the lower latency, measured in the app: E2
+- One plan step checked by a run or test is one commit: D2, E1–E4
