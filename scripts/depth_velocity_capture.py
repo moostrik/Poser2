@@ -102,7 +102,7 @@ def main() -> int:
     def saved(self: LucasKanadeFlow3D, depth: Texture | None, delta_time: float, view_span: float,
               depth_step: tuple[float, float], guarded: bool = False,
               depth_range: tuple[float, float] = (0.0, 0.0)) -> None:
-        if starting.is_set():                     # on the render thread: the loop starts here
+        if starting.is_set():                     # on the main thread: the loop starts here
             starting.clear()
             recording.set()
         if recording.is_set() and depth is not None:
@@ -151,7 +151,7 @@ def main() -> int:
                 if loops.acquire(timeout=0.1) and time.perf_counter() - began >= SHORTEST_LOOP:
                     break                         # a call back sooner is its start's again, not the next loop
             recording.clear()
-            time.sleep(0.2)                       # the render thread's last measure is in
+            time.sleep(0.2)                       # the main thread's last measure is in
             for index, (luminance, depth, mask) in enumerate(held[:len(calls)]):
                 np.save(out_dir / f'luminance_{index:04d}.npy', luminance)
                 np.save(out_dir / f'depth_{index:04d}.npy', depth)

@@ -98,8 +98,8 @@ def next_credit_cell(current: str | None, left: str | None, started: list[str],
 
 class WallRender:
     """One wall of the sphere: grin sequences in a grid of cells, each image turned a quarter, with a trail
-    over the whole grid, composited into `texture` on the render thread (`update`) and shown in one of SMILE's
-    secondary windows. A cell flashes white for one frame when its next sequence starts, and is white with
+    over the whole grid, composited into `texture` on the main thread (`update`) and shown in one of SMILE's
+    windows 1 and 2. A cell flashes white for one frame when its next sequence starts, and is white with
     its screen's number while the laughter test lights it (`light`). One cell shows the artist's name and
     a QR code to the project page instead of its clip (`credit_qr_walls`): it takes a cell when a clip
     starts there, after its white frame, and stays for that play, so it moves on as often as the clips
@@ -177,7 +177,7 @@ class WallRender:
         """The wall as composited last (`update`), to blit into its window."""
         return self._trail_fbo
 
-    # RENDER THREAD
+    # MAIN THREAD
     def allocate(self) -> None:
         self._image_fbo.allocate(self.width, self.height, GL_RGBA16F)
         self._trail_fbo.allocate(self.width, self.height, GL_RGBA16F)
@@ -224,7 +224,7 @@ class WallRender:
             image.deallocate()
 
     def set_online(self, cell: str | None, mode: str = 'clip', view: Texture | None = None, page: str = '') -> None:
-        """The online cell for the frames from now on (render thread, before `update`): None for none, else
+        """The online cell for the frames from now on (main thread, before `update`): None for none, else
         the cell and what it shows, `qr` (the card with the code to `page`) or `screen` (`view`, the main screen)."""
         self._online_cell = cell if mode != 'clip' else None
         self._online_mode = mode

@@ -28,7 +28,7 @@ Mutation (functional — returns new Frame):
 Immutability:
   • __setattr__ / __delattr__ raise AttributeError
   • _features dict is shallow-copied at construction
-  • Thread-safe: shared between input and render threads
+  • Thread-safe: shared between the input threads and the main thread
 
 Construction:
   • Frame(track_id, cam_id)

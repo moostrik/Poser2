@@ -73,7 +73,7 @@ class Monitor3DLayer(Monitor2DLayer):
 
     def drag(self, dx: float, dy: float, button: MouseButton) -> None:
         """A drag of `dx`, `dy` (shares of the window, y down): the left button turns the 3D view,
-        the right zooms it. Render thread, from the window's callbacks."""
+        the right zooms it. Main thread, from the window's callbacks."""
         orbit: OrbitSettings = self.settings.advanced.orbit
         camera: Orbit = Orbit(orbit.yaw, orbit.pitch, orbit.zoom)
         if button == MouseButton.LEFT:

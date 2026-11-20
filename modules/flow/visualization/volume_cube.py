@@ -18,7 +18,7 @@ LIGHT_COLOR: tuple[float, float, float, float] = (1.0, 0.757, 0.027, 1.0)  # the
 
 
 class VolumeCube:
-    """Draws a volume's cube into its own FBO (RGBA8) at the size `resize` sets; render thread only."""
+    """Draws a volume's cube into its own FBO (RGBA8) at the size `resize` sets; main thread only."""
 
     def __init__(self) -> None:
         self._fbo: Fbo = Fbo()

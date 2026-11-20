@@ -298,7 +298,7 @@ class Tensor(Texture):
 
         # Map the PBO on the current stream, queue the copy of the tensor into it there, unmap: the copy runs after
         # the conversions above on the same stream, and the unmap has it done before OpenGL reads the PBO, so the
-        # render thread queues it and goes on. A tensor written on another stream is waited for by its reader
+        # main thread queues it and goes on. A tensor written on another stream is waited for by its reader
         # (`stream.wait_event`) before it gets here.
         assert self._cuda_gl_resource is not None
         stream = torch.cuda.current_stream().cuda_stream

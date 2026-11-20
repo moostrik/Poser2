@@ -12,7 +12,7 @@ from OpenGL.GL import (GL_DYNAMIC_COPY, GL_R32UI, GL_RED_INTEGER, GL_SHADER_STOR
 
 
 class StorageBuffer:
-    """A GPU buffer of `size` bytes for shader storage blocks; render thread only."""
+    """A GPU buffer of `size` bytes for shader storage blocks; main thread only."""
 
     def __init__(self) -> None:
         self.buffer_id: int = 0

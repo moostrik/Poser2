@@ -62,7 +62,7 @@ class SpeedCount(Protocol):
 
 
 class VelocityPeak:
-    """A velocity's p99 speed over the moving pixels (`VelocityPeakSettings.speed`), while `enabled`; render thread
+    """A velocity's p99 speed over the moving pixels (`VelocityPeakSettings.speed`), while `enabled`; main thread
     only. `update` once per velocity: it counts the velocity's speeds into the bins with `count`, about once a
     second copies them into a pixel buffer behind a fence and clears them, and writes the percentile of a copy the
     GPU has finished; nothing waits. Off, nothing runs and `speed` is 0."""

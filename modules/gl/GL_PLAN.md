@@ -25,7 +25,7 @@ path.
 
 ## Rules this plan touches
 
-- gl.md: All OpenGL calls execute on the render thread
+- gl.md: All OpenGL calls execute on the main thread, in the window loop
 - gl.md: Create textures, FBOs and shaders at setup or on a resize, not per frame
 - app-lifecycle.md: Start workers/services only after wiring is complete
 - settings-presets.md: Do not subclass a module's Settings class in app code; use `Group`

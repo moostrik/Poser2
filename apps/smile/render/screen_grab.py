@@ -1,6 +1,6 @@
 """A grab of the main screen for SMILE Online: the frame of the render as the room sees it, without
 the room's overlays (the QR code, the operator's status line), scaled down and read back to the CPU
-at a few frames a second, so the phone can show what the screen shows. The render thread asks `due`
+at a few frames a second, so the phone can show what the screen shows. The main thread asks `due`
 once per frame and, when it is, blits the texture into a small FBO and reads it (`grab`, from
 SmileRender.update); another thread takes the newest frame (`take`) and encodes it. The turn's last frame
 (`last`) is taken at once and without the caption (`clean`, for the render): the phone fades the caption
@@ -50,7 +50,7 @@ class ScreenGrab:
             last, self._last_frame = self._last_frame, False
         return frame, last
 
-    # RENDER THREAD
+    # MAIN THREAD
     def due(self, now: float) -> bool:
         """Whether a frame is wanted now (on, and the interval passed, or the last frame asked for); marks the
         time when it is."""

@@ -1,11 +1,11 @@
-"""ScreenPreview: a held screen frame (its YUV planes, in RAM) drawn back as an RGB picture, without the render thread
+"""ScreenPreview: a held screen frame (its YUV planes, in RAM) drawn back as an RGB picture, without the main thread
 waiting.
 
 `set_screen_frame` stores the latest frame to show; the preview's own thread copies it straight into one of two
-unpack pixel buffers, mapped once on the render thread (persistent and coherent), and marks it written. `update`, on
+unpack pixel buffers, mapped once on the main thread (persistent and coherent), and marks it written. `update`, on
 the render tick, uploads a written buffer into the planes' textures, turns them back into RGB in `fbo`, and sets
 a fence on the buffer; once that fence has passed, checked on a later tick without waiting, the buffer is free
-again. Only the render thread makes GL calls. See modules/video/VIDEO.md.
+again. Only the main thread makes GL calls. See modules/video/VIDEO.md.
 """
 
 import ctypes
@@ -66,7 +66,7 @@ class ScreenPreview:
     def height(self) -> int:
         return self.format.height if self.format else 0
 
-    # RENDER THREAD
+    # MAIN THREAD
 
     def allocate(self, screen_format: ScreenFormat) -> None:
         """GL objects for frames of `screen_format` and the two buffers, mapped once, and the thread."""

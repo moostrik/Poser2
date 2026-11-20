@@ -65,7 +65,7 @@ Each render tick the layers an app records are drawn into the screen frame, an F
 each finished frame (`ScreenFrame`) to the `ScreenRecorder`, whose thread copies it into a ring in RAM. When the
 ring is full, the duration is reached or Stop is pressed, recording stops and the take is held: in and out are set
 on it, and each `save` has the recorder's thread encode the frames between them to an HEVC mp4 with NVENC;
-`discard` frees the memory. The render thread never waits on the GPU, the copy or the encoder.
+`discard` frees the memory. The main thread never waits on the GPU, the copy or the encoder.
 
 ### What gets recorded
 
@@ -198,7 +198,7 @@ The 15 s take, 882 frames at 58.73 fps, encoded in 24.0 s: 36.8 frames/s, as at 
 blocks are sized by the rate measured at Start; they are only chunks of memory, and the ring grows by as many
 as the take needs.
 
-### Capture, on the render thread
+### Capture, on the main thread
 
 - The RgbToYuv shader (`shaders/rgb_to_yuv.py`, `rgb_to_yuv.frag` in the screen recording's package) converts the
   screen frame into its planes, one pass each (`YuvPlane`): Y into a one-channel texture at full size; at 4:2:0 Cb Cr
@@ -261,9 +261,9 @@ dragged marker, or the place on the bar pressed, so it shows where the take is l
 bound, because the panel writes them back to −1 at once.
 
 While a marker is dragged, the main window shows the held frame nearest to it (`ScreenRecorder.preview_frame`), fit
-on black, so a cut is made on what is seen. `ScreenPreview` (beside the capture) draws it without the render thread
+on black, so a cut is made on what is seen. `ScreenPreview` (beside the capture) draws it without the main thread
 waiting: the render tick stores the frame under the marker (`set_screen_frame`, a held slot no one changes), and
-the preview's own thread copies it straight into one of two unpack pixel buffers, mapped once on the render thread
+the preview's own thread copies it straight into one of two unpack pixel buffers, mapped once on the main thread
 (persistent and coherent), and marks it written. The render tick uploads the newest written buffer into the
 planes' textures, turns them back into RGB in `ScreenPreview.fbo` with the `YuvToRgb` shader
 (`shaders/yuv_to_rgb.py`), upright, and sets a fence on the buffer; once the fence has passed, checked on a later
@@ -278,7 +278,7 @@ the tick rate, and `preview_frame` gives the frame there. A dragged marker shows
 it. Only a held take plays: the switch goes off without one and when a save starts, as the save turns the take to
 ENCODING. While it plays the show waits: each app reads `ScreenRecordingCompositor.playing` (the recorder's state,
 not the switch, so a refused play holds nothing), takes and drops its camera frames, and runs and draws no layer.
-The fluid goes on where it stopped, and the secondary windows keep the show's last picture. This is not
+The fluid goes on where it stopped, and the other windows keep the show's last picture. This is not
 `freeze_frame`, the apps' switch that holds the camera frame while the fluid runs on with it. In deep_flow (`-sim`,
 UHD portrait 4:4:4, 60 Hz with v_sync) **(measured 2026-11-20)**: playing the middle half of a held 3.85 s take for
 6 s, the ticks were 16.66 ms on average (p95 19.3 ms, none over 25 ms; idle 16.89 ms, 8 % over 25 ms), the motion and
@@ -325,7 +325,7 @@ mean and the worst gap and the frames dropped go in the log line and the file's 
 A failure (no ffmpeg, no NVENC, a capture that cannot be made) is logged once, shown as ERROR, and the show
 runs on. At exit a recording in progress is written up to its last stored frame, and a held take none of whose
 parts is written yet is written whole; the thread is joined, every frame is given back and the ring freed, then the
-render thread frees the capture.
+main thread frees the capture.
 
 ### Limits
 
@@ -347,7 +347,7 @@ render thread frees the capture.
 
 ### Constraints from the alternatives
 
-- The ring is RAM, not GL textures or buffers: a GL ring would be read back on the render thread while the show
+- The ring is RAM, not GL textures or buffers: a GL ring would be read back on the main thread while the show
   runs, and the encode thread cannot touch GL.
 - The ring is not pinned (above).
 - The encode runs after the recording, not live: live it would push ~750 MB/s **(deduction)** through a pipe and

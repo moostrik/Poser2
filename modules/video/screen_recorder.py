@@ -1,7 +1,7 @@
 """ScreenRecorder: records the screen frames the screen capture hands over into a ring in RAM, holds a take, and
 encodes the parts asked for to HEVC mp4s.
 
-The capture (render thread) calls `submit_screen_frame` with each finished frame; the recorder's own thread copies
+The capture (main thread) calls `submit_screen_frame` with each finished frame; the recorder's own thread copies
 it into its ring (`ScreenFrameRing`, plain RAM, grown by one-second blocks) and gives the capture's buffer back. The
 render tick (`update`) runs the states: it says whether to capture this tick (`capturing`) and at which size
 (`capture_format`), and acts on the buttons, which only set Events. Design and reasons: modules/video/VIDEO.md.
@@ -214,7 +214,7 @@ class ScreenRecorder:
         self._failed: bool = False          # the last take was not written
         self._done: Event = Event()         # the thread finished a take or a free
 
-        # render thread only
+        # main thread only
         self._state: ScreenRecorderState = ScreenRecorderState.IDLE
         self._format: ScreenFormat = ScreenFormat(2, 2)     # the take's, set at its begin
         self._duration: float = 0.0         # the duration the look-back ring was made for
@@ -252,12 +252,12 @@ class ScreenRecorder:
 
     @property
     def capturing(self) -> bool:
-        """Whether the screen frame is to be drawn and captured this tick; render thread, after `update`."""
+        """Whether the screen frame is to be drawn and captured this tick; main thread, after `update`."""
         return self._capture_now
 
     @property
     def capture_format(self) -> ScreenFormat | None:
-        """The format the capture is made at while the recorder has a take, else None; render thread."""
+        """The format the capture is made at while the recorder has a take, else None; main thread."""
         if self._state in (ScreenRecorderState.RECORDING, ScreenRecorderState.HELD, ScreenRecorderState.ENCODING):
             return self._format
         return None
@@ -269,7 +269,7 @@ class ScreenRecorder:
 
     @property
     def playing(self) -> bool:
-        """Whether the held take plays this tick; render thread, after `update`."""
+        """Whether the held take plays this tick; main thread, after `update`."""
         return self._playing
 
     @property
@@ -314,7 +314,7 @@ class ScreenRecorder:
         self._ring.clear()
 
     def fail(self, message: str) -> None:
-        """A failure outside the recorder, as the capture's allocation: logged once, ERROR; render thread."""
+        """A failure outside the recorder, as the capture's allocation: logged once, ERROR; main thread."""
         self._fail(message)
 
     # THE HAND-OVER (the capture's thread)

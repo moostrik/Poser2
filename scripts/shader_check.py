@@ -1,6 +1,6 @@
 """The shader check: every shader of `modules/gl` drawn once on known input and held to a reference image.
 
-A hidden GL 4.6 window gives the context; it is this script's own render thread. Each case draws into a 128 x 128
+A hidden GL 4.6 window gives the context; it is this script's own main thread. Each case draws into a 128 x 128
 RGBA8 FBO with blending off, cleared to transparent black, is read back and compared with the reference its first run
 made, within 1/255 per channel: a GPU's output is not bit-exact across two code paths that draw the same. Shaders
 with no draw to compare (a compute shader) are compiled only. It runs on the GPU like the apps: run it only while no

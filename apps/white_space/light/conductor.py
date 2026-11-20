@@ -119,8 +119,8 @@ class Conductor(Thread):
 
     def run(self) -> None:
         # No thread priority boost: inside the process no thread outranks another — the GIL hands
-        # over on its own schedule regardless of OS priority, so a boost only preempts the pose,
-        # video and render threads without making this one's Python run sooner (profiled
+        # over on its own schedule regardless of OS priority, so a boost only preempts the pose and
+        # video threads and the main thread without making this one's Python run sooner (profiled
         # 2026-10-08: an elevated conductor caused playback stutter). Timing is protected by
         # keeping the tick's work short; the clock's late_max/busy_max/overruns are the watchdog.
         while not self._stop_event.is_set():

@@ -52,7 +52,7 @@ class GuardSlot:
 
 
 class FiniteGuard:
-    """The non-finite counts of one stage's fields; render thread only. `update` once per tick."""
+    """The non-finite counts of one stage's fields; main thread only. `update` once per tick."""
 
     def __init__(self, stage: str, fields: tuple[str, ...]) -> None:
         self._stage: str = stage

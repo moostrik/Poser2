@@ -37,13 +37,13 @@ class StageLayerSettings(BaseSettings):
 
 class StageLayer[I, O: StageOutput](LayerBase, ABC):
     """A stage's layer: `set_input` before the render loop, `output` its output, `reset` from rest.
-    `update` resets first when the panel asked for it, on the render thread, then runs the stage
+    `update` resets first when the panel asked for it, on the main thread, then runs the stage
     (`_update`). A subclass that overrides `deallocate` calls this one, which unbinds the button."""
 
     def __init__(self, settings: StageLayerSettings) -> None:
         self.settings: StageLayerSettings = settings
         self._input: I | None = None
-        self._reset_asked: Event = Event()      # set by the panel's thread, taken by the render thread
+        self._reset_asked: Event = Event()      # set by the panel's thread, taken by the main thread
         settings.bind(StageLayerSettings.reset, self._ask_reset)
 
     def set_input(self, input: I) -> None:
@@ -75,7 +75,7 @@ class StageLayer[I, O: StageOutput](LayerBase, ABC):
 
     @abstractmethod
     def reset(self) -> None:
-        """Start the stage from rest. Render thread only."""
+        """Start the stage from rest. Main thread only."""
 
     def deallocate(self) -> None:
         self.settings.unbind(StageLayerSettings.reset, self._ask_reset)

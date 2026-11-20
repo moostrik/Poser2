@@ -1,5 +1,5 @@
 """The strip: a texture's channels over time, a rolling plot of the frame-wide mean amount (absolute
-value) of each channel it holds, or of one of them, one column per tick, on a log axis of three decades. It stays on the GPU, so the render thread never waits on a read."""
+value) of each channel it holds, or of one of them, one column per tick, on a log axis of three decades. It stays on the GPU, so the main thread never waits on a read."""
 
 from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_RGBA16F, GL_RGBA8, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, glBindTexture, glGenerateMipmap, glTexParameteri
 

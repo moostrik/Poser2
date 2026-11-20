@@ -153,7 +153,7 @@ default portrait mode): the same 4:5 as the workflow's 896 x 1120 portrait, whic
 the render as a texture. `render/smile_render.py` runs the `Sequencer` once per frame (it is the app clock:
 Art-Net, OSC and saving hang off its messages), then the stage for the current `SequenceType`
 (`stages.py`) renders the layers (`layers/`) and picks the one to show. Images from other threads go
-through `inputs.py` (`Image.set_image`, uploaded on the render thread); the grin frames go
+through `inputs.py` (`Image.set_image`, uploaded on the main thread); the grin frames go
 through `grin_player.py`, a buffer the generator fills and the render plays on its own clock, with
 its timings in the sequence settings. At the capture the diffusion layer starts over from it
 (`FlashStage` seeds it, and the capture is the diffusion input until the generator sends an image), so

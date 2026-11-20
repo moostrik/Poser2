@@ -1,8 +1,8 @@
 """ScreenCapture: the recording's screen frame, converted to YUV planes, read back into RAM and handed over when it is done.
 
-The render thread draws into `frame` (or copies the window into it with `copy_window`) and calls `capture`; `poll`
+The main thread draws into `frame` (or copies the window into it with `copy_window`) and calls `capture`; `poll`
 on every tick hands over each frame whose read-back has passed its fence. The pixel buffers are host memory mapped
-once, so the read-back needs no CUDA and the CPU never waits for it. Only the render thread makes GL calls; the
+once, so the read-back needs no CUDA and the CPU never waits for it. Only the main thread makes GL calls; the
 consumer reads a lent buffer on its own thread and gives it back with the frame's `release`. See
 modules/video/VIDEO.md.
 """
@@ -117,7 +117,7 @@ class ScreenCapture:
             if callback in self._callbacks:
                 self._callbacks.remove(callback)
 
-    # RENDER THREAD
+    # MAIN THREAD
 
     def allocate(self, screen_format: ScreenFormat) -> None:
         """GL objects for frames of `screen_format` (an even size) and the pool, mapped once; raises on failure with

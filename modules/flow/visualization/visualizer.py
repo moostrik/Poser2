@@ -30,7 +30,7 @@ def histogram_volume_grid(width: int, height: int, depth: int) -> tuple[int, int
 
 class Visualizer:
     """Draws one texture per call into its FBO, `texture`, at the size `resize` sets, the size the
-    view is drawn at; render thread only."""
+    view is drawn at; main thread only."""
 
     def __init__(self) -> None:
         self._fbo: Fbo = Fbo()

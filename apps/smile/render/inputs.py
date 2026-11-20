@@ -7,7 +7,7 @@ from modules.gl import Image
 
 
 class Faces:
-    """The newest frame of the face detector: set from its thread, read on the render thread."""
+    """The newest frame of the face detector: set from its thread, read on the main thread."""
 
     def __init__(self) -> None:
         self._mutex: Lock = Lock()
@@ -24,7 +24,7 @@ class Faces:
 
 class Inputs:
     """Images for the render. set_image() may be called from any thread; update() uploads the
-    newest of each on the render thread. All images are OpenCV BGR."""
+    newest of each on the main thread. All images are OpenCV BGR."""
 
     def __init__(self) -> None:
         self.camera: Image =            Image('BGR')    # live camera frames

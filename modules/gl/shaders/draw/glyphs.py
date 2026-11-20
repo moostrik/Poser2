@@ -3,7 +3,7 @@
 Draws a whole string's glyph quads from a font atlas in one call: the caller uploads the
 batch (positions in 0..1 of the target, origin top-left, + atlas UVs, 6 vertices per glyph) into its own VAO
 and binds it.
-One draw per string instead of one per glyph keeps the render thread's Python/GL step count
+One draw per string instead of one per glyph keeps the main thread's Python/GL step count
 — and with it its GIL exposure — flat in the text length.
 """
 

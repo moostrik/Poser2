@@ -1,7 +1,7 @@
 """The connection to the relay (relay/server.py): a websocket client on its own thread that reconnects
 by itself, hands every message to a callback and sends what the other threads queue. The screen frames
 for the phone (`set_frame`) have one slot, the newest wins, and are JPEG-encoded on the link's thread,
-never on the render thread. Uploads (the visitor's files, over HTTP) run on a third thread, so a slow
+never on the main thread. Uploads (the visitor's files, over HTTP) run on a third thread, so a slow
 upload never holds the frames.
 
 Nothing here ends the thread: a relay that is down, refuses the token or sends rubbish is a warning
@@ -84,7 +84,7 @@ class Link(Thread):
         return self._connected
 
     def stop(self) -> None:
-        """Ends the threads; does not wait for them (called from the render thread when the panel's
+        """Ends the threads; does not wait for them (called from the main thread when the panel's
         switch goes off), they are daemons and stop at their next step."""
         self._stop.set()
         ws = self._ws

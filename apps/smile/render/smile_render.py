@@ -78,7 +78,7 @@ class SmileRender(RenderBase):
 
         self.window_manager.input.add_key_callback(self._on_key)
 
-    # RENDER THREAD
+    # MAIN THREAD
     def allocate(self) -> None:
         for layer in self._all_layers:
             layer.allocate(self.width, self.height, COMPOSITION_FORMAT)

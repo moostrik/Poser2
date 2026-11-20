@@ -102,7 +102,7 @@ class GrinPlayer():
         with self._mutex:
             return self._open
 
-    # RENDER THREAD
+    # MAIN THREAD
     def update(self, now: float) -> np.ndarray | None:
         """The frame that became due, or None while the current one stays. Call once per render frame."""
         start_wait: float | None = None

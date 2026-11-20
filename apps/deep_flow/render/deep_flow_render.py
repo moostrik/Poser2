@@ -280,7 +280,7 @@ class DeepFlowRender(RenderBase):
 
     def _hold_show(self) -> None:
         """While the held take plays, the show waits: the camera frames are taken and dropped, and no layer works,
-        so the fluid goes on where it stopped and the secondary windows keep its last picture."""
+        so the fluid goes on where it stopped and the other windows keep its last picture."""
         for i in self.L[ChainLayers.view]:
             self.board.take_inference_frames(i)
 

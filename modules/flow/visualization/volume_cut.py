@@ -40,7 +40,7 @@ def projects_max(kind: TextureKind) -> bool:
 
 
 class VolumeCut:
-    """Draws a volume's flat cut into its own FBO (RGBA16F, the values as they are); render thread only."""
+    """Draws a volume's flat cut into its own FBO (RGBA16F, the values as they are); main thread only."""
 
     def __init__(self) -> None:
         self._fbo: Fbo = Fbo()

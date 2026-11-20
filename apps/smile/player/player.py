@@ -1,5 +1,5 @@
 """The clip player of the sphere: one pool of clips for the 48 cells of the two walls, each cell playing
-on its own thread, the walls composited by `WallRender` into SMILE's secondary windows. No window and no
+on its own thread, the walls composited by `WallRender` into SMILE's windows 1 and 2. No window and no
 OSC in here but the `/bang` to the Max patch; SMILE's laughter test and scrolling name call `light` and
 `scroll_loop` directly."""
 

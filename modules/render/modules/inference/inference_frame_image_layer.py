@@ -31,7 +31,7 @@ class InferenceFrameImageLayer(LayerBase):
         return self._timestamp
 
     def set_inference_frame(self, frame: "InferenceFrame") -> None:
-        """The frame whose image the next update takes in; render thread."""
+        """The frame whose image the next update takes in; main thread."""
         self._frame = frame
 
     def deallocate(self) -> None:

@@ -31,7 +31,7 @@ class LegendKind(IntEnum):
 
 class Legend:
     """Lane names, log lines and their labels, or the color key, on transparent at the size `resize`
-    sets, the size the view is drawn at, so its text keeps its pixel size. Render thread only."""
+    sets, the size the view is drawn at, so its text keeps its pixel size. Main thread only."""
 
     def __init__(self) -> None:
         self._fbo: Fbo = Fbo()

@@ -123,7 +123,7 @@ class WhiteSpaceRender(RenderBase):
 
         # The strip's height follows the focus depth: a nearer cylinder is seen over a narrower
         # band of elevation from the center, so dragging this reshapes the row — and reshaping means
-        # GL reallocation, which only the render thread may do. The callback arrives on whichever
+        # GL reallocation, which only the main thread may do. The callback arrives on whichever
         # thread wrote the setting, so it raises a flag and `update()` acts on it.
         self._layout_dirty: bool = False
         settings.panorama.bind(render.PanoramaLayerSettings.focus_radius, self._on_layout_setting)

@@ -21,7 +21,7 @@ def glyph_grid(width_px: int, spacing: float, box: tuple[float, float, float], l
 
 
 class VolumeGlyphs:
-    """Draws a volume's 3D glyphs into its own FBO (RGBA8 with depth) at the size `resize` sets; render thread only."""
+    """Draws a volume's 3D glyphs into its own FBO (RGBA8 with depth) at the size `resize` sets; main thread only."""
 
     def __init__(self) -> None:
         self._fbo: Fbo = Fbo(depth=True)

@@ -39,7 +39,7 @@ class BeamLightSimulationLayer(render.LayerBase):
         self.fbo_angles: Fbo = Fbo()
         self.image: Image = Image()
         self._shader: LightSimulation = LightSimulation()
-        self._projection: np.ndarray | None = None   # the LightFrame-shaped (1, R, 3) image, render-thread local
+        self._projection: np.ndarray | None = None   # the LightFrame-shaped (1, R, 3) image, main-thread local
         self._heading: float = 0.0                   # last finite playhead — the bar stays where it stopped
 
 

@@ -8,7 +8,7 @@ Thread Safety:
 --------------
 Designed for multi-threaded operation:
 - Input thread: Calls process() at ~30 FPS
-- Render thread: Calls update() at 60+ FPS
+- Main thread: Calls update() at 60+ FPS
 
 VectorChaseInterpolator classes are NOT thread-safe. FeatureChaseInterpolator
 serializes all access using a lock to prevent concurrent set_target() and update() calls
