@@ -1,9 +1,5 @@
-"""Pinned staging buffers that frames are copied from to the GPU, a ring of `STAGING_COUNT` per key.
-
-From pinned memory the copy to the GPU is queued and the caller goes on; from the frame's own pageable memory it would
-wait until the GPU had taken it. A buffer is reused once the copy queued from it has run, its event passed, so only a
-GPU `STAGING_COUNT` copies behind makes the caller wait.
-"""
+"""Pinned staging buffers that frames are copied from to the GPU, a ring of `STAGING_COUNT` per key; a buffer is
+reused once the copy queued from it has run, its event passed."""
 
 from collections.abc import Hashable
 

@@ -52,7 +52,12 @@ in any order unless they are synchronized so
 - The crop step keeps the uploader's last snapshots (`submit_snapshot`), takes the poses with the capture times
   they are for, which the frame source and the pose pipeline carry without the images, and cuts from exactly the
   images of those times, never a newer one, at each size it was made with (the pose model's, and where a segmentation runs, its own), from one box per
-  player. All sizes share one `crops_ready` event; each size has its own callbacks, and its finished callbacks
+  player. It keeps three snapshots (`KEPT`): the frame source's waiting bangs (`TrackerFrameSource`'s `WAITING`) and
+  the one it runs. A size's padding is one value for both axes: the crop is grown to the output's aspect, which
+  recomputes one axis from the other, so only one padding counts, the height for a narrow (standing) box, the width
+  for a wide one (arms out, crouching); RTMPose was trained on boxes padded by 0.25, scale-jittered around that. A
+  crop larger than the output is scaled down antialiased: plain bilinear would sample only a 2x2 neighborhood of each
+  output pixel and alias. All sizes share one `crops_ready` event; each size has its own callbacks, and its finished callbacks
   for readers outside the package, called after the crop stream has run. It cuts the RAW stage's smoothed
   and predicted box, so it runs after that stage, on the frame source's thread, not in the upload. A size is cut
   every `interval`-th set (the pose's every other frame, the segmentation's every frame); after the crops it tells
@@ -128,7 +133,11 @@ which every user of the camera needs:
 
 - the color: `ImageUpload` copies it from a pinned staging buffer (`StagingRing`, `STAGING_COUNT` 3, reused once
   the copy queued from it has run), converts it (BGR, NV12 or mono) to RGB half, straightens it by the tilt's
-  homography and mirrors it, in one CUDA kernel;
+  homography and mirrors it, in one CUDA kernel. From pinned memory the copy is queued and the thread goes on; from
+  the frame's own pageable memory it would wait until the GPU had taken it, so only a GPU `STAGING_COUNT` copies
+  behind makes it wait. NV12 is read as BT.601 limited range with the chroma repeated, as `getCvFrame` reads an
+  OAK4's frame, so the colors match the BGR it replaced; the torch ops repeat the chroma by a broadcast view, as
+  `repeat_interleave` waits for the GPU to size its output;
 - the depth: copied the same way, through the same ring, turned into meters and moved onto the color's view at a
   grid as fine as the depth itself (`aligned_depth_size`), the nearest kept where two land on one cell and 0 where nothing lands, straightened
   and mirrored as the color, handed on as a `GpuDepth`.

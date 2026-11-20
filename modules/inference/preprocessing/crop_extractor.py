@@ -15,16 +15,11 @@ from modules.utils import PerformanceTimer, Rect, Point2f
 logger = logging.getLogger(__name__)
 
 
-KEPT: int = 3      # snapshots kept: the frame source's waiting bangs (`TrackerFrameSource`'s WAITING) and the one it runs
+KEPT: int = 3      # snapshots kept
 
 
 class CropExtractorSettings(BaseSettings):
-    """Configuration for GPU-based image cropping."""
-    # Padding around the person's box, as a fraction of it, on both axes. Live: it only moves the
-    # crop window. One value, not one per axis: the crop is then grown to the output's aspect, which
-    # recomputes one axis from the other, so only one padding ever counts — the height for a narrow
-    # (standing) box, the width for a wide one (arms out, crouching). RTMPose was trained on boxes
-    # padded by 0.25, scale-jittered around that.
+    """One size the crop step cuts: the padding around each box, the output's size, the players and the interval."""
     padding:          Field[float] = Field(0.0, min=0.0, max=1.0, step=0.05,
                                            description="Margin added around the box before cropping (fraction; RTMPose uses 0.25)")
     output_width:     Field[int]   = Field(384, access=Field.INIT)
@@ -221,8 +216,6 @@ class CropExtractor:
             crop = F.pad(crop, (pad_left, pad_right, pad_top, pad_bottom), mode='constant', value=0)
 
         if crop.shape[1] != size.output_height or crop.shape[2] != size.output_width:
-            # Antialiased: a crop is usually larger than the output, and plain bilinear would sample
-            # only a 2×2 neighborhood of each output pixel and alias. No effect when enlarging.
             crop = F.interpolate(crop.unsqueeze(0), size=(size.output_height, size.output_width), mode='bilinear',
                                  align_corners=False, antialias=True).squeeze(0)
         return crop

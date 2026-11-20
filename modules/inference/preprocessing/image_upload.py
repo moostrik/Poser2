@@ -117,12 +117,8 @@ class _Stack(ctypes.Structure):
 
 def nv12_to_rgb(y: torch.Tensor, uv: torch.Tensor) -> torch.Tensor:
     """RGB float32 in [0, 1], channels before the rows, from NV12's planes, uint8: Y (…, H, W) and interleaved UV
-    (…, H / 2, W), any leading dimensions (a stack) kept: (…, 3, H, W).
-
-    BT.601 limited range with the chroma repeated, which is how `getCvFrame` reads an OAK4's frame,
-    so the colors match the BGR it replaces.
-    """
-    # The chroma repeated by a broadcast view: `repeat_interleave` waits for the GPU to size its output
+    (…, H / 2, W), any leading dimensions (a stack) kept: (…, 3, H, W); BT.601 limited range, the chroma repeated by a
+    broadcast view."""
     lead: tuple[int, ...] = tuple(uv.shape[:-2])
     half: torch.Tensor = uv.reshape(*lead, uv.shape[-2], -1, 2)
     rows, columns = half.shape[-3], half.shape[-2]
