@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 from enum import Enum
-from typing import Any, Callable, Iterator, get_args, get_origin
+from typing import Any, Callable, Iterator, cast, get_args, get_origin
 
 from modules.utils import Color, Point2f, Rect
 
@@ -168,7 +168,7 @@ def describe(root: BaseSettings) -> dict[str, Any]:
 
 def _make_enum(description: dict[str, Any]) -> type[Enum]:
     members: list[list[Any]] = description["members"]
-    enum_type = Enum(description["name"], [(name, value) for name, value, _ in members])
+    enum_type = cast(type[Enum], Enum(description["name"], [(name, value) for name, value, _ in members]))   # the functional API makes a class
     labels: dict[str, str] = {name: label for name, _, label in members if label is not None}
     if labels:
         setattr(enum_type, "label", property(lambda member: labels.get(member.name)))
