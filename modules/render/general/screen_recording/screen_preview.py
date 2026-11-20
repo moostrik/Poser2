@@ -12,6 +12,7 @@ import ctypes
 import logging
 from collections import deque
 from threading import Condition, Thread
+from typing import cast
 
 import numpy as np
 from OpenGL.GL import (GL_ALREADY_SIGNALED, GL_CONDITION_SATISFIED, GL_MAP_COHERENT_BIT, GL_MAP_PERSISTENT_BIT,
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 BUFFERS: int = 2            # one written by the preview's thread while the other is uploaded
 _UNPACK_ALIGNMENT: int = 4  # GL's default, which nothing else in the apps changes: set back after the uploads
-_MAP_FLAGS: int = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT
+_MAP_FLAGS: int = int(GL_MAP_WRITE_BIT) | int(GL_MAP_PERSISTENT_BIT) | int(GL_MAP_COHERENT_BIT)
 
 
 class ScreenPreview:
@@ -83,7 +84,7 @@ class ScreenPreview:
             for buffer in self._buffers:
                 glBindBuffer(GL_PIXEL_UNPACK_BUFFER, buffer)
                 glBufferStorage(GL_PIXEL_UNPACK_BUFFER, size, None, _MAP_FLAGS)
-                pointer = glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, 0, size, _MAP_FLAGS)
+                pointer = cast(int | ctypes.c_void_p, glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, 0, size, _MAP_FLAGS))     # the stub says None
                 address = pointer if isinstance(pointer, int) else ctypes.cast(pointer, ctypes.c_void_p).value
                 if not address:
                     raise RuntimeError('a pixel buffer could not be mapped')

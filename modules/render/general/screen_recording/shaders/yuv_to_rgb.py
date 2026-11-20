@@ -33,7 +33,7 @@ class YuvToRgb(Shader):
 
         glUseProgram(self.shader_program)
         for unit in range(3):
-            glActiveTexture(GL_TEXTURE0 + unit)
+            glActiveTexture(int(GL_TEXTURE0) + unit)
             glBindTexture(GL_TEXTURE_2D, planes[min(unit, len(planes) - 1)].tex_id)
             glUniform1i(self.get_uniform_loc(f"plane{unit}"), unit)
         glActiveTexture(GL_TEXTURE0)

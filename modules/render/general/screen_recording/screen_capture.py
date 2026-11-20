@@ -12,6 +12,7 @@ import logging
 from collections import deque
 from functools import partial
 from threading import Lock
+from typing import cast
 
 import numpy as np
 from OpenGL.GL import (GL_ALREADY_SIGNALED, GL_COLOR_BUFFER_BIT, GL_CONDITION_SATISFIED, GL_DRAW_FRAMEBUFFER,
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 POOL: int = 4               # pixel buffers: one being read back, the rest with the recorder or waiting for it
 _PACK_ALIGNMENT: int = 4    # GL's default, which nothing else in the apps changes: set back after the capture's reads
-_MAP_FLAGS: int = GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT
+_MAP_FLAGS: int = int(GL_MAP_READ_BIT) | int(GL_MAP_PERSISTENT_BIT) | int(GL_MAP_COHERENT_BIT)
 
 
 class _Plane:
@@ -137,7 +138,7 @@ class ScreenCapture:
             for buffer in self._buffers:
                 glBindBuffer(GL_PIXEL_PACK_BUFFER, buffer)
                 glBufferStorage(GL_PIXEL_PACK_BUFFER, size, None, _MAP_FLAGS)
-                pointer = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, size, _MAP_FLAGS)
+                pointer = cast(int | ctypes.c_void_p, glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, size, _MAP_FLAGS))     # the stub says None
                 address = pointer if isinstance(pointer, int) else ctypes.cast(pointer, ctypes.c_void_p).value
                 if not address:
                     raise RuntimeError('a pixel buffer could not be mapped')
