@@ -22,6 +22,18 @@ sources: `window_systems_research.md`. Windows now, Linux kept possible.
   `v_sync_window` swapped last. gl.md's thread rule says the main thread. The window manager tests move to the new
   parts.
 
+## Later: more to take from Cinder
+
+From knowledge of Cinder's gl, not yet held against our code. Each one is looked at only for what it gains the 2D
+path.
+
+- Readback without a stall: GPU-to-CPU reads (the screen recorder, any download) through a pixel buffer and a
+  fence (Cinder's `gl::Pbo`, `gl::Sync`), read a frame later, so the frame never waits on the GPU.
+- Upload without a stall: camera frames into textures through a small ring of pixel buffers, unless the CUDA path
+  (`cudart.py`) already does this.
+- A fence, not `glFinish`, where code waits for GPU work to finish.
+- Shaders: `#include` and live reload from file (Cinder's shader format and asset watcher).
+
 ## Rules this plan touches
 
 - gl.md: All OpenGL calls execute on the render thread
