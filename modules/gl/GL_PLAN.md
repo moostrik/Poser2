@@ -4,13 +4,6 @@ The window manager (`modules/gl/window_manager.py`) and its panel are rebuilt on
 keeping to GLFW's threading rules: one kind of window, set by its own settings, on the main thread. Research and
 sources: `window_systems_research.md`. Windows now, Linux kept possible.
 
-## C. Frame pacing
-
-- Question: a GPU wait (`glFinish`) after the paced swap? Measured on deep_flow -sim, v-sync on window 1 (M2, 3840 x 2160),
-  25 s: without it 16.9 ms a frame (p95 30.5, p99 36.2), at a frame's start 1 swap the GPU has not finished in 91% of
-  frames, 2 in 9%; with it 24.1 ms (p95 30.6, p99 35.9), never 2, the swap blocking 13.8 ms. It keeps the queue at one
-  frame, the plan's test for keeping it, at 59 → 42 fps. Not built: the choice is Matthias's.
-
 ## D. Check and document
 
 - D1. Run each app on the PC: start windowed and fullscreen, the operator window off and on, no tearing on the

@@ -5,7 +5,8 @@ from threading import Event, Lock, Thread, current_thread
 from time import perf_counter
 from typing import Callable, TYPE_CHECKING
 
-from OpenGL.GL import glGetString, GL_VERSION, glBindFramebuffer, GL_FRAMEBUFFER, glViewport
+from OpenGL.GL import glBindFramebuffer, glClientWaitSync, glDeleteSync, glFenceSync, glFlush, glGetString, glViewport, \
+    GL_FRAMEBUFFER, GL_SYNC_FLUSH_COMMANDS_BIT, GL_SYNC_GPU_COMMANDS_COMPLETE, GL_VERSION
 import glfw
 
 if TYPE_CHECKING:
@@ -58,6 +59,7 @@ class WindowManager:
         self._swap_intervals: tuple[bool, int] | None = None    # (v_sync, v_sync_window) as applied
         self._waker = Waker()                       # the frame pacing's wait, ended at once by stop()
         self._next_frame: float = 0.0               # the paced frame's deadline (perf_counter), 0 when not paced
+        self._swap_fences: list = []                # a fence after each paced swap, the newest last
 
         self._exit_callbacks: list[Callable[[], None]] = []
         self._callback_lock = Lock()
@@ -182,6 +184,9 @@ class WindowManager:
                     logger.exception("Error in event callback")
         finally:
             main.make_current()
+            for fence in self._swap_fences:
+                glDeleteSync(fence)
+            self._swap_fences.clear()
             self.renderer.deallocate()
 
     def _tick_windows(self) -> None:
@@ -228,6 +233,7 @@ class WindowManager:
     def _draw(self) -> None:
         """Each shown window drawn, the others swapped, then the v-sync window last."""
         shown: list[Window] = [w for w in self._windows if w.shown]
+        self._hold_frame_in_flight()
         start = perf_counter()
         for window in shown:
             window.make_current()
@@ -248,6 +254,18 @@ class WindowManager:
             if window.index == v_sync_index:
                 window.make_current()
                 glfw.swap_buffers(window.handle)
+                self._swap_fences.append(glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0))
+                glFlush()                   # the fence sent to the GPU from this context, where it was made
+
+    _FENCE_TIMEOUT_NS: int = 100_000_000    # a fence not passed in 100 ms is given up on
+
+    def _hold_frame_in_flight(self) -> None:
+        """Before a frame draws, a wait for the GPU to pass the paced swap before last: one frame stays in flight, so the
+        driver queues no more than one (the fences are shared between the windows' contexts)."""
+        while len(self._swap_fences) >= 2:
+            fence = self._swap_fences.pop(0)
+            glClientWaitSync(fence, GL_SYNC_FLUSH_COMMANDS_BIT, self._FENCE_TIMEOUT_NS)
+            glDeleteSync(fence)
 
     def _pace(self) -> None:
         """Without v-sync pacing the loop, a wait until the next frame's deadline at `fps_limit`: an absolute deadline

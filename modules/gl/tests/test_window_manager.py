@@ -83,7 +83,9 @@ class TestWindowManager(unittest.TestCase):
             window.make_current.side_effect = lambda window=window: current.append(window)
         self.renderer.update.side_effect = lambda: current.append(('update', current[-1]))
         with mock.patch.object(self.manager, '_tick_windows'), mock.patch.object(MODULE, 'glBindFramebuffer'), \
-                mock.patch.object(MODULE, 'glViewport'):
+                mock.patch.object(MODULE, 'glViewport'), mock.patch.object(MODULE, 'glFenceSync'), \
+                mock.patch.object(MODULE, 'glFlush'), mock.patch.object(MODULE, 'glClientWaitSync'), \
+                mock.patch.object(MODULE, 'glDeleteSync'):
             count: list[int] = [0]
             self.glfw.window_should_close.side_effect = lambda _h: (count.__setitem__(0, count[0] + 1), count[0] > 4)[1]
             self.manager._render_loop()
@@ -95,9 +97,21 @@ class TestWindowManager(unittest.TestCase):
         self.manager.settings.v_sync_window = 0
         swapped: list[object] = []
         self.glfw.swap_buffers.side_effect = swapped.append
-        with mock.patch.object(MODULE, 'glBindFramebuffer'), mock.patch.object(MODULE, 'glViewport'):
+        with mock.patch.object(MODULE, 'glBindFramebuffer'), mock.patch.object(MODULE, 'glViewport'), \
+                mock.patch.object(MODULE, 'glFenceSync', return_value='fence'), mock.patch.object(MODULE, 'glFlush'):
             self.manager._draw()
         self.assertEqual(swapped, [windows[1].handle, windows[0].handle])
+        self.assertEqual(self.manager._swap_fences, ['fence'])               # a fence after the paced swap only
+
+    def test_a_frame_waits_for_the_paced_swap_before_last(self):
+        self.manager._swap_fences = ['two before', 'last']
+        waited: list[str] = []
+        with mock.patch.object(MODULE, 'glClientWaitSync', side_effect=lambda fence, *_: waited.append(fence)), \
+                mock.patch.object(MODULE, 'glDeleteSync'):
+            self.manager._hold_frame_in_flight()
+            self.manager._hold_frame_in_flight()
+        self.assertEqual(waited, ['two before'])                             # one frame stays in flight
+        self.assertEqual(self.manager._swap_fences, ['last'])
 
     def test_a_hot_plug_is_handled_at_the_top_of_the_next_frame(self):
         self.with_windows()
