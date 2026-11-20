@@ -428,7 +428,9 @@ class Timeline(Control):
 
     def _dragged(self) -> list[float]:
         """Where the handles stand now, which during a drag is not what the field holds."""
-        return [self.range.value["min"], self.range.value["max"]]
+        handles = self.range.value
+        assert handles is not None
+        return [handles["min"], handles["max"]]
 
     def _show_times(self, value: list[float]) -> None:
         length: float = self.position[1]

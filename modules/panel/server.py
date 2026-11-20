@@ -115,7 +115,11 @@ class PanelServer:
             process.stdin.close()
             line: bytes = process.stdout.readline()     # the port it listens on; empty when it failed to start
             process.stdout.close()
-            conn: Connection | None = Client((HOST, int(line)), authkey=authkey) if line.strip() else None
+            conn: Connection | None = None
+            if line.strip():
+                client = Client((HOST, int(line)), authkey=authkey)
+                assert isinstance(client, Connection)          # a socket's, never a pipe's
+                conn = client
         except (OSError, ValueError):
             logger.warning("Panel process could not be reached", exc_info=True)
             conn = None

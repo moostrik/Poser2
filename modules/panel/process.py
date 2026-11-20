@@ -166,7 +166,8 @@ def _connect() -> Connection:
     """The app's connection: the key from stdin, the port on stdout."""
     authkey = bytes.fromhex(sys.stdin.readline().strip())
     listener = Listener((HOST, 0), authkey=authkey)
-    port: int = listener.address[1]
+    port = listener.address[1]
+    assert isinstance(port, int)                            # a socket's address: (host, port)
     print(port, flush=True)
     if sys.stderr is not None:
         os.dup2(sys.stderr.fileno(), sys.stdout.fileno())   # stdout's pipe carries the port alone
@@ -174,6 +175,7 @@ def _connect() -> Connection:
     watchdog.daemon = True
     watchdog.start()
     conn = listener.accept()
+    assert isinstance(conn, Connection)                     # a socket's, never a pipe's
     watchdog.cancel()
     listener.close()
     return conn
