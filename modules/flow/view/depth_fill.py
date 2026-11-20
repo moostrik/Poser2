@@ -19,8 +19,8 @@ def pyramid_sizes(height: int, width: int) -> list[tuple[int, int]]:
 
 class DepthFill:
     """`use` writes a depth filled where the mask is above 0 into a target (push-pull, Gortler et al. 1996): a pixel
-    with a depth keeps it, one without takes the depth around it. The pyramid, every level half the one above down
-    to 1 × 1, is made with its owner's textures."""
+    with a depth keeps it and its confidence, one without takes the depth around it and a confidence of 0. The
+    pyramid, every level half the one above down to 1 × 1, is made with its owner's textures."""
 
     def __init__(self) -> None:
         self._pushed: list[Fbo] = []                    # the levels below the read, each (depth × weight, weight)
@@ -46,7 +46,8 @@ class DepthFill:
         self._shader.deallocate()
 
     def use(self, read: Texture, mask: Texture, target: Fbo) -> None:
-        """`read` (metres, 0 for none) filled where `mask` is above 0, into `target`, the read's size."""
+        """`read` (meters in red, 0 for none, its confidence in green) filled where `mask` is above 0, into `target`,
+        the read's size, an RG target."""
         if not self._pushed:
             return
         finer: Texture = read

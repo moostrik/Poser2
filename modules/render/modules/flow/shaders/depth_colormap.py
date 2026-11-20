@@ -1,4 +1,4 @@
-"""DepthColormap: a depth in metres as a picture, through a colormap or grey."""
+"""DepthColormap: a depth in meters as a picture, through a colormap or grey, or its confidence as grey."""
 
 from enum import IntEnum
 
@@ -11,11 +11,12 @@ class DepthDrawMode(IntEnum):
     GREY = 0            # near white, far black
     COLOR = 1           # through the colormap
     OVER_IMAGE = 2      # through the colormap, over the image
+    CONFIDENCE = 3      # its confidence, green, as grey from 0 black to 1 white
 
 
 class DepthColormap(Shader):
     def use(self, depth: Texture, image: Texture, near: float, far: float, mode: DepthDrawMode, colormap: Colormap = Colormap.JET) -> None:
-        """Depth in metres as a picture, drawn as `mode` says, colored by `colormap`; `image` is drawn under it in
+        """Depth in meters as a picture, drawn as `mode` says, colored by `colormap`; `image` is drawn under it in
         OVER_IMAGE. Waits for both textures: the depth can arrive before the first image."""
         if not self.allocated or not self.shader_program or not depth.allocated or not image.allocated:
             return

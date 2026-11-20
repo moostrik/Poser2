@@ -4,16 +4,17 @@
 //   0  push: a level down, each pixel the mean of the up to four it covers; from the read (`first`), a pair is its
 //      depth with weight 1 where there is one, (0, 0) where not
 //   1  pull: a level's pair plus (1 − its weight) times the coarser pulled level's, read bilinearly
-//   2  the last pull, onto the read: a pixel with a depth keeps it, one without takes the pulled level's depth
-//      (its pair's ratio); 0 where the mask is 0 or nothing was found
+//   2  the last pull, onto the read: a pixel with a depth keeps it and its confidence (the read's green), one
+//      without takes the pulled level's depth (its pair's ratio) and a confidence of 0; 0 and 0 where the mask is 0
+//      or nothing was found
 // A coarser pixel's center lies in the middle of the two it covers, its edges clamped; rows count from the bottom,
 // as GL holds a texture.
 
-uniform sampler2D tex0;     // 0: the finer level (or the read); 1: this level's push; 2: the read (metres)
+uniform sampler2D tex0;     // 0: the finer level (or the read); 1: this level's push; 2: the read (meters, confidence)
 uniform sampler2D tex1;     // 1, 2: the coarser pulled level
 uniform sampler2D tex2;     // 2: the mask (red, 0 to 1)
 uniform int stage;
-uniform bool first;         // 0: tex0 is the read, metres in red
+uniform bool first;         // 0: tex0 is the read, meters in red
 
 out vec4 fragColor;
 
@@ -55,9 +56,9 @@ void main() {
         vec2 level = texelFetch(tex0, p, 0).rg;
         fragColor = vec4(level + (1.0 - level.g) * coarse(p), 0.0, 0.0);
     } else {
-        float read = texelFetch(tex0, p, 0).r;
+        vec2 read = texelFetch(tex0, p, 0).rg;
         vec2 pulled = coarse(p);
-        float filled = read > 0.0 ? read : (pulled.g > 0.0 ? pulled.r / pulled.g : 0.0);
-        fragColor = vec4(texelFetch(tex2, p, 0).r > 0.0 ? filled : 0.0, 0.0, 0.0, 1.0);
+        vec2 filled = read.r > 0.0 ? read : vec2(pulled.g > 0.0 ? pulled.r / pulled.g : 0.0, 0.0);
+        fragColor = vec4(texelFetch(tex2, p, 0).r > 0.0 ? filled : vec2(0.0), 0.0, 1.0);
     }
 }

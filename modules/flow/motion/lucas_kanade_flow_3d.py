@@ -137,7 +137,7 @@ class LucasKanadeFlow3D:
         """Measure between the newest two frames.
 
         Args:
-            depth: Metres in red; None without depth (z is 0)
+            depth: Meters in red, the camera's confidence in green (read as Flow Motion weights by it); None without depth (z is 0)
             delta_time: Seconds since the previous frame
             view_span: Metres one view width spans per metre of depth, for z
             depth_step: uv between two depth samples in the flow's view, for z

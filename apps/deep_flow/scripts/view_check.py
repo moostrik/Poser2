@@ -2,8 +2,10 @@
 how long do their passes take?
 
 Plays a recording's color and depth frames through the `SerialUploader` (the color straightened, the depth aligned, as the
-app does), takes them into GL and runs the view stage and the color stage at the flow file's settings. Prints the share
-of the mask without depth, upscaled and filled (0), and the share of the view that is the player. Saves the last frame's
+app does, with the depth's confidence where the chunk has it), takes them into GL and runs the view stage and the color
+stage at the flow file's settings. Prints the share of the mask without depth, upscaled and filled (0), the share of
+the view that is the player, and the confidence in green: the upscale's where the fill kept the depth, 0 where it
+filled (1 where the recording has none). Saves the last frame's
 image, the crop's depth, the mask, the upscaled depth, the filled depth and the color side by side as a PNG, the depths
 from the box's front (white) to its back (black).
 
@@ -29,7 +31,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_FLOAT, GL_NEAREST, GL_RED, GL_RGBA,
 
 from scripts import monitor_harness as mh  # noqa: E402
 from modules.camera import CameraFrame, FrameType  # noqa: E402
-from modules.recording import read_metadata  # noqa: E402
+from modules.recording import ChunkStream, read_metadata  # noqa: E402
 from modules.gl import Style, Tensor, Texture  # noqa: E402
 from modules.inference import GpuDepth, GpuImage, SerialUploader, SerialUploaderSettings  # noqa: E402
 from apps.deep_flow.render.layers import EDGE, ViewInput, ViewLayer  # noqa: E402
@@ -42,11 +44,11 @@ SETTINGS_FILE = Path('apps/deep_flow/data/settings/flow/settings.json')
 SETUP = Path('apps/deep_flow/data/settings/setup/studio.json')
 
 
-def frames(chunk: Path, count: int, depth: bool) -> list[np.ndarray]:
+def frames(chunk: Path, count: int, stream: ChunkStream) -> list[np.ndarray]:
+    """The chunk's first `count` frames of `stream`: color as BGR, depth as millimeters, the confidence grey."""
     found: list[np.ndarray] = []
-    kind = FrameType.DEPTH if depth else FrameType.VIDEO
-    reader = StreamReader(0, kind, lambda _c, _t, frame, _chunk, _i: found.append(frame.copy()) if len(found) < count else None,
-                          True, fps=1000.0, stream=1 if depth else 0, depth=depth)
+    reader = StreamReader(0, stream, lambda _c, _t, frame, _chunk, _i: found.append(frame.copy()) if len(found) < count else None,
+                          stream == ChunkStream.VIDEO, fps=1000.0, stream=int(stream), depth=stream == ChunkStream.DEPTH)
     reader.load(str(chunk), 0, 0, count)
     while not reader.is_loaded():
         time.sleep(0.01)
@@ -108,9 +110,10 @@ def main() -> int:
     chunk = RECORDINGS / args.recording / '0_000.mkv'
     info = read_metadata(chunk).info
     assert info is not None, 'the recording has no metadata'
-    colors = frames(chunk, args.frames, depth=False)
-    depths = frames(chunk, args.frames, depth=True)
-    count = min(len(colors), len(depths))
+    colors = frames(chunk, args.frames, ChunkStream.VIDEO)
+    depths = frames(chunk, args.frames, ChunkStream.DEPTH)
+    confidences: list[np.ndarray | None] = list(frames(chunk, args.frames, ChunkStream.CONFIDENCE)) if info.confidence else [None] * len(depths)
+    count = min(len(colors), len(depths), len(confidences))
     alignment = info.depth_alignment
 
     settings_file = json.loads(SETTINGS_FILE.read_text(encoding='utf-8'))
@@ -143,11 +146,12 @@ def main() -> int:
     print(f'{args.recording}: {count} captures, view {view.output.image.width} x {view.output.image.height}, '
           f'edge {EDGE} m, near {band.near} far {band.far}')
     empty_upscaled, empty_filled, shares = [], [], []
+    green_kept, green_made, green_mean = [], [], []
     last: dict[str, np.ndarray] = {}
     for i in range(count):
         t = float(i)
         uploader.submit_frame(CameraFrame(0, FrameType.VIDEO, colors[i], t))
-        uploader.submit_frame(CameraFrame(0, FrameType.DEPTH, depths[i], t, alignment=alignment))
+        uploader.submit_frame(CameraFrame(0, FrameType.DEPTH, depths[i], t, alignment=alignment, confidence=confidences[i]))
         end = time.perf_counter() + 5.0
         while (len(images) <= i or len(gpu_depths) <= i) and time.perf_counter() < end:
             time.sleep(0.002)
@@ -170,6 +174,12 @@ def main() -> int:
         if inside.any():
             empty_upscaled.append(float((inside & (upscaled <= 0.0)).sum()) / float(inside.sum()))
             empty_filled.append(float((inside & (filled <= 0.0)).sum()) / float(inside.sum()))
+        # The confidence in green: the camera's where the upscale kept a depth, 0 where the fill made it
+        upscaled_green, filled_green = read(view._depth._upscaled, 4)[..., 1], read(output.depth.texture, 4)[..., 1]
+        kept, made = upscaled > 0.0, (filled > 0.0) & (upscaled <= 0.0)
+        green_kept.append(float(np.abs(filled_green[kept] - upscaled_green[kept]).max(initial=0.0)))
+        green_made.append(float(np.abs(filled_green[made]).max(initial=0.0)))
+        green_mean.append(float(filled_green[kept].mean()) if kept.any() else float('nan'))
         shares.append(float((mask > 0.5).mean()))
         if i == count - 1:
             def near_white(metres: np.ndarray) -> np.ndarray:
@@ -191,6 +201,9 @@ def main() -> int:
     if empty_upscaled:
         print(f'the mask without depth: {np.mean(empty_upscaled) * 100:.2f}% upscaled, {np.mean(empty_filled) * 100:.2f}% filled; '
               f'the player {np.mean(shares) * 100:.1f}% of the view')
+    if green_kept:
+        print(f'the confidence ({"recorded" if info.confidence else "none recorded: 1"}): where kept off the upscale by at most '
+              f'{max(green_kept):.6f}, mean {np.nanmean(green_mean):.3f}; where filled at most {max(green_made):.6f}')
     if args.png and last:
         def bgr(picture: np.ndarray) -> np.ndarray:
             if picture.ndim == 2:

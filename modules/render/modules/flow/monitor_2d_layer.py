@@ -34,7 +34,7 @@ class FlowStage(IntEnum):
 
 class MonitorView(IntEnum):
     """How the monitor draws the channels, the most used first."""
-    COLORMAP = 0            # by the port's kind: a vector by its direction, an image as stored, a scalar centered on grey
+    COLORMAP = 0            # by the port's kind: a vector by its direction, an image as stored, a scalar centered on grey, a depth in its colormap (channel Y: its confidence as grey)
     GLYPHS = auto()
     IMAGE = auto()          # the raw values as stored, for debugging
     HISTOGRAM = auto()
@@ -203,7 +203,8 @@ class Monitor2DLayer(LayerBase):
             return
         texture: Texture = self._flat(port, view)
         if view == MonitorView.COLORMAP and port.kind == TextureKind.DEPTH and port.depth_range is not None:
-            self._render_depth(texture, port.depth_range, title=self._title(port))
+            mode: DepthDrawMode = DepthDrawMode.CONFIDENCE if channel == Channel.Y else DepthDrawMode.COLOR
+            self._render_depth(texture, port.depth_range, mode, title=self._title(port))
             return
         self._visualizer.resize(*self._rendered_size)
         if view == MonitorView.STRIP:
@@ -242,15 +243,16 @@ class Monitor2DLayer(LayerBase):
         per_step: str = " per step" if port.kind == TextureKind.ACCELERATION else ""
         return f"{self.stage.name.lower()} / {name}{per_step}"
 
-    def _render_depth(self, depth: Texture, depth_range: tuple[float, float], title: str) -> None:
-        """A depth in `advanced.colormap`, on a log scale from its near to its far."""
+    def _render_depth(self, depth: Texture, depth_range: tuple[float, float], mode: DepthDrawMode, title: str) -> None:
+        """A depth in `advanced.colormap`, on a log scale from its near to its far (its red); or with `mode`
+        CONFIDENCE its confidence (its green) as grey from 0 to 1."""
         width, height = self._rendered_size
         if (self._depth_picture.width, self._depth_picture.height) != (width, height):
             self._depth_picture.deallocate()
             self._depth_picture.allocate(width, height, GL_RGBA16F)
         near, far = depth_range
         self._depth_picture.begin()
-        self._depth_colormap.use(depth, depth, near, far, DepthDrawMode.COLOR, self.settings.advanced.colormap)
+        self._depth_colormap.use(depth, depth, near, far, mode, self.settings.advanced.colormap)
         self._depth_picture.end()
         self._shown = self._depth_picture
         if self.settings.advanced.legend:

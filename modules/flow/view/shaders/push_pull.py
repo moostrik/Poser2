@@ -14,7 +14,7 @@ class PushPull(Shader):
 
     def push(self, finer: Texture, first: bool) -> None:
         """A level down: each pixel the mean of the pairs (depth × weight, weight) it covers; `first`, `finer` is
-        the read, metres in red."""
+        the read, meters in red."""
         self._use(PUSH, (finer,), first)
 
     def pull(self, level: Texture, coarser: Texture) -> None:
@@ -22,7 +22,8 @@ class PushPull(Shader):
         self._use(PULL, (level, coarser))
 
     def last(self, read: Texture, coarser: Texture, mask: Texture) -> None:
-        """The depth, metres in red: `read` where it has one, else the `coarser` pulled level's; 0 where `mask` is 0."""
+        """The depth, meters in red and its confidence in green: `read`'s where it has one, else the `coarser` pulled
+        level's depth and a confidence of 0; 0 and 0 where `mask` is 0."""
         self._use(LAST, (read, coarser, mask))
 
     def _use(self, stage: int, textures: tuple[Texture, ...], first: bool = False) -> None:

@@ -31,7 +31,7 @@ its textures, ports and settings group, and the monitor lists each part's textur
 ```mermaid
 flowchart TB
   I["Camera image<br/>992 × 800"]
-  D["Camera depth<br/>480 × 300, metres"]
+  D["Camera depth<br/>480 × 300, meters and confidence"]
   C["crop → image: the box's sides<br/>448 × 800"]
   K["crop → depth: who, the box's front and back<br/>the depth's own pixels, 0 outside; 448 × 800"]
   M["mask → mask: where<br/>guided filter; 448 × 800"]
@@ -72,13 +72,17 @@ the density's color from the image and the mask ([COLOR.md](COLOR.md)); the moti
 
 The aligned depth is coarser than the view (`NEURAL_480`, 480 × 300 on the whole camera image), and its edge is
 coarser than the mask's: between them lies a band about `guided_radius` wide (2 depth pixels, about 5 view
-pixels) where the mask is and the player's depth is not. The depth is made in two passes, once, after the mask
-exists:
+pixels) where the mask is and the player's depth is not. The depth comes with the camera's confidence in green, 0
+to 1, 1 where the recording has none ([INFERENCE.md](../inference/INFERENCE.md)), and the view's textures carry it
+the same way, RG32F: green is the camera's confidence where the view kept a depth and 0 where the fill made it, so
+the motion can weigh a filled pixel apart. The crop's depth feeds only the mask and keeps red alone. The depth is
+made in two passes, once, after the mask exists:
 
 - The upscale (`DepthUpscale`): the four depth pixels around a view pixel, interpolated bilinearly where they lie
   within 0.1 m of each other (`EDGE`, `view_depth.py`), else the one it lies in, so an edge never reads as a
-  distance in between; a 0, no depth, is never blended. Kept where it
-  is the player's (`near`..`far`) and the mask is above 0, else 0. The edge's jump is a constant, not a setting:
+  distance in between; a 0, no depth, is never blended. The confidence goes with the depth's own weights, or is
+  the one pixel's where the depth is. Kept where it
+  is the player's (`near`..`far`) and the mask is above 0, else 0 and 0. The edge's jump is a constant, not a setting:
   it lies above the depth's noise between neighbours on one surface and below the smallest edge to keep, a hand
   before the chest, as the motion's `z.edge` (0.1 m); 0.05, 0.1 and 0.2 m measured alike on the views before this one, no limit did not (the
   table below). It keeps the edges inside the mask (an arm before the body) from reading as a depth in between,
@@ -86,8 +90,8 @@ exists:
 - The fill (`DepthFill`): push-pull (Gortler et al. 1996). Push: each level down halves
   the size, rounded up, to 1 × 1, a pixel the mean of the pairs (depth × weight, weight) below it, the upscaled
   depth's weight 1 where it has a depth. Pull: from the coarsest up, a level's pair plus (1 − its weight) times the
-  coarser pulled level's, read bilinearly. A pixel with a depth keeps it; one without takes the mean of the depth
-  around it, from the finest level that has one. Where the mask is 0 the depth is 0. The band between the
+  coarser pulled level's, read bilinearly. A pixel with a depth keeps it and its confidence; one without takes the
+  mean of the depth around it, from the finest level that has one, and a confidence of 0. Where the mask is 0 the depth is 0. The band between the
   depth's edge and the mask's takes the depth just inside it, and the camera's few holes in the body are filled on
   the way. A filled pixel moves with its surroundings, rather than reading as no z. The fill is always on: it
   gives every pixel of the mask a depth, so the density made there has a place in the fluid, and it leaves the
@@ -144,8 +148,11 @@ The mask has no erosion, as one pulls the guided edge off the image's; the color
 ## Checked
 
 Shaders are checked in a GPU harness. `apps/deep_flow/scripts/view_check.py` plays a recording's captures through
-the uploader, the view stage and the color stage, prints the share of the mask without depth, times each pass
-(`--time`) and saves the last capture's textures side by side (`--png`).
+the uploader, the view stage and the color stage, prints the share of the mask without depth and the confidence
+in green (the upscale's where kept, 0 where filled), times each pass (`--time`) and saves the last capture's
+textures side by side (`--png`). On the measure recording, without a confidence, green read 1 where kept and 0
+where filled, to the float; on `20261121-004342_probe_A5_hevc`, with one, it matched the upscale's, mean 0.874
+(2026-11-21).
 
 The mask without depth is 1.62% of the mask upscaled, 0.00% after the fill. The passes on the GPU, the median
 of 40, are in [TIMING.md](TIMING.md#the-view). Without the app: `modules/flow/tests/test_view_window.py`, the

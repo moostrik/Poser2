@@ -1,9 +1,9 @@
 """ViewDepth: how far. The camera's depth upscaled to the view once, blended within a surface, kept where it is the
 player's and the mask is; then filled across the mask by push-pull, so the mask and the depth agree pixel for
-pixel."""
+pixel. Its textures are RG32F: meters in red, the camera's confidence in green, 0 where the fill made the depth."""
 
 # Third-party imports
-from OpenGL.GL import GL_NEAREST, GL_R32F
+from OpenGL.GL import GL_NEAREST, GL_RG32F
 
 # Local application imports
 from modules.flow import DepthFill, DepthUpscale, Port, TextureKind
@@ -39,8 +39,8 @@ class ViewDepth:
                 'filled': Port(self._filled, TextureKind.DEPTH, depth_range=band)}
 
     def allocate(self, width: int, height: int) -> None:
-        self._upscaled.allocate(width, height, GL_R32F)
-        self._filled.allocate(width, height, GL_R32F)
+        self._upscaled.allocate(width, height, GL_RG32F)
+        self._filled.allocate(width, height, GL_RG32F)
         self._upscale_shader.allocate()
         self._fill.allocate(width, height)
 

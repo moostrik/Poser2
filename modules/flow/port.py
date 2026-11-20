@@ -24,7 +24,7 @@ class TextureKind(IntEnum):
     SCALAR = auto()
     ACCELERATION = auto()
     Z_POSITION = auto()     # a z position, 0 front to 1 back, times its weight in red, the weight in green
-    DEPTH = auto()          # metres in red, 0 where there is none, drawn in a colormap from its port's near to far
+    DEPTH = auto()          # meters in red, 0 where there is none, drawn in a colormap from its port's near to far; the confidence 0 to 1 in green, where it has one
 
     @property
     def vector(self) -> bool:
