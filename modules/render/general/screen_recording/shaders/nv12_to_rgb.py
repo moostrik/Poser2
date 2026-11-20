@@ -6,7 +6,7 @@ import numpy as np
 from OpenGL.GL import (GL_FALSE, GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i,
                        glUniform3fv, glUniformMatrix3fv, glUseProgram)
 
-from ... import Shader, draw_quad, Texture
+from modules.gl import Shader, draw_quad, Texture
 from .nv12 import MATRIX, OFFSET
 
 logger = logging.getLogger(__name__)

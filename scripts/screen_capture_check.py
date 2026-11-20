@@ -1,14 +1,18 @@
-"""Does a screen frame reach the ring as the right NV12, and come back from it upright as the same RGB, in RAM and in
-video memory?
+"""Does the screen capture hand over the right NV12 frames from its mapped pool, and how fast is a frame copied out?
 
-A 64 × 32 frame of 8 × 8 blocks of known colors is drawn into `ScreenCapture.frame`, captured into slot 0 of a ring
-of two, and read back: the Y and Cb Cr codes at each block's middle against the BT.709 video-range codes of its color
-(a table of numbers, not a second conversion). Then `show_preview(0)` draws the slot back into `preview`, and each
-block's middle must hold its color within 3 levels of 255, the top row of blocks still at the top.
+1. A 64 × 32 frame of 8 × 8 blocks of known colors is drawn into `ScreenCapture.frame`, captured, and handed over once
+   its fence has passed: the Y and Cb Cr codes at each block's middle against the BT.709 video-range codes of its
+   color (a table of numbers). `show_preview` then draws the frame back into `preview`: each block's middle holds
+   its color within 3 levels of 255, the top row of blocks still at the top.
+2. The pool: with no frame given back, four captures go out and the fifth is left out; after one is given back,
+   the next frame says one was skipped before it.
+3. The copy: one 2160 × 3840 frame copied out of its mapped buffer into plain RAM, as the recorder's thread does,
+   timed over 20 copies; 60 frames a second need it well under 16.7 ms.
 
     python scripts/screen_capture_check.py
 """
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -17,25 +21,25 @@ import numpy as np  # noqa: E402
 from OpenGL.GL import glFinish  # noqa: E402
 
 import monitor_harness as mh  # noqa: E402
-from modules.gl import ScreenCapture, Style  # noqa: E402
+from modules.gl import Style  # noqa: E402
+from modules.render import ScreenCapture  # noqa: E402
+from modules.video import ScreenFrame  # noqa: E402
 
 WIDTH, HEIGHT, BLOCK = 64, 32, 8
 
 # color (0..255), and its BT.709 video-range Y, Cb, Cr codes
 CODES: dict[str, tuple[tuple[int, int, int], tuple[int, int, int]]] = {
-    'black':  ((0, 0, 0),       (16, 128, 128)),
-    'white':  ((255, 255, 255), (235, 128, 128)),
-    'red':    ((255, 0, 0),     (63, 102, 240)),
-    'green':  ((0, 255, 0),     (173, 42, 26)),
-    'blue':   ((0, 0, 255),     (32, 240, 118)),
-    'yellow': ((255, 255, 0),   (219, 16, 138)),
-    'cyan':   ((0, 255, 255),   (188, 154, 16)),
-    'magenta': ((255, 0, 255),  (78, 214, 230)),
+    'black':   ((0, 0, 0),       (16, 128, 128)),
+    'white':   ((255, 255, 255), (235, 128, 128)),
+    'red':     ((255, 0, 0),     (63, 102, 240)),
+    'green':   ((0, 255, 0),     (173, 42, 26)),
+    'blue':    ((0, 0, 255),     (32, 240, 118)),
+    'yellow':  ((255, 255, 0),   (219, 16, 138)),
+    'cyan':    ((0, 255, 255),   (188, 154, 16)),
+    'magenta': ((255, 0, 255),   (78, 214, 230)),
 }
-# the picture's rows of blocks, top first: the top row differs from the others, so a flip shows
 TOP: list[str] = ['red', 'green', 'blue', 'white', 'black', 'yellow', 'cyan', 'magenta']
-BELOW: list[str] = ['black'] * 8
-ROWS: list[list[str]] = [TOP] + [BELOW] * (HEIGHT // BLOCK - 1)
+ROWS: list[list[str]] = [TOP] + [['black'] * 8] * (HEIGHT // BLOCK - 1)
 
 
 def picture() -> np.ndarray:
@@ -48,22 +52,37 @@ def picture() -> np.ndarray:
     return top_first[::-1].copy()
 
 
-def check(host_memory: bool, source) -> int:
-    bad = 0
-    capture = ScreenCapture()
-    capture.allocate(WIDTH, HEIGHT, host_memory)
-    capture.add_block(2)
+def draw(capture: ScreenCapture, source) -> None:
     Style.push_style()
     Style.set_blend_mode(Style.BlendMode.DISABLED)
     capture.frame.begin()
     source.draw()
     capture.frame.end()
     Style.pop_style()
-    capture.capture(0)
-    capture.flush()
-    capture.synchronize()
-    capture.queue_download(0)
-    nv12 = capture.wait_download().copy()
+
+
+def wait_for(capture: ScreenCapture, frames: list[ScreenFrame], count: int) -> None:
+    glFinish()
+    deadline = time.perf_counter() + 2.0
+    while len(frames) < count and time.perf_counter() < deadline:
+        capture.poll()
+        glFinish()
+
+
+def check_codes(source) -> int:
+    bad = 0
+    capture = ScreenCapture()
+    capture.allocate(WIDTH, HEIGHT)
+    frames: list[ScreenFrame] = []
+    capture.add_screen_frame_callback(frames.append)
+    draw(capture, source)
+    capture.capture(1.0)
+    wait_for(capture, frames, 1)
+    if not frames:
+        print('  no frame handed over')
+        return 1
+    nv12 = frames[0].data.copy()
+    frames[0].release()
     luma, chroma = nv12[:HEIGHT], nv12[HEIGHT:].reshape(HEIGHT // 2, WIDTH // 2, 2)
     for r, names in enumerate(ROWS):
         for c, name in enumerate(names):
@@ -73,7 +92,7 @@ def check(host_memory: bool, source) -> int:
             if any(abs(g - w) > 1 for g, w in zip(got, want)):
                 bad += 1
                 print(f'  NV12 {name} at row {r} col {c}: {got}, want {want}')
-    capture.show_preview(0)
+    capture.show_preview(0, nv12)
     glFinish()
     shown = capture.preview.read_to_numpy(flip=False)
     assert shown is not None
@@ -87,16 +106,67 @@ def check(host_memory: bool, source) -> int:
             if any(abs(g - w) > 3 for g, w in zip(got, want)):
                 bad += 1
                 print(f'  preview {name} at row {r} col {c}: {got}, want {want}')
-    capture.free_blocks()
     capture.deallocate()
     return bad
 
 
+def check_pool(source) -> int:
+    bad = 0
+    capture = ScreenCapture()
+    capture.allocate(WIDTH, HEIGHT)
+    frames: list[ScreenFrame] = []
+    capture.add_screen_frame_callback(frames.append)
+    for n in range(5):
+        draw(capture, source)
+        capture.capture(float(n))
+    wait_for(capture, frames, 4)
+    if len(frames) != 4:
+        bad += 1
+        print(f'  {len(frames)} frames out of five captures with four buffers, want 4')
+    frames[0].release()
+    draw(capture, source)
+    capture.capture(5.0)
+    wait_for(capture, frames, 5)
+    if len(frames) != 5 or frames[-1].skipped != 1:
+        bad += 1
+        print(f'  after one given back: {len(frames)} frames, skipped {frames[-1].skipped if frames else None}, want 5 and 1')
+    if not capture.lent:
+        bad += 1
+        print('  the pool says nothing is lent while four frames are')
+    for frame in frames[1:]:
+        frame.release()
+    if capture.lent:
+        bad += 1
+        print('  the pool says a frame is lent after all were given back')
+    capture.deallocate()
+    return bad
+
+
+def time_copy() -> float:
+    capture = ScreenCapture()
+    capture.allocate(2160, 3840)
+    frames: list[ScreenFrame] = []
+    capture.add_screen_frame_callback(frames.append)
+    capture.capture(0.0)
+    wait_for(capture, frames, 1)
+    ring = np.empty_like(frames[0].data)
+    np.copyto(ring, frames[0].data)         # first touch of the destination's pages, as the ring's new block has
+    started = time.perf_counter()
+    for _ in range(20):
+        np.copyto(ring, frames[0].data)
+    ms = (time.perf_counter() - started) / 20 * 1000.0
+    frames[0].release()
+    capture.deallocate()
+    return ms
+
+
 window = mh.context()
 source = mh.texture_of(picture())
-total = 0
-for host_memory in (True, False):
-    bad = check(host_memory, source)
-    total += bad
-    print(f'{"RAM" if host_memory else "video memory"}: {bad} wrong of {2 * len(ROWS) * len(TOP)}')
-print('PASS' if total == 0 else f'FAIL: {total} wrong')
+codes = check_codes(source)
+print(f'NV12 codes and preview: {codes} wrong of {2 * len(ROWS) * len(TOP)}')
+pool = check_pool(source)
+print(f'pool: {pool} wrong')
+ms = time_copy()
+mb = 2160 * 3840 * 3 // 2 / 1e6
+print(f'copy of one 2160x3840 NV12 frame ({mb:.1f} MB) out of a mapped buffer: {ms:.2f} ms ({mb / ms:.1f} GB/s)')
+print('PASS' if codes == 0 and pool == 0 and ms < 8.0 else 'FAIL')

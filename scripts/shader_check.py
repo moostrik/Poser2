@@ -38,6 +38,7 @@ from modules.render.modules.board.shaders import TimeSeries  # noqa: E402
 from modules.render.modules.pose.shaders import AddMix, Feature, LayerComposite, Window  # noqa: E402
 from modules.render.modules.flow.shaders import DepthColormap  # noqa: E402
 from modules.render.modules.inference.shaders import CelShade  # noqa: E402
+from modules.render.general.screen_recording.shaders import Nv12, Nv12Plane  # noqa: E402
 from modules.utils import Color, Point2f, Quad, Rect  # noqa: E402
 
 OUT: str = os.path.join('temp', 'shader_check')
@@ -177,9 +178,9 @@ def cases() -> dict[str, tuple[object, Case | None, Case | None]]:
     simplex = s.SimplexNoise()
 
     add('simplex_noise', simplex, lambda t: simplex.use(12.5, 1.0, 0.5))
-    nv12 = s.Nv12()
-    add('nv12_y', nv12, lambda t: nv12.use(t['gradient'], s.Nv12Plane.Y))
-    add('nv12_uv', nv12, lambda t: nv12.use(t['gradient'], s.Nv12Plane.UV))
+    nv12 = Nv12()
+    add('nv12_y', nv12, lambda t: nv12.use(t['gradient'], Nv12Plane.Y))
+    add('nv12_uv', nv12, lambda t: nv12.use(t['gradient'], Nv12Plane.UV))
     sharpen = s.Sharpen()
     add('sharpen', sharpen, lambda t: sharpen.use(t['second'], 1.5))
 

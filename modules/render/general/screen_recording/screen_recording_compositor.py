@@ -1,13 +1,17 @@
 """ScreenRecordingCompositor: the screen recording's frame, drawn from the layers an app hands it, and its recorder."""
 
+import logging
 from dataclasses import dataclass, field
 
 from OpenGL.GL import glViewport
 
-from modules.gl import ScreenCapture, Style, Texture, clear_color, fill, fit
+from modules.gl import Style, Texture, clear_color, fill, fit
 from modules.video import ScreenRecorder, ScreenRecorderSettings
 
 from ...layer_base import LayerBase
+from .screen_capture import ScreenCapture
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -28,16 +32,18 @@ class ScreenRecordingInput:
 
 
 class ScreenRecordingCompositor(LayerBase):
-    """The screen frame of a recording: the sources, each fit (or filled) at its own shape and added on black as the
-    show draws them, or the main window just drawn; then the recorder's tick, which copies it, and while a marker of
-    a held take is dragged its frame over the main window. Owns the `ScreenCapture` and the `ScreenRecorder`; `snap`
-    sets the size to the first source's, or the window's."""
+    """The screen recording on the render tick: the recorder's tick, the capture made at the recorder's size, the
+    finished frames handed to the recorder, and, when the recorder captures this tick, the sources drawn into the
+    screen frame, each fit (or filled) at its own shape and added on black as the show draws them, or the main window
+    just drawn; while a marker of a held take is dragged, its frame over the main window. Owns the `ScreenCapture`
+    and the `ScreenRecorder`; `snap` sets the size to the first source's, or the window's."""
 
     def __init__(self, settings: ScreenRecorderSettings, folder: str) -> None:
         """`folder`: where the recordings go."""
         self.settings: ScreenRecorderSettings = settings
         self._capture: ScreenCapture = ScreenCapture()
-        self.recorder: ScreenRecorder = ScreenRecorder(settings, self._capture, folder)
+        self.recorder: ScreenRecorder = ScreenRecorder(settings, folder)
+        self._capture.add_screen_frame_callback(self.recorder.submit_screen_frame)
         self._input: ScreenRecordingInput = ScreenRecordingInput()
         self.settings.bind(ScreenRecorderSettings.snap, self._on_snap)
 
@@ -47,23 +53,27 @@ class ScreenRecordingCompositor(LayerBase):
         return self._capture.frame
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
-        """Start the recorder's thread; the capture's GL objects are made at Start."""
+        """Start the recorder's thread; the capture's GL objects are made when a take begins."""
         self.recorder.start()
 
     def deallocate(self) -> None:
-        """End the recording (its encode finishes and frees its memory), then free the GL objects."""
+        """End the recording (its encode finishes, its thread gives every frame back), then free the GL objects."""
         self.settings.unbind(ScreenRecorderSettings.snap, self._on_snap)
         self.recorder.stop()
-        self.recorder.deallocate()
+        self._capture.remove_screen_frame_callback(self.recorder.submit_screen_frame)
+        if self._capture.allocated:
+            self._capture.deallocate()
 
     def set_input(self, input: ScreenRecordingInput) -> None:
         self._input = input
 
     def update(self) -> None:
-        """Draw the screen frame when the recorder records this tick, then run the recorder's tick; call it right after
-        the main window is drawn, before it is shown."""
+        """The recording's tick; call it right after the main window is drawn, before it is shown."""
         input = self._input
-        if self.recorder.capturing:
+        self.recorder.update(input.timestamp)
+        self._follow_capture_size()
+        self._capture.poll()
+        if self.recorder.capturing and self._capture.allocated:
             capture = self._capture
             if self.settings.main_window:
                 capture.copy_window(input.window_width, input.window_height, self.settings.fill)
@@ -80,17 +90,35 @@ class ScreenRecordingCompositor(LayerBase):
                     source.layer.draw()
                 Style.pop_style()
                 capture.frame.end()
+            capture.capture(input.timestamp)
             glViewport(0, 0, input.window_width, input.window_height)
-        self.recorder.update(input.timestamp)
         self._draw_preview(input.window_width, input.window_height)
+
+    def _follow_capture_size(self) -> None:
+        """Make the capture at the recorder's size while it has a take, and free it after; never while a frame of it
+        is lent or on its way."""
+        size = self.recorder.capture_size
+        capture = self._capture
+        if capture.lent:
+            return
+        if size is None:
+            if capture.allocated:
+                capture.deallocate()
+            return
+        if capture.allocated and (capture.width, capture.height) == size:
+            return
+        try:
+            capture.allocate(*size)
+        except Exception as e:
+            self.recorder.fail(f'could not make the screen capture at {size[0]}x{size[1]}: {e}')
 
     def _draw_preview(self, window_width: int, window_height: int) -> None:
         """While a marker of a held take is dragged, its frame over the main window, fit on black."""
-        slot = self.recorder.preview_slot
-        if slot is None or window_width <= 0 or window_height <= 0:
+        shown = self.recorder.preview_frame
+        if shown is None or window_width <= 0 or window_height <= 0 or not self._capture.allocated:
             return
         capture = self._capture
-        capture.show_preview(slot)
+        capture.show_preview(*shown)
         glViewport(0, 0, window_width, window_height)
         clear_color(0.0, 0.0, 0.0, 1.0)
         x, y, w, h = fit(capture.width, capture.height, window_width, window_height)

@@ -8,11 +8,8 @@ the apps' plan F reaches the video module.
 
 ## C. The frame handed over, the ring in RAM
 
-The ring lives in RAM only. Video memory held 10 to 13 s of 4K in deep_flow; this PC has 96 GB of RAM, 74 GB free (measured 2026-11-19), about 80 s at 4:2:0 60 fps in 60 GB (deduction). Video memory gave nothing back for its length: the render tick does the same work either way, and the encode copied every frame to RAM anyway.
+The capture hands over finished frames to the recorder's RAM ring (C2, built; VIDEO.md holds the design).
 
-Recording into RAM jerks about once a second (seen by Matthias in low_flow, 2026-11-19): the code pins a one-second block (`cudaMallocHost`, about 750 MB at 4K60) each recorded second, which stalls the render tick (deduction). The recorder drives the capture through `ScreenRing` because the ring was CUDA memory only the GL side could write; with the ring in plain RAM the frame can be handed over like every other item.
-
-- C2. The capture hands over finished frames. `ScreenCapture` and `ScreenPreview` move from modules/gl to `modules/render/general/screen_recording/` beside the compositor, their shaders in its `shaders/`, so modules/gl stays the framework and imports no video. `ScreenCapture` (render thread) is the producer: it draws and converts as now, then reads back with `glReadPixels` into one of four pack pixel buffers in host memory, mapped once (persistent and coherent) when it is allocated, and sets a fence after it. On a later tick it checks the fence without waiting; once it has passed it calls `add_screen_frame_callback`'s callbacks (a list with its own lock) with a `ScreenFrame`: the mapped buffer as an array, and its `timestamp` (the tick's). `ScreenFrame`, and E1's `ScreenFormat`, are plain dataclasses in modules/video, the recording's item and format; the capture imports them, so the recorder holds no OpenGL and no CUDA and its tests need no GPU. The capture frees or resizes its pixel buffers only once every one is back in the pool, the recorder's queue drained. `ScreenRecorder.submit_screen_frame` enqueues and returns. The recorder's thread wakes on the queue, copies the frame into its ring (plain RAM, numpy blocks of one second) and gives the buffer back to the pool (the render thread reuses it at its next tick). A full queue drops its oldest frame, gives its buffer back and counts it; with no buffer free the capture skips the tick and counts it. The count shows in the panel and in the file's comment. The recorder tells the capture whether to draw this tick, as `capturing` does now. Removed: `ScreenRing`, `ScreenMemory`, the `memory` and `reserve` settings (presets migrated in deep_flow and low_flow), the video-memory blocks, `add_block`, `queue_download` and `wait_download`, the capture's CUDA registration and streams, and the `cudart` calls only the capture used (malloc and free, pinned malloc and free, `mem_get_info`, streams, events, the device-to-host copy); the recording path holds no CUDA. VIDEO.md: the hand-over, the readback with fences, the RAM ring, why it is not pinned, the dropped frames. Check: the recorder's unit tests fed plain arrays (a take, look back, a full queue dropping its oldest); `scripts/screen_capture_check.py` rewritten for the pool and the hand-over, timing one 4K frame's copy out of a mapped buffer (if slow, the buffers get the client-storage flag); both apps' tests; C3's run. One commit.
 - C3. One `-sim` run in deep_flow at 4K, 60 Hz with v_sync: tick time idle, recording, idle, and a 30 s take with its encode (encode time, frames, dropped, the file plays); then one take that runs until `ram_reserve` stops it, showing the app runs on while it is held. The ticks while recording show no stall once a second, and 0 dropped. Check of C2 and the drawing through `ScreenRecordingCompositor`, in the app. A fix found here is one more commit only if a test checks it.
 
 ## D. In and out before saving
@@ -32,25 +29,19 @@ Quality is traded against length; `max_duration` shows the length the chosen for
 
 ## The rules it touches
 
-- Fix a problem where it is made: A; C2, at the allocation that stalls
-- A producer calls its callbacks itself, a callback only hands over: C2; a callback list has its own lock
-- Every other frame type is qualified: C2, `ScreenFrame`
-- An item that leaves its package is finished, its GPU work included: C2, the fence checked before the hand-over
-- An item handed to a callback is not changed afterwards: C2, a buffer reused only after the recorder gives it back
-- The part that works on the item has its own thread: C2 (the recorder's), D2 (the preview's)
-- Its queue drops the oldest item and counts it: C2
+- Fix a problem where it is made: A
+- The part that works on the item has its own thread: D2 (the preview's)
 - A part that only needs the latest value reads it at its own tick: D2, E3
-- Prefer not to wait on the GPU inside a frame: C2, D2
-- Create resources at setup, not per frame: C2 (the pool), D2 (the preview's buffers)
-- All GL calls on the render thread: C2, D2 (buffers mapped and fences set and checked there; the other threads only read or write mapped memory); the recorder's thread touches only RAM and the pipe
-- Use a Protocol for what a consumer needs: C2 removes `ScreenRing`, which the hand-over no longer needs
-- Remove obsolete pathways, presets in sync: C2, E1, E2, E4
+- Prefer not to wait on the GPU inside a frame: D2
+- Create resources at setup, not per frame: D2 (the preview's buffers)
+- All GL calls on the render thread: D2 (buffers mapped and fences set and checked there; the other threads only read or write mapped memory); the recorder's thread touches only RAM and the pipe
+- Remove obsolete pathways, presets in sync: E1, E2, E4
 - When a term changes, rename it everywhere in the same change: E1, the NV12 names; E3, `pause` to `freeze_frame`
-- Shaders get checked in a GPU harness, named after their .py: C2, D2, E1, E2
+- Shaders get checked in a GPU harness, named after their .py: D2, E1, E2
 - A settings class mirrors the code, in the order it runs: E4
 - The show owns only what it does with it: E3, each app holds its own show
 - Settings connect the user and a component, not two components: E3, the apps read a property
-- A document describes what is built: VIDEO.md in C2, D2, E1–E4
-- A package is one thing: C2, D2, the capture and the preview in the screen recording's render package, not in modules/gl
+- A document describes what is built: VIDEO.md in D2, E1–E4
+- A package is one thing: D2, the preview in the screen recording's render package, not in modules/gl
 - Prefer the design with the lower latency, measured in the app: C3, E2
-- One plan step checked by a run or test is one commit: C2, C3, D2, E1–E4
+- One plan step checked by a run or test is one commit: C3, D2, E1–E4
