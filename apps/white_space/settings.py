@@ -22,7 +22,7 @@ from modules.tracker import PanoramicTrackerSettings, TrackerFrameSourceSettings
 from modules.pose import nodes, trackers, window, analytics
 from modules import inference
 from modules.session import SessionSettings
-from modules.gl import WindowSettings
+from modules.gl import WindowManagerSettings, WindowSettings
 from .light import LightSettings, PoseInstrumentSettings
 from .inout import OscLightSenderSettings, UdpLightReceiverSettings
 from .pose import HitSyncSettings, NeutralWeightSettings
@@ -379,7 +379,6 @@ class RenderSettings(BaseSettings):
     # actually delivers; it moves nothing, the warp has already levelled the frame.
     panorama:    Group[render.PanoramaLayerSettings] = Group(render.PanoramaLayerSettings, share=[tilt])
     colors:      Group[render.ColorSettings] = Group(render.ColorSettings)
-    window:      Group[WindowSettings]      = Group(WindowSettings)
 
 
 class CadenceSettings(BaseSettings):
@@ -397,6 +396,16 @@ class CadenceSettings(BaseSettings):
 # ---------------------------------------------------------------------------
 #  Root settings
 # ---------------------------------------------------------------------------
+
+class WindowsSettings(BaseSettings):
+    """The render's window"""
+    loop    : Group[WindowManagerSettings] = Group(WindowManagerSettings)
+    window_0: Group[WindowSettings]        = Group(WindowSettings)
+
+    @property
+    def windows(self) -> list[WindowSettings]:
+        return [self.window_0]
+
 
 class Settings(BaseSettings):
     max_players     : Field[int]   = Field(4, access=Field.INIT, description="Players tracked at most: the id slots 0..N−1")
@@ -416,6 +425,7 @@ class Settings(BaseSettings):
     # In panel order: what you look at, what you capture, the wires out, the sensors, what is made of
     # them, and what the show does with it.
     render : Group[RenderSettings]  = Group(RenderSettings, share=[max_players, num_cams, tilt])
+    windows: Group[WindowsSettings] = Group(WindowsSettings)
     session: Group[SessionGroup]    = Group(SessionGroup, share=[num_cams, input_fps.as_('fps')])
     inout  : Group[InOutGroup]      = Group(InOutGroup, share=[max_players, light_resolution.as_('resolution')])
     camera : Group[OakGroup]        = Group(OakGroup, share=[num_cams, input_fps.as_('fps'), fov, tilt, resolution,

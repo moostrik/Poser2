@@ -209,7 +209,7 @@ class WhiteSpaceMain:
         self.camera_health = CameraHealth(self.settings.camera.cameras, self.settings.camera.camera_health)
 
         # RENDER
-        self.render = WhiteSpaceRender(self.board, self.settings.render, self.settings.tracker,
+        self.render = WhiteSpaceRender(self.board, self.settings.render, self.settings.windows, self.settings.tracker,
                                        self.settings.camera.cameras, self.settings.camera.camera_health, ps.angle_extractor)
         self.render.add_update_callback(self.camera_health.update)
         self.render.add_update_callback(self._update_drops)
@@ -218,7 +218,7 @@ class WhiteSpaceMain:
         self.conductor.add_update_callback(self._update_poses)
         self.conductor.add_update_callback(self.state_machine.update)
         self.render.add_exit_callback(self.stop)
-        self.render.window_manager.add_keyboard_callback(self._on_key)
+        self.render.window_manager.input.add_key_callback(self._on_key)
 
     def start(self) -> None:
         self.panel_server.start()
@@ -286,7 +286,7 @@ class WhiteSpaceMain:
         """A camera column's world azimuth in radians, through the tracker's own geometry."""
         return math.radians(self.tracker.column_to_azimuth(cam_id, x))
 
-    def _on_key(self, key: int, action: int, _mods: int) -> None:
+    def _on_key(self, _window: int, key: int, action: int, _mods: int) -> None:
         """Render-window hotkeys: M marks an incident in the tracker journal."""
         if key == glfw.KEY_M and action == glfw.PRESS:
             self.tracker_journal.mark()

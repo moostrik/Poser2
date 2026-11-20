@@ -5,7 +5,7 @@ from typing import Callable, cast
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import GpuTimer, RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId, MouseButton, shaders
+from modules.gl import GpuTimer, RenderBase, Shader, Style, clear_color, fit, Texture, MouseButton, shaders
 from modules.video import ScreenRecorderSettings
 from modules.flow import Port, hold_tick
 from modules.inference import InferenceFrame, Poses
@@ -14,7 +14,7 @@ from modules import render
 from modules.utils import FPS, Color, Rect, Point2f
 
 from ..board import RenderBoard
-from ..settings import PoseFrame, RenderSettings
+from ..settings import PoseFrame, RenderSettings, WindowsSettings
 from .layers import InferenceFrameMonitorLayer, ViewInput, ViewOutput, ViewLayer, PoseMonitorCompositor
 from .chain import ChainLayers, Size, TICK_LAYERS, INFERENCE_FRAME_LAYERS, MONITORS, POSE_SHAPES, shown, size_of, layers_of, shape_of
 
@@ -27,11 +27,11 @@ BORDER_WIDTH: float = 2.0       # px
 
 
 class DeepFlowRender(RenderBase):
-    def __init__(self, board: RenderBoard, settings: RenderSettings, recorder_settings: ScreenRecorderSettings, fov: float, screen_recordings: str,
+    def __init__(self, board: RenderBoard, settings: RenderSettings, windows: WindowsSettings, recorder_settings: ScreenRecorderSettings, fov: float, screen_recordings: str,
                  num_cams: int = 1, max_players: int = 1) -> None:
         """`fov` is the camera image's horizontal field (degrees), for the metres a view width spans;
         `recorder_settings` the screen recorder's, `screen_recordings` the folder its recordings go to."""
-        super().__init__(settings.window)
+        super().__init__(windows.loop, windows.windows)
         self.max_players: int = max_players
         self.num_cams: int = num_cams
         self.settings: RenderSettings = settings
@@ -74,9 +74,9 @@ class DeepFlowRender(RenderBase):
         self.L[ChainLayers.time_series][0] = render.TimeSeriesLayer(self.board, settings.time_series)      # the board's series, one for all cameras
 
         # Split view: the left and right panels side by side or stacked, whichever shows what they hold larger
-        self._window_size: tuple[int, int] = (settings.window.width, settings.window.height)
+        self._window_size: tuple[int, int]                  # window 0's, from allocate on
         self._panel_aspect_ratios: list[float] = self._read_panel_aspect_ratios()
-        self.subdivision: render.Subdivision = self._make_layout()
+        self.subdivision: render.Subdivision                # made in allocate, at window 0's size
 
         # The length of each tick, the flow's dt, held to twice the mean tick (`hold_tick`)
         self._last_tick: float = 0.0
@@ -107,9 +107,9 @@ class DeepFlowRender(RenderBase):
         # every monitor, so A and B keep one angle and one layer (nothing else in the main window takes it)
         self._drag: tuple[MouseButton, float, float] | None = None     # the button held and where the cursor was
         self._dragged: bool = False
-        self.window_manager.add_mouse_button_callback(self._on_mouse_button)
-        self.window_manager.add_mouse_move_callback(self._on_mouse_move)
-        self.window_manager.add_mouse_scroll_callback(self._on_mouse_scroll)
+        self.window_manager.input.add_mouse_button_callback(self._on_mouse_button)
+        self.window_manager.input.add_mouse_move_callback(self._on_mouse_move)
+        self.window_manager.input.add_mouse_scroll_callback(self._on_mouse_scroll)
 
         # The screen recording: the main panel's layers, or the main window
         self.screen_recording: render.ScreenRecordingCompositor = render.ScreenRecordingCompositor(recorder_settings, screen_recordings)
@@ -138,12 +138,16 @@ class DeepFlowRender(RenderBase):
             self.subdivision = self._make_layout()
             self.allocate_window_renders()
 
-    def on_main_window_resize(self, width: int, height: int) -> None:
+    def on_window_resize(self, window: int, width: int, height: int) -> None:
+        if window != 0:
+            return
         self._window_size = (width, height)
         self.subdivision = self._make_layout()
         self.allocate_window_renders()
 
     def allocate(self) -> None:
+        self._window_size = self.window_size(0)
+        self.subdivision = self._make_layout()
         self._view_size = (self.settings.view.width, self.settings.view.height)
         for layer_type, cam_dict in self.L.items():
             for layer in cam_dict.values():
@@ -207,8 +211,10 @@ class DeepFlowRender(RenderBase):
         """The monitors with a 3D view, the ones the mouse moves."""
         return [monitor for monitor in self._monitors() if isinstance(monitor, render.Monitor3DLayer)]
 
-    def _on_mouse_button(self, x: float, y: float, button: MouseButton, pressed: bool) -> None:
-        """A press starts a drag; a middle click that did not move resets the views."""
+    def _on_mouse_button(self, window: int, x: float, y: float, button: MouseButton, pressed: bool) -> None:
+        """A press in window 0 starts a drag; a middle click that did not move resets the views."""
+        if pressed and window != 0:
+            return
         if pressed:
             self._drag, self._dragged = (button, x, y), False
             return
@@ -217,16 +223,18 @@ class DeepFlowRender(RenderBase):
                 monitor.reset_view()
         self._drag = None
 
-    def _on_mouse_move(self, x: float, y: float) -> None:
-        if self._drag is None:
+    def _on_mouse_move(self, window: int, x: float, y: float) -> None:
+        if self._drag is None or window != 0:
             return
         button, last_x, last_y = self._drag
         for monitor in self._volume_monitors():
             monitor.drag(x - last_x, y - last_y, button)
         self._drag, self._dragged = (button, x, y), True
 
-    def _on_mouse_scroll(self, steps: float) -> None:
-        """A layer per step for every monitor, the show's density's layers."""
+    def _on_mouse_scroll(self, window: int, steps: float) -> None:
+        """A layer per step for every monitor, the show's density's layers; over window 0."""
+        if window != 0:
+            return
         for monitor in self._volume_monitors():
             monitor.scroll(steps, self.settings.fluid.depth)
 
@@ -370,7 +378,10 @@ class DeepFlowRender(RenderBase):
 
     # ========== Drawing ==========
 
-    def draw_main(self, width: int, height: int) -> None:
+    def draw(self, window: int, width: int, height: int) -> None:
+        if window != 0:
+            self._draw_show(width, height)
+            return
         if self.screen_recording.playing:
             self._draw_screen_recording(width, height)      # the held take over the main window, the show waiting
             return
@@ -399,9 +410,6 @@ class DeepFlowRender(RenderBase):
         debug_rect: Rect = self.subdivision.get_rect('panels', 1)
         self._draw_fit(self._debug_layers, debug_rect.x, height - debug_rect.y - debug_rect.height, debug_rect.width, debug_rect.height,
                        True, debug=True)
-
-    def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
-        self._draw_show(width, height)
 
     def _draw_show(self, width: int, height: int) -> None:
         """The show: the main panel's layers in order, each fit to `width` × `height` at its own shape."""

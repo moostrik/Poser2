@@ -3,8 +3,8 @@
 Art installation: a camera captures a face, an image generator turns it into a portrait, and the
 result is shown with music (Max patch via OSC) and lights (Art-Net), and the grins of the visitors before
 play on two walls of screens. SMILE is `apps/smile/` of Poser2: `launcher.py -app smile` from the Poser2 root starts it
-(`SmileMain` in `main.py`; its own arguments `-fs`, `-wc`, `-lm`, `-dw`, `-dh` follow the launcher's; the walls are two
-secondary windows of its render). Paths in this file are relative to `apps/smile/`; commands run from the Poser2 root with
+(`SmileMain` in `main.py`; its own arguments `-fs`, `-wc`, `-lm`, `-dw`, `-dh` follow the launcher's; the walls are windows 1
+and 2 of its render). Paths in this file are relative to `apps/smile/`; commands run from the Poser2 root with
 its `.venv` (`scripts/install.bat` there makes it, `apps/smile/scripts/install.bat` adds ComfyUI). Tests:
 `python -m unittest discover -s apps/smile/<package>/tests -t .` (`tests`, `face`, `comfy`, ..., `relay`).
 The app's packages are its own (`cam`, `face`, `comfy`, `render`, `player`, ...); `modules/gl`, `modules/settings`,
@@ -161,14 +161,12 @@ a generation that fails shows the capture as its result and nothing of the previ
 `render.show_camera` draws the raw camera on top and starts
 no new sequence while it is on (`Sequencer.blocked`). Shaders are
 `.frag` files named after their `.py`, beside it, and hot-reload while running.
-The two **walls** of the sphere are secondary windows of the same `WindowManager` (`render.window.secondary_list`, read at
-the start: the first entry is wall 0, screens 1-24, the second wall 1; `secondary_fullscreen` borderless on that monitor,
-forced on by `-fs` like the main window; a monitor that is missing gets a small window on the primary one, and back when
-it is plugged in). `SmileRender.walls` are two `WallRender`s (`player/wall_render.py`, no window of their own)
-composited in `update()` after the main screen, and `draw_secondary` blits the wall of the monitor's index in the list
-(poser2's pattern, hd_trio). The secondary windows share the main context (textures yes, FBOs and VAOs no), so the
-render loop makes the main context current at the start of every frame and before `deallocate` (`WindowManager._render_loop`;
-drawing a secondary leaves its context current; the same fix is in poser2).
+The two **walls** of the sphere are windows 1 and 2 of the same `WindowManager` (`windows.window_1` is wall 0, screens
+1-24, `window_2` wall 1; each with its own monitor and `fullscreen`, forced on by `-fs` like window 0; a window whose
+monitor is missing waits small on the primary one, and moves back when it is plugged in). `SmileRender.walls` are two
+`WallRender`s (`player/wall_render.py`, no window of their own) composited in `update()` after the main screen, a wall
+only while its window is shown, and `draw` blits a wall in its window. The windows and the render loop are described in
+`modules/gl/GL.md`.
 
 ## Credit
 

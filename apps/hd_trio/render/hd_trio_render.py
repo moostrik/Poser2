@@ -6,7 +6,7 @@ from typing import cast
 import numpy as np
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId, shaders
+from modules.gl import RenderBase, Shader, Style, clear_color, Texture, shaders
 from modules.board import HasFrames
 from modules.camera import RigCameraSettings, CameraHealthSettings
 from modules.flow import hold_tick
@@ -15,7 +15,7 @@ from modules import render
 from modules.utils import Rect, Point2f, Color
 
 from ..board import RenderBoard
-from ..settings import Layers, RenderSettings, ShowStage
+from ..settings import Layers, RenderSettings, ShowStage, WindowsSettings
 from ..render_stages import STAGES, StageLayer
 from ..intro_sequence import IntroSequencePlayer, SequenceDataProxy, FixedColorProxy
 from .layers import CenterGeometry, CenterCamLayer, CenterMaskLayer, CenterForegroundLayer, SourceSpace, Motion2DLayer, Bridge2DLayer, \
@@ -60,9 +60,9 @@ BORDER_WIDTH: float = 2.0       # px
 
 
 class HDTrioRender(RenderBase):
-    def __init__(self, board: RenderBoard, settings: RenderSettings,
+    def __init__(self, board: RenderBoard, settings: RenderSettings, windows: WindowsSettings,
                  cameras: Sequence[RigCameraSettings], camera_health: CameraHealthSettings, data_path: str = "") -> None:
-        super().__init__(settings.window)
+        super().__init__(windows.loop, windows.windows)
         self.max_players: int = settings.max_players
         self.num_cams: int = settings.num_cams
         self.settings: RenderSettings = settings
@@ -126,7 +126,7 @@ class HDTrioRender(RenderBase):
             render.SubdivisionRow(name='track',        columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
             render.SubdivisionRow(name='preview',      columns=self.max_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
         ]
-        self.subdivision: render.Subdivision = render.make_subdivision(self.subdivision_rows, settings.window.width, settings.window.height, False)
+        self.subdivision: render.Subdivision                # made in allocate, at window 0's size
 
         # The length of each tick, the flow's dt, held to twice the mean tick (`hold_tick`)
         self._last_tick: float = 0.0
@@ -140,11 +140,14 @@ class HDTrioRender(RenderBase):
         self._prev_stage: ShowStage | None = None
         self._active_stages: list[StageLayer] = []
 
-    def on_main_window_resize(self, width: int, height: int) -> None:
+    def on_window_resize(self, window: int, width: int, height: int) -> None:
+        if window != 0:
+            return
         self.subdivision = render.make_subdivision(self.subdivision_rows, width, height, True)
         self.allocate_window_renders()
 
     def allocate(self) -> None:
+        self.subdivision = render.make_subdivision(self.subdivision_rows, *self.window_size(0), True)
         for layer_type, cam_dict in self.L.items():
             for layer in cam_dict.values():
                 if layer_type in LARGE_LAYERS:
@@ -258,7 +261,14 @@ class HDTrioRender(RenderBase):
         for s in self._active_stages:
             s.update(progress)
 
-    def draw_main(self, width: int, height: int) -> None:
+    def draw(self, window: int, width: int, height: int) -> None:
+        """Window 0 the operator's panels, windows 1-3 the cameras'."""
+        if window == 0:
+            self._draw_panels(width, height)
+        else:
+            self._draw_camera(window - 1)
+
+    def _draw_panels(self, width: int, height: int) -> None:
         clear_color()
 
         Style.set_blend_mode(Style.BlendMode.ALPHA)
@@ -286,13 +296,9 @@ class HDTrioRender(RenderBase):
         self._border.use(Rect(0.0, 0.0, 1.0, 1.0), BORDER, BORDER_WIDTH / width, BORDER_WIDTH / height)
         Style.pop_style()
 
-    def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
+    def _draw_camera(self, cam_id: int) -> None:
+        """A camera's show, in its own window."""
         clear_color()
-
-        try:
-            cam_id: int = self.settings.window.secondary_list.index(MonitorId(monitor_id))
-        except ValueError:
-            return
 
         if cam_id >= self.num_cams:
             return

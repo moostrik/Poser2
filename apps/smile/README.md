@@ -90,12 +90,12 @@ not in git, safe to delete); the app's own logs are in Poser2's `logs\`.
 ### Settings panel
 * open http://localhost:667 in a browser (also reachable from other devices on the network, the log says the address)
 * presets live in `data\settings\`; `smile.json` loads at startup (the star in the panel picks the startup preset; it is kept in `data\settings\.ui_preset.json`)
-* monitors are numbered primary first, then left to right: SMILE uses the one in its preset (`render.window.monitor`) and the walls the two of `render.window.secondary_list` (the first is wall 1, screens 1-24; read at the start, so restart after changing it); a wall whose monitor is not connected opens in a small window on the primary one and moves to its monitor when that is plugged in
+* monitors are numbered primary first, then left to right: SMILE's window is `windows.window_0`, the walls `window_1` (wall 1, screens 1-24) and `window_2`, each with its `monitor`, `fullscreen` and `enabled`; a window whose monitor is not connected waits in a small window on the primary one and moves to its monitor when that is plugged in
 * **Walls** tab: `pool` (clips kept decoded in RAM, about 200 MB each), `recent` (the last recordings, always playing on every third of the sphere), `recycle_every`, `decoder` (the chip the clips are decoded on, read at the start); `fps`, `spread` and `trail` (live)
 
 ### Keys
-* in the SMILE window: Enter starts a sequence, F fullscreen, W borderless fullscreen, Esc quits (the panel's Exit button does the same); fullscreen hides the mouse pointer unless the panel's window setting `fullscreen_mouse` is on (a window always shows it)
-* in a wall window: Esc quits SMILE; the window setting `secondary_fullscreen` puts both walls borderless on their monitors or in a window
+* in the SMILE window: Enter starts a sequence, F fullscreen (borderless, the size of its monitor), Esc quits (the panel's Exit button does the same); fullscreen hides the mouse pointer unless `windows.loop.fullscreen_mouse` is on (a window always shows it)
+* in a wall window: Esc quits SMILE, F toggles that wall's fullscreen
 
 ### Pieces on their own
 * ```apps\smile\scripts\start_comfy.bat```: only ComfyUI, in this window (`--enable-manager` for the ComfyUI-Manager); the launcher does not start it, so start it first when running SMILE from VSCode
@@ -140,7 +140,7 @@ rig.
 7. **Light ring at the end of a visitor** (open): stays full red into the bloom, no dip
 8. **Music** (open): two clips that start at the same moment send two `/bang`s, each with its cell; Max plays two laughs, each from its own screen
 9. **A failed visitor** (open): a manual start (Enter) with nobody in the image fails in ComfyUI: flash, the camera frame as the result, bloom, back to the camera
-10. **Both wall monitors connected** (open): both walls borderless on their own screens, wall 1 (screens 1-24) on the first of `secondary_list`; on the dev PC each runs in a small window on the primary monitor (log: `Monitor slot 1 not available at startup, placing in fallback`)
+10. **Both wall monitors connected** (open): both walls borderless on their own screens, wall 1 (screens 1-24) in `windows.window_1`; on the dev PC a wall whose monitor is missing runs in a small window on the primary monitor
 11. **Packet size** (open): the log line at start says `packet size 8228` or more; with 1500, watch `dropped_frames`
 12. **Startup after a reboot** (open): everything comes up by itself through the shortcut, SMILE waits for ComfyUI with its status line
 13. **Network stays up for a day** (open): in the System log the adapter driver (`aqnic650`) reports `Network link is lost` only at boot, and `Microsoft-Windows-NCSI/Operational` has no `ArpProbeFailed`; the SMILE log has no `no complete frame for 5 s`

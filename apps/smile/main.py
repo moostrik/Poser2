@@ -21,7 +21,6 @@ from .player import Player, online_cell_mode
 from . import sphere
 from modules.settings import presets
 from modules.panel import PanelServer
-from modules.gl import FullscreenMode
 from .settings import Settings
 from argparse import ArgumentParser, Namespace
 from enum import Enum
@@ -80,15 +79,15 @@ class SmileMain():
             self.settings.panel.browser = False  # launcher override; the preset cannot turn it back on
         if fullscreen:
             # the installation's start: borderless (exclusive fullscreen minimizes when a wall gets focus), the walls too
-            self.settings.render.window.fullscreen_mode = FullscreenMode.WINDOWED_FULLSCREEN
-            self.settings.render.window.secondary_fullscreen = True
+            for window in self.settings.windows.windows:
+                window.fullscreen = True
         self.settings.initialize()
         self.panel_server = PanelServer(self.settings, self.settings.panel, on_exit=self.stop)
 
         self.sequencer: Sequencer = Sequencer(self.settings.sequence)
         # the generator fills the grin player with the grin frames, the render plays them on its own clock
         self.grin_player: GrinPlayer = GrinPlayer(self.settings.sequence)
-        self.render: SmileRender = SmileRender(self.settings.render, self.settings.walls, self.sequencer, self.grin_player, self.width, self.height)
+        self.render: SmileRender = SmileRender(self.settings.render, self.settings.windows, self.settings.walls, self.sequencer, self.grin_player, self.width, self.height)
         # the clip player of the sphere's walls: one pool for the 48 cells of the render's two walls
         self.clip_player: Player = Player(self.settings.walls, self.render.walls, self.settings.render)
         self.generator: Generator = Generator(self.settings.generator, self.grin_player)
@@ -158,10 +157,10 @@ class SmileMain():
         # last: the render's frames drive the sequencer, which drives everything else; the launcher runs it after start()
         self.render.add_exit_callback(self.stop)
         self.sequencer.add_message_callback(self.sequence_callback)
-        if self.settings.render.window.secondary_list:
+        if any(window.enabled for window in self.settings.windows.windows[1:]):
             self.clip_player.start()
         else:
-            logger.info('No wall monitors in the preset (render.window.secondary_list): the clip player stays off')
+            logger.info('No wall window shown in the preset (windows.window_1, window_2): the clip player stays off')
 
         self.is_running = True
 

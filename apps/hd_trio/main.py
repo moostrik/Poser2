@@ -16,7 +16,7 @@ from modules.pose.pipeline import Domain, PosePipeline
 from modules.inference import pose, segmentation, person, BatchUploader, CameraSync, CropExtractor, \
     frame_poses, has_points
 from modules.session import Session, SessionSettings, SequencerState
-from modules.gl import WindowSettings
+from modules.gl import WindowManagerSettings
 
 from .board import RenderBoard
 from .pose.pipeline import pipeline_spec
@@ -179,9 +179,9 @@ class HDTrioMain:
         self.camera_health = CameraHealth(self.settings.camera.cameras, self.settings.camera.camera_health)
 
         # RENDER
-        self.render = HDTrioRender(self.board, self.settings.render, self.settings.camera.cameras,
+        self.render = HDTrioRender(self.board, self.settings.render, self.settings.windows, self.settings.camera.cameras,
                                    self.settings.camera.camera_health, data_path=DATA_PATH)
-        self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
+        self.settings.windows.loop.bind(WindowManagerSettings.avg_fps, self._on_render_fps)
         self.render.add_update_callback(self.camera_health.update)
         self.render.add_update_callback(self._update_drops)
         self.render.add_update_callback(self.sequencer.update)
@@ -253,7 +253,7 @@ class HDTrioMain:
 
         self.panel_server.stop()
         self.settings.render.intro_sequence.unbind(IntroSequenceSettings.arm_record, self._on_arm_record)
-        self.settings.render.window.unbind(WindowSettings.avg_fps, self._on_render_fps)
+        self.settings.windows.loop.unbind(WindowManagerSettings.avg_fps, self._on_render_fps)
         self.sequencer.stop()
 
         self.render.stop()

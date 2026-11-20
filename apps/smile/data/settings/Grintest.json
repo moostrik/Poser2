@@ -149,18 +149,41 @@
     "trail": 0.99,
     "loop_trail": 0.8,
     "fade_blur": 0.9,
-    "bloom_amount": 0.6,
-    "window": {
+    "bloom_amount": 0.6
+  },
+  "windows": {
+    "loop": {
       "title": "SMILE",
       "v_sync": true,
+      "v_sync_window": 0,
+      "fullscreen_mouse": false
+    },
+    "window_0": {
+      "enabled": true,
       "monitor": "M0",
+      "fullscreen": false,
       "x": 958,
       "y": 760,
       "width": 638,
-      "height": 1000,
-      "secondary_list": [],
-      "secondary_fullscreen": false,
-      "fullscreen_mode": "WINDOWED"
+      "height": 1000
+    },
+    "window_1": {
+      "enabled": false,
+      "monitor": "M0",
+      "fullscreen": false,
+      "x": 100,
+      "y": 100,
+      "width": 1920,
+      "height": 1080
+    },
+    "window_2": {
+      "enabled": false,
+      "monitor": "M0",
+      "fullscreen": false,
+      "x": 100,
+      "y": 100,
+      "width": 1920,
+      "height": 1080
     }
   },
   "audio": {

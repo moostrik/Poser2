@@ -166,7 +166,7 @@ class LowFlowMain:
         self.camera_health = CameraHealth(self.settings.camera.cameras, self.settings.camera.camera_health)
 
         # RENDER
-        self.render = LowFlowRender(self.board, self.settings.render, self.settings.screen_recorder, f'{DATA_PATH}/screen_recordings',
+        self.render = LowFlowRender(self.board, self.settings.render, self.settings.windows, self.settings.screen_recorder, f'{DATA_PATH}/screen_recordings',
                                             num_cams=len(self.cameras), max_players=max_players)
         self.render.add_exit_callback(self.stop)
         self.render.add_update_callback(self.camera_health.update)

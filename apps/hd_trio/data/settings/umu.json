@@ -546,47 +546,47 @@
     },
     "fluid": {
       "blend_mode": "ADD",
-        "profile": false,
-        "width": 1088,
-        "height": 1920,
-        "time_step": "MEASURED",
-        "fixed_fps": 60.0,
-        "fps_smoothing": 1.0,
-        "speed": 0.5,
-        "velocity": {
-          "gain":0.57,
-          "self_advection": 0.2,
-          "fade_time": 31.77,
-          "dampen_threshold": 14.13,
-          "dampen_time": 3.0,
-          "vorticity": 0.0,
-          "vorticity_radius": 9.0,
-          "viscosity": 0.0,
-          "viscosity_iter": 20
-        },
-        "density": {
-          "gain":1.0,
-          "speed_offset": 0.1,
-          "fade_time": 18.0,
-          "dampen_threshold": 1.02,
-          "dampen_time": 3.63,
-          "wall": "OPEN"
-        },
-        "temperature": {
-          "gain":0.0,
-          "speed_offset": 0.0,
-          "fade_time": 3.0,
-          "buoyancy": 0.0,
-          "sink": 0.0,
-          "ambient": 0.2,
-          "wall": "CLOSED"
-        },
-        "pressure": {
-          "speed": 0.0,
-          "fade_time": 8.0,
-          "iterations": 40,
-          "wall": "OPEN"
-        }
+      "profile": false,
+      "width": 1088,
+      "height": 1920,
+      "time_step": "MEASURED",
+      "fixed_fps": 60.0,
+      "fps_smoothing": 1.0,
+      "speed": 0.5,
+      "velocity": {
+        "gain": 0.57,
+        "self_advection": 0.2,
+        "fade_time": 31.77,
+        "dampen_threshold": 14.13,
+        "dampen_time": 3.0,
+        "vorticity": 0.0,
+        "vorticity_radius": 9.0,
+        "viscosity": 0.0,
+        "viscosity_iter": 20
+      },
+      "density": {
+        "gain": 1.0,
+        "speed_offset": 0.1,
+        "fade_time": 18.0,
+        "dampen_threshold": 1.02,
+        "dampen_time": 3.63,
+        "wall": "OPEN"
+      },
+      "temperature": {
+        "gain": 0.0,
+        "speed_offset": 0.0,
+        "fade_time": 3.0,
+        "buoyancy": 0.0,
+        "sink": 0.0,
+        "ambient": 0.2,
+        "wall": "CLOSED"
+      },
+      "pressure": {
+        "speed": 0.0,
+        "fade_time": 8.0,
+        "iterations": 40,
+        "wall": "OPEN"
+      }
     },
     "colors": {
       "player_0": {
@@ -661,22 +661,50 @@
         "b": 0.5,
         "a": 1.0
       }
-    },
-    "window": {
+    }
+  },
+  "windows": {
+    "loop": {
       "title": "Poser",
       "v_sync": false,
+      "v_sync_window": 0,
+      "fullscreen_mouse": false
+    },
+    "window_0": {
+      "enabled": true,
       "monitor": "M0",
+      "fullscreen": false,
       "x": 101,
       "y": 31,
       "width": 1080,
-      "height": 1000,
-      "secondary_list": [
-        "M3",
-        "M2",
-        "M1"
-      ],
-      "secondary_fullscreen": true,
-      "fullscreen_mode": "WINDOWED"
+      "height": 1000
+    },
+    "window_1": {
+      "enabled": true,
+      "monitor": "M3",
+      "fullscreen": true,
+      "x": 100,
+      "y": 100,
+      "width": 960,
+      "height": 540
+    },
+    "window_2": {
+      "enabled": true,
+      "monitor": "M2",
+      "fullscreen": true,
+      "x": 100,
+      "y": 100,
+      "width": 1920,
+      "height": 1080
+    },
+    "window_3": {
+      "enabled": true,
+      "monitor": "M1",
+      "fullscreen": true,
+      "x": 100,
+      "y": 100,
+      "width": 1080,
+      "height": 1920
     }
   },
   "panel": {

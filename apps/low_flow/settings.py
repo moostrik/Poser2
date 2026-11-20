@@ -22,7 +22,7 @@ from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import OnePerCamTrackerSettings, TrackerFrameSourceSettings
 from modules.pose import nodes, window
 from modules import inference
-from modules.gl import WindowSettings
+from modules.gl import WindowManagerSettings, WindowSettings
 from modules.video import ScreenRecorderSettings
 
 
@@ -267,7 +267,6 @@ class RenderSettings(BaseSettings):
     # the display
     time_series: Group[render.TimeSeriesLayerSettings] = Group(render.TimeSeriesLayerSettings)
     colors : Group[render.ColorSettings]         = Group(render.ColorSettings)
-    window : Group[WindowSettings]               = Group(WindowSettings)
 
 
 class CadenceSettings(BaseSettings):
@@ -289,6 +288,15 @@ class CadenceSettings(BaseSettings):
                                           description="Pose model results dropped before the stages after it took them")
 
 
+class WindowsSettings(BaseSettings):
+    """The render's window"""
+    loop    : Group[WindowManagerSettings] = Group(WindowManagerSettings)
+    window_0: Group[WindowSettings]        = Group(WindowSettings)
+
+    @property
+    def windows(self) -> list[WindowSettings]:
+        return [self.window_0]
+
 # ---------------------------------------------------------------------------
 #  Root settings
 # ---------------------------------------------------------------------------
@@ -302,6 +310,7 @@ class Settings(BaseSettings):
     cadence: Group[CadenceSettings] = Group(CadenceSettings)
     pose  : Group[PoseGroup]      = Group(PoseGroup, share=[max_players, input_fps.as_('frequency')])
     render: Group[RenderSettings] = Group(RenderSettings, share=[input_fps])
+    windows: Group[WindowsSettings] = Group(WindowsSettings)
     screen_recorder: Group[ScreenRecorderSettings] = Group(ScreenRecorderSettings)
     inout : Group[InOutGroup]     = Group(InOutGroup)
     panel : Group[PanelSettings]  = Group(PanelSettings)

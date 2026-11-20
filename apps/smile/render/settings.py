@@ -5,7 +5,6 @@ import pytweening as easing
 
 from ..credit import LINE as CREDIT_LINE, LINES as CREDIT_LINES, NAME as CREDIT_NAME, URL as CREDIT_URL
 from ..credit_scroll import DEFAULT_GAP_PX as CREDIT_SCROLL_GAP, DEFAULT_ROWS as CREDIT_SCROLL_ROWS
-from modules.gl import WindowSettings
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.utils import Color
 from modules.video import Hardware
@@ -68,7 +67,6 @@ class FaceEffect(Enum):
 
 
 class RenderSettings(BaseSettings):
-    window:        Group[WindowSettings] = Group(WindowSettings)
     show_camera:   Field[bool]  = Field(False, description="Draw the raw camera image on top; no sequence starts", pinned=True)
     face_marks:    Field[bool]  = Field(False, description="Draw the faces' outlines, dots and reject reasons on the camera")
     face_color:    Field[Color] = Field(Color(0.2, 1.0, 0.2), description="Color of the chosen face's box and dots")

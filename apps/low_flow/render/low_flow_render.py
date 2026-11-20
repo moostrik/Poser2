@@ -14,7 +14,7 @@ from modules import render
 from modules.utils import FPS, Color, Rect, Point2f
 
 from ..board import RenderBoard
-from ..settings import PoseFrame, RenderSettings
+from ..settings import PoseFrame, RenderSettings, WindowsSettings
 from .layers import InferenceFrameMonitorLayer, ViewInput, ViewOutput, ViewLayer, PoseMonitorCompositor
 from .chain import ChainLayers, Size, TICK_LAYERS, INFERENCE_FRAME_LAYERS, MONITORS, POSE_SHAPES, shown, size_of, layers_of, shape_of
 
@@ -27,10 +27,10 @@ BORDER_WIDTH: float = 2.0       # px
 
 
 class LowFlowRender(RenderBase):
-    def __init__(self, board: RenderBoard, settings: RenderSettings, recorder_settings: ScreenRecorderSettings, screen_recordings: str,
+    def __init__(self, board: RenderBoard, settings: RenderSettings, windows: WindowsSettings, recorder_settings: ScreenRecorderSettings, screen_recordings: str,
                  num_cams: int = 1, max_players: int = 1) -> None:
         """`recorder_settings` the screen recorder's, `screen_recordings` the folder its recordings go to."""
-        super().__init__(settings.window)
+        super().__init__(windows.loop, windows.windows)
         self.max_players: int = max_players
         self.num_cams: int = num_cams
         self.settings: RenderSettings = settings
@@ -68,9 +68,9 @@ class LowFlowRender(RenderBase):
         self.L[ChainLayers.time_series][0] = render.TimeSeriesLayer(self.board, settings.time_series)      # the board's series, one for all cameras
 
         # Split view: the left and right panels side by side or stacked, whichever shows what they hold larger
-        self._window_size: tuple[int, int] = (settings.window.width, settings.window.height)
+        self._window_size: tuple[int, int]                  # window 0's, from allocate on
         self._panel_aspect_ratios: list[float] = self._read_panel_aspect_ratios()
-        self.subdivision: render.Subdivision = self._make_layout()
+        self.subdivision: render.Subdivision                # made in allocate, at window 0's size
 
         # The length of each tick, the flow's dt, held to twice the mean tick (`hold_tick`)
         self._last_tick: float = 0.0
@@ -124,12 +124,14 @@ class LowFlowRender(RenderBase):
             self.subdivision = self._make_layout()
             self.allocate_window_renders()
 
-    def on_main_window_resize(self, width: int, height: int) -> None:
+    def on_window_resize(self, window: int, width: int, height: int) -> None:
         self._window_size = (width, height)
         self.subdivision = self._make_layout()
         self.allocate_window_renders()
 
     def allocate(self) -> None:
+        self._window_size = self.window_size(0)
+        self.subdivision = self._make_layout()
         self._view_size = (self.settings.view.width, self.settings.view.height)
         for layer_type, cam_dict in self.L.items():
             for layer in cam_dict.values():
@@ -319,7 +321,7 @@ class LowFlowRender(RenderBase):
 
     # ========== Drawing ==========
 
-    def draw_main(self, width: int, height: int) -> None:
+    def draw(self, window: int, width: int, height: int) -> None:
         if self.screen_recording.playing:
             self._draw_screen_recording(width, height)      # the held take over the main window, the show waiting
             return
@@ -348,9 +350,6 @@ class LowFlowRender(RenderBase):
         debug_rect: Rect = self.subdivision.get_rect('panels', 1)
         self._draw_fit(self._debug_layers, debug_rect.x, height - debug_rect.y - debug_rect.height, debug_rect.width, debug_rect.height,
                        True, debug=True)
-
-    def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
-        self._draw_show(width, height)
 
     def _draw_show(self, width: int, height: int) -> None:
         """The show: the main panel's layers in order, each fit to `width` × `height` at its own shape."""

@@ -16,7 +16,7 @@ from modules import render
 from ..board import RenderBoard
 from ..light import FIXTURE_PROJECTION_RPM
 from ..pose import PlayheadOffset, dummy_id
-from ..settings import Layers, RenderSettings, PlayheadFeatureSelect, CameraView, Layout, Stage
+from ..settings import Layers, RenderSettings, PlayheadFeatureSelect, CameraView, Layout, Stage, WindowsSettings
 from .layers import AzimuthOverlayLayer, BeamLightSimulationLayer, LightSimulationLayer, PoseFigureLayer
 from .pose_slots import POSE_SLOTS, pose_slots
 
@@ -42,11 +42,11 @@ _SWITCHED_ROWS: dict[str, tuple[Layers, ...]] = {
 
 
 class WhiteSpaceRender(RenderBase):
-    def __init__(self, board: RenderBoard, settings: RenderSettings,
+    def __init__(self, board: RenderBoard, settings: RenderSettings, windows: WindowsSettings,
                  tracker: PanoramicTrackerSettings,
                  cameras: Sequence[RigCameraSettings], camera_health: CameraHealthSettings,
                  angle_extractor: nodes.AngleExtractorSettings) -> None:
-        super().__init__(settings.window)
+        super().__init__(windows.loop, windows.windows)
         self.max_players: int = settings.max_players
         self.num_cams: int = settings.num_cams
         self.dummy_id: int = dummy_id(self.max_players)
@@ -118,11 +118,8 @@ class WhiteSpaceRender(RenderBase):
         self.L[Layers.pose_figures][0]          = PoseFigureLayer(board, settings.colors, angle_extractor)
 
         self.subdivision_rows: list[render.SubdivisionRow] = self._build_rows()
-        self._window_size: tuple[int, int] = (settings.window.width, settings.window.height)
-        self._align_center: bool = False
-        self.subdivision: render.Subdivision =render.make_subdivision(
-            self.subdivision_rows, *self._window_size, self._align_center
-        )
+        self._window_size: tuple[int, int]                  # window 0's, from allocate on
+        self.subdivision: render.Subdivision                # made in allocate, at window 0's size
 
         # The strip's height follows the focus depth: a nearer cylinder is seen over a narrower
         # band of elevation from the center, so dragging this reshapes the row — and reshaping means
@@ -194,18 +191,17 @@ class WhiteSpaceRender(RenderBase):
 
     def _rebuild_layout(self) -> None:
         self.subdivision_rows = self._build_rows()
-        self.subdivision = render.make_subdivision(
-            self.subdivision_rows, *self._window_size, self._align_center
-        )
+        self.subdivision = render.make_subdivision(self.subdivision_rows, *self._window_size, True)
         self.allocate_window_renders()
 
-    def on_main_window_resize(self, width: int, height: int) -> None:
+    def on_window_resize(self, window: int, width: int, height: int) -> None:
         self._window_size = (width, height)
-        self._align_center = True
         self.subdivision = render.make_subdivision(self.subdivision_rows, width, height, True)
         self.allocate_window_renders()
 
     def allocate(self) -> None:
+        self._window_size = self.window_size(0)
+        self.subdivision = render.make_subdivision(self.subdivision_rows, *self._window_size, True)
         for layer_type, cam_dict in self.L.items():
             for layer in cam_dict.values():
                 layer.allocate(1080, 1920, GL_RGBA16F)
@@ -274,7 +270,7 @@ class WhiteSpaceRender(RenderBase):
             int(rect.height),
         )
 
-    def draw_main(self, width: int, height: int) -> None:
+    def draw(self, window: int, width: int, height: int) -> None:
         clear_color(*_BACKGROUND)
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
@@ -331,6 +327,3 @@ class WhiteSpaceRender(RenderBase):
         self.L[Layers.data_time][track_id].draw()
         self.L[Layers.data_playhead_W][track_id].draw()
         self.L[Layers.data_playhead_F][track_id].draw()
-
-    def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
-        pass

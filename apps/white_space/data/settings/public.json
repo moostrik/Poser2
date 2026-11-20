@@ -145,18 +145,23 @@
         "b": 0.5,
         "a": 1.0
       }
-    },
-    "window": {
+    }
+  },
+  "windows": {
+    "loop": {
       "title": "Poser",
       "v_sync": true,
+      "v_sync_window": 0,
+      "fullscreen_mouse": false
+    },
+    "window_0": {
+      "enabled": true,
       "monitor": "M0",
+      "fullscreen": false,
       "x": 1,
       "y": 31,
       "width": 1278,
-      "height": 1000,
-      "secondary_list": [],
-      "secondary_fullscreen": true,
-      "fullscreen_mode": "WINDOWED"
+      "height": 1000
     }
   },
   "session": {

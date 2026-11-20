@@ -807,19 +807,32 @@
         "b": 0.5,
         "a": 1.0
       }
-    },
-    "window": {
+    }
+  },
+  "windows": {
+    "loop": {
       "title": "Poser",
       "v_sync": true,
+      "v_sync_window": 0,
+      "fullscreen_mouse": false
+    },
+    "window_0": {
+      "enabled": true,
       "monitor": "M1",
+      "fullscreen": true,
       "x": 569,
       "y": 528,
       "width": 1277,
-      "height": 1385,
-      "secondary_list": [],
-      "secondary_fullscreen": false,
-      "fullscreen_mode": "WINDOWED_FULLSCREEN",
-      "fullscreen_mouse": false
+      "height": 1385
+    },
+    "window_1": {
+      "enabled": false,
+      "monitor": "M0",
+      "fullscreen": false,
+      "x": 100,
+      "y": 100,
+      "width": 1920,
+      "height": 1080
     }
   },
   "screen_recorder": {

@@ -9,8 +9,9 @@ from .screen_grab import ScreenGrab
 from ..comfy.messages import GeneratorMessage, GeneratorState
 from ..face import FaceObservations
 from .. import sphere
-from modules.gl import Fbo, MonitorId, RenderBase, Shader, Style, Texture, clear_color, fit
+from modules.gl import Fbo, RenderBase, Shader, Style, Texture, clear_color, fit
 from ..player import WallRender, WallsSettings
+from ..settings import WindowsSettings
 from .inputs import Inputs
 from .layers import (BloomLayer, CameraLayer, CreditLayer, CreditView, DiffusionLayer, FlashLayer, LayerBase, RevealLayer,
                      StatusLayer, caption_shown, copy, fade_step, new_line_due)
@@ -27,12 +28,13 @@ class SmileRender(RenderBase):
     stage of the current sequence state render the layers, and fits its output in the window.
     The grin frames come from the grin player, which is asked every frame for the one that is due.
     The two walls of the sphere (`walls`, `WallRender`) are composited after it, each shown in the
-    secondary window of its monitor (`window.secondary_list`: the first entry is wall 0, screens 1-24);
+    window of its own: window 1 is wall 0, screens 1-24, window 2 wall 1;
     the online cell of one of them shows the output without the QR code during an online turn.
-    Keys: Enter starts a sequence; f fullscreen, w borderless, Esc quit (the window manager)."""
+    Keys: Enter starts a sequence; F fullscreen, Esc quit (the window manager)."""
 
-    def __init__(self, settings: RenderSettings, walls_settings: WallsSettings, sequencer: Sequencer, grin_player: GrinPlayer, width: int, height: int) -> None:
-        super().__init__(settings.window)
+    def __init__(self, settings: RenderSettings, windows: WindowsSettings, walls_settings: WallsSettings, sequencer: Sequencer, grin_player: GrinPlayer, width: int, height: int) -> None:
+        super().__init__(windows.loop, windows.windows)
+        self.windows: WindowsSettings = windows
         self.settings: RenderSettings = settings
         self.sequencer: Sequencer = sequencer
         self.grin_player: GrinPlayer = grin_player
@@ -74,7 +76,7 @@ class SmileRender(RenderBase):
         self.walls: list[WallRender] = [WallRender(settings, walls_settings, [str(i) for i in range(sphere.CELLS)]) for _ in range(sphere.WALLS)]
         self._online: tuple[int, int, str, str] | None = None
 
-        self.window_manager.add_keyboard_callback(self._on_key)
+        self.window_manager.input.add_key_callback(self._on_key)
 
     # RENDER THREAD
     def allocate(self) -> None:
@@ -153,15 +155,15 @@ class SmileRender(RenderBase):
 
     def _update_walls(self) -> None:
         """The walls after the main screen, so the online cell shows this frame; only the walls that have a
-        window (`secondary_list`) are composited."""
+        window shown are composited."""
         online: tuple[int, int, str, str] | None = self._online
-        shown: int = len(self.settings.window.secondary_list)
+        windows = self.windows.windows
         for index, wall in enumerate(self.walls):
             if online is not None and online[0] == index:
                 wall.set_online(str(online[1]), online[2], self._cell_view if online[2] == 'screen' else None, online[3])
             else:
                 wall.set_online(None)
-            if index < shown:
+            if index + 1 < len(windows) and windows[index + 1].enabled:
                 wall.update()
 
     def _play_grin(self) -> None:
@@ -177,25 +179,19 @@ class SmileRender(RenderBase):
         if started or (frame is not None and self.grin_player.playing):
             self.sequencer.set_diffusion_progress(self.grin_player.progress)
 
-    def draw_main(self, width: int, height: int) -> None:
+    def draw(self, window: int, width: int, height: int) -> None:
+        """Window 0 the output, windows 1-2 the walls."""
         clear_color(0, 0, 0, 1)
         Style.set_blend_mode(Style.BlendMode.DISABLED)
+        if window != 0:
+            if window - 1 < len(self.walls):
+                self._draw_fit(self.walls[window - 1].texture, width, height)
+            return
         self._draw_fit(self._output, width, height)
         if self.settings.show_camera and self.inputs.camera.allocated:
             self._draw_fit(self.inputs.camera, width, height)
 
-    def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
-        """The wall of this monitor: the i-th entry of `secondary_list` is wall i (poser2's pattern)."""
-        clear_color(0, 0, 0, 1)
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
-        try:
-            index: int = list(self.settings.window.secondary_list).index(MonitorId(monitor_id))
-        except ValueError:
-            return
-        if index < len(self.walls):
-            self._draw_fit(self.walls[index].texture, width, height)
-
-    def on_main_window_resize(self, width: int, height: int) -> None:
+    def on_window_resize(self, window: int, width: int, height: int) -> None:
         pass
 
     @staticmethod
@@ -206,7 +202,7 @@ class SmileRender(RenderBase):
         glViewport(int(x), int(y), int(w), int(h))
         texture.draw()
 
-    def _on_key(self, key: int, action: int, mods: int) -> None:
+    def _on_key(self, window: int, key: int, action: int, mods: int) -> None:
         if action == glfw.PRESS and key in (glfw.KEY_ENTER, glfw.KEY_KP_ENTER):
             self.sequencer.start_sequence()
 

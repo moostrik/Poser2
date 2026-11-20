@@ -1,5 +1,5 @@
-"""Tests for the window manager's survival of what its event callbacks raise: a monitor that is
-unplugged must not end the app (glfw mocked: no window, no GL)."""
+"""Tests for the window loop: its end from another thread, its survival of what its event callbacks raise, and a
+monitor's hot-plug at the top of the next frame (glfw mocked: no window, no GL)."""
 
 import ctypes
 import sys
@@ -8,7 +8,7 @@ import time
 import unittest
 from unittest import mock
 
-from modules.gl import FullscreenMode, Monitor, WindowManager, WindowSettings
+from modules.gl import Monitor, WindowManager, WindowManagerSettings, WindowSettings
 
 MODULE = sys.modules['modules.gl.window_manager']     # the module: the package exports the class under its name
 LOGGER: str = 'modules.gl.window_manager'
@@ -18,18 +18,32 @@ DISCONNECTED: int = 0x00040002
 class TestWindowManager(unittest.TestCase):
     def setUp(self):
         self.renderer = mock.Mock()
-        self.manager = WindowManager(self.renderer, WindowSettings())
+        self.manager = WindowManager(self.renderer, WindowManagerSettings(), [WindowSettings(), WindowSettings()])
         patcher = mock.patch.object(MODULE, 'glfw')
         self.glfw = patcher.start()
         self.addCleanup(patcher.stop)
         self.glfw.DISCONNECTED = DISCONNECTED
+        self.glfw.window_should_close.return_value = False
+
+    def with_windows(self) -> list[mock.Mock]:
+        windows = [mock.Mock(index=i, shown=True) for i in range(2)]
+        for window in windows:
+            window.framebuffer_size.return_value = (100, 100)
+        self.manager._windows = windows
+        self.manager._sizes = [(100, 100), (100, 100)]
+        return windows
 
     def run_loop(self, frames: int) -> None:
         """The render loop for that many frames, without a window: update and draw do nothing."""
-        self.manager._main_window = object()
-        self.glfw.window_should_close.side_effect = [False] * frames + [True]
-        with mock.patch.object(MODULE, 'Context'), mock.patch.object(self.manager, '_update'), \
-                mock.patch.object(self.manager, '_draw_main_window'):
+        if not self.manager._windows:
+            self.with_windows()
+        count: list[int] = [0]
+
+        def should_close(_handle) -> bool:
+            count[0] += 1
+            return count[0] > frames * len(self.manager._windows)
+        self.glfw.window_should_close.side_effect = should_close
+        with mock.patch.object(self.manager, '_update'), mock.patch.object(self.manager, '_draw'):
             self.manager._render_loop()
 
     def test_stop_from_another_thread_ends_the_loop(self):
@@ -40,11 +54,11 @@ class TestWindowManager(unittest.TestCase):
         stopper = threading.Timer(0.05, self.manager.stop)
 
         def setup() -> None:
-            self.manager._main_window = object()
+            self.with_windows()
             stopper.start()
 
-        with mock.patch.object(MODULE, 'Context'), mock.patch.object(self.manager, '_setup', side_effect=setup), \
-                mock.patch.object(self.manager, '_update'), mock.patch.object(self.manager, '_draw_main_window'):
+        with mock.patch.object(self.manager, '_setup', side_effect=setup), mock.patch.object(self.manager, '_update'), \
+                mock.patch.object(self.manager, '_draw'):
             self.manager.run()
         stopper.join(timeout=3.0)
         self.assertFalse(stopper.is_alive())          # stop() returned: it saw the loop end
@@ -61,71 +75,49 @@ class TestWindowManager(unittest.TestCase):
         self.assertEqual(self.glfw.poll_events.call_count, 3)
         self.renderer.deallocate.assert_called_once()
 
-    def test_an_exception_from_a_deferred_call_does_not_end_the_loop(self):
-        done: list[int] = []
-        self.manager._deferred.put(lambda: 1 / 0)
-        self.manager._deferred.put(lambda: done.append(1))
-        with self.assertLogs(LOGGER, 'ERROR'):
-            self.run_loop(2)
-        self.assertEqual(done, [1])                 # the calls after it still run
-        self.assertEqual(self.glfw.poll_events.call_count, 2)
-
-    def test_every_frame_starts_in_the_main_context(self):
-        # drawing a secondary window leaves its context current; the renderer's FBOs live in the main one
-        main, secondary = object(), object()
-        self.manager._main_window = main
-        self.manager._secondary_windows[1] = secondary
-        self.glfw.window_should_close.side_effect = [False, False, True]
-        self.glfw.get_framebuffer_size.return_value = (100, 100)
+    def test_every_frame_starts_in_window_0s_context(self):
+        # drawing a window leaves its context current; the renderer's objects live in window 0's
+        windows = self.with_windows()
         current: list[object] = []
-        self.glfw.make_context_current.side_effect = current.append
+        for window in windows:
+            window.make_current.side_effect = lambda window=window: current.append(window)
         self.renderer.update.side_effect = lambda: current.append(('update', current[-1]))
-        self.renderer.deallocate.side_effect = lambda: current.append(('deallocate', current[-1]))
-        with mock.patch.object(MODULE, 'Context'), mock.patch.object(MODULE, 'glBindFramebuffer'), \
-                mock.patch.object(MODULE, 'glViewport'), mock.patch.object(MODULE, 'glGetString', return_value=b'4.6'):
+        with mock.patch.object(self.manager, '_tick_windows'), mock.patch.object(MODULE, 'glBindFramebuffer'), \
+                mock.patch.object(MODULE, 'glViewport'):
+            count: list[int] = [0]
+            self.glfw.window_should_close.side_effect = lambda _h: (count.__setitem__(0, count[0] + 1), count[0] > 4)[1]
             self.manager._render_loop()
-        self.assertEqual([c for c in current if isinstance(c, tuple)], [('update', main), ('update', main), ('deallocate', main)])
-        self.assertIn(secondary, current)
+        self.assertEqual([c for c in current if isinstance(c, tuple)], [('update', windows[0])] * 2)
+        self.assertIn(windows[1], current)                                    # window 1 drawn and swapped
 
-    def test_the_mouse_is_hidden_in_fullscreen_unless_the_setting_shows_it(self):
-        glfw, settings = self.glfw, self.manager.settings
-        self.manager._main_window = window = object()
-        self.manager._fullscreen_mode = FullscreenMode.WINDOWED_FULLSCREEN
-        self.manager.apply_cursor()
-        glfw.set_input_mode.assert_called_with(window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
-        settings.fullscreen_mouse = True                 # the panel's switch: applied by the render loop
-        self.run_loop(1)
-        glfw.set_input_mode.assert_called_with(self.manager._main_window, glfw.CURSOR, glfw.CURSOR_NORMAL)
-        settings.fullscreen_mouse = False
-        self.manager._fullscreen_mode = FullscreenMode.WINDOWED      # a window always shows it
-        self.manager.apply_cursor()
-        glfw.set_input_mode.assert_called_with(self.manager._main_window, glfw.CURSOR, glfw.CURSOR_NORMAL)
-
-    def test_a_dragged_window_follows_the_monitor_under_its_center(self):
-        left = Monitor('left', 0, 0, 1920, 1080, ctypes.pointer(ctypes.c_int(1)))
-        right = Monitor('right', 1920, 0, 1920, 1080, ctypes.pointer(ctypes.c_int(2)))
-        self.manager._monitors = [left, right]
-        self.manager._monitor = left
-        self.glfw.get_window_size.return_value = (100, 100)
-        self.assertEqual(self.manager.fullscreen_mode, FullscreenMode.WINDOWED)
-        self.manager._window_pos_callback(object(), 1930, 20)
-        self.assertIs(self.manager._monitor, right)
-        self.assertEqual((self.manager.settings.x, self.manager.settings.y), (10, 20))
+    def test_the_v_sync_window_is_swapped_last(self):
+        windows = self.with_windows()
+        self.manager.settings.v_sync_window = 0
+        swapped: list[object] = []
+        self.glfw.swap_buffers.side_effect = swapped.append
+        with mock.patch.object(MODULE, 'glBindFramebuffer'), mock.patch.object(MODULE, 'glViewport'):
+            self.manager._draw()
+        self.assertEqual(swapped, [windows[1].handle, windows[0].handle])
 
     def test_a_hot_plug_is_handled_at_the_top_of_the_next_frame(self):
-        ours = ctypes.pointer(ctypes.c_int(1))
-        self.manager._monitor = Monitor('ours', 0, 0, 1920, 1080, ours)
-        connected: list[list[Monitor]] = [[Monitor('ours', 0, 0, 1920, 1080, ctypes.pointer(ours.contents))], []]
+        self.with_windows()
         with mock.patch.object(MODULE, 'Monitor') as monitor_class:
-            monitor_class.connected.side_effect = connected
-            self.manager._on_monitor_change(ours, DISCONNECTED)
+            monitor_class.connected.return_value = [Monitor('m', 0, 0, 1920, 1080, ctypes.pointer(ctypes.c_int(1)))]
+            self.manager._on_monitor_change(object(), DISCONNECTED)
             monitor_class.connected.assert_not_called()          # the callback only marks it
-            self.run_loop(1)                                      # still connected: a handle of its own, kept
-            self.assertIsNotNone(self.manager._monitor)
-            self.manager._on_monitor_change(ours, DISCONNECTED)
-            self.run_loop(1)                                      # gone: dropped
-        self.assertIsNone(self.manager._monitor)
-        self.assertEqual(monitor_class.connected.call_count, 2)
+            self.run_loop(1)
+            self.run_loop(1)
+        monitor_class.connected.assert_called_once()
+        self.assertEqual(self.manager.settings.connected, 'M0 m 1920×1080')
+
+    def test_f_toggles_the_fullscreen_of_the_window_with_focus_and_esc_closes(self):
+        F, ESCAPE, PRESS = 70, 256, 1
+        self.glfw.KEY_F, self.glfw.KEY_ESCAPE, self.glfw.PRESS = F, ESCAPE, PRESS
+        self.manager._on_key(1, F, PRESS, 0)
+        self.assertEqual([s.fullscreen for s in self.manager.window_settings], [False, True])
+        self.assertFalse(self.manager._close_request.is_set())
+        self.manager._on_key(0, ESCAPE, PRESS, 0)
+        self.assertTrue(self.manager._close_request.is_set())
 
 
 if __name__ == '__main__':

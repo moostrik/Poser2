@@ -196,19 +196,41 @@
     "credit_scroll_speed_2": 0.91,
     "credit_scroll_size": 512,
     "credit_scroll_gap": 256,
-    "credit_scroll_reverse": false,
-    "window": {
+    "credit_scroll_reverse": false
+  },
+  "windows": {
+    "loop": {
       "title": "SMILE",
       "v_sync": true,
+      "v_sync_window": 0,
+      "fullscreen_mouse": false
+    },
+    "window_0": {
+      "enabled": true,
       "monitor": "M0",
+      "fullscreen": true,
       "x": 1493,
       "y": 288,
       "width": 1438,
-      "height": 1541,
-      "secondary_list": [],
-      "secondary_fullscreen": false,
-      "fullscreen_mode": "WINDOWED_FULLSCREEN",
-      "fullscreen_mouse": false
+      "height": 1541
+    },
+    "window_1": {
+      "enabled": false,
+      "monitor": "M0",
+      "fullscreen": false,
+      "x": 100,
+      "y": 100,
+      "width": 1920,
+      "height": 1080
+    },
+    "window_2": {
+      "enabled": false,
+      "monitor": "M0",
+      "fullscreen": false,
+      "x": 100,
+      "y": 100,
+      "width": 1920,
+      "height": 1080
     }
   },
   "audio": {

@@ -2,7 +2,10 @@
 from .render_base import RenderBase
 from .shader import Shader, draw_quad
 from .compute_shader import ComputeShader
-from .window_manager import WindowManager, WindowSettings, FullscreenMode, MouseButton
+from .window_manager import WindowManager
+from .window_settings import WindowSettings, WindowManagerSettings
+from .window import Window
+from .window_input import WindowInput, MouseButton
 from .monitor import Monitor, MonitorId
 from . import style as Style
 from .context import Context, context

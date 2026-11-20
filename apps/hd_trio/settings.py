@@ -15,7 +15,7 @@ from modules.tracker import OnePerCamTrackerSettings, TrackerFrameSourceSettings
 from modules.pose import nodes, trackers, window, analytics, RecorderSettings as PoseRecorderSettings
 from modules import inference
 from modules.session import SessionSettings
-from modules.gl import Style, WindowSettings
+from modules.gl import Style, WindowManagerSettings, WindowSettings
 from .flow import GradientFlowSettings, Fluid2DSettings, bridge_2d
 from .sequencer import SequencerSettings
 
@@ -485,7 +485,6 @@ class RenderSettings(BaseSettings):
     bridge : Group[Bridge2DLayerSettings]     = Group(Bridge2DLayerSettings)
     fluid  : Group[Fluid2DLayerSettings]      = Group(Fluid2DLayerSettings)
     colors : Group[render.ColorSettings]      = Group(render.ColorSettings)
-    window : Group[WindowSettings]            = Group(WindowSettings)
 
 
 class CadenceSettings(BaseSettings):
@@ -504,6 +503,19 @@ class CadenceSettings(BaseSettings):
 #  Root settings
 # ---------------------------------------------------------------------------
 
+class WindowsSettings(BaseSettings):
+    """The render's windows: window 0 the operator's, windows 1-3 the cameras'"""
+    loop    : Group[WindowManagerSettings] = Group(WindowManagerSettings)
+    window_0: Group[WindowSettings]        = Group(WindowSettings)
+    window_1: Group[WindowSettings]        = Group(WindowSettings)
+    window_2: Group[WindowSettings]        = Group(WindowSettings)
+    window_3: Group[WindowSettings]        = Group(WindowSettings)
+
+    @property
+    def windows(self) -> list[WindowSettings]:
+        return [self.window_0, self.window_1, self.window_2, self.window_3]
+
+
 class Settings(BaseSettings):
     max_players: Field[int]   = Field(3, access=Field.INIT)
     num_cams   : Field[int]   = Field(3, access=Field.INIT, description="Number of cameras")
@@ -514,6 +526,7 @@ class Settings(BaseSettings):
     inout  : Group[InOutGroup]   = Group(InOutGroup)
     pose   : Group[PoseGroup]    = Group(PoseGroup, share=[max_players, input_fps.as_('frequency'), render_fps.as_('output_frequency')])
     render : Group[RenderSettings]  = Group(RenderSettings, share=[max_players, num_cams, input_fps])
+    windows: Group[WindowsSettings] = Group(WindowsSettings)
     panel : Group[PanelSettings] = Group(PanelSettings)
     session: Group[SessionGroup] = Group(SessionGroup, share=[num_cams, input_fps.as_('fps')])
     cadence: Group[CadenceSettings] = Group(CadenceSettings)

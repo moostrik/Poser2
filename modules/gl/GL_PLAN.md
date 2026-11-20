@@ -4,40 +4,6 @@ The window manager (`modules/gl/window_manager.py`) and its panel are rebuilt on
 keeping to GLFW's threading rules: one kind of window, set by its own settings, on the main thread. Research and
 sources: `window_systems_research.md`. Windows now, Linux kept possible.
 
-## B. One kind of window
-
-- B2. The settings, the renderer and the window manager, in one step and one commit (the half-way state, the old
-  manager on the new settings, is never used):
-  - `WindowSettings`, one window: `enabled` (shown), `monitor` (the one it is on), `fullscreen`, `x`, `y`,
-    `width`, `height` (the windowed place on that monitor).
-  - `WindowManagerSettings`, the loop: `v_sync`, `v_sync_window` (default 0), `fps_limit`, `fullscreen_mouse`,
-    `default_placement` (button), `avg_fps`, `min_fps`, `connected` (read: the monitors by id, name, resolution).
-  - Each app's root group `windows` holds `loop` and `window_0`, `window_1`, … (as `cam_0`, `cam_1`); the render
-    panel's `window` goes, in all five apps (built before the settings plan, which then leaves `windows` as it is).
-  - The windows per app: hd_trio windows 1–3 its cameras; smile windows 1–2 its walls, their count fixed at start;
-    deep_flow, low_flow, white_space window 0; deep_flow also a `window_1`, off, for its show.
-  - The renderer: `RenderBase` takes the `windows` group; `draw(window, width, height)` replaces `draw_main` and
-    `draw_secondary`. The window sizes are known in `allocate`; `on_window_resize(window, width, height)` comes
-    only on a change. The sizes guessed in `__init__` (deep_flow, low_flow, white_space, hd_trio) go.
-  - `FullscreenMode`, `secondary_list`, `secondary_fullscreen` go: `gl/__init__.py`, the five apps' settings and
-    renderers, `smile/main.py`, `smile_render.py`, tests.
-  - The 13 presets migrate, as whole trees: `secondary_list` entries become windows'
-    monitors, at today's windowed place (half the monitor, at +100).
-  - `Window` (`window.py`): one GLFW window with its `gl.Context` and settings. Every declared window is made at
-    start, window 0 first, the others sharing its objects. A window that is off is hidden, not destroyed, and not
-    drawn or swapped. A window whose monitor is missing waits small on the primary monitor, its settings untouched.
-  - Fullscreen is a borderless window the size of its monitor; the other monitors stay on. Closing any window
-    closes the app; F toggles the fullscreen of the window with focus; Esc closes.
-  - No callback calls GL: callbacks store or hand over; the loop makes a window's context current for its draw.
-  - `WindowInput` (`window_input.py`): the key, mouse and scroll callbacks, each told the window. A raising
-    callback is logged and the next one runs.
-  - The settings are read at the tick and only differences applied; no binds, no deferred queue (the button stays
-    a bind). A user's move or resize is written to the settings once at the tick, as applied.
-  - `WindowManager` keeps the loop: monitors, settings, update once, draw each shown window, swap the others, then
-    the `v_sync_window` last with v-sync, then events. `_contexts`, `_secondary_fallback`, `_main_window`, the
-    index lookups and the two placement paths go.
-  - Tests: a raising input callback; a setting change applied once; a drag written and not applied back.
-
 ## C. Frame pacing
 
 - C1. `fps_limit` (0 = off) when v-sync is off or every window is hidden (then 60 when it is 0): an absolute
