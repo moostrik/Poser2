@@ -8,7 +8,9 @@ import time
 import unittest
 from unittest import mock
 
-from modules.gl import Monitor, MonitorId, WindowManager, WindowManagerSettings, WindowSettings
+from modules.gl import WindowManagerSettings, WindowSettings
+from modules.gl.monitor import Monitor, MonitorId
+from modules.gl.window_manager import WindowManager
 from modules.settings import Group
 
 MODULE = sys.modules['modules.gl.window_manager']     # the module: the package exports the class under its name

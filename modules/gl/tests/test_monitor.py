@@ -6,7 +6,7 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
-from modules.gl import Monitor
+from modules.gl.monitor import Monitor
 
 MODULE = sys.modules['modules.gl.monitor']
 

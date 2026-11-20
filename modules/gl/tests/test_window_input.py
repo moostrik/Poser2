@@ -4,7 +4,7 @@ import sys
 import unittest
 from unittest import mock
 
-from modules.gl import WindowInput
+from modules.gl.window_input import WindowInput
 
 MODULE = sys.modules['modules.gl.window_input']
 LOGGER: str = 'modules.gl.window_input'

@@ -5,7 +5,9 @@ import sys
 import unittest
 from unittest import mock
 
-from modules.gl import Monitor, MonitorId, Window, WindowSettings
+from modules.gl import WindowSettings
+from modules.gl.monitor import Monitor, MonitorId
+from modules.gl.window import Window
 
 MODULE = sys.modules['modules.gl.window']
 
