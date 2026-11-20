@@ -6,11 +6,11 @@ measurement; E and H from the package scan of the same day. The lines are in wor
 
 ## G. Fewer GL calls
 
-Standard GL 4.5, not from Cinder. Each PyOpenGL call holds the GIL on the main thread; how much that costs is not
-known yet.
+Standard GL 4.5, not from Cinder. Measured (G0, 2026-11-20, -sim, 20 s from 10 s): white_space makes 1000 GL calls a
+frame, 72 of them sampler units and 153 texture binds; deep_flow 2338, 509 sampler units and 608 binds. One PyOpenGL
+call costs 0.4 to 0.7 µs on the main thread, so all of them take about 0.4 ms (white_space) and 1.3 ms (deep_flow) a
+frame (deduction). G1 and G2 wait for the coordinator's call on whether that gain is worth their size.
 
-- G0. Measure: a counter of GL calls per frame and the time of one PyOpenGL call, on deep_flow and white_space -sim.
-  G1 and G2 go ahead only if the numbers show a gain worth their size; rectangles drawn one quad each are counted too.
 - G1. `layout(binding = N)` on samplers: no `glUniform1i` per texture, per pass, per frame. The one shader below
   `#version 420` (hd_trio's `temperature_bridge_shader.frag`, 410) is raised; `bind_texture*` of `Shader` and
   `ComputeShader` lose their `uniform_name`, and every caller with them. Check: `scripts/shader_check.py` and G0's
@@ -18,9 +18,6 @@ known yet.
 - G2. Direct state access: `glBindTextureUnit` for a texture's bind and `glTextureSubImage2D` for its upload; the CUDA
   upload in `tensor.py` from 6 calls to about 3, its `glGetError` behind the debug flag. Every caller of
   `Texture.bind`/`unbind` moves with it. Check: `scripts/shader_check.py` and G0's count.
-- G3. A debug context: GLFW's debug hint at window creation and a synchronous `glDebugMessageCallback` that logs the
-  failing call, behind a flag that is off by default (it stalls each call); the ctypes callback is kept so it is not
-  collected.
 
 ## H. The package held to the rules
 

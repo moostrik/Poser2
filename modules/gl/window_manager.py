@@ -12,6 +12,7 @@ import glfw
 if TYPE_CHECKING:
     from .render_base import RenderBase
 from modules.utils import FPS, PerformanceTimer, Waker
+from .gl_debug import enable_debug_output
 from .monitor import Monitor
 from .shader import Shader
 from .window import Window
@@ -118,6 +119,7 @@ class WindowManager:
         glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
         glfw.window_hint(glfw.DECORATED, glfw.TRUE)
         glfw.window_hint(glfw.RESIZABLE, glfw.TRUE)
+        glfw.window_hint(glfw.OPENGL_DEBUG_CONTEXT, glfw.TRUE if self.settings.gl_debug else glfw.FALSE)
 
         self._monitors = Monitor.connected()
         self._write_monitors()
@@ -141,6 +143,12 @@ class WindowManager:
         if not isinstance(version, bytes):
             raise RuntimeError("OpenGL context is not valid")
         logger.info("OpenGL version: %s", version.decode("utf-8"))
+        if self.settings.gl_debug:
+            for window in self._windows:             # debug output is each context's own
+                window.make_current()
+                enable_debug_output()
+            self._windows[0].make_current()
+            logger.warning("GL debug output on: each GL error is logged at its call, and every call is slower")
 
         for window in self._windows:
             window.apply(window.placement(self._monitors, self.settings.fullscreen_mouse))
