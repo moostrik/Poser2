@@ -27,7 +27,7 @@ in the child::
     interp = Group(InterpolatorSettings, share=[frequency.as_('input_frequency')])
 """
 
-from typing import TYPE_CHECKING, Generic, TypeVar, overload, Sequence
+from typing import TYPE_CHECKING, Any, Generic, Mapping, TypeVar, overload, Sequence
 
 from .field import Field, FieldAlias, Access
 
@@ -57,6 +57,10 @@ class Group(Generic[T]):
     tint : str, optional
         The child's panel's background, a CSS color, in place of its depth's
         grey; empty for the grey. A GUI hint.
+    defaults : mapping of field name to value, optional
+        The child's own fields' starting values in this place, in place of
+        their class defaults (a shared field takes the parent's value). The
+        field's own ``default``, which the panel shows, stays the class's.
     """
 
     def __init__(
@@ -67,11 +71,13 @@ class Group(Generic[T]):
         last: bool = False,
         description: str = "",
         tint: str = "",
+        defaults: Mapping[str, Any] | None = None,
     ):
         self.settings_type = settings_type
         self.last: bool = last
         self.description: str = description
         self.tint: str = tint
+        self.defaults: dict[str, Any] = dict(defaults) if defaults else {}
         self._share_refs: list[Field | FieldAlias] = list(share) if share else []
         self.share_map: dict[str, str] = {}  # parent_name → child_name
         self.name = ""
@@ -152,8 +158,8 @@ class Group(Generic[T]):
                 )
 
     def build_share_kwargs(self, owner: 'BaseSettings') -> dict:
-        """Build constructor kwargs from the parent's shared field values."""
-        kwargs = {}
+        """Build constructor kwargs from the group's defaults and the parent's shared field values."""
+        kwargs = dict(self.defaults)
         for parent_name, child_name in self.share_map.items():
             if parent_name in owner._fields:
                 kwargs[child_name] = owner._values[parent_name]

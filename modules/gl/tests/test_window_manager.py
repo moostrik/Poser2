@@ -8,7 +8,7 @@ import time
 import unittest
 from unittest import mock
 
-from modules.gl import Monitor, WindowManager, WindowManagerSettings, WindowSettings
+from modules.gl import Monitor, MonitorId, WindowManager, WindowManagerSettings, WindowSettings
 
 MODULE = sys.modules['modules.gl.window_manager']     # the module: the package exports the class under its name
 LOGGER: str = 'modules.gl.window_manager'
@@ -157,6 +157,15 @@ class TestWindowManager(unittest.TestCase):
         windows[0].shown = True
         self.manager.settings.v_sync = False
         self.assertEqual(self.pace([1.0]), [])                                # shown, no v-sync, no limit: free
+
+    def test_default_placement_places_every_window_on_its_own_monitor(self):
+        self.with_windows()
+        first, second = self.manager.window_settings
+        second.monitor, second.fullscreen, second.x = MonitorId.M2, True, 900
+        self.manager.settings.default_placement = True                   # the panel's button
+        self.manager._tick_windows()
+        self.assertEqual([(s.monitor, s.fullscreen, s.x, s.y, s.width, s.height) for s in (first, second)],
+                         [(MonitorId.M0, False, 20, 40, 1280, 720), (MonitorId.M2, False, 20, 40, 1280, 720)])
 
     def test_f_toggles_the_fullscreen_of_the_window_with_focus_and_esc_closes(self):
         F, ESCAPE, PRESS = 70, 256, 1

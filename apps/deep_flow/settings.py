@@ -314,7 +314,7 @@ class WindowsSettings(BaseSettings):
     """The render's windows: window 0 the operator's, window 1 the show's"""
     loop    : Group[WindowManagerSettings] = Group(WindowManagerSettings)
     window_0: Group[WindowSettings]        = Group(WindowSettings)
-    window_1: Group[WindowSettings]        = Group(WindowSettings)
+    window_1: Group[WindowSettings]        = Group(WindowSettings, defaults={'enabled': False})     # the show's, off
 
     @property
     def windows(self) -> list[WindowSettings]:

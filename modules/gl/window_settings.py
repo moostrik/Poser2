@@ -20,7 +20,7 @@ class WindowManagerSettings(BaseSettings):
     v_sync_window:     Field[int]  = Field(0, min=0, max=7, description="The window swapped last, with v-sync")
     fps_limit:         Field[float] = Field(0.0, min=0.0, max=480.0, unit="fps", description="The loop's rate when v-sync does not pace it; 0 = off")
     fullscreen_mouse:  Field[bool] = Field(False, description="Show the mouse pointer in fullscreen (a window always shows it)")
-    default_placement: Field[bool] = Field(False, widget=Widget.button, description="Place window 0 on monitor 0 at 20, 40, 1280 × 720, windowed")
+    default_placement: Field[bool] = Field(False, widget=Widget.button, description="Place every window on its monitor at 20, 40, 1280 × 720, windowed")
     avg_fps:           Field[int]  = Field(60, access=Field.READ, pinned=True, label="Render", unit="fps", description="Average render frame rate")
     min_fps:           Field[int]  = Field(60, access=Field.READ, pinned=True, label="Render min", unit="fps", description="Minimum render frame rate")
     connected:         Field[str]  = Field("", access=Field.READ, description="The connected monitors: id, name, resolution")

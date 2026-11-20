@@ -12,7 +12,7 @@ import glfw
 if TYPE_CHECKING:
     from .render_base import RenderBase
 from modules.utils import FPS, PerformanceTimer, Waker
-from .monitor import Monitor, MonitorId
+from .monitor import Monitor
 from .window import Window
 from .window_input import WindowInput
 from .window_settings import WindowManagerSettings, WindowSettings
@@ -120,7 +120,7 @@ class WindowManager:
         with self._window_lock:
             for index, settings in enumerate(self.window_settings):
                 if self._off_screen(settings):
-                    logger.warning("Window %s is under half on the monitors, placing it on monitor 0", index)
+                    logger.warning("Window %s is under half on the monitors, placing it at the default place on its monitor", index)
                     self._write_default_placement(settings)
                 share: Window | None = self._windows[0] if self._windows else None
                 window = Window(index, settings, title if index == 0 else f"{title} {index}", share, self._close_request.set)
@@ -199,7 +199,8 @@ class WindowManager:
             logger.info("Monitors changed: %s", self.settings.connected)
         if self._place_default:
             self._place_default = False
-            self._write_default_placement(self.window_settings[0])
+            for settings in self.window_settings:
+                self._write_default_placement(settings)
         mouse: bool = self.settings.fullscreen_mouse
         for window in self._windows:
             window.write_move(self._monitors, mouse)
@@ -336,8 +337,7 @@ class WindowManager:
         return visible / (width * height)
 
     def _write_default_placement(self, settings: WindowSettings) -> None:
-        """The default placement into a window's settings: monitor 0, windowed, its position and size."""
-        settings.monitor = MonitorId.M0
+        """The default placement into a window's settings: windowed, on its own monitor, its position and size."""
         settings.fullscreen = False
         settings.x = self._DEFAULT_X
         settings.y = self._DEFAULT_Y
