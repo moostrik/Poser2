@@ -87,9 +87,25 @@ ACCESS_CLASS = {
 }
 
 
-def tab_entries(root: BaseSettings) -> list[tuple[str, BaseSettings]]:
-    """The children of the root that get a tab: those with visible content."""
-    return [(name, child) for name, child in root.children.items() if has_visible_content(child)]
+SETUP_GROUP = "setup"     # the root group every app's root holds once its groups have moved under root groups
+
+
+class TabEntry(NamedTuple):
+    """One tab: its path from the root, which is its state key, its root group ("" on a root without root
+    groups) and its settings."""
+    path: str
+    group: str
+    settings: BaseSettings
+
+
+def tab_entries(root: BaseSettings) -> list[TabEntry]:
+    """The tabs: the children of each root group, grouped under it, when the root holds `setup`; else the
+    children of the root. Only those with visible content."""
+    if SETUP_GROUP not in root.children:
+        return [TabEntry(name, "", child) for name, child in root.children.items() if has_visible_content(child)]
+    return [TabEntry(f"{group}.{name}", group, child)
+            for group, groups in root.children.items()
+            for name, child in groups.children.items() if has_visible_content(child)]
 
 
 # -- cards -------------------------------------------------------------------------------
@@ -303,9 +319,9 @@ class TabBar:
     """The tabs of one client and their toolbar: the three toggles and expand/collapse-all act on
     the active tab. The state remembers the active tab and each tab's toggles."""
 
-    def __init__(self, names: list[str], state: PanelState) -> None:
+    def __init__(self, entries: list[TabEntry], state: PanelState) -> None:
         self.state = state
-        self.active = state.active_tab(names)
+        self.active = state.active_tab([entry.path for entry in entries])
         self.panels: dict[str, ui.tab_panel] = {}
         self.expansions: dict[str, list[ui.expansion]] = {}
         self.all_open: dict[str, bool] = {}
@@ -313,10 +329,14 @@ class TabBar:
         self.buttons: dict[HideToggle, ui.button] = {}
 
         with ui.tabs().classes("w-full bg-[#121212] rounded").props("dense active-color=primary no-indicator") as self.tabs:
-            for name in names:
-                tab = ui.tab(generate_label(name))
-                tab.on("click", partial(self.select, name))
-                self.tab_of[name] = tab
+            group = ""
+            for entry in entries:
+                if entry.group != group:
+                    group = entry.group
+                    ui.label(generate_label(group).upper()).classes("text-xs text-grey-6 px-2 self-center")
+                tab = ui.tab(entry.path, label=generate_label(entry.path.rsplit(".", 1)[-1]))
+                tab.on("click", partial(self.select, entry.path))
+                self.tab_of[entry.path] = tab
 
         with ui.row().classes("w-full items-center"):
             for toggle in TOGGLES:
@@ -327,11 +347,11 @@ class TabBar:
             ui.button(icon="unfold_more", on_click=self.toggle_all).props("dense flat size=sm").tooltip("Expand / Collapse All")
         self.show_toggles()
 
-    def panels_for(self, entries: list[tuple[str, BaseSettings]], controls: list[Control]) -> None:
+    def panels_for(self, entries: list[TabEntry], controls: list[Control]) -> None:
         """The tab panels, one per entry, each holding its settings' body with the tab's hidden
         types applied; the active tab's panel is shown."""
         with ui.tab_panels(self.tabs, value=self.tab_of[self.active]).classes("w-full bg-grey-10 rounded ").style("padding-bottom: 320px;"):
-            for name, settings in entries:
+            for name, _, settings in entries:
                 with ui.tab_panel(self.tab_of[name]) as panel:
                     for toggle in TOGGLES:
                         if self.state.hidden(name, toggle.key, toggle.default):
@@ -399,7 +419,7 @@ def build_page(root: BaseSettings, state: PanelState, *, title: str, port: int,
         header(presets_store, title=title, port=port, on_exit=on_exit, toggle_log=toggle_log)
         pinned_bar(root, controls)
         if entries:
-            tab_bar = TabBar([name for name, _ in entries], state)
+            tab_bar = TabBar(entries, state)
         else:
             ui.label("No settings registered.")
 
