@@ -1,4 +1,4 @@
-"""The panel's tabs: the children of each root group, or of a root without root groups."""
+"""The panel's tabs: the children of each root group."""
 
 import unittest
 
@@ -39,12 +39,6 @@ class Rooted(BaseSettings):
     flow: Group[Flow] = Group(Flow)
 
 
-class Flat(BaseSettings):
-    camera: Group[Camera] = Group(Camera)
-    panel: Group[Hidden] = Group(Hidden)
-    pose: Group[Pose] = Group(Pose)
-
-
 class TestTabs(unittest.TestCase):
 
     def test_a_tab_per_child_of_a_root_group(self):
@@ -53,13 +47,6 @@ class TestTabs(unittest.TestCase):
             TabEntry("setup.camera", "setup", root.setup.camera),
             TabEntry("setup.pose", "setup", root.setup.pose),
             TabEntry("flow.view", "flow", root.flow.view),
-        ])
-
-    def test_a_root_without_setup_has_a_tab_per_child(self):
-        root = Flat()
-        self.assertEqual(tab_entries(root), [
-            TabEntry("camera", "", root.camera),
-            TabEntry("pose", "", root.pose),
         ])
 
 

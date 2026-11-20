@@ -17,7 +17,7 @@ from modules.settings import presets
 
 class TestAudioTree(unittest.TestCase):
     def test_osc_lives_under_audio(self):
-        settings = Settings()
+        settings = Settings().setup
         self.assertIsInstance(settings.audio.osc, OscSenderSettings)
         self.assertNotIn('osc', settings.children)
         self.assertIn('osc', settings.to_dict()['audio'])
@@ -57,7 +57,7 @@ class TestMaxControls(unittest.TestCase):
         return self.app.credit_scroller.update.call_args.args[1]
 
     def test_the_name_waits_the_idle_time_after_the_last_qualifying_face(self):
-        self.settings.render.credit_scroll_idle = 120.0
+        self.settings.setup.render.credit_scroll_idle = 120.0
         self.app._face_seen = time.perf_counter() - 121.0
         self.assertFalse(self.name_held())
         SmileMain.face_callback(self.app, SimpleNamespace(qualified=False, timestamp=time.perf_counter()))
@@ -76,7 +76,7 @@ class TestMaxControls(unittest.TestCase):
 
     def test_the_laughter_test_holds_the_name_back(self):
         self.app._face_seen = time.perf_counter() - 121.0
-        self.settings.audio.laughter_test = True
+        self.settings.setup.audio.laughter_test = True
         self.assertTrue(self.name_held())
 
     def test_the_panel_controls_go_out_every_frame_in_max_units(self):
@@ -86,7 +86,7 @@ class TestMaxControls(unittest.TestCase):
         self.assertEqual(sent['/laughter'], 1)
         self.assertEqual(sent['/laughter_volume'], 0.0)
         self.assertEqual(sent['/laughter_offset'], 0.0)
-        audio = self.settings.audio
+        audio = self.settings.setup.audio
         audio.sound, audio.laughter = False, False
         audio.music_volume, audio.laughter_volume, audio.laughter_offset = -12.0, -6.0, -90.0
         sent = self.frame()
@@ -103,7 +103,7 @@ class TestMaxControls(unittest.TestCase):
             self.assertIs(type(sent[address]), float, address)
 
     def test_nothing_goes_out_while_osc_is_off(self):
-        self.settings.audio.osc.enabled = False
+        self.settings.setup.audio.osc.enabled = False
         self.assertEqual(self.frame(), {})
 
     def test_the_laughter_test_runs_every_frame_holds_new_visitors_and_tells_max(self):
@@ -111,11 +111,11 @@ class TestMaxControls(unittest.TestCase):
         self.app.laughter_test.update.assert_called_once()
         self.assertFalse(self.app.sequencer.blocked)
         self.assertEqual((sent['/laughter_test'], sent['/laughter']), (0, 1))
-        self.settings.audio.laughter_test = True
+        self.settings.setup.audio.laughter_test = True
         sent = self.frame()
         self.assertTrue(self.app.sequencer.blocked)
         self.assertEqual((sent['/laughter_test'], sent['/laughter']), (1, 1))    # the panel's switch is untouched
-        self.settings.audio.laughter_test = False
+        self.settings.setup.audio.laughter_test = False
         sent = self.frame()
         self.assertFalse(self.app.sequencer.blocked)
         self.assertEqual(sent['/laughter_test'], 0)
@@ -125,7 +125,7 @@ class TestMaxControls(unittest.TestCase):
         self.app.osc.submit.assert_called_once_with('/test_bang', (3, 1))
 
     def test_the_online_cell_follows_the_screen_setting_the_link_and_the_turn(self):
-        online = self.settings.online
+        online = self.settings.setup.online
         online.active, online.screen = True, 27         # screen 27: wall 1, unit 1 output 3, cell 12
         online.connected = False
         self.frame()

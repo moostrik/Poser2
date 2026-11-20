@@ -97,7 +97,7 @@ def load_app_settings(app: str) -> BaseSettings:
     settings = importlib.import_module(f"apps.{app}.settings").Settings()
     if not presets.load(settings, presets.startup_path()):
         raise FileNotFoundError(f"No startup preset for '{app}' at {presets.startup_path()}")
-    setup: BaseSettings = settings.children.get('setup', settings)     # an app not yet moved under `setup`: its root
+    setup: BaseSettings = settings.setup
     if app in ('white_space', 'hd_trio'):   # they cut the pose model's crops at its size (their main.py)
         setup.pose.pose_crop.output_width = setup.pose.pose.width
         setup.pose.pose_crop.output_height = setup.pose.pose.height

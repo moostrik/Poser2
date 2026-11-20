@@ -70,65 +70,65 @@ class SmileMain():
         # SETTINGS
         presets.set_app(APP_NAME, default_startup='Smile')
         self.settings = Settings()
-        self.settings.panel.title = 'SMILE'
-        self.settings.panel.port = 667
+        self.settings.setup.panel.title = 'SMILE'
+        self.settings.setup.panel.port = 667
         preset_file = presets.startup_path()
         if not presets.load(self.settings, preset_file):
             logger.warning('No preset at %s, using defaults', preset_file)
         if not interface:
-            self.settings.panel.browser = False  # launcher override; the preset cannot turn it back on
+            self.settings.setup.panel.browser = False  # launcher override; the preset cannot turn it back on
         if fullscreen:
             # the installation's start: borderless (exclusive fullscreen minimizes when a wall gets focus), the walls too
-            for window in self.settings.windows.windows:
+            for window in self.settings.setup.windows.windows:
                 window.fullscreen = True
         self.settings.initialize()
-        self.panel_server = PanelServer(self.settings, self.settings.panel, on_exit=self.stop)
+        self.panel_server = PanelServer(self.settings, self.settings.setup.panel, on_exit=self.stop)
 
-        self.sequencer: Sequencer = Sequencer(self.settings.sequence)
+        self.sequencer: Sequencer = Sequencer(self.settings.setup.sequence)
         # the generator fills the grin player with the grin frames, the render plays them on its own clock
-        self.grin_player: GrinPlayer = GrinPlayer(self.settings.sequence)
-        self.render: SmileRender = SmileRender(self.settings.render, self.settings.windows, self.settings.walls, self.sequencer, self.grin_player, self.width, self.height)
+        self.grin_player: GrinPlayer = GrinPlayer(self.settings.setup.sequence)
+        self.render: SmileRender = SmileRender(self.settings.setup.render, self.settings.setup.windows, self.settings.setup.walls, self.sequencer, self.grin_player, self.width, self.height)
         # the clip player of the sphere's walls: one pool for the 48 cells of the render's two walls
-        self.clip_player: Player = Player(self.settings.walls, self.render.walls, self.settings.render)
-        self.generator: Generator = Generator(self.settings.generator, self.grin_player)
+        self.clip_player: Player = Player(self.settings.setup.walls, self.render.walls, self.settings.setup.render)
+        self.generator: Generator = Generator(self.settings.setup.generator, self.grin_player)
         # the face crop is the image ComfyUI generates from, so it has the workflow's portrait size
         portrait_width, portrait_height = self.generator.workflow.portrait_size
         # the faces as the other apps find them: the frames to judge uploaded, the faces found on the GPU, and smile's
         # choice of a subject among them (the camera states hand over frames, sequence_callback)
-        self.uploader: SerialUploader = SerialUploader(self.settings.camera.uploader)
-        self.face_detector: FaceDetector = FaceDetector(self.settings.camera.face_detector)
-        self.face: FaceFinder = FaceFinder(self.settings.camera.face, self.settings.camera.face_detector, portrait_width, portrait_height)
+        self.uploader: SerialUploader = SerialUploader(self.settings.setup.camera.uploader)
+        self.face_detector: FaceDetector = FaceDetector(self.settings.setup.camera.face_detector)
+        self.face: FaceFinder = FaceFinder(self.settings.setup.camera.face, self.settings.setup.camera.face_detector, portrait_width, portrait_height)
 
         # the camera device; the panel can switch to an image from input/ at any time
         if cam_type == CamType.VIMBA:
             # without the Vimba 6 SDK (VIMBA_HOME, VimbaC) the backend logs an error at start: no device, the image still works
-            device = vimba.Camera(self.settings.camera, rotate90=self.portrait_mode)
+            device = vimba.Camera(self.settings.setup.camera, rotate90=self.portrait_mode)
             device_name = 'vimba'
         else:
-            device = webcam.Camera(self.settings.camera, rotate90=self.portrait_mode)
+            device = webcam.Camera(self.settings.setup.camera, rotate90=self.portrait_mode)
             device_name = 'webcam'
-        self.camera: Camera = Camera(self.settings.camera, (self.width, self.height), device, device_name)
+        self.camera: Camera = Camera(self.settings.setup.camera, (self.width, self.height), device, device_name)
 
-        self.music_map: MusicMap = MusicMap(self.settings.audio, f'{DATA_PATH}/audio/music_map.json')
-        self.osc: OscSender = OscSender(self.settings.audio.osc, events=('/test_bang',))
+        self.music_map: MusicMap = MusicMap(self.settings.setup.audio, f'{DATA_PATH}/audio/music_map.json')
+        self.osc: OscSender = OscSender(self.settings.setup.audio.osc, events=('/test_bang',))
         # the laughter test, stepped from sequence_callback: it lights the walls' cells and bangs Max
-        self.laughter_test: LaughterTest = LaughterTest(self.settings.audio, send=self.clip_player.light, bang=self._test_bang)
+        self.laughter_test: LaughterTest = LaughterTest(self.settings.setup.audio, send=self.clip_player.light, bang=self._test_bang)
         # the name going round the walls while nobody is seen, planned here and handed to them every second
-        self.credit_scroller: CreditScroller = CreditScroller(self.settings.render, self.clip_player.scroll_loop)
+        self.credit_scroller: CreditScroller = CreditScroller(self.settings.setup.render, self.clip_player.scroll_loop)
         self._face_seen: float = time.perf_counter()    # the last qualifying face or visitor: the name waits from here
-        self.save: ClipSaver = ClipSaver(self.settings.sequence, watermark=self.settings.render.credit_name)
+        self.save: ClipSaver = ClipSaver(self.settings.setup.sequence, watermark=self.settings.setup.render.credit_name)
         self._grin_saved: bool = False      # the visitor's grin was saved to its last frame
         self._saving: bool = False          # the visitor's files are open in the saver
         self._style_picked: bool = False    # the style of the next visitor is picked: until the flash
         self._face_frame_time: float = 0.0  # arrival of the camera frame last handed over to be judged
         self._visitor_start: float | None = None    # the capture of the visitor the generator is working on
         self._flash_time: float = 0.0       # when the flash started: the music starts then (Max, the phone, the clip's sound)
-        self.lights: Lights = Lights(self.settings.artnet, f'{DATA_PATH}/artnet.json')
+        self.lights: Lights = Lights(self.settings.setup.artnet, f'{DATA_PATH}/artnet.json')
         # SMILE Online: a turn for someone outside when the room's eye is free, stepped from sequence_callback
-        self.online: Online = Online(self.settings.online, self.camera, self.sequencer, self.face, self.render.grab,
-                                     lambda: self.settings.render.credit_name,
+        self.online: Online = Online(self.settings.setup.online, self.camera, self.sequencer, self.face, self.render.grab,
+                                     lambda: self.settings.setup.render.credit_name,
                                      lambda: (self.music_map.get_music_id(), self.music_map.track_path()),
-                                     laughs=laugh_files, laughter=lambda: self.settings.audio.laughter, pick=self.pick_style)
+                                     laughs=laugh_files, laughter=lambda: self.settings.setup.audio.laughter, pick=self.pick_style)
         self.save.add_saved_callback(self.online.on_saved)
 
         self._stopping: bool = False
@@ -157,7 +157,7 @@ class SmileMain():
         # last: the render's frames drive the sequencer, which drives everything else; the launcher runs it after start()
         self.render.add_exit_callback(self.stop)
         self.sequencer.add_message_callback(self.sequence_callback)
-        if any(window.enabled for window in self.settings.windows.windows[1:]):
+        if any(window.enabled for window in self.settings.setup.windows.windows[1:]):
             self.clip_player.start()
         else:
             logger.info('No wall window shown in the preset (windows.window_1, window_2): the clip player stays off')
@@ -204,9 +204,9 @@ class SmileMain():
         # None either while the raw camera is shown: the sequence would run unseen behind it.
         # Nor while the laughter test runs: a visitor's state would close Max's laughter gate
         ready: bool = self.generator.ready
-        self.sequencer.blocked = not ready or self.settings.render.show_camera or self.settings.audio.laughter_test
+        self.sequencer.blocked = not ready or self.settings.setup.render.show_camera or self.settings.setup.audio.laughter_test
         # the operator's line: the generator's reason first, then a camera that delivers no frames
-        status: str | None = None if ready else self.settings.generator.connection.status
+        status: str | None = None if ready else self.settings.setup.generator.connection.status
         if status is None and self.camera.stalled:
             status = NO_CAMERA
         self.render.set_status(status)
@@ -227,7 +227,7 @@ class SmileMain():
             # the grin starts playing: the share clip gets the track from the point the room hears now
             self.save.submit_share(self.music_map.track_path(), time.perf_counter() - self._flash_time)
 
-        audio = self.settings.audio
+        audio = self.settings.setup.audio
         if audio.osc.enabled:
             progress: float = message.progress
             music_id: str = self.music_map.get_music_id()
@@ -252,10 +252,10 @@ class SmileMain():
         # qualifying face (the finder sees no frames during a visitor, who counts as one) and not while the test lights the screens
         if seq not in CAMERA_STATES:
             self._face_seen = time.perf_counter()
-        waiting: bool = time.perf_counter() - self._face_seen < self.settings.render.credit_scroll_idle
-        self.credit_scroller.update(now, self.settings.audio.laughter_test or waiting)
+        waiting: bool = time.perf_counter() - self._face_seen < self.settings.setup.render.credit_scroll_idle
+        self.credit_scroller.update(now, self.settings.setup.audio.laughter_test or waiting)
         # the online turn: it takes the camera when the room's eye is free, and the sequence runs as for a visitor inside
-        self.online.update(now, message, ready, self.settings.render.show_camera or self.settings.audio.laughter_test)
+        self.online.update(now, message, ready, self.settings.setup.render.show_camera or self.settings.setup.audio.laughter_test)
         self._online_cell()
 
         if seq == SequenceType.CAMERA_SHOW and message.initial:
@@ -283,7 +283,7 @@ class SmileMain():
                 logger.warning('Generator not ready at the capture, ending the visitor')
                 self.sequencer.finish()
             self.render.set_cap_image(cap_image)
-            self.save.submit_open(cap_image, self.settings.generator.style_current)
+            self.save.submit_open(cap_image, self.settings.setup.generator.style_current)
             self._saving = True
             self._grin_saved = False
             # a test run on images: the next visitor is the next file
@@ -307,7 +307,7 @@ class SmileMain():
     def _online_cell(self) -> None:
         """The online cell of the walls, every frame: the screen `online.screen` shows the QR code to the phone
         page while SMILE Online waits for someone, the main screen during a turn, a clip like any cell otherwise."""
-        online = self.settings.online
+        online = self.settings.setup.online
         screen: int = int(online.screen)
         mode: str = 'clip'
         wall = cell = 0
@@ -328,12 +328,12 @@ class SmileMain():
         if self._visitor_start is None:
             return
         now: float = time.perf_counter()
-        grin = self.settings.generator.grin
+        grin = self.settings.setup.generator.grin
         if not (SequenceType.CAPTURE <= seq <= SequenceType.DIFF_LOOP):
             self._visitor_start = None      # ended
         elif grin.loop or grin.still:
             self._visitor_start = now       # testing: the grin goes round until both are off
-        elif now - self._visitor_start > self.settings.generator.connection.job_timeout + VISITOR_MARGIN:
+        elif now - self._visitor_start > self.settings.setup.generator.connection.job_timeout + VISITOR_MARGIN:
             logger.error('The generator did not end the visitor after %.0f s, ending it', now - self._visitor_start)
             self._visitor_start = None
             self.generator.interrupt()
@@ -360,7 +360,7 @@ class SmileMain():
         if message.image is None:
             return
         # the grin loop and still are for testing: their frames would fill the clip without end
-        grin = self.settings.generator.grin
+        grin = self.settings.setup.generator.grin
         if message.state == GeneratorState.DIFF_LOOP and (grin.loop or grin.still):
             return
         if message.state == GeneratorState.DIFFUSION and message.final:

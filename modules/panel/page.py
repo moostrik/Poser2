@@ -87,22 +87,15 @@ ACCESS_CLASS = {
 }
 
 
-SETUP_GROUP = "setup"     # the root group every app's root holds once its groups have moved under root groups
-
-
 class TabEntry(NamedTuple):
-    """One tab: its path from the root, which is its state key, its root group ("" on a root without root
-    groups) and its settings."""
+    """One tab: its path from the root, which is its state key, its root group and its settings."""
     path: str
     group: str
     settings: BaseSettings
 
 
 def tab_entries(root: BaseSettings) -> list[TabEntry]:
-    """The tabs: the children of each root group, grouped under it, when the root holds `setup`; else the
-    children of the root. Only those with visible content."""
-    if SETUP_GROUP not in root.children:
-        return [TabEntry(name, "", child) for name, child in root.children.items() if has_visible_content(child)]
+    """The tabs: the children of each root group, grouped under it; only those with visible content."""
     return [TabEntry(f"{group}.{name}", group, child)
             for group, groups in root.children.items()
             for name, child in groups.children.items() if has_visible_content(child)]

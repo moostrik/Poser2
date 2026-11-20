@@ -15,7 +15,7 @@ import os
 
 from .workflow import Workflow, _find
 from modules.settings import presets
-from ..settings import Settings
+from ..settings import Settings, SetupSettings
 
 CAPTURE: str = 'smile_capture.png'      # the name Generator uploads every capture under
 PROMPT: str = 'test_prompt'
@@ -23,7 +23,7 @@ VIDEO: str = 'test_video'
 VIDEO_FILE: str = 'test_video_file'
 
 
-def make_test_workflow(workflow_path: str, settings: Settings, style: str = 'a') -> dict:
+def make_test_workflow(workflow_path: str, settings: SetupSettings, style: str = 'a') -> dict:
     wf: Workflow = Workflow(workflow_path)
     p = settings.generator
     workflow: dict = wf.build(CAPTURE, getattr(p, f'style_{style}'), p)
@@ -64,7 +64,7 @@ def main() -> None:
     settings = Settings()
     if not presets.load(settings, args.preset):
         raise SystemExit(f'could not load preset {args.preset}')
-    workflow: dict = make_test_workflow(settings.generator.connection.workflow, settings, args.style)
+    workflow: dict = make_test_workflow(settings.setup.generator.connection.workflow, settings.setup, args.style)
     os.makedirs(os.path.dirname(args.out) or '.', exist_ok=True)
     with open(args.out, 'w', encoding='utf-8') as f:
         json.dump(workflow, f, indent=2, ensure_ascii=False)

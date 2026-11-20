@@ -19,7 +19,8 @@ class WindowsSettings(WindowManagerSettings):
     window_2: Group[WindowSettings]        = Group(WindowSettings)
 
 
-class Settings(BaseSettings):
+class SetupSettings(BaseSettings):
+    """The machine and the site: the camera, the generator, the sequence, the render, the walls and the links."""
     camera:    Group[CameraSettings]    = Group(CameraSettings)
     generator: Group[GeneratorSettings] = Group(GeneratorSettings)
     sequence:  Group[SequencerSettings] = Group(SequencerSettings)
@@ -30,3 +31,7 @@ class Settings(BaseSettings):
     artnet:    Group[ArtNetSenderSettings]    = Group(ArtNetSenderSettings)
     online:    Group[OnlineSettings]    = Group(OnlineSettings)
     panel:     Group[PanelSettings]     = Group(PanelSettings)
+
+
+class Settings(BaseSettings):
+    setup: Group[SetupSettings] = Group(SetupSettings)

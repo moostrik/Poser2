@@ -14,7 +14,7 @@ class TestVisitorLimit(unittest.TestCase):
     def setUp(self):
         generator = GeneratorSettings()
         generator.connection.job_timeout = 45.0
-        self.app = SimpleNamespace(settings=SimpleNamespace(generator=generator), generator=mock.Mock(),
+        self.app = SimpleNamespace(settings=SimpleNamespace(setup=SimpleNamespace(generator=generator)), generator=mock.Mock(),
                                    sequencer=mock.Mock(), _visitor_start=100.0)
         self.limit: float = 100.0 + 45.0 + VISITOR_MARGIN
 
@@ -40,10 +40,10 @@ class TestVisitorLimit(unittest.TestCase):
         self.app.sequencer.finish.assert_not_called()
 
     def test_the_grin_loop_has_no_limit_and_gets_the_full_time_after_it(self):
-        self.app.settings.generator.grin.loop = True
+        self.app.settings.setup.generator.grin.loop = True
         self.step(self.limit + 100.0, SequenceType.DIFF_LOOP)
         self.app.sequencer.finish.assert_not_called()
-        self.app.settings.generator.grin.loop = False
+        self.app.settings.setup.generator.grin.loop = False
         self.step(self.limit + 101.0, SequenceType.DIFF_LOOP)     # the pass that was running may finish
         self.app.sequencer.finish.assert_not_called()
 
