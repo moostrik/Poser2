@@ -25,11 +25,16 @@ class Dither(Shader):
         self._blue_noise: Image = Image(interpolation=GL_NEAREST)
 
     def allocate(self) -> None:
+        """The program, and this object's blue noise, made once."""
+        if self.allocated:
+            return
         super().allocate()
         self._blue_noise.set_image(blue_noise(64))
         self._blue_noise.update()
 
     def deallocate(self) -> None:
+        if not self.allocated:
+            return
         self._blue_noise.deallocate()
         super().deallocate()
 

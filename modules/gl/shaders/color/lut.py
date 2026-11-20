@@ -15,11 +15,6 @@ class Lut(Shader):
 
     def __init__(self) -> None:
         super().__init__()
-        # Only initialize LUT-specific attributes once
-        if hasattr(self, '_lut_initialized'):
-            return
-        self._lut_initialized = True
-
         self._lut_tex_id: int = 0
         self._lut_size: int = 0
         self._lut_title: str = ""

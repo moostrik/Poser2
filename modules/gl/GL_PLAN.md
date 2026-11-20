@@ -9,8 +9,6 @@ measurement; E and H from the package scan of the same day. The lines are in wor
 Shaders reload at one point in the window loop, and each class's program is compiled once and shared by its
 objects (`Shader._programs`).
 
-- F6. `Dither` and `Lut` hold their own state per object, made in `allocate` and freed in `deallocate`; `Lut`'s
-  `hasattr` guard goes. Test: with the noise mocked, a `Dither` makes its noise once and frees it once.
 - F7. GL.md's Shaders section describes hot reload, `ComputeShader`, the program shared by a class's objects, the
   reload point, F2 to F5, and the `_generic.vert` fallback as it is.
 
