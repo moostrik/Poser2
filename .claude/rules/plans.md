@@ -12,3 +12,4 @@ paths:
 - What is not decided yet is a question, not a step
 - A change that is already worked out is costly to get: keep it
 - A plan is committed at the user's go, before it is built
+- A plan is kept when it is empty; new issues land in it
