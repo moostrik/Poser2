@@ -3,16 +3,19 @@
 A rule file in `.claude/rules/` governs the files its `paths` match; one without `paths`, and `CLAUDE.md`,
 govern every file. With `--hook` the list goes out as the JSON a Claude Code hook hands to Claude, with the
 request to check the commit against those rules and report; the hook runs after every shell command and
-answers only when the command it reads on stdin held a `git commit`.
+answers only when the command it reads on stdin held a `git commit`. Below the rules stands pyright's result over
+the repository, from its two runs: the oak4 venv with `pyproject.toml`, the main venv with `pyright.oak.json`.
 
     python scripts/commit_rules.py [commit] [--hook]
 """
 
 import io
 import json
+import os
 import re
 import subprocess
 import sys
+import time
 from argparse import ArgumentParser
 from pathlib import Path
 
@@ -21,7 +24,12 @@ RULES: Path = ROOT / ".claude" / "rules"
 SHOWN: int = 6      # the files named per rule file; the rest are counted
 COMMIT: re.Pattern[str] = re.compile(r"\bgit\s+(?:-\S+\s+(?:[^-\s]\S*\s+)?)*commit\b")   # git, its options, commit
 REQUEST: str = ("Check this commit against the rules below and report to the user, brief: "
-                "one line per rule that is not met, with its file; one line when all are met.")
+                "one line per rule that is not met, with its file; one line when all are met. "
+                "Report the pyright result in one line.")
+PYTHON: str = "Scripts/python.exe" if os.name == "nt" else "bin/python"
+PYRIGHT_RUNS: list[tuple[str, list[str]]] = [(".venv-oak4", []), (".venv", ["-p", "pyright.oak.json"])]
+PYRIGHT_TIMEOUT: float = 120.0  # seconds, per run
+PYRIGHT_SHOWN: int = 30         # the errors listed; the rest are counted
 
 
 def git(*args: str) -> str:
@@ -104,6 +112,53 @@ def report(commit: str) -> str:
     return "\n".join(lines)
 
 
+def pyright() -> str:
+    """Pyright's result over the repository: clean with its file count and time, its errors, or why it did not run."""
+    start: float = time.perf_counter()
+    processes: list[tuple[str, subprocess.Popen[str]]] = []
+    try:
+        for venv, args in PYRIGHT_RUNS:
+            python: Path = ROOT / venv / PYTHON
+            if not python.is_file():
+                return f"pyright: not run (no {venv}/{PYTHON})"
+            processes.append((venv, subprocess.Popen([str(python), "-m", "pyright", "--outputjson", *args], cwd=ROOT,
+                                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                                     text=True, encoding="utf-8")))
+        files: int = 0
+        errors: list[str] = []
+        for venv, process in processes:
+            try:
+                stdout, stderr = process.communicate(timeout=max(0.0, start + PYRIGHT_TIMEOUT - time.perf_counter()))
+            except subprocess.TimeoutExpired:
+                return f"pyright: not run ({venv} timed out after {PYRIGHT_TIMEOUT:.0f} s)"
+            try:
+                output = json.loads(stdout)
+                files += int(output["summary"]["filesAnalyzed"])
+                for diagnostic in output["generalDiagnostics"]:
+                    if diagnostic["severity"] != "error":
+                        continue
+                    file: Path = Path(diagnostic["file"]).resolve()
+                    path: str = file.relative_to(ROOT).as_posix() if file.is_relative_to(ROOT) else str(file)
+                    line: int = int(diagnostic["range"]["start"]["line"]) + 1
+                    message: str = " ".join(str(diagnostic["message"]).split())
+                    rule: str = f" ({diagnostic['rule']})" if "rule" in diagnostic else ""
+                    errors.append(f"{path}:{line}: {message}{rule}")
+            except (ValueError, KeyError, TypeError):
+                reason: str = (stderr.strip().splitlines() or ["unreadable output"])[-1]
+                return f"pyright: not run ({venv}: {reason})"
+    except OSError as error:
+        return f"pyright: not run ({error})"
+    finally:
+        for _, process in processes:
+            if process.poll() is None:
+                process.kill()
+                process.communicate()
+    if not errors:
+        return f"pyright: clean ({files} files, {time.perf_counter() - start:.0f} s)"
+    more: list[str] = [f"... and {len(errors) - PYRIGHT_SHOWN} more"] if len(errors) > PYRIGHT_SHOWN else []
+    return "\n".join([f"pyright: {len(errors)} errors", *errors[:PYRIGHT_SHOWN], *more])
+
+
 def held_commit() -> bool:
     """Whether the command a hook reads on stdin held a `git commit`; True without a command to read."""
     if sys.stdin.isatty():
@@ -123,7 +178,7 @@ def main() -> None:
     args = parser.parse_args()
     if args.hook and not held_commit():
         return
-    text: str = report(args.commit)
+    text: str = f"{report(args.commit)}\n\n{pyright()}"
     if args.hook:
         text = json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": text}})
     if isinstance(sys.stdout, io.TextIOWrapper):
