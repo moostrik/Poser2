@@ -20,7 +20,7 @@ Per thread, the callbacks in the order they are registered (`apps/deep_flow/main
 | the recording sync's (`RecordingSync`)            | matches a capture's parts, hands the capture to the recorder   | nothing                                    |
 | the tracklets' (depthai)                          | queues them for the tracker, the board; `tracker.update`       | nothing                                    |
 | the tracker's                                     | associates the tracklets, to the frame source and the board    | nothing                                    |
-| the frame source's (`TrackerFrameSource`)         | a pose per player, the RAW box steps, the crops, the submit    | nothing                                    |
+| the frame source's (`TrackerFrameSource`)         | a pose per player, the RAW box steps, the crops, the process   | nothing                                    |
 | the pose model's (`pose.PoseEstimator`)           | RTMPose on the crops, queues the poses for the pipeline        | its own model                              |
 | the pipeline's (`PosePipeline raw`)               | the RAW stage after the model, CLEAN, SMOOTH, their users      | nothing                                    |
 | the detector's (-sim)                             | YOLOv8n on the uploaded image, boxes to the replay camera      | its own model                              |
@@ -47,7 +47,7 @@ When an image is on the GPU, the uploader hands it to four others, each of which
 - through the snapshot callback, the frame source, which queues the frame bang with exactly that image and its
   previous one, two waiting at most (the oldest dropped, `dropped` on the panel). On its own thread `TrackerFrameSource.process`
   makes a pose per player from the tracker's newest boxes and pushes them with those images; the RAW stage's two
-  box filters smooth them, and the pipeline hands the images to the crop step, `CropExtractor.submit(frames, images)`,
+  box filters smooth them, and the pipeline hands the images to the crop step, `CropExtractor.process(frames, cam_timestamps)`,
   which cuts the crops from exactly those, this very image and not a newer one, at the pose model's input size, queued on the GPU and not waited for; it records a "crops ready" event and hands crops, poses and event to
   the pose model, whose thread has RTMPose wait for that event on its own stream; with the pose model off
   (`pose.enabled`), the poses carrying the camera's own keypoints (an OAK4 pose chain) go on as they are. Then the

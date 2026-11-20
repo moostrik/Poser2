@@ -67,7 +67,7 @@ class TickSource(Protocol):
 class AsyncInput(Protocol):
     """Where an async step's frames go in, with the capture times the source pushed with the poses (the crop step)."""
 
-    def submit(self, frames: FrameDict, cam_timestamps: dict[int, float] | None) -> None: ...
+    def process(self, frames: FrameDict, cam_timestamps: dict[int, float] | None) -> None: ...
 
 
 @runtime_checkable

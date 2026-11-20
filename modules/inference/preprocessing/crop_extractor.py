@@ -37,7 +37,7 @@ class CropExtractor:
     """The crop step: every pose's box cut out of the images it is for, at each size it is given, in one pass.
 
     `submit_snapshot` takes each `ImageSnapshot` from the uploader and keeps the last `KEPT`, by their capture times.
-    `submit` takes the poses with the capture times they are for (carried by the frame source and the pipeline),
+    `process` takes the poses with the capture times they are for (carried by the frame source and the pipeline),
     finds the snapshot of those times and cuts each pose's box from exactly its images, at every size
     (`CropExtractorSettings`: the pose model's, and, where a segmentation runs, its own), from the one image and box.
     Each size's consumers get the poses with their crops (`add_image_callback`): the pose leaves with its crop as its box and the image's capture time as its stamp,
@@ -46,8 +46,8 @@ class CropExtractor:
     outside the package get them finished (`add_finished_image_callback`): after the other callbacks the crop stream
     is waited for, only when a size that is cut has such a callback.
 
-    A size is cut every `interval`-th submit and handed on only then. After the crops, each size's asked callbacks
-    hear, per camera in the capture times, its capture time and the poses cut for its image: none on a submit the
+    A size is cut every `interval`-th process and handed on only then. After the crops, each size's asked callbacks
+    hear, per camera in the capture times, its capture time and the poses cut for its image: none on a process the
     interval passes or whose snapshot is no longer kept, so a consumer that waits for the results knows none come.
 
     All tensors are float16 RGB CHW [0, 1].
@@ -56,7 +56,7 @@ class CropExtractor:
     def __init__(self, settings: CropExtractorSettings, *more: CropExtractorSettings) -> None:
         self.settings: CropExtractorSettings = settings
         self._sizes: tuple[CropExtractorSettings, ...] = (settings, *more)
-        self._submits: int = 0                          # the submits taken, for each size's `interval`
+        self._processed: int = 0                        # the processes taken, for each size's `interval`
         self._callback_lock: Lock = Lock()
         self._callbacks: dict[int, list[ImageCallback]] = {id(size): [] for size in self._sizes}   # per size, in registration order
         self._asked_callbacks: dict[int, list[AskedCallback]] = {id(size): [] for size in self._sizes}
@@ -83,7 +83,7 @@ class CropExtractor:
                 self._finished_callbacks[key].append(callback)
 
     def add_asked_callback(self, callback: AskedCallback, size: CropExtractorSettings | None = None) -> None:
-        """Per camera in each submit, its capture time and the poses cut for its image at `size` (the first by
+        """Per camera in each process, its capture time and the poses cut for its image at `size` (the first by
         default), none when the interval passed it; after the image callbacks."""
         key: int = self._key(size)
         with self._callback_lock:
@@ -109,15 +109,15 @@ class CropExtractor:
                     return snapshot
         return None
 
-    def submit(self, frames: FrameDict, cam_timestamps: dict[int, float] | None) -> None:
+    def process(self, frames: FrameDict, cam_timestamps: dict[int, float] | None) -> None:
         """Cut the poses' boxes from the snapshot of `cam_timestamps` at every size whose turn it is and hand each
         size's crops on, then tell each size's asked callbacks, on the caller's thread and without waiting for the GPU
         unless a finished callback is due. A snapshot no longer kept is logged, and its poses are cut from nothing."""
         if cam_timestamps is None:
             raise ValueError("CropExtractor: poses came without the capture times they are for")
         snapshot: ImageSnapshot | None = self._snapshot(cam_timestamps)
-        due: list[CropExtractorSettings] = [size for size in self._sizes if self._submits % size.interval == 0]
-        self._submits += 1
+        due: list[CropExtractorSettings] = [size for size in self._sizes if self._processed % size.interval == 0]
+        self._processed += 1
         timestamps: dict[int, float] = cam_timestamps
         if snapshot is None:
             logger.warning("CropExtractor: the images of %s are no longer kept; their poses are not cut", cam_timestamps)

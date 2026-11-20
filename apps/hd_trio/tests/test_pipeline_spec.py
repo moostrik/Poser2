@@ -25,10 +25,10 @@ class _Source:
 
 class _Async:
     def __init__(self) -> None:
-        self.submitted: list[FrameDict] = []
+        self.processed: list[FrameDict] = []
 
-    def submit(self, frames: FrameDict, images: object) -> None:
-        self.submitted.append(frames)
+    def process(self, frames: FrameDict, images: object) -> None:
+        self.processed.append(frames)
 
     def add_frames_callback(self, callback) -> None:
         pass
@@ -53,8 +53,8 @@ class PipelineSpecTest(unittest.TestCase):
 
     def test_the_boxes_are_filtered_before_the_pose_model(self) -> None:
         self.source.emit({0: Frame(0, 0, 0.0, features={BBox: BBox.from_rect(Rect(0.1, 0.1, 0.3, 0.8))})})
-        self.assertEqual(len(self.pose_step.submitted), 1)
-        self.assertIn(BBox, self.pose_step.submitted[0][0])
+        self.assertEqual(len(self.pose_step.processed), 1)
+        self.assertIn(BBox, self.pose_step.processed[0][0])
 
 
 if __name__ == "__main__":

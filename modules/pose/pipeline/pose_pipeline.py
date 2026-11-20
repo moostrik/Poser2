@@ -10,7 +10,7 @@ dropped. The stage's synchronous steps
 are timed as ``Pose <stage>``; the crossing's ``InterpolatorTracker`` as ``Pose interpolate``.
 
 A frame source pushes its poses with the capture times of the images they are for, by cam_id; the stage's chain
-carries them to its async step (its ``AsyncInput.submit(frames, cam_timestamps)``), and a stage's other entries (a
+carries them to its async step (its ``AsyncInput.process(frames, cam_timestamps)``), and a stage's other entries (a
 reading stage, the tick) carry none. The group record travels with the poses: a source's stage starts a fresh one on every push, a stage that reads
 another gets that stage's record, and the latest record is held across an async step and across the crossing,
 where the tick re-stamps it. Frames leave a stage in one order: the app's callbacks (board, recorders, OSC),
@@ -115,7 +115,7 @@ class _AsyncSplit:
 
     def submit(self, frames: FrameDict, group: GroupRecord, cam_timestamps: dict[int, float] | None = None) -> None:
         self._group = group
-        self._input.submit(frames, cam_timestamps)
+        self._input.process(frames, cam_timestamps)
 
     def _emitted(self, frames: FrameDict) -> None:
         """The node's frames, on its thread: queued for the split's thread, the oldest dropped beyond `WAITING`."""

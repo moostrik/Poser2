@@ -34,7 +34,7 @@ class CropStampTest(unittest.TestCase):
         images, timestamps, ready = self.snapshots[-1]
         pose = Frame(track_id=0, cam_id=0, timestamp=12.4833, features={BBox: BBox.from_rect(Rect(0.25, 0.25, 0.5, 0.5))})
         self.extractor.submit_snapshot((images, timestamps, ready))
-        self.extractor.submit({0: pose}, timestamps)
+        self.extractor.process({0: pose}, timestamps)
         self.assertEqual(self.results[0][0].timestamp, 12.5)
 
     def test_the_crops_are_queued_with_the_event_their_readers_wait_on(self) -> None:
@@ -46,7 +46,7 @@ class CropStampTest(unittest.TestCase):
         images, timestamps, ready = self.snapshots[-1]
         pose = Frame(track_id=0, cam_id=0, timestamp=1.0, features={BBox: BBox.from_rect(Rect(0.25, 0.0, 0.5, 1.0))})
         self.extractor.submit_snapshot((images, timestamps, ready))
-        self.extractor.submit({0: pose}, timestamps)
+        self.extractor.process({0: pose}, timestamps)
         cut = crops[0][0]
         self.assertIsNotNone(cut.ready)
         reader = torch.cuda.Stream()

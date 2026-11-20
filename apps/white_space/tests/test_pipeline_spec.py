@@ -23,10 +23,10 @@ class _Source:
 
 class _Async:
     def __init__(self) -> None:
-        self.submitted: list[FrameDict] = []
+        self.processed: list[FrameDict] = []
 
-    def submit(self, frames: FrameDict, images: object) -> None:
-        self.submitted.append(frames)
+    def process(self, frames: FrameDict, images: object) -> None:
+        self.processed.append(frames)
 
     def add_frames_callback(self, callback) -> None:
         pass

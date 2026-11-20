@@ -61,19 +61,19 @@ class _Async:
     """An async node that holds what it gets until ``release``."""
 
     def __init__(self) -> None:
-        self.submitted: list[FrameDict] = []
+        self.processed: list[FrameDict] = []
         self.cam_timestamps: list[dict[int, float] | None] = []
         self._callbacks: list = []
 
-    def submit(self, frames: FrameDict, cam_timestamps: dict[int, float] | None) -> None:
-        self.submitted.append(frames)
+    def process(self, frames: FrameDict, cam_timestamps: dict[int, float] | None) -> None:
+        self.processed.append(frames)
         self.cam_timestamps.append(cam_timestamps)
 
     def add_frames_callback(self, callback) -> None:
         self._callbacks.append(callback)
 
     def release(self) -> None:
-        frames = self.submitted[-1]
+        frames = self.processed[-1]
         for callback in self._callbacks:
             callback(frames)
 
@@ -225,8 +225,8 @@ class BuildTest(unittest.TestCase):
         try:
             source.emit(_frames(0))
             self.assertEqual([tag for tag, _, _ in log], ['before'])
-            self.assertEqual(len(node.submitted), 1)
-            self.assertIn(Age, node.submitted[0][0])          # the steps before it ran on what it got
+            self.assertEqual(len(node.processed), 1)
+            self.assertIn(Age, node.processed[0][0])          # the steps before it ran on what it got
             self.assertEqual(out.events, [])
             node.release()
             _wait_until(lambda: out.events)

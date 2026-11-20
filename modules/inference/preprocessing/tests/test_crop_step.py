@@ -42,7 +42,7 @@ class CropStepTest(unittest.TestCase):
         crops = CropExtractor(crop_settings())
         cut: list = []
         crops.add_image_callback(lambda frames, images: cut.append((frames, images)))
-        crops.submit({0: self.pose}, self.upload_two(crops))
+        crops.process({0: self.pose}, self.upload_two(crops))
         self.assertEqual(cut[0][0][0].timestamp, 1.0)            # stamped with the given image's capture time
         self.assertIn(0, cut[0][1])
 
@@ -56,7 +56,7 @@ class CropStepTest(unittest.TestCase):
             return on_cut
         crops.add_image_callback(cut_as('pose'))
         crops.add_image_callback(cut_as('segmentation'), segmentation_crop)
-        crops.submit({0: self.pose}, self.upload_two(crops))
+        crops.process({0: self.pose}, self.upload_two(crops))
         self.assertEqual(tuple(cut['pose'][1][0].crop.shape), (3, 256, 192))
         self.assertEqual(tuple(cut['segmentation'][1][0].crop.shape), (3, 1024, 768))
         self.assertEqual(cut['segmentation'][0][0].timestamp, 1.0)                                  # the same images
@@ -67,7 +67,7 @@ class CropStepTest(unittest.TestCase):
         crops = CropExtractor(crop_settings())
         asked: list[tuple[int, float, set]] = []
         crops.add_asked_callback(lambda timestamp, cam_id, poses: asked.append((cam_id, timestamp, set(poses))))
-        crops.submit({0: self.pose}, self.upload_two(crops))
+        crops.process({0: self.pose}, self.upload_two(crops))
         self.assertEqual(asked, [(0, 1.0, {0})])
 
     def test_with_interval_two_every_other_submit_is_cut_and_the_others_told_not_asked(self) -> None:
@@ -85,7 +85,7 @@ class CropStepTest(unittest.TestCase):
         crops.add_asked_callback(lambda timestamp, cam_id, poses: asked.append(set(poses)))
         cam_timestamps: dict[int, float] = self.upload_two(crops)
         for _ in range(4):
-            crops.submit({0: self.pose}, cam_timestamps)
+            crops.process({0: self.pose}, cam_timestamps)
         self.assertEqual(cut, {'pose': 2, 'segmentation': 4})
         self.assertEqual(asked, [{0}, set(), {0}, set()])
 
@@ -100,7 +100,7 @@ class CropStepTest(unittest.TestCase):
         asked: list[tuple[int, float, set]] = []
         crops.add_asked_callback(lambda timestamp, cam_id, poses: asked.append((cam_id, timestamp, set(poses))))
         self.upload_two(crops)
-        crops.submit({0: self.pose}, {0: 0.5})
+        crops.process({0: self.pose}, {0: 0.5})
         self.assertEqual(cut, [])
         self.assertEqual(asked, [(0, 0.5, set())])
 
@@ -113,12 +113,12 @@ class CropStepTest(unittest.TestCase):
             assert ready is not None
             finished.append(ready.query())
         crops.add_finished_image_callback(on_finished)
-        crops.submit({0: self.pose}, self.upload_two(crops))
+        crops.process({0: self.pose}, self.upload_two(crops))
         self.assertEqual(finished, [True])
 
     def test_poses_without_capture_times_are_an_error(self) -> None:
         with self.assertRaises(ValueError):
-            CropExtractor(crop_settings()).submit({0: self.pose}, None)
+            CropExtractor(crop_settings()).process({0: self.pose}, None)
 
     def test_with_the_host_model_off_the_cameras_keypoints_come_out(self) -> None:
         pose_settings = pose.PoseEstimatorSettings()
@@ -136,7 +136,7 @@ class CropStepTest(unittest.TestCase):
         with_points = Frame(track_id=0, cam_id=0, timestamp=1.0,
                             features={BBox: BBox.from_rect(Rect(0.25, 0.25, 0.5, 0.5)), Points2D: keypoints})
         without = Frame(track_id=1, cam_id=0, timestamp=1.0, features={BBox: BBox.from_rect(Rect(0.1, 0.1, 0.2, 0.2))})
-        crops.submit({0: with_points, 1: without}, self.snapshots[-1][1])
+        crops.process({0: with_points, 1: without}, self.snapshots[-1][1])
         self.assertEqual(len(out), 1)
         self.assertEqual(set(out[0]), {0})                      # the camera's pose, not the one without points
         self.assertTrue(np.allclose(out[0][0][Points2D].values, keypoints.values))
