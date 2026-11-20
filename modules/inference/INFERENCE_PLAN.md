@@ -4,22 +4,99 @@ What is not built in `modules/inference`, apart from the threads the app refacto
 ([REFACTOR_PLAN.md](../../REFACTOR_PLAN.md)). What is built is in [INFERENCE.md](INFERENCE.md), its times and how
 the refactor's steps were checked in [TIMING.md](TIMING.md). **(deduction)** marks what is inferred.
 
-## A. The TensorRT models side by side
+## A. RAFT goes, and each model's log names its file
+
+- A1. RAFT goes (decided 2026-11-20), first, so the other steps leave it alone. Its flow reaches no one: deep_flow,
+  its one app, registers no flow callback, and its preset has it off (`optical_flow.enabled: false`), yet it loads
+  at every start **(seen)**. The fluid's own LK flow (`modules/flow/motion`, 2D and 3D) covers the whole view for
+  about 0.2 ms of GPU time **(seen)**, where RAFT covers one crop for 5.4 ms (TIMING.md). What exists only for it goes
+  with it:
+  - `modules/inference/optical_flow/` and its tests; its line in `modules/inference/__init__.py`
+  - deep_flow's estimator, its wiring and its `optical_flow` settings group (`main.py`, `settings.py`)
+  - the previous crop: `CropExtractorSettings.enable_prev_crop`, `crop.Image.prev_crop`, and the previous images
+    the uploaders keep for it, so `ImageSnapshot` becomes (images, capture times, event) **(seen: nothing else reads
+    them)**; the tests that unpack it follow (`test_serial_uploader.py`, `test_batch_uploader.py`,
+    `test_crop_extractor.py`, `test_crop_step.py`)
+  - `tools/models/export_raft_to_onnx.py`, `export_raft_onnx_to_trt.py`, the RAFT lines of `scripts/makemodels.bat`;
+    in LFS the ONNX files, `data/models/base/raft/` and `data/models/base/raft-sintel.pth`; the engines in the apps'
+    model folders
+  - `scripts/model_benchmark.py`'s and `scripts/cadence_probe.py`'s RAFT parts; INFERENCE.md's RAFT rows and the
+    uploader's and crop step's lines on the previous crop; `apps/hd_trio/HD_TRIO.md`'s line on the previous crop and
+    `modules/recording/RECORDING.md`'s mention of the optical flow among the crops' readers; TIMING.md keeps its
+    measurements
+  - The presets keep their `optical_flow` and `enable_prev_crop` keys until their next save: the loader skips
+    unknown fields (`modules/settings/presets.py`) **(seen)**
+  Checked by pyright, the guard tests and the inference, deep_flow and hd_trio tests, and one deep_flow `-sim`
+  start that loads and plays
+- A2. The log names the model's file, not a wrong precision. `Engine.precision` is the first input's type
+  (`engine.py`; `trt_engine.py` and `onnx_engine.py`, `setup`), and the pose and the segmentation log it as the
+  model's precision (their `_setup`) **(seen)**; the pose's FP16 files keep FP32 inputs and outputs, so they log FP32
+  **(seen)**. TensorRT builds the engine strongly typed, its precision from the ONNX file **(seen: the export
+  scripts)**; reading each layer's precision from an engine needs it built with detailed profiling, which ours are
+  not **(site fact: TensorRT's `IEngineInspector`)**. `Engine.precision` and both engines' `PRECISIONS` go; the
+  workers log the file's name in its place (`os.path.basename(engine.model_file)`), e.g. "Pose: STANDARD model
+  ready: 192x256 rtmpose-l_256x192_fp16.trt". Checked by pyright and the inference tests
+- A3. The segmentation's files are named for their precision, as the pose's: RVM's ONNX files are FP16, all 159
+  weight tensors but two of one value each, their inputs FP16 too, while their names say nothing **(seen: the
+  weights' types, 2026-11-20)**. A name says `_fp16` when the file is FP16 and nothing when FP32, so
+  `rvm_mobilenetv3_<size>.onnx` and `.trt` become `rvm_mobilenetv3_<size>_fp16`: in LFS, in the apps' model
+  folders (the engines, not tracked), in `tools/models/export_rvm_to_onnx.py`, `scripts/makemodels.bat` and the
+  segmentation's settings table (`segmentation/settings.py`). Checked by the inference tests and a low_flow `-sim`
+  start, which loads the segmentation (deep_flow runs none **(seen)**)
+
+## B. Timed waits that end on the Windows tick (from the module refactor thread, 2026-11-20)
+
+On Windows a timed wait (`Condition.wait(t)`, `Event.wait(t)`) ends on the 15.6 ms system tick, up to 15.6 ms
+late; a signalled wait wakes at once, and `time.sleep` is about 1 ms on Python 3.12 **(site fact, the module refactor
+thread; measured there in `StreamReader`, a quarter of the frames ~30 ms apart at 50 fps)**. Two loops here pace on
+a timed `Condition.wait` **(seen)**, and both are woken by every new item: the sync by each part it pairs, the
+player by each frame it plays. `modules.utils.wait_until` sleeps the last `WAKE_STEP` (17.5 ms) before a deadline
+blind, the lock released (`wait_until.py`) **(seen)**: a part that comes in that stretch waits for the sleep's end,
+up to 17.5 ms, so as it stands it would add latency here, not remove it **(deduction, and the Screen Recorder
+thread's measurement)**.
+
+B waits for the module refactor's measurement of `timeBeginPeriod(1)` (its `REFACTOR_PLAN.md` B6, decided
+2026-11-20): with every timed wait ending within about 1 ms, B2 and B3 would need only a plain timed wait, and B1
+nothing.
+
+- B1. `wait_until` takes a wake test, `woken: Callable[[], bool] | None`: in its last stretch it sleeps in 1 ms steps
+  (`time.sleep(0.001)`, about 1 ms on Python 3.12), the lock released between, and returns True as soon as the test
+  holds. Without a test it behaves exactly as now: its five tests stay, one for the wake test joins them in
+  `modules/utils/tests`; its docstring and `modules/video/VIDEO.md`'s line on it say so (agreed with the Screen
+  Recorder thread, which made it, 2026-11-20)
+- B2. `InferenceFrameSync.run` waits for the next frame's deadline (`_remaining()`) with
+  `wait_until(deadline, self._wake.wait, self._wake, woken=lambda: bool(self._inbox))`: a frame whose results do not
+  all come leaves within about 1 ms of its deadline, not up to 15.6 ms after it, and a part still pairs within
+  about 1 ms **(deduction)**
+- B3. `RecordedPoses._send` waits for each recorded pose's moment (capture + its recorded latency) the same way,
+  woken by a new frame that is due sooner: in `-sim` the poses come within about 1 ms of their moment, not up to
+  15.6 ms late and uneven **(deduction)**
+- Checked by deep_flow `-sim` on `20261112-125832_measure`, 60 s before and after: a timer of each overdue frame's
+  lateness past its deadline (B2) and of each played pose's lateness past its moment (B3), both new, the inference
+  frame sync's part wait (`Wait inference frame sync`), and `POSE_LATENCY_RAW`'s spread (p95 − p50); expected
+  **(deduction)**: lateness and part wait under about 1 ms where they reached 15
+
+## C. The pose model
+
+For one player `STANDARD` does not fill the GPU, so `HIGH` costs as much in the app (TIMING.md, "The pose
+models": 20 to 23 ms whichever model) **(seen)**; hd_trio (up to 3 players a set) and white_space (up to 8) batch
+several crops, where it may not.
+
+- C1. deep_flow and low_flow run the pose at `HIGH` (decided 2026-11-20): `pose.pose.resolution` from `STANDARD` to
+  `HIGH` in every preset that has it, deep_flow's `settings.json`, `close.json`, `mattijs.json`, `slow.json` and
+  `very nice.json`, and low_flow's `studio.json` **(seen: all `STANDARD` today)**. Checked by each app's `-sim` start:
+  the log's "Pose: HIGH model ready", and no drops
+- C2. hd_trio and white_space are measured at `STANDARD` and `HIGH`, FP16, before their resolution is chosen: alone,
+  per batch size up to each app's engine's maximum (3 and 8), on their own engines (`scripts/model_benchmark.py
+  --app <app> --models pose`, the resolution set); in the app, each app's `-sim` on a recording with several players,
+  60 s a resolution: the pose's time, its drops and `POSE_LATENCY_RAW`. Into TIMING.md, "The pose models". They run
+  on `.venv` (depthai 2); which of their recordings hold several players is found first, offline from the files
 
 Questions:
-- CUDA graphs: capture each model's `execute_async_v3` per batch size and replay it, to cut the launch time on the
-  CPU. Worth it, now the models run side by side?
-- The pose's stream at a higher priority than the others', as the model on the critical path?
-
-## B. The pose model
-
-Questions:
-- The licence of the Body8 training data (AI Challenger and others) is unresolved, for ours as for every candidate
-- The workers log the engine's first input type as the model's precision, FP32 for the pose's FP16 models, whose
-  inputs and outputs are FP32 **(seen)**: the weights' type, or the file's name, would say what runs
-- Which pose resolution the presets run, `STANDARD` or `HIGH`, both FP16: yours to save
 - Each keypoint's uncertainty for the One Euro filter: in the pose package's plan ([POSE_PLAN.md](../pose/POSE_PLAN.md))
 
 ## The rules it touches
 
-- `CLAUDE.md` Performance, prefer the design with the lower latency, measured in the context of the app: A
+- `CLAUDE.md` API evolution, remove obsolete pathways: A1, A2
+- `CLAUDE.md` Naming, name a concept after what it is: A2, A3
+- `CLAUDE.md` Time, pace a loop with `utils.wait_until`: B1, B2, B3
