@@ -4,7 +4,6 @@ uniform sampler2D   src;
 uniform int         numStreams;
 uniform float       streamStep;
 uniform float       lineWidth;
-uniform float       lineSmooth;
 uniform float       outputAspectRatio;  // output buffer aspect ratio (width/height)
 uniform vec2        displayRange;       // (min, max) value range for display
 uniform vec4        colors[8];           // RGBA color array to cycle through

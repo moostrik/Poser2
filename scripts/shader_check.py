@@ -331,7 +331,7 @@ def cases() -> dict[str, tuple[Allocated | None, Case | None, Case | None]]:
     colors = [(1.0, 0.45, 0.1, 1.0), (0.1, 0.5, 1.0, 1.0), (0.4, 1.0, 0.5, 1.0)]
     add('time_series', lanes, lambda t: lanes.use(t['gradient'], 3, 64, 0.04, colors))
     window = Window()
-    add('feature_window', window, lambda t: window.use(t['gradient'], 128, 4, 0.25, 0.01, 0.005, 1.0, (0.0, 1.0), colors))
+    add('feature_window', window, lambda t: window.use(t['gradient'], 128, 4, 0.25, 0.01, 1.0, (0.0, 1.0), colors))
     feature = Feature()
     sample = HarnessFeature()
     add('feature', feature, lambda t: feature.use(sample, colors, 0.02, 0.01, True))

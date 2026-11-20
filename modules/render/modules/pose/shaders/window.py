@@ -32,7 +32,6 @@ class Window(Shader):
         num_streams: int,
         stream_step: float,
         line_width: float,
-        line_smooth: float = 0.01,
         output_aspect_ratio: float = 1.0,
         display_range: tuple[float, float] = (-3.14159, 3.14159),
         colors: list[tuple[float, float, float, float]] = [(1.0, 0.5, 0.0, 1.0), (0.0, 1.0, 1.0, 1.0)],
@@ -45,7 +44,6 @@ class Window(Shader):
             num_streams: Number of feature elements (height)
             stream_step: Normalized height per stream (constrained)
             line_width: Line thickness in normalized coordinates
-            line_smooth: Line smoothing amount
             output_aspect_ratio: Output buffer aspect ratio (width/height)
             display_range: (min, max) value range for normalization
             colors: List of RGBA colors to cycle through (default orange/cyan)
@@ -66,7 +64,6 @@ class Window(Shader):
         glUniform1i(self.get_uniform_loc("numStreams"), num_streams)
         glUniform1f(self.get_uniform_loc("streamStep"), stream_step)
         glUniform1f(self.get_uniform_loc("lineWidth"), line_width)
-        glUniform1f(self.get_uniform_loc("lineSmooth"), line_smooth)
         glUniform1f(self.get_uniform_loc("outputAspectRatio"), output_aspect_ratio)
         glUniform2f(self.get_uniform_loc("displayRange"), display_range[0], display_range[1])
 

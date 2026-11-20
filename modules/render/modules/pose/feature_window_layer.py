@@ -145,7 +145,6 @@ class FeatureWindowLayer(LayerBase):
             num_streams,
             stream_step,
             line_width=self.settings.line_width / self._fbo.height,
-            line_smooth=self.settings.line_smooth / self._fbo.height,
             output_aspect_ratio=output_aspect,
             display_range=display_range,
             colors=colors,
