@@ -49,6 +49,16 @@
             "timeout": 150
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "python \"$CLAUDE_PROJECT_DIR/scripts/plan_page.py\" --hook"
+          }
+        ]
       }
     ]
   }
