@@ -24,17 +24,12 @@ The package runs ffmpeg two ways, and names the same hardware two ways. What the
 - `StreamReader` reads its decoder through Windows' default 4 KB pipe; `decode_clip` uses the 8 MB pipe, measured 6
   times faster for a clip. Whether it costs the player time is not measured.
 
-The target: one place starts ffmpeg and ffprobe, with one set of names. Each step is one commit and leaves the
-repository working; its own tests run with it. The runs in an app (the player's timing, a recording, the live run) and
-the depthai 2 venv's tests run once, after the last step.
+The target: one place starts ffmpeg and ffprobe, with one set of names. Built but for A6, which waits for the camera
+plan's A1.
 
 - A6. deep_flow's color in HEVC (CAMERA_PLAN.md A4's writer side, after the camera plan's A1): deep_flow's presets
   from H.264 to HEVC on the iGPU, `MP4` staying H.264. The confidence stream's writer is A5's; the camera plan wires
   it. OAK4.md's recording section. Check: the seek check and the encoder load run again.
-
-After the last step, once: deep_flow `-sim` playback of a known recording; the depthai 2 venv's tests (white_space, hd_trio);
-one live deep_flow run recording the camera on the iGPU while a screen take saves on NVENC: the chunk whole with every
-stream's frames counted, the take 0 dropped, the ticks.
 
 ## The rules it touches
 

@@ -22,7 +22,19 @@ ffmpeg process, its error lines read while it writes, with the output options of
 clips), `master_encode` (the screen recorder's HEVC master, below) or `stream_encode` (a camera recording's stream,
 live: the codec on its chip, its constant quality, an exact keyframe interval, no B-frames for depth).
 `StreamWriter` feeds one from a queue on its own thread: color as BGR, NV12 or gray, depth as P012. The chip each
-writer encodes on is its own, so the camera records on the iGPU while the screen recorder encodes on the GPU.
+writer encodes on is its own, so the camera records on the iGPU while the screen recorder encodes on the GPU. In
+deep_flow live (the camera at 50 fps recording its color and depth on the iGPU, a 15 s UHD 4:4:4 screen take held and
+saved on the GPU meanwhile, 60 Hz with v_sync) **(measured 2026-11-20)**:
+
+| Phase                         | Ticks | Mean (ms) | p95 (ms) | Max (ms) | Over 25 ms |
+|-------------------------------|-------|-----------|----------|----------|------------|
+| Idle                          | 181   | 16.66     | 20.2     | 30.3     | 3          |
+| Camera recording              | 180   | 16.69     | 20.6     | 31.3     | 3          |
+| Camera and the screen take    | 905   | 16.66     | 20.1     | 42.2     | 16         |
+| Camera and the screen save    | 1473  | 16.70     | 22.2     | 34.6     | 30         |
+
+The chunk held 2285 color and 2285 depth frames against 2285 metadata lines, at 50 fps, with nothing dropped or
+missed; the screen take dropped no frame and saved in 24.6 s.
 
 A camera recording's stream is read by `StreamReader`: one decoder started with `popen`, its frames
 through the 8 MB pipe, its error lines logged. It waits for each frame's moment with `modules.utils.wait_until`: a
