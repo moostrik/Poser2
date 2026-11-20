@@ -120,6 +120,27 @@ class StreamReaderTest(unittest.TestCase):
         self.assertTrue(wait_for(lambda: process is not None and process.poll() is not None))
         self.assertTrue(wait_for(lambda: not reader.is_playing()))       # the reader's thread ends too
 
+    def test_a_stop_ends_a_reader_waiting_near_its_frames_moment_at_once(self) -> None:
+        schedule = FixedSchedule(0.0, [0.0] * 30)
+        handed: list[int] = []
+        reader = StreamReader(0, 'video', lambda _c, _t, _f, _chunk, frame_id: handed.append(frame_id), True, fps=30.0,
+                              schedule=schedule)
+        reader.load(self.path, 0)
+        self.assertTrue(wait_for(reader.is_loaded))
+        schedule.origin = time.perf_counter() + 0.05        # its first frame 50 ms away
+        reader.play()
+        time.sleep(0.04)                                    # within the last timer tick before that moment
+        thread = reader._play_thread
+        assert thread is not None
+        stopped: float = time.perf_counter()
+        reader.stop()
+        thread.join(1.0)
+        ended: float = time.perf_counter() - stopped
+        reader.join()
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(handed, [])                        # woken by the stop, not by the moment
+        self.assertLess(ended, 0.005)
+
     def test_nv12_comes_packed_at_half_the_bytes(self) -> None:
         shapes: list[tuple[int, ...]] = []
         reader = StreamReader(0, 'video', lambda _c, _t, frame, _chunk, _i: shapes.append(frame.shape), True, fps=1000.0, nv12=True)
