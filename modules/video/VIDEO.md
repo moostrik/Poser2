@@ -209,6 +209,19 @@ thread takes no part. In deep_flow (`-sim`, UHD portrait at 4:2:0, 60 Hz with v_
 **(measured 2026-11-20)**: dragging over a held 10 s take for 3 s drew 142 pictures in 181 ticks, the ticks 16.66 ms
 on average (max 33 ms, 11 % over 25 ms, 8 % held without a drag).
 
+`play` plays the held take over the main window through the same preview: each render tick the recorder moves the
+play position by the tick's time, looping between in and out, so the frames show at their recorded times whatever
+the tick rate, and `preview_frame` gives the frame there. A dragged marker shows its own frame, and play goes on from
+it. Only a held take plays: the switch goes off without one and when a save starts, as the save turns the take to
+ENCODING. While it plays the show waits: each app reads `ScreenRecordingCompositor.playing` (the recorder's state,
+not the switch, so a refused play holds nothing), takes and drops its camera frames, and runs and draws no layer.
+The fluid goes on where it stopped, and the secondary windows keep the show's last picture. This is not
+`freeze_frame`, the apps' switch that holds the camera frame while the fluid runs on with it. In deep_flow (`-sim`,
+UHD portrait 4:4:4, 60 Hz with v_sync) **(measured 2026-11-20)**: playing the middle half of a held 3.85 s take for
+6 s, the ticks were 16.66 ms on average (p95 19.3 ms, none over 25 ms; idle 16.89 ms, 8 % over 25 ms), the motion and
+the fluid did no work, and the preview drew 118 different frames; after play the fluid ran on, with one tick of
+99.6 ms as it did.
+
 ### Look back
 
 With `look_back` on the ring records all the time, the newest frame replacing the oldest. It holds 1.2 ×

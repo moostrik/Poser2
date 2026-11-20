@@ -271,7 +271,7 @@
   },
   "render": {
     "debug": false,
-    "pause": false,
+    "freeze_frame": false,
     "layer": {
       "main": [
         "show"

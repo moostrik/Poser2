@@ -67,6 +67,7 @@ class ScreenRecorderSettings(BaseSettings):
     seek:         Field[float]               = Field(-1.0, visible=False, saved=False, description="Where the bar was pressed, as a fraction of the length; -1 otherwise")
     in_out:       Field[list[float]]         = Field([0.0, 1.0], widget=Widget.timeline, options=playhead, drag=scrub, seek=seek, saved=False,
                                                      label="In / Out", description="The part of the held take that save writes")
+    play:         Field[bool]                = Field(False, widget=Widget.switch, saved=False, description="Play the held take between in and out, looped, over the main window; the show waits")
     name:         Field[str]                 = Field("", widget=Widget.input, description="Added to the file name")
     main_window:  Field[bool]                = Field(False, widget=Widget.switch, description="Record the main window instead of the sources")
     fill:         Field[bool]                = Field(False, widget=Widget.switch, description="Fill the frame and cut the overhang, instead of black bars")
@@ -214,9 +215,11 @@ class ScreenRecorder:
         self._saving_held: bool = False     # the thread writes a part of the held take
         self._paths: set[str] = set()       # the files handed to the thread, so no name is given twice
 
-        # where the held take is looked at, as a fraction of its length: the dragged marker or the bar pressed
+        # where the held take is looked at, as a fraction of its length: the dragged marker, the bar pressed or play
         self._position: float = 0.0
         self._dragging: bool = False
+        self._playing: bool = False
+        self._play_from: tuple[float, float] | None = None     # (tick timestamp, take moment) play counts from
 
         self._thread: Thread = Thread(target=self._run, name='screen recorder', daemon=True)
 
@@ -249,9 +252,15 @@ class ScreenRecorder:
         return self._fps
 
     @property
+    def playing(self) -> bool:
+        """Whether the held take plays this tick; render thread, after `update`."""
+        return self._playing
+
+    @property
     def preview_frame(self) -> tuple[int, np.ndarray] | None:
-        """The held frame under the dragged marker and its slot, or None when no marker is dragged; render thread."""
-        if self._state is not ScreenRecorderState.HELD or not self._dragging or not self._held_stamps:
+        """The held frame under the dragged marker, or at the play position, and its slot; None when neither; render
+        thread."""
+        if self._state is not ScreenRecorderState.HELD or not (self._dragging or self._playing) or not self._held_stamps:
             return None
         moment = self._held_stamps[0] + self._position * self._held_length()
         index = min(bisect_left(self._held_stamps, moment), len(self._held_stamps) - 1)
@@ -398,6 +407,7 @@ class ScreenRecorder:
         self._stop_requested.clear()
         self._save_requested.clear()
         self._discard_requested.clear()
+        self._play(timestamp)
         self._show(timestamp)
 
     def _measure(self, timestamp: float) -> None:
@@ -472,6 +482,26 @@ class ScreenRecorder:
         self.settings.playhead = [0.0, self._held_length()]
         self._set_state(ScreenRecorderState.HELD)
         logger.info('Screen recording held: %d frames, %.2f s', len(order), self._held_length())
+
+    def _play(self, timestamp: float) -> None:
+        """Play the held take at its recorded times, looping between in and out; the dragged marker shows its own
+        frame and play goes on from there. Only a held take plays; the switch goes off otherwise, a save included."""
+        if self.settings.play and self._state is not ScreenRecorderState.HELD:
+            self.settings.play = False
+        self._playing = self.settings.play and bool(self._held_stamps)
+        if not self._playing or self._dragging:
+            self._play_from = None
+            return
+        start, length = self._held_stamps[0], self._held_length()
+        mark_in, mark_out = sorted(self.settings.in_out)
+        low, high = start + mark_in * length, start + mark_out * length
+        if self._play_from is None:
+            moment = start + self._position * length
+            self._play_from = (timestamp, moment if low <= moment < high else low)
+        began, moment = self._play_from
+        span = high - low
+        moment = low + ((moment - low) + (timestamp - began)) % span if span > 0.0 else low
+        self._position = (moment - start) / length if length > 0.0 else 0.0
 
     def _held_length(self) -> float:
         """The held take's length by its frames' times (s)."""

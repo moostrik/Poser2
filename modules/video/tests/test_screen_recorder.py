@@ -324,6 +324,52 @@ class StateTest(unittest.TestCase):
         self.assertEqual(self.recorder._ring.frame(0).dtype, np.uint16)
         self.discard(ScreenRecorderState.IDLE)
 
+    def shown_tick(self) -> int:
+        frame = self.recorder.preview_frame
+        self.assertIsNotNone(frame)
+        assert frame is not None
+        return tick_of(frame[1])
+
+    def hold_half_a_second(self) -> list[int]:
+        """A held take of 0.5 s; the ticks of its frames, oldest first."""
+        self.settings.duration = 0.5
+        ScreenRecorderSettings.start.fire(self.settings)
+        self.tick_until(lambda: self.settings.state is ScreenRecorderState.HELD)
+        return [tick_of(self.recorder._ring.frame(slot)) for slot in self.recorder._held_slots]
+
+    def test_play_shows_the_held_frames_at_their_times_looping_between_in_and_out(self) -> None:
+        held = self.hold_half_a_second()
+        self.settings.in_out = [0.5, 1.0]
+        self.settings.play = True
+        shown: list[int] = []
+        for _ in range(2 * len(held)):
+            self.tick()
+            self.assertTrue(self.recorder.playing)
+            shown.append(self.shown_tick())
+        second_half = held[len(held) // 2:]
+        self.assertEqual(shown[0], second_half[0])                       # play starts at in
+        self.assertTrue(set(shown) <= set(second_half), shown)
+        period = round(0.25 * FPS)          # in to out: half of the 0.5 s, one frame a tick
+        self.assertEqual(shown[:period], list(range(second_half[0], second_half[0] + period)), shown)
+        self.assertEqual(shown, [shown[n % period] for n in range(len(shown))], shown)    # and loops
+
+    def test_play_goes_off_with_a_save_and_without_a_held_take(self) -> None:
+        self.settings.play = True
+        self.tick()
+        self.assertFalse(self.settings.play)
+        self.assertFalse(self.recorder.playing)
+        self.hold_half_a_second()
+        self.settings.play = True
+        self.tick()
+        self.assertTrue(self.recorder.playing)
+        ScreenRecorderSettings.save.fire(self.settings)
+        self.tick()
+        self.assertFalse(self.settings.play)
+        self.assertFalse(self.recorder.playing)
+        self.tick_until(lambda: self.settings.state is ScreenRecorderState.HELD)
+        self.assertFalse(self.recorder.playing)
+        self.assertIsNone(self.recorder.preview_frame)
+
     def test_look_back_keeps_the_last_seconds_and_saves_them(self) -> None:
         self.settings.duration = 0.5
         self.settings.look_back = True

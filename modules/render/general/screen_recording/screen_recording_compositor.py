@@ -36,8 +36,8 @@ class ScreenRecordingCompositor(LayerBase):
     """The screen recording on the render tick: the recorder's tick, the capture made at the recorder's size, the
     finished frames handed to the recorder, and, when the recorder captures this tick, the sources drawn into the
     screen frame, each fit (or filled) at its own shape and added on black as the show draws them, or the main window
-    just drawn; while a marker of a held take is dragged, its frame over the main window. Owns the `ScreenCapture`
-    and the `ScreenRecorder`; `snap` sets the size to the first source's, or the window's."""
+    just drawn; while a marker of a held take is dragged, or the take plays, its frame over the main window. Owns the
+    `ScreenCapture` and the `ScreenRecorder`; `snap` sets the size to the first source's, or the window's."""
 
     def __init__(self, settings: ScreenRecorderSettings, folder: str) -> None:
         """`folder`: where the recordings go."""
@@ -53,6 +53,11 @@ class ScreenRecordingCompositor(LayerBase):
     def texture(self) -> Texture:
         """The screen frame."""
         return self._capture.frame
+
+    @property
+    def playing(self) -> bool:
+        """Whether the held take plays over the main window, as of the last `update`: the show waits while it does."""
+        return self.recorder.playing
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         """Start the recorder's thread; the capture's GL objects are made when a take begins."""
@@ -120,8 +125,9 @@ class ScreenRecordingCompositor(LayerBase):
             self.recorder.fail(f'could not make the screen capture at {screen_format}: {e}')
 
     def _draw_preview(self, window_width: int, window_height: int) -> None:
-        """While a marker of a held take is dragged, its frame over the main window, fit on black: the frame under the
-        marker is stored for the preview's thread, and the picture shown is the newest one it has made."""
+        """While a marker of a held take is dragged, or the take plays, its frame over the main window, fit on black:
+        the frame wanted is stored for the preview's thread, and the picture shown is the newest one it has made; black
+        until it has made one."""
         preview = self._preview
         if not preview.allocated:
             return
@@ -129,10 +135,12 @@ class ScreenRecordingCompositor(LayerBase):
         if shown is not None:
             preview.set_screen_frame(*shown)
         preview.update()
-        if shown is None or preview.shown is None or window_width <= 0 or window_height <= 0:
+        if shown is None or window_width <= 0 or window_height <= 0:
             return
         glViewport(0, 0, window_width, window_height)
         clear_color(0.0, 0.0, 0.0, 1.0)
+        if preview.shown is None:
+            return
         x, y, w, h = fit(preview.width, preview.height, window_width, window_height)
         glViewport(round(x), round(y), round(w), round(h))
         Style.push_style()

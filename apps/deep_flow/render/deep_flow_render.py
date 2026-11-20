@@ -248,6 +248,10 @@ class DeepFlowRender(RenderBase):
         self._update_layout()
         self._follow_view_size()
 
+        if self.screen_recording.playing:
+            self._hold_show()
+            return
+
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         seen: set[ChainLayers] = set()
         for layer_type in TICK_LAYERS + self._main_layers + self._debug_layers:
@@ -266,17 +270,23 @@ class DeepFlowRender(RenderBase):
             for monitor in self._debug_monitors.get(layer_type, {}).values():
                 monitor.update()
 
+    def _hold_show(self) -> None:
+        """While the held take plays, the show waits: the camera frames are taken and dropped, and no layer works,
+        so the fluid goes on where it stopped and the secondary windows keep its last picture."""
+        for i in self.L[ChainLayers.view]:
+            self.board.take_inference_frames(i)
+
     # ========== The flow's wiring ==========
 
 
     def _run_inference_frames(self) -> None:
         """Every frame since the last tick, each camera's in order, through the frame layers (`_run_inference_frame`).
-        A tick without a frame runs none of them, so no stage works on a frame twice. Paused, the frames are
-        taken and dropped and only the view and the color run, on the last frame, made again when one of their
+        A tick without a frame runs none of them, so no stage works on a frame twice. With `freeze_frame` the frames
+        are taken and dropped and only the view and the color run, on the last frame, made again when one of their
         settings changes."""
         for i in self.L[ChainLayers.view]:
             frames: list[InferenceFrame] = self.board.take_inference_frames(i)
-            if self.settings.pause:
+            if self.settings.freeze_frame:
                 view = cast(ViewLayer, self.L[ChainLayers.view][i])
                 view.update()
                 self._run_color(i, view)
@@ -361,6 +371,9 @@ class DeepFlowRender(RenderBase):
     # ========== Drawing ==========
 
     def draw_main(self, width: int, height: int) -> None:
+        if self.screen_recording.playing:
+            self._draw_screen_recording(width, height)      # the held take over the main window, the show waiting
+            return
         if self.settings.debug:
             self._draw_panels(width, height)
         else:

@@ -271,7 +271,7 @@
   },
   "render": {
     "debug": true,
-    "pause": false,
+    "freeze_frame": false,
     "layer": {
       "main": [
         "fluid"
