@@ -50,14 +50,14 @@ class CameraSync(Thread, Generic[M]):
         # On the deciding thread
         self._phases: dict[int, tuple[float, float]] = {}  # each camera's phase, as an averaged unit vector
         self._newest: dict[int, float] = {}                 # each camera's newest capture time
-        self._open: dict[int, M] = {}             # the set being filled
+        self._open: dict[int, M] = {}                       # the set being filled
         self._open_round: int | None = None
 
         self._callback_lock: Lock = Lock()
-        self._callbacks: list[SyncSetCallback[M]] = []         # run in registration order, with the set
+        self._callbacks: list[SyncSetCallback[M]] = []      # run in registration order, with the set
         self._wake: Condition = Condition()
         self._running: bool = False
-        self._inbox: deque[tuple[M, float]] = deque()    # (message, the moment it was queued)
+        self._inbox: deque[tuple[M, float]] = deque()               # (message, the moment it was queued)
         self._queued: dict[int, int] = {}                           # what the inbox holds per camera
         self.dropped: int = 0
         self._stopped: bool = False
