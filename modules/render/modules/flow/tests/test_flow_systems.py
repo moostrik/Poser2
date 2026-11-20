@@ -12,8 +12,8 @@ from modules.render import Motion2DLayerSettings, Bridge2DLayerSettings, Fluid2D
                                   Motion3DLayerSettings, Bridge3DLayerSettings, Fluid3DLayerSettings
 
 ROOT: Path = Path(__file__).resolve().parents[5]
-PRESETS_3D: list[Path] = [ROOT / 'apps' / 'deep_flow' / 'data' / 'settings' / 'settings.json']
-PRESETS_2D: list[Path] = [ROOT / 'apps' / 'low_flow' / 'data' / 'settings' / 'studio.json']
+PRESETS_3D: list[Path] = [ROOT / 'apps' / 'deep_flow' / 'data' / 'settings' / 'flow' / 'settings.json']
+PRESETS_2D: list[Path] = [ROOT / 'apps' / 'low_flow' / 'data' / 'settings' / 'flow' / 'studio.json']
 SOURCES: list[Path] = [ROOT / 'modules' / 'flow', ROOT / 'modules' / 'render' / 'modules' / 'flow',
                        ROOT / 'modules' / 'render' / 'general' / 'grade']     # the fluid's LUT
 STAGES: tuple[str, ...] = ('motion', 'bridge', 'fluid')
@@ -45,7 +45,7 @@ class PresetTest(unittest.TestCase):
 
     def _load(self, presets: list[Path], system: dict[str, type[BaseSettings]]) -> None:
         for preset in presets:
-            flow: dict = json.loads(preset.read_text(encoding='utf-8'))['flow']
+            flow: dict = json.loads(preset.read_text(encoding='utf-8'))
             self.assertIn('motion', flow, f'{preset.name} has no flow')
             for stage in STAGES:
                 if stage not in flow:

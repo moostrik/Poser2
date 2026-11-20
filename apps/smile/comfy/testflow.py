@@ -1,7 +1,7 @@
-"""A test workflow for the ComfyUI page: what SMILE sends for one visitor, with a preset's values,
+"""A test workflow for the ComfyUI page: what SMILE sends for one visitor, with a setup file's values,
 plus previews and a video recorder. Generated, so it can't drift from the app:
 
-    .venv\\Scripts\\python -m apps.smile.comfy.testflow [-p preset] [-s a|b] [-o file]
+    .venv\\Scripts\\python -m apps.smile.comfy.testflow [--setup NAME] [-s a|b] [-o file]
 
 The input is the app's own capture (SMILE uploads every capture as smile_capture.png); for any other
 photo, crop it first as SMILE would (python apps/smile/scripts/crop_faces.py photo.jpg) and pick the crop in the
@@ -14,7 +14,7 @@ import json
 import os
 
 from .workflow import Workflow, _find
-from modules.settings import presets
+from modules.settings import SettingsStore
 from ..settings import Settings, SetupSettings
 
 CAPTURE: str = 'smile_capture.png'      # the name Generator uploads every capture under
@@ -56,19 +56,19 @@ def make_test_workflow(workflow_path: str, settings: SetupSettings, style: str =
 
 def main() -> None:
     parser = argparse.ArgumentParser(description='Write the test workflow for the ComfyUI page')
-    parser.add_argument('-p', '--preset', default='apps/smile/data/settings/Smile.json', help='preset with the values to fill in')
+    parser.add_argument('--setup', default='Smile', help='the setup file with the values to fill in')
     parser.add_argument('-s', '--style', default='a', choices=['a', 'b'], help='which of the two styles')
     parser.add_argument('-o', '--out', default='apps/smile/data/comfy/smile_test.json', help='file to write')
     args = parser.parse_args()
 
     settings = Settings()
-    if not presets.load(settings, args.preset):
-        raise SystemExit(f'could not load preset {args.preset}')
+    if not SettingsStore('apps/smile/data/settings').load(settings, 'setup', args.setup):
+        raise SystemExit(f'could not load setup file {args.setup}')
     workflow: dict = make_test_workflow(settings.setup.generator.connection.workflow, settings.setup, args.style)
     os.makedirs(os.path.dirname(args.out) or '.', exist_ok=True)
     with open(args.out, 'w', encoding='utf-8') as f:
         json.dump(workflow, f, indent=2, ensure_ascii=False)
-    print(f'{args.out}: {len(workflow)} nodes, preset {args.preset}, style {args.style.upper()}')
+    print(f'{args.out}: {len(workflow)} nodes, setup {args.setup}, style {args.style.upper()}')
 
 
 if __name__ == '__main__':

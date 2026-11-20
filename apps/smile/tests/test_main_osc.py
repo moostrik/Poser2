@@ -4,7 +4,6 @@ tab is built from (no camera, no GL, no ComfyUI: the callback runs on a stand-in
 import logging
 import time
 import unittest
-from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
@@ -12,7 +11,7 @@ from apps.smile.main import SmileMain
 from apps.smile.settings import Settings
 from modules.inout import OscSenderSettings
 from apps.smile.render.sequencer import SequenceMessage, SequenceType
-from modules.settings import presets
+from modules.settings import SettingsStore
 
 
 class TestAudioTree(unittest.TestCase):
@@ -22,13 +21,14 @@ class TestAudioTree(unittest.TestCase):
         self.assertNotIn('osc', settings.children)
         self.assertIn('osc', settings.to_dict()['audio'])
 
-    def test_every_preset_in_the_repo_loads_without_a_warning(self):
-        # a preset with the OSC block still at the root would log 'ignoring unknown key'
-        paths = [p for p in sorted(Path('apps/smile/data/settings').glob('*.json')) if not p.name.startswith('.')]
-        self.assertTrue(paths)
-        for path in paths:
-            with self.subTest(preset=path.name), self.assertNoLogs('modules.settings', logging.WARNING):
-                self.assertTrue(presets.load(Settings(), str(path)))
+    def test_every_setup_file_in_the_repo_loads_without_a_warning(self):
+        # a setup file with the OSC block still at the root would log 'ignoring unknown key'
+        store = SettingsStore('apps/smile/data/settings')
+        names = store.scan('setup')
+        self.assertTrue(names)
+        for name in names:
+            with self.subTest(setup=name), self.assertNoLogs('modules.settings', logging.WARNING):
+                self.assertTrue(store.load(Settings(), 'setup', name))
 
 
 class TestMaxControls(unittest.TestCase):

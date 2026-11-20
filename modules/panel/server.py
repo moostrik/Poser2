@@ -8,7 +8,7 @@ What the link carries, as tuples of plain values:
 
     app → panel   ("init", description, values, config, log entries), ("values", changes),
                   ("log", entries), ("reply", request, ok), ("stop",)
-    panel → app   ("set", path, name, value), ("fire", path, name), ("load" | "save", request, preset name),
+    panel → app   ("set", path, name, value), ("fire", path, name), ("load" | "save", request, file name),
                   ("exit",), ("log", record)
 """
 
@@ -22,7 +22,7 @@ from multiprocessing.connection import Client, Connection
 from typing import Any, Callable
 
 from modules.log_config import get_log_buffer
-from modules.settings import BaseSettings, Field, mirror, presets
+from modules.settings import BaseSettings, Field, SettingsStore, mirror
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +48,11 @@ class PanelServer:
 
     A panel process that ends while the app runs is logged and started again."""
 
-    def __init__(self, root: BaseSettings, settings: PanelSettings, on_exit: Callable[[], None] | None = None):
+    def __init__(self, root: BaseSettings, settings: PanelSettings, store: SettingsStore,
+                 on_exit: Callable[[], None] | None = None):
         self.root = root
         self.settings = settings
+        self.store = store
         self.on_exit = on_exit
         self._thread: threading.Thread | None = None
         self._stopped = threading.Event()
@@ -146,7 +148,7 @@ class PanelServer:
             "title": s.title, "port": s.port, "browser": s.browser,
             "browser_x": s.browser_x, "browser_y": s.browser_y,
             "browser_width": s.browser_width, "browser_height": s.browser_height,
-            "app": presets.current_app(), "default_startup": presets.default_startup(),
+            "folder": str(self.store.folder), "default_startup": self.store.default_startup,
             "log_level": logging.getLogger().getEffectiveLevel(),
         }
         self._send(("init", mirror.describe(self.root), mirror.values(self.root), config, [tuple(e) for e in entries]))
@@ -197,7 +199,7 @@ class PanelServer:
                 logger.warning("Panel: no action %s.%s", path, name)
         elif kind in ("load", "save"):
             _, request, name = message
-            self._send(("reply", request, self._preset(kind, name)))
+            self._send(("reply", request, self._file(kind, "setup", name)))
         elif kind == "exit":
             if self.on_exit is not None:
                 self.on_exit()
@@ -207,15 +209,14 @@ class PanelServer:
         else:
             logger.warning("Panel: unknown message %r", kind)
 
-    def _preset(self, kind: str, name: str) -> bool:
-        """Load or save the preset *name* on the tree; whether it worked."""
+    def _file(self, kind: str, group: str, name: str) -> bool:
+        """Load or save root group *group*'s file *name* on the tree; whether it worked."""
         try:
-            presets.validate_name(name)
-            path = presets.path(name)
+            self.store.validate_name(name)
             if kind == "load":
-                return presets.load(self.root, path)
-            presets.save(self.root, path)
+                return self.store.load(self.root, group, name)
+            self.store.save(self.root, group, name)
             return True
         except (OSError, ValueError):
-            logger.warning("Panel: preset %s of '%s' failed", kind, name, exc_info=True)
+            logger.warning("Panel: %s of %s file '%s' failed", kind, group, name, exc_info=True)
             return False

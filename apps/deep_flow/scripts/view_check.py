@@ -38,7 +38,8 @@ from modules.render import ColorInput, ColorLayer, ColorLayerSettings  # noqa: E
 from modules.video import StreamReader  # noqa: E402
 
 RECORDINGS = Path('apps/deep_flow/data/recordings')
-PRESET = Path('apps/deep_flow/data/settings/settings.json')
+PRESET = Path('apps/deep_flow/data/settings/flow/settings.json')
+SETUP = Path('apps/deep_flow/data/settings/setup/studio.json')
 
 
 def frames(chunk: Path, count: int, depth: bool) -> list[np.ndarray]:
@@ -112,7 +113,7 @@ def main() -> int:
     count = min(len(colors), len(depths))
     alignment = info.depth_alignment
 
-    preset = json.loads(PRESET.read_text(encoding='utf-8'))['flow']
+    preset = json.loads(PRESET.read_text(encoding='utf-8'))
     mh.context()
     settings = ViewLayerSettings()
     settings.initialize()
@@ -125,7 +126,7 @@ def main() -> int:
     if args.feather is not None:
         color_settings.feather = args.feather
     band = settings.crop
-    view = ViewLayer(settings, json.loads(PRESET.read_text(encoding='utf-8'))['camera']['fov'])
+    view = ViewLayer(settings, json.loads(SETUP.read_text(encoding='utf-8'))['setup']['camera']['fov'])
     view.allocate(preset['view']['width'], preset['view']['height'])
     color_stage = ColorLayer(color_settings)
     color_stage.allocate(preset['view']['width'], preset['view']['height'])

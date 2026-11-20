@@ -74,7 +74,7 @@ class Side:
     def __init__(self, spec: str, output: tuple[int, int], slice: float) -> None:
         self.slice: float = slice
         self.name, _, items = spec.partition(':')
-        preset = json.loads(PRESET.read_text())['flow']
+        preset = json.loads(PRESET.read_text())
         self.bridge_settings = Bridge3DLayerSettings()
         self.bridge_settings.update_from_dict(preset['bridge'])
         self.fluid_settings = Fluid3DLayerSettings()

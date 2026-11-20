@@ -7,9 +7,11 @@ from typing import Protocol
 
 from nicegui import ui
 
-from modules.settings import presets
+from modules.settings import SettingsStore
 
 logger = logging.getLogger(__name__)
+
+GROUP = "setup"     # the root group whose files the header shows
 
 
 class PresetStore(Protocol):
@@ -21,11 +23,11 @@ class PresetStore(Protocol):
     def save(self, name: str) -> bool: ...
 
 
-def preset_controls(store: PresetStore) -> None:
+def preset_controls(store: PresetStore, files: SettingsStore) -> None:
     """The star that marks the startup preset, the dropdown that loads a preset when picked, and
     the reload, save, save-as and delete buttons, in the caller's row."""
-    names = presets.scan()
-    startup = presets.get_startup()
+    names = files.scan(GROUP)
+    startup = files.startup(GROUP)
     initial = startup if startup in names else (names[0] if names else None)
 
     def set_startup() -> None:
@@ -33,7 +35,7 @@ def preset_controls(store: PresetStore) -> None:
         if not name:
             ui.notify("Select a preset first", type="warning")
             return
-        presets.set_startup(name)
+        files.set_startup(GROUP, name)
         show_star(name)
         ui.notify(f"'{name}' will load on next startup", type="positive")
 
@@ -41,7 +43,7 @@ def preset_controls(store: PresetStore) -> None:
 
     def show_star(selected: str | None) -> None:
         """The star lit when the selected preset is the startup one, grey and outlined otherwise."""
-        if selected and selected == presets.get_startup():
+        if selected and selected == files.startup(GROUP):
             star.props("color=warning", remove="outline")
         else:
             star.props("color=grey outline")
@@ -51,14 +53,14 @@ def preset_controls(store: PresetStore) -> None:
     dropdown = ui.select(options=names, value=initial, label="Preset").props("dense outlined").classes("min-w-[180px]")
 
     def refresh_dropdown() -> None:
-        dropdown.set_options(presets.scan())
+        dropdown.set_options(files.scan(GROUP))
 
     def on_preset_change(e) -> None:
         name = e.value
         show_star(name)
         if not name:
             return
-        if presets.path(name).exists():
+        if files.path(GROUP, name).exists():
             notify_load(name)
 
     dropdown.on_value_change(on_preset_change)
@@ -74,7 +76,7 @@ def preset_controls(store: PresetStore) -> None:
         if not name:
             ui.notify("Select a preset first", type="warning")
             return
-        if presets.path(name).exists():
+        if files.path(GROUP, name).exists():
             notify_load(name)
         else:
             ui.notify(f"Preset '{name}' not found", type="negative")
@@ -103,7 +105,7 @@ def preset_controls(store: PresetStore) -> None:
                         ui.notify("Enter a preset name", type="warning")
                         return
                     try:
-                        presets.validate_name(name)
+                        files.validate_name(name)
                     except ValueError:
                         ui.notify("Invalid preset name — no slashes or leading dots", type="negative")
                         return
@@ -133,7 +135,7 @@ def preset_controls(store: PresetStore) -> None:
                 ui.button("Cancel", on_click=dialog.close).props("flat")
 
                 def confirm() -> None:
-                    path = presets.path(name)
+                    path = files.path(GROUP, name)
                     if path.exists():
                         path.unlink()
                     refresh_dropdown()

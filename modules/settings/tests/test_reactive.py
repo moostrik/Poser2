@@ -1,14 +1,11 @@
 """Tests for the reactive settings system."""
 
 import json
-import os
-import tempfile
 import threading
 import unittest
 from enum import Enum
-from pathlib import Path
 
-from modules.settings import Field, Widget, BaseSettings, Group, presets
+from modules.settings import Field, Widget, BaseSettings, Group
 from modules.utils import Color, Point2f, Rect
 
 
@@ -398,82 +395,6 @@ class TestThreadSafety(unittest.TestCase):
         self.assertGreater(counter["n"], 0)
 
 
-class TestPresetSaveLoad(unittest.TestCase):
-    """Tests for preset save/load using a root Settings."""
-
-    def _make_root(self):
-        class Root(BaseSettings):
-            camera = Group(CameraSettings)
-        return Root()
-
-    def test_save_and_load(self):
-        root = self._make_root()
-        root.camera.exposure = 3000
-        root.camera.mode = RenderMode.WIREFRAME
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = os.path.join(tmpdir, "settings.json")
-            presets.save(root, path)
-
-            # Verify JSON file content
-            with open(path, "r") as f:
-                raw = json.load(f)
-            self.assertIn("camera", raw)
-            self.assertEqual(raw["camera"]["exposure"], 3000)
-
-            # Load into fresh root
-            root2 = self._make_root()
-            presets.load(root2, path)
-
-            self.assertEqual(root2.camera.exposure, 3000)
-            # init_only fields stay at default
-            self.assertEqual(root2.camera.resolution, 1080)
-            self.assertEqual(root2.camera.mode, RenderMode.WIREFRAME)
-
-    def test_load_fires_callbacks(self):
-        root = self._make_root()
-        results = []
-        root.camera.bind(CameraSettings.exposure, lambda v: results.append(v))
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = os.path.join(tmpdir, "settings.json")
-            # Save with different value
-            root.camera.exposure = 5000
-            presets.save(root, path)
-            results.clear()
-
-            # Reset and load
-            root.camera.exposure = 1000
-            results.clear()
-            presets.load(root, path)
-            self.assertEqual(results, [5000])
-
-    def test_children_accessible(self):
-        root = self._make_root()
-        self.assertIn("camera", root.children)
-        self.assertIsInstance(root.camera, CameraSettings)
-
-    def test_save_is_atomic(self):
-        """M5: save writes to a temp file then atomically replaces."""
-        root = self._make_root()
-        root.camera.exposure = 4242
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = os.path.join(tmpdir, "settings.json")
-            # Save twice — second write should not corrupt the first
-            presets.save(root, path)
-            root.camera.exposure = 9999
-            presets.save(root, path)
-
-            with open(path, "r") as f:
-                raw = json.load(f)
-            self.assertEqual(raw["camera"]["exposure"], 9999)
-
-            # No leftover .tmp files
-            tmp_files = [f for f in os.listdir(tmpdir) if f.endswith(".tmp")]
-            self.assertEqual(tmp_files, [])
-
-
 class TestSettingMetadata(unittest.TestCase):
     """Tests that metadata attributes are accessible."""
 
@@ -577,29 +498,6 @@ class TestFieldsProperty(unittest.TestCase):
         f = s.fields
         f["fake"] = None # type: ignore
         self.assertNotIn("fake", s.fields)
-
-
-class TestPresetExtras(unittest.TestCase):
-    """Tests for preset edge cases (missing/corrupt files)."""
-
-    def _make_root(self):
-        class Root(BaseSettings):
-            cam: CameraSettings
-        return Root()
-
-    def test_load_missing_file_no_error(self):
-        root = self._make_root()
-        presets.load(root, "nonexistent_path_12345.json")  # should not raise
-
-    def test_load_corrupt_file_no_error(self):
-        root = self._make_root()
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            f.write("{corrupt json!!!")
-            path = f.name
-        try:
-            presets.load(root, path)  # should not raise
-        finally:
-            os.unlink(path)
 
 
 class TestAction(unittest.TestCase):
@@ -831,28 +729,6 @@ class TestChild(unittest.TestCase):
     def test_class_level_group_descriptor_exists(self):
         desc = OuterSettings.__dict__.get("inner")
         self.assertIsInstance(desc, Group)
-
-    # -- Preset save/load with children -------------------------------------
-
-    def test_save_load_with_children(self):
-        class Root(BaseSettings):
-            outer = Group(OuterSettings)
-        root = Root()
-        root.outer.fps = 30.0
-        root.outer.inner.speed = 2.0
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            path = f.name
-        try:
-            presets.save(root, path)
-
-            root2 = Root()
-            presets.load(root2, path)
-
-            self.assertEqual(root2.outer.fps, 30.0)
-            self.assertEqual(root2.outer.inner.speed, 2.0)
-        finally:
-            os.unlink(path)
 
     # -- Deep nesting (3 levels) --------------------------------------------
 
@@ -1995,100 +1871,6 @@ class TestFieldReprBranches(unittest.TestCase):
         self.assertTrue(r.startswith("Field("))
 
 
-# ── load() return value ──────────────────────────────────────────────────
-
-class TestLoadReturnValue(unittest.TestCase):
-    """load() should return True on success, False on failure."""
-
-    def _make_root(self):
-        class Root(BaseSettings):
-            camera = Group(CameraSettings)
-        return Root()
-
-    def test_load_success_returns_true(self):
-        root = self._make_root()
-        with tempfile.TemporaryDirectory() as d:
-            p = os.path.join(d, "test.json")
-            presets.save(root, p)
-            self.assertTrue(presets.load(root, p))
-
-    def test_load_missing_returns_false(self):
-        root = self._make_root()
-        self.assertFalse(presets.load(root, "/nonexistent/path.json"))
-
-    def test_load_corrupt_returns_false(self):
-        root = self._make_root()
-        with tempfile.TemporaryDirectory() as d:
-            p = os.path.join(d, "bad.json")
-            with open(p, "w") as f:
-                f.write("{corrupted json!!")
-            self.assertFalse(presets.load(root, p))
-
-
-# ── presets utility functions ─────────────────────────────────────────────
-
-class TestPresetsUtilities(unittest.TestCase):
-    """Tests for path(), scan(), get_startup(), set_startup()."""
-
-    APP = "_test_app"
-
-    def setUp(self):
-        # presets resolves "apps/<app>/data/settings" relative to the cwd, so each test runs
-        # inside a temp tree under a throwaway app name — exercising the real app_dir lookup.
-        tmp = self.enterContext(tempfile.TemporaryDirectory())
-        self._orig_cwd = os.getcwd()
-        os.chdir(tmp)
-        self.settings_dir = Path(tmp) / "apps" / self.APP / "data" / "settings"
-        presets.set_app(self.APP)
-
-    def tearDown(self):
-        presets.set_app(None)          # module default: no app set
-        os.chdir(self._orig_cwd)
-
-    def test_path_returns_expected(self):
-        p = presets.path("mypreset")
-        self.assertEqual(p.name, "mypreset.json")
-        self.assertEqual(p.parent, Path("apps") / self.APP / "data" / "settings")
-
-    def test_path_without_app_raises(self):
-        presets.set_app(None)
-        with self.assertRaises(RuntimeError):
-            presets.path("mypreset")
-
-    def test_set_startup_get_startup_round_trip(self):
-        presets.set_startup("custom")
-        self.assertEqual(presets.get_startup(), "custom")
-
-    def test_get_startup_default_fallback(self):
-        # No .ui_preset.json → should return "studio"
-        self.assertEqual(presets.get_startup(), "studio")
-
-    def test_scan_returns_sorted_names(self):
-        self.settings_dir.mkdir(parents=True, exist_ok=True)
-        (self.settings_dir / "beta.json").write_text("{}")
-        (self.settings_dir / "alpha.json").write_text("{}")
-        (self.settings_dir / ".ui_preset.json").write_text("{}")   # dotfiles are not presets
-        self.assertEqual(presets.scan(), ["alpha", "beta"])
-
-    def test_set_startup_rejects_path_traversal(self):
-        with self.assertRaises(ValueError):
-            presets.set_startup("../etc/passwd")
-
-    def test_set_startup_rejects_empty(self):
-        with self.assertRaises(ValueError):
-            presets.set_startup("")
-
-    def test_set_startup_rejects_dotfile(self):
-        with self.assertRaises(ValueError):
-            presets.set_startup(".hidden")
-
-    def test_pinned_attribute(self):
-        f = Field(42, pinned=True)
-        self.assertTrue(f.pinned)
-        f2 = Field(42)
-        self.assertFalse(f2.pinned)
-
-
 # ── Bug-fix regression tests ──────────────────────────────────────────────
 
 class TestToJsonValueListElements(unittest.TestCase):
@@ -2760,35 +2542,6 @@ class TestGroupUpwardShare(unittest.TestCase):
         BtnChild.go.fire(s.writer)
         self.assertEqual(parent_calls, [True])
         self.assertEqual(reader_calls, [True])
-
-
-class TestValidateName(unittest.TestCase):
-    """Tests for presets.validate_name()."""
-
-    def test_valid_name_passes(self):
-        presets.validate_name("default")
-        presets.validate_name("my_preset")
-        presets.validate_name("preset-1")
-
-    def test_empty_raises(self):
-        with self.assertRaises(ValueError):
-            presets.validate_name("")
-
-    def test_forward_slash_raises(self):
-        with self.assertRaises(ValueError):
-            presets.validate_name("foo/bar")
-
-    def test_backslash_raises(self):
-        with self.assertRaises(ValueError):
-            presets.validate_name("foo\\bar")
-
-    def test_dot_prefix_raises(self):
-        with self.assertRaises(ValueError):
-            presets.validate_name(".hidden")
-
-    def test_path_traversal_raises(self):
-        with self.assertRaises(ValueError):
-            presets.validate_name("../etc/passwd")
 
 
 class _OrderBase(BaseSettings):

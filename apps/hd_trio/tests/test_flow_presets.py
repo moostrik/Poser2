@@ -8,7 +8,7 @@ from modules.settings import BaseSettings
 from apps.hd_trio.settings import Motion2DLayerSettings, Bridge2DLayerSettings, Fluid2DLayerSettings
 
 ROOT: Path = Path(__file__).resolve().parents[3]
-PRESETS: list[Path] = [ROOT / 'apps' / 'hd_trio' / 'data' / 'settings' / name for name in ('studio.json', 'umu.json')]
+PRESETS: list[Path] = [ROOT / 'apps' / 'hd_trio' / 'data' / 'settings' / 'setup' / name for name in ('studio.json', 'umu.json')]
 STAGES: dict[str, type[BaseSettings]] = {'motion': Motion2DLayerSettings, 'bridge': Bridge2DLayerSettings,
                                          'fluid': Fluid2DLayerSettings}
 

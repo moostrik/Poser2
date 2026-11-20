@@ -1,9 +1,9 @@
-"""deep_flow's timing runs, back to back, each on the preset with settings changed by path.
+"""deep_flow's timing runs, back to back, each on the startup files with settings changed by path.
 
-Each run copies the startup preset to `trial.json` beside it with its changes, points `.ui_preset.json` at it,
-runs `launcher.py -app deep_flow -sim -ni -timing 60 -warmup 10` and puts the pointer and the folder back as
-they were, so the operator's presets are never written. The reports land in `logs/` as every timing run's do;
-the script prints their names and the fluid's timers side by side.
+Each run copies the startup setup and flow files to `trial.json` in their folders with its changes, points
+`.startup.json` at them, runs `launcher.py -app deep_flow -sim -ni -timing 60 -warmup 10` and puts the pointer
+and the folders back as they were, so the operator's files are never written. The reports land in `logs/` as
+every timing run's do; the script prints their names and the fluid's timers side by side.
 
     python scripts/trial_runs.py --run base --run "visc:fluid.viscosity.viscosity=0.0001" [--seconds 60]
 """
@@ -16,17 +16,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SETTINGS = ROOT / 'apps' / 'deep_flow' / 'data' / 'settings'
-POINTER = SETTINGS / '.ui_preset.json'
+POINTER = SETTINGS / '.startup.json'
+GROUPS = ('setup', 'flow')
+DEFAULT_STARTUP = 'studio'
 TRIAL = 'trial'
 PYTHON = ROOT / '.venv-oak4' / 'Scripts' / 'python.exe'
 
 
-def changed(preset: dict, changes: list[str]) -> dict:
-    """The preset with each `path=value` set; a path's first part may name a top-level group or the group holding it."""
+def changed(tree: dict, changes: list[str]) -> dict:
+    """The tree with each `path=value` set; a path's first part may name a top-level group or the group holding it."""
     for change in changes:
         path, value = change.split('=', 1)
         parts = path.split('.')
-        node = _find(preset, parts[0])
+        node = _find(tree, parts[0])
         for part in parts[1:-1]:
             node = node[part]
         current = node[parts[-1]]
@@ -36,7 +38,7 @@ def changed(preset: dict, changes: list[str]) -> dict:
             node[parts[-1]] = value in ('1', 'true', 'True')
         else:
             node[parts[-1]] = type(current)(value)
-    return preset
+    return tree
 
 
 def _find(node: dict, key: str) -> dict:
@@ -55,20 +57,28 @@ def report_names() -> set[str]:
 
 
 def run(label: str, changes: list[str], seconds: int, warmup: int) -> Path | None:
-    startup = json.loads(POINTER.read_text(encoding='utf-8'))['startup_preset']
-    preset = json.loads((SETTINGS / f'{startup}.json').read_text(encoding='utf-8'))
-    trial = SETTINGS / f'{TRIAL}.json'
-    pointer = POINTER.read_text(encoding='utf-8')
+    pointer: str | None = POINTER.read_text(encoding='utf-8') if POINTER.exists() else None
+    startup: dict[str, str] = json.loads(pointer) if pointer else {}
+    # the setup's file holds the root's fields beside `setup`; the flow joins it as `flow`, so a path finds either
+    tree: dict = json.loads((SETTINGS / 'setup' / f"{startup.get('setup', DEFAULT_STARTUP)}.json").read_text(encoding='utf-8'))
+    tree['flow'] = json.loads((SETTINGS / 'flow' / f"{startup.get('flow', DEFAULT_STARTUP)}.json").read_text(encoding='utf-8'))
+    tree = changed(tree, changes)
+    trials = {group: SETTINGS / group / f'{TRIAL}.json' for group in GROUPS}
     before = report_names()
     try:
-        trial.write_text(json.dumps(changed(preset, changes), indent=2), encoding='utf-8')
-        POINTER.write_text(json.dumps({'startup_preset': TRIAL}, indent=2), encoding='utf-8')
-        print(f'{label}: {", ".join(changes) or "the preset"}', flush=True)
+        trials['flow'].write_text(json.dumps(tree.pop('flow'), indent=2), encoding='utf-8')
+        trials['setup'].write_text(json.dumps(tree, indent=2), encoding='utf-8')
+        POINTER.write_text(json.dumps({group: TRIAL for group in GROUPS}, indent=2), encoding='utf-8')
+        print(f'{label}: {", ".join(changes) or "the startup files"}', flush=True)
         subprocess.run([str(PYTHON), 'launcher.py', '-app', 'deep_flow', '-sim', '-ni',
                         '-timing', str(seconds), '-warmup', str(warmup)], cwd=ROOT, check=False)
     finally:
-        POINTER.write_text(pointer, encoding='utf-8')
-        trial.unlink(missing_ok=True)
+        if pointer is None:
+            POINTER.unlink(missing_ok=True)
+        else:
+            POINTER.write_text(pointer, encoding='utf-8')
+        for trial in trials.values():
+            trial.unlink(missing_ok=True)
     new = sorted(report_names() - before)
     return ROOT / 'logs' / new[-1] if new else None
 

@@ -1,0 +1,317 @@
+{
+  "view": {
+    "width": 448,
+    "height": 800,
+    "crop": {
+      "center_x": 0.5,
+      "center_y": 0.5,
+      "height": 1.0
+    },
+    "monitor_main": {
+      "texture": "depth.filled",
+      "view": "COLORMAP",
+      "advanced": {
+        "channel": "ALL",
+        "scale": 1.0,
+        "blend_mode": "ADD",
+        "glyph_spacing": "SPACING_32",
+        "colormap": "JET",
+        "legend": true
+      }
+    },
+    "monitor_debug": {
+      "texture": "depth.filled",
+      "view": "IMAGE",
+      "advanced": {
+        "channel": "ALL",
+        "scale": 1.0,
+        "blend_mode": "ADD",
+        "glyph_spacing": "SPACING_32",
+        "colormap": "JET",
+        "legend": true
+      }
+    }
+  },
+  "color": {
+    "enabled": true,
+    "white_balance": 6500.0,
+    "exposure": 1.0,
+    "offset": 0.0,
+    "gamma": 0.8,
+    "contrast": 1.25,
+    "saturation": 1.2,
+    "sharpen": 1.0,
+    "luma_matte": 0.0,
+    "use_mask": true,
+    "erode": 0,
+    "feather": 4.0,
+    "monitor_main": {
+      "texture": "output.velocity",
+      "view": "COLORMAP",
+      "advanced": {
+        "channel": "ALL",
+        "scale": 1.0,
+        "blend_mode": "ADD",
+        "glyph_spacing": "SPACING_32",
+        "colormap": "JET",
+        "legend": true
+      }
+    },
+    "monitor_debug": {
+      "texture": "output.velocity",
+      "view": "COLORMAP",
+      "advanced": {
+        "channel": "ALL",
+        "scale": 1.0,
+        "blend_mode": "ADD",
+        "glyph_spacing": "SPACING_32",
+        "colormap": "JET",
+        "legend": true
+      }
+    }
+  },
+  "motion": {
+    "guard": true,
+    "width": 448,
+    "height": 800,
+    "use_mask": true,
+    "x_gain": 1.0,
+    "y_gain": 1.0,
+    "xy": {
+      "levels": 5,
+      "window": "SEVEN",
+      "damping": 0.03,
+      "threshold": 0.5
+    },
+    "monitor_main": {
+      "texture": "output.velocity",
+      "view": "IMAGE",
+      "advanced": {
+        "channel": "ALL",
+        "scale": 58.9,
+        "blend_mode": "ADD",
+        "glyph_spacing": "SPACING_16",
+        "colormap": "JET",
+        "legend": true
+      }
+    },
+    "monitor_debug": {
+      "texture": "output.velocity",
+      "view": "IMAGE",
+      "advanced": {
+        "channel": "ALL",
+        "scale": 100.0,
+        "blend_mode": "ADD",
+        "glyph_spacing": "SPACING_32",
+        "colormap": "JET",
+        "legend": true
+      }
+    }
+  },
+  "bridge": {
+    "width": 448,
+    "height": 800,
+    "filters": {
+      "lowpass": {
+        "advect": 0.5,
+        "attack": 1.0,
+        "smooth": 200.0,
+        "blur": 0.081
+      },
+      "bandpass": {
+        "fast_smooth": 25.0,
+        "slow_smooth": 150.0,
+        "start_region_weight": 1.0,
+        "stop_region_weight": 1.0,
+        "start_region_size": 128.0,
+        "stop_region_size": 128.0
+      }
+    },
+    "velocity": {
+      "trail": 1.0,
+      "change": 0.0,
+      "start": 0.0,
+      "bow": 0.0,
+      "stop": 0.0,
+      "wake": 0.0,
+      "peak": {
+        "enabled": true
+      }
+    },
+    "acceleration": {
+      "trail": 0.0,
+      "change": 0.0,
+      "start": 0.0,
+      "bow": 0.0,
+      "stop": 0.0,
+      "wake": 1.0
+    },
+    "density": {
+      "trail": 1.0,
+      "change": 0.0,
+      "start": 0.0,
+      "bow": 0.05,
+      "stop": 0.0,
+      "wake": 0.0,
+      "mask": 0.0
+    },
+    "temperature": {
+      "trail": 1.0,
+      "change": 0.0,
+      "start": 0.0,
+      "bow": 0.0,
+      "stop": 0.0,
+      "wake": 0.0,
+      "mask": 0.0
+    },
+    "expansion": {
+      "trail": 0.0,
+      "change": 0.0,
+      "start": 0.0,
+      "bow": 0.0,
+      "stop": 1.0,
+      "wake": 0.0,
+      "mask": 0.05
+    },
+    "monitor_main": {
+      "texture": "output.density",
+      "view": "COLORMAP",
+      "advanced": {
+        "channel": "ALL",
+        "scale": 1.0,
+        "blend_mode": "ADD",
+        "glyph_spacing": "SPACING_32",
+        "colormap": "JET",
+        "legend": true
+      }
+    },
+    "monitor_debug": {
+      "texture": "density.amount",
+      "view": "IMAGE",
+      "advanced": {
+        "channel": "ALL",
+        "scale": 1.0,
+        "blend_mode": "ADD",
+        "glyph_spacing": "SPACING_32",
+        "colormap": "JET",
+        "legend": true
+      }
+    }
+  },
+  "fluid": {
+    "guard": true,
+    "wall": "CLOSED",
+    "slip_time": 9.4,
+    "width": 1080,
+    "height": 1920,
+    "blend_mode": "ADD",
+    "time": {
+      "time_step": "MEASURED",
+      "fixed_fps": 60.0,
+      "fps_smoothing": 1.0,
+      "time_scale": 1.0
+    },
+    "gravity": {
+      "x": 0.0,
+      "y": -0.02
+    },
+    "input": {
+      "velocity_drag": 76.0,
+      "velocity_gain": 1.0,
+      "acceleration_gain": 10.0,
+      "density_drag": 200.0,
+      "density_release": 0.0,
+      "density_gain": 5.0,
+      "density_blend": "OVER",
+      "temperature_drag": 200.0,
+      "temperature_gain": 5.0
+    },
+    "velocity": {
+      "advection": "SEMI_LAGRANGIAN",
+      "limiter": "CLAMP",
+      "advection_scale": 1.0,
+      "fade_time": 0.0,
+      "evaporation_time": 0.0,
+      "evaporation_knee": 0.1
+    },
+    "viscosity": {
+      "enabled": true,
+      "viscosity": 0.0,
+      "iterations": 20
+    },
+    "vorticity": {
+      "enabled": true,
+      "strength_1": 32.83,
+      "strength_2": 0.0,
+      "strength_3": 0.0,
+      "radius_1": 0.1,
+      "radius_2": 0.01,
+      "radius_3": 0.025
+    },
+    "temperature": {
+      "enabled": true,
+      "buoyancy": 3.8,
+      "fade_time": 0.0,
+      "evaporation_time": 10.0,
+      "evaporation_knee": 0.1
+    },
+    "expansion": {
+      "enabled": false,
+      "rate": 0.0
+    },
+    "pressure": {
+      "enabled": true,
+      "solver": "MULTIGRID",
+      "iterations": 40,
+      "relaxation": 1.85,
+      "cycles": 1,
+      "reach": 0.05
+    },
+    "density": {
+      "color_space": "OKLAB",
+      "sink": 1.36,
+      "advection": "MACCORMACK",
+      "limiter": "CLAMP",
+      "advection_scale": 2.0,
+      "fade_time": 0.0,
+      "evaporation_time": 0.0,
+      "evaporation_knee": 0.1
+    },
+    "lut": {
+      "folder": "data/luts",
+      "files": [
+        "",
+        "Blockbuster.cube",
+        "Cityscape.cube",
+        "Frosted.cube",
+        "Vibrance.cube"
+      ],
+      "file": "",
+      "strength": 1.0
+    },
+    "monitor_main": {
+      "texture": "output.velocity",
+      "view": "COLORMAP",
+      "advanced": {
+        "channel": "ALL",
+        "scale": 1.0,
+        "blend_mode": "ADD",
+        "glyph_spacing": "SPACING_32",
+        "colormap": "JET",
+        "legend": true
+      }
+    },
+    "monitor_debug": {
+      "texture": "output.velocity",
+      "view": "COLORMAP",
+      "advanced": {
+        "channel": "ALL",
+        "scale": 1.0,
+        "blend_mode": "ADD",
+        "glyph_spacing": "SPACING_32",
+        "colormap": "JET",
+        "legend": true
+      }
+    }
+  }
+}

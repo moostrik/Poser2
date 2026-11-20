@@ -4,7 +4,7 @@ Starts ComfyUI from its own venv the way start_comfy.bat does, waits for it, che
 and that onnxruntime has its CUDA provider, runs the warm-up workflow once (every model loads, the whole
 chain works), then stops it. A failure names the step. Exit 0 when all passed.
 
-    .venv\\Scripts\\python -m apps.smile.comfy.smoke [--comfy DIR] [--port 8188] [--preset FILE] [--keep] [--save DIR]
+    .venv\\Scripts\\python -m apps.smile.comfy.smoke [--comfy DIR] [--port 8188] [--setup NAME] [--keep] [--save DIR]
 
 --save runs the whole workflow with the fixed seed instead and writes its portrait and last grin frame into
 DIR: the picture of an install, which install_comfy.ps1 -Update makes before and after to put side by side.
@@ -28,14 +28,15 @@ from .client import ComfyClient, Event
 from .generator import WARMUP_IMAGE, WARMUP_TIMEOUT
 from .workflow import NO_LORA, Workflow
 from ..settings import Settings
-from modules.settings import presets
+from modules.settings import SettingsStore
 
 logger = logging.getLogger('smoke')
 
 ROOT: Path = Path(__file__).resolve().parents[3]       # the Poser2 root: the app runs from it
 APP: Path = ROOT / 'apps' / 'smile'
 START_TIMEOUT: float = 240.0        # s for ComfyUI to answer /system_stats (the packs import torch, insightface, transformers)
-PRESET: str = 'apps/smile/data/settings/Smile.json'
+SETTINGS: str = 'apps/smile/data/settings'     # the app's settings folder
+SETUP: str = 'Smile'
 
 
 class Failed(Exception):
@@ -84,13 +85,13 @@ def check_cuda(log: Path) -> None:
     logger.info('%s', line.strip())
 
 
-def warm_up(client: ComfyClient, preset: str, save: Path | None = None) -> float:
+def warm_up(client: ComfyClient, setup: str, save: Path | None = None) -> float:
     """The warm-up workflow once, as the generator runs it after every connect. The seconds it took.
     With save: the full run instead, with the fixed seed, and its portrait and last grin frame written
     into that folder as PNGs (the picture of an install, to put next to another's)."""
     settings = Settings()
-    if not presets.load(settings, preset):
-        raise Failed(f'could not load the preset {preset}')
+    if not SettingsStore(SETTINGS).load(settings, 'setup', setup):
+        raise Failed(f'could not load the setup file {setup}')
     p = settings.setup.generator
     sampler: dict = client.object_info('KSampler')['input']['required']
     loras: list[str] = list(client.object_info('LoraLoader')['input']['required']['lora_name'][0])
@@ -158,7 +159,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--comfy', type=Path, default=APP / 'ComfyUI', help='the ComfyUI install')
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('--port', type=int, default=8188)
-    parser.add_argument('--preset', default=PRESET, help='the preset whose models and workflow are tested')
+    parser.add_argument('--setup', default=SETUP, help='the setup file whose models and workflow are tested')
     parser.add_argument('--keep', action='store_true', help='leave ComfyUI running afterwards')
     parser.add_argument('--save', type=Path, help='run the full workflow with the fixed seed and save its portrait and last grin frame here')
     args = parser.parse_args(argv)
@@ -179,7 +180,7 @@ def main(argv: list[str] | None = None) -> int:
         process = start_comfy(args.comfy, python, args.port, log)
         wait_for(client, process, START_TIMEOUT)
         check_cuda(log)
-        seconds: float = warm_up(client, args.preset, args.save)
+        seconds: float = warm_up(client, args.setup, args.save)
         print(f'Smoke test passed: ComfyUI on CUDA, the {"fixed-seed run" if args.save else "warm-up"} took {seconds:.0f} s (log {log})')
         return 0
     except Failed as e:

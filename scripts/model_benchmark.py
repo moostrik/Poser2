@@ -34,7 +34,7 @@ import modules.inference as inference  # noqa: E402
 from modules.camera import CameraFrame, FrameType  # noqa: E402
 from modules.inference import GpuImage, ImageUpload, ModelType, crop, pose, segmentation  # noqa: E402
 from modules.pose import BBox, Frame, FrameDict, Points2D  # noqa: E402
-from modules.settings import BaseSettings, presets  # noqa: E402
+from modules.settings import BaseSettings, SettingsStore  # noqa: E402
 from modules.utils import PerformanceTimer, Rect, timing  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -92,11 +92,9 @@ DETECTOR_IMAGE: Path = Path('modules/inference/face/tests/data/face.jpg')
 
 
 def load_app_settings(app: str) -> BaseSettings:
-    """The app's setup with its startup preset loaded, as the app's main builds it."""
-    presets.set_app(app)
+    """The app's setup with its startup files loaded, as the app's main builds it."""
     settings = importlib.import_module(f"apps.{app}.settings").Settings()
-    if not presets.load(settings, presets.startup_path()):
-        raise FileNotFoundError(f"No startup preset for '{app}' at {presets.startup_path()}")
+    SettingsStore(f"apps/{app}/data/settings", 'Smile' if app == 'smile' else 'studio').load_startup(settings)
     setup: BaseSettings = settings.setup
     if app in ('white_space', 'hd_trio'):   # they cut the pose model's crops at its size (their main.py)
         setup.pose.pose_crop.output_width = setup.pose.pose.width

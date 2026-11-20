@@ -18,7 +18,7 @@ from typing import Any, Callable
 from nicegui import Client, app as nicegui_app, core, ui
 
 from modules.log_config import LogEntry, LogRingBuffer
-from modules.settings import BaseSettings, Field, Widget, mirror, presets
+from modules.settings import BaseSettings, Field, SettingsStore, Widget, mirror
 
 from .app_window import APP_QUERY, SELF_CLOSE_SCRIPT, open_app_window
 from .page import STATIC_DIR, STATIC_URL, build_page, local_ips
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 HOST = "127.0.0.1"
 CONNECT_TIMEOUT = 15.0  # seconds the process waits for the app's connection before it ends
-REPLY_TIMEOUT = 5.0     # seconds a preset load or save waits for the app's answer
+REPLY_TIMEOUT = 5.0     # seconds a settings file's load or save waits for the app's answer
 
 
 class AppLink:
@@ -202,8 +202,8 @@ def main() -> None:
     mirror.apply(root, values)
     link.watch(root)
 
-    presets.set_app(config["app"], config["default_startup"])
-    state = PanelState(presets.app_dir() / STATE_FILE)
+    store = SettingsStore(config["folder"], config["default_startup"])
+    state = PanelState(store.folder / STATE_FILE)
     state.load()
     title: str = config["title"]
     port: int = config["port"]
@@ -220,7 +220,7 @@ def main() -> None:
         ui.add_head_html('<style>* { transition-duration: 0s !important; animation-duration: 0s !important; }</style>')
         with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
             controls = build_page(root, state, title=title, port=port, on_exit=link.exit, log_buffer=log_buffer,
-                                  presets_store=link)
+                                  link=link, store=store)
         # The page is built on the event loop, which holds every other client's poll and commit
         # meanwhile: the number says whether the build must get cheaper.
         logger.info("Panel built in %.0f ms, %d polled controls", (time.perf_counter() - started) * 1000, controls)

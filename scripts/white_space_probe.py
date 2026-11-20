@@ -35,7 +35,7 @@ import numpy as np  # noqa: E402
 from modules.log_config import setup_logging, install_excepthooks  # noqa: E402
 from modules.camera import CameraFrame, CameraFrameCallback, FrameType  # noqa: E402
 from modules.pose import FrameDict  # noqa: E402
-from modules.settings import presets  # noqa: E402
+from modules.settings import BaseSettings, SettingsStore  # noqa: E402
 from modules.utils import PerformanceTimer  # noqa: E402
 from apps.white_space.main import WhiteSpaceMain  # noqa: E402
 from apps.white_space.settings import Stage  # noqa: E402
@@ -79,17 +79,16 @@ def main() -> int:
 
     setup_logging(verbose=False, name='white_space')
     install_excepthooks()
-    load = presets.load
+    load_startup = SettingsStore.load_startup
 
-    def load_for_replay(settings, path) -> bool:
-        """The startup preset, then the replay with the detector: both are read when the app builds its cameras."""
-        loaded: bool = load(settings, path)
-        settings.setup.camera.simulator.replay = True
-        settings.setup.camera.yolo = True
-        return loaded
-    presets.load = load_for_replay
+    def load_for_replay(self: SettingsStore, root: BaseSettings) -> None:
+        """The startup files, then the replay with the detector: both are read when the app builds its cameras."""
+        load_startup(self, root)
+        root.setup.camera.simulator.replay = True
+        root.setup.camera.yolo = True
+    SettingsStore.load_startup = load_for_replay
     app = WhiteSpaceMain(simulation=True, interface=False)
-    presets.load = load
+    SettingsStore.load_startup = load_startup
     settings = app.settings.setup
     settings.camera.simulator.folder = args.folder
     settings.pose.pose.enabled = True

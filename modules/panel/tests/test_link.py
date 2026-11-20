@@ -7,7 +7,7 @@ from multiprocessing import Pipe
 from typing import Callable
 
 from modules.log_config import LogRingBuffer
-from modules.settings import BaseSettings, Field, Widget, mirror
+from modules.settings import BaseSettings, Field, SettingsStore, Widget, mirror
 
 from ..process import AppLink
 from ..server import PanelServer, PanelSettings
@@ -36,7 +36,7 @@ class TestLink(unittest.TestCase):
         self.tree.bind(Probe.reset, self.presses.append)
 
         app_end, panel_end = Pipe()
-        self.server = PanelServer(self.tree, PanelSettings())
+        self.server = PanelServer(self.tree, PanelSettings(), SettingsStore("settings"))
         self.server._conn = app_end
         self.thread = threading.Thread(target=self.server._link, args=(app_end,), daemon=True)
         self.thread.start()

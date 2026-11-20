@@ -1,4 +1,4 @@
-"""HD Trio's settings tree, its root ``Settings``; its presets in ``apps/hd_trio/data/settings/``."""
+"""HD Trio's settings tree, its root ``Settings``, which holds ``setup``; its files in ``apps/hd_trio/data/settings/setup/``."""
 
 from enum import IntEnum, auto
 from typing import Any

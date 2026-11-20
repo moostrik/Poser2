@@ -19,7 +19,7 @@ from .online.online import Online
 from .online.link import http_base
 from .player import Player, online_cell_mode
 from . import sphere
-from modules.settings import presets
+from modules.settings import SettingsStore
 from modules.panel import PanelServer
 from .settings import Settings
 from argparse import ArgumentParser, Namespace
@@ -30,7 +30,6 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-APP_NAME = 'smile'
 DATA_PATH = 'apps/smile/data'
 
 # a visitor the generator has not ended this long after its own limit (connection.job_timeout) is ended
@@ -68,13 +67,14 @@ class SmileMain():
         fullscreen: bool = options.fullscreen
 
         # SETTINGS
-        presets.set_app(APP_NAME, default_startup='Smile')
         self.settings = Settings()
         self.settings.setup.panel.title = 'SMILE'
         self.settings.setup.panel.port = 667
-        preset_file = presets.startup_path()
-        if not presets.load(self.settings, preset_file):
-            logger.warning('No preset at %s, using defaults', preset_file)
+        self.store = SettingsStore(f'{DATA_PATH}/settings', default_startup='Smile')
+        try:
+            self.store.load_startup(self.settings)
+        except FileNotFoundError:
+            logger.warning('No setup file at %s, using defaults', self.store.path('setup', self.store.startup('setup')))
         if not interface:
             self.settings.setup.panel.browser = False  # launcher override; the preset cannot turn it back on
         if fullscreen:
@@ -82,7 +82,7 @@ class SmileMain():
             for window in self.settings.setup.windows.windows:
                 window.fullscreen = True
         self.settings.initialize()
-        self.panel_server = PanelServer(self.settings, self.settings.setup.panel, on_exit=self.stop)
+        self.panel_server = PanelServer(self.settings, self.settings.setup.panel, self.store, on_exit=self.stop)
 
         self.sequencer: Sequencer = Sequencer(self.settings.setup.sequence)
         # the generator fills the grin player with the grin frames, the render plays them on its own clock

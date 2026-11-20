@@ -30,7 +30,7 @@ from OpenGL.GL import GL_FLOAT, GL_RGBA, GL_TEXTURE_3D, glBindTexture, glFinish,
 import monitor_harness as mh  # noqa: E402
 from modules.flow import Advection, Fluid3D, Fluid3DSettings  # noqa: E402
 
-PRESET = Path(__file__).resolve().parent.parent / 'apps' / 'deep_flow' / 'data' / 'settings' / 'settings.json'
+PRESET = Path(__file__).resolve().parent.parent / 'apps' / 'deep_flow' / 'data' / 'settings' / 'flow' / 'settings.json'
 W, H = 448, 800         # the bridge's output size the body is drawn at
 FPS = 60.0
 

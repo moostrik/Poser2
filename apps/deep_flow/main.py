@@ -11,7 +11,7 @@ from modules.camera import CameraSource, CameraHealth, CameraTracklets
 from modules.camera.oak4 import Camera, ModelChain
 from modules.recording import Player, Recorder, replay
 from modules.session import Session
-from modules.settings import presets
+from modules.settings import SettingsStore
 from modules.panel import PanelServer
 from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, TrackerFrameSource
@@ -26,7 +26,6 @@ from .pose.pipeline import pipeline_spec
 from .settings import Settings, Stage
 from .render import DeepFlowRender
 
-APP_NAME = 'deep_flow'
 DATA_PATH = 'apps/deep_flow/data'
 
 
@@ -37,11 +36,9 @@ class DeepFlowMain:
         self.is_finished: bool = False
 
         # SETTINGS
-        presets.set_app(APP_NAME)
         self.settings = Settings()
-        preset_file = presets.startup_path()
-        if not presets.load(self.settings, preset_file):
-            raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
+        self.store = SettingsStore(f'{DATA_PATH}/settings')
+        self.store.load_startup(self.settings)
         self.settings.setup.camera.sim_enabled = simulation
         if not interface:
             self.settings.setup.panel.browser = False  # launcher override; the preset cannot turn it back on
@@ -52,7 +49,7 @@ class DeepFlowMain:
         crop_settings.output_width = self.settings.setup.pose.pose.width
         crop_settings.output_height = self.settings.setup.pose.pose.height
         self.settings.initialize()
-        self.panel_server = PanelServer(self.settings, self.settings.setup.panel, on_exit=self.stop)
+        self.panel_server = PanelServer(self.settings, self.settings.setup.panel, self.store, on_exit=self.stop)
 
         max_players: int = self.settings.setup.max_players
         num_cams: int = self.settings.setup.num_cams

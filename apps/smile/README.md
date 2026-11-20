@@ -89,7 +89,7 @@ not in git, safe to delete); the app's own logs are in Poser2's `logs\`.
 
 ### Settings panel
 * open http://localhost:667 in a browser (also reachable from other devices on the network, the log says the address)
-* presets live in `data\settings\`; `smile.json` loads at startup (the star in the panel picks the startup preset; it is kept in `data\settings\.ui_preset.json`)
+* the setup files live in `data\settings\setup\`; `Smile.json` loads at startup (the star in the panel picks the startup file; it is kept in `data\settings\.startup.json`)
 * monitors are numbered primary first, then left to right: SMILE's window is `windows.window_0`, the walls `window_1` (wall 1, screens 1-24) and `window_2`, each with its `monitor`, `fullscreen` and `enabled`; a window whose monitor is not connected waits in a small window on the primary one and moves to its monitor when that is plugged in
 * **Walls** tab: `pool` (clips kept decoded in RAM, about 200 MB each), `recent` (the last recordings, always playing on every third of the sphere), `recycle_every`, `decoder` (the chip the clips are decoded on, read at the start); `fps`, `spread` and `trail` (live)
 
@@ -102,7 +102,7 @@ not in git, safe to delete); the app's own logs are in Poser2's `logs\`.
 * ComfyUI log lines that are safe to ignore: `0 models unloaded.` at every sampler step (ComfyUI fills the card on purpose and reports that nothing could be freed), at startup `[ComfyUI-Manager] PyTorch is not installed` (it wants torchaudio), the `PatchTritonVAE requires triton` traceback (KJNodes, an unused node), `No module named 'llama_cpp'` (QwenVL's GGUF variant, unused), `triton not found`, `Skip loading CUDA and cuDNN DLLs since torch is imported` (a good sign: onnxruntime reuses torch's CUDA), and `ConnectionResetError ... _call_connection_lost` after "Prompt executed" (a browser tab closed). **Not ignorable**: `CUDAExecutionProvider is not in available provider names` means face analysis fell back to the CPU (crops take 25 s instead of 1 s); `install_comfy.ps1` checks the provider and reinstalls `onnxruntime-gpu` when it is missing, so run `apps\smile\scripts\install.bat` again
 * ```.venv\Scripts\python launcher.py -app smile```: `-fs` borderless fullscreen with the walls borderless too (else the preset's window modes), `-wc` a webcam instead of the Vimba camera, `-lm` landscape instead of portrait, `-v` DEBUG on the console (the launcher's, before the app's)
 * ```apps\smile\scripts\make_test_workflow.bat```: writes `data\comfy\smile_test.json`, the app's workflow with a preset's values plus previews and a video recorder, to drag into the ComfyUI page; it starts from the app's last capture, and any other photo goes in after ```.venv\Scripts\python apps\smile\scripts\crop_faces.py photo.jpg``` (the crop as SMILE makes it, `photo_crop.png`)
-* drop a saved clip or portrait on ```apps\smile\scripts\clip_info.bat``` to see what it was made with (the record: id, style, description, seed, settings); ```.venv\Scripts\python -m apps.smile.save.record <file> --preset <name>``` writes those settings to `data\settings\<name>.json`
+* drop a saved clip or portrait on ```apps\smile\scripts\clip_info.bat``` to see what it was made with (the record: id, style, description, seed, settings); ```.venv\Scripts\python -m apps.smile.save.record <file> --setup <name>``` writes those settings to `data\settings\setup\<name>.json`
 * tests: ```.venv\Scripts\python -m unittest discover -s apps/smile/<package>/tests -t .``` from the Poser2 root (`tests`, `face`, `comfy`, ..., `relay`)
 
 ### Credit

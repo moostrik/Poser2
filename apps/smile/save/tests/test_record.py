@@ -44,7 +44,7 @@ class TestRecord(unittest.TestCase):
         self.assertIsNone(record.read_jpeg(self.path))
         self.assertIsNone(record.read(self.path))
 
-    def test_a_record_as_a_preset(self):
+    def test_a_record_as_a_setup_file(self):
         made = GeneratorSettings()
         made.style_b.prompt = 'the style'
         made.portrait.steps = 9
@@ -55,7 +55,7 @@ class TestRecord(unittest.TestCase):
                             'peak': {'smile': 3.21, 'yaw': -7.5}, 'peak_at': {'smile': 0.6, 'yaw': 0.4}}}
         settings = GeneratorSettings()
         style_a = settings.style_a.to_dict()
-        settings.update_from_dict(json.loads(json.dumps(record.to_preset(visitor)))['setup']['generator'])
+        settings.update_from_dict(json.loads(json.dumps(record.to_setup(visitor)))['setup']['generator'])
         self.assertEqual(settings.style_b.prompt, 'the style')
         self.assertEqual(settings.style_a.to_dict(), style_a)       # the other style is not touched
         self.assertEqual(settings.portrait.steps, 9)
@@ -64,8 +64,8 @@ class TestRecord(unittest.TestCase):
         # every range closed on the value that was drawn
         self.assertEqual((g.smile_min, g.smile_max, g.yaw_min, g.yaw_max), (3.21, 3.21, -7.5, -7.5))
 
-    def test_a_record_of_the_first_shape_as_a_preset(self):
-        self.assertEqual(record.to_preset({'style': 'A', 'settings': {'pipeline': {}}}), {'setup': {'generator': {}}})
+    def test_a_record_of_the_first_shape_as_a_setup_file(self):
+        self.assertEqual(record.to_setup({'style': 'A', 'settings': {'pipeline': {}}}), {'setup': {'generator': {}}})
 
     def test_a_comment_that_is_no_record(self):
         self.write(record.embed_jpeg(self.jpeg, 'made by a camera'))

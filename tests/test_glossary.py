@@ -114,7 +114,7 @@ def names(path: Path) -> list[tuple[int, str]]:
 
 
 def preset_files() -> list[Path]:
-    return [path for folder in PRESET_DIRS for path in sorted(folder.glob('*.json')) if not path.name.startswith('.')]
+    return [path for folder in PRESET_DIRS for path in sorted(folder.glob('*/*.json')) if not path.name.startswith('.')]
 
 
 def stored_names(node: object, path: str = '') -> Iterator[tuple[str, str]]:
@@ -159,7 +159,7 @@ class TestGlossary(unittest.TestCase):
 
     def test_every_preset_folder_has_presets(self) -> None:
         for folder in PRESET_DIRS:
-            self.assertTrue(any(folder.glob('*.json')), f"no presets in {folder.relative_to(ROOT).as_posix()}")
+            self.assertTrue(any(folder.glob('*/*.json')), f"no presets in {folder.relative_to(ROOT).as_posix()}")
 
 
 if __name__ == '__main__':

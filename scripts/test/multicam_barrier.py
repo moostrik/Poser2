@@ -2,7 +2,7 @@
 THERE IS NO OFFICIAL DEPTHAI V3 MULTICAM SUPPORT FOR OAK-D Pro W (according to the luxonis ai)
 depthai v3 multi-camera test — mirrors the app's exact camera setup.
 
-4 camera IDs from apps/white_space/data/settings/studio.json.
+4 camera IDs from apps/white_space/data/settings/setup/studio.json.
 Sometimes not all cameras are connected. DeviceInfo is resolved in the main
 thread before any camera thread starts (same fix applied to camera.py).
 
@@ -46,7 +46,7 @@ def _t() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Camera IDs — from apps/white_space/data/settings/studio.json
+# Camera IDs — from apps/white_space/data/settings/setup/studio.json
 # ---------------------------------------------------------------------------
 
 CAMERA_IDS = [

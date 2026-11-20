@@ -1,12 +1,7 @@
 """Low Flow settings — single-camera 2D fluid installation.
 
-PRESET MAINTENANCE
-------------------
-Preset JSON files live in ``apps/low_flow/data/settings/``.
-Each JSON mirrors this settings tree exactly.  When you rename, add,
-or remove a Field here, update every ``.json`` file in that directory
-to match — delete stale keys, add new keys with their Field default.
-The root class is ``Settings``.
+Its root ``Settings`` holds ``setup`` and ``flow``; each root group's files are in
+``apps/low_flow/data/settings/<group>/``.
 """
 
 from enum import IntEnum, auto

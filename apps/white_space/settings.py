@@ -1,12 +1,6 @@
 """White Space settings — 3-camera panoramic installation with circular LED output.
 
-PRESET MAINTENANCE
-------------------
-Preset JSON files live in ``apps/white_space/data/settings/``.
-Each JSON mirrors this settings tree exactly.  When you rename, add,
-or remove a Field here, update every ``.json`` file in that directory
-to match — delete stale keys, add new keys with their Field default.
-The root class is ``Settings``.
+Its root ``Settings`` holds ``setup``, whose files are in ``apps/white_space/data/settings/setup/``.
 """
 
 from enum import IntEnum, auto

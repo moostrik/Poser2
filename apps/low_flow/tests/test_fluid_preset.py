@@ -8,7 +8,7 @@ from pathlib import Path
 from modules.flow import Fluid2DSettings
 
 ROOT: Path = Path(__file__).resolve().parents[3]
-LOW_FLOW: Path = ROOT / 'apps' / 'low_flow' / 'data' / 'settings' / 'studio.json'
+LOW_FLOW: Path = ROOT / 'apps' / 'low_flow' / 'data' / 'settings' / 'flow' / 'studio.json'
 
 
 def leaves(node: dict, at: tuple[str, ...] = ()) -> set[tuple[str, ...]]:
@@ -24,7 +24,7 @@ def leaves(node: dict, at: tuple[str, ...] = ()) -> set[tuple[str, ...]]:
 class TestFluidPreset(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.preset: dict = json.loads(LOW_FLOW.read_text(encoding='utf-8'))['flow']['fluid']
+        self.preset: dict = json.loads(LOW_FLOW.read_text(encoding='utf-8'))['fluid']
 
     def test_the_preset_holds_every_key_of_the_settings(self) -> None:
         missing = leaves(Fluid2DSettings().to_dict()) - leaves(self.preset)

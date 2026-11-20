@@ -221,7 +221,7 @@ The clip (its `comment` tag) and the portrait (JPEG comment segments) carry the 
 the visitor's one seed (portrait, description and grin share it), the settings of its style (not the other's) and of the portrait
 as the workflow was filled with them, and the grin as it was drawn: each value's peak and the moment of it (`peak`, `peak_at`), not
 the ranges (`Generator.record`, handed to the saver with the final portrait). `save/record.py` reads it:
-`python -m apps.smile.save.record <file>` prints it, `--preset <name>` writes it as a preset to `data/settings/<name>.json` (the grin's
+`python -m apps.smile.save.record <file>` prints it, `--setup <name>` writes it as a setup file to `data/settings/setup/<name>.json` (the grin's
 ranges closed on the drawn values, so loading it repeats the pose); dropping a clip or portrait on `scripts/clip_info.bat` opens it.
 Encoding and decoding run `ffmpeg`/`ffprobe` subprocesses through `modules/video` (ffmpeg
 must be on the PATH: the gyan.dev full build); the encoder is picked at startup by a trial encode
@@ -325,4 +325,4 @@ Tests: `relay/tests` (the line, the server on aiohttp's test server, the page's 
 ## Settings
 
 Poser2's settings system (`modules/settings/`, its rules in Poser2's CLAUDE.md); root tree in `settings.py`,
-presets in `data/settings/` (`Smile` at startup unless `.ui_preset.json` names another), web panel at `http://localhost:667`.
+setup files in `data/settings/setup/` (`Smile` at startup unless `.startup.json` names another), web panel at `http://localhost:667`.

@@ -56,12 +56,12 @@ STOP_WINDOW: tuple[float, float] = (-0.1, 0.6)    # s around a move's end
 COAST_SHARE: float = 0.2
 MAX_LAG: int = 12           # frames
 EPSILON: float = 1e-4       # below this a speed is no motion, as in the bridge
-PRESET: Path = Path(__file__).resolve().parent.parent / 'apps' / 'deep_flow' / 'data' / 'settings' / 'settings.json'
+PRESET: Path = Path(__file__).resolve().parent.parent / 'apps' / 'deep_flow' / 'data' / 'settings' / 'flow' / 'settings.json'
 
 
 def depth_range() -> tuple[float, float]:
     """The player's depth range in the preset, the depth source's near and far (m), which the z position spans."""
-    depth: dict = json.loads(PRESET.read_text())['flow']['depth']
+    depth: dict = json.loads(PRESET.read_text())['depth']
     return float(depth['near']), float(depth['far'])
 
 
@@ -92,7 +92,7 @@ class Side:
         self.name, rest = spec.split('=', 1)
         kind, _, items = rest.partition(':')
         self.kind = kind
-        preset = json.loads(PRESET.read_text())['flow']['bridge']
+        preset = json.loads(PRESET.read_text())['bridge']
         self.changed: dict[str, object] = {}
         if kind == 'lowpass':
             self.settings: VelocityLowpassSettings | VelocityBandpassSettings = VelocityLowpassSettings()

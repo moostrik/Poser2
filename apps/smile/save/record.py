@@ -5,7 +5,7 @@ grin as it was drawn (each value's peak and the moment of it). ClipSaver writes 
 comment segments); this module puts it in a JPEG and reads it back from either.
 
     python -m apps.smile.save.record <clip or portrait>                  prints the record
-    python -m apps.smile.save.record <clip or portrait> --preset <name>  writes its settings to data/settings/<name>.json
+    python -m apps.smile.save.record <clip or portrait> --setup <name>  writes its settings to data/settings/setup/<name>.json
     python -m apps.smile.save.record <clip or portrait> --open           opens the record as a file (scripts/clip_info.bat)
 """
 
@@ -13,7 +13,7 @@ import argparse
 import json
 import os
 
-from modules.settings import presets
+from modules.settings import SettingsStore
 from modules import video
 
 SOI: bytes = b'\xff\xd8'
@@ -67,11 +67,11 @@ def read(path: str) -> dict | None:
     return record if isinstance(record, dict) else None
 
 
-def to_preset(record: dict) -> dict:
-    """The record as a preset of the generator settings: its style under style_a or style_b, the
+def to_setup(record: dict) -> dict:
+    """The record as a setup file of the generator settings: its style under style_a or style_b, the
     portrait, and the grin with every range closed on the value that was drawn, so loading it
     repeats this visitor's pose (the moments stay random around the midpoint: no setting holds them)."""
-    if 'settings' in record:        # a record of the first shape held the preset itself, the generator's group as 'pipeline'
+    if 'settings' in record:        # a record of the first shape held the settings file itself, the generator's group as 'pipeline'
         return {'setup': {('generator' if key == 'pipeline' else key): value for key, value in record['settings'].items()}}
     grin: dict = {name: value for name, value in record.get('grin', {}).items() if name not in ('peak', 'peak_at')}
     for name, value in record.get('grin', {}).get('peak', {}).items():
@@ -83,7 +83,7 @@ def to_preset(record: dict) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description='The record in a saved clip or portrait: how it was made')
     parser.add_argument('file', help='a clip (output/grins/<style>/<id>.mp4) or its portrait (<id>_portrait.jpg)')
-    parser.add_argument('--preset', metavar='NAME', help='write the settings to data/settings/NAME.json')
+    parser.add_argument('--setup', metavar='NAME', help='write the settings to data/settings/setup/NAME.json')
     parser.add_argument('--open', action='store_true', help='write the record to output/temp/ and open it')
     args = parser.parse_args()
 
@@ -92,12 +92,13 @@ def main() -> None:
         raise SystemExit(f'No record in {args.file}')
     text: str = json.dumps(record, indent=2, ensure_ascii=False)
 
-    if args.preset:
-        presets.set_app('smile')
-        presets.validate_name(args.preset)
-        preset_path = presets.path(args.preset)
-        preset_path.write_text(json.dumps(to_preset(record), indent=2), encoding='utf-8')
-        print(f'Wrote {preset_path}')
+    if args.setup:
+        store = SettingsStore('apps/smile/data/settings')
+        store.validate_name(args.setup)
+        setup_path = store.path('setup', args.setup)
+        setup_path.parent.mkdir(parents=True, exist_ok=True)
+        setup_path.write_text(json.dumps(to_setup(record), indent=2), encoding="utf-8")
+        print(f'Wrote {setup_path}')
     elif args.open:
         id: str = str(record.get('id') or os.path.splitext(os.path.basename(args.file))[0])
         path: str = os.path.join('output', 'temp', f'{id}_record.json')
