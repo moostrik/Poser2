@@ -53,7 +53,7 @@ class ClipSaver:
         self.enabled: bool = video.available()
         if not self.enabled:
             logger.error('ffmpeg not found on the PATH: visitors are not saved')
-        self.encoder: video.Encoder = video.pick_encoder(settings.encoder) if self.enabled else video.Encoder.CPU
+        self.encoder: video.Hardware = video.pick_encoder(settings.encoder) if self.enabled else video.Hardware.CPU
         logger.info('Clip encoder: %s', self.encoder.value)
 
         self.queue: queue.Queue[Command] = queue.Queue(max_queue_size)

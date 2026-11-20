@@ -28,17 +28,6 @@ The target: one place starts ffmpeg and ffprobe, with one set of names. Each ste
 repository working; its own tests run with it. The runs in an app (the player's timing, a recording, the live run) and
 the depthai 2 venv's tests run once, after the last step.
 
-- A4. One set of names: one hardware enum (CPU, iGPU, GPU), the chip, used to encode and to decode, with `ClipCodec`
-  beside it; the encoder (h264_qsv, hevc_nvenc…) and the hardware decode follow from chip and codec in code. Smile's
-  `AUTO` stays an encoder choice on top. `codec.py` goes, and the fixed `DEPTH_ENCODER` comes from the same table.
-  The recorder's and the player's settings use them; the player's `video_format` goes and it takes the color file's
-  suffix from the container, as the recorder does; `recording_folder.py` finds files by container. The color part
-  is written as `.mkv`, as the depth's is: today H.265 writes a raw `.hevc` with no timestamps, which the merge
-  copies in without a frame rate **(deduction: the chunk may get ffmpeg's 25 fps)**. One hardware decode, d3d11va or
-  d3d12va, whichever decodes a real chunk faster on the iGPU, both timed. Takes over RECORDING_PLAN.md's rename of
-  `CoderFormat` and `CoderType` (its line 2). All presets migrated (deep_flow 5, low_flow 1, hd_trio 2, white_space
-  2, smile's if the name changes). VIDEO.md, RECORDING.md's stream table. Check: tests, every preset loads, the
-  decode timing, an H.265 chunk's merged timestamps.
 - A5. One writer: `StreamWriter` keeps its queue, thread and split, and writes through `ClipWriter`, which takes gray,
   depth (P012) and color input, a keyframe interval, no B-frames on request, and HEVC on QSV; errors are logged.
   ffmpeg-python leaves `pyproject.toml`; pyright passes on both stream files. Each writer keeps its own hardware, so
@@ -47,8 +36,15 @@ the depthai 2 venv's tests run once, after the last step.
 - A6. deep_flow's color in HEVC (CAMERA_PLAN.md A4's writer side, after the camera plan's A1): deep_flow's presets
   from H.264 to HEVC on the iGPU, `MP4` staying H.264. The confidence stream's writer is A5's; the camera plan wires
   it. OAK4.md's recording section. Check: the seek check and the encoder load run again.
+- A7. The player's pacing: a frame's moment is waited for on `perf_counter`, not with `Event.wait` alone, which on
+  Windows waits in ~15.6 ms steps **(deduction)**: in A3's run about a quarter of the frames came ~30 ms after the one
+  before, against 20 ms nominal (p95 31.8 ms). One shared helper in `modules/utils` waits until a `perf_counter`
+  deadline: a timed wait on a stop event until ~2 ms before it, then `time.sleep` for the rest, returning at once when
+  the event is set. `StreamReader` uses it; the module refactor thread reuses it for the other pacing loops. Its unit
+  test in `modules/utils/tests`. VIDEO.md. Check: the helper's test; A3's `-sim` run again: the frame interval (mean,
+  p95) and the frames over 30 ms. Built after A5 (and A6).
 
-After A6, once: deep_flow `-sim` playback of a known recording; the depthai 2 venv's tests (white_space, hd_trio);
+After A7, once: deep_flow `-sim` playback of a known recording; the depthai 2 venv's tests (white_space, hd_trio);
 one live deep_flow run recording the camera on the iGPU while a screen take saves on NVENC: the chunk whole with every
 stream's frames counted, the take 0 dropped, the ticks.
 
@@ -58,8 +54,8 @@ Assumed: hevc_qsv takes nv12, p010 and p012, not gray, so ffmpeg turns the confi
 ## The rules it touches
 
 - Remove obsolete pathways instead of leaving parallel ones: A5
-- Name a concept after what it is in the domain; no synonyms, rename everywhere: A4
-- Keep presets in sync with code changes: A4, A6
+- Read `time.perf_counter()` for every stamp and duration: A7
+- Keep presets in sync with code changes: A6
 - Log exceptions with context; never fail silently: A5
 - Fix a type error at its cause: A5
 - A document describes what is built: every step

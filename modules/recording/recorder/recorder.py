@@ -31,7 +31,7 @@ from typing import Any, TextIO
 from modules.camera import CameraFrame, CameraTracklets, FrameType, mirrored_alignment, mirrored_image, mirrored_intrinsics, \
     mirrored_tracklets
 from modules.settings import BaseSettings, Field, Widget
-from modules.video import CoderType, CoderFormat, DEPTH_ENCODER, encoder_name, StreamWriter
+from modules.video import ClipCodec, DEPTH_ENCODER, Hardware, encoder_name, StreamWriter
 
 from ..container import DEPTH_SUFFIX, METADATA_LABEL, METADATA_SUFFIX, ChunkInfo, Container, FrameMetadata, finish_unmerged, \
     frame_line, info_line, keep_chunk, make_chunk_name, make_file_name, make_folder_name, merge_chunk
@@ -48,8 +48,8 @@ class RecorderSettings(BaseSettings):
     fps:                Field[float]            = Field(30.0, access=Field.INIT, description="Camera frame rate")
     keyframe_interval:  Field[int]              = Field(0, access=Field.INIT, description="Keyframe interval in frames (0 = encoder default, 1 = every frame)")
     temp_path:          Field[str]              = Field("temp", access=Field.INIT, description="Temporary files directory")
-    video_encoder:      Field[CoderType]        = Field(CoderType.iGPU, access=Field.INIT, description="Video encoder type")
-    video_format:       Field[CoderFormat]      = Field(CoderFormat.H264, access=Field.INIT, description="Video codec")
+    video_encoder:      Field[Hardware]         = Field(Hardware.iGPU, access=Field.INIT, description="The chip the color is encoded on")
+    video_codec:        Field[ClipCodec]        = Field(ClipCodec.H264, access=Field.INIT, description="The color's codec")
     container:          Field[Container]        = Field(Container.MKV, access=Field.INIT, description="Chunk file: mkv with depth and metadata, or mp4 with the metadata beside")
     video_quality:      Field[int]              = Field(0, min=0, max=51, access=Field.INIT, description="Video constant quality, lower is better (0 = encoder default)")
     video_frame_types:  Field[list[FrameType]]  = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record", visible=False)
@@ -135,14 +135,15 @@ class Recorder(Thread):
             self.recorders[c] = {}
             self.frames[c] = Queue()
             for t in self.types:
-                vcodec: str = DEPTH_ENCODER if t == FrameType.DEPTH else encoder_name(settings.video_format, settings.video_encoder)
+                vcodec: str = DEPTH_ENCODER if t == FrameType.DEPTH else encoder_name(settings.video_codec, settings.video_encoder)
                 self.recorders[c][t] = StreamWriter(vcodec, settings.keyframe_interval, settings.video_quality)
 
         if self.with_depth and settings.keyframe_interval <= 0:
             logger.warning("keyframe_interval 0 with depth: each encoder picks its own keyframes, so seeking will show the wrong depth")
 
-        # The color stream's file: the chunk itself in an mp4, merged into the mkv otherwise.
-        self.suffix: str = Container.MP4.value if self.container == Container.MP4 else settings.video_format.value
+        # The color stream's file: the chunk itself in an mp4, an mkv merged into the chunk's otherwise; a raw stream
+        # has no timestamps, and the merge refuses it.
+        self.suffix: str = Container.MP4.value if self.container == Container.MP4 else Container.MKV.value
         self.split_requested = Event()
         self._split_at: float | None = None             # the capture time the chunks are cut after, while a split goes on
         self._split_request_time: float = float('-inf')

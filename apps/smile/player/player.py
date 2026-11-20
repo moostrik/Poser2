@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from modules import video
+
 from .. import sphere
 from ..credit import CreditLines
 from .clip_loader import ClipLoader
@@ -64,10 +66,10 @@ class Player:
 
         # the clips are decoded once into RAM at the size the cells show them (the portrait is turned a quarter)
         cell_size: tuple[int, int] = (WallRender.CELL_HEIGHT, WallRender.CELL_WIDTH)
-        hwaccel: int | None = int(settings.hwaccel) if int(settings.hwaccel) >= 0 else None
+        decoder: video.Hardware = settings.decoder
         pool_size: int = int(settings.pool)
         recent: int = int(settings.recent)
-        self.pool: ClipPool = ClipPool(pool_size, cell_size, hwaccel, recent)
+        self.pool: ClipPool = ClipPool(pool_size, cell_size, decoder, recent)
         self.scanner: FolderScanner = FolderScanner(os.path.join(root, 'grins'), self.pool, pool_size, recent, float(settings.recycle_every))
 
         self.loaders: list[ClipLoader] = []
@@ -88,7 +90,7 @@ class Player:
         logger.info('Player: %d cells on %d walls, pool %d (last %d always on every third of the sphere), %s, root %s, %s',
                     len(ids), len(walls), pool_size, recent,
                     f'a clip from disk after {float(settings.recycle_every):g} s without a new one' if float(settings.recycle_every) > 0 else 'no recycling',
-                    root, f'GPU decode on adapter {hwaccel}' if hwaccel is not None else 'software decode')
+                    root, f'decoded on {decoder.value}')
 
     def start(self) -> None:
         self.pool.start()

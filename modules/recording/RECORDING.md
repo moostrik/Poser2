@@ -54,7 +54,7 @@ recordings, plays at `fps`, its frames as stored (`flip_h` False). An `MKV` chun
 
 | Stream / part | Holds                                                                                   |
 |---------------|-----------------------------------------------------------------------------------------|
-| stream 0      | color, the camera's encoder (`video_encoder`, `video_format`)                           |
+| stream 0      | color, the camera's encoder (`video_encoder`, `video_codec`)                            |
 | stream 1      | depth when recorded, uint16 mm, `DEPTH_ENCODER`, the same `keyframe_interval`           |
 | tags          | the info line's values                                                                  |
 | attachment    | the metadata, one JSON line each (`.jsonl`)                                             |

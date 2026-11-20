@@ -30,7 +30,6 @@ With the apps' refactors ([APPS_PLAN.md](../../apps/APPS_PLAN.md)), each tested 
 - The OAK-D's capture time: the oak backend (depthai 2) stamps a frame's arrival, so hd_trio and white_space record
   USB's jitter in their times. Oak4's `capture_time` shows the way; it needs an OAK-D to test.
 - A white_space recording of the new layout played by hand, beside the old ones, which play as they are.
-- `Encoder` for `CoderFormat` and `CoderType`, the name the guard test asks for: a rename through `modules/video` and the three apps.
 
 ## 3. The poses the pose model drops
 
@@ -59,6 +58,5 @@ timing, not the recording's data. Looked at when F reaches the recording module.
 
 ## The rules it touches
 
-- Use no synonyms for one concept across modules: `CoderFormat` and `CoderType` stay until their rename
 - Keep presets and settings schemas in sync with code changes: hd_trio's `container` in its preset
 - Run a test of the app or a GPU harness only on the user's go, and only what the plan names: the checks of 1 and 3

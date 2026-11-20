@@ -31,7 +31,7 @@ def write_watermark(text: str, path: str) -> bool:
         return False
 
 
-def build_share(clip: str, track: str | None, offset: float, watermark: str | None, encoder: video.Encoder, out: str,
+def build_share(clip: str, track: str | None, offset: float, watermark: str | None, encoder: video.Hardware, out: str,
                 sample_rate: int = SAMPLE_RATE) -> None:
     """Write the share clip `out` from the players' clip: `track` from `offset` s (the point the room heard
     when the grin started) on the tape, or silence without one; the `watermark` PNG (or None) in the bottom

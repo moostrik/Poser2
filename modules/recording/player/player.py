@@ -21,9 +21,9 @@ from time import perf_counter, sleep
 
 from modules.camera import FrameType
 from modules.settings import BaseSettings, Field, Widget
-from modules.video import CoderType, CoderFormat, hwaccel
+from modules.video import Hardware
 
-from ..container import ChunkInfo, RecordingFolder, Timeline, locate
+from ..container import ChunkInfo, Container, RecordingFolder, Timeline, locate
 from .chunk_readers import ChunkReaders, Decoding
 from .frame_hand_over import ClipFrameCallback, FrameHandOver
 
@@ -37,8 +37,7 @@ class PlayerSettings(BaseSettings):
     num_cams:        Field[int]              = Field(1, access=Field.INIT, description="Number of cameras")
     fps:                Field[float]            = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Simulation FPS")
     video_path:         Field[str]              = Field("recordings", access=Field.INIT, description="Video recordings directory")
-    video_decoder:      Field[CoderType]        = Field(CoderType.iGPU, access=Field.INIT, description="Video decoder type")
-    video_format:       Field[CoderFormat]      = Field(CoderFormat.H264, access=Field.INIT, description="Video format")
+    video_decoder:      Field[Hardware]         = Field(Hardware.iGPU, access=Field.INIT, description="The chip the video is decoded on")
     video_frame_types:  Field[list[FrameType]]  = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record", visible=False)
 
     # ── Playback controls ─────────────────────────────────────────────
@@ -113,12 +112,12 @@ class Player(Thread):
         self.load_folder: str = ''
         self.active_folder: str = ''        # folder we currently intend to play ('' = stopped)
         self._loading_markers: bool = False   # a load writes `in_out`: not a move to save
-        self.suffix: str = settings.video_format.value
+        self.suffix: str = Container.MP4.value       # a color-only chunk is an mp4, whatever its codec
 
         self.folders: dict[str, RecordingFolder] = RecordingFolder.find(Path(data_path) / settings.video_path)
         self.settings.available_folders = list(self.folders.keys())
 
-        self.hwaccel, self.hwaccel_device = hwaccel(settings.video_decoder)
+        self.decoder: Hardware = settings.video_decoder
 
         self.loading: ChunkReaders | None = None        # the readers of the chunk being loaded,
         self.playing: ChunkReaders | None = None        # of the one playing,
@@ -243,7 +242,7 @@ class Player(Thread):
     def _load_chunk(self, lo: int, hi: int | None) -> None:
         """The readers of the load chunk's frames `lo` up to `hi`."""
         known: ChunkReaders | None = self.playing or self.loading or self.known
-        decoding = Decoding(self.gray, self.nv12, self.hwaccel, self.hwaccel_device, self.fps, self.suffix)
+        decoding = Decoding(self.gray, self.nv12, self.decoder, self.fps, self.suffix)
         self.loading = ChunkReaders(self.folders[self.load_folder], self._get_load_chunk(), lo, hi, self.num_cams, self.types,
                                     self.hand_over.submit_frame, decoding, known)
 

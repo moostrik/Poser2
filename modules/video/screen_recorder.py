@@ -22,8 +22,8 @@ import psutil
 
 from modules.settings import BaseSettings, Field, Group, Widget
 
-from .clip_writer import ClipCodec, ClipInput, ClipWriter
-from .encoder import Encoder
+from .clip_writer import ClipInput, ClipWriter
+from .hardware import ClipCodec, Hardware
 from .screen_format import BitDepth, Chroma, ScreenFormat
 from .screen_frame import ScreenFrame
 from .screen_frame_ring import ScreenFrameRing
@@ -155,9 +155,9 @@ _CLIP_INPUTS: dict[tuple[Chroma, BitDepth], ClipInput] = {
 
 
 def hevc_clip(path: str, fps: float, quality: int, screen_format: ScreenFormat) -> ClipSink:
-    """An HEVC mp4 on NVENC from the frames' YUV planes in their chroma and bit depth."""
+    """An HEVC mp4 on the GPU from the frames' YUV planes in their chroma and bit depth."""
     clip_input = _CLIP_INPUTS[(screen_format.chroma, screen_format.bit_depth)]
-    return ClipWriter(path, fps, Encoder.NVENC, clip_input, ClipCodec.HEVC, quality)
+    return ClipWriter(path, fps, Hardware.GPU, clip_input, ClipCodec.HEVC, quality)
 
 
 class _Take:

@@ -236,7 +236,7 @@
     "pool": 30,
     "recent": 4,
     "recycle_every": 20.0,
-    "hwaccel": -1,
+    "decoder": "CPU",
     "fps": 20.0,
     "spread": 0.1,
     "trail": 0.0

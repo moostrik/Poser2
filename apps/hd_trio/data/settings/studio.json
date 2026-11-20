@@ -113,7 +113,6 @@
     "simulator": {
       "video_path": "test_video",
       "video_decoder": "iGPU",
-      "video_format": "H264",
       "video_frame_types": [
         "VIDEO"
       ],
@@ -733,7 +732,7 @@
       "keyframe_interval": 0,
       "temp_path": "temp",
       "video_encoder": "iGPU",
-      "video_format": "H264",
+      "video_codec": "H264",
       "video_frame_types": [
         "VIDEO"
       ],

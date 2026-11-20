@@ -23,7 +23,7 @@ class TestClipSaverStyle(unittest.TestCase):
 
     def test_a_kept_visitor_lands_in_its_style_folders(self):
         settings = SequencerSettings()
-        settings.encoder = video.Encoder.CPU
+        settings.encoder = video.Hardware.CPU
         settings.save = True
         with tempfile.TemporaryDirectory() as root:
             saver = ClipSaver(settings, root=root)
@@ -52,7 +52,7 @@ class TestClipSaverStyle(unittest.TestCase):
 
     def test_the_record_is_in_the_clip_and_the_portrait(self):
         settings = SequencerSettings()
-        settings.encoder = video.Encoder.CPU
+        settings.encoder = video.Hardware.CPU
         settings.save = True
         made = {'description': 'a face, "quoted"', 'seed': 7, 'grin': {'smile': 2.0},
                 'settings': {'generator': GeneratorSettings().to_dict()}}
@@ -78,7 +78,7 @@ class TestClipSaverStyle(unittest.TestCase):
 
     def test_the_share_clip_has_the_track_and_the_watermark_and_the_players_clip_is_silent(self):
         settings = SequencerSettings()
-        settings.encoder = video.Encoder.CPU
+        settings.encoder = video.Hardware.CPU
         settings.save = True
         settings.grin_fps = 10.0
         made = {'description': 'a face', 'seed': 7}
@@ -146,7 +146,7 @@ class TestClipSaverStyle(unittest.TestCase):
 
     def test_a_track_that_fails_leaves_the_players_clip_and_no_share_clip(self):
         settings = SequencerSettings()
-        settings.encoder = video.Encoder.CPU
+        settings.encoder = video.Hardware.CPU
         settings.save = True
         with tempfile.TemporaryDirectory() as root:
             saved = []

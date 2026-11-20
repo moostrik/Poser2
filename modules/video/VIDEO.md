@@ -8,7 +8,16 @@ clip decode (`clip_decode.py`), audio (`audio.py`) and the share clip (`share.py
 
 `probe` is the one question to ffprobe: a video stream's size, frame rate and exact frame count (the count an mp4
 stores, else the packets counted, which reads an mkv or a raw stream without decoding it) and the clip's comment
-(`StreamInfo`). A camera recording's stream is read by `StreamReader`: one decoder started with `popen`, its frames
+(`StreamInfo`).
+
+`hardware.py` names the chips video is encoded and decoded on (`Hardware`: CPU, iGPU, GPU, and AUTO, to encode on
+the first whose trial passes) and the codecs (`ClipCodec`); what ffmpeg calls an encoder follows from the two
+(`encoder_name`), and a hardware decode from the chip (`hwaccel_args`): d3d12va on the chip's DXGI adapter, which
+decoded a recording's chunk (2999 frames, 992 × 800 H.264) on the iGPU in 6.3 s against d3d11va's 8.3 s **(measured
+2026-11-20)**. A camera recording's color part is an `.mkv` whatever its codec: a raw `.hevc` has no timestamps, and
+the merge into the chunk refuses it.
+
+A camera recording's stream is read by `StreamReader`: one decoder started with `popen`, its frames
 through the 8 MB pipe, its error lines logged. In deep_flow `-sim` (20261112-130105_show, 50 fps) the reader hands
 over a frame every 19.99 ms on average, p95 31.8 ms, as it did through the default pipe **(measured 2026-11-20)**.
 

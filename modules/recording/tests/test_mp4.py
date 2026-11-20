@@ -33,7 +33,7 @@ def probe(path: Path, entry: str) -> str:
     return out.decode().strip()
 
 
-@unittest.skipUnless(video.available() and video.encoder_works(video.Encoder.QSV), 'no iGPU encoder')
+@unittest.skipUnless(video.available() and video.encoder_works(video.Hardware.iGPU), 'no iGPU encoder')
 class Mp4Test(unittest.TestCase):
     def test_an_mp4_chunk_is_the_color_clip_with_its_metadata_beside(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:

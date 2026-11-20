@@ -10,9 +10,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from modules.camera import FrameType
-from modules.video import CoderFormat, probe
+from modules.video import probe
 
-from .chunk import make_chunk_name, make_file_name
+from .chunk import Container, make_chunk_name, make_file_name
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ class RecordingFolder:
             if folder.is_dir():
                 max_chunk: int = -1
                 for file in folder.iterdir():
-                    if file.is_file() and file.suffix in ('.mkv', CoderFormat.H264.value, CoderFormat.H265.value):
+                    if file.is_file() and file.suffix in (Container.MKV.value, Container.MP4.value):
                         n: str = file.stem.split('_')[-1]
                         if n.isdigit():
                             max_chunk = max(max_chunk, int(n))

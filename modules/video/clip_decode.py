@@ -7,19 +7,13 @@ from typing import BinaryIO
 
 import numpy as np
 
+from .hardware import Hardware, hwaccel_args
 from .probe import probe
 from .process import big_pipe, error_text, popen
 
 
 DECODE_THREADS: int = 2     # a background job: the players' render and loaders must keep their cores
 DECODE_TIMEOUT: float = 60.0    # s a clip may take to decode (it takes a few); then ffmpeg is ended
-
-
-def hwaccel_args(adapter: int | None) -> list[str]:
-    """Input options for a D3D11 hardware decode on the DXGI adapter with that index (tested on the Intel iGPU)."""
-    if adapter is None:
-        return []
-    return ['-hwaccel', 'd3d11va', '-hwaccel_device', str(adapter)]
 
 
 def _read_exactly(file: BinaryIO, size: int) -> bytes:
@@ -34,13 +28,13 @@ def _read_exactly(file: BinaryIO, size: int) -> bytes:
     return b''.join(parts)
 
 
-def decode_clip(path: str, size: tuple[int, int], hwaccel: int | None = None) -> tuple[np.ndarray, float]:
+def decode_clip(path: str, size: tuple[int, int], decoder: Hardware = Hardware.CPU) -> tuple[np.ndarray, float]:
     """The whole clip as a (frames, height, width, 3) bgr uint8 array scaled to size (width, height), and its fps."""
     info = probe(path)
     frames, fps = info.frames, info.fps
     width, height = size
     frame_bytes = width * height * 3
-    args = ['-nostdin', '-threads', str(DECODE_THREADS), *hwaccel_args(hwaccel), '-i', path,
+    args = ['-nostdin', '-threads', str(DECODE_THREADS), *hwaccel_args(decoder), '-i', path,
             '-filter_threads', str(DECODE_THREADS), '-vf', f'scale={width}:{height}',
             '-an', '-f', 'rawvideo', '-pix_fmt', 'bgr24', 'pipe:1']
     out, write_fd = big_pipe()

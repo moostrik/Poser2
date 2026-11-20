@@ -70,7 +70,6 @@
     "simulator": {
       "video_path": "recordings",
       "video_decoder": "iGPU",
-      "video_format": "H264",
       "video_frame_types": [
         "VIDEO",
         "DEPTH"
@@ -101,7 +100,7 @@
     "recorder": {
       "temp_path": "temp",
       "video_encoder": "iGPU",
-      "video_format": "H264",
+      "video_codec": "H264",
       "container": "MKV",
       "video_quality": 24,
       "video_frame_types": [

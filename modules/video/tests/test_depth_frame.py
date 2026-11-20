@@ -26,7 +26,7 @@ class PackingTest(unittest.TestCase):
         self.assertEqual(int(p012_to_depth(depth_to_p012(depth), 2, 2).max()), 4095 * DEPTH_STEP_MM)
 
 
-@unittest.skipUnless(video.available() and video.encoder_works(video.Encoder.QSV), 'no iGPU encoder')
+@unittest.skipUnless(video.available() and video.encoder_works(video.Hardware.iGPU), 'no iGPU encoder')
 class RoundTripTest(unittest.TestCase):
     def test_depth_survives_the_igpu(self) -> None:
         frames: list[np.ndarray] = []

@@ -8,7 +8,7 @@ from ..credit_scroll import DEFAULT_GAP_PX as CREDIT_SCROLL_GAP, DEFAULT_ROWS as
 from modules.gl import WindowSettings
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.utils import Color
-from modules.video import Encoder
+from modules.video import Hardware
 
 
 class Easing(Enum):
@@ -106,7 +106,7 @@ class SequencerSettings(BaseSettings):
     reset:              Field[bool]   = Field(False, widget=Widget.button, description="Reset the sequence")
     pause:              Field[bool]   = Field(False, pinned=True, description="No new visitors: a found face does not start a cycle (Start still works)")
     save:               Field[bool]   = Field(True, pinned=True, newline=True, label="Save visitors", description="Save each finished visitor's grin, capture and portrait to output/")
-    encoder:            Field[Encoder] = Field(Encoder.AUTO, access=Field.INIT, label="Encoder", description="Video encoder for the grin clip (Auto tries Intel, Nvidia, CPU)")
+    encoder:            Field[Hardware] = Field(Hardware.AUTO, access=Field.INIT, label="Encoder", description="The chip the grin clip is encoded on (Auto tries the iGPU, the GPU, the CPU)")
 
     state:              Field[str]    = Field("", access=Field.READ, newline=True, description="Current sequence state")
     state_progress:     Field[float]  = Field(0.0, access=Field.READ, description="Progress of the current state")

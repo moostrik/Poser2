@@ -57,7 +57,7 @@ def record(root: Path, count: int) -> Path:
 def make_player(root: Path, recording: Path) -> Player:
     settings = PlayerSettings()
     settings.video_frame_types = [FrameType.VIDEO, FrameType.DEPTH]
-    settings.video_decoder = video.CoderType.iGPU
+    settings.video_decoder = video.Hardware.iGPU
     settings.video_path = 'recordings'
     settings.fps = 30.0
     settings.folder = recording.name
@@ -73,7 +73,7 @@ def wait_for(condition, seconds: float = 10.0) -> bool:
     return False
 
 
-@unittest.skipUnless(video.available() and video.encoder_works(video.Encoder.QSV), 'no iGPU encoder')
+@unittest.skipUnless(video.available() and video.encoder_works(video.Hardware.iGPU), 'no iGPU encoder')
 class PlaybackTest(unittest.TestCase):
     """One recording, played at 30 fps so a test can act in the middle of it."""
     COUNT: int = 90

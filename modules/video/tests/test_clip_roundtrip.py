@@ -25,13 +25,13 @@ def synthetic_frame(i: int) -> np.ndarray:
 class TestClipRoundTrip(unittest.TestCase):
 
     def test_roundtrip_on_every_working_encoder(self):
-        encoders = [e for e in (video.Encoder.QSV, video.Encoder.NVENC, video.Encoder.CPU) if video.encoder_works(e)]
-        self.assertIn(video.Encoder.CPU, encoders)
+        encoders = [e for e in (video.Hardware.iGPU, video.Hardware.GPU, video.Hardware.CPU) if video.encoder_works(e)]
+        self.assertIn(video.Hardware.CPU, encoders)
         for encoder in encoders:
             with self.subTest(encoder=encoder.value):
                 self._roundtrip(encoder)
 
-    def _roundtrip(self, encoder: video.Encoder) -> None:
+    def _roundtrip(self, encoder: video.Hardware) -> None:
         with tempfile.TemporaryDirectory() as folder:
             path = os.path.join(folder, 'clip.mp4')
             writer = video.ClipWriter(path, FPS, encoder)
@@ -51,7 +51,7 @@ class TestClipRoundTrip(unittest.TestCase):
     def test_odd_size_is_cropped_to_even(self):
         with tempfile.TemporaryDirectory() as folder:
             path = os.path.join(folder, 'odd.mp4')
-            writer = video.ClipWriter(path, 15.0, video.Encoder.CPU)
+            writer = video.ClipWriter(path, 15.0, video.Hardware.CPU)
             writer.add(np.full((33, 65, 3), 128, np.uint8))
             self.assertTrue(writer.close())
             probed = video.probe(path)
@@ -59,12 +59,12 @@ class TestClipRoundTrip(unittest.TestCase):
 
     def test_size_change_raises(self):
         with tempfile.TemporaryDirectory() as folder:
-            writer = video.ClipWriter(os.path.join(folder, 'size.mp4'), 15.0, video.Encoder.CPU)
+            writer = video.ClipWriter(os.path.join(folder, 'size.mp4'), 15.0, video.Hardware.CPU)
             writer.add(np.zeros((64, 64, 3), np.uint8))
             with self.assertRaises(ValueError):
                 writer.add(np.zeros((32, 64, 3), np.uint8))
             writer.close()
 
     def test_pick_encoder_falls_back_to_cpu(self):
-        self.assertIn(video.pick_encoder(video.Encoder.AUTO), (video.Encoder.QSV, video.Encoder.NVENC, video.Encoder.CPU))
-        self.assertEqual(video.pick_encoder(video.Encoder.CPU), video.Encoder.CPU)
+        self.assertIn(video.pick_encoder(video.Hardware.AUTO), (video.Hardware.iGPU, video.Hardware.GPU, video.Hardware.CPU))
+        self.assertEqual(video.pick_encoder(video.Hardware.CPU), video.Hardware.CPU)

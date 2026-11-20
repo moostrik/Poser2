@@ -11,6 +11,7 @@ from typing import Callable, Protocol
 import time
 
 from .depth_frame import DEPTH_PIX_FMT, depth_frame_bytes, p012_to_depth
+from .hardware import Hardware, hwaccel_args
 from .probe import probe
 from .process import big_pipe, popen
 
@@ -37,7 +38,7 @@ class FrameSchedule(Protocol):
 
 class StreamReader:
     def __init__(self, cam_id: int, frame_type: object, frame_callback: StreamFrameCallback, color: bool,
-                 hwaccel: str = '', hwaccel_device: str = '', fps: float = 0.0, stream: int = 0, depth: bool = False,
+                 decoder: Hardware = Hardware.CPU, fps: float = 0.0, stream: int = 0, depth: bool = False,
                  schedule: FrameSchedule | None = None, nv12: bool = False) -> None:
         """``color``: decode to BGR, or with ``nv12`` to packed NV12 (H * 3 / 2, W), half the bytes, as a camera
         delivers it; otherwise to gray, so a mono pipeline gets the luma straight from ffmpeg, saving the colour
@@ -54,8 +55,7 @@ class StreamReader:
         self.stream: int = stream
         self.depth: bool = depth
         self.channels: int = 1
-        self.hwaccel: str = hwaccel
-        self.hwaccel_device: str = hwaccel_device
+        self.decoder: Hardware = decoder
 
         self.ffmpeg_process: subprocess.Popen | None = None
         self._frames_in: io.FileIO | None = None     # the decoder's frames, through the 8 MB pipe
@@ -142,9 +142,7 @@ class StreamReader:
                                      else self.frame_width * self.frame_height * 3 // 2 if self.nv12
                                      else self.frame_width * self.frame_height * self.channels)
 
-        hardware: list[str] = [] if self.hwaccel == '' or self.hwaccel_device == '' else \
-            ['-hwaccel', self.hwaccel, '-hwaccel_device', self.hwaccel_device]
-        args: list[str] = ['-nostdin', *seek, *hardware, '-i', video_file, '-map', f'0:v:{self.stream}',
+        args: list[str] = ['-nostdin', *seek, *hwaccel_args(self.decoder), '-i', video_file, '-map', f'0:v:{self.stream}',
                            '-f', 'rawvideo', '-pix_fmt', pix_fmt, 'pipe:1']
         ffmpeg_process: subprocess.Popen | None = None
         frames_in: io.FileIO | None = None

@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import cast
 
 from modules.camera import CAPTURE_TOLERANCE, FrameType
-from modules.video import StreamFrameCallback, StreamReader
+from modules.video import Hardware, StreamFrameCallback, StreamReader
 
 from ..container import ChunkInfo, ChunkMetadata, FrameMetadata, RecordingFolder, make_chunk_name, make_file_name, read_metadata
 from .play_clock import PlayClock
@@ -30,8 +30,7 @@ class Decoding:
     without times, and the color-only clips' suffix."""
     gray: bool
     nv12: bool
-    hwaccel: str
-    hwaccel_device: str
+    decoder: Hardware
     fps: float
     suffix: str
 
@@ -108,8 +107,8 @@ class ChunkReaders:
     def _load(self, cam_id: int, frame_type: FrameType, path: Path, stream: int, lo: int, hi: int | None,
               frame_callback: StreamFrameCallback, decoding: Decoding, clock: PlayClock | None) -> None:
         color: bool = frame_type == FrameType.VIDEO and not decoding.gray
-        reader = StreamReader(cam_id, frame_type, cast(StreamFrameCallback, frame_callback), color, decoding.hwaccel,
-                              decoding.hwaccel_device, decoding.fps, stream, frame_type == FrameType.DEPTH, clock,
+        reader = StreamReader(cam_id, frame_type, cast(StreamFrameCallback, frame_callback), color, decoding.decoder,
+                              decoding.fps, stream, frame_type == FrameType.DEPTH, clock,
                               color and decoding.nv12)
         reader.load(str(path), self.chunk, lo, hi)
         self._readers.append(reader)

@@ -17,7 +17,7 @@ from modules.recording.tests.recordings import LENS, video_frame, poses, depth_f
     cam_frame, record, player, Played, collect, FPS
 
 
-@unittest.skipUnless(video.available() and video.encoder_works(video.Encoder.QSV), 'no iGPU encoder')
+@unittest.skipUnless(video.available() and video.encoder_works(video.Hardware.iGPU), 'no iGPU encoder')
 class RoundTripTest(unittest.TestCase):
     def test_a_split_keeps_the_streams_in_step_across_chunks(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
@@ -88,7 +88,7 @@ class RoundTripTest(unittest.TestCase):
 
             settings = PlayerSettings()
             settings.video_frame_types = [FrameType.VIDEO, FrameType.DEPTH]
-            settings.video_decoder = video.CoderType.iGPU
+            settings.video_decoder = video.Hardware.iGPU
             settings.video_path = 'recordings'
             settings.fps = 120.0
             settings.folder = chunks[0].parent.name
@@ -146,7 +146,27 @@ class RoundTripTest(unittest.TestCase):
             self.assertEqual(len(metadata.frames), count)
 
 
-@unittest.skipUnless(video.available() and video.encoder_works(video.Encoder.QSV), 'no iGPU encoder')
+@unittest.skipUnless(video.available() and video.encoder_works(video.Hardware.iGPU), 'no iGPU encoder')
+class HevcChunkTest(unittest.TestCase):
+    def test_an_hevc_chunk_keeps_its_rate_and_frames(self) -> None:
+        """The color part is an mkv whatever the codec: a raw .hevc has no timestamps, and the merge refuses it."""
+        count: int = 30
+
+        def color(rec: Recorder) -> None:
+            for i in range(count):
+                rec.submit_frame(cam_frame(0, 60 + i * 4, 100.0 + i / FPS))
+                time.sleep(0.003)
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            recording = record(Path(folder), [FrameType.VIDEO], 1, color, codec=video.ClipCodec.HEVC)
+            chunk = recording / make_chunk_name(0, 0)
+            self.assertTrue(chunk.is_file())
+            info = video.probe(str(chunk))
+            self.assertEqual(info.frames, count)
+            self.assertAlmostEqual(info.fps, FPS)
+
+
+@unittest.skipUnless(video.available() and video.encoder_works(video.Hardware.iGPU), 'no iGPU encoder')
 class TwoRecordingsTest(unittest.TestCase):
     def test_the_second_recording_takes_nothing_of_the_first(self) -> None:
         def with_poses(rec: Recorder) -> None:
@@ -198,7 +218,7 @@ class TwoRecordingsTest(unittest.TestCase):
             self.assertGreaterEqual(p[3], 500.0)
 
 
-@unittest.skipUnless(video.available() and video.encoder_works(video.Encoder.QSV), 'no iGPU encoder')
+@unittest.skipUnless(video.available() and video.encoder_works(video.Hardware.iGPU), 'no iGPU encoder')
 class DroppedCaptureTest(unittest.TestCase):
     def test_a_capture_dropped_for_the_bound_keeps_the_streams_and_metadata_alike(self) -> None:
         def flood(rec: Recorder) -> None:

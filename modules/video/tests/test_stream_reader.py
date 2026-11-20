@@ -12,7 +12,7 @@ from modules.video import StreamReader
 
 
 def make_clip(path: str, frames: int) -> None:
-    writer = video.ClipWriter(path, 30.0, video.Encoder.CPU)
+    writer = video.ClipWriter(path, 30.0, video.Hardware.CPU)
     for _ in range(frames):
         writer.add(np.zeros((48, 64, 3), np.uint8))
     writer.close()

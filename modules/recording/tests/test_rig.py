@@ -36,7 +36,7 @@ def two_cameras(rec: Recorder) -> None:
         time.sleep(0.003)
 
 
-@unittest.skipUnless(video.available() and video.encoder_works(video.Encoder.QSV), 'no iGPU encoder')
+@unittest.skipUnless(video.available() and video.encoder_works(video.Hardware.iGPU), 'no iGPU encoder')
 class SeveralCamerasTest(unittest.TestCase):
     """Two cameras with unlike data recorded and played back through the real encoders."""
 
@@ -111,7 +111,7 @@ class SeveralCamerasTest(unittest.TestCase):
 
     def test_a_seek_lands_both_cameras_at_one_recorded_time(self) -> None:
         folder = RecordingFolder.find(self.root / 'recordings')[self.recording.name]
-        decoding = Decoding(False, False, *video.hwaccel(video.CoderType.iGPU), FPS, '')
+        decoding = Decoding(False, False, video.Hardware.iGPU, FPS, '')
         for lo in (3, 4, 9):
             readers = ChunkReaders(folder, 1, lo, None, 2, [FrameType.VIDEO, FrameType.DEPTH], lambda *_: None, decoding)
             try:
@@ -154,7 +154,7 @@ def rig(with_depth: bool) -> Callable[[Recorder], None]:
     return feed
 
 
-@unittest.skipUnless(video.available() and video.encoder_works(video.Encoder.QSV), 'no iGPU encoder')
+@unittest.skipUnless(video.available() and video.encoder_works(video.Hardware.iGPU), 'no iGPU encoder')
 class RigTest(unittest.TestCase):
     """The cameras of one rig, as hd_trio's and white_space's: one folder, every camera with the same data, recorded
     and played back together in step."""

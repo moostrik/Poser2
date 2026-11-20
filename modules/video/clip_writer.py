@@ -8,7 +8,8 @@ from typing import BinaryIO
 
 import numpy as np
 
-from .encoder import CODECS, Encoder
+from .encoder import H264_OPTIONS
+from .hardware import ClipCodec, Hardware, encoder_name
 from .process import error_text, pipe, popen
 
 logger = logging.getLogger(__name__)
@@ -36,11 +37,6 @@ _HEVC_PIX_FMT: dict[ClipInput, str] = {ClipInput.NV12: 'nv12', ClipInput.YUV444P
                                        ClipInput.XV30: 'yuv444p16le'}
 
 
-class ClipCodec(Enum):
-    H264 = 'h264'
-    HEVC = 'hevc'
-
-
 HEVC_QUALITY: int = 18      # NVENC constant quality, lower is better
 
 
@@ -58,18 +54,18 @@ _BT709_TAGS: list[str] = ['-colorspace', 'bt709', '-color_primaries', 'bt709', '
 
 
 class ClipWriter:
-    """Writes frames of one size to an mp4: bgr24 or a YUV input in, h264 on `encoder` or HEVC on NVENC out, through
+    """Writes frames of one size to an mp4: bgr24 or a YUV input in, h264 on `hardware` or HEVC on the GPU out, through
     a pipe of `PIPE_SIZE`; the process starts with the first frame. comment, set before that frame, goes into the
     file's comment tag."""
 
-    def __init__(self, path: str, fps: float, encoder: Encoder, clip_input: ClipInput = ClipInput.BGR24,
+    def __init__(self, path: str, fps: float, hardware: Hardware, clip_input: ClipInput = ClipInput.BGR24,
                  codec: ClipCodec = ClipCodec.H264, quality: int = HEVC_QUALITY) -> None:
         """`quality` is the HEVC constant quality; the h264 encoders keep their own."""
-        if codec == ClipCodec.HEVC and encoder != Encoder.NVENC:
-            raise ValueError(f'HEVC is written with NVENC only, not {encoder.value}')
+        if codec == ClipCodec.HEVC and hardware != Hardware.GPU:
+            raise ValueError(f'HEVC is written on the GPU only, not on {hardware.value}')
         self.path: str = path
         self.fps: float = fps
-        self.encoder: Encoder = encoder
+        self.hardware: Hardware = hardware
         self.clip_input: ClipInput = clip_input
         self.codec: ClipCodec = codec
         self.quality: int = quality
@@ -128,7 +124,8 @@ class ClipWriter:
             pix_fmt = _HEVC_PIX_FMT.get(self.clip_input, 'nv12')
             output = [*_hevc_args(self.quality), '-pix_fmt', pix_fmt]
         else:
-            codec, quality, pix_fmt = CODECS[self.encoder]
+            codec = encoder_name(ClipCodec.H264, self.hardware)
+            quality, pix_fmt = H264_OPTIONS[self.hardware]
             output = ['-c:v', codec, *quality, '-pix_fmt', pix_fmt]
         tags = _BT709_TAGS if self.clip_input in _YUV_ROWS else []
         args = ['-y', '-f', 'rawvideo', '-pix_fmt', self.clip_input.value, '-s', f'{width}x{height}',

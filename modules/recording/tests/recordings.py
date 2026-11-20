@@ -49,7 +49,7 @@ def depth_frame(value: int, timestamp: float) -> CameraFrame:
 def recorder(types: list[FrameType], temp: str = 'temp', output: str = 'out', data_path: str = '', keyframe_interval: int = 1) -> Recorder:
     settings = RecorderSettings()
     settings.video_frame_types = types
-    settings.video_encoder = video.CoderType.iGPU
+    settings.video_encoder = video.Hardware.iGPU
     settings.temp_path = temp
     settings.output_path = output
     settings.fps = 60.0
@@ -76,13 +76,14 @@ def cam_tracklets(cam_id: int, timestamp: float) -> CameraTracklets:
 
 
 def record(root: Path, types: list[FrameType], num_cams: int, feed: Callable[[Recorder], None], name: str = '',
-           container: Container = Container.MKV) -> Path:
+           container: Container = Container.MKV, codec: video.ClipCodec = video.ClipCodec.H264) -> Path:
     """A recording in `root`'s recordings, of what `feed` hands the recorder; its folder."""
     settings = RecorderSettings()
     settings.num_cams = num_cams
     settings.video_frame_types = types
     settings.container = container
-    settings.video_encoder = video.CoderType.iGPU
+    settings.video_encoder = video.Hardware.iGPU
+    settings.video_codec = codec
     settings.temp_path = str(root / 'temp')
     settings.output_path = 'recordings'
     settings.fps = 60.0
@@ -111,7 +112,7 @@ def player(root: Path, num_cams: int) -> Player:
     settings = PlayerSettings()
     settings.num_cams = num_cams
     settings.video_frame_types = [FrameType.VIDEO, FrameType.DEPTH]
-    settings.video_decoder = video.CoderType.iGPU
+    settings.video_decoder = video.Hardware.iGPU
     settings.video_path = 'recordings'
     settings.fps = 120.0
     return Player(settings, str(root))
