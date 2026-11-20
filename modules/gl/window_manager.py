@@ -119,7 +119,7 @@ class WindowManager:
         glfw.window_hint(glfw.RESIZABLE, glfw.TRUE)
 
         self._monitors = Monitor.connected()
-        self._write_connected()
+        self._write_monitors()
         if self.settings.v_sync_window not in self._window_names:
             logger.warning("v_sync_window %r is not one of the windows %s, using %s", self.settings.v_sync_window,
                            self._window_names, self._window_names[0])
@@ -204,8 +204,8 @@ class WindowManager:
         if self._monitors_changed:
             self._monitors_changed = False
             self._monitors = Monitor.connected()
-            self._write_connected()
-            logger.info("Monitors changed: %s", self.settings.connected)
+            self._write_monitors()
+            logger.info("Monitors changed: %s", self.settings.monitors)
         if self._place_default:
             self._place_default = False
             for settings in self.window_settings:
@@ -363,5 +363,5 @@ class WindowManager:
         settings.width = self._DEFAULT_WIDTH
         settings.height = self._DEFAULT_HEIGHT
 
-    def _write_connected(self) -> None:
-        self.settings.connected = ", ".join(f"M{i} {m.name} {m.width}×{m.height}" for i, m in enumerate(self._monitors))
+    def _write_monitors(self) -> None:
+        self.settings.monitors = ", ".join(f"M{i} {m.name} {m.width}×{m.height}" for i, m in enumerate(self._monitors))

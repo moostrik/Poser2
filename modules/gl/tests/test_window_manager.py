@@ -129,7 +129,7 @@ class TestWindowManager(unittest.TestCase):
             self.run_loop(1)
             self.run_loop(1)
         monitor_class.connected.assert_called_once()
-        self.assertEqual(self.manager.settings.connected, 'M0 m 1920×1080')
+        self.assertEqual(self.manager.settings.monitors, 'M0 m 1920×1080')
 
     def pace(self, times: list[float]) -> list[float]:
         """The deadlines the pacing waits for, one frame ending at each of `times`."""
