@@ -1,6 +1,6 @@
 from OpenGL.GL import (Constant, GL_CLAMP_TO_EDGE, GL_COLOR_ATTACHMENT0, GL_COLOR_BUFFER_BIT, GL_DEPTH_ATTACHMENT,
                        GL_DEPTH_BUFFER_BIT, GL_DEPTH_COMPONENT24, GL_FRAMEBUFFER, GL_LINEAR, GL_RENDERBUFFER, GL_TEXTURE_2D,
-                       glBindFramebuffer, glBindRenderbuffer, glClear, glClearColor, glDeleteRenderbuffers,
+                       glBindFramebuffer, glBindRenderbuffer, glClear, glClearColor, glDeleteFramebuffers, glDeleteRenderbuffers,
                        glFramebufferRenderbuffer, glFramebufferTexture2D, glGenFramebuffers, glGenRenderbuffers,
                        glRenderbufferStorage, glViewport)
 from .texture import Texture
@@ -41,6 +41,9 @@ class Fbo(Texture):
         self.unbind()
 
     def deallocate(self) -> None:
+        if self.fbo_id:
+            glDeleteFramebuffers(1, [self.fbo_id])
+            self.fbo_id = 0
         if self._depth_id:
             glDeleteRenderbuffers(1, [self._depth_id])
             self._depth_id = 0

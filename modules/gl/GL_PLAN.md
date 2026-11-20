@@ -6,10 +6,8 @@ measurement; E and H from the package scan of the same day. The lines are in wor
 
 ## E. The leak and the form
 
-E1 is the plan's one bug and stands alone; E2 moves files that F then edits once.
+E2 moves files that F then edits once.
 
-- E1. `Fbo.deallocate` deletes its framebuffer: today every reallocation of an `Fbo`, `SwapFbo` or `Image` leaks one.
-  Test: with GL mocked, each `glGenFramebuffers` is paired with a `glDeleteFramebuffers`.
 - E2. Form only: `draw_quad` to `context.py`; the file watcher in its own file; `utils.py` split by subject (fit and
   fill, clears); `LayeredFbo` in its own file; one `from OpenGL.GL` line per file, imports at the top, `logger` after
   them; unused imports and loggers out (`utils.py`, `window.py`, `monitor.py`); errors logged with their traceback in
