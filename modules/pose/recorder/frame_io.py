@@ -3,8 +3,8 @@
 File layout (``pose_NNN.h5``):
 
     /attrs
-        recording_start  float64   absolute time.time() when recording began
-        chunk_start      float64   absolute time.time() when this chunk began
+        recording_start  float64   when recording began, on `clock`
+        chunk_start      float64   when this chunk began, on `clock`
         chunk_index      uint32    0-based index of this chunk
         clock            str       the clock of /timestamps: 'perf_counter' (files before it: time.time())
 
@@ -50,8 +50,8 @@ def write_chunk(
     Args:
         path:             Destination .h5 file path.
         entries:          Ordered list of (timestamp, FrameDict) captured during the chunk.
-        recording_start:  Absolute time.time() when the overall recording began.
-        chunk_start:      Absolute time.time() when this chunk began.
+        recording_start:  perf_counter() when the overall recording began.
+        chunk_start:      perf_counter() when this chunk began.
         chunk_index:      0-based chunk index (matches the suffix in the filename).
         feature_types:    Feature classes to include; others are ignored.
     """

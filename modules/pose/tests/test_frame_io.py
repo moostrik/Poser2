@@ -1,13 +1,14 @@
 """Tests for the HDF5 pose chunk format: write_chunk / read_chunk round-trip."""
 
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
 import numpy as np
 
 from modules.pose.features import Age, AngleLandmark, Angles, Points2D
-from modules.pose.recorder import read_chunk, write_chunk
+from modules.pose.recorder import Recorder, RecorderSettings, read_chunk, write_chunk
 
 from ._builders import frame, scalar, skeleton
 
@@ -63,6 +64,24 @@ class FrameIoTest(unittest.TestCase):
         entries = [(0.0, {0: frame(0, 0.0, features={Points2D: skeleton(), Age: Age.from_value(3.0)})})]
         write_chunk(self.path, entries, 0.0, 0.0, 0, feature_types=[Age])
         self.assertEqual(set(read_chunk(self.path)['tracks'][0]['features']), {'Age'})
+
+    def test_a_recording_stamps_its_start_and_its_chunks_on_perf_counter(self) -> None:
+        settings = RecorderSettings()
+        recorder = Recorder(settings, data_path=self._tmp.name)
+        before = time.perf_counter()
+        settings.start = True
+        recorder.submit_frames(0, {0: frame(0, before, features={Points2D: skeleton()})})
+        settings.split = True
+        recorder.submit_frames(0, {0: frame(0, before, features={Points2D: skeleton()})})
+        settings.stop = True
+        after = time.perf_counter()
+        chunks = [read_chunk(path) for path in sorted(Path(self._tmp.name).rglob('pose_*.h5'))]
+        self.assertEqual([chunk['chunk_index'] for chunk in chunks], [0, 1])
+        start = chunks[0]['recording_start']
+        self.assertTrue(before <= start <= after)
+        self.assertEqual(chunks[0]['chunk_start'], start)
+        self.assertEqual(chunks[1]['recording_start'], start)
+        self.assertTrue(start <= chunks[1]['chunk_start'] <= after)
 
     def test_no_entries_writes_nothing(self) -> None:
         write_chunk(self.path, [], 0.0, 0.0, 0, feature_types=[Points2D])

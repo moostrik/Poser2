@@ -88,7 +88,7 @@ class Recorder:
         folder_name = make_folder_name(self.settings.name)
         folder = Path(self.data_path) / self.settings.output_path / folder_name
         folder.mkdir(parents=True, exist_ok=True)
-        self._start(folder, time.time())
+        self._start(folder, time.perf_counter())
         self.settings.recording = True
 
     def _on_stop(self, _=None) -> None:
@@ -167,7 +167,7 @@ class Recorder:
                 if buffer and folder is not None:
                     self._flush(folder, buffer, chunk_start, chunk_index)
                 chunk_index += 1
-                chunk_start = time.time()
+                chunk_start = time.perf_counter()
                 buffer = []
 
             else:
