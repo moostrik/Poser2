@@ -42,29 +42,29 @@ class LowFlowMain:
         preset_file = presets.startup_path()
         if not presets.load(self.settings, preset_file):
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
-        self.settings.camera.sim_enabled = simulation
+        self.settings.setup.camera.sim_enabled = simulation
         if not interface:
-            self.settings.panel.browser = False  # launcher override; the preset cannot turn it back on
+            self.settings.setup.panel.browser = False  # launcher override; the preset cannot turn it back on
         # The crop is the pose model's input, so it is cut at that size: one antialiased resample
         # from the camera frame, rather than a larger crop the runner scales down again. Derived
         # from the model so a change of pose model cannot silently reintroduce the second one.
-        crop_settings = self.settings.pose.pose_crop
-        crop_settings.output_width = self.settings.pose.pose.width
-        crop_settings.output_height = self.settings.pose.pose.height
+        crop_settings = self.settings.setup.pose.pose_crop
+        crop_settings.output_width = self.settings.setup.pose.pose.width
+        crop_settings.output_height = self.settings.setup.pose.pose.height
         # The segmentation's crop likewise, at the segmentation model's size
-        segmentation_crop = self.settings.pose.segmentation_crop
-        segmentation_crop.output_width = self.settings.pose.segmentation.width
-        segmentation_crop.output_height = self.settings.pose.segmentation.height
+        segmentation_crop = self.settings.setup.pose.segmentation_crop
+        segmentation_crop.output_width = self.settings.setup.pose.segmentation.width
+        segmentation_crop.output_height = self.settings.setup.pose.segmentation.height
         self.settings.initialize()
-        self.panel_server = PanelServer(self.settings, self.settings.panel, on_exit=self.stop)
+        self.panel_server = PanelServer(self.settings, self.settings.setup.panel, on_exit=self.stop)
 
-        max_players: int = self.settings.max_players
-        num_cams: int = self.settings.num_cams
-        p = self.settings.pose
+        max_players: int = self.settings.setup.max_players
+        num_cams: int = self.settings.setup.num_cams
+        p = self.settings.setup.pose
 
         # BLACKBOARD
         self.board = RenderBoard()
-        self.osc_sound = OscSound(self.settings.inout.osc_sound)
+        self.osc_sound = OscSound(self.settings.setup.inout.osc_sound)
 
         # CAMERA
         configure_features(max_players)
@@ -72,22 +72,22 @@ class LowFlowMain:
         self.cameras: list[CameraSource] = []
         self.player: Player | None = None
         # Live and in -sim: a recording played can be recorded again, with what the app found in it (its poses)
-        self.recorder: Recorder = Recorder(self.settings.camera.recorder, data_path=DATA_PATH)
-        self.session = Session(self.settings.camera.control)       # splits the recording into chunks
+        self.recorder: Recorder = Recorder(self.settings.setup.camera.recorder, data_path=DATA_PATH)
+        self.session = Session(self.settings.setup.camera.control)       # splits the recording into chunks
         self.person_detector: person.PersonDetector | None = None      # the replay backend's, shared by its cameras
-        if self.settings.camera.sim_enabled:
-            self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH, nv12=True)     # as the camera hands its frames
+        if self.settings.setup.camera.sim_enabled:
+            self.player = Player(self.settings.setup.camera.simulator, data_path=DATA_PATH, nv12=True)     # as the camera hands its frames
             # the recordings on the host, without a device: the people found and followed here
-            if self.settings.camera.cam_0.model_chain != ModelChain.OFF:
-                self.person_detector = person.PersonDetector(self.settings.camera.person_detector)
+            if self.settings.setup.camera.cam_0.model_chain != ModelChain.OFF:
+                self.person_detector = person.PersonDetector(self.settings.setup.camera.person_detector)
             for i in range(num_cams):
-                cam = self.settings.camera.cameras[i]
+                cam = self.settings.setup.camera.cameras[i]
                 self.cameras.append(replay.Camera(self.player, cam, self.person_detector, replay.Tracker(), i, cam.tilt))
         else:
             for i in range(num_cams):
-                self.cameras.append(Camera(self.settings.camera.cameras[i]))
-        self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
-        self.uploader = SerialUploader(self.settings.camera.uploader)    # the camera's hand-off: each frame onto the GPU as it comes, on its own thread
+                self.cameras.append(Camera(self.settings.setup.camera.cameras[i]))
+        self.tracker = OnePerCamTracker(self.settings.setup.camera.tracker, max_players)
+        self.uploader = SerialUploader(self.settings.setup.camera.uploader)    # the camera's hand-off: each frame onto the GPU as it comes, on its own thread
         # The frame domain's async step: the crop step in (the pose model's crops at their interval and the
         # segmentation's every frame, in one pass, from the same images and boxes), the pose model out
         self.crops = CropExtractor(p.pose_crop, p.segmentation_crop)
@@ -99,7 +99,7 @@ class LowFlowMain:
         self.recorded_poses: RecordedPoses | None = None
         poses: pose.PoseEstimator | RecordedPoses = self.pose_estimator
         if self.player is not None:
-            self.recorded_poses = RecordedPoses(self.settings.camera.recorded_poses, self.pose_estimator)
+            self.recorded_poses = RecordedPoses(self.settings.setup.camera.recorded_poses, self.pose_estimator)
             self.player.add_frame_callback(self.recorded_poses.set_clip_frame)
             self.player.add_jump_callback(self.recorded_poses.clear_waiting)
             poses = self.recorded_poses
@@ -118,7 +118,7 @@ class LowFlowMain:
             camera.add_tracklet_callback(self.recorder.submit_tracklets)
         # What each camera's frames wait for from the first: live, a camera with a model sends tracklets (a replay's
         # come or not with the recording); the crop step says per image whether it asked poses (`_on_asked`)
-        live_tracklets: bool = not self.settings.camera.sim_enabled and self.settings.camera.cam_0.model_chain != ModelChain.OFF
+        live_tracklets: bool = not self.settings.setup.camera.sim_enabled and self.settings.setup.camera.cam_0.model_chain != ModelChain.OFF
         for i in range(num_cams):
             self.recorder.expect_parts(i, tracklets=live_tracklets, poses=True)
         self.uploader.add_tracklet_callback(self.tracker.submit_cam_tracklets)
@@ -162,10 +162,10 @@ class LowFlowMain:
         self.inference_frame_sync.add_frame_callback(self._on_inference_frame)
 
         # CAMERA HEALTH — the camera's IMU reading and frame rate against the preset, as pinned indicators
-        self.camera_health = CameraHealth(self.settings.camera.cameras, self.settings.camera.camera_health)
+        self.camera_health = CameraHealth(self.settings.setup.camera.cameras, self.settings.setup.camera.camera_health)
 
         # RENDER
-        self.render = LowFlowRender(self.board, self.settings.render, self.settings.windows, self.settings.screen_recorder, f'{DATA_PATH}/screen_recordings',
+        self.render = LowFlowRender(self.board, self.settings.setup.render, self.settings.flow, self.settings.setup.windows, self.settings.setup.screen_recorder, f'{DATA_PATH}/screen_recordings',
                                             num_cams=len(self.cameras), max_players=max_players)
         self.render.add_exit_callback(self.stop)
         self.render.add_update_callback(self.camera_health.update)
@@ -219,14 +219,14 @@ class LowFlowMain:
         """A frame bang's poses, on the frame source's thread: the recorder hears whether poses come for the image (the
         pose model asked, the recording's played, or the camera's own keypoints handed on), so a frame without a
         player, or passed by the pose crop's `interval`, does not wait."""
-        modelled: bool = (self.recorded_poses is not None and self.settings.camera.recorded_poses.enabled) or self.settings.pose.pose.enabled
+        modelled: bool = (self.recorded_poses is not None and self.settings.setup.camera.recorded_poses.enabled) or self.settings.setup.pose.pose.enabled
         posing: bool = modelled or any(has_points(frame) for frame in asked.values())
         self.recorder.expect_poses(cam_id, timestamp, bool(asked) and posing)
 
     def _on_masks_asked(self, timestamp: float, cam_id: int, asked: FrameDict) -> None:
         """A frame bang's segmentation crops, on the frame source's thread: the inference frame sync hears whether masks
         come for the image, so a frame without a player does not wait."""
-        self.inference_frame_sync.expect(cam_id, timestamp, bool(asked) and self.settings.pose.segmentation.enabled)
+        self.inference_frame_sync.expect(cam_id, timestamp, bool(asked) and self.settings.setup.pose.segmentation.enabled)
 
     def _on_masks(self, poses: FrameDict, masks: segmentation.ImageDict) -> None:
         """The segmentation's masks, on its thread, to the inference frame sync, one result a camera."""
@@ -265,7 +265,7 @@ class LowFlowMain:
 
     def _update_cadence(self, now: float) -> None:
         """The panel's cadence: the frames the sync hands on and the frames the motion measures, the slowest camera's, and the drops."""
-        cadence = self.settings.cadence
+        cadence = self.settings.setup.cadence
         cadence.inference_frame_fps = round(self.inference_frame_rate.get_rate_average(), 1)
         cadence.inference_frame_min_fps = round(self.inference_frame_rate.get_rate_minimum(), 1)
         rates = list(self.render.motion_rates.values())

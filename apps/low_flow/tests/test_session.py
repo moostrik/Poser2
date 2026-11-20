@@ -10,7 +10,7 @@ from modules.session import Session, SessionSettings
 
 class SessionWiringTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.camera = Settings().camera
+        self.camera = Settings().setup.camera
         self.starts: list[bool] = []
         self.splits: list[bool] = []
         self.camera.recorder.bind(RecorderSettings.start, self.starts.append)

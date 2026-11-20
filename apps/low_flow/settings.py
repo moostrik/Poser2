@@ -254,16 +254,10 @@ class PoseMonitorSettings(BaseSettings):
     data    : Group[_DataLayerSettings]         = Group(_DataLayerSettings, share=[stage])
 
 class RenderSettings(BaseSettings):
+    """The render's panels and its monitors beside the flow: the pose and the timings."""
     debug: Field[bool]                           = Field(True, description="The main and the debug panel; off, the main panel alone, as on a second screen")
     freeze_frame: Field[bool]                    = Field(False, description="Hold the last frame; the view and the color are made again on it when a setting changes")
-    input_fps: Field[float]                      = Field(60.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
     layer  : Group[LayerSettings]                = Group(LayerSettings)
-    # the chain, in its order, then the pose beside it
-    view   : Group[ViewLayerSettings]            = Group(ViewLayerSettings)
-    color  : Group[render.ColorLayerSettings]    = Group(render.ColorLayerSettings)
-    motion : Group[render.Motion2DLayerSettings] = Group(render.Motion2DLayerSettings, share=[input_fps.as_('fps')])
-    bridge : Group[render.Bridge2DLayerSettings] = Group(render.Bridge2DLayerSettings)
-    fluid  : Group[render.Fluid2DLayerSettings]  = Group(render.Fluid2DLayerSettings)
     pose   : Group[PoseMonitorSettings]          = Group(PoseMonitorSettings)
     # the display
     time_series: Group[render.TimeSeriesLayerSettings] = Group(render.TimeSeriesLayerSettings)
@@ -295,19 +289,41 @@ class WindowsSettings(WindowManagerSettings):
 
 
 # ---------------------------------------------------------------------------
-#  Root settings
+#  Root groups
 # ---------------------------------------------------------------------------
 
-class Settings(BaseSettings):
+class SetupSettings(BaseSettings):
+    """The machine and the site: the camera, the pose, the render, the window and the links."""
     max_players:        Field[int]   = Field(1, access=Field.INIT, visible=False)
     num_cams:           Field[int]   = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
-    input_fps:          Field[float] = Field(60.0, min=1.0, max=120.0, access=Field.INIT)
+    input_fps:          Field[float] = Field(60.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
 
     camera: Group[Oak4Group]      = Group(Oak4Group, share=[num_cams, input_fps.as_('fps')])
     cadence: Group[CadenceSettings] = Group(CadenceSettings)
     pose  : Group[PoseGroup]      = Group(PoseGroup, share=[max_players, input_fps.as_('frequency')])
-    render: Group[RenderSettings] = Group(RenderSettings, share=[input_fps])
+    render: Group[RenderSettings] = Group(RenderSettings)
     windows: Group[WindowsSettings] = Group(WindowsSettings)
     screen_recorder: Group[ScreenRecorderSettings] = Group(ScreenRecorderSettings)
     inout : Group[InOutGroup]     = Group(InOutGroup)
     panel : Group[PanelSettings]  = Group(PanelSettings)
+
+
+class FlowSettings(BaseSettings):
+    """The flow chain, in its order: the view, the color, the motion, the bridge and the fluid."""
+    input_fps: Field[float]                      = Field(60.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
+    view   : Group[ViewLayerSettings]            = Group(ViewLayerSettings)
+    color  : Group[render.ColorLayerSettings]    = Group(render.ColorLayerSettings)
+    motion : Group[render.Motion2DLayerSettings] = Group(render.Motion2DLayerSettings, share=[input_fps.as_('fps')])
+    bridge : Group[render.Bridge2DLayerSettings] = Group(render.Bridge2DLayerSettings)
+    fluid  : Group[render.Fluid2DLayerSettings]  = Group(render.Fluid2DLayerSettings)
+
+
+# ---------------------------------------------------------------------------
+#  Root settings
+# ---------------------------------------------------------------------------
+
+class Settings(BaseSettings):
+    input_fps: Field[float] = Field(60.0, min=1.0, max=120.0, access=Field.INIT)
+
+    setup: Group[SetupSettings] = Group(SetupSettings, share=[input_fps])
+    flow : Group[FlowSettings]  = Group(FlowSettings, share=[input_fps])

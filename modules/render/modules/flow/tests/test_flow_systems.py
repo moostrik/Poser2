@@ -43,23 +43,23 @@ class PresetTest(unittest.TestCase):
     """A preset's stage groups load into the system's settings classes with nothing left over; a preset holds the
     stages its app runs."""
 
-    def _load(self, presets: list[Path], system: dict[str, type[BaseSettings]], group: str) -> None:
+    def _load(self, presets: list[Path], system: dict[str, type[BaseSettings]]) -> None:
         for preset in presets:
-            render: dict = json.loads(preset.read_text(encoding='utf-8'))[group]
-            self.assertIn('motion', render, f'{preset.name} has no flow')
+            flow: dict = json.loads(preset.read_text(encoding='utf-8'))['flow']
+            self.assertIn('motion', flow, f'{preset.name} has no flow')
             for stage in STAGES:
-                if stage not in render:
+                if stage not in flow:
                     continue
                 with self.subTest(preset=preset.name, stage=stage):
                     settings: BaseSettings = system[stage]()
                     with self.assertNoLogs('modules.settings.base_settings', level='WARNING'):
-                        settings.update_from_dict(render[stage])
+                        settings.update_from_dict(flow[stage])
 
     def test_deep_flow_preset_loads_into_the_3d_system(self) -> None:
-        self._load(PRESETS_3D, SYSTEMS['3D'], 'flow')
+        self._load(PRESETS_3D, SYSTEMS['3D'])
 
     def test_low_flow_preset_loads_into_the_2d_system(self) -> None:
-        self._load(PRESETS_2D, SYSTEMS['2D'], 'render')
+        self._load(PRESETS_2D, SYSTEMS['2D'])
 
 
 class DeadFieldTest(unittest.TestCase):

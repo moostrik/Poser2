@@ -14,7 +14,7 @@ from modules import render
 from modules.utils import FPS, Color, Rect, Point2f
 
 from ..board import RenderBoard
-from ..settings import PoseFrame, RenderSettings, WindowsSettings
+from ..settings import FlowSettings, PoseFrame, RenderSettings, WindowsSettings
 from .layers import InferenceFrameMonitorLayer, ViewInput, ViewOutput, ViewLayer, PoseMonitorCompositor
 from .chain import ChainLayers, Size, TICK_LAYERS, INFERENCE_FRAME_LAYERS, MONITORS, POSE_SHAPES, shown, size_of, layers_of, shape_of
 
@@ -27,13 +27,15 @@ BORDER_WIDTH: float = 2.0       # px
 
 
 class LowFlowRender(RenderBase):
-    def __init__(self, board: RenderBoard, settings: RenderSettings, windows: WindowsSettings, recorder_settings: ScreenRecorderSettings, screen_recordings: str,
+    def __init__(self, board: RenderBoard, settings: RenderSettings, flow: FlowSettings, windows: WindowsSettings, recorder_settings: ScreenRecorderSettings, screen_recordings: str,
                  num_cams: int = 1, max_players: int = 1) -> None:
-        """`recorder_settings` the screen recorder's, `screen_recordings` the folder its recordings go to."""
+        """`flow` is the flow chain's settings; `recorder_settings` the screen recorder's, `screen_recordings` the folder
+        its recordings go to."""
         super().__init__(windows)
         self.max_players: int = max_players
         self.num_cams: int = num_cams
         self.settings: RenderSettings = settings
+        self.flow: FlowSettings = flow
 
         self.board: RenderBoard = board
 
@@ -50,19 +52,19 @@ class LowFlowRender(RenderBase):
             self.L[ChainLayers.inference_frame_monitor][i] =     InferenceFrameMonitorLayer(image)
 
             # The stages, each with its monitor, and the pose's monitor
-            view =          self.L[ChainLayers.view][i] =        ViewLayer(           settings.view)
+            view =          self.L[ChainLayers.view][i] =        ViewLayer(           flow.view)
             self.L[ChainLayers.pose_monitor][i] =                PoseMonitorCompositor(i, self.board, cam_image, cam_crop, view, settings.pose, settings.colors)
-            self.L[ChainLayers.color][i] =                       render.ColorLayer(   settings.color)
-            self.L[ChainLayers.motion][i] =                      render.Motion2DLayer(settings.motion)
-            self.L[ChainLayers.bridge][i] =                      render.Bridge2DLayer(settings.bridge)
-            self.L[ChainLayers.fluid][i] =                       render.Fluid2DLayer(settings.fluid)
+            self.L[ChainLayers.color][i] =                       render.ColorLayer(   flow.color)
+            self.L[ChainLayers.motion][i] =                      render.Motion2DLayer(flow.motion)
+            self.L[ChainLayers.bridge][i] =                      render.Bridge2DLayer(flow.bridge)
+            self.L[ChainLayers.fluid][i] =                       render.Fluid2DLayer(flow.fluid)
             # each stage's main monitor in self.L, shown in the main panel; its debug monitor in self._debug_monitors,
             # shown in the debug panel
-            for key, stage, flat in ((ChainLayers.view_monitor, render.FlowStage.VIEW, settings.view),
-                                     (ChainLayers.color_monitor, render.FlowStage.COLOR, settings.color),
-                                     (ChainLayers.motion_monitor, render.FlowStage.MOTION, settings.motion),
-                                     (ChainLayers.bridge_monitor, render.FlowStage.BRIDGE, settings.bridge),
-                                     (ChainLayers.fluid_monitor, render.FlowStage.FLUID, settings.fluid)):
+            for key, stage, flat in ((ChainLayers.view_monitor, render.FlowStage.VIEW, flow.view),
+                                     (ChainLayers.color_monitor, render.FlowStage.COLOR, flow.color),
+                                     (ChainLayers.motion_monitor, render.FlowStage.MOTION, flow.motion),
+                                     (ChainLayers.bridge_monitor, render.FlowStage.BRIDGE, flow.bridge),
+                                     (ChainLayers.fluid_monitor, render.FlowStage.FLUID, flow.fluid)):
                 self.L[key][i] = render.Monitor2DLayer(stage, flat.monitor_main)
                 self._debug_monitors.setdefault(key, {})[i] = render.Monitor2DLayer(stage, flat.monitor_debug)
         self.L[ChainLayers.time_series][0] = render.TimeSeriesLayer(self.board, settings.time_series)      # the board's series, one for all cameras
@@ -132,7 +134,7 @@ class LowFlowRender(RenderBase):
     def allocate(self) -> None:
         self._window_size = self.window_size(0)
         self.subdivision = self._make_layout()
-        self._view_size = (self.settings.view.width, self.settings.view.height)
+        self._view_size = (self.flow.view.width, self.flow.view.height)
         for layer_type, cam_dict in self.L.items():
             for layer in cam_dict.values():
                 size: Size = size_of(layer_type)
@@ -159,7 +161,7 @@ class LowFlowRender(RenderBase):
 
     def _follow_view_size(self) -> None:
         """Reallocate the view layers when the view's size changed."""
-        size: tuple[int, int] = (self.settings.view.width, self.settings.view.height)
+        size: tuple[int, int] = (self.flow.view.width, self.flow.view.height)
         if size == self._view_size:
             return
         self._view_size = size
@@ -275,7 +277,7 @@ class LowFlowRender(RenderBase):
 
         motion = cast(render.Motion2DLayer, self.L[ChainLayers.motion][i])
         bridge = cast(render.Bridge2DLayer, self.L[ChainLayers.bridge][i])
-        interval: float = render.frame_interval(frame.timestamp, self._inference_frame_timestamps.get(i), self.settings.motion.fps, self._dt, self._dt)
+        interval: float = render.frame_interval(frame.timestamp, self._inference_frame_timestamps.get(i), self.flow.motion.fps, self._dt, self._dt)
         self._inference_frame_timestamps[i] = frame.timestamp
         self.motion_rates.setdefault(i, FPS()).processed()
         output: ViewOutput = view.output

@@ -24,7 +24,7 @@ def leaves(node: dict, at: tuple[str, ...] = ()) -> set[tuple[str, ...]]:
 class TestFluidPreset(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.preset: dict = json.loads(LOW_FLOW.read_text(encoding='utf-8'))['render']['fluid']
+        self.preset: dict = json.loads(LOW_FLOW.read_text(encoding='utf-8'))['flow']['fluid']
 
     def test_the_preset_holds_every_key_of_the_settings(self) -> None:
         missing = leaves(Fluid2DSettings().to_dict()) - leaves(self.preset)
