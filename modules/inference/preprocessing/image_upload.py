@@ -268,8 +268,3 @@ class ImageUpload:
             event.synchronize()
         self._staging[key] = (buffers, events, slot)
         return buffers[slot]
-
-    def reset(self) -> None:
-        """Forget the cameras' grids and inverses: a new homography makes its own."""
-        self._warp_grids.clear()
-        self._inverses.clear()

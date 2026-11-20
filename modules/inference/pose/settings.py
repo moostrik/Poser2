@@ -24,10 +24,6 @@ class PoseEstimatorSettings(ModelWorkerSettings):
         return _HEIGHT
 
     @property
-    def aspect_ratio(self) -> float:
-        return self.width / self.height
-
-    @property
     def model(self) -> str:
         """The model's name; its file is `model_file(model)`."""
         return _MODEL

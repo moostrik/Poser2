@@ -34,8 +34,7 @@ SyncSetCallback = Callable[[dict[int, M]], None]
 
 
 class CameraSyncSettings(BaseSettings):
-    num_cams:    Field[int]   = Field(1, access=Field.INIT, visible=False)
-    fps:            Field[float] = Field(30.0, access=Field.INIT, visible=False)
+    fps: Field[float] = Field(30.0, access=Field.INIT, visible=False)
 
 
 class CameraSync(Thread, Generic[M]):
