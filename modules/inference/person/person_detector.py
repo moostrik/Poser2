@@ -32,7 +32,7 @@ class PersonDetector(ModelWorker[GpuImage, PersonDetectorSettings]):
         super().__init__(settings, "PersonDetector")
         self.width: int = settings.width
         self.height: int = settings.height
-        self._engine: Engine = make_engine(settings.model_type, settings.model_file)
+        self._engine: Engine = make_engine(settings.model_type, settings.model_file(settings.model))
 
         self._callback_lock: Lock = Lock()
         self._callbacks: list[DetectionCallback] = []   # run in registration order, on this thread

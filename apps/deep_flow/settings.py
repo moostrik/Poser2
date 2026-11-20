@@ -162,12 +162,13 @@ class MotionFeature(BaseSettings):
 class PoseGroup(BaseSettings):
     max_players:          Field[int]                  = Field(1, min=1, max=16, access=Field.INIT)
     model_type:         Field[inference.ModelType]  = Field(inference.ModelType.TRT, access=Field.INIT)
-    model_path:         Field[str]                  = Field("", access=Field.INIT, visible=False)
+    onnx_path:          Field[str]                  = Field("data/models", access=Field.INIT, visible=False)
+    engine_path:        Field[str]                  = Field("data/models", access=Field.INIT, visible=False)
     verbose:            Field[bool]                 = Field(False, access=Field.INIT)
     frequency:          Field[float]                = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float]                = Field(60.0)
 
-    _batch_share  : list = [max_players, model_type, model_path, verbose]
+    _batch_share  : list = [max_players, model_type, onnx_path, engine_path, verbose]
     _feature_share: list = [frequency, output_frequency]
 
     pose           : Group[inference.pose.PoseEstimatorSettings]          = Group(inference.pose.PoseEstimatorSettings, share=_batch_share)

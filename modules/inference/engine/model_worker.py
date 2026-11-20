@@ -6,20 +6,19 @@ from typing import Generic, Protocol, TypeVar, cast
 
 import torch
 
-from modules.settings import BaseSettings
+from .model_worker_settings import ModelWorkerSettings
 
 logger = logging.getLogger(__name__)
 
 Item = TypeVar('Item')
 
 
-class ModelWorkerSettings(Protocol):
-    """What a model worker needs from its settings, as their fields read on an instance."""
+class _Dropped(Protocol):
+    """The monitor each worker's settings declare last, beside the base's fields, as read on an instance."""
     dropped: int        # items replaced by a newer one before the model ran them
-    verbose: bool
 
 
-Settings = TypeVar('Settings', bound=BaseSettings)       # with the fields of `ModelWorkerSettings`
+Settings = TypeVar('Settings', bound=ModelWorkerSettings)       # with a `dropped` field
 
 
 class ModelWorker(ABC, Generic[Item, Settings]):
@@ -71,9 +70,8 @@ class ModelWorker(ABC, Generic[Item, Settings]):
             replaced: tuple[Item, float] | None = self._pending.get(key)
             self._pending[key] = (item, now)
         if replaced is not None:
-            fields: ModelWorkerSettings = cast(ModelWorkerSettings, self.settings)     # a Field reads as its value
-            fields.dropped += 1
-            if fields.verbose:
+            cast(_Dropped, self.settings).dropped += 1     # a Field reads as its value
+            if self.settings.verbose:
                 logger.info(f"{self.name}: dropped an item with lag {int((now - replaced[1]) * 1000)} ms")
         self._wake.set()
 

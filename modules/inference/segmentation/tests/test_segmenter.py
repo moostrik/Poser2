@@ -8,6 +8,7 @@ import unittest
 import torch
 
 from modules.inference import ModelType, crop, segmentation
+from modules.inference.engine import Resolution
 from modules.pose import BBox, Frame
 from modules.utils import Rect
 
@@ -85,6 +86,16 @@ class SegmenterTest(unittest.TestCase):
         self.assertTrue(all(name == 'Segmenter' for _, name in told))
         self.assertTrue(events and all(event is WRITTEN for event in events))    # every image carries the runner's event
         self.assertEqual(states.resets, 1)                     # at the second batch
+
+
+class ModelFileTest(unittest.TestCase):
+    def test_the_resolution_and_the_runtime_pick_the_file_each_in_its_own_folder(self) -> None:
+        settings = segmentation.SegmenterSettings(resolution=Resolution.HIGH, onnx_path='onnx_folder',
+                                                  engine_path='engine_folder')
+        self.assertEqual((settings.width, settings.height), (288, 384))
+        self.assertEqual(settings.model_file(settings.model), 'engine_folder/rvm_mobilenetv3_384x288_fp16.trt')
+        settings.model_type = ModelType.ONNX
+        self.assertEqual(settings.model_file(settings.model), 'onnx_folder/rvm_mobilenetv3_384x288_fp16.onnx')
 
 
 if __name__ == '__main__':

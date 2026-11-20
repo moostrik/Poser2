@@ -103,5 +103,13 @@ class FaceDetectorTest(unittest.TestCase):
         self.assertEqual([frame.timestamp for frame in frames], [2.0])
 
 
+class ModelFileTest(unittest.TestCase):
+    def test_each_model_and_the_runtime_pick_the_file_each_in_its_own_folder(self) -> None:
+        settings = FaceDetectorSettings(onnx_path='onnx_folder', engine_path='engine_folder')
+        self.assertEqual(settings.model_file('scrfd_10g_bnkps'), 'onnx_folder/scrfd_10g_bnkps.onnx')
+        settings.model_type = ModelType.TRT
+        self.assertEqual(settings.model_file('2d106det'), 'engine_folder/2d106det.trt')
+
+
 if __name__ == '__main__':
     unittest.main()

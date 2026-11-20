@@ -3,9 +3,9 @@ thresholds the device detector has."""
 
 from enum import IntEnum, auto
 
-from modules.settings import BaseSettings, Field
+from modules.settings import Field
 
-from ..engine import ModelType
+from ..engine import ModelType, ModelWorkerSettings
 
 
 class Resolution(IntEnum):
@@ -24,18 +24,15 @@ RESOLUTION_DIMS: dict[Resolution, tuple[int, int]] = {  # (width, height)
 }
 
 
-class PersonDetectorSettings(BaseSettings):
+class PersonDetectorSettings(ModelWorkerSettings):
     """A YOLO person detector on the host, the replay backend's stand-in for the device's detector;
     `confidence` and `overlap` default to the values the oak pipeline sets."""
 
-    enabled:     Field[bool]  = Field(True, description="Find the players on the host; off, a recording's own tracklets play")
     model_type:  Field[ModelType]  = Field(ModelType.ONNX, access=Field.INIT, description="Runtime the model runs on")
+    enabled:     Field[bool]  = Field(True, description="Find the players on the host; off, a recording's own tracklets play")
     resolution:  Field[Resolution] = Field(Resolution.R512X448, access=Field.INIT, description="Model input size, width x height")
-    model_path:  Field[str]   = Field("data/models", access=Field.INIT, visible=False, description="ONNX model files directory")
-    engine_path: Field[str]   = Field("data/models", access=Field.INIT, visible=False, description="TensorRT engines directory")
     confidence:  Field[float] = Field(0.5, min=0.0, max=1.0, step=0.05, description="Minimum person score")
     overlap:     Field[float] = Field(0.5, min=0.0, max=1.0, step=0.05, description="Boxes overlapping more than this (IoU) are one person")
-    verbose:     Field[bool]  = Field(False, access=Field.INIT)
     dropped:     Field[int]   = Field(0, access=Field.READ, description="Images replaced by a newer one before the model ran them")
 
     @property
@@ -48,10 +45,5 @@ class PersonDetectorSettings(BaseSettings):
 
     @property
     def model(self) -> str:
-        extension: str = 'onnx' if self.model_type is ModelType.ONNX else 'trt'
-        return f"yolov8n_coco_{self.width}x{self.height}.{extension}"
-
-    @property
-    def model_file(self) -> str:
-        folder: str = self.model_path if self.model_type is ModelType.ONNX else self.engine_path
-        return f"{folder}/{self.model}"
+        """The model's name at the resolution; its file is `model_file(model)`."""
+        return f"yolov8n_coco_{self.width}x{self.height}"

@@ -43,7 +43,7 @@ class PoseEstimator(ModelWorker[Batch, PoseEstimatorSettings], FrameDictCallback
 
         self.max_batch: int = min(settings.max_players, 8)
         self._model_size: tuple[int, int] = (settings.width, settings.height)
-        self._engine: Engine = make_engine(settings.model_type, f"{settings.model_path}/{settings.model}",
+        self._engine: Engine = make_engine(settings.model_type, settings.model_file(settings.model),
                                            self.max_batch if settings.model_type is ModelType.ONNX else None)
         self._mean: torch.Tensor
         self._std: torch.Tensor

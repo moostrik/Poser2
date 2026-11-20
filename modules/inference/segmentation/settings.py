@@ -1,33 +1,23 @@
-from ..engine import ModelType, Resolution, RESOLUTION_DIMS
-from modules.settings import BaseSettings, Field
+from ..engine import ModelWorkerSettings, Resolution, RESOLUTION_DIMS
+from modules.settings import Field
 
-_MODELS = {
-    'onnx': {
-        Resolution.STANDARD: "rvm_mobilenetv3_256x192_fp16.onnx",
-        Resolution.HIGH: "rvm_mobilenetv3_384x288_fp16.onnx",
-        Resolution.ULTRA: "rvm_mobilenetv3_512x384_fp16.onnx",
-        Resolution.EXTREME: "rvm_mobilenetv3_1024x768_fp16.onnx",
-    },
-    'tensorrt': {
-        Resolution.STANDARD: "rvm_mobilenetv3_256x192_fp16.trt",
-        Resolution.HIGH: "rvm_mobilenetv3_384x288_fp16.trt",
-        Resolution.ULTRA: "rvm_mobilenetv3_512x384_fp16.trt",
-        Resolution.EXTREME: "rvm_mobilenetv3_1024x768_fp16.trt",
-    }
+# The model of each resolution RVM was exported at, in FP16
+_MODELS: dict[Resolution, str] = {
+    Resolution.STANDARD: "rvm_mobilenetv3_256x192_fp16",
+    Resolution.HIGH:     "rvm_mobilenetv3_384x288_fp16",
+    Resolution.ULTRA:    "rvm_mobilenetv3_512x384_fp16",
+    Resolution.EXTREME:  "rvm_mobilenetv3_1024x768_fp16",
 }
 
 
-class SegmenterSettings(BaseSettings):
+class SegmenterSettings(ModelWorkerSettings):
     """The person segmentation's settings (RVM)."""
 
     max_players:      Field[int]        = Field(1, min=1, max=16, access=Field.INIT)
-    model_type:     Field[ModelType]  = Field(ModelType.TRT, access=Field.INIT)
     resolution:     Field[Resolution] = Field(Resolution.STANDARD, access=Field.INIT)
-    model_path:     Field[str]        = Field("data/models", access=Field.INIT, visible=False)
-    verbose:        Field[bool]       = Field(False, access=Field.INIT)
-    dropped:        Field[int]        = Field(0, access=Field.READ, description="Batches replaced by a newer one before the model ran them")
     enabled:        Field[bool]       = Field(True)
     reset_interval: Field[int]        = Field(60, min=1, access=Field.INIT)
+    dropped:        Field[int]        = Field(0, access=Field.READ, description="Batches replaced by a newer one before the model ran them")
 
     @property
     def width(self) -> int:
@@ -39,8 +29,5 @@ class SegmenterSettings(BaseSettings):
 
     @property
     def model(self) -> str:
-        if self.model_type == ModelType.ONNX:
-            return f"data/models/{_MODELS['onnx'][self.resolution]}"
-        elif self.model_type == ModelType.TRT:
-            return _MODELS['tensorrt'][self.resolution]
-        return ""
+        """The model's name at the resolution; its file is `model_file(model)`."""
+        return _MODELS[self.resolution]

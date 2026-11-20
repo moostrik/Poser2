@@ -107,14 +107,13 @@ def load_app_settings(app: str) -> BaseSettings:
 def model_settings(app_group: BaseSettings, model_type: ModelType) -> BaseSettings:
     """A standalone copy of a model's settings group with the requested model type.
 
-    The ONNX models are named from the repo root (`data/models/...`), the TensorRT engines from the app's
-    model folder.
+    Its model files are the app's: the ONNX files in the repo's `data/models`, the engines in the app's model folder.
     """
     copy = type(app_group)()
-    copy.max_players = app_group.max_players
-    copy.resolution = app_group.resolution
+    for name in ('max_players', 'resolution', 'onnx_path', 'engine_path'):
+        if hasattr(app_group, name):
+            setattr(copy, name, getattr(app_group, name))
     copy.model_type = model_type
-    copy.model_path = '.' if model_type is ModelType.ONNX else app_group.model_path
     copy.initialize()
     return copy
 
@@ -152,7 +151,7 @@ def run_model(name: str, worker_class: type, add_callback: Callable, read_output
 
     The stats are read here, while the timers live: the session holds them weakly.
     """
-    label = f"{name} {settings.model_type.name} {settings.resolution.name} b{settings.max_players}"
+    label = f"{name} {settings.model_type.name} {settings.model} b{settings.max_players}"
     latency_timer = PerformanceTimer(name=f"{label} latency")
 
     memory_before = gpu_used_mb()
@@ -171,7 +170,7 @@ def run_model(name: str, worker_class: type, add_callback: Callable, read_output
         deadline = time.perf_counter() + READY_TIMEOUT
         while not worker.is_ready:
             if time.perf_counter() > deadline:
-                raise RuntimeError(f"{label}: model not ready ({settings.model_path}/{settings.model})")
+                raise RuntimeError(f"{label}: model not ready ({settings.model_file(settings.model)})")
             time.sleep(0.05)
         memory_mb = gpu_used_mb() - memory_before
 
@@ -197,7 +196,7 @@ def detector_settings(app_group: BaseSettings, model_type: ModelType) -> BaseSet
     """A standalone copy of a detector's settings with the requested model type: its model files as the app's, its
     thresholds as the preset's, on."""
     copy = type(app_group)()
-    for name in ('resolution', 'model_path', 'engine_path', 'confidence', 'overlap', 'threshold', 'pitch_zero'):
+    for name in ('resolution', 'onnx_path', 'engine_path', 'confidence', 'overlap', 'threshold', 'pitch_zero'):
         if hasattr(app_group, name):
             setattr(copy, name, getattr(app_group, name))
     copy.model_type = model_type

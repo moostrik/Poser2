@@ -92,10 +92,12 @@ class DecodeTest(unittest.TestCase):
 
 
 class ModelFileTest(unittest.TestCase):
-    def test_the_one_model_and_its_size(self) -> None:
-        settings = pose.PoseEstimatorSettings(model_type=ModelType.TRT)
-        self.assertEqual(settings.model, 'rtmpose-l_384x288_fp16.trt')
+    def test_the_one_model_its_size_and_its_file_in_each_folder(self) -> None:
+        settings = pose.PoseEstimatorSettings(onnx_path='onnx_folder', engine_path='engine_folder')
         self.assertEqual((settings.width, settings.height), (288, 384))
+        self.assertEqual(settings.model_file(settings.model), 'engine_folder/rtmpose-l_384x288_fp16.trt')
+        settings.model_type = ModelType.ONNX
+        self.assertEqual(settings.model_file(settings.model), 'onnx_folder/rtmpose-l_384x288_fp16.onnx')
 
 if __name__ == '__main__':
     unittest.main()

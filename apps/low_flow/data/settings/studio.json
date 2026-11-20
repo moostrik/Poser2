@@ -83,7 +83,7 @@
       "enabled": false,
       "model_type": "TRT",
       "resolution": "R640X512",
-      "model_path": "data/models",
+      "onnx_path": "data/models",
       "engine_path": "apps/deep_flow/data/models",
       "confidence": 0.5,
       "overlap": 0.5,
@@ -123,7 +123,7 @@
   "cadence": {},
   "pose": {
     "model_type": "TRT",
-    "model_path": "apps/deep_flow/data/models",
+    "engine_path": "apps/deep_flow/data/models",
     "verbose": false,
     "output_frequency": 60.0,
     "pose": {

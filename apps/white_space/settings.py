@@ -240,14 +240,15 @@ class SimilarityFeature(BaseSettings):
 class PoseGroup(BaseSettings):
     max_players      : Field[int]       = Field(3, min=1, max=16, access=Field.INIT, description="Players tracked at most (shared from root max_players)")
     model_type       : Field[inference.ModelType] = Field(inference.ModelType.TRT, access=Field.INIT)
-    model_path       : Field[str]       = Field("", access=Field.INIT, visible=False)
+    onnx_path        : Field[str]       = Field("data/models", access=Field.INIT, visible=False)
+    engine_path      : Field[str]       = Field("data/models", access=Field.INIT, visible=False)
     verbose          : Field[bool]      = Field(False, access=Field.INIT)
     frequency        : Field[float]     = Field(30.0, access=Field.INIT)
     output_frequency : Field[float]     = Field(32.0, min=1.0, max=120.0, description="LERP tick rate (fps, shared from the root light_rate)")
 
     _feature_share: list = [frequency, output_frequency]
 
-    pose            : Group[inference.pose.PoseEstimatorSettings]         = Group(inference.pose.PoseEstimatorSettings, share=[max_players, model_type, model_path, verbose])
+    pose            : Group[inference.pose.PoseEstimatorSettings]         = Group(inference.pose.PoseEstimatorSettings, share=[max_players, model_type, onnx_path, engine_path, verbose])
     frame_source    : Group[TrackerFrameSourceSettings]      = Group(TrackerFrameSourceSettings)
     pose_crop       : Group[inference.crop.CropExtractorSettings]         = Group(inference.crop.CropExtractorSettings, share=[max_players])
     angle_extractor : Group[nodes.AngleExtractorSettings]    = Group(nodes.AngleExtractorSettings)

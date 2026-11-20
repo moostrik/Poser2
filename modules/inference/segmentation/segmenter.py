@@ -38,7 +38,7 @@ class Segmenter(ModelWorker[Batch, SegmenterSettings]):
 
         self.max_batch: int = min(settings.max_players, 4)
         self._model_size: tuple[int, int] = (settings.width, settings.height)
-        self._engine: Engine = make_engine(settings.model_type, f"{settings.model_path}/{settings.model}",
+        self._engine: Engine = make_engine(settings.model_type, settings.model_file(settings.model),
                                            self.max_batch if settings.model_type is ModelType.ONNX else None)
         self._states: dict[int, RecurrentState] = {}    # per track id: each player's memory of the earlier frames
         self._zero_states: list[torch.Tensor] = []      # (1, C, h, w) per recurrent input, for a new player

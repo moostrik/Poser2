@@ -70,7 +70,7 @@ class PersonDetectorTest(unittest.TestCase):
     def setUp(self) -> None:
         self.folder = tempfile.mkdtemp()
         write_stub_model(os.path.join(self.folder, MODEL_FILE), self.symbolic)
-        self.settings = PersonDetectorSettings(model_path=self.folder)
+        self.settings = PersonDetectorSettings(onnx_path=self.folder)
         self.settings.initialize()
         self.detector = PersonDetector(self.settings)
         self.detections = []
@@ -124,16 +124,16 @@ class SymbolicInputTest(PersonDetectorTest):
 
 class ModelFileTest(unittest.TestCase):
     def test_the_size_and_the_runtime_pick_the_file_each_in_its_own_folder(self) -> None:
-        settings = PersonDetectorSettings(resolution=Resolution.R640X512, model_path='onnx_folder', engine_path='engine_folder')
+        settings = PersonDetectorSettings(resolution=Resolution.R640X512, onnx_path='onnx_folder', engine_path='engine_folder')
         self.assertEqual((settings.width, settings.height), (640, 512))
-        self.assertEqual(settings.model_file, 'onnx_folder/yolov8n_coco_640x512.onnx')
+        self.assertEqual(settings.model_file(settings.model), 'onnx_folder/yolov8n_coco_640x512.onnx')
         settings.model_type = ModelType.TRT
-        self.assertEqual(settings.model_file, 'engine_folder/yolov8n_coco_640x512.trt')
+        self.assertEqual(settings.model_file(settings.model), 'engine_folder/yolov8n_coco_640x512.trt')
 
 
 class MissingModelTest(unittest.TestCase):
     def test_a_missing_file_fails_to_load_with_its_name(self) -> None:
-        settings = PersonDetectorSettings(model_path=tempfile.mkdtemp())
+        settings = PersonDetectorSettings(onnx_path=tempfile.mkdtemp())
         settings.initialize()
         detector = PersonDetector(settings)
         with self.assertLogs('modules.inference.engine.model_worker', level='ERROR') as logs:

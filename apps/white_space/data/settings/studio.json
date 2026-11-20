@@ -355,7 +355,7 @@
     "person_detector": {
       "model_type": "TRT",
       "engine_path": "apps/white_space/data/models",
-      "model_path": "data/models",
+      "onnx_path": "data/models",
       "confidence": 0.5,
       "overlap": 0.5,
       "verbose": false
@@ -387,7 +387,7 @@
   },
   "pose": {
     "model_type": "TRT",
-    "model_path": "apps/white_space/data/models",
+    "engine_path": "apps/white_space/data/models",
     "verbose": false,
     "pose": {
       "enabled": true
