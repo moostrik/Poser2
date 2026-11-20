@@ -10,6 +10,7 @@ from modules.gl import ComputeShader, Shader
 
 SHADER = sys.modules['modules.gl.shader']
 ACTIVE_UNIFORMS = Shader._active_uniforms           # the real one; the tests' setUp mocks it
+SOURCE: str = '#version 460\nvoid main() {}\n'
 
 
 class _Draw(Shader):
@@ -33,7 +34,9 @@ class ShaderTest(unittest.TestCase):
         self.active: dict[str, int] = {}
         for patcher in (mock.patch.object(Shader, '_compile', classmethod(compile)),
                         mock.patch.object(Shader, '_active_uniforms', staticmethod(lambda program: dict(self.active))),
-                        mock.patch.object(SHADER, 'glDeleteProgram')):
+                        mock.patch.object(SHADER, 'glDeleteProgram'),
+                        mock.patch.object(SHADER, 'SETTLE', 0.0),           # F5's own tests set them
+                        mock.patch.object(SHADER, 'READ_RETRIES', 0)):
             patcher.start()
             self.addCleanup(patcher.stop)
         self.deleted = SHADER.glDeleteProgram
@@ -145,6 +148,56 @@ class ShaderTest(unittest.TestCase):
         with mock.patch.object(SHADER, 'glGetProgramiv', return_value=3),                 mock.patch.object(SHADER, 'glGetActiveUniform', side_effect=lambda program, index: names[index]),                 mock.patch.object(SHADER, 'glGetUniformLocation', side_effect=lambda program, name: locations[name]):
             uniforms = ACTIVE_UNIFORMS(7)
         self.assertEqual(uniforms, {'gain': 3, 'colors[0]': 5, 'colors': 5})
+
+    def shader_on(self, path: Path) -> Shader:
+        shader_class = type('_File', (Shader,), {'_stages': classmethod(lambda cls: [(0, path)])})
+        shader: Shader = shader_class()
+        shader.allocate()
+        self.compiles.clear()
+        return shader
+
+    def test_a_save_in_two_events_compiles_once_after_it_settles(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'a.frag'
+            path.write_text(SOURCE)
+            self.shader_on(path)
+            clock = [10.0]
+            with mock.patch.object(SHADER, 'SETTLE', 0.1), mock.patch.object(SHADER, 'perf_counter', lambda: clock[0]):
+                Shader._on_file_changed(str(path))
+                clock[0] = 10.05
+                Shader._on_file_changed(str(path))          # the save's second event
+                Shader.reload_marked()
+                self.assertEqual(self.compiles, [])         # not settled
+                clock[0] = 10.2
+                Shader.reload_marked()
+                Shader.reload_marked()
+        self.assertEqual(len(self.compiles), 1)
+
+    def test_a_half_written_file_is_tried_again_not_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'a.frag'
+            path.write_text(SOURCE)
+            self.shader_on(path)
+            with mock.patch.object(SHADER, 'READ_RETRIES', 30), mock.patch.object(SHADER.logger, 'error') as error:
+                path.write_text('')                         # the editor has truncated it, not yet written
+                Shader._on_file_changed(str(path))
+                Shader.reload_marked()
+                self.assertEqual(self.compiles, [])
+                path.write_text(SOURCE)
+                Shader.reload_marked()
+            error.assert_not_called()
+        self.assertEqual(len(self.compiles), 1)
+
+    def test_two_files_saved_together_both_reload(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            first, second = Path(folder) / 'a.frag', Path(folder) / 'b.frag'
+            for path in (first, second):
+                path.write_text(SOURCE)
+            a, b = self.shader_on(first), self.shader_on(second)
+            Shader._on_file_changed(str(first))
+            Shader._on_file_changed(str(second))            # within the same moment: nothing dropped
+            Shader.reload_marked()
+        self.assertEqual(sorted(c.__name__ for c in self.compiles), ['_File', '_File'])
 
     def test_a_compute_shader_has_one_stage_its_comp_file(self) -> None:
         stages = _Compute._stages()

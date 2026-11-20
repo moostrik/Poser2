@@ -9,9 +9,6 @@ measurement; E and H from the package scan of the same day. The lines are in wor
 Shaders reload at one point in the window loop, and each class's program is compiled once and shared by its
 objects (`Shader._programs`).
 
-- F5. A save that arrives in two events or half-written is tried again on the next frame, not reported as a compile
-  error; the debounce is per file, not per folder. Test: a half-written file, then the whole one; two files saved
-  together both reload.
 - F6. `Dither` and `Lut` hold their own state per object, made in `allocate` and freed in `deallocate`; `Lut`'s
   `hasattr` guard goes. Test: with the noise mocked, a `Dither` makes its noise once and frees it once.
 - F7. GL.md's Shaders section describes hot reload, `ComputeShader`, the program shared by a class's objects, the

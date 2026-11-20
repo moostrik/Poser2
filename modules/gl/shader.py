@@ -4,6 +4,7 @@ import re
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
+from time import perf_counter
 from typing import cast
 
 from OpenGL.GL import GL_ACTIVE_UNIFORMS, GL_COMPILE_STATUS, GL_FRAGMENT_SHADER, GL_LINK_STATUS, GL_VERTEX_SHADER, glAttachShader, glCompileShader, glCreateProgram, glCreateShader, glDeleteProgram, glDeleteShader, glGetActiveUniform, glGetProgramInfoLog, glGetProgramiv, glGetShaderInfoLog, glGetShaderiv, glGetUniformLocation, glLinkProgram, glShaderSource
@@ -14,6 +15,8 @@ from .file_watcher import monitor_path
 logger = logging.getLogger(__name__)
 
 SHARED_SHADERS: Path = Path(__file__).parent / "shaders"     # the shared includes and `_generic.vert`
+SETTLE: float = 0.1                 # s after a file's last event before its programs compile again: a save is whole
+READ_RETRIES: int = 30              # frames a program whose file reads empty is tried again before the error
 _LOG_LOCATION = re.compile(r'^(\d+)\((\d+)\)')               # NVIDIA's "file(line)" at the start of a log line
 
 
@@ -35,6 +38,8 @@ class _Program:
     files: set[Path] = field(default_factory=set)       # the files it was compiled from
     uniforms: dict[str, int] = field(default_factory=dict)     # read after linking; an array element at its use
     marked: bool = False                                # a file changed: compiled again at the next reload point
+    marked_at: float = 0.0                              # the last change's time (perf_counter), for SETTLE
+    retries: int = 0                                    # frames its files read empty since the change
 
 
 class Shader():
@@ -125,9 +130,8 @@ class Shader():
 
     # COMPILE
     @classmethod
-    def _compile_into(cls, entry: _Program) -> bool:
-        """Compile the class's program into `entry`; on failure the program it had stays. The files it reads, its
-        includes too, are the ones whose change marks it."""
+    def _read_sources(cls, entry: _Program) -> list[tuple[int, Path, str, list[Path]]]:
+        """The stages' sources; the files they read, their includes too, become the ones whose change marks it."""
         sources: list[tuple[int, Path, str, list[Path]]] = []
         files: set[Path] = set()
         for stage, path in cls._stages():
@@ -136,6 +140,13 @@ class Shader():
             files.update(read)
         with Shader._lock:
             entry.files = files
+        return sources
+
+    @classmethod
+    def _compile_into(cls, entry: _Program, sources: list[tuple[int, Path, str, list[Path]]] | None = None) -> bool:
+        """Compile the class's program into `entry`, from `sources` or read now; on failure the program it had stays."""
+        if sources is None:
+            sources = cls._read_sources(entry)
         program: int | None = cls._compile(sources)
         if program is None:
             return False
@@ -199,17 +210,27 @@ class Shader():
     # HOT RELOAD
     @classmethod
     def reload_marked(cls) -> None:
-        """Compile again every program a changed file marked; on the main thread, at the top of each frame."""
+        """Compile again every program a changed file marked, once its files have been quiet for SETTLE; on the main
+        thread, at the top of each frame. A file that reads empty, a save under way, is tried again next frame."""
         if not Shader._marked:
             return
+        now: float = perf_counter()
         with Shader._lock:
-            Shader._marked = False
             marked: list[tuple[type, _Program]] = [(shader_class, entry) for shader_class, entry in Shader._programs.items()
-                                                   if entry.marked]
+                                                   if entry.marked and now - entry.marked_at >= SETTLE]
             for _, entry in marked:
                 entry.marked = False
+            Shader._marked = any(entry.marked for entry in Shader._programs.values())
         for shader_class, entry in marked:
-            compiled: bool = shader_class._compile_into(entry)
+            sources = shader_class._read_sources(entry)
+            if any(not source for _, _, source, _ in sources) and entry.retries < READ_RETRIES:
+                entry.retries += 1
+                with Shader._lock:
+                    entry.marked = True
+                    Shader._marked = True
+                continue
+            entry.retries = 0
+            compiled: bool = shader_class._compile_into(entry, sources)
             if compiled:
                 logger.info("%s reloaded", shader_class.__name__)
             else:
@@ -288,8 +309,10 @@ class Shader():
     def _on_file_changed(filepath: str) -> None:
         """The watcher's thread: mark each program made from the file."""
         path = Path(filepath)
+        now: float = perf_counter()
         with Shader._lock:
             for entry in Shader._programs.values():
                 if path in entry.files:
                     entry.marked = True
+                    entry.marked_at = now
                     Shader._marked = True
