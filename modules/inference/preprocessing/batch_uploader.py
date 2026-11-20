@@ -5,11 +5,10 @@ synced first.
 returns: sets wait whole, at most `WAITING`; beyond that the oldest set is dropped whole and counted (`dropped`), so
 a frame never leaves its set. This one's own thread uploads a set with `ImageUpload`, as one stack when its frames
 share a size (one copy, one round of kernels), and hands on each image to the image callbacks (`GpuImage`) and the
-set to the snapshot callbacks (`ImageSnapshot`: the set's images, the previous set's as each camera's previous one,
-their capture times, the event recorded after them), at once, for the readers in the package, which wait on the
-event on their own streams; then the set's capture times to the capture callbacks; then, only when a finished
-callback is registered, it waits for its stream and hands each image on written, for the readers outside the
-package. No tracklets and no depth: they do not go through it."""
+set to the snapshot callbacks (`ImageSnapshot`: the set's images, their capture times, the event recorded after
+them), at once, for the readers in the package, which wait on the event on their own streams; then the set's
+capture times to the capture callbacks; then, only when a finished callback is registered, it waits for its stream
+and hands each image on written, for the readers outside the package. No tracklets and no depth: they do not go through it."""
 
 import logging
 import time
@@ -36,7 +35,6 @@ class BatchUploader(Thread):
         super().__init__(daemon=True, name='BatchUploader')
         self._image_upload: ImageUpload = ImageUpload()
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
-        self._previous: ImageDict = {}                  # each camera's image of the set before, on this thread
         self._wake: Condition = Condition()
         self._running: bool = False
         self._sets: deque[tuple[dict[int, CameraFrame], float]] = deque()      # each with the moment it was queued
@@ -140,12 +138,10 @@ class BatchUploader(Thread):
             for frame, image in zip(stack, uploaded):
                 images[frame.cam_id] = image
         assert ready is not None        # recorded after the last stack, so after every image of the set
-        previous: ImageDict = {cam_id: self._previous[cam_id] for cam_id in images if cam_id in self._previous}
-        self._previous.update(images)
         self._timer.add_time((time.perf_counter() - start) * 1000.0, report=False)
 
         timestamps: dict[int, float] = {cam_id: frame.timestamp for cam_id, frame in frames.items()}
-        snapshot: ImageSnapshot = (images, previous, timestamps, ready)
+        snapshot: ImageSnapshot = (images, timestamps, ready)
         with self._callback_lock:
             image_callbacks: list[GpuImageCallback] = list(self._image_callbacks)
             snapshot_callbacks: list[ImageSnapshotCallback] = list(self._snapshot_callbacks)

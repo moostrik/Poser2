@@ -17,7 +17,7 @@ from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, TrackerFrameSource
 from modules.pose import configure_features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import optical_flow, pose, person, CropExtractor, GpuDepth, GpuImage, has_points, RecordedPoses, Depth, InferenceFrame, InferenceFrameSync, Poses, SerialUploader, frame_poses
+from modules.inference import pose, person, CropExtractor, GpuDepth, GpuImage, has_points, RecordedPoses, Depth, InferenceFrame, InferenceFrameSync, Poses, SerialUploader, frame_poses
 from modules.pose import FrameDict
 from modules.utils import FPS, PerformanceTimer
 
@@ -118,15 +118,11 @@ class DeepFlowMain:
 
         # DETECTION
         self.frame_source = TrackerFrameSource(p.frame_source, max_players)
-        self.optical_flow_estimator  = optical_flow.OpticalFlowEstimator(p.optical_flow)
 
         self.tracker.add_tracklet_callback(self.frame_source.set_tracklets)
-        # The frame source's thread: each bang's poses with its images to the pipeline; the crop step in it then
-        # tells the poses asked
+        # The frame source's thread: each bang's poses with its capture times to the pipeline; the crop step in it
+        # then tells the poses asked
         self.crops.add_asked_callback(self._on_asked)
-
-        # The optical flow reads the same crops the pose model gets.
-        self.crops.add_image_callback(self.optical_flow_estimator.submit)
 
         # POSE PIPELINE — the stages are declared in pose/pipeline.py. Each uploaded image drives the frame domain
         # through the tracklet poses (the uploader's capture times);
@@ -194,7 +190,6 @@ class DeepFlowMain:
             self.recorded_poses.start()         # starts the pose model with it
         else:
             self.pose_estimator.start()
-        self.optical_flow_estimator.start()
 
         self.osc_sound.start()
 
@@ -305,7 +300,6 @@ class DeepFlowMain:
         self.inference_frame_sync.stop()
         if self.person_detector is not None:
             self.person_detector.stop()
-        self.optical_flow_estimator.stop()
 
         for camera in self.cameras:
             camera.join(timeout=10)

@@ -33,8 +33,8 @@ class SerialUploaderSettings(BaseSettings):
 class SerialUploader(Thread):
     """Takes the camera's frames on the camera's thread (`submit_frame`) and does all the rest on its own: the color
     goes to the GPU (`ImageUpload`, one frame), converted, straightened and flipped there, and is handed on as a
-    `GpuImage` with the event that says it is written, and as an `ImageSnapshot` of one (the image, its camera's
-    previous one, the event) to the snapshot callbacks; the depth goes the same way, is turned into metres and
+    `GpuImage` with the event that says it is written, and as an `ImageSnapshot` of one (the image, its capture
+    time, the event) to the snapshot callbacks; the depth goes the same way, is turned into metres and
     moved onto the color's view (`DepthAligner`, by the camera's calibration, straightened and mirrored as the
     color), and is handed on as a `GpuDepth`. These go at once, for the readers in the package, which wait on the
     event on their own streams; then each color's capture time goes to the capture callbacks, and then, only when a
@@ -48,9 +48,6 @@ class SerialUploader(Thread):
     notes by capture time (`NOTED` frames, a dropped one included), and hands them on, before any frame that waits.
     Tracklets whose frame is no longer noted take the newest frame's; tracklets `straightened` already pass as they are.
 
-    Each camera's previous color image is kept for the next snapshot, for the optical flow's previous crop; this
-    thread alone keeps it.
-
     Input:  BGR uint8 (H, W, 3), grayscale uint8 (H, W) or packed NV12 uint8 (H * 3 / 2, W)
     Output: float16 RGB CHW [0, 1] tensors keyed by cam_id
     """
@@ -59,7 +56,6 @@ class SerialUploader(Thread):
         super().__init__(daemon=True, name='SerialUploader')
         self.settings: SerialUploaderSettings = settings
         self._image_upload: ImageUpload = ImageUpload()
-        self._previous: dict[int, torch.Tensor] = {}       # each camera's previous color image, on this thread
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
         # Each camera's depth staging buffers, the events of the copies queued from them, the one used last
         self._staging: dict[tuple[int, FrameType], tuple[list[torch.Tensor], list[torch.cuda.Event | None], int]] = {}
@@ -187,7 +183,7 @@ class SerialUploader(Thread):
                 self._gpu_image_callbacks.append(callback)
 
     def add_snapshot_callback(self, callback: ImageSnapshotCallback) -> None:
-        """Every uploaded color image as an `ImageSnapshot` of one: the image, its camera's previous one, its capture
+        """Every uploaded color image as an `ImageSnapshot` of one: the image, its capture
         time and the event that says it is written, on this thread, after the image callbacks."""
         with self._callback_lock:
             if callback not in self._snapshot_callbacks:
@@ -225,17 +221,15 @@ class SerialUploader(Thread):
 
     def _upload(self, frame: CameraFrame) -> None:
         """A color frame to the GPU (`ImageUpload`, one frame), handed on as a `GpuImage` and as an `ImageSnapshot`
-        of one with its camera's previous image."""
+        of one."""
         cam_id: int = frame.cam_id
         start = time.perf_counter()
         images, ready = self._image_upload.upload([frame], self._stream)
         rgb: torch.Tensor = images[0]
-        previous: torch.Tensor | None = self._previous.get(cam_id)
-        self._previous[cam_id] = rgb
         self._timer.add_time((time.perf_counter() - start) * 1000.0, report=False)
 
         gpu_image: GpuImage = GpuImage(cam_id, frame.timestamp, rgb, ready, frame)
-        snapshot: ImageSnapshot = ({cam_id: rgb}, {cam_id: previous} if previous is not None else {}, {cam_id: frame.timestamp}, ready)
+        snapshot: ImageSnapshot = ({cam_id: rgb}, {cam_id: frame.timestamp}, ready)
         with self._callback_lock:
             image_callbacks: list[GpuImageCallback] = list(self._gpu_image_callbacks)
             snapshot_callbacks: list[ImageSnapshotCallback] = list(self._snapshot_callbacks)

@@ -171,7 +171,6 @@ class PoseGroup(BaseSettings):
     _feature_share: list = [frequency, output_frequency]
 
     pose           : Group[inference.pose.PoseEstimatorSettings]          = Group(inference.pose.PoseEstimatorSettings, share=_batch_share)
-    optical_flow   : Group[inference.optical_flow.OpticalFlowEstimatorSettings]  = Group(inference.optical_flow.OpticalFlowEstimatorSettings, share=_batch_share)
     frame_source   : Group[TrackerFrameSourceSettings]       = Group(TrackerFrameSourceSettings)
     pose_crop      : Group[inference.crop.CropExtractorSettings]          = Group(inference.crop.CropExtractorSettings, share=[max_players])
     inference_frame_sync   : Group[inference.InferenceFrameSyncSettings]    = Group(inference.InferenceFrameSyncSettings)

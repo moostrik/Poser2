@@ -183,7 +183,7 @@ def main() -> int:
                           drops=dict(uploader=app.uploader.dropped, board=app.board.get_dropped_inference_frames(),
                                      depth_without_image=app.inference_frame_sync.settings.misses, inference_frame_sync=app.inference_frame_sync.settings.dropped,
                                      pose_step=app.settings.pose.frame_source.dropped, pose_pipeline=app.pipeline.dropped,
-                                     pose_model=app.settings.pose.pose.dropped, optical_flow=app.settings.pose.optical_flow.dropped))
+                                     pose_model=app.settings.pose.pose.dropped))
             if args.record:
                 recorder = settings.camera.recorder
                 report['recorded'] = dict(missed_depth=recorder.missed_depth, missed_color=recorder.missed_color,

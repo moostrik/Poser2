@@ -14,8 +14,8 @@ camera. The camera's thread only hands its frames and tracklets over; every rece
 The crops are two, cut by the crop step (`CropExtractor`) in one pass from the same images and boxes: `pose_crop` at the pose model's input
 size (192 × 256), one antialiased resample from the camera frame rather than a larger crop the runner scales down
 again, and `segmentation_crop` at RVM's (768 × 1024), for the segmentation and the board. Both are 3:4, so they
-cover one region, and the mask lines up with the pose's box (`SourceSpace.CROP`). The previous crop is not cut: no
-optical-flow model runs in hd_trio; its motion is the 2D flow on the centered mask.
+cover one region, and the mask lines up with the pose's box (`SourceSpace.CROP`). Its motion is the 2D flow on the
+centered mask.
 
 The panel pins the drops where they happen (`cadence`): the two syncs', the uploader's, the pipeline's.
 

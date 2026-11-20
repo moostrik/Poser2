@@ -23,9 +23,8 @@ class CropExtractor:
     `submit_snapshot` takes each `ImageSnapshot` from the uploader and keeps the last `KEPT`, by their capture times.
     `submit` takes the poses with the capture times they are for (carried by the frame source and the pipeline),
     finds the snapshot of those times and cuts each pose's box from exactly its images, at every size
-    (`CropExtractorSettings`: the pose model's, and, where a segmentation runs, its own), from the one image and box; with `enable_prev_crop` the
-    previous image is cut at the same box too, for the optical flow. Each size's consumers get the poses with their
-    crops (`add_image_callback`): the pose leaves with its crop as its box and the image's capture time as its stamp,
+    (`CropExtractorSettings`: the pose model's, and, where a segmentation runs, its own), from the one image and box.
+    Each size's consumers get the poses with their crops (`add_image_callback`): the pose leaves with its crop as its box and the image's capture time as its stamp,
     so its keypoints, box and time all belong to the one image. The crops are queued on the crop stream, not waited
     for: each carries the event recorded after them all, and the models wait on that on their own streams. Readers
     outside the package get them finished (`add_finished_image_callback`): after the other callbacks the crop stream
@@ -90,7 +89,7 @@ class CropExtractor:
     def _snapshot(self, cam_timestamps: dict[int, float]) -> ImageSnapshot | None:
         with self._snapshot_lock:
             for snapshot in reversed(self._snapshots):
-                if snapshot[2] == cam_timestamps:
+                if snapshot[1] == cam_timestamps:
                     return snapshot
         return None
 
@@ -108,7 +107,7 @@ class CropExtractor:
             logger.warning("CropExtractor: the images of %s are no longer kept; their poses are not cut", cam_timestamps)
             due = []
         else:
-            current, previous, timestamps, ready = snapshot
+            current, timestamps, ready = snapshot
         crops_ready: torch.cuda.Event = torch.cuda.Event()      # recorded after the last crop, before anyone reads one
         cut: dict[int, tuple[FrameDict, CropImageDict]] = {}
         if due and snapshot is not None:
@@ -117,10 +116,8 @@ class CropExtractor:
                     self._stream.wait_event(ready)
                 for image in current.values():
                     image.record_stream(self._stream)       # read here: not reused before this stream has run
-                for image in previous.values():
-                    image.record_stream(self._stream)
                 for size in due:
-                    cut[id(size)] = self._cut(size, frames, current, previous, timestamps, crops_ready)
+                    cut[id(size)] = self._cut(size, frames, current, timestamps, crops_ready)
                 crops_ready.record(self._stream)
 
         for size in due:
@@ -159,7 +156,7 @@ class CropExtractor:
                 except Exception:
                     logger.exception("Error in finished crop callback")
 
-    def _cut(self, size: CropExtractorSettings, frames: FrameDict, current: ImageDict, previous: ImageDict,
+    def _cut(self, size: CropExtractorSettings, frames: FrameDict, current: ImageDict,
              timestamps: dict[int, float], crops_ready: torch.cuda.Event) -> tuple[FrameDict, CropImageDict]:
         """One size's crops of every pose, queued on the crop stream."""
         cropped: FrameDict = {}
@@ -177,12 +174,9 @@ class CropExtractor:
                 height, width = image.shape[1:3]
                 roi = self._roi(size, pose[BBox].to_rect().zoom(zoom), width, height)
                 crop = self._crop(size, image, roi)
-                prev_crop: torch.Tensor | None = None
-                if size.enable_prev_crop and cam_id in previous:
-                    prev_crop = self._crop(size, previous[cam_id], roi)
                 box = roi.scale(Point2f(1.0 / width, 1.0 / height))
                 cropped[track_id] = replace(pose, {BBox: BBox.from_rect(box)}, timestamps.get(cam_id, pose.timestamp))
-                crops[track_id] = Image(crop=crop, prev_crop=prev_crop, ready=crops_ready, box=box)
+                crops[track_id] = Image(crop=crop, ready=crops_ready, box=box)
             except Exception:
                 logger.exception(f"Error processing pose {track_id}")
         return cropped, crops

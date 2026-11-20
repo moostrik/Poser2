@@ -185,7 +185,7 @@ The recorded ones go out from the camera's own thread, so nothing but the hand-o
 
 `RecordedPoses` (`modules/inference`) is the RAW stage's async output in -sim, between the crop step and the pose model. Its
 `recorded_poses.enabled` is off by default, so -sim runs the pose model as live does. With it on the pose model
-does not run: the crops are cut for what reads them (the optical flow, hd_trio's masks, the previews), and each pose gets its recorded box and points by
+does not run: the crops are cut for what reads them (hd_trio's masks, the previews), and each pose gets its recorded box and points by
 `track_id`, handed on after the recorded `pose_latency`. The `track_id`s come from the host tracker on the recorded
 tracklets, the same tracker on the same messages as live, so they match the recording's **(deduction)**. With it
 off the pose model runs as live, with live's GPU load, its poses differing a little every play. It is apart from

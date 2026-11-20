@@ -7,8 +7,8 @@ every app uses them together, and the crop step and the detectors read the uploa
 [INFERENCE_PLAN.md](INFERENCE_PLAN.md), the models' times in [TIMING.md](TIMING.md); how the threads of an app hand
 on is in [INPUT_THREADS.md](../flow/INPUT_THREADS.md). **(deduction)** marks what is inferred.
 
-No code in the package is one app's: the face model is smile's alone, the segmentation hd_trio's, the optical flow
-and `RecordedPoses` deep_flow's, but each is general code with one user, as the camera's backends are.
+No code in the package is one app's: the face model is smile's alone, the segmentation hd_trio's and low_flow's,
+`RecordedPoses` deep_flow's, but each is general code with one user, as the camera's backends are.
 
 ## The parts
 
@@ -25,7 +25,6 @@ models share; each model has its package; the inference frame and its sync, whic
 | `PoseEstimator`                      | `pose/`                                             | its own        | RTMPose, 17 points a player                                        |
 | `RecordedPoses`                      | `pose/recorded_poses.py`                            | the caller's   | the recorded poses, in place of the pose model in -sim             |
 | `Segmenter`                          | `segmentation/`                                     | its own        | Robust Video Matting, a mask a player                              |
-| `OpticalFlowEstimator`               | `optical_flow/`                                     | its own        | RAFT, the flow from a player's previous crop to this one           |
 | `PersonDetector`                     | `person/`                                           | its own        | YOLOv8n, the players' boxes on the host (replay)                   |
 | `FaceDetector`                       | `face/`                                             | its own        | SCRFD and the 106 landmarks, the faces (smile)                     |
 | `ModelWorker`                        | `engine/model_worker.py`                            |                | the five workers' base                                             |
@@ -45,7 +44,7 @@ in any order unless they are synchronized so
 **(site fact: [CUDA streams](https://docs.pytorch.org/docs/stable/notes/cuda.html#cuda-streams))**.
 
 - The uploader hands each image on as a `GpuImage` with its `ready` event, and as an `ImageSnapshot`: each
-  camera's image and its previous one, their capture times, the event (`preprocessing/source.py`). Then it hands
+  camera's image, their capture times, the event (`preprocessing/source.py`). Then it hands
   the set's capture times to the capture callbacks, and then, for the readers outside the package, it waits for its
   stream and hands the images and the depth on written (`add_finished_gpu_image_callback`,
   `add_finished_gpu_depth_callback`), only when such a callback is registered. The readers in the package are queued
@@ -62,19 +61,19 @@ in any order unless they are synchronized so
   (`crop.Image.box`), and the segmentation's mask takes it (`segmentation.Image.box`), where the mask lies in the
   camera image.
 - Each model worker waits for the crops' event on its stream and runs there. The pose estimator synchronizes once,
-  at the end, to decode its points on the CPU; the segmenter and the optical flow synchronize once at the end too,
-  so their masks and flows are written when handed on, for readers outside the package. The decode stays on the CPU: on the GPU it gives the same points
-  but takes longer, its kernel launches costing more than copying the model's outputs
+  at the end, to decode its points on the CPU; the segmenter synchronizes once at the end too, so its
+  masks are written when handed on, for readers outside the package. The decode stays on the CPU: on the GPU it
+  gives the same points but takes longer, its kernel launches costing more than copying the model's outputs
   ([TIMING.md](TIMING.md#the-poses-decode)).
 
 ### The model workers
 
 `ModelWorker` is a model on its own thread and stream. A worker queues an item under a key and returns: the newest
-item per key waits, and one it replaces is counted in the worker's `settings.dropped`. The pose estimator, the
-segmenter and the optical flow estimator keep one key, the batch of players; the detectors one per camera, each
+item per key waits, and one it replaces is counted in the worker's `settings.dropped`. The pose estimator and the
+segmenter keep one key, the batch of players; the detectors one per camera, each
 camera's newest image. The thread loads its model on its stream, runs it once at its largest batch so no kernel is
 made while running, and then runs every waiting item. Each worker keeps its model's own steps (the pose's ImageNet
-normalization and SimCC decode, the segmentation's recurrent states, RAFT's 0 to 255 input) and its callbacks.
+normalization and SimCC decode, the segmentation's recurrent states) and its callbacks.
 
 The engines run a model's named GPU tensors on the worker's stream. `TrtEngine` gives each worker its own TensorRT
 execution context on the worker's thread, which needs no lock between contexts (TensorRT's thread-safety model,
@@ -87,7 +86,6 @@ at and cuts the outputs back.
 |---------------------|------------------------|-------------------------|------------|------------------------|
 | RTMPose-l           | `PoseEstimator`        | 192x256 or 288x384      | FP16 (1)   | players, up to 8       |
 | RVM MobileNetV3     | `Segmenter`            | 192x256 to 768x1024     | FP16       | players, up to 4       |
-| RAFT Sintel, 12 it. | `OpticalFlowEstimator` | 192x256                 | FP32       | players, up to 8 / 4   |
 | YOLOv8n             | `PersonDetector`       | 480x384 to 640x512      | the file's | one image per camera   |
 | SCRFD 10G, 2d106det | `FaceDetector`         | 640x640, 192x192        | the file's | an image, its faces    |
 

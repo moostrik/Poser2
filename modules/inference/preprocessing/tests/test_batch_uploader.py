@@ -41,11 +41,10 @@ class BatchUploaderTest(unittest.TestCase):
         self.uploader.start()
         self.uploader.submit_set(_set(1.0))
         self.wait_for(1)
-        (images, previous, timestamps, ready), thread = self.snapshots[0]
+        (images, timestamps, ready), thread = self.snapshots[0]
         ready.synchronize()
         self.assertEqual(thread, 'BatchUploader')
         self.assertEqual(sorted(images), [0, 1, 2, 3])
-        self.assertEqual(previous, {})                                  # the first set has none before it
         self.assertAlmostEqual(timestamps[2], 1.002)
         self.assertAlmostEqual(float(images[3][0, 0, 0]), 30 / 255, places=3)     # each camera's own image
         self.assertEqual(sorted(image.cam_id for image in self.images), [0, 1, 2, 3])
@@ -53,22 +52,12 @@ class BatchUploaderTest(unittest.TestCase):
         self.assertTrue(all(image.frame is not None and image.frame.cam_id == image.cam_id and image.frame.timestamp == image.timestamp
                             for image in self.images))
 
-    def test_the_previous_set_is_each_cameras_previous_image(self) -> None:
-        self.uploader.start()
-        self.uploader.submit_set(_set(1.0))
-        self.wait_for(1)
-        self.uploader.submit_set(_set(2.0))
-        self.wait_for(2)
-        first, second = self.snapshots[0][0], self.snapshots[1][0]
-        for cam_id in range(4):
-            self.assertIs(second[1][cam_id], first[0][cam_id])
-
     def test_beyond_the_bound_the_oldest_whole_set_is_dropped_and_counted(self) -> None:
         for t in range(WAITING + 2):
             self.uploader.submit_set(_set(float(t)))
         self.uploader.start()
         self.wait_for(WAITING)
-        times = [snapshot[2][0] for snapshot, _ in self.snapshots]
+        times = [snapshot[1][0] for snapshot, _ in self.snapshots]
         self.assertEqual(times, [float(t) for t in range(2, WAITING + 2)])
         self.assertEqual(self.uploader.dropped, 2)
         self.assertTrue(all(len(snapshot[0]) == 4 for snapshot, _ in self.snapshots))      # never a set cut short

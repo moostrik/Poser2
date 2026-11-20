@@ -4,30 +4,8 @@ What is not built in `modules/inference`, apart from the threads the app refacto
 ([REFACTOR_PLAN.md](../../REFACTOR_PLAN.md)). What is built is in [INFERENCE.md](INFERENCE.md), its times and how
 the refactor's steps were checked in [TIMING.md](TIMING.md). **(deduction)** marks what is inferred.
 
-## A. RAFT goes, and each model's log names its file
+## A. Each model's log names its file
 
-- A1. RAFT goes (decided 2026-11-20), first, so the other steps leave it alone. Its flow reaches no one: deep_flow,
-  its one app, registers no flow callback, and its preset has it off (`optical_flow.enabled: false`), yet it loads
-  at every start **(seen)**. The fluid's own LK flow (`modules/flow/motion`, 2D and 3D) covers the whole view for
-  about 0.2 ms of GPU time **(seen)**, where RAFT covers one crop for 5.4 ms (TIMING.md). What exists only for it goes
-  with it:
-  - `modules/inference/optical_flow/` and its tests; its line in `modules/inference/__init__.py`
-  - deep_flow's estimator, its wiring and its `optical_flow` settings group (`main.py`, `settings.py`)
-  - the previous crop: `CropExtractorSettings.enable_prev_crop`, `crop.Image.prev_crop`, and the previous images
-    the uploaders keep for it, so `ImageSnapshot` becomes (images, capture times, event) **(seen: nothing else reads
-    them)**; the tests that unpack it follow (`test_serial_uploader.py`, `test_batch_uploader.py`,
-    `test_crop_extractor.py`, `test_crop_step.py`)
-  - `tools/models/export_raft_to_onnx.py`, `export_raft_onnx_to_trt.py`, the RAFT lines of `scripts/makemodels.bat`;
-    in LFS the ONNX files, `data/models/base/raft/` and `data/models/base/raft-sintel.pth`; the engines in the apps'
-    model folders
-  - `scripts/model_benchmark.py`'s and `scripts/cadence_probe.py`'s RAFT parts; INFERENCE.md's RAFT rows and the
-    uploader's and crop step's lines on the previous crop; `apps/hd_trio/HD_TRIO.md`'s line on the previous crop and
-    `modules/recording/RECORDING.md`'s mention of the optical flow among the crops' readers; TIMING.md keeps its
-    measurements
-  - The presets keep their `optical_flow` and `enable_prev_crop` keys until their next save: the loader skips
-    unknown fields (`modules/settings/presets.py`) **(seen)**
-  Checked by pyright, the guard tests and the inference, deep_flow and hd_trio tests, and one deep_flow `-sim`
-  start that loads and plays
 - A2. The log names the model's file, not a wrong precision. `Engine.precision` is the first input's type
   (`engine.py`; `trt_engine.py` and `onnx_engine.py`, `setup`), and the pose and the segmentation log it as the
   model's precision (their `_setup`) **(seen)**; the pose's FP16 files keep FP32 inputs and outputs, so they log FP32
@@ -97,6 +75,6 @@ Questions:
 
 ## The rules it touches
 
-- `CLAUDE.md` API evolution, remove obsolete pathways: A1, A2
+- `CLAUDE.md` API evolution, remove obsolete pathways: A2
 - `CLAUDE.md` Naming, name a concept after what it is: A2, A3
 - `CLAUDE.md` Time, pace a loop with `utils.wait_until`: B1, B2, B3

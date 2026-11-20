@@ -9,9 +9,9 @@ from modules.camera import CameraFrame
 ImageDict: TypeAlias = dict[int, torch.Tensor]
 TimestampDict: TypeAlias = dict[int, float]     # each camera's image's capture time (`CameraFrame.timestamp`)
 
-# What an uploader handed on at once: each camera's image and its previous one by cam_id, the images' capture times,
-# and the event recorded after them on the upload's stream, which a reader on another stream waits on first
-ImageSnapshot: TypeAlias = tuple[ImageDict, ImageDict, TimestampDict, torch.cuda.Event]
+# What an uploader handed on at once: each camera's image by cam_id, the images' capture times, and the event
+# recorded after them on the upload's stream, which a reader on another stream waits on first
+ImageSnapshot: TypeAlias = tuple[ImageDict, TimestampDict, torch.cuda.Event]
 ImageSnapshotCallback: TypeAlias = Callable[[ImageSnapshot], None]
 CaptureCallback: TypeAlias = Callable[[TimestampDict], None]     # an uploaded set's capture times, no images
 

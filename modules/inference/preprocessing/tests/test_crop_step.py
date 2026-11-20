@@ -34,7 +34,7 @@ class CropStepTest(unittest.TestCase):
         """The first image's capture times, a newer image uploaded after it; both snapshots kept by `crops`."""
         self.uploader.add_snapshot_callback(crops.submit_snapshot)
         self.uploader._upload(CameraFrame(0, FrameType.VIDEO, np.zeros((48, 64, 3), np.uint8), 1.0))
-        given = self.snapshots[-1][2]
+        given = self.snapshots[-1][1]
         self.uploader._upload(CameraFrame(0, FrameType.VIDEO, np.zeros((48, 64, 3), np.uint8), 2.0))
         return given
 
@@ -136,7 +136,7 @@ class CropStepTest(unittest.TestCase):
         with_points = Frame(track_id=0, cam_id=0, timestamp=1.0,
                             features={BBox: BBox.from_rect(Rect(0.25, 0.25, 0.5, 0.5)), Points2D: keypoints})
         without = Frame(track_id=1, cam_id=0, timestamp=1.0, features={BBox: BBox.from_rect(Rect(0.1, 0.1, 0.2, 0.2))})
-        crops.submit({0: with_points, 1: without}, self.snapshots[-1][2])
+        crops.submit({0: with_points, 1: without}, self.snapshots[-1][1])
         self.assertEqual(len(out), 1)
         self.assertEqual(set(out[0]), {0})                      # the camera's pose, not the one without points
         self.assertTrue(np.allclose(out[0][0][Points2D].values, keypoints.values))

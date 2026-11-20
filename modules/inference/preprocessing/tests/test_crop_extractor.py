@@ -25,15 +25,15 @@ class CropStampTest(unittest.TestCase):
 
     def test_the_uploader_hands_on_each_image_with_its_capture_time(self) -> None:
         self.uploader._upload(CameraFrame(0, FrameType.VIDEO, np.zeros((48, 64, 3), np.uint8), 12.5))
-        images, _, timestamps, _ = self.snapshots[-1]
+        images, timestamps, _ = self.snapshots[-1]
         self.assertEqual(set(images), {0})
         self.assertEqual(timestamps, {0: 12.5})
 
     def test_a_pose_takes_the_time_of_the_image_it_is_cropped_from(self) -> None:
         self.uploader._upload(CameraFrame(0, FrameType.VIDEO, np.zeros((48, 64, 3), np.uint8), 12.5))
-        images, prev_images, timestamps, ready = self.snapshots[-1]
+        images, timestamps, ready = self.snapshots[-1]
         pose = Frame(track_id=0, cam_id=0, timestamp=12.4833, features={BBox: BBox.from_rect(Rect(0.25, 0.25, 0.5, 0.5))})
-        self.extractor.submit_snapshot((images, prev_images, timestamps, ready))
+        self.extractor.submit_snapshot((images, timestamps, ready))
         self.extractor.submit({0: pose}, timestamps)
         self.assertEqual(self.results[0][0].timestamp, 12.5)
 
@@ -43,9 +43,9 @@ class CropStampTest(unittest.TestCase):
         image = np.zeros((48, 64, 3), np.uint8)
         image[:, 16:48] = 255                                    # white in the middle half of each row
         self.uploader._upload(CameraFrame(0, FrameType.VIDEO, image, 1.0))
-        images, prev_images, timestamps, ready = self.snapshots[-1]
+        images, timestamps, ready = self.snapshots[-1]
         pose = Frame(track_id=0, cam_id=0, timestamp=1.0, features={BBox: BBox.from_rect(Rect(0.25, 0.0, 0.5, 1.0))})
-        self.extractor.submit_snapshot((images, prev_images, timestamps, ready))
+        self.extractor.submit_snapshot((images, timestamps, ready))
         self.extractor.submit({0: pose}, timestamps)
         cut = crops[0][0]
         self.assertIsNotNone(cut.ready)

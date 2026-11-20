@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import modules.inference as inference  # noqa: E402
 from modules.camera import CameraFrame, FrameType  # noqa: E402
-from modules.inference import GpuImage, ImageUpload, ModelType, crop, optical_flow, pose, segmentation  # noqa: E402
+from modules.inference import GpuImage, ImageUpload, ModelType, crop, pose, segmentation  # noqa: E402
 from modules.pose import BBox, Frame, FrameDict, Points2D  # noqa: E402
 from modules.settings import BaseSettings, presets  # noqa: E402
 from modules.utils import PerformanceTimer, Rect, timing  # noqa: E402
@@ -56,10 +56,6 @@ def _segmentation_output(images: segmentation.ImageDict) -> dict[str, np.ndarray
             torch.cuda.current_stream().wait_event(image.ready)
     return {'mask': torch.stack([i.mask for i in ordered]).float().cpu().numpy(),
             'fgr': torch.stack([i.foreground for i in ordered]).float().cpu().numpy()}
-
-
-def _flow_output(flows: optical_flow.FlowDict) -> dict[str, np.ndarray]:
-    return {'flow': torch.stack([flows[track_id] for track_id in sorted(flows)]).float().cpu().numpy()}
 
 
 def _person_output(detection: Any) -> dict[str, np.ndarray]:
@@ -86,7 +82,6 @@ _person_package: Any = getattr(inference, 'person', None) or getattr(inference, 
 MODELS: list[tuple[str, type, Callable[[Any, Callable[[Any], None]], None], Callable[[Any], dict[str, np.ndarray]]]] = [
     ('pose', _worker(pose, 'PoseEstimator', 'Predictor'), lambda p, cb: p.add_frames_callback(cb), _pose_output),
     ('segmentation', _worker(segmentation, 'Segmenter', 'Predictor'), lambda p, cb: p.add_segmentation_callback(lambda _poses, images: cb(images)), _segmentation_output),
-    ('optical_flow', _worker(optical_flow, 'OpticalFlowEstimator', 'Predictor'), lambda p, cb: p.add_flow_callback(cb), _flow_output),
 ]
 # name (the camera's settings group), the worker class, how its results are registered and read; on a whole image
 DETECTORS: list[tuple[str, str, type, Callable[[Any, Callable[[Any], None]], None], Callable[[Any], dict[str, np.ndarray]]]] = [
@@ -125,8 +120,7 @@ def model_settings(app_group: BaseSettings, model_type: ModelType) -> BaseSettin
 
 
 def make_batch(batch: int, width: int, height: int, image: Path | None, seed: int) -> tuple[FrameDict, crop.CropImageDict]:
-    """The batch's poses and their crops with the previous frame's: (3, H, W) float16 RGB [0, 1] on the GPU, as the
-    crop extractor gives."""
+    """The batch's poses and their crops: (3, H, W) float16 RGB [0, 1] on the GPU, as the crop extractor gives."""
     if image is not None:
         import cv2
         bgr = cv2.imread(str(image))
@@ -134,16 +128,13 @@ def make_batch(batch: int, width: int, height: int, image: Path | None, seed: in
             raise FileNotFoundError(image)
         rgb = cv2.resize(bgr, (width, height), interpolation=cv2.INTER_AREA)[:, :, ::-1]
         base = np.ascontiguousarray(rgb.transpose(2, 0, 1)).astype(np.float32) / 255.0
-        frames = [base, np.roll(base, 4, axis=2)]
     else:
-        rng = np.random.default_rng(seed)
-        frames = [rng.random((3, height, width), dtype=np.float32) for _ in range(2)]
-    curr = torch.from_numpy(frames[0]).to('cuda', torch.float16)
-    prev = torch.from_numpy(frames[1]).to('cuda', torch.float16)
+        base = np.random.default_rng(seed).random((3, height, width), dtype=np.float32)
+    curr = torch.from_numpy(base).to('cuda', torch.float16)
     torch.cuda.synchronize()
     box = BBox.from_rect(Rect(0.0, 0.0, 1.0, 1.0))
     poses: FrameDict = {i: Frame(track_id=i, cam_id=0, timestamp=0.0, features={BBox: box}) for i in range(batch)}
-    crops: crop.CropImageDict = {i: crop.Image(crop=curr.clone(), prev_crop=prev.clone(), ready=None) for i in range(batch)}
+    crops: crop.CropImageDict = {i: crop.Image(crop=curr.clone(), ready=None) for i in range(batch)}
     torch.cuda.synchronize()
     return poses, crops
 
@@ -291,7 +282,7 @@ def main() -> None:
     parser.add_argument('--warmup', type=int, default=100, help='untimed batches per model first')
     parser.add_argument('--image', type=Path, default=None, help='a photo to crop from instead of seeded noise')
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--models', nargs='*', default=None, help='the models to run, enabled or not (pose, segmentation, optical_flow, person, face); default the enabled crop models')
+    parser.add_argument('--models', nargs='*', default=None, help='the models to run, enabled or not (pose, segmentation, person, face); default the enabled crop models')
     parser.add_argument('--detector-image', type=Path, default=DETECTOR_IMAGE, help='the photo the detectors run on')
     parser.add_argument('--reference', type=Path, default=None, help='an earlier .npz to compare the outputs with')
     args = parser.parse_args()

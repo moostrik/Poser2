@@ -172,7 +172,7 @@ class HandOffTest(unittest.TestCase):
             time.sleep(0.005)
         self.assertIs(handed[0], message)
 
-    def test_each_image_is_handed_on_as_a_snapshot_with_its_previous_one(self) -> None:
+    def test_each_image_is_handed_on_as_a_snapshot_of_one(self) -> None:
         snapshots: list[ImageSnapshot] = []
         self.uploader.add_snapshot_callback(snapshots.append)
         self.uploader.start()
@@ -183,9 +183,8 @@ class HandOffTest(unittest.TestCase):
         while len(snapshots) < 2 and time.perf_counter() < end:
             time.sleep(0.005)
         first, second = snapshots
-        self.assertEqual((first[2], first[1]), ({0: 1.0}, {}))           # the first has no previous image
-        self.assertEqual(second[2], {0: 2.0})
-        self.assertIs(second[1][0], first[0][0])                         # the previous is the image before it
+        self.assertEqual((first[1], second[1]), ({0: 1.0}, {0: 2.0}))
+        self.assertIsNot(second[0][0], first[0][0])                      # each its own image
 
     def test_stop_ends_the_thread_with_frames_still_queued(self) -> None:
         self.uploader.start()

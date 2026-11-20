@@ -16,8 +16,6 @@ class Image:
 
     Attributes:
         crop:      Resized crop on GPU (3, H, W) float16 RGB CHW [0, 1]
-        prev_crop: Previous frame cropped at current bbox for optical flow,
-                   or None if no previous frame is available.
         ready:     Recorded on the crop stream after the crops are written; a model waits on it
                    (`stream.wait_event`) first, and it has passed for crops handed on finished. None for crops
                    already written.
@@ -25,7 +23,6 @@ class Image:
                    by the crop step.
     """
     crop: torch.Tensor
-    prev_crop: torch.Tensor | None = None
     ready: torch.cuda.Event | None = None
     box: Rect | None = None
 
@@ -47,5 +44,4 @@ class CropExtractorSettings(BaseSettings):
     output_width:     Field[int]   = Field(384, access=Field.INIT)
     output_height:    Field[int]   = Field(512, access=Field.INIT)
     max_players:        Field[int]   = Field(4, min=1, max=16, access=Field.INIT)
-    enable_prev_crop: Field[bool]  = Field(False, access=Field.INIT, description="Cut the previous frame at the box too, for the optical-flow model")
     interval:         Field[int]   = Field(1, min=1, max=8, description="Frames from one cut to the next: 1 every frame, 2 every other")

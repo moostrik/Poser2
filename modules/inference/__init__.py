@@ -1,5 +1,5 @@
 from .engine import ModelType
-from . import face, optical_flow, person, pose, preprocessing, segmentation
+from . import face, person, pose, preprocessing, segmentation
 from .preprocessing import (crop, source, GpuDepth, GpuImage, ImageSnapshot, ImageSnapshotCallback, CropExtractor, ImageUpload,
                             SerialUploader, SerialUploaderSettings, BatchUploader, DepthAligner, depth_metres, CameraSync,
                             CameraSyncSettings, SyncMessage, SyncSetCallback)
