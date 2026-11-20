@@ -396,8 +396,7 @@
     "pose_crop": {
       "padding": 0.25,
       "output_width": 192,
-      "output_height": 256,
-      "enable_prev_crop": false
+      "output_height": 256
     },
     "angle_extractor": {
       "aspect_ratio": 0.75

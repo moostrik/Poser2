@@ -132,10 +132,6 @@
       "enabled": true,
       "resolution": "STANDARD"
     },
-    "optical_flow": {
-      "resolution": "STANDARD",
-      "enabled": false
-    },
     "frame_source": {
       "detection_timeout": 2.0,
       "crop_aspect": 0.75,
@@ -145,7 +141,6 @@
       "padding": 0.1,
       "output_width": 192,
       "output_height": 256,
-      "enable_prev_crop": false,
       "interval": 2
     },
     "inference_frame_sync": {

@@ -144,14 +144,12 @@
       "padding": 0.1,
       "output_width": 192,
       "output_height": 256,
-      "enable_prev_crop": false,
       "interval": 2
     },
     "segmentation_crop": {
       "padding": 0.1,
       "output_width": 768,
       "output_height": 1024,
-      "enable_prev_crop": false,
       "interval": 1
     },
     "inference_frame_sync": {
