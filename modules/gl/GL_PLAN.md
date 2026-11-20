@@ -6,8 +6,10 @@ sources: `window_systems_research.md`. Windows now, Linux kept possible.
 
 ## C. Frame pacing
 
-- C3. Run, v-sync on a show window: frame time and the frames the driver queues, with and without a GPU wait
-  (`glFinish`) after the paced swap. The wait stays if it keeps the queue at one frame.
+- Question: a GPU wait (`glFinish`) after the paced swap? Measured on deep_flow -sim, v-sync on window 1 (M2, 3840 x 2160),
+  25 s: without it 16.9 ms a frame (p95 30.5, p99 36.2), at a frame's start 1 swap the GPU has not finished in 91% of
+  frames, 2 in 9%; with it 24.1 ms (p95 30.6, p99 35.9), never 2, the swap blocking 13.8 ms. It keeps the queue at one
+  frame, the plan's test for keeping it, at 59 → 42 fps. Not built: the choice is Matthias's.
 
 ## D. Check and document
 
