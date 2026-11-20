@@ -4,16 +4,6 @@ What is not built in `modules/inference`, apart from the threads the app refacto
 ([REFACTOR_PLAN.md](../../REFACTOR_PLAN.md)). What is built is in [INFERENCE.md](INFERENCE.md), its times and how
 the refactor's steps were checked in [TIMING.md](TIMING.md). **(deduction)** marks what is inferred.
 
-## A. Each model's file named for its precision
-
-- A3. The segmentation's files are named for their precision, as the pose's: RVM's ONNX files are FP16, all 159
-  weight tensors but two of one value each, their inputs FP16 too, while their names say nothing **(seen: the
-  weights' types, 2026-11-20)**. A name says `_fp16` when the file is FP16 and nothing when FP32, so
-  `rvm_mobilenetv3_<size>.onnx` and `.trt` become `rvm_mobilenetv3_<size>_fp16`: in LFS, in the apps' model
-  folders (the engines, not tracked), in `tools/models/export_rvm_to_onnx.py`, `scripts/makemodels.bat` and the
-  segmentation's settings table (`segmentation/settings.py`). Checked by the inference tests and a low_flow `-sim`
-  start, which loads the segmentation (deep_flow runs none **(seen)**)
-
 ## B. Timed waits that end on the Windows tick (from the module refactor thread, 2026-11-20)
 
 On Windows a timed wait (`Condition.wait(t)`, `Event.wait(t)`) ends on the 15.6 ms system tick, up to 15.6 ms
@@ -67,5 +57,4 @@ Questions:
 
 ## The rules it touches
 
-- `CLAUDE.md` Naming, name a concept after what it is: A3
 - `CLAUDE.md` Time, pace a loop with `utils.wait_until`: B1, B2, B3

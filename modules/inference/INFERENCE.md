@@ -97,7 +97,9 @@ of FP32, 97% of its points within one SimCC bin of FP32's ([TIMING.md](TIMING.md
 The models' ONNX files sit in `data/models`, in LFS; an engine is built from one on each PC by `scripts/makemodels.bat`,
 per app at its batch, as an engine runs only on the TensorRT version and the GPU that built it. TensorRT 11 builds
 strongly typed: each layer's precision is its ONNX file's, so an FP16 engine is built from an FP16 ONNX file
-(`tools/models/export_rtm_onnx_to_trt.py`). LFS therefore keeps what an engine is built from and the original it was
+(`tools/models/export_rtm_onnx_to_trt.py`). A file's name says `_fp16` when it is FP16 and nothing when it is FP32,
+its engine's the same, and the workers log the file they load: the pose's and RVM's (`rvm_mobilenetv3_<size>_fp16`)
+are FP16. LFS therefore keeps what an engine is built from and the original it was
 made from: the pose's FP32 originals (`rtmpose-l_256x192.onnx`, `rtmpose-l_384x288.onnx`) and the FP16 files the
 pose runs (`rtmpose-l_<size>_fp16.onnx`), made once per model by
 `uv run --with onnxconverter-common python tools/models/convert_onnx_to_fp16.py --fp32-norms --keep-io-types`. Its

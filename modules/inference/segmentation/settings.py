@@ -3,16 +3,16 @@ from modules.settings import BaseSettings, Field
 
 _MODELS = {
     'onnx': {
-        Resolution.STANDARD: "rvm_mobilenetv3_256x192.onnx",
-        Resolution.HIGH: "rvm_mobilenetv3_384x288.onnx",
-        Resolution.ULTRA: "rvm_mobilenetv3_512x384.onnx",
-        Resolution.EXTREME: "rvm_mobilenetv3_1024x768.onnx",
+        Resolution.STANDARD: "rvm_mobilenetv3_256x192_fp16.onnx",
+        Resolution.HIGH: "rvm_mobilenetv3_384x288_fp16.onnx",
+        Resolution.ULTRA: "rvm_mobilenetv3_512x384_fp16.onnx",
+        Resolution.EXTREME: "rvm_mobilenetv3_1024x768_fp16.onnx",
     },
     'tensorrt': {
-        Resolution.STANDARD: "rvm_mobilenetv3_256x192.trt",
-        Resolution.HIGH: "rvm_mobilenetv3_384x288.trt",
-        Resolution.ULTRA: "rvm_mobilenetv3_512x384.trt",
-        Resolution.EXTREME: "rvm_mobilenetv3_1024x768.trt",
+        Resolution.STANDARD: "rvm_mobilenetv3_256x192_fp16.trt",
+        Resolution.HIGH: "rvm_mobilenetv3_384x288_fp16.trt",
+        Resolution.ULTRA: "rvm_mobilenetv3_512x384_fp16.trt",
+        Resolution.EXTREME: "rvm_mobilenetv3_1024x768_fp16.trt",
     }
 }
 
