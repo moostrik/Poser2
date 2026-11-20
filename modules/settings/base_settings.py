@@ -17,7 +17,6 @@ class BaseSettings:
 
     def __init__(self, **kwargs):
         object.__setattr__(self, "_initialized", False)
-        object.__setattr__(self, "_parent", None)
         object.__setattr__(self, "_share_down", {})     # parent_name → [(child, child_name), ...]
         object.__setattr__(self, "_share_up", {})        # child_name → (parent, parent_name)
         object.__setattr__(self, "_is_propagating", False)
@@ -65,7 +64,6 @@ class BaseSettings:
             group_desc.validate_wiring(self)
             share_kwargs = group_desc.build_share_kwargs(self)
             child = group_desc.settings_type(**share_kwargs)
-            object.__setattr__(child, "_parent", self)
             # Wire sharing: both directions
             for parent_name, child_name in group_desc.share_map.items():
                 self._share_down.setdefault(parent_name, []).append((child, child_name))
@@ -124,11 +122,6 @@ class BaseSettings:
         return {n: f for n, f in self._fields.items() if f.widget == Widget.button}
 
     @property
-    def parent(self) -> 'BaseSettings | None':
-        """The parent Settings that owns this child, or None for root."""
-        return self._parent
-
-    @property
     def children(self) -> dict[str, 'BaseSettings']:
         """Read-only view of all child instances, keyed by name."""
         return dict(self._children)
@@ -136,11 +129,6 @@ class BaseSettings:
     def is_shared(self, name: str) -> bool:
         """Return True if *name* is shared from the parent into this instance."""
         return name in self._share_up
-
-    def shared_source(self, name: str) -> str | None:
-        """Return the parent field name that shares *name*, or None if local."""
-        upward = self._share_up.get(name)
-        return upward[1] if upward is not None else None
 
     def is_share_source(self, name: str) -> bool:
         """Return True if *name* shares its value to one or more children."""

@@ -1992,14 +1992,6 @@ class TestGroupSingle(unittest.TestCase):
         with self.assertRaises(AttributeError):
             s.player = PlayerSettings()
 
-    def test_parent_wired(self):
-        s = ParentWithChild()
-        self.assertIs(s.player.parent, s)
-
-    def test_root_parent_is_none(self):
-        s = ParentWithChild()
-        self.assertIsNone(s.parent)
-
     def test_in_children_dict(self):
         s = ParentWithChild()
         self.assertIn("player", s.children)
@@ -2034,11 +2026,6 @@ class TestGroupMulti(unittest.TestCase):
     def test_returns_list(self):
         s = ParentWithChild()
         self.assertIsInstance(s.cores, list)
-
-    def test_parent_wired(self):
-        s = ParentWithChild()
-        for core in s.cores:
-            self.assertIs(core.parent, s)
 
     def test_not_replaceable(self):
         s = ParentWithChild()
@@ -2127,7 +2114,7 @@ class TestGroupShare(unittest.TestCase):
         s.child.value = 9
         self.assertEqual(s.level, 9)
 
-    def test_shared_metadata_records_parent_source(self):
+    def test_a_shared_field_says_so(self):
         class SharedValue(BaseSettings):
             value = Field(0)
 
@@ -2137,7 +2124,6 @@ class TestGroupShare(unittest.TestCase):
 
         s = LiveParent()
         self.assertTrue(s.child.is_shared('value'))
-        self.assertEqual(s.child.shared_source('value'), 'level')
 
     def test_round_trip(self):
         s1 = ParentWithChild(fps=45.0, color=False)

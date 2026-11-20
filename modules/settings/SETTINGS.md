@@ -104,3 +104,18 @@ members); `mirror.build_mirror` makes a tree of the same shape from it. `mirror.
 values, encoded as the files hold them and coerced by `Field.set` on arrival; `mirror.ValueDiff` gives the values
 changed since the last send. A field is addressed by its instance's path, the child names from the root joined by
 dots ("" for the root), and its name (`mirror.walk`, `mirror.find`).
+
+## Measured
+
+The cost of the settings writes (`BaseSettings.__setattr__`, a field's write through it; the part that looks for a
+`property` setter in the class's MRO beside it), 2026-11-20, commit 7b787812, deep_flow `-sim` on its startup files
+(setup `studio`, flow `mattijs`), 30 s after a 25 s warm-up, 1771 render ticks; timed inside the write, so the
+timing adds to it. The most frequent writes are the pinned readouts, each once a tick.
+
+| Measure        | Total     | Per tick  | Per write |
+|----------------|-----------|-----------|-----------|
+| Writes         | 46 829    | 26.4      |           |
+| A write        | 153.3 ms  | 0.087 ms  | 3.27 µs   |
+| Its MRO scan   | 54.8 ms   | 0.031 ms  | 1.17 µs   |
+
+Below 0.1 ms a tick, the property names are not cached.
