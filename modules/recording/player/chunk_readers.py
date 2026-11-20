@@ -13,13 +13,18 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
+from typing import Callable, cast
+
+import numpy as np
 
 from modules.camera import CAPTURE_TOLERANCE, FrameType
 from modules.video import Hardware, StreamFrameCallback, StreamReader
 
 from ..container import ChunkInfo, ChunkMetadata, FrameMetadata, RecordingFolder, make_chunk_name, make_file_name, read_metadata
 from .play_clock import PlayClock
+
+# (cam_id, frame_type, frame, chunk_id, frame_id): a reader's frame, of the kind a chunk's readers read
+ChunkFrameCallback = Callable[[int, FrameType, np.ndarray, int, int], None]
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +54,7 @@ def first_at(frames: Sequence[FrameMetadata], timestamp: float) -> int:
 
 class ChunkReaders:
     def __init__(self, folder: RecordingFolder, chunk: int, lo: int, hi: int | None, num_cams: int, types: list[FrameType],
-                 frame_callback: StreamFrameCallback, decoding: Decoding, known: 'ChunkReaders | None' = None) -> None:
+                 frame_callback: ChunkFrameCallback, decoding: Decoding, known: 'ChunkReaders | None' = None) -> None:
         """The readers of `folder`'s `chunk`, camera 0's frames `lo` up to `hi` (None: to its end) and every other
         camera's of the same moments, of the streams of `types` each camera has, each reader handing its frames to
         `frame_callback` on its own thread. `known`: readers of the same chunk of the same folder, whose metadata is
@@ -105,7 +110,7 @@ class ChunkReaders:
         return first, max(end, first)
 
     def _load(self, cam_id: int, frame_type: FrameType, path: Path, stream: int, lo: int, hi: int | None,
-              frame_callback: StreamFrameCallback, decoding: Decoding, clock: PlayClock | None) -> None:
+              frame_callback: ChunkFrameCallback, decoding: Decoding, clock: PlayClock | None) -> None:
         color: bool = frame_type == FrameType.VIDEO and not decoding.gray
         reader = StreamReader(cam_id, frame_type, cast(StreamFrameCallback, frame_callback), color, decoding.decoder,
                               decoding.fps, stream, frame_type == FrameType.DEPTH, clock,

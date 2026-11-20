@@ -106,7 +106,8 @@ class SeveralCamerasTest(unittest.TestCase):
                             if p[3] is not None and p[4] is not None and p[3] > 100.0 + 5.0 / FPS])
         self.assertLess(float(offsets.max() - offsets.min()), 0.002)
         for cam in (0, 1):
-            recorded = [p[3] for p in colors[cam]]
+            recorded = [p[3] for p in colors[cam] if p[3] is not None]
+            self.assertEqual(len(recorded), len(colors[cam]))          # every frame has its recorded time
             self.assertEqual(recorded, sorted(recorded))
 
     def test_a_seek_lands_both_cameras_at_one_recorded_time(self) -> None:

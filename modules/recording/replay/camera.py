@@ -28,7 +28,6 @@ from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, CameraF
 from modules.utils import FPS, Rect
 
 from ..container import ChunkInfo, FrameMetadata
-from ..player import Player
 from .tracker import Track
 
 logger = logging.getLogger(__name__)
@@ -56,12 +55,21 @@ class BoxTracker(Protocol):
     def update(self, boxes: list[Rect]) -> list[Track]: ...
 
 
+class PlayerFeed(Protocol):
+    """What the replay camera needs of a player: its frames, its jumps, a chunk's info, and whether video comes as
+    NV12 (`modules.recording.Player`)."""
+    nv12: bool
+    def add_frame_callback(self, callback) -> None: ...
+    def add_jump_callback(self, callback) -> None: ...
+    def get_chunk_info(self, cam_id: int) -> ChunkInfo | None: ...
+
+
 class Camera:
-    def __init__(self, player: Player, settings: RigCameraSettings, detector: PersonDetector | None, tracker: BoxTracker | None, cam_id: int = 0,
+    def __init__(self, player: PlayerFeed, settings: RigCameraSettings, detector: PersonDetector | None, tracker: BoxTracker | None, cam_id: int = 0,
                  tilt: TiltCorrectionSettings | None = None) -> None:
         self.cam_id: int = cam_id
         self.settings: RigCameraSettings = settings
-        self.player: Player = player
+        self.player: PlayerFeed = player
         self.detector: PersonDetector | None = detector
         self.tracker: BoxTracker | None = tracker if detector is not None else None
         self.running: bool = False

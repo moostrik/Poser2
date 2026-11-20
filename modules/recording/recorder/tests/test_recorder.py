@@ -91,9 +91,10 @@ class ColorOnlyTest(unittest.TestCase):
         self.assertFalse(color.with_depth)
 
 
-class _Writer:
+class _Writer(video.StreamWriter):
     """A writer that keeps what it is handed."""
     def __init__(self) -> None:
+        super().__init__(video.ClipCodec.H264, video.Hardware.CPU)
         self.images: list[np.ndarray] = []
 
     def submit_frame(self, image: np.ndarray, nv12: bool = False) -> None:

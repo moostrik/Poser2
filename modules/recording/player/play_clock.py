@@ -1,6 +1,6 @@
 """The recorded time of a play: when the player hands each recorded frame over, on `perf_counter`."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from threading import Lock
 
 from ..container import FrameMetadata
@@ -26,10 +26,10 @@ class PlayClock:
     clip) is paced on the same origin at `fps`: frame `n` captured, and due, at the origin plus `n` from its first
     over `fps`, so the cameras of such a recording come as a synced rig's do."""
 
-    def __init__(self, frames: dict[int, Sequence[FrameMetadata]], firsts: dict[int, int], fps: float = 0.0) -> None:
+    def __init__(self, frames: Mapping[int, Sequence[FrameMetadata]], firsts: dict[int, int], fps: float = 0.0) -> None:
         """`frames`: each camera's metadata by frame number; `firsts`: each camera's frame number the play starts
         at; `fps`: the pace of a camera without recorded times, 0 for none."""
-        self._frames: dict[int, Sequence[FrameMetadata]] = frames
+        self._frames: Mapping[int, Sequence[FrameMetadata]] = frames
         self._firsts: dict[int, int] = firsts
         self._fps: float = fps
         starts: list[float] = [cam_frames[firsts.get(c, 0)].timestamp for c, cam_frames in frames.items()

@@ -9,9 +9,10 @@ What is to be built in `modules/video`: ffmpeg, the clips and streams it writes 
   iGPU (d3d12va), measured once outside the app. Question: is the CPU the better default for playback? Check:
   deep_flow `-sim` with the player's decoder on the CPU and on the iGPU: the frame interval, late frames, CPU load,
   ticks.
-- A3. Type errors in recording's and smile's tests: pyright reports fakes passed where real classes are typed; they
-  predate today. Fixed at the cause: a `Protocol` for what the code needs, or the fake typed as what it stands for; no
-  suppressions. Smile's thread is asked for feedback. Check: pyright clean on those tests, the tests pass.
+- A3. Type errors in smile's tests: about 180 across 20 test files, predating today: `Optional` results used
+  without narrowing, and `SimpleNamespace` or fakes passed where real classes are typed (recording's were fixed in
+  their own commit). Fixed at the cause: a narrowing assert where a test expects a value, a `Protocol` for what the
+  code needs, or the fake typed as what it stands for; no suppressions. Check: pyright clean on smile, its tests pass.
 - A4. The preview checked by eye (Matthias): a held take, the in and out markers dragged, the preview showing the
   frame under the marker.
 
