@@ -166,6 +166,9 @@ class PosePipeline:
     def stop(self) -> None:
         for split in self._splits:
             split.stop()
+        for stage in self._stages.values():
+            if stage.window is not None:
+                stage.window.close()
 
     @property
     def dropped(self) -> int:

@@ -132,6 +132,10 @@ class WindowNode:
         with self._lock:
             self._reset_buffer()
 
+    def close(self) -> None:
+        """Stop following the settings."""
+        self.settings.unbind_all(self._on_settings_change)
+
     def is_ready(self) -> bool:
         """Window nodes are always ready to process."""
         return True

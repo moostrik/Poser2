@@ -84,3 +84,9 @@ class WindowTracker(FrameWindowDictCallbackMixin):
         for ft_nodes in self._nodes.values():
             for node in ft_nodes.values():
                 node.reset()
+
+    def close(self) -> None:
+        """Every window node stops following the settings."""
+        for ft_nodes in self._nodes.values():
+            for node in ft_nodes.values():
+                node.close()

@@ -35,9 +35,8 @@ class GradientFlow(FlowBase):
         self._input_kind = TextureKind.IMAGE
         self._output_kind = TextureKind.VELOCITY
 
-        # Configuration with change notification
+        # Configuration; followed while allocated
         self.settings: GradientFlowSettings = settings or GradientFlowSettings()
-        self.settings.bind_all(lambda v: self._on_settings_changed())
 
         # State
         self._frame_count: int = 0  # 0=no frames, 1=first frame, 2+=can compute flow
@@ -60,6 +59,7 @@ class GradientFlow(FlowBase):
         """Allocate optical flow layer."""
 
         super().allocate(width, height, output_width, output_height)
+        self.settings.bind_all(self._on_settings_changed)
 
         for tex in [self._input_fbo, self._input_fbo.back]:
             glBindTexture(GL_TEXTURE_2D, tex.tex_id)
@@ -76,6 +76,7 @@ class GradientFlow(FlowBase):
 
     def deallocate(self) -> None:
         """Release all resources."""
+        self.settings.unbind_all(self._on_settings_changed)
         super().deallocate()
         self._gradient_flow_shader.deallocate()
         self._luminance_shader.deallocate()
@@ -153,6 +154,6 @@ class GradientFlow(FlowBase):
         self._frame_count = 0
         self._needs_update = False
 
-    def _on_settings_changed(self) -> None:
+    def _on_settings_changed(self, _value: object = None) -> None:
         """Called when settings values change - trigger recompute if we have frames."""
         self._needs_update = True

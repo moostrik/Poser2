@@ -278,6 +278,13 @@ class WindowNodeTest(unittest.TestCase):
         node.set(_age_frame(2.0))
         self.assertEqual(int(node.get_window().mask.sum()), 1)
 
+    def test_a_closed_node_stops_following_the_settings(self) -> None:
+        settings = _window_settings(3)
+        node = WindowNode(Age, settings)
+        node.close()
+        settings.window_size = 5
+        self.assertEqual(node._values.shape[0], 3)
+
 
 class WindowTrackerTest(unittest.TestCase):
     def test_emits_per_feature_per_track_windows(self) -> None:
