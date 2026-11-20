@@ -54,6 +54,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Keep `Field` descriptions to one short line of panel text: what the value is and its unit
 - Prefer the textbook unit for a quantity (seconds, metres, radians, pixels)
 - A setting follows the quantity it controls, in a form that is easy to set (ms for a short time, degrees for an angle)
+- Prefer not to change what `initialize()`, `update_from_dict()` and `to_dict()` do; every app's presets depend on it
 
 ## Pose Frame contract
 
@@ -81,6 +82,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - When that part can't keep up, its queue drops the oldest item and counts it
 - A part that only needs the latest value, like the render, reads it at its own tick
 - A callback list has its own lock; register under it, copy the list under it, call the callbacks outside it
+- A failing callback does not stop the others
 - Avoid heavy pure-Python loops in hot paths; they hold the GIL, while numpy, ONNX Runtime, OpenGL and depthai release it
 
 ## Time
