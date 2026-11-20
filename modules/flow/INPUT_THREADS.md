@@ -154,4 +154,4 @@ only the newest capture per tick:
 Checked without the app: the uploader's queue and its depth (`test_uploader`), the inference frame sync (`test_inference_frame_sync`),
 the crops cut without `synchronize` (`test_crop_extractor`), the alignment's two paths on known geometry
 (`test_depth_align`), the view's geometry and the depth's read (`test_view_window`), the board's captures
-(`test_inference_frames`); in GL, by the scripts above and `scripts/frame_max_check.py`.
+(`test_inference_frames`); in GL, by the scripts above.
