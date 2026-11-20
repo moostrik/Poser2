@@ -1,38 +1,116 @@
 # GL plan
 
-The window manager (`modules/gl/window_manager.py`) and its panel are rebuilt on Cinder's structure, on GLFW,
-keeping to GLFW's threading rules: one kind of window, set by its own settings, on the main thread. Research and
-sources: `window_systems_research.md`. Windows now, Linux kept possible.
+Shaders that reload and report errors well, fewer GL calls on the main thread, and the package held to the rules.
+F and G come from the Cinder research (2026-11-20), argued from the code and not measured, so G starts with a
+measurement; E and H from the package scan of the same day. The lines are in work order.
 
-## Later: more to take from Cinder
+## E. The leak and the form
 
-From knowledge of Cinder's gl, not yet held against our code. Each one is looked at only for what it gains the 2D
-path.
+E1 is the plan's one bug and stands alone; E2 moves files that F then edits once.
 
-- Readback without a stall: GPU-to-CPU reads (the screen recorder, any download) through a pixel buffer and a
-  fence (Cinder's `gl::Pbo`, `gl::Sync`), read a frame later, so the frame never waits on the GPU.
-- Upload without a stall: camera frames into textures through a small ring of pixel buffers, unless the CUDA path
-  (`cudart.py`) already does this.
-- A fence, not `glFinish`, where code waits for GPU work to finish.
-- Shaders: `#include` and live reload from file (Cinder's shader format and asset watcher).
+- E1. `Fbo.deallocate` deletes its framebuffer: today every reallocation of an `Fbo`, `SwapFbo` or `Image` leaks one.
+  Test: with GL mocked, each `glGenFramebuffers` is paired with a `glDeleteFramebuffers`.
+- E2. Form only: `draw_quad` to `context.py`; the file watcher in its own file; `utils.py` split by subject (fit and
+  fill, clears); `LayeredFbo` in its own file; one `from OpenGL.GL` line per file, imports at the top, `logger` after
+  them; unused imports and loggers out (`utils.py`, `window.py`, `monitor.py`); errors logged with their traceback in
+  `shader.py` and `compute_shader.py`; `internal_format` and the watcher typed; `shader_program` one type in both
+  shader classes; the stale docstrings fixed (`clear_color`, `Fbo.end`, `text.py`). Check: the import and guard tests.
+
+## F. Shaders
+
+Today a shader reloads only where its user calls `reload()` by hand (96 calls in 31 files, of 207 files with a
+`Shader` or `ComputeShader`), and `ComputeShader` copies `Shader`'s init, compile and reload.
+
+- F0. Find out why `Shader` is one instance per class (`__new__`), from the code and its history (`git log` on
+  `shader.py`); keep it and state it as a gl.md rule, or drop it. If no reason is found, it is kept and stated as a
+  gl.md rule.
+- F1. One reload point: at the top of each frame the window loop reloads every marked shader, on the main thread, as
+  Cinder's watcher callbacks run in its update. The 96 `.reload()` calls go. `ComputeShader` builds on `Shader`: one
+  init, compile and reload. The fallbacks to `_generic.frag` and to a shader's own-folder `_generic.*` go; the shared
+  `_generic.vert` stays. `enable_hot_reload` stays the app's choice (white_space leaves it off). Test: a marked
+  shader of each kind is reloaded once at the next frame.
+- F2. A shader reloads when a file it includes changes (`position.glsl`, `color.glsl`), or the shared `_generic.vert`
+  it falls back to, as Cinder's `GlslProg::getIncludedFiles`: `read_shader_source` returns the files it read, and a
+  map from each file to its shaders marks them all; the shared shaders folder is watched. Test: an edited include
+  marks every shader that uses it.
+- F3. A compile error names the real file and line: a `#line` per include and our own file table, NVIDIA's log prefix
+  rewritten, the raw log kept when it does not match. Test: an error in an include names that file and line.
+- F4. The uniforms are read once after linking; setting an unknown name warns once. Test: a misspelled uniform warns
+  once.
+- F5. A save that arrives in two events or half-written is tried again on the next frame, not reported as a compile
+  error; the debounce is per file, not per folder. Test: a half-written file, then the whole one; two files saved
+  together both reload.
+- F6. `Dither`'s blue noise as F0 decides: with one instance per class it is made once, in the first `allocate`, and
+  freed in the last `deallocate`, as `Lut` does; without it each `Dither` holds its own. Test: with the noise mocked,
+  it is made once and freed once.
+- F7. GL.md's Shaders section describes hot reload, `ComputeShader`, F0's answer, F1 to F5, and the `_generic.vert`
+  fallback as it is.
+- Question: compile off the frame (`KHR_parallel_shader_compile`), so a reload never drops a frame? First check that
+  the NVIDIA driver offers it and compiles in parallel.
+
+## G. Fewer GL calls
+
+Standard GL 4.5, not from Cinder. Each PyOpenGL call holds the GIL on the main thread; how much that costs is not
+known yet.
+
+- G0. Measure: a counter of GL calls per frame and the time of one PyOpenGL call, on deep_flow and white_space -sim.
+  G1 and G2 go ahead only if the numbers show a gain worth their size; rectangles drawn one quad each are counted too.
+- G1. `layout(binding = N)` on samplers: no `glUniform1i` per texture, per pass, per frame. The one shader below
+  `#version 420` (hd_trio's `temperature_bridge_shader.frag`, 410) is raised; `bind_texture*` of `Shader` and
+  `ComputeShader` lose their `uniform_name`, and every caller with them. Check: `scripts/shader_check.py` and G0's
+  count.
+- G2. Direct state access: `glBindTextureUnit` for a texture's bind and `glTextureSubImage2D` for its upload; the CUDA
+  upload in `tensor.py` from 6 calls to about 3, its `glGetError` behind the debug flag. Every caller of
+  `Texture.bind`/`unbind` moves with it. Check: `scripts/shader_check.py` and G0's count.
+- G3. A debug context: GLFW's debug hint at window creation and a synchronous `glDebugMessageCallback` that logs the
+  failing call, behind a flag that is off by default (it stalls each call); the ctypes callback is kept so it is not
+  collected.
+
+## H. The package held to the rules
+
+- H1. One format table (`texture_format.py`) replaces the three in `texture.py`, `image.py` and `tensor.py`; 16F stays
+  `GL_FLOAT` for `Texture` and `GL_HALF_FLOAT` for `Tensor`, said where it differs. Test: for each format, the table
+  gives what the three gave.
+- H2. The default placement is read from `WindowSettings`' defaults: `WindowManager._DEFAULT_*` go, the button's
+  description drops the numbers.
+- H3. Tests for `Style`'s state (a repeated call skipped, buffer modes, push and pop), `clear_value`, and `fit` and
+  `fill`.
+- H4. `Profiler` goes: hd_trio's `fluid_2d` times its passes with `GpuTimer`, which does not wait on the GPU. Check:
+  hd_trio's tests and pyright.
+- H5. `frame_time` becomes `frame_timestamp` (glossary: a stamp is `timestamp`): `render_base.py`,
+  `window_manager.py`, the low_flow and deep_flow renders, and `shaders.SimplexNoise.use` with its callers.
+  `artnet_bars.py`'s `frame_time`, a duration, stays.
+- H6. `Image`'s `channel_order` becomes an `IntEnum`, every caller with it.
+- H7. `__init__.py` drops the exports only gl's own tests use (`Window`, `WindowInput`, `WindowManager`, `Monitor`,
+  `MonitorId`); the tests import them from their files.
+- H8. `Style` gets the blend equation (min, max), and flow's `particle_density.py` sets it through `Style`;
+  modules/flow's owner is told when it is built. Check: flow's GPU check of the particle density.
+- H9. GL.md: the `video` shader kind goes; `window_systems_research.md` leaves the repo for the scratchpad, and The
+  windows section's link to it becomes one line on Cinder as the model; the narrative traces in the pacing section
+  go; "frame time" for a duration stays apart from `frame_timestamp`.
 
 ## Rules this plan touches
 
+- gl.md: Prefer as few GL calls and state switches as possible
+- gl.md: Prefer not to read back from the GPU or wait on it inside a frame
 - gl.md: All OpenGL calls execute on the main thread, in the window loop
-- gl.md: Create textures, FBOs and shaders at setup or on a resize, not per frame
-- app-lifecycle.md: Start workers/services only after wiring is complete
-- settings-presets.md: Do not subclass a module's Settings class in app code; use `Group`
-- settings-presets.md: For renamed fields, rename the key in each JSON, preserving the value
-- panels.md: A panel that holds more than one chain (an app's root) may order its groups by use
-- glossary.md: An on/off switch: `enabled`
-- CLAUDE.md: Pass collaborators and fixed structure (counts known at startup) through constructors
-- CLAUDE.md: A callback only hands the item over and returns
-- CLAUDE.md: A part that only needs the latest value, like the render, reads it at its own tick
-- CLAUDE.md: A thread's loop catches an exception per item, logs it and goes on with the next
-- CLAUDE.md: A failing callback does not stop the others
-- CLAUDE.md: Read `time.perf_counter()` for every stamp and duration
-- CLAUDE.md: A thread that waits for a moment waits on a `utils.Waker`; a wait's timeout (`Event.wait(t)`, `Queue.get(timeout=t)`) ends on Windows' 15.6 ms tick
+- gl.md: Pair every creation with its destruction
+- gl.md: Name a shader's `.frag`/`.vert`/`.comp` source after the `.py` file that holds its class, beside it; the loader resolves it by that module name
+- gl.md: Shaders get checked in a GPU harness
+- glossary.md: A time stamp: `timestamp`; not `time`, `time_stamp`
+- docs.md: Leave out how a conclusion was reached, what the code used to do, and what changed; that belongs in commit messages
+- CLAUDE.md: Fix a problem where it is made, not where it shows
+- CLAUDE.md: Prefer the design with the lower latency, measured in the context of the app
 - CLAUDE.md: Its files each hold one class or one subject, named after it
-- CLAUDE.md: Keep presets and settings schemas in sync with code changes
-- CLAUDE.md: A commit leaves no pyright errors
+- CLAUDE.md: Its `__init__.py` holds what other packages use
+- CLAUDE.md: Inside a package, its subpackages included, import relatively; tests may import absolutely
+- CLAUDE.md: Put all imports from one package on a single `from` line
+- CLAUDE.md: Define module loggers as `logger = logging.getLogger(__name__)`
+- CLAUDE.md: Give public methods return type hints
+- CLAUDE.md: Prefer `IntEnum` over string keys for dict lookups and identifiers
+- CLAUDE.md: Log exceptions with context; never fail silently
+- CLAUDE.md: Rely on running the real-time system for integration; unit-test infrastructure (settings, frame/features, serialization, utility primitives, geometry)
+- CLAUDE.md: Update all affected call sites in the same change
 - CLAUDE.md: Remove obsolete pathways instead of leaving parallel legacy ones
+- CLAUDE.md: Run a test of the app or a GPU harness only on the user's go, and only what the plan names
+- CLAUDE.md: A commit leaves no pyright errors
