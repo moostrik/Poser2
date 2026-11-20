@@ -176,11 +176,12 @@ class StreamReader:
 
     def _log_errors(self, process: subprocess.Popen, video_file: str) -> None:
         """ffmpeg's error lines, read as they come so its pipe never fills, and logged unless the reader was
-        stopped (an ended decoder may say so)."""
+        stopped (an ended decoder may say so); the pipe is closed at its end, when the decoder ends."""
         assert process.stderr is not None
-        for line in process.stderr:
-            if not self.stop_event.is_set():
-                logger.error('Decoder of %s: %s', video_file, line.decode(errors='replace').strip())
+        with process.stderr as stderr:
+            for line in stderr:
+                if not self.stop_event.is_set():
+                    logger.error('Decoder of %s: %s', video_file, line.decode(errors='replace').strip())
 
     def _close(self) -> None:
         with self._load_lock:

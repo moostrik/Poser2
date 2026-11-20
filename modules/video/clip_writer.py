@@ -154,9 +154,13 @@ class ClipWriter:
         stderr = self._process.stderr
         assert stderr is not None
         # read while the frames go in: an encoder that writes a line per frame would fill its pipe and stop
-        self._error_reader = threading.Thread(target=lambda: self._errors.append(stderr.read()),
-                                              name='ffmpeg errors', daemon=True)
+        self._error_reader = threading.Thread(target=self._read_errors, args=(stderr,), name='ffmpeg errors', daemon=True)
         self._error_reader.start()
+
+    def _read_errors(self, stderr: BinaryIO) -> None:
+        """ffmpeg's error output to its end, when the process ends; the pipe is closed then."""
+        with stderr:
+            self._errors.append(stderr.read())
 
     def _end(self, timeout: float) -> str:
         """Close the pipe and wait for ffmpeg; its error output. Kills it after `timeout` s."""
