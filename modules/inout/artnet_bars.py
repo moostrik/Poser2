@@ -9,6 +9,7 @@ from threading import Thread, Lock
 import socket
 import time
 
+import numpy as np
 from stupidArtnet import StupidArtnet
 
 from modules.settings import BaseSettings, Field, Widget, Access
@@ -317,21 +318,6 @@ class ArtNetBars:
         self._artnet.set_universe(self.settings.base_universe + 1)
         self._artnet.show()
 
-    def _set_pixel(self, pixel_index: int, r: int, g: int, b: int, w: int) -> None:
-        """Set a single pixel's RGBW values in the buffer.
-
-        Args:
-            pixel_index: Pixel index (0 to num_pixels-1)
-            r, g, b, w: Color values (0-255)
-        """
-        base: int = pixel_index * self._channels_per_pixel
-        r_idx, g_idx, b_idx, w_idx = self._channel_indices
-
-        self._buffer[base + r_idx] = r
-        self._buffer[base + g_idx] = g
-        self._buffer[base + b_idx] = b
-        self._buffer[base + w_idx] = w
-
     def _compute_frame(self) -> None:
         """Compute full DMX frame for the LED bar.
 
@@ -349,28 +335,21 @@ class ArtNetBars:
         accent_g = int(c.g * 255)
         accent_b = int(c.b * 255)
 
-        # Calculate how many pixels are "lit" by the bar
-        lit_count: int = int(bar_value * num_pixels + 0.5)  # Round to nearest
+        # Calculate how many pixels are "lit" by the bar: pixels 0..lit_count-1 (bottom-up)
+        lit_count: int = min(max(int(bar_value * num_pixels + 0.5), 0), num_pixels)  # Round to nearest
 
         # Base white value for all pixels
         base_w: int = int(white_intensity * 255)
 
-        for i in range(num_pixels):
-            # Pixels 0..lit_count-1 are lit (bottom-up)
-            is_lit = i < lit_count
-
-            if is_lit:
-                # Lit pixel: accent color + white
-                r = int(accent_r * color_intensity)
-                g = int(accent_g * color_intensity)
-                b = int(accent_b * color_intensity)
-                w = base_w
-            else:
-                # Unlit pixel: only white base
-                r, g, b = 0, 0, 0
-                w = base_w
-
-            self._set_pixel(i, r, g, b, w)
+        # The buffer as one row of RGBW channels per pixel, written in place
+        pixels: np.ndarray = np.frombuffer(self._buffer, dtype=np.uint8)[:num_pixels * self._channels_per_pixel]
+        pixels = pixels.reshape(num_pixels, self._channels_per_pixel)
+        r_idx, g_idx, b_idx, w_idx = self._channel_indices
+        for idx, accent in ((r_idx, accent_r), (g_idx, accent_g), (b_idx, accent_b)):
+            # lit pixel: accent color + white; unlit: only white base
+            pixels[:lit_count, idx] = int(accent * color_intensity)
+            pixels[lit_count:, idx] = 0
+        pixels[:, w_idx] = base_w
 
     def _send_frame(self) -> None:
         """Send current buffer via ArtNet to both universes."""
