@@ -14,10 +14,9 @@ What is to do now, across the threads, in order.
 
 | Who                 | What                                                                                     | After            |
 |---------------------|------------------------------------------------------------------------------------------|------------------|
-| Refactor            | What holds the GIL on a hot path: py-spy of each app (B1)                                |                  |
-| Camera              | Depth confidence from the camera to the motion (CAMERA_PLAN.md A)                        |                  |
-| GL Window           | The window manager: GLFW on the main thread, one kind of window, frame pacing (GL_PLAN.md)| the camera plan |
-| Inference           | hd_trio and white_space at full batch: whether the STANDARD pose model goes (INFERENCE_PLAN.md C) |  |
+| Settings            | Setup and preset split (SETTINGS_PLAN.md)                                                |                  |
+| Camera              | Depth confidence from the camera through the recording (CAMERA_PLAN.md A)                | the settings     |
+| Flow Motion         | Depth confidence in the motion (FLOW_PLAN.md)                                            | the camera plan  |
 | Low Flow            | The water's speed of sound in the 2D (LOW_FLOW_PLAN.md G4); what the view's 2.9 ms is    |                  |
 | You                 | The checks at the rig (C)                                                                |                  |
 | Refactor            | Board held up to the rules, then one package at a time (A)                               |                  |
@@ -34,27 +33,30 @@ What is to do now, across the threads, in order.
 
 ## A. Each package held up to the rules
 
-One package at a time, in alphabetical order, against `CLAUDE.md` and `.claude/rules`. Code that only one app uses
-or decides comes first: it moves to that app, unless it is general code with one user (the camera backends stay).
-Each package gets a report, and a plan for what does not meet the rules, built on your go. Its rules file, where it
-has one, is checked line by line: still true of the code, about this package, a rule and not a description, said
-once, not clashing with or repeating `CLAUDE.md`, checkable, without an unwanted side effect, and nothing missing.
-What is wrong with a rule, and how it is known, goes to the rules thread.
+One package at a time, in alphabetical order, each with the `package-scan` skill: `CLAUDE.md` held to the code
+line by line (where the code belongs, leftovers, tests, pyright spelled out), its rules file both ways, its document
+and plan. The scan changes nothing. A decided fix becomes a step in the package's plan (or this one), built on your
+go; what is not decided is a question. Rule findings go to the rules thread as "Rules that go" and "New rules".
 
 Done: camera (14 Nov), render (its plan built and removed), hd_trio (G5). Held up in their own plans: flow
-(FLOW_PLAN.md J), inference, video (VIDEO_PLAN.md A), gl's window manager (GL_PLAN.md).
+(FLOW_PLAN.md J), inference (scanned 20 Nov, its fixes in INFERENCE_PLAN.md), video (VIDEO_PLAN.md A), gl's window manager (GL_PLAN.md, built 20 Nov).
 
 - A1. `board`
 - A2. `gl`, apart from the window manager
-- A3. `inout`
+- A3. `inout`. The OSC sound bundle (`osc_sound.py`, white_space's `OscSoundSender`), on its own thread at the
+  output tick: `.tolist()` of every feature and python-osc packing each float on its own, a few hundred floats a
+  tick, 5–20 ms of GIL a second **(deduction)**.
 - A4. `panel`
 - A5. `pose`; its `pipeline` changed with inference C4 (`SourceFramesCallback` and `AsyncInput` carry the capture
-  times, `dict[int, float]`). Its hot path, with B1's py-spy numbers: the steps run per player with a `Frame`
-  replace each (white_space 37 a pose and 21 on the light tick), and every stage's `WindowTracker` writes ~18
-  scalar features per player with a lock each, ~360 small writes a frame **(deduction)**. The fixes in view: one
+  times, `dict[int, float]`). It starts with one `py-spy record --gil` of the pose pipeline (deep_flow and
+  white_space `-sim`, 30 s after 10 s warm-up), so its fixes are chosen on measured numbers. Its hot path: the steps
+  run per player with a `Frame` replace each (white_space 37 a pose and 21 on the light tick), and every stage's
+  `WindowTracker` writes ~18 scalar features per player with a lock each, ~360 small writes a frame **(deduction)**. The fixes in view: one
   window buffer per stage holding all players, and fusing steps that run back to back (one smoother over several
   features). Batching all players through every step is left out: it goes against `pose-processing.md`'s
-  per-track state.
+  per-track state. The pose recorder's chunk (`recorder/frame_io.py`, `write_chunk`) loops in Python over every
+  buffered frame, up to 50,000, for each track and feature, at a split and at stop **(seen; its GIL time:
+  deduction)**.
 - A6. `recording`, with its plan's split test (RECORDING_PLAN.md 4); its plan's line 3 (the pose model's drops) goes with this plan's commit: it
   assumes a pose every frame, and deep_flow poses every other frame
 - A7. `session`
@@ -104,28 +106,6 @@ at most one tick late, every recorder together), white_space's motor sim (its fa
 `perf_counter`, so a late wait does not move them), smile's start loop (a 20 ms poll for loaded clips, at start-up
 only).
 
-- B1. What holds the GIL on a hot path: one `py-spy record --gil` of each app over 30 s after 10 s warm-up (deep_flow,
-  low_flow, hd_trio in `-sim`; white_space and smile as far as they run without the rig). Every function that holds
-  the GIL more than 1% of the run becomes a step here (numpy, a shader, or off the hot path), each on Matthias's go. A
-  thread busy in pure Python delays every other thread's wake by up to one 15.6 ms tick **(seen with the Waker and
-  `time.sleep`, 2026-11-20)**. py-spy confirms or drops each of these. The pose pipeline's and the window trackers'
-  numbers go to A5, which holds their fixes.
-
-  Candidates from reading the code (deduction), most GIL time a second first, at 3 players:
-  - The pose pipeline's steps (`modules/pose/nodes`), on the pose model's thread at the pose rate and on the output
-    tick: per pose and step a `Frame` replace and numpy on 1–34 values, ~10–30 µs each, Python's overhead rather than
-    the arithmetic. white_space runs 37 steps a pose and 21 on the light tick, the others 31–38: 50–150 ms a second.
-  - The window trackers: every stage's `WindowTracker.process` writes ~18 scalar features per player, each with a
-    lock, `nan_to_num` and two row writes: ~360 small writes a frame in white_space and hd_trio.
-  - The OSC sound bundle (`modules/inout/osc_sound.py`, white_space's `OscSoundSender`), on its own thread at the
-    output tick: `.tolist()` of every feature and python-osc packing each float on its own, a few hundred floats a
-    tick: 5–20 ms a second.
-  - The pose recorder's chunk (`modules/pose/recorder/frame_io.py`, `write_chunk`), on the recorder's thread at a
-    split and at stop: a Python loop over every buffered frame, up to 50,000 (`_MAX_BUFFER_FRAMES`), for each track
-    and each feature **(seen in the code; its GIL time: deduction)**.
-
-  No Python loop over pixels, depth points or samples was found on a hot path: that work is numpy, cv2 and shaders.
-
 ## C. Checks at the rig
 
 - C1. white_space, live and back to back with `main`, you at the rig: its camera threads only hand over (under 1 ms
@@ -149,5 +129,5 @@ only).
 
 - `CLAUDE.md` Project shape and Packages, what a package holds: A
 - `CLAUDE.md` Concurrency, work that numpy or the GPU does faster is not done in a Python loop; the loop holds the GIL
-  and delays every other thread: B1
+  and delays every other thread: A3, A5
 - `CLAUDE.md` Settings, settings connect the user and a component, not two components: Parked
