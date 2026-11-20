@@ -220,13 +220,13 @@ class OscSound:
 
         # Reset angle/rad values to 0
         angle_reset_msg = OscMessageBuilder(address=f"/pose/{id}/angle/rad")
-        for _ in range(17):  # 17 angle values based on AngleLandmark
+        for _ in range(len(AngleLandmark)):
             angle_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(angle_reset_msg.build())
 
         # Reset angle/vel values to 0
         vel_reset_msg = OscMessageBuilder(address=f"/pose/{id}/angle/vel")
-        for _ in range(17):
+        for _ in range(len(AngleLandmark)):
             vel_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(vel_reset_msg.build())
 
@@ -349,7 +349,7 @@ class OscSound:
             gate_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(gate_msg.build())
 
-        # range [0, 1] - motion-gated similarity (similarity * motion_gate)
+        # range [0, 1] - the same row as similarity/pose
         motion_sim_values: list[float] = np.nan_to_num(frame[Similarity].values, nan=0.0).tolist() if Similarity in frame else [0.0] * max_players
         motion_sim_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/motion")
         for val in motion_sim_values:
@@ -363,11 +363,8 @@ class OscSound:
             leader_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(leader_msg.build())
 
-        # DEPRECATED: Compute motion-gated similarity using old method (backward compatibility)
-
+        # range [0, 1] - DEPRECATED: the same row as similarity/pose, on the old address
         similarity_values: list[float] = np.nan_to_num(frame[Similarity].values, nan=0.0).tolist() if Similarity in frame else [0.0] * max_players
-
-        # range [0, 1] - DEPRECATED backward-compatible motion-gated similarity
         similarity_msg = OscMessageBuilder(address=f"/pose/{id}/similarity")
         for similarity in similarity_values:
             similarity_msg.add_arg(similarity, OscMessageBuilder.ARG_TYPE_FLOAT)

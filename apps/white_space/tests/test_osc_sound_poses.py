@@ -93,6 +93,16 @@ class SoundPosesTest(unittest.TestCase):
         self.assertEqual(messages[f"/pose/{ID}/distance"], (0.0,))
         self.assertEqual(messages[f"/pose/{ID}/active"], (0,))
 
+    def test_an_emptied_slot_resets_the_angles_with_the_length_a_player_sends(self) -> None:
+        angles = np.full(len(AngleLandmark), 0.3, dtype=np.float32)
+        frame = Frame(ID, 0, 0.0, features={Angles: Angles(angles, np.ones(len(AngleLandmark), dtype=np.float32))})
+        live = self._active(frame)
+        reset = _messages(lambda b: self.sender._add_inactive_frame_messages(b, ID, self.settings.max_players))
+        for address in (f"/pose/{ID}/angle/rad", f"/pose/{ID}/angle/vel"):
+            with self.subTest(address=address):
+                self.assertEqual(len(reset[address]), len(live[address]))
+                self.assertTrue(all(value == 0.0 for value in reset[address]))
+
 
 if __name__ == "__main__":
     unittest.main()

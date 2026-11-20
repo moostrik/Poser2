@@ -192,5 +192,3 @@ smoothed angles; this stage only takes the edge off.
   name once its joints are selectable, `n_top` has no equivalent, and a degrees-from-neutral readout needs a
   feature of its own.
 - A pair sharing very few joints is judged on those alone; a minimum coverage for the sync.
-- `/pose/N/similarity/motion` (`modules/inout/osc_sound.py`) sends the plain `Similarity` row; its comment
-  says motion-gated. `MotionGate` goes out separately on `/pose/N/similarity/gate`. Whether Max uses either.

@@ -185,7 +185,3 @@ As the wire is now:
 
 - `/pose/{id}/angle/vel` is the raw angles' velocity, so inside a dead zone the wire reports an arm
   moving at a fixed position; whether the patch reads the velocity
-- The reset of `/pose/{id}/angle/rad` and `/pose/{id}/angle/vel` sends 17 zeros, the live message
-  9 values (`OscSound._add_inactive_frame_messages`); whether Max depends on the list length
-- `/pose/{id}/similarity/motion` sends the plain similarity row although its comment says
-  motion-gated (`SIMILARITY.md`, *Open*); which of the three similarity addresses Max listens to
