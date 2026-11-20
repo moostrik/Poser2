@@ -26,10 +26,6 @@ class FieldAdvection:
         self._advect_shader.deallocate()
         self._maccormack_shader.deallocate()
 
-    def reload(self) -> None:
-        self._advect_shader.reload()
-        self._maccormack_shader.reload()
-
     def carry(self, advection: Advection, field: SwapTexture3D, scratch: Texture3D, velocity: Texture3D,
               obstacle: Texture3D, aspect: float, z_extent: float, step: float, dissipation: float,
               internal_format: int, has_obstacles: bool, evaporation: float = 0.0,

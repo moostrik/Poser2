@@ -31,8 +31,7 @@ class BloomLayer(LayerBase):
         self._blur.deallocate()
 
     def update(self) -> None:
-        self._omission.reload()
-        self._blur.reload()
+        """Nothing to advance per frame."""
 
     @property
     def texture(self) -> Texture:

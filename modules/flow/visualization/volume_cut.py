@@ -65,7 +65,6 @@ class VolumeCut:
             self._fbo.deallocate()
             self._fbo.allocate(*size, GL_RGBA16F)
         self._fbo.begin()
-        self._shader.reload()
         self._shader.use(volume, int(cut) - int(Cut.SLICE), position, projects_max(kind), kind.vector)
         self._fbo.end()
         return self._fbo

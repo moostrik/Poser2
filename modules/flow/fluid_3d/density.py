@@ -48,10 +48,6 @@ class Density(DensityCarrier):
     def allocated(self) -> bool:
         return self._density.allocated
 
-    def reload(self) -> None:
-        self._inject_shader.reload()
-        self._composite_shader.reload()
-
     def reset(self) -> None:
         self._density.clear_all()
 

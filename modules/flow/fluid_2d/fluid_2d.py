@@ -263,25 +263,6 @@ class Fluid2D:
     def _input_shaders(self) -> tuple:
         return (self._inject_velocity_shader, self._inject_density_shader, self._inject_scalar_shader, self._picture_shader)
 
-    def _reload_shaders(self) -> None:
-        """Hot-reload all shaders."""
-        self._advect_shader.reload()
-        self._maccormack_shader.reload()
-        self._divergence_shader.reload()
-        self._expansion_mean_shader.reload()
-        self._gradient_shader.reload()
-        self._jacobi_pressure_shader.reload()
-        self._jacobi_pressure_compute.reload()
-        self._jacobi_diffusion_shader.reload()
-        self._jacobi_diffusion_compute.reload()
-        self._multigrid.reload()
-        self._vorticity_curl_shader.reload()
-        self._vorticity_force_shader.reload()
-        self._buoyancy_shader.reload()
-        self._add_boolean_shader.reload()
-        for shader in self._input_shaders():
-            shader.reload()
-
     # ========== Update Pipeline ==========
 
     def reset(self) -> None:
@@ -302,7 +283,6 @@ class Fluid2D:
         if not self._allocated:
             return
 
-        self._reload_shaders()
         self._handle_deferred_actions()
         self._step_time(dt)
         self._gpu_timer.begin()

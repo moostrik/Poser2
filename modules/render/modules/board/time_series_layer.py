@@ -88,7 +88,6 @@ class TimeSeriesLayer(LayerBase):
         self._image.set_image(ranges)
         self._image.update()
 
-        self._shader.reload()
         self._fbo.begin()
         clear_color()
         self._shader.use(self._image, len(lanes), COLUMNS,

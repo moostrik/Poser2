@@ -121,7 +121,6 @@ class FeatureWindowLayer(LayerBase):
         self._image.set_image(stream_image)
         self._image.update()
 
-        self._shader.reload()
 
         # Use window's display_range
         display_range = window.display_range

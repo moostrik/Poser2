@@ -142,9 +142,6 @@ class SimilaritySilhouetteLayer(LayerBase):
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
-        self._color_fill.reload()
-        self._add_mix.reload()
-        self._shader.reload()
 
         # Step 1: Tint all cameras' masks
         colors = self._color_settings.track_colors

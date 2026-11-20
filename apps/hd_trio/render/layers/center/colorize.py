@@ -74,7 +74,6 @@ class Colorize:
         self._mix_shader.use(self._blend_fbo.back, source, s.blend_factor)
         self._blend_fbo.end()
 
-        self._cel_shade_shader.reload()
         self._effect_fbo.swap()
         self._effect_fbo.begin()
         self._cel_shade_shader.use(self._blend_fbo, s.exposure, s.gamma, s.offset, s.contrast, s.levels, s.smoothness, s.saturation)

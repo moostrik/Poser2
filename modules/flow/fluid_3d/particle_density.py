@@ -125,10 +125,6 @@ class ParticleDensity(DensityCarrier):
     def allocated(self) -> bool:
         return self._particles.allocated
 
-    def reload(self) -> None:
-        for shader in self._shaders():
-            shader.reload()
-
     def reset(self) -> None:
         self._particles.clear()
         self._ring.clear()

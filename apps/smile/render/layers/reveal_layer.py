@@ -32,8 +32,7 @@ class RevealLayer(LayerBase):
         self._blur.deallocate()
 
     def update(self) -> None:
-        self._flash_out.reload()
-        self._blur.reload()
+        """Nothing to advance per frame."""
 
     @property
     def texture(self) -> Texture:

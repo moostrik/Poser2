@@ -232,7 +232,6 @@ class WallRender:
         self._online_page = page
 
     def update(self) -> None:
-        self._mix.reload()
         settings = self.settings
         credit: bool = bool(settings.credit_qr_walls)
         caption: bool = bool(settings.credit_walls)

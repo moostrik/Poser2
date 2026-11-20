@@ -84,11 +84,6 @@ class FineDensity(DensityCarrier):
     def allocated(self) -> bool:
         return self._amount.allocated
 
-    def reload(self) -> None:
-        for shader in (self._inject_shader, self._average_shader, self._composite_shader, self._coordinates_shader,
-                       self._turbulent_shader):
-            shader.reload()
-
     def reset(self) -> None:
         self._amount.clear_all()
 

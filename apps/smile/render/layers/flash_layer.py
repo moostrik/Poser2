@@ -23,7 +23,7 @@ class FlashLayer(LayerBase):
         self._flash_in.deallocate()
 
     def update(self) -> None:
-        self._flash_in.reload()
+        """Nothing to advance per frame."""
 
     @property
     def texture(self) -> Texture:

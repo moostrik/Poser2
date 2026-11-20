@@ -126,7 +126,6 @@ class TemperatureBridge(FlowBase):
         if not self._allocated:
             return
 
-        self._temperature_bridge_shader.reload()
 
         # Interpret RGB color and apply velocity mask
         self._output_fbo.begin()

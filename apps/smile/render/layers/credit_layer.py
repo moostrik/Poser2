@@ -103,7 +103,6 @@ class CreditLayer(LayerBase):
         self._qr.deallocate()
 
     def update(self) -> None:
-        self._mix.reload()
         self._title.update()
         key: tuple[str, int] = (self.settings.credit_url, self.settings.credit_size)
         if key != self._qr_key:

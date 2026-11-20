@@ -79,9 +79,7 @@ class CameraLayer(LayerBase):
         self._blur.deallocate()
 
     def update(self) -> None:
-        self._face_color.reload()
-        self._drawer.reload()
-        self._blur.reload()
+        """Nothing to advance per frame."""
 
     @property
     def texture(self) -> Texture:

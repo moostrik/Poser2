@@ -70,10 +70,6 @@ class MultigridPressure:
         for shader in (self._smoother, self._residual_restrict_shader, self._coarse_shader, self._prolong_shader):
             shader.deallocate()
 
-    def reload(self) -> None:
-        for shader in (self._smoother, self._residual_restrict_shader, self._coarse_shader, self._prolong_shader):
-            shader.reload()
-
     @property
     def levels(self) -> int:
         """The levels below the finest."""

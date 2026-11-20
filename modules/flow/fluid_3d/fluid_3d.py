@@ -418,33 +418,6 @@ class Fluid3D:
 
         self._allocated = False
 
-    def _reload_shaders(self) -> None:
-        """Hot-reload all shaders."""
-        self._advection.reload()
-        for carrier in self._densities:
-            carrier.reload()
-        self._over_shader.reload()
-        self._knee_shader.reload()
-        self._light_shader.reload()
-        self._light_sweep_shader.reload()
-        self._caustic_shader.reload()
-        self._layer_light_shader.reload()
-        self._light_blur_shader.reload()
-        self._divergence_shader.reload()
-        self._expansion_mean_shader.reload()
-        self._gradient_shader.reload()
-        self._jacobi_pressure_shader.reload()
-        self._sor_pressure_shader.reload()
-        self._multigrid.reload()
-        for face_shader in self._face_shaders:
-            face_shader.reload()
-        self._vorticity_curl_shader.reload()
-        self._vorticity_force_shader.reload()
-        self._buoyancy_shader.reload()
-        self._inject_shader.reload()
-        self._add_to_faces_shader.reload()
-        self._inject_binary_shader.reload()
-
     # ========== Update Pipeline ==========
 
     def reset(self) -> None:
@@ -464,7 +437,6 @@ class Fluid3D:
         if not self._allocated:
             return
 
-        self._reload_shaders()
         self._handle_deferred_actions()
 
         # Per-frame state

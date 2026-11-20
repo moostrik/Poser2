@@ -82,8 +82,5 @@ class DensityCarrier(ABC):
     @abstractmethod
     def ports(self) -> dict[str, Port]: ...
 
-    def reload(self) -> None:
-        """Hot-reload its shaders."""
-
     def set_walls(self, xy: tuple[int, tuple[float, float, float, float]], z: tuple[int, tuple[float, float, float, float]]) -> None:
         """The walls' wrap modes, as GL wrap and border color, for a carrier on textures."""

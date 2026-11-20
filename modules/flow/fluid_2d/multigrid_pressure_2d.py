@@ -69,10 +69,6 @@ class MultigridPressure2D:
         for shader in self._shaders:
             shader.deallocate()
 
-    def reload(self) -> None:
-        for shader in self._shaders:
-            shader.reload()
-
     @property
     def _shaders(self) -> tuple:
         return (self._smoother, self._residual_restrict_shader, self._coarse_shader, self._prolong_shader)

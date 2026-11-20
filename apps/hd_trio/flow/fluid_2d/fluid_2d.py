@@ -228,20 +228,6 @@ class Fluid2D:
 
         self._allocated = False
 
-    def _reload_shaders(self) -> None:
-        """Hot-reload all shaders."""
-        self._advect_shader.reload()
-        self._divergence_shader.reload()
-        self._gradient_shader.reload()
-        self._jacobi_pressure_shader.reload()
-        self._jacobi_pressure_compute.reload()
-        self._jacobi_diffusion_shader.reload()
-        self._jacobi_diffusion_compute.reload()
-        self._vorticity_curl_shader.reload()
-        self._vorticity_force_shader.reload()
-        self._buoyancy_shader.reload()
-        self._add_boolean_shader.reload()
-
     # ========== Update Pipeline ==========
 
     def reset(self) -> None:
@@ -258,7 +244,6 @@ class Fluid2D:
         if not self._allocated:
             return
 
-        self._reload_shaders()
         self._handle_deferred_actions()
 
         # Per-frame state

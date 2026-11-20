@@ -102,7 +102,6 @@ class GradientFlow(FlowBase):
         # Compute optical flow using settings values
         power = 1.0 - self.settings.boost
 
-        self._gradient_flow_shader.reload()
 
         # Pass output_fbo directly since it's now a Fbo
         self._output_fbo.begin()

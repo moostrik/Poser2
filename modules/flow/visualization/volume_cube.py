@@ -60,11 +60,9 @@ class VolumeCube:
         self._fbo.begin()
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
-        self._cube.reload()
         self._cube.use(volume, np.linalg.inv(matrix), box, scale, channel, color, STEPS, opacity, depth_fade, slice_z, slice_focus)
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         if outlines:
-            self._edges.reload()
             self._edges.use(matrix, box)
             if slice_z is not None:         # the layer's frame: the box's edges flattened to its depth
                 at_layer: np.ndarray = np.eye(4)
@@ -73,7 +71,6 @@ class VolumeCube:
             if light is not None:
                 for mark in light_marks(light, box):
                     self._edges.use(matrix @ mark, (1.0, 1.0, 1.0), LIGHT_COLOR)
-            self._axes.reload()
             self._axes.use(matrix, box)
         Style.pop_style()
         self._fbo.end()

@@ -6,17 +6,9 @@ measurement; E and H from the package scan of the same day. The lines are in wor
 
 ## F. Shaders
 
-Today a shader reloads only where its user calls `reload()` by hand (96 calls in 31 files, of 207 files with a
-`Shader` or `ComputeShader`), and `ComputeShader` copies `Shader`'s init, compile and reload.
+Shaders reload at one point in the window loop, and each class's program is compiled once and shared by its
+objects (`Shader._programs`).
 
-- F0. Find out why `Shader` is one instance per class (`__new__`), from the code and its history (`git log` on
-  `shader.py`); keep it and state it as a gl.md rule, or drop it. If no reason is found, it is kept and stated as a
-  gl.md rule.
-- F1. One reload point: at the top of each frame the window loop reloads every marked shader, on the main thread, as
-  Cinder's watcher callbacks run in its update. The 96 `.reload()` calls go. `ComputeShader` builds on `Shader`: one
-  init, compile and reload. The fallbacks to `_generic.frag` and to a shader's own-folder `_generic.*` go; the shared
-  `_generic.vert` stays. `enable_hot_reload` stays the app's choice (white_space leaves it off). Test: a marked
-  shader of each kind is reloaded once at the next frame.
 - F2. A shader reloads when a file it includes changes (`position.glsl`, `color.glsl`), or the shared `_generic.vert`
   it falls back to, as Cinder's `GlslProg::getIncludedFiles`: `read_shader_source` returns the files it read, and a
   map from each file to its shaders marks them all; the shared shaders folder is watched. Test: an edited include
@@ -28,11 +20,10 @@ Today a shader reloads only where its user calls `reload()` by hand (96 calls in
 - F5. A save that arrives in two events or half-written is tried again on the next frame, not reported as a compile
   error; the debounce is per file, not per folder. Test: a half-written file, then the whole one; two files saved
   together both reload.
-- F6. `Dither`'s blue noise as F0 decides: with one instance per class it is made once, in the first `allocate`, and
-  freed in the last `deallocate`, as `Lut` does; without it each `Dither` holds its own. Test: with the noise mocked,
-  it is made once and freed once.
-- F7. GL.md's Shaders section describes hot reload, `ComputeShader`, F0's answer, F1 to F5, and the `_generic.vert`
-  fallback as it is.
+- F6. `Dither` and `Lut` hold their own state per object, made in `allocate` and freed in `deallocate`; `Lut`'s
+  `hasattr` guard goes. Test: with the noise mocked, a `Dither` makes its noise once and frees it once.
+- F7. GL.md's Shaders section describes hot reload, `ComputeShader`, the program shared by a class's objects, the
+  reload point, F2 to F5, and the `_generic.vert` fallback as it is.
 
 ## G. Fewer GL calls
 

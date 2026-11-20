@@ -72,15 +72,11 @@ class VolumeGlyphs:
         glDepthFunc(GL_LESS)
         pixels_per_unit: float = self._fbo.height * 0.5 / math.tan(FOV / 2.0)
         if dots:
-            self._dots.reload()
             self._dots.use(volume, matrix, box, grid, scale, channel, pixels_per_unit)
         else:
-            self._arrows.reload()
             self._arrows.use(volume, matrix, box, grid, scale, pixels_per_unit, push)
         if outlines:                        # the box's edges and its axes, in the scene's depth
-            self._edges.reload()
             self._edges.use(matrix, box)
-            self._axes.reload()
             self._axes.use(matrix, box)
         glDisable(GL_DEPTH_TEST)
         Style.pop_style()

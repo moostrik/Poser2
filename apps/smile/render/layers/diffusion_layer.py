@@ -25,8 +25,7 @@ class DiffusionLayer(LayerBase):
         self._blur.deallocate()
 
     def update(self) -> None:
-        self._mix.reload()
-        self._blur.reload()
+        """Nothing to advance per frame."""
 
     @property
     def texture(self) -> Texture:

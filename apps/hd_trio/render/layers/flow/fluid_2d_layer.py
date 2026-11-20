@@ -94,7 +94,6 @@ class Fluid2DLayer(FluidLayer):
     def _step(self, dt: float) -> None:
         self._channel = 0
         self._fluid.update(dt)      # reallocates itself on a size change
-        self._colorize_shader.reload()
         self._colorized.begin()
         self._colorize_shader.use(self._fluid.density, self._colors)
         self._colorized.end()

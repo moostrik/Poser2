@@ -101,7 +101,6 @@ class Visualizer:
         channels: int = FlowUtil.get_num_channels(texture.internal_format)
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._fbo.begin()
-        self._glyphs.reload()
         self._glyphs.use(texture, scale, spacing, spacing * ARROW_WIDTH, channels >= 3, dots or channels == 1, channel, push)
         self._fbo.end()
 
@@ -116,15 +115,12 @@ class Visualizer:
         if isinstance(texture, Texture3D):
             grid3: tuple[int, int, int] = histogram_volume_grid(texture.width, texture.height, texture.depth)
             self._histogram_total = grid3[0] * grid3[1] * grid3[2]
-            self._histogram_count_volume.reload()
             self._histogram_count_volume.use(texture, self._histogram, scale, grid3)
         else:
             grid: tuple[int, int] = histogram_grid(texture.width, texture.height)
             self._histogram_total = grid[0] * grid[1]
-            self._histogram_count.reload()
             self._histogram_count.use(texture, self._histogram, scale, grid)
         self._fbo.begin()
-        self._histogram_draw.reload()
         self._histogram_draw.use(self._histogram, channel, channels, self._histogram_total)
         self._fbo.end()
 
@@ -132,6 +128,5 @@ class Visualizer:
         if not self._fbo.allocated or not texture.allocated:
             return
         self._fbo.begin()
-        self._channel_view.reload()
         self._channel_view.use(texture, scale, channel, colormap, vector)
         self._fbo.end()

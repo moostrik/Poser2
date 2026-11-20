@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from .render_base import RenderBase
 from modules.utils import FPS, PerformanceTimer, Waker
 from .monitor import Monitor
+from .shader import Shader
 from .window import Window
 from .window_input import WindowInput
 from .window_settings import WindowManagerSettings, WindowSettings
@@ -200,7 +201,9 @@ class WindowManager:
 
     def _tick_windows(self) -> None:
         """The monitors after a hot-plug, the user's moves written, the settings' differences applied, and the
-        renderer told of each changed size; in window 0's context."""
+        renderer told of each changed size, and the shaders a changed file marked compiled again; in window 0's
+        context, which shares its programs with every window."""
+        Shader.reload_marked()
         if self._monitors_changed:
             self._monitors_changed = False
             self._monitors = Monitor.connected()

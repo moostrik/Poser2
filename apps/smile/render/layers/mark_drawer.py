@@ -22,10 +22,6 @@ class MarkDrawer:
         self._outline.deallocate()
         self._rect.deallocate()
 
-    def reload(self) -> None:
-        self._outline.reload()
-        self._rect.reload()
-
     def draw(self, mark: Mark, width: int, height: int, alpha: float = 1.0, outline: bool = True) -> None:
         w, h = float(width), float(height)
         r, g, b, a = mark.color

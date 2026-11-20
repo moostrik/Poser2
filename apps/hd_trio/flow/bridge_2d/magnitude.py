@@ -70,7 +70,6 @@ class Magnitude(FlowBase):
         if not self._allocated:
             return
 
-        self._magnitude_shader.reload()
 
         # Extract vector magnitude to R channel
         self._output_fbo.begin()

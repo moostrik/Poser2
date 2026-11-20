@@ -118,7 +118,6 @@ class Legend:
         lines: list[AxisLine] = strip_lines(scale) if kind == LegendKind.STRIP else histogram_lines(samples)
         w, h = self._fbo.width, self._fbo.height
 
-        self._grid.reload()
         self._grid.use(lanes, [line.fraction for line in lines], kind == LegendKind.HISTOGRAM)
         if not self._text.allocated:
             return
@@ -153,7 +152,6 @@ class Legend:
         x1: float = x0 + KEY_WIDTH
         top: float = h - MARGIN - 4 - below                         # from the bottom, room for the name boxes' padding
         bottom: float = top - bars * KEY_BAR - (bars - 1) * KEY_GAP
-        self._key.reload()
         self._key.use((x0 / w, (h - top) / h, (x1 - x0) / w, (top - bottom) / h), channel, channels, KEY_BAR / h,
                       KEY_GAP / h)
         if not self._text.allocated:

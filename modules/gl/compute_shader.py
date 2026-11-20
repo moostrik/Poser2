@@ -17,20 +17,15 @@ Usage:
 """
 from __future__ import annotations
 
-import inspect
-import logging
 import math
-import threading
 from pathlib import Path
 
-from OpenGL.GL import GL_ALL_BARRIER_BITS, GL_COMPILE_STATUS, GL_COMPUTE_SHADER, GL_FALSE, GL_LINK_STATUS, GL_MAX_COMPUTE_WORK_GROUP_COUNT, GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, GL_MAX_COMPUTE_WORK_GROUP_SIZE, GL_READ_ONLY, GL_READ_WRITE, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_SHADER_STORAGE_BARRIER_BIT, GL_TEXTURE0, GL_TEXTURE_2D, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_3D, GL_TEXTURE_FETCH_BARRIER_BIT, GL_TRUE, GL_WRITE_ONLY, glActiveTexture, glAttachShader, glBindImageTexture, glBindTexture, glCompileShader, glCreateProgram, glCreateShader, glDeleteProgram, glDeleteShader, glDispatchCompute, glGetIntegeri_v, glGetIntegerv, glGetProgramInfoLog, glGetProgramiv, glGetShaderInfoLog, glGetShaderiv, glLinkProgram, glMemoryBarrier, glShaderSource, glUniform1i
+from OpenGL.GL import GL_ALL_BARRIER_BITS, GL_COMPUTE_SHADER, GL_FALSE, GL_MAX_COMPUTE_WORK_GROUP_COUNT, GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, GL_MAX_COMPUTE_WORK_GROUP_SIZE, GL_READ_ONLY, GL_READ_WRITE, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_SHADER_STORAGE_BARRIER_BIT, GL_TEXTURE0, GL_TEXTURE_2D, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_3D, GL_TEXTURE_FETCH_BARRIER_BIT, GL_TRUE, GL_WRITE_ONLY, glActiveTexture, glBindImageTexture, glBindTexture, glDispatchCompute, glGetIntegeri_v, glGetIntegerv, glMemoryBarrier, glUniform1i
 
 from .shader import Shader
 from .texture import Texture
 from .texture_3d import Texture3D
 from .texture_2d_array import Texture2DArray
-
-logger = logging.getLogger(__name__)
 
 
 class ComputeShader(Shader):
@@ -44,123 +39,10 @@ class ComputeShader(Shader):
     WORKGROUP_SIZE_Y: int = 16
     WORKGROUP_SIZE_Z: int = 1
 
-    def __init__(self) -> None:
-        """Initialize compute shader and discover .comp file."""
-        # Skip if already initialized (singleton pattern from parent)
-        if hasattr(self, '_initialized'):
-            return
-
-        # Don't call parent __init__ yet - we need to set up compute-specific paths first
-        self._initialized = True
-        self.allocated: bool = False
-        self.shader_name: str = self.__class__.__name__
-        self.shader_program: int | None = None
-        self.need_reload: bool = False
-        self._ref_count: int = 0
-        self._uniform_cache: dict[str, int] = {}
-
-        # Discover compute shader file named after the class's module file, in the same directory
-        source_stem = type(self).__module__.rsplit('.', 1)[-1]
-        self.shader_dir = Path(inspect.getfile(self.__class__)).parent
-
-        compute_path = self.shader_dir / f"{source_stem}{self.COMPUTE_SUFFIX}"
-        self.compute_file_path: Path | None = compute_path if compute_path.exists() else None
-
-        # Clear parent's vertex/fragment paths (not used for compute)
-        self.vertex_file_path = None
-        self.fragment_file_path = None
-
-        # Import threading for reload lock
-        import threading
-        self._reload_lock = threading.Lock()
-
-    def allocate(self) -> None:
-        """Compile compute shader and create OpenGL program."""
-        self._ref_count += 1
-
-        if self.allocated:
-            return
-
-        # Register for hot-reload
-        with Shader._observer_lock:
-            if self not in Shader._monitored_shaders:
-                Shader._monitored_shaders.append(self)
-
-            if Shader._hot_reload_enabled and self.shader_dir:
-                Shader._watch_directory(self.shader_dir)
-
-        # Compile compute shader
-        self.allocated = self._compile_compute_shader(verbose=False)
-
-    def _compile_compute_shader(self, verbose: bool = False) -> bool:
-        """Load and compile compute shader. Returns True if successful."""
-        # Load compute shader source
-        compute_source: str = ''
-        if self.compute_file_path:
-            compute_source = self.read_shader_source(str(self.compute_file_path))
-
-        if not compute_source:
-            logger.error(f"{self.shader_name}: No compute shader found at {self.compute_file_path}")
-            return False
-
-        try:
-            # Compile compute shader
-            compute_shader = glCreateShader(GL_COMPUTE_SHADER)
-            glShaderSource(compute_shader, compute_source)
-            glCompileShader(compute_shader)
-
-            if not glGetShaderiv(compute_shader, GL_COMPILE_STATUS):
-                error = glGetShaderInfoLog(compute_shader).decode()
-                logger.error(f"{self.shader_name} COMPUTE SHADER ERROR:\n{error}")
-                glDeleteShader(compute_shader)
-                return False
-
-            # Link program
-            new_program = glCreateProgram()
-            glAttachShader(new_program, compute_shader)
-            glLinkProgram(new_program)
-
-            if not glGetProgramiv(new_program, GL_LINK_STATUS):
-                error = glGetProgramInfoLog(new_program).decode()
-                logger.error(f"{self.shader_name} LINK ERROR:\n{error}")
-                glDeleteShader(compute_shader)
-                glDeleteProgram(new_program)
-                return False
-
-            # Clean up shader object
-            glDeleteShader(compute_shader)
-
-            # Replace old program if exists
-            if self.shader_program is not None:
-                glDeleteProgram(self.shader_program)
-            self.shader_program = new_program
-
-            # Clear uniform cache
-            self._uniform_cache.clear()
-
-            if verbose:
-                logger.info(f"{self.shader_name} compute shader loaded successfully")
-            return True
-
-        except Exception:
-            logger.exception("%s: unexpected error while compiling", self.shader_name)
-            return False
-
-    def reload(self) -> bool:
-        """Reload compute shader if marked for reload."""
-        if not self.need_reload:
-            return False
-
-        with self._reload_lock:
-            self.need_reload = False
-            compiled = self._compile_compute_shader(verbose=True)
-            logger.info("%s reload %s", self.shader_name, 'succeeded' if compiled else 'failed')
-            return True
-
-    def _on_file_changed(self, file_path: Path) -> None:
-        """Mark shader for reload when .comp file changes."""
-        if self.compute_file_path and file_path == self.compute_file_path:
-            self.need_reload = True
+    @classmethod
+    def _stages(cls) -> list[tuple[int, Path]]:
+        """The one compute stage: the class's `.comp`."""
+        return [(int(GL_COMPUTE_SHADER), cls._source_dir() / f"{cls._source_stem()}{cls.COMPUTE_SUFFIX}")]
 
     # ========== Dispatch Methods ==========
 
