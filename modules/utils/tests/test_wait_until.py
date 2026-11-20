@@ -56,7 +56,11 @@ class WaitUntilTest(unittest.TestCase):
         threading.Thread(target=take).start()
         with condition:
             self.assertFalse(wait_until(time.perf_counter() + 0.012, condition.wait, condition))
-            self.assertTrue(condition._is_owned())      # pyright: ignore[reportAttributeAccessIssue]
+            held: list[bool] = []
+            other = threading.Thread(target=lambda: held.append(not condition.acquire(timeout=0.01)))
+            other.start()
+            other.join()
+            self.assertEqual(held, [True])             # held again when it returns
         self.assertEqual(taken, [True])
 
 
