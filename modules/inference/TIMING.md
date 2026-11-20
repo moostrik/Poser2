@@ -157,6 +157,41 @@ In deep_flow as it is, the fluid on the GPU, 60 s a model, one run each, 2026-11
 Under the fluid the pose takes 20 to 23 ms whichever model: most of it is its wait for the GPU, not the model's own
 1.3 to 4.3 ms **(deduction)**. At 59003bd2, HIGH in FP16: 21.0 / 43.5 ms, 1498 posed, none dropped **(seen)**.
 
+## The pose's resolution for several players
+
+hd_trio's and white_space's pose at `STANDARD` (192x256) and `HIGH` (288x384), TensorRT FP16, 2026-11-20, 20dd751c
+**(seen)**. Alone: each app's own engine (hd_trio built for batch 3, white_space for 8), 300 batches after 50, seeded
+crops at the model's size, idle GPU (`c2_pose_batches.py`, not committed, on `scripts/model_benchmark.py`), its
+`Pose Estimation` timer, mean / p99 ms:
+
+| Batch | hd_trio STANDARD | hd_trio HIGH | white_space STANDARD | white_space HIGH |
+|-------|------------------|--------------|----------------------|------------------|
+| 1     | 1.58 / 2.57      | 1.86 / 2.96  | 1.74 / 2.89          | 1.78 / 2.89      |
+| 2     | 1.62 / 2.62      | 1.96 / 3.11  | 1.72 / 2.91          | 1.83 / 2.89      |
+| 3     | 1.70 / 2.75      | 2.00 / 2.94  | 1.77 / 2.78          | 1.96 / 2.90      |
+| 4     |                  |              | 1.81 / 2.87          | 2.06 / 2.96      |
+| 5     |                  |              | 1.90 / 3.11          | 2.15 / 3.04      |
+| 6     |                  |              | 1.91 / 2.82          | 2.20 / 3.15      |
+| 7     |                  |              | 1.94 / 2.71          | 2.29 / 3.15      |
+| 8     |                  |              | 2.02 / 2.84          | 2.39 / 3.17      |
+
+In the app: each app `-sim`, its preset with the resolution set, 60 s after the first pose and 3 s more
+(`c2_app_probe.py`, not committed); hd_trio on `intro_1` (two players a set), white_space on
+`20260924-161443_3_person_long` (two or three); no recording holds more than three. Mean / p95 / p99 ms:
+
+| What                   | hd_trio STANDARD     | hd_trio HIGH         | white_space STANDARD | white_space HIGH     |
+|------------------------|----------------------|----------------------|----------------------|----------------------|
+| Pose                   | 9.41 / 13.42 / 16.00 | 9.57 / 14.51 / 16.23 | 9.22 / 16.92 / 29.51 | 9.70 / 18.71 / 27.44 |
+| Batches by size        | 2: 1373, 1: 12       | 2: 1372, 1: 14       | 3: 605, 2: 757       | 3: 606, 2: 757       |
+| Dropped                | 2                    | 0                    | 0                    | 0                    |
+| Render interval (mean) | 21.5                 | 21.3                 | 12.5                 | 13.3                 |
+
+- Alone the model barely grows with the batch: most of its time is fixed cost; `HIGH` adds 0.04 to 0.37 ms
+  (white_space, one to eight players) **(deduction from the table)**
+- In the app `HIGH` adds 0.15 ms to hd_trio's pose and 0.5 ms (1.8 at p95) to white_space's, at two or three
+  players; the pose's in-app time is mostly its wait for the GPU it shares with the render **(deduction)**
+- One run each: white_space's render interval, 0.8 ms longer at `HIGH`, may be the run's spread **(deduction)**
+
 ## The pose's decode
 
 The SimCC decode on the GPU (two max with their indices, a minimum, 17 points and scores a player back) against the

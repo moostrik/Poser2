@@ -38,17 +38,9 @@ nothing.
 
 ## C. The pose model
 
-deep_flow and low_flow run the pose at `HIGH` (2026-11-20). For one player `STANDARD` does not fill the GPU, so `HIGH` costs as much in the app (TIMING.md, "The pose
-models": 20 to 23 ms whichever model) **(seen)**; hd_trio (up to 3 players a set) and white_space (up to 8) batch
-several crops, where it may not.
-
-- C2. hd_trio and white_space are measured at `STANDARD` and `HIGH`, FP16, before their resolution is chosen: alone,
-  per batch size up to each app's engine's maximum (3 and 8), on their own engines (`scripts/model_benchmark.py
-  --app <app> --models pose`, the resolution set); in the app, each app's `-sim` on a recording with several players,
-  60 s a resolution: the pose's time, its drops and `POSE_LATENCY_RAW`. Into TIMING.md, "The pose models". They run
-  on `.venv` (depthai 2); which of their recordings hold several players is found first, offline from the files
-
 Questions:
+- hd_trio's and white_space's pose resolution, measured at both (TIMING.md, "The pose's resolution for several
+  players"): yours to choose and save in their presets
 - Each keypoint's uncertainty for the One Euro filter: in the pose package's plan ([POSE_PLAN.md](../pose/POSE_PLAN.md))
 
 ## The rules it touches
