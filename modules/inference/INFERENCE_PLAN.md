@@ -4,45 +4,30 @@ What is not built in `modules/inference`, apart from the threads the app refacto
 ([REFACTOR_PLAN.md](../../REFACTOR_PLAN.md)). What is built is in [INFERENCE.md](INFERENCE.md), its times and how
 the refactor's steps were checked in [TIMING.md](TIMING.md). **(deduction)** marks what is inferred.
 
-## B. Timed waits that end on the Windows tick (from the module refactor thread, 2026-11-20)
+## A. The pose model
 
-On Windows a timed wait (`Condition.wait(t)`, `Event.wait(t)`) ends on the 15.6 ms system tick, up to 15.6 ms
-late; a signalled wait wakes at once, and `time.sleep` is about 1 ms on Python 3.12 **(site fact, the module refactor
-thread; measured there in `StreamReader`, a quarter of the frames ~30 ms apart at 50 fps)**. Two loops here pace on
-a timed `Condition.wait` **(seen)**, and both are woken by every new item: the sync by each part it pairs, the
-player by each frame it plays. `modules.utils.wait_until` sleeps the last `WAKE_STEP` (17.5 ms) before a deadline
-blind, the lock released (`wait_until.py`) **(seen)**: a part that comes in that stretch waits for the sleep's end,
-up to 17.5 ms, so as it stands it would add latency here, not remove it **(deduction, and the Screen Recorder
-thread's measurement)**.
-
-B waits for the module refactor's measurement of `timeBeginPeriod(1)` (its `REFACTOR_PLAN.md` B6, decided
-2026-11-20): with every timed wait ending within about 1 ms, B2 and B3 would need only a plain timed wait, and B1
-nothing.
-
-- B1. `wait_until` takes a wake test, `woken: Callable[[], bool] | None`: in its last stretch it sleeps in 1 ms steps
-  (`time.sleep(0.001)`, about 1 ms on Python 3.12), the lock released between, and returns True as soon as the test
-  holds. Without a test it behaves exactly as now: its five tests stay, one for the wake test joins them in
-  `modules/utils/tests`; its docstring and `modules/video/VIDEO.md`'s line on it say so (agreed with the Screen
-  Recorder thread, which made it, 2026-11-20)
-- B2. `InferenceFrameSync.run` waits for the next frame's deadline (`_remaining()`) with
-  `wait_until(deadline, self._wake.wait, self._wake, woken=lambda: bool(self._inbox))`: a frame whose results do not
-  all come leaves within about 1 ms of its deadline, not up to 15.6 ms after it, and a part still pairs within
-  about 1 ms **(deduction)**
-- B3. `RecordedPoses._send` waits for each recorded pose's moment (capture + its recorded latency) the same way,
-  woken by a new frame that is due sooner: in `-sim` the poses come within about 1 ms of their moment, not up to
-  15.6 ms late and uneven **(deduction)**
-- Checked by deep_flow `-sim` on `20261112-125832_measure`, 60 s before and after: a timer of each overdue frame's
-  lateness past its deadline (B2) and of each played pose's lateness past its moment (B3), both new, the inference
-  frame sync's part wait (`Wait inference frame sync`), and `POSE_LATENCY_RAW`'s spread (p95 − p50); expected
-  **(deduction)**: lateness and part wait under about 1 ms where they reached 15
-
-## C. The pose model
+- A1. One pose model, RTMPose-l at 288x384 (`HIGH`), in every app; `STANDARD` goes (decided 2026-11-20). Alone it
+  costs 0.3 to 0.4 ms more than `STANDARD` at full batches; in the app a full room costs 2 to 3 ms more, one run each
+  (TIMING.md, "The pose's resolution for several players") **(seen)**, most of it the wait for the GPU it shares
+  **(deduction)**; for 78.3 against 76.7 COCO AP **(site fact)**. With one model the pose's `resolution` has nothing
+  to choose, so it goes:
+  - `PoseEstimatorSettings.resolution` and `_MODELS`; `width`, `height` and `model` are the one model's
+    (`pose/settings.py`); the apps' crops keep taking the pose's size (their `main.py`); the engine's `Resolution`
+    and `RESOLUTION_DIMS` stay, the segmentation chooses by them
+  - deep_flow's and low_flow's `main.py` comment on "a change of pose resolution" says what it guards
+  - the presets' `pose.pose.resolution`, in all four apps (hd_trio and white_space run `STANDARD` today **(seen)**)
+  - in LFS `rtmpose-l_256x192.onnx` and `rtmpose-l_256x192_fp16.onnx`; the `rtmpose-l_256x192*.trt` engines in the
+    apps' model folders; their lines in `scripts/makemodels.bat`, which gains low_flow's 384x288 line (it has
+    none); the 256x192 examples in `tools/models`'s docstrings (`convert_onnx_to_fp16.py`,
+    `diagnose_fp16_weights.py`, `diagnostic_precision.py`, `export_rtm_onnx_to_trt.py`) name the 384x288
+  - `test_pose_estimator.py`'s resolution, and its ULTRA case with the "no model" error it tests; INFERENCE.md's
+    lines on the two resolutions; TIMING.md keeps its numbers
+  Checked by pyright, the inference and four apps' tests, and a `-sim` start of hd_trio and white_space: "Pose
+  model ready: 288x384 rtmpose-l_384x288_fp16.trt", and no drops
 
 Questions:
-- hd_trio's and white_space's pose resolution, measured at both (TIMING.md, "The pose's resolution for several
-  players"): yours to choose and save in their presets
 - Each keypoint's uncertainty for the One Euro filter: in the pose package's plan ([POSE_PLAN.md](../pose/POSE_PLAN.md))
 
 ## The rules it touches
 
-- `CLAUDE.md` Time, pace a loop with `utils.wait_until`: B1, B2, B3
+- `CLAUDE.md` API evolution, remove obsolete pathways; keep presets in sync: A1
