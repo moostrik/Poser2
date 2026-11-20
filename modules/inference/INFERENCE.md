@@ -123,11 +123,11 @@ color goes up at once to start the pose. `submit_frame` queues the frame and ret
 camera wait, and a third drops the oldest, counted (`dropped`). Its own thread makes the corrected camera frame,
 which every user of the camera needs:
 
-- the color: `ImageUpload` copies it from a pinned staging buffer (`STAGING_COUNT` 3, reused once the copy queued
-  from it has run), converts it (BGR, NV12 or mono) to RGB half, straightens it by the tilt's homography and mirrors
-  it, in one CUDA kernel;
-- the depth: copied the same way, turned into metres and moved onto the color's view at a grid as fine as the depth
-  itself (`aligned_depth_size`), the nearest kept where two land on one cell and 0 where nothing lands, straightened
+- the color: `ImageUpload` copies it from a pinned staging buffer (`StagingRing`, `STAGING_COUNT` 3, reused once
+  the copy queued from it has run), converts it (BGR, NV12 or mono) to RGB half, straightens it by the tilt's
+  homography and mirrors it, in one CUDA kernel;
+- the depth: copied the same way, through the same ring, turned into meters and moved onto the color's view at a
+  grid as fine as the depth itself (`aligned_depth_size`), the nearest kept where two land on one cell and 0 where nothing lands, straightened
   and mirrored as the color, handed on as a `GpuDepth`.
 
 `CameraSync` groups one moment's frames of several cameras into a set, which `BatchUploader.submit_set` puts on the

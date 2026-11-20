@@ -16,7 +16,7 @@ from modules.camera import CAPTURE_TOLERANCE, CameraFrame, CameraTracklets, Dept
 from modules.settings import BaseSettings, Field
 from modules.utils import PerformanceTimer
 from .depth_align import DepthAligner
-from .image_upload import STAGING_COUNT, ImageUpload
+from .image_upload import ImageUpload
 from .source import CaptureCallback, GpuDepth, GpuDepthCallback, GpuImage, GpuImageCallback, ImageSnapshot, ImageSnapshotCallback
 
 logger = logging.getLogger(__name__)
@@ -57,8 +57,6 @@ class SerialUploader(Thread):
         self.settings: SerialUploaderSettings = settings
         self._image_upload: ImageUpload = ImageUpload()
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
-        # Each camera's depth staging buffers, the events of the copies queued from them, the one used last
-        self._staging: dict[tuple[int, FrameType], tuple[list[torch.Tensor], list[torch.cuda.Event | None], int]] = {}
         self._aligners: dict[int, DepthAligner] = {}
         # Each camera's depth alignment, the depth's size, and what they make: to_ray, to_uv, the aligned size
         self._projections: dict[int, tuple[DepthAlignment | None, tuple[int, int], np.ndarray, np.ndarray, tuple[int, int]]] = {}
@@ -270,15 +268,15 @@ class SerialUploader(Thread):
         _, _, to_ray, to_uv, aligned_size = projection
         aligner: DepthAligner = self._aligners.setdefault(cam_id, DepthAligner())
 
-        staging: torch.Tensor = self._staging_buffer((cam_id, FrameType.DEPTH), image)
+        key: tuple[int, str] = (cam_id, 'depth')       # beside the color stacks' keys in the upload's ring
+        staging: torch.Tensor = self._image_upload.staging.buffer(key, image.shape, torch.from_numpy(image[:0]).dtype)
         staging.copy_(torch.from_numpy(image))
         with torch.cuda.stream(self._stream):
             depth: torch.Tensor = aligner.align_staged(staging, to_ray, to_uv, frame.homography, frame.flip_h, aligned_size,
                                                        kernels=self.settings.depth_kernels)
             ready: torch.cuda.Event = torch.cuda.Event()
             ready.record(self._stream)
-        _, events, index = self._staging[(cam_id, FrameType.DEPTH)]
-        events[index] = ready
+        self._image_upload.staging.queued(key, ready)
 
         gpu_depth: GpuDepth = GpuDepth(cam_id, frame.timestamp, depth, ready)
         with self._callback_lock:
@@ -296,20 +294,3 @@ class SerialUploader(Thread):
                 callback(gpu_depth)
             except Exception:
                 logger.exception("Error in finished GPU depth callback")
-
-    def _staging_buffer(self, key: tuple[int, FrameType], image: np.ndarray) -> torch.Tensor:
-        """The camera's next pinned buffer of the frame's kind for `image`, (re)made at its shape. From pinned memory the copy to the
-        GPU is queued and this thread goes on; from the frame's own pageable memory it would wait until the
-        GPU had taken it. A buffer is reused once the copy queued from it has run, its event passed; only a GPU
-        `STAGING_COUNT` frames behind makes the thread wait."""
-        events: list[torch.cuda.Event | None]
-        buffers, events, index = self._staging.get(key, ([], [], -1))
-        if not buffers or buffers[0].shape != image.shape or buffers[0].dtype != torch.from_numpy(image[:0]).dtype:
-            buffers = [torch.empty(image.shape, dtype=torch.from_numpy(image[:0]).dtype, pin_memory=True) for _ in range(STAGING_COUNT)]
-            events = [None] * STAGING_COUNT
-        index = (index + 1) % STAGING_COUNT
-        event: torch.cuda.Event | None = events[index]
-        if event is not None:
-            event.synchronize()
-        self._staging[key] = (buffers, events, index)
-        return buffers[index]

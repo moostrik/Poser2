@@ -7,8 +7,7 @@ one copy and one CUDA kernel compiled at runtime (`SOURCE`, `cuda_kernels`), whi
 Where the kernel cannot be compiled (logged once), or with `kernel` off, the same runs as torch ops: the conversion
 and the straightening over the whole stack (the cameras' grids stacked), the mirror per mirrored camera; they are the
 reference `scripts/gpu_input_timing.py` holds the kernel to. Neither the caller's thread nor this waits for the GPU
-while it has room: a staging buffer is reused once the copy queued from it has run, and only a GPU `STAGING_COUNT`
-uploads behind makes the caller wait. Not thread-safe: one uploader's thread uses it."""
+while it has room: a frame goes through its cameras' ring of staging buffers (`staging_ring.py`). Not thread-safe: one uploader's thread uses it."""
 
 import ctypes
 import logging
@@ -20,10 +19,10 @@ import torch.nn.functional as F
 from modules.camera import CameraFrame
 
 from .cuda_kernels import CudaKernelError, CudaKernels
+from .staging_ring import StagingRing
 
 logger = logging.getLogger(__name__)
 
-STAGING_COUNT: int = 3      # pinned buffers per stack of cameras: uploads the GPU may be behind before the caller waits
 MAX_STACK: int = 8          # the frames one kernel launch takes
 BLOCK: tuple[int, int] = (16, 16)
 NV12, BGR, MONO = 0, 1, 2   # the layouts the kernel reads
@@ -154,8 +153,7 @@ class ImageUpload:
     """See the module docstring."""
 
     def __init__(self) -> None:
-        # Each stack's pinned staging buffers (by its cameras), the events of the copies queued from them, the one used last
-        self._staging: dict[tuple[int, ...], tuple[list[torch.Tensor], list[torch.cuda.Event | None], int]] = {}
+        self.staging: StagingRing = StagingRing()      # each stack's pinned buffers, by its cameras
         self._warp_grids: dict[int, tuple[np.ndarray, torch.Tensor]] = {}      # each camera's homography and its grid
         self._kernels: CudaKernels = CudaKernels(SOURCE, ('upload',), 'ImageUpload')
         self._kernel_failed: bool = False
@@ -168,7 +166,7 @@ class ImageUpload:
         `kernel`, as one CUDA kernel; without, or where it cannot be compiled, as torch ops."""
         first: np.ndarray = frames[0].image
         cam_ids: tuple[int, ...] = tuple(frame.cam_id for frame in frames)
-        staging: torch.Tensor = self._staging_buffer(cam_ids, (len(frames), *first.shape), torch.from_numpy(first[:0]).dtype)
+        staging: torch.Tensor = self.staging.buffer(cam_ids, (len(frames), *first.shape), torch.from_numpy(first[:0]).dtype)
         for index, frame in enumerate(frames):
             staging[index].copy_(torch.from_numpy(frame.image))
         with torch.cuda.stream(stream):
@@ -184,8 +182,7 @@ class ImageUpload:
                 images = self._upload_torch(gpu, frames)
             ready: torch.cuda.Event = torch.cuda.Event()
             ready.record(stream)
-        _, events, slot = self._staging[cam_ids]
-        events[slot] = ready            # the buffer is free again once the copy queued from it has run
+        self.staging.queued(cam_ids, ready)
         return images, ready
 
     def _upload_kernel(self, gpu: torch.Tensor, frames: list[CameraFrame], stream: torch.cuda.Stream) -> list[torch.Tensor]:
@@ -253,18 +250,3 @@ class ImageUpload:
             cached = (frame.homography, warp_grid(matrix, height, width))
             self._warp_grids[frame.cam_id] = cached
         return cached[1]
-
-    def _staging_buffer(self, key: tuple[int, ...], shape: tuple[int, ...], dtype: torch.dtype) -> torch.Tensor:
-        """The stack's next pinned buffer, (re)made at its shape. From pinned memory the copy to the GPU is queued and
-        the caller goes on; from the frame's own pageable memory it would wait until the GPU had taken it."""
-        events: list[torch.cuda.Event | None]
-        buffers, events, slot = self._staging.get(key, ([], [], -1))
-        if not buffers or tuple(buffers[0].shape) != shape or buffers[0].dtype != dtype:
-            buffers = [torch.empty(shape, dtype=dtype, pin_memory=True) for _ in range(STAGING_COUNT)]
-            events = [None] * STAGING_COUNT
-        slot = (slot + 1) % STAGING_COUNT
-        event: torch.cuda.Event | None = events[slot]
-        if event is not None:
-            event.synchronize()
-        self._staging[key] = (buffers, events, slot)
-        return buffers[slot]
