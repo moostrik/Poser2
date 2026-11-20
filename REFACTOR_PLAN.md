@@ -14,8 +14,7 @@ What is to do now, across the threads, in order.
 
 | Who                 | What                                                                                     | After            |
 |---------------------|------------------------------------------------------------------------------------------|------------------|
-| Refactor            | The loops still off the Waker (B1), the angles in numpy (B2), OscSound's two bugs (B3)   |                  |
-| Refactor            | What holds the GIL on a hot path: py-spy of each app (B4)                                |                  |
+| Refactor            | What holds the GIL on a hot path: py-spy of each app (B1)                                |                  |
 | Camera              | Depth confidence from the camera to the motion (CAMERA_PLAN.md A)                        |                  |
 | GL Window           | The window manager: GLFW on the main thread, one kind of window, frame pacing (GL_PLAN.md)| the camera plan |
 | Inference           | hd_trio and white_space at full batch: whether the STANDARD pose model goes (INFERENCE_PLAN.md C) |  |
@@ -50,7 +49,7 @@ Done: camera (14 Nov), render (its plan built and removed), hd_trio (G5). Held u
 - A3. `inout`
 - A4. `panel`
 - A5. `pose`; its `pipeline` changed with inference C4 (`SourceFramesCallback` and `AsyncInput` carry the capture
-  times, `dict[int, float]`). Its hot path, with B4's py-spy numbers: the steps run per player with a `Frame`
+  times, `dict[int, float]`). Its hot path, with B1's py-spy numbers: the steps run per player with a `Frame`
   replace each (white_space 37 a pose and 21 on the light tick), and every stage's `WindowTracker` writes ~18
   scalar features per player with a lock each, ~360 small writes a frame **(deduction)**. The fixes in view: one
   window buffer per stage holding all players, and fusing steps that run back to back (one smoother over several
@@ -69,7 +68,9 @@ Done: camera (14 Nov), render (its plan built and removed), hd_trio (G5). Held u
 
 A wait's timeout ends on Windows' 15.6 ms tick (CLAUDE.md, Time). Built: every loop on a deadline waits on a
 `utils.Waker`, a high-resolution waitable timer and an event waited on together (the recording player, `ArtNetBars`,
-the replay camera's tracklets, smile's camera, `InferenceFrameSync`, `RecordedPoses`). A 1 ms system tick
+`ArtNetSender`, `OscSender`, the replay camera's tracklets, smile's camera and clip cells, the Vimba camera's
+control loop, `InferenceFrameSync`, `RecordedPoses`; white_space's light clock to 1 ms before its deadline, then a
+spin, as LAYERS.md's *The light clock* measures). A 1 ms system tick
 (`timeBeginPeriod(1)`) was measured against it and not taken: Windows 11 drops it while the window is minimized.
 The high-resolution timer (`CREATE_WAITABLE_TIMER_HIGH_RESOLUTION`, Windows 10 1803 on) is not tied to the system
 tick; `time.sleep` uses it since Python 3.11, and on Linux a timed `threading.Event.wait` is already this precise
@@ -103,68 +104,7 @@ at most one tick late, every recorder together), white_space's motor sim (its fa
 `perf_counter`, so a late wait does not move them), smile's start loop (a 20 ms poll for loaded clips, at start-up
 only).
 
-- B1. The loops that wait for a moment without the Waker, in one commit **(their faults: deduction, from reading the
-  code)**:
-  - white_space's light clock (`apps/white_space/light/clock.py`) waits on a `utils.Waker` on its deadline grid,
-    instead of sleeping and then spinning its last millisecond (`_SPIN_MARGIN`). The Waker's steady lateness
-    (~0.4 ms) does not move the fixture's seam, only its jitter (~0.3 ms) does: about 3.5° at 1920 rpm
-    **(deduction)**. The light conductor's stop sets the clock's Waker, so a stop no longer waits a tick, and closes
-    it once its thread has ended. Its stale docstring (a 5 ms switch interval, the Conductor raising its
-    priority) goes. Checked by the clock's own readouts (`late_max_ms`, `min_fps`, `overruns`) in one white_space
-    `-sim` run, the spin then the Waker back to back: white_space runs without the rig, as its startup preset
-    (`public`) replays its recording on the host (`camera.simulator.replay`) **(seen in the preset and `main.py`)**.
-    C1 at the rig decides on the seam; the spin comes back if it is worse.
-  - smile's 48 clip cells (`apps/smile/player/clip_loader.py`, `_sleep_until`) wait for each frame's moment in 5 ms
-    sleeps on a `perf_counter` loop: a frame up to 5 ms late, 200 wakes a second per cell. One Waker per cell, on the
-    frame's deadline; stop sets it. Whether all cells run on one thread is a question in
-    [SMILE_PLAN.md](apps/smile/SMILE_PLAN.md).
-  - `inout.ArtNetSender` (smile's lights) sleeps one interval after each send, on no deadline, so it sends below its
-    `fps` by the send's time; `inout.OscSender` (smile's sound, the clip player's OSC) sleeps the interval less its
-    work, timed on `time.time()`, so a send comes up to a tick early or late. Both take `ArtNetBars`' fixed-rate
-    loop, copied: a `perf_counter` grid, a resync on a late tick, `set()` on stop. `OscSender.submit` of an event
-    address (`/bang`) sets the Waker, so it goes out at once. Every `time.time()` in `OscSender` goes to
-    `perf_counter`, `last_message_time` and the error log's included. `ArtNetSender.flash()` no longer sleeps under
-    its lock on the settings thread: the loop sends the flash frame on its next tick, and stop sends the flash and
-    the blackout from the loop's end.
-  - The Vimba camera (`modules/camera/vimba/camera.py`, `_stream`) takes the handler's frame on a 10 ms poll, so a
-    frame waits up to 10 ms. The frame handler, on Vimba's thread, copies, rotates and flips the frame, stamps it
-    with its arrival and calls the callbacks itself (CLAUDE.md: a producer calls its callbacks itself, with no
-    thread for dispatching); `_take_frame` and the frame hand-over go. The stream thread keeps only
-    `control.update` and the no-frame timeout, on a Waker with a slow deadline (about 100 ms) that stop sets.
-    CAMERA.md's *Vimba* says where the frame is handed over.
-  - gl's window manager: the sleep-and-spin branch of `_render_loop` goes, dead since nothing sets `frame_interval`
-    **(seen)**; nothing else in `window_manager.py` or `render_base.py` changes. GL_PLAN.md C builds the cap on the
-    Waker: the GL thread's word.
-
-  Checked by the tests of `inout`, the Vimba camera, smile and white_space's light, a new test of the light clock's
-  tick lateness on the PC, the white_space run above, and C1 at the rig. Of the documents only CAMERA.md speaks of
-  these loops **(seen, a grep of the .md files)**.
-
-- B2. The angles in one numpy pass. `AngleUtils.from_points` (`AngleExtractor`, twice a pose in every app) is a
-  Python loop over 9 angles, each with a validity test, three point-pair norms and the angle: ~0.2–0.3 ms a pose,
-  15–50 ms a second **(deduction)**. It computes the 9 angles with index arrays, with the same validity, scores and
-  mirroring. Tests first for what the pose tests do not cover: a head yaw, a too-close non-adjacent pair, the ±π
-  wrap. Checked by the pose tests, results equal to rounding. The comment's "4-point" head becomes 3-point. A
-  timing of `from_points` before and after, in a script without an app (a few thousand calls, mean per call), is
-  reported, not committed.
-
-- B3. OscSound's two bugs (`modules/inout/osc_sound.py`; deep_flow, hd_trio, low_flow, and white_space through
-  `OscSoundSender`), in one commit **(seen)**:
-  - The inactive reset (`_add_inactive_frame_messages`) sends 17 zeros on `/pose/{id}/angle/rad` and
-    `/pose/{id}/angle/vel`, the live message 9: the 17 is in the file's first commit (13b35596). The reset takes its
-    length from the feature, `len(AngleLandmark)` (9), the way `angle/sym` uses `AngleSymmetry.length()`, so Max
-    gets the length a live player sends.
-  - `/pose/{id}/similarity/motion` sends the plain `Similarity` row, the same as `/similarity/pose` and the deprecated
-    `/similarity`, while its comment says similarity × motion gate. It was `Similarity` × `MotionGate` (the gate on
-    `/similarity/gate`, both of the pair moving) from fc6d5435; 35f4e2f1 ("better fluid") dropped the product, with
-    no reason given. The comment is what is wrong: it says the address carries the same row as `/similarity/pose`.
-    The wire stays, as white_space's SOUND.md holds it until the installation is finished; the address goes with
-    that wire change. Gating it again would change what Max receives.
-
-  SOUND.md's two lines on these under *As the wire is now* and SIMILARITY.md's open item go in the same commit.
-  Checked by inout's tests.
-
-- B4. What holds the GIL on a hot path: one `py-spy record --gil` of each app over 30 s after 10 s warm-up (deep_flow,
+- B1. What holds the GIL on a hot path: one `py-spy record --gil` of each app over 30 s after 10 s warm-up (deep_flow,
   low_flow, hd_trio in `-sim`; white_space and smile as far as they run without the rig). Every function that holds
   the GIL more than 1% of the run becomes a step here (numpy, a shader, or off the hot path), each on Matthias's go. A
   thread busy in pure Python delays every other thread's wake by up to one 15.6 ms tick **(seen with the Waker and
@@ -182,6 +122,9 @@ only).
     tick: 5–20 ms a second.
   - `ArtNetBars._compute_frame`: a Python loop over the bar's pixels, four writes each, only on a settings change and
     the periodic resend: under 1 ms a second.
+  - The pose recorder's chunk (`modules/pose/recorder/frame_io.py`, `write_chunk`), on the recorder's thread at a
+    split and at stop: a Python loop over every buffered frame, up to 50,000 (`_MAX_BUFFER_FRAMES`), for each track
+    and each feature **(seen in the code; its GIL time: deduction)**.
 
   No Python loop over pixels, depth points or samples was found on a hot path: that work is numpy, cv2 and shaders.
 
@@ -207,7 +150,6 @@ only).
 ## The rules it touches
 
 - `CLAUDE.md` Project shape and Packages, what a package holds: A
-- `CLAUDE.md` Time, a thread that waits for a moment waits on a `utils.Waker`: B1
-- `CLAUDE.md` Concurrency, a producer calls its callbacks itself, with no thread for dispatching: B1
-- `CLAUDE.md` Concurrency, avoid heavy pure-Python loops in hot paths: B2, B4
+- `CLAUDE.md` Concurrency, work that numpy or the GPU does faster is not done in a Python loop; the loop holds the GIL
+  and delays every other thread: B1
 - `CLAUDE.md` Settings, settings connect the user and a component, not two components: Parked
