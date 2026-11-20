@@ -105,17 +105,11 @@ Checked by each package's tests; B5 also by one deep_flow `-sim` run, the trackl
 Every file outside the tests type-checks clean, fixed in CLAUDE.md's order (annotation, narrowing, `cast`,
 suppression last). Tests are not checked. Clean now: `modules/recording` (f9211f41), `modules/video`.
 
-The count (D1, 20 Nov, **seen**): `.venv/Scripts/python.exe -m pyright --pythonpath .venv/Scripts/python.exe`,
-24 s, 565 errors; the same with `.venv-oak4`, 20 s, 607 (the OAK-D backend fails there, depthai 3). 404 of the 565
-are in tests, 27 in the untracked `temp/`, so about 134 in the code. `pyproject.toml` leaves out `apps/deep_flow`,
-`apps/low_flow` and `modules/camera/oak4`.
+The count (D2, 20 Nov, **seen**): `.venv-oak4/Scripts/python.exe -m pyright` (`[tool.pyright]` names the venv,
+leaves out every `tests/`, `temp/` and `modules/camera/oak`), 14 s, 140 errors: flow 61, scripts 52, render 7,
+camera 5, panel 5, gl 4, deep_flow 3, hd_trio 1, white_space 1, settings 1. `.venv/Scripts/python.exe -m pyright -p
+pyright.oak.json` checks only `modules/camera/oak` in depthai 2: 1.2 s, 0 errors. Five files: 1.6 s.
 
-- D2. Pyright runs in `.venv-oak4`, the venv deep_flow, low_flow and `oak4` run in: `[tool.pyright]` names it
-  (`venvPath = "."`, `venv = ".venv-oak4"`), so Pylance and the command line check the same, and the command needs no
-  `--pythonpath`. It leaves out every `tests/` folder and `temp/`, checks deep_flow, low_flow and `oak4`, and leaves
-  out `modules/camera/oak`, the depthai 2 backend, which a second config at the root (`pyright.oak.json`, venv
-  `.venv`) checks alone. Then the count again per package, both commands, and the time of a run on a handful of
-  files. Checked by those runs.
 - D3. Each package's errors fixed, one commit per package, checked by pyright and the package's tests: `scripts`
   (with `velocity_peak_check.py`, which imports the removed `modules.flow.bridge_3d.velocity_peak`), smile,
   white_space, deep_flow, low_flow, hd_trio, then the modules in alphabetical order. The threads that own a package

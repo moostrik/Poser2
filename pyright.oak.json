@@ -1,0 +1,8 @@
+{
+    "typeCheckingMode": "basic",
+    "stubPath": "modules/inference/engine",
+    "venvPath": ".",
+    "venv": ".venv",
+    "include": ["modules/camera/oak"],
+    "exclude": ["**/__pycache__", "**/tests"]
+}
