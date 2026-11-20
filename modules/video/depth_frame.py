@@ -6,9 +6,10 @@ frame the largest error was 24 mm and frame-to-frame noise grew from 8.6 to 9.0 
 
 import numpy as np
 
-from .hardware import ClipCodec, Hardware, encoder_name
+from .hardware import ClipCodec, Hardware
 
-DEPTH_ENCODER: str = encoder_name(ClipCodec.HEVC, Hardware.iGPU)
+DEPTH_CODEC: ClipCodec = ClipCodec.HEVC
+DEPTH_HARDWARE: Hardware = Hardware.iGPU
 DEPTH_PIX_FMT: str = 'p012le'
 DEPTH_QUALITY: int = 10         # constant quality, `-q:v`
 DEPTH_STEP_MM: int = 3

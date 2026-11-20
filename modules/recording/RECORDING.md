@@ -52,12 +52,12 @@ another player shows the rest a frame early **(deduction)**, while ours plays th
 With depth asked for, `MP4` records color and warns once. A clip without its `.jsonl`, the layout of the older
 recordings, plays at `fps`, its frames as stored (`flip_h` False). An `MKV` chunk holds:
 
-| Stream / part | Holds                                                                                   |
-|---------------|-----------------------------------------------------------------------------------------|
-| stream 0      | color, the camera's encoder (`video_encoder`, `video_codec`)                            |
-| stream 1      | depth when recorded, uint16 mm, `DEPTH_ENCODER`, the same `keyframe_interval`           |
-| tags          | the info line's values                                                                  |
-| attachment    | the metadata, one JSON line each (`.jsonl`)                                             |
+| Stream / part | Holds                                                                                           |
+|---------------|-------------------------------------------------------------------------------------------------|
+| stream 0      | color, the camera's encoder (`video_encoder`, `video_codec`)                                    |
+| stream 1      | depth when recorded, uint16 mm, `DEPTH_CODEC` on `DEPTH_HARDWARE`, the same `keyframe_interval` |
+| tags          | the info line's values                                                                          |
+| attachment    | the metadata, one JSON line each (`.jsonl`)                                                     |
 
 The metadata, attached or beside, is the same lines:
 

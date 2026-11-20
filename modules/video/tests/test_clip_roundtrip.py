@@ -34,7 +34,7 @@ class TestClipRoundTrip(unittest.TestCase):
     def _roundtrip(self, encoder: video.Hardware) -> None:
         with tempfile.TemporaryDirectory() as folder:
             path = os.path.join(folder, 'clip.mp4')
-            writer = video.ClipWriter(path, FPS, encoder)
+            writer = video.ClipWriter(path, FPS, video.h264_encode(encoder))
             for i in range(FRAMES):
                 writer.add(synthetic_frame(i))
             self.assertTrue(writer.close())
@@ -51,7 +51,7 @@ class TestClipRoundTrip(unittest.TestCase):
     def test_odd_size_is_cropped_to_even(self):
         with tempfile.TemporaryDirectory() as folder:
             path = os.path.join(folder, 'odd.mp4')
-            writer = video.ClipWriter(path, 15.0, video.Hardware.CPU)
+            writer = video.ClipWriter(path, 15.0, video.h264_encode(video.Hardware.CPU))
             writer.add(np.full((33, 65, 3), 128, np.uint8))
             self.assertTrue(writer.close())
             probed = video.probe(path)
@@ -59,7 +59,7 @@ class TestClipRoundTrip(unittest.TestCase):
 
     def test_size_change_raises(self):
         with tempfile.TemporaryDirectory() as folder:
-            writer = video.ClipWriter(os.path.join(folder, 'size.mp4'), 15.0, video.Hardware.CPU)
+            writer = video.ClipWriter(os.path.join(folder, 'size.mp4'), 15.0, video.h264_encode(video.Hardware.CPU))
             writer.add(np.zeros((64, 64, 3), np.uint8))
             with self.assertRaises(ValueError):
                 writer.add(np.zeros((32, 64, 3), np.uint8))

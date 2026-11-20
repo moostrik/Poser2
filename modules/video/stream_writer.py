@@ -1,4 +1,4 @@
-"""One ffmpeg encoder process fed raw frames from a queue: the writer of one camera recording stream.
+"""A ClipWriter fed raw frames from a queue on its own thread: the writer of one camera recording stream.
 
 It writes every frame it is given, in order: a stream of a recording must hold every frame its other streams and its
 metadata hold, so whatever is dropped is dropped whole, by the recorder, before any part of it is written. The bytes
@@ -10,24 +10,27 @@ from threading import Lock, Thread
 from queue import Empty, Queue
 from time import sleep
 
-import ffmpeg
 import numpy as np
 
+from .clip_writer import ClipInput, ClipWriter, stream_encode
 from .depth_frame import DEPTH_PIX_FMT, DEPTH_QUALITY, depth_to_p012
+from .hardware import ClipCodec, Hardware
 
 logger = logging.getLogger(__name__)
 
 
 class StreamWriter:
-    def __init__(self, vcodec: str, keyframe_interval: int = 0, quality: int = 0) -> None:
-        """``quality``: the encoder's constant quality, lower is better; 0 is its default."""
+    def __init__(self, codec: ClipCodec, hardware: Hardware, keyframe_interval: int = 0, quality: int = 0) -> None:
+        """``codec`` on ``hardware``; ``quality``: the encoder's constant quality, lower is better; 0 is its default.
+        Depth takes its own quality and no B-frames."""
         self.output_file: str = ''
         self.fps: float = 30.0
         self.is_recording: bool = False
         self.is_receiving: bool = False
         self.frames: Queue[tuple[np.ndarray, bool]] = Queue()
         self.thread: Thread | None = None
-        self.vcodec: str = vcodec
+        self.codec: ClipCodec = codec
+        self.hardware: Hardware = hardware
         self.keyframe_interval: int = keyframe_interval
         self.quality: int = quality
         self._lock: Lock = Lock()
@@ -91,7 +94,7 @@ class StreamWriter:
         self.frames.put((frame, nv12))
 
     def _record(self) -> None:
-        process = None
+        writer: ClipWriter | None = None
         try:
             while self.is_recording:
                 try:
@@ -102,46 +105,32 @@ class StreamWriter:
                     self._queued_bytes -= frame.nbytes
 
                 depth: bool = frame.dtype == np.uint16
-                if process is None:
-                    process = self._open(frame, nv12, depth)
+                if writer is None:
+                    writer = self._open(frame, nv12, depth)
                 if depth:
-                    process.stdin.write(depth_to_p012(frame))
+                    height, width = frame.shape
+                    writer.add(np.frombuffer(depth_to_p012(frame), np.uint16).reshape(height * 3 // 2, width))
                 else:
-                    process.stdin.write(np.ascontiguousarray(frame, dtype=np.uint8).data)   # the frame's own buffer when it is uint8 and contiguous
+                    writer.add(np.ascontiguousarray(frame, dtype=np.uint8))
+                if writer.failed:
+                    raise OSError('the encoder died')
         except (OSError, ValueError) as e:
             self._failed = True
             self.is_receiving = False
             logger.error('Encoder of %s ended: %s; the stream is dropped from here', self.output_file, e)
             self._clear()
         finally:
-            if process is not None:
-                try:
-                    process.stdin.close()
-                except OSError:
-                    pass
-                process.wait()
+            if writer is not None:
+                writer.close()
 
-    def _open(self, frame: np.ndarray, nv12: bool, depth: bool):
-        width: int = frame.shape[1]
-        height: int = frame.shape[0] * 2 // 3 if nv12 else frame.shape[0]
-        pix_fmt: str = DEPTH_PIX_FMT if depth else 'nv12' if nv12 else 'gray' if len(frame.shape) == 2 else 'bgr24'
-        output_kwargs = dict(pix_fmt=DEPTH_PIX_FMT if depth else 'yuv420p', vcodec=self.vcodec, r=self.fps)
-        if depth:
-            output_kwargs['q:v'] = DEPTH_QUALITY
-            output_kwargs['bf'] = 0     # measured: with B-frames a seek in a merged chunk gave depth about 100 mm off, why is not settled
-        elif self.quality > 0:
-            output_kwargs['q:v'] = self.quality
-        if self.keyframe_interval > 0:
-            output_kwargs['g'] = self.keyframe_interval          # GOP size
-            output_kwargs['keyint_min'] = self.keyframe_interval  # force exact spacing (no early IDR skip)
-        return (
-            ffmpeg
-            .input('pipe:', format='rawvideo', pix_fmt=pix_fmt, s=f'{width}x{height}', r=self.fps)
-            .output(self.output_file, **output_kwargs)
-            .overwrite_output()
-            .global_args('-loglevel', 'quiet')
-            .run_async(pipe_stdin=True)
-        )
+    def _open(self, frame: np.ndarray, nv12: bool, depth: bool) -> ClipWriter:
+        clip_input: ClipInput = (ClipInput.P012 if depth else ClipInput.NV12 if nv12
+                                 else ClipInput.GRAY if frame.ndim == 2 else ClipInput.BGR24)
+        encode: list[str] = stream_encode(self.codec, self.hardware, DEPTH_PIX_FMT if depth else 'yuv420p',
+                                          DEPTH_QUALITY if depth else self.quality, self.keyframe_interval,
+                                          b_frames=not depth)   # measured: with B-frames a seek in a merged chunk gave
+                                                                # depth about 100 mm off, why is not settled
+        return ClipWriter(self.output_file, self.fps, encode, clip_input)
 
     def _clear(self) -> None:
         while True:

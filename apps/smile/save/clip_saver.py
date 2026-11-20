@@ -141,7 +141,7 @@ class ClipSaver:
                         self._finish(id, style, writer, keep=False)
                     id = command[1]
                     style = command[3]
-                    writer = video.ClipWriter(self._temp_path(id, '.mp4'), command[2], self.encoder)
+                    writer = video.ClipWriter(self._temp_path(id, '.mp4'), command[2], video.h264_encode(self.encoder))
                     self._share = None
                 elif writer is None:
                     continue

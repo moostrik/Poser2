@@ -1,8 +1,10 @@
-"""ClipWriter: raw frames piped into one ffmpeg encoder process, written to an mp4."""
+"""ClipWriter: raw frames piped into one ffmpeg encoder process, written to a file, and the encodes it is given: h264
+for a clip, an HEVC master, a camera recording's stream."""
 
 import logging
 import os
 import subprocess
+import threading
 from enum import Enum
 from typing import BinaryIO
 
@@ -21,63 +23,84 @@ MAX_COMMENT: int = 30000    # characters; a Windows command line holds 32767
 class ClipInput(Enum):
     """The pixel format of the frames a ClipWriter is given."""
     BGR24   = 'bgr24'       # (height, width, 3) uint8
-    NV12    = 'nv12'        # (height × 3/2, width) uint8: Y, then Cb Cr at half size; BT.709 video range
-    YUV444P = 'yuv444p'     # (height × 3, width) uint8: Y, Cb and Cr planes at full size; BT.709 video range
+    GRAY    = 'gray'        # (height, width) uint8
+    NV12    = 'nv12'        # (height × 3/2, width) uint8: Y, then Cb Cr at half size
+    YUV444P = 'yuv444p'     # (height × 3, width) uint8: Y, Cb and Cr planes at full size
     P010    = 'p010le'      # as NV12 in uint16, 10 bits in the high bits
+    P012    = 'p012le'      # as NV12 in uint16, 12 bits in the high bits: a camera's depth (depth_frame.py)
     XV30    = 'xv30le'      # (height, width) uint32: Cb, Y, Cr in bits 0-9, 10-19, 20-29; 4:4:4 at 10 bits
 
 
-# the rows a YUV input's array holds per picture row, its sample type, and what hevc_nvenc is given: xv30le is
-# unpacked by ffmpeg to 16-bit planes on the CPU, which costs only the encode's time
+# the rows a YUV input's array holds per picture row, and its sample type
 _YUV_ROWS: dict[ClipInput, float] = {ClipInput.NV12: 1.5, ClipInput.YUV444P: 3.0, ClipInput.P010: 1.5,
-                                     ClipInput.XV30: 1.0}
+                                     ClipInput.P012: 1.5, ClipInput.XV30: 1.0}
 _YUV_DTYPE: dict[ClipInput, type[np.unsignedinteger]] = {ClipInput.NV12: np.uint8, ClipInput.YUV444P: np.uint8,
-                                                        ClipInput.P010: np.uint16, ClipInput.XV30: np.uint32}
-_HEVC_PIX_FMT: dict[ClipInput, str] = {ClipInput.NV12: 'nv12', ClipInput.YUV444P: 'yuv444p', ClipInput.P010: 'p010le',
-                                       ClipInput.XV30: 'yuv444p16le'}
+                                                        ClipInput.P010: np.uint16, ClipInput.P012: np.uint16,
+                                                        ClipInput.XV30: np.uint32}
+# what hevc_nvenc is given for an input: xv30le is unpacked by ffmpeg to 16-bit planes on the CPU, which costs only
+# the encode's time
+_MASTER_PIX_FMT: dict[ClipInput, str] = {ClipInput.NV12: 'nv12', ClipInput.YUV444P: 'yuv444p',
+                                         ClipInput.P010: 'p010le', ClipInput.XV30: 'yuv444p16le'}
 
 
 HEVC_QUALITY: int = 18      # NVENC constant quality, lower is better
 
 
-def _hevc_args(quality: int) -> list[str]:
-    """hevc_nvenc at constant quality, its slowest preset with a full-resolution second pass and spatial and temporal
-    adaptive quantization: the encode runs after a take, so its time goes to quality. Tagged hvc1 so Windows and
-    QuickTime play it."""
-    return ['-c:v', 'hevc_nvenc', '-preset', 'p7', '-tune', 'hq', '-multipass', 'fullres', '-rc', 'vbr',
-            '-cq', str(quality), '-b:v', '0', '-spatial-aq', '1', '-temporal-aq', '1', '-tag:v', 'hvc1']
+# THE ENCODES: ffmpeg's output options, from the codec to the pixel format it is given
+
+def h264_encode(hardware: Hardware) -> list[str]:
+    """h264 on `hardware` (not AUTO) at its own constant quality."""
+    quality, pix_fmt = H264_OPTIONS[hardware]
+    return ['-c:v', encoder_name(ClipCodec.H264, hardware), *quality, '-pix_fmt', pix_fmt]
 
 
-# what a YUV input is, told to the file: BT.709 in video range
-_BT709_TAGS: list[str] = ['-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709',
-                          '-color_range', 'tv']
+def master_encode(clip_input: ClipInput, quality: int = HEVC_QUALITY) -> list[str]:
+    """HEVC on the GPU at constant quality `quality`, from YUV planes in BT.709 video range: the slowest preset with a
+    full-resolution second pass and spatial and temporal adaptive quantization, as the encode runs after a take and
+    its time goes to quality. Tagged hvc1 so Windows and QuickTime play it, and told it is BT.709 video range."""
+    return ['-c:v', encoder_name(ClipCodec.HEVC, Hardware.GPU), '-preset', 'p7', '-tune', 'hq', '-multipass',
+            'fullres', '-rc', 'vbr', '-cq', str(quality), '-b:v', '0', '-spatial-aq', '1', '-temporal-aq', '1',
+            '-tag:v', 'hvc1', '-pix_fmt', _MASTER_PIX_FMT[clip_input],
+            '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv']
+
+
+def stream_encode(codec: ClipCodec, hardware: Hardware, pix_fmt: str, quality: int = 0, keyframe_interval: int = 0,
+                  b_frames: bool = True) -> list[str]:
+    """A camera recording's stream, encoded live: `codec` on `hardware` (not AUTO) into `pix_fmt`, at the encoder's
+    constant quality `quality` (0: its default), a keyframe every `keyframe_interval` frames exactly (0: as the encoder
+    likes), and without B-frames when asked."""
+    args = ['-c:v', encoder_name(codec, hardware), '-pix_fmt', pix_fmt]
+    if quality > 0:
+        args += ['-q:v', str(quality)]
+    if not b_frames:
+        args += ['-bf', '0']
+    if keyframe_interval > 0:
+        args += ['-g', str(keyframe_interval), '-keyint_min', str(keyframe_interval)]     # no early keyframes
+    return args
 
 
 class ClipWriter:
-    """Writes frames of one size to an mp4: bgr24 or a YUV input in, h264 on `hardware` or HEVC on the GPU out, through
-    a pipe of `PIPE_SIZE`; the process starts with the first frame. comment, set before that frame, goes into the
-    file's comment tag."""
+    """Writes frames of one size and pixel format (`clip_input`) to a file with the output options `encode`, through a
+    pipe of `PIPE_SIZE`; the process starts with the first frame, and its error lines are read while it writes.
+    comment, set before that frame, goes into the file's comment tag."""
 
-    def __init__(self, path: str, fps: float, hardware: Hardware, clip_input: ClipInput = ClipInput.BGR24,
-                 codec: ClipCodec = ClipCodec.H264, quality: int = HEVC_QUALITY) -> None:
-        """`quality` is the HEVC constant quality; the h264 encoders keep their own."""
-        if codec == ClipCodec.HEVC and hardware != Hardware.GPU:
-            raise ValueError(f'HEVC is written on the GPU only, not on {hardware.value}')
+    def __init__(self, path: str, fps: float, encode: list[str], clip_input: ClipInput = ClipInput.BGR24) -> None:
         self.path: str = path
         self.fps: float = fps
-        self.hardware: Hardware = hardware
+        self.encode: list[str] = encode
         self.clip_input: ClipInput = clip_input
-        self.codec: ClipCodec = codec
-        self.quality: int = quality
         self.comment: str = ''
         self.frames: int = 0
         self.failed: bool = False
         self._size: tuple[int, int] = (0, 0)
         self._process: subprocess.Popen | None = None
         self._stdin: BinaryIO | None = None
+        self._errors: list[bytes] = []
+        self._error_reader: threading.Thread | None = None
 
     def _frame_size(self, image: np.ndarray) -> tuple[int, int]:
-        """(width, height) of the picture in `image`; bgr24 is cropped to even, a YUV input must be even already."""
+        """(width, height) of the picture in `image`; bgr24 and gray are cropped to even, a YUV input must be even
+        already."""
         rows = _YUV_ROWS.get(self.clip_input)
         if rows is not None:
             width, height = image.shape[1], round(image.shape[0] / rows)
@@ -120,22 +143,20 @@ class ClipWriter:
             logger.warning('Comment of %s is too long (%d characters), left out', self.path, len(self.comment))
         elif self.comment:
             metadata = ['-metadata', f'comment={self.comment}']
-        if self.codec == ClipCodec.HEVC:
-            pix_fmt = _HEVC_PIX_FMT.get(self.clip_input, 'nv12')
-            output = [*_hevc_args(self.quality), '-pix_fmt', pix_fmt]
-        else:
-            codec = encoder_name(ClipCodec.H264, self.hardware)
-            quality, pix_fmt = H264_OPTIONS[self.hardware]
-            output = ['-c:v', codec, *quality, '-pix_fmt', pix_fmt]
-        tags = _BT709_TAGS if self.clip_input in _YUV_ROWS else []
         args = ['-y', '-f', 'rawvideo', '-pix_fmt', self.clip_input.value, '-s', f'{width}x{height}',
-                '-r', f'{self.fps:g}', '-i', 'pipe:0', *output, *tags, *metadata, self.path]
+                '-r', f'{self.fps:g}', '-i', 'pipe:0', *self.encode, *metadata, self.path]
         read_fd, write_fd = pipe()
         try:
             self._process = popen(args, read_fd, subprocess.DEVNULL)
         finally:
             os.close(read_fd)       # the child has its own copy; ours must close for its read to reach the end
         self._stdin = os.fdopen(write_fd, 'wb', buffering=0)
+        stderr = self._process.stderr
+        assert stderr is not None
+        # read while the frames go in: an encoder that writes a line per frame would fill its pipe and stop
+        self._error_reader = threading.Thread(target=lambda: self._errors.append(stderr.read()),
+                                              name='ffmpeg errors', daemon=True)
+        self._error_reader.start()
 
     def _end(self, timeout: float) -> str:
         """Close the pipe and wait for ffmpeg; its error output. Kills it after `timeout` s."""
@@ -149,15 +170,17 @@ class ClipWriter:
         if process is None:
             return ''
         try:
-            _, err = process.communicate(timeout=timeout)       # waits for the moov atom
+            process.wait(timeout=timeout)       # waits for the moov atom
         except subprocess.TimeoutExpired:
             process.kill()
-            process.communicate()
+            process.wait()
             self.failed = True
             return 'did not finish, killed'
+        if self._error_reader is not None:
+            self._error_reader.join(timeout=5)
         if process.returncode != 0:
             self.failed = True
-        return error_text(err)
+        return error_text(b''.join(self._errors))
 
     def close(self) -> bool:
         """Finish the file. True when it is complete and has frames."""

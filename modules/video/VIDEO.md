@@ -17,6 +17,13 @@ decoded a recording's chunk (2999 frames, 992 × 800 H.264) on the iGPU in 6.3 s
 2026-11-20)**. A camera recording's color part is an `.mkv` whatever its codec: a raw `.hevc` has no timestamps, and
 the merge into the chunk refuses it.
 
+Every file is written by `ClipWriter`: raw frames of one pixel format (`ClipInput`) through the 8 MB pipe into one
+ffmpeg process, its error lines read while it writes, with the output options of one encode: `h264_encode` (smile's
+clips), `master_encode` (the screen recorder's HEVC master, below) or `stream_encode` (a camera recording's stream,
+live: the codec on its chip, its constant quality, an exact keyframe interval, no B-frames for depth).
+`StreamWriter` feeds one from a queue on its own thread: color as BGR, NV12 or gray, depth as P012. The chip each
+writer encodes on is its own, so the camera records on the iGPU while the screen recorder encodes on the GPU.
+
 A camera recording's stream is read by `StreamReader`: one decoder started with `popen`, its frames
 through the 8 MB pipe, its error lines logged. In deep_flow `-sim` (20261112-130105_show, 50 fps) the reader hands
 over a frame every 19.99 ms on average, p95 31.8 ms, as it did through the default pipe **(measured 2026-11-20)**.
@@ -200,7 +207,7 @@ as the take needs.
 ### Encode, on the recorder's thread
 
 - One ffmpeg process takes the raw planes on stdin (`ClipWriter` with `ClipInput.YUV444P`, `NV12`, `XV30` or
-  `P010`, `ClipCodec.HEVC`) through a pipe of 8 MB (`PIPE_SIZE`; Windows' default pipe takes 4 KB a write):
+  `P010`, and `master_encode`) through a pipe of 8 MB (`PIPE_SIZE`; Windows' default pipe takes 4 KB a write):
   `hevc_nvenc -preset p7 -tune hq -multipass fullres -rc vbr -cq <quality> -b:v 0 -spatial-aq 1 -temporal-aq 1`,
   tagged BT.709 video range and `hvc1`, so Windows and QuickTime play the 4:2:0 files. The encode runs after a take,
   so its time goes to quality: the slowest preset, a full-resolution second pass, and the bits put where the eye

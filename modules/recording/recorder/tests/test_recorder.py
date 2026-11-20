@@ -62,10 +62,10 @@ class QueueTest(unittest.TestCase):
 
 class WriterTest(unittest.TestCase):
     def test_a_dead_encoder_ends_the_writer_and_stop_returns(self) -> None:
-        writer = video.StreamWriter('no_such_encoder_xyz')
+        writer = video.StreamWriter(video.ClipCodec.H264, video.Hardware.CPU)
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
             with self.assertLogs('modules.video.stream_writer', 'ERROR'):
-                writer.start(str(Path(folder) / 'out.mp4'), 30.0)
+                writer.start(str(Path(folder) / 'no_such_folder' / 'out.mp4'), 30.0)      # ffmpeg cannot open it
                 deadline = time.perf_counter() + 10.0
                 while not writer.failed and time.perf_counter() < deadline:
                     writer.submit_frame(np.zeros((48, 64, 3), np.uint8))
@@ -75,7 +75,7 @@ class WriterTest(unittest.TestCase):
             self.assertFalse(writer.thread is not None and writer.thread.is_alive())
 
     def test_a_stop_right_after_the_start_ends_the_writer(self) -> None:
-        writer = video.StreamWriter('libx264')
+        writer = video.StreamWriter(video.ClipCodec.H264, video.Hardware.CPU)
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
             writer.start(str(Path(folder) / 'out.mp4'), 30.0)
             writer.stop()

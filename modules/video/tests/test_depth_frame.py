@@ -9,7 +9,7 @@ import numpy as np
 
 from modules import video
 from modules.video import StreamReader, StreamWriter, depth_frame_bytes, depth_to_p012, p012_to_depth
-from modules.video.depth_frame import DEPTH_ENCODER, DEPTH_STEP_MM
+from modules.video.depth_frame import DEPTH_CODEC, DEPTH_HARDWARE, DEPTH_STEP_MM
 
 
 class PackingTest(unittest.TestCase):
@@ -38,7 +38,7 @@ class RoundTripTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'depth.mkv'
-            writer = StreamWriter(DEPTH_ENCODER, 1)
+            writer = StreamWriter(DEPTH_CODEC, DEPTH_HARDWARE, 1)
             writer.start(str(path), 60.0)
             time.sleep(0.05)
             for frame in frames:

@@ -28,11 +28,6 @@ The target: one place starts ffmpeg and ffprobe, with one set of names. Each ste
 repository working; its own tests run with it. The runs in an app (the player's timing, a recording, the live run) and
 the depthai 2 venv's tests run once, after the last step.
 
-- A5. One writer: `StreamWriter` keeps its queue, thread and split, and writes through `ClipWriter`, which takes gray,
-  depth (P012) and color input, a keyframe interval, no B-frames on request, and HEVC on QSV; errors are logged.
-  ffmpeg-python leaves `pyproject.toml`; pyright passes on both stream files. Each writer keeps its own hardware, so
-  the camera records on the iGPU while the screen recorder encodes on the GPU. VIDEO.md. Check: the recording round
-  trip with depth and a gray stream.
 - A6. deep_flow's color in HEVC (CAMERA_PLAN.md A4's writer side, after the camera plan's A1): deep_flow's presets
   from H.264 to HEVC on the iGPU, `MP4` staying H.264. The confidence stream's writer is A5's; the camera plan wires
   it. OAK4.md's recording section. Check: the seek check and the encoder load run again.
@@ -53,9 +48,6 @@ Assumed: hevc_qsv takes nv12, p010 and p012, not gray, so ffmpeg turns the confi
 
 ## The rules it touches
 
-- Remove obsolete pathways instead of leaving parallel ones: A5
 - Read `time.perf_counter()` for every stamp and duration: A7
 - Keep presets in sync with code changes: A6
-- Log exceptions with context; never fail silently: A5
-- Fix a type error at its cause: A5
 - A document describes what is built: every step

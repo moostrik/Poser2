@@ -31,7 +31,7 @@ from typing import Any, TextIO
 from modules.camera import CameraFrame, CameraTracklets, FrameType, mirrored_alignment, mirrored_image, mirrored_intrinsics, \
     mirrored_tracklets
 from modules.settings import BaseSettings, Field, Widget
-from modules.video import ClipCodec, DEPTH_ENCODER, Hardware, encoder_name, StreamWriter
+from modules.video import ClipCodec, DEPTH_CODEC, DEPTH_HARDWARE, Hardware, StreamWriter
 
 from ..container import DEPTH_SUFFIX, METADATA_LABEL, METADATA_SUFFIX, ChunkInfo, Container, FrameMetadata, finish_unmerged, \
     frame_line, info_line, keep_chunk, make_chunk_name, make_file_name, make_folder_name, merge_chunk
@@ -135,8 +135,9 @@ class Recorder(Thread):
             self.recorders[c] = {}
             self.frames[c] = Queue()
             for t in self.types:
-                vcodec: str = DEPTH_ENCODER if t == FrameType.DEPTH else encoder_name(settings.video_codec, settings.video_encoder)
-                self.recorders[c][t] = StreamWriter(vcodec, settings.keyframe_interval, settings.video_quality)
+                codec, hardware = ((DEPTH_CODEC, DEPTH_HARDWARE) if t == FrameType.DEPTH
+                                   else (settings.video_codec, settings.video_encoder))
+                self.recorders[c][t] = StreamWriter(codec, hardware, settings.keyframe_interval, settings.video_quality)
 
         if self.with_depth and settings.keyframe_interval <= 0:
             logger.warning("keyframe_interval 0 with depth: each encoder picks its own keyframes, so seeking will show the wrong depth")
