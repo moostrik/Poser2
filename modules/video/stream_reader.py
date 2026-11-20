@@ -2,7 +2,9 @@
 on `perf_counter` and handing each frame to a callback with its index. It paces on its own at `fps`
 from its start, or on a `FrameSchedule` it is given, which several readers can share."""
 
-import ffmpeg
+import io
+import os
+import subprocess
 import numpy as np
 from threading import Thread, Event, Lock
 from typing import Callable, Protocol
@@ -10,6 +12,7 @@ import time
 
 from .depth_frame import DEPTH_PIX_FMT, depth_frame_bytes, p012_to_depth
 from .probe import probe
+from .process import big_pipe, popen
 
 import logging
 logger = logging.getLogger(__name__)
@@ -54,7 +57,8 @@ class StreamReader:
         self.hwaccel: str = hwaccel
         self.hwaccel_device: str = hwaccel_device
 
-        self.ffmpeg_process = None
+        self.ffmpeg_process: subprocess.Popen | None = None
+        self._frames_in: io.FileIO | None = None     # the decoder's frames, through the 8 MB pipe
         self.bytes_per_frame: int = 0
         self.frame_width: int = 0
         self.frame_height: int = 0
@@ -126,7 +130,7 @@ class StreamReader:
             if self.fps == 0.0:
                 self.fps = fps
             # Half a frame early: the seek takes the first frame at or after it, and stamps are rounded.
-            seek: dict[str, float] = {'ss': (start_frame - 0.5) / fps} if start_frame > 0 else {}
+            seek: list[str] = ['-ss', f'{(start_frame - 0.5) / fps}'] if start_frame > 0 else []
         except Exception as e:
             logger.error('Error getting video dimensions of %s: %s', video_file, e)
             self.ffmpeg_process = None
@@ -138,40 +142,68 @@ class StreamReader:
                                      else self.frame_width * self.frame_height * 3 // 2 if self.nv12
                                      else self.frame_width * self.frame_height * self.channels)
 
-        ffmpeg_process = None
+        hardware: list[str] = [] if self.hwaccel == '' or self.hwaccel_device == '' else \
+            ['-hwaccel', self.hwaccel, '-hwaccel_device', self.hwaccel_device]
+        args: list[str] = ['-nostdin', *seek, *hardware, '-i', video_file, '-map', f'0:v:{self.stream}',
+                           '-f', 'rawvideo', '-pix_fmt', pix_fmt, 'pipe:1']
+        ffmpeg_process: subprocess.Popen | None = None
+        frames_in: io.FileIO | None = None
         try:
-            hardware: dict[str, str] = {} if self.hwaccel == '' or self.hwaccel_device == '' else \
-                {'hwaccel': self.hwaccel, 'hwaccel_device': self.hwaccel_device}
-            ffmpeg_process = (
-                ffmpeg
-                .input(video_file, **seek, **hardware)[f'v:{self.stream}']
-                .output('pipe:', format='rawvideo', pix_fmt=pix_fmt)
-                .global_args('-loglevel', 'quiet')
-                .run_async(pipe_stdout=True)
-            )
-
-        except ffmpeg.Error as e:
+            frames_in, write_fd = big_pipe()
+            try:
+                ffmpeg_process = popen(args, subprocess.DEVNULL, write_fd)
+            finally:
+                os.close(write_fd)      # the child has its own copy; ours must close for the read to reach the end
+            Thread(target=self._log_errors, args=(ffmpeg_process, video_file), name='StreamReader errors',
+                   daemon=True).start()
+        except OSError as e:
             logger.error('Error loading %s: %s', video_file, e)
-            self.ffmpeg_process = None
+            if frames_in is not None:
+                frames_in.close()
+            ffmpeg_process, frames_in = None, None
 
         with self._load_lock:
             self.ffmpeg_process = ffmpeg_process
+            self._frames_in = frames_in
             self.chunk_id = chunk_id
             self.start_frame = start_frame
             self.end_frame = end_frame
         if self.stop_event.is_set():
             self._close()
 
+    def _log_errors(self, process: subprocess.Popen, video_file: str) -> None:
+        """ffmpeg's error lines, read as they come so its pipe never fills, and logged unless the reader was
+        stopped (an ended decoder may say so)."""
+        assert process.stderr is not None
+        for line in process.stderr:
+            if not self.stop_event.is_set():
+                logger.error('Decoder of %s: %s', video_file, line.decode(errors='replace').strip())
+
     def _close(self) -> None:
         with self._load_lock:
             process, self.ffmpeg_process = self.ffmpeg_process, None
+            frames_in, self._frames_in = self._frames_in, None
         if process is not None:
-            process.stdout.close()
             process.terminate()
             process.wait()
+        if frames_in is not None:
+            frames_in.close()
+
+    @staticmethod
+    def _read_frame(frames_in: io.FileIO, frame: bytearray) -> bool:
+        """Fill `frame` from the pipe, which hands over what it holds per read; False at the stream's end."""
+        view = memoryview(frame)
+        got = 0
+        while got < len(view):
+            n = frames_in.readinto(view[got:])
+            if not n:
+                return False
+            got += n
+        return True
 
     def _play(self) -> None:
-        if self.ffmpeg_process is None:
+        frames_in = self._frames_in
+        if self.ffmpeg_process is None or frames_in is None:
             logger.warning('video not loaded')
             return
         frame_interval: float = 1.0 / self.fps
@@ -188,9 +220,9 @@ class StreamReader:
             try:
                 # A bytearray, not bytes: an array over bytes is read-only, and torch warns on it
                 in_bytes = bytearray(self.bytes_per_frame)
-                if self.ffmpeg_process.stdout.readinto(in_bytes) < self.bytes_per_frame:
+                if not self._read_frame(frames_in, in_bytes):
                     break       # the stream's end, or its decoder ended by `stop`
-            except (ffmpeg.Error, OSError, ValueError) as e:
+            except (OSError, ValueError) as e:
                 if not self.stop_event.is_set():
                     logger.error('Error reading frame: %s', e)
                 break

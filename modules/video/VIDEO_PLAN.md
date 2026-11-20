@@ -26,15 +26,8 @@ The package runs ffmpeg two ways, and names the same hardware two ways. What the
 
 The target: one place starts ffmpeg and ffprobe, with one set of names. Each step is one commit and leaves the
 repository working; its own tests run with it. The runs in an app (the player's timing, a recording, the live run) and
-the depthai 2 venv's tests run once, after the last step, except where a step changes the real-time path (A3).
+the depthai 2 venv's tests run once, after the last step.
 
-- A2. One probe: any stream's size, fps, exact frame count (stored, else packets counted) and comment. `probe`,
-  `read_comment`, `StreamReader.frame_count` and the reader's `_get_video_dimensions` become it; the recording tests'
-  helpers, the seek test's packet listing included, start ffprobe through the process file. VIDEO.md. Check: video,
-  recording and smile tests.
-- A3. The player's decoder: `StreamReader` starts its decoder through the process file on the 8 MB pipe, the same
-  seek, hardware decode, stream and pixel format as now. VIDEO.md. Check: tests; one deep_flow `-sim` run on one
-  recording before and after: the player's frame interval (mean, p95) and late frames.
 - A4. One set of names: one hardware enum (CPU, iGPU, GPU), the chip, used to encode and to decode, with `ClipCodec`
   beside it; the encoder (h264_qsv, hevc_nvenc…) and the hardware decode follow from chip and codec in code. Smile's
   `AUTO` stays an encoder choice on top. `codec.py` goes, and the fixed `DEPTH_ENCODER` comes from the same table.
@@ -64,7 +57,7 @@ Assumed: hevc_qsv takes nv12, p010 and p012, not gray, so ffmpeg turns the confi
 
 ## The rules it touches
 
-- Remove obsolete pathways instead of leaving parallel ones: A3, A5
+- Remove obsolete pathways instead of leaving parallel ones: A5
 - Name a concept after what it is in the domain; no synonyms, rename everywhere: A4
 - Keep presets in sync with code changes: A4, A6
 - Log exceptions with context; never fail silently: A5

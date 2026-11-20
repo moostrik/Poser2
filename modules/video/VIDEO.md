@@ -8,7 +8,9 @@ clip decode (`clip_decode.py`), audio (`audio.py`) and the share clip (`share.py
 
 `probe` is the one question to ffprobe: a video stream's size, frame rate and exact frame count (the count an mp4
 stores, else the packets counted, which reads an mkv or a raw stream without decoding it) and the clip's comment
-(`StreamInfo`).
+(`StreamInfo`). A camera recording's stream is read by `StreamReader`: one decoder started with `popen`, its frames
+through the 8 MB pipe, its error lines logged. In deep_flow `-sim` (20261112-130105_show, 50 fps) the reader hands
+over a frame every 19.99 ms on average, p95 31.8 ms, as it did through the default pipe **(measured 2026-11-20)**.
 
 ## Screen recorder
 
