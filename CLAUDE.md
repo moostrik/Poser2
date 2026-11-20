@@ -154,7 +154,7 @@ python -m unittest discover -s modules/<pkg>/tests -t .    # camera/oak4 in .ven
 
 ## Plans and commits
 
-- A plan is named after the package, app or folder it is for, and sits in it (`FLOW_PLAN.md` in `modules/flow`, `APPS_PLAN.md` in `apps`)
+- A plan is named after the package, app or folder it is for, and sits in it (`FLOW_PLAN.md` in `modules/flow`)
 - A document describes what is built; what is not built is in the plan
 - A built step leaves the plan
 - A plan ends with the rules it touches, one line each

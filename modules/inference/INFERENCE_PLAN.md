@@ -1,7 +1,7 @@
 # The inference package's plan
 
 What is not built in `modules/inference`, apart from the threads the app refactor moves
-([apps/APPS_PLAN.md](../../apps/APPS_PLAN.md)). What is built is in [INFERENCE.md](INFERENCE.md), its times and how
+([REFACTOR_PLAN.md](../../REFACTOR_PLAN.md)). What is built is in [INFERENCE.md](INFERENCE.md), its times and how
 the refactor's steps were checked in [TIMING.md](TIMING.md). **(deduction)** marks what is inferred.
 
 ## A. The TensorRT models side by side

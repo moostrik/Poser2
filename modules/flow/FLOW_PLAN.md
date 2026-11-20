@@ -23,7 +23,7 @@ operator saw.
 
 E6 needs the operator at the screen; the other lines go on meanwhile.
 
-The apps on deep_flow's input have their own plan, [apps/APPS_PLAN.md](../../apps/APPS_PLAN.md); recording and
+The apps and the modules held up to the rules are in [REFACTOR_PLAN.md](../../REFACTOR_PLAN.md); recording and
 -sim, deep_flow's live checks among them, theirs, [RECORDING_PLAN.md](../recording/RECORDING_PLAN.md). The
 chain's timing is in [TIMING.md](TIMING.md) and [INPUT_THREADS.md](INPUT_THREADS.md#the-cadence).
 

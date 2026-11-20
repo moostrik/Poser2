@@ -1,7 +1,7 @@
 # The recording plan
 
 What is next for recording and -sim, in order. How it works is in [RECORDING.md](RECORDING.md); the apps' move to
-the recorder is in [the app refactor](../../apps/APPS_PLAN.md). **(deduction)** marks what is inferred, **(site
+the recorder is in [the refactor's plan](../../REFACTOR_PLAN.md). **(deduction)** marks what is inferred, **(site
 fact)** what was told.
 
 ## 1. Checks waiting for the camera
@@ -23,7 +23,7 @@ deep_flow live, with the camera and a player in view:
 
 ## 2. The recorder in the other apps
 
-With the apps' refactors ([APPS_PLAN.md](../../apps/APPS_PLAN.md)), each tested with its refactored app:
+With the apps' refactors ([REFACTOR_PLAN.md](../../REFACTOR_PLAN.md)), each tested with its refactored app:
 
 - hd_trio: its settings (`MP4`), its wiring (the tracklets from each camera as they come, `expect_parts` per camera,
   `expect_poses` per camera and set), as white_space's is wired, and its pose `.h5` cut at the recorder's split.
@@ -31,32 +31,13 @@ With the apps' refactors ([APPS_PLAN.md](../../apps/APPS_PLAN.md)), each tested 
   USB's jitter in their times. Oak4's `capture_time` shows the way; it needs an OAK-D to test.
 - A white_space recording of the new layout played by hand, beside the old ones, which play as they are.
 
-## 3. The poses the pose model drops
-
-In -sim, with the recorded tracklets and the pose model on, about one frame in six with a player gets no poses (107
-of 596 on `hands`, [RECORDING.md](RECORDING.md#measured)): the pose model's TensorRT runner keeps one batch in
-flight and one waiting (`pose/pose_estimator.py`), and a batch that comes while one waits replaces it. At 50 fps a frame
-comes every 20 ms, so the host's 34 ms keeps up only while batches overlap, and drops when one runs long. With the
-recorded tracklets -sim loads the GPU as live does, its one addition, the decoding, on the iGPU and the CPU, so live
-drops about as many **(deduction)**; no live number exists.
-
-In order:
-
-1. Live, with a player in view: a new recording's `missed_poses` and its frames with poses, the live drop rate.
-2. In -sim on the same scene, the host's 34 ms split: RTMPose's own time (the pose estimator's timer), the
-   wait for the crops' event behind the GPU's queue, and the wait in the runner's waiting slot, each per frame.
-3. From that split, what stops the drops: RTMPose's own time over 20 ms means a faster model or input; a long wait
-   for the crops means the pose work queued behind the fluid's (its own stream's priority, or the order of the work
-   on the GPU); a long wait in the slot means the runner's hand-over. Each is weighed against the poses' precision
-   (RTMPose stays FP32).
-
-## 4. The split test that sometimes fails
+## 3. The split test that sometimes fails
 
 `test_a_split_keeps_the_streams_in_step_across_chunks` (`tests/test_round_trip.py`) fails about 2 runs in 5: the
 split lands 1 to 3 frames early on one stream. No frame is lost (50 of 50 in all three streams), so it is the split's
-timing, not the recording's data. Looked at when F reaches the recording module.
+timing, not the recording's data. Looked at when the refactor's A6 reaches the recording module.
 
 ## The rules it touches
 
 - Keep presets and settings schemas in sync with code changes: hd_trio's `container` in its preset
-- Run a test of the app or a GPU harness only on the user's go, and only what the plan names: the checks of 1 and 3
+- Run a test of the app or a GPU harness only on the user's go, and only what the plan names: the checks of 1

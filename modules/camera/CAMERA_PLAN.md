@@ -1,6 +1,6 @@
 # The camera's plan
 
-The camera package held up to the rules (2026-11-14, the apps' plan F). Who uses what, from the code: the contract
+The camera package held up to the rules (2026-11-14, the refactor's plan A). Who uses what, from the code: the contract
 (`CameraSource`, `CameraFrame`, `CameraTracklet(s)`, the settings, `CameraHealth`, the capture match) is read by
 every app and by inference, recording, tracker and render. The backends are each one kind of camera, used now by
 the apps that have it: `oak` by white_space and hd_trio, `oak4` by deep_flow, `vimba` and `webcam` by smile. That is
