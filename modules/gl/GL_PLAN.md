@@ -10,10 +10,6 @@ sources: `window_systems_research.md`. Windows now, Linux kept possible.
   windows without v-sync, fullscreen with the other monitors staying on, resize, drag onto another monitor and save, drag and release, F, the panel moving a
   window, every window of hd_trio and smile, a monitor unplugged and back. hd_trio's show looks as before (its
   window layout may change).
-- D2. `GL.md`: a section on the windows: one kind of window, hidden not destroyed, the main thread, no GL in
-  callbacks, which context is current when, the size, the placement, the settings at the tick, the pacing and the
-  `v_sync_window` swapped last. gl.md's thread rule says the main thread. The window manager tests move to the new
-  parts.
 
 ## Later: more to take from Cinder
 

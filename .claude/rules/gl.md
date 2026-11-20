@@ -1,5 +1,5 @@
 ---
-description: OpenGL: the render thread, resources, state, shaders
+description: OpenGL: the main thread, resources, state, shaders
 paths:
   - "modules/gl/**"
   - "modules/render/**"
@@ -22,7 +22,7 @@ paths:
 
 ## Working with OpenGL
 
-- All OpenGL calls execute on the render thread
+- All OpenGL calls execute on the main thread, in the window loop
 - Create textures, FBOs and shaders at setup or on a resize, not per frame
 - Pair every creation with its destruction
 - Set the GL state a draw needs where it draws (blend, depth, viewport)

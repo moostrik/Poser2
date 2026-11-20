@@ -146,7 +146,7 @@ the moment of that peak within midpoint ± deviation, sent to Grin Frames as `<n
 
 ## Render
 
-OpenGL engine: Poser2's `modules/gl/` (glfw, GL 4.6 core, render thread owned by `WindowManager`). The render loop goes on when `update`, `draw`, an event callback (key, mouse, window, monitor) or
+OpenGL engine: Poser2's `modules/gl/` (glfw, GL 4.6 core, the window loop of `WindowManager` on the main thread). The render loop goes on when `update`, `draw`, an event callback (key, mouse, window, monitor) or
 a deferred settings call raises: it is logged, and a monitor that is unplugged does not close the app
 (`modules/gl/tests/test_window_manager.py`). The render is the display's 1024 x 1280 (`main.py` defaults, swapped by the
 default portrait mode): the same 4:5 as the workflow's 896 x 1120 portrait, which stays at the size SDXL is best at and fills
