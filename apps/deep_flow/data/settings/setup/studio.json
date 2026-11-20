@@ -101,7 +101,7 @@
       "recorder": {
         "temp_path": "temp",
         "video_encoder": "iGPU",
-        "video_codec": "H264",
+        "video_codec": "HEVC",
         "container": "MKV",
         "video_quality": 24,
         "video_frame_types": [

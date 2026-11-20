@@ -20,12 +20,6 @@ so it goes the depth's whole way: camera, alignment, recording, view, motion. It
 as a frame of its own, so it is never paired with another frame's depth. A step in another thread's package is told to
 that thread when it is built.
 
-- **A5. The color in HEVC.** deep_flow's `recorder.video_codec` in its settings files from H264 to HEVC, so a chunk is one codec,
-  smaller at the same quality **(deduction: HEVC is usually 30–50% smaller)**; `MP4` stays H.264, for any player; older
-  recordings play as they are. The writer side is built (1670244c). Check, first: the iGPU encoder's load on the real
-  camera at 50 fps, color in HEVC with the depth and the confidence encoding at once, against color in H.264; color has
-  only been measured in H.264 (18 % at 900 × 720, OAK4.md's Encoder load), and the setting changes only if HEVC leaves
-  margin. Then OAK4.md's seek check on a new recording. After A3, for the three streams.
 - **A6. The view.** `ViewDepth`'s textures become RG32F, the confidence in green: the upscale blends green with the
   depth's own weights, or takes the one pixel's where it takes the one depth; the fill's last pass keeps the read's
   green where the read has a depth and gives 0 where it filled. The crop's depth feeds only the mask and stays as it
@@ -46,6 +40,5 @@ The recordings measured so far have no confidence, so the motion's A/B needs a n
 
 ## Rules it touches
 
-- Keep settings files in sync with code changes: A5, deep_flow's `video_codec`.
-- A step checked by a run or a test is one commit: A5–A6.
-- Separate what the code or a measurement shows from what is inferred: the probe, A5.
+- A step checked by a run or a test is one commit: A6.
+- Separate what the code or a measurement shows from what is inferred: the probe.

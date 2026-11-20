@@ -367,18 +367,26 @@ The picture's height fills the frame's, so every row has picture: the wide end i
 
 ## Recording and replay
 
-How recording and playback work is in [RECORDING.md](../../recording/RECORDING.md); this section holds what is the OAK4's. The format is in [chunk.py](../../recording/container/chunk.py) and [depth_frame.py](../../video/depth_frame.py). Each chunk is one self-contained `.mkv`: stream 0 color, stream 1 depth, fixed info in the tags and per-frame readings attached. Recording starts at the first depth frame, and each depth frame is written with the color frame captured with it ([Capture time](#capture-time)), so both streams have equal frame counts. A color frame whose depth never comes is left out. Recordings made before capture times paired each color frame with the newest depth, which was captured one or two frames earlier **(deduction)**. Replay plays a recorded frame's color and depth with one time.
+How recording and playback work is in [RECORDING.md](../../recording/RECORDING.md); this section holds what is the OAK4's. The format is in [chunk.py](../../recording/container/chunk.py) and [depth_frame.py](../../video/depth_frame.py). Each chunk is one self-contained `.mkv`: stream 0 color, stream 1 depth, stream 2 the depth's confidence, fixed info in the tags and per-frame readings attached. Recording starts at the first depth frame, and each depth frame is written with the color frame captured with it ([Capture time](#capture-time)), so all streams have equal frame counts. A color frame whose depth never comes is left out. Recordings made before capture times paired each color frame with the newest depth, which was captured one or two frames earlier **(deduction)**. Replay plays a recorded frame's color and depth with one time.
 
 Encoding runs on the iGPU because it does nothing else in the installation **(site fact)**, so recording stays out of the way of the show.
 
-| Stream | Codec       | Encoder    | Format                                |
-|--------|-------------|------------|---------------------------------------|
-| Color  | H.264       | `h264_qsv` | `video_quality` 24                    |
-| Depth  | 12-bit HEVC | `hevc_qsv` | `p012le`, 3 mm steps, 12 m full scale |
+| Stream     | Codec       | Encoder    | Format                                |
+|------------|-------------|------------|---------------------------------------|
+| Color      | HEVC        | `hevc_qsv` | `video_quality` 24                    |
+| Depth      | 12-bit HEVC | `hevc_qsv` | `p012le`, 3 mm steps, 12 m full scale |
+| Confidence | 8-bit HEVC  | `hevc_qsv` | grey                                  |
 
-`keyframe_interval` is 60 on both.
+`keyframe_interval` is 50 on all three. Recordings made before 2026-11-21 hold H.264 color and no confidence, and play as they are.
 
-Both streams share `keyframe_interval`, and depth has no B-frames, so a seek finds both streams whole. A seek in a chunk goes to a color keyframe, and depth without a keyframe there comes back about 100 mm off. With B-frames depth was also off after a shared keyframe; why is not settled. At 60, 15 of 15 seeks on a real recording matched reading from the start, in both streams, at about 185 ms a frame. A recording made with `keyframe_interval` 0 keeps the fault in its depth.
+The streams share `keyframe_interval`, and depth and its confidence have no B-frames, so a seek finds every stream whole. A seek in a chunk goes to a color keyframe, and depth without a keyframe there comes back about 100 mm off. With B-frames depth was also off after a shared keyframe; why is not settled. A recording made with `keyframe_interval` 0 keeps the fault in its depth. Seeks on real recordings, each frame against the same frame read from the start:
+
+| Recording                | Color | `keyframe_interval` | Seeks matched                        | A seek        |
+|--------------------------|-------|---------------------|--------------------------------------|---------------|
+| A real recording, `P720` | H.264 | 60                  | 15 of 15, color and depth            | 185 ms        |
+| `probe_A5_hevc`, `P800`  | HEVC  | 50                  | 15 of 15 in color, depth, confidence | 241 to 310 ms |
+
+The second row is 2026-11-21, a 28.4 s chunk of 1421 frames, read on the iGPU decoder, the median seek per stream.
 
 Depth is lossy. That is acceptable because the fluid spreads and smooths its input and has only 20 to 32 depth layers, so a few millimeters should not show **(deduction)**. On synthetic frames 99 % of pixels are within 11 mm, with a steady offset of about 6 mm. Set depth quality with `-q:v`; `global_quality` breaks at low values, with errors in meters.
 
@@ -391,7 +399,7 @@ Depth is lossy. That is acceptable because the fluid spreads and smooths its inp
 | Same clip, re-encoded | 24              | 60                  | 1.8 MB/s | 2.1 MB/s | 3.9 MB/s |
 | `P1080`, recorded     | 24              | 60                  |          |          | 10 MB/s  |
 
-The first three rows are `P720`, and the third is the current setup at that size. The last row is the current setup at `P1080`, and a 60 s chunk comes to about 600 MB. All rows are a dark room, and the color rate at 18 is mostly sensor noise **(deduction)**.
+All rows have H.264 color and no confidence. The first three rows are `P720`, and the third is the H.264 setup at that size. The last row is the H.264 setup at `P1080`, and a 60 s chunk comes to about 600 MB; HEVC color makes a `P800` chunk about 17 % smaller ([Encoder load](#encoder-load)). All rows are a dark room, and the color rate at 18 is mostly sensor noise **(deduction)**.
 
 ### Encoder load
 
@@ -406,6 +414,15 @@ Synthetic frames, nothing written, on the configuration's PC. Speed is a multipl
 | Depth, 376x300, 16-bit  | FFV1, CPU   | 30x   | 13 % of one of 24 threads |
 
 FFV1 is the fallback, exact and on the CPU. The second row is one H.264 picture holding both, which limits depth to 8 bits at a range fixed when recording.
+
+On the real camera, recording: Deep Flow live over USB at 50 fps, `P800` color 992x800, `video_quality` 24, `keyframe_interval` 50, color, depth and confidence encoding at once on the iGPU, 28.4 s each, started 10 s after the first frame, the two back to back on 2026-11-21. Load is the UHD 770's engines in Windows' GPU Engine counters, 17 samples, mean; QSV's encode shows on its 3D engine and VDBOX (VideoDecode):
+
+| Color | 3D engine | VideoDecode | Queues, max                 | Dropped | Frames, 3 streams | Chunk   |
+|-------|-----------|-------------|-----------------------------|---------|-------------------|---------|
+| H.264 | 29.7 %    | 5.0 %       | writers 1, recorder 2       | 0       | 1418              | 87.1 MB |
+| HEVC  | 36.0 %    | 4.1 %       | writers 1, recorder 1       | 0       | 1421              | 72.4 MB |
+
+HEVC adds about 6 points and leaves the 3D engine about 63 % free, so color records in HEVC; the chunk comes out 17 % smaller.
 
 ### On the real camera
 
