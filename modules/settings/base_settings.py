@@ -1,29 +1,4 @@
-"""
-Settings — a reactive dataclass.
-
-Declare fields as class attributes; use them as plain variables.
-Each field is a single line that can optionally carry GUI hints,
-access restrictions, and value constraints — but these are declarations,
-not code. The functional class that uses Settings never deals with GUI,
-serialization, or threading logic.
-
-    class CameraSettings(Settings):
-        exposure = Field(1000, min=100, max=10000)
-        resolution = Field(1080, access=Field.INIT)
-        manual = Field(False)
-
-    settings = CameraSettings(resolution=720)
-    settings.exposure = 500          # set like a normal variable
-    x = settings.exposure            # get like a normal variable
-    settings.bind(CameraSettings.exposure, on_changed)  # react to changes
-
-Group children nest related fields into scopes::
-
-    class PoseGroup(Settings):
-        frequency = Field(30.0, access=Field.INIT)
-        bbox      = Group(BboxFeature, share=[frequency])
-        point     = Group(PointFeature, share=[frequency])
-"""
+"""BaseSettings, the reactive data container every settings class derives from (SETTINGS.md)."""
 
 import copy
 import logging
@@ -38,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class BaseSettings:
-    """Reactive dataclass — declare fields and groups as class attributes."""
+    """A reactive data container: its `Field` and `Group` class attributes are its values and its children."""
 
     def __init__(self, **kwargs):
         object.__setattr__(self, "_initialized", False)
@@ -53,7 +28,7 @@ class BaseSettings:
         object.__setattr__(self, "_children", {})
 
         # Collect Field and Group descriptors from the class hierarchy, base classes first, so a
-        # panel and a preset list a base's fields before a subclass's; a name a subclass declares
+        # panel and a settings file list a base's fields before a subclass's; a name a subclass declares
         # again keeps the base's place and takes the subclass's descriptor
         mro: tuple[type, ...] = type(self).__mro__
         names: dict[str, None] = {}
@@ -193,13 +168,7 @@ class BaseSettings:
     # -- Callback registration -----------------------------------------------
 
     def bind(self, field: 'Field', callback) -> None:
-        """Register a callback for a field.
-
-        Usage::
-
-            settings.bind(MySettings.exposure, on_exposure_changed)
-            settings.bind(MySettings.reset, on_reset_fired)
-        """
+        """Register *callback* for *field* (`MySettings.exposure`), called with each new value."""
         if field.name not in self._fields:
             raise KeyError(
                 f"'{type(self).__name__}' has no setting '{field.name}'"
@@ -223,15 +192,8 @@ class BaseSettings:
     # -- Serialization -------------------------------------------------------
 
     def to_dict(self, *, _exclude: set[str] | None = None) -> dict[str, Any]:
-        """Serialize mutable fields to a dict.
-
-        Excludes ``Access.READ`` fields, ``Widget.button`` fields and ``saved=False`` fields.
-        ``Access.INIT`` fields **are** included (they are editable in JSON but
-        cannot be changed at runtime after construction).
-
-        Shared fields are excluded from child dicts (parent is source of
-        truth for serialization).
-        """
+        """The tree as plain values: every field but `READ` ones, buttons and `saved=False` ones, a child's shared
+        fields left to its parent."""
         result = {}
         exclude = _exclude or set()
         for name, field in self._fields.items():
@@ -248,25 +210,14 @@ class BaseSettings:
         return result
 
     def initialize(self) -> None:
-        """Lock INIT fields.  Call once after the startup preset is loaded.
-
-        After this call, ``Access.INIT`` fields can no longer be written
-        programmatically or via ``update_from_dict``.
-        """
+        """Lock the tree's `INIT` fields: from here a write raises and a load skips them."""
         object.__setattr__(self, '_initialized', True)
         for child in self._children.values():
             child.initialize()
 
     def update_from_dict(self, data) -> None:
-        """Restore fields from a dict.
-
-        ``Access.INIT`` fields are included only while ``_initialized``
-        is ``False`` (before ``initialize()`` has been called).
-
-        Nested dicts matching child names are forwarded to the child.
-        Bad values are logged and skipped — one broken field does not
-        prevent the remaining fields from loading.
-        """
+        """Set the fields *data* holds, own fields first, then each child's; an unknown key or a bad value is
+        logged and skipped."""
         # Pass 1: update own fields (so count fields like num_cams are current)
         child_data = {}
         for name, raw in data.items():

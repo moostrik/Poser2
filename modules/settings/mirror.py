@@ -1,11 +1,5 @@
-"""The settings mirror: a tree described in plain values, and a tree rebuilt from that description.
-
-A process that must not import an app's settings classes (they pull in the app's whole stack) builds a
-mirror from ``describe()``: the same instances, fields, hints, labels and wiring, each enum made again from
-its members. Values travel as a preset holds them (``Field.encode``) and arrive through ``Field.set``'s
-coercion, on either side. A field is addressed by its instance's path, the child names from the root
-joined by dots ("" for the root), and its name.
-"""
+"""The settings mirror: a tree described in plain values, and a tree rebuilt from that description (SETTINGS.md,
+The mirror)."""
 
 from __future__ import annotations
 
@@ -97,7 +91,7 @@ def _kind(type_: Any) -> tuple[str, str | None, type[Enum] | None]:
 
 
 def encode_value(field: Field, value: Any) -> Any:
-    """*value* as it travels: as a preset holds it, or as its text for a type without a kind."""
+    """*value* as it travels: as a settings file holds it, or as its text for a type without a kind."""
     if field.type_ is Shown or _kind(field.type_)[0] == "other":
         return str(value)
     return field.encode(value)

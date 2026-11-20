@@ -1,31 +1,4 @@
-"""Group descriptor for declaring nested Settings.
-
-``Group`` is the single way to declare a child Settings on a parent::
-
-    class PoseGroup(Settings):
-        frequency = Field(30.0, access=Field.INIT)
-
-        bbox  = Group(BboxFeature, share=[frequency])
-        point = Group(PointFeature, share=[frequency])
-
-    pose = PoseGroup()
-    pose.bbox.smoother.frequency   # accesses the child's field
-
-Shared fields are passed as constructor kwargs to the child.  The parent
-is the serialization source of truth — shared fields are excluded from
-child serialization, re-propagated on ``update_from_dict``, and pushed
-downstream on normal parent assignment.
-
-All sharing is bidirectional: changes on the parent propagate to children,
-and changes on a child propagate upward to the parent (and fan out to
-sibling children wired to the same field).
-
-Name-mapped sharing allows a parent field to arrive under a different name
-in the child::
-
-    frequency = Field(30.0)
-    interp = Group(InterpolatorSettings, share=[frequency.as_('input_frequency')])
-"""
+"""Group, the descriptor that declares a child settings instance on a parent (SETTINGS.md, Groups and sharing)."""
 
 from typing import TYPE_CHECKING, Any, Generic, Mapping, TypeVar, overload, Sequence
 
@@ -38,19 +11,19 @@ T = TypeVar("T")
 
 
 class Group(Generic[T]):
-    """Descriptor that declares a child Settings on a parent.
+    """The descriptor that declares a child settings instance on a parent.
 
     Parameters
     ----------
     settings_type : type[T]
-        The Settings subclass to instantiate as the child.
+        The settings class the child is an instance of.
     share : list of Field or FieldAlias, optional
         Parent fields whose values are shared with the child.  Sharing is
         bidirectional: parent writes propagate to the child, and child
         writes propagate upward to the parent (and fan out to siblings).
     last : bool, optional
         The child comes after the other children, a subclass's included,
-        on a panel and in a preset.
+        on a panel and in a settings file.
     description : str, optional
         One short line of panel text: what the child is. A GUI hint, as a
         field's description.

@@ -14,15 +14,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class FieldAlias:
-    """A Field reference with an alternate name for sharing to a child.
-
-    Created via ``Field.as_('child_name')`` and used in share lists::
-
-        frequency = Field(30.0)
-        interpolator = InterpolatorSettings(share=[frequency.as_('input_frequency')])
-
-    The parent field ``frequency`` is shared to the child as ``input_frequency``.
-    """
+    """A field shared to a child under another name, made by `Field.as_('child_name')` in a `Group`'s share list."""
     field: 'Field'
     child_name: str
 
@@ -30,17 +22,7 @@ T = TypeVar("T")
 
 
 class Access(Enum):
-    """Controls who may read/write a Field and whether the UI polls it.
-
-    ========== ============ ======== ==========================================
-    Member     UI editable  Polled   Use case
-    ========== ============ ======== ==========================================
-    READ       no           yes      Code writes, UI displays (e.g. FPS)
-    WRITE      yes          no       UI is the only writer (most fields)
-    READWRITE  yes          yes      Both code and UI write (e.g. window size)
-    INIT       static label no       Set once at construction, then immutable
-    ========== ============ ======== ==========================================
-    """
+    """Who writes a field, and with it whether the panel polls it (SETTINGS.md, Access)."""
     READ = "read"
     WRITE = "write"
     READWRITE = "readwrite"
@@ -48,83 +30,8 @@ class Access(Enum):
 
 
 class Field(Generic[T]):
-    """Descriptor-based setting field with type coercion, callbacks, and thread safety.
-
-    Declare as a class attribute on a Settings subclass::
-
-        exposure = Field(1000, min=100, max=10000)
-
-    The type is always inferred from the default value.  For list settings,
-    the element type is inferred from the first element::
-
-        tags = Field(["default"])
-        modes = Field([RenderMode.SOLID])
-
-    List defaults must contain at least one element for type inference.
-
-    The descriptor handles get/set, type enforcement, init-only guards,
-    callbacks, and JSON serialization.
-
-    **Parameters and GUI hints**
-
-    Only *default* affects the runtime behaviour of the class that uses the
-    setting.  All other keyword parameters are metadata consumed by the UI
-    layer (``modules/panel``) and are never enforced by the descriptor itself:
-
-    - ``min``, ``max``, ``step`` — range hints for sliders; the descriptor
-      does **not** clamp or validate values against them.
-    - ``description`` — tooltip / label text.
-    - ``label`` — the panel's title for the control; ``None`` derives it from the name.
-    - ``row_label`` — a text title the panel renders before this field: the name of the row it
-      starts.
-    - ``width`` — a Tailwind width step for a control with a fixed width (a select, a slider, a toggle);
-      ``None`` keeps the control's own.
-    - ``visible`` — whether the field appears in the panel.
-    - ``pinned`` — whether the field is shown in a pinned summary section.
-        - ``newline`` — start this field on a new compact UI row.
-    - ``widget`` — explicit widget override (validated for type compatibility
-      at construction time, but has no effect on get/set).
-    - ``color`` — UI colour hint for the control.
-    - ``options`` — the Field a control reads beside its own: the ``list[str]`` of options for
-      ``Widget.text_select``, the position and length for ``Widget.timeline``.
-    - ``drag`` — the Field a ``Widget.timeline`` writes while a handle is dragged.
-    - ``seek`` — the Field a ``Widget.timeline`` writes when the bar is pressed beside a handle.
-
-    ``saved`` does change behaviour: ``False`` leaves the field out of ``to_dict``, for a value
-    that belongs somewhere else than the preset.
-
-    **Action buttons (``widget=Widget.button``)**
-
-    A button is a stateless action trigger, declared as ``Field[bool]`` by
-    convention::
-
-        start = Field(False, widget=Widget.button, description="Start recording")
-
-    The stored ``bool`` value is never meaningful — it stays ``False``
-    forever.  Pressing the button calls ``field.fire(settings)``, which
-    invokes all registered callbacks with ``True`` without changing the
-    value.  Buttons are excluded from serialization (``to_dict``).
-    If the button field is shared to a child via ``Group(..., share=[])``,
-    ``fire()`` propagates downstream automatically.
-
-    The one keyword parameter with a runtime effect is ``access``:
-
-    - ``access=Field.INIT`` prevents writes after ``settings.initialize()``
-      has been called (raises ``AttributeError``).
-    - ``access=Field.READ`` is a UI hint only — code can still write the
-      field freely at runtime.
-
-    Custom types used as Field values should implement ``__eq__`` so that
-    change detection (skip callback when value unchanged) works correctly.
-
-    .. note:: In-place mutation limitation
-
-        Modifying a mutable value in place (e.g. ``settings.tags.append(x)``)
-        will **not** trigger callbacks because the descriptor ``__set__`` is
-        never invoked.  To fire callbacks, re-assign the whole value::
-
-            settings.tags = settings.tags + [x]
-    """
+    """One value of a settings class: its type, from the default, its coerced writes and its callbacks; every
+    keyword but `default`, `access` and `saved` is a panel hint (SETTINGS.md, Fields)."""
 
     # Convenience aliases so callers write Field.READ instead of Access.READ
     READ = Access.READ
@@ -153,7 +60,7 @@ class Field(Generic[T]):
         options: Field | None = None,  # the Field a control reads beside its own (text_select, timeline)
         drag: Field | None = None,     # the Field a control writes while dragged (timeline)
         seek: Field | None = None,     # the Field a control writes when pressed beside a handle (timeline)
-        saved: bool = True,            # False: left out of to_dict, so a preset does not hold it
+        saved: bool = True,            # False: left out of to_dict, so a settings file does not hold it
     ) -> None:
         # Infer type from default value
         if isinstance(default, list):
@@ -417,7 +324,7 @@ class Field(Generic[T]):
         return self.encode(obj._values[self.name])
 
     def encode(self, value: Any) -> Any:
-        """*value* as a preset holds it: an Enum by its name, a value object as its dict, a list
+        """*value* as a settings file holds it: an Enum by its name, a value object as its dict, a list
         element by element. ``set`` takes it back."""
         if hasattr(value, "to_dict"):
             return value.to_dict()
@@ -473,13 +380,5 @@ class Field(Generic[T]):
         return f"Field({', '.join(parts)})"
 
     def as_(self, child_name: str) -> FieldAlias:
-        """Return an alias for sharing this field under a different name.
-
-        Usage::
-
-            frequency = Field(30.0)
-            interp = InterpolatorSettings(share=[frequency.as_('input_frequency')])
-
-        The parent's ``frequency`` value is shared to the child as ``input_frequency``.
-        """
+        """This field, shared to a child as *child_name*."""
         return FieldAlias(self, child_name)
