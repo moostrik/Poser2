@@ -11,6 +11,12 @@ Questions:
   research, 2026-11-18, [INFERENCE.md](../inference/INFERENCE.md#the-models-and-their-files)). Built, it would be the width carried as a
   feature beside the score and the filter's cutoff scaled by it; whether it steadies the points more than the
   filter's own settings is to be measured
+- `PosePipeline.submit` → `process`? (noted 2026-11-20) It stores the group and hands the frames to the async step's
+  `AsyncInput.process` on the caller's thread (`pipeline/pose_pipeline.py`) **(seen)**, which the naming rule calls
+  `process`; `AsyncInput.submit` became `process` in d277fa2e. Its callers are the apps' frame sources
+- Feedback on two changes made from the inference package (2026-11-20): `AsyncInput.process` (d277fa2e), and
+  `has_points` moved beside `Frame` in `frame/frame.py` (fd65fde4), with `modules/recording` now importing
+  `modules.pose` for its pose packing
 
 ## The rules it touches
 
