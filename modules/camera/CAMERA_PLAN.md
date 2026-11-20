@@ -20,12 +20,6 @@ so it goes the depth's whole way: camera, alignment, recording, view, motion. It
 as a frame of its own, so it is never paired with another frame's depth. A step in another thread's package is told to
 that thread when it is built.
 
-- **A1. The camera.** The oak4 pipeline links `neural.depth` and `neural.confidence` into one `Sync` node, so one
-  message holds a frame's depth and its confidence and the backend needs no join (`pipeline.py`, `camera.py`). The DEPTH
-  `CameraFrame` gets `confidence: np.ndarray | None`, uint8 (H, W) on the depth's view, a copy as the depth is; None
-  from every other backend. It adds 7 MB/s on the link at 50 fps **(deduction: 480 × 300 bytes a frame)**. Check, live:
-  the panel's depth fps and latency against OAK4.md's table, the Sync node adding no wait **(deduction: both outputs
-  come off one node with one timestamp)**; `camera/oak4` tests. OAK4.md's Depth section, with the probe's numbers.
 - **A2. The alignment.** The uploader stages the confidence beside the depth, in a pinned buffer of its own key, and
   `DepthAligner` moves it with the depth that wins a cell: the atomic minimum's key is the depth's float bits with
   255 − the confidence in the lowest 8, so the nearest point brings its own confidence in the one pass and, of two
@@ -81,11 +75,9 @@ The recordings measured so far have no confidence, so the motion's A/B needs a n
 
 ## Rules it touches
 
-- Stamp a frame once, where the backend hands it over: A1, the confidence on the depth's frame.
-- An item handed to a callback is not changed afterwards: A1, the confidence a copy.
 - Fix a problem where it is made: A2, a missing confidence is 1 at the alignment, and `Tensor` takes (H, W, C) in its uploads.
 - Avoid unnecessary copies: A2, one tensor of two channels.
 - Keep settings files in sync with code changes: A5, deep_flow's `video_codec`.
-- A step checked by a run or a test is one commit: A1–A6, A3 and A4 apart.
+- A step checked by a run or a test is one commit: A2–A6, A3 and A4 apart.
 - Name a concept after what it is: `ChunkStream`, the recording's streams, beside the camera's `FrameType`.
-- Separate what the code or a measurement shows from what is inferred: the probe, A1, A5.
+- Separate what the code or a measurement shows from what is inferred: the probe, A5.

@@ -23,7 +23,7 @@ from .imu import imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL
 from .messages import packed_nv12, smoothed_latency, capture_time
 from .models import ModelChain, model_archives, TRACKING_STATUS, tracklet_keypoints, keypoints_in_frame
 from .sensor import SENSOR_SOCKET, requested_size, DepthModel
-from .pipeline import build_pipeline, delivered_size, MountConfig, PipelineOutputs
+from .pipeline import build_pipeline, delivered_size, MountConfig, PipelineOutputs, DEPTH_STREAM, CONFIDENCE_STREAM
 from .keypoint_join import KeypointJoin, Box
 from .settings import Oak4CameraSettings
 
@@ -347,11 +347,14 @@ class Camera(Thread):
         readings: RigCameraReadings = self.settings.readings
         return FrameReadings(readings.tilt_measured, readings.roll_measured, self.settings.sensor.exposure, self.settings.sensor.iso)
 
-    def _depth_callback(self, name: str, msg: dai.ImgFrame) -> None:
-        """The hand-over of the depth: uint16 millimetres on the left camera's view, with the capture
-        time of the video frame taken with it (the sensors end their exposures together). Until a
-        video frame has said where depth lands in it, there is nothing to put it on."""
+    def _depth_callback(self, name: str, group: dai.MessageGroup) -> None:
+        """The hand-over of the depth: uint16 millimeters on the left camera's view with its confidence,
+        one message group of the two, and the capture time of the video frame taken with it (the sensors
+        end their exposures together). Until a video frame has said where depth lands in it, there is
+        nothing to put it on."""
         arrival: float = time.perf_counter()
+        msg: dai.ImgFrame = cast(dai.ImgFrame, group[DEPTH_STREAM])
+        confidence: dai.ImgFrame = cast(dai.ImgFrame, group[CONFIDENCE_STREAM])
         timestamp: float = capture_time(msg)
         readings: RigCameraReadings = self.settings.readings
         readings.depth_latency = smoothed_latency(readings.depth_latency, msg)
@@ -360,7 +363,8 @@ class Camera(Thread):
         alignment: DepthAlignment | None = self._depth_alignment(msg)
         if alignment is None:
             return
-        self._emit_frame(FrameType.DEPTH, msg.getFrame().copy(), timestamp, arrival, alignment=alignment)
+        self._emit_frame(FrameType.DEPTH, msg.getFrame().copy(), timestamp, arrival, alignment=alignment,
+                         confidence=confidence.getFrame().copy())
 
     def _depth_alignment(self, msg: dai.ImgFrame) -> DepthAlignment | None:
         """Where this camera's depth lands in its video frames, made once from the calibration the
@@ -448,11 +452,13 @@ class Camera(Thread):
         self.tilt_correction.update(tilt, self._intrinsics, self.frame_size)
 
     def _emit_frame(self, kind: FrameType, image: ndarray, timestamp: float, arrival: float, nv12: bool = False,
-                    readings: FrameReadings | None = None, alignment: DepthAlignment | None = None) -> None:
+                    readings: FrameReadings | None = None, alignment: DepthAlignment | None = None,
+                    confidence: ndarray | None = None) -> None:
         """The hand-over: the frame, with its capture time (`capture_time`) and its arrival, goes to every callback."""
         frame = CameraFrame(cam_id=self.cam_id, kind=kind, image=image, timestamp=timestamp,
                             nv12=nv12, flip_h=self.flip_on_host, homography=self.tilt_correction.homography,
-                            readings=readings, intrinsics=self._intrinsics, alignment=alignment, arrival=arrival)
+                            readings=readings, intrinsics=self._intrinsics, alignment=alignment, arrival=arrival,
+                            confidence=confidence)
         with self._callback_lock:
             callbacks: list[CameraFrameCallback] = list(self.frame_callbacks)
         for c in callbacks:

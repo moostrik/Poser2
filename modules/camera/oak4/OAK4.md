@@ -230,7 +230,8 @@ The load on the link:
 |-----------------------|---------------------------|
 | Color, 896x720 NV12   | 464 Mbit/s before padding |
 | Depth, 480x300 uint16 | 138 Mbit/s                |
-| Together              | 602 Mbit/s                |
+| Confidence, uint8     | 69 Mbit/s                 |
+| Together              | 671 Mbit/s                |
 | Ethernet, expected    | About 800 Mbit/s          |
 
 The stream rates are calculated from the frame sizes **(deduction)**, before the chip's row padding. The Ethernet figure is from the Luxonis docs.
@@ -272,7 +273,7 @@ It reads the frames, the tracklets and the IMU through queues on the node output
 where they become the contract's and get their capture time. The device runs the chain `model_chain` names:
 `DETECTOR` gives boxes only; with a pose chain a tracklet carries its keypoints, from its own detection in the
 one-model chain, or in the two-model chain from its crop's pose, put on it per frame by `KeypointJoin`. With
-`depth_model` it delivers depth as DEPTH frames on the left camera's view, each with the `DepthAlignment` that puts
+`depth_model` it delivers depth as DEPTH frames on the left camera's view, each with its confidence and the `DepthAlignment` that puts
 it on the frames' view on the GPU. An NV12 frame goes on packed, so the callback thread does no color work; the
 boxes and keypoints go on as the model found them, and the uploader straightens and mirrors them with their frame.
 
@@ -294,7 +295,13 @@ That gives a view of about 79.6° by 67.6° **(deduction)**, and `readings.fov_f
 
 ## Depth
 
-Neural Depth runs on the camera off 640x400 mono frames and arrives as 480x300 uint16 millimeters on the left mono camera's view, with 0 for no depth. Each depth frame carries its `DepthAlignment`: both lenses and the move from the left camera to the color camera, 3.76 cm sideways, read once from the calibration the frames carry. The uploader puts depth on the color view on the GPU (`DepthAligner` in `modules/inference/preprocessing/depth_align.py`), together with the tilt correction and the mirror: each depth pixel goes to its point in space and into the color frame, the nearest point wins where two land on one pixel, and a pixel nothing lands on stays 0. The output is 374x300, the depth's rows at the color frame's aspect (`aligned_depth_size`).
+Neural Depth runs on the camera off 640x400 mono frames and arrives as 480x300 uint16 millimeters on the left mono camera's view, with 0 for no depth. Its confidence comes with it, 480x300 uint8, higher surer, on the 0–255 scale of the `confidence` filter: a `Sync` node joins the two outputs of Neural Depth into one message, as they share one sequence number and timestamp, and the DEPTH `CameraFrame` carries it as `confidence`. Probed with `NEURAL_480`, 100 frames, no IR light, it ran 73 to 255, median 230; the 2.2 % of pixels with no depth at every cut read lower (median 158 against 231) but overlap the valid range, so no one value parts them. The `Sync` node adds no wait: Deep Flow live over USB at 50 fps, 30 s after 10 s, as the panel reads it:
+
+| Depth            | Rate     | Capture to PC, mean | p95     | Max     | Worst gap |
+|------------------|----------|---------------------|---------|---------|-----------|
+| With confidence  | 50.0 fps | 43.5 ms             | 49.3 ms | 51.0 ms | 20.0 ms   |
+
+which matches the depth alone in [Link](#link) and [Depth filters](#depth-filters). Each depth frame carries its `DepthAlignment`: both lenses and the move from the left camera to the color camera, 3.76 cm sideways, read once from the calibration the frames carry. The uploader puts depth on the color view on the GPU (`DepthAligner` in `modules/inference/preprocessing/depth_align.py`), together with the tilt correction and the mirror: each depth pixel goes to its point in space and into the color frame, the nearest point wins where two land on one pixel, and a pixel nothing lands on stays 0. The output is 374x300, the depth's rows at the color frame's aspect (`aligned_depth_size`).
 
 Next to a near object the color camera sees background the left camera could not, so that band has no depth. It is about `538 px × 3.76 cm × (1/Z_near − 1/Z_far)` wide, 12 px for a player at 1 m before a wall at 2.5 m. The black shadow bands beside near objects are this band and the stereo occlusion.
 

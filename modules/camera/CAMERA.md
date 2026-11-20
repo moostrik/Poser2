@@ -20,7 +20,8 @@ One job: hand an app a camera. That is three things.
 - A frame or tracklet message is stamped once, at hand-over, with its capture where the backend knows it (the end
   of the exposure, oak4), else its arrival, on `perf_counter`; where the two differ it also carries its arrival, so
   its latency needs no clock read downstream. A depth frame and the video frame of one capture carry timestamps
-  within `CAPTURE_TOLERANCE` (2 ms; on the OAK4 0.12 ms apart), so time pairs them.
+  within `CAPTURE_TOLERANCE` (2 ms; on the OAK4 0.12 ms apart), so time pairs them. A depth frame's `confidence`
+  rides on it, on the depth's own view, never as a frame of its own; a backend without one gives None.
 - A camera hands its frames and its model's boxes and keypoints as delivered: the uploader straightens them on the
   GPU with the frame's `homography`, then mirrors them by `flip_h`; off the GPU `mirrored_image` mirrors. One
   `homography` array stands for one correction, so a consumer keeps what it derives from it until the array
@@ -95,7 +96,7 @@ implies 577.5, with the optical center 5 to 24 px left of and about 10 px below 
 | ...1136D1D200 | 565.0        | 634.5 | 410.3 | 129.6                |
 
 The lens taken as `fov` read bearings about 1° short toward the seams and put the horizon 10 px (1°) too high, a
-metre of distance at 5 m. So the lens is three settings of its own, shared by an installation's cameras:
+meter of distance at 5 m. So the lens is three settings of its own, shared by an installation's cameras:
 `lens_fov` (the field across the full sensor width, 0 the same as `fov`), `lens_center_x` and `lens_center_y` (the
 optical center's offset from the frame's center in px, at the full sensor mode, the same under the 720-row center
 crop). One shared lens and not one per unit is a trade: the mean leaves the outlier unit 1.4° off at its azimuth
@@ -109,7 +110,7 @@ square crop, the 1080 to 1072 trim) removes pixels without changing the scale.
 
 The rows are cylindrical: `horizon_px - row = focal * tan(elevation)`, with the columns' `focal`, so the frame is
 locally a level pinhole camera panned to each column's bearing. That keeps a body's proportions true at any height,
-for the pose model, which was trained on pinhole photographs; rows linear in elevation shrink a metre at 40°
+for the pose model, which was trained on pinhole photographs; rows linear in elevation shrink a meter at 40°
 elevation by 41 % and at 55° by 67 % against eye level.
 
 The window is pinned at the bottom: the last row is the sensor's lowest reach on the center column, and the rows
@@ -168,7 +169,7 @@ noisy, and a picture that followed it would shimmer. How the OAK4 uses it is in 
 
 ## The depth's alignment
 
-Depth comes from a stereo camera a few centimetres beside the video camera, so a point lands in the video frame
+Depth comes from a stereo camera a few centimeters beside the video camera, so a point lands in the video frame
 shifted by an amount that depends on its distance. The GPU moves each depth pixel there and keeps the nearest where
 two land on one pixel; the background a near object uncovers stays empty, because the depth camera never saw it.
 

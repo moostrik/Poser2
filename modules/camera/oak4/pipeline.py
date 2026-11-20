@@ -3,12 +3,14 @@ grey one through the warp, the model chain and its tracker, Neural Depth aligned
 (OAK4.md, the frame)."""
 
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 import logging
 import os
 
 import depthai as dai
 
+from .. import CAPTURE_TOLERANCE
 from ..geometry import CameraResolution, frame_size, WARP_MESH, warp_mesh_points
 
 from .device import SYSTEM_RATE_HZ
@@ -18,6 +20,9 @@ from .models import nn_frame_type, POSE_CONFIDENCE_THRESHOLD, POSE_OVERLAP_THRES
 from .sensor import SENSOR_SOCKET, STEREO_SOCKETS, STEREO_SIZE, DEPTH_MODELS, DepthModel, requested_size, direct_size
 
 logger = logging.getLogger(__name__)
+
+DEPTH_STREAM: str = 'depth'             # the depth's name in the depth's message group
+CONFIDENCE_STREAM: str = 'confidence'   # its confidence's
 
 
 @dataclass
@@ -187,11 +192,16 @@ def add_pose_chain(pipeline: dai.Pipeline, frames: dai.Node.Output, fps: float, 
 
 def add_depth(pipeline: dai.Pipeline, fps: float, model: DepthModel) -> tuple[dai.Node.Output, dai.Node.Input]:
     """Neural Depth off the stereo pair, on the left camera's view, aligned on the GPU and not by `ImageAlign` (OAK4.md,
-    depth); returns the depth and its config input."""
+    depth); returns one message group a frame, its depth (`DEPTH_STREAM`) with its confidence (`CONFIDENCE_STREAM`),
+    and the config input."""
     left, right = [pipeline.create(dai.node.Camera).build(socket, sensorFps=fps).requestOutput(STEREO_SIZE, fps=fps)
                    for socket in STEREO_SOCKETS]
     neural: dai.node.NeuralDepth = pipeline.create(dai.node.NeuralDepth).build(left, right, DEPTH_MODELS[model])
-    return neural.depth, neural.inputConfig
+    sync: dai.node.Sync = pipeline.create(dai.node.Sync)
+    sync.setSyncThreshold(timedelta(seconds=CAPTURE_TOLERANCE))
+    neural.depth.link(sync.inputs[DEPTH_STREAM])
+    neural.confidence.link(sync.inputs[CONFIDENCE_STREAM])
+    return sync.out, neural.inputConfig
 
 
 def add_imu(pipeline: dai.Pipeline) -> dai.Node.Output:

@@ -30,7 +30,7 @@ class DepthAlignment:
     intrinsics: list[list[float]]           # the depth camera's 3x3 lens, px
     color_intrinsics: list[list[float]]     # the video camera's 3x3 lens, px
     color_size: tuple[int, int]             # the video frame's size
-    to_color: list[list[float]]             # the move from the depth camera to the video camera, 4x4, metres
+    to_color: list[list[float]]             # the move from the depth camera to the video camera, 4x4, meters
 
 
 @dataclass(frozen=True)
@@ -47,6 +47,7 @@ class CameraFrame:
     intrinsics: list[list[float]] | None = None     # its 3x3 lens, px
     alignment: DepthAlignment | None = None # a DEPTH frame on its own camera's view; None: on the video's already
     arrival: float | None = None            # its hand-over, s on `perf_counter`; None where `timestamp` is it
+    confidence: np.ndarray | None = None    # DEPTH: uint8 (H, W) on the depth's view, higher surer; None where the source has none
 
 
 def mirrored_image(frame: CameraFrame) -> np.ndarray:
