@@ -157,7 +157,8 @@ capture time and `synced`: this moment's own, or the newest from before. The syn
 runs (deep_flow: `Depth`, `Poses`), so each app's frames carry what it needs; a frame is complete with its image
 and, where the app has depth, its depth, and it waits for each model's result by that type's setting (`pose_wait`,
 `mask_wait`). Its submits queue the parts, at most 8 of a stream per camera (the oldest dropped, `dropped` on the
-panel), and its own thread matches them and hands every complete frame, in the order of capture, on. With
+panel), and its own thread matches them, waits for a waiting frame's deadline on a `modules.utils.Waker` (to the
+millisecond, and at once for a new part), and hands every complete frame, in the order of capture, on. With
 `pose_wait` 0 a frame never waits for its poses: it carries the poses of the frame before.
 
 ## Checks

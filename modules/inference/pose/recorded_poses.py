@@ -18,14 +18,14 @@ import heapq
 import logging
 import time
 from collections import defaultdict
-from threading import Condition, Lock, Thread
+from threading import Lock, Thread
 import numpy as np
 
 from modules.camera import CaptureStream, FrameType, MissedParts
 from modules.recording import FrameMetadata, FramePoses, PoseArrays
 from modules.pose import BBox, Frame, FrameDict, FrameDictCallbackMixin, Points2D, replace
 from modules.settings import BaseSettings, Field
-from modules.utils import Rect
+from modules.utils import Rect, Waker
 
 from ..preprocessing import crop
 from .pose_estimator import PoseEstimator
@@ -81,7 +81,8 @@ class RecordedPoses(FrameDictCallbackMixin):
         # The poses waiting for their moment: (due, order, poses), on this node's thread
         self._waiting: list[tuple[float, int, FrameDict]] = []
         self._order: int = 0
-        self._wake: Condition = Condition()
+        self._waiting_lock: Lock = Lock()
+        self._waker: Waker = Waker()
         self._running: bool = False
         self._thread: Thread | None = None
 
@@ -92,16 +93,18 @@ class RecordedPoses(FrameDictCallbackMixin):
         self._thread.start()
 
     def stop(self) -> None:
-        with self._wake:
+        with self._waiting_lock:
             self._running = False
             self._waiting.clear()
-            self._wake.notify()
+        self._waker.set()
         if self._thread is not None:
             self._thread.join(timeout=2.0)
+        if self._thread is None or not self._thread.is_alive():
+            self._waker.close()
         self._pose.stop()
 
     def reset(self) -> None:
-        with self._wake:
+        with self._waiting_lock:
             self._waiting.clear()
         self._pose.reset()
 
@@ -122,7 +125,7 @@ class RecordedPoses(FrameDictCallbackMixin):
         with self._lock:
             for recorded in self._recorded.values():
                 recorded.clear()
-        with self._wake:
+        with self._waiting_lock:
             self._waiting.clear()
 
     # ── The async step ─────────────────────────────────────────────────
@@ -154,20 +157,24 @@ class RecordedPoses(FrameDictCallbackMixin):
                 played[track_id] = frame
                 self.missed.count(cam_id, 'track_id')
         due: float = stamp + (metadata.pose_latency or 0.0)
-        with self._wake:
+        with self._waiting_lock:
             heapq.heappush(self._waiting, (due, self._order, played))
             self._order += 1
-            self._wake.notify()
+        self._waker.set()
 
     def _send(self) -> None:
         """This node's thread: each waiting frame's poses out at their moment."""
         while True:
-            with self._wake:
-                while self._running and (not self._waiting or self._waiting[0][0] > time.perf_counter()):
-                    self._wake.wait(self._waiting[0][0] - time.perf_counter() if self._waiting else None)
+            with self._waiting_lock:
                 if not self._running:
                     return
-                _, _, frames = heapq.heappop(self._waiting)
+                due: float | None = self._waiting[0][0] if self._waiting else None
+                frames: FrameDict | None = None
+                if due is not None and due <= time.perf_counter():
+                    _, _, frames = heapq.heappop(self._waiting)
+            if frames is None:
+                self._waker.wait(due)
+                continue
             self._notify_frames_callbacks(frames)
             self.missed.warn()
 

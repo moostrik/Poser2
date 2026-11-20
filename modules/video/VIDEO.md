@@ -46,14 +46,14 @@ The chunk held 2285 color and 2285 depth frames against 2285 metadata lines, at 
 missed; the screen take dropped no frame and saved in 24.6 s.
 
 A camera recording's stream is read by `StreamReader`: one decoder started with `popen`, its frames
-through the 8 MB pipe, its error lines logged. It waits for each frame's moment with `modules.utils.wait_until`: a
-timed `Event.wait` returns on Windows' 15.6 ms timer ticks, so it waits on its stop event only while more than a tick
-is left and sleeps the rest. In deep_flow `-sim` (20261112-130105_show, 50 fps, 20 s) **(measured 2026-11-20)**:
+through the 8 MB pipe, its error lines logged. It waits for each frame's moment on a `modules.utils.Waker`, which
+`stop` wakes: a timed `Event.wait` returns on Windows' 15.6 ms timer ticks. Its frame gaps in deep_flow `-sim`
+(20261112-130105_show, 50 fps, 20 s) **(measured 2026-11-20)**:
 
 | Pacing                   | Mean (ms) | p95 (ms) | Max (ms) | Over 30 ms |
 |--------------------------|-----------|----------|----------|------------|
 | `Event.wait` alone       | 19.99     | 31.8     | 33.5     | 267        |
-| `wait_until`             | 20.00     | 22.5     | 26.6     | 0          |
+| `Event.wait`, then sleep | 20.00     | 22.5     | 26.6     | 0          |
 
 The 8 MB pipe left the first row as it was through the default pipe.
 

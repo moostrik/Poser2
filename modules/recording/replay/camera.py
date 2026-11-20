@@ -18,14 +18,14 @@ boxes go through a host tracker (`Tracker`) and out as tracklets marked `straigh
 import heapq
 import logging
 import time
-from threading import Condition, Thread
+from threading import Lock, Thread
 from typing import Protocol
 
 import numpy as np
 
 from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, CameraFrameCallback, DepthAlignment, FrameReadings, FrameType, \
     RigCameraReadings, RigCameraSettings, TiltCorrection, TiltCorrectionSettings, TrackletCallback
-from modules.utils import FPS, Rect
+from modules.utils import FPS, Rect, Waker
 
 from ..container import ChunkInfo, FrameMetadata
 from .tracker import Track
@@ -79,7 +79,8 @@ class Camera:
         # The recorded tracklets waiting for their moment: (due, order, message), on this camera's thread
         self._waiting: list[tuple[float, int, CameraTracklets]] = []
         self._order: int = 0
-        self._wake: Condition = Condition()
+        self._lock: Lock = Lock()
+        self._waker: Waker = Waker()
         self._thread: Thread | None = None
 
         self.video_fps: FPS = FPS()
@@ -109,14 +110,17 @@ class Camera:
         self._thread.start()
 
     def stop(self) -> None:
-        with self._wake:
+        with self._lock:
             self.running = False
             self._waiting.clear()
-            self._wake.notify()
+        self._waker.set()
 
     def join(self, timeout: float | None = None) -> None:
         if self._thread is not None:
             self._thread.join(timeout)
+            if self._thread.is_alive():
+                return
+        self._waker.close()
 
     def add_frame_callback(self, callback: CameraFrameCallback) -> None:
         if self.running:
@@ -178,14 +182,14 @@ class Camera:
     def _on_jump(self) -> None:
         """The player starts somewhere that does not follow what played (a loop, a seek): what still waits
         belongs to the frames before it, and is dropped."""
-        with self._wake:
+        with self._lock:
             self._waiting.clear()
 
     def _queue_recorded(self, metadata: FrameMetadata, timestamp: float) -> None:
         """The frame's recorded tracklets, due their recorded latency after its stamp; none while the detector
         plays, or for a frame no tracklets came for."""
         playing_detector: bool = self.detector is not None and self.detector.enabled
-        with self._wake:
+        with self._lock:
             if metadata.tracklets is None or playing_detector:
                 return
             tracklets: list[CameraTracklet] = [CameraTracklet(cam_id=self.cam_id, id=t.id, status=t.status, roi=t.roi, age=t.age,
@@ -194,17 +198,21 @@ class Camera:
             due: float = timestamp + (metadata.tracklet_latency or 0.0)
             heapq.heappush(self._waiting, (due, self._order, message))
             self._order += 1
-            self._wake.notify()
+        self._waker.set()
 
     def _send_recorded(self) -> None:
         """This camera's thread: each waiting message out at its moment, stamped with its arrival."""
         while True:
-            with self._wake:
-                while self.running and (not self._waiting or self._waiting[0][0] > time.perf_counter()):
-                    self._wake.wait(self._waiting[0][0] - time.perf_counter() if self._waiting else None)
+            with self._lock:
                 if not self.running:
                     return
-                _, _, message = heapq.heappop(self._waiting)
+                due: float | None = self._waiting[0][0] if self._waiting else None
+                message: CameraTracklets | None = None
+                if due is not None and due <= time.perf_counter():
+                    _, _, message = heapq.heappop(self._waiting)
+            if message is None:
+                self._waker.wait(due)
+                continue
             self._emit_tracklets(CameraTracklets(message.cam_id, message.timestamp, message.tracklets, arrival=time.perf_counter()))
 
     # ── The detector's tracklets ───────────────────────────────────────

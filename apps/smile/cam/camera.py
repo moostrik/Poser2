@@ -12,7 +12,7 @@ its backend stamped), so a source that stopped is told from one that delivers (`
 
 import logging
 import os
-from threading import Condition, Lock, Thread
+from threading import Lock, Thread
 from time import perf_counter
 from typing import Any, Callable
 
@@ -21,6 +21,7 @@ import numpy as np
 
 from .settings import CameraSettings
 from modules.camera import CameraFrame, CameraSource
+from modules.utils import Waker
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,8 @@ class Camera:
         self._image: np.ndarray | None = None
         self._online: bool = False          # the online source has the image: the device and the image source are muted
         # The newest frame handed over (the device's or the phone's) and when it arrived, for this thread to fit
-        self._wake: Condition = Condition()
+        self._lock: Lock = Lock()
+        self._waker: Waker = Waker()
         self._handed: tuple[np.ndarray, float] | None = None
 
         self._running: bool = False
@@ -98,10 +100,11 @@ class Camera:
         self.settings.unbind(CameraSettings.image, self._on_image)
         self.settings.unbind(CameraSettings.reload, self._on_reload)
         if self._running:
-            with self._wake:
+            with self._lock:
                 self._running = False
-                self._wake.notify()
+            self._waker.set()
             self._thread.join()
+        self._waker.close()
         if self._device is not None:
             self._device.stop()
             self._device.join()
@@ -134,9 +137,9 @@ class Camera:
         self._hand_over(frame.image, frame.timestamp)
 
     def _hand_over(self, image: np.ndarray, arrived: float) -> None:
-        with self._wake:
+        with self._lock:
             self._handed = (image, arrived)
-            self._wake.notify()
+        self._waker.set()
 
     # ONLINE SOURCE: the frames of a phone during its turn (modules/online/), in place of the device
     # and the image; the device keeps running underneath and is back the moment the turn ends
@@ -163,10 +166,12 @@ class Camera:
             image: np.ndarray | None = self._image
             image_on: bool = self.settings.use_image and image is not None and not self._online
             now: float = perf_counter()
-            timeout: float = min(READOUT_EVERY, max(0.0, next_image - now)) if image_on else READOUT_EVERY
-            with self._wake:
-                if self._running and self._handed is None:
-                    self._wake.wait(timeout)
+            deadline: float = min(now + READOUT_EVERY, max(now, next_image)) if image_on else now + READOUT_EVERY
+            with self._lock:
+                idle: bool = self._running and self._handed is None
+            if idle:
+                self._waker.wait(deadline)
+            with self._lock:
                 if not self._running:
                     return
                 handed: tuple[np.ndarray, float] | None = self._handed
@@ -176,8 +181,8 @@ class Camera:
                     self._emit(cover(handed[0], self._width, self._height), handed[1])
                 now = perf_counter()
                 if image_on and image is not None and now >= next_image:
-                    # on an absolute schedule: a wait's timeout is late by up to the system tick (15.6 ms), so
-                    # each image is due a period after the last one's due time, not after it came out
+                    # on an absolute schedule: each image is due a period after the last one's due time, not after
+                    # it came out
                     next_image = max(next_image + 1.0 / IMAGE_FPS, now - 1.0 / IMAGE_FPS)
                     self._emit(image, now)
             except Exception:

@@ -10,7 +10,7 @@ from threading import Thread, Event, Lock
 from typing import Callable, Protocol
 import time
 
-from modules.utils import wait_until
+from modules.utils import Waker
 
 from .depth_frame import DEPTH_PIX_FMT, depth_frame_bytes, p012_to_depth
 from .hardware import Hardware, hwaccel_args
@@ -71,6 +71,7 @@ class StreamReader:
 
         self._play_thread: Thread | None = None
         self.stop_event = Event()
+        self._waker: Waker = Waker()      # wakes the play thread's wait for a frame's moment on stop
 
         self.chunk_id: int
         self.start_frame: int = 0
@@ -109,6 +110,7 @@ class StreamReader:
         and a reader still loading ends it when the load is done. One that plays has its decoder ended
         here too, so a read waiting on a decoder that stalled returns and the reader's thread ends."""
         self.stop_event.set()
+        self._waker.set()
         if self._play_thread is None:
             self._close()
             return
@@ -124,6 +126,7 @@ class StreamReader:
         if self._play_thread is not None:
             self._play_thread.join()
             self._play_thread = None
+        self._waker.close()
 
     def _load(self, video_file: str, chunk_id: int, start_frame: int = 0, end_frame: int | None = None) -> None:
         try:
@@ -242,7 +245,7 @@ class StreamReader:
                 if now - due > frame_interval:
                     due = self.schedule.catch_up(self.cam_id, frame_count, now)     # behind: every reader comes later, together
                 due = max(due, next_time)           # never before the frame before it
-                if wait_until(due, self.stop_event.wait):
+                if self._waker.wait(due):
                     break               # stopped while it waited
                 next_time = due
 
@@ -254,7 +257,7 @@ class StreamReader:
             next_time += frame_interval
             remaining: float = next_time - time.perf_counter()
             if remaining > 0:
-                wait_until(next_time, self.stop_event.wait)
+                self._waker.wait(next_time)
             elif -remaining > frame_interval:
                 next_time = time.perf_counter()   # resync after a stall rather than bursting catch-up frames
         self._close()

@@ -54,6 +54,10 @@ class WakerTest(unittest.TestCase):
         self.assertTrue(self.waker.wait(None))
         self.assertGreaterEqual(time.perf_counter() - started, 0.04)
 
+    def test_a_set_after_close_does_nothing(self) -> None:
+        self.waker.close()
+        self.waker.set()
+
     def test_a_busy_python_thread_runs_while_it_waits(self) -> None:
         # The woken thread asks the busy one for the GIL with a timed wait of the switch interval, which on Windows
         # ends on the system tick: beside a pure-Python loop a wake comes up to one tick late, as time.sleep's does.

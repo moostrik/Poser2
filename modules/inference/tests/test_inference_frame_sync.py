@@ -52,9 +52,11 @@ class InferenceFrameSyncTest(unittest.TestCase):
         self.settings.initialize()
         self.sync = InferenceFrameSync(self.settings, (Depth, Poses, Masks))
         self.frames: list[InferenceFrame] = []
+        self.came: list[float] = []
         self.threads: list[str] = []
 
         def on_frame(frame: InferenceFrame) -> None:
+            self.came.append(time.perf_counter())
             self.frames.append(frame)
             self.threads.append(threading.current_thread().name)
         self.sync.add_frame_callback(on_frame)
@@ -118,6 +120,21 @@ class InferenceFrameSyncTest(unittest.TestCase):
         self.assertGreaterEqual(time.perf_counter() - start, 0.004)
         self.assertFalse(self.frames[0][Poses].synced)
         self.assertEqual(self.frames[0][Poses].poses[0].timestamp, 1.0 - FRAME)
+
+    def test_a_frame_that_waits_goes_out_at_its_deadline_not_on_the_timer_tick(self) -> None:
+        for wait_ms in (1.0, 10.0):
+            self.settings.pose_wait = wait_ms
+            t: float = 1.0 + len(self.frames) * 2 * FRAME
+            self.sync.submit(poses(t - FRAME))
+            self.sync.submit_image(image(t))
+            self.sync.settle()
+            start: float = time.perf_counter()
+            self.sync.submit(depth(t))
+            count: int = len(self.frames) + 1
+            self.assertTrue(wait_for(lambda: len(self.frames) == count))
+            waited: float = self.came[-1] - start
+            self.assertGreaterEqual(waited, wait_ms / 1000.0)
+            self.assertLess(waited, wait_ms / 1000.0 + 0.004, f'a {wait_ms:.0f} ms wait took {waited * 1000:.1f} ms')
 
     def test_after_a_wait_that_ran_out_the_next_frame_does_not_wait(self) -> None:
         self.settings.pose_wait = 5.0

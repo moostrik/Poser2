@@ -59,7 +59,7 @@ if sys.platform == 'win32':
         """A wait for a `perf_counter` deadline that `set()` ends at once: a high-resolution waitable timer and an
         event, waited on together. A producer calls `set()` for a new item, and stop calls it after setting its stop
         flag. A `set()` stays until the next wait takes it, so a wake is never lost. One thread waits on a Waker;
-        `close()` frees its handles once that thread has stopped."""
+        `close()` frees its handles once that thread has stopped, and a `set()` after it does nothing."""
 
         def __init__(self) -> None:
             timer = _CreateWaitableTimerExW(None, None, _CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, _TIMER_ALL_ACCESS)
@@ -72,11 +72,13 @@ if sys.platform == 'win32':
             self._timer: int | None = timer
             self._event: int | None = event
             self._handles = (wintypes.HANDLE * 2)(event, timer)
+            self._lock = threading.Lock()   # guards the event handle between set() and close()
 
         def set(self) -> None:
             """Wake the waiting thread, or the next wait if none waits."""
-            assert self._event is not None, 'Waker is closed'
-            _check(_SetEvent(self._event), 'SetEvent')
+            with self._lock:
+                if self._event is not None:
+                    _check(_SetEvent(self._event), 'SetEvent')
 
         def wait(self, deadline: float | None) -> bool:
             """True when woken by `set()`, False at `deadline` (a `perf_counter` time); `None` waits for a wake only."""
@@ -99,11 +101,12 @@ if sys.platform == 'win32':
 
         def close(self) -> None:
             """Free the timer and the event."""
-            for handle in (self._timer, self._event):
-                if handle:
-                    _CloseHandle(handle)
-            self._timer = None
-            self._event = None
+            with self._lock:
+                for handle in (self._timer, self._event):
+                    if handle:
+                        _CloseHandle(handle)
+                self._timer = None
+                self._event = None
 
 else:
     class Waker:

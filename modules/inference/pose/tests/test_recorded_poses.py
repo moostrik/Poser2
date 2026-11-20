@@ -88,6 +88,17 @@ class RecordedPosesTest(unittest.TestCase):
         np.testing.assert_array_almost_equal(frames[3][Points2D].values, POINTS[:, :2])
         self.assertEqual(self.inference.model_runs, 0)                                    # no model
 
+    def test_the_poses_go_out_at_their_moment_not_on_the_timer_tick(self) -> None:
+        for latency in (0.001, 0.018):
+            self.played.clear()
+            captured = time.perf_counter()
+            self.clip(captured, 10.0, {3: (BOX, POINTS)}, latency)
+            self.node.submit({3: pose(3, captured)}, CROPS)
+            self.assertTrue(wait_for(lambda: self.played))
+            late = self.played[0][0] - (captured + latency)
+            self.assertGreaterEqual(late, 0.0)
+            self.assertLess(late, 0.003, f'{latency * 1000:.0f} ms latency came {late * 1000:.1f} ms late')
+
     def test_a_track_id_the_recording_has_not_goes_on_without_points_and_is_counted(self) -> None:
         captured = time.perf_counter()
         self.clip(captured, 10.0, {3: (BOX, POINTS)}, 0.0)

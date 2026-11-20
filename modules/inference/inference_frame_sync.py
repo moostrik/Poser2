@@ -26,12 +26,12 @@ import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, replace
 from enum import IntEnum, auto
-from threading import Condition, Event, Lock, Thread
+from threading import Event, Lock, Thread
 from typing import Any, Callable
 
 from modules.camera import CAPTURE_TOLERANCE, CaptureStream, MissedParts
 from modules.settings import BaseSettings, Field
-from modules.utils import PerformanceTimer
+from modules.utils import PerformanceTimer, Waker
 
 from .inference_frame import Depth, InferenceFrame, InferenceFrameCallback, InferenceResult, Masks, Poses
 from .preprocessing import GpuImage
@@ -87,7 +87,7 @@ class InferenceFrameSync(Thread):
         self._has_depth: bool = Depth in results
         self._waited: tuple[type[InferenceResult], ...] = tuple(kind for kind in results if kind is not Depth)
         self._lock: Lock = Lock()                       # the inbox
-        self._wake: Condition = Condition(self._lock)
+        self._waker: Waker = Waker()
         self._running: bool = False
         self._inbox: deque[tuple[_Part, int, Any, float]] = deque()      # each with the moment it was queued
         self._wait: PerformanceTimer = PerformanceTimer(name="Wait inference frame sync")
@@ -125,7 +125,7 @@ class InferenceFrameSync(Thread):
             dropped: list[tuple[_Part, int, Any, float]] = list(self._inbox)
             self._inbox.clear()
             self._queued.clear()
-            self._wake.notify()
+        self._waker.set()
         parts: int = 0
         for part, _, value, _ in dropped:
             if part == _Part.SETTLE:
@@ -136,21 +136,22 @@ class InferenceFrameSync(Thread):
             logger.info("InferenceFrameSync: %d parts dropped at stop", parts)
         if self.is_alive():
             self.join(timeout=2.0)
+        if not self.is_alive():
+            self._waker.close()
 
     def run(self) -> None:
         """Match what came in, in the order it came, and send out a waiting frame whose deadline has passed."""
         while True:
             with self._lock:
-                while self._running and not self._inbox:
-                    remaining: float | None = self._remaining()
-                    if remaining is not None and remaining <= 0.0:
-                        break
-                    self._wake.wait(remaining)
                 if not self._running:
                     return
                 parts: list[tuple[_Part, int, Any, float]] = list(self._inbox)
                 self._inbox.clear()
                 self._queued.clear()
+                deadline: float | None = self._deadline()
+            if not parts and (deadline is None or deadline > time.perf_counter()):
+                self._waker.wait(deadline)
+                continue
             try:
                 taken: float = time.perf_counter()
                 frames: list[InferenceFrame] = []
@@ -194,7 +195,7 @@ class InferenceFrameSync(Thread):
     def _queue(self, part: _Part, cam_id: int, value: Any) -> None:
         """Into the inbox, the stream's oldest dropped beyond `KEPT`. Before `start` an error; after `stop` dropped (a
         settle returns at once)."""
-        with self._wake:
+        with self._lock:
             if not self._running:
                 if self._stopped:
                     if part == _Part.SETTLE:
@@ -212,7 +213,7 @@ class InferenceFrameSync(Thread):
             else:
                 self._queued[key] += 1
             self._inbox.append((part, cam_id, value, time.perf_counter()))
-            self._wake.notify()
+        self._waker.set()
 
     # ── Matching, on the sync's thread ─────────────────────────────────
 
@@ -271,11 +272,11 @@ class InferenceFrameSync(Thread):
             last = timestamp
         return frames
 
-    def _remaining(self) -> float | None:
-        """The seconds until the earliest waiting frame's deadline; None while none waits."""
+    def _deadline(self) -> float | None:
+        """The earliest waiting frame's deadline (perf_counter); None while none waits."""
         if not self._waiting:
             return None
-        return min(waiting.deadline for waiting in list(self._waiting.values())) - time.perf_counter()
+        return min(waiting.deadline for waiting in self._waiting.values())
 
     def _overdue(self) -> list[InferenceFrame]:
         """The waiting frames whose deadline has passed."""

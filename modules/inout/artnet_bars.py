@@ -5,14 +5,14 @@ Each instance controls one controller (one IP) with two bars.
 """
 
 from enum import IntEnum
-from threading import Thread, Event, Lock
+from threading import Thread, Lock
 import socket
 import time
 
 from stupidArtnet import StupidArtnet
 
 from modules.settings import BaseSettings, Field, Widget, Access
-from modules.utils import Color, wait_until
+from modules.utils import Color, Waker
 from .net_probe import validate_connection
 
 import logging
@@ -136,7 +136,7 @@ class ArtNetBars:
 
         # Threading
         self._running: bool = False
-        self._update_event: Event = Event()
+        self._waker: Waker = Waker()
         self._thread: Thread | None = None
         self._dirty: bool = True  # Frame needs recalculation
 
@@ -170,10 +170,14 @@ class ArtNetBars:
             return
 
         self._running = False
-        self._update_event.set()  # Wake up thread to exit
+        self._waker.set()  # Wake up thread to exit
 
+        stopped: bool = True
         if self._thread:
             self._thread.join(timeout=1.0)
+            stopped = not self._thread.is_alive()
+            if not stopped:
+                logger.warning("ArtNetBars %s: thread did not stop within 1 s", self.settings.ip)
             self._thread = None
 
         # Blackout using internal method
@@ -182,6 +186,8 @@ class ArtNetBars:
         # Clean up bindings
         self.settings.unbind_all(self._on_settings_change)
         self.settings.unbind(ArtNetBarsSettings.enabled, self._on_enabled_change)
+        if stopped:
+            self._waker.close()
 
         if self.settings.verbose:
             logger.info(f"Stopped output to {self.settings.ip}")
@@ -211,7 +217,7 @@ class ArtNetBars:
     def _on_settings_change(self, _=None) -> None:
         """Called on any settings change - mark dirty and wake thread."""
         self._dirty = True
-        self._update_event.set()
+        self._waker.set()
 
     def _validate_and_reinit_artnet(self) -> None:
         """Reinitialize ArtNet connection after IP change with validation."""
@@ -246,7 +252,7 @@ class ArtNetBars:
         # Stop everything first if running
         if was_running:
             self._running = False
-            self._update_event.set()
+            self._waker.set()
             if self._thread:
                 self._thread.join(timeout=2.0)
                 self._thread = None
@@ -390,9 +396,6 @@ class ArtNetBars:
         next_frame: float = time.perf_counter()
         while self._running:
             try:
-                # Cleared before the work, so a settings change that lands during it wakes the next wait
-                self._update_event.clear()
-
                 # Periodic dirty trigger: ensure send at least once per interval
                 current_time: float = time.perf_counter()
                 if current_time - self._last_periodic_time >= self._periodic_interval:
@@ -411,7 +414,7 @@ class ArtNetBars:
                 now: float = time.perf_counter()
                 if now - next_frame > frame_time:
                     next_frame = now
-                if not wait_until(next_frame + frame_time, self._update_event.wait):
+                if not self._waker.wait(next_frame + frame_time):
                     next_frame += frame_time
             except socket.error as e:
                 logger.error(f"ArtNetBars ERROR: Socket error with exception: {e}")
