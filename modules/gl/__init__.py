@@ -20,7 +20,7 @@ from .texture_2d_array import Texture2DArray, SwapTexture2DArray
 from .layered_fbo import LayeredFbo
 from .fbo import Fbo, SwapFbo
 from .storage_buffer import StorageBuffer
-from .image import Image
+from .image import ChannelOrder, Image
 from .tensor import Tensor
 
 # SHADERS (after the texture classes: they import `Texture` from this package)

@@ -3,7 +3,7 @@ from threading import Lock
 import numpy as np
 
 from ..face import FaceObservations
-from modules.gl import Image
+from modules.gl import ChannelOrder, Image
 
 
 class Faces:
@@ -27,12 +27,12 @@ class Inputs:
     newest of each on the main thread. All images are OpenCV BGR."""
 
     def __init__(self) -> None:
-        self.camera: Image =            Image('BGR')    # live camera frames
-        self.capture: Image =           Image('BGR')    # the captured face, display crop
-        self.capture_depth: Image =     Image('BGR')    # depth of the capture, mask of the flash out
-        self.diffusion: Image =         Image('BGR')    # generated previews, portrait and grin frames
-        self.diffusion_depth: Image =   Image('BGR')    # depth of the last grin frame, mask of the bloom
-        self.white: Image =             Image('BGR')    # what the flash fades to
+        self.camera: Image =            Image(ChannelOrder.BGR)    # live camera frames
+        self.capture: Image =           Image(ChannelOrder.BGR)    # the captured face, display crop
+        self.capture_depth: Image =     Image(ChannelOrder.BGR)    # depth of the capture, mask of the flash out
+        self.diffusion: Image =         Image(ChannelOrder.BGR)    # generated previews, portrait and grin frames
+        self.diffusion_depth: Image =   Image(ChannelOrder.BGR)    # depth of the last grin frame, mask of the bloom
+        self.white: Image =             Image(ChannelOrder.BGR)    # what the flash fades to
         self.faces: Faces =             Faces()         # the faces of the newest camera frame
 
         self._all: list[Image] = [self.camera, self.capture, self.capture_depth,

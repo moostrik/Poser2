@@ -3,7 +3,7 @@ from enum import IntEnum
 from OpenGL.GL import glViewport
 
 from ...credit import FONT, TITLE_FONT, CreditLines, qr_image, title_image, wrap_balanced
-from modules.gl import Fbo, Image, Style, Text, Texture, shaders
+from modules.gl import ChannelOrder, Fbo, Image, Style, Text, Texture, shaders
 from modules.utils import Color
 from ..sequencer import SequenceType
 from ..settings import RenderSettings
@@ -73,8 +73,8 @@ class CreditLayer(LayerBase):
         self._targets: dict[CreditView, Fbo] = {CreditView.ROOM: self._fbo, CreditView.CELL: self._cell, CreditView.PHONE: self._clean}
         self._mix: shaders.Mix = shaders.Mix()
         self._text: Text = Text()
-        self._title: Image = Image('BGR')
-        self._qr: Image = Image('BGR')
+        self._title: Image = Image(ChannelOrder.BGR)
+        self._qr: Image = Image(ChannelOrder.BGR)
         self._qr_key: tuple[str, int] | None = None
         self._width: int = 1
         self._height: int = 1

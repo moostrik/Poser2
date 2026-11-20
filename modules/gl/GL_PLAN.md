@@ -21,7 +21,6 @@ frame (deduction). G1 and G2 wait for the coordinator's call on whether that gai
 
 ## H. The package held to the rules
 
-- H6. `Image`'s `channel_order` becomes an `IntEnum`, every caller with it.
 - H7. `__init__.py` drops the exports only gl's own tests use (`Window`, `WindowInput`, `WindowManager`, `Monitor`,
   `MonitorId`); the tests import them from their files.
 - H8. `Style` gets the blend equation (min, max), and flow's `particle_density.py` sets it through `Style`;

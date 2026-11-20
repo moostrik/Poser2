@@ -6,7 +6,7 @@ from .texture_format import data_type as texture_data_type, pixel_format
 from modules.utils import Rect
 import numpy as np
 from threading import Lock
-from typing import Literal
+from enum import IntEnum
 
 logger = logging.getLogger(__name__)
 
@@ -50,16 +50,22 @@ def _get_internal_format(image: np.ndarray) -> Constant:
     return GL_NONE
 
 
+class ChannelOrder(IntEnum):
+    """The order of a CPU image's color channels: RGB, or BGR as OpenCV keeps them."""
+    RGB = 0
+    BGR = 1
+
+
 class Image(Fbo):
     def __init__(self,
-                 channel_order: Literal['BGR', 'RGB'] = 'RGB',
+                 channel_order: ChannelOrder = ChannelOrder.RGB,
                  interpolation: int = GL_LINEAR,
                  wrap: int = GL_CLAMP_TO_EDGE,
                  border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)) -> None:
         """Initialize Image texture with specified channel order and texture settings.
 
         Args:
-            channel_order: Channel order for input images - 'BGR' (OpenCV default) or 'RGB' (standard)
+            channel_order: Channel order of the input images: BGR (OpenCV's) or RGB
             interpolation: Filter mode for min/mag (GL_LINEAR or GL_NEAREST)
             wrap: Wrap mode for both axes (GL_CLAMP_TO_EDGE, GL_REPEAT, GL_MIRRORED_REPEAT, GL_CLAMP_TO_BORDER)
             border_color: RGBA color when wrap is GL_CLAMP_TO_BORDER
@@ -68,7 +74,7 @@ class Image(Fbo):
         self._image: np.ndarray | None = None
         self._needs_update: bool = False
         self._mutex: Lock = Lock()
-        self._channel_order: Literal['BGR', 'RGB'] = channel_order
+        self._channel_order: ChannelOrder = channel_order
         self._source: Texture = Texture(interpolation, wrap, border_color)  # Private texture for numpy upload
         # Cache last uploaded dimensions/format to avoid redundant checks
         self._cached_width: int = 0
@@ -121,7 +127,7 @@ class Image(Fbo):
         self._source.width = width
         self._source.height = height
         self._source.internal_format = internal_format
-        self._source.format = pixel_format(internal_format, bgr=self._channel_order == 'BGR')
+        self._source.format = pixel_format(internal_format, bgr=self._channel_order == ChannelOrder.BGR)
         self._source.data_type = data_type
         self._source.tex_id = glGenTextures(1)
 

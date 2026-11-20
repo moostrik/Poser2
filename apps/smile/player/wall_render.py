@@ -11,7 +11,7 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA8, GL_RGBA16F, GL_SCISSOR_TES
 
 from ..credit import FONT, TITLE_FONT, qr_image, quiet_px, title_image, wrap_balanced
 from ..credit_scroll import TIMEOUT as SCROLL_TIMEOUT, name_strip, scroll_copies, scroll_gone
-from modules.gl import Fbo, Image, Shader, Style, SwapFbo, Text, Texture, shaders
+from modules.gl import ChannelOrder, Fbo, Image, Shader, Style, SwapFbo, Text, Texture, shaders
 from modules.utils import Color, Point2f, Quad
 from .settings import WallsSettings
 
@@ -122,7 +122,7 @@ class WallRender:
         self.height: int = ceil(len(ids) / self.COLUMNS) * self.CELL_HEIGHT
 
         self._ids: list[str] = ids
-        self._images: dict[str, Image] = {id: Image('BGR') for id in ids}
+        self._images: dict[str, Image] = {id: Image(ChannelOrder.BGR) for id in ids}
         # 1: first image of a sequence arrived (flash white), 2: flashed (draw the image directly), 0: playing
         self._initials: dict[str, int] = {id: 0 for id in ids}
         self._lit: dict[str, float] = {}       # cells the laughter test lights: id -> when the light ends
@@ -147,7 +147,7 @@ class WallRender:
         self._credit_cell: str | None = None
         self._credit_left: str | None = None
         self._credit_fbo: Fbo = Fbo()
-        self._credit_qr: Image = Image('BGR')
+        self._credit_qr: Image = Image(ChannelOrder.BGR)
         self._credit_key: tuple[str, str] | None = None     # the url and name the card was drawn with
         self._credit_name_text: Text = Text()
         # the online cell: its card like the credit's, and the main screen's picture during a turn
@@ -156,7 +156,7 @@ class WallRender:
         self._online_view: Texture | None = None
         self._online_page: str = ''
         self._online_fbo: Fbo = Fbo()
-        self._online_qr: Image = Image('BGR')
+        self._online_qr: Image = Image(ChannelOrder.BGR)
         self._online_key: str | None = None                 # the url the card was drawn with
         self._online_text: Text = Text()
         # the clips' captions: per cell a line, drawn with the title into a transparent portrait texture when
@@ -165,7 +165,7 @@ class WallRender:
         self._caption_drawn: dict[str, str | None] = {id: None for id in ids}
         self._caption_fbos: dict[str, Fbo] = {id: Fbo() for id in ids}
         self._caption_text: Text = Text()
-        self._caption_title: Image = Image('BGR')
+        self._caption_title: Image = Image(ChannelOrder.BGR)
         # the scrolling name: the words going round, a strip texture per word and size in use, and per cell a
         # transparent portrait texture with the parts of the strips on that screen
         self._scrolls: list[Scroll] = []
@@ -387,7 +387,7 @@ class WallRender:
             keys.add(key)
             strip: Image | None = self._scroll_strips.get(key)
             if strip is None:
-                strip = self._scroll_strips[key] = Image('BGR')
+                strip = self._scroll_strips[key] = Image(ChannelOrder.BGR)
                 strip.set_image(name_strip(scroll.name, height, scroll.size))
             strip.update()
             if not strip.allocated:
