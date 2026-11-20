@@ -1,5 +1,24 @@
-from ..engine import ModelWorkerSettings, Resolution, RESOLUTION_DIMS
+from enum import IntEnum, auto
+
 from modules.settings import Field
+
+from ..engine import ModelWorkerSettings
+
+
+class Resolution(IntEnum):
+    """The input sizes RVM was exported at."""
+    STANDARD = 0
+    HIGH = auto()
+    ULTRA = auto()
+    EXTREME = auto()
+
+
+RESOLUTION_DIMS: dict[Resolution, tuple[int, int]] = {  # (width, height)
+    Resolution.STANDARD: (192, 256),
+    Resolution.HIGH:     (288, 384),
+    Resolution.ULTRA:    (384, 512),
+    Resolution.EXTREME:  (768, 1024),
+}
 
 # The model of each resolution RVM was exported at, in FP16
 _MODELS: dict[Resolution, str] = {
