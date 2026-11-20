@@ -110,11 +110,14 @@ squares can overflow FP16's 65504 in other runtimes **(site fact: a LiteRT port 
 The pose is RTMPose-l trained on Body8, OpenMMLab's own checkpoint (76.7 COCO AP at 256x192, 78.3 at 384x288)
 **(seen: its weights against OpenMMLab's file; site fact: the AP)**. Every app runs the one model, 288x384
 (`PoseEstimatorSettings`): in the app a full room costs 2 to 3 ms more than at 192x256
-([TIMING.md](TIMING.md), "The pose's resolution for several players"), for 1.6 AP. What else was weighed
-(2026-11-18, online sources) sets these limits **(site fact)**: ViTPose gains as much for several times the time and
-needs a heatmap decode; the one-stage models (RTMO, YOLO-pose) score below RTMPose-l; Sapiens is too heavy and its
-weights non-commercial; the video models need future frames, 33 to 67 ms more; RTMPose-x gains 0.5 AP over
-RTMPose-l at 384x288 for nearly twice the file and the time.
+([TIMING.md](TIMING.md), "The pose's resolution for several players"), for 1.6 AP.
+
+The model is held to these limits **(site fact)**:
+- it runs in a fraction of ViTPose's time, which gains as much AP, and decodes without a heatmap
+- it is two-stage: the one-stage models (RTMO, YOLO-pose) score below RTMPose-l
+- its weights allow commercial use and it runs in the frame's time, which rules out Sapiens
+- it reads one frame: the video models need future frames, 33 to 67 ms more latency
+- it is the l size: RTMPose-x gains 0.5 AP at 384x288 for nearly twice the file and the time
 
 ## The upload
 
