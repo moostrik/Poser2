@@ -16,7 +16,8 @@ if TYPE_CHECKING:
 
 class InferenceFrameDepthLayer(LayerBase):
     """The depth of the frame it is given (`set_inference_frame`), the one its image and poses belong to, as the uploader
-    made it: metres in red, 0 where there is none, on the color image's view at the depth's own grid. Read NEAREST,
+    made it, an RG32F texture: meters in red and the confidence 0 to 1 in green, both 0 where there is no depth, on the
+    color image's view at the depth's own grid. Read NEAREST,
     so an edge never reads as a distance in between; beyond it is no depth. Taken into GL at the next update."""
 
     def __init__(self) -> None:

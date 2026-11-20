@@ -36,9 +36,10 @@ GpuImageCallback: TypeAlias = Callable[[GpuImage], None]
 
 @dataclass(frozen=True)
 class GpuDepth:
-    """One camera's depth frame on the GPU as the `SerialUploader` made it: float32 meters (H, W), 0 where there is none, on
-    the color image's view at a grid as fine as the depth itself (`aligned_depth_size`), rows down, straightened and
-    mirrored as the image is, with the frame's capture time. `ready` as a `GpuImage`'s."""
+    """One camera's depth frame on the GPU as the `SerialUploader` made it: float32 (H, W, 2), meters and the confidence
+    0 to 1, both 0 where there is no depth, the confidence 1 where the frame has none; on the color image's view at a
+    grid as fine as the depth itself (`aligned_depth_size`), rows down, straightened and mirrored as the image is, with
+    the frame's capture time. `ready` as a `GpuImage`'s."""
     cam_id: int
     timestamp: float
     depth: torch.Tensor

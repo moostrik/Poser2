@@ -20,19 +20,6 @@ so it goes the depth's whole way: camera, alignment, recording, view, motion. It
 as a frame of its own, so it is never paired with another frame's depth. A step in another thread's package is told to
 that thread when it is built.
 
-- **A2. The alignment.** The uploader stages the confidence beside the depth, in a pinned buffer of its own key, and
-  `DepthAligner` moves it with the depth that wins a cell: the atomic minimum's key is the depth's float bits with
-  255 − the confidence in the lowest 8, so the nearest point brings its own confidence in the one pass and, of two
-  equally near, the surer wins; 15 bits of depth precision, under 0.1 mm at 3 m, against the recording's 3 mm steps.
-  The result is one tensor (H, W, 2), the layout GL takes and the kernel writes: meters, and the confidence 0 to 1;
-  0 and 0 where nothing lands; a confidence of 1 where the frame has none (an older recording), so nothing after needs
-  a case for it. `GpuDepth.depth` says so; `InferenceFrameDepthLayer` takes it as it is, an RG32F texture: `Tensor`
-  infers the format, and its two uploads (`_update_with_pbo`, `_update_with_cpu`), which take only (C, H, W) now, take
-  (H, W, C) as `update` does. All three paths: the kernels, the torch ops (`scatter_reduce` on the key's int32 bits),
-  and the CUDA graph, captured with the confidence as a second input (255 where the frame has none). `depth_metres`
-  becomes `depth_meters`, and the file's comments say meters. Check: the preprocessing tests hold the kernels to the
-  torch ops, the confidence included; `depth_align_check.py` holds the meters to the GL shader as before. INFERENCE.md's
-  upload.
 - **A3. Recording it.** A chunk's `.mkv` holds the confidence as a third stream after the depth, written by
   `StreamWriter` as grey 8-bit HEVC on the iGPU (`ClipWriter`, built), with the depth's keyframes. It is not in the depth
   stream's empty chroma: the iGPU's `hevc_qsv` encodes 12 bits only as 4:2:0, which halves the confidence to 240 × 150,
@@ -75,9 +62,7 @@ The recordings measured so far have no confidence, so the motion's A/B needs a n
 
 ## Rules it touches
 
-- Fix a problem where it is made: A2, a missing confidence is 1 at the alignment, and `Tensor` takes (H, W, C) in its uploads.
-- Avoid unnecessary copies: A2, one tensor of two channels.
 - Keep settings files in sync with code changes: A5, deep_flow's `video_codec`.
-- A step checked by a run or a test is one commit: A2–A6, A3 and A4 apart.
+- A step checked by a run or a test is one commit: A3–A6, A3 and A4 apart.
 - Name a concept after what it is: `ChunkStream`, the recording's streams, beside the camera's `FrameType`.
 - Separate what the code or a measurement shows from what is inferred: the probe, A5.

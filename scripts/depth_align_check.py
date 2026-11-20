@@ -2,7 +2,7 @@
 
 Takes depth frames of a recording with their recorded alignment, mirrored as the replay mirrors it, runs each through
 both, level and straightened by the recorded tilt (and once by a steeper one), and compares them pixel for pixel; then
-times both on the GPU. Expected: equal to the float's last bits (fused multiply-adds round differently), and a handful
+times both on the GPU. Expected: equal to the 15 bits of the float the depth keeps beside its confidence, and a handful
 of border pixels taking a neighbor's depth where that rounding moves a landing point across a pixel edge.
 
     python scripts/depth_align_check.py [RECORDING] [--frames 40]
@@ -92,8 +92,8 @@ def main() -> int:
 
     def ours(path: str, frame: np.ndarray, homography: np.ndarray | None) -> np.ndarray:
         if path == 'kernels':
-            return aligner.align_staged(torch.from_numpy(frame).pin_memory(), to_ray, to_uv, homography, False, size).cpu().numpy()
-        return aligner.align(depth_meters(torch.from_numpy(frame.astype(np.int32)).cuda()), to_ray, to_uv, homography, False, size).cpu().numpy()
+            return aligner.align_staged(torch.from_numpy(frame).pin_memory(), None, to_ray, to_uv, homography, False, size)[..., 0].cpu().numpy()
+        return aligner.align(depth_meters(torch.from_numpy(frame.astype(np.int32)).cuda()), None, to_ray, to_uv, homography, False, size)[..., 0].cpu().numpy()
 
     for path in ('torch', 'kernels'):
         for label, extra in (('level', None), ('recorded tilt', 0.0), ('tilt + 15 deg', 15.0)):
@@ -126,8 +126,8 @@ def main() -> int:
     tensor = depth_meters(torch.from_numpy(frames[0].astype(np.int32)).cuda())
     staged = torch.from_numpy(frames[0]).pin_memory()
     timings: dict[str, float] = {}
-    for path, run in (('torch', lambda: aligner.align(tensor, to_ray, to_uv, None, False, size)),
-                      ('kernels', lambda: aligner.align_staged(staged, to_ray, to_uv, None, False, size))):
+    for path, run in (('torch', lambda: aligner.align(tensor, None, to_ray, to_uv, None, False, size)),
+                      ('kernels', lambda: aligner.align_staged(staged, None, to_ray, to_uv, None, False, size))):
         for _ in range(10):
             run()
         torch.cuda.synchronize()

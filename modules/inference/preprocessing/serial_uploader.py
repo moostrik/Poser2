@@ -257,7 +257,7 @@ class SerialUploader:
                 logger.exception("Error in finished GPU image callback")
 
     def _upload_depth(self, frame: CameraFrame) -> None:
-        """A depth frame to the GPU: meters, moved onto the color's view at its own grid, and handed on."""
+        """A depth frame to the GPU: meters and its confidence, moved onto the color's view at its own grid, and handed on."""
         cam_id: int = frame.cam_id
         image: np.ndarray = frame.image
         size: tuple[int, int] = (image.shape[1], image.shape[0])
@@ -271,12 +271,19 @@ class SerialUploader:
         key: tuple[int, str] = (cam_id, 'depth')       # beside the color stacks' keys in the upload's ring
         staging: torch.Tensor = self._image_upload.staging.buffer(key, image.shape, torch.from_numpy(image[:0]).dtype)
         staging.copy_(torch.from_numpy(image))
+        confidence_key: tuple[int, str] = (cam_id, 'confidence')
+        confidence: torch.Tensor | None = None
+        if frame.confidence is not None:
+            confidence = self._image_upload.staging.buffer(confidence_key, frame.confidence.shape, torch.uint8)
+            confidence.copy_(torch.from_numpy(frame.confidence))
         with torch.cuda.stream(self._stream):
-            depth: torch.Tensor = aligner.align_staged(staging, to_ray, to_uv, frame.homography, frame.flip_h, aligned_size,
-                                                       kernels=self.settings.depth_kernels)
+            depth: torch.Tensor = aligner.align_staged(staging, confidence, to_ray, to_uv, frame.homography, frame.flip_h,
+                                                       aligned_size, kernels=self.settings.depth_kernels)
             ready: torch.cuda.Event = torch.cuda.Event()
             ready.record(self._stream)
         self._image_upload.staging.queued(key, ready)
+        if confidence is not None:
+            self._image_upload.staging.queued(confidence_key, ready)
 
         gpu_depth: GpuDepth = GpuDepth(cam_id, frame.timestamp, depth, ready)
         with self._callback_lock:

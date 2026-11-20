@@ -130,18 +130,22 @@ class HandOffTest(unittest.TestCase):
         self.assertEqual(tuple(images[0].image.shape), (3, 48, 64))
         self.assertIs(images[0].frame, frame)              # the camera frame it was uploaded from
 
-    def test_the_depth_handed_on_is_meters_on_the_gpu_with_its_event(self) -> None:
+    def test_the_depth_handed_on_is_meters_and_confidence_on_the_gpu_with_its_event(self) -> None:
         depths: list[GpuDepth] = []
         self.uploader.add_gpu_depth_callback(depths.append)
         self.uploader.start()
         frame = _depth(3.0)
         frame.image[:] = 1500
+        sure = CameraFrame(0, FrameType.DEPTH, frame.image, 4.0, confidence=np.full((30, 40), 51, np.uint8))
         self.uploader.submit_frame(frame)
-        self.wait_for(1)
-        depths[0].ready.synchronize()
+        self.uploader.submit_frame(sure)
+        self.wait_for(2)
+        depths[1].ready.synchronize()
         self.assertTrue(depths[0].depth.is_cuda)
-        self.assertEqual(tuple(depths[0].depth.shape), (30, 40))        # no alignment: on the color's view already
-        self.assertAlmostEqual(float(depths[0].depth.max()), 1.5, places=5)
+        self.assertEqual(tuple(depths[0].depth.shape), (30, 40, 2))     # no alignment: on the color's view already
+        self.assertAlmostEqual(float(depths[0].depth[..., 0].max()), 1.5, places=5)
+        self.assertEqual(float(depths[0].depth[..., 1].max()), 1.0)    # the frame has none: sure
+        self.assertAlmostEqual(float(depths[1].depth[..., 1].max()), 0.2, places=5)
 
     def test_tracklets_are_straightened_with_their_own_frame(self) -> None:
         handed: list[CameraTracklets] = []

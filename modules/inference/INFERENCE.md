@@ -138,9 +138,14 @@ which every user of the camera needs:
   behind makes it wait. NV12 is read as BT.601 limited range with the chroma repeated, as `getCvFrame` reads an
   OAK4's frame, so the colors match the BGR it replaced; the torch ops repeat the chroma by a broadcast view, as
   `repeat_interleave` waits for the GPU to size its output;
-- the depth: copied the same way, through the same ring, turned into meters and moved onto the color's view at a
-  grid as fine as the depth itself (`aligned_depth_size`), the nearest kept where two land on one cell and 0 where nothing lands, straightened
-  and mirrored as the color, handed on as a `GpuDepth`.
+- the depth: copied the same way, through the same ring, its confidence beside it under a key of its own, turned
+  into meters and moved onto the color's view at a grid as fine as the depth itself (`aligned_depth_size`), the
+  nearest kept where two land on one cell and 0 where nothing lands, straightened and mirrored as the color, handed
+  on as a `GpuDepth`: one tensor (H, W, 2), meters and the confidence 0 to 1, the layout GL takes as RG32F. The
+  nearest point brings its own confidence: the minimum is taken on its depth's float bits with 255 − the confidence
+  in the lowest 8, so of two equally near the surer wins, and the depth keeps 15 bits, under 0.1 mm at 3 m against
+  a recording's 3 mm steps. A frame without a confidence (an older recording) reads 1, so nothing after it needs a
+  case for it.
 
 `CameraSync` groups one moment's frames of several cameras into a set, which `BatchUploader.submit_set` puts on the
 GPU as one stack (one copy, one round of kernels, when the frames share a size). It stays in this package: it
@@ -149,7 +154,7 @@ groups the frames for the upload, the input's first step, and holds nothing of a
 The kernels are CUDA C compiled at runtime by the NVRTC torch ships (`preprocessing/cuda_kernels.py`, through ctypes, no extra
 package). `camera.uploader.depth_kernels` off, or kernels that cannot be compiled or loaded (logged once), run the
 same in torch ops, the reference the tests and the harness hold the kernels to; the depth's then run as one CUDA
-graph per lens, homography and size. The torch ops are about a hundred small kernels; launched one by one they held
+graph per lens, homography and size, with the depth and the confidence its inputs (255 where the frame has none). The torch ops are about a hundred small kernels; launched one by one they held
 the uploader 12 ms a frame while the GPU's queue was full, as each launch waits there. `scripts/depth_align_check.py`
 holds both to the GL `DepthAlign` shader on recorded frames.
 

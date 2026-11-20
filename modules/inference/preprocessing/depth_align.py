@@ -8,6 +8,11 @@ nearest is kept, and a cell nothing lands on is 0. The value is the depth along 
 depth times the homography's third row (`video.z * corrected.z`), as a level camera would have measured it. Rows run
 down, as in the frame. `to_ray` and `to_uv` are `modules.camera.depth_projection`'s, the size `aligned_depth_size`.
 `scripts/depth_align_check.py` compares it with the GL shader on recorded frames.
+
+The depth pixel's confidence moves with it. The minimum is taken on one key a landing point: its depth's float bits
+with 255 − its confidence in the lowest 8 (`key`), so the nearest point brings its own confidence in the one pass and,
+of two equally near, the surer wins; the depth keeps 15 bits of its float's 23, under 0.1 mm at 3 m. The result is
+(H, W, 2): meters, and the confidence 0 to 1; 0 and 0 where nothing lands; a confidence of 1 where the frame has none.
 """
 
 import ctypes
@@ -23,10 +28,15 @@ logger = logging.getLogger(__name__)
 IDENTITY: np.ndarray = np.eye(3)
 BLOCK: tuple[int, int] = (16, 16)
 
+CONFIDENCE_BITS: int = 0xFF                 # a key's lowest 8 bits: 255 − the confidence
+DEPTH_BITS: int = ~CONFIDENCE_BITS          # the rest: the depth's float bits
+EMPTY_KEY: int = 0x7FFFFFFF                 # above every positive float's bits: nothing landed
+SURE: int = 255                             # the confidence of a frame that has none
+
 # The GL `DepthAlign` shader's two stages as CUDA kernels. SPLAT runs over the depth pixels: each goes to its point
 # in space, into the color frame, through the homography and the mirror, and lands on the 2x2 cells around it, the
-# nearest kept by an atomic minimum on the float's bits (positive floats order as their bits do). RESOLVE runs over
-# the cells: what landed becomes meters, the rest 0, and the minimum is emptied for the next frame. Rows run down.
+# nearest kept by an atomic minimum on its key (positive floats order as their bits do). RESOLVE runs over the cells:
+# what landed becomes meters and its confidence, the rest 0, and the minimum is emptied for the next frame. Rows run down.
 SOURCE: str = r"""
 struct Geometry {
     float to_ray[9];        // row-major 3x3: a depth pixel to its ray at unit depth
@@ -36,12 +46,14 @@ struct Geometry {
 };
 
 #define EMPTY 0xFFFFFFFFu
+#define CONFIDENCE_BITS 0xFFu
 
-extern "C" __global__ void splat(const unsigned short* depth, unsigned int* nearest, Geometry g) {
+extern "C" __global__ void splat(const unsigned short* depth, const unsigned char* confidence, unsigned int* nearest, Geometry g) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     if (x >= g.depth_width || y >= g.depth_height) return;
-    float meters = depth[y * g.depth_width + x] / 1000.0f;
+    int i = y * g.depth_width + x;
+    float meters = depth[i] / 1000.0f;
     if (meters <= 0.0f) return;
     const float* r = g.to_ray;
     float px = meters * (r[0] * x + r[1] * y + r[2]);
@@ -59,26 +71,27 @@ extern "C" __global__ void splat(const unsigned short* depth, unsigned int* near
     float u = (h[0] * fx + h[1] * fy + h[2]) / cz;
     float v = (h[3] * fx + h[4] * fy + h[5]) / cz;
     if (g.flip_h) u = 1.0f - u;
-    unsigned int level = __float_as_uint(vz * cz);
+    unsigned int key = (__float_as_uint(vz * cz) & ~CONFIDENCE_BITS) | (CONFIDENCE_BITS - confidence[i]);
     int cx = (int)floorf(u * g.out_width - 0.5f);
     int cy = (int)floorf(v * g.out_height - 0.5f);
     for (int dy = 0; dy < 2; ++dy) {
         for (int dx = 0; dx < 2; ++dx) {
             int tx = cx + dx, ty = cy + dy;
             if (tx >= 0 && ty >= 0 && tx < g.out_width && ty < g.out_height) {
-                atomicMin(&nearest[ty * g.out_width + tx], level);
+                atomicMin(&nearest[ty * g.out_width + tx], key);
             }
         }
     }
 }
 
-extern "C" __global__ void resolve(unsigned int* nearest, float* aligned, Geometry g) {
+extern "C" __global__ void resolve(unsigned int* nearest, float2* aligned, Geometry g) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     if (x >= g.out_width || y >= g.out_height) return;
     int i = y * g.out_width + x;
-    unsigned int level = nearest[i];
-    aligned[i] = level == EMPTY ? 0.0f : __uint_as_float(level);
+    unsigned int key = nearest[i];
+    aligned[i] = key == EMPTY ? make_float2(0.0f, 0.0f)
+        : make_float2(__uint_as_float(key & ~CONFIDENCE_BITS), (CONFIDENCE_BITS - (key & CONFIDENCE_BITS)) / 255.0f);
     nearest[i] = EMPTY;
 }
 """
@@ -122,9 +135,10 @@ class DepthAligner:
         self._kernels: CudaKernels = CudaKernels(SOURCE, ('splat', 'resolve'), 'DepthAligner')
         self._kernels_failed: bool = False
         self._source: torch.Tensor | None = None
+        self._confidence: torch.Tensor | None = None
         self._nearest: torch.Tensor | None = None
-        # without the kernels, `align` as a CUDA graph: what it was captured for, the graph, its input and its output
-        self._captured: tuple[tuple, torch.cuda.CUDAGraph, torch.Tensor, torch.Tensor] | None = None
+        # without the kernels, `align` as a CUDA graph: what it was captured for, the graph, its two inputs and its output
+        self._captured: tuple[tuple, torch.cuda.CUDAGraph, torch.Tensor, torch.Tensor, torch.Tensor] | None = None
 
     def _matrix(self, name: str, matrix: np.ndarray, device: torch.device) -> torch.Tensor:
         cached: tuple[int, torch.Tensor] | None = self._matrices.get(name)
@@ -142,10 +156,11 @@ class DepthAligner:
             self._rays = (id(to_ray), size, device, self._matrix('to_ray', to_ray, device) @ pixels)
         return self._rays[3]
 
-    def align(self, depth: torch.Tensor, to_ray: np.ndarray, to_uv: np.ndarray, homography: np.ndarray | None, flip_h: bool,
-              size: tuple[int, int]) -> torch.Tensor:
-        """`depth` (H, W) meters, 0 for none, on the depth camera's view, as (height, width) = `size[::-1]` meters on
-        the color frame's view, queued on the current stream."""
+    def align(self, depth: torch.Tensor, confidence: torch.Tensor | None, to_ray: np.ndarray, to_uv: np.ndarray,
+              homography: np.ndarray | None, flip_h: bool, size: tuple[int, int]) -> torch.Tensor:
+        """`depth` (H, W) meters, 0 for none, and its `confidence` (H, W) 0 to 255 (None: 255), on the depth camera's
+        view, as (height, width, 2) = (*`size[::-1]`, 2), meters and the confidence 0 to 1, on the color frame's view,
+        queued on the current stream."""
         device: torch.device = depth.device
         height, width = depth.shape
         out_w, out_h = size
@@ -166,65 +181,84 @@ class DepthAligner:
         if flip_h:
             u = 1.0 - u
         valid: torch.Tensor = (meters > 0.0) & (vz > 0.0) & (cz > 0.0)
-        level: torch.Tensor = torch.where(valid, vz * cz, float('inf'))
-        u = torch.where(valid, u, 0.0)     # a point that lands nowhere: a cell index that is a number
+        level: torch.Tensor = torch.where(valid, vz * cz, 1.0)     # a point that lands nowhere: a key that is a number
+        u = torch.where(valid, u, 0.0)     # and a cell index that is one
         v = torch.where(valid, v, 0.0)
+        unsure: torch.Tensor | int = 0 if confidence is None else SURE - confidence.reshape(-1).to(torch.int32)
+        key: torch.Tensor = (level.contiguous().view(torch.int32) & DEPTH_BITS) | unsure
 
         # The four cells around each point at once, (4, N): a kernel per step, not per step and corner
         corners: torch.Tensor = self._matrix('corners', CORNER_OFFSETS, device)      # (4, 2)
         tx: torch.Tensor = torch.floor(u * out_w - 0.5) + corners[:, :1]
         ty: torch.Tensor = torch.floor(v * out_h - 0.5) + corners[:, 1:]
-        inside: torch.Tensor = (tx >= 0) & (ty >= 0) & (tx < out_w) & (ty < out_h)
+        inside: torch.Tensor = valid & (tx >= 0) & (ty >= 0) & (tx < out_w) & (ty < out_h)
         indices: torch.Tensor = (ty.clamp(0, out_h - 1) * out_w + tx.clamp(0, out_w - 1)).to(torch.int64)
-        values: torch.Tensor = torch.where(inside, level, float('inf'))
-        nearest: torch.Tensor = torch.full((out_h * out_w,), float('inf'), device=device, dtype=torch.float32)
+        values: torch.Tensor = torch.where(inside, key, EMPTY_KEY)
+        nearest: torch.Tensor = torch.full((out_h * out_w,), EMPTY_KEY, device=device, dtype=torch.int32)
         nearest.scatter_reduce_(0, indices.reshape(-1), values.reshape(-1), reduce='amin')
-        return torch.where(torch.isinf(nearest), 0.0, nearest).reshape(out_h, out_w)
+        empty: torch.Tensor = nearest == EMPTY_KEY
+        aligned_meters: torch.Tensor = (nearest & DEPTH_BITS).view(torch.float32)
+        aligned_confidence: torch.Tensor = (SURE - (nearest & CONFIDENCE_BITS)).to(torch.float32) / SURE
+        aligned: torch.Tensor = torch.stack((aligned_meters, aligned_confidence), dim=-1)
+        return torch.where(empty[:, None], 0.0, aligned).reshape(out_h, out_w, 2)
 
-    def align_staged(self, staged: torch.Tensor, to_ray: np.ndarray, to_uv: np.ndarray, homography: np.ndarray | None, flip_h: bool,
-                     size: tuple[int, int], kernels: bool = True) -> torch.Tensor:
-        """`staged`, the depth frame's uint16 millimeters (H, W) in a pinned buffer, aligned as `align` does, queued on
-        the current stream; the result is a tensor of its own. With `kernels`, as a copy and two CUDA kernels compiled
-        at runtime (`SOURCE`), the GL shader's two stages; without, or where they cannot be compiled (logged once), as
-        `align` captured in a CUDA graph, its hundred small kernels launched as one."""
+    def align_staged(self, staged: torch.Tensor, confidence: torch.Tensor | None, to_ray: np.ndarray, to_uv: np.ndarray,
+                     homography: np.ndarray | None, flip_h: bool, size: tuple[int, int], kernels: bool = True) -> torch.Tensor:
+        """`staged`, the depth frame's uint16 millimeters (H, W), and its `confidence`, uint8 (H, W) or None, each in a
+        pinned buffer, aligned as `align` does, queued on the current stream; the result is a tensor of its own. With
+        `kernels`, as copies and two CUDA kernels compiled at runtime (`SOURCE`), the GL shader's two stages; without,
+        or where they cannot be compiled (logged once), as `align` captured in a CUDA graph, its hundred small kernels
+        launched as one."""
         if kernels and not self._kernels_failed:
             try:
-                return self._align_kernels(staged, to_ray, to_uv, homography, flip_h, size)
+                return self._align_kernels(staged, confidence, to_ray, to_uv, homography, flip_h, size)
             except (CudaKernelError, OSError):
                 logger.exception("DepthAligner: the CUDA kernels failed; the depth is aligned by torch ops from now on")
                 self._kernels_failed = True
-        return self._align_graph(staged, to_ray, to_uv, homography, flip_h, size)
+        return self._align_graph(staged, confidence, to_ray, to_uv, homography, flip_h, size)
 
-    def _align_kernels(self, staged: torch.Tensor, to_ray: np.ndarray, to_uv: np.ndarray, homography: np.ndarray | None, flip_h: bool,
-                       size: tuple[int, int]) -> torch.Tensor:
-        """SPLAT: each depth pixel lands on its 2x2 cells with an atomic minimum; RESOLVE: the cells become meters and
-        are emptied for the next frame."""
+    def _staged_confidence(self, target: torch.Tensor, confidence: torch.Tensor | None) -> None:
+        """The frame's confidence copied into `target` on the GPU, or 255 where the frame has none."""
+        if confidence is None:
+            target.fill_(SURE)
+        else:
+            target.copy_(confidence, non_blocking=True)
+
+    def _align_kernels(self, staged: torch.Tensor, confidence: torch.Tensor | None, to_ray: np.ndarray, to_uv: np.ndarray,
+                       homography: np.ndarray | None, flip_h: bool, size: tuple[int, int]) -> torch.Tensor:
+        """SPLAT: each depth pixel lands on its 2x2 cells with an atomic minimum on its key; RESOLVE: the cells become
+        meters and the confidence and are emptied for the next frame."""
         stream: torch.cuda.Stream = torch.cuda.current_stream()
         height, width = staged.shape
         out_w, out_h = size
         if self._source is None or self._source.shape != staged.shape:
             self._source = torch.empty(staged.shape, dtype=torch.int16, device='cuda')     # the millimeters' bits, read as unsigned
+            self._confidence = torch.empty(staged.shape, dtype=torch.uint8, device='cuda')
+        assert self._confidence is not None
         if self._nearest is None or self._nearest.numel() != out_w * out_h:
             self._nearest = torch.full((out_h * out_w,), -1, dtype=torch.int32, device='cuda')     # empty: all bits set
         self._source.copy_(staged.view(torch.int16), non_blocking=True)
-        aligned: torch.Tensor = torch.empty((out_h, out_w), dtype=torch.float32, device='cuda')
+        self._staged_confidence(self._confidence, confidence)
+        aligned: torch.Tensor = torch.empty((out_h, out_w, 2), dtype=torch.float32, device='cuda')
         geometry: _Geometry = _geometry(to_ray, to_uv, homography, flip_h, (width, height), size)
         self._kernels.launch('splat', _grid(width, height), BLOCK, [ctypes.c_void_p(self._source.data_ptr()),
-                             ctypes.c_void_p(self._nearest.data_ptr()), geometry], stream)
+                             ctypes.c_void_p(self._confidence.data_ptr()), ctypes.c_void_p(self._nearest.data_ptr()), geometry],
+                             stream)
         self._kernels.launch('resolve', _grid(out_w, out_h), BLOCK, [ctypes.c_void_p(self._nearest.data_ptr()),
                              ctypes.c_void_p(aligned.data_ptr()), geometry], stream)
         return aligned
 
-    def _align_graph(self, staged: torch.Tensor, to_ray: np.ndarray, to_uv: np.ndarray, homography: np.ndarray | None, flip_h: bool,
-                     size: tuple[int, int]) -> torch.Tensor:
-        """`align` as one CUDA graph, captured once per lens, homography and size, which waits for the GPU once; its
-        output is copied out, as the next frame writes it again."""
+    def _align_graph(self, staged: torch.Tensor, confidence: torch.Tensor | None, to_ray: np.ndarray, to_uv: np.ndarray,
+                     homography: np.ndarray | None, flip_h: bool, size: tuple[int, int]) -> torch.Tensor:
+        """`align` as one CUDA graph, captured once per lens, homography and size, with the depth and the confidence
+        its inputs, which waits for the GPU once; its output is copied out, as the next frame writes it again."""
         key: tuple = (id(to_ray), id(to_uv), id(homography), flip_h, size, tuple(staged.shape), staged.dtype)
         if self._captured is None or self._captured[0] != key:
             self._capture(key, staged, to_ray, to_uv, homography, flip_h, size)
         assert self._captured is not None
-        _, graph, source, aligned = self._captured
+        _, graph, source, source_confidence, aligned = self._captured
         source.copy_(staged, non_blocking=True)
+        self._staged_confidence(source_confidence, confidence)
         graph.replay()
         return aligned.clone()
 
@@ -232,14 +266,15 @@ class DepthAligner:
                  flip_h: bool, size: tuple[int, int]) -> None:
         self._captured = None
         source: torch.Tensor = torch.zeros(staged.shape, dtype=staged.dtype, device='cuda')
+        source_confidence: torch.Tensor = torch.full(staged.shape, SURE, dtype=torch.uint8, device='cuda')
         stream: torch.cuda.Stream = torch.cuda.current_stream()
         warm_up: torch.cuda.Stream = torch.cuda.Stream()
         warm_up.wait_stream(stream)
         with torch.cuda.stream(warm_up):            # the rays, the matrices and the kernels made before the capture
             for _ in range(2):
-                self.align(depth_meters(source), to_ray, to_uv, homography, flip_h, size)
+                self.align(depth_meters(source), source_confidence, to_ray, to_uv, homography, flip_h, size)
         stream.wait_stream(warm_up)
         graph: torch.cuda.CUDAGraph = torch.cuda.CUDAGraph()
         with torch.cuda.graph(graph, capture_error_mode='thread_local'):      # the other threads' GPU work goes on
-            aligned: torch.Tensor = self.align(depth_meters(source), to_ray, to_uv, homography, flip_h, size)
-        self._captured = (key, graph, source, aligned)
+            aligned: torch.Tensor = self.align(depth_meters(source), source_confidence, to_ray, to_uv, homography, flip_h, size)
+        self._captured = (key, graph, source, source_confidence, aligned)

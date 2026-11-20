@@ -33,16 +33,7 @@ def infer_internal_format(tensor: "torch.Tensor") -> Constant:
     Returns:
         OpenGL internal format constant
     """
-    # Detect channel count
-    if len(tensor.shape) == 2:
-        channels = 1
-    elif len(tensor.shape) == 3:
-        if tensor.shape[0] <= 4:  # (C, H, W)
-            channels = tensor.shape[0]
-        else:  # (H, W, C)
-            channels = tensor.shape[2]
-    else:
-        channels = 1
+    channels: int = interleaved(tensor).shape[2] if len(tensor.shape) == 3 else 1
 
     # Determine precision from dtype
     if tensor.dtype == torch.uint8:
@@ -53,6 +44,14 @@ def infer_internal_format(tensor: "torch.Tensor") -> Constant:
         format_map = {1: GL_R32F, 2: GL_RG32F, 3: GL_RGB32F, 4: GL_RGBA32F}
 
     return format_map.get(channels, GL_R32F)
+
+
+def interleaved(tensor: "torch.Tensor") -> "torch.Tensor":
+    """The tensor with its channels last, as OpenGL takes them: (H, W) and (H, W, C) as they are, (C, H, W), C up to
+    4, permuted to (H, W, C)."""
+    if len(tensor.shape) == 3 and tensor.shape[0] <= 4:
+        return tensor.permute(1, 2, 0)
+    return tensor
 
 
 class Tensor(Texture):
@@ -171,16 +170,9 @@ class Tensor(Texture):
             return
 
         try:
-            # Detect tensor dimensions
-            if len(tensor.shape) == 2:  # (H, W)
-                height, width = tensor.shape
-            elif len(tensor.shape) == 3:
-                if tensor.shape[0] <= 4:  # (C, H, W)
-                    channels, height, width = tensor.shape
-                else:  # (H, W, C)
-                    height, width, channels = tensor.shape
-            else:
+            if len(tensor.shape) not in (2, 3):
                 raise ValueError(f"Unsupported tensor shape: {tensor.shape}")
+            height, width = interleaved(tensor).shape[:2]
 
             # Infer internal format from tensor
             internal_format = infer_internal_format(tensor)
@@ -233,15 +225,8 @@ class Tensor(Texture):
             elif tensor.dtype != torch.float32:
                 tensor = tensor.float()
 
-        # Convert CHW to HWC (OpenGL expects interleaved channels)
-        if len(tensor.shape) == 3:
-            # Expect CHW format: (C, H, W) with C <= 4
-            if tensor.shape[0] > 4:
-                raise ValueError(f"Expected CHW format (C, H, W) with C <= 4, got shape {tensor.shape}")
-            tensor = tensor.permute(1, 2, 0)  # (C, H, W) -> (H, W, C)
-
-        # Flip vertically to match OpenGL/FBO/Image convention
-        tensor = torch.flip(tensor, [0])
+        # Channels last, then flipped vertically to match OpenGL/FBO/Image convention
+        tensor = torch.flip(interleaved(tensor), [0])
 
         # Ensure contiguous memory for GPU copy
         tensor = tensor.contiguous()
@@ -286,16 +271,8 @@ class Tensor(Texture):
 
         Preserves uint8, FP16, or FP32 precision based on internal format.
         """
-        # Convert CHW to HWC (OpenGL expects interleaved channels)
-        if len(tensor.shape) == 3:
-            # Expect CHW format: (C, H, W) with C <= 4
-            if tensor.shape[0] > 4:
-                raise ValueError(f"Expected CHW format (C, H, W) with C <= 4, got shape {tensor.shape}")
-            tensor = tensor.permute(1, 2, 0)  # (C, H, W) -> (H, W, C)
-
-        # Flip vertically to match OpenGL/FBO/Image convention
-        # After permute, shape is (H, W) or (H, W, C), so flip dimension [0] (height)
-        tensor = torch.flip(tensor, [0])
+        # Channels last, then flipped vertically to match OpenGL/FBO/Image convention
+        tensor = torch.flip(interleaved(tensor), [0])
 
         # Convert to appropriate dtype and move to CPU
         bytes_per_channel = format_bytes_per_channel(self.internal_format)
