@@ -18,7 +18,7 @@ class FlowPresetTest(unittest.TestCase):
 
     def test_presets_load_into_the_2d_flow(self) -> None:
         for preset in PRESETS:
-            render: dict = json.loads(preset.read_text(encoding='utf-8'))['render']
+            render: dict = json.loads(preset.read_text(encoding='utf-8'))['setup']['render']
             for stage, cls in STAGES.items():
                 with self.subTest(preset=preset.name, stage=stage):
                     settings: BaseSettings = cls()

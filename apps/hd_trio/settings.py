@@ -512,7 +512,8 @@ class WindowsSettings(WindowManagerSettings):
     window_3: Group[WindowSettings]        = Group(WindowSettings)
 
 
-class Settings(BaseSettings):
+class SetupSettings(BaseSettings):
+    """The machine and the site: the cameras, the pose, the render, the windows and the links."""
     max_players: Field[int]   = Field(3, access=Field.INIT)
     num_cams   : Field[int]   = Field(3, access=Field.INIT, description="Number of cameras")
     input_fps  : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
@@ -526,3 +527,7 @@ class Settings(BaseSettings):
     panel : Group[PanelSettings] = Group(PanelSettings)
     session: Group[SessionGroup] = Group(SessionGroup, share=[num_cams, input_fps.as_('fps')])
     cadence: Group[CadenceSettings] = Group(CadenceSettings)
+
+
+class Settings(BaseSettings):
+    setup: Group[SetupSettings] = Group(SetupSettings)

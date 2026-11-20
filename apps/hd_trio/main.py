@@ -40,67 +40,67 @@ class HDTrioMain:
         preset_file = presets.startup_path()
         if not presets.load(self.settings, preset_file):
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
-        self.settings.camera.sim_enabled = simulation
+        self.settings.setup.camera.sim_enabled = simulation
         if not interface:
-            self.settings.panel.browser = False  # launcher override; the preset cannot turn it back on
-        self.settings.render.intro_sequence.arm_record = False     # never armed at start (HD_TRIO.md, The intro figure)
-        pose_crop = self.settings.pose.pose_crop                   # cut at the pose model's input size (HD_TRIO.md, Input)
-        pose_crop.output_width = self.settings.pose.pose.width
-        pose_crop.output_height = self.settings.pose.pose.height
+            self.settings.setup.panel.browser = False  # launcher override; the preset cannot turn it back on
+        self.settings.setup.render.intro_sequence.arm_record = False     # never armed at start (HD_TRIO.md, The intro figure)
+        pose_crop = self.settings.setup.pose.pose_crop                   # cut at the pose model's input size (HD_TRIO.md, Input)
+        pose_crop.output_width = self.settings.setup.pose.pose.width
+        pose_crop.output_height = self.settings.setup.pose.pose.height
         self.settings.initialize()
-        self.panel_server = PanelServer(self.settings, self.settings.panel, on_exit=self.stop)
+        self.panel_server = PanelServer(self.settings, self.settings.setup.panel, on_exit=self.stop)
 
-        max_players: int = self.settings.max_players
-        num_cams: int = self.settings.num_cams
-        ps = self.settings.pose
+        max_players: int = self.settings.setup.max_players
+        num_cams: int = self.settings.setup.num_cams
+        ps = self.settings.setup.pose
 
         # BLACKBOARD
         self.board = RenderBoard()
 
         # SESSION
-        self.session = Session(self.settings.session.control)
-        self.session_osc = OscReceiver(self.settings.session.osc)
+        self.session = Session(self.settings.setup.session.control)
+        self.session_osc = OscReceiver(self.settings.setup.session.osc)
         self.session_osc.bind('/start/recording', self._on_osc_start_recording)
         self.session_osc.bind('/stop/recording',  self._on_osc_stop_recording)
         self.session_osc.bind('/group/id',        self._on_osc_group_id)
-        self.osc_sound = OscSound(self.settings.inout.osc_sound)
-        self.sequencer = Sequencer(self.settings.session.sequencer)
+        self.osc_sound = OscSound(self.settings.setup.inout.osc_sound)
+        self.sequencer = Sequencer(self.settings.setup.session.sequencer)
         self.sequencer.add_state_callback(self.board.set_sequencer_state)
         self.sequencer.add_state_callback(self.osc_sound.set_sequencer_state)
-        self.video_recorder = VideoRecorder(self.settings.session.video, data_path=DATA_PATH)
-        self.pose_recorder = PoseRecorder(self.settings.session.pose, data_path=DATA_PATH)
+        self.video_recorder = VideoRecorder(self.settings.setup.session.video, data_path=DATA_PATH)
+        self.pose_recorder = PoseRecorder(self.settings.setup.session.pose, data_path=DATA_PATH)
 
         # The intro figure's recorder, outside the session's shared start and stop (HD_TRIO.md, The intro figure)
-        self.intro_recorder = PoseRecorder(self.settings.render.intro_sequence.recorder, data_path=DATA_PATH)
+        self.intro_recorder = PoseRecorder(self.settings.setup.render.intro_sequence.recorder, data_path=DATA_PATH)
         self._prev_in_record_window: bool = False
         self.sequencer.add_state_callback(self._on_show_state)
-        self.settings.render.intro_sequence.bind(IntroSequenceSettings.arm_record, self._on_arm_record)
+        self.settings.setup.render.intro_sequence.bind(IntroSequenceSettings.arm_record, self._on_arm_record)
         self.artnet_controllers: list[ArtNetBars] = []
         for i in range(max_players):
-            self.artnet_controllers.append(ArtNetBars(self.settings.inout.artnets[i]))
+            self.artnet_controllers.append(ArtNetBars(self.settings.setup.inout.artnets[i]))
 
         # CAMERA
         self.cameras: list[CameraSource] = []
         self.player: Player | None = None
         self.person_detector: person.PersonDetector | None = None      # the replay backend's, shared by its cameras
-        if self.settings.camera.sim_enabled:
-            self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH)
-            if self.settings.camera.simulator.replay:
+        if self.settings.setup.camera.sim_enabled:
+            self.player = Player(self.settings.setup.camera.simulator, data_path=DATA_PATH)
+            if self.settings.setup.camera.simulator.replay:
                 # the recordings on the host, without a device: the people found and followed here
-                if self.settings.camera.yolo:
-                    self.person_detector = person.PersonDetector(self.settings.camera.person_detector)
+                if self.settings.setup.camera.yolo:
+                    self.person_detector = person.PersonDetector(self.settings.setup.camera.person_detector)
                 for i in range(num_cams):
-                    self.cameras.append(replay.Camera(self.player, self.settings.camera.cameras[i], self.person_detector, replay.Tracker(), i))
+                    self.cameras.append(replay.Camera(self.player, self.settings.setup.camera.cameras[i], self.person_detector, replay.Tracker(), i))
             else:
                 for i in range(num_cams):
-                    self.cameras.append(ClipCamera(self.player, self.settings.camera.cameras[i]))
+                    self.cameras.append(ClipCamera(self.player, self.settings.setup.camera.cameras[i]))
         else:
             for i in range(num_cams):
-                self.cameras.append(Camera(self.settings.camera.cameras[i]))
-        self.frame_sync: CameraSync[CameraFrame] = CameraSync(self.settings.camera.frame_sync, 'frame_sync')
+                self.cameras.append(Camera(self.settings.setup.camera.cameras[i]))
+        self.frame_sync: CameraSync[CameraFrame] = CameraSync(self.settings.setup.camera.frame_sync, 'frame_sync')
         self.uploader = BatchUploader()          # a synced set of the cameras' frames onto the GPU as one batch, on its own thread
-        self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
-        self.tracklet_sync: CameraSync[CameraTracklets] = CameraSync(self.settings.camera.tracklet_sync, 'tracklet_sync')
+        self.tracker = OnePerCamTracker(self.settings.setup.camera.tracker, max_players)
+        self.tracklet_sync: CameraSync[CameraTracklets] = CameraSync(self.settings.setup.camera.tracklet_sync, 'tracklet_sync')
         # The frame domain's async step: the crop step in (the pose model's crops and the segmentation's, in one pass,
         # from the same images and boxes), the pose model out
         self.crops = CropExtractor(ps.pose_crop, ps.segmentation_crop)
@@ -119,7 +119,7 @@ class HDTrioMain:
         # What each camera's captures wait for from the first: live and through the clip camera, the device sends
         # tracklets (a replay's come or not with the recording); the crop step says per set whether it asked poses
         # (`_on_asked`)
-        device_tracklets: bool = not (self.settings.camera.sim_enabled and self.settings.camera.simulator.replay)
+        device_tracklets: bool = not (self.settings.setup.camera.sim_enabled and self.settings.setup.camera.simulator.replay)
         for i in range(num_cams):
             self.video_recorder.expect_parts(i, tracklets=device_tracklets, poses=True)
 
@@ -175,12 +175,12 @@ class HDTrioMain:
         self.window_correlator.add_similarity_callback(self.similarity_hold.set)
 
         # CAMERA HEALTH — each camera's IMU reading and frame rate against the preset, as pinned indicators
-        self.camera_health = CameraHealth(self.settings.camera.cameras, self.settings.camera.camera_health)
+        self.camera_health = CameraHealth(self.settings.setup.camera.cameras, self.settings.setup.camera.camera_health)
 
         # RENDER
-        self.render = HDTrioRender(self.board, self.settings.render, self.settings.windows, self.settings.camera.cameras,
-                                   self.settings.camera.camera_health, data_path=DATA_PATH)
-        self.settings.windows.bind(WindowManagerSettings.avg_fps, self._on_render_fps)
+        self.render = HDTrioRender(self.board, self.settings.setup.render, self.settings.setup.windows, self.settings.setup.camera.cameras,
+                                   self.settings.setup.camera.camera_health, data_path=DATA_PATH)
+        self.settings.setup.windows.bind(WindowManagerSettings.avg_fps, self._on_render_fps)
         self.render.add_update_callback(self.camera_health.update)
         self.render.add_update_callback(self._update_drops)
         self.render.add_update_callback(self.sequencer.update)
@@ -225,7 +225,7 @@ class HDTrioMain:
     def _on_asked(self, timestamp: float, cam_id: int, asked: FrameDict) -> None:
         """A set's poses for one camera, on the frame source's thread: the recorder hears whether poses come for the
         camera's image, so a frame without a player does not wait."""
-        posing: bool = self.settings.pose.pose.enabled or any(has_points(frame) for frame in asked.values())
+        posing: bool = self.settings.setup.pose.pose.enabled or any(has_points(frame) for frame in asked.values())
         self.video_recorder.expect_poses(cam_id, timestamp, bool(asked) and posing)
 
     def _record_poses(self, frames: FrameDict) -> None:
@@ -235,7 +235,7 @@ class HDTrioMain:
 
     def _update_drops(self, _now: float) -> None:
         """The panel's drops, counted where they happen (the frame source's are on its own panel)."""
-        cadence = self.settings.cadence
+        cadence = self.settings.setup.cadence
         cadence.frame_sync_drops = self.frame_sync.dropped
         cadence.tracklet_sync_drops = self.tracklet_sync.dropped
         cadence.upload_drops = self.uploader.dropped
@@ -251,8 +251,8 @@ class HDTrioMain:
         self.is_running = False
 
         self.panel_server.stop()
-        self.settings.render.intro_sequence.unbind(IntroSequenceSettings.arm_record, self._on_arm_record)
-        self.settings.windows.unbind(WindowManagerSettings.avg_fps, self._on_render_fps)
+        self.settings.setup.render.intro_sequence.unbind(IntroSequenceSettings.arm_record, self._on_arm_record)
+        self.settings.setup.windows.unbind(WindowManagerSettings.avg_fps, self._on_render_fps)
         self.sequencer.stop()
 
         self.render.stop()
@@ -268,8 +268,8 @@ class HDTrioMain:
         self.pipeline.stop()
         self.video_recorder.stop()
         # a pose recorder writes its chunk on its stop button only
-        if self.settings.render.intro_sequence.recorder.recording:
-            PoseRecorderSettings.stop.fire(self.settings.render.intro_sequence.recorder)
+        if self.settings.setup.render.intro_sequence.recorder.recording:
+            PoseRecorderSettings.stop.fire(self.settings.setup.render.intro_sequence.recorder)
 
         self.tracker.stop()
         self.osc_sound.stop()
@@ -293,20 +293,20 @@ class HDTrioMain:
 
     def _on_arm_record(self, armed: bool) -> None:
         """Warn at arm time if the configured window can never open."""
-        intro = self.settings.render.intro_sequence
+        intro = self.settings.setup.render.intro_sequence
         if armed and intro.record_end < intro.record_start:
             logger.warning("intro record window is empty: record_end (%s) is before record_start (%s)",
                            intro.record_end.name, intro.record_start.name)
 
     def _submit_intro_frames(self, stage: Stage, frames: FrameDict) -> None:
         """Submit only the performer's track, so the intro file holds one figure."""
-        track_id: int = self.settings.render.intro_sequence.record_track
+        track_id: int = self.settings.setup.render.intro_sequence.record_track
         frame = frames.get(track_id)
         self.intro_recorder.submit_frames(stage, {track_id: frame} if frame is not None else {})
 
     def _on_show_state(self, state: SequencerState) -> None:
         """Start and stop the intro recording on its stage window, `record_start` to `record_end` in show order."""
-        intro = self.settings.render.intro_sequence
+        intro = self.settings.setup.render.intro_sequence
         stage = ShowStage(state.stage)
         in_window: bool = intro.record_start <= stage <= intro.record_end
         entering: bool = in_window and not self._prev_in_record_window
@@ -320,14 +320,14 @@ class HDTrioMain:
             intro.arm_record = False
 
     def _on_osc_start_recording(self, *_) -> None:
-        SessionSettings.start.fire(self.settings.session)
+        SessionSettings.start.fire(self.settings.setup.session)
 
     def _on_osc_stop_recording(self, *_) -> None:
-        SessionSettings.stop.fire(self.settings.session)
+        SessionSettings.stop.fire(self.settings.setup.session)
 
     def _on_osc_group_id(self, gid: str, *_) -> None:
-        self.settings.session.name = gid
+        self.settings.setup.session.name = gid
 
     def _on_render_fps(self, fps: int) -> None:
         if fps > 0:
-            self.settings.render_fps = float(fps)
+            self.settings.setup.render_fps = float(fps)
