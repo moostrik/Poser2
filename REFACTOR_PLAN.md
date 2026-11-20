@@ -14,7 +14,7 @@ What is to do now, across the threads, in order. Lines with the same number run 
 
 | # | Who                 | What                                                                                     | After            |
 |---|---------------------|------------------------------------------------------------------------------------------|------------------|
-| 1 | Inference, Refactor | The timing issue: the loops a new item wakes (INFERENCE_PLAN.md B, B's question)       |                  |
+| 1 | Refactor            | The timing issue: one `Waker` for every loop on a deadline (B1, B2)                      |                  |
 | 1 | Refactor            | Board held up to the rules, then one package at a time (A)                               |                  |
 | 2 | Camera              | Depth confidence from the camera to the motion (CAMERA_PLAN.md A)                        |                  |
 | 3 | GL Window           | The window manager: GLFW on the main thread, one kind of window, frame pacing (GL_PLAN.md)| the camera plan |
@@ -90,12 +90,31 @@ at most one tick late, every recorder together), white_space's motor sim (its fa
 `perf_counter`, so a late wait does not move them), smile's start loop (a 20 ms poll for loaded clips, at start-up
 only).
 
-### Question
+The textbook answer, and the one taken: a high-resolution waitable timer (`CREATE_WAITABLE_TIMER_HIGH_RESOLUTION`,
+Windows 10 1803 on) waited on together with a wake event (`WaitForMultipleObjects`). It returns at the deadline to
+about 1 ms, or at once when the event is set, without the system tick, without polling, and whether the window is
+shown or not; `time.sleep` uses the same timer since Python 3.11 **(deduction, from the documentation)**. On Linux
+a timed `threading.Event.wait` is already this precise.
 
-- Which loops a new item wakes still need `wait_until`'s `woken` check (1 ms steps in its last stretch, the lock
-  released between) — the replay camera's tracklets (`modules/recording/replay/camera.py`), smile's camera image
-  rate (`cam/camera.py`), and INFERENCE_PLAN.md B's `InferenceFrameSync` and `RecordedPoses` — or none, if the 1 ms
-  tick fixes them.
+- B1. `Waker` in `modules/utils`: `wait(deadline: float | None) -> bool` (True when woken, False at the deadline;
+  `None` waits for a wake only) and `set()`, which stays set until the next wait takes it, so a wake is never lost;
+  one thread waits on a `Waker`; `close()` frees its handles. Windows: the high-resolution timer and a Win32 event
+  through `ctypes` (the GIL released while waiting); elsewhere a `threading.Event`, cleared before the wait returns
+  so a later `set()` is kept. Checked by its tests (a deadline, a wake, a wake before the wait, `None`, a busy second
+  thread beside it) and 200 waits measured against B's table: lateness at the deadline and from `set()` to waking,
+  mean / p95 / max, with the window shown and minimized.
+- B2. Every loop on a deadline takes a `Waker` in one commit, and `wait_until` goes: the recording player
+  (`StreamReader`), `ArtNetBars`, the replay camera's tracklets, smile's camera image rate, `InferenceFrameSync`
+  and `RecordedPoses` (out of INFERENCE_PLAN.md B). A loop that holds a `Condition` keeps its lock for its data,
+  takes the deadline under it, and waits on the `Waker` outside it; the producer calls `waker.set()` instead of
+  `notify()`. A loop keeps its own stop flag (`stop_event`, `_running`), and stop sets it, then calls `set()`. Each
+  loop closes its `Waker` on teardown. With it: `modules/utils/__init__.py`'s `WAKE_STEP, wait_until` export,
+  `wait_until`'s tests (into the `Waker`'s), VIDEO.md's and INFERENCE.md's lines on the waits. Checked by each
+  package's tests, `InferenceFrameSync`'s and `RecordedPoses`' with a frame that waits for its deadline, and one
+  deep_flow `-sim` run against B's table: the player's frame gaps and the tracklets' lateness, with the window shown
+  and minimized.
+- The rules thread words the rule (CLAUDE.md Time, in place of "Pace a loop with `utils.wait_until`"), with
+  Matthias, before B2 is committed.
 
 ## C. Checks at the rig
 
@@ -119,5 +138,5 @@ only).
 ## The rules it touches
 
 - `CLAUDE.md` Project shape and Packages, what a package holds: A
-- `CLAUDE.md` Time, pace a loop with `utils.wait_until`: B
+- `CLAUDE.md` Time, a thread that waits for a moment waits on a `utils.Waker` (the rules thread's line): B
 - `CLAUDE.md` Settings, settings connect the user and a component, not two components: Parked
