@@ -8,7 +8,7 @@ every app uses them together, and the crop step and the detectors read the uploa
 on is in [INPUT_THREADS.md](../flow/INPUT_THREADS.md). **(deduction)** marks what is inferred.
 
 No code in the package is one app's: the face model is smile's alone, the segmentation hd_trio's and low_flow's,
-`RecordedPoses` deep_flow's, but each is general code with one user, as the camera's backends are.
+`RecordedPoses` deep_flow's and low_flow's, but each is general code with one user, as the camera's backends are.
 
 ## The parts
 
@@ -23,11 +23,11 @@ models share; each model has its package; the inference frame and its sync, whic
 | `DepthAligner`                       | `preprocessing/depth_align.py`, `cuda_kernels.py`   | the uploader's | the depth moved onto the color's view                              |
 | `CropExtractor`                      | `preprocessing/crop_extractor.py`, `crop.py`        | the caller's   | every player's box cut at every size, in one pass                  |
 | `PoseEstimator`                      | `pose/`                                             | its own        | RTMPose, 17 points a player                                        |
-| `RecordedPoses`                      | `pose/recorded_poses.py`                            | the caller's   | the recorded poses, in place of the pose model in -sim             |
+| `RecordedPoses`                      | `pose/recorded_poses.py`                            | its own        | the recorded poses, in place of the pose model in -sim             |
 | `Segmenter`                          | `segmentation/`                                     | its own        | Robust Video Matting, a mask a player                              |
 | `PersonDetector`                     | `person/`                                           | its own        | YOLOv8n, the players' boxes on the host (replay)                   |
 | `FaceDetector`                       | `face/`                                             | its own        | SCRFD and the 106 landmarks, the faces (smile)                     |
-| `ModelWorker`                        | `engine/model_worker.py`                            |                | the five workers' base                                             |
+| `ModelWorker`                        | `engine/model_worker.py`                            |                | the four workers' base                                             |
 | `Engine` (`OnnxEngine`, `TrtEngine`) | `engine/`                                           | the worker's   | a model file run on GPU tensors, ONNX Runtime or TensorRT          |
 | `InferenceFrameSync`                 | `inference_frame_sync.py`, `inference_frame.py`     | its own        | an image and the results of one moment, as an `InferenceFrame`     |
 
@@ -84,7 +84,7 @@ at and cuts the outputs back.
 
 | Model               | Worker                 | Input (width x height)  | Precision  | Batch, ONNX / TensorRT |
 |---------------------|------------------------|-------------------------|------------|------------------------|
-| RTMPose-l           | `PoseEstimator`        | 192x256 or 288x384      | FP16 (1)   | players, up to 8       |
+| RTMPose-l           | `PoseEstimator`        | 288x384                 | FP16 (1)   | players, up to 8       |
 | RVM MobileNetV3     | `Segmenter`            | 192x256 to 768x1024     | FP16       | players, up to 4       |
 | YOLOv8n             | `PersonDetector`       | 480x384 to 640x512      | the file's | one image per camera   |
 | SCRFD 10G, 2d106det | `FaceDetector`         | 640x640, 192x192        | the file's | an image, its faces    |

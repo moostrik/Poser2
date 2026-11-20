@@ -36,7 +36,7 @@ GpuImageCallback: TypeAlias = Callable[[GpuImage], None]
 
 @dataclass(frozen=True)
 class GpuDepth:
-    """One camera's depth frame on the GPU as the `SerialUploader` made it: float32 metres (H, W), 0 where there is none, on
+    """One camera's depth frame on the GPU as the `SerialUploader` made it: float32 meters (H, W), 0 where there is none, on
     the color image's view at a grid as fine as the depth itself (`aligned_depth_size`), rows down, straightened and
     mirrored as the image is, with the frame's capture time. `ready` as a `GpuImage`'s."""
     cam_id: int

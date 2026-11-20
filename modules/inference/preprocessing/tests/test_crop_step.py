@@ -10,13 +10,13 @@ import numpy as np
 import torch
 
 from modules.camera import CameraFrame, FrameType
-from modules.inference import CropExtractor, ImageSnapshot, SerialUploader, SerialUploaderSettings, crop, pose
+from modules.inference import CropExtractor, CropExtractorSettings, ImageSnapshot, SerialUploader, SerialUploaderSettings, crop, pose
 from modules.pose import BBox, Frame, PointLandmark, Points2D
 from modules.utils import Rect
 
 
-def crop_settings(width: int = 192, height: int = 256) -> crop.CropExtractorSettings:
-    settings = crop.CropExtractorSettings()
+def crop_settings(width: int = 192, height: int = 256) -> CropExtractorSettings:
+    settings = CropExtractorSettings()
     settings.output_width, settings.output_height = width, height
     settings.initialize()
     return settings

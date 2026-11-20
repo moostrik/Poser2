@@ -11,6 +11,7 @@ is dropped, counted in `dropped`. The sync's own thread decides the sets in the 
 each, by `cam_id`, to the set callbacks outside its lock. A submit before `start` is an error; one after `stop` is
 dropped."""
 
+import logging
 import math
 import time
 from collections import deque
@@ -21,7 +22,6 @@ from modules.camera import CameraFrame, CameraTracklets, FrameType
 from modules.settings import BaseSettings, Field
 from modules.utils import PerformanceTimer
 
-import logging
 logger = logging.getLogger(__name__)
 
 WAITING: int = 16       # messages per camera waiting for the sync's thread

@@ -7,7 +7,8 @@ import torch
 import torch.nn.functional as F
 
 from modules.pose import BBox, FrameDict, replace
-from .crop import AskedCallback, Image, CropImageDict, ImageCallback, CropExtractorSettings
+from modules.settings import BaseSettings, Field
+from .crop import AskedCallback, Image, CropImageDict, ImageCallback
 from .source import ImageDict, ImageSnapshot
 from modules.utils import PerformanceTimer, Rect, Point2f
 
@@ -15,6 +16,21 @@ logger = logging.getLogger(__name__)
 
 
 KEPT: int = 3      # snapshots kept: the frame source's waiting bangs (`TrackerFrameSource`'s WAITING) and the one it runs
+
+
+class CropExtractorSettings(BaseSettings):
+    """Configuration for GPU-based image cropping."""
+    # Padding around the person's box, as a fraction of it, on both axes. Live: it only moves the
+    # crop window. One value, not one per axis: the crop is then grown to the output's aspect, which
+    # recomputes one axis from the other, so only one padding ever counts — the height for a narrow
+    # (standing) box, the width for a wide one (arms out, crouching). RTMPose was trained on boxes
+    # padded by 0.25, scale-jittered around that.
+    padding:          Field[float] = Field(0.0, min=0.0, max=1.0, step=0.05,
+                                           description="Margin added around the box before cropping (fraction; RTMPose uses 0.25)")
+    output_width:     Field[int]   = Field(384, access=Field.INIT)
+    output_height:    Field[int]   = Field(512, access=Field.INIT)
+    max_players:        Field[int]   = Field(4, min=1, max=16, access=Field.INIT)
+    interval:         Field[int]   = Field(1, min=1, max=8, description="Frames from one cut to the next: 1 every frame, 2 every other")
 
 
 class CropExtractor:
@@ -206,7 +222,7 @@ class CropExtractor:
 
         if crop.shape[1] != size.output_height or crop.shape[2] != size.output_width:
             # Antialiased: a crop is usually larger than the output, and plain bilinear would sample
-            # only a 2×2 neighbourhood of each output pixel and alias. No effect when enlarging.
+            # only a 2×2 neighborhood of each output pixel and alias. No effect when enlarging.
             crop = F.interpolate(crop.unsqueeze(0), size=(size.output_height, size.output_width), mode='bilinear',
                                  align_corners=False, antialias=True).squeeze(0)
         return crop

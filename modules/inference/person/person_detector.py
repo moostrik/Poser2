@@ -1,5 +1,5 @@
 """A YOLO person detector on the host, for the replay backend: the uploaded images of every camera of a
-round in one batch, through ONNX Runtime or TensorRT, out as `Detection`s with boxes normalised to the frame.
+round in one batch, through ONNX Runtime or TensorRT, out as `Detection`s with boxes normalized to the frame.
 
 It takes the uploaded images (`GpuImage`), so a frame goes to the GPU once and nothing of it is worked
 on the CPU: each image is stretched whole into the model's input on the GPU, as the device manip does
@@ -20,7 +20,7 @@ from modules.utils import PerformanceTimer, Rect
 
 from ..engine import Engine, ModelWorker, make_engine
 from ..preprocessing import GpuImage
-from .decode import PERSON_ROWS, normalise, person_boxes
+from .decode import PERSON_ROWS, normalize, person_boxes
 from .detection import Detection, DetectionCallback
 from .settings import PersonDetectorSettings
 
@@ -76,7 +76,7 @@ class PersonDetector(ModelWorker[GpuImage, PersonDetectorSettings]):
         detections: list[Detection] = []
         for i, cam_id in enumerate(cam_ids):
             boxes, scores = person_boxes(output[i], confidence, overlap)
-            rects: np.ndarray = normalise(boxes, self.width, self.height)
+            rects: np.ndarray = normalize(boxes, self.width, self.height)
             detections.append(Detection(cam_id=cam_id, timestamp=items[cam_id].timestamp, boxes=[Rect(*map(float, r)) for r in rects],
                                         scores=[float(s) for s in scores]))
         self._timer.add_time((time.perf_counter() - start) * 1000.0, report=self.settings.verbose)

@@ -3,7 +3,7 @@ Runtime.
 
 It takes the uploaded images (`GpuImage`), so nothing of an image is worked on the CPU: it is fitted into SCRFD's
 640 input on the GPU (scaled to fit, top left, as insightface letterboxes it), and each face's square crop of 1.5
-times its box, levelled by its roll, is cut for the landmarks on the GPU too, all of an image's faces as one batch.
+times its box, leveled by its roll, is cut for the landmarks on the GPU too, all of an image's faces as one batch.
 Out goes a `FaceFrame` per image: its faces with what their points measure (`measures`), and the image they were
 found in, carried unread. A newer image of a camera replaces one still waiting: the latest wins."""
 

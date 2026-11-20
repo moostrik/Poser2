@@ -3,7 +3,7 @@
 Takes depth frames of a recording with their recorded alignment, mirrored as the replay mirrors it, runs each through
 both, level and straightened by the recorded tilt (and once by a steeper one), and compares them pixel for pixel; then
 times both on the GPU. Expected: equal to the float's last bits (fused multiply-adds round differently), and a handful
-of border pixels taking a neighbour's depth where that rounding moves a landing point across a pixel edge.
+of border pixels taking a neighbor's depth where that rounding moves a landing point across a pixel edge.
 
     python scripts/depth_align_check.py [RECORDING] [--frames 40]
 """
@@ -23,7 +23,7 @@ import monitor_harness as mh  # noqa: E402
 from modules.camera import (DepthAlignment, FrameType, TiltCorrection, TiltCorrectionSettings, aligned_depth_size, depth_projection)  # noqa: E402
 from modules.recording import read_metadata  # noqa: E402
 from modules.gl import Image, Texture  # noqa: E402
-from modules.inference.preprocessing import DepthAligner, depth_metres  # noqa: E402
+from modules.inference.preprocessing import DepthAligner, depth_meters  # noqa: E402
 from modules.inference.preprocessing.shaders import DepthAlign  # noqa: E402
 from modules.video import StreamReader  # noqa: E402
 
@@ -93,7 +93,7 @@ def main() -> int:
     def ours(path: str, frame: np.ndarray, homography: np.ndarray | None) -> np.ndarray:
         if path == 'kernels':
             return aligner.align_staged(torch.from_numpy(frame).pin_memory(), to_ray, to_uv, homography, False, size).cpu().numpy()
-        return aligner.align(depth_metres(torch.from_numpy(frame.astype(np.int32)).cuda()), to_ray, to_uv, homography, False, size).cpu().numpy()
+        return aligner.align(depth_meters(torch.from_numpy(frame.astype(np.int32)).cuda()), to_ray, to_uv, homography, False, size).cpu().numpy()
 
     for path in ('torch', 'kernels'):
         for label, extra in (('level', None), ('recorded tilt', 0.0), ('tilt + 15 deg', 15.0)):
@@ -106,11 +106,11 @@ def main() -> int:
                     correction = TiltCorrection(tilt_settings)
                     correction.update(tilt + extra, intrinsics, (info.width, info.height))
                     homography = correction.homography
-                metres = frame.astype(np.float32) / 1000.0
-                want = gl_align(shader, source, nearest, aligned, metres, to_ray, to_uv, homography)
+                meters = frame.astype(np.float32) / 1000.0
+                want = gl_align(shader, source, nearest, aligned, meters, to_ray, to_uv, homography)
                 got = ours(path, frame, homography)
                 diff = np.abs(got - want)
-                border = diff > 0.001                   # a neighbour's depth, not a rounding
+                border = diff > 0.001                   # a neighbor's depth, not a rounding
                 differing += int(border.sum())
                 both = (want > 0.0) & (got > 0.0) & ~border
                 if both.any():
@@ -121,9 +121,9 @@ def main() -> int:
                   f'(largest {largest:.4f} m); the rest within {rounding:.1e} of the depth')
             worst = max(worst, differing)
 
-    # GPU time per frame, each alone: torch from metres on the GPU; the kernels from the pinned millimetres, the copy included
-    metres_np = frames[0].astype(np.float32) / 1000.0
-    tensor = depth_metres(torch.from_numpy(frames[0].astype(np.int32)).cuda())
+    # GPU time per frame, each alone: torch from meters on the GPU; the kernels from the pinned millimeters, the copy included
+    meters_np = frames[0].astype(np.float32) / 1000.0
+    tensor = depth_meters(torch.from_numpy(frames[0].astype(np.int32)).cuda())
     staged = torch.from_numpy(frames[0]).pin_memory()
     timings: dict[str, float] = {}
     for path, run in (('torch', lambda: aligner.align(tensor, to_ray, to_uv, None, False, size)),
@@ -139,7 +139,7 @@ def main() -> int:
         torch.cuda.synchronize()
         timings[path] = start.elapsed_time(end) / 200
     for _ in range(10):
-        gl_align(shader, source, nearest, aligned, metres_np, to_ray, to_uv, None)
+        gl_align(shader, source, nearest, aligned, meters_np, to_ray, to_uv, None)
     t0 = time.perf_counter()
     for _ in range(200):
         shader.use(source, nearest, aligned, to_ray, to_uv, None, False)

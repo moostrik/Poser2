@@ -1,11 +1,11 @@
 """Tests for the YOLOv8 output decoding: the person class, the score threshold, the suppression
-of overlapping boxes and the normalisation to the frame."""
+of overlapping boxes and the normalization to the frame."""
 
 import unittest
 
 import numpy as np
 
-from modules.inference.person import person_boxes, nms, normalise
+from modules.inference.person import person_boxes, nms, normalize
 
 
 def output(candidates: list[tuple[float, float, float, float, float, float]], classes: int = 80) -> np.ndarray:
@@ -47,15 +47,15 @@ class NmsTest(unittest.TestCase):
         self.assertEqual(list(nms(boxes, scores, overlap=0.7)), [1, 0, 2])  # kept below 0.7
 
 
-class NormaliseTest(unittest.TestCase):
+class NormalizeTest(unittest.TestCase):
     def test_boxes_become_fractions_of_the_input_and_are_clipped(self) -> None:
         boxes = np.array([[128, 112, 256, 448], [-10, 0, 20, 500]], dtype=np.float32)
-        rects = normalise(boxes, width=512, height=448)
+        rects = normalize(boxes, width=512, height=448)
         np.testing.assert_allclose(rects[0], (0.25, 0.25, 0.25, 0.75))
         np.testing.assert_allclose(rects[1], (0.0, 0.0, 20 / 512, 1.0))
 
     def test_no_boxes(self) -> None:
-        self.assertEqual(normalise(np.empty((0, 4)), 512, 448).shape, (0, 4))
+        self.assertEqual(normalize(np.empty((0, 4)), 512, 448).shape, (0, 4))
 
 
 if __name__ == '__main__':

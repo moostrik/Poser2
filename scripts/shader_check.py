@@ -77,14 +77,14 @@ def texture(pixels: np.ndarray) -> Texture:
     return tex
 
 
-def depth_texture(metres: np.ndarray) -> Texture:
-    """A one-channel float texture holding `metres`, row 0 at GL's bottom."""
+def depth_texture(meters: np.ndarray) -> Texture:
+    """A one-channel float texture holding `meters`, row 0 at GL's bottom."""
     tex = Texture()
-    tex.allocate(metres.shape[1], metres.shape[0], GL_R32F)
+    tex.allocate(meters.shape[1], meters.shape[0], GL_R32F)
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
     glBindTexture(GL_TEXTURE_2D, tex.tex_id)
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, metres.shape[1], metres.shape[0], GL_RED, GL_FLOAT,
-                    np.ascontiguousarray(metres, dtype=np.float32))
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, meters.shape[1], meters.shape[0], GL_RED, GL_FLOAT,
+                    np.ascontiguousarray(meters, dtype=np.float32))
     glBindTexture(GL_TEXTURE_2D, 0)
     return tex
 

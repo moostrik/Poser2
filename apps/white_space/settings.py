@@ -250,7 +250,7 @@ class PoseGroup(BaseSettings):
 
     pose            : Group[inference.pose.PoseEstimatorSettings]         = Group(inference.pose.PoseEstimatorSettings, share=[max_players, model_type, onnx_path, engine_path, verbose])
     frame_source    : Group[TrackerFrameSourceSettings]      = Group(TrackerFrameSourceSettings)
-    pose_crop       : Group[inference.crop.CropExtractorSettings]         = Group(inference.crop.CropExtractorSettings, share=[max_players])
+    pose_crop       : Group[inference.CropExtractorSettings]         = Group(inference.CropExtractorSettings, share=[max_players])
     angle_extractor : Group[nodes.AngleExtractorSettings]    = Group(nodes.AngleExtractorSettings)
     angle_calibrator: Group[nodes.AngleCalibratorSettings]   = Group(nodes.AngleCalibratorSettings)
     leg_deviation_extractor: Group[nodes.LegDeviationExtractorSettings] = Group(nodes.LegDeviationExtractorSettings)

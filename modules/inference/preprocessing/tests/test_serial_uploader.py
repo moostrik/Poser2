@@ -38,7 +38,7 @@ class Nv12ToRgbTest(unittest.TestCase):
 
     def test_the_chroma_covers_every_pixel_of_its_block(self) -> None:
         luma = torch.full((2, 4), 81, dtype=torch.uint8)
-        chroma = torch.tensor([[90, 240, 128, 128]], dtype=torch.uint8)     # red, then grey
+        chroma = torch.tensor([[90, 240, 128, 128]], dtype=torch.uint8)     # red, then gray
         rgb = nv12_to_rgb(luma, chroma)
         self.assertEqual(rgb.shape, (3, 2, 4))
         self.assertGreater(float(rgb[0, 1, 1]), float(rgb[0, 1, 2]))
@@ -130,7 +130,7 @@ class HandOffTest(unittest.TestCase):
         self.assertEqual(tuple(images[0].image.shape), (3, 48, 64))
         self.assertIs(images[0].frame, frame)              # the camera frame it was uploaded from
 
-    def test_the_depth_handed_on_is_metres_on_the_gpu_with_its_event(self) -> None:
+    def test_the_depth_handed_on_is_meters_on_the_gpu_with_its_event(self) -> None:
         depths: list[GpuDepth] = []
         self.uploader.add_gpu_depth_callback(depths.append)
         self.uploader.start()

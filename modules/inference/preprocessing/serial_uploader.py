@@ -34,7 +34,7 @@ class SerialUploader(Thread):
     """Takes the camera's frames on the camera's thread (`submit_frame`) and does all the rest on its own: the color
     goes to the GPU (`ImageUpload`, one frame), converted, straightened and flipped there, and is handed on as a
     `GpuImage` with the event that says it is written, and as an `ImageSnapshot` of one (the image, its capture
-    time, the event) to the snapshot callbacks; the depth goes the same way, is turned into metres and
+    time, the event) to the snapshot callbacks; the depth goes the same way, is turned into meters and
     moved onto the color's view (`DepthAligner`, by the camera's calibration, straightened and mirrored as the
     color), and is handed on as a `GpuDepth`. These go at once, for the readers in the package, which wait on the
     event on their own streams; then each color's capture time goes to the capture callbacks, and then, only when a
@@ -257,7 +257,7 @@ class SerialUploader(Thread):
                 logger.exception("Error in finished GPU image callback")
 
     def _upload_depth(self, frame: CameraFrame) -> None:
-        """A depth frame to the GPU: metres, moved onto the color's view at its own grid, and handed on."""
+        """A depth frame to the GPU: meters, moved onto the color's view at its own grid, and handed on."""
         cam_id: int = frame.cam_id
         image: np.ndarray = frame.image
         size: tuple[int, int] = (image.shape[1], image.shape[0])

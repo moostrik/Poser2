@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 from modules.camera import CameraFrame, FrameType
-from modules.inference import CropExtractor, ImageSnapshot, SerialUploader, SerialUploaderSettings, crop
+from modules.inference import CropExtractor, CropExtractorSettings, ImageSnapshot, SerialUploader, SerialUploaderSettings, crop
 from modules.pose import BBox, Frame, FrameDict
 from modules.utils import Rect
 
@@ -17,7 +17,7 @@ class CropStampTest(unittest.TestCase):
         self.uploader = SerialUploader(SerialUploaderSettings())
         self.snapshots: list[ImageSnapshot] = []
         self.uploader.add_snapshot_callback(self.snapshots.append)
-        self.settings = crop.CropExtractorSettings()
+        self.settings = CropExtractorSettings()
         self.settings.initialize()
         self.extractor = CropExtractor(self.settings)
         self.results: list[FrameDict] = []

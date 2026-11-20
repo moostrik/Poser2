@@ -6,7 +6,7 @@ from modules.utils import Rect
 
 @dataclass(frozen=True)
 class Detection:
-    """The people found in one frame: boxes normalised to the frame, with their scores, and the
+    """The people found in one frame: boxes normalized to the frame, with their scores, and the
     frame's `timestamp` as it was submitted."""
     cam_id: int
     timestamp: float

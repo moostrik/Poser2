@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 from modules.camera import depth_projection
-from modules.inference import DepthAligner, depth_metres
+from modules.inference import DepthAligner, depth_meters
 
 
 class DepthAlignerTest(unittest.TestCase):
@@ -16,12 +16,12 @@ class DepthAlignerTest(unittest.TestCase):
         self.to_ray, self.to_uv = depth_projection(None, self.size)      # depth already on the color's view
 
     def align(self, depth: np.ndarray, flip_h: bool = False, homography: np.ndarray | None = None) -> np.ndarray:
-        """The aligned depth to a tenth of a millimetre: the paths round the float's last bits each their own way."""
+        """The aligned depth to a tenth of a millimeter: the paths round the float's last bits each their own way."""
         return np.round(self.aligner.align(torch.from_numpy(depth.astype(np.float32)), self.to_ray, self.to_uv, homography, flip_h, self.size).numpy(), 4)
 
-    def test_millimetres_become_metres_and_none_stays_none(self) -> None:
-        metres = depth_metres(torch.tensor([[0, 1500]], dtype=torch.int32))
-        self.assertEqual(metres.tolist(), [[0.0, 1.5]])
+    def test_millimeters_become_meters_and_none_stays_none(self) -> None:
+        meters = depth_meters(torch.tensor([[0, 1500]], dtype=torch.int32))
+        self.assertEqual(meters.tolist(), [[0.0, 1.5]])
 
     def test_a_depth_on_the_color_view_lands_where_it_was(self) -> None:
         depth = np.full((6, 8), 2.0)
@@ -62,7 +62,7 @@ class DepthAlignerTest(unittest.TestCase):
 
 @unittest.skipUnless(torch.cuda.is_available(), 'needs CUDA')
 class AlignStagedTest(DepthAlignerTest):
-    """The same cases through the CUDA kernels, from uint16 millimetres in a pinned buffer."""
+    """The same cases through the CUDA kernels, from uint16 millimeters in a pinned buffer."""
     kernels: bool = True
 
     def align(self, depth: np.ndarray, flip_h: bool = False, homography: np.ndarray | None = None) -> np.ndarray:

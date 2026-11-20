@@ -24,8 +24,8 @@ class DepthAlign(ComputeShader):
 
     def use(self, depth: Texture, nearest: Texture, aligned: Texture, to_ray: np.ndarray, to_uv: np.ndarray,
             homography: np.ndarray | None, flip_h: bool) -> None:
-        """`depth` (metres, R32F) onto `aligned` (R32F) through `nearest` (R32UI, empty), by
-        `geometry.depth_projection`'s `to_ray` and `to_uv`, then `homography` (None for a level frame)
+        """`depth` (meters, R32F) onto `aligned` (R32F) through `nearest` (R32UI, empty), by
+        `modules.camera.depth_projection`'s `to_ray` and `to_uv`, then `homography` (None for a level frame)
         and `flip_h`."""
         if not self.allocated or not self.shader_program or not depth.allocated:
             return

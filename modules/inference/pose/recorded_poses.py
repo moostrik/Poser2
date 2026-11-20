@@ -9,8 +9,8 @@ Playback: `RecordedPoses` is the RAW stage's async output in -sim, between the c
 takes the crop step's poses with their crops (`submit`, an `ImageCallback`) and emits the stage's poses. It hears the
 player's frames (`set_clip_frame`, a `ClipFrameCallback`) and keeps each frame's recorded poses by its capture on the
 play's clock, the stamp the crops give the stage's poses. With `enabled` on, it sets each cropped pose's box and points
-from the recording by track_id, without the pose model, and hands them on after the recorded latency, from its own
-thread; a frame the recording has no poses for sends none, and a pose it has no track_id for goes on without points,
+from the recording by track_id, without the pose model. It is a player: its own thread makes each frame's poses at
+the moment the recorded latency gives it, and calls the callbacks itself; a frame the recording has no poses for sends none, and a pose it has no track_id for goes on without points,
 counted. With `enabled` off, the crops go to the pose model, as live.
 """
 

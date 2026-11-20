@@ -81,7 +81,7 @@ class PersonDetectorTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.detector.stop()
 
-    def test_every_submitted_image_gets_its_detection_with_boxes_normalised_to_the_frame_and_its_time(self) -> None:
+    def test_every_submitted_image_gets_its_detection_with_boxes_normalized_to_the_frame_and_its_time(self) -> None:
         self.detector.submit(uploaded(0, 600, 800, 1.5))       # another size
         self.detector.submit(uploaded(2, 300, 400, 2.5))
         self.assertTrue(wait_for(lambda: len(self.detections) == 2))

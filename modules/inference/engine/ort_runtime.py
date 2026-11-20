@@ -1,6 +1,7 @@
 """Shared ONNX Runtime setup: its CUDA provider loads the CUDA and cuDNN libraries torch brought."""
-from threading import Lock
+
 import logging
+from threading import Lock
 
 import torch   # noqa: F401  loaded first, so onnxruntime finds its CUDA libraries next to it
 import onnxruntime as ort

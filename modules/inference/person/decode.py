@@ -1,6 +1,6 @@
 """From the YOLOv8 output to person boxes: pure numpy, so it is tested without a model or a GPU.
 
-The exported model gives one row per candidate, (4 + classes) x candidates: centre x, centre y,
+The exported model gives one row per candidate, (4 + classes) x candidates: center x, center y,
 width and height in input pixels, then a score per COCO class with the sigmoid applied. Person is
 class 0.
 """
@@ -50,7 +50,7 @@ def nms(boxes: np.ndarray, scores: np.ndarray, overlap: float) -> np.ndarray:
     return np.asarray(kept, dtype=np.int64)
 
 
-def normalise(boxes: np.ndarray, width: int, height: int) -> np.ndarray:
+def normalize(boxes: np.ndarray, width: int, height: int) -> np.ndarray:
     """Boxes in input pixels to x, y, width, height as fractions of the input, clipped to it. The
     input was the frame stretched whole into the model, so these are fractions of the frame too."""
     if len(boxes) == 0:
