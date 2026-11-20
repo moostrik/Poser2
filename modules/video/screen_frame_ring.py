@@ -12,8 +12,9 @@ class ScreenFrameRing:
 
     def __init__(self) -> None:
         self._lock: Lock = Lock()
-        self._blocks: list[np.ndarray] = []     # each (slots, *shape) uint8
+        self._blocks: list[np.ndarray] = []     # each (slots, *shape) of dtype
         self._shape: tuple[int, ...] = (0,)
+        self._dtype: np.dtype = np.dtype(np.uint8)
 
     @property
     def num_slots(self) -> int:
@@ -27,23 +28,24 @@ class ScreenFrameRing:
 
     @property
     def frame_bytes(self) -> int:
-        return int(np.prod(self._shape))
+        return int(np.prod(self._shape)) * self._dtype.itemsize
 
     @property
     def nbytes(self) -> int:
         with self._lock:
             return sum(block.nbytes for block in self._blocks)
 
-    def clear(self, shape: tuple[int, ...] | None = None) -> None:
-        """Let every block go; with `shape`, the frames to come have that shape."""
+    def clear(self, shape: tuple[int, ...] | None = None, dtype: type[np.unsignedinteger] = np.uint8) -> None:
+        """Let every block go; with `shape`, the frames to come have that shape and `dtype`."""
         with self._lock:
             self._blocks = []
             if shape is not None:
                 self._shape = shape
+                self._dtype = np.dtype(dtype)
 
     def add_block(self, slots: int) -> None:
         """Grow the ring by `slots` frames; raises MemoryError when the system has no room."""
-        block = np.empty((slots, *self._shape), np.uint8)
+        block = np.empty((slots, *self._shape), self._dtype)
         with self._lock:
             self._blocks.append(block)
 

@@ -838,6 +838,8 @@
     "portrait": true,
     "width": 2160,
     "height": 3840,
+    "chroma": "YUV444",
+    "bit_depth": "BIT_8",
     "frame_step": 1,
     "duration": 0.0,
     "quality": 18

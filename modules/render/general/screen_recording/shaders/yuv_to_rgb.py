@@ -1,43 +1,44 @@
-"""YUV to RGB shader: a screen frame's Y and Cb Cr planes, BT.709 video range, at 4:2:0 or 4:4:4, back to RGB."""
+"""YUV to RGB shader: a screen frame's YUV planes, BT.709 video range, at 4:2:0 or 4:4:4, in any sample size, back to
+RGB."""
 
 import logging
 
 import numpy as np
-from OpenGL.GL import (GL_FALSE, GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture,
-                       glUniform1i, glUniform3fv, glUniformMatrix3fv, glUseProgram)
+from OpenGL.GL import (GL_FALSE, GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i,
+                       glUniform3fv, glUniformMatrix3fv, glUseProgram)
 
 from modules.gl import Shader, draw_quad, Texture
 
-from .rgb_to_yuv import MATRIX, OFFSET
+from .rgb_to_yuv import BT709
 
 logger = logging.getLogger(__name__)
 
-INVERSE: np.ndarray = np.linalg.inv(MATRIX.astype(np.float64)).astype(np.float32)     # rows R, G, B on Y Cb Cr
+# per sample maximum: rows R, G, B on Y Cb Cr, the inverse of `RgbToYuv`'s matrix
+INVERSE: dict[int, np.ndarray] = {sample_max: np.linalg.inv(matrix.astype(np.float64)).astype(np.float32)
+                                  for sample_max, (matrix, _) in BT709.items()}
 
 
 class YuvToRgb(Shader):
-    """Draws the RGB picture of a screen frame into the bound target, upright: `luma` (R8) and `chroma` hold its
-    planes as uploaded, top row first; `chroma` is Cb Cr (RG8 at half size) for 4:2:0, or Cb (R8) with `cr` (R8)
-    for 4:4:4."""
+    """Draws the RGB picture of a screen frame into the bound target, upright, from its planes as uploaded, top row
+    first: Y and Cb Cr at half size (4:2:0); Y, Cb and Cr (4:4:4); or one plane of Cb, Y, Cr (4:4:4 packed). Their
+    samples go to `sample_max`."""
 
-    def use(self, luma: Texture, chroma: Texture, cr: Texture | None = None) -> None:
+    def use(self, planes: list[Texture], sample_max: int = 255) -> None:
         if not self.allocated or not self.shader_program:
             logger.warning("YuvToRgb shader not allocated or shader program missing.")
             return
-        if not luma.allocated or not chroma.allocated or (cr is not None and not cr.allocated):
+        if not 1 <= len(planes) <= 3 or not all(plane.allocated for plane in planes):
             logger.warning("YuvToRgb shader: input textures not allocated.")
             return
 
         glUseProgram(self.shader_program)
-        for unit, texture in ((GL_TEXTURE0, luma), (GL_TEXTURE1, chroma), (GL_TEXTURE2, cr or chroma)):
-            glActiveTexture(unit)
-            glBindTexture(GL_TEXTURE_2D, texture.tex_id)
+        for unit in range(3):
+            glActiveTexture(GL_TEXTURE0 + unit)
+            glBindTexture(GL_TEXTURE_2D, planes[min(unit, len(planes) - 1)].tex_id)
+            glUniform1i(self.get_uniform_loc(f"plane{unit}"), unit)
         glActiveTexture(GL_TEXTURE0)
-        glUniform1i(self.get_uniform_loc("luma"), 0)
-        glUniform1i(self.get_uniform_loc("chroma"), 1)
-        glUniform1i(self.get_uniform_loc("cr"), 2)
-        glUniform1i(self.get_uniform_loc("full_chroma"), int(cr is not None))
+        glUniform1i(self.get_uniform_loc("num_planes"), len(planes))
         # Row-major rows read as GLSL columns, so `matrix[i]` in the shader is row i (R, G, B)
-        glUniformMatrix3fv(self.get_uniform_loc("matrix"), 1, GL_FALSE, INVERSE)
-        glUniform3fv(self.get_uniform_loc("offset"), 1, OFFSET)
+        glUniformMatrix3fv(self.get_uniform_loc("matrix"), 1, GL_FALSE, INVERSE[sample_max])
+        glUniform3fv(self.get_uniform_loc("offset"), 1, BT709[sample_max][1])
         draw_quad()

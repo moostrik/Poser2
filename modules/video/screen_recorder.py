@@ -23,7 +23,7 @@ import psutil
 from modules.settings import BaseSettings, Field, Widget
 
 from .ffmpeg import ClipCodec, ClipInput, ClipWriter, Encoder
-from .screen_format import Chroma, ScreenFormat
+from .screen_format import BitDepth, Chroma, ScreenFormat
 from .screen_frame import ScreenFrame
 from .screen_frame_ring import ScreenFrameRing
 
@@ -76,6 +76,7 @@ class ScreenRecorderSettings(BaseSettings):
     height:       Field[int]                 = Field(3840, min=2, max=8192, step=2, description="Recording height (px); a change sets the preset to CUSTOM")
     snap:         Field[bool]                = Field(False, widget=Widget.button, description="Set the size to the first source's")
     chroma:       Field[Chroma]              = Field(Chroma.YUV444, description="Color resolution: 4:4:4 full, 4:2:0 half (twice the seconds)")
+    bit_depth:    Field[BitDepth]            = Field(BitDepth.BIT_8, description="Bits per sample: 10 keeps smooth gradients (half the seconds)")
     frame_step:   Field[int]                 = Field(1, min=1, max=2, step=1, description="Record every tick (1), or every other (2)")
     duration:     Field[float]               = Field(0.0, min=0.0, max=120.0, description="Recording length (s); 0 or above the maximum uses the maximum")
     max_duration: Field[float]               = Field(0.0, access=Field.READ, description="Longest recording the free RAM holds (s)")
@@ -119,31 +120,38 @@ def available_ram() -> int:
 
 
 class ClipSink(Protocol):
-    """What the encode writes NV12 frames to."""
+    """What the encode writes the frames' YUV planes to."""
     comment: str
     def add(self, image: np.ndarray) -> None: ...
     def close(self) -> bool: ...
 
 
-ClipSinkFactory = Callable[[str, float, int, Chroma], ClipSink]     # (path, fps, quality, chroma)
+ClipSinkFactory = Callable[[str, float, int, ScreenFormat], ClipSink]     # (path, fps, quality, the frames' format)
+
+_CLIP_INPUTS: dict[tuple[Chroma, BitDepth], ClipInput] = {
+    (Chroma.YUV420, BitDepth.BIT_8):  ClipInput.NV12,
+    (Chroma.YUV444, BitDepth.BIT_8):  ClipInput.YUV444P,
+    (Chroma.YUV420, BitDepth.BIT_10): ClipInput.P010,
+    (Chroma.YUV444, BitDepth.BIT_10): ClipInput.XV30,
+}
 
 
-def hevc_clip(path: str, fps: float, quality: int, chroma: Chroma) -> ClipSink:
-    """An HEVC mp4 on NVENC from the frames' YUV planes: NV12 for 4:2:0, yuv444p for 4:4:4."""
-    clip_input = ClipInput.NV12 if chroma is Chroma.YUV420 else ClipInput.YUV444P
+def hevc_clip(path: str, fps: float, quality: int, screen_format: ScreenFormat) -> ClipSink:
+    """An HEVC mp4 on NVENC from the frames' YUV planes in their chroma and bit depth."""
+    clip_input = _CLIP_INPUTS[(screen_format.chroma, screen_format.bit_depth)]
     return ClipWriter(path, fps, Encoder.NVENC, clip_input, ClipCodec.HEVC, quality)
 
 
 class _Take:
-    """One encode: the ring's slots in recorded order, their timestamps, the file, the frames' chroma, the frames
+    """One encode: the ring's slots in recorded order, their timestamps, the file, the frames' format, the frames
     left out, and whether the ring is freed after it."""
 
-    def __init__(self, slots: list[int], stamps: list[float], path: str, chroma: Chroma, dropped: int,
+    def __init__(self, slots: list[int], stamps: list[float], path: str, screen_format: ScreenFormat, dropped: int,
                  free_after: bool) -> None:
         self.slots: list[int] = slots
         self.stamps: list[float] = stamps
         self.path: str = path
-        self.chroma: Chroma = chroma
+        self.format: ScreenFormat = screen_format
         self.dropped: int = dropped
         self.free_after: bool = free_after
 
@@ -400,7 +408,8 @@ class ScreenRecorder:
         self._last_timestamp = timestamp
 
     def _format_wanted(self) -> ScreenFormat:
-        return ScreenFormat(even(self.settings.width), even(self.settings.height), self.settings.chroma)
+        return ScreenFormat(even(self.settings.width), even(self.settings.height), self.settings.chroma,
+                            self.settings.bit_depth)
 
     def _busy(self) -> bool:
         with self._lock:
@@ -417,7 +426,7 @@ class ScreenRecorder:
         maximum = self.settings.max_duration
         limit = self._duration if self._duration > 0.0 and (maximum <= 0.0 or self._duration <= maximum) else 0.0
         target = frames_for(limit * LOOK_BACK_MARGIN, self._fps, self._frame_step) if look_back and limit else 0
-        self._ring.clear(self._format.shape)
+        self._ring.clear(self._format.shape, self._format.dtype)
         with self._lock:
             self._take_id += 1
             self._take_start = timestamp
@@ -432,8 +441,8 @@ class ScreenRecorder:
             self._dropped = 0
             self._accepting = True
         self._set_state(ScreenRecorderState.RECORDING)
-        logger.info('Screen recording %s at %dx%d, %s', 'look back' if look_back else 'started', self._format.width,
-                    self._format.height, self._format.chroma.name)
+        logger.info('Screen recording %s at %dx%d, %s %d-bit', 'look back' if look_back else 'started',
+                    self._format.width, self._format.height, self._format.chroma.name, self._format.bit_depth)
 
     def _hold(self) -> None:
         """Hold the frames in the ring, oldest first (in look back those of the last `duration` seconds), for in and
@@ -518,7 +527,7 @@ class ScreenRecorder:
         self._paths.add(str(path))
         with self._wake:
             self._accepting = False
-            self._take = _Take(slots, stamps, str(path), self._format.chroma, self._dropped, free_after)
+            self._take = _Take(slots, stamps, str(path), self._format, self._dropped, free_after)
             self._wake.notify()
         self._set_state(ScreenRecorderState.ENCODING)
 
@@ -675,8 +684,7 @@ class ScreenRecorder:
 
     def _estimate(self) -> None:
         """`max_duration`: what the free RAM, with the ring's own, holds above `ram_reserve`."""
-        width, height = even(self.settings.width), even(self.settings.height)
-        frame_bytes = ScreenFormat(width, height, self.settings.chroma).frame_bytes
+        frame_bytes = self._format_wanted().frame_bytes
         try:
             free = self._free_memory()
         except Exception as e:
@@ -698,7 +706,7 @@ class ScreenRecorder:
         ok = False
         try:
             Path(take.path).parent.mkdir(parents=True, exist_ok=True)
-            sink = self._clip_sink(take.path, fps, self.settings.quality, take.chroma)
+            sink = self._clip_sink(take.path, fps, self.settings.quality, take.format)
             sink.comment = comment
             for slot in take.slots:
                 sink.add(self._ring.frame(slot))

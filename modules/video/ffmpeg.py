@@ -132,10 +132,18 @@ class ClipInput(Enum):
     BGR24   = 'bgr24'       # (height, width, 3) uint8
     NV12    = 'nv12'        # (height × 3/2, width) uint8: Y, then Cb Cr at half size; BT.709 video range
     YUV444P = 'yuv444p'     # (height × 3, width) uint8: Y, Cb and Cr planes at full size; BT.709 video range
+    P010    = 'p010le'      # as NV12 in uint16, 10 bits in the high bits
+    XV30    = 'xv30le'      # (height, width) uint32: Cb, Y, Cr in bits 0-9, 10-19, 20-29; 4:4:4 at 10 bits
 
 
-# the rows a YUV input's array holds per picture row
-_YUV_ROWS: dict[ClipInput, float] = {ClipInput.NV12: 1.5, ClipInput.YUV444P: 3.0}
+# the rows a YUV input's array holds per picture row, its sample type, and what hevc_nvenc is given: xv30le is
+# unpacked by ffmpeg to 16-bit planes on the CPU, which costs only the encode's time
+_YUV_ROWS: dict[ClipInput, float] = {ClipInput.NV12: 1.5, ClipInput.YUV444P: 3.0, ClipInput.P010: 1.5,
+                                     ClipInput.XV30: 1.0}
+_YUV_DTYPE: dict[ClipInput, type[np.unsignedinteger]] = {ClipInput.NV12: np.uint8, ClipInput.YUV444P: np.uint8,
+                                                        ClipInput.P010: np.uint16, ClipInput.XV30: np.uint32}
+_HEVC_PIX_FMT: dict[ClipInput, str] = {ClipInput.NV12: 'nv12', ClipInput.YUV444P: 'yuv444p', ClipInput.P010: 'p010le',
+                                       ClipInput.XV30: 'yuv444p16le'}
 
 
 class ClipCodec(Enum):
@@ -160,7 +168,7 @@ _BT709_TAGS: list[str] = ['-colorspace', 'bt709', '-color_primaries', 'bt709', '
 
 
 class ClipWriter:
-    """Writes frames of one size to an mp4: bgr24, NV12 or yuv444p in, h264 on `encoder` or HEVC on NVENC out, through
+    """Writes frames of one size to an mp4: bgr24 or a YUV input in, h264 on `encoder` or HEVC on NVENC out, through
     a pipe of `PIPE_SIZE`; the process starts with the first frame. comment, set before that frame, goes into the
     file's comment tag."""
 
@@ -187,9 +195,11 @@ class ClipWriter:
         rows = _YUV_ROWS.get(self.clip_input)
         if rows is not None:
             width, height = image.shape[1], round(image.shape[0] / rows)
-            if image.ndim != 2 or width % 2 or height % 2 or round(height * rows) != image.shape[0]:
-                raise ValueError(f'{self.clip_input.value} frame of shape {image.shape} is not '
-                                 f'(even height × {rows:g}, even width)')
+            dtype = _YUV_DTYPE[self.clip_input]
+            if (image.ndim != 2 or width % 2 or height % 2 or round(height * rows) != image.shape[0]
+                    or image.dtype != dtype):
+                raise ValueError(f'{self.clip_input.value} frame of shape {image.shape} {image.dtype} is not '
+                                 f'(even height × {rows:g}, even width) {np.dtype(dtype).name}')
             return width, height
         return image.shape[1] - image.shape[1] % 2, image.shape[0] - image.shape[0] % 2
 
@@ -225,7 +235,7 @@ class ClipWriter:
         elif self.comment:
             metadata = ['-metadata', f'comment={self.comment}']
         if self.codec == ClipCodec.HEVC:
-            pix_fmt = self.clip_input.value if self.clip_input in _YUV_ROWS else 'nv12'
+            pix_fmt = _HEVC_PIX_FMT.get(self.clip_input, 'nv12')
             output = [*_hevc_args(self.quality), '-pix_fmt', pix_fmt]
         else:
             codec, quality, pix_fmt = _CODECS[self.encoder]

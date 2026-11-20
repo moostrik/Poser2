@@ -33,6 +33,14 @@ class Bt709Test(unittest.TestCase):
         self.assertAlmostEqual(float(matrix[1].sum()), 0.0, places=6)
         self.assertAlmostEqual(float(matrix[2].sum()), 0.0, places=6)
 
+    def test_ten_bits_are_the_8_bit_codes_times_4_or_times_256_in_16_bit_samples(self) -> None:
+        for sample_max, scale, black in ((1023, 4, [64, 512, 512]), (65535, 256, [4096, 32768, 32768])):
+            matrix, offset = shaders.bt709_video_range(sample_max)
+            for rgb in ([0, 0, 0], [255, 255, 255], [255, 0, 0], [0, 0, 255]):
+                codes = np.round((matrix @ (np.asarray(rgb, np.float64) / 255.0) + offset) * sample_max)
+                np.testing.assert_allclose(codes / scale, to_codes(rgb), atol=0.5)
+            np.testing.assert_array_equal(np.round(offset * sample_max), black)
+
 
 if __name__ == '__main__':
     unittest.main()

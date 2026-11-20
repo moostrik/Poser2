@@ -1,14 +1,17 @@
-"""Does the screen capture hand over the right YUV frames from its mapped pool, in each chroma, and how fast is a
-frame copied out?
+"""Does the screen capture hand over the right YUV frames from its mapped pool, in each chroma and bit depth, and how
+fast is a frame copied out?
 
-1. For 4:2:0 and 4:4:4: a 64 × 32 frame of 8 × 8 blocks of known colors is drawn into `ScreenCapture.frame`, captured
+1. For 4:2:0 and 4:4:4, at 8 and 10 bits (the 10-bit codes as 8-bit codes against the same table; 4:4:4 at 10 bits
+   is one packed plane, xv30le): a 64 × 32 frame of 8 × 8 blocks of known colors is drawn into `ScreenCapture.frame`, captured
    (`RgbToYuv`), and handed over once its fence has passed: the Y, Cb and Cr codes at each block's middle against the
    BT.709 video-range codes of its color (a table of numbers). `ScreenPreview` then draws the frame back (`YuvToRgb`)
    through its thread and its mapped buffers: each block's middle holds its color within 3 levels of 255, the top row
    of blocks still at the top.
-2. The pool: with no frame given back, four captures go out and the fifth is left out; after one is given back,
+2. The gradient: a 1024-wide gray ramp captured at 10 bits holds more than 600 Y codes, most of them off the 8-bit
+   steps (multiples of 4 in 10 bits).
+3. The pool: with no frame given back, four captures go out and the fifth is left out; after one is given back,
    the next frame says one was skipped before it.
-3. The copy: one 2160 × 3840 4:4:4 frame copied out of its mapped buffer into plain RAM, as the recorder's thread
+4. The copy: one 2160 × 3840 4:4:4 frame at 8 and at 10 bits copied out of its mapped buffer into plain RAM, as the recorder's thread
    does, timed over 20 copies; 60 frames a second need it well under 16.7 ms.
 
     python scripts/screen_capture_check.py
@@ -25,7 +28,7 @@ from OpenGL.GL import glFinish  # noqa: E402
 import monitor_harness as mh  # noqa: E402
 from modules.gl import Style  # noqa: E402
 from modules.render import ScreenCapture, ScreenPreview  # noqa: E402
-from modules.video import Chroma, ScreenFormat, ScreenFrame  # noqa: E402
+from modules.video import BitDepth, Chroma, ScreenFormat, ScreenFrame  # noqa: E402
 
 WIDTH, HEIGHT, BLOCK = 64, 32, 8
 
@@ -71,18 +74,27 @@ def wait_for(capture: ScreenCapture, frames: list[ScreenFrame], count: int) -> N
         glFinish()
 
 
-def codes_at(frame: np.ndarray, chroma: Chroma, y: int, x: int) -> tuple[int, int, int]:
-    """Y, Cb, Cr at a pixel of a frame in its format's layout."""
-    luma = int(frame[y, x])
+def unpack_xv30(value: int) -> tuple[int, int, int]:
+    """Y, Cb, Cr 10-bit codes of an xv30le sample."""
+    return (value >> 10) & 1023, value & 1023, (value >> 20) & 1023
+
+
+def codes_at(frame: np.ndarray, chroma: Chroma, y: int, x: int) -> tuple[float, float, float]:
+    """Y, Cb, Cr at a pixel of a frame in its format's layout, as 8-bit codes (10-bit samples scaled down)."""
+    if frame.dtype == np.uint32:
+        luma, cb, cr = unpack_xv30(int(frame[y, x]))
+        return luma / 4.0, cb / 4.0, cr / 4.0
+    scale = 1.0 if frame.dtype == np.uint8 else 256.0
+    luma = float(frame[y, x]) / scale
     if chroma is Chroma.YUV420:
         cbcr = frame[HEIGHT:].reshape(HEIGHT // 2, WIDTH // 2, 2)[y // 2, x // 2]
-        return luma, int(cbcr[0]), int(cbcr[1])
-    return luma, int(frame[HEIGHT + y, x]), int(frame[2 * HEIGHT + y, x])
+        return luma, float(cbcr[0]) / scale, float(cbcr[1]) / scale
+    return luma, float(frame[HEIGHT + y, x]) / scale, float(frame[2 * HEIGHT + y, x]) / scale
 
 
-def check_codes(source, chroma: Chroma) -> int:
+def check_codes(source, chroma: Chroma, bit_depth: BitDepth) -> int:
     bad = 0
-    screen_format = ScreenFormat(WIDTH, HEIGHT, chroma)
+    screen_format = ScreenFormat(WIDTH, HEIGHT, chroma, bit_depth)
     capture = ScreenCapture()
     capture.allocate(screen_format)
     frames: list[ScreenFrame] = []
@@ -102,7 +114,7 @@ def check_codes(source, chroma: Chroma) -> int:
             want = CODES[name][1]
             if any(abs(g - w) > 1 for g, w in zip(got, want)):
                 bad += 1
-                print(f'  {chroma.name} {name} at row {r} col {c}: {got}, want {want}')
+                print(f'  {chroma.name} {bit_depth.name} {name} at row {r} col {c}: {got}, want {want}')
     preview = ScreenPreview()
     preview.allocate(screen_format)
     preview.set_screen_frame(0, yuv)
@@ -126,7 +138,7 @@ def check_codes(source, chroma: Chroma) -> int:
             want = CODES[name][0]
             if any(abs(g - w) > 3 for g, w in zip(got, want)):
                 bad += 1
-                print(f'  {chroma.name} preview {name} at row {r} col {c}: {got}, want {want}')
+                print(f'  {chroma.name} {bit_depth.name} preview {name} at row {r} col {c}: {got}, want {want}')
     capture.deallocate()
     return bad
 
@@ -163,8 +175,32 @@ def check_pool(source) -> int:
     return bad
 
 
-def time_copy() -> tuple[float, float]:
-    screen_format = ScreenFormat(2160, 3840, Chroma.YUV444)
+def check_gradient() -> tuple[int, int, float]:
+    """A gray ramp, 1024 wide, captured at 10 bits: its Y codes in 10 bits, how many differ, and the share off the
+    8-bit steps."""
+    width = 1024
+    ramp = np.zeros((2, width, 4), np.float32)
+    ramp[..., :3] = (np.arange(width) / (width - 1))[None, :, None]
+    ramp[..., 3] = 1.0
+    gradient = mh.texture_of(ramp)
+    capture = ScreenCapture()
+    capture.allocate(ScreenFormat(width, 2, Chroma.YUV444, BitDepth.BIT_10))
+    frames: list[ScreenFrame] = []
+    capture.add_screen_frame_callback(frames.append)
+    draw(capture, gradient)
+    capture.capture(0.0)
+    wait_for(capture, frames, 1)
+    if not frames:
+        capture.deallocate()
+        return 0, 0, 0.0
+    luma = (frames[0].data[0].astype(np.int64) >> 10) & 1023
+    frames[0].release()
+    capture.deallocate()
+    return int(luma.min()), len(np.unique(luma)), float(np.mean(luma % 4 != 0))
+
+
+def time_copy(bit_depth: BitDepth) -> tuple[float, float]:
+    screen_format = ScreenFormat(2160, 3840, Chroma.YUV444, bit_depth)
     capture = ScreenCapture()
     capture.allocate(screen_format)
     frames: list[ScreenFrame] = []
@@ -185,12 +221,20 @@ def time_copy() -> tuple[float, float]:
 window = mh.context()
 source = mh.texture_of(picture())
 codes = 0
-for chroma in (Chroma.YUV420, Chroma.YUV444):
-    wrong = check_codes(source, chroma)
-    codes += wrong
-    print(f'{chroma.name} codes and preview: {wrong} wrong of {2 * len(ROWS) * len(TOP)}')
+for bit_depth in BitDepth:
+    for chroma in (Chroma.YUV420, Chroma.YUV444):
+        wrong = check_codes(source, chroma, bit_depth)
+        codes += wrong
+        print(f'{chroma.name} {bit_depth.name} codes and preview: {wrong} wrong of {2 * len(ROWS) * len(TOP)}')
+lowest, levels, off_steps = check_gradient()
+smooth = levels > 600 and off_steps > 0.5 and abs(lowest - 64) <= 1
+print(f'10-bit gradient: lowest Y {lowest} (want 64), {levels} Y codes, {off_steps:.0%} off the 8-bit steps')
 pool = check_pool(source)
 print(f'pool: {pool} wrong')
-ms, mb = time_copy()
-print(f'copy of one 2160x3840 4:4:4 frame ({mb:.1f} MB) out of a mapped buffer: {ms:.2f} ms ({mb / ms:.1f} GB/s)')
-print('PASS' if codes == 0 and pool == 0 and ms < 8.0 else 'FAIL')
+slowest = 0.0
+for bit_depth in BitDepth:
+    ms, mb = time_copy(bit_depth)
+    slowest = max(slowest, ms)
+    print(f'copy of one 2160x3840 4:4:4 {bit_depth.name} frame ({mb:.1f} MB) out of a mapped buffer: {ms:.2f} ms '
+          f'({mb / ms:.1f} GB/s)')
+print('PASS' if codes == 0 and smooth and pool == 0 and slowest < 8.0 else 'FAIL')

@@ -1,4 +1,4 @@
-from OpenGL.GL import Constant, GL_BGR, GL_BGRA, GL_CLAMP_TO_EDGE, GL_FLOAT, GL_HALF_FLOAT, GL_LINEAR, GL_NONE, GL_ONE, GL_R16F, GL_R32F, GL_R32UI, GL_R8, GL_RED, GL_RED_INTEGER, GL_UNSIGNED_INT, GL_RG, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNSIGNED_BYTE, glBindTexture, glClearTexImage, glDeleteTextures, glGenTextures, glGetTexImage, glTexImage2D, glTexParameterf, glTexParameterfv, glTexParameteri
+from OpenGL.GL import Constant, GL_BGR, GL_BGRA, GL_CLAMP_TO_EDGE, GL_FLOAT, GL_HALF_FLOAT, GL_LINEAR, GL_NONE, GL_ONE, GL_R16, GL_R16F, GL_R32F, GL_R32UI, GL_R8, GL_RED, GL_RED_INTEGER, GL_UNSIGNED_INT, GL_RG, GL_RG16, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB, GL_RGB10_A2, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNSIGNED_BYTE, GL_UNSIGNED_INT_2_10_10_10_REV, GL_UNSIGNED_SHORT, glBindTexture, glClearTexImage, glDeleteTextures, glGenTextures, glGetTexImage, glTexImage2D, glTexParameterf, glTexParameterfv, glTexParameteri
 import logging
 import numpy as np
 
@@ -18,10 +18,14 @@ def get_numpy_dtype(data_type: Constant) -> type | None:
         data_type: OpenGL data type (e.g., GL_UNSIGNED_BYTE, GL_FLOAT)
 
     Returns:
-        NumPy dtype (np.uint8, np.float16, np.float32) or None if unsupported
+        NumPy dtype (np.uint8, np.uint16, np.uint32, np.float16, np.float32) or None if unsupported
     """
     if data_type == GL_UNSIGNED_BYTE:
         return np.uint8
+    if data_type == GL_UNSIGNED_SHORT:
+        return np.uint16
+    if data_type == GL_UNSIGNED_INT_2_10_10_10_REV:     # one packed RGB10_A2 pixel
+        return np.uint32
     if data_type == GL_FLOAT:
         return np.float32
     if data_type == GL_HALF_FLOAT:
@@ -45,6 +49,8 @@ def clear_value(data_type: Constant, channels: int, color: tuple[float, float, f
     if key not in _CLEAR_VALUES:
         if data_type == GL_UNSIGNED_BYTE:
             _CLEAR_VALUES[key] = np.array([v * 255 for v in values], dtype=np.uint8)
+        elif data_type == GL_UNSIGNED_SHORT:
+            _CLEAR_VALUES[key] = np.array([v * 65535 for v in values], dtype=np.uint16)
         elif data_type == GL_HALF_FLOAT:
             _CLEAR_VALUES[key] = np.array(values, dtype=np.float16)
         else:
@@ -87,13 +93,16 @@ def get_format(internal_format) -> Constant:
     if internal_format == GL_RGB32F: return GL_RGB
     if internal_format == GL_RGBA: return GL_RGBA
     if internal_format == GL_RGBA8: return GL_RGBA
+    if internal_format == GL_RGB10_A2: return GL_RGBA
     if internal_format == GL_RGBA16F: return GL_RGBA
     if internal_format == GL_RGBA32F: return GL_RGBA
     if internal_format == GL_R8: return GL_RED
+    if internal_format == GL_R16: return GL_RED
     if internal_format == GL_R16F: return GL_RED
     if internal_format == GL_R32F: return GL_RED
     if internal_format == GL_R32UI: return GL_RED_INTEGER
     if internal_format == GL_RG8: return GL_RG
+    if internal_format == GL_RG16: return GL_RG
     if internal_format == GL_RG16F: return GL_RG
     if internal_format == GL_RG32F: return GL_RG
     logger.warning("internal format not supported")
@@ -107,13 +116,16 @@ def get_data_type(internal_format) -> Constant:
     if internal_format == GL_RGB32F: return GL_FLOAT
     if internal_format == GL_RGBA: return GL_UNSIGNED_BYTE
     if internal_format == GL_RGBA8: return GL_UNSIGNED_BYTE
+    if internal_format == GL_RGB10_A2: return GL_UNSIGNED_INT_2_10_10_10_REV
     if internal_format == GL_RGBA16F: return GL_FLOAT
     if internal_format == GL_RGBA32F: return GL_FLOAT
     if internal_format == GL_R8: return GL_UNSIGNED_BYTE
+    if internal_format == GL_R16: return GL_UNSIGNED_SHORT
     if internal_format == GL_R16F: return GL_FLOAT
     if internal_format == GL_R32F: return GL_FLOAT
     if internal_format == GL_R32UI: return GL_UNSIGNED_INT
     if internal_format == GL_RG8: return GL_UNSIGNED_BYTE
+    if internal_format == GL_RG16: return GL_UNSIGNED_SHORT
     if internal_format == GL_RG16F: return GL_FLOAT
     if internal_format == GL_RG32F: return GL_FLOAT
     logger.warning("internal format not supported")

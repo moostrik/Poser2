@@ -16,7 +16,7 @@ from threading import Condition, Thread
 import numpy as np
 from OpenGL.GL import (GL_ALREADY_SIGNALED, GL_CONDITION_SATISFIED, GL_MAP_COHERENT_BIT, GL_MAP_PERSISTENT_BIT,
                        GL_MAP_WRITE_BIT, GL_PIXEL_UNPACK_BUFFER, GL_RGBA8,
-                       GL_SYNC_GPU_COMMANDS_COMPLETE, GL_TEXTURE_2D, GL_UNPACK_ALIGNMENT, GL_UNSIGNED_BYTE,
+                       GL_SYNC_GPU_COMMANDS_COMPLETE, GL_TEXTURE_2D, GL_UNPACK_ALIGNMENT,
                        glBindBuffer, glBindTexture, glBufferStorage, glClientWaitSync, glDeleteBuffers, glDeleteSync,
                        glFenceSync, glGenBuffers, glMapBufferRange, glPixelStorei, glTexSubImage2D, glUnmapBuffer)
 
@@ -43,7 +43,7 @@ class ScreenPreview:
         self._planes = yuv_planes(ScreenFormat(2, 2))   # the textures the planes are uploaded into, remade at allocate
         self._shader: YuvToRgb = YuvToRgb()
         self._buffers: list[int] = []
-        self._arrays: list[np.ndarray] = []         # each buffer's mapped memory, the format's shape, uint8
+        self._arrays: list[np.ndarray] = []         # each buffer's mapped memory, the format's shape and dtype
         self._wake: Condition = Condition()         # guards what follows
         self._free: deque[int] = deque()
         self._written: deque[tuple[int, int]] = deque()     # (buffer, key), oldest first
@@ -88,7 +88,7 @@ class ScreenPreview:
                 if not address:
                     raise RuntimeError('a pixel buffer could not be mapped')
                 data = (ctypes.c_uint8 * size).from_address(address)
-                self._arrays.append(np.ctypeslib.as_array(data).reshape(screen_format.shape))
+                self._arrays.append(np.ctypeslib.as_array(data).view(screen_format.dtype).reshape(screen_format.shape))
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
         except Exception:
             self.deallocate()
@@ -152,7 +152,7 @@ class ScreenPreview:
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1)   # rows of any even width, unpadded
         for plane in self._planes:
             glBindTexture(GL_TEXTURE_2D, plane.fbo.tex_id)
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, plane.width, plane.height, plane.read_format, GL_UNSIGNED_BYTE,
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, plane.width, plane.height, plane.read_format, plane.sample_type,
                             ctypes.c_void_p(plane.offset))
         glBindTexture(GL_TEXTURE_2D, 0)
         glPixelStorei(GL_UNPACK_ALIGNMENT, _UNPACK_ALIGNMENT)
@@ -161,7 +161,7 @@ class ScreenPreview:
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
         self.fbo.begin()
-        self._shader.use(self._planes[0].fbo, self._planes[1].fbo, self._planes[2].fbo if len(self._planes) > 2 else None)
+        self._shader.use([plane.fbo for plane in self._planes], self._planes[0].sample_max)
         self.fbo.end()
         Style.pop_style()
         self.shown = key

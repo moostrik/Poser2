@@ -7,8 +7,8 @@ The video package writes and reads clips through ffmpeg (`ffmpeg.py`), the camer
 ## Screen recorder
 
 Each render tick the layers an app records are drawn into the screen frame, an Fbo of the recording's size;
-`ScreenCapture` (`modules/render/general/screen_recording/`) converts it to its YUV planes (`chroma`: 4:4:4 or 4:2:0),
-reads them back into RAM and hands
+`ScreenCapture` (`modules/render/general/screen_recording/`) converts it to its YUV planes (`chroma`: 4:4:4 or 4:2:0;
+`bit_depth`: 8 or 10), reads them back into RAM and hands
 each finished frame (`ScreenFrame`) to the `ScreenRecorder`, whose thread copies it into a ring in RAM. When the
 ring is full, the duration is reached or Stop is pressed, recording stops and the take is held: in and out are set
 on it, and each `save` has the recorder's thread encode the frames between them to an HEVC mp4 with NVENC;
@@ -37,7 +37,7 @@ its overhang is cut. It is never stretched.
 they change, the preset becomes the one that matches in either orientation, else CUSTOM, and `portrait`
 becomes height > width. Every write lands on the value already there, so the three never loop. `snap` sets
 the size to the first source's shape, or the window's with `main_window`. Sizes are rounded down to even numbers, which
-4:2:0 needs. The size and the chroma are read at Start and hold for that recording.
+4:2:0 needs. The size, the chroma and the bit depth are read at Start and hold for that recording.
 
 | Preset | Landscape   | Portrait    |
 |--------|-------------|-------------|
@@ -48,15 +48,19 @@ the size to the first source's shape, or the window's with `main_window`. Sizes 
 
 ### How many seconds fit
 
-Quality is traded against length. `chroma` (`ScreenFormat`, `modules/video/screen_format.py`) picks the frame's
-layout, BT.709 video range either way, one (rows, width) array of planes, top row first:
+Quality is traded against length. `chroma` and `bit_depth` (`ScreenFormat`, `modules/video/screen_format.py`) pick
+the frame's layout, BT.709 video range always, one (rows, width) array of planes, top row first:
 
-| `chroma`         | Planes                                 | Bytes/pixel | ffmpeg input | For                          |
-|------------------|----------------------------------------|-------------|--------------|------------------------------|
-| YUV444 (default) | Y, Cb, Cr, each at full size           | 3           | `yuv444p`    | sharp colored edges, masters |
-| YUV420           | Y, then Cb Cr interleaved at half size | 1.5         | `nv12`       | twice the length             |
+| `chroma`, `bit_depth` | Planes                                          | Bytes/pixel | ffmpeg input | For                          |
+|-----------------------|-------------------------------------------------|-------------|--------------|------------------------------|
+| YUV444, 8 (default)   | Y, Cb, Cr, each at full size, bytes             | 3           | `yuv444p`    | sharp colored edges, masters |
+| YUV420, 8             | Y, then Cb Cr interleaved at half size, bytes   | 1.5         | `nv12`       | twice the length             |
+| YUV444, 10            | one plane, Cb Y Cr packed in 32 bits            | 4           | `xv30le`     | smooth gradients, masters    |
+| YUV420, 10            | as YUV420 8 in 16-bit samples, the 10 bits high | 3           | `p010le`     | smooth gradients, length     |
 
-4:2:0 halves the color resolution, which blurs sharp colored edges in graphic content; 4:4:4 keeps it. A 4:4:4 HEVC
+4:2:0 halves the color resolution, which blurs sharp colored edges in graphic content; 4:4:4 keeps it. 10 bits keep
+the layers' gradients without 8-bit steps (banding); at 10 bits the screen frame is RGBA16F, so the layers' precision
+reaches the conversion. A 4:4:4 HEVC
 file is a master: edit software plays it, Windows' own player often does not. The render loop is not locked to a
 rate, so the length follows the window's measured tick rate; `frame_step` 2 doubles it, and a smaller size gives
 more (HD is a quarter of UHD's bytes).
@@ -65,6 +69,8 @@ more (HD is a quarter of UHD's bytes).
 |------------------------|-----------|------------|-----------------|------------------|
 | UHD, 4:4:4             | 24.9 MB   | 1.49 GB    | 5.4 s           | 40 s             |
 | UHD, 4:2:0             | 12.4 MB   | 746 MB     | 10.7 s          | 80 s             |
+| UHD, 4:4:4, 10 bits    | 33.2 MB   | 1.99 GB    | 4.0 s           | 30 s             |
+| UHD, 4:2:0, 10 bits    | 24.9 MB   | 1.49 GB    | 5.4 s           | 40 s             |
 | UHD, RGBA8 (not used)  | 33.2 MB   | 1.99 GB    | 4.0 s           | 30 s             |
 | QHD, 4:4:4             | 11.1 MB   | 664 MB     | 12.0 s          | 90 s             |
 | QHD, 4:2:0             | 5.5 MB    | 332 MB     | 24.1 s          | 181 s            |
@@ -111,6 +117,16 @@ The same run at the default format, 4:4:4 with today's encode (commit 7e32c69a a
 The 30 s take, 1782 frames at 59.34 fps (worst gap 36.1 ms), encoded in 48.7 s: 36.6 frames/s, under the show's
 58, so a take takes about 1.6 times its length to save (120.2 MB).
 
+At the heaviest read-back, 4:4:4 at 10 bits (33.2 MB a frame, E2) **(measured 2026-11-20)**:
+
+| Phase                 | Ticks | Mean (ms) | p95 (ms) | Max (ms) | Over 25 ms | Dropped |
+|-----------------------|-------|-----------|----------|----------|------------|---------|
+| Idle                  | 174   | 17.15     | 27.4     | 38.4     | 11 %       |         |
+| Recording 15 s        | 903   | 17.03     | 26.7     | 48.1     | 7 %        | 0       |
+
+The 15 s take, 882 frames at 58.73 fps, encoded in 24.0 s: 36.8 frames/s, as at 8 bits (HEVC Rext,
+`yuv444p10le`, 61.1 MB).
+
 `max_duration` is the estimate (free RAM + the ring's own − `ram_reserve`) / (bytes per frame × measured ticks/s /
 `frame_step`), refreshed once a second. `duration` 0, or above `max_duration`, records until the memory stops it.
 
@@ -124,8 +140,10 @@ as the take needs.
 - The RgbToYuv shader (`shaders/rgb_to_yuv.py`, `rgb_to_yuv.frag` in the screen recording's package) converts the
   screen frame into its planes, one pass each (`YuvPlane`): Y into a one-channel texture at full size; at 4:2:0 Cb Cr
   into a two-channel texture at half size, each chroma sample the average of its 2 × 2 pixels; at 4:4:4 Cb and Cr
-  each into a one-channel texture at full size. It samples through `position.glsl`'s `topLeft`, so the first row read
-  back is the picture's top. The BT.709 matrix is plain code beside the shader (`bt709_video_range`).
+  each into a one-channel texture at full size; at 4:4:4 and 10 bits Cb, Y and Cr into one RGB10_A2 texture (red,
+  green, blue), which reads back as `xv30le`. 4:2:0 at 10 bits uses 16-bit textures (P010). It samples through `position.glsl`'s `topLeft`, so the first row read
+  back is the picture's top. The BT.709 matrix is plain code beside the shader (`bt709_video_range`), scaled to the
+  plane's sample size (255, 1023 or 65535).
 - `glReadPixels` reads the planes, Y first, into one of four pixel buffers in host memory, each mapped once
   (persistent and coherent) when the capture is made, and a fence is set after it. The GPU writes the frame into
   RAM; the CPU does not wait.
@@ -139,8 +157,9 @@ as the take needs.
 - The capture sets its own blend and viewport and leaves framebuffer 0 bound. Nothing is drawn or converted unless
   the recorder captures this tick (`ScreenRecorder.capturing`).
 - No CUDA: the read-back is GL's own, and a mapped buffer in host memory reads as plain RAM. `scripts/screen_capture_check.py`
-  checks the YUV codes of known colors and the preview in both chromas, the pool's lending and skipping, and times
-  one UHD frame's copy out of a mapped buffer: 0.31 ms for 4:2:0 and 0.70 ms for 4:4:4 over 20 copies
+  checks the YUV codes of known colors and the preview in both chromas at both bit depths, a 10-bit gray ramp
+  (877 Y codes back, 75 % off the 8-bit steps), the pool's lending and skipping, and times one UHD frame's copy out
+  of a mapped buffer: 0.31 ms for 4:2:0, 0.70 to 0.90 ms for 4:4:4 and 1.27 ms for 4:4:4 at 10 bits over 20 copies
   **(measured 2026-11-20, 2160 × 3840, partly from the CPU's cache)**, which says the mapped memory is cached.
 
 ### The hand-over, to the recorder's thread
@@ -153,13 +172,14 @@ as the take needs.
 
 ### Encode, on the recorder's thread
 
-- One ffmpeg process takes the raw planes on stdin (`ClipWriter` with `ClipInput.YUV444P` or `ClipInput.NV12`,
-  `ClipCodec.HEVC`) through a pipe of 8 MB (`PIPE_SIZE`; Windows' default pipe takes 4 KB a write):
+- One ffmpeg process takes the raw planes on stdin (`ClipWriter` with `ClipInput.YUV444P`, `NV12`, `XV30` or
+  `P010`, `ClipCodec.HEVC`) through a pipe of 8 MB (`PIPE_SIZE`; Windows' default pipe takes 4 KB a write):
   `hevc_nvenc -preset p7 -tune hq -multipass fullres -rc vbr -cq <quality> -b:v 0 -spatial-aq 1 -temporal-aq 1`,
   tagged BT.709 video range and `hvc1`, so Windows and QuickTime play the 4:2:0 files. The encode runs after a take,
   so its time goes to quality: the slowest preset, a full-resolution second pass, and the bits put where the eye
-  sees them. 4:4:4 input is encoded as HEVC 4:4:4 (Range Extensions). HEVC because fine detail at 4K needs fewer
-  bits than h264 for the same quality.
+  sees them. 4:4:4 input is encoded as HEVC 4:4:4 (Range Extensions), P010 as HEVC Main 10. NVENC does not take
+  `xv30le`, so ffmpeg unpacks it to `yuv444p16le` on the CPU, which costs only the encode's time. HEVC because fine
+  detail at 4K needs fewer bits than h264 for the same quality.
 - Each slot of the ring is written to the pipe as it is.
 - After the last frame the pipe is closed and ffmpeg waited for; the ring stays held.
 - The thread makes no GL call; it touches only RAM and the pipe. NVENC is its own unit on the card, so the show
@@ -249,3 +269,9 @@ render thread frees the capture.
 - The planes are made in a fragment shader, not a compute shader: GLSL has no byte arrays, and packing four pixels
   per integer would force widths to multiples of 4.
 - The ring holds YUV planes, not RGBA: 4:4:4 is 3 bytes a pixel against 4, and 4:2:0 gives 2.7× the seconds.
+- 4:4:4 at 10 bits is packed in one plane, not three 16-bit planes: the read-back runs on the GPU's graphics queue
+  at about 12 GB/s, so its time follows its bytes. Three 16-bit planes (49.8 MB at UHD) took 4.1 ms of GPU a frame
+  and slowed the show (19.0 ms mean tick, 6 frames dropped in 15 s); packed (33.2 MB) it takes 2.6 ms, against 2.1 ms
+  at 8 bits **(measured 2026-11-20, GL timer queries, UHD)**.
+- The packed 10-bit RGB formats NVENC takes (`x2rgb10le`) are converted inside it to 4:2:0 with the BT.601 matrix,
+  so the shader makes the YUV itself at 10 bits too **(measured 2026-11-20, ffmpeg 2025-08-25)**.

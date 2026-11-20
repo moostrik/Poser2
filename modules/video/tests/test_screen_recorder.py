@@ -8,7 +8,7 @@ from typing import Callable
 
 import numpy as np
 
-from modules.video import (Chroma, ScreenFormat, ScreenFrame, ScreenRecorder, ScreenRecorderSettings,
+from modules.video import (BitDepth, Chroma, ScreenFormat, ScreenFrame, ScreenRecorder, ScreenRecorderSettings,
                            ScreenRecorderState, ScreenSize, even, frames_for, matching_preset, preset_size)
 
 FPS = 64.0      # ticks/s; 1/64 s and its multiples are exact in binary, so spans compare exactly
@@ -27,8 +27,8 @@ class FakeClip:
     """Keeps the tick number of each frame it is given."""
     clips: list['FakeClip'] = []
 
-    def __init__(self, path: str, fps: float, quality: int, chroma: Chroma) -> None:
-        self.path, self.fps, self.quality, self.chroma = path, fps, quality, chroma
+    def __init__(self, path: str, fps: float, quality: int, screen_format: ScreenFormat) -> None:
+        self.path, self.fps, self.quality, self.format = path, fps, quality, screen_format
         self.comment = ''
         self.frames: list[int] = []
         FakeClip.clips.append(self)
@@ -64,6 +64,15 @@ class SizeRulesTest(unittest.TestCase):
         self.assertEqual(full.shape, (3840 * 3, 2160))
         self.assertEqual(nv12.frame_bytes, 2160 * 3840 * 3 // 2)
         self.assertEqual(full.frame_bytes, 2 * nv12.frame_bytes)
+
+    def test_ten_bits_take_16_bit_samples_or_one_packed_plane(self) -> None:
+        half = ScreenFormat(2160, 3840, Chroma.YUV420, BitDepth.BIT_10)
+        self.assertEqual((half.shape, half.dtype), (ScreenFormat(2160, 3840, Chroma.YUV420).shape, np.uint16))
+        self.assertEqual(half.frame_bytes, 2 * ScreenFormat(2160, 3840, Chroma.YUV420).frame_bytes)
+        full = ScreenFormat(2160, 3840, Chroma.YUV444, BitDepth.BIT_10)
+        self.assertTrue(full.packed)
+        self.assertEqual((full.shape, full.dtype), ((3840, 2160), np.uint32))
+        self.assertEqual(full.frame_bytes, 2160 * 3840 * 4)
 
 
 class SizeSettingsTest(unittest.TestCase):
@@ -125,7 +134,7 @@ class StateTest(unittest.TestCase):
     def frame(self, tick: int, timestamp: float) -> ScreenFrame:
         """A frame at the size the capture is made at, as a real capture hands it over."""
         screen_format = self.recorder.capture_format or ScreenFormat(WIDTH, HEIGHT)
-        data = np.zeros(screen_format.shape, np.uint8)
+        data = np.zeros(screen_format.shape, screen_format.dtype)
         data.flat[0], data.flat[1] = tick & 0xFF, tick >> 8
         with self.lock:
             self.lent += 1
@@ -295,17 +304,24 @@ class StateTest(unittest.TestCase):
         self.settings.chroma = Chroma.YUV420        # half the bytes a frame: twice the seconds
         self.tick_until(lambda: self.settings.max_duration > 15.0)
         self.assertTrue(1280 / 64 - 0.2 <= self.settings.max_duration <= 1280 / 60 + 0.2, self.settings.max_duration)
+        self.settings.bit_depth = BitDepth.BIT_10   # two bytes a sample: half again
+        self.tick_until(lambda: self.settings.max_duration < 15.0)
+        self.assertTrue(640 / 64 - 0.1 <= self.settings.max_duration <= 640 / 60 + 0.1, self.settings.max_duration)
 
-    def test_the_chroma_is_read_at_start_and_goes_to_the_clip(self) -> None:
+    def test_the_format_is_read_at_start_and_goes_to_the_clip(self) -> None:
         self.settings.chroma = Chroma.YUV420
+        self.settings.bit_depth = BitDepth.BIT_10
         self.settings.duration = 0.25
         ScreenRecorderSettings.start.fire(self.settings)
         self.tick()
-        self.assertEqual(self.recorder.capture_format, ScreenFormat(WIDTH, HEIGHT, Chroma.YUV420))
+        wanted = ScreenFormat(WIDTH, HEIGHT, Chroma.YUV420, BitDepth.BIT_10)
+        self.assertEqual(self.recorder.capture_format, wanted)
         self.settings.chroma = Chroma.YUV444          # a change counts from the next Start
+        self.settings.bit_depth = BitDepth.BIT_8
         clip = self.save_held()
-        self.assertIs(clip.chroma, Chroma.YUV420)
-        self.assertEqual(self.recorder._ring.shape, ScreenFormat(WIDTH, HEIGHT, Chroma.YUV420).shape)
+        self.assertEqual(clip.format, wanted)
+        self.assertEqual(self.recorder._ring.shape, wanted.shape)
+        self.assertEqual(self.recorder._ring.frame(0).dtype, np.uint16)
         self.discard(ScreenRecorderState.IDLE)
 
     def test_look_back_keeps_the_last_seconds_and_saves_them(self) -> None:

@@ -1,4 +1,4 @@
-"""ScreenCapture: the recording's screen frame, converted to NV12, read back into RAM and handed over when it is done.
+"""ScreenCapture: the recording's screen frame, converted to YUV planes, read back into RAM and handed over when it is done.
 
 The render thread draws into `frame` (or copies the window into it with `copy_window`) and calls `capture`; `poll`
 on every tick hands over each frame whose read-back has passed its fence. The pixel buffers are host memory mapped
@@ -16,14 +16,16 @@ from threading import Lock
 import numpy as np
 from OpenGL.GL import (GL_ALREADY_SIGNALED, GL_COLOR_BUFFER_BIT, GL_CONDITION_SATISFIED, GL_DRAW_FRAMEBUFFER,
                        GL_FRAMEBUFFER, GL_LINEAR, GL_MAP_COHERENT_BIT, GL_MAP_PERSISTENT_BIT, GL_MAP_READ_BIT,
-                       GL_NEAREST, GL_PACK_ALIGNMENT, GL_PIXEL_PACK_BUFFER, GL_R8, GL_READ_FRAMEBUFFER, GL_RED, GL_RG,
-                       GL_RG8, GL_RGBA8, GL_SYNC_GPU_COMMANDS_COMPLETE, GL_UNSIGNED_BYTE, glBindBuffer,
+                       GL_NEAREST, GL_PACK_ALIGNMENT, GL_PIXEL_PACK_BUFFER, GL_R16, GL_R8, GL_READ_FRAMEBUFFER, GL_RED,
+                       GL_RG, GL_RG16, GL_RG8, GL_RGB10_A2, GL_RGBA, GL_RGBA16F, GL_RGBA8,
+                       GL_SYNC_GPU_COMMANDS_COMPLETE, GL_UNSIGNED_BYTE, GL_UNSIGNED_INT_2_10_10_10_REV, GL_UNSIGNED_SHORT,
+                       glBindBuffer,
                        glBindFramebuffer, glBlitFramebuffer, glBufferStorage, glClear, glClearColor, glClientWaitSync,
                        glDeleteBuffers, glDeleteSync, glFenceSync, glGenBuffers, glMapBufferRange, glPixelStorei,
                        glReadPixels, glUnmapBuffer)
 
 from modules.gl import Fbo, Style, fill, fit
-from modules.video import Chroma, ScreenFormat, ScreenFrame, ScreenFrameCallback
+from modules.video import BitDepth, Chroma, ScreenFormat, ScreenFrame, ScreenFrameCallback
 
 from .shaders import RgbToYuv, YuvPlane
 
@@ -35,32 +37,41 @@ _MAP_FLAGS: int = GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT
 
 
 class _Plane:
-    """One YUV plane of the frame: the Fbo it is drawn into, which plane, and where it lies in the read-back."""
+    """One YUV plane of the frame: the Fbo it is drawn into, which plane, its GL formats and sample type, the
+    largest value a sample holds, and where it lies in the read-back (bytes)."""
 
     def __init__(self, plane: YuvPlane, width: int, height: int, internal_format: int, read_format: int,
-                 offset: int) -> None:
+                 sample_type: int, sample_max: int, offset: int) -> None:
         self.fbo: Fbo = Fbo(GL_NEAREST)
         self.plane: YuvPlane = plane
         self.width, self.height = width, height
-        self.internal_format, self.read_format = internal_format, read_format
+        self.internal_format, self.read_format, self.sample_type = internal_format, read_format, sample_type
+        self.sample_max: int = sample_max
         self.offset: int = offset
 
 
 def yuv_planes(screen_format: ScreenFormat) -> list[_Plane]:
-    """The planes of a format, in the order the frame holds them: Y, then Cb Cr (4:2:0) or Cb and Cr (4:4:4)."""
+    """The planes of a format, in the order the frame holds them: Y, then Cb Cr (4:2:0) or Cb and Cr (4:4:4); 8-bit
+    samples in bytes, 4:2:0 at 10 bits in 16-bit textures, 4:4:4 at 10 bits packed in one RGB10_A2 plane."""
     width, height = screen_format.width, screen_format.height
-    planes = [_Plane(YuvPlane.Y, width, height, GL_R8, GL_RED, 0)]
+    if screen_format.packed:
+        return [_Plane(YuvPlane.CBYCR, width, height, GL_RGB10_A2, GL_RGBA, GL_UNSIGNED_INT_2_10_10_10_REV, 1023, 0)]
+    eight = screen_format.bit_depth is BitDepth.BIT_8
+    one, two = (GL_R8, GL_RG8) if eight else (GL_R16, GL_RG16)
+    sample_type, sample_max = (GL_UNSIGNED_BYTE, 255) if eight else (GL_UNSIGNED_SHORT, 65535)
+    plane_bytes = width * height * np.dtype(screen_format.dtype).itemsize
+    planes = [_Plane(YuvPlane.Y, width, height, one, GL_RED, sample_type, sample_max, 0)]
     if screen_format.chroma is Chroma.YUV420:
-        planes.append(_Plane(YuvPlane.CBCR, width // 2, height // 2, GL_RG8, GL_RG, width * height))
+        planes.append(_Plane(YuvPlane.CBCR, width // 2, height // 2, two, GL_RG, sample_type, sample_max, plane_bytes))
     else:
-        planes.append(_Plane(YuvPlane.CB, width, height, GL_R8, GL_RED, width * height))
-        planes.append(_Plane(YuvPlane.CR, width, height, GL_R8, GL_RED, 2 * width * height))
+        planes.append(_Plane(YuvPlane.CB, width, height, one, GL_RED, sample_type, sample_max, plane_bytes))
+        planes.append(_Plane(YuvPlane.CR, width, height, one, GL_RED, sample_type, sample_max, 2 * plane_bytes))
     return planes
 
 
 class ScreenCapture:
-    """The screen frame (RGBA8) of the recording's size, its YUV planes, and a pool of four pixel buffers in host
-    memory they are read back into; each finished frame goes to the callbacks, lent until it is released."""
+    """The screen frame of the recording's size (RGBA8, or RGBA16F at 10 bits), its YUV planes, and a pool of four
+    pixel buffers in host memory they are read back into; each finished frame goes to the callbacks, lent until it is released."""
 
     def __init__(self) -> None:
         self.format: ScreenFormat | None = None
@@ -68,7 +79,7 @@ class ScreenCapture:
         self._planes: list[_Plane] = []
         self._shader: RgbToYuv = RgbToYuv()
         self._buffers: list[int] = []
-        self._arrays: list[np.ndarray] = []         # each buffer's mapped memory, the format's shape, uint8
+        self._arrays: list[np.ndarray] = []         # each buffer's mapped memory, the format's shape and dtype
         self._in_flight: deque[tuple[int, object, float, int]] = deque()     # (buffer, fence, timestamp, skipped)
         self._lock: Lock = Lock()                   # guards the free list and the lent count
         self._free: deque[int] = deque()
@@ -117,7 +128,7 @@ class ScreenCapture:
         self.format = screen_format
         size = screen_format.frame_bytes
         try:
-            self.frame.allocate(width, height, GL_RGBA8)
+            self.frame.allocate(width, height, GL_RGBA8 if screen_format.bit_depth is BitDepth.BIT_8 else GL_RGBA16F)
             self._planes = yuv_planes(screen_format)
             for plane in self._planes:
                 plane.fbo.allocate(plane.width, plane.height, plane.internal_format)
@@ -131,7 +142,7 @@ class ScreenCapture:
                 if not address:
                     raise RuntimeError('a pixel buffer could not be mapped')
                 data = (ctypes.c_uint8 * size).from_address(address)
-                self._arrays.append(np.ctypeslib.as_array(data).reshape(screen_format.shape))
+                self._arrays.append(np.ctypeslib.as_array(data).view(screen_format.dtype).reshape(screen_format.shape))
             glBindBuffer(GL_PIXEL_PACK_BUFFER, 0)
             with self._lock:
                 self._free = deque(range(POOL))
@@ -193,13 +204,13 @@ class ScreenCapture:
         Style.set_blend_mode(Style.BlendMode.DISABLED)
         for plane in self._planes:
             plane.fbo.begin()
-            self._shader.use(self.frame, plane.plane)
+            self._shader.use(self.frame, plane.plane, plane.sample_max)
         Style.pop_style()
         glPixelStorei(GL_PACK_ALIGNMENT, 1)     # rows of any even width, unpadded
         glBindBuffer(GL_PIXEL_PACK_BUFFER, self._buffers[buffer])
         for plane in self._planes:
             glBindFramebuffer(GL_READ_FRAMEBUFFER, plane.fbo.fbo_id)
-            glReadPixels(0, 0, plane.width, plane.height, plane.read_format, GL_UNSIGNED_BYTE, plane.offset)
+            glReadPixels(0, 0, plane.width, plane.height, plane.read_format, plane.sample_type, plane.offset)
         glBindBuffer(GL_PIXEL_PACK_BUFFER, 0)
         glPixelStorei(GL_PACK_ALIGNMENT, _PACK_ALIGNMENT)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)

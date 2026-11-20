@@ -4,12 +4,13 @@
 
 // One YUV plane of the RGB screen frame, BT.709 video range, the picture's top row first, so the plane reads back
 // in the order a video file holds it. plane 0: Y, at the frame's size; 1: Cb Cr interleaved at half width and half
-// height (4:2:0), each sample the average of its 2 x 2 source pixels; 2: Cb and 3: Cr at the frame's size (4:4:4).
+// height (4:2:0), each sample the average of its 2 x 2 source pixels; 2: Cb and 3: Cr at the frame's size (4:4:4);
+// 4: Cb, Y, Cr in red, green and blue at the frame's size (4:4:4 packed, as xv30le reads it).
 
 uniform sampler2D src;
 uniform int plane;
 uniform mat3 matrix;    // rows: Y, Cb, Cr coefficients on RGB 0..1, scaled to video range
-uniform vec3 offset;    // 16, 128, 128 over 255
+uniform vec3 offset;    // 16, 128, 128 as normalized samples of the plane's bit depth
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -28,6 +29,7 @@ void main() {
         fragColor = vec4(c.y, c.z, 0.0, 1.0);
     } else {
         vec3 c = ycbcr(texelFetch(src, ivec2(at), 0).rgb);
-        fragColor = vec4(plane == 0 ? c.x : (plane == 2 ? c.y : c.z), 0.0, 0.0, 1.0);
+        fragColor = plane == 4 ? vec4(c.y, c.x, c.z, 0.0)
+                               : vec4(plane == 0 ? c.x : (plane == 2 ? c.y : c.z), 0.0, 0.0, 1.0);
     }
 }
