@@ -1,6 +1,5 @@
 """GPU-based text rendering using VAO and font texture atlas.
 
-Replaces the deprecated GLUT-based text rendering with modern OpenGL.
 Uses freetype-py to generate a font atlas at allocation time.
 """
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from typing import Callable
 
@@ -9,8 +8,6 @@ import glfw
 from .context import Context
 from .monitor import Monitor, MonitorId
 from .window_settings import WindowSettings
-
-logger = logging.getLogger(__name__)
 
 FALLBACK_SIZE: int = 200        # px: a window whose monitor is missing waits this small on the primary monitor
 FALLBACK_STEP: int = 240        # px between the waiting windows: the size, a title bar and a gap

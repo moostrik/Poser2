@@ -25,7 +25,7 @@ class FrameMax:
     def texture(self) -> Texture:
         return self._held
 
-    def allocate(self, width: int, height: int, internal_format: Constant) -> None:
+    def allocate(self, width: int, height: int, internal_format: Constant | int) -> None:
         self._held.allocate(width, height, internal_format)
         self._larger_shader.allocate()
 

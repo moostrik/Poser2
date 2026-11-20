@@ -4,16 +4,6 @@ Shaders that reload and report errors well, fewer GL calls on the main thread, a
 F and G come from the Cinder research (2026-11-20), argued from the code and not measured, so G starts with a
 measurement; E and H from the package scan of the same day. The lines are in work order.
 
-## E. The leak and the form
-
-E2 moves files that F then edits once.
-
-- E2. Form only: `draw_quad` to `context.py`; the file watcher in its own file; `utils.py` split by subject (fit and
-  fill, clears); `LayeredFbo` in its own file; one `from OpenGL.GL` line per file, imports at the top, `logger` after
-  them; unused imports and loggers out (`utils.py`, `window.py`, `monitor.py`); errors logged with their traceback in
-  `shader.py` and `compute_shader.py`; `internal_format` and the watcher typed; `shader_program` one type in both
-  shader classes; the stale docstrings fixed (`clear_color`, `Fbo.end`, `text.py`). Check: the import and guard tests.
-
 ## F. Shaders
 
 Today a shader reloads only where its user calls `reload()` by hand (96 calls in 31 files, of 207 files with a
@@ -43,8 +33,6 @@ Today a shader reloads only where its user calls `reload()` by hand (96 calls in
   it is made once and freed once.
 - F7. GL.md's Shaders section describes hot reload, `ComputeShader`, F0's answer, F1 to F5, and the `_generic.vert`
   fallback as it is.
-- Question: compile off the frame (`KHR_parallel_shader_compile`), so a reload never drops a frame? First check that
-  the NVIDIA driver offers it and compiles in parallel.
 
 ## G. Fewer GL calls
 

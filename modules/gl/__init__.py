@@ -1,6 +1,6 @@
 
 from .render_base import RenderBase
-from .shader import Shader, draw_quad
+from .shader import Shader
 from .compute_shader import ComputeShader
 from .window_manager import WindowManager
 from .window_settings import WindowSettings, WindowManagerSettings
@@ -8,14 +8,16 @@ from .window import Window
 from .window_input import WindowInput, MouseButton
 from .monitor import Monitor, MonitorId
 from . import style as Style
-from .context import Context, context
-from .utils import clear_color, fill, fit
+from .context import Context, context, draw_quad
+from .clear import clear_color
+from .fit import fill, fit
 from .colormap import Colormap
 
 # TEXTURE CLASSES
 from .texture import Texture
 from .texture_3d import Texture3D, SwapTexture3D
-from .texture_2d_array import Texture2DArray, SwapTexture2DArray, LayeredFbo
+from .texture_2d_array import Texture2DArray, SwapTexture2DArray
+from .layered_fbo import LayeredFbo
 from .fbo import Fbo, SwapFbo
 from .storage_buffer import StorageBuffer
 from .image import Image

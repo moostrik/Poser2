@@ -11,7 +11,6 @@ Usage:
     density_tex = Texture2DArray(wrap=GL_CLAMP_TO_BORDER, border_color=(0,0,0,0))
     density_tex.allocate(3840, 2160, 28, GL_RGBA16F)
 """
-from OpenGL.GL import GL_COLOR_ATTACHMENT0, GL_FRAMEBUFFER, glBindFramebuffer, glDeleteFramebuffers, glFramebufferTexture, glGenFramebuffers, glViewport
 from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_HALF_FLOAT, GL_LINEAR, GL_NONE, GL_ONE, GL_RED, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNSIGNED_BYTE, glBindTexture, glClearTexImage, glDeleteTextures, glGenTextures, glGetTexImage, glTexImage3D, glTexParameterfv, glTexParameteri
 import numpy as np
 
@@ -44,7 +43,7 @@ class Texture2DArray:
         self.width: int = 0
         self.height: int = 0
         self.depth: int = 0
-        self.internal_format: Constant = GL_NONE
+        self.internal_format: Constant | int = GL_NONE
         self.format: Constant = GL_NONE
         self.data_type: int = int(GL_NONE)
         self.tex_id: int = 0
@@ -52,7 +51,7 @@ class Texture2DArray:
         self._wrap: int = wrap
         self._border_color: tuple[float, float, float, float] = border_color
 
-    def allocate(self, width: int, height: int, depth: int, internal_format) -> None:
+    def allocate(self, width: int, height: int, depth: int, internal_format: Constant | int) -> None:
         """Allocate 2D array texture with specified dimensions and format.
 
         Args:
@@ -122,7 +121,7 @@ class Texture2DArray:
         self.width = 0
         self.height = 0
         self.depth = 0
-        self.internal_format: Constant = GL_NONE
+        self.internal_format: Constant | int = GL_NONE
         self.format: Constant = GL_NONE
         self.data_type: int = int(GL_NONE)
         glDeleteTextures(1, [self.tex_id])
@@ -184,38 +183,6 @@ class Texture2DArray:
         return pixels
 
 
-class LayeredFbo(Texture2DArray):
-    """A 2D array texture with a framebuffer that draws into all its layers: a draw picks the layer per
-    primitive (`gl_Layer`). `begin` binds it and sets the viewport to one layer's size."""
-
-    def __init__(self, interpolation: int = GL_LINEAR, wrap: int = GL_CLAMP_TO_EDGE,
-                 border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
-        super().__init__(interpolation, wrap, border_color)
-        self.fbo_id: int = 0
-
-    def allocate(self, width: int, height: int, depth: int, internal_format) -> None:
-        super().allocate(width, height, depth, internal_format)
-        if not self.allocated:
-            return
-        self.fbo_id = int(glGenFramebuffers(1))
-        glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
-        glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, self.tex_id, 0)
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
-
-    def deallocate(self) -> None:
-        if self.fbo_id:
-            glDeleteFramebuffers(1, [self.fbo_id])
-            self.fbo_id = 0
-        super().deallocate()
-
-    def begin(self) -> None:
-        glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
-        glViewport(0, 0, self.width, self.height)
-
-    def end(self) -> None:
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
-
-
 class SwapTexture2DArray(Texture2DArray):
     """Double-buffered 2D array texture for ping-pong compute operations.
 
@@ -252,7 +219,7 @@ class SwapTexture2DArray(Texture2DArray):
         return self._textures[self._swap_state].depth
 
     @property
-    def internal_format(self) -> Constant:
+    def internal_format(self) -> Constant | int:
         return self._textures[self._swap_state].internal_format
 
     @property
@@ -272,7 +239,7 @@ class SwapTexture2DArray(Texture2DArray):
         """The other buffer, the previous one, to read while the current is written; it is the current one after the next swap."""
         return self._textures[1 - self._swap_state]
 
-    def allocate(self, width: int, height: int, depth: int, internal_format) -> None:
+    def allocate(self, width: int, height: int, depth: int, internal_format: Constant | int) -> None:
         """Allocate both 2D array texture buffers."""
         self._textures[0].allocate(width, height, depth, internal_format)
         self._textures[1].allocate(width, height, depth, internal_format)

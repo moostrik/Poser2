@@ -40,7 +40,7 @@ class Texture3D:
         self.width: int = 0
         self.height: int = 0
         self.depth: int = 0
-        self.internal_format: Constant = GL_NONE
+        self.internal_format: Constant | int = GL_NONE
         self.format: Constant = GL_NONE
         self.data_type: int = int(GL_NONE)
         self.tex_id: int = 0
@@ -48,7 +48,7 @@ class Texture3D:
         self._wrap: int = wrap
         self._border_color: tuple[float, float, float, float] = border_color
 
-    def allocate(self, width: int, height: int, depth: int, internal_format) -> None:
+    def allocate(self, width: int, height: int, depth: int, internal_format: Constant | int) -> None:
         """Allocate 3D texture with specified dimensions and format.
 
         Args:
@@ -128,7 +128,7 @@ class Texture3D:
         self.width = 0
         self.height = 0
         self.depth = 0
-        self.internal_format: Constant = GL_NONE
+        self.internal_format: Constant | int = GL_NONE
         self.format: Constant = GL_NONE
         self.data_type: int = int(GL_NONE)
         glDeleteTextures(1, [self.tex_id])
@@ -226,7 +226,7 @@ class SwapTexture3D(Texture3D):
         return self._textures[self._swap_state].depth
 
     @property
-    def internal_format(self) -> Constant:
+    def internal_format(self) -> Constant | int:
         return self._textures[self._swap_state].internal_format
 
     @property
@@ -246,7 +246,7 @@ class SwapTexture3D(Texture3D):
         """The other buffer, the previous one, to read while the current is written; it is the current one after the next swap."""
         return self._textures[1 - self._swap_state]
 
-    def allocate(self, width: int, height: int, depth: int, internal_format) -> None:
+    def allocate(self, width: int, height: int, depth: int, internal_format: Constant | int) -> None:
         """Allocate both 3D texture buffers."""
         self._textures[0].allocate(width, height, depth, internal_format)
         self._textures[1].allocate(width, height, depth, internal_format)

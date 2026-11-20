@@ -78,7 +78,7 @@ def get_channel_count(format: Constant) -> int | None:
     return None
 
 
-def get_format(internal_format) -> Constant:
+def get_format(internal_format: Constant | int) -> Constant:
     """Get the default pixel format for glTexImage2D (always RGB order).
 
     Args:
@@ -109,7 +109,7 @@ def get_format(internal_format) -> Constant:
     return GL_RGB  # fallback
 
 
-def get_data_type(internal_format) -> int:
+def get_data_type(internal_format: Constant | int) -> int:
     if internal_format == GL_RGB: return int(GL_UNSIGNED_BYTE)
     if internal_format == GL_RGB8: return int(GL_UNSIGNED_BYTE)
     if internal_format == GL_RGB16F: return int(GL_FLOAT)
@@ -149,7 +149,7 @@ class Texture():
         self.allocated = False
         self.width: int = 0
         self.height: int = 0
-        self.internal_format: Constant = GL_NONE
+        self.internal_format: Constant | int = GL_NONE
         self.format: Constant = GL_NONE
         self.data_type: int = int(GL_NONE)
         self.tex_id = 0
@@ -158,7 +158,7 @@ class Texture():
         self._wrap: int = wrap
         self._border_color: tuple[float, float, float, float] = border_color
 
-    def allocate(self, width: int, height: int, internal_format) -> None:
+    def allocate(self, width: int, height: int, internal_format: Constant | int) -> None:
         """Allocate OpenGL texture with specified dimensions and format.
 
         Args:

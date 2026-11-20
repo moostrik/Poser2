@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import ctypes
-import logging
 from dataclasses import dataclass
 from enum import IntEnum
 
 import glfw
-
-logger = logging.getLogger(__name__)
 
 
 class MonitorId(IntEnum):

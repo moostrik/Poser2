@@ -1,40 +1,15 @@
-from OpenGL.GL import GL_COMPILE_STATUS, GL_FRAGMENT_SHADER, GL_LINK_STATUS, GL_TRIANGLE_FAN, GL_VERTEX_SHADER, glAttachShader, glCompileShader, glCreateProgram, glCreateShader, glDeleteProgram, glDeleteShader, glDrawArrays, glGetProgramInfoLog, glGetProgramiv, glGetShaderInfoLog, glGetShaderiv, glGetUniformLocation, glLinkProgram, glShaderSource, shaders
-
-import time
 import inspect
-import threading
 import logging
-import ctypes
+import threading
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
-from watchdog.observers import Observer
+from OpenGL.GL import GL_COMPILE_STATUS, GL_FRAGMENT_SHADER, GL_LINK_STATUS, GL_VERTEX_SHADER, glAttachShader, glCompileShader, glCreateProgram, glCreateShader, glDeleteProgram, glDeleteShader, glGetProgramInfoLog, glGetProgramiv, glGetShaderInfoLog, glGetShaderiv, glGetUniformLocation, glLinkProgram, glShaderSource
 from watchdog.observers.api import BaseObserver
-from watchdog.events import FileSystemEventHandler
 
+from .file_watcher import monitor_path
 
-def draw_quad() -> None:
-    """Draw fullscreen quad. Assumes VAO already bound by WindowManager."""
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4)
+logger = logging.getLogger(__name__)
 
-class FileModifiedHandler(FileSystemEventHandler):
-    def __init__(self, callback):
-        self.callback = callback
-        self.last_modified: float = time.perf_counter()
-
-    def on_modified(self, event) -> None:
-        if time.perf_counter() - self.last_modified < 0.5:
-            return
-        self.last_modified = time.perf_counter()
-        if not event.is_directory:
-            self.callback(event.src_path)
-
-def monitor_path(path, callback) -> BaseObserver:
-    event_handler = FileModifiedHandler(callback)
-    observer = Observer()
-    observer.schedule(event_handler, path=path, recursive=False)
-    observer.start()
-    return observer
 
 class Shader():
     # Class-level hot-reload management (one observer per directory)
@@ -68,7 +43,7 @@ class Shader():
 
         self.allocated: bool = False
         self.shader_name: str = self.__class__.__name__
-        self.shader_program: shaders.ShaderProgram | None = None
+        self.shader_program: int | None = None
         self.need_reload: bool = False
         self._reload_lock = threading.Lock()
         self._ref_count: int = 0
@@ -236,8 +211,8 @@ class Shader():
 
             return True
 
-        except Exception as e:
-            logger.error(f"{self.shader_name} UNEXPECTED ERROR: {e}")
+        except Exception:
+            logger.exception("%s: unexpected error while compiling", self.shader_name)
             return False
 
     def _on_file_changed(self, file_path: Path) -> None:

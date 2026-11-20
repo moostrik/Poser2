@@ -18,7 +18,7 @@ class Fbo(Texture):
         self._depth_id: int = 0
 
 
-    def allocate(self, width: int, height: int, internal_format) -> None:
+    def allocate(self, width: int, height: int, internal_format: Constant | int) -> None:
         super().allocate(width, height, internal_format)
         if not self.allocated: return
 
@@ -55,8 +55,7 @@ class Fbo(Texture):
         glViewport(0, 0, self.width, self.height)
 
     def end(self)  -> None:
-        """End rendering to FBO and restore previous state."""
-        # pass
+        """End drawing into this FBO: the window's framebuffer is bound again."""
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
 class SwapFbo(Fbo):
@@ -93,7 +92,7 @@ class SwapFbo(Fbo):
         return self._fbos[self._swap_state].height
 
     @property
-    def internal_format(self) -> Constant:
+    def internal_format(self) -> Constant | int:
         return self._fbos[self._swap_state].internal_format
 
     @property
@@ -113,7 +112,7 @@ class SwapFbo(Fbo):
         """The other buffer, the previous one, to read while the current is written; it is the current one after the next swap."""
         return self._fbos[1 - self._swap_state]
 
-    def allocate(self, width: int, height: int, internal_format) -> None:
+    def allocate(self, width: int, height: int, internal_format: Constant | int) -> None:
         """Allocate both buffers with same parameters."""
         self._fbos[0].allocate(width, height, internal_format)
         self._fbos[1].allocate(width, height, internal_format)

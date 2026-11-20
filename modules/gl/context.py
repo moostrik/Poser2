@@ -12,9 +12,9 @@ import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
-from OpenGL.GL import (GL_ARRAY_BUFFER, GL_FALSE, GL_FLOAT, GL_STATIC_DRAW, glBindBuffer, glBindVertexArray,
-                       glBufferData, glDeleteBuffers, glDeleteVertexArrays, glEnableVertexAttribArray, glGenBuffers,
-                       glGenVertexArrays, glVertexAttribPointer)
+from OpenGL.GL import (GL_ARRAY_BUFFER, GL_FALSE, GL_FLOAT, GL_STATIC_DRAW, GL_TRIANGLE_FAN, glBindBuffer,
+                       glBindVertexArray, glBufferData, glDeleteBuffers, glDeleteVertexArrays, glDrawArrays,
+                       glEnableVertexAttribArray, glGenBuffers, glGenVertexArrays, glVertexAttribPointer)
 
 from . import style
 from .style import StyleStack
@@ -23,6 +23,11 @@ if TYPE_CHECKING:
     from .shaders import Blit
 
 logger = logging.getLogger(__name__)
+
+
+def draw_quad() -> None:
+    """Draw the full-screen quad of the context made current; its vertex array is bound while it is current."""
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4)
 
 
 class Context:

@@ -17,13 +17,13 @@ except (ImportError, OSError):
 if TYPE_CHECKING:
     import torch
 
-from OpenGL.GL import GL_CLAMP_TO_EDGE, GL_FLOAT, GL_HALF_FLOAT, GL_LINEAR, GL_PIXEL_UNPACK_BUFFER, GL_R16F, GL_R32F, GL_R8, GL_RED, GL_RG, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_STREAM_DRAW, GL_TEXTURE_2D, GL_UNSIGNED_BYTE, glBindBuffer, glBindTexture, glBufferData, glDeleteBuffers, glGenBuffers, glGetError, glTexSubImage2D
+from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_FLOAT, GL_HALF_FLOAT, GL_LINEAR, GL_PIXEL_UNPACK_BUFFER, GL_R16F, GL_R32F, GL_R8, GL_RED, GL_RG, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_STREAM_DRAW, GL_TEXTURE_2D, GL_UNSIGNED_BYTE, glBindBuffer, glBindTexture, glBufferData, glDeleteBuffers, glGenBuffers, glGetError, glTexSubImage2D
 
 # Local application imports
 from .texture import Texture
 
 
-def get_channel_count_from_format(internal_format) -> int:
+def get_channel_count_from_format(internal_format: Constant | int) -> int:
     """Get number of channels from OpenGL internal format.
 
     Args:
@@ -42,7 +42,7 @@ def get_channel_count_from_format(internal_format) -> int:
         return 4
     return 1  # fallback
 
-def get_bytes_per_channel(internal_format) -> int:
+def get_bytes_per_channel(internal_format: Constant | int) -> int:
     """Get bytes per channel from OpenGL internal format.
 
     Args:
@@ -59,7 +59,7 @@ def get_bytes_per_channel(internal_format) -> int:
         return 4  # FP32
     return 4  # fallback to FP32
 
-def get_gl_type_from_format(internal_format) -> int:
+def get_gl_type_from_format(internal_format: Constant | int) -> int:
     """Get OpenGL type constant from internal format.
 
     Args:
@@ -74,7 +74,7 @@ def get_gl_type_from_format(internal_format) -> int:
         return GL_HALF_FLOAT
     return GL_FLOAT
 
-def infer_internal_format(tensor: "torch.Tensor") -> int:
+def infer_internal_format(tensor: "torch.Tensor") -> Constant:
     """Infer OpenGL internal format from tensor shape and dtype.
 
     Args:
@@ -150,7 +150,7 @@ class Tensor(Texture):
             self._tensor = tensor
             self._needs_update = True
 
-    def allocate(self, width: int, height: int, internal_format) -> None:
+    def allocate(self, width: int, height: int, internal_format: Constant | int) -> None:
         """Allocate texture and PBO for CUDA-OpenGL interop.
 
         Args:

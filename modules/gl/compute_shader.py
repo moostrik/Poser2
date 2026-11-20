@@ -17,11 +17,11 @@ Usage:
 """
 from __future__ import annotations
 
+import inspect
 import logging
 import math
+import threading
 from pathlib import Path
-
-logger = logging.getLogger(__name__)
 
 from OpenGL.GL import GL_ALL_BARRIER_BITS, GL_COMPILE_STATUS, GL_COMPUTE_SHADER, GL_FALSE, GL_LINK_STATUS, GL_MAX_COMPUTE_WORK_GROUP_COUNT, GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, GL_MAX_COMPUTE_WORK_GROUP_SIZE, GL_READ_ONLY, GL_READ_WRITE, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_SHADER_STORAGE_BARRIER_BIT, GL_TEXTURE0, GL_TEXTURE_2D, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_3D, GL_TEXTURE_FETCH_BARRIER_BIT, GL_TRUE, GL_WRITE_ONLY, glActiveTexture, glAttachShader, glBindImageTexture, glBindTexture, glCompileShader, glCreateProgram, glCreateShader, glDeleteProgram, glDeleteShader, glDispatchCompute, glGetIntegeri_v, glGetIntegerv, glGetProgramInfoLog, glGetProgramiv, glGetShaderInfoLog, glGetShaderiv, glLinkProgram, glMemoryBarrier, glShaderSource, glUniform1i
 
@@ -29,6 +29,8 @@ from .shader import Shader
 from .texture import Texture
 from .texture_3d import Texture3D
 from .texture_2d_array import Texture2DArray
+
+logger = logging.getLogger(__name__)
 
 
 class ComputeShader(Shader):
@@ -58,7 +60,6 @@ class ComputeShader(Shader):
         self._uniform_cache: dict[str, int] = {}
 
         # Discover compute shader file named after the class's module file, in the same directory
-        import inspect
         source_stem = type(self).__module__.rsplit('.', 1)[-1]
         self.shader_dir = Path(inspect.getfile(self.__class__)).parent
 
@@ -141,8 +142,8 @@ class ComputeShader(Shader):
                 logger.info(f"{self.shader_name} compute shader loaded successfully")
             return True
 
-        except Exception as e:
-            logger.error(f"{self.shader_name} UNEXPECTED ERROR: {e}")
+        except Exception:
+            logger.exception("%s: unexpected error while compiling", self.shader_name)
             return False
 
     def reload(self) -> bool:

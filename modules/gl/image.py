@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 _FLIPPED: Rect = Rect(0.0, 1.0, 1.0, -1.0)     # the whole texture, its rows drawn bottom to top
 
 
-def _get_format_bgr(internal_format, channel_order: Literal['BGR', 'RGB']) -> Constant:
+def _get_format_bgr(internal_format: Constant | int, channel_order: Literal['BGR', 'RGB']) -> Constant:
     """Get pixel format for glTexImage2D with channel order support.
 
     Args:
@@ -134,7 +134,7 @@ class Image(Fbo):
         if needs_update and image is not None:
             self.set_from_image(image)
 
-    def allocate(self, width: int, height: int, internal_format) -> None:
+    def allocate(self, width: int, height: int, internal_format: Constant | int) -> None:
         """Allocate source texture and FBO for flipped output.
 
         Args:
@@ -150,7 +150,7 @@ class Image(Fbo):
         # Allocate source texture for numpy upload (with BGR support)
         self._allocate_source(width, height, internal_format)
 
-    def _allocate_source(self, width: int, height: int, internal_format) -> None:
+    def _allocate_source(self, width: int, height: int, internal_format: Constant | int) -> None:
         """Allocate the internal source texture with BGR channel order support."""
         data_type: int = get_data_type(internal_format)
         if data_type == GL_NONE:

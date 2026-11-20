@@ -4,6 +4,8 @@ import sys
 import unittest
 from unittest import mock
 
+from OpenGL.GL import GL_RGBA8
+
 from modules.gl import Fbo
 
 FBO = sys.modules['modules.gl.fbo']
@@ -34,14 +36,14 @@ class FboTest(unittest.TestCase):
     def test_each_framebuffer_made_is_deleted(self) -> None:
         fbo = Fbo()
         for _ in range(3):                                   # a resize reallocates
-            fbo.allocate(64, 32, 0)
+            fbo.allocate(64, 32, GL_RGBA8)
             fbo.deallocate()
         self.assertEqual(self.deleted('glDeleteFramebuffers'), [11, 12, 13])
         self.assertEqual(fbo.fbo_id, 0)
 
     def test_a_depth_buffer_is_deleted_with_it(self) -> None:
         fbo = Fbo(depth=True)
-        fbo.allocate(64, 32, 0)
+        fbo.allocate(64, 32, GL_RGBA8)
         fbo.deallocate()
         self.assertEqual(self.deleted('glDeleteFramebuffers'), [11])
         self.assertEqual(self.deleted('glDeleteRenderbuffers'), [21])
