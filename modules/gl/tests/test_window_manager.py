@@ -6,10 +6,9 @@ import sys
 import threading
 import time
 import unittest
-from types import SimpleNamespace
 from unittest import mock
 
-from modules.gl import FullscreenMode, WindowManager, WindowSettings
+from modules.gl import FullscreenMode, Monitor, WindowManager, WindowSettings
 
 MODULE = sys.modules['modules.gl.window_manager']     # the module: the package exports the class under its name
 LOGGER: str = 'modules.gl.window_manager'
@@ -102,34 +101,31 @@ class TestWindowManager(unittest.TestCase):
         self.manager.apply_cursor()
         glfw.set_input_mode.assert_called_with(self.manager._main_window, glfw.CURSOR, glfw.CURSOR_NORMAL)
 
-    def test_a_monitor_without_a_video_mode_is_skipped(self):
-        # a monitor that is being unplugged is still listed, and asking for its video mode fails
-        gone, good = object(), object()
+    def test_a_dragged_window_follows_the_monitor_under_its_center(self):
+        left = Monitor('left', 0, 0, 1920, 1080, ctypes.pointer(ctypes.c_int(1)))
+        right = Monitor('right', 1920, 0, 1920, 1080, ctypes.pointer(ctypes.c_int(2)))
+        self.manager._monitors = [left, right]
+        self.manager._monitor = left
         self.glfw.get_window_size.return_value = (100, 100)
-        self.glfw.get_monitors.return_value = [gone, good]
-        self.glfw.get_monitor_pos.return_value = (0, 0)
-
-        def video_mode(monitor):
-            if monitor is gone:
-                raise ValueError('NULL pointer access')
-            return SimpleNamespace(size=SimpleNamespace(width=1920, height=1080))
-
-        self.glfw.get_video_mode.side_effect = video_mode
         self.assertEqual(self.manager.fullscreen_mode, FullscreenMode.WINDOWED)
-        self.manager._window_pos_callback(object(), 10, 20)
-        self.assertIs(self.manager._monitor, good)
+        self.manager._window_pos_callback(object(), 1930, 20)
+        self.assertIs(self.manager._monitor, right)
         self.assertEqual((self.manager.settings.x, self.manager.settings.y), (10, 20))
 
-    def test_the_handle_of_a_disconnected_monitor_is_dropped(self):
-        self.glfw.get_monitors.return_value = []
+    def test_a_hot_plug_is_handled_at_the_top_of_the_next_frame(self):
         ours = ctypes.pointer(ctypes.c_int(1))
-        other = ctypes.pointer(ctypes.c_int(2))
-        self.manager._monitor = ours
-        self.manager._on_monitor_change(other, DISCONNECTED)
-        self.assertIs(self.manager._monitor, ours)
-        # GLFW hands the callback a handle object of its own for the same monitor
-        self.manager._on_monitor_change(ctypes.pointer(ours.contents), DISCONNECTED)
+        self.manager._monitor = Monitor('ours', 0, 0, 1920, 1080, ours)
+        connected: list[list[Monitor]] = [[Monitor('ours', 0, 0, 1920, 1080, ctypes.pointer(ours.contents))], []]
+        with mock.patch.object(MODULE, 'Monitor') as monitor_class:
+            monitor_class.connected.side_effect = connected
+            self.manager._on_monitor_change(ours, DISCONNECTED)
+            monitor_class.connected.assert_not_called()          # the callback only marks it
+            self.run_loop(1)                                      # still connected: a handle of its own, kept
+            self.assertIsNotNone(self.manager._monitor)
+            self.manager._on_monitor_change(ours, DISCONNECTED)
+            self.run_loop(1)                                      # gone: dropped
         self.assertIsNone(self.manager._monitor)
+        self.assertEqual(monitor_class.connected.call_count, 2)
 
 
 if __name__ == '__main__':

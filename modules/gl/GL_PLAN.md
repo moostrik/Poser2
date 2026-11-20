@@ -6,9 +6,6 @@ sources: `window_systems_research.md`. Windows now, Linux kept possible.
 
 ## B. One kind of window
 
-- B1. `Monitor` (`monitor.py`): a connected monitor (name, position, size, handle); the monitors in `MonitorId`
-  order (primary first, then by position); a hot-plug is handled at the top of the next frame. Test: the order, a
-  monitor without a video mode skipped.
 - B2. The settings, the renderer and the window manager, in one step and one commit (the half-way state, the old
   manager on the new settings, is never used):
   - `WindowSettings`, one window: `enabled` (shown), `monitor` (the one it is on), `fullscreen`, `x`, `y`,
