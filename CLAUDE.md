@@ -27,6 +27,9 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - A package is one thing, and its name is that thing
 - Its `__init__.py` holds what other packages use
 - Its files each hold one class or one subject, named after it
+- A job of three or more files has its own folder, named after the job
+- Prefer no folder for one or two files
+- Inside a package, code that does the same is written once
 - Its tests sit in its `tests/` folder
 - A script sits in a `scripts/` folder: the repo's, or its app's when only that app uses it
 

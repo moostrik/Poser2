@@ -11,7 +11,7 @@ The panoramic tracker owns cross-camera identity only: seam links, world merges 
 
 - Compare cameras only by world azimuth; edge, overlap, dead-zone, hysteresis and re-acquisition tests use the camera's local angle
 - Correct the world azimuth at the fixed `rig.parallax_radius`, never at a measured distance
-- Keep behavioural gates in degrees, fractions or seconds, never in meters; the measured distance only feeds read-outs and the far-edge filter
+- Keep behavioral gates in degrees, fractions or seconds, never in meters; the measured distance only feeds read-outs and the far-edge filter
 - Check `height_is_measured` on both readings before comparing two heights
 
 ## Identity
