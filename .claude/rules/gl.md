@@ -11,6 +11,8 @@ paths:
 
 ## What the GL does
 
+- Judge a GL design by the latency it adds to the 2D path, camera to screen
+- A 3D step stays inside its own pass
 - Drawing is done in shaders
 - Simple geometry, as from poses, is worked out on the CPU, in plain modules
 - Volumetrics and any other 3D are done inside a shader
@@ -26,11 +28,11 @@ paths:
 - Create textures, FBOs and shaders at setup or on a resize, not per frame
 - Pair every creation with its destruction
 - Set the GL state a draw needs where it draws (blend, depth, viewport)
+- Change the blend state only through `Style`, which keeps it without `glGet*`
 - Prefer not to read back from the GPU or wait on it inside a frame
 - Name a shader's `.frag`/`.vert`/`.comp` source after the `.py` file that holds its class, beside it; the loader resolves it by that module name
 - A shader is named after the operation it does; the `shaders` package in front says what it is (`shaders.PosePointLines`)
 - Import OpenGL names by name, never with `from OpenGL.GL import *`
-- Pass `0xFFFFFFFFFFFFFFFF` as `glWaitSync`'s timeout, never PyOpenGL's `GL_TIMEOUT_IGNORED`: in PyOpenGL 3.1.10 it is a signed value the driver rejects (GL_INVALID_VALUE), and with error checking off the error surfaces at a later `glGetError`, in unrelated code
 - `modules/gl/shaders` holds the shaders that are useful to any app
 - An app's own shader sits in that app
 - Shaders get checked in a GPU harness
