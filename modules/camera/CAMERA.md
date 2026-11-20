@@ -29,7 +29,7 @@ One job: hand an app a camera. That is three things.
   detector never calls it.
 - `connected` says whether the device is open now: a backend that keeps looking for its device (Vimba) is started
   without one and connects when it is there.
-- A backend's settings extend `CameraSettings` or `RigCameraSettings` with its device's fields, so the preset keys
+- A backend's settings extend `CameraSettings` or `RigCameraSettings` with its device's fields, so the settings file keys
   stay flat: `cam_0.fov` and `cam_0.readings.roll_offset` are the same keys for every rig backend. A backend whose
   device takes a field live redeclares it without `Field.INIT`; the panel shows the backend's fields first.
 - Nothing in the show reads a rig camera's readings: they are for setting the rig up. A backend fills what its
@@ -40,9 +40,9 @@ One job: hand an app a camera. That is three things.
 
 One setting, the sensor mode (`resolution`, `CameraResolution`), sets every width, height, aspect and buffer size
 in the pipeline and the render, with the mount. It is a setting and not a constant because everything
-frame-relative in a preset is tuned against one frame, and a constant in code with its dependants in a preset is
+frame-relative in a settings file is tuned against one frame, and a constant in code with its dependants in a settings file is
 two sources that can disagree; it also lets a recording play right: a clip shot at 720 rows runs through an 800-row
-pipeline with `vfov`, the distance and the panorama all wrong, and a playback preset saying `P720` fixes them at
+pipeline with `vfov`, the distance and the panorama all wrong, and a playback settings file saying `P720` fixes them at
 once. Nothing downstream restates a frame dimension as a literal. It is `CameraResolution`, not `Resolution`,
 because `modules/pose` has a `resolution` of its own and the apps import both.
 
@@ -179,7 +179,7 @@ them as on the rig. A clip that is warped (`clip_warp`, for raw clips only, unwa
 input and must be the sensor's size; one that passes through must be the delivered size, its derived height
 included. A clip of another size still runs (the XLinkIn's size is a ceiling, the frame carries its own size, the
 detector resizes what comes), but every frame-relative setting is off by the ratio: the tracker's vfov and height
-gates, the pose distance thresholds. The fix is in the preset, `camera.resolution` set to the clip's label; the
+gates, the pose distance thresholds. The fix is in the settings file, `camera.resolution` set to the clip's label; the
 clip camera warns once per size.
 
 ## Vimba
@@ -265,7 +265,7 @@ be reprojected twice; the geometry a clip was shot with is not stored with it.
 
 **The lens's reach.** `fov` is the frame's span, and the lens must reach half of it on each side of its own center,
 which is not the frame's; where it falls short, the edge columns near the horizon read past the sensor and go black.
-A pixel or two is the price of a shared lens center and is logged as information; more is a preset to fix, and
+A pixel or two is the price of a shared lens center and is logged as information; more is a settings file to fix, and
 warns.
 
 **The detector.** The wide blobs are built on tools.luxonis.com from the stock ultralytics yolov8n weights,
@@ -301,11 +301,11 @@ The package's `__init__.py` exports what other packages use; a backend takes the
 Recording and playback, the replay camera among them, are `modules/recording`, which uses a camera; the cameras'
 sync (`CameraSync`) is `modules/inference`'s, beside `InferenceFrameSync`.
 
-## What no preset runs
+## What no settings file runs
 
 Kept, and listed so a reader knows what is live:
 
-| Code                             | Runs when                                            | In a preset |
+| Code                             | Runs when                                            | In a settings file |
 |----------------------------------|------------------------------------------------------|-------------|
 | `KeypointJoin`, `add_pose_chain` | OAK4 `model_chain` is the detector plus a pose model | none        |
 | `add_one_model_chain`            | OAK4 `model_chain` is one pose model                 | none        |

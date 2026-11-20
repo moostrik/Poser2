@@ -41,7 +41,7 @@ use root paths, so no code knows the name. Only the relay folder goes there, nev
    own data (passes, visitors' files, log) is never touched. The first time `deploy_relay.bat --library` sends
    the PC relay's `data\tracks` and `data\laughs` too (64 MB), so the first visitors wait for no uploads.
 4. SMILE, Online tab: `relay` = `wss://smile.oostrik.net/ws/smile`, `page` empty, `active` on; saved in the
-   preset. SMILE makes outgoing connections only; nothing on the installation is opened to the internet.
+   settings file. SMILE makes outgoing connections only; nothing on the installation is opened to the internet.
 5. On the VPS: `systemctl status smile-relay`, `journalctl -u smile-relay -f` and `/home/smile/relay/data/relay.log`
    say what the relay does; `systemctl status caddy` the proxy and its certificate.
 6. After the first turns: `relay.log`'s `timing` and `frames to the phone` lines, for what the venue's uplink

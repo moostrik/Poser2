@@ -68,7 +68,7 @@ class TestLaughterTest(unittest.TestCase):
         self.assertEqual(self.banged, [])
         self.assertEqual(self.settings.laughter_test_screen, 0)
 
-    def test_a_preset_saved_with_the_test_on_starts_off(self):
+    def test_a_settings_file_saved_with_the_test_on_starts_off(self):
         settings = AudioSettings()
         settings.laughter_test = True
         settings.laughter_test_screen = 7

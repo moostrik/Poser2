@@ -29,7 +29,7 @@ bridge is everything the synth does not know:
   compresses about its person as one picture, the synth none the wiser. ``window.overlap``
   clips neighbouring reaches toward their midpoints: windows meet as territories at 0.
 - the **mask**: a band at the person, over every pattern, lit at its levels by presence (dim blue
-  in the preset) and flashing to its flash levels on a hit; its **border**, a line centerd on
+  in the settings file) and flashing to its flash levels on a hit; its **border**, a line centerd on
   each edge of the band, half over the blue, that does not flash; and the playhead's **marker** over
   it all (``PlayheadMarker``), dimmed inside the masks. With ``pose_instrument.opposite`` the patterns are
   drawn half a turn from their people (ON) or in both places (BOTH) while the masks stay on

@@ -159,7 +159,7 @@ class TestWindowManager(unittest.TestCase):
     def test_a_negative_limit_is_off_and_a_change_ends_the_wait(self):
         self.with_windows()
         self.manager.settings.v_sync = False
-        self.manager.settings.fps_limit = -5                                 # from a preset: off
+        self.manager.settings.fps_limit = -5                                 # from a settings file: off
         self.assertEqual(self.pace([0.0]), [])
         with mock.patch.object(self.manager, '_waker') as waker:
             self.manager.settings.fps_limit = 30                             # the panel's new value

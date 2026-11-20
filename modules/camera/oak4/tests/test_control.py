@@ -79,7 +79,7 @@ class SettingsTest(unittest.TestCase):
     def test_every_anti_banding_mode_has_its_depthai_mode(self) -> None:
         self.assertEqual(set(ANTI_BANDING_MODES), set(AntiBanding))
 
-    def test_the_region_and_the_depth_group_survive_a_preset(self) -> None:
+    def test_the_region_and_the_depth_group_survive_a_settings_file(self) -> None:
         settings = Oak4CameraSettings()
         settings.sensor.exposure_region = Rect(0.1, 0.2, 0.3, 0.4)
         settings.depth.far = 5.0

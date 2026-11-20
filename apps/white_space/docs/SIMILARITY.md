@@ -34,7 +34,7 @@ In this order; each step's number is read off the data view (`render.layers.data
    poses, raise it; swapping in and out, widen the band. With three or more, `mode` ALL_BUT_ONE lets the group
    sync while one person does not.
 
-Restart the app before saving a preset: the running app rewrites `studio.json`.
+Restart the app before saving a settings file: the running app rewrites `studio.json`.
 
 ## The definition
 
@@ -111,7 +111,7 @@ zeros.
 | `states.intro_grace_seconds`                         | the show (S4)       | 20 s          | after the sync end, the hits out of sync this long before INTRO can spin up again |
 | `pose.similarity.group_sync.on_at`, `off_at`         | group sync          | 0.95, 0.9     | the band: the gate opens when the group's level reads `on_at`, closes below `off_at` |
 | `pose.similarity.group_sync.mode`                    | group sync          | ALL           | the group's level: the least alike pair of all, or with the one who drags it down most left out (ALL_BUT_ONE, 3 or more) |
-| `pose_instrument.sync_strobe.threshold`              | the reach growth    | 0.9           | where sync's reach growth begins (bypassed in the preset) |
+| `pose_instrument.sync_strobe.threshold`              | the reach growth    | 0.9           | where sync's reach growth begins (bypassed in the settings file) |
 | `pose_instrument.window.width`                       | window              | 33°           | the window before it opens |
 
 ## What the numbers mean

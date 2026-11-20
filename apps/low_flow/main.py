@@ -41,7 +41,7 @@ class LowFlowMain:
         self.store.load_startup(self.settings)
         self.settings.setup.camera.sim_enabled = simulation
         if not interface:
-            self.settings.setup.panel.browser = False  # launcher override; the preset cannot turn it back on
+            self.settings.setup.panel.browser = False  # launcher override; the settings file cannot turn it back on
         # The crop is the pose model's input, so it is cut at that size: one antialiased resample
         # from the camera frame, rather than a larger crop the runner scales down again. Derived
         # from the model so a change of pose model cannot silently reintroduce the second one.
@@ -158,7 +158,7 @@ class LowFlowMain:
         self.segmenter.add_segmentation_callback(self._on_masks)
         self.inference_frame_sync.add_frame_callback(self._on_inference_frame)
 
-        # CAMERA HEALTH — the camera's IMU reading and frame rate against the preset, as pinned indicators
+        # CAMERA HEALTH — the camera's IMU reading and frame rate against the settings file, as pinned indicators
         self.camera_health = CameraHealth(self.settings.setup.camera.cameras, self.settings.setup.camera.camera_health)
 
         # RENDER

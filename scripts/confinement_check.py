@@ -6,7 +6,7 @@ the end, the largest difference between runs that should agree, and how much the
     split           all three at (ε / 4, ε / 4, ε / 2, R): the forces summed, the same water
     two sizes       confinement 1 (ε, R), confinement 2 (ε, r): what a second size adds
 
-deep_flow's preset otherwise (`maccormack_check.fluid_settings`). No app: a hidden window gives the GL context.
+deep_flow's settings file otherwise (`maccormack_check.fluid_settings`). No app: a hidden window gives the GL context.
 
     python scripts/confinement_check.py [--seconds 2] [--strength 2] [--radius 0.02] [--small 0.006]
 """

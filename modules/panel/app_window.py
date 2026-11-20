@@ -13,7 +13,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # Dedicated Edge profile: forces a browser process we own, and holds Edge's own record of the
-# window's last position/size. Deleting the directory resets the window to the preset defaults.
+# window's last position/size. Deleting the directory resets the window to the settings file defaults.
 # Lives under LOCALAPPDATA, not TEMP: temp cleaners prune half a profile, and its broken HTTP
 # cache then serves truncated page resources (the "ES modules" banner, unstyled panels).
 EDGE_PROFILE_DIR = Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir())) / "Poser2" / "settings_edge"

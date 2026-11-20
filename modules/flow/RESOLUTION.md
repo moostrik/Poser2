@@ -2,7 +2,7 @@
 
 The sizes the flow's picture and motion pass through, from the camera to the 4K output, and why each is what
 it is. **(deduction)** marks what is inferred, **(site fact)** what the operator saw. All numbers are
-deep_flow's preset. What is next is in [FLOW_PLAN.md](FLOW_PLAN.md).
+deep_flow's settings file. What is next is in [FLOW_PLAN.md](FLOW_PLAN.md).
 
 ## The rules
 
@@ -52,7 +52,7 @@ lowpass's blur **(deduction)**.
 
 The density and the fine density ([FLUID_3D.md](FLUID_3D.md#the-densitys-detail)): one RGBA density, color
 × amount, at its own `density.width` × `height` × `depth`, the dye's size by the fine density's layers in the
-preset, 8.6 M texels against the fine density's 199 M, RGBA16F as 8 bits would round at every advection; it is
+settings file, 8.6 M texels against the fine density's 199 M, RGBA16F as 8 bits would round at every advection; it is
 the fine density's color and what the buoyancy weighs, by uv. A density at the simulation's 288 × 512 cells
 blurs the dye's color **(site fact)**. On the show recording, `-sim`, 40 s, two runs: the fluid 9.6 / 9.1 ms,
 its density pass 6.1 / 5.8; a density on the grid beside a color volume takes 10.1 / 9.2 and 6.7 / 5.9.

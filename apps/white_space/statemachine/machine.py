@@ -81,7 +81,7 @@ class StateMachine:
         self._states = {s: cls(settings, light, reset_layers) for s, cls in STATES.items()}
         # The show always starts in OFF (dark, motor BEAM) and wakes through OFF_IDLE once the
         # playhead has locked. `manual.select` is only the goto target, entered on `goto`, never
-        # at start. Nothing in the preset is forced: a saved hold or blackout comes back as saved.
+        # at start. Nothing in the settings file is forced: a saved hold or blackout comes back as saved.
         self._current: StateId = StateId.OFF
         self._active: StateBase = self._states[self._current]
         self._entered: bool = False             # the boot entry into OFF happens on the first

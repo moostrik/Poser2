@@ -381,7 +381,7 @@ class TestZoneLines(unittest.TestCase):
         self.assertLess(strip_y(far, self.WINDOW), strip_y(near, self.WINDOW))
 
     def test_the_far_edge_is_inside_the_studio_window_and_the_near_one_is_not(self) -> None:
-        """Which is why the zone is drawn as a clipped field rather than two lines: at this preset
+        """Which is why the zone is drawn as a clipped field rather than two lines: at this settings file
         the near edge really is below what the strip can show, and a fill running off the bottom
         says "continues past here" where a line pinned to the boundary would have claimed an
         elevation that is not its own. The strip shows less than the frames do —

@@ -26,7 +26,7 @@ Today the ComfyUI side is installed by hand from `comfy/`, a 27 GiB "bundle" tha
 old PC over USB: `comfy/setup.ps1` clones ComfyUI, fetches the node packs, applies the patches, builds
 the venv and robocopies `comfy/models/` into `ComfyUI/models/`. `scripts/install.bat` only does the
 app side and refuses to run twice. The bundle idea is now redundant, and it has drifted: the startup
-preset `data/settings/smile.json` runs `realvisxlV40_v40Bakedvae` + the DMD2 LoRA, which exist only in
+settings file `data/settings/smile.json` runs `realvisxlV40_v40Bakedvae` + the DMD2 LoRA, which exist only in
 `ComfyUI/models/` on this PC, not in the bundle. A new PC built from the bundle would silently run the
 Lightning checkpoint without distillation, because `Workflow.build()` drops a model ComfyUI does not
 have without a word. The bundle also carries 10 GB the app never uses (Qwen 4B, MiDaS cache, animal
@@ -39,7 +39,7 @@ Decided with the user (2026-10-06):
    ComfyUI-relative paths (free up to 100 GB private; the set is ~18.5 GB). Each file also lists its
    public canonical URL as a fallback. A local mirror folder (USB SSD, or the iCloud Drive folder)
    serves offline installs, filled by an export step. The website is not used.
-2. **Model set**: only what `data/comfy/smile_workflow.json` and the `smile.json` preset run (table
+2. **Model set**: only what `data/comfy/smile_workflow.json` and the `smile.json` settings file run (table
    below). The workflow and the code defaults change to that checkpoint + DMD2.
 3. **Layout**: one re-runnable `scripts\install.bat` for app + ComfyUI + models; running it again is
    the install check. ComfyUI-side sources stay in `comfy/` (`patches/`, `aiia_grin/`, the manifest);
@@ -50,7 +50,7 @@ Decided with the user (2026-10-06):
 
 Added 2026-10-26:
 
-5. **The ICK PC is the reference**, not the dev PC of October 6: presets and settings changed since.
+5. **The ICK PC is the reference**, not the dev PC of October 6: settings files and settings changed since.
    `comfy/inventory.py` (in the repo, stdlib only, read-only) records it: ComfyUI commit, every pack
    with its version and a diff against its Comfy Registry archive (hand edits we forgot), every model
    file with size and sha256, `pip freeze`. Its output (`output/inventory/`) fills the manifest, the
@@ -316,12 +316,12 @@ Order of work: 4.1 (the mask, the one that matters), 4.2, 4.3, 4.4, then 5. Each
   Regenerate `data/comfy/smile_test.json` with `scripts\make_test_workflow.bat` (the user runs it: it
   needs the app venv; it does not need ComfyUI).
 - `modules/comfy/settings.py` (`PortraitSettings`, lines 51-63): defaults become the `smile.json` values so
-  a fresh preset is a working model: `checkpoint_options` and `checkpoint` →
+  a fresh settings file is a working model: `checkpoint_options` and `checkpoint` →
   `realvisxlV40_v40Bakedvae.safetensors`; `lora_options` → `["none", "dmd2_sdxl_4step_lora_fp16.safetensors"]`;
   `distill_lora` → `dmd2_sdxl_4step_lora_fp16.safetensors`; `distill_strength` 1.0; `steps` 4; `cfg` 1.2;
   `sampler` `lcm` (and `sampler_options` `["lcm"]`); `scheduler` stays `exponential`. `GenerationTest.json`
   and `Grintest.json` set no checkpoint or distill LoRA and so follow the new defaults (their own steps,
-  cfg and sampler stay; they are test presets, the user adjusts them if wanted).
+  cfg and sampler stay; they are test settings files, the user adjusts them if wanted).
   Existing tests that assume no distill node by default: `test_lora_chain` and `test_distill_lora` in
   `modules/comfy/tests/test_workflow.py` are updated (the chain starts at the distill node by default;
   switching the distill LoRA off makes it start at the checkpoint).

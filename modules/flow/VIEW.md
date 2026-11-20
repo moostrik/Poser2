@@ -61,7 +61,7 @@ Its outputs, in the order it makes them, are the image, the mask and the depth, 
 makes it; the input's depth is a depth in the box's range, drawn in its colormap. The color stage after it makes
 the density's color from the image and the mask ([COLOR.md](COLOR.md)); the motion reads all three.
 
-| Setting                              | Preset        | Is                                                                        |
+| Setting                              | Settings file        | Is                                                                        |
 |--------------------------------------|---------------|---------------------------------------------------------------------------|
 | `crop.center_x`, `center_y`, `height` | 0.5, 0.5, 1  | the box's sides: its center and height on the camera image, shares of it  |
 | `crop.near`, `far`                   | 0.1, 1.7 m    | the box's front and back, the player's depth range                        |
@@ -112,7 +112,7 @@ without it) **(deduction)**.
 Measured with `scripts/depth_velocity_capture.py` and `depth_velocity_compare.py` on the measure recording
 (`20261112-125832_measure`), 2026-11-16, commit fdf8f8de: three captures of its first 16.5 s, every camera frame
 (810 a capture, `measure_1` to `measure_3`), replayed through the motion on its raw output (`xy.threshold`,
-`z.threshold` and `z.smooth` at 0); the preset then (the view's `guided_radius` 3; the motion's `levels` 4, `edge`
+`z.threshold` and `z.smooth` at 0); the settings file then (the view's `guided_radius` 3; the motion's `levels` 4, `edge`
 0.1 m, `tolerance` 0.2 m, `dead_zone` 0.02 m); the still part 1–5 s, the slow move 5.5–10 s, the fast 11.5–16 s;
 z as the fluid gets it, in px per frame, weighted by the mask; noise the still part's p99 12 px and more inside
 the mask and within 6 px of its edge; slow and fast z's mean inside; fit the image's brightness gradient (Sobel,

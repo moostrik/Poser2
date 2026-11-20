@@ -30,7 +30,7 @@ class GridRenderer(LayerBase):
     **In elevation**, the horizon and the **zone band**: the tracked floor, a translucent band between
     the two radii at `atan(camera_height / R)` below the horizon, the same at every azimuth. The only
     thing on the strip in metres, so the one a tape on the floor checks, and what a mark's foot tick is
-    read against. A band rather than two lines, because at some presets the zone runs below the
+    read against. A band rather than two lines, because at some settings files the zone runs below the
     strip's bottom and a fill running off the edge says so, where a line pinned there would claim a
     wrong elevation.
     """

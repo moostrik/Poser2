@@ -172,7 +172,7 @@ recorded, depth frames with the recorded alignment, and with `tilt` the homograp
 live offset on the recorded lens. That matches live's to within `TILT_STEP` (0.25°): live makes it from the IMU's
 newest tilt, the recording keeps the tilt read with the frame **(deduction)**.
 
-Its tracklets come one of two ways, by `PersonDetector.enabled` (off in deep_flow's preset):
+Its tracklets come one of two ways, by `PersonDetector.enabled` (off in deep_flow's settings file):
 
 | Detector | Tracklets                                                                     | Against live                                |
 |----------|-------------------------------------------------------------------------------|---------------------------------------------|
@@ -189,7 +189,7 @@ does not run: the crops are cut for what reads them (hd_trio's masks, the previe
 `track_id`, handed on after the recorded `pose_latency`. The `track_id`s come from the host tracker on the recorded
 tracklets, the same tracker on the same messages as live, so they match the recording's **(deduction)**. With it
 off the pose model runs as live, with live's GPU load, its poses differing a little every play. It is apart from
-`pose.enabled`, which the preset shares between live and -sim.
+`pose.enabled`, which the settings file shares between live and -sim.
 
 A recording without poses plays boxes without points while it is on, as one without tracklets plays no players with
 the detector off. The pose recorder of `modules/pose` (`Recorder`, HDF5 per stage) is another thing: it records a

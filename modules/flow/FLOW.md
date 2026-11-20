@@ -333,7 +333,7 @@ frame. How a frame gets there, thread by thread, and what costs frames are in
   viscosity takes its `viscosity.iterations` at a 60 fps step and fewer at a shorter one, never more
   (`viscosity_iterations`). Iterations growing with the step would keep a dropped frame rate down:
   at 4 fps, 15 times the work per frame **(deduction)**.
-- The output is 4K, 2160 × 3840 (deep_flow's preset). Every frame runs the same passes, whatever
+- The output is 4K, 2160 × 3840 (deep_flow's settings file). Every frame runs the same passes, whatever
   its content: no pass is skipped for what a frame holds, and nothing is read back from the GPU to
   decide one.
 - The stages draw nothing; the monitors draw, only while shown, once per tick. A port's kind says
@@ -348,7 +348,7 @@ frame. How a frame gets there, thread by thread, and what costs frames are in
   `x_gain`, `y_gain`, `z_gain` say how much of each axis is the body's motion, the fluid's how strongly the
   water takes it; the bridge has none **(site fact)**, it translates and holds; the density's sinking along gravity
   in the buoyancy is each fluid's `density.sink`.
-- `modules/render/modules/flow/tests/test_flow_systems.py` loads each app preset into its system's stage
+- `modules/render/modules/flow/tests/test_flow_systems.py` loads each app settings file into its system's stage
   settings and fails on an unknown key, and fails on a field of the flow's settings that no code
   in `modules/flow` or `modules/render/modules/flow` names: such a field is dead **(deduction)**.
 - `modules/render/modules/flow/tests/test_stage_layer.py` checks, without GL, that a reset button asks and the

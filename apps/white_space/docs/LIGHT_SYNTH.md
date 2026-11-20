@@ -286,7 +286,7 @@ line's shift: `width = 1 − shift / 2`.
 | 0.25  | 8              | 1                        | 0.875                   |
 | 0.125 | 16             | ½                        | 0.9375                  |
 
-One dark tick per cycle, black frame insertion, at the studio preset's 32 fps:
+One dark tick per cycle, black frame insertion, at the studio settings file's 32 fps:
 
 | rate | ticks per cycle | width for one dark tick |
 |------|-----------------|-------------------------|
@@ -297,7 +297,7 @@ One dark tick per cycle, black frame insertion, at the studio preset's 32 fps:
 | 16   | 2               | 1/2                     |
 
 A dark tick is one dark revolution on the fixture when the frame rate equals the revolution rate,
-32 fps and 1920 rpm in the studio preset **(deduction)**: the fixture takes a frame mid-revolution,
+32 fps and 1920 rpm in the studio settings file **(deduction)**: the fixture takes a frame mid-revolution,
 so every frame boundary is a seam in the room, and the seam stands still only at that ratio. At a
 tick rate that is no power of two the cycles are uneven by a tick.
 
@@ -499,7 +499,7 @@ meet.
 
 - More LFOs than the one in time per voice: one along the wall; one shared by all voices, all
   patterns moving in step
-- Whether blue half an interval from white is the instrument's rest, or a preset value
+- Whether blue half an interval from white is the instrument's rest, or a settings file value
 - Both solid (the overlap tone everywhere) and both dark: whether each is a sound of the
   instrument or a silence to avoid
 - A pitch's amount in lines is linear in pitch: an LFO on a pitch would swing it further up than

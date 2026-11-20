@@ -59,5 +59,5 @@ The color is resampled twice, straightened in the uploader and cut to the view, 
 ## Checked
 
 Moved from the view into its own stage with the same shaders: on the show recording (`20261112-130105_show`, 40
-captures, deep_flow's preset), the last capture's color is the same as the view's was, the largest difference 0 of
+captures, deep_flow's settings file), the last capture's color is the same as the view's was, the largest difference 0 of
 255 (`apps/deep_flow/scripts/view_check.py --compare`, 18 November 2026).

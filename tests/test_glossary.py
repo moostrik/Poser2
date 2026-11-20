@@ -1,11 +1,11 @@
 """Guard test for the glossary (`.claude/rules/glossary.md`): no identifier in `modules/` or a
-finished app, and no key or stored name in that app's presets, uses a synonym a finished rename
+finished app, and no key or stored name in that app's settings files, uses a synonym a finished rename
 replaced.
 
 Reads the source with `tokenize` and checks NAME tokens only, so comments and strings may still
-quote an old name. Tests are checked too; vendored code is skipped. Preset keys are checked at
-every depth, and so are string values that are identifiers (the enum names a preset stores, such
-as a layer playlist's entries); files starting with '.' are not presets. Each entry is one
+quote an old name. Tests are checked too; vendored code is skipped. Settings file keys are checked at
+every depth, and so are string values that are identifiers (the enum names a settings file stores, such
+as a layer playlist's entries); files starting with '.' are not settings files. Each entry is one
 finished concept; add an entry when a rename lands, and add an app to `APPS` when it follows.
 A package's own terms are banned in its code only: the flow's (its documents in `modules/flow`
 and `.claude/rules/flow.md`) in the flow's code (`FLOW_BANNED`), an app's (smile's in
@@ -23,12 +23,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 APPS = ['white_space', 'hd_trio', 'deep_flow', 'low_flow', 'smile']
 ROOTS = [ROOT / 'modules'] + [ROOT / 'apps' / app for app in APPS]
-PRESET_DIRS = [ROOT / 'apps' / app / 'data' / 'settings' for app in APPS]
+SETTINGS_FILE_DIRS = [ROOT / 'apps' / app / 'data' / 'settings' for app in APPS]
 SKIPPED_DIRS = {'vimbapython', '__pycache__'}
 # vendored code inside an app: SMILE's ComfyUI install and the ComfyUI nodes it ships
 SKIPPED_PATHS = {ROOT / 'apps' / 'smile' / 'ComfyUI', ROOT / 'apps' / 'smile' / 'data' / 'comfy'}
-# Stale preset keys the settings tree no longer has: the loader ignores them, and they stay as saved.
-STALE_PRESET_KEYS = {
+# Stale settings file keys the settings tree no longer has: the loader ignores them, and they stay as saved.
+STALE_SETTINGS_FILE_KEYS = {
     ('apps/deep_flow/data/settings/3D_rev2.json', 'render.fluid3d.visualisation'),
 }
 
@@ -67,7 +67,7 @@ FLOW_BANNED: list[tuple[str, str]] = [
     ('the quantity or boundary, not body alone (the flow)', r'^body$|^bodies$'),
 ]
 
-# an app's own terms (smile's in .claude/rules/smile.md): banned in that app's code and presets
+# an app's own terms (smile's in .claude/rules/smile.md): banned in that app's code and settings files
 APP_BANNED: dict[str, list[tuple[str, str]]] = {
     'smile': [
         ('wall, not player (WallRender, WALLS)', r'PlayerRender|PLAYERS|PlayersSettings|credit_(qr_)?players'),
@@ -113,8 +113,8 @@ def names(path: Path) -> list[tuple[int, str]]:
         return [(tok.start[0], tok.string) for tok in tokenize.generate_tokens(f.readline) if tok.type == tokenize.NAME]
 
 
-def preset_files() -> list[Path]:
-    return [path for folder in PRESET_DIRS for path in sorted(folder.glob('*/*.json')) if not path.name.startswith('.')]
+def settings_file_files() -> list[Path]:
+    return [path for folder in SETTINGS_FILE_DIRS for path in sorted(folder.glob('*/*.json')) if not path.name.startswith('.')]
 
 
 def stored_names(node: object, path: str = '') -> Iterator[tuple[str, str]]:
@@ -144,22 +144,22 @@ class TestGlossary(unittest.TestCase):
                         found.append(f"{path.relative_to(ROOT).as_posix()}:{lineno} {name}  ({concept})")
         self.assertEqual(found, [], "identifiers that use a replaced synonym:\n" + '\n'.join(found))
 
-    def test_no_preset_name_uses_a_replaced_synonym(self) -> None:
+    def test_no_settings_file_name_uses_a_replaced_synonym(self) -> None:
         found: list[str] = []
-        for path in preset_files():
+        for path in settings_file_files():
             patterns = patterns_for(path)
-            preset = path.relative_to(ROOT).as_posix()
+            settings_file = path.relative_to(ROOT).as_posix()
             for key_path, name in stored_names(json.loads(path.read_text(encoding='utf-8'))):
-                if (preset, key_path) in STALE_PRESET_KEYS:
+                if (settings_file, key_path) in STALE_SETTINGS_FILE_KEYS:
                     continue
                 for concept, pattern in patterns:
                     if pattern.search(name):
-                        found.append(f"{preset} {key_path}: {name}  ({concept})")
-        self.assertEqual(found, [], "preset keys or stored names that use a replaced synonym:\n" + '\n'.join(found))
+                        found.append(f"{settings_file} {key_path}: {name}  ({concept})")
+        self.assertEqual(found, [], "settings file keys or stored names that use a replaced synonym:\n" + '\n'.join(found))
 
-    def test_every_preset_folder_has_presets(self) -> None:
-        for folder in PRESET_DIRS:
-            self.assertTrue(any(folder.glob('*/*.json')), f"no presets in {folder.relative_to(ROOT).as_posix()}")
+    def test_every_settings_file_folder_has_settings_files(self) -> None:
+        for folder in SETTINGS_FILE_DIRS:
+            self.assertTrue(any(folder.glob('*/*.json')), f"no settings files in {folder.relative_to(ROOT).as_posix()}")
 
 
 if __name__ == '__main__':

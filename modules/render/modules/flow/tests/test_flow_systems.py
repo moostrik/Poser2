@@ -1,6 +1,6 @@
-"""The two flow systems' settings: deep_flow's preset loads into the 3D system and low_flow's into the 2D,
+"""The two flow systems' settings: deep_flow's settings file loads into the 3D system and low_flow's into the 2D,
 each without an unknown key, and every field of the flow's settings classes is named somewhere in the flow's code.
-hd_trio's presets load into its own copy (apps/hd_trio/tests)."""
+hd_trio's settings files load into its own copy (apps/hd_trio/tests)."""
 
 import json
 import re
@@ -12,8 +12,8 @@ from modules.render import Motion2DLayerSettings, Bridge2DLayerSettings, Fluid2D
                                   Motion3DLayerSettings, Bridge3DLayerSettings, Fluid3DLayerSettings
 
 ROOT: Path = Path(__file__).resolve().parents[5]
-PRESETS_3D: list[Path] = [ROOT / 'apps' / 'deep_flow' / 'data' / 'settings' / 'flow' / 'settings.json']
-PRESETS_2D: list[Path] = [ROOT / 'apps' / 'low_flow' / 'data' / 'settings' / 'flow' / 'studio.json']
+SETTINGS_FILES_3D: list[Path] = [ROOT / 'apps' / 'deep_flow' / 'data' / 'settings' / 'flow' / 'settings.json']
+SETTINGS_FILES_2D: list[Path] = [ROOT / 'apps' / 'low_flow' / 'data' / 'settings' / 'flow' / 'studio.json']
 SOURCES: list[Path] = [ROOT / 'modules' / 'flow', ROOT / 'modules' / 'render' / 'modules' / 'flow',
                        ROOT / 'modules' / 'render' / 'general' / 'grade']     # the fluid's LUT
 STAGES: tuple[str, ...] = ('motion', 'bridge', 'fluid')
@@ -39,27 +39,27 @@ def flow_source() -> str:
     return '\n'.join(path.read_text(encoding='utf-8') for root in SOURCES for path in sorted(root.rglob('*.py')))
 
 
-class PresetTest(unittest.TestCase):
-    """A preset's stage groups load into the system's settings classes with nothing left over; a preset holds the
+class SettingsFileTest(unittest.TestCase):
+    """A settings file's stage groups load into the system's settings classes with nothing left over; a settings file holds the
     stages its app runs."""
 
-    def _load(self, presets: list[Path], system: dict[str, type[BaseSettings]]) -> None:
-        for preset in presets:
-            flow: dict = json.loads(preset.read_text(encoding='utf-8'))
-            self.assertIn('motion', flow, f'{preset.name} has no flow')
+    def _load(self, settings_files: list[Path], system: dict[str, type[BaseSettings]]) -> None:
+        for settings_file in settings_files:
+            flow: dict = json.loads(settings_file.read_text(encoding='utf-8'))
+            self.assertIn('motion', flow, f'{settings_file.name} has no flow')
             for stage in STAGES:
                 if stage not in flow:
                     continue
-                with self.subTest(preset=preset.name, stage=stage):
+                with self.subTest(settings_file=settings_file.name, stage=stage):
                     settings: BaseSettings = system[stage]()
                     with self.assertNoLogs('modules.settings.base_settings', level='WARNING'):
                         settings.update_from_dict(flow[stage])
 
-    def test_deep_flow_preset_loads_into_the_3d_system(self) -> None:
-        self._load(PRESETS_3D, SYSTEMS['3D'])
+    def test_deep_flow_settings_file_loads_into_the_3d_system(self) -> None:
+        self._load(SETTINGS_FILES_3D, SYSTEMS['3D'])
 
-    def test_low_flow_preset_loads_into_the_2d_system(self) -> None:
-        self._load(PRESETS_2D, SYSTEMS['2D'])
+    def test_low_flow_settings_file_loads_into_the_2d_system(self) -> None:
+        self._load(SETTINGS_FILES_2D, SYSTEMS['2D'])
 
 
 class DeadFieldTest(unittest.TestCase):

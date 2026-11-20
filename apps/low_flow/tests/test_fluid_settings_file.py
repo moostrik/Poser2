@@ -1,4 +1,4 @@
-"""Low Flow's studio preset holds the 2D fluid's settings: every key of `Fluid2DSettings` at the preset's fluid, and
+"""Low Flow's studio settings file holds the 2D fluid's settings: every key of `Fluid2DSettings` at the settings file's fluid, and
 nothing the settings no longer have; the values are the app's own look."""
 
 import json
@@ -21,18 +21,18 @@ def leaves(node: dict, at: tuple[str, ...] = ()) -> set[tuple[str, ...]]:
     return found
 
 
-class TestFluidPreset(unittest.TestCase):
+class TestFluidSettingsFile(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.preset: dict = json.loads(LOW_FLOW.read_text(encoding='utf-8'))['fluid']
+        self.settings_file: dict = json.loads(LOW_FLOW.read_text(encoding='utf-8'))['fluid']
 
-    def test_the_preset_holds_every_key_of_the_settings(self) -> None:
-        missing = leaves(Fluid2DSettings().to_dict()) - leaves(self.preset)
-        self.assertEqual(missing, set(), 'keys of Fluid2DSettings missing from the preset')
+    def test_the_settings_file_holds_every_key_of_the_settings(self) -> None:
+        missing = leaves(Fluid2DSettings().to_dict()) - leaves(self.settings_file)
+        self.assertEqual(missing, set(), 'keys of Fluid2DSettings missing from the settings file')
 
-    def test_the_preset_loads_into_the_settings(self) -> None:
+    def test_the_settings_file_loads_into_the_settings(self) -> None:
         settings = Fluid2DSettings()
-        settings.update_from_dict(self.preset)
+        settings.update_from_dict(self.settings_file)
         self.assertEqual(leaves(settings.to_dict()), leaves(Fluid2DSettings().to_dict()))
 
 

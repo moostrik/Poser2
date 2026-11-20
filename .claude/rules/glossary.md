@@ -9,6 +9,7 @@ Names for things that more than one package uses. Each bullet gives the name and
 
 - A component's settings object: `settings` / `self.settings`; not `config`, `_config`
 - A settings class: `<ClassName>Settings`, after the class it configures
+- A root group's named file: "settings file"; not "preset"
 - The id of a tracked person: `track_id`; not `tracklet_id`, `pose_id`
 - A time stamp: `timestamp`; not `time`, `time_stamp`
 - Camera identifiers: `cam_id`, `num_cams`, `cam_tracklets`; not `camera_id`, `num_cameras`. Class names keep `Camera` (`CameraFrame`, `CameraTracklet`)
@@ -23,7 +24,7 @@ Names for things that more than one package uses. Each bullet gives the name and
 
 ## Apps
 
-- Settings groups shared by the apps: `session` / `control`, `tracker`, `input_fps`; not `record` / `core`, `track`, `fps`
+- Settings groups shared by the apps: `setup`, `session` / `control`, `tracker`, `input_fps`; not `record` / `core`, `track`, `fps`
 - An app's renderer: `<App>Render`
 - The camera count at an app's root: `num_cams`, separate from `max_players`
 - The gate on the group's similarity: "group sync" (`group_sync`, `GroupSync`, `GroupSyncGate`); not "full sync". The OSC address stays `/global/sync`

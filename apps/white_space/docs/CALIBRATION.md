@@ -10,7 +10,7 @@ choreography) and `LAYERS.md` (the layers).
 - Operator-facing angles are degrees, 0–360, counter-clockwise seen from above. The code keeps
   radians internally and on the wire.
 - The fixture firmware is never changed. Everything is modelled and corrected app-side.
-- Setting paths are written as they appear in the preset (`camera.camera_health.mount`); `cam_N` means
+- Setting paths are written as they appear in the settings file (`camera.camera_health.mount`); `cam_N` means
   each of `cam_0`…`cam_3`.
 
 ---
@@ -24,7 +24,7 @@ Calibrate in this order. Cameras first: everything else is tuned against the fra
    offset to turn instead. See *Layout*.
 1. **Cameras.**
    - Set `fov`, `resolution`, `tilt` and the three lens numbers (`lens_fov`, `lens_center_x`,
-     `lens_center_y`) in the preset — `tilt` from the table under *Tilt — derived from the build*,
+     `lens_center_y`) in the settings file — `tilt` from the table under *Tilt — derived from the build*,
      the lens from *The lens* — and relaunch. All of them are baked in when the devices open, and
      the frame height is derived from them.
    - Read the open log: per camera one `lens:` line (its field, center offset and `lens_error`,
@@ -141,7 +141,7 @@ loop's output delay. The playhead is never reset at spin-up, so it keeps that le
 playhead line reaches the wall one output delay later — exactly where the beam would have been. So
 the playhead needs no offset of its own in projection mode, and tuning the projection offset onto the
 moving line would rotate the whole projection by that delay. (The firmware applies a frame on the next fast
-revolution, so the line may lag up to one light tick more (31 ms at the studio preset's 32 fps) — a degree or two, within the half playhead step
+revolution, so the line may lag up to one light tick more (31 ms at the studio settings file's 32 fps) — a degree or two, within the half playhead step
 (3.6° at 36 rpm) the flash tick can sit from the person; deduction.) The hit and the sound fire on the internal playhead in both modes, so their timing
 against the light matches too.
 
@@ -245,8 +245,8 @@ on a wall `D` away sits at elevation `atan(H · cos b / D)` at bearing `b`: high
 falling toward the sides by tens of degrees. That is the projection, not a fault. The checks are a
 vertical edge (one column, anywhere) and tape at lens height (one row).
 
-Seven constants at the preset root define the frame, all `INIT` — baked in when the devices open, so
-changed by editing the preset and relaunching:
+Seven constants at the settings file root define the frame, all `INIT` — baked in when the devices open, so
+changed by editing the settings file and relaunching:
 
 - **`fov`** — 127°, the azimuth span of the delivered frame, quoted for the full sensor width. A
   contract, not a lens fact: the tracker's `cam_fov`, the overlaps and the azimuth of a column all
@@ -308,7 +308,7 @@ Modelling the lens as `fov` reads bearings ~1° short toward the seams — the c
 in the overlap in the fault table under *Reading the panorama* — and puts the horizon 10 px ≈ 1° too
 high, which is ≈ 1 m of distance error at 5 m (`TRACKING.md`, *The tracker's distance*).
 
-One lens for all four, the mean, in the preset: `lens_fov` **128.9** (568.6 px/rad across 1280 px),
+One lens for all four, the mean, in the settings file: `lens_fov` **128.9** (568.6 px/rad across 1280 px),
 `lens_center_x` **−10.5**, `lens_center_y` **+10.5** (px from the frame center, at the full sensor
 mode; the 720-row crop keeps the offset). A lens per unit would remove the residuals in the last
 column; a shared lens is the chosen trade, and the residual stays visible: at open each camera logs
@@ -383,7 +383,7 @@ publishes, as radii from the fixture:
 
 All three are measured against what the sensor fills per column (`frame_coverage`), not the frame's
 rows, so the black arch counts. At the derived height the top is the sensor's own edge, falling
-toward the seams, so the seam read-out is the worse of the two hands read-outs. The studio preset
+toward the seams, so the seam read-out is the worse of the two hands read-outs. The studio settings file
 (P720, tilt 15, the derived 960 rows): feet from R 1.72, hands from R 1.67 on the axis and R 2.0 on
 the seam. The seam line is
 searched, not read off the 45° column: a person on it near the fixture is seen by the camera ≈9°
@@ -577,7 +577,7 @@ against the zone band, because going through the person's own distance makes the
   so the zone is a band of rows, the same at every azimuth. Tape the two circles on the floor and they
   must land on the band's two edges. It is also what a person's mark is read against: a mark's line
   ends at the foot row, so someone inside the zone has that end inside the band. The band is clipped
-  to the strip's window, and at the studio preset it runs off the bottom: the window bottom is −16.9°
+  to the strip's window, and at the studio settings file it runs off the bottom: the window bottom is −16.9°
   against R 1.5's −18.4° (the strip shows less than the frames do: `elevation_window` takes the band at
   its tightest column so no column fades to black). A fill that runs off the edge says *continues past
   here*, which a line pinned to the boundary row could not.
@@ -637,7 +637,7 @@ Two things the field does not say:
   `d / (d + r)` of it on axis, so 5° reads as 4.5° at 3 m and 4.7° at 6 m. The same conversion is
   applied to the positions, which keeps the pair test valid once drawn.
 
-The footer prints all of it — `dead 6.5°  link 15.0°/0.20  reacquire 7.0°` on the studio preset — so a
+The footer prints all of it — `dead 6.5°  link 15.0°/0.20  reacquire 7.0°` on the studio settings file — so a
 width on screen can be checked against the number that produced it.
 
 **Setting the seam values.** One person crossing a seam keeps two overlapping fields of one color with
@@ -766,7 +766,7 @@ the measured motor phase while locked and adds it (`light/playhead.py`). (The pe
 - Max receives it as `/global/playhead`.
 
 Calibrating it aligns all three consumers at once. The flash lights the `frames` ticks closest to the
-person (1 in the preset), so on a correct offset the single flash sits within half a playhead step
+person (1 in the settings file), so on a correct offset the single flash sits within half a playhead step
 (3.6° at 36 rpm) of them.
 Re-tune after changing `light.motor.beam_rpm`: the loop delay inside the offset scales with speed.
 
@@ -859,13 +859,13 @@ the room's angles; only the wall shows what the fixture makes of them.
 
 ## Simulation
 
-Nothing here applies to a simulated session, and no separate preset is needed: the offsets describe
+Nothing here applies to a simulated session, and no separate settings file is needed: the offsets describe
 the physical build, and a recording carries its own frame. The show compares a person's `Azimuth` from
 the recording with the playhead from the simulated motor, both in one frame, so the flash, the hit, the
 sound and both screen views are self-consistent.
 
 - Existing recordings are 1280 × 720 raw clips, shot at `tilt = 0`. Set `resolution` to P720 in the
-  playback preset and the whole chain derives correctly — the frame height, the window and the horizon
+  playback settings file and the whole chain derives correctly — the frame height, the window and the horizon
   row, the distance estimate and the panorama's geometry. Left at P800 the warp expects an 800-row clip
   and every frame-relative number is off (the simulator warns once).
 - `camera.cam_N.clip_warp` applies `tilt` to a raw clip. It assumes the clip was shot at exactly
@@ -948,7 +948,7 @@ to check against the parts.
     loop delay, beam:   ≈ 50 ms (42–58) at 36 rpm                (derived — the 10.8° residual)
     interlace:          white_1 +5, blue_0 −10, blue_1 +9 px     (tuned)
     resolution / tilt:  target P800, tilt 16°                    (the table under Camera; next recording)
-                        the preset's P720 / tilt 15 is for playing back the old 720-row footage,
+                        the settings file's P720 / tilt 15 is for playing back the old 720-row footage,
                         whose capture tilt is unknown; the frame height follows either
     tilt, measured:     reads as configured on all four          (IMU)
     roll offsets:       cam_0 −1.00, cam_1 −0.91,

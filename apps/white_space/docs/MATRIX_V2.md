@@ -86,7 +86,7 @@ Not rows of the matrix: the push and its release (an envelope on the hit, `LIGHT
 
 ## Base matrix
 
-The shoulders' mean into both pulse widths, nothing else. The bases are the studio preset's.
+The shoulders' mean into both pulse widths, nothing else. The bases are the studio settings file's.
 
 | Oscillator | Parameter   | Source    | Base | Amount |
 |------------|-------------|-----------|------|--------|

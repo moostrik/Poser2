@@ -47,4 +47,4 @@ A white example figure plays over WHITE_POSE to ENJOY_IN: a recorded track, the 
 render's tick. It is recorded on site: armed on the panel, the next show records `record_track` from `record_start`
 to `record_end`. The window is a range in show order, so leaving it also ends a recording when the show is stopped or
 skipped. The intro's recorder is outside the session's shared start and stop, so it never starts the show, and it is
-never armed at start, so a preset saved during a take does not record the first show.
+never armed at start, so a settings file saved during a take does not record the first show.

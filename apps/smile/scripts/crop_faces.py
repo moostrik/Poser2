@@ -4,7 +4,7 @@ For testing any photo in an image generator that starts from a cropped portrait 
     .venv\\Scripts\\python apps\\smile\\scripts\\crop_faces.py photo.jpg [more photos] [-o folder] [--zoom 1.2] [--offset 0.0] [--size 1024 1280]
 
 Writes <name>_crop.png next to each photo (or into -o). The zoom and offset default to the face finder's
-defaults (the panel's Portrait zoom and offset); pass the preset's values to match a capture exactly.
+defaults (the panel's Portrait zoom and offset); pass the settings file's values to match a capture exactly.
 """
 
 import argparse

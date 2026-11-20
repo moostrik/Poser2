@@ -65,7 +65,8 @@ fields and a child's shared fields; it keeps `INIT` fields.
 `update_from_dict(data)` sets the instance's own fields first, so a count field is current before the children
 load, then each child's dict, then pushes the shared fields down again. An unknown key and a value that cannot be
 coerced are logged and skipped, so one bad key does not stop the rest. `INIT` fields load only before
-`initialize()`.
+`initialize()`. A field a file does not hold keeps its default, so a new field's key goes only into the files that need
+another value.
 
 An app builds its tree, loads its startup files, sets what it derives (a crop sized from the pose model), then calls
 `initialize()`, which locks the `INIT` fields of the whole tree. Every app's files depend on what these three do.

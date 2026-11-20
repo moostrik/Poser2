@@ -1,7 +1,7 @@
 """white_space's input cadence and latency in -sim, over one stretch of a recording.
 
 Runs white_space -sim headless on `--folder`, replayed on the host with the person detector (`simulator.replay` and
-`yolo` set on the loaded preset before the app reads them; no preset is written) and measures while the playhead is between `--start` and `--end`
+`yolo` set on the loaded settings file before the app reads them; no settings file is written) and measures while the playhead is between `--start` and `--end`
 (seconds of the recording, a stretch found first from the recording's metadata):
 - the cameras' hand-over: each camera thread's time per frame (the frame's callbacks, which only queue);
 - the syncs: the sets each `CameraSync` hands on, as counts and gaps, against the cameras' frame rate;

@@ -21,7 +21,7 @@ stay distinct. Ink's thin sheets folding into tendrils are shear, water at one d
 the water beside it, their boundary rolling up **(deduction)**. The light is a means to it, not a goal of
 its own, and so far not a good one **(site fact)**.
 
-What decides it in the upscale now (the code and deep_flow's preset):
+What decides it in the upscale now (the code and deep_flow's settings file):
 
 | What                     | Now                                                                                   | Against the goal                                                                          |
 |--------------------------|---------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
@@ -208,7 +208,7 @@ Every pass reads the same ghosts, and none reads the texture's border instead:
   level, a different place on each, and the coarse correction spreads to the edge as at a closed
   wall, so it diverges.
 
-Measured with `scripts/maccormack_check.py` at deep_flow's preset (the multigrid, 256 × 448 × 128), a
+Measured with `scripts/maccormack_check.py` at deep_flow's settings file (the multigrid, 256 × 448 × 128), a
 disc swinging for 3 s, then still; the mean speed (widths/s) in the two cells next to the walls and
 inside them, at 4 s and 12 s:
 
@@ -270,7 +270,7 @@ level; where a level is odd its last coarse cell's missing fine cells are a resi
 keeps the sum and a closed box's coarse right-hand side sums to 0, and the prolongation reads the coarse level
 stretched over the fine, so the coarse walls lie on the fine walls ([FLUID_2D.md](FLUID_2D.md)); and the coarsest level's sweeps run in shared memory in one dispatch (`CoarsePressure3D`, up to 4096
 cells): a level of a few thousand cells cannot fill the GPU, so 32 half-sweep dispatches would be only
-their latency. At the preset (288 × 512 × 64) a cycle alone takes 0.77 ms against 0.98 as dispatches, the
+their latency. At the settings file (288 × 512 × 64) a cycle alone takes 0.77 ms against 0.98 as dispatches, the
 pressure in the app 1.44 ms against 1.61; the fused residual is the same to the bit, the coarse solve the same to a float's last bit (the
 compiler orders its multiply-adds its own way).
 
@@ -330,7 +330,7 @@ push in one place is a slight pull everywhere else. Without an expansion the fac
 cell and a closed wall's face is 0, so the divergence sums to 0 already; through an open wall the water leaves.
 
 Measured at reach 1 with `scripts/expansion_check.py`: a disc of full presence at the box's middle depth, rate 0.5/s, one
-projection from rest, deep_flow's preset (288 × 512 × 64, multigrid); the error is the RMS of the divergence less
+projection from rest, deep_flow's settings file (288 × 512 × 64, multigrid); the error is the RMS of the divergence less
 φ over φ's, the floor the same box without a source, the swinging body's velocity projected once, the RMS after
 over before:
 
@@ -368,7 +368,7 @@ acceleration at the cells (`buoyancy_3d.comp`) is made only for its monitor. The
 around cannot let through: a uniform push on a sphere in still water moves it at 2/3 of the push, the rest moving
 the water around it, its added mass, half the sphere's **(deduction)**.
 
-Measured with `scripts/buoyancy_check.py`, a result, 18 November 2026, commit 1b60f186, deep_flow's preset
+Measured with `scripts/buoyancy_check.py`, a result, 18 November 2026, commit 1b60f186, deep_flow's settings file
 (288 × 512 × 64, the multigrid), every wall closed: a sphere 0.15 widths in radius at the box's middle, the water
 at rest, one buoyancy pass and one projection, one run (the passes are deterministic). The force's largest error
 against the formula over the cells (for the density, on its own grid, the cells two of its texels or more from
@@ -383,7 +383,7 @@ the sphere's surface), and the velocity at the sphere's middle along gravity ove
 | dense RGB, 19 November                     | +1.5             | 1.2e-6        | 0.6935        | 0.6582         |
 | dense Oklab, 19 November                   | +1.5             | 1.2e-6        | 0.6935        | 0.6582         |
 
-The 19 November rows run deep_flow's preset of that day, gravity (0, 0, 0.02): the force, 0.03 widths/s² along
+The 19 November rows run deep_flow's settings file of that day, gravity (0, 0, 0.02): the force, 0.03 widths/s² along
 it, is not exact in half precision **(deduction)**.
 
 At 8 cycles the solve is near exact, and the closed box keeps the sphere a little under 2/3, the water it pushes
@@ -438,7 +438,7 @@ bridge makes from the motion; not "signal", "band", "component", "event".
 Tests go through the harness, `scripts/fluid_compare.py` beside `bridge_compare.py`: nothing saves
 the bridge's outputs, so it chains the saved frames of a recording (`depth_velocity_capture`)
 through the flow, a `Bridge3DLayer` and a `Fluid3DLayer` per side, A against B, with deep_flow's
-preset and one setting changed by its panel path (`fluid.input.velocity_drag=0`,
+settings file and one setting changed by its panel path (`fluid.input.velocity_drag=0`,
 `bridge.filters.lowpass.smooth=300`), and reads the fluid's velocity and density on the injection
 layer's slice (`VolumeCut`). `--every N` steps the bridge and the fluid once per N frames with the
 summed dt, a frame-rate check. The drag's share, set on the CPU, is tested as a formula (`test_drag.py`).
@@ -446,16 +446,16 @@ summed dt, a frame-rate check. The drag's share, set on the CPU, is tested as a 
 On stillslowfast (gone) (353 frames, 43 ms each) and standmoves (gone) (1356 frames, 44 ms), the water on the
 moving player: its mean in the moves' fast halves over the body's (the trail's), the highest water
 over the loop over the highest body, and the coast, s after a move's end until the water is under
-20% of its fast mean; the body's coast beside it. The preset is `velocity_drag` 50 ms, `gain` 1,
+20% of its fast mean; the body's coast beside it. The settings file is `velocity_drag` 50 ms, `gain` 1,
 `smooth` 1000 ms:
 
 | Clip          | Side              | Water / body, fast | Peak / body | Coast s, body / water | GPU ms, mean / p95 |
 |---------------|-------------------|--------------------|-------------|-----------------------|--------------------|
-| stillslowfast | preset            | 0.55               | 0.74        | 0.85 / 0.94           | 9.7 / 12.8         |
+| stillslowfast | settings file            | 0.55               | 0.74        | 0.85 / 0.94           | 9.7 / 12.8         |
 | stillslowfast | `velocity_drag` 0 | 0.61               | 1.18        | 0.85 / 0.94           | 9.8 / 12.8         |
 | stillslowfast | `smooth` 300      | 0.56               | 0.66        | 0.23 / 0.94           | 9.7 / 12.6         |
 | stillslowfast | `gain` 2          | 0.86               | 1.41        | 0.85 / 0.94           | 9.7 / 12.8         |
-| standmoves    | preset            | 0.73               | 0.79        | 1.15 / 3.34           | 9.2 / 13.1         |
+| standmoves    | settings file            | 0.73               | 0.79        | 1.15 / 3.34           | 9.2 / 13.1         |
 | standmoves    | `velocity_drag` 0 | 0.78               | 0.93        | 1.15 / 2.68           | 9.3 / 13.2         |
 
 The water stays under the body at `gain` 1 and under twice it at `gain` 2 in the mean; the peak
@@ -539,7 +539,7 @@ The output's allocation is not in it. A cell taken as the grid's width over the 
 
 ## Tuning
 
-What remains is the preset, saved by the operator on the clips: `depth`, the gains, `velocity_drag`, the
+What remains is the settings file, saved by the operator on the clips: `depth`, the gains, `velocity_drag`, the
 lowpass's `smooth`, the mixes; judged on deep_flow with the standmoves (gone) and stillslowfast (gone)
 recordings. Judge on: slow against fast reads; a stop coasts; the burst's fps; the wall.
 
@@ -553,11 +553,11 @@ back the source up to the step's error, half of which is added back, bounded by 
 texels around the backward trace: where the correction leaves them, the predictor stands (Selle's
 revert), as it does where that trace reads past a wall: the wall's value is in no texel, and a
 correction kept there grows the velocity at the walls step after step, to eight times its speed in a
-second at the preset's grid (measured without the guard).
+second at the settings file's grid (measured without the guard).
 
 Measured in a hidden window at 448 × 800 × 64, a swirl dragged in and left, then a square of
 density carried for 2 s, no confinement, no viscosity; and on stillslowfast (gone) through the harness at
-the preset:
+the settings file:
 
 | Measure                                                        | Semi-Lagrangian | MacCormack |
 |----------------------------------------------------------------|-----------------|------------|
@@ -570,7 +570,7 @@ the preset:
 
 The revert, not a clamp to the bounds: a clamp keeps the corrected value at the bound, energy the
 step lost, and with the vorticity confinement adding more the water grows after the body stops.
-Measured with `scripts/maccormack_check.py` at deep_flow's preset (256 × 448 × 128), a disc swinging
+Measured with `scripts/maccormack_check.py` at deep_flow's settings file (256 × 448 × 128), a disc swinging
 through the water for 3 s, the water's mean speed (widths/s) after the body stopped, 4 s and 20 s, and a
 square of density carried 2 s by a steady swirl at 128 × 224 × 32, no confinement:
 
@@ -597,7 +597,7 @@ its own (a slight hue shift at an RGBA density's sharp edges). On standmoves (go
 step has none.
 
 The fine density's color is the density's color over its amount, at the same place. The density is at the
-dye's size by the fine density's layers in deep_flow's preset (448 × 800 × 24, RGBA16F, as 8 bits would round at
+dye's size by the fine density's layers in deep_flow's settings file (448 × 800 × 24, RGBA16F, as 8 bits would round at
 every advection), so it keeps the dye's color as the bridge made it, its bands and edges included, where the
 simulation's 288 × 512 cells blurred them **(site fact: less blocky)**; it moves without the turbulence below
 the grid, which only the fine density takes. Where the two are carried apart, the fine density lies where the
@@ -666,7 +666,7 @@ expectation, whatever the look. Everything stays on the GPU: the CPU dispatches 
 reads no particle back.
 
 Measured in a hidden window, the output at 2160 × 3840, the grid 448 × 800 × 64, the step with the
-carrier's draw; with the ring full, and on stillslowfast (gone) through the harness at the preset (`rate` 2
+carrier's draw; with the ring full, and on stillslowfast (gone) through the harness at the settings file (`rate` 2
 for the blobby looks):
 
 | `draw`, `overlap`   | Particles | Ring full, GPU ms | stillslowfast, ms mean / p95 |
@@ -763,11 +763,11 @@ detail than the bridge's 448 × 800 it comes from.
 | composite   | the fine density's layers marched at the output: the brightness and the opacity from its amount, the color the density's rgb over its amount at the same place                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | off         | `fine_density.enabled` off: the fine density is not allocated, the density drawn                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | settings    | `fine_density.enabled`, its size, and `fine_density.sample` (`MIDDLE` or `AVERAGE`, the velocity a layer spanning several of the grid's moves with); smaller than the output, the composite enlarges it by uv; on the monitor the amount is `fine_density`, the color `density`; timed in [TIMING.md](TIMING.md#the-density-at-the-outputs-4k)                                                                                                                                                                                                                                                                                                                                                                                                    |
-| turbulence  | the 4K amount moved semi-Lagrangian by the grid's velocity plus swirls below the grid (wavelet turbulence, Kim et al. 2008): a periodic 64³ tile of divergence-free noise (`swirl_noise`, the curl of random vectors band-passed to 8–16 texels, the tile 8 grid cells, so the swirls are 1 to 2 cells), read where the water started (two displacements of the water on the grid, reset a second apart half a cycle from each other and cross-faded), scaled by the grid's curl × its cell and `fine_density.turbulence`; the curl computed for it when the confinement is off. On stillslowfast with the calm preset, 1 to 3 change the picture by under 0.2 of 255; 10 to 30 give visible fine frizz along the density's edges, where the curl is |
+| turbulence  | the 4K amount moved semi-Lagrangian by the grid's velocity plus swirls below the grid (wavelet turbulence, Kim et al. 2008): a periodic 64³ tile of divergence-free noise (`swirl_noise`, the curl of random vectors band-passed to 8–16 texels, the tile 8 grid cells, so the swirls are 1 to 2 cells), read where the water started (two displacements of the water on the grid, reset a second apart half a cycle from each other and cross-faded), scaled by the grid's curl × its cell and `fine_density.turbulence`; the curl computed for it when the confinement is off. On stillslowfast with the calm settings file, 1 to 3 change the picture by under 0.2 of 255; 10 to 30 give visible fine frizz along the density's edges, where the curl is |
 | storage     | 3D textures, as every field: the advection reads a traced point in one trilinear fetch, z included, and the driver tiles the texels in x, y and z; a texture array filters within a layer only, two fetches and a mix for z, and its layers are tiled apart, which suits drawing into layers (the particles' slices), not tracing through them                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 Measured: the step at 4K × 16, 32 and 64 layers, semi-Lagrangian and MacCormack, against the budget,
-in TIMING.md; judged by eye against the RGBA 4K look on standmoves (gone). A second preset, `flat.json`, for this
+in TIMING.md; judged by eye against the RGBA 4K look on standmoves (gone). A second settings file, `flat.json`, for this
 look with a velocity grid still to pick (448 × 800 × 64 or 128 × 224 × 16).
 
 What a 4K volume cannot do, and so where the detail comes from:
@@ -920,7 +920,7 @@ operators on the GPU (Zaspel).
 
 ### Measured
 
-Against the centered velocity, deep_flow's preset; what the faces cost is in
+Against the centered velocity, deep_flow's settings file; what the faces cost is in
 [TIMING.md](TIMING.md#the-staggered-velocity). The swirl (`maccormack_check.py --test swirl`, multigrid), at 10 s:
 
 | Advection       | Swirl kept, centered | faces | Density total | The floor, centered | faces   |

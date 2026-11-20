@@ -122,7 +122,7 @@ The defaults are the best measured for deep_flow, in this order of importance:
 - C: least smear
 
 Every number is measured with `scripts/depth_velocity_capture.py` and `depth_velocity_compare.py` on the GPU,
-unless marked **(deduction)**, 2026-11-16 and 17, commits fdf8f8de to 73861281: the flow at 448×800, the preset
+unless marked **(deduction)**, 2026-11-16 and 17, commits fdf8f8de to 73861281: the flow at 448×800, the settings file
 then, Neural Depth on an OAK4, every camera frame (50 a second), each part against its neutral value with the
 parts after it neutral, on the motion's raw output (the thresholds, `smooth` and `dead_zone` at 0) unless a row
 says. Three captures a recording agree within 0.1; the rows here are their mean. Noise is the still stretch's
@@ -160,7 +160,7 @@ own, as it reads z's filter; the 2D's panel has `use_mask`, `x_gain`, `y_gain` a
 | damping       | 0.03    | 0–0.1 (0.001)       | B   | x/y's noise a quarter of undamped          |
 | threshold     | 0.5     | 0–5 px/frame (0.05) | B   | the still x/y noise 0                      |
 
-The x/y solve, on the raw output, with `levels` 4 (the preset) as the reference: x/y kept over the moves, and
+The x/y solve, on the raw output, with `levels` 4 (the settings file) as the reference: x/y kept over the moves, and
 x/y's still noise inside (measure / hands / edges / show):
 
 | Change                 | x/y kept                    | x/y still noise              |

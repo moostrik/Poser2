@@ -24,7 +24,7 @@ from modules.inference.preprocessing.image_upload import nv12_to_rgb, warp_grid 
 from modules.video import StreamReader  # noqa: E402
 
 RECORDINGS = Path('apps/deep_flow/data/recordings')
-CROP_SIZE = (768, 1024)         # the preset's crop (width, height)
+CROP_SIZE = (768, 1024)         # the settings file's crop (width, height)
 MODEL_SIZE = (192, 256)         # the pose model's input, STANDARD
 
 
@@ -133,7 +133,7 @@ def main() -> int:
         print(f'  {name}: largest difference {difference:.6f} ({difference * 255.0:.3f} of 1/255), '
               f'{"within" if difference <= 1.0 / 255.0 else "BEYOND"} 1/255; {torch_ms - kernel_ms:.3f} ms less GPU')
 
-    # A player about a third of the frame wide and most of its height, padded as the preset pads
+    # A player about a third of the frame wide and most of its height, padded as the settings file pads
     roi = (width * 0.30, height * 0.05, width * 0.40, height * 0.90)
     crop_w, crop_h = CROP_SIZE
     scale = max(crop_w / roi[2], crop_h / roi[3])

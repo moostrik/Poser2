@@ -2,7 +2,7 @@
 and out markers in a file of its own, and where a place on its timeline falls, as a chunk and a frame in it.
 
 The markers belong to the recording: each folder keeps its own in `IN_OUT_FILE`, so they survive a restart and a
-change of preset. The timeline (`Timeline`) is plain arithmetic on the chunks' frame counts: no thread, no reader."""
+change of settings file. The timeline (`Timeline`) is plain arithmetic on the chunks' frame counts: no thread, no reader."""
 
 import json
 import logging

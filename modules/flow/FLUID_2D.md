@@ -44,7 +44,7 @@ its default, the sizes apart (`modules/flow/tests/test_fluid_2d_settings.py`). W
 | `pressure`    | `enabled`, `solver`, `iterations`, `relaxation`, `cycles`, `reach`                             | [the pressure](FLUID_3D.md#the-pressure)                                                         |
 | `density`     | `color_space`, `sink`, `advection`, `limiter`, `advection_scale`, `fade_time`, the evaporation | [the density's blend](FLUID_3D.md#the-densitys-blend), the buoyancy                              |
 
-low_flow's preset holds every key of these settings and loads into them (`apps/low_flow/tests/test_fluid_preset.py`);
+low_flow's settings file holds every key of these settings and loads into them (`apps/low_flow/tests/test_fluid_settings_file.py`);
 its values are its own look. deep_flow's gravity points along z, so on the plane the default points down the screen
 at its length, (0, −0.02).
 

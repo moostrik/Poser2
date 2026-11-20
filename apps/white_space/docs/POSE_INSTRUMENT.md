@@ -64,7 +64,7 @@ The ground rules, as set:
 - Sync shows as the **sync strobe**, at group sync only: while every pair is alike, the whole
   room's white and blue trade places on strobe frames, the lines staying what they are, the
   rate climbing in over the attack and stepping away over the release. Sync can also open the
-  window toward the partner (off in the preset).
+  window toward the partner (off in the settings file).
 - A player's pattern can be drawn half a turn from them (`opposite` ON) or in both places
   (BOTH), their mask staying on them. Under BOTH the copies win the overlap: an own window
   retreats to a copy's settled edge, and yields entirely to a copy reaching over its player —
@@ -280,7 +280,7 @@ the range and the direction. A measure may feed several parameters; a slot has o
 measures never sum into one parameter.
 
 The arms are `MATRIX_V2.md`'s Step 5, rebuilt one connection at a time under its rule 4: keep
-the visualization as simple as possible. The bases and amounts are the preset's:
+the visualization as simple as possible. The bases and amounts are the settings file's:
 
 | Source              | Range | Parameter         | Base | Amount     | At full                                         |
 |---------------------|-------|-------------------|------|------------|-------------------------------------------------|
@@ -440,7 +440,7 @@ The mask, its border and the marker keep their real size.
 The **mask** is a band `mask.width` wide at the player, each channel at its level (`mask.white`,
 `mask.blue`) times presence, and goes over everything at the player: the patterns of every voice.
 A mask cuts a line where it falls, so lines slide out from under it; the window cuts nothing. In
-the preset the white is 0, so the mask is the dim blue band. The mask's **border** is a line
+the settings file the white is 0, so the mask is the dim blue band. The mask's **border** is a line
 centered on each edge of the band, half over the blue (`mask.border_width`, with `mask.border_white`
 and `mask.border_blue` times presence); it cuts the patterns like the band and does not flash. The
 playhead's **marker**
@@ -527,12 +527,12 @@ its parameter a source.
 ### Working the composition
 
 The composition is worked on the machine in two ways. Values — every base, amount, curve and
-bypass — are tweaked live in the panel and saved in the preset. The routing is code: a change of
+bypass — are tweaked live in the panel and saved in the settings file. The routing is code: a change of
 `connect` needs a restart, so a session alternates short restarts for the wiring with live
 tuning of its numbers. Hence the rules:
 
 - The numbers of a connection are its slot's base and amount, settings, never literals in
-  `connect`, so the preset keeps describing the show and a connection is tuned without a
+  `connect`, so the settings file keeps describing the show and a connection is tuned without a
   restart.
 - The table of *The connections* is `connect` in words; when one changes, the other follows in
   the same change.
@@ -574,13 +574,13 @@ judged: a figure whose joints and torso lean are set in the panel, each joint in
 −180..180 from its rest (arms hanging, elbows and knees straight, standing). Its frame joins
 the poses before the LERP filters at its own id, `max_players`, so from there it is a pose like
 any other: extracted, drawn, heard in Max and lit. With `solo` it is the only pose from the LERP
-filters on. The preset's calibration is the dummy's raw readings,
+filters on. The settings file's calibration is the dummy's raw readings,
 so its hanging arm reads 0 and its vertical arm π. How the figure is built is the module's
 docstring.
 
 Its poses are named in `data/poses.json`, the rows of *Pose results*, picked in the `pose`
 select and saved under `name` with `save`. A pose is the torso and the eight joints; where the
-dummy stands (`azimuth`, `distance`) is a setting of its own, kept in the app preset and left
+dummy stands (`azimuth`, `distance`) is a setting of its own, kept in the app settings file and left
 alone when a pose is picked. A change of any measure morphs over `morph` seconds.
 
 ---
@@ -620,7 +620,7 @@ Not yet in the design:
 
 From the machine **(site facts)**:
 
-- Whether the preset's mask width and window width are right, and what the *Pose results* draw;
+- Whether the settings file's mask width and window width are right, and what the *Pose results* draw;
   judged on location
 - Whether the 90-line limit holds with the moiré of two synced patterns
 - A pitched wide-FOV camera reads a small spurious body bend near the frame edges, a bend nobody

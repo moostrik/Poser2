@@ -52,7 +52,7 @@ after it, records in its streak only the hits on poses at least `pose.hit_sync.m
 The conductor's clock (`light/clock.py`) waits on a `utils.Waker` until 1 ms before each tick's deadline and
 busy-spins the rest. The Waker alone wakes about 0.4 ms late with 0.3 ms of jitter, and in projection mode the
 jitter moves the fixture's seam, about 3.5° at 1920 rpm **(deduction)**; the spin takes the jitter out. The tick's
-lateness against its deadline, white_space `-sim` on the `public` preset, 32 fps, 30 s after warm-up (2026-11-20):
+lateness against its deadline, white_space `-sim` on the `public` settings file, 32 fps, 30 s after warm-up (2026-11-20):
 
 | Wait (ms late)     | Mean | p95  | p99  | Max  |
 |--------------------|------|------|------|------|
@@ -72,7 +72,7 @@ lateness against its deadline, white_space `-sim` on the `public` preset, 32 fps
 | `beam_sync_wind_down` | beam       | tick clock; `pose_instrument.sync_strobe`  | the wall strobing white ↔ blue, fading        | S11                       |
 | `beam_blue_sound`     | beam       | sound levels from Max (board)              | left/right blue beam lights                   | S1, S2, S3, S5, S10       |
 
-`beam_flash`'s blue beam lights are zeroed in the presets: S4 runs blue-none by design.
+`beam_flash`'s blue beam lights are zeroed in the settings files: S4 runs blue-none by design.
 
 `beam_wind_down` is `flood`'s ending and a plain beam layer: the fixture is in beam mode from
 S9's or S11's first packet, so the wall while the bar is still fast is the two white beam lights
@@ -104,7 +104,7 @@ sound Max is playing.
   messages (`SOUND.md`).
 - **Behavior**: left level → left blue beam light, right level → right blue beam light; a gain scales
   the mapping. Latency first: no softening — only a minimal smoothing window of at
-  most 2–3 light frames (63–94 ms at the studio preset's 32 fps), there purely to bridge OSC-arrival vs light-tick
+  most 2–3 light frames (63–94 ms at the studio settings file's 32 fps), there purely to bridge OSC-arrival vs light-tick
   timing jitter, never to shape the response (Max shapes the envelope; the beam lights follow).
 - **Stale input**: when no message has arrived for `stale_seconds`, the layer falls back —
   either off, or a gentle idle pulse (tunable choice) — so a silent or disconnected Max
@@ -177,7 +177,7 @@ and the light synth that draws the lines is `LIGHT_SYNTH.md`.
   from their people while the masks stay on them
 - **Strobe**: each oscillator's lines can be gated whole, on or off per tick, on the clock's shared
   tick grid (`LIGHT_SYNTH.md`, *The strobe*); a dark tick is one dark revolution because the frame
-  rate equals the revolution rate (32 fps and 1920 rpm in the studio preset)
+  rate equals the revolution rate (32 fps and 1920 rpm in the studio settings file)
 - **Reset**: forgets every player and pass (S6's entry, a fresh instrument per cycle)
 
 ---

@@ -39,7 +39,7 @@ class HDTrioMain:
         self.store.load_startup(self.settings)
         self.settings.setup.camera.sim_enabled = simulation
         if not interface:
-            self.settings.setup.panel.browser = False  # launcher override; the preset cannot turn it back on
+            self.settings.setup.panel.browser = False  # launcher override; the settings file cannot turn it back on
         self.settings.setup.render.intro_sequence.arm_record = False     # never armed at start (HD_TRIO.md, The intro figure)
         pose_crop = self.settings.setup.pose.pose_crop                   # cut at the pose model's input size (HD_TRIO.md, Input)
         pose_crop.output_width = self.settings.setup.pose.pose.width
@@ -171,7 +171,7 @@ class HDTrioMain:
         self.pipeline.window(Stage.SMOOTH).add_windows_callback(self.window_correlator.submit)
         self.window_correlator.add_similarity_callback(self.similarity_hold.set)
 
-        # CAMERA HEALTH — each camera's IMU reading and frame rate against the preset, as pinned indicators
+        # CAMERA HEALTH — each camera's IMU reading and frame rate against the settings file, as pinned indicators
         self.camera_health = CameraHealth(self.settings.setup.camera.cameras, self.settings.setup.camera.camera_health)
 
         # RENDER

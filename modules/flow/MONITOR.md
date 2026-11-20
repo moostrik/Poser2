@@ -148,7 +148,7 @@ as it is.
   back: one layer, or the projection along z, y or x, the max for an image port and the mean for a
   velocity or a scalar, whose signs would cancel in a max.
 - The orbit is `advanced.orbit` (`yaw`, `pitch`, `zoom`) and the slice's place `slice_position`,
-  settings the mouse writes, so the panel shows and sets them and a preset keeps them. In deep_flow a drag that starts anywhere in the main window goes to every 3D monitor, so
+  settings the mouse writes, so the panel shows and sets them and a settings file keeps them. In deep_flow a drag that starts anywhere in the main window goes to every 3D monitor, so
   the main and the debug monitor stay on one view; a flat monitor takes no mouse: the left button turns (a drag across the window 180°), the right
   zooms, scroll steps one of the fluid's `depth` layers (away from the user is further back,
   a volume with fewer layers showing its nearest), a middle click without a move resets to the

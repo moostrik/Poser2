@@ -54,7 +54,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Keep `Field` descriptions to one short line of panel text: what the value is and its unit
 - Prefer the textbook unit for a quantity (seconds, meters, radians, pixels)
 - A setting follows the quantity it controls, in a form that is easy to set (ms for a short time, degrees for an angle)
-- Prefer not to change what `initialize()`, `update_from_dict()` and `to_dict()` do; every app's presets depend on it
+- Prefer not to change what `initialize()`, `update_from_dict()` and `to_dict()` do; every app's settings files depend on it
 
 ## Pose Frame contract
 
@@ -152,7 +152,7 @@ python -m unittest discover -s modules/<pkg>/tests -t .    # camera/oak4 in .ven
 
 - Prefer clean breaks over deprecation windows
 - Update all affected call sites in the same change
-- Keep presets and settings schemas in sync with code changes
+- Keep settings files in sync with code changes
 - Remove obsolete pathways instead of leaving parallel legacy ones
 
 ## Plans and commits

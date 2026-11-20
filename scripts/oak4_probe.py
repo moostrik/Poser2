@@ -128,7 +128,7 @@ def main(argv: list[str] | None = None) -> int:
         logger.info('no tracklet arrived: nobody in view, or the model did not run')
     if camera.keypoint_join is not None:
         logger.info(f'two-model chain: {camera.keypoint_join.joined} frames joined, {camera.keypoint_join.dropped} dropped incomplete')
-    logger.info(f'lens: field {settings.readings.fov_factory:.1f} deg, {settings.readings.lens_error:.2f} deg off the preset lens; '
+    logger.info(f'lens: field {settings.readings.fov_factory:.1f} deg, {settings.readings.lens_error:.2f} deg off the settings file lens; '
                 f'tilt {settings.readings.tilt_measured:+.1f} roll {settings.readings.roll_measured:+.1f} deg')
     return 0
 

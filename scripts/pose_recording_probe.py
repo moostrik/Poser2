@@ -1,6 +1,6 @@
 """deep_flow's recorded poses in -sim, two runs.
 
-record: plays the preset's recording with the pose model on (`recorded_poses.enabled` off), records it again for
+record: plays the settings file's recording with the pose model on (`recorded_poses.enabled` off), records it again for
 `--seconds`, and reports what the new recording holds: its frames, those with poses, the poses' latency, the
 recorder's counts.
 

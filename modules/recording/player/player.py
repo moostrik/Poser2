@@ -7,7 +7,7 @@ streams it has, whatever `video_frame_types` asks for. A chunk's readers are `Ch
 their markers and the timeline are `RecordingFolder` and `Timeline`.
 
 The markers belong to the recording: each folder keeps its own in a file, so they survive a restart
-and a change of preset. Dragging one pauses playback and shows the frame under it, the newest one
+and a change of settings file. Dragging one pauses playback and shows the frame under it, the newest one
 asked for as fast as a frame can be fetched; letting go plays from the in marker. Pressing the bar
 beside them moves only the playhead: playback goes on from there, and a place outside the markers
 shows its frame and plays from the in marker."""
@@ -155,7 +155,7 @@ class Player(Thread):
         state: State = State.IDLE
         self.running = True
 
-        # Auto-start if a folder was loaded from preset
+        # Auto-start if a folder was loaded from settings file
         folder = self.settings.folder
         if folder and folder in self.folders:
             self.play(True, folder, prepare=True)

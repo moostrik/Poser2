@@ -85,7 +85,7 @@ class Conductor(Thread):
         }
 
         self._compositor = Compositor(settings, self.layers)
-        # Nothing in the preset is forced at start; the one saved state that spins the fixture up
+        # Nothing in the settings file is forced at start; the one saved state that spins the fixture up
         # at power-on is worth a line in the log.
         if not settings.motor.simulate and _debug_motor_mode(settings.debug, self.layers) is MotorMode.PROJECTION:
             logger.warning("Starting with debug layer %s selected: the fixture spins up to PROJECTION at once",

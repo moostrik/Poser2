@@ -10,7 +10,7 @@ The one-per-camera tracker (`modules/tracker/onepercam/`) is not described here.
 
 - Everything here is code-verified unless marked **(site fact)** — told by the operator — or
   **(deduction)** — follows from the facts, not checked on hardware.
-- Numbers assume the studio preset: a rig of 4 cameras at R 0.36 m and 0.50 m high, `fov` 127, P720,
+- Numbers assume the studio settings file: a rig of 4 cameras at R 0.36 m and 0.50 m high, `fov` 127, P720,
   tilt 15, the derived 960-row frame, the tracked zone R 1.5 – R 3.5. A table on another
   configuration names it.
 - Every length is a radius from the fixture axis, as in `CALIBRATION.md`.
@@ -417,7 +417,7 @@ nothing in the show consumes it.
 - **`square = true` would break the distance silently.** That branch sets `setKeepAspectRatio(True)`
   on the detector's `ImageManip`, so the NN input is letterboxed and a normalised ROI row stops mapping
   linearly onto a delivered row — the one assumption `estimate_distance` makes about the ROI. The
-  studio preset is `square: false`; the flag is there for other apps.
+  studio settings file is `square: false`; the flag is there for other apps.
 - **A stalled camera (deduction).** A camera that stops sending leaves its views TRACKED with a frozen
   `last_active` until `lost_timeout`. If one is a primary, the pose ends at `detection_timeout` while
   another camera still sees the person, for up to `lost_timeout − detection_timeout` (1 s).

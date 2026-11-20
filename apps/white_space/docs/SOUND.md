@@ -72,7 +72,7 @@ One OSC bundle per LERP frame, over UDP, to `ip`:`port`. The frames are the LERP
 poses as the motion gate emits them (the LERP stage of `pose/pipeline.py`), so every value is smoothed and
 interpolated as the light's is.
 
-| Setting | Preset `studio` | What it is                      |
+| Setting | Settings file `studio` | What it is                      |
 |---------|-----------------|---------------------------------|
 | `ip`    | 192.168.1.40    | the Max machine                 |
 | `port`  | 8000            | the port Max listens on         |
@@ -80,7 +80,7 @@ interpolated as the light's is.
 
 ## Slots
 
-Every player is a slot `{id}` in `/pose/{id}/...`. With the preset `studio` (`max_players` 6):
+Every player is a slot `{id}` in `/pose/{id}/...`. With the settings file `studio` (`max_players` 6):
 
 | Slots | Who                                             |
 |-------|-------------------------------------------------|
@@ -148,7 +148,7 @@ are operator settings and are never zeroed.
 ## The return path
 
 Max sends two levels back, received by `OscReceiver` (`inout.osc_sound_receiver`, port 8001 in the
-preset `studio`): `/WS/idle/blue/left` and `/WS/idle/blue/right`, one 0..1 float each, to the
+settings file `studio`): `/WS/idle/blue/left` and `/WS/idle/blue/right`, one 0..1 float each, to the
 `beam_blue_sound` layer (`LAYERS.md`).
 
 ## Open

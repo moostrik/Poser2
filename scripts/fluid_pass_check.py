@@ -1,12 +1,12 @@
 """Each pass of the 3D fluid alone against its floor: where a pass does work beyond moving its data.
 
-The fluid at deep_flow's preset (`maccormack_check.fluid_settings`) runs `--warmup` seconds with the swinging body,
+The fluid at deep_flow's settings file (`maccormack_check.fluid_settings`) runs `--warmup` seconds with the swinging body,
 so its fields hold real values; then each pass is repeated `--repeats` times between GL timer queries and its
 median kept. A pass's floor is the time to read each volume it needs once and write its result once at the GPU's
 memory speed (`--bandwidth`, GB/s; the RTX 4090's 1008): a pass far above it spends its time on something else
 (setup each cell repeats, interpolations, branches), one near it is bound by its memory. The density passes
-count the fine density too where the preset runs it. A pass that skips what it need not touch can run under
-its floor; the floor counts every texel. Passes off at the preset
+count the fine density too where the settings file runs it. A pass that skips what it need not touch can run under
+its floor; the floor counts every texel. Passes off at the settings file
 run with what turns them on (the viscosity, the vorticity, the buoyancy, MacCormack). Settings by path as in
 maccormack_check: `--set vorticity.strength_1=1`.
 

@@ -113,7 +113,7 @@ class TrackerJournal:
 
     # LIFECYCLE
     def start(self) -> None:
-        """App start: capture begins now if the switch (preset, panel or `-journal`) is on."""
+        """App start: capture begins now if the switch (settings file, panel or `-journal`) is on."""
         self._started = True
         if self.settings.enabled:
             self._begin()

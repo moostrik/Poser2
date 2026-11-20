@@ -233,7 +233,7 @@ play or share.
 
 ### Time
 
-Measured 2026-10-26: preset `Smile` (250 grin frames at 12 fps; stream 512 px wide at 10 fps), Quick Sync
+Measured 2026-10-26: settings file `Smile` (250 grin frames at 12 fps; stream 512 px wide at 10 fps), Quick Sync
 encoder, this PC as room and relay, the phone over Tailscale on a direct connection (`tailscale status`).
 
 | Step                                        | Time       |

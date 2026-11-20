@@ -54,7 +54,7 @@ Option 3 adds the breath, a source the instrument makes in time (*Option 3 Matri
 ## Option 1 Matrix
 
 The base matrix with each elbow on its color's pitch. Speed is not the arms'. The pitch's base
-and amount are the preset's: 25.7 lines (one every 14°) straight, 72 (one every 5°) folded.
+and amount are the settings file's: 25.7 lines (one every 14°) straight, 72 (one every 5°) folded.
 
 | Oscillator | Parameter   | Source              | Base | Amount |
 |------------|-------------|---------------------|------|--------|
@@ -83,7 +83,7 @@ The difference is large only with one arm up and the other not, where both color
 
 Option 1 with each elbow's turn on its color's speed: the elbow bent +90° flows its color one
 way, −90° the other, straight and fully folded leave it at its base. The speed's base and amount
-are the preset's.
+are the settings file's.
 
 | Oscillator | Parameter   | Source              | Base    | Amount |
 |------------|-------------|---------------------|---------|--------|

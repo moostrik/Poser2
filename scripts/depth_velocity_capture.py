@@ -4,7 +4,7 @@
                                              [--set PATH=VALUE ...]
 
 Runs deep_flow on the recording (as -sim, without the panel), from the start of its loop to the next, or
-for its first `--seconds`, with the preset's settings and the Lucas–Kanade flow. Each measure of the flow is
+for its first `--seconds`, with the settings file's settings and the Lucas–Kanade flow. Each measure of the flow is
 saved to OUT/NAME (the recording's name without `--name`): `luminance_NNNN.npy` (the newest luminance frame,
 0 to 1), `depth_NNNN.npy` (the depth it got, m, at the flow's size, before the step filter), `mask_NNNN.npy`
 (the player's mask, 0 to 1, the weight of each pixel), and `calls.json`: each
@@ -129,7 +129,7 @@ def main() -> int:
     def run() -> None:
         try:
             time.sleep(8.0)                       # the app and its models come up
-            for item in args.set:                 # the settings the capture runs with, beside the preset's
+            for item in args.set:                 # the settings the capture runs with, beside the settings file's
                 path, value = item.split('=', 1)
                 *groups, name = path.split('.')
                 owner = app.settings

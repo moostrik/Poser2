@@ -47,7 +47,7 @@ class WhiteSpaceMain:
         self.store.load_startup(self.settings)
         self.settings.setup.camera.sim_enabled = simulation
         if not interface:
-            self.settings.setup.panel.browser = False  # launcher override; the preset cannot turn it back on
+            self.settings.setup.panel.browser = False  # launcher override; the settings file cannot turn it back on
         # The crop is the pose model's input, so it is cut at that size: one antialiased resample
         # from the camera frame, rather than a larger crop the runner scales down again. Derived
         # from the model so a change of pose resolution cannot silently reintroduce the second one.
@@ -147,7 +147,7 @@ class WhiteSpaceMain:
 
         # DIAGNOSIS — a subscribe-only journal of the tracker's inputs, observations and emitted
         # primaries (JSONL under data/diagnosis), for dissecting identity incidents offline.
-        # Always wired; `session.journal.enabled` (panel, preset or `launcher.py -journal`) toggles
+        # Always wired; `session.journal.enabled` (panel, settings file or `launcher.py -journal`) toggles
         # capture live, one folder per capture, and the taps return on a flag check while off.
         self.tracker_journal = TrackerJournal(self.settings.setup.session.journal, data_path=DATA_PATH,
                                               meta_provider=self._journal_meta,
@@ -202,7 +202,7 @@ class WhiteSpaceMain:
         )
         self.state_machine.add_state_callback(self.osc_sound_sender.set_sequencer_state)
 
-        # CAMERA HEALTH — compares each camera's own IMU reading and frame rate against the preset,
+        # CAMERA HEALTH — compares each camera's own IMU reading and frame rate against the settings file,
         # and summarises them as pinned indicators. A setup aid; nothing downstream reads it.
         self.camera_health = CameraHealth(self.settings.setup.camera.cameras, self.settings.setup.camera.camera_health)
 

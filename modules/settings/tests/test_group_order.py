@@ -22,7 +22,7 @@ class GroupOrderTest(unittest.TestCase):
     def test_last_after_a_subclass_groups(self) -> None:
         self.assertEqual(list(_Sub().children), ['first', 'own', 'end'])
 
-    def test_preset_order_follows(self) -> None:
+    def test_settings_file_order_follows(self) -> None:
         settings = _Sub()
         settings.initialize()
         self.assertEqual([key for key in settings.to_dict() if key in settings.children], ['first', 'own', 'end'])

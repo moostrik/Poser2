@@ -1,6 +1,6 @@
 """The 3D monitor's mouse: a scroll steps one of the show's layers and stays inside the volume; a drag
 turns its orbit; a reset brings the front view at the middle layer back. Both write the monitor's
-settings, so the panel shows them and a preset keeps them. The flat monitor has no mouse."""
+settings, so the panel shows them and a settings file keeps them. The flat monitor has no mouse."""
 
 import unittest
 

@@ -14,7 +14,7 @@ from the numbers.
 | Target            | 60 fps, 16.7 ms a frame                                                                 |
 | App               | deep_flow, `launcher.py -app deep_flow -sim -ni -timing 60 -warmup 10`                  |
 | Input             | a recording (`-sim`), 1 camera, 50 fps: hands from 15 Nov, standmoves before (not kept) |
-| Preset            | `apps/deep_flow/data/settings/settings.json`, one setting changed per run               |
+| Settings file            | `apps/deep_flow/data/settings/settings.json`, one setting changed per run               |
 | Pose              | on: the person detection and RTM pose on TensorRT, on the same GPU                      |
 | Segmentation      | off: the mask is the depth's, the RVM model not run                                     |
 | Output            | the large layers at 2 × the output, 2160 × 3840; no upscale pass beyond that allocation |
@@ -30,12 +30,12 @@ two render ticks; its fps is 1000 over its mean.
 
 ## The stages
 
-On 19 November, a time, at the preset as saved (commit c796999b, the hands recording, the pose model running,
-one run), the preset's viscosity on (0.001) since 16 November. On 16 November, a time, at the preset as saved (commit fdf8f8de, the hands recording
+On 19 November, a time, at the settings file as saved (commit c796999b, the hands recording, the pose model running,
+one run), the settings file's viscosity on (0.001) since 16 November. On 16 November, a time, at the settings file as saved (commit fdf8f8de, the hands recording
 `20261112-124918_hands`, the pose model running, one run): the view with its fill, the motion without the
 depth mask. On 15 November, the same recording and grid at commit 802de71c: the velocity's grid
 288 × 512 × 64, the density 448 × 800 × 64 with the fine density at 2160 × 3840 × 24, MacCormack. Beside
-them, from 7 November, the preset then, its grid
+them, from 7 November, the settings file then, its grid
 448 × 800 × 64 with the density on the grid, and the default this document set, 256 × 448 × 128:
 
 | Stage                     | Timer                          | 19 Nov                | 16 Nov                | 15 Nov                | 7 Nov, 448 × 800 × 64 | 7 Nov, 256 × 448 × 128 |
@@ -63,20 +63,20 @@ them, from 7 November, the preset then, its grid
 | the frame                 | `Render interval`              | 14.25 / 30.79, 70 fps | 12.36 / 22.56, 81 fps | 12.22 / 22.91, 82 fps | 17.93 / 25.34, 56 fps | 13.29 / 18.50, 75 fps  |
 
 On 19 November the step's 11.08 against 9.71 is the viscosity's 1.22 and the buoyancy timer's 0.34; without them
-it is 9.5, its other passes as on 16 November. The buoyancy timer reads 0.34 at the preset's `buoyancy` 0: its
+it is 9.5, its other passes as on 16 November. The buoyancy timer reads 0.34 at the settings file's `buoyancy` 0: its
 `density.sink` 1 runs the pass (the code: `Fluid3D._apply_buoyancy`), the pass then in two dispatches. The pose model (`Pose Estimation`) takes 27.88 / 41.78 in this run, 19.5 to 20.4 / 32.6 in four
-deep_flow runs the same morning at the same preset; no code it runs changed between them, so the GPU it shares
+deep_flow runs the same morning at the same settings file; no code it runs changed between them, so the GPU it shares
 with the fluid **(deduction)**.
 
-On 15 November the bandpass runs at the preset; on 7 November it ran only while a mix took one of its
+On 15 November the bandpass runs at the settings file; on 7 November it ran only while a mix took one of its
 readings, so its row then is from a run with `acceleration` taking `change`, `start`, `bow`,
 `stop` and `wake` at 1. The image upload's timer spans the CUDA work between its timestamps, so its p95
 holds the pose model's; the motion's p95 under its mean is a mean pulled up by a few long frames (max
-10 ms). The viscosity is 0, and the buoyancy and the light are off in the preset, so they skip their
+10 ms). The viscosity is 0, and the buoyancy and the light are off in the settings file, so they skip their
 dispatches. With the buoyancy on, each pass alone (`fluid_pass_check.py`, a time, 18 November, commit 1b60f186,
-the preset's 288 × 512 × 64, the median of 40), the temperature's advection after the projection takes 0.082 ms
+the settings file's 288 × 512 × 64, the median of 40), the temperature's advection after the projection takes 0.082 ms
 and the buoyancy 0.152; in one pass (19 November, commit 71d7dd9d, the same run), 0.114. Carried as the density is (18 November, the density's `advection` MacCormack, as in the
-preset), the temperature's advection takes 0.222 ms. On 15 November the density is the step's largest pass, the fine density's 2160 × 3840 × 24
+settings file), the temperature's advection takes 0.222 ms. On 15 November the density is the step's largest pass, the fine density's 2160 × 3840 × 24
 among it; the pressure, multigrid since, is a quarter of what its 40 Jacobi iterations took on
 7 November. The composite marches one step per layer over the 2160 × 3840 output, so it grows with
 `layers`, not with the grid's x and y. On 16 November the view takes 0.21 ms against 0.09, its fill
@@ -91,9 +91,9 @@ recording on 7 November); every other stage runs every frame.
 The view stage is made once per capture, before the motion; the color, measured here as the view's last pass, is
 the color stage's since 18 November, the same shaders after the view, so `GPU view` in the app no longer holds it.
 Each pass alone on the measure recording's last of
-40 captures (`20261112-125832_measure`, the view 448 × 800, the preset's view settings), 2026-11-16, the GPU
+40 captures (`20261112-125832_measure`, the view 448 × 800, the settings file's view settings), 2026-11-16, the GPU
 otherwise idle, the median of 40 runs (`apps/deep_flow/scripts/view_check.py --time`), ms, commit fdf8f8de; the
-color at the preset's `erode` 0 and `feather` 0, which skip their passes, and at 2 and 4 (`--erode 2 --feather 4`):
+color at the settings file's `erode` 0 and `feather` 0, which skip their passes, and at 2 and 4 (`--erode 2 --feather 4`):
 
 | Pass                               | `erode` 0, `feather` 0 | `erode` 2, `feather` 4 |
 |------------------------------------|------------------------|------------------------|
@@ -129,7 +129,7 @@ MacCormack, the density on the grid, `pressure.iterations` 40:
 | 256 × 448 × 128 | 0.50          | 15 M  | 4.40 / 5.91   | 2.44 / 3.53 | 10.68 / 12.09 | 13.29 / 18.50, 75 fps |
 
 The box's depth is `depth` / `width`, the cells being cubic. 256 × 448 × 128 is the one grid that holds
-60 fps, and it is half a width deep where the preset's is 0.14.
+60 fps, and it is half a width deep where the settings file's is 0.14.
 
 ### The pose's share
 
@@ -203,7 +203,7 @@ with the pose, on 256 × 448 × 128:
 The defaults (`modules/flow/fluid_3d/fluid_settings.py`): the grid `width` 256, `height` 448,
 `depth` 128, half a width deep; `input.spread` 0.075 widths, a body's
 thickness; the particles' `count` 2 M, the points' budget, and their ranges to what fits:
-`count` 10 k to 8 M, `rate` 0.01 to 50, `radius` 1 to 48 pixels, `spread` 0 to 10. The preset
+`count` 10 k to 8 M, `rate` 0.01 to 50, `radius` 1 to 48 pixels, `spread` 0 to 10. The settings file
 takes the grid, the spread and, for its streaks, 1 M.
 
 Each recommendation timed as set, the other particle settings at their defaults:
@@ -240,7 +240,7 @@ estimate is **(deduction)** unless its source measured it; a source's numbers ar
 |-----|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | 1   | The pressure by multigrid: a V-cycle, restriction to 128 × 224 × 64 and down, smoothed by red-black Gauss–Seidel, warm-started from the last step's pressure as now; or that cycle as the preconditioner of a conjugate gradient (MGPCG)                                                                                                                                                                           | 4.8 ms, 40 Jacobi iterations                                                       | 2.5 to 3.5 ms                                                                                                                                                                                         | one V-cycle converges like about a thousand Jacobi iterations at the cost of about ten (gist); 3 × the accuracy of Jacobi in the same time on the GPU (Glimberg 2009); convergence independent of the grid's size (McAdams 2010) |
 | 2   | The pressure by red-black Gauss–Seidel with over-relaxation (SOR) in place of Jacobi: the cheap form of 1, one solve, two colors a sweep, each color from the other's fresh values                                                                                                                                                                                                                                 | the same 4.8 ms                                                                    | 1.5 to 2.5 ms, the same residual in about half the sweeps                                                                                                                                             | red-black ordering keeps most of Gauss–Seidel's lead on Jacobi in parallel (Pyroclast; Astaroth); Jacobi converges slowly (FLIP on GPU)                                                                                          |
-| 3   | The composite's early exit, which never fires: it stops only at `glow` 0, and the preset's 0.1 keeps every ray marching all 128 layers for the additive sum; instead the additive sum stopped with the transmittance where it is under the output's precision, and empty space skipped by a coarse occupancy volume (the density's max over 8 × 8 × 8 cells), the ray stepping a block at a time where it is empty | 2.4 ms, 128 steps over 8.3 M pixels                                                | 0.5 to 1.5 ms, by how much of the box is empty or already opaque                                                                                                                                      | min-max octrees and occupancy grids in volume renderers                                                                                                                                                                          |
+| 3   | The composite's early exit, which never fires: it stops only at `glow` 0, and the settings file's 0.1 keeps every ray marching all 128 layers for the additive sum; instead the additive sum stopped with the transmittance where it is under the output's precision, and empty space skipped by a coarse occupancy volume (the density's max over 8 × 8 × 8 cells), the ray stepping a block at a time where it is empty | 2.4 ms, 128 steps over 8.3 M pixels                                                | 0.5 to 1.5 ms, by how much of the box is empty or already opaque                                                                                                                                      | min-max octrees and occupancy grids in volume renderers                                                                                                                                                                          |
 | 4   | Passes fused, each field read once: the dampen into the velocity's advection; the curl and the confinement force in one pass with the curl in shared memory; the divergence into the first Jacobi dispatch; the body force's and the boundary's injections in one pass                                                                                                                                             | dampen 0.4, vorticity 1.7, inject 0.8, the divergence in the pressure              | 1 to 1.5 ms                                                                                                                                                                                           | the stencils are bandwidth-bound; kernel fusion and blocking (Intel 3.5D blocking, Aalto)                                                                                                                                        |
 | 5   | The temperature cleared once when `buoyancy` goes to 0, not both buffers every step, and its injection skipped while it is 0; nothing reads it then                                                                                                                                                                                                                                                                | 0.4 ms                                                                             | 0.4 to 0.5 ms                                                                                                                                                                                         | the code: `Fluid3D._advect_temperature`                                                                                                                                                                                          |
 | 6   | The 3D stencil passes on 3D workgroups: the advections, the curl, the divergence and the gradient run 16 × 16 × 1, one layer a group, so a group's z neighbors come from another group's reads; 8 × 8 × 4 groups keep the three neighbors in the cache                                                                                                                                                             | the advections 1.5, vorticity 1.7, the gradient and the divergence in the pressure | 0.3 to 0.6 ms                                                                                                                                                                                         | 3D blocking of stencils (Intel 3.5D blocking)                                                                                                                                                                                    |
@@ -296,11 +296,11 @@ replacement. Different: an option, judged on the look in the app.
 
 Beside 5 and 6, the memory a step: the bytes read and written per cell by every pass, counted from
 the shaders before and after, since the passes are bandwidth-bound and the three force and curl
-volumes (24 bytes a cell) exist only between passes. A winning solver becomes the preset's
+volumes (24 bytes a cell) exist only between passes. A winning solver becomes the settings file's
 `pressure.solver` too.
 
 What each came to is under [Measured](#measured): kept as replacements 1, 3, 5,
-9 and 10; options 6 (`SOR`), 7 (`MULTIGRID`, the preset's) and 11 (`WEIGHTED`); dropped 2, 12 and 13,
+9 and 10; options 6 (`SOR`), 7 (`MULTIGRID`, the settings file's) and 11 (`WEIGHTED`); dropped 2, 12 and 13,
 slower; not built 4 and 14, for the reasons there; 8 parked ([FLOW_PLAN.md](FLOW_PLAN.md#parked)).
 
 The panel gains at most three options from it: `pressure.solver`, `overlap`'s `WEIGHTED`, and the
@@ -309,7 +309,7 @@ its row under Measured.
 
 ### Measured
 
-Each change, by its number in [How each is judged](#how-each-is-judged), against the code before it, three runs back to back (`trial_runs.py`, the preset with the
+Each change, by its number in [How each is judged](#how-each-is-judged), against the code before it, three runs back to back (`trial_runs.py`, the settings file with the
 density on the grid unless the row says otherwise): the pass before, with the change, before again. The
 noise is the two befores' difference; a change counts as faster when it beats both by 2.5 times that.
 The harness's check is `fluid_compare.py` on stillslowfast (gone), its water numbers and four saved outputs
@@ -332,12 +332,12 @@ against the code before.
 |     |                                                                                        | vorticity                                              | 1.20        | 0.92       | 1.21        | 0.01       | yes                                     |                                                                        |                      |
 |     |                                                                                        | dampen, then advect velocity                           | 0.33 + 0.78 | 0.81       | 0.33 + 0.78 | 0.00       | yes                                     |                                                                        |                      |
 | 6   | `pressure.solver` `SOR`, 10 sweeps at 1.8, an option                                   | the step, harness                                      | 8.74        | 8.85       |             |            | no                                      | the water 1.23 of the body, was 0.90                                   | option               |
-| 7   | `pressure.solver` `MULTIGRID`, 1 cycle, an option and the preset's                     | pressure                                               | 4.07        | 2.56       | 4.12        | 0.05       | yes                                     | the water 1.36 of the body, was 0.90; the coast 0.10 s, was 0.94       | option, the preset's |
+| 7   | `pressure.solver` `MULTIGRID`, 1 cycle, an option and the settings file's                     | pressure                                               | 4.07        | 2.56       | 4.12        | 0.05       | yes                                     | the water 1.36 of the body, was 0.90; the coast 0.10 s, was 0.94       | option, the settings file's |
 |     |                                                                                        | the step                                               | 9.31        | 7.77       | 9.41        | 0.10       | yes                                     |                                                                        |                      |
 |     |                                                                                        | the frame                                              | 12.23       | 10.24      | 12.17       | 0.06       | yes                                     |                                                                        |                      |
 | 9   | the blobs drawn to 2.5 sigma, the gaussian scaled by its share inside                  | particles draw, 100 k blobs                            | 1.64, 2.15  | 0.96, 0.96 | 1.40, 1.38  | 0.24, 0.77 | not by the rule; below all four befores | 0.1 to 0.5 of 255 in the mean, 2% of pixels over 4 at the blobs' edges | replacement          |
 |     |                                                                                        | the harness's step                                     | 16.08       | 12.97      |             |            | yes                                     |                                                                        |                      |
-| 10  | the draw and the advection over the ring's filled slots, by indirect commands          | particles draw, the preset's 1 M streaks at `rate` 0.1 | 1.33        | 1.12       | 1.41        | 0.08       | yes                                     | the same; 0 of 255 apart                                               | replacement          |
+| 10  | the draw and the advection over the ring's filled slots, by indirect commands          | particles draw, the settings file's 1 M streaks at `rate` 0.1 | 1.33        | 1.12       | 1.41        | 0.08       | yes                                     | the same; 0 of 255 apart                                               | replacement          |
 |     |                                                                                        | particles draw, 2 M points at `rate` 20                | 2.75        | 2.54       | 2.55        | 0.20       | no: the ring is full                    |                                                                        |                      |
 | 11  | `overlap` `WEIGHTED`, weighted blended order-independent transparency, an option       | particles draw, 2 M points                             | 2.98        | 1.32       | 2.68        | 0.30       | yes                                     | 0.25 of 255 in the mean against `OCCLUDED`                             | option               |
 |     |                                                                                        | particles march                                        | 0.40        | 0.21       | 0.41        | 0.01       | yes                                     |                                                                        |                      |
@@ -346,8 +346,8 @@ against the code before.
 | 13  | the surface's filter, a run of 256 pixels read once into shared memory                 | particles march, 100 k spheres                         | 0.70        | 0.89       | 0.70        | 0.00       | no: slower                              | 0.1 to 1.1 of 255 in the mean                                          | dropped              |
 | 14  | the ring sorted by Morton order                                                        |                                                        |             |            |             |            |                                         |                                                                        | not built            |
 
-The preset without the programme (`cac62f39`, Jacobi, the preset's 1 M streaks occluded) against the
-preset with it (the multigrid, every kept change), three runs, before, now, before:
+The settings file without the programme (`cac62f39`, Jacobi, the settings file's 1 M streaks occluded) against the
+settings file with it (the multigrid, every kept change), three runs, before, now, before:
 
 | Timer                        | Before                | Now                   | Before again          |
 |------------------------------|-----------------------|-----------------------|-----------------------|
@@ -407,7 +407,7 @@ A replacement on that, the exception to the rule.
 Item 11 draws into three 4K targets in one pass where `OCCLUDED` draws into 16 layered slices, clears them
 (1 GB) and marches them: the draw halves and the march halves. Its order is a weight by depth, not the
 slices', so where the density is thick and near density should hide far density it differs; on the recording's
-thin density it is 0.25 of 255 from the slices. An option, the preset keeps `OCCLUDED`.
+thin density it is 0.25 of 255 from the slices. An option, the settings file keeps `OCCLUDED`.
 
 Item 12 is slower: the draw's time is not the rasterizer's setup of 2 M points but the 16 slices' clear
 and the sum into them, which the atomics make no cheaper, for the streaks as for the points. `WEIGHTED`
@@ -449,7 +449,7 @@ Sources: [McAdams, Sifakis, Teran 2010](https://pages.cs.wisc.edu/~sifakis/proje
 ## The staggered velocity
 
 The velocity on the cells' faces ([FLUID_3D.md](FLUID_3D.md#the-staggered-velocity)) against the centered one
-(`28655856`), deep_flow's preset, in the app (`trial_runs.py`, standmoves (gone), the pose on), ms mean, two runs each
+(`28655856`), deep_flow's settings file, in the app (`trial_runs.py`, standmoves (gone), the pose on), ms mean, two runs each
 within 0.03:
 
 | Pass                     | Centered | Faces | Faces, three R16F |
@@ -471,7 +471,7 @@ With the multigrid's coarsest level in one dispatch and its residual fused into 
 
 ## Workgroup shapes
 
-Seven shapes swept over the fluid's 14 compute passes (`fluid_pass_check.py`, each pass alone), at the preset's
+Seven shapes swept over the fluid's 14 compute passes (`fluid_pass_check.py`, each pass alone), at the settings file's
 288 × 512 × 64 and at depth 144 and 256. 8 × 8 × 4 is the best or tied for the stencil passes and the velocity's
 advection at depth 64. The density injections take 8 × 8 × 8, at every depth:
 
@@ -506,7 +506,7 @@ the floats' last bits the solve amplifies. Not worth a pass of their own: the ba
 ### The bridges on one ABC
 
 deep_flow's bridge before and after its Python moved onto the `Bridge` both bridges share (low_flow's C1), a
-time, 19 November, commits 9bba4317 and the C1 commit, the hands recording, the preset, one run each, back to back,
+time, 19 November, commits 9bba4317 and the C1 commit, the hands recording, the settings file, one run each, back to back,
 about 2990 steps, mean / p95 ms **(seen)**:
 
 | Timer               | Before        | After         |
@@ -522,7 +522,7 @@ The kernels and their order are unchanged; on one synthetic input the outputs ar
 ### The body at its own depth
 
 The z positions and the passes they ride in ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)), each pass alone on the
-stillslowfast (gone) frames as above, the second of two runs, deep_flow's preset with the lowpass's `blur` at 0.081:
+stillslowfast (gone) frames as above, the second of two runs, deep_flow's settings file with the lowpass's `blur` at 0.081:
 
 | Step                                                         | lowpass | with its rate | bandpass | with its accelerations | the bridge whole | motion whole |
 |--------------------------------------------------------------|---------|---------------|----------|------------------------|------------------|--------------|
@@ -555,11 +555,11 @@ slab reaches; the drag and the body force read the z position at each face. The 
 
 ### The confinements
 
-The vorticity pass alone (`fluid_pass_check.py`), deep_flow's preset, ms, the median of 40, its floor 0.529:
+The vorticity pass alone (`fluid_pass_check.py`), deep_flow's settings file, ms, the median of 40, its floor 0.529:
 
 | Confinements running                           | One (before) | Up to three, each curl in one pass, the forces summed in one |
 |------------------------------------------------|--------------|--------------------------------------------------------------|
-| one at 0.1 widths (the preset; 2 and 3 off)    | 0.515        | 0.521                                                        |
+| one at 0.1 widths (the settings file; 2 and 3 off)    | 0.515        | 0.521                                                        |
 | one at 0.006 widths                            | 0.552        | 0.557                                                        |
 | 0.1 and 0.006 widths                           |              | 0.868                                                        |
 | 0.1, 0.006 and 0.025 widths                    |              | 1.200                                                        |
@@ -575,7 +575,7 @@ volume's round trip saves.
 
 ## The density's own advection
 
-`density.advection` apart from the velocity's, deep_flow's preset (288 × 512 × 64 cells, the 4K amount
+`density.advection` apart from the velocity's, deep_flow's settings file (288 × 512 × 64 cells, the 4K amount
 2160 × 3840 × 24, `fine_density.sample` MIDDLE): the density's pass alone (`fluid_pass_check.py`), and on
 stillslowfast (gone) at 2160 × 3840 the composited output's sharpness, its luminance's gradient mean and p99 over
 the lit pixels, at four steps of the loop (`fluid_compare.py --save`):
@@ -590,7 +590,7 @@ speckle where the limiter clamps **(deduction from the picture)**.
 
 ## The box as deep as it is wide
 
-`depth_check.py` on stillslowfast (gone)'s fast half, deep_flow's preset (288 × 512 × 64 cells), the body's own z
+`depth_check.py` on stillslowfast (gone)'s fast half, deep_flow's settings file (288 × 512 × 64 cells), the body's own z
 off (its share 0) so what shows is xy turned into z; `isotropy_check.py` for the swirls:
 
 | The box                                  | water z / xy | divergence after the projection, /s | the step, ms mean / p95 |
@@ -604,19 +604,19 @@ is the injection's, a flat sheet that the water flows around over its faces **(d
 At `depth_ratio` 1 a swirl in the depth plane, 0.1 widths in radius, stays round (its aspect 1.00 after 2 s)
 and keeps 0.88 of its speed, one in the image plane 0.84. The body's z from the bridge is 5.8 times its xy on
 this recording, where the player moves mostly sideways: depth noise **(deduction)**; the motion's `z_gain`
-sets its share. The pressure pass at the preset 1.22 ms with the
+sets its share. The pressure pass at the settings file 1.22 ms with the
 multigrid's semi-coarsened levels, against 1.04 in the thin box's cubic cells.
 
 ## The light and the composite
 
-`fluid_pass_check.py` and the same passes alone with a swinging body's density, at deep_flow's preset
+`fluid_pass_check.py` and the same passes alone with a swinging body's density, at deep_flow's settings file
 (288 × 512 × 64 cells, the 4K amount's 2160 × 3840 × 16, the light grid `FULL`), ms:
 
 | The look                                               | light | composite | sum  |
 |--------------------------------------------------------|-------|-----------|------|
 | the light off                                          | 0     | 0.65      | 0.65 |
 | a lamp at a quarter grid, marched (before)             | 0.09  | 0.74      | 0.83 |
-| the preset's sun, rays, caustics, octaves, powder, sky | 0.55  | 1.41      | 1.96 |
+| the settings file's sun, rays, caustics, octaves, powder, sky | 0.55  | 1.41      | 1.96 |
 | the light per layer (`LayerLight3D`)                   | 0.56  | 1.32      | 1.88 |
 | the sweep stored sheared, only the layers in the box   | 0.31  | 1.32      | 1.64 |
 | the sky's light in the light on the dye                | 0.30  | 1.13      | 1.43 |
@@ -642,7 +642,7 @@ What the sweep and the rays do not do, and why: the rays' fog as a power of one 
 ## The density at the output's 4K
 
 The fine density ([FLUID_3D.md](FLUID_3D.md#the-densitys-detail)): the amount at 2160 × 3840 ×
-`fine_density.depth`, the color the density's on the fluid's grid, `fine_density.sample` `AVERAGE`; the fluid at 448 × 800, the preset's
+`fine_density.depth`, the color the density's on the fluid's grid, `fine_density.sample` `AVERAGE`; the fluid at 448 × 800, the settings file's
 other settings, the pose on, one 60 s run each after 10 s. Semi-Lagrangian, with the depth scale and the dampen
 at 3 widths/s:
 
@@ -668,7 +668,7 @@ from 32 fluid layers up; its cost is in [FLOW_PLAN.md's Parked](FLOW_PLAN.md#par
 ## The 2D flow
 
 low_flow's chain, a time, 19 November, commit c796999b, `launcher.py -app superficial_flow -sim -ni -timing 60
--warmup 10`, the measure recording (`20261112-125832_measure`), the preset `studio.json` as saved: the view
+-warmup 10`, the measure recording (`20261112-125832_measure`), the settings file `studio.json` as saved: the view
 448 × 800, the fluid's grid 1080 × 1920 with its density at 2160 × 3840; the segmentation and the pose on, on the
 same GPU; one run, mean / p95 ms:
 

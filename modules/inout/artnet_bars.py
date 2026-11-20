@@ -59,7 +59,7 @@ def _parse_channel_order(order_enum: ChannelOrder) -> tuple[int, int, int, int]:
 class ArtNetBarsSettings(BaseSettings):
     """Configuration for a single ArtNet LED bar controller.
 
-    Init fields (set via preset, then locked after initialize()):
+    Init fields (set via settings file, then locked after initialize()):
         ip, base_universe, fps, pixels, channel_order, verbose
 
     Runtime fields (adjustable at any time):

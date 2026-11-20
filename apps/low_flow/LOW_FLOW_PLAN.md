@@ -44,7 +44,7 @@ harness and seen in low_flow; the march's light, shadows and fog need a depth an
 - **D7.** The particles.
 - **D8.** The one-pass buoyancy in -sim: the GPU fluid time (built and checked on the GPU 2026-11-19, as the 3D's:
   one draw against the two it replaced within one step of the velocity's half precision, skipped at gravity 0).
-  low_flow's preset has gravity down the screen at deep_flow's length, (0, −0.02).
+  low_flow's settings file has gravity down the screen at deep_flow's length, (0, −0.02).
 
 Each step updates the documents it makes stale (FLOW.md, MOTION.md, TIMING.md).
 
@@ -71,7 +71,7 @@ pressure") limits how far. The water gets a speed of sound too, so a push travel
   the reach's 0 there is no pressure, so no sound either. Closed walls reflect a front; open walls let it out, the
   textbook's absorbing wall (Engquist and Majda 1977, first order: ∂P/∂t + c ∂P/∂n = 0 on the face, in the solve's
   wall ghost), where the pressure 0 on the face would reflect it inverted. The field's default 1 width/s (the field
-  crossed in 1.8 s), the presets 0, off. FLUID_2D.md says the setting is the 2D's alone for now. Question: the 3D's
+  crossed in 1.8 s), the settings files 0, off. FLUID_2D.md says the setting is the 2D's alone for now. Question: the 3D's
   G4, after it is seen in low_flow.
 
 ## Checks
@@ -84,7 +84,7 @@ pressure") limits how far. The water gets a speed of sound too, so a push travel
 
 ## Rules it touches
 
-- Keep presets and settings schemas in sync with code changes: D7, G4.
+- Keep settings files in sync with code changes: D7, G4.
 - Shaders get checked in a GPU harness: D7, G4.
 - Prefer the textbook unit for a quantity: G4 in widths/s and s.
 - Similar things share the noun and differ by a qualifier: G4 (`pressure.fade_time`).

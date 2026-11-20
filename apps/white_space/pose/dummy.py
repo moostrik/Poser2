@@ -161,7 +161,7 @@ class Dummy:
         self._poses_path = Path(poses_path)
         self._poses: dict[str, dict[str, float]] = self._read_poses()
         settings.poses = list(self._poses) or [""]
-        if NEUTRAL in self._poses:                                # start in neutral, not where the preset left it
+        if NEUTRAL in self._poses:                                # start in neutral, not where the settings file left it
             settings.pose = NEUTRAL
             self._on_pose(NEUTRAL)
         self._last: float | None = None

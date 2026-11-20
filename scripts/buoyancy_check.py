@@ -1,6 +1,6 @@
 """The buoyancy on a still blob in a closed box: its force, and the water's first step after the projection.
 
-The fluid at deep_flow's preset, every wall closed, the water at rest. A sphere `--radius` widths across at the
+The fluid at deep_flow's settings file, every wall closed, the water at rest. A sphere `--radius` widths across at the
 box's middle holds a uniform warmth (`--warmth`, `temperature.buoyancy` `--buoyancy`), or, with the warmth 0, a
 uniform density of amount `--amount` (`density.sink` `--sink`, the temperature off), its color in RGB or in Oklab (a and b
 negative). One buoyancy pass, then one projection. It prints:
@@ -12,7 +12,7 @@ negative). One buoyancy pass, then one projection. It prints:
   force held at half precision there): their largest difference;
 - the water's velocity at the sphere's middle (its cells within half the radius) along gravity, after the
   projection, over the force × dt it was given: a sphere in still water takes 2/3 of it, the rest pushing the
-  water around it (its added mass, half its own) **(deduction)**; once at the preset's `pressure.cycles` and once
+  water around it (its added mass, half its own) **(deduction)**; once at the settings file's `pressure.cycles` and once
   at `--cycles`.
 
 It runs on the GPU like the apps: run it only while no app is running.

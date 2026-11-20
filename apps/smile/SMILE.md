@@ -9,7 +9,7 @@ its `.venv` (`scripts/install.bat` there makes it, `apps/smile/scripts/install.b
 `python -m unittest discover -s apps/smile/<package>/tests -t .` (`tests`, `face`, `comfy`, ..., `relay`).
 The app's packages are its own (`cam`, `face`, `comfy`, `render`, `player`, ...); `modules/gl`, `modules/settings`,
 `modules/utils` and `modules/log_config.py` are Poser2's, shared with the other apps. `data/` is what the installation
-is given (presets, models, workflow, audio, test photos), `output/` what it produces (git-ignored, safe to delete).
+is given (settings files, models, workflow, audio, test photos), `output/` what it produces (git-ignored, safe to delete).
 `README.md` is for whoever installs or runs the installation: setup, scripts, the on-site checklist
 with the date each check passed, and the known limits; keep it current when any of that changes.
 The app runs under pythonw, without a console: say things with `logging`, never `print` (the log file
@@ -136,10 +136,10 @@ queue without one event), shows `no events from ComfyUI: close or reload its bro
 not ready until a warm-up gets its events again; a warm-up that fails is retried, never counted as
 ready. Keep no ComfyUI tab open on the installation, or exclude `127.0.0.1:8188` from Edge's sleeping tabs.
 For tests in the ComfyUI page, `python -m apps.smile.comfy.testflow` writes `data/comfy/smile_test.json`
-(drag it into the page): what the app sends with a preset's values, plus an input switch (the
+(drag it into the page): what the app sends with a settings file's values, plus an input switch (the
 app's last capture; any other photo is cropped first with `python apps/smile/scripts/crop_faces.py`), previews and a video
 recorder from ComfyUI's own video nodes. Regenerate
-it after changing the workflow or the presets instead of editing a copy by hand.
+it after changing the workflow or the settings files instead of editing a copy by hand.
 Our own ComfyUI nodes live in `data/comfy/aiia_grin/` (`ComfyUI/custom_nodes/aiia_grin` is a junction to it: restart ComfyUI after a change).
 The grin's random picks are SMILE's (`Workflow._fill_grin`, from the visitor's seed): each value's peak between its min and max, and
 the moment of that peak within midpoint ± deviation, sent to Grin Frames as `<name>_peak` (without them the node draws its own moments).
@@ -312,7 +312,7 @@ the first connect, `/api/library`) at random, following `audio.laughter` through
 with the sequence; `ClipSaver`'s saved callback gives the files (the recording closes at the last grin frame, `Main.generator_callback`, while the
 grin still plays), which are uploaded at once (`Delivery`)
 and the `result` goes to the phone by its id, so it has the video when its turn ends and the next turn can start meanwhile. The phone sends its camera mirrored, as it
-shows it. The token is a file (`data/online_token.txt`, git-ignored), never a setting in a preset.
+shows it. The token is a file (`data/online_token.txt`, git-ignored), never a setting in a settings file.
 The **online cell**: the screen `online.screen` (1-48, 0 = none; pick one off the scroll rows) of the walls shows a white card with the
 QR code to the phone page (`online.page`, empty = the relay's host, `Link.http_base`) and a line under it while SMILE Online is on
 and the relay connected, and the main screen (`CreditLayer.cell`: the caption, no QR code, no status line)

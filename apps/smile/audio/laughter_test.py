@@ -51,7 +51,7 @@ class LaughterTest:
         self._index: int = -1           # the screen lit last, -1 while off
         self._next_time: float = 0.0    # when the next screen is due
         self._warned: bool = False      # a failed send was logged since the switch-on
-        # the switch is saved with the presets: one saved on must not start the installation testing
+        # the switch is saved with the settings files: one saved on must not start the installation testing
         settings.laughter_test = False
         settings.laughter_test_screen = 0
         # the samples to choose from; a choice that is no file any more falls back to the first

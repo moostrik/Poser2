@@ -2,7 +2,7 @@
 how long do their passes take?
 
 Plays a recording's color and depth frames through the `SerialUploader` (the color straightened, the depth aligned, as the
-app does), takes them into GL and runs the view stage and the color stage at the preset's settings. Prints the share
+app does), takes them into GL and runs the view stage and the color stage at the flow file's settings. Prints the share
 of the mask without depth, upscaled and filled (0), and the share of the view that is the player. Saves the last frame's
 image, the crop's depth, the mask, the upscaled depth, the filled depth and the color side by side as a PNG, the depths
 from the box's front (white) to its back (black).
@@ -38,7 +38,7 @@ from modules.render import ColorInput, ColorLayer, ColorLayerSettings  # noqa: E
 from modules.video import StreamReader  # noqa: E402
 
 RECORDINGS = Path('apps/deep_flow/data/recordings')
-PRESET = Path('apps/deep_flow/data/settings/flow/settings.json')
+SETTINGS_FILE = Path('apps/deep_flow/data/settings/flow/settings.json')
 SETUP = Path('apps/deep_flow/data/settings/setup/studio.json')
 
 
@@ -100,8 +100,8 @@ def main() -> int:
     parser.add_argument('--frames', type=int, default=40)
     parser.add_argument('--png', default='')
     parser.add_argument('--time', action='store_true', help='also time each pass on the last capture')
-    parser.add_argument('--erode', type=int, help="the color's erode, where not the preset's")
-    parser.add_argument('--feather', type=float, help="the color's feather, where not the preset's")
+    parser.add_argument('--erode', type=int, help="the color's erode, where not the settings file's")
+    parser.add_argument('--feather', type=float, help="the color's feather, where not the settings file's")
     parser.add_argument('--npy', default='', help="save the last capture's color, float RGBA, as .npy")
     parser.add_argument('--compare', default='', help="a .npy of the color to compare the last capture's with (largest difference)")
     args = parser.parse_args()
@@ -113,23 +113,23 @@ def main() -> int:
     count = min(len(colors), len(depths))
     alignment = info.depth_alignment
 
-    preset = json.loads(PRESET.read_text(encoding='utf-8'))
+    settings_file = json.loads(SETTINGS_FILE.read_text(encoding='utf-8'))
     mh.context()
     settings = ViewLayerSettings()
     settings.initialize()
-    settings.update_from_dict(preset['view'])
+    settings.update_from_dict(settings_file['view'])
     color_settings = ColorLayerSettings()
     color_settings.initialize()
-    color_settings.update_from_dict(preset['color'])
+    color_settings.update_from_dict(settings_file['color'])
     if args.erode is not None:
         color_settings.erode = args.erode
     if args.feather is not None:
         color_settings.feather = args.feather
     band = settings.crop
     view = ViewLayer(settings, json.loads(SETUP.read_text(encoding='utf-8'))['setup']['camera']['fov'])
-    view.allocate(preset['view']['width'], preset['view']['height'])
+    view.allocate(settings_file['view']['width'], settings_file['view']['height'])
     color_stage = ColorLayer(color_settings)
-    color_stage.allocate(preset['view']['width'], preset['view']['height'])
+    color_stage.allocate(settings_file['view']['width'], settings_file['view']['height'])
 
     uploader = SerialUploader(SerialUploaderSettings())
     images: list[GpuImage] = []

@@ -169,7 +169,7 @@ them: `velocity.velocity`, `acceleration.acceleration`, `density.amount`, `tempe
 A wake may drag (its share in `velocity`: the water behind a leaving limb is pulled to the
 speed it left with, and let go when the pulse dies), kick (its share in `acceleration`),
 leave dye where it is, or any of these at once; the same reading in two outputs is a
-choice, not an error. The change beside its parts lets a preset take the physics (the true
+choice, not an error. The change beside its parts lets a settings file take the physics (the true
 acceleration, braking at stops) or the look (a stop that pushes).
 
 The bridge has no finite guard, unlike the motion and the fluid ([MOTION.md](MOTION.md#the-guard),
@@ -240,8 +240,8 @@ bins' percentile, 3.989 widths/s against numpy's 3.988 on the speeds. On deep_fl
 `scripts/bridge_compare.py` on the standmoves ([gone](FLOW.md#recordings-gone)) recording (`20261103-215324`: four whole-arm moves
 from rest, with starts and stops, a player at 0.65–1.5 m), its frames as captured on 2026-11-05
 (`temp/depth_track_1105/`, 1449 frames, 25 fps, the stamps the replay's decode times), the flow run
-again on them with deep_flow's preset flow of 2026-11-06 (levels 4, same_surface and smooth_like_z on,
-the depth velocity's `smooth` 50 ms unless named), each bridge at its preset values (trail: smooth
+again on them with deep_flow's settings file flow of 2026-11-06 (levels 4, same_surface and smooth_like_z on,
+the depth velocity's `smooth` 50 ms unless named), each bridge at its settings file values (trail: smooth
 1000 ms, attack 1 ms, advect 1, blur 4 px × 4; change: 25 / 150 ms, both region weights 1,
 regions 128 px), stepped once per flow frame. Per frame, the mean over the body's pixels that move
 in the loop; noise is the still part's p99 per pixel; slow and fast are the steady halves of the
@@ -269,7 +269,7 @@ The stop's region, `smooth` 50 ms:
 |------------------------------------------------|-------|-------------|-------------------------------------|---------------|
 | region weight 0                                | 0.040 | 2.46        | 1.00                                | 1.00          |
 | region 64 px                                   | 0.019 | 3.57        | 0.44                                | 0.63          |
-| region 128 px (the preset)                     | 0.010 | 4.07        | 0.38                                | 0.62          |
+| region 128 px (the settings file)                     | 0.010 | 4.07        | 0.38                                | 0.62          |
 | region 256 px                                  | 0.008 | 4.31        | 0.36                                | 0.61          |
 | region 128 px over the flow's moving pixels    | 0.011 | 3.48        | 0.45                                | 0.63          |
 
@@ -292,4 +292,4 @@ Advice, from these numbers on this clip:
 
 The clip moves whole arms from rest, so a limb arriving and a part speeding up come together: the
 start and bow split, `start_region_*`, `fast_smooth` and z's changes toward the camera are not
-tested on it, and the lowpass's and the bandpass's own settings are left as the preset.
+tested on it, and the lowpass's and the bandpass's own settings are left as the settings file.

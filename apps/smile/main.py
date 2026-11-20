@@ -49,7 +49,7 @@ def parse_args(args: list[str]) -> Namespace:
     parser.add_argument('-dh',  '--height',         type=int,   default=1024,   help='image height')
     parser.add_argument('-wc',  '--webcam',         action='store_true',        help='use a webcam instead of the Vimba camera')
     parser.add_argument('-lm',  '--landscape',      action='store_true',        help='landscape instead of portrait mode')
-    parser.add_argument('-fs',  '--fullscreen',     action='store_true',        help='open borderless fullscreen, the walls too (the installation) instead of the window modes of the preset')
+    parser.add_argument('-fs',  '--fullscreen',     action='store_true',        help='open borderless fullscreen, the walls too (the installation) instead of the window modes of the settings file')
     return parser.parse_args(args)
 
 
@@ -76,7 +76,7 @@ class SmileMain():
         except FileNotFoundError:
             logger.warning('No setup file at %s, using defaults', self.store.path('setup', self.store.startup('setup')))
         if not interface:
-            self.settings.setup.panel.browser = False  # launcher override; the preset cannot turn it back on
+            self.settings.setup.panel.browser = False  # launcher override; the settings file cannot turn it back on
         if fullscreen:
             # the installation's start: borderless (exclusive fullscreen minimizes when a wall gets focus), the walls too
             for window in self.settings.setup.windows.windows:
@@ -160,7 +160,7 @@ class SmileMain():
         if any(window.enabled for window in self.settings.setup.windows.windows[1:]):
             self.clip_player.start()
         else:
-            logger.info('No wall window shown in the preset (windows.window_1, window_2): the clip player stays off')
+            logger.info('No wall window shown in the settings file (windows.window_1, window_2): the clip player stays off')
 
         self.is_running = True
 

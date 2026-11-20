@@ -141,7 +141,7 @@ number, not something anyone can see.
 
 The machine always **boots into OFF** — dark, motor at BEAM — and wakes through OFF_IDLE by itself once
 the playhead has locked, so power-on is the same wake as a blackout release. The persisted
-`manual.select` is only the goto target, entered on `goto`, never at start. Nothing else in the preset
+`manual.select` is only the goto target, entered on `goto`, never at start. Nothing else in the settings file
 is forced: a saved `manual.hold` or `blackout` comes back as saved, and holds OFF until released. **OFF (S0)** is also
 entered from any state by pinning `blackout` (an operator input, so it is not drawn as an edge above), and
 leaves by condition like any other state — through OFF_IDLE, once neither the pin nor a missing lock
@@ -149,7 +149,7 @@ holds it. In **session mode** the two open-ended states run on time: INTRO spins
 with anyone present, PLAY runs `session.play_seconds` whatever the count, and END only winds down (no
 return to PLAY), so a session always concludes.
 
-**Boot — the app starts as the startup preset says, and forces nothing.** A preset is written only by
+**Boot — the app starts as the startup settings file says, and forces nothing.** A settings file is written only by
 Save or Save As in the panel, so a saved state is one an operator chose; the app cannot tell a power cycle
 from a launch, so every start is the same start. What keeps the motor from powering on into PROJECTION:
 
@@ -159,19 +159,19 @@ from a launch, so every start is the same start. What keeps the motor from power
 2. **Motor**: there is no manual mode field — the arbitration is debug > machine command > **STOPPED**, so
    before the machine's first tick (or with the machine disabled) nothing spins (`light/motor.py`
    `_target_mode`; `test_boot_without_command_is_stopped`).
-3. **The site preset**: saved with the debug select OFF and the dummy off. A projection layer saved as
+3. **The site settings file**: saved with the debug select OFF and the dummy off. A projection layer saved as
    selected comes back selected and spins the fixture up at power-on; the Conductor warns about it in the log
    (`light/conductor.py`; `test_a_saved_debug_selection_comes_back_as_saved`), it does not reset it.
 4. **A simulated motor never reaches the fixture**: while `light.motor_simulate` is on the light sender sends
-   nothing, no rpm and no pixels, read live (`inout/osc_light_sender.py`). The desk preset is saved with it
-   on, with the debug layer, the dummy and any hold as wanted, and set as the startup preset.
+   nothing, no rpm and no pixels, read live (`inout/osc_light_sender.py`). The desk settings file is saved with it
+   on, with the debug layer, the dummy and any hold as wanted, and set as the startup settings file.
 
 On top of these, `osc_light` holds the commanded rpm at 0 for `startup_delay` seconds after connecting,
 giving the motor controller one clean 0 → target edge. The firmware acts on the rpm only when it changes,
 and its packet watchdog stops the motor without recording that stop — so after any send silence long
 enough that the watchdog may have fired (leaving motor simulation, a host stall), the sender repeats the
 hold for `resync_hold` seconds; a stopped motor would otherwise never restart
-(`inout/osc_light_sender.py` `FixtureSpeedLatch`). With the site preset, PROJECTION is reachable only
+(`inout/osc_light_sender.py` `FixtureSpeedLatch`). With the site settings file, PROJECTION is reachable only
 through an explicit runtime action: the show's own sync into INTRO_PLAY, an operator goto to a PROJECTION
 state, or selecting a projection layer in the debug select.
 

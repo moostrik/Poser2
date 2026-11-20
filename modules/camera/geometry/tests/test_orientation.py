@@ -184,14 +184,14 @@ class TestRollOffsetIsABox(unittest.TestCase):
         self.assertIsNone(field.min)
         self.assertIsNone(field.max)
 
-    def test_it_is_recorded_in_the_preset(self) -> None:
+    def test_it_is_recorded_in_the_settings_file(self) -> None:
         """It is a measurement, so unlike the rest of `readings` it has to survive a save."""
         camera = RigCameraSettings()
         camera.readings.roll_offset = -2.2458989103710865
         self.assertIn('roll_offset', camera.to_dict()['readings'])
         self.assertEqual(camera.to_dict()['readings']['roll_offset'], -2.2458989103710865)
 
-    def test_the_rest_of_readings_stays_out_of_the_preset(self) -> None:
+    def test_the_rest_of_readings_stays_out_of_the_settings_file(self) -> None:
         stored = RigCameraSettings().to_dict()['readings']
         for read_only in ('video_fps', 'tilt_measured', 'roll_measured', 'fov_factory'):
             self.assertNotIn(read_only, stored)

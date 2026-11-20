@@ -26,7 +26,7 @@ class TestGroupDefaults(unittest.TestCase):
     def test_a_shared_field_takes_the_parents_value(self):
         self.assertEqual(_Parent().shared.rate, 5.0)
 
-    def test_a_preset_value_still_wins(self):
+    def test_a_settings_file_value_still_wins(self):
         parent = _Parent()
         parent.update_from_dict({'second': {'enabled': True}})
         self.assertTrue(parent.second.enabled)

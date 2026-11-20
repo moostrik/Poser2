@@ -479,7 +479,7 @@ class DebugOverrideTest(unittest.TestCase):
         self.assertIsNone(_debug_motor_mode(DebugLayer.OFF, layers))         # debug disarmed
 
     def test_a_saved_debug_selection_comes_back_as_saved(self) -> None:
-        # Nothing in the preset is forced at start: a debug layer saved as selected is selected
+        # Nothing in the settings file is forced at start: a debug layer saved as selected is selected
         # after construction (a projection layer with a real motor is warned about in the log).
         from apps.white_space.light import Conductor, DebugLayer, LightSettings, PoseInstrumentSettings
         from apps.white_space.board import RenderBoard

@@ -35,7 +35,7 @@ class MarkerFileTest(unittest.TestCase):
 
 
 def record(root: Path, count: int) -> Path:
-    """A recording of `count` frames, one chunk, with keyframes apart as the presets record them. Both
+    """A recording of `count` frames, one chunk, with keyframes apart as the settings files record them. Both
     streams tell the frame: the colour by its grey, the depth as 1000 + 30 per frame."""
     rec = recorder([FrameType.VIDEO, FrameType.DEPTH], str(root / 'temp'), 'recordings', str(root), keyframe_interval=30)
     rec.start()

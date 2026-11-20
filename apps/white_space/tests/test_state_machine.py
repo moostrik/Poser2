@@ -144,7 +144,7 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, StateId.IDLE)
 
     def test_startup_ignores_persisted_select(self) -> None:
-        # Failsafe: a preset saved mid-show (select = PLAY) must never boot into a
+        # Failsafe: a settings file saved mid-show (select = PLAY) must never boot into a
         # PROJECTION-motor state — the show always starts in OFF; select is only the goto target.
         self.settings.manual.select = StateId.PLAY
         self.settings.manual.hold = True          # isolate the boot state from conditions
@@ -673,7 +673,7 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, StateId.OFF_IDLE)      # unpinned → wakes right out
 
     def test_a_saved_blackout_comes_back_pinned(self) -> None:
-        # Nothing in the preset is forced at start: saved with blackout pinned, the machine boots
+        # Nothing in the settings file is forced at start: saved with blackout pinned, the machine boots
         # into OFF and stays there past the lock, dark at BEAM, until the pin is released.
         self.settings.blackout = True
         self.board.is_locked = True
@@ -707,7 +707,7 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, StateId.IDLE_INTRO)
 
     def test_a_saved_hold_comes_back_held(self) -> None:
-        # Nothing in the preset is forced at start: saved mid-hold, the machine boots into OFF and
+        # Nothing in the settings file is forced at start: saved mid-hold, the machine boots into OFF and
         # the hold keeps it there past the lock, until it is released.
         self.settings.manual.hold = True
         self.board.is_locked = True

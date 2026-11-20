@@ -1,6 +1,6 @@
 """The expansion through the projection: the water's divergence after it, in a closed box and an open one.
 
-The fluid at deep_flow's preset, the water at rest, a disc of full presence at z position 0.5 injected as the
+The fluid at deep_flow's settings file, the water at rest, a disc of full presence at z position 0.5 injected as the
 expansion at `--rate` (1/s); one projection. Per wall it prints the presence's sum over the cells and the
 divergence's mean (0 in a closed box). The solve's own floor beside it: the same box, no source, the swinging
 body's velocity dragged in and projected once, the RMS of the divergence after over before.

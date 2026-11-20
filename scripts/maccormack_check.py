@@ -1,4 +1,4 @@
-"""MacCormack against semi-Lagrangian on one input: the fluid at deep_flow's preset.
+"""MacCormack against semi-Lagrangian on one input: the fluid at deep_flow's settings file.
 
 `--test swing` (the default): a disc of velocity (the body) sweeps left and right through the water for `--move`
 seconds, then stops; the fluid runs on for the rest of `--seconds`. Each half second it prints, per advection, the
@@ -30,13 +30,13 @@ from OpenGL.GL import GL_FLOAT, GL_RGBA, GL_TEXTURE_3D, glBindTexture, glFinish,
 import monitor_harness as mh  # noqa: E402
 from modules.flow import Advection, Fluid3D, Fluid3DSettings  # noqa: E402
 
-PRESET = Path(__file__).resolve().parent.parent / 'apps' / 'deep_flow' / 'data' / 'settings' / 'flow' / 'settings.json'
+SETTINGS_FILE = Path(__file__).resolve().parent.parent / 'apps' / 'deep_flow' / 'data' / 'settings' / 'flow' / 'settings.json'
 W, H = 448, 800         # the bridge's output size the body is drawn at
 FPS = 60.0
 
 
-def preset_fluid() -> dict:
-    """The fluid's group of deep_flow's preset."""
+def settings_file_fluid() -> dict:
+    """The fluid's group of deep_flow's settings file."""
     def find(node):
         if isinstance(node, dict):
             if 'input' in node and 'velocity' in node and 'density' in node:
@@ -46,8 +46,8 @@ def preset_fluid() -> dict:
                 if found is not None:
                     return found
         return None
-    found = find(json.loads(PRESET.read_text(encoding='utf-8')))
-    assert found is not None, 'the preset has no fluid group'
+    found = find(json.loads(SETTINGS_FILE.read_text(encoding='utf-8')))
+    assert found is not None, 'the settings file has no fluid group'
     return found
 
 
@@ -66,9 +66,9 @@ def body(t: float, moving: bool) -> np.ndarray:
 
 
 def fluid_settings(advection: Advection, overrides: list[str]) -> Fluid3DSettings:
-    """deep_flow's preset fluid, every field carried by `advection`, and the settings changed by path."""
+    """deep_flow's settings file fluid, every field carried by `advection`, and the settings changed by path."""
     settings = Fluid3DSettings()
-    settings.update_from_dict(preset_fluid())
+    settings.update_from_dict(settings_file_fluid())
     for field in (settings.velocity, settings.density):      # the temperature is carried as the density is
         field.advection = advection
     for item in overrides:

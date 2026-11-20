@@ -42,7 +42,7 @@ class GroupDescriptionTest(unittest.TestCase):
         group = getattr(type(mirrored), 'child')
         self.assertEqual((group.description, group.tint), ("What the child is", "#4d5a4f"))
 
-    def test_the_preset_is_unchanged(self) -> None:
+    def test_the_settings_file_is_unchanged(self) -> None:
         settings = _Base()
         settings.initialize()
         self.assertEqual(settings.to_dict(), {'described': {'value': 0.0}, 'plain': {'value': 0.0}})

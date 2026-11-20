@@ -487,7 +487,7 @@ class TestCrossCameraLinking(PanoramicTrackerCase):
 
     def test_two_people_fuse_at_a_loose_link_angle(self) -> None:
         # The other half of the same fixture: the gate, not the geometry, is what kept them
-        # apart — which is what makes the preset's 20.5 worth shrinking on the rig.
+        # apart — which is what makes the settings file's 20.5 worth shrinking on the rig.
         self.settings.seam.link_angle = 20.5
         self.submit(self.person(0, 1, 96.0))
         out = self.submit(self.person(1, 2, 18.0))
@@ -750,7 +750,7 @@ PARALLAX_FOV = 127.0
 TARGET_FOV = 90.0
 CAMERA_RADIUS = 0.36
 CAMERA_HEIGHT = 0.5
-# The tracked zone, deliberately WIDER than the studio preset's R 1.5 – R 3.5. It was chosen when
+# The tracked zone, deliberately WIDER than the studio settings file's R 1.5 – R 3.5. It was chosen when
 # the distance was clamped to the zone, to keep that clamp clear of the frame's own nearest
 # readable row; the clamp is gone, and the geometry tests below only ever read distances, so the
 # zone now matters to them only through the overlap band and the parallax depth.
@@ -1900,7 +1900,7 @@ class TestInitialRigSync(unittest.TestCase):
                 self.assertLessEqual(settings.rig.parallax_radius, hi)
 
     def test_settings_applied_to_the_rig_at_construction(self) -> None:
-        # bind() does not fire with the initial value and presets load before
+        # bind() does not fire with the initial value and settings files load before
         # the tracker exists, so construction must push settings into the rig.
         settings = PanoramicTrackerSettings(fov=PARALLAX_FOV)
         settings.rig.camera_radius = CAMERA_RADIUS

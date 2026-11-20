@@ -132,7 +132,7 @@ class Online:
         self._invite: str = ''          # the relay's invite, the pass without an end, for the panel's link
         self._delivery: Delivery | None = None
         self._no_token_warned: bool = False
-        # the switch is saved with the presets: the readouts start clean
+        # the switch is saved with the settings files: the readouts start clean
         settings.connected = False
         settings.status = 'off'
         settings.waiting = 0

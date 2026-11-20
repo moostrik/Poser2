@@ -67,7 +67,7 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
   eye; `max_speed` stays 6 (its job is another surface at the player's edge, which `exclude` leaves out of
   these runs, and it was tested before); `smooth_like_z` off; `halving_speed` stays 0.5: since the 1€ rule opens on
   the track's own speed (2026-11-18) it lags 4 ms on hands at a still noise of 0.64, 0.25 lags 2 ms at 3.7.
-  `levels` 5 measured again after C5 (MOTION.md): x/y follows 20% more, z 1 ms less lag, a later stop on hands; the defaults then set with Matthias at the PC, MOTION.md's reasons following, the preset
+  `levels` 5 measured again after C5 (MOTION.md): x/y follows 20% more, z 1 ms less lag, a later stop on hands; the defaults then set with Matthias at the PC, MOTION.md's reasons following, the settings file
   when he saves it.
 - **C3.** The range. `edge`, `max_speed` and the thresholds are in metres or px, tuned at 0.65–1.5 m; stereo
   noise grows with the square of the distance, so at 2–3.5 m they may need to be in disparity, and a depth's
@@ -94,7 +94,7 @@ coverage); the luma matte in the view ([VIEW.md](VIEW.md#the-stage)), the bridge
   where the input meets older density; `fill` against `over`; `add` builds up without going white; `oklab`
   mixes without turning muddy; the monitor's `IMAGE` shows what the composite shows; `color.white_balance`
   pulls a warm room light to white. The injection's and the march's times measured again, with -sim while
-  Matthias is away; the preset saved after.
+  Matthias is away; the settings file saved after.
 
 ## E. The 3D fluid's physics
 
@@ -132,7 +132,7 @@ What is built: [FLUID_3D.md](FLUID_3D.md#the-density).
 
 - **H1.** Every length in the flow in the smaller side's widths: the motion's velocity, the bridge's readings, the
   fluid's inputs (`spread`), its look (`opacity`, `fog`), the box's depth, the monitor's scale. Today a width is
-  the image's, the smaller side in portrait and the longer in landscape, so a preset means less when the box
+  the image's, the smaller side in portrait and the longer in landscape, so a settings file means less when the box
   turns; in portrait nothing changes. One rule for every stage, made where each length is made.
 
 ## I. The 2D flow follows the 3D

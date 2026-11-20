@@ -127,7 +127,7 @@ class FigureTest(unittest.TestCase):
 class ReadingsTest(unittest.TestCase):
     """What the pipeline reads of the dummy, with the calibrator set to the dummy's own raw
     readings in the saved neutral and with the arms straight up: self-consistency, so figure and
-    calibration cannot drift apart. No test pins the preset to the dummy: the calibrator is tuned
+    calibration cannot drift apart. No test pins the settings file to the dummy: the calibrator is tuned
     on a person, and the dummy reading a little off after that is information."""
 
     def setUp(self) -> None:
@@ -240,7 +240,7 @@ class DummyTest(unittest.TestCase):
     def test_the_dummy_starts_in_the_saved_neutral(self) -> None:
         self.path.write_text(json.dumps({'up': {'left_shoulder': 180.0}, 'neutral': {'left_shoulder': -20.0, 'left_hip': -10.0}}), encoding='utf-8')
         settings = DummySettings()
-        settings.left_shoulder = 90.0                                  # where a preset left it
+        settings.left_shoulder = 90.0                                  # where a settings file left it
         dummy = Dummy(settings, nodes.AngleExtractorSettings(), nodes.AngleCalibratorSettings(), track_id=ID, poses_path=self.path)
         self.assertEqual(settings.pose, 'neutral')
         self.assertEqual(settings.left_shoulder, -20.0)

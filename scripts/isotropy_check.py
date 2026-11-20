@@ -4,7 +4,7 @@ across does, and what the projection leaves of the divergence.
 
     python scripts/isotropy_check.py [--seconds 2] [--set path=value ...]
 
-deep_flow's preset (`maccormack_check.fluid_settings`), still water, no vorticity, no fade: each swirl a Rankine
+deep_flow's settings file (`maccormack_check.fluid_settings`), still water, no vorticity, no fade: each swirl a Rankine
 vortex 0.1 widths in radius, 0.3 widths/s at its edge, about the box's middle. Each half second, per swirl:
 
     kept      its mean speed over the start's

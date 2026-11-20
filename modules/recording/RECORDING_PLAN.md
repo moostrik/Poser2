@@ -39,5 +39,5 @@ timing, not the recording's data. Looked at when the refactor's A6 reaches the r
 
 ## The rules it touches
 
-- Keep presets and settings schemas in sync with code changes: hd_trio's `container` in its preset
+- Keep settings files in sync with code changes: hd_trio's `container` in its settings file
 - Run a test of the app or a GPU harness only on the user's go, and only what the plan names: the checks of 1

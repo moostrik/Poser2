@@ -158,7 +158,7 @@ class Camera(Thread):
     def _open(self) -> bool:
         device_list: list[str] = get_device_list(verbose=False)
         if not self.device_id and device_list:
-            self.device_id = device_list[0]          # no id in the preset: the first OAK4 found
+            self.device_id = device_list[0]          # no id in the settings file: the first OAK4 found
             logger.info(f'no device id set: opening the first OAK4 found, {self.device_id} (of {device_list})')
         if not self.device_id:
             self._warn('no OAK4 found (an OAK-D is never opened by this backend)')
@@ -282,7 +282,7 @@ class Camera(Thread):
 
     def _log_frame_geometry(self) -> None:
         """The window the grey frame's warp delivers and where the sensor covers it, pure geometry
-        from the preset, logged so a rig check reads the horizon row off the log."""
+        from the settings file, logged so a rig check reads the horizon row off the log."""
         src: tuple[int, int] = requested_size(self.color, self.resolution)
         out: tuple[int, int] = self.frame_size
         window = frame_window(src, out, src[0], self.mount.fov_h, 0.0,
@@ -297,7 +297,7 @@ class Camera(Thread):
 
     def _read_mount_calibration(self) -> None:
         """One-shot at open: what this unit says about its own lens and its IMU's orientation. The
-        lens against the preset's is the grey frame's warp's concern; a color frame brings its own."""
+        lens against the settings file's is the grey frame's warp's concern; a color frame brings its own."""
         assert self.device is not None
         src: tuple[int, int] = requested_size(self.color, self.resolution)
         lens = None if self.color else read_lens_calibration(self.device, SENSOR_SOCKET, src, self.device_id)

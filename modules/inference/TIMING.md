@@ -11,7 +11,7 @@ from them.
 | GPU       | GeForce RTX 4090, 24 GB, driver 621.24                                  |
 | Libraries | torch 2.14.1 (CUDA 13.0), TensorRT 11.4.0.106, ONNX Runtime 1.31.1      |
 | Recording | `20261112-125832_measure` (still, then an arm sideways, slow then fast) |
-| App       | deep_flow `-sim`, its preset: the pose every other frame, the fluid on  |
+| App       | deep_flow `-sim`, its settings file: the pose every other frame, the fluid on  |
 
 ## How the outputs are checked
 
@@ -30,7 +30,7 @@ ONNX Runtime.
 
 ## The refactor's steps, in the app
 
-Mean / p99 ms of the pose as deep_flow runs (its preset), and the outputs against the run before **(seen, one run a
+Mean / p99 ms of the pose as deep_flow runs (its settings file), and the outputs against the run before **(seen, one run a
 step unless said)**:
 
 | Step                     | Model        | Pose mean / p99 (ms) | Frames compared | Frames that differ | Max difference   |
@@ -175,7 +175,7 @@ crops at the model's size, idle GPU (`c2_pose_batches.py`, not committed, on `sc
 | 7     |                  |              | 1.94 / 2.71          | 2.29 / 3.15      |
 | 8     |                  |              | 2.02 / 2.84          | 2.39 / 3.17      |
 
-In the app: each app `-sim`, its preset with the resolution set, 60 s after the first pose and 3 s more
+In the app: each app `-sim`, its settings file with the resolution set, 60 s after the first pose and 3 s more
 (`c2_app_probe.py`, not committed); hd_trio on `intro_1` (two players a set), white_space on
 `20260924-161443_3_person_long` (two or three); no recording holds more than three. Mean / p95 / p99 ms:
 
@@ -223,7 +223,7 @@ less than its kernel launches and its own copy **(deduction)**. The decode stays
 
 ## The results handed on finished
 
-Each app `-sim` on `20261112-125832_measure`, 60 s after 3 s of play, its preset, before (0d842a69) and after
+Each app `-sim` on `20261112-125832_measure`, 60 s after 3 s of play, its settings file, before (0d842a69) and after
 (4af51883) the producers hand on finished items to the readers outside the package, 2026-11-19, mean / p95 ms
 (`c_probe.py`, not committed) **(seen)**. One run each.
 

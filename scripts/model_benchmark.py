@@ -4,7 +4,7 @@
     python scripts/model_benchmark.py --app hd_trio --model-type onnx --reference logs/<earlier>.npz
     python scripts/model_benchmark.py --app deep_flow --models person face
 
-Loads the app's startup preset for the models it enables, their resolutions and its batch size
+Loads the app's startup settings file for the models it enables, their resolutions and its batch size
 (the players), feeds the same seeded crops (or `--image`) at the app's crop size one batch at a time,
 and times every batch: the worker's own process time and the latency from submit to callback. The
 detectors (`person`, `face`, named with `--models`) take one uploaded camera image a run, `--detector-image`
@@ -193,7 +193,7 @@ def run_model(name: str, worker_class: type, add_callback: Callable, read_output
 
 def detector_settings(app_group: BaseSettings, model_type: ModelType) -> BaseSettings:
     """A standalone copy of a detector's settings with the requested model type: its model files as the app's, its
-    thresholds as the preset's, on."""
+    thresholds as the settings file's, on."""
     copy = type(app_group)()
     for name in ('resolution', 'onnx_path', 'engine_path', 'confidence', 'overlap', 'threshold', 'pitch_zero'):
         if hasattr(app_group, name):

@@ -55,14 +55,14 @@ depth cam pose synchony detection
 
 ### Run Project
 * activate venv and run ```python launcher.py```
-* ```python launcher.py -app <app> -sim``` plays the app's recordings through an OAK device (its detector and tracker); with `replay: true` under `camera.simulator` in the preset they play on the host without a device, the people found by `modules/inference/person`, on ONNX or TensorRT by its `model_type`, at the input size of `resolution` (the ONNX files exported from the blobs' own weights by ```uv run --with ultralytics python tools/models/export_yolo_to_onnx.py```, the engines built by `scripts\makemodels.bat`) and followed by `modules/camera/replay`
+* ```python launcher.py -app <app> -sim``` plays the app's recordings through an OAK device (its detector and tracker); with `replay: true` under `camera.simulator` in the settings file they play on the host without a device, the people found by `modules/inference/person`, on ONNX or TensorRT by its `model_type`, at the input size of `resolution` (the ONNX files exported from the blobs' own weights by ```uv run --with ultralytics python tools/models/export_yolo_to_onnx.py```, the engines built by `scripts\makemodels.bat`) and followed by `modules/camera/replay`
 
 ### Timing
 * ```scripts\timing.bat <app> [seconds]``` runs the app in simulation for a timing session (300 s after a 30 s warm-up, no settings window) and writes `logs/timing_<app>_<date>_<time>.json`: count, mean, p50, p95, p99 and max per timer, with the commit and the package versions
 * ```.venv\Scripts\python scripts\timing_compare.py <baseline>.json <new>.json``` compares two reports; a timer fails when its mean is more than 5% slower or its p95 more than 10%
 * The timers: inference (pose estimation, segmentation, optical flow estimation, person and face detection), GPU image upload, window similarity and correlation, tracker tick, each pose stage's filters, render update, draw and frame interval
-* ```.venv\Scripts\python scripts\model_benchmark.py --app <app> [--model-type onnx] [--reference <earlier>.npz]``` times the app's enabled models through their workers without cameras (the startup preset's resolutions, batch and crop size; seeded input or `--image`) and writes `logs/inference_<app>_<type>_<date>_<time>.json` in the same format, with each model's GPU memory, and an `.npz` of the outputs; `--reference` reports how far the outputs moved
-* A package upgrade lands only when its report passes against a baseline of the build before it, both from the same simulation preset on the same PC
+* ```.venv\Scripts\python scripts\model_benchmark.py --app <app> [--model-type onnx] [--reference <earlier>.npz]``` times the app's enabled models through their workers without cameras (the startup settings file's resolutions, batch and crop size; seeded input or `--image`) and writes `logs/inference_<app>_<type>_<date>_<time>.json` in the same format, with each model's GPU memory, and an `.npz` of the outputs; `--reference` reports how far the outputs moved
+* A package upgrade lands only when its report passes against a baseline of the build before it, both from the same simulation settings file on the same PC
 
 ### Startup
 * make a shortcut to `scripts\start\<app>.bat`

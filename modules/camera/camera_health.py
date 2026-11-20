@@ -1,4 +1,4 @@
-"""The cameras' health: what they report about themselves against what the preset says they should be."""
+"""The cameras' health: what they report about themselves against what the settings file says they should be."""
 
 import math
 from collections.abc import Sequence
