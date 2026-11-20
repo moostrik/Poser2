@@ -21,9 +21,6 @@ frame (deduction). G1 and G2 wait for the coordinator's call on whether that gai
 
 ## H. The package held to the rules
 
-- H1. One format table (`texture_format.py`) replaces the three in `texture.py`, `image.py` and `tensor.py`; 16F stays
-  `GL_FLOAT` for `Texture` and `GL_HALF_FLOAT` for `Tensor`, said where it differs. Test: for each format, the table
-  gives what the three gave.
 - H2. The default placement is read from `WindowSettings`' defaults: `WindowManager._DEFAULT_*` go, the button's
   description drops the numbers.
 - H3. Tests for `Style`'s state (a repeated call skipped, buffer modes, push and pop), `clear_value`, and `fit` and

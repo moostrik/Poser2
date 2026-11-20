@@ -1,7 +1,8 @@
-from OpenGL.GL import Constant, GL_BGR, GL_BGRA, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_NONE, GL_ONE, GL_R16F, GL_R32F, GL_R8, GL_RED, GL_RG, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNPACK_ALIGNMENT, glBindTexture, glGenTextures, glPixelStorei, glTexImage2D, glTexParameterf, glTexParameterfv, glTexParameteri, glTexSubImage2D
+from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_NONE, GL_ONE, GL_R16F, GL_R32F, GL_R8, GL_RED, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNPACK_ALIGNMENT, glBindTexture, glGenTextures, glPixelStorei, glTexImage2D, glTexParameterf, glTexParameterfv, glTexParameteri, glTexSubImage2D
 import logging
 from .fbo import Fbo
-from .texture import Texture, get_data_type
+from .texture import Texture
+from .texture_format import data_type as texture_data_type, pixel_format
 from modules.utils import Rect
 import numpy as np
 from threading import Lock
@@ -11,45 +12,6 @@ logger = logging.getLogger(__name__)
 
 _FLIPPED: Rect = Rect(0.0, 1.0, 1.0, -1.0)     # the whole texture, its rows drawn bottom to top
 
-
-def _get_format_bgr(internal_format: Constant | int, channel_order: Literal['BGR', 'RGB']) -> Constant:
-    """Get pixel format for glTexImage2D with channel order support.
-
-    Args:
-        internal_format: OpenGL internal format (e.g., GL_RGB8, GL_RGBA8)
-        channel_order: Channel order of source image - 'BGR' (OpenCV) or 'RGB' (standard)
-
-    Returns:
-        OpenGL format constant (GL_BGR, GL_RGB, GL_BGRA, GL_RGBA, GL_RED, GL_RG)
-    """
-    if channel_order == 'RGB':
-        if internal_format == GL_RGB: return GL_RGB
-        if internal_format == GL_RGB8: return GL_RGB
-        if internal_format == GL_RGB16F: return GL_RGB
-        if internal_format == GL_RGB32F: return GL_RGB
-        if internal_format == GL_RGBA: return GL_RGBA
-        if internal_format == GL_RGBA8: return GL_RGBA
-        if internal_format == GL_RGBA16F: return GL_RGBA
-        if internal_format == GL_RGBA32F: return GL_RGBA
-    else:  # BGR (for OpenCV compatibility)
-        if internal_format == GL_RGB: return GL_BGR
-        if internal_format == GL_RGB8: return GL_BGR
-        if internal_format == GL_RGB16F: return GL_BGR
-        if internal_format == GL_RGB32F: return GL_BGR
-        if internal_format == GL_RGBA: return GL_BGRA
-        if internal_format == GL_RGBA8: return GL_BGRA
-        if internal_format == GL_RGBA16F: return GL_BGRA
-        if internal_format == GL_RGBA32F: return GL_BGRA
-
-    # Single/dual channel formats are unaffected by RGB/BGR
-    if internal_format == GL_R8: return GL_RED
-    if internal_format == GL_R16F: return GL_RED
-    if internal_format == GL_R32F: return GL_RED
-    if internal_format == GL_RG8: return GL_RG
-    if internal_format == GL_RG16F: return GL_RG
-    if internal_format == GL_RG32F: return GL_RG
-    logger.warning("internal format not supported")
-    return GL_NONE
 
 def _get_internal_format(image: np.ndarray) -> Constant:
     """Determine OpenGL internal format from NumPy array properties."""
@@ -152,14 +114,14 @@ class Image(Fbo):
 
     def _allocate_source(self, width: int, height: int, internal_format: Constant | int) -> None:
         """Allocate the internal source texture with BGR channel order support."""
-        data_type: int = get_data_type(internal_format)
+        data_type: int = texture_data_type(internal_format)
         if data_type == GL_NONE:
             return
 
         self._source.width = width
         self._source.height = height
         self._source.internal_format = internal_format
-        self._source.format = _get_format_bgr(internal_format, self._channel_order)
+        self._source.format = pixel_format(internal_format, bgr=self._channel_order == 'BGR')
         self._source.data_type = data_type
         self._source.tex_id = glGenTextures(1)
 

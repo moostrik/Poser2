@@ -10,10 +10,11 @@ Usage:
     pressure_tex = Texture3D(wrap=GL_CLAMP_TO_EDGE)   # Neumann BC
     pressure_tex.allocate(256, 192, 32, GL_R16F)
 """
-from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_HALF_FLOAT, GL_LINEAR, GL_NONE, GL_ONE, GL_RED, GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNSIGNED_BYTE, glBindTexture, glClearTexImage, glDeleteTextures, glGenTextures, glGetTexImage, glTexImage3D, glTexParameterfv, glTexParameteri
+from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_NONE, GL_ONE, GL_RED, GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, glBindTexture, glClearTexImage, glDeleteTextures, glGenTextures, glGetTexImage, glTexImage3D, glTexParameterfv, glTexParameteri
 import numpy as np
 
-from .texture import clear_value, get_format, get_data_type, get_channel_count, get_numpy_dtype
+from .texture import clear_value, get_numpy_dtype
+from .texture_format import channel_count, data_type as texture_data_type, pixel_format
 
 
 class Texture3D:
@@ -57,7 +58,7 @@ class Texture3D:
             depth: Number of depth layers
             internal_format: OpenGL internal format (e.g., GL_RGBA16F, GL_R16F)
         """
-        data_type = get_data_type(internal_format)
+        data_type = texture_data_type(internal_format)
         if data_type == GL_NONE:
             return
 
@@ -65,7 +66,7 @@ class Texture3D:
         self.height = height
         self.depth = depth
         self.internal_format = internal_format
-        self.format = get_format(internal_format)
+        self.format = pixel_format(internal_format)
         self.data_type = data_type
         self.tex_id = glGenTextures(1)
 
@@ -151,9 +152,7 @@ class Texture3D:
         if not self.allocated:
             return
 
-        channels = get_channel_count(self.format)
-        if channels is None:
-            return
+        channels: int = channel_count(self.internal_format)
 
         clear_data = clear_value(self.data_type, channels, (r, g, b, a))
 
@@ -172,9 +171,7 @@ class Texture3D:
         if dtype is None:
             return None
 
-        channels = get_channel_count(self.format)
-        if channels is None:
-            return None
+        channels: int = channel_count(self.internal_format)
 
         if channels == 1:
             pixels = np.zeros((self.depth, self.height, self.width), dtype=dtype)

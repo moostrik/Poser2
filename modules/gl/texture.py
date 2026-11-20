@@ -1,9 +1,10 @@
-from OpenGL.GL import Constant, GL_BGR, GL_BGRA, GL_CLAMP_TO_EDGE, GL_FLOAT, GL_HALF_FLOAT, GL_LINEAR, GL_NONE, GL_ONE, GL_R16, GL_R16F, GL_R32F, GL_R32UI, GL_R8, GL_RED, GL_RED_INTEGER, GL_UNSIGNED_INT, GL_RG, GL_RG16, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB, GL_RGB10_A2, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNSIGNED_BYTE, GL_UNSIGNED_INT_2_10_10_10_REV, GL_UNSIGNED_SHORT, glBindTexture, glClearTexImage, glDeleteTextures, glGenTextures, glGetTexImage, glTexImage2D, glTexParameterf, glTexParameterfv, glTexParameteri
+from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_FLOAT, GL_HALF_FLOAT, GL_LINEAR, GL_NONE, GL_ONE, GL_RED, GL_RGB8, GL_RGBA8, GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNSIGNED_BYTE, GL_UNSIGNED_INT_2_10_10_10_REV, GL_UNSIGNED_SHORT, glBindTexture, glClearTexImage, glDeleteTextures, glGenTextures, glGetTexImage, glTexImage2D, glTexParameterf, glTexParameterfv, glTexParameteri
 import logging
 import numpy as np
 
 from modules.utils import Quad, Rect
 from .context import context
+from .texture_format import channel_count, data_type as texture_data_type, pixel_format
 
 logger = logging.getLogger(__name__)
 
@@ -58,82 +59,6 @@ def clear_value(data_type: int, channels: int, color: tuple[float, float, float,
     return _CLEAR_VALUES[key]
 
 
-def get_channel_count(format: Constant) -> int | None:
-    """Get number of channels from OpenGL format.
-
-    Args:
-        format: OpenGL format (e.g., GL_RGB, GL_RGBA, GL_RED)
-
-    Returns:
-        Number of channels (1-4) or None if unsupported
-    """
-    if format in (GL_BGR, GL_RGB):
-        return 3
-    elif format in (GL_BGRA, GL_RGBA):
-        return 4
-    elif format == GL_RED:
-        return 1
-    elif format == GL_RG:
-        return 2
-    return None
-
-
-def get_format(internal_format: Constant | int) -> Constant:
-    """Get the default pixel format for glTexImage2D (always RGB order).
-
-    Args:
-        internal_format: OpenGL internal format (e.g., GL_RGB8, GL_RGBA8)
-
-    Returns:
-        OpenGL format constant (GL_RGB, GL_RGBA, GL_RED, GL_RG)
-    """
-    if internal_format == GL_RGB: return GL_RGB
-    if internal_format == GL_RGB8: return GL_RGB
-    if internal_format == GL_RGB16F: return GL_RGB
-    if internal_format == GL_RGB32F: return GL_RGB
-    if internal_format == GL_RGBA: return GL_RGBA
-    if internal_format == GL_RGBA8: return GL_RGBA
-    if internal_format == GL_RGB10_A2: return GL_RGBA
-    if internal_format == GL_RGBA16F: return GL_RGBA
-    if internal_format == GL_RGBA32F: return GL_RGBA
-    if internal_format == GL_R8: return GL_RED
-    if internal_format == GL_R16: return GL_RED
-    if internal_format == GL_R16F: return GL_RED
-    if internal_format == GL_R32F: return GL_RED
-    if internal_format == GL_R32UI: return GL_RED_INTEGER
-    if internal_format == GL_RG8: return GL_RG
-    if internal_format == GL_RG16: return GL_RG
-    if internal_format == GL_RG16F: return GL_RG
-    if internal_format == GL_RG32F: return GL_RG
-    logger.warning("internal format not supported")
-    return GL_RGB  # fallback
-
-
-def get_data_type(internal_format: Constant | int) -> int:
-    if internal_format == GL_RGB: return int(GL_UNSIGNED_BYTE)
-    if internal_format == GL_RGB8: return int(GL_UNSIGNED_BYTE)
-    if internal_format == GL_RGB16F: return int(GL_FLOAT)
-    if internal_format == GL_RGB32F: return int(GL_FLOAT)
-    if internal_format == GL_RGBA: return int(GL_UNSIGNED_BYTE)
-    if internal_format == GL_RGBA8: return int(GL_UNSIGNED_BYTE)
-    if internal_format == GL_RGB10_A2: return int(GL_UNSIGNED_INT_2_10_10_10_REV)
-    if internal_format == GL_RGBA16F: return int(GL_FLOAT)
-    if internal_format == GL_RGBA32F: return int(GL_FLOAT)
-    if internal_format == GL_R8: return int(GL_UNSIGNED_BYTE)
-    if internal_format == GL_R16: return int(GL_UNSIGNED_SHORT)
-    if internal_format == GL_R16F: return int(GL_FLOAT)
-    if internal_format == GL_R32F: return int(GL_FLOAT)
-    if internal_format == GL_R32UI: return int(GL_UNSIGNED_INT)
-    if internal_format == GL_RG8: return int(GL_UNSIGNED_BYTE)
-    if internal_format == GL_RG16: return int(GL_UNSIGNED_SHORT)
-    if internal_format == GL_RG16F: return int(GL_FLOAT)
-    if internal_format == GL_RG32F: return int(GL_FLOAT)
-    logger.warning("internal format not supported")
-    return int(GL_NONE)
-
-
-
-
 class Texture():
     def __init__(self,
                  interpolation: int = GL_LINEAR,
@@ -166,13 +91,13 @@ class Texture():
             height: Texture height in pixels
             internal_format: OpenGL internal format (e.g., GL_RGB8, GL_RGBA8)
         """
-        data_type: int = get_data_type(internal_format)
+        data_type: int = texture_data_type(internal_format)
         if data_type == GL_NONE: return
 
         self.width = width
         self.height = height
         self.internal_format = internal_format
-        self.format = get_format(internal_format)
+        self.format = pixel_format(internal_format)
         self.data_type = data_type
         self.tex_id: int = glGenTextures(1)
 
@@ -242,10 +167,7 @@ class Texture():
             return None
 
         # Get channel count from format
-        channels = get_channel_count(self.format)
-        if channels is None:
-            logger.warning("Unsupported format %s", self.format)
-            return None
+        channels: int = channel_count(self.internal_format)
 
         # Allocate output array
         if channels == 1:
@@ -282,9 +204,7 @@ class Texture():
             return
 
         # Get channel count to know how many components to pass
-        channels = get_channel_count(self.format)
-        if channels is None:
-            return
+        channels: int = channel_count(self.internal_format)
 
         # The clear color, kept alive (clear_value)
         clear_data = clear_value(self.data_type, channels, (r, g, b, a))

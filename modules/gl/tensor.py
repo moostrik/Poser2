@@ -17,62 +17,12 @@ except (ImportError, OSError):
 if TYPE_CHECKING:
     import torch
 
-from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_FLOAT, GL_HALF_FLOAT, GL_LINEAR, GL_PIXEL_UNPACK_BUFFER, GL_R16F, GL_R32F, GL_R8, GL_RED, GL_RG, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_STREAM_DRAW, GL_TEXTURE_2D, GL_UNSIGNED_BYTE, glBindBuffer, glBindTexture, glBufferData, glDeleteBuffers, glGenBuffers, glGetError, glTexSubImage2D
+from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_HALF_FLOAT, GL_LINEAR, GL_PIXEL_UNPACK_BUFFER, GL_R16F, GL_R32F, GL_R8, GL_RED, GL_RG, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_STREAM_DRAW, GL_TEXTURE_2D, GL_UNSIGNED_BYTE, glBindBuffer, glBindTexture, glBufferData, glDeleteBuffers, glGenBuffers, glGetError, glTexSubImage2D
 
 # Local application imports
 from .texture import Texture
+from .texture_format import bytes_per_channel as format_bytes_per_channel, channel_count, tensor_type
 
-
-def get_channel_count_from_format(internal_format: Constant | int) -> int:
-    """Get number of channels from OpenGL internal format.
-
-    Args:
-        internal_format: OpenGL internal format constant
-
-    Returns:
-        Number of channels (1-4)
-    """
-    if internal_format in (GL_R8, GL_R16F, GL_R32F):
-        return 1
-    elif internal_format in (GL_RG8, GL_RG16F, GL_RG32F):
-        return 2
-    elif internal_format in (GL_RGB, GL_RGB8, GL_RGB16F, GL_RGB32F):
-        return 3
-    elif internal_format in (GL_RGBA, GL_RGBA8, GL_RGBA16F, GL_RGBA32F):
-        return 4
-    return 1  # fallback
-
-def get_bytes_per_channel(internal_format: Constant | int) -> int:
-    """Get bytes per channel from OpenGL internal format.
-
-    Args:
-        internal_format: OpenGL internal format constant
-
-    Returns:
-        Bytes per channel (1 for uint8, 2 for FP16, 4 for FP32)
-    """
-    if internal_format in (GL_R8, GL_RG8, GL_RGB8, GL_RGBA8):
-        return 1  # uint8
-    elif internal_format in (GL_R16F, GL_RG16F, GL_RGB16F, GL_RGBA16F):
-        return 2  # FP16
-    elif internal_format in (GL_R32F, GL_RG32F, GL_RGB32F, GL_RGBA32F):
-        return 4  # FP32
-    return 4  # fallback to FP32
-
-def get_gl_type_from_format(internal_format: Constant | int) -> int:
-    """Get OpenGL type constant from internal format.
-
-    Args:
-        internal_format: OpenGL internal format constant
-
-    Returns:
-        GL_UNSIGNED_BYTE, GL_HALF_FLOAT, or GL_FLOAT
-    """
-    if internal_format in (GL_R8, GL_RG8, GL_RGB8, GL_RGBA8):
-        return GL_UNSIGNED_BYTE
-    elif internal_format in (GL_R16F, GL_RG16F, GL_RGB16F, GL_RGBA16F):
-        return GL_HALF_FLOAT
-    return GL_FLOAT
 
 def infer_internal_format(tensor: "torch.Tensor") -> Constant:
     """Infer OpenGL internal format from tensor shape and dtype.
@@ -164,8 +114,8 @@ class Tensor(Texture):
             return
 
         # Get channel count and bytes per channel
-        channels = get_channel_count_from_format(internal_format)
-        bytes_per_channel = get_bytes_per_channel(internal_format)
+        channels = channel_count(internal_format)
+        bytes_per_channel = format_bytes_per_channel(internal_format)
 
         # Allocate PBO
         self._pbo = glGenBuffers(1)
@@ -260,7 +210,7 @@ class Tensor(Texture):
         Preserves uint8, FP16, or FP32 precision based on internal format.
         """
         # Convert to appropriate dtype based on internal format
-        bytes_per_channel = get_bytes_per_channel(self.internal_format)
+        bytes_per_channel = format_bytes_per_channel(self.internal_format)
 
         if bytes_per_channel == 1:  # uint8
             target_dtype = torch.uint8
@@ -310,8 +260,8 @@ class Tensor(Texture):
             cudart.unmap_resource(self._cuda_gl_resource, stream)
 
         # Get channel count and GL type
-        channels = get_channel_count_from_format(self.internal_format)
-        gl_type = get_gl_type_from_format(self.internal_format)
+        channels = channel_count(self.internal_format)
+        gl_type = tensor_type(self.internal_format)
 
         # Select upload format based on channel count
         format_map = {1: GL_RED, 2: GL_RG, 3: GL_RGB, 4: GL_RGBA}
@@ -348,7 +298,7 @@ class Tensor(Texture):
         tensor = torch.flip(tensor, [0])
 
         # Convert to appropriate dtype and move to CPU
-        bytes_per_channel = get_bytes_per_channel(self.internal_format)
+        bytes_per_channel = format_bytes_per_channel(self.internal_format)
 
         if bytes_per_channel == 1:  # uint8
             if tensor.dtype in (torch.float16, torch.float32):
@@ -368,8 +318,8 @@ class Tensor(Texture):
                 tensor_np = tensor.float().cpu().numpy()
 
         # Get channel count and GL type
-        channels = get_channel_count_from_format(self.internal_format)
-        gl_type = get_gl_type_from_format(self.internal_format)
+        channels = channel_count(self.internal_format)
+        gl_type = tensor_type(self.internal_format)
 
         # Select upload format based on channel count
         format_map = {1: GL_RED, 2: GL_RG, 3: GL_RGB, 4: GL_RGBA}
