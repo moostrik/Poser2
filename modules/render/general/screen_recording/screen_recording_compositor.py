@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from OpenGL.GL import glViewport
 
 from modules.gl import Style, Texture, clear_color, fill, fit
-from modules.video import ScreenRecorder, ScreenRecorderSettings
+from modules.video import ScreenRecorder, ScreenRecorderFrameSettings, ScreenRecorderSettings
 
 from ...layer_base import LayerBase
 from .screen_capture import ScreenCapture
@@ -47,7 +47,7 @@ class ScreenRecordingCompositor(LayerBase):
         self.recorder: ScreenRecorder = ScreenRecorder(settings, folder)
         self._capture.add_screen_frame_callback(self.recorder.submit_screen_frame)
         self._input: ScreenRecordingInput = ScreenRecordingInput()
-        self.settings.bind(ScreenRecorderSettings.snap, self._on_snap)
+        self.settings.frame.bind(ScreenRecorderFrameSettings.snap, self._on_snap)
 
     @property
     def texture(self) -> Texture:
@@ -65,7 +65,7 @@ class ScreenRecordingCompositor(LayerBase):
 
     def deallocate(self) -> None:
         """End the recording (its encode finishes, its thread gives every frame back), then free the GL objects."""
-        self.settings.unbind(ScreenRecorderSettings.snap, self._on_snap)
+        self.settings.frame.unbind(ScreenRecorderFrameSettings.snap, self._on_snap)
         self.recorder.stop()
         self._capture.remove_screen_frame_callback(self.recorder.submit_screen_frame)
         if self._preview.allocated:
@@ -84,10 +84,10 @@ class ScreenRecordingCompositor(LayerBase):
         self._capture.poll()
         if self.recorder.capturing and self._capture.allocated:
             capture = self._capture
-            if self.settings.main_window:
-                capture.copy_window(input.window_width, input.window_height, self.settings.fill)
+            if self.settings.frame.main_window:
+                capture.copy_window(input.window_width, input.window_height, self.settings.frame.fill)
             else:
-                place = fill if self.settings.fill else fit
+                place = fill if self.settings.frame.fill else fit
                 capture.frame.begin()
                 clear_color()
                 Style.set_blend_mode(Style.BlendMode.DISABLED)
@@ -152,11 +152,11 @@ class ScreenRecordingCompositor(LayerBase):
     def _on_snap(self, _: bool) -> None:
         """The recording's size: the first source's shape, or the main window's when it is recorded."""
         input = self._input
-        if self.settings.main_window:
+        if self.settings.frame.main_window:
             width, height = input.window_width, input.window_height
         elif input.sources:
             width, height = input.sources[0].width, input.sources[0].height
         else:
             return
-        self.settings.width = width
-        self.settings.height = height
+        self.settings.frame.width = width
+        self.settings.frame.height = height

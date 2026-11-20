@@ -8,7 +8,8 @@ from typing import Callable
 
 import numpy as np
 
-from modules.video import (BitDepth, Chroma, ScreenFormat, ScreenFrame, ScreenRecorder, ScreenRecorderSettings,
+from modules.video import (BitDepth, Chroma, ScreenFormat, ScreenFrame, ScreenRecorder, ScreenRecorderFrameSettings,
+                           ScreenRecorderRecordSettings, ScreenRecorderSettings, ScreenRecorderTakeSettings,
                            ScreenRecorderState, ScreenSize, even, frames_for, matching_preset, preset_size)
 
 FPS = 64.0      # ticks/s; 1/64 s and its multiples are exact in binary, so spans compare exactly
@@ -84,27 +85,27 @@ class SizeSettingsTest(unittest.TestCase):
         self.recorder.stop()
 
     def test_default_is_upright_4k(self) -> None:
-        self.assertEqual((self.settings.width, self.settings.height), (2160, 3840))
+        self.assertEqual((self.settings.frame.width, self.settings.frame.height), (2160, 3840))
 
     def test_a_preset_writes_the_size(self) -> None:
-        self.settings.size = ScreenSize.HD
-        self.assertEqual((self.settings.width, self.settings.height, self.settings.portrait), (1080, 1920, True))
+        self.settings.frame.size = ScreenSize.HD
+        self.assertEqual((self.settings.frame.width, self.settings.frame.height, self.settings.frame.portrait), (1080, 1920, True))
 
     def test_portrait_swaps_the_size(self) -> None:
-        self.settings.portrait = False
-        self.assertEqual((self.settings.width, self.settings.height), (3840, 2160))
-        self.assertIs(self.settings.size, ScreenSize.UHD)
+        self.settings.frame.portrait = False
+        self.assertEqual((self.settings.frame.width, self.settings.frame.height), (3840, 2160))
+        self.assertIs(self.settings.frame.size, ScreenSize.UHD)
 
     def test_a_size_by_hand_sets_custom_and_portrait(self) -> None:
-        self.settings.width = 1000
-        self.settings.height = 600
-        self.assertIs(self.settings.size, ScreenSize.CUSTOM)
-        self.assertFalse(self.settings.portrait)
+        self.settings.frame.width = 1000
+        self.settings.frame.height = 600
+        self.assertIs(self.settings.frame.size, ScreenSize.CUSTOM)
+        self.assertFalse(self.settings.frame.portrait)
 
     def test_a_size_by_hand_that_is_a_preset_sets_it(self) -> None:
-        self.settings.width = 1440
-        self.settings.height = 2560
-        self.assertIs(self.settings.size, ScreenSize.QHD)
+        self.settings.frame.width = 1440
+        self.settings.frame.height = 2560
+        self.assertIs(self.settings.frame.size, ScreenSize.QHD)
 
 
 class StateTest(unittest.TestCase):
@@ -113,7 +114,7 @@ class StateTest(unittest.TestCase):
     def setUp(self) -> None:
         FakeClip.clips = []
         self.settings = ScreenRecorderSettings()
-        self.settings.width, self.settings.height = WIDTH, HEIGHT
+        self.settings.frame.width, self.settings.frame.height = WIDTH, HEIGHT
         self.free = 1 << 40         # bytes of free RAM before the ring
         self.recorder = ScreenRecorder(self.settings, 'unused', FakeClip, lambda: self.free - self._ring_bytes())
         self.recorder.start()
@@ -174,28 +175,28 @@ class StateTest(unittest.TestCase):
             return self.recorder._written
 
     def save_held(self) -> FakeClip:
-        self.tick_until(lambda: self.settings.state is ScreenRecorderState.HELD)
+        self.tick_until(lambda: self.settings.record.state is ScreenRecorderState.HELD)
         saved = len(FakeClip.clips)
-        ScreenRecorderSettings.save.fire(self.settings)
-        self.tick_until(lambda: len(FakeClip.clips) == saved + 1 and self.settings.state is ScreenRecorderState.HELD)
+        ScreenRecorderTakeSettings.save.fire(self.settings.take)
+        self.tick_until(lambda: len(FakeClip.clips) == saved + 1 and self.settings.record.state is ScreenRecorderState.HELD)
         return FakeClip.clips[-1]
 
     def discard(self, then: ScreenRecorderState) -> None:
-        ScreenRecorderSettings.discard.fire(self.settings)
-        self.tick_until(lambda: self.settings.state is then)
+        ScreenRecorderTakeSettings.discard.fire(self.settings.take)
+        self.tick_until(lambda: self.settings.record.state is then)
 
     def test_start_records_and_stop_holds_then_save_and_discard(self) -> None:
         self.ticks(3)
-        self.assertIs(self.settings.state, ScreenRecorderState.IDLE)
+        self.assertIs(self.settings.record.state, ScreenRecorderState.IDLE)
         self.assertIsNone(self.recorder.capture_format)
-        ScreenRecorderSettings.start.fire(self.settings)
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
         self.tick()
-        self.assertIs(self.settings.state, ScreenRecorderState.RECORDING)
+        self.assertIs(self.settings.record.state, ScreenRecorderState.RECORDING)
         self.assertEqual(self.recorder.capture_format, ScreenFormat(WIDTH, HEIGHT, Chroma.YUV444))
         self.tick_until(lambda: self.stored() >= 20)
-        ScreenRecorderSettings.stop.fire(self.settings)
+        ScreenRecorderRecordSettings.stop.fire(self.settings.record)
         self.tick()
-        self.assertIs(self.settings.state, ScreenRecorderState.HELD)
+        self.assertIs(self.settings.record.state, ScreenRecorderState.HELD)
         self.ticks(5)
         self.assertEqual(FakeClip.clips, [])        # held, not written
         clip = self.save_held()
@@ -209,23 +210,23 @@ class StateTest(unittest.TestCase):
         self.tick_until(lambda: self.lent == 0)     # every frame given back
 
     def test_start_is_refused_while_held(self) -> None:
-        ScreenRecorderSettings.start.fire(self.settings)
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
         self.tick_until(lambda: self.stored() >= 5)
-        ScreenRecorderSettings.stop.fire(self.settings)
+        ScreenRecorderRecordSettings.stop.fire(self.settings.record)
         self.tick()
-        ScreenRecorderSettings.start.fire(self.settings)
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
         self.ticks(3)
-        self.assertIs(self.settings.state, ScreenRecorderState.HELD)
+        self.assertIs(self.settings.record.state, ScreenRecorderState.HELD)
 
     def test_save_writes_between_in_and_out_and_a_second_part(self) -> None:
-        self.settings.duration = 1.0
-        ScreenRecorderSettings.start.fire(self.settings)
+        self.settings.record.duration = 1.0
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
         whole = self.save_held().frames
-        self.settings.in_out = [0.25, 0.75]
+        self.settings.take.in_out = [0.25, 0.75]
         first = self.save_held().frames
         self.assertEqual(self.span(first), 0.5)
         self.assertEqual(self.times[first[0]] - self.times[whole[0]], 0.25)
-        self.settings.in_out = [0.75, 1.0]
+        self.settings.take.in_out = [0.75, 1.0]
         second = self.save_held().frames
         self.assertEqual(second[0], first[-1])
         self.assertEqual(second[-1], whole[-1])
@@ -233,44 +234,44 @@ class StateTest(unittest.TestCase):
         self.discard(ScreenRecorderState.IDLE)
 
     def test_the_preview_is_the_frame_under_the_dragged_marker(self) -> None:
-        self.settings.duration = 1.0
-        ScreenRecorderSettings.start.fire(self.settings)
+        self.settings.record.duration = 1.0
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
         whole = self.save_held().frames
         self.assertIsNone(self.recorder.preview_frame)
-        self.settings.scrub = 0.5
+        self.settings.take.scrub = 0.5
         shown = self.recorder.preview_frame
         assert shown is not None
         self.assertEqual(self.times[tick_of(shown[1])] - self.times[whole[0]], 0.5)
-        self.settings.scrub = 1.0
+        self.settings.take.scrub = 1.0
         last = self.recorder.preview_frame
         assert last is not None
         self.assertEqual(tick_of(last[1]), whole[-1])
-        self.settings.scrub = -1.0
+        self.settings.take.scrub = -1.0
         self.assertIsNone(self.recorder.preview_frame)
         self.discard(ScreenRecorderState.IDLE)
 
     def test_the_playhead_follows_the_dragged_marker(self) -> None:
-        self.settings.duration = 1.0
-        ScreenRecorderSettings.start.fire(self.settings)
-        self.tick_until(lambda: self.settings.state is ScreenRecorderState.HELD)
-        self.tick_until(lambda: self.settings.playhead[1] == 1.0)
-        self.settings.scrub = 0.5
-        self.tick_until(lambda: self.settings.playhead[0] == 0.5)
-        self.settings.scrub = -1.0
+        self.settings.record.duration = 1.0
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
+        self.tick_until(lambda: self.settings.record.state is ScreenRecorderState.HELD)
+        self.tick_until(lambda: self.settings.take.playhead[1] == 1.0)
+        self.settings.take.scrub = 0.5
+        self.tick_until(lambda: self.settings.take.playhead[0] == 0.5)
+        self.settings.take.scrub = -1.0
         self.ticks(20)
-        self.assertEqual(self.settings.playhead[0], 0.5)
+        self.assertEqual(self.settings.take.playhead[0], 0.5)
         self.discard(ScreenRecorderState.IDLE)
 
     def test_duration_stops_the_recording(self) -> None:
-        self.settings.duration = 0.5
-        ScreenRecorderSettings.start.fire(self.settings)
+        self.settings.record.duration = 0.5
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
         frames = self.save_held().frames
         self.assertEqual(self.span(frames), 0.5)
         self.assertEqual(len(frames), frames_for(0.5, FPS, 1) + 1)
 
     def test_a_take_slowing_down_still_spans_its_duration(self) -> None:
-        self.settings.duration = 0.5
-        ScreenRecorderSettings.start.fire(self.settings)
+        self.settings.record.duration = 0.5
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
         self.tick_until(lambda: self.stored() >= 4)
         self.interval = 2.0 / FPS
         frames = self.save_held().frames
@@ -279,9 +280,9 @@ class StateTest(unittest.TestCase):
         self.assertLess(len(frames), frames_for(0.5, FPS, 1))
 
     def test_frame_step_two_records_every_other_tick(self) -> None:
-        self.settings.frame_step = 2
-        self.settings.duration = 0.5
-        ScreenRecorderSettings.start.fire(self.settings)
+        self.settings.quality.frame_step = 2
+        self.settings.record.duration = 0.5
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
         frames = self.save_held().frames
         self.assertEqual(self.span(frames), 0.5)
         self.assertEqual(len(frames), frames_for(0.5, FPS, 2) + 1)
@@ -289,35 +290,35 @@ class StateTest(unittest.TestCase):
         self.assertAlmostEqual(FakeClip.clips[0].fps, FPS / 2, places=3)
 
     def test_the_ram_reserve_stops_the_recording(self) -> None:
-        self.free = int(self.settings.ram_reserve * GB) + 150 * FRAME_BYTES     # room for two one-second blocks
-        ScreenRecorderSettings.start.fire(self.settings)
+        self.free = int(self.settings.record.ram_reserve * GB) + 150 * FRAME_BYTES     # room for two one-second blocks
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
         clip = self.save_held()
         blocks = self.recorder._ring.num_slots
         self.assertEqual(len(clip.frames), blocks)      # every slot of the two blocks
         self.assertGreater(blocks, 100)
 
     def test_max_duration_counts_the_free_ram(self) -> None:
-        self.free = int(self.settings.ram_reserve * GB) + 640 * FRAME_BYTES     # 10 s at 64 ticks/s
-        self.settings.width, self.settings.height = WIDTH, HEIGHT
-        self.tick_until(lambda: 0.0 < self.settings.max_duration < 100.0)
-        self.assertTrue(640 / 64 - 0.1 <= self.settings.max_duration <= 640 / 60 + 0.1, self.settings.max_duration)
-        self.settings.chroma = Chroma.YUV420        # half the bytes a frame: twice the seconds
-        self.tick_until(lambda: self.settings.max_duration > 15.0)
-        self.assertTrue(1280 / 64 - 0.2 <= self.settings.max_duration <= 1280 / 60 + 0.2, self.settings.max_duration)
-        self.settings.bit_depth = BitDepth.BIT_10   # two bytes a sample: half again
-        self.tick_until(lambda: self.settings.max_duration < 15.0)
-        self.assertTrue(640 / 64 - 0.1 <= self.settings.max_duration <= 640 / 60 + 0.1, self.settings.max_duration)
+        self.free = int(self.settings.record.ram_reserve * GB) + 640 * FRAME_BYTES     # 10 s at 64 ticks/s
+        self.settings.frame.width, self.settings.frame.height = WIDTH, HEIGHT
+        self.tick_until(lambda: 0.0 < self.settings.quality.max_duration < 100.0)
+        self.assertTrue(640 / 64 - 0.1 <= self.settings.quality.max_duration <= 640 / 60 + 0.1, self.settings.quality.max_duration)
+        self.settings.quality.chroma = Chroma.YUV420        # half the bytes a frame: twice the seconds
+        self.tick_until(lambda: self.settings.quality.max_duration > 15.0)
+        self.assertTrue(1280 / 64 - 0.2 <= self.settings.quality.max_duration <= 1280 / 60 + 0.2, self.settings.quality.max_duration)
+        self.settings.quality.bit_depth = BitDepth.BIT_10   # two bytes a sample: half again
+        self.tick_until(lambda: self.settings.quality.max_duration < 15.0)
+        self.assertTrue(640 / 64 - 0.1 <= self.settings.quality.max_duration <= 640 / 60 + 0.1, self.settings.quality.max_duration)
 
     def test_the_format_is_read_at_start_and_goes_to_the_clip(self) -> None:
-        self.settings.chroma = Chroma.YUV420
-        self.settings.bit_depth = BitDepth.BIT_10
-        self.settings.duration = 0.25
-        ScreenRecorderSettings.start.fire(self.settings)
+        self.settings.quality.chroma = Chroma.YUV420
+        self.settings.quality.bit_depth = BitDepth.BIT_10
+        self.settings.record.duration = 0.25
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
         self.tick()
         wanted = ScreenFormat(WIDTH, HEIGHT, Chroma.YUV420, BitDepth.BIT_10)
         self.assertEqual(self.recorder.capture_format, wanted)
-        self.settings.chroma = Chroma.YUV444          # a change counts from the next Start
-        self.settings.bit_depth = BitDepth.BIT_8
+        self.settings.quality.chroma = Chroma.YUV444          # a change counts from the next Start
+        self.settings.quality.bit_depth = BitDepth.BIT_8
         clip = self.save_held()
         self.assertEqual(clip.format, wanted)
         self.assertEqual(self.recorder._ring.shape, wanted.shape)
@@ -332,15 +333,15 @@ class StateTest(unittest.TestCase):
 
     def hold_half_a_second(self) -> list[int]:
         """A held take of 0.5 s; the ticks of its frames, oldest first."""
-        self.settings.duration = 0.5
-        ScreenRecorderSettings.start.fire(self.settings)
-        self.tick_until(lambda: self.settings.state is ScreenRecorderState.HELD)
+        self.settings.record.duration = 0.5
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
+        self.tick_until(lambda: self.settings.record.state is ScreenRecorderState.HELD)
         return [tick_of(self.recorder._ring.frame(slot)) for slot in self.recorder._held_slots]
 
     def test_play_shows_the_held_frames_at_their_times_looping_between_in_and_out(self) -> None:
         held = self.hold_half_a_second()
-        self.settings.in_out = [0.5, 1.0]
-        self.settings.play = True
+        self.settings.take.in_out = [0.5, 1.0]
+        self.settings.take.play = True
         shown: list[int] = []
         for _ in range(2 * len(held)):
             self.tick()
@@ -354,32 +355,35 @@ class StateTest(unittest.TestCase):
         self.assertEqual(shown, [shown[n % period] for n in range(len(shown))], shown)    # and loops
 
     def test_play_goes_off_with_a_save_and_without_a_held_take(self) -> None:
-        self.settings.play = True
+        self.settings.take.play = True
         self.tick()
-        self.assertFalse(self.settings.play)
+        self.assertFalse(self.settings.take.play)
         self.assertFalse(self.recorder.playing)
         self.hold_half_a_second()
-        self.settings.play = True
+        self.settings.take.play = True
         self.tick()
         self.assertTrue(self.recorder.playing)
-        ScreenRecorderSettings.save.fire(self.settings)
+        ScreenRecorderTakeSettings.save.fire(self.settings.take)
         self.tick()
-        self.assertFalse(self.settings.play)
+        self.assertFalse(self.settings.take.play)
         self.assertFalse(self.recorder.playing)
-        self.tick_until(lambda: self.settings.state is ScreenRecorderState.HELD)
+        self.tick_until(lambda: self.settings.record.state is ScreenRecorderState.HELD)
         self.assertFalse(self.recorder.playing)
         self.assertIsNone(self.recorder.preview_frame)
 
-    def test_look_back_keeps_the_last_seconds_and_saves_them(self) -> None:
-        self.settings.duration = 0.5
-        self.settings.look_back = True
+    def test_look_back_keeps_the_last_seconds_and_stop_holds_them(self) -> None:
+        self.settings.record.duration = 0.5
+        self.settings.record.look_back = True
         self.tick()
-        self.assertIs(self.settings.state, ScreenRecorderState.RECORDING)
+        self.assertIs(self.settings.record.state, ScreenRecorderState.RECORDING)
         self.tick_until(lambda: self.tick_count > 200)
-        ScreenRecorderSettings.save.fire(self.settings)
+        ScreenRecorderTakeSettings.save.fire(self.settings.take)         # save only writes a held take
+        self.tick()
+        self.assertIs(self.settings.record.state, ScreenRecorderState.RECORDING)
+        ScreenRecorderRecordSettings.stop.fire(self.settings.record)
         self.tick()
         held_at = self.tick_count
-        self.assertIs(self.settings.state, ScreenRecorderState.HELD)
+        self.assertIs(self.settings.record.state, ScreenRecorderState.HELD)
         self.ticks(10)
         self.assertFalse(self.recorder.capturing)          # look back pauses while the take is held
         frames = self.save_held().frames
@@ -391,40 +395,40 @@ class StateTest(unittest.TestCase):
         self.discard(ScreenRecorderState.RECORDING)         # emptied, and recording on in the same ring
         self.assertEqual(self.recorder._ring.num_slots, slots)
         self.tick_until(lambda: self.stored() >= 5)
-        ScreenRecorderSettings.save.fire(self.settings)
+        ScreenRecorderRecordSettings.stop.fire(self.settings.record)
         self.tick()
         again = self.save_held().frames
         self.assertGreater(again[0], held_at)               # nothing from before the discard
         self.discard(ScreenRecorderState.RECORDING)
 
     def test_look_back_off_frees_the_ring(self) -> None:
-        self.settings.look_back = True
+        self.settings.record.look_back = True
         self.tick_until(lambda: self.recorder._ring.num_slots > 0)
-        self.settings.look_back = False
-        self.tick_until(lambda: self.settings.state is ScreenRecorderState.IDLE)
+        self.settings.record.look_back = False
+        self.tick_until(lambda: self.settings.record.state is ScreenRecorderState.IDLE)
         self.assertEqual(self.recorder._ring.num_slots, 0)
         self.assertEqual(FakeClip.clips, [])
 
     def test_a_size_change_remakes_the_look_back_ring(self) -> None:
-        self.settings.look_back = True
+        self.settings.record.look_back = True
         self.tick_until(lambda: self.recorder._ring.num_slots > 0)
-        self.settings.width = 16
+        self.settings.frame.width = 16
         self.tick_until(lambda: self.recorder.capture_format == ScreenFormat(16, HEIGHT) and self.stored() > 0)
 
     def test_a_failure_is_an_error_and_start_tries_again(self) -> None:
-        ScreenRecorderSettings.start.fire(self.settings)
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
         self.tick()
         with self.assertLogs('modules.video.screen_recorder', 'ERROR'):
             self.recorder.fail('no capture')
-        self.assertIs(self.settings.state, ScreenRecorderState.ERROR)
+        self.assertIs(self.settings.record.state, ScreenRecorderState.ERROR)
         self.assertIsNone(self.recorder.capture_format)
         self.ticks(3)
-        self.assertIs(self.settings.state, ScreenRecorderState.ERROR)
-        ScreenRecorderSettings.start.fire(self.settings)
-        self.tick_until(lambda: self.settings.state is ScreenRecorderState.RECORDING)
+        self.assertIs(self.settings.record.state, ScreenRecorderState.ERROR)
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
+        self.tick_until(lambda: self.settings.record.state is ScreenRecorderState.RECORDING)
 
     def test_exit_while_recording_writes_what_was_stored(self) -> None:
-        ScreenRecorderSettings.start.fire(self.settings)
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
         self.tick_until(lambda: self.stored() >= 10)
         self.recorder.stop()
         self.assertEqual(len(FakeClip.clips), 1)
@@ -433,15 +437,15 @@ class StateTest(unittest.TestCase):
         self.assertEqual(self.lent, 0)
 
     def test_exit_while_held_writes_a_take_never_saved(self) -> None:
-        self.settings.duration = 0.5
-        ScreenRecorderSettings.start.fire(self.settings)
-        self.tick_until(lambda: self.settings.state is ScreenRecorderState.HELD)
+        self.settings.record.duration = 0.5
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
+        self.tick_until(lambda: self.settings.record.state is ScreenRecorderState.HELD)
         self.recorder.stop()
         self.assertEqual(len(FakeClip.clips), 1)
 
     def test_exit_while_held_after_a_save_writes_nothing_more(self) -> None:
-        self.settings.duration = 0.5
-        ScreenRecorderSettings.start.fire(self.settings)
+        self.settings.record.duration = 0.5
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
         self.save_held()
         self.recorder.stop()
         self.assertEqual(len(FakeClip.clips), 1)
@@ -452,9 +456,9 @@ class QueueTest(unittest.TestCase):
 
     def test_a_full_queue_drops_its_oldest_and_counts_it(self) -> None:
         settings = ScreenRecorderSettings()
-        settings.width, settings.height = WIDTH, HEIGHT
+        settings.frame.width, settings.frame.height = WIDTH, HEIGHT
         recorder = ScreenRecorder(settings, 'unused', FakeClip, lambda: 1 << 40)
-        ScreenRecorderSettings.start.fire(settings)
+        ScreenRecorderRecordSettings.start.fire(settings.record)
         recorder.update(1.0)
         given_back: list[int] = []
         for n in range(6):

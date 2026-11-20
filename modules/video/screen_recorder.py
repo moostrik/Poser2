@@ -20,7 +20,7 @@ from typing import Callable, Protocol
 import numpy as np
 import psutil
 
-from modules.settings import BaseSettings, Field, Widget
+from modules.settings import BaseSettings, Field, Group, Widget
 
 from .ffmpeg import ClipCodec, ClipInput, ClipWriter, Encoder
 from .screen_format import BitDepth, Chroma, ScreenFormat
@@ -56,36 +56,52 @@ class ScreenRecorderState(Enum):
     ERROR =     auto()
 
 
-class ScreenRecorderSettings(BaseSettings):
+class ScreenRecorderFrameSettings(BaseSettings):
+    main_window:  Field[bool]                = Field(False, widget=Widget.switch, description="Record the main window instead of the sources")
+    size:         Field[ScreenSize]          = Field(ScreenSize.UHD, description="Recording size preset")
+    portrait:     Field[bool]                = Field(True, widget=Widget.switch, description="Upright: width and height swapped")
+    width:        Field[int]                 = Field(2160, min=2, max=8192, step=2, description="Recording width (px); a change sets the preset to CUSTOM")
+    height:       Field[int]                 = Field(3840, min=2, max=8192, step=2, description="Recording height (px); a change sets the preset to CUSTOM")
+    snap:         Field[bool]                = Field(False, widget=Widget.button, description="Set the size to the first source's")
+    fill:         Field[bool]                = Field(False, widget=Widget.switch, description="Fill the frame and cut the overhang, instead of black bars")
+
+
+class ScreenRecorderQualitySettings(BaseSettings):
+    chroma:       Field[Chroma]              = Field(Chroma.YUV444, description="Color resolution: 4:4:4 full, 4:2:0 half (twice the seconds)")
+    bit_depth:    Field[BitDepth]            = Field(BitDepth.BIT_8, description="Bits per sample: 10 keeps smooth gradients (fewer seconds)")
+    frame_step:   Field[int]                 = Field(1, min=1, max=2, step=1, description="Record every tick (1), or every other (2)")
+    max_duration: Field[float]               = Field(0.0, access=Field.READ, description="Longest recording the free RAM holds (s)")
+
+
+class ScreenRecorderRecordSettings(BaseSettings):
     start:        Field[bool]                = Field(False, widget=Widget.button, description="Start screen recording")
-    stop:         Field[bool]                = Field(False, widget=Widget.button, description="Stop screen recording")
-    look_back:    Field[bool]                = Field(False, widget=Widget.switch, description="Keep the last seconds all the time")
-    save:         Field[bool]                = Field(False, widget=Widget.button, description="Hold the last seconds (look back), or write the held take between in and out")
-    discard:      Field[bool]                = Field(False, widget=Widget.button, description="Let the held take go")
+    stop:         Field[bool]                = Field(False, widget=Widget.button, description="Stop screen recording and hold the take")
+    look_back:    Field[bool]                = Field(False, widget=Widget.switch, description="Keep the last seconds all the time; Stop holds them")
+    duration:     Field[float]               = Field(0.0, min=0.0, max=120.0, description="Recording length (s); 0 or above the maximum uses the maximum")
+    ram_reserve:  Field[float]               = Field(8.0, min=1.0, max=64.0, description="RAM left free for Windows and the app (GB)")
+    state:        Field[ScreenRecorderState] = Field(ScreenRecorderState.IDLE, access=Field.READ, description="Idle, recording, held, encoding")
+    recorded:     Field[float]               = Field(0.0, access=Field.READ, description="Seconds in the ring (s)")
+    dropped:      Field[int]                 = Field(0, access=Field.READ, description="Frames of this take left out: no buffer free, or the queue full")
+
+
+class ScreenRecorderTakeSettings(BaseSettings):
     playhead:     Field[list[float]]         = Field([0.0, 0.0], access=Field.READ, visible=False, description="Where the held take is looked at, and its length (s)")
     scrub:        Field[float]               = Field(-1.0, visible=False, saved=False, description="Where the dragged marker is, as a fraction of the length; -1 when none is")
     seek:         Field[float]               = Field(-1.0, visible=False, saved=False, description="Where the bar was pressed, as a fraction of the length; -1 otherwise")
     in_out:       Field[list[float]]         = Field([0.0, 1.0], widget=Widget.timeline, options=playhead, drag=scrub, seek=seek, saved=False,
                                                      label="In / Out", description="The part of the held take that save writes")
     play:         Field[bool]                = Field(False, widget=Widget.switch, saved=False, description="Play the held take between in and out, looped, over the main window; the show waits")
+    save:         Field[bool]                = Field(False, widget=Widget.button, description="Write the held take between in and out")
+    discard:      Field[bool]                = Field(False, widget=Widget.button, description="Let the held take go")
     name:         Field[str]                 = Field("", widget=Widget.input, description="Added to the file name")
-    main_window:  Field[bool]                = Field(False, widget=Widget.switch, description="Record the main window instead of the sources")
-    fill:         Field[bool]                = Field(False, widget=Widget.switch, description="Fill the frame and cut the overhang, instead of black bars")
-    size:         Field[ScreenSize]          = Field(ScreenSize.UHD, description="Recording size preset")
-    portrait:     Field[bool]                = Field(True, widget=Widget.switch, description="Upright: width and height swapped")
-    width:        Field[int]                 = Field(2160, min=2, max=8192, step=2, description="Recording width (px); a change sets the preset to CUSTOM")
-    height:       Field[int]                 = Field(3840, min=2, max=8192, step=2, description="Recording height (px); a change sets the preset to CUSTOM")
-    snap:         Field[bool]                = Field(False, widget=Widget.button, description="Set the size to the first source's")
-    chroma:       Field[Chroma]              = Field(Chroma.YUV444, description="Color resolution: 4:4:4 full, 4:2:0 half (twice the seconds)")
-    bit_depth:    Field[BitDepth]            = Field(BitDepth.BIT_8, description="Bits per sample: 10 keeps smooth gradients (half the seconds)")
-    frame_step:   Field[int]                 = Field(1, min=1, max=2, step=1, description="Record every tick (1), or every other (2)")
-    duration:     Field[float]               = Field(0.0, min=0.0, max=120.0, description="Recording length (s); 0 or above the maximum uses the maximum")
-    max_duration: Field[float]               = Field(0.0, access=Field.READ, description="Longest recording the free RAM holds (s)")
-    ram_reserve:  Field[float]               = Field(8.0, min=1.0, max=64.0, description="RAM left free for Windows and the app (GB)")
     quality:      Field[int]                 = Field(18, min=0, max=51, description="Constant quality, lower is better")
-    state:        Field[ScreenRecorderState] = Field(ScreenRecorderState.IDLE, access=Field.READ, description="Idle, recording, held, encoding")
-    recorded:     Field[float]               = Field(0.0, access=Field.READ, description="Seconds in the ring (s)")
-    dropped:      Field[int]                 = Field(0, access=Field.READ, description="Frames of this take left out: no buffer free, or the queue full")
+
+
+class ScreenRecorderSettings(BaseSettings):
+    frame:   Group[ScreenRecorderFrameSettings]   = Group(ScreenRecorderFrameSettings, description="What is recorded, at what size")
+    quality: Group[ScreenRecorderQualitySettings] = Group(ScreenRecorderQualitySettings, description="The frames' format, which sets the length")
+    record:  Group[ScreenRecorderRecordSettings]  = Group(ScreenRecorderRecordSettings, description="Recording into RAM")
+    take:    Group[ScreenRecorderTakeSettings]    = Group(ScreenRecorderTakeSettings, description="The held take: look, play, save")
 
 
 # SIZE RULES: width and height are the truth; the preset and portrait follow them
@@ -158,7 +174,7 @@ class _Take:
 
 
 class ScreenRecorder:
-    """Screen recording of the frames the screen capture hands over: Start / Stop, or look back with Save; a take is
+    """Screen recording of the frames the screen capture hands over: Start / Stop, or look back and Stop; a take is
     held for in and out, and each save writes a part."""
 
     def __init__(self, settings: ScreenRecorderSettings, folder: str, clip_sink: ClipSinkFactory = hevc_clip,
@@ -223,16 +239,16 @@ class ScreenRecorder:
 
         self._thread: Thread = Thread(target=self._run, name='screen recorder', daemon=True)
 
-        self.settings.bind(ScreenRecorderSettings.start, self._on_start)
-        self.settings.bind(ScreenRecorderSettings.stop, self._on_stop)
-        self.settings.bind(ScreenRecorderSettings.save, self._on_save)
-        self.settings.bind(ScreenRecorderSettings.discard, self._on_discard)
-        self.settings.bind(ScreenRecorderSettings.scrub, self._on_scrub)
-        self.settings.bind(ScreenRecorderSettings.seek, self._on_seek)
-        self.settings.bind(ScreenRecorderSettings.size, self._on_size)
-        self.settings.bind(ScreenRecorderSettings.portrait, self._on_portrait)
-        self.settings.bind(ScreenRecorderSettings.width, self._on_width_height)
-        self.settings.bind(ScreenRecorderSettings.height, self._on_width_height)
+        self.settings.record.bind(ScreenRecorderRecordSettings.start, self._on_start)
+        self.settings.record.bind(ScreenRecorderRecordSettings.stop, self._on_stop)
+        self.settings.take.bind(ScreenRecorderTakeSettings.save, self._on_save)
+        self.settings.take.bind(ScreenRecorderTakeSettings.discard, self._on_discard)
+        self.settings.take.bind(ScreenRecorderTakeSettings.scrub, self._on_scrub)
+        self.settings.take.bind(ScreenRecorderTakeSettings.seek, self._on_seek)
+        self.settings.frame.bind(ScreenRecorderFrameSettings.size, self._on_size)
+        self.settings.frame.bind(ScreenRecorderFrameSettings.portrait, self._on_portrait)
+        self.settings.frame.bind(ScreenRecorderFrameSettings.width, self._on_width_height)
+        self.settings.frame.bind(ScreenRecorderFrameSettings.height, self._on_width_height)
 
     @property
     def capturing(self) -> bool:
@@ -275,16 +291,16 @@ class ScreenRecorder:
     def stop(self) -> None:
         """Stop the recording: a take in progress is written up to its last stored frame, and a held take none of
         whose parts is written yet is written whole; then the frames waiting are let go and the ring freed."""
-        self.settings.unbind(ScreenRecorderSettings.start, self._on_start)
-        self.settings.unbind(ScreenRecorderSettings.stop, self._on_stop)
-        self.settings.unbind(ScreenRecorderSettings.save, self._on_save)
-        self.settings.unbind(ScreenRecorderSettings.discard, self._on_discard)
-        self.settings.unbind(ScreenRecorderSettings.scrub, self._on_scrub)
-        self.settings.unbind(ScreenRecorderSettings.seek, self._on_seek)
-        self.settings.unbind(ScreenRecorderSettings.size, self._on_size)
-        self.settings.unbind(ScreenRecorderSettings.portrait, self._on_portrait)
-        self.settings.unbind(ScreenRecorderSettings.width, self._on_width_height)
-        self.settings.unbind(ScreenRecorderSettings.height, self._on_width_height)
+        self.settings.record.unbind(ScreenRecorderRecordSettings.start, self._on_start)
+        self.settings.record.unbind(ScreenRecorderRecordSettings.stop, self._on_stop)
+        self.settings.take.unbind(ScreenRecorderTakeSettings.save, self._on_save)
+        self.settings.take.unbind(ScreenRecorderTakeSettings.discard, self._on_discard)
+        self.settings.take.unbind(ScreenRecorderTakeSettings.scrub, self._on_scrub)
+        self.settings.take.unbind(ScreenRecorderTakeSettings.seek, self._on_seek)
+        self.settings.frame.unbind(ScreenRecorderFrameSettings.size, self._on_size)
+        self.settings.frame.unbind(ScreenRecorderFrameSettings.portrait, self._on_portrait)
+        self.settings.frame.unbind(ScreenRecorderFrameSettings.width, self._on_width_height)
+        self.settings.frame.unbind(ScreenRecorderFrameSettings.height, self._on_width_height)
         if self._state == ScreenRecorderState.RECORDING and not self._look_back:
             self._hold()
         if self._state == ScreenRecorderState.HELD and not self._held_saved:
@@ -345,21 +361,21 @@ class ScreenRecorder:
     def _on_size(self, size: ScreenSize) -> None:
         if size is ScreenSize.CUSTOM:
             return
-        width, height = preset_size(size, self.settings.portrait)
-        self.settings.width = width
-        self.settings.height = height
+        width, height = preset_size(size, self.settings.frame.portrait)
+        self.settings.frame.width = width
+        self.settings.frame.height = height
 
     def _on_portrait(self, portrait: bool) -> None:
-        width, height = self.settings.width, self.settings.height
+        width, height = self.settings.frame.width, self.settings.frame.height
         if portrait != (height > width) and width != height:
-            self.settings.width = height
-            self.settings.height = width
+            self.settings.frame.width = height
+            self.settings.frame.height = width
 
     def _on_width_height(self, _: int) -> None:
-        width, height = self.settings.width, self.settings.height
-        self.settings.size = matching_preset(width, height)
+        width, height = self.settings.frame.width, self.settings.frame.height
+        self.settings.frame.size = matching_preset(width, height)
         if width != height:
-            self.settings.portrait = height > width
+            self.settings.frame.portrait = height > width
 
     # RENDER TICK
 
@@ -374,27 +390,23 @@ class ScreenRecorder:
                 reached = self._reached
             if reached:
                 self._hold()        # the duration or the memory ends the take
-            elif self._look_back:
-                if not self.settings.look_back:
-                    self._leave_look_back()
-                elif self._format_wanted() != self._format or self.settings.duration != self._duration:
-                    self._leave_look_back()     # emptied, and made again at the new size or duration
-                elif self._save_requested.is_set():
-                    self._hold()
+            elif self._look_back and (not self.settings.record.look_back or self._format_wanted() != self._format
+                                      or self.settings.record.duration != self._duration):
+                self._leave_look_back()     # off, or emptied and made again at the new size or duration
             elif self._stop_requested.is_set():
-                self._hold()
+                self._hold()        # in look back too: the last seconds
         elif self._state == ScreenRecorderState.HELD:
             if self._discard_requested.is_set():
                 self._discard()
             elif self._save_requested.is_set():
                 self._save_held()
         elif self._state == ScreenRecorderState.IDLE and not self._busy():
-            if self.settings.look_back:
+            if self.settings.record.look_back:
                 self._begin(timestamp, look_back=True)
             elif self._start_requested.is_set():
                 self._begin(timestamp, look_back=False)
         elif self._state == ScreenRecorderState.ERROR and not self._busy() and self._start_requested.is_set():
-            self._begin(timestamp, look_back=self.settings.look_back)      # after a failure only Start tries again
+            self._begin(timestamp, look_back=self.settings.record.look_back)      # after a failure only Start tries again
 
         self._capture_now = False
         if self._state == ScreenRecorderState.RECORDING:
@@ -418,8 +430,8 @@ class ScreenRecorder:
         self._last_timestamp = timestamp
 
     def _format_wanted(self) -> ScreenFormat:
-        return ScreenFormat(even(self.settings.width), even(self.settings.height), self.settings.chroma,
-                            self.settings.bit_depth)
+        return ScreenFormat(even(self.settings.frame.width), even(self.settings.frame.height), self.settings.quality.chroma,
+                            self.settings.quality.bit_depth)
 
     def _busy(self) -> bool:
         with self._lock:
@@ -430,10 +442,10 @@ class ScreenRecorder:
         adds the blocks."""
         self._format = self._format_wanted()
         self._error_logged = False
-        self._duration = self.settings.duration
-        self._frame_step = self.settings.frame_step
+        self._duration = self.settings.record.duration
+        self._frame_step = self.settings.quality.frame_step
         self._ticks = 0
-        maximum = self.settings.max_duration
+        maximum = self.settings.quality.max_duration
         limit = self._duration if self._duration > 0.0 and (maximum <= 0.0 or self._duration <= maximum) else 0.0
         target = frames_for(limit * LOOK_BACK_MARGIN, self._fps, self._frame_step) if look_back and limit else 0
         self._ring.clear(self._format.shape, self._format.dtype)
@@ -478,22 +490,22 @@ class ScreenRecorder:
         self._held_slots, self._held_stamps = order, held_stamps
         self._held_saved = False
         self._position = 0.0
-        self.settings.in_out = [0.0, 1.0]
-        self.settings.playhead = [0.0, self._held_length()]
+        self.settings.take.in_out = [0.0, 1.0]
+        self.settings.take.playhead = [0.0, self._held_length()]
         self._set_state(ScreenRecorderState.HELD)
         logger.info('Screen recording held: %d frames, %.2f s', len(order), self._held_length())
 
     def _play(self, timestamp: float) -> None:
         """Play the held take at its recorded times, looping between in and out; the dragged marker shows its own
         frame and play goes on from there. Only a held take plays; the switch goes off otherwise, a save included."""
-        if self.settings.play and self._state is not ScreenRecorderState.HELD:
-            self.settings.play = False
-        self._playing = self.settings.play and bool(self._held_stamps)
+        if self.settings.take.play and self._state is not ScreenRecorderState.HELD:
+            self.settings.take.play = False
+        self._playing = self.settings.take.play and bool(self._held_stamps)
         if not self._playing or self._dragging:
             self._play_from = None
             return
         start, length = self._held_stamps[0], self._held_length()
-        mark_in, mark_out = sorted(self.settings.in_out)
+        mark_in, mark_out = sorted(self.settings.take.in_out)
         low, high = start + mark_in * length, start + mark_out * length
         if self._play_from is None:
             moment = start + self._position * length
@@ -511,7 +523,7 @@ class ScreenRecorder:
         """Write the held frames whose times lie between in and out; the take stays held."""
         start = self._held_stamps[0]
         length = self._held_length()
-        mark_in, mark_out = sorted(self.settings.in_out)
+        mark_in, mark_out = sorted(self.settings.take.in_out)
         low, high = start + mark_in * length, start + mark_out * length
         kept = [n for n, t in enumerate(self._held_stamps) if low - 1e-9 <= t <= high + 1e-9]
         if not kept:
@@ -523,8 +535,8 @@ class ScreenRecorder:
     def _discard(self) -> None:
         """Let the held take go: a look-back ring is emptied and records on, any other ring is freed."""
         self._held_slots, self._held_stamps = [], []
-        self.settings.playhead = [0.0, 0.0]
-        if self._look_back and self.settings.look_back:
+        self.settings.take.playhead = [0.0, 0.0]
+        if self._look_back and self.settings.record.look_back:
             self._ticks = 0
             with self._lock:
                 self._take_id += 1
@@ -548,7 +560,7 @@ class ScreenRecorder:
     def _hand_over(self, slots: list[int], stamps: list[float], free_after: bool) -> None:
         """Hand frames of the ring, in their order, to the thread to encode into a new file."""
         stamp = datetime.now().strftime('%Y%m%d-%H%M%S')
-        name = f'{stamp}_{self.settings.name}' if self.settings.name else stamp
+        name = f'{stamp}_{self.settings.take.name}' if self.settings.take.name else stamp
         path = self._folder / f'{name}.mp4'
         part = 1
         while path.exists() or str(path) in self._paths:        # a second part saved within the same second
@@ -594,7 +606,7 @@ class ScreenRecorder:
 
     def _set_state(self, state: ScreenRecorderState) -> None:
         self._state = state
-        self.settings.state = state
+        self.settings.record.state = state
 
     def _show(self, timestamp: float) -> None:
         if timestamp - self._shown_at < SHOW_INTERVAL:
@@ -604,13 +616,13 @@ class ScreenRecorder:
             dropped = self._dropped
             first = self._first
             last = max(self._stamps) if self._stamps else None
-        self.settings.dropped = dropped
+        self.settings.record.dropped = dropped
         if self._state == ScreenRecorderState.HELD:
             length = self._held_length()
-            self.settings.recorded = round(length, 2)
-            self.settings.playhead = [round(self._position * length, 3), length]
+            self.settings.record.recorded = round(length, 2)
+            self.settings.take.playhead = [round(self._position * length, 3), length]
             return
-        self.settings.recorded = round(last - first, 2) if first is not None and last is not None else 0.0
+        self.settings.record.recorded = round(last - first, 2) if first is not None and last is not None else 0.0
 
     # THREAD: THE RING AND THE ENCODE, NO GL
 
@@ -701,7 +713,7 @@ class ScreenRecorder:
                     self._complete = True
                 return
         try:
-            if self._free_memory() - block * self._ring.frame_bytes < int(self.settings.ram_reserve * GB):
+            if self._free_memory() - block * self._ring.frame_bytes < int(self.settings.record.ram_reserve * GB):
                 logger.info('Screen recording ring full at %d frames: free RAM reached the reserve', slots)
                 with self._lock:
                     self._complete = True
@@ -720,9 +732,9 @@ class ScreenRecorder:
         except Exception as e:
             logger.debug('Screen recorder could not read the free RAM: %s', e)
             return
-        usable = max(0, free + self._ring.nbytes - int(self.settings.ram_reserve * GB))
-        rate = frame_bytes * self._fps / max(1, self.settings.frame_step)
-        self.settings.max_duration = round(usable / rate, 1)
+        usable = max(0, free + self._ring.nbytes - int(self.settings.record.ram_reserve * GB))
+        rate = frame_bytes * self._fps / max(1, self.settings.quality.frame_step)
+        self.settings.quality.max_duration = round(usable / rate, 1)
 
     def _write(self, take: _Take) -> None:
         """Encode the take at the rate it was recorded at, then free the ring when the take says so."""
@@ -736,7 +748,7 @@ class ScreenRecorder:
         ok = False
         try:
             Path(take.path).parent.mkdir(parents=True, exist_ok=True)
-            sink = self._clip_sink(take.path, fps, self.settings.quality, take.format)
+            sink = self._clip_sink(take.path, fps, self.settings.take.quality, take.format)
             sink.comment = comment
             for slot in take.slots:
                 sink.add(self._ring.frame(slot))

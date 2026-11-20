@@ -17,7 +17,17 @@ on it, and each `save` has the recorder's thread encode the frames between them 
 ### What gets recorded
 
 The recorder's settings are the group `screen_recorder` at the root of an app's settings, so it has a tab
-of its own on the panel (deep_flow and low_flow).
+of its own on the panel (deep_flow and low_flow). It holds four groups, in the order the recorder uses them:
+
+| Group     | Fields                                                 | Readouts                 |
+|-----------|--------------------------------------------------------|--------------------------|
+| `frame`   | main_window, size, portrait, width, height, snap, fill |                          |
+| `quality` | chroma, bit_depth, frame_step                          | max_duration             |
+| `record`  | start, stop, look_back, duration, ram_reserve          | state, recorded, dropped |
+| `take`    | in_out, play, save, discard, name, quality             | playhead                 |
+
+Each button has one meaning: Stop ends a recording and holds the take, in look back too; `save` writes the held take
+between in and out.
 
 `ScreenRecordingCompositor` (`modules/render/general/screen_recording/`) owns the `ScreenCapture` and the
 `ScreenRecorder`. Each tick, right after the main window is drawn, the app hands it the layers to record with
@@ -226,8 +236,8 @@ the fluid did no work, and the preview drew 118 different frames; after play the
 
 With `look_back` on the ring records all the time, the newest frame replacing the oldest. It holds 1.2 ×
 `duration` at the rate measured when it is made (`LOOK_BACK_MARGIN`), so ticks faster than that still leave
-it the last `duration` seconds; with `duration` 0 it holds what the memory holds. `save` holds the frames whose
-times lie in the last `duration` seconds, oldest first (see the held take); a slot being written over at that
+it the last `duration` seconds; with `duration` 0 it holds what the memory holds. Stop holds the frames whose
+times lie in the last `duration` seconds, as it holds a recording; `save` only writes a held take, oldest first (see the held take); a slot being written over at that
 moment is left out. The ring pauses while the take is held and records on after `discard`; it is blind for that
 time, because recording on in a second ring would need the memory twice. It holds its memory while the switch is
 on; a change of size or duration empties it and makes it again.

@@ -3,7 +3,7 @@
 import unittest
 
 from modules.render import LayerBase, ScreenRecordingCompositor, ScreenRecordingInput, ScreenRecordingSource
-from modules.video import ScreenRecorderSettings, ScreenSize
+from modules.video import ScreenRecorderFrameSettings, ScreenRecorderSettings, ScreenSize
 
 
 class NoLayer(LayerBase):
@@ -25,19 +25,19 @@ class SnapTest(unittest.TestCase):
         self.compositor.deallocate()
 
     def test_snap_takes_the_first_source(self) -> None:
-        ScreenRecorderSettings.snap.fire(self.settings)
-        self.assertEqual((self.settings.width, self.settings.height), (1440, 2560))
-        self.assertIs(self.settings.size, ScreenSize.QHD)
+        ScreenRecorderFrameSettings.snap.fire(self.settings.frame)
+        self.assertEqual((self.settings.frame.width, self.settings.frame.height), (1440, 2560))
+        self.assertIs(self.settings.frame.size, ScreenSize.QHD)
 
     def test_snap_takes_the_window_when_it_is_recorded(self) -> None:
-        self.settings.main_window = True
-        ScreenRecorderSettings.snap.fire(self.settings)
-        self.assertEqual((self.settings.width, self.settings.height), (1918, 1080))
+        self.settings.frame.main_window = True
+        ScreenRecorderFrameSettings.snap.fire(self.settings.frame)
+        self.assertEqual((self.settings.frame.width, self.settings.frame.height), (1918, 1080))
 
     def test_snap_without_sources_keeps_the_size(self) -> None:
         self.compositor.set_input(ScreenRecordingInput([], 1918, 1080, 1.0))
-        ScreenRecorderSettings.snap.fire(self.settings)
-        self.assertEqual((self.settings.width, self.settings.height), (2160, 3840))
+        ScreenRecorderFrameSettings.snap.fire(self.settings.frame)
+        self.assertEqual((self.settings.frame.width, self.settings.frame.height), (2160, 3840))
 
 
 if __name__ == '__main__':

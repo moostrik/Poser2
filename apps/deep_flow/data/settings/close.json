@@ -830,19 +830,27 @@
     }
   },
   "screen_recorder": {
-    "look_back": false,
-    "name": "",
-    "main_window": false,
-    "fill": false,
-    "size": "UHD",
-    "portrait": true,
-    "width": 2160,
-    "height": 3840,
-    "chroma": "YUV444",
-    "bit_depth": "BIT_8",
-    "frame_step": 1,
-    "duration": 0.0,
-    "quality": 18
+    "frame": {
+      "main_window": false,
+      "size": "UHD",
+      "portrait": true,
+      "width": 2160,
+      "height": 3840,
+      "fill": false
+    },
+    "quality": {
+      "chroma": "YUV444",
+      "bit_depth": "BIT_8",
+      "frame_step": 1
+    },
+    "record": {
+      "look_back": false,
+      "duration": 0.0
+    },
+    "take": {
+      "name": "",
+      "quality": 18
+    }
   },
   "inout": {
     "osc_sound": {
