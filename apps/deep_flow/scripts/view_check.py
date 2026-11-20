@@ -19,15 +19,15 @@ import json
 import sys
 import time
 from pathlib import Path
+from typing import cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'scripts'))
 import cv2  # noqa: E402
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
 from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_FLOAT, GL_NEAREST, GL_RED, GL_RGBA, GL_TEXTURE_2D, glBindTexture, glFinish, glGetTexImage  # noqa: E402
 
-import monitor_harness as mh  # noqa: E402
+from scripts import monitor_harness as mh  # noqa: E402
 from modules.camera import CameraFrame, FrameType  # noqa: E402
 from modules.recording import read_metadata  # noqa: E402
 from modules.gl import Style, Tensor, Texture  # noqa: E402
@@ -61,7 +61,7 @@ def read(texture: Texture, channels: int = 1) -> np.ndarray:
     """A texture's pixels, rows down."""
     glFinish()
     glBindTexture(GL_TEXTURE_2D, texture.tex_id)
-    data = glGetTexImage(GL_TEXTURE_2D, 0, GL_RED if channels == 1 else GL_RGBA, GL_FLOAT)
+    data = cast(bytes, glGetTexImage(GL_TEXTURE_2D, 0, GL_RED if channels == 1 else GL_RGBA, GL_FLOAT))
     glBindTexture(GL_TEXTURE_2D, 0)
     shape = (texture.height, texture.width) if channels == 1 else (texture.height, texture.width, 4)
     return np.frombuffer(data, np.float32).reshape(shape)[::-1]
