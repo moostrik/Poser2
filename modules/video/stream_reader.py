@@ -10,6 +10,8 @@ from threading import Thread, Event, Lock
 from typing import Callable, Protocol
 import time
 
+from modules.utils import wait_until
+
 from .depth_frame import DEPTH_PIX_FMT, depth_frame_bytes, p012_to_depth
 from .hardware import Hardware, hwaccel_args
 from .probe import probe
@@ -240,8 +242,7 @@ class StreamReader:
                 if now - due > frame_interval:
                     due = self.schedule.catch_up(self.cam_id, frame_count, now)     # behind: every reader comes later, together
                 due = max(due, next_time)           # never before the frame before it
-                remaining: float = due - time.perf_counter()
-                if remaining > 0 and self.stop_event.wait(remaining):
+                if wait_until(due, self.stop_event.wait):
                     break               # stopped while it waited
                 next_time = due
 
@@ -251,9 +252,9 @@ class StreamReader:
             if due is not None:
                 continue
             next_time += frame_interval
-            remaining = next_time - time.perf_counter()
+            remaining: float = next_time - time.perf_counter()
             if remaining > 0:
-                self.stop_event.wait(remaining)
+                wait_until(next_time, self.stop_event.wait)
             elif -remaining > frame_interval:
                 next_time = time.perf_counter()   # resync after a stall rather than bursting catch-up frames
         self._close()

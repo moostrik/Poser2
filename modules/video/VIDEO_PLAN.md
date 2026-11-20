@@ -31,23 +31,12 @@ the depthai 2 venv's tests run once, after the last step.
 - A6. deep_flow's color in HEVC (CAMERA_PLAN.md A4's writer side, after the camera plan's A1): deep_flow's presets
   from H.264 to HEVC on the iGPU, `MP4` staying H.264. The confidence stream's writer is A5's; the camera plan wires
   it. OAK4.md's recording section. Check: the seek check and the encoder load run again.
-- A7. The player's pacing: a frame's moment is waited for on `perf_counter`, not with `Event.wait` alone, which on
-  Windows waits in ~15.6 ms steps **(deduction)**: in A3's run about a quarter of the frames came ~30 ms after the one
-  before, against 20 ms nominal (p95 31.8 ms). One shared helper in `modules/utils` waits until a `perf_counter`
-  deadline: a timed wait on a stop event until ~2 ms before it, then `time.sleep` for the rest, returning at once when
-  the event is set. `StreamReader` uses it; the module refactor thread reuses it for the other pacing loops. Its unit
-  test in `modules/utils/tests`. VIDEO.md. Check: the helper's test; A3's `-sim` run again: the frame interval (mean,
-  p95) and the frames over 30 ms. Built after A5 (and A6).
 
-After A7, once: deep_flow `-sim` playback of a known recording; the depthai 2 venv's tests (white_space, hd_trio);
+After the last step, once: deep_flow `-sim` playback of a known recording; the depthai 2 venv's tests (white_space, hd_trio);
 one live deep_flow run recording the camera on the iGPU while a screen take saves on NVENC: the chunk whole with every
 stream's frames counted, the take 0 dropped, the ticks.
 
-Assumed: hevc_qsv takes nv12, p010 and p012, not gray, so ffmpeg turns the confidence's gray into nv12 on the CPU
-**(deduction: cheap at 480 × 300, not measured; A5's round trip shows it works)**.
-
 ## The rules it touches
 
-- Read `time.perf_counter()` for every stamp and duration: A7
 - Keep presets in sync with code changes: A6
 - A document describes what is built: every step
