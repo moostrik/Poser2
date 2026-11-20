@@ -8,7 +8,7 @@ import numpy as np
 
 from modules.camera import FrameType
 from modules.recording import FrameMetadata
-from modules.inference import RecordedPoses, RecordedPosesSettings, frame_poses
+from modules.inference import RecordedPoses, RecordedPosesSettings
 from modules.pose import BBox, Frame, FrameDict, FrameDictCallbackMixin, Points2D
 from modules.utils import Rect
 
@@ -47,16 +47,6 @@ def wait_for(condition, seconds: float = 2.0) -> bool:
             return True
         time.sleep(0.002)
     return condition()
-
-
-class FramePosesTest(unittest.TestCase):
-    def test_the_poses_with_points_per_camera(self) -> None:
-        frames: FrameDict = {0: pose(0, 2.0, with_points=True), 1: pose(1, 2.0)}       # track 1 has no points
-        [kept] = frame_poses(frames, 2.05)
-        self.assertEqual((kept.cam_id, kept.timestamp, kept.arrival, list(kept.poses)), (0, 2.0, 2.05, [0]))
-        box, points = kept.poses[0]
-        np.testing.assert_array_almost_equal(box, [0.5, 0.5, 0.2, 0.2])
-        np.testing.assert_array_almost_equal(points, POINTS)
 
 
 class RecordedPosesTest(unittest.TestCase):

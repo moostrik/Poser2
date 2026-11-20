@@ -9,7 +9,8 @@ import numpy as np
 
 from modules import video
 from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, FrameReadings, FrameType, TrackingStatus
-from modules.recording import Container, FrameMetadata, FramePoses, Player, PlayerSettings, Recorder, RecorderSettings
+from modules.pose import BBox, Frame, FrameDict, Points2D
+from modules.recording import Container, FrameMetadata, Player, PlayerSettings, Recorder, RecorderSettings
 from modules.recording.recorder.recorder import RecState
 from modules.utils import Rect
 
@@ -27,14 +28,15 @@ def video_frame(i: int, timestamp: float | None = None) -> CameraFrame:
 POINTS: np.ndarray = np.tile(np.array([[0.25, 0.5, 0.9]], dtype=np.float32), (17, 1))
 
 
-def poses(timestamp: float) -> FramePoses:
-    """The host's poses of camera 0's frame captured at `timestamp`: one player, track 3."""
-    return FramePoses(0, timestamp, {3: (np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32), POINTS)}, timestamp + 0.05)
+BOX: Rect = Rect(0.1, 0.2, 0.3, 0.4)
 
 
-def as_recorded(poses: FramePoses, arrival: float) -> list[FramePoses]:
-    """The tests' poses are packed already: the recorder's packing hands them on as they are."""
-    return [poses]
+def poses(timestamp: float, cam_id: int = 0) -> FrameDict:
+    """The RAW stage's poses of the camera's frame captured at `timestamp`: one player, track 3, at `BOX` with
+    `POINTS`."""
+    frame = Frame(track_id=3, cam_id=cam_id, timestamp=timestamp,
+                  features={BBox: BBox.from_rect(BOX), Points2D: Points2D(values=POINTS[:, :2].copy(), scores=POINTS[:, 2].copy())})
+    return {3: frame}
 
 
 def tracklets(timestamp: float) -> CameraTracklets:
@@ -54,7 +56,7 @@ def recorder(types: list[FrameType], temp: str = 'temp', output: str = 'out', da
     settings.output_path = output
     settings.fps = 60.0
     settings.keyframe_interval = keyframe_interval
-    rec = Recorder(settings, as_recorded, data_path)
+    rec = Recorder(settings, data_path)
     rec.sync._queue = rec.sync._take        # the tests match the parts on their own thread, the sync's work as it is
     return rec
 
@@ -89,7 +91,7 @@ def record(root: Path, types: list[FrameType], num_cams: int, feed: Callable[[Re
     settings.fps = 60.0
     settings.keyframe_interval = 1
     settings.name = name                # two recordings in one second have their own folders
-    rec = Recorder(settings, as_recorded, str(root))
+    rec = Recorder(settings, str(root))
     before = set((root / 'recordings').iterdir()) if (root / 'recordings').is_dir() else set()
     rec.start()
     try:

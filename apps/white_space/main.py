@@ -14,9 +14,9 @@ from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, TrackerFrameSource
-from modules.pose import FrameDict, features
+from modules.pose import FrameDict, features, has_points
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import pose, person, BatchUploader, CameraSync, CropExtractor, frame_poses, has_points
+from modules.inference import pose, person, BatchUploader, CameraSync, CropExtractor
 from modules.session import Session
 
 from .board import RenderBoard
@@ -74,7 +74,7 @@ class WhiteSpaceMain:
         # tick, so it is a pose like any other from there.
         self.dummy = Dummy(self.settings.pose_instrument.dummy, ps.angle_extractor, ps.angle_calibrator, dummy_id(max_players),
                            Path(DATA_PATH) / "poses.json")
-        self.video_recorder = VideoRecorder(self.settings.session.video, frame_poses, data_path=DATA_PATH)
+        self.video_recorder = VideoRecorder(self.settings.session.video, data_path=DATA_PATH)
 
         # CAMERA
         self.cameras: list[CameraSource] = []
@@ -271,7 +271,7 @@ class WhiteSpaceMain:
 
     def _record_poses(self, frames: FrameDict) -> None:
         """The RAW stage's poses, on the pose model's thread, to the recorder as they are: their hand-over, stamped
-        here; the recorder packs them on its own thread (`frame_poses`)."""
+        here; the recorder packs them on its own thread."""
         self.video_recorder.submit_poses(frames, time.perf_counter())
 
     def _update_drops(self, _now: float) -> None:

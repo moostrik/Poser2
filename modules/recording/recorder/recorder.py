@@ -26,16 +26,17 @@ from pathlib import Path
 import time
 from enum import Enum, auto
 from queue import Queue, Empty
-from typing import Any, TextIO
+from typing import TextIO
 
 from modules.camera import CameraFrame, CameraTracklets, FrameType, mirrored_alignment, mirrored_image, mirrored_intrinsics, \
     mirrored_tracklets
+from modules.pose import FrameDict
 from modules.settings import BaseSettings, Field, Widget
 from modules.video import ClipCodec, DEPTH_CODEC, DEPTH_HARDWARE, Hardware, StreamWriter
 
 from ..container import DEPTH_SUFFIX, METADATA_LABEL, METADATA_SUFFIX, ChunkInfo, Container, FrameMetadata, finish_unmerged, \
     frame_line, info_line, keep_chunk, make_chunk_name, make_file_name, make_folder_name, merge_chunk
-from .recording_sync import FramePoses, PosesPacker, RecordedCapture, RecordingSync
+from .recording_sync import FramePoses, RecordedCapture, RecordingSync
 
 import logging
 logger = logging.getLogger(__name__)
@@ -104,8 +105,7 @@ class RecState(Enum):
     STOP =  auto()
 
 class Recorder(Thread):
-    def __init__(self, settings: RecorderSettings, pack_poses: PosesPacker, data_path: str = "") -> None:
-        """`pack_poses`: the app's poses into `FramePoses`, run on the recording sync's thread (`submit_poses`)."""
+    def __init__(self, settings: RecorderSettings, data_path: str = "") -> None:
         super().__init__()
         self.temp_path: Path = Path(settings.temp_path)
         self.data_path: str = data_path
@@ -124,7 +124,7 @@ class Recorder(Thread):
         self._queued_bytes: int = 0                     # what the queues here hold
         self._dropped: int = 0                          # captures dropped whole for the bound, this recording
         self._unmerged: Thread | None = None            # what a crash left, merged beside the recording
-        self.sync: RecordingSync = RecordingSync(self.with_depth, pack_poses)
+        self.sync: RecordingSync = RecordingSync(self.with_depth)
         self.sync.add_capture_callback(self._on_capture)
         self.metadata: dict[int, TextIO] = {}
         self.metadata_frames: dict[int, int] = {}       # the frames of each camera's chunk so far
@@ -450,8 +450,8 @@ class Recorder(Thread):
         if self._taking_parts():
             self.sync.expect_poses(cam_id, timestamp, asked)
 
-    def submit_poses(self, poses: Any, arrival: float) -> None:
-        """The app's poses as they came out, handed over at `arrival`: while recording, to the sync, which packs them."""
+    def submit_poses(self, poses: FrameDict, arrival: float) -> None:
+        """The RAW stage's poses as they came out, handed over at `arrival`: while recording, to the sync, which packs them."""
         if self._taking_parts():
             self.sync.submit_poses(poses, arrival)
 

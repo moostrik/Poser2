@@ -11,10 +11,9 @@ from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker, TrackerFrameSource
-from modules.pose import nodes, features, analytics, FrameDict, Recorder as PoseRecorder, RecorderSettings as PoseRecorderSettings
+from modules.pose import nodes, features, analytics, FrameDict, has_points, Recorder as PoseRecorder, RecorderSettings as PoseRecorderSettings
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import pose, segmentation, person, BatchUploader, CameraSync, CropExtractor, \
-    frame_poses, has_points
+from modules.inference import pose, segmentation, person, BatchUploader, CameraSync, CropExtractor
 from modules.session import Session, SessionSettings, SequencerState
 from modules.gl import WindowManagerSettings
 
@@ -68,7 +67,7 @@ class HDTrioMain:
         self.sequencer = Sequencer(self.settings.session.sequencer)
         self.sequencer.add_state_callback(self.board.set_sequencer_state)
         self.sequencer.add_state_callback(self.osc_sound.set_sequencer_state)
-        self.video_recorder = VideoRecorder(self.settings.session.video, frame_poses, data_path=DATA_PATH)
+        self.video_recorder = VideoRecorder(self.settings.session.video, data_path=DATA_PATH)
         self.pose_recorder = PoseRecorder(self.settings.session.pose, data_path=DATA_PATH)
 
         # The intro figure's recorder, outside the session's shared start and stop (HD_TRIO.md, The intro figure)
@@ -231,7 +230,7 @@ class HDTrioMain:
 
     def _record_poses(self, frames: FrameDict) -> None:
         """The RAW stage's poses, on the pose model's thread, to the recorder as they are: their hand-over, stamped
-        here; the recorder packs them on its own thread (`frame_poses`)."""
+        here; the recorder packs them on its own thread."""
         self.video_recorder.submit_poses(frames, time.perf_counter())
 
     def _update_drops(self, _now: float) -> None:

@@ -1,4 +1,4 @@
-from .frame import Frame, replace, FrameCallback, FrameDict, FrameDictCallback, GroupRecord, replace_group, GroupCallback, \
+from .frame import Frame, replace, has_points, FrameCallback, FrameDict, FrameDictCallback, GroupRecord, replace_group, GroupCallback, \
                    FrameCallbackMixin, FrameDictCallbackMixin, FrameWindowDictCallbackMixin, \
                    FeatureWindow, FeatureWindowDict, FrameWindowDict, FrameWindowDictCallback
 from .features import BaseFeature, BaseScalarFeature, BaseVectorFeature, NormalizedScalarFeature, AggregationMethod, \

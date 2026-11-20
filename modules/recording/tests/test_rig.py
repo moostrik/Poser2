@@ -11,9 +11,9 @@ import numpy as np
 
 from modules import video
 from modules.camera import CameraFrame, FrameType
-from modules.recording import FramePoses, Recorder, RecorderSettings, RecordingFolder, make_chunk_name, read_metadata
+from modules.recording import Recorder, RecorderSettings, RecordingFolder, make_chunk_name, read_metadata
 from modules.recording.player.chunk_readers import ChunkReaders, Decoding
-from modules.recording.tests.recordings import POINTS, poses, stream_frames, cam_frame, cam_tracklets, record, \
+from modules.recording.tests.recordings import poses, stream_frames, cam_frame, cam_tracklets, record, \
     player, Played, collect, FPS, SPLIT, COUNT
 
 
@@ -150,7 +150,7 @@ def rig(with_depth: bool) -> Callable[[Recorder], None]:
                     rec.submit_frame(CameraFrame(cam, FrameType.DEPTH, np.full((120, 160), 1000 + i * 30, np.uint16), t))
                 rec.submit_tracklets(cam_tracklets(cam, t))
                 rec.expect_poses(cam, t, True)
-                rec.submit_poses(FramePoses(cam, t, {3: (np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32), POINTS)}, t + 0.05), t + 0.05)
+                rec.submit_poses(poses(t, cam), t + 0.05)
             time.sleep(0.004)
     return feed
 

@@ -6,7 +6,7 @@ from typing import TypeAlias
 import numpy as np
 import torch
 
-from modules.pose import Frame, Points2D, FrameDictCallbackMixin, replace, FrameDict
+from modules.pose import Frame, Points2D, FrameDictCallbackMixin, replace, FrameDict, has_points
 from modules.utils import PerformanceTimer
 
 from ..engine import Engine, ModelType, ModelWorker, make_engine
@@ -21,11 +21,6 @@ IMAGENET_MEAN = torch.tensor([0.485, 0.456, 0.406], dtype=torch.float32).view(1,
 IMAGENET_STD = torch.tensor([0.229, 0.224, 0.225], dtype=torch.float32).view(1, 3, 1, 1)
 
 Batch: TypeAlias = tuple[FrameDict, list[int], list[torch.Tensor], torch.cuda.Event | None]     # poses, ids, crops, their event
-
-
-def has_points(frame: Frame) -> bool:
-    """Whether a pose carries keypoints: any point with a score."""
-    return bool(np.any(frame[Points2D].scores > 0.0))
 
 
 class PoseEstimator(ModelWorker[Batch, PoseEstimatorSettings], FrameDictCallbackMixin):

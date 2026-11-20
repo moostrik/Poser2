@@ -24,7 +24,11 @@ from enum import IntEnum, auto
 from threading import Condition, Event, Lock, Thread
 from typing import Any, Callable, TypeAlias
 
+import numpy as np
+
 from modules.camera import CAPTURE_TOLERANCE, CameraFrame, CameraTracklets, CaptureStream, FrameType, MissedParts
+from modules.pose import BBox, FrameDict, Points2D, has_points
+from modules.utils import Rect
 
 from ..container import PoseArrays
 
@@ -43,6 +47,27 @@ class FramePoses:
     arrival: float
 
 
+def pose_arrays(frames: FrameDict) -> dict[int, tuple[float, PoseArrays]]:
+    """The poses with points, per camera: their frame's capture time and each pose's box and points."""
+    by_cam: dict[int, tuple[float, PoseArrays]] = {}
+    for track_id, frame in frames.items():
+        if not has_points(frame):
+            continue
+        points: Points2D = frame[Points2D]
+        rect: Rect = frame[BBox].to_rect()
+        box: np.ndarray = np.array([rect.x, rect.y, rect.width, rect.height], dtype=np.float32)
+        arrays: np.ndarray = np.column_stack((points.values, points.scores)).astype(np.float32)
+        timestamp, cam_poses = by_cam.get(frame.cam_id, (frame.timestamp, {}))
+        cam_poses[track_id] = (box, arrays)
+        by_cam[frame.cam_id] = (max(timestamp, frame.timestamp), cam_poses)
+    return by_cam
+
+
+def frame_poses(frames: FrameDict, arrival: float) -> list[FramePoses]:
+    """The RAW stage's poses as the recorder keeps them, one per camera, handed over at `arrival`."""
+    return [FramePoses(cam_id, timestamp, poses, arrival) for cam_id, (timestamp, poses) in pose_arrays(frames).items()]
+
+
 @dataclass(frozen=True)
 class RecordedCapture:
     """One capture as the recorder writes it: the color frame, its depth (None without depth recorded or sent), the
@@ -59,7 +84,6 @@ class RecordedCapture:
 
 
 RecordedCaptureCallback: TypeAlias = Callable[[RecordedCapture], None]
-PosesPacker: TypeAlias = Callable[[Any, float], list[FramePoses]]     # the app's poses and their arrival, per camera
 
 
 class _Part(IntEnum):
@@ -107,12 +131,9 @@ def _later(stream: CaptureStream, timestamp: float) -> bool:
 
 
 class RecordingSync(Thread):
-    def __init__(self, with_depth: bool, pack_poses: PosesPacker) -> None:
-        """`pack_poses`: the app's poses and their arrival into `FramePoses`, one per camera; the recording knows no
-        pose frames, so the app that has them hands this in."""
+    def __init__(self, with_depth: bool) -> None:
         super().__init__(daemon=True, name='RecordingSync')
         self.with_depth: bool = with_depth
-        self._pack_poses: PosesPacker = pack_poses
         self._cameras_lock: Lock = Lock()
         self._cameras: dict[int, _Camera] = {}
         self._expected: dict[int, tuple[bool, bool]] = {}      # each camera's parts said ahead: (tracklets, poses)
@@ -234,9 +255,9 @@ class RecordingSync(Thread):
         """Whether the pose model was asked poses for the camera's frame captured at `timestamp`."""
         self._queue(_Part.ASKED, (cam_id, timestamp, asked))
 
-    def submit_poses(self, poses: Any, arrival: float) -> None:
-        """The app's poses as they came out, handed over at `arrival`; packed into `FramePoses` on the sync's thread
-        (`pack_poses`)."""
+    def submit_poses(self, poses: FrameDict, arrival: float) -> None:
+        """The RAW stage's poses as they came out, handed over at `arrival`; packed into `FramePoses` on the sync's
+        thread (`frame_poses`)."""
         self._queue(_Part.POSES, (poses, arrival))
 
     def flush(self) -> None:
@@ -266,8 +287,8 @@ class RecordingSync(Thread):
             value.set()
             return
         if part == _Part.POSES:
-            for frame_poses in self._pack_poses(*value):
-                self._take_part(_Part.POSES, frame_poses)
+            for packed in frame_poses(*value):
+                self._take_part(_Part.POSES, packed)
             return
         self._take_part(part, value)
 

@@ -15,10 +15,9 @@ from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, TrackerFrameSource
-from modules.pose import configure_features
+from modules.pose import FrameDict, configure_features, has_points
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import pose, person, CropExtractor, GpuDepth, GpuImage, has_points, RecordedPoses, Depth, InferenceFrame, InferenceFrameSync, Poses, SerialUploader, frame_poses
-from modules.pose import FrameDict
+from modules.inference import pose, person, CropExtractor, GpuDepth, GpuImage, RecordedPoses, Depth, InferenceFrame, InferenceFrameSync, Poses, SerialUploader
 from modules.utils import FPS, PerformanceTimer
 
 from .board import RenderBoard
@@ -69,7 +68,7 @@ class DeepFlowMain:
         self.cameras: list[CameraSource] = []
         self.player: Player | None = None
         # Live and in -sim: a recording played can be recorded again, with what the app found in it (its poses)
-        self.recorder: Recorder = Recorder(self.settings.camera.recorder, frame_poses, data_path=DATA_PATH)
+        self.recorder: Recorder = Recorder(self.settings.camera.recorder, data_path=DATA_PATH)
         self.session = Session(self.settings.camera.control)       # splits the recording into chunks
         self.person_detector: person.PersonDetector | None = None      # the replay backend's, shared by its cameras
         if self.settings.camera.sim_enabled:
@@ -217,7 +216,7 @@ class DeepFlowMain:
 
     def _record_poses(self, frames: FrameDict) -> None:
         """The RAW stage's poses, on the pose model's thread, to the recorder as they are: their hand-over, stamped
-        here; the recorder packs them on its own thread (`frame_poses`)."""
+        here; the recorder packs them on its own thread."""
         self.recorder.submit_poses(frames, time.perf_counter())
 
     def _on_tracklets(self, cam_tracklets: CameraTracklets) -> None:

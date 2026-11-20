@@ -60,6 +60,10 @@ To add a new feature to the system:
 from __future__ import annotations
 from typing import Callable, Any, TypeAlias, TypeVar, TYPE_CHECKING
 
+import numpy as np
+
+from ..features import Points2D
+
 if TYPE_CHECKING:
     from ..features import BaseFeature
 
@@ -148,6 +152,11 @@ def replace(frame: Frame, updates: dict[type[BaseFeature], BaseFeature], timesta
         timestamp=frame._timestamp if timestamp is None else timestamp,
         features=merged,
     )
+
+
+def has_points(frame: Frame) -> bool:
+    """Whether a pose carries keypoints: any point with a score."""
+    return bool(np.any(frame[Points2D].scores > 0.0))
 
 
 FrameCallback: TypeAlias =      Callable[[Frame], Any]

@@ -1,17 +1,14 @@
-"""The host's poses recorded with the video, and played back in place of the pose model.
+"""The host's poses recorded with the video, played back in place of the pose model. The recorder packs them
+(`modules.recording.frame_poses`).
 
-Recording: `frame_poses` turns the RAW stage's poses into what the camera's recorder keeps of them (`FramePoses`,
-per camera: each pose's crop box and the model's points with their scores, by track_id), stamped with their
-arrival, the one clock read for them: the poses come from the host's pipeline, not from a camera backend. An app
-hands it to its recorder, which runs it on its own thread.
-
-Playback: `RecordedPoses` is the RAW stage's async output in -sim, between the crop step and the pose model: it
-takes the crop step's poses with their crops (`submit`, an `ImageCallback`) and emits the stage's poses. It hears the
-player's frames (`set_clip_frame`, a `ClipFrameCallback`) and keeps each frame's recorded poses by its capture on the
-play's clock, the stamp the crops give the stage's poses. With `enabled` on, it sets each cropped pose's box and points
-from the recording by track_id, without the pose model. It is a player: its own thread makes each frame's poses at
-the moment the recorded latency gives it, and calls the callbacks itself; a frame the recording has no poses for sends none, and a pose it has no track_id for goes on without points,
-counted. With `enabled` off, the crops go to the pose model, as live.
+`RecordedPoses` is the RAW stage's async output in -sim, between the crop step and the pose model: it takes the crop
+step's poses with their crops (`submit`, an `ImageCallback`) and emits the stage's poses. It hears the player's frames
+(`set_clip_frame`, a `ClipFrameCallback`) and keeps each frame's recorded poses by its capture on the play's clock, the
+stamp the crops give the stage's poses. With `enabled` on, it sets each cropped pose's box and points from the
+recording by track_id, without the pose model. It is a player: its own thread makes each frame's poses at the moment
+the recorded latency gives it, and calls the callbacks itself; a frame the recording has no poses for sends none, and
+a pose it has no track_id for goes on without points, counted. With `enabled` off, the crops go to the pose model, as
+live.
 """
 
 import heapq
@@ -22,7 +19,7 @@ from threading import Lock, Thread
 import numpy as np
 
 from modules.camera import CaptureStream, FrameType, MissedParts
-from modules.recording import FrameMetadata, FramePoses, PoseArrays
+from modules.recording import FrameMetadata, PoseArrays
 from modules.pose import BBox, Frame, FrameDict, FrameDictCallbackMixin, Points2D, replace
 from modules.settings import BaseSettings, Field
 from modules.utils import Rect, Waker
@@ -37,27 +34,6 @@ KEPT: int = 32          # recorded frames kept per camera: the stage asks for a 
 
 class RecordedPosesSettings(BaseSettings):
     enabled: Field[bool] = Field(False, description="Play the recording's poses in place of the pose model")
-
-
-def pose_arrays(frames: FrameDict) -> dict[int, tuple[float, PoseArrays]]:
-    """The poses with points, per camera: their frame's capture time and each pose's box and points."""
-    by_cam: dict[int, tuple[float, PoseArrays]] = {}
-    for track_id, frame in frames.items():
-        points: Points2D = frame[Points2D]
-        if not np.any(points.scores > 0.0):
-            continue
-        rect: Rect = frame[BBox].to_rect()
-        box: np.ndarray = np.array([rect.x, rect.y, rect.width, rect.height], dtype=np.float32)
-        arrays: np.ndarray = np.column_stack((points.values, points.scores)).astype(np.float32)
-        timestamp, cam_poses = by_cam.get(frame.cam_id, (frame.timestamp, {}))
-        cam_poses[track_id] = (box, arrays)
-        by_cam[frame.cam_id] = (max(timestamp, frame.timestamp), cam_poses)
-    return by_cam
-
-
-def frame_poses(frames: FrameDict, arrival: float) -> list[FramePoses]:
-    """The RAW stage's poses as the recorder keeps them, one per camera, handed over at `arrival`."""
-    return [FramePoses(cam_id, timestamp, poses, arrival) for cam_id, (timestamp, poses) in pose_arrays(frames).items()]
 
 
 def recorded_pose(frame: Frame, box: np.ndarray, points: np.ndarray) -> Frame:
