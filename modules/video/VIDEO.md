@@ -273,8 +273,18 @@ The fluid goes on where it stopped, and the secondary windows keep the show's la
 `freeze_frame`, the apps' switch that holds the camera frame while the fluid runs on with it. In deep_flow (`-sim`,
 UHD portrait 4:4:4, 60 Hz with v_sync) **(measured 2026-11-20)**: playing the middle half of a held 3.85 s take for
 6 s, the ticks were 16.66 ms on average (p95 19.3 ms, none over 25 ms; idle 16.89 ms, 8 % over 25 ms), the motion and
-the fluid did no work, and the preview drew 118 different frames; after play the fluid ran on, with one tick of
-99.6 ms as it did.
+the fluid did no work, and the preview drew 118 different frames; after play the fluid ran on.
+
+The show's first ticks after play are its ordinary ones. Four plays of 2 s, each followed by 3 s of show, against four
+3 s windows of show without play (deep_flow `-sim`, 20261112-130105_show) **(measured 2026-11-20)**:
+
+| Window                | Resume tick (ms) | Slowest tick (ms) | Fluid's update in it (ms) |
+|-----------------------|------------------|-------------------|---------------------------|
+| 3 s after play        | 16.1–22.1        | 37.6–64.5         | 1.5–35.0                  |
+| 3 s of show, no play  |                  | 33.2–35.7         | 13.9–17.5                 |
+
+The fluid's update is the CPU time of its GL calls; a long one waits on the GPU **(deduction)**. A single 99.6 ms tick
+seen once after play did not come back in these four.
 
 ### Look back
 
