@@ -3,6 +3,9 @@ latency."""
 
 import logging
 import time
+from collections.abc import Callable
+from datetime import timedelta
+from typing import cast
 
 import depthai as dai
 import numpy as np
@@ -12,13 +15,14 @@ logger = logging.getLogger(__name__)
 LATENCY_SMOOTHING: float = 0.1      # how hard each frame pulls the latency reading
 
 _future_capture_warned: bool = False     # a capture time after now is logged once per run
+clock_now: Callable[[], timedelta] = cast(Callable[[], timedelta], dai.Clock.now)  # static; the stub says a method
 
 
 def packed_nv12(frame: dai.ImgFrame) -> np.ndarray:
     """The frame's Y rows then its interleaved UV rows, without the chip's padding: `getData` holds
     each row at the stride and the UV below a padded plane. A new array, safe to keep."""
     width, height, stride = frame.getWidth(), frame.getHeight(), frame.getStride()
-    data: np.ndarray = frame.getData()
+    data: np.ndarray = cast(np.ndarray, frame.getData())
     uv_start: int = stride * frame.getPlaneHeight()
     y: np.ndarray = data[:stride * height].reshape(height, stride)[:, :width]
     uv: np.ndarray = data[uv_start:uv_start + stride * (height // 2)].reshape(height // 2, stride)[:, :width]
@@ -32,7 +36,7 @@ def capture_time(message: dai.ImgFrame | dai.Tracklets | dai.ImgDetections) -> f
     capture time after now cannot be, so such a message is stamped with its arrival instead."""
     global _future_capture_warned
     now: float = time.perf_counter()
-    latency: float = (dai.Clock.now() - message.getTimestamp()).total_seconds()
+    latency: float = (clock_now() - message.getTimestamp()).total_seconds()
     if latency >= 0.0:
         return now - latency
     if not _future_capture_warned:
@@ -45,5 +49,5 @@ def capture_time(message: dai.ImgFrame | dai.Tracklets | dai.ImgDetections) -> f
 def smoothed_latency(previous: float, message: dai.ImgFrame | dai.Tracklets) -> float:
     """The latency reading in ms after this message, capture to arrival, on depthai's clock because
     the message's timestamp is. A reading for the panel; the frame's time is `capture_time`."""
-    latency: float = (dai.Clock.now() - message.getTimestamp()).total_seconds() * 1000.0
+    latency: float = (clock_now() - message.getTimestamp()).total_seconds() * 1000.0
     return latency if previous == 0.0 else previous + LATENCY_SMOOTHING * (latency - previous)

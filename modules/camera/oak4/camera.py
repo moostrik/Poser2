@@ -335,9 +335,10 @@ class Camera(Thread):
             self._video_transformation = msg.getTransformation()
         if msg.getType() == dai.ImgFrame.Type.NV12:
             if self._intrinsics is None:
-                self._intrinsics = msg.getTransformation().getIntrinsicMatrix()
-                self.settings.readings.fov_factory = rectilinear_field(self._intrinsics[0][0], self._intrinsics[0][2], self.frame_size[0])
-                logger.info(f'{self.device_id} delivered lens: {self._intrinsics}, field {self.settings.readings.fov_factory:.1f} deg')
+                intrinsics: list[list[float]] = cast(list[list[float]], msg.getTransformation().getIntrinsicMatrix())
+                self._intrinsics = intrinsics
+                self.settings.readings.fov_factory = rectilinear_field(intrinsics[0][0], intrinsics[0][2], self.frame_size[0])
+                logger.info(f'{self.device_id} delivered lens: {intrinsics}, field {self.settings.readings.fov_factory:.1f} deg')
             self._emit_frame(FrameType.VIDEO, packed_nv12(msg), timestamp, arrival, nv12=True, readings=self._frame_readings())
         else:
             self._emit_frame(FrameType.VIDEO, msg.getCvFrame(), timestamp, arrival, readings=self._frame_readings())
