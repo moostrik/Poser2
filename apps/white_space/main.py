@@ -47,59 +47,59 @@ class WhiteSpaceMain:
         preset_file = presets.startup_path()
         if not presets.load(self.settings, preset_file):
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
-        self.settings.camera.sim_enabled = simulation
+        self.settings.setup.camera.sim_enabled = simulation
         if not interface:
-            self.settings.panel.browser = False  # launcher override; the preset cannot turn it back on
+            self.settings.setup.panel.browser = False  # launcher override; the preset cannot turn it back on
         # The crop is the pose model's input, so it is cut at that size: one antialiased resample
         # from the camera frame, rather than a larger crop the runner scales down again. Derived
         # from the model so a change of pose resolution cannot silently reintroduce the second one.
-        crop_settings = self.settings.pose.pose_crop
-        crop_settings.output_width = self.settings.pose.pose.width
-        crop_settings.output_height = self.settings.pose.pose.height
+        crop_settings = self.settings.setup.pose.pose_crop
+        crop_settings.output_width = self.settings.setup.pose.pose.width
+        crop_settings.output_height = self.settings.setup.pose.pose.height
         self.settings.initialize()
-        self.panel_server = PanelServer(self.settings, self.settings.panel, on_exit=self.stop)
+        self.panel_server = PanelServer(self.settings, self.settings.setup.panel, on_exit=self.stop)
 
-        max_players: int = self.settings.max_players
-        num_cams: int = self.settings.camera.num_cams
+        max_players: int = self.settings.setup.max_players
+        num_cams: int = self.settings.setup.camera.num_cams
         logger.info("Settings loaded: %s players, %s cameras, simulation=%s", max_players, num_cams, simulation)
-        ps = self.settings.pose
+        ps = self.settings.setup.pose
 
         # BLACKBOARD
         self.board = RenderBoard()
 
         # RECORDING (independent of the show — works stand-alone and during session mode)
-        self.session = Session(self.settings.session.control)
-        self.osc_sound_sender = OscSoundSender(self.settings.inout.osc_sound_sender)
+        self.session = Session(self.settings.setup.session.control)
+        self.osc_sound_sender = OscSoundSender(self.settings.setup.inout.osc_sound_sender)
         # The dummy has its own id above the live players: a source of the LERP stage, polled on the light
         # tick, so it is a pose like any other from there.
-        self.dummy = Dummy(self.settings.pose_instrument.dummy, ps.angle_extractor, ps.angle_calibrator, dummy_id(max_players),
+        self.dummy = Dummy(self.settings.setup.pose_instrument.dummy, ps.angle_extractor, ps.angle_calibrator, dummy_id(max_players),
                            Path(DATA_PATH) / "poses.json")
-        self.video_recorder = VideoRecorder(self.settings.session.video, data_path=DATA_PATH)
+        self.video_recorder = VideoRecorder(self.settings.setup.session.video, data_path=DATA_PATH)
 
         # CAMERA
         self.cameras: list[CameraSource] = []
         self.player: Player | None = None
         self.person_detector: person.PersonDetector | None = None      # the replay backend's, shared by its cameras
-        if self.settings.camera.sim_enabled:
+        if self.settings.setup.camera.sim_enabled:
             # The rig is uniform: mono cameras decode their clips straight to gray
-            gray = not self.settings.camera.cameras[0].color
-            self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH, gray=gray)
-            if self.settings.camera.simulator.replay:
+            gray = not self.settings.setup.camera.cameras[0].color
+            self.player = Player(self.settings.setup.camera.simulator, data_path=DATA_PATH, gray=gray)
+            if self.settings.setup.camera.simulator.replay:
                 # the recordings on the host, without a device: the people found and followed here
-                if self.settings.camera.yolo:
-                    self.person_detector = person.PersonDetector(self.settings.camera.person_detector)
+                if self.settings.setup.camera.yolo:
+                    self.person_detector = person.PersonDetector(self.settings.setup.camera.person_detector)
                 for i in range(num_cams):
-                    self.cameras.append(replay.Camera(self.player, self.settings.camera.cameras[i], self.person_detector, replay.Tracker(), i))
+                    self.cameras.append(replay.Camera(self.player, self.settings.setup.camera.cameras[i], self.person_detector, replay.Tracker(), i))
             else:
                 for i in range(num_cams):
-                    self.cameras.append(ClipCamera(self.player, self.settings.camera.cameras[i]))
+                    self.cameras.append(ClipCamera(self.player, self.settings.setup.camera.cameras[i]))
         else:
             for i in range(num_cams):
-                self.cameras.append(Camera(self.settings.camera.cameras[i]))
-        self.frame_sync: CameraSync[CameraFrame] = CameraSync(self.settings.camera.frame_sync, 'frame_sync')
+                self.cameras.append(Camera(self.settings.setup.camera.cameras[i]))
+        self.frame_sync: CameraSync[CameraFrame] = CameraSync(self.settings.setup.camera.frame_sync, 'frame_sync')
         self.uploader = BatchUploader()          # a synced set of the cameras' frames onto the GPU as one batch, on its own thread
-        self.tracker = PanoramicTracker(self.settings.tracker, max_players, num_cams)
-        self.tracklet_sync: CameraSync[CameraTracklets] = CameraSync(self.settings.camera.tracklet_sync, 'tracklet_sync')
+        self.tracker = PanoramicTracker(self.settings.setup.tracker, max_players, num_cams)
+        self.tracklet_sync: CameraSync[CameraTracklets] = CameraSync(self.settings.setup.camera.tracklet_sync, 'tracklet_sync')
         # The frame domain's async step: the crop step in, the pose model out
         self.crops = CropExtractor(ps.pose_crop)
         self.pose_estimator = pose.PoseEstimator(ps.pose)
@@ -117,7 +117,7 @@ class WhiteSpaceMain:
         # What each camera's captures wait for from the first: live and through the clip camera, the device sends
         # tracklets (a replay's come or not with the recording); the crop step says per set whether it asked poses
         # (`_on_asked`)
-        device_tracklets: bool = not (self.settings.camera.sim_enabled and self.settings.camera.simulator.replay)
+        device_tracklets: bool = not (self.settings.setup.camera.sim_enabled and self.settings.setup.camera.simulator.replay)
         for i in range(num_cams):
             self.video_recorder.expect_parts(i, tracklets=device_tracklets, poses=True)
 
@@ -151,9 +151,9 @@ class WhiteSpaceMain:
         # primaries (JSONL under data/diagnosis), for dissecting identity incidents offline.
         # Always wired; `session.journal.enabled` (panel, preset or `launcher.py -journal`) toggles
         # capture live, one folder per capture, and the taps return on a flag check while off.
-        self.tracker_journal = TrackerJournal(self.settings.session.journal, data_path=DATA_PATH,
+        self.tracker_journal = TrackerJournal(self.settings.setup.session.journal, data_path=DATA_PATH,
                                               meta_provider=self._journal_meta,
-                                              track_provider=self.settings.tracker.to_dict)
+                                              track_provider=self.settings.setup.tracker.to_dict)
         for camera in self.cameras:
             camera.add_tracklet_callback(self.tracker_journal.submit_cam_tracklets)
         self.tracker.add_observation_callback(self.tracker_journal.submit_observations)
@@ -166,7 +166,7 @@ class WhiteSpaceMain:
         # the light tick drives the output domain (LERP, where the dummy joins).
         # Every stage's frames and group record go to the board, which also reads each stage's window; the sound
         # reads LERP, and so do the instrument and the state machine (the group sync on the LERP record).
-        self.pipeline = PosePipeline(pipeline_spec(ps, self.settings.light, self.frame_source, self.crops, self.pose_estimator,
+        self.pipeline = PosePipeline(pipeline_spec(ps, self.settings.setup.light, self.frame_source, self.crops, self.pose_estimator,
                                                    self.dummy, self._column_to_azimuth, self.board.get_playhead_phase,
                                                    self.board.get_playhead_bars))
         for stage in Stage:
@@ -178,14 +178,14 @@ class WhiteSpaceMain:
 
         # WS PIPELINE — light output
         # The show reads LERP poses: the stable eye azimuth, and the only stage with PlayheadOffset.
-        self.conductor = Conductor(self.settings.light, self.settings.pose_instrument, board=self.board, pose_stage=int(Stage.LERP))
+        self.conductor = Conductor(self.settings.setup.light, self.settings.setup.pose_instrument, board=self.board, pose_stage=int(Stage.LERP))
         # One receiver per domain, matching each source's actual transport: the fixture
         # firmware sends the fall as a plain UDP text packet (not OSC) to the light
         # receiver's port; Max sends /WS/idle/blue/left and /right as real OSC (the UDP
         # receiver could never decode their float args). Don't cross-bind them.
-        self.osc_light_sender   = OscLightSender(self.settings.inout.osc_light_sender, self.settings.light.motor)
-        self.udp_light_receiver = UdpLightReceiver(self.settings.inout.udp_light_receiver)
-        self.osc_sound_receiver = OscReceiver(self.settings.inout.osc_sound_receiver)
+        self.osc_light_sender   = OscLightSender(self.settings.setup.inout.osc_light_sender, self.settings.setup.light.motor)
+        self.udp_light_receiver = UdpLightReceiver(self.settings.setup.inout.udp_light_receiver)
+        self.osc_sound_receiver = OscReceiver(self.settings.setup.inout.osc_sound_receiver)
         self.udp_light_receiver.bind("/WS/sensor/fall", self.conductor.set_fall)
         # Sound levels from Max (one 0..1 float each) → board → the beam_blue_sound layer.
         self.osc_sound_receiver.bind("/WS/idle/blue/left",  self._on_sound_level_left)
@@ -196,7 +196,7 @@ class WhiteSpaceMain:
         # STATE MACHINE — the show's single decision maker; commands the Conductor through
         # its three channels (look, layer resets, motor) and emits state to board + OSC.
         self.state_machine = StateMachine(
-            self.settings.states, self.settings.light, board=self.board,
+            self.settings.setup.states, self.settings.setup.light, board=self.board,
             set_mix=self.conductor.set_mix,
             reset_layers=self.conductor.reset_layers,
             set_motor=self.conductor.set_motor_mode,
@@ -206,11 +206,11 @@ class WhiteSpaceMain:
 
         # CAMERA HEALTH — compares each camera's own IMU reading and frame rate against the preset,
         # and summarises them as pinned indicators. A setup aid; nothing downstream reads it.
-        self.camera_health = CameraHealth(self.settings.camera.cameras, self.settings.camera.camera_health)
+        self.camera_health = CameraHealth(self.settings.setup.camera.cameras, self.settings.setup.camera.camera_health)
 
         # RENDER
-        self.render = WhiteSpaceRender(self.board, self.settings.render, self.settings.windows, self.settings.tracker,
-                                       self.settings.camera.cameras, self.settings.camera.camera_health, ps.angle_extractor)
+        self.render = WhiteSpaceRender(self.board, self.settings.setup.render, self.settings.setup.windows, self.settings.setup.tracker,
+                                       self.settings.setup.camera.cameras, self.settings.setup.camera.camera_health, ps.angle_extractor)
         self.render.add_update_callback(self.camera_health.update)
         self.render.add_update_callback(self._update_drops)
         # In order: LERP first, which stamps this tick's hit on the poses and writes the streak and the group
@@ -266,7 +266,7 @@ class WhiteSpaceMain:
         """A set's poses for one camera, on the frame source's thread: the recorder hears whether poses come for the
         camera's image (the pose model asked, or the camera's own keypoints handed on), so a frame without a player
         does not wait."""
-        posing: bool = self.settings.pose.pose.enabled or any(has_points(frame) for frame in asked.values())
+        posing: bool = self.settings.setup.pose.pose.enabled or any(has_points(frame) for frame in asked.values())
         self.video_recorder.expect_poses(cam_id, timestamp, bool(asked) and posing)
 
     def _record_poses(self, frames: FrameDict) -> None:
@@ -276,7 +276,7 @@ class WhiteSpaceMain:
 
     def _update_drops(self, _now: float) -> None:
         """The panel's drops, counted where they happen (the frame source's are on its own panel)."""
-        cadence = self.settings.cadence
+        cadence = self.settings.setup.cadence
         cadence.frame_sync_drops = self.frame_sync.dropped
         cadence.tracklet_sync_drops = self.tracklet_sync.dropped
         cadence.upload_drops = self.uploader.dropped
@@ -293,13 +293,13 @@ class WhiteSpaceMain:
 
     def _journal_meta(self) -> dict:
         """The journal's meta line: the numbers an offline analysis recomputes the gates from."""
-        sim = self.settings.camera.simulator
+        sim = self.settings.setup.camera.simulator
         return {
             'app': APP_NAME,
-            'num_cams': self.settings.camera.num_cams,
-            'max_players': self.settings.max_players,
-            'fps': self.settings.camera.fps,
-            'track': self.settings.tracker.to_dict(),
+            'num_cams': self.settings.setup.camera.num_cams,
+            'max_players': self.settings.setup.max_players,
+            'fps': self.settings.setup.camera.fps,
+            'track': self.settings.setup.tracker.to_dict(),
             'source': {'folder': sim.folder, 'start': sim.in_out[0], 'end': sim.in_out[1]}
                       if self.player else None,
         }

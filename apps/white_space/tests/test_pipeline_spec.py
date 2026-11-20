@@ -37,12 +37,12 @@ class PipelineSpecTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
         self.settings = Settings()
-        ps = self.settings.pose
-        self.players = self.settings.max_players
+        ps = self.settings.setup.pose
+        self.players = self.settings.setup.max_players
         configure_features(self.players)                     # the track features' width, as main.py sets it
-        self.dummy = Dummy(self.settings.pose_instrument.dummy, ps.angle_extractor, ps.angle_calibrator,
+        self.dummy = Dummy(self.settings.setup.pose_instrument.dummy, ps.angle_extractor, ps.angle_calibrator,
                            dummy_id(self.players), Path(self.tmp.name) / 'poses.json')
-        self.pipeline = PosePipeline(pipeline_spec(ps, self.settings.light, _Source(list(range(self.players))), *[_Async()] * 2,
+        self.pipeline = PosePipeline(pipeline_spec(ps, self.settings.setup.light, _Source(list(range(self.players))), *[_Async()] * 2,
                                                    self.dummy, lambda _cam, x: x, lambda: 0.25, lambda: 0.0))
 
     def tearDown(self) -> None:
@@ -62,8 +62,8 @@ class PipelineSpecTest(unittest.TestCase):
         groups: list[GroupRecord] = []
         self.pipeline.add_frames_callback(Stage.LERP, out.append)
         self.pipeline.add_group_callback(Stage.LERP, groups.append)
-        self.settings.pose_instrument.dummy.enabled = True
-        self.settings.pose_instrument.dummy.morph = 0.0
+        self.settings.setup.pose_instrument.dummy.enabled = True
+        self.settings.setup.pose_instrument.dummy.morph = 0.0
         self.pipeline.update(Domain.OUTPUT, 1.0)
         self.pipeline.update(Domain.OUTPUT, 1.5)             # the age counts from the second tick
         self.assertEqual(set(out[-1]), {dummy_id(self.players)})

@@ -403,7 +403,8 @@ class WindowsSettings(WindowManagerSettings):
     window_0: Group[WindowSettings]        = Group(WindowSettings)
 
 
-class Settings(BaseSettings):
+class SetupSettings(BaseSettings):
+    """The machine and the site: the cameras, the tracker, the pose, the light, the render and the links."""
     max_players     : Field[int]   = Field(4, access=Field.INIT, description="Players tracked at most: the id slots 0..N−1")
     num_cams     : Field[int]   = Field(4, access=Field.INIT)
     input_fps       : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
@@ -438,3 +439,7 @@ class Settings(BaseSettings):
     states : Group[StateMachineSettings] = Group(StateMachineSettings, share=[spin_down_seconds])
     cadence: Group[CadenceSettings] = Group(CadenceSettings)
     panel : Group[PanelSettings]    = Group(PanelSettings)
+
+
+class Settings(BaseSettings):
+    setup: Group[SetupSettings] = Group(SetupSettings)

@@ -84,13 +84,13 @@ def main() -> int:
     def load_for_replay(settings, path) -> bool:
         """The startup preset, then the replay with the detector: both are read when the app builds its cameras."""
         loaded: bool = load(settings, path)
-        settings.camera.simulator.replay = True
-        settings.camera.yolo = True
+        settings.setup.camera.simulator.replay = True
+        settings.setup.camera.yolo = True
         return loaded
     presets.load = load_for_replay
     app = WhiteSpaceMain(simulation=True, interface=False)
     presets.load = load
-    settings = app.settings
+    settings = app.settings.setup
     settings.camera.simulator.folder = args.folder
     settings.pose.pose.enabled = True
 

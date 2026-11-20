@@ -20,7 +20,7 @@ DT = 1.0 / 30.0
 class RegimeSwitchTest(unittest.TestCase):
 
     def setUp(self) -> None:
-        settings = Settings()
+        settings = Settings().setup
         self.conductor = Conductor(settings.light, settings.pose_instrument, board=RenderBoard(), pose_stage=int(Stage.LERP))
         self.frames: list[LightFrame] = []
         self.conductor.add_light_frame_callback(self.frames.append)
