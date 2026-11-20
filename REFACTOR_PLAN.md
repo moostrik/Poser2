@@ -14,7 +14,7 @@ What is to do now, across the threads, in order. Lines with the same number run 
 
 | # | Who                 | What                                                                                     | After            |
 |---|---------------------|------------------------------------------------------------------------------------------|------------------|
-| 1 | Refactor            | The timing issue: one `Waker` for every loop on a deadline (B1, B2)                      |                  |
+| 1 | Refactor            | What holds the GIL on a hot path: `py-spy --gil` of each app (B3)                        |                  |
 | 1 | Refactor            | Board held up to the rules, then one package at a time (A)                               |                  |
 | 2 | Camera              | Depth confidence from the camera to the motion (CAMERA_PLAN.md A)                        |                  |
 | 3 | GL Window           | The window manager: GLFW on the main thread, one kind of window, frame pacing (GL_PLAN.md)| the camera plan |
@@ -61,60 +61,47 @@ Done: camera (14 Nov), render (its plan built and removed), hd_trio (G5). Held u
 
 ## B. The timing issue: Windows' 15.6 ms tick
 
-A wait's timeout ends on Windows' 15.6 ms tick (CLAUDE.md, Time), so a loop paced by one comes up to 15.6 ms late
-**(seen: 18 ms asked, 31.3 ms waited)**. `wait_until` sleeps its last ~17.5 ms, so a signal in that time wakes it up
-to ~17 ms late **(seen)**: it fits a loop that only paces, not one a new item must wake at once. Built: the recording
-player (`StreamReader`), `ArtNetBars` (40.0 frames a second at 40 fps, from 32.0).
+A wait's timeout ends on Windows' 15.6 ms tick (CLAUDE.md, Time). Built: every loop on a deadline waits on a
+`utils.Waker`, a high-resolution waitable timer and an event waited on together (the recording player, `ArtNetBars`,
+the replay camera's tracklets, smile's camera, `InferenceFrameSync`, `RecordedPoses`). A 1 ms system tick
+(`timeBeginPeriod(1)`) was measured against it and not taken: Windows 11 drops it while the window is minimized.
+The high-resolution timer (`CREATE_WAITABLE_TIMER_HIGH_RESOLUTION`, Windows 10 1803 on) is not tied to the system
+tick; `time.sleep` uses it since Python 3.11, and on Linux a timed `threading.Event.wait` is already this precise
+**(deduction, from the documentation)**.
 
-A 1 ms system tick, `timeBeginPeriod(1)` at the process's start, against none **(seen 2026-11-20)**: 200 waits each
-in a script, and deep_flow `-sim` on `20261112-125832_measure` (pose model on, recorded tracklets, 30 s measured).
-A notify wakes a waiting thread at once either way (0.02 ms), and `time.sleep` is precise without the tick. The tick
-holds only while the app's window is shown: minimized, Windows 11 drops it.
+200 waits each in a script, and deep_flow `-sim` on `20261112-125832_measure` (pose model on, recorded tracklets,
+30 s measured after 10 s warm-up) **(seen 2026-11-20)**:
 
-| What (ms)                                              | Without             | With                |
-|--------------------------------------------------------|---------------------|---------------------|
-| `Event.wait(0.001)`, mean / p95                        | 15.6 / 16.2         | 1.6 / 2.1           |
-| `Event.wait(0.018)`, mean / p95                        | 31.1 / 32.0         | 18.5 / 19.0         |
-| `time.sleep(0.001)`, mean / p95                        | 1.6 / 1.7           | 1.5 / 1.7           |
-| the player's frame gaps, mean / p95 / max              | 20.0 / 22.2 / 38.6  | 20.0 / 22.1 / 38.4  |
-| the replay tracklets, late, mean / p95 / max           | 7.9 / 14.5 / 16.7   | 0.7 / 1.5 / 2.6     |
-| the same, the window minimized, mean / p95             | 7.7 / 14.5          | 7.9 / 14.7          |
-| `Event.wait(0.001)` in the app, minimized, mean / p95  | 15.6 / 16.5         | 15.7 / 16.8         |
-| the poses (RAW) after their capture, mean / p95        | 41.2 / 49.1         | 39.8 / 44.6         |
-| the process's CPU, cores                               | 15.75               | 15.63               |
+| What (ms)                                              | No tick             | 1 ms tick           | Waker               |
+|--------------------------------------------------------|---------------------|---------------------|---------------------|
+| a 1 ms wait, waited, mean / p95                        | 15.6 / 16.2         | 1.6 / 2.1           | 1.5 / 1.6           |
+| the same, the window minimized                         |                     |                     | 1.6 / 1.8           |
+| an 18 ms wait, waited, mean / p95                      | 31.1 / 32.0         | 18.5 / 19.0         | 18.4 / 18.7         |
+| the same, the window minimized                         |                     |                     | 18.4 / 18.7         |
+| a wake to waking, mean / p95                           | 0.02 (notify)       | 0.02 (notify)       | 0.09 / 0.23         |
+| `time.sleep(0.001)`, mean / p95                        | 1.6 / 1.7           | 1.5 / 1.7           |                     |
+| the player's frame gaps, mean / p95 / max              | 20.0 / 22.2 / 38.6  | 20.0 / 22.1 / 38.4  | 20.0 / 22.2 / 38.2  |
+| the same, the window minimized                         |                     |                     | 20.0 / 21.9 / 30.4  |
+| the replay tracklets, late, mean / p95 / max           | 7.9 / 14.5 / 16.7   | 0.7 / 1.5 / 2.6     | 0.4 / 0.9 / 3.0     |
+| the same, the window minimized, mean / p95             | 7.7 / 14.5          | 7.9 / 14.7          | 0.4 / 1.0           |
+| `Event.wait(0.001)` in the app, minimized, mean / p95  | 15.6 / 16.5         | 15.7 / 16.8         | 15.6 / 16.6         |
+| the poses (RAW) after their capture, mean / p95        | 41.2 / 49.1         | 39.8 / 44.6         | 39.4 / 43.9         |
+| the process's CPU, cores                               | 15.75               | 15.63               | 15.64               |
 
-`InferenceFrameSync`'s deadline was not reached in these runs: no frame waited for its poses.
+The Waker's wait to a wake ran in the script; the run's sync deadline was not reached: no frame waited for its
+poses. Beside a thread busy in pure Python, a wake comes up to one tick late, the Waker's and `time.sleep`'s alike
+(14.6 ms for a 1 ms wait) **(seen)**: the woken thread asks for the GIL with a timed wait **(deduction)**.
 
 Not changed **(seen)**: the session's chunk timer (`chunk_start += chunk_length` keeps it from drifting; a split is
 at most one tick late, every recorder together), white_space's motor sim (its falls are interpolated from
 `perf_counter`, so a late wait does not move them), smile's start loop (a 20 ms poll for loaded clips, at start-up
 only).
 
-The textbook answer, and the one taken: a high-resolution waitable timer (`CREATE_WAITABLE_TIMER_HIGH_RESOLUTION`,
-Windows 10 1803 on) waited on together with a wake event (`WaitForMultipleObjects`). It returns at the deadline to
-about 1 ms, or at once when the event is set, without the system tick, without polling, and whether the window is
-shown or not; `time.sleep` uses the same timer since Python 3.11 **(deduction, from the documentation)**. On Linux
-a timed `threading.Event.wait` is already this precise.
-
-- B1. `Waker` in `modules/utils`: `wait(deadline: float | None) -> bool` (True when woken, False at the deadline;
-  `None` waits for a wake only) and `set()`, which stays set until the next wait takes it, so a wake is never lost;
-  one thread waits on a `Waker`; `close()` frees its handles. Windows: the high-resolution timer and a Win32 event
-  through `ctypes` (the GIL released while waiting); elsewhere a `threading.Event`, cleared before the wait returns
-  so a later `set()` is kept. Checked by its tests (a deadline, a wake, a wake before the wait, `None`, a busy second
-  thread beside it) and 200 waits measured against B's table: lateness at the deadline and from `set()` to waking,
-  mean / p95 / max, with the window shown and minimized.
-- B2. Every loop on a deadline takes a `Waker` in one commit, and `wait_until` goes: the recording player
-  (`StreamReader`), `ArtNetBars`, the replay camera's tracklets, smile's camera image rate, `InferenceFrameSync`
-  and `RecordedPoses` (out of INFERENCE_PLAN.md B). A loop that holds a `Condition` keeps its lock for its data,
-  takes the deadline under it, and waits on the `Waker` outside it; the producer calls `waker.set()` instead of
-  `notify()`. A loop keeps its own stop flag (`stop_event`, `_running`), and stop sets it, then calls `set()`. Each
-  loop closes its `Waker` on teardown. With it: `modules/utils/__init__.py`'s `WAKE_STEP, wait_until` export,
-  `wait_until`'s tests (into the `Waker`'s), VIDEO.md's and INFERENCE.md's lines on the waits. Checked by each
-  package's tests, `InferenceFrameSync`'s and `RecordedPoses`' with a frame that waits for its deadline, and one
-  deep_flow `-sim` run against B's table: the player's frame gaps and the tracklets' lateness, with the window shown
-  and minimized.
-- The rules thread words the rule (CLAUDE.md Time, in place of "Pace a loop with `utils.wait_until`"), with
-  Matthias, before B2 is committed.
+- B3. What holds the GIL on a hot path: one `py-spy record --gil` of each app over 30 s after 10 s warm-up (deep_flow,
+  low_flow, hd_trio in `-sim`; white_space and smile as far as they run without the rig). Every function that holds
+  the GIL more than 1% of the run becomes a step here (numpy, a shader, or off the hot path), each on Matthias's go. A
+  thread busy in pure Python delays every other thread's wake by up to one 15.6 ms tick **(seen with the Waker and
+  `time.sleep`, 2026-11-20)**.
 
 ## C. Checks at the rig
 
@@ -138,5 +125,5 @@ a timed `threading.Event.wait` is already this precise.
 ## The rules it touches
 
 - `CLAUDE.md` Project shape and Packages, what a package holds: A
-- `CLAUDE.md` Time, a thread that waits for a moment waits on a `utils.Waker` (the rules thread's line): B
+- `CLAUDE.md` Concurrency, avoid heavy pure-Python loops in hot paths: B3
 - `CLAUDE.md` Settings, settings connect the user and a component, not two components: Parked
