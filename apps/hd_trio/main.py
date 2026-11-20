@@ -181,7 +181,7 @@ class HDTrioMain:
         # RENDER
         self.render = HDTrioRender(self.board, self.settings.render, self.settings.windows, self.settings.camera.cameras,
                                    self.settings.camera.camera_health, data_path=DATA_PATH)
-        self.settings.windows.loop.bind(WindowManagerSettings.avg_fps, self._on_render_fps)
+        self.settings.windows.bind(WindowManagerSettings.avg_fps, self._on_render_fps)
         self.render.add_update_callback(self.camera_health.update)
         self.render.add_update_callback(self._update_drops)
         self.render.add_update_callback(self.sequencer.update)
@@ -253,7 +253,7 @@ class HDTrioMain:
 
         self.panel_server.stop()
         self.settings.render.intro_sequence.unbind(IntroSequenceSettings.arm_record, self._on_arm_record)
-        self.settings.windows.loop.unbind(WindowManagerSettings.avg_fps, self._on_render_fps)
+        self.settings.windows.unbind(WindowManagerSettings.avg_fps, self._on_render_fps)
         self.sequencer.stop()
 
         self.render.stop()

@@ -33,7 +33,7 @@ class SmileRender(RenderBase):
     Keys: Enter starts a sequence; F fullscreen, Esc quit (the window manager)."""
 
     def __init__(self, settings: RenderSettings, windows: WindowsSettings, walls_settings: WallsSettings, sequencer: Sequencer, grin_player: GrinPlayer, width: int, height: int) -> None:
-        super().__init__(windows.loop, windows.windows)
+        super().__init__(windows)
         self.windows: WindowsSettings = windows
         self.settings: RenderSettings = settings
         self.sequencer: Sequencer = sequencer

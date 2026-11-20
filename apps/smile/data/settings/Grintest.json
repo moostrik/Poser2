@@ -152,12 +152,10 @@
     "bloom_amount": 0.6
   },
   "windows": {
-    "loop": {
-      "title": "SMILE",
-      "v_sync": true,
-      "v_sync_window": 0,
-      "fullscreen_mouse": false
-    },
+    "title": "SMILE",
+    "v_sync": true,
+    "v_sync_window": "window_0",
+    "fullscreen_mouse": false,
     "window_0": {
       "enabled": true,
       "monitor": "M0",

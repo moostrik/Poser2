@@ -30,10 +30,12 @@ class WindowManager:
     _DEFAULT_WIDTH = 1280
     _DEFAULT_HEIGHT = 720
 
-    def __init__(self, renderer: RenderBase, settings: WindowManagerSettings, windows: list[WindowSettings]) -> None:
+    def __init__(self, renderer: RenderBase, settings: WindowManagerSettings) -> None:
+        """`settings` an app's `windows` group: the loop's fields and its declared windows."""
         self.renderer = renderer
         self.settings: WindowManagerSettings = settings
-        self.window_settings: list[WindowSettings] = windows          # fixed at start: every window is made
+        self.window_settings: list[WindowSettings] = settings.windows      # fixed at start: every window is made
+        self._window_names: list[str] = settings.window_names
         self.input = WindowInput()
         self.input.add_key_callback(self._on_key)
 
@@ -116,6 +118,10 @@ class WindowManager:
 
         self._monitors = Monitor.connected()
         self._write_connected()
+        if self.settings.v_sync_window not in self._window_names:
+            logger.warning("v_sync_window %r is not one of the windows %s, using %s", self.settings.v_sync_window,
+                           self._window_names, self._window_names[0])
+            self.settings.v_sync_window = self._window_names[0]
         title: str = self.settings.title
         with self._window_lock:
             for index, settings in enumerate(self.window_settings):
@@ -205,6 +211,9 @@ class WindowManager:
         for window in self._windows:
             window.write_move(self._monitors, mouse)
             window.apply(window.placement(self._monitors, mouse))
+        shown: list[str] = [self._window_names[w.index] for w in self._windows if w.shown]
+        if shown != self.settings.shown_windows:
+            self.settings.shown_windows = shown
         self._apply_swap_intervals()
         for index, window in enumerate(self._windows):
             size: tuple[int, int] = window.framebuffer_size()
@@ -246,7 +255,7 @@ class WindowManager:
             except Exception:
                 logger.exception("Error in draw of window %s", window.index)
         self._draw_timer.add_time((perf_counter() - start) * 1000.0, report=False)
-        v_sync_index: int = self.settings.v_sync_window
+        v_sync_index: int = self._v_sync_index()
         for window in shown:
             if window.index != v_sync_index:
                 window.make_current()
@@ -274,7 +283,8 @@ class WindowManager:
         a period behind the deadline moves to now. Every window hidden and `fps_limit` 0: 60 fps."""
         s = self.settings
         shown: list[Window] = [w for w in self._windows if w.shown]
-        v_synced: bool = s.v_sync and any(w.index == s.v_sync_window for w in shown)
+        v_sync_index: int = self._v_sync_index()
+        v_synced: bool = s.v_sync and any(w.index == v_sync_index for w in shown)
         rate: float = s.fps_limit if s.fps_limit > 0.0 else (0.0 if shown else 60.0)
         if v_synced or rate <= 0.0:
             self._next_frame = 0.0
@@ -291,7 +301,7 @@ class WindowManager:
 
     def _apply_swap_intervals(self) -> None:
         """V-sync on the v-sync window only, the others swapped without it; applied on a change."""
-        wanted: tuple[bool, int] = (self.settings.v_sync, self.settings.v_sync_window)
+        wanted: tuple[bool, int] = (self.settings.v_sync, self._v_sync_index())
         if wanted == self._swap_intervals:
             return
         self._swap_intervals = wanted
@@ -299,6 +309,11 @@ class WindowManager:
             window.make_current()
             glfw.swap_interval(1 if wanted[0] and window.index == wanted[1] else 0)
         self._windows[0].make_current()
+
+    def _v_sync_index(self) -> int:
+        """The v-sync window's index; window 0 for a name that is not one of the windows."""
+        name: str = self.settings.v_sync_window
+        return self._window_names.index(name) if name in self._window_names else 0
 
     # CALLBACKS
     def _on_monitor_change(self, monitor: glfw._GLFWmonitorPointerT, event: int) -> None:

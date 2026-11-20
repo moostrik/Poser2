@@ -4,13 +4,6 @@ The window manager (`modules/gl/window_manager.py`) and its panel are rebuilt on
 keeping to GLFW's threading rules: one kind of window, set by its own settings, on the main thread. Research and
 sources: `window_systems_research.md`. Windows now, Linux kept possible.
 
-## D. Check and document
-
-- D1. Run each app on the PC: start windowed and fullscreen, the operator window off and on, no tearing on the
-  windows without v-sync, fullscreen with the other monitors staying on, resize, drag onto another monitor and save, drag and release, F, the panel moving a
-  window, every window of hd_trio and smile, a monitor unplugged and back. hd_trio's show looks as before (its
-  window layout may change).
-
 ## Later: more to take from Cinder
 
 From knowledge of Cinder's gl, not yet held against our code. Each one is looked at only for what it gains the 2D

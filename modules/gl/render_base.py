@@ -5,7 +5,7 @@ from typing import Any, Callable
 import logging
 
 from .window_manager import WindowManager
-from .window_settings import WindowManagerSettings, WindowSettings
+from .window_settings import WindowManagerSettings
 
 logger = logging.getLogger(__name__)
 
@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 class RenderBase(ABC):
     """A renderer: its update once a frame, its draw in each shown window, on the main thread's window loop."""
 
-    def __init__(self, loop: WindowManagerSettings, windows: list[WindowSettings]) -> None:
-        """`loop` the window loop's settings, `windows` each window's, window 0 first: an app's `windows` group."""
+    def __init__(self, windows: WindowManagerSettings) -> None:
+        """`windows` an app's `windows` group: the window loop's settings and its windows."""
         self._update_callbacks: list[Callable[[float], Any]] = []     # run in registration order
         self._update_lock = Lock()
-        self.window_manager: WindowManager = WindowManager(self, loop, windows)
+        self.window_manager: WindowManager = WindowManager(self, windows)
 
     def add_update_callback(self, callback: Callable[[float], Any]) -> None:
         """Register a per-frame update callback; it gets the frame's time (perf_counter, the stamp of the

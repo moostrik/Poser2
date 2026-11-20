@@ -503,17 +503,12 @@ class CadenceSettings(BaseSettings):
 #  Root settings
 # ---------------------------------------------------------------------------
 
-class WindowsSettings(BaseSettings):
+class WindowsSettings(WindowManagerSettings):
     """The render's windows: window 0 the operator's, windows 1-3 the cameras'"""
-    loop    : Group[WindowManagerSettings] = Group(WindowManagerSettings)
     window_0: Group[WindowSettings]        = Group(WindowSettings)
     window_1: Group[WindowSettings]        = Group(WindowSettings)
     window_2: Group[WindowSettings]        = Group(WindowSettings)
     window_3: Group[WindowSettings]        = Group(WindowSettings)
-
-    @property
-    def windows(self) -> list[WindowSettings]:
-        return [self.window_0, self.window_1, self.window_2, self.window_3]
 
 
 class Settings(BaseSettings):

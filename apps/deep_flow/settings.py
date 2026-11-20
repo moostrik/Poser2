@@ -310,15 +310,11 @@ class CadenceSettings(BaseSettings):
                                           description="Pose model results dropped before the stages after it took them")
 
 
-class WindowsSettings(BaseSettings):
+class WindowsSettings(WindowManagerSettings):
     """The render's windows: window 0 the operator's, window 1 the show's"""
-    loop    : Group[WindowManagerSettings] = Group(WindowManagerSettings)
     window_0: Group[WindowSettings]        = Group(WindowSettings)
     window_1: Group[WindowSettings]        = Group(WindowSettings, defaults={'enabled': False})     # the show's, off
 
-    @property
-    def windows(self) -> list[WindowSettings]:
-        return [self.window_0, self.window_1]
 
 # ---------------------------------------------------------------------------
 #  Root settings

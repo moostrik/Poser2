@@ -94,7 +94,7 @@ not in git, safe to delete); the app's own logs are in Poser2's `logs\`.
 * **Walls** tab: `pool` (clips kept decoded in RAM, about 200 MB each), `recent` (the last recordings, always playing on every third of the sphere), `recycle_every`, `decoder` (the chip the clips are decoded on, read at the start); `fps`, `spread` and `trail` (live)
 
 ### Keys
-* in the SMILE window: Enter starts a sequence, F fullscreen (borderless, the size of its monitor), Esc quits (the panel's Exit button does the same); fullscreen hides the mouse pointer unless `windows.loop.fullscreen_mouse` is on (a window always shows it)
+* in the SMILE window: Enter starts a sequence, F fullscreen (borderless, the size of its monitor), Esc quits (the panel's Exit button does the same); fullscreen hides the mouse pointer unless `windows.fullscreen_mouse` is on (a window always shows it)
 * in a wall window: Esc quits SMILE, F toggles that wall's fullscreen
 
 ### Pieces on their own

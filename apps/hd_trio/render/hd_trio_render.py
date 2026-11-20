@@ -62,7 +62,7 @@ BORDER_WIDTH: float = 2.0       # px
 class HDTrioRender(RenderBase):
     def __init__(self, board: RenderBoard, settings: RenderSettings, windows: WindowsSettings,
                  cameras: Sequence[RigCameraSettings], camera_health: CameraHealthSettings, data_path: str = "") -> None:
-        super().__init__(windows.loop, windows.windows)
+        super().__init__(windows)
         self.max_players: int = settings.max_players
         self.num_cams: int = settings.num_cams
         self.settings: RenderSettings = settings

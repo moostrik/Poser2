@@ -46,7 +46,7 @@ class WhiteSpaceRender(RenderBase):
                  tracker: PanoramicTrackerSettings,
                  cameras: Sequence[RigCameraSettings], camera_health: CameraHealthSettings,
                  angle_extractor: nodes.AngleExtractorSettings) -> None:
-        super().__init__(windows.loop, windows.windows)
+        super().__init__(windows)
         self.max_players: int = settings.max_players
         self.num_cams: int = settings.num_cams
         self.dummy_id: int = dummy_id(self.max_players)

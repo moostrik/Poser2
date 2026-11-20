@@ -43,7 +43,9 @@ follows Cinder (`window_systems_research.md`).
 
 There is one kind of window (`Window`, `window.py`), set by its own `WindowSettings`: `enabled`, its `monitor`,
 `fullscreen`, and its windowed place on that monitor (`x`, `y`, `width`, `height`). An app's root group `windows`
-holds the loop's `WindowManagerSettings` (`loop`) and `window_0`, `window_1`, …; their number is fixed at start.
+subclasses `WindowManagerSettings`: the loop's fields at the top of its panel, the frame rates first, then the
+windows it declares, `window_0`, `window_1`, …, their number fixed at start. `v_sync_window` names one of the shown
+windows (`shown_windows`, kept by the loop); a name the app does not declare falls back to `window_0`, logged.
 Every window is made at start, window 0 first, the others sharing its objects. A window that is off is hidden, not
 destroyed, and is neither drawn nor swapped. Fullscreen is a borderless window the size of its monitor, so the other
 monitors stay on. A window whose monitor is missing waits small on the primary monitor with its settings untouched,

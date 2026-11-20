@@ -810,12 +810,10 @@
     }
   },
   "windows": {
-    "loop": {
-      "title": "Poser",
-      "v_sync": true,
-      "v_sync_window": 0,
-      "fullscreen_mouse": false
-    },
+    "title": "Poser",
+    "v_sync": true,
+    "v_sync_window": "window_0",
+    "fullscreen_mouse": false,
     "window_0": {
       "enabled": true,
       "monitor": "M1",

@@ -30,7 +30,7 @@ class LowFlowRender(RenderBase):
     def __init__(self, board: RenderBoard, settings: RenderSettings, windows: WindowsSettings, recorder_settings: ScreenRecorderSettings, screen_recordings: str,
                  num_cams: int = 1, max_players: int = 1) -> None:
         """`recorder_settings` the screen recorder's, `screen_recordings` the folder its recordings go to."""
-        super().__init__(windows.loop, windows.windows)
+        super().__init__(windows)
         self.max_players: int = max_players
         self.num_cams: int = num_cams
         self.settings: RenderSettings = settings

@@ -9,16 +9,23 @@ import unittest
 from unittest import mock
 
 from modules.gl import Monitor, MonitorId, WindowManager, WindowManagerSettings, WindowSettings
+from modules.settings import Group
 
 MODULE = sys.modules['modules.gl.window_manager']     # the module: the package exports the class under its name
 LOGGER: str = 'modules.gl.window_manager'
 DISCONNECTED: int = 0x00040002
 
 
+class _Windows(WindowManagerSettings):
+    """An app's windows group: the loop's fields and two windows."""
+    window_0: Group[WindowSettings] = Group(WindowSettings)
+    window_1: Group[WindowSettings] = Group(WindowSettings)
+
+
 class TestWindowManager(unittest.TestCase):
     def setUp(self):
         self.renderer = mock.Mock()
-        self.manager = WindowManager(self.renderer, WindowManagerSettings(), [WindowSettings(), WindowSettings()])
+        self.manager = WindowManager(self.renderer, _Windows())
         patcher = mock.patch.object(MODULE, 'glfw')
         self.glfw = patcher.start()
         self.addCleanup(patcher.stop)
@@ -94,7 +101,7 @@ class TestWindowManager(unittest.TestCase):
 
     def test_the_v_sync_window_is_swapped_last(self):
         windows = self.with_windows()
-        self.manager.settings.v_sync_window = 0
+        self.manager.settings.v_sync_window = 'window_0'
         swapped: list[object] = []
         self.glfw.swap_buffers.side_effect = swapped.append
         with mock.patch.object(MODULE, 'glBindFramebuffer'), mock.patch.object(MODULE, 'glViewport'), \
@@ -166,6 +173,21 @@ class TestWindowManager(unittest.TestCase):
         self.manager._tick_windows()
         self.assertEqual([(s.monitor, s.fullscreen, s.x, s.y, s.width, s.height) for s in (first, second)],
                          [(MonitorId.M0, False, 20, 40, 1280, 720), (MonitorId.M2, False, 20, 40, 1280, 720)])
+
+    def test_the_v_sync_window_is_offered_among_the_shown_windows_only(self):
+        windows = self.with_windows()
+        windows[1].shown = False
+        self.manager._tick_windows()
+        self.assertEqual(self.manager.settings.shown_windows, ['window_0'])
+        windows[1].shown = True
+        self.manager._tick_windows()
+        self.assertEqual(self.manager.settings.shown_windows, ['window_0', 'window_1'])
+
+    def test_a_v_sync_window_that_is_not_declared_falls_back_to_window_0(self):
+        self.manager.settings.v_sync_window = 'window_5'
+        self.assertEqual(self.manager._v_sync_index(), 0)
+        self.manager.settings.v_sync_window = 'window_1'
+        self.assertEqual(self.manager._v_sync_index(), 1)
 
     def test_f_toggles_the_fullscreen_of_the_window_with_focus_and_esc_closes(self):
         F, ESCAPE, PRESS = 70, 256, 1
