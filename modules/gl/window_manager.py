@@ -59,7 +59,7 @@ class WindowManager:
         self._monitors_changed: bool = False        # a hot-plug, handled at the top of the next frame
         self._monitor_cb = None                     # strong ref to the monitor callback (prevents GC)
         self._swap_intervals: tuple[bool, int] | None = None    # (v_sync, v_sync_window) as applied
-        self._waker = Waker()                       # the frame pacing's wait, ended at once by stop()
+        self._waker = Waker()                       # the frame pacing's wait, ended at once by stop() and a new limit
         self._next_frame: float = 0.0               # the paced frame's deadline (perf_counter), 0 when not paced
         self._swap_fences: list = []                # a fence after each paced swap, the newest last
 
@@ -69,6 +69,8 @@ class WindowManager:
         self._place_default: bool = False           # the button, applied at the tick
         self._cb_default = lambda v: self._ask_default_placement() if v else None
         self.settings.bind(WindowManagerSettings.default_placement, self._cb_default)
+        self._cb_fps_limit = lambda _v: self._waker.set()    # a new limit ends the wait at once: none outlasts it
+        self.settings.bind(WindowManagerSettings.fps_limit, self._cb_fps_limit)
 
     # LIFECYCLE
     def run(self) -> None:
@@ -152,6 +154,7 @@ class WindowManager:
 
     def _cleanup(self) -> None:
         self.settings.unbind_all(self._cb_default)
+        self.settings.unbind_all(self._cb_fps_limit)
         try:
             glfw.set_monitor_callback(None)  # pyright: ignore[reportArgumentType]
             self._monitor_cb = None
@@ -285,7 +288,8 @@ class WindowManager:
         shown: list[Window] = [w for w in self._windows if w.shown]
         v_sync_index: int = self._v_sync_index()
         v_synced: bool = s.v_sync and any(w.index == v_sync_index for w in shown)
-        rate: float = s.fps_limit if s.fps_limit > 0.0 else (0.0 if shown else 60.0)
+        limit: float = s.fps_limit                          # a negative is off; a fraction of 1 fps is 1: a wait of 1 s at most
+        rate: float = max(1.0, limit) if limit > 0.0 else (0.0 if shown else 60.0)
         if v_synced or rate <= 0.0:
             self._next_frame = 0.0
             return

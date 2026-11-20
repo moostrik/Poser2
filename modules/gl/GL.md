@@ -76,9 +76,10 @@ at its default place on its own monitor, windowed; so does the start, for a wind
 
 ### Pacing
 
-With v-sync on and the `v_sync_window` shown, its swap paces the loop. Otherwise `fps_limit` does (0 is off; 60 while
-every window is hidden): an absolute deadline on `perf_counter`, a period on from the last, waited with the shared
-`utils.Waker`, a high-resolution waitable timer, without a spin. A frame that ends after its deadline goes on at once;
+With v-sync on and the `v_sync_window` shown, its swap paces the loop. Otherwise `fps_limit` does, in whole fps (0 is
+off; 60 while every window is hidden): an absolute deadline on `perf_counter`, a period on from the last, waited with
+the shared `utils.Waker`, a high-resolution waitable timer, without a spin. A change of `fps_limit` ends the wait at
+once. A frame that ends after its deadline goes on at once;
 one more than a period behind moves the deadline to now.
 
 The Waker's lateness after its deadline, v-sync off (white_space -sim on 20261024-164009_ICK, the launcher's priority

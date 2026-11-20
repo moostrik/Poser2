@@ -144,17 +144,26 @@ class TestWindowManager(unittest.TestCase):
 
     def test_v_sync_on_a_shown_window_paces_the_loop_itself(self):
         self.with_windows()
-        self.manager.settings.fps_limit = 100.0
+        self.manager.settings.fps_limit = 100
         self.assertEqual(self.pace([0.0, 0.01]), [])
 
     def test_fps_limit_waits_for_an_absolute_deadline_and_resyncs_when_a_period_behind(self):
         self.with_windows()
         self.manager.settings.v_sync = False
-        self.manager.settings.fps_limit = 100.0
+        self.manager.settings.fps_limit = 100
         # on time, on time, past its deadline (on at once, the deadline kept), more than a period behind (moved to
         # now, no wait), then on time from there
         self.assertEqual(self.pace([0.0, 0.0101, 0.0335, 0.06, 0.065]), [0.01, 0.02, 0.07])
         self.assertAlmostEqual(self.manager._next_frame, 0.07)
+
+    def test_a_negative_limit_is_off_and_a_change_ends_the_wait(self):
+        self.with_windows()
+        self.manager.settings.v_sync = False
+        self.manager.settings.fps_limit = -5                                 # from a preset: off
+        self.assertEqual(self.pace([0.0]), [])
+        with mock.patch.object(self.manager, '_waker') as waker:
+            self.manager.settings.fps_limit = 30                             # the panel's new value
+        waker.set.assert_called_once()                                       # a wait under way ends at once
 
     def test_every_window_hidden_runs_at_60_fps_without_a_limit(self):
         windows = self.with_windows()
