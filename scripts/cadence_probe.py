@@ -199,6 +199,7 @@ def main() -> int:
     try:
         app.start()
         threading.Thread(target=run, daemon=True).start()
+        app.render.run()                  # the window loop on the main thread, until the probe stops the app
         while not app.is_finished:
             time.sleep(0.05)
     finally:

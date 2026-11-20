@@ -198,7 +198,6 @@ class DeepFlowMain:
         self.recorder.start()
 
         self.is_running = True
-        self.render.start()
 
     def _on_image(self, image: GpuImage) -> None:
         """An uploaded image, on the uploader's thread: the camera's interval."""

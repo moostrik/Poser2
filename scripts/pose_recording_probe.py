@@ -127,6 +127,7 @@ def main() -> int:
 
     app.start()
     threading.Thread(target=run, daemon=True).start()
+    app.render.run()                  # the window loop on the main thread, until the probe stops the app
     deadline: float = time.perf_counter() + 2 * (args.seconds + 10.0)
     while not app.is_finished and time.perf_counter() < deadline:
         time.sleep(0.05)

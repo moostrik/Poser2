@@ -155,10 +155,9 @@ class SmileMain():
 
         self.panel_server.start()
 
-        # last: its frames drive the sequencer, which drives everything else
+        # last: the render's frames drive the sequencer, which drives everything else; the launcher runs it after start()
         self.render.add_exit_callback(self.stop)
         self.sequencer.add_message_callback(self.sequence_callback)
-        self.render.start()
         if self.settings.render.window.secondary_list:
             self.clip_player.start()
         else:

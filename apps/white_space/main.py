@@ -248,7 +248,6 @@ class WhiteSpaceMain:
         self.tracker_journal.start()
 
         self.is_running = True
-        self.render.start()
 
     def _on_sound_level_left(self, level: float = 0.0, *_rest: object) -> None:
         """OSC callback for /WS/idle/blue/left — store the Max soundscape's left level."""

@@ -38,12 +38,12 @@ class RenderBase(ABC):
                 except Exception:
                     logger.exception("Error in update callback")
 
-    def start(self) -> None:
-        """Start the render loop."""
-        self.window_manager.start()
+    def run(self) -> None:
+        """The window loop on the calling thread, the main thread, until the windows close."""
+        self.window_manager.run()
 
     def stop(self) -> None:
-        """Stop the render loop."""
+        """Ask the window loop to end; from any thread."""
         self.window_manager.stop()
 
     def add_exit_callback(self, callback: Callable) -> None:

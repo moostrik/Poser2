@@ -217,7 +217,6 @@ class HDTrioMain:
         self.video_recorder.start()
 
         self.is_running = True
-        self.render.start()
 
     def _on_tracklet_set(self, items: dict[int, CameraTracklets]) -> None:
         """A set of the cameras' tracklet messages, on the tracklets' sync's thread: the tracker's update, at the newest

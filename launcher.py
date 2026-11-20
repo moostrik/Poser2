@@ -101,14 +101,15 @@ if __name__ == '__main__':
         Thread(target=_timing_session, daemon=True, name="timing").start()
 
     def signal_handler_exit(sig, frame) -> None:
+        # runs on the main thread, inside the window loop: ending the loop stops the app (its exit callback)
         logging.info("Received interrupt signal, shutting down...")
-        shutdown_event.set()
-        if app.is_running:
-            app.stop()
+        app.render.stop()
 
     signal(SIGINT, signal_handler_exit)
 
-    while not app.is_finished and not shutdown_event.is_set():
+    app.render.run()            # the window loop on the main thread (GLFW's rule), until the windows close
+
+    while not app.is_finished:
         shutdown_event.wait(0.01)
 
     # Hard exit required: GLFW does not release its main-thread context cleanly

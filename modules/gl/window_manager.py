@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from enum import IntEnum
 from queue import SimpleQueue
-from threading import Thread, Lock, current_thread
+from threading import Event, Lock, Thread, current_thread
 from time import perf_counter
 from typing import Callable, TYPE_CHECKING
 
@@ -103,7 +103,11 @@ class WindowManager():
         self._monitor: glfw._GLFWmonitorPointerT | None = None
         self._ordered_monitor_ids: list[int] = []
 
-        self._render_thread: Thread | None = None
+        self._loop_thread: Thread | None = None     # the thread that runs the loop, set by run()
+        self._close_request = Event()               # stop() asked the loop to end
+        self._finished = Event()                    # the loop has ended and cleaned up
+        self._finished.set()                        # no loop yet
+        self._window_lock = Lock()                  # the main window's handle, for stop() from another thread
         self.frame_time: float = 0.0        # the current frame's stamp (perf_counter), set before its update
         self._callback_lock = Lock()
         # Callbacks run in registration order
@@ -122,7 +126,7 @@ class WindowManager():
         self._contexts: dict[int, Context] = {}  # id(window) -> its gl.Context, made at its first use
 
         # Deferred call queue: settings callbacks enqueue GLFW calls here;
-        # the render loop drains it on its own thread (GLFW requires render-thread calls).
+        # the render loop drains it on the main thread (GLFW requires main-thread calls).
         self._deferred: SimpleQueue[Callable[[], None]] = SimpleQueue()
 
         # Reactive bindings: settings → window manager (stored for unbind on teardown)
@@ -149,40 +153,31 @@ class WindowManager():
     def fullscreen_mode(self) -> FullscreenMode:
         return self._fullscreen_mode
 
-    def start(self) -> None:
-        """Start the rendering thread"""
-        if self._render_thread is None or not self._render_thread.is_alive():
-            self._render_thread = Thread(target=self._run, daemon=False)
-            self._render_thread.start()
-
-    def stop(self) -> None:
-        """Stop the rendering thread"""
-        # Early exit if thread doesn't exist or isn't running
-        if not self._render_thread or not self._render_thread.is_alive():
-            logger.debug("Render thread is not running, nothing to stop")
-            return
-
-        # Check if we're calling from the render thread itself
-        if current_thread() is self._render_thread:
-            logger.debug("Render thread self-terminating")
-            return
-
-        # Normal case - external thread stopping the render thread
-        self.clear_callbacks()
-        if self._main_window:
-            glfw.set_window_should_close(self._main_window, True)
-            glfw.post_empty_event()  # Wake up the event loop
-
-        self._render_thread.join(timeout=2.0)  # Wait for thread to finish with timeout
-        if self._render_thread.is_alive():
-            logger.warning("Render thread didn't stop gracefully")
-
-    def _run(self) -> None:
+    def run(self) -> None:
+        """The window loop on the calling thread, the main thread (GLFW's rule), until the windows close."""
+        self._loop_thread = current_thread()
+        self._finished.clear()
         try:
             self._setup()
             self._render_loop()
+        except Exception:
+            logger.exception("Error in the window loop")
         finally:
             self._cleanup()
+            self._finished.set()
+
+    def stop(self) -> None:
+        """Ask the window loop to end; from any thread. From another thread, wait up to 2 s for it to end."""
+        self.clear_callbacks()
+        self._close_request.set()
+        with self._window_lock:                         # the loop's cleanup destroys the window under it
+            if self._main_window:
+                glfw.set_window_should_close(self._main_window, True)     # both allowed from any thread
+                glfw.post_empty_event()
+        if self._loop_thread is None or current_thread() is self._loop_thread:
+            return
+        if not self._finished.wait(2.0):
+            logger.warning("The window loop did not end within 2 s")
 
     def _setup(self) -> None:
         """Setup GLFW window and callbacks"""
@@ -299,7 +294,7 @@ class WindowManager():
             self.set_fullscreen_mode(self.settings.fullscreen_mode)
 
         try:
-            while not glfw.window_should_close(self._main_window):
+            while not self._close_request.is_set() and not glfw.window_should_close(self._main_window):
                 # the renderer's objects (FBOs, VAOs) live in the main context: drawing a secondary window
                 # leaves its context current, so every frame starts by making the main one current again
                 self._make_current(self._main_window)
@@ -355,11 +350,12 @@ class WindowManager():
             glfw.set_monitor_callback(None)  # pyright: ignore[reportArgumentType]
             self._monitor_cb = None
             self._destroy_secondary_windows()
-            if self._main_window:
-                self._free_context(self._main_window)
-                glfw.destroy_window(self._main_window)
-                self._main_window = None
-            glfw.terminate()
+            with self._window_lock:
+                if self._main_window:
+                    self._free_context(self._main_window)
+                    glfw.destroy_window(self._main_window)
+                    self._main_window = None
+                glfw.terminate()
         except Exception as e:
             logger.error("Error cleaning up GLFW: %s", e)
 
@@ -484,7 +480,7 @@ class WindowManager():
         glfw.set_input_mode(window, glfw.CURSOR, glfw.CURSOR_NORMAL)
 
     def _on_monitor_change(self, monitor: glfw._GLFWmonitorPointerT, event: int) -> None:
-        """GLFW monitor connect/disconnect callback. Fires on render thread during poll_events()."""
+        """GLFW monitor connect/disconnect callback. Fires on the main thread during poll_events()."""
         if event == glfw.DISCONNECTED and self._monitor is not None and self._same_monitor(monitor, self._monitor):
             self._monitor = None  # its handle is no longer valid; the primary monitor stands in until the window moves
         self._ordered_monitor_ids = self._get_monitors_sorted_by_position()

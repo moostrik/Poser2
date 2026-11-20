@@ -4,19 +4,6 @@ The window manager (`modules/gl/window_manager.py`) and its panel are rebuilt on
 keeping to GLFW's threading rules: one kind of window, set by its own settings, on the main thread. Research and
 sources: `window_systems_research.md`. Windows now, Linux kept possible.
 
-## A. GLFW on the main thread
-
-GLFW puts window creation, monitors and events on the main thread; ours runs them on a render thread, which works
-on Windows only. The launcher's main thread only waits, so it takes the loop, the drawing included (no locks, no
-hand-over), as in Cinder, openFrameworks and pyglet.
-
-- A1. `RenderBase.run()` runs the window loop on the calling thread until the windows close. The launcher calls it
-  after `app.start()`, then waits for `app.is_finished` as now; Ctrl-C only calls `render.stop()`. The apps no
-  longer start the render; the render thread goes. `stop()` works from any thread: a close request (`Event`),
-  should-close and an empty event (GLFW allows both from any thread); from another thread it waits up to 2 s for the
-  loop to end. Test: `stop()` from another thread ends the loop (glfw mocked). Run: one app, started windowed and
-  fullscreen: resize, F, Ctrl-C, Esc, the timing session's stop.
-
 ## B. One kind of window
 
 - B1. `Monitor` (`monitor.py`): a connected monitor (name, position, size, handle); the monitors in `MonitorId`

@@ -3,6 +3,8 @@ unplugged must not end the app (glfw mocked: no window, no GL)."""
 
 import ctypes
 import sys
+import threading
+import time
 import unittest
 from types import SimpleNamespace
 from unittest import mock
@@ -30,6 +32,27 @@ class TestWindowManager(unittest.TestCase):
         with mock.patch.object(MODULE, 'Context'), mock.patch.object(self.manager, '_update'), \
                 mock.patch.object(self.manager, '_draw_main_window'):
             self.manager._render_loop()
+
+    def test_stop_from_another_thread_ends_the_loop(self):
+        frames: list[int] = []
+        limit: int = 5000                             # the loop's end without stop(): a failed test, not a hung one
+        self.glfw.window_should_close.side_effect = lambda _: len(frames) >= limit
+        self.glfw.poll_events.side_effect = lambda: (frames.append(1), time.sleep(0.001))
+        stopper = threading.Timer(0.05, self.manager.stop)
+
+        def setup() -> None:
+            self.manager._main_window = object()
+            stopper.start()
+
+        with mock.patch.object(MODULE, 'Context'), mock.patch.object(self.manager, '_setup', side_effect=setup), \
+                mock.patch.object(self.manager, '_update'), mock.patch.object(self.manager, '_draw_main_window'):
+            self.manager.run()
+        stopper.join(timeout=3.0)
+        self.assertFalse(stopper.is_alive())          # stop() returned: it saw the loop end
+        self.assertLess(len(frames), limit)
+        self.assertIs(self.manager._loop_thread, threading.current_thread())
+        self.glfw.post_empty_event.assert_called()
+        self.renderer.deallocate.assert_called_once()
 
     def test_an_exception_from_an_event_callback_does_not_end_the_loop(self):
         # pyGLFW raises what a callback raised from poll_events
