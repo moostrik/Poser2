@@ -2,10 +2,8 @@
 
 `next_tick()` is the single authority for both timing and measurement: it waits on a `utils.Waker`
 until `_SPIN_MARGIN` before the next frame deadline on `perf_counter`, busy-spins the rest, then
-measures `dt` and returns the `Tick`; `wake()` ends the wait at once, for a stop. The spin is there
-because the Waker alone wakes about 0.4 ms late with 0.3 ms of jitter, and the jitter moves the
-fixture's seam (3.5° at 1920 rpm): in white_space `-sim` the Waker alone came 0.42 ms late on average
-and 1.03 ms at p95, the spin 0.05 and 0.12 ms.
+measures `dt` and returns the `Tick`; `wake()` ends the wait at once, for a stop. Why it spins:
+`docs/LAYERS.md`, *The light clock*.
 
 Deliberately carries no musical time: the show's musical clock is the playhead bar (one
 revolution at `beam_rpm`) — states count bars, the sound side rides them. Debug patterns

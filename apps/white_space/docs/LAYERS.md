@@ -47,6 +47,19 @@ LERP `PlayheadOffset` and the step `beam_rpm` at the light rate), and stamped on
 after it, records in its streak only the hits on poses at least `pose.hit_sync.min_age_seconds` old
 (`STATES.md` *Vocabulary*: in sync); the hit itself, the flash and the instrument's mark fire on every crossing.
 
+## The light clock
+
+The conductor's clock (`light/clock.py`) waits on a `utils.Waker` until 1 ms before each tick's deadline and
+busy-spins the rest. The Waker alone wakes about 0.4 ms late with 0.3 ms of jitter, and in projection mode the
+jitter moves the fixture's seam, about 3.5° at 1920 rpm **(deduction)**; the spin takes the jitter out. The tick's
+lateness against its deadline, white_space `-sim` on the `public` preset, 32 fps, 30 s after warm-up (2026-11-20):
+
+| Wait (ms late)     | Mean | p95  | p99  | Max  |
+|--------------------|------|------|------|------|
+| Sleep, then spin   | 0.05 | 0.12 | 0.76 | 25.4 |
+| Waker              | 0.42 | 1.03 | 1.70 | 2.0  |
+| Waker, then spin   | 0.02 | 0.01 | 0.75 | 1.5  |
+
 ## Index — show layers
 
 | Layer                 | Mode       | Reads                                      | Writes                                        | Used by                   |
