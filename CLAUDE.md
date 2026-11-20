@@ -105,6 +105,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Suppress only when a third-party stub is provably wrong or the type system cannot express the code, never to hide an error in our own code
 - Suppress with `# pyright: ignore[<rule>]` on the one line; never add a bare `# type: ignore`
 - Never disable a rule in `[tool.pyright]` to clear errors
+- A commit leaves no pyright errors
 
 ## Imports
 
