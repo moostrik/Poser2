@@ -51,7 +51,7 @@ class PlayerSettings(BaseSettings):
     scrub:              Field[float]            = Field(-1.0, visible=False, saved=False, description="Where the dragged marker is, as a fraction of the length; -1 when none is")
     seek:               Field[float]            = Field(-1.0, visible=False, saved=False, description="Where the bar was pressed, as a fraction of the length; -1 otherwise")
     in_out:             Field[list[float]]      = Field([0.0, 1.0], widget=Widget.timeline, options=playhead, drag=scrub, seek=seek, saved=False, label="In / Out", newline=True,
-                                                        description="Plays between the two handles; each recording keeps its own")
+                                                        description="Plays between the two handles; each recording keeps its own", access=Field.READWRITE)
     current_chunk:      Field[int]              = Field(0, access=Field.READ, description="Current chunk", newline=True)
     max_chunks:         Field[int]              = Field(0, access=Field.READ, description="Total chunks")
 

@@ -83,7 +83,7 @@ class ArtNetBarsSettings(BaseSettings):
     # Runtime controls
     white_strength: Field[float]    = Field(0.5, min=0.0, max=1.0, description="Base white intensity for all pixels")
     color_strength: Field[float]    = Field(0.5, min=0.0, max=1.0, description="Accent color intensity")
-    bar: Field[float]               = Field(0.5, min=0.0, max=1.0, description="Bar fill level (0=empty, 1=full)")
+    bar: Field[float]               = Field(0.5, min=0.0, max=1.0, description="Bar fill level (0=empty, 1=full)", access=Field.READWRITE)
 
 
 class ArtNetBars:

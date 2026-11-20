@@ -58,10 +58,10 @@ class ScreenRecorderState(Enum):
 
 class ScreenRecorderFrameSettings(BaseSettings):
     main_window:  Field[bool]                = Field(False, widget=Widget.switch, description="Record the main window instead of the sources")
-    size:         Field[ScreenSize]          = Field(ScreenSize.UHD, description="Recording size preset")
-    portrait:     Field[bool]                = Field(True, widget=Widget.switch, description="Upright: width and height swapped")
-    width:        Field[int]                 = Field(2160, min=2, max=8192, step=2, description="Recording width (px); a change sets the preset to CUSTOM")
-    height:       Field[int]                 = Field(3840, min=2, max=8192, step=2, description="Recording height (px); a change sets the preset to CUSTOM")
+    size:         Field[ScreenSize]          = Field(ScreenSize.UHD, description="Recording size preset", access=Field.READWRITE)
+    portrait:     Field[bool]                = Field(True, widget=Widget.switch, description="Upright: width and height swapped", access=Field.READWRITE)
+    width:        Field[int]                 = Field(2160, min=2, max=8192, step=2, description="Recording width (px); a change sets the preset to CUSTOM", access=Field.READWRITE)
+    height:       Field[int]                 = Field(3840, min=2, max=8192, step=2, description="Recording height (px); a change sets the preset to CUSTOM", access=Field.READWRITE)
     snap:         Field[bool]                = Field(False, widget=Widget.button, description="Set the size to the first source's")
     fill:         Field[bool]                = Field(False, widget=Widget.switch, description="Fill the frame and cut the overhang, instead of black bars")
 
@@ -89,8 +89,8 @@ class ScreenRecorderTakeSettings(BaseSettings):
     scrub:        Field[float]               = Field(-1.0, visible=False, saved=False, description="Where the dragged marker is, as a fraction of the length; -1 when none is")
     seek:         Field[float]               = Field(-1.0, visible=False, saved=False, description="Where the bar was pressed, as a fraction of the length; -1 otherwise")
     in_out:       Field[list[float]]         = Field([0.0, 1.0], widget=Widget.timeline, options=playhead, drag=scrub, seek=seek, saved=False,
-                                                     label="In / Out", description="The part of the held take that save writes")
-    play:         Field[bool]                = Field(False, widget=Widget.switch, saved=False, description="Play the held take between in and out, looped, over the main window; the show waits")
+                                                     label="In / Out", description="The part of the held take that save writes", access=Field.READWRITE)
+    play:         Field[bool]                = Field(False, widget=Widget.switch, saved=False, description="Play the held take between in and out, looped, over the main window; the show waits", access=Field.READWRITE)
     save:         Field[bool]                = Field(False, widget=Widget.button, description="Write the held take between in and out")
     discard:      Field[bool]                = Field(False, widget=Widget.button, description="Let the held take go")
     name:         Field[str]                 = Field("", widget=Widget.input, description="Added to the file name")

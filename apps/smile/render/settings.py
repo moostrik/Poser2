@@ -119,7 +119,7 @@ class SequencerSettings(BaseSettings):
     flash_in_ease:      Field[Easing] = Field(Easing.QUAD_IN, label="Ease", description="Easing of the flash in")
     flash_hold:         Field[float]  = Field(0.5, min=0.0, max=3.0, step=0.1, label="Hold (s)", description="Hold the full flash at least this long before the capture appears (s)")
     flash_out_auto:     Field[bool]   = Field(True, newline=True, row_label="Flash out", label="Auto", description="Match the flash out to the measured wait for the first portrait step")
-    flash_out:          Field[float]  = Field(2.2, min=0.1, max=6.0, step=0.1, label="Duration (s)", description="The capture appears out of the flash (s); set by Auto")
+    flash_out:          Field[float]  = Field(2.2, min=0.1, max=6.0, step=0.1, label="Duration (s)", description="The capture appears out of the flash (s); set by Auto", access=Field.READWRITE)
     flash_out_ease:     Field[Easing] = Field(Easing.SINE_OUT, label="Ease", description="Easing of the flash out")
     grin_delay:         Field[float]  = Field(1.0, min=0.0, max=5.0, step=0.1, newline=True, row_label="Grin", label="Delay (s)", description="Shortest hold on the portrait before the grin plays, for the blend (s)")
     grin_fps:           Field[float]  = Field(15.0, min=5.0, max=30.0, step=1.0, label="Fps", description="Grin playback speed (frames per second)")

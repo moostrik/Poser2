@@ -26,7 +26,7 @@ class SimilaritySilhouetteLayerSettings(BaseSettings):
     blend_mode:             Field[Style.BlendMode] = Field(Style.BlendMode.ALPHA)
     similarity_threshold:   Field[float] = Field(0.1, min=0.0, max=1.0, description="Similarity below this contributes nothing")
     motion_exponent:        Field[float] = Field(1.0, min=0.0, max=5.0, description="Similarity response curve")
-    similarity_scale:       Field[float] = Field(1.0, min=0.0, max=1.0, description="0 = own silhouette only, 1 = full cross-camera response")
+    similarity_scale:       Field[float] = Field(1.0, min=0.0, max=1.0, description="0 = own silhouette only, 1 = full cross-camera response", access=Field.READWRITE)
     foreground_threshold:   Field[float] = Field(0.2, min=0.0, max=0.95, description="The players' lowest similarity below which the foreground does not show")
     # LayerComposite parameters
     layered:                Field[float] = Field(0.8, min=0.0, max=1.0, description="0 = additive, 1 = own in front")

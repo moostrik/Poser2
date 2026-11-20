@@ -16,7 +16,8 @@ class Mode(Enum):
 
 
 class Probe(BaseSettings):
-    gain = Field(1.0, min=0.0, max=10.0)
+    gain = Field(1.0, min=0.0, max=10.0, access=Field.READWRITE)
+    level = Field(0.0)
     readout = Field(0.5, access=Field.READ)
     port = Field(80, access=Field.INIT)
     names = Field(["a", "b"])
@@ -43,6 +44,7 @@ class TestControl(unittest.TestCase):
         self.assertEqual(gain.label, "Gain")
         self.assertFalse(gain.locked)
         self.assertTrue(gain.polled)        # READWRITE: the app may write it
+        self.assertFalse(FakeControl(self.probe, "level", self.probe.fields["level"]).polled)    # WRITE, the default: the user alone
         self.assertEqual(gain.shown, 1.0)
         readout = FakeControl(self.probe, "readout", self.probe.fields["readout"])
         self.assertTrue(readout.locked)

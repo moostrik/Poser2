@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 class LutSettings(BaseSettings):
     """LUT color grading configuration."""
     folder:   Field[str]       = Field("data/luts", access=Field.INIT, description="LUT folder")
-    files:    Field[list[str]] = Field([""], visible=False)
-    file:     Field[str]       = Field("", widget=Widget.text_select, options=files, description="LUT file")
+    files:    Field[list[str]] = Field([""], visible=False, access=Field.READWRITE)
+    file:     Field[str]       = Field("", widget=Widget.text_select, options=files, description="LUT file", access=Field.READWRITE)
     rescan:   Field[bool]      = Field(False, widget=Widget.button, description="Rescan LUTs")
     strength: Field[float]     = Field(1.0, min=0.0, max=1.0)
 

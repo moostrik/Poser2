@@ -11,9 +11,9 @@ from .monitor_2d_layer import Monitor2DLayer, Monitor2DLayerSettings, Monitor2DA
 
 class OrbitSettings(BaseSettings):
     """The 3D views' camera around the box, which the mouse turns and zooms, and the panel too."""
-    yaw: Field[float] =             Field(0.0, min=-180.0, max=180.0, description="Turn around the vertical axis (degrees); 0 = from the front")
-    pitch: Field[float] =           Field(0.0, min=-PITCH_LIMIT, max=PITCH_LIMIT, description="Turn up or down (degrees)")
-    zoom: Field[float] =            Field(1.0, min=ZOOM_LIMITS[0], max=ZOOM_LIMITS[1], widget=Widget.log_slider, description="1 frames the box")
+    yaw: Field[float] =             Field(0.0, min=-180.0, max=180.0, description="Turn around the vertical axis (degrees); 0 = from the front", access=Field.READWRITE)
+    pitch: Field[float] =           Field(0.0, min=-PITCH_LIMIT, max=PITCH_LIMIT, description="Turn up or down (degrees)", access=Field.READWRITE)
+    zoom: Field[float] =            Field(1.0, min=ZOOM_LIMITS[0], max=ZOOM_LIMITS[1], widget=Widget.log_slider, description="1 frames the box", access=Field.READWRITE)
 
 
 class Monitor3DAdvancedSettings(Monitor2DAdvancedSettings):
@@ -23,7 +23,7 @@ class Monitor3DAdvancedSettings(Monitor2DAdvancedSettings):
     opacity: Field[float] =         Field(6.0, min=0.1, max=100.0, widget=Widget.log_slider, description="The cube: how much a full sample hides what is behind it, per box width")
     depth_fade: Field[float] =      Field(0.0, min=0.0, max=10.0, description="The cube: dimming per box width behind the near side; 0 = none")
     slice: Field[bool] =            Field(False, description="The cube: the scrolled layer framed and in focus, the rest dimmed")
-    slice_position: Field[float] =  Field(0.5, min=0.0, max=1.0, description="The slice's place through the volume: 0 the front, 1 the back; the wheel steps it")
+    slice_position: Field[float] =  Field(0.5, min=0.0, max=1.0, description="The slice's place through the volume: 0 the front, 1 the back; the wheel steps it", access=Field.READWRITE)
     slice_focus: Field[float] =     Field(0.5, min=0.0, max=1.0, description="Opacity moved from the rest to the slice: 0 none, 1 only the slice at its amount")
 
     orbit = Group(OrbitSettings)

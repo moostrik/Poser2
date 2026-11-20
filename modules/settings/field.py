@@ -51,7 +51,7 @@ class Field(Generic[T]):
         unit: str | None = None,         # UI hint only — shown after the value in pinned chips (e.g. 'ms', 'fps')
         row_label: str | None = None,    # UI hint only — a text title rendered before this field
         width: int | None = None,        # UI hint only — Tailwind width step for a fixed-width control
-        access: Access = Access.READWRITE,
+        access: Access = Access.WRITE,
         visible: bool = True,
         pinned: bool = False,
         newline: bool = False,

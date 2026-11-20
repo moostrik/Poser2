@@ -39,19 +39,19 @@ class StrobeSettings(BaseSettings):
     rate:          Field[float] = Field(0.0,  min=0.0,  max=16.0, step=1.0,  widget=KNOB, label="Base",   description="Strobes per second: 0 off, else 1, 2, 4, 8 or 16", row_label="Rate", newline=True)
     rate_amount:   Field[float] = Field(0.0,  min=-16.0, max=16.0, step=1.0, widget=KNOB, label="Amount", description="How far the source moves the rate (strobes per second)")
     rate_curve:    Field[Curve] = Field(Curve.LINEAR,                        width=CURVE, label="Curve",  description="How the source's magnitude is eased")
-    rate_bypass:   Field[bool]  = Field(False,                                            label="Bypass", description="Switch the modulation off: the rate is its base")
+    rate_bypass:   Field[bool]  = Field(False,                                            label="Bypass", description="Switch the modulation off: the rate is its base", access=Field.READWRITE)
     width:         Field[float] = Field(0.5,  min=0.0,  max=1.0,  step=0.01, widget=KNOB, label="Base",   description="Lit part of every cycle: 0 always dark, 1 always lit", row_label="Width", newline=True)
     width_amount:  Field[float] = Field(0.0,  min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Amount", description="How far the source moves the width")
     width_curve:   Field[Curve] = Field(Curve.LINEAR,                        width=CURVE, label="Curve",  description="How the source's magnitude is eased")
-    width_bypass:  Field[bool]  = Field(False,                                            label="Bypass", description="Switch the modulation off: the width is its base")
+    width_bypass:  Field[bool]  = Field(False,                                            label="Bypass", description="Switch the modulation off: the width is its base", access=Field.READWRITE)
     phase:         Field[float] = Field(0.0,  min=-0.5, max=0.5,  step=0.01, widget=KNOB, label="Base",   description="Where the cycle starts (cycles)", row_label="Phase", newline=True)
     phase_amount:  Field[float] = Field(0.0,  min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Amount", description="How far the source moves the phase (cycles)")
     phase_curve:   Field[Curve] = Field(Curve.LINEAR,                        width=CURVE, label="Curve",  description="How the source's magnitude is eased")
-    phase_bypass:  Field[bool]  = Field(False,                                            label="Bypass", description="Switch the modulation off: the phase is its base")
+    phase_bypass:  Field[bool]  = Field(False,                                            label="Bypass", description="Switch the modulation off: the phase is its base", access=Field.READWRITE)
     shift:         Field[float] = Field(0.0,  min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Base",   description="Line-to-line shift: 0 in step, 0.5 quarter cycle, 1 opposite; < 0 inward", row_label="Shift", newline=True)
     shift_amount:  Field[float] = Field(0.0,  min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Amount", description="How far the source moves the shift (half cycles per line)")
     shift_curve:   Field[Curve] = Field(Curve.LINEAR,                        width=CURVE, label="Curve",  description="How the source's magnitude is eased")
-    shift_bypass:  Field[bool]  = Field(False,                                            label="Bypass", description="Switch the modulation off: the shift is its base")
+    shift_bypass:  Field[bool]  = Field(False,                                            label="Bypass", description="Switch the modulation off: the shift is its base", access=Field.READWRITE)
 
 
 class Strobe:

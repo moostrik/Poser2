@@ -14,7 +14,7 @@ class CameraSettings(VimbaCameraSettings):
     # the source: the camera device, or an image from input/ (whether a device was found or not)
     use_image:     Field[bool]      = Field(False, pinned=True, newline=True, description="Use the selected image instead of the camera")
     image_options: Field[list[str]] = Field([""], access=Field.READ, visible=False, description="Images in input/")
-    image:         Field[str]       = Field("", widget=Widget.text_select, options=image_options, description="Image in input/ used as the source")
+    image:         Field[str]       = Field("", widget=Widget.text_select, options=image_options, description="Image in input/ used as the source", access=Field.READWRITE)
     image_count:   Field[int]       = Field(0, access=Field.READ, label="Images", description="Number of images in input/")
     reload:        Field[bool]      = Field(False, widget=Widget.button, description="Rescan input/ for images")
     image_next:    Field[bool]      = Field(False, label="Next after capture", description="Image source: move to the next image in input/ after each capture")

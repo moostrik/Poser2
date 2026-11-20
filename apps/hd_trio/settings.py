@@ -293,7 +293,7 @@ class SessionGroup(BaseSettings):
     start:         Field[bool]  = Field(False, widget=Widget.button, description="Start session", pinned=True)
     stop:          Field[bool]  = Field(False, widget=Widget.button, description="Stop session")
     output_path:   Field[str]   = Field("recordings", access=Field.INIT, description="Recordings output directory")
-    name:          Field[str]   = Field("", widget=Widget.input, description="Recording group ID")
+    name:          Field[str]   = Field("", widget=Widget.input, description="Recording group ID", access=Field.READWRITE)
     split:         Field[bool]  = Field(False, widget=Widget.button, description="Split chunk", visible=False)
     split_seconds: Field[float] = Field(10, min=1, max=60, widget=Widget.number, description="Split recording into chunks of this length (seconds)")
 
@@ -334,7 +334,7 @@ class SnapPoint(IntEnum):
 
 class CenterGeometrySettings(BaseSettings):
     """Configuration for CenterGeometry anchor point positioning."""
-    stage:              Field[Stage] = Field(Stage.SMOOTH, description="Pose data pipeline stage")
+    stage:              Field[Stage] = Field(Stage.SMOOTH, description="Pose data pipeline stage", access=Field.READWRITE)
     target_x:           Field[float] = Field(0.5, min=0.0, max=1.0, description="Horizontal position of the pinned point in the output")
     target_y:           Field[float] = Field(0.33, min=0.0, max=1.0, description="Vertical position of the pinned point in the output")
     target_size:        Field[float] = Field(0.27, min=0.01, max=1.0, description="Torso height as a fraction of output height (zoom)")
@@ -458,13 +458,13 @@ class IntroSequenceSettings(BaseSettings):
     refresh_path:      Field[bool]      = Field(False, widget=Widget.button, description="Refresh intro folder list")
     available_folders: Field[list[str]] = Field([""], access=Field.READ, visible=False, description="Available intro recordings")
     folder:            Field[str]       = Field("", widget=Widget.text_select, options=available_folders, description="Selected intro recording")
-    source_track:      Field[int]       = Field(0, min=0, max=7, description="Track ID to use from recording")
+    source_track:      Field[int]       = Field(0, min=0, max=7, description="Track ID to use from recording", access=Field.READWRITE)
 
     # -- authoring a new intro recording --
     record_track:      Field[int]       = Field(1, min=0, max=7, description="Camera to record the intro from — set source_track to match when playing it back")
     record_start:      Field[ShowStage] = Field(ShowStage.WHITE_POSE, newline=True, description="Show stage where recording begins")
     record_end:        Field[ShowStage] = Field(ShowStage.ENJOY_IN, description="Last show stage recorded (inclusive)")
-    arm_record:        Field[bool]      = Field(False, widget=Widget.toggle, description="Record the next show's window into a new intro folder")
+    arm_record:        Field[bool]      = Field(False, widget=Widget.toggle, description="Record the next show's window into a new intro folder", access=Field.READWRITE)
     recorder:          Group[_IntroRecorderSettings]     = Group(_IntroRecorderSettings)
 
     color:             Field[Color]     = Field(Color(1.0, 1.0, 1.0), description="Skeleton color for intro overlay")
@@ -473,7 +473,7 @@ class IntroSequenceSettings(BaseSettings):
 
 class RenderSettings(BaseSettings):
     stage:       Field[Stage] = Field(Stage.LERP, description="Pipeline stage for flow/fluid/color layers")
-    similarity_scale: Field[float] = Field(1.0, min=0.0, max=1.0, description="Cross-camera response for fluid and color mask (driven per show stage)")
+    similarity_scale: Field[float] = Field(1.0, min=0.0, max=1.0, description="Cross-camera response for fluid and color mask (driven per show stage)", access=Field.READWRITE)
     num_cams:    Field[int]   = Field(3, access=Field.INIT, visible=False, description="Number of cameras")
     max_players: Field[int]   = Field(3, access=Field.INIT, visible=False, description="Number of players")
     input_fps:   Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
@@ -517,7 +517,7 @@ class SetupSettings(BaseSettings):
     max_players: Field[int]   = Field(3, access=Field.INIT)
     num_cams   : Field[int]   = Field(3, access=Field.INIT, description="Number of cameras")
     input_fps  : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
-    render_fps : Field[float] = Field(60.0)
+    render_fps : Field[float] = Field(60.0, access=Field.READWRITE)
 
     camera : Group[OakGroup]     = Group(OakGroup, share=[num_cams, input_fps.as_('fps')])
     inout  : Group[InOutGroup]   = Group(InOutGroup)

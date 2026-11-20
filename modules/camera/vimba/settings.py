@@ -31,8 +31,8 @@ class VimbaCameraSettings(CameraSettings):
     auto_gain:         Field[bool]  = Field(False, widget=Widget.switch, description="Automatic gain")
     gain_max:          Field[float] = Field(15.0, min=0.0, max=30.0, step=0.1, description="Most gain auto may add, in dB")
 
-    manual_WB_red:     Field[float] = Field(1.0, min=0.5, max=4.0, step=0.01, newline=True, description="White balance red ratio (auto off)")
-    manual_WB_blue:    Field[float] = Field(1.0, min=0.5, max=4.0, step=0.01, description="White balance blue ratio (auto off)")
+    manual_WB_red:     Field[float] = Field(1.0, min=0.5, max=4.0, step=0.01, newline=True, description="White balance red ratio (auto off)", access=Field.READWRITE)
+    manual_WB_blue:    Field[float] = Field(1.0, min=0.5, max=4.0, step=0.01, description="White balance blue ratio (auto off)", access=Field.READWRITE)
     auto_WB:           Field[bool]  = Field(False, widget=Widget.switch, description="Continuous automatic white balance")
     set_WB:            Field[bool]  = Field(False, widget=Widget.button, description="Measure the white balance once and keep it (auto off)")
 
