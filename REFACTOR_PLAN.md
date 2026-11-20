@@ -14,12 +14,10 @@ What is to do now, across the threads, in order. Lines with the same number run 
 
 | # | Who                 | What                                                                                     | After            |
 |---|---------------------|------------------------------------------------------------------------------------------|------------------|
-| 1 | Refactor            | The timing issue: measure a 1 ms system tick (`timeBeginPeriod(1)`) (B1)               |                  |
-| 2 | Refactor            | The timing issue: ArtNetBars' frame tick (B2)                                            | 1                |
-| 3 | Inference, Refactor | The timing issue: the loops a new item wakes (INFERENCE_PLAN.md B, B's question)       | 1                |
-| 3 | Refactor            | Board held up to the rules, then one package at a time (A)                               |                  |
-| 4 | Camera              | Depth confidence from the camera to the motion (CAMERA_PLAN.md A)                        |                  |
-| 5 | GL Window           | The window manager: GLFW on the main thread, one kind of window, frame pacing (GL_PLAN.md)| the camera plan |
+| 1 | Inference, Refactor | The timing issue: the loops a new item wakes (INFERENCE_PLAN.md B, B's question)       |                  |
+| 1 | Refactor            | Board held up to the rules, then one package at a time (A)                               |                  |
+| 2 | Camera              | Depth confidence from the camera to the motion (CAMERA_PLAN.md A)                        |                  |
+| 3 | GL Window           | The window manager: GLFW on the main thread, one kind of window, frame pacing (GL_PLAN.md)| the camera plan |
 | – | Inference           | hd_trio and white_space at full batch: whether the STANDARD pose model goes (INFERENCE_PLAN.md C) |  |
 | – | Low Flow            | The water's speed of sound in the 2D (LOW_FLOW_PLAN.md G4); what the view's 2.9 ms is    |                  |
 | – | You                 | The checks at the rig (C)                                                                |                  |
@@ -66,16 +64,26 @@ Done: camera (14 Nov), render (its plan built and removed), hd_trio (G5). Held u
 A wait's timeout ends on Windows' 15.6 ms tick (CLAUDE.md, Time), so a loop paced by one comes up to 15.6 ms late
 **(seen: 18 ms asked, 31.3 ms waited)**. `wait_until` sleeps its last ~17.5 ms, so a signal in that time wakes it up
 to ~17 ms late **(seen)**: it fits a loop that only paces, not one a new item must wake at once. Built: the recording
-player (`StreamReader`).
+player (`StreamReader`), `ArtNetBars` (40.0 frames a second at 40 fps, from 32.0).
 
-- B1. A 1 ms system tick, `timeBeginPeriod(1)` at the app's start, measured against `wait_until`: one deep_flow
-  `-sim` run with and without it, the player's frame gaps (mean, p95), the poses' arrival against their moment, the
-  process's CPU load, and whether the tick holds with the window minimized (Windows 11 drops the request of a hidden
-  window **(deduction)**).
-- B2. `ArtNetBars` (`modules/inout/artnet_bars.py`): its frame tick waits `1/fps` after its work, so its rate drifts
-  by the work as well as the tick, and `_update_event.clear()` after the wait drops a settings change that lands in
-  between **(seen)**. It waits for a fixed-rate deadline (`next += 1/fps`) and clears the event before its work.
-  Checked by its frame intervals logged before and after.
+A 1 ms system tick, `timeBeginPeriod(1)` at the process's start, against none **(seen 2026-11-20)**: 200 waits each
+in a script, and deep_flow `-sim` on `20261112-125832_measure` (pose model on, recorded tracklets, 30 s measured).
+A notify wakes a waiting thread at once either way (0.02 ms), and `time.sleep` is precise without the tick. The tick
+holds only while the app's window is shown: minimized, Windows 11 drops it.
+
+| What (ms)                                              | Without             | With                |
+|--------------------------------------------------------|---------------------|---------------------|
+| `Event.wait(0.001)`, mean / p95                        | 15.6 / 16.2         | 1.6 / 2.1           |
+| `Event.wait(0.018)`, mean / p95                        | 31.1 / 32.0         | 18.5 / 19.0         |
+| `time.sleep(0.001)`, mean / p95                        | 1.6 / 1.7           | 1.5 / 1.7           |
+| the player's frame gaps, mean / p95 / max              | 20.0 / 22.2 / 38.6  | 20.0 / 22.1 / 38.4  |
+| the replay tracklets, late, mean / p95 / max           | 7.9 / 14.5 / 16.7   | 0.7 / 1.5 / 2.6     |
+| the same, the window minimized, mean / p95             | 7.7 / 14.5          | 7.9 / 14.7          |
+| `Event.wait(0.001)` in the app, minimized, mean / p95  | 15.6 / 16.5         | 15.7 / 16.8         |
+| the poses (RAW) after their capture, mean / p95        | 41.2 / 49.1         | 39.8 / 44.6         |
+| the process's CPU, cores                               | 15.75               | 15.63               |
+
+`InferenceFrameSync`'s deadline was not reached in these runs: no frame waited for its poses.
 
 Not changed **(seen)**: the session's chunk timer (`chunk_start += chunk_length` keeps it from drifting; a split is
 at most one tick late, every recorder together), white_space's motor sim (its falls are interpolated from
@@ -84,10 +92,10 @@ only).
 
 ### Question
 
-- After B1: which loops a new item wakes still need `wait_until`'s `woken` check (1 ms steps in its last stretch,
-  the lock released between) — the replay camera's tracklets (`modules/recording/replay/camera.py`), smile's camera
-  image rate (`cam/camera.py`), and INFERENCE_PLAN.md B's `InferenceFrameSync` and `RecordedPoses` — or none, if the
-  1 ms tick fixes them; and whether B2 then waits with `wait_until` or a plain `Event.wait`.
+- Which loops a new item wakes still need `wait_until`'s `woken` check (1 ms steps in its last stretch, the lock
+  released between) — the replay camera's tracklets (`modules/recording/replay/camera.py`), smile's camera image
+  rate (`cam/camera.py`), and INFERENCE_PLAN.md B's `InferenceFrameSync` and `RecordedPoses` — or none, if the 1 ms
+  tick fixes them.
 
 ## C. Checks at the rig
 
