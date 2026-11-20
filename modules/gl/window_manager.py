@@ -251,8 +251,8 @@ class WindowManager:
 
     def _pace(self) -> None:
         """Without v-sync pacing the loop, a wait until the next frame's deadline at `fps_limit`: an absolute deadline
-        on perf_counter, a period on from the last, resynced when the loop is a period behind. Every window hidden
-        and `fps_limit` 0: 60 fps."""
+        on perf_counter, a period on from the last; a frame that ends after its deadline goes on at once, and more than
+        a period behind the deadline moves to now. Every window hidden and `fps_limit` 0: 60 fps."""
         s = self.settings
         shown: list[Window] = [w for w in self._windows if w.shown]
         v_synced: bool = s.v_sync and any(w.index == s.v_sync_window for w in shown)
@@ -262,8 +262,13 @@ class WindowManager:
             return
         period: float = 1.0 / rate
         now: float = perf_counter()
-        self._next_frame = now + period if self._next_frame == 0.0 or now - self._next_frame > period else self._next_frame + period
-        self._waker.wait(self._next_frame)
+        deadline: float = self._next_frame + period if self._next_frame else now + period
+        if now - deadline > period:
+            self._next_frame = now          # behind: no wait, and no run of short frames to catch up
+            return
+        self._next_frame = deadline
+        if deadline > now:
+            self._waker.wait(deadline)
 
     def _apply_swap_intervals(self) -> None:
         """V-sync on the v-sync window only, the others swapped without it; applied on a change."""

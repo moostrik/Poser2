@@ -130,8 +130,10 @@ class TestWindowManager(unittest.TestCase):
         self.with_windows()
         self.manager.settings.v_sync = False
         self.manager.settings.fps_limit = 100.0
-        # on time, on time, late by less than a period (kept), then more than a period behind (resynced)
-        self.assertEqual(self.pace([0.0, 0.0101, 0.0205, 0.045]), [0.01, 0.02, 0.03, 0.055])
+        # on time, on time, past its deadline (on at once, the deadline kept), more than a period behind (moved to
+        # now, no wait), then on time from there
+        self.assertEqual(self.pace([0.0, 0.0101, 0.0335, 0.06, 0.065]), [0.01, 0.02, 0.07])
+        self.assertAlmostEqual(self.manager._next_frame, 0.07)
 
     def test_every_window_hidden_runs_at_60_fps_without_a_limit(self):
         windows = self.with_windows()

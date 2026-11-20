@@ -6,8 +6,6 @@ sources: `window_systems_research.md`. Windows now, Linux kept possible.
 
 ## C. Frame pacing
 
-- C2. Run, 60 and 120 fps, v-sync off: frame-time jitter. A miss over 1 ms is fixed in `Waker` itself, with the
-  thread that owns it.
 - C3. Run, v-sync on a show window: frame time and the frames the driver queues, with and without a GPU wait
   (`glFinish`) after the paced swap. The wait stays if it keeps the queue at one frame.
 
