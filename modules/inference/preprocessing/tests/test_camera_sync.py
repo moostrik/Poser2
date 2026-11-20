@@ -58,7 +58,7 @@ class CameraSyncTest(unittest.TestCase):
         sync = CameraSync(CameraSyncSettings())
         calls: list[int] = []
         sync.add_set_callback(_Recorder(0, calls).fire)
-        sync.submit_frame(CameraFrame(0, FrameType.DEPTH, np.zeros((2, 2), np.uint16), 12.5))
+        sync.submit(CameraFrame(0, FrameType.DEPTH, np.zeros((2, 2), np.uint16), 12.5))
         self.assertEqual(calls, [])
 
     def test_a_set_holds_one_frame_of_each_camera(self) -> None:
@@ -115,10 +115,10 @@ class CameraSyncTest(unittest.TestCase):
     def test_a_message_before_start_is_an_error_and_one_after_stop_is_dropped(self) -> None:
         sync, sets = synced(1, 10.0)
         with self.assertRaises(RuntimeError):
-            sync.submit_frame(frame(0, 1.0))
+            sync.submit(frame(0, 1.0))
         sync.start()
         sync.stop()
-        sync.submit_frame(frame(0, 1.1))
+        sync.submit(frame(0, 1.1))
         self.assertEqual(sets, [])
 
 
@@ -142,7 +142,7 @@ class CameraSyncThreadTest(unittest.TestCase):
             time.sleep(0.001)
 
     def test_a_sync_fires_on_the_sync_thread(self) -> None:
-        self.sync.submit_frame(frame(0, 1.0))
+        self.sync.submit(frame(0, 1.0))
         self.wait_for(1)
         self.assertEqual(self.fired, [(1.0, 'CameraSync frame_sync')])
 
@@ -155,10 +155,10 @@ class CameraSyncThreadTest(unittest.TestCase):
                 held.set()
                 release.wait(2.0)
         self.sync.add_set_callback(hold)
-        self.sync.submit_frame(frame(0, 1.0))
+        self.sync.submit(frame(0, 1.0))
         self.assertTrue(held.wait(1.0))                     # the sync's thread is held: what comes now waits
         for i in range(1, 19):
-            self.sync.submit_frame(frame(0, 1.0 + i * 0.1))     # eighteen frames, sixteen kept
+            self.sync.submit(frame(0, 1.0 + i * 0.1))     # eighteen frames, sixteen kept
         release.set()
         self.wait_for(17)
         self.assertEqual(self.sync.dropped, 2)

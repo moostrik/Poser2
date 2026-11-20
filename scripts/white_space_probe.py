@@ -34,7 +34,6 @@ import numpy as np  # noqa: E402
 
 from modules.log_config import setup_logging, install_excepthooks  # noqa: E402
 from modules.camera import CameraFrame, CameraFrameCallback, FrameType  # noqa: E402
-from modules.inference import SyncMessage  # noqa: E402
 from modules.pose import FrameDict  # noqa: E402
 from modules.settings import presets  # noqa: E402
 from modules.utils import PerformanceTimer  # noqa: E402
@@ -119,11 +118,11 @@ def main() -> int:
                 frames.setdefault(frame.cam_id, []).append(start)
         camera.frame_callbacks = [hand_over]
 
-    def on_set(name: str, _items: dict[int, SyncMessage]) -> None:
+    def on_set(name: str) -> None:
         if on.is_set():
             syncs[name].append(time.perf_counter())
-    app.frame_sync.add_set_callback(lambda items: on_set('frames', items))
-    app.tracklet_sync.add_set_callback(lambda items: on_set('tracklets', items))
+    app.frame_sync.add_set_callback(lambda _items: on_set('frames'))
+    app.tracklet_sync.add_set_callback(lambda _items: on_set('tracklets'))
 
     upload = app.uploader._upload
 

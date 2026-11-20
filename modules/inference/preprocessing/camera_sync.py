@@ -6,7 +6,7 @@ phases of the live cameras (those with a message within `LIVE_FRAMES` frames), s
 together in time. A set closes as soon as every live camera is in it, or when a message of a later round, or a
 camera's second message, comes; a camera that did not come is then left out. Every message is in one set.
 
-The submits only queue a message, on the threads they come on, at most `WAITING` per camera; beyond that the oldest
+`submit` only queues a message, on the thread it comes on, at most `WAITING` per camera; beyond that the oldest
 is dropped, counted in `dropped`. The sync's own thread decides the sets in the order the messages came and hands
 each, by `cam_id`, to the set callbacks outside its lock. A submit before `start` is an error; one after `stop` is
 dropped."""
@@ -15,7 +15,7 @@ import math
 import time
 from collections import deque
 from threading import Condition, Lock, Thread
-from typing import Callable
+from typing import Callable, Generic, TypeVar
 
 from modules.camera import CameraFrame, CameraTracklets, FrameType
 from modules.settings import BaseSettings, Field
@@ -29,7 +29,8 @@ PHASE_FRAMES: int = 10  # frames a camera's phase is averaged over
 LIVE_FRAMES: int = 2    # a camera without a message for this many frames is left out of the sets
 
 SyncMessage = CameraFrame | CameraTracklets
-SyncSetCallback = Callable[[dict[int, SyncMessage]], None]
+M = TypeVar('M', CameraFrame, CameraTracklets)   # the message one sync pairs
+SyncSetCallback = Callable[[dict[int, M]], None]
 
 
 class CameraSyncSettings(BaseSettings):
@@ -37,7 +38,7 @@ class CameraSyncSettings(BaseSettings):
     fps:            Field[float] = Field(30.0, access=Field.INIT, visible=False)
 
 
-class CameraSync(Thread):
+class CameraSync(Thread, Generic[M]):
     """The cameras' sync, see the module docstring. Frames and tracklet messages are two separate instances with the
     same rule (`frame_sync`, `tracklet_sync`)."""
 
@@ -49,14 +50,14 @@ class CameraSync(Thread):
         # On the deciding thread
         self._phases: dict[int, tuple[float, float]] = {}  # each camera's phase, as an averaged unit vector
         self._newest: dict[int, float] = {}                 # each camera's newest capture time
-        self._open: dict[int, SyncMessage] = {}             # the set being filled
+        self._open: dict[int, M] = {}             # the set being filled
         self._open_round: int | None = None
 
         self._callback_lock: Lock = Lock()
-        self._callbacks: list[SyncSetCallback] = []         # run in registration order, with the set
+        self._callbacks: list[SyncSetCallback[M]] = []         # run in registration order, with the set
         self._wake: Condition = Condition()
         self._running: bool = False
-        self._inbox: deque[tuple[SyncMessage, float]] = deque()    # (message, the moment it was queued)
+        self._inbox: deque[tuple[M, float]] = deque()    # (message, the moment it was queued)
         self._queued: dict[int, int] = {}                           # what the inbox holds per camera
         self.dropped: int = 0
         self._stopped: bool = False
@@ -100,16 +101,11 @@ class CameraSync(Thread):
 
     # ── Inputs: each queues and returns ───────────────────────────────
 
-    def submit_frame(self, frame: CameraFrame) -> None:
-        """A camera's frame callback. Only VIDEO frames count: a sync is one frame per camera."""
-        if frame.kind == FrameType.VIDEO:
-            self._submit(frame)
-
-    def submit_tracklets(self, cam_tracklets: CameraTracklets) -> None:
-        self._submit(cam_tracklets)
-
-    def _submit(self, message: SyncMessage) -> None:
-        """A message, queued for the thread, the camera's oldest dropped beyond `WAITING`."""
+    def submit(self, message: M) -> None:
+        """A camera's frame or tracklet callback: the message, queued for the thread, the camera's oldest dropped beyond
+        `WAITING`. Of the frames only VIDEO counts: a sync is one frame per camera."""
+        if isinstance(message, CameraFrame) and message.kind != FrameType.VIDEO:
+            return
         cam_id: int = message.cam_id
         with self._wake:
             if not self._running:
@@ -127,7 +123,7 @@ class CameraSync(Thread):
             self._inbox.append((message, time.perf_counter()))
             self._wake.notify()
 
-    def _decide(self, message: SyncMessage) -> None:
+    def _decide(self, message: M) -> None:
         """The message into its round's set; the set goes out once complete, or once a later round has begun."""
         cam_id: int = message.cam_id
         timestamp: float = message.timestamp
@@ -162,20 +158,20 @@ class CameraSync(Thread):
         return (start + width / 2.0) % period
 
     def _close(self) -> None:
-        items: dict[int, SyncMessage] = self._open
+        items: dict[int, M] = self._open
         self._open = {}
         self._open_round = None
         self._notify_callbacks(items)
 
-    def add_set_callback(self, callback: SyncSetCallback) -> None:
+    def add_set_callback(self, callback: SyncSetCallback[M]) -> None:
         """Every set, one message per camera by `cam_id`, on the deciding thread."""
         with self._callback_lock:
             if callback not in self._callbacks:
                 self._callbacks.append(callback)
 
-    def _notify_callbacks(self, items: dict[int, SyncMessage]) -> None:
+    def _notify_callbacks(self, items: dict[int, M]) -> None:
         with self._callback_lock:
-            callbacks: list[SyncSetCallback] = list(self._callbacks)
+            callbacks: list[SyncSetCallback[M]] = list(self._callbacks)
         for callback in callbacks:
             try:
                 callback(dict(items))

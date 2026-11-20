@@ -7,7 +7,7 @@ from functools import partial
 
 import glfw
 
-from modules.camera import CameraSource, CameraHealth
+from modules.camera import CameraFrame, CameraHealth, CameraSource, CameraTracklets
 from modules.camera.oak import Camera, ClipCamera
 from modules.recording import Player, Recorder as VideoRecorder, replay
 from modules.settings import presets
@@ -16,7 +16,7 @@ from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, TrackerFrameSource
 from modules.pose import FrameDict, features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import pose, person, BatchUploader, CameraSync, CropExtractor, SyncMessage, frame_poses, has_points
+from modules.inference import pose, person, BatchUploader, CameraSync, CropExtractor, frame_poses, has_points
 from modules.session import Session
 
 from .board import RenderBoard
@@ -96,10 +96,10 @@ class WhiteSpaceMain:
         else:
             for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
-        self.frame_sync = CameraSync(self.settings.camera.frame_sync, 'frame_sync')
+        self.frame_sync: CameraSync[CameraFrame] = CameraSync(self.settings.camera.frame_sync, 'frame_sync')
         self.uploader = BatchUploader()          # a synced set of the cameras' frames onto the GPU as one batch, on its own thread
         self.tracker = PanoramicTracker(self.settings.tracker, max_players, num_cams)
-        self.tracklet_sync = CameraSync(self.settings.camera.tracklet_sync, 'tracklet_sync')
+        self.tracklet_sync: CameraSync[CameraTracklets] = CameraSync(self.settings.camera.tracklet_sync, 'tracklet_sync')
         # The frame domain's async step: the crop step in, the pose model out
         self.crops = CropExtractor(ps.pose_crop)
         self.pose_estimator = pose.PoseEstimator(ps.pose)
@@ -108,11 +108,11 @@ class WhiteSpaceMain:
         # The camera's thread only hands its frames and tracklets over: the frames to the recorder and the frames'
         # sync, the tracklets as they come to the tracker, the board and the tracklets' sync (the journal's below)
         for camera in self.cameras:
-            camera.add_frame_callback(self.frame_sync.submit_frame)          # the live path first, the recorder after it
+            camera.add_frame_callback(self.frame_sync.submit)          # the live path first, the recorder after it
             camera.add_frame_callback(self.video_recorder.submit_frame)
             camera.add_tracklet_callback(self.tracker.submit_cam_tracklets)
             camera.add_tracklet_callback(self.board.set_camera_tracklets)
-            camera.add_tracklet_callback(self.tracklet_sync.submit_tracklets)
+            camera.add_tracklet_callback(self.tracklet_sync.submit)
             camera.add_tracklet_callback(self.video_recorder.submit_tracklets)
         # What each camera's captures wait for from the first: live and through the clip camera, the device sends
         # tracklets (a replay's come or not with the recording); the crop step says per set whether it asked poses
@@ -258,7 +258,7 @@ class WhiteSpaceMain:
         """OSC callback for /WS/idle/blue/right — store the Max soundscape's right level."""
         self.board.set_sound_level_right(float(level))
 
-    def _on_tracklet_set(self, items: dict[int, SyncMessage]) -> None:
+    def _on_tracklet_set(self, items: dict[int, CameraTracklets]) -> None:
         """A set of the cameras' tracklet messages, on the tracklets' sync's thread: the tracker's update, at the newest
         of their capture times."""
         self.tracker.update(max(message.timestamp for message in items.values()))

@@ -4,7 +4,7 @@ import logging
 import time
 from functools import partial
 
-from modules.camera import CameraSource, CameraHealth
+from modules.camera import CameraFrame, CameraHealth, CameraSource, CameraTracklets
 from modules.camera.oak import Camera, ClipCamera
 from modules.recording import Player, Recorder as VideoRecorder, replay
 from modules.settings import presets
@@ -13,7 +13,7 @@ from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker, TrackerFrameSource
 from modules.pose import nodes, features, analytics, FrameDict, Recorder as PoseRecorder, RecorderSettings as PoseRecorderSettings
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import pose, segmentation, person, BatchUploader, CameraSync, CropExtractor, SyncMessage, \
+from modules.inference import pose, segmentation, person, BatchUploader, CameraSync, CropExtractor, \
     frame_poses, has_points
 from modules.session import Session, SessionSettings, SequencerState
 from modules.gl import WindowSettings
@@ -98,10 +98,10 @@ class HDTrioMain:
         else:
             for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
-        self.frame_sync = CameraSync(self.settings.camera.frame_sync, 'frame_sync')
+        self.frame_sync: CameraSync[CameraFrame] = CameraSync(self.settings.camera.frame_sync, 'frame_sync')
         self.uploader = BatchUploader()          # a synced set of the cameras' frames onto the GPU as one batch, on its own thread
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
-        self.tracklet_sync = CameraSync(self.settings.camera.tracklet_sync, 'tracklet_sync')
+        self.tracklet_sync: CameraSync[CameraTracklets] = CameraSync(self.settings.camera.tracklet_sync, 'tracklet_sync')
         # The frame domain's async step: the crop step in (the pose model's crops and the segmentation's, in one pass,
         # from the same images and boxes), the pose model out
         self.crops = CropExtractor(ps.pose_crop, ps.segmentation_crop)
@@ -111,11 +111,11 @@ class HDTrioMain:
         # The camera's thread only hands its frames and tracklets over: the frames to the frames' sync and the
         # recorder, the tracklets as they come to the tracker, the board, the tracklets' sync and the recorder
         for camera in self.cameras:
-            camera.add_frame_callback(self.frame_sync.submit_frame)          # the live path first, the recorder after it
+            camera.add_frame_callback(self.frame_sync.submit)          # the live path first, the recorder after it
             camera.add_frame_callback(self.video_recorder.submit_frame)
             camera.add_tracklet_callback(self.tracker.submit_cam_tracklets)
             camera.add_tracklet_callback(self.board.set_camera_tracklets)
-            camera.add_tracklet_callback(self.tracklet_sync.submit_tracklets)
+            camera.add_tracklet_callback(self.tracklet_sync.submit)
             camera.add_tracklet_callback(self.video_recorder.submit_tracklets)
         # What each camera's captures wait for from the first: live and through the clip camera, the device sends
         # tracklets (a replay's come or not with the recording); the crop step says per set whether it asked poses
@@ -219,7 +219,7 @@ class HDTrioMain:
         self.is_running = True
         self.render.start()
 
-    def _on_tracklet_set(self, items: dict[int, SyncMessage]) -> None:
+    def _on_tracklet_set(self, items: dict[int, CameraTracklets]) -> None:
         """A set of the cameras' tracklet messages, on the tracklets' sync's thread: the tracker's update, at the newest
         of their capture times."""
         self.tracker.update(max(message.timestamp for message in items.values()))
