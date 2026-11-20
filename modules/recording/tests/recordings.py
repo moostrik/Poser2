@@ -1,6 +1,7 @@
 """What the recording tests share: frames, tracklets and poses to record, a recorder and a player
 set up for the tests, and a recording made in a folder."""
 
+import subprocess
 import time
 from pathlib import Path
 from typing import Callable
@@ -48,6 +49,13 @@ def depth_frame(value: int, timestamp: float, confidence: int | None = None) -> 
     """A depth frame of `value` mm, with a confidence of `confidence` where given."""
     return CameraFrame(0, FrameType.DEPTH, np.full((300, 374), value, np.uint16), timestamp,
                        confidence=np.full((300, 374), confidence, np.uint8) if confidence is not None else None)
+
+
+def stream_packets(path: Path, stream: int) -> list[tuple[int, bool]]:
+    """One stream of a chunk as its packets in stored order: each one's time stamp and whether it is a keyframe."""
+    args = ['-select_streams', f'v:{stream}', '-show_entries', 'packet=pts,flags', '-of', 'csv=p=0', str(path)]
+    out, _ = video.popen(args, subprocess.DEVNULL, subprocess.PIPE, command=video.FFPROBE).communicate(timeout=20)
+    return [(int(line.split(',')[0]), 'K' in line) for line in out.decode().split()]
 
 
 def stream_images(path: Path, stream: int) -> list[np.ndarray]:
@@ -142,7 +150,7 @@ Played = tuple[int, FrameType, int, float | None, float | None, FrameMetadata | 
 
 
 def collect(play: Player, out: list[Played]) -> None:
-    play.add_frame_callback(lambda cam, kind, image, frame, captured: out.append(
+    play.add_frame_callback(lambda cam, kind, image, confidence, frame, captured: out.append(
         (cam, kind, int(np.median(image[..., 0] if image.ndim == 3 else image)), frame.timestamp if frame else None, captured, frame)))
 
 

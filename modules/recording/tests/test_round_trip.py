@@ -13,7 +13,7 @@ from modules import video
 from modules.camera import CameraFrame, FrameReadings, FrameType
 from modules.recording import ChunkInfo, Player, PlayerSettings, Recorder, RecorderSettings, make_chunk_name, read_metadata
 from modules.recording.recorder.recorder import RecState
-from modules.recording.tests.recordings import LENS, video_frame, poses, depth_frame, recorder, stream_frames, stream_images, \
+from modules.recording.tests.recordings import LENS, video_frame, poses, depth_frame, recorder, stream_frames, stream_images, stream_packets, \
     cam_frame, record, player, Played, collect, FPS
 
 
@@ -103,8 +103,8 @@ class RoundTripTest(unittest.TestCase):
             player = Player(settings, str(root))
             played: list[tuple[FrameType, int, FrameReadings | None]] = []
             moments: list[tuple[float, float | None]] = []      # when each color frame came, and its capture on the play's clock
-            player.add_frame_callback(lambda cam, kind, image, frame, captured: played.append((kind, int(np.median(image)), frame.readings if frame else None)))
-            player.add_frame_callback(lambda cam, kind, image, frame, captured: moments.append((time.perf_counter(), captured)) if kind == FrameType.VIDEO else None)
+            player.add_frame_callback(lambda cam, kind, image, confidence, frame, captured: played.append((kind, int(np.median(image)), frame.readings if frame else None)))
+            player.add_frame_callback(lambda cam, kind, image, confidence, frame, captured: moments.append((time.perf_counter(), captured)) if kind == FrameType.VIDEO else None)
             player.start()
             deadline = time.perf_counter() + 10.0
             while len(played) < 2 * count and time.perf_counter() < deadline:
@@ -152,6 +152,69 @@ class RoundTripTest(unittest.TestCase):
             metadata = read_metadata(chunks[0])
             self.assertEqual(metadata.info, ChunkInfo(896, 720, LENS, False, 60.0, None, False))
             self.assertEqual(len(metadata.frames), count)
+
+
+@unittest.skipUnless(video.available() and video.encoder_works(video.Hardware.iGPU), 'no iGPU encoder')
+class ConfidencePlaybackTest(unittest.TestCase):
+    def test_the_confidence_plays_back_on_its_depth_and_a_seek_finds_all_three_whole(self) -> None:
+        """Keyframes apart as the settings files record them: a seek goes to a color keyframe, so the depth and its
+        confidence need theirs there. Each stream tells the frame: the depth 1000 + 30 per frame, the confidence
+        50 + 2 per frame."""
+        count: int = 90
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            root = Path(folder)
+            rec = recorder([FrameType.VIDEO, FrameType.DEPTH], str(root / 'temp'), 'recordings', str(root), keyframe_interval=30)
+            rec.start()
+            rec.settings.start = True
+            deadline = time.perf_counter() + 10.0
+            while rec._get_state() != RecState.REC and time.perf_counter() < deadline:
+                time.sleep(0.01)
+            for i in range(count):
+                rec.submit_frame(video_frame(i, i / 30.0))
+                rec.submit_frame(depth_frame(1000 + i * 30, i / 30.0, 50 + i * 2))
+                time.sleep(0.002)
+            rec.settings.stop = True
+            while rec._get_state() != RecState.IDLE and time.perf_counter() < deadline + 10.0:
+                time.sleep(0.01)
+            rec.stop()
+
+            chunk = next((root / 'recordings').glob('*/' + make_chunk_name(0, 0)))
+            keyframes = [sorted(pts for pts, key in stream_packets(chunk, s) if key) for s in (0, 1, 2)]
+            self.assertEqual(keyframes[2], keyframes[0])
+            self.assertEqual(keyframes[1], keyframes[0])
+
+            settings = PlayerSettings()
+            settings.video_frame_types = [FrameType.VIDEO, FrameType.DEPTH]
+            settings.video_decoder = video.Hardware.iGPU
+            settings.video_path = 'recordings'
+            settings.fps = 30.0
+            settings.folder = chunk.parent.name
+            play = Player(settings, str(root))
+            depths: list[tuple[int, float | None]] = []      # each depth's frame, and its confidence's median
+            play.add_frame_callback(lambda cam, kind, image, confidence, frame, captured: depths.append(
+                (round((int(np.median(image)) - 1000) / 30), float(np.median(confidence)) if confidence is not None else None))
+                if kind == FrameType.DEPTH else None)
+            play.start()
+            try:
+                deadline = time.perf_counter() + 10.0
+                while len(depths) < 5 and time.perf_counter() < deadline:
+                    time.sleep(0.01)
+                arrived: int = len(depths)
+                play.settings.seek = 50 / count
+                play.settings.seek = -1.0
+                while not [d for d in depths[arrived:] if d[0] >= 55] and time.perf_counter() < deadline:
+                    time.sleep(0.01)
+            finally:
+                play.settings.stop = True
+                play.stop()
+
+        self.assertTrue(all(c is not None for _, c in depths))
+        after: list[tuple[int, float | None]] = depths[arrived:]
+        frames: list[int] = [f for f, _ in after]
+        self.assertIn(50, frames)
+        for f, c in after[frames.index(50):]:
+            assert c is not None
+            self.assertLess(abs(c - (50 + f * 2)), 4.0, f'frame {f}')
 
 
 @unittest.skipUnless(video.available() and video.encoder_works(video.Hardware.iGPU), 'no iGPU encoder')

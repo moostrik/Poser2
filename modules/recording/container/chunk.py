@@ -25,7 +25,7 @@ from typing import TypeAlias, overload
 
 import numpy as np
 
-from modules.camera import CameraTracklet, DepthAlignment, FrameReadings, TrackingStatus
+from modules.camera import CameraTracklet, DepthAlignment, FrameReadings, FrameType, TrackingStatus
 from modules.utils import Rect
 from modules.video import popen
 
@@ -49,6 +49,11 @@ CHUNK_STREAM_LABELS: dict[ChunkStream, str] = {     # a stream's letter in its f
     ChunkStream.DEPTH: 'D',
     ChunkStream.CONFIDENCE: 'F',
 }
+
+
+def chunk_streams(types: Sequence[FrameType]) -> list[ChunkStream]:
+    """The streams of the camera's frame types, in their order: the color, and with depth the depth and its confidence."""
+    return [ChunkStream.VIDEO] + ([ChunkStream.DEPTH, ChunkStream.CONFIDENCE] if FrameType.DEPTH in types else [])
 
 
 class Container(Enum):

@@ -1,7 +1,6 @@
 """The in and out markers: the file a recording keeps them in, and on a real chunk what dragging one
 does to playback."""
 
-import subprocess
 import tempfile
 import time
 import unittest
@@ -14,7 +13,7 @@ from modules.camera import FrameType
 from modules.recording import Player, PlayerSettings, make_chunk_name
 from modules.recording.container.recording_folder import IN_OUT_FILE, read_in_out, write_in_out
 from modules.recording.recorder.recorder import RecState
-from modules.recording.tests.recordings import depth_frame, recorder, video_frame
+from modules.recording.tests.recordings import depth_frame, recorder, stream_packets, video_frame
 
 
 class MarkerFileTest(unittest.TestCase):
@@ -94,7 +93,8 @@ class PlaybackTest(unittest.TestCase):
         self.colours: list[int] = []
         self.player: Player = make_player(self.root, self.recording)
 
-        def on_frame(_cam: int, kind: FrameType, image: np.ndarray, _metadata: object, _captured: float | None) -> None:
+        def on_frame(_cam: int, kind: FrameType, image: np.ndarray, _confidence: np.ndarray | None, _metadata: object,
+                     _captured: float | None) -> None:
             if kind == FrameType.DEPTH:
                 self.depths.append(round((int(np.median(image)) - 1000) / 30))
             else:
@@ -113,14 +113,8 @@ class PlaybackTest(unittest.TestCase):
     def test_a_seek_finds_both_streams_whole(self) -> None:
         """A seek goes to a colour keyframe, so depth needs one there too, and its frames stored in
         display order: the encoder calls its forward-only frames B as well, so the type says nothing."""
-        chunk = str(self.recording / make_chunk_name(0, 0))
-
-        def packets(stream: int) -> list[tuple[int, bool]]:
-            args = ['-select_streams', f'v:{stream}', '-show_entries', 'packet=pts,flags', '-of', 'csv=p=0', chunk]
-            out, _ = video.popen(args, subprocess.DEVNULL, subprocess.PIPE, command=video.FFPROBE).communicate(timeout=20)
-            lines = out.decode().split()
-            return [(int(line.split(',')[0]), 'K' in line) for line in lines]
-        colour, depth = packets(0), packets(1)
+        chunk = self.recording / make_chunk_name(0, 0)
+        colour, depth = stream_packets(chunk, 0), stream_packets(chunk, 1)
         self.assertEqual(len(colour), self.COUNT)
         stamps: list[int] = [pts for pts, _key in depth]
         self.assertEqual(stamps, sorted(stamps))

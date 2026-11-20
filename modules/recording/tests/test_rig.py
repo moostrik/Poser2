@@ -11,7 +11,7 @@ import numpy as np
 
 from modules import video
 from modules.camera import CameraFrame, FrameType
-from modules.recording import Recorder, RecorderSettings, RecordingFolder, make_chunk_name, read_metadata
+from modules.recording import ChunkStream, Recorder, RecorderSettings, RecordingFolder, make_chunk_name, read_metadata
 from modules.recording.player.chunk_readers import ChunkReaders, Decoding
 from modules.recording.tests.recordings import poses, stream_frames, cam_frame, cam_tracklets, record, \
     player, Played, collect, FPS, SPLIT, COUNT
@@ -114,14 +114,14 @@ class SeveralCamerasTest(unittest.TestCase):
         folder = RecordingFolder.find(self.root / 'recordings')[self.recording.name]
         decoding = Decoding(False, False, video.Hardware.iGPU, FPS, '')
         for lo in (3, 4, 9):
-            readers = ChunkReaders(folder, 1, lo, None, 2, [FrameType.VIDEO, FrameType.DEPTH], lambda *_: None, decoding)
+            readers = ChunkReaders(folder, 1, lo, None, 2, [ChunkStream.VIDEO, ChunkStream.DEPTH, ChunkStream.CONFIDENCE], lambda *_: None, decoding)
             try:
                 reference = readers.metadata[0].frames[lo].timestamp
                 first, _ = readers._range(1, lo, None)
                 landed = readers.metadata[1].frames[first].timestamp
                 self.assertGreaterEqual(landed, reference - 0.5 / FPS)     # its frame of the same round, or the next one where that was lost
                 self.assertLess(landed - reference, 1.5 / FPS)
-                self.assertEqual(readers.types, {0: {FrameType.VIDEO, FrameType.DEPTH}, 1: {FrameType.VIDEO}})
+                self.assertEqual(readers.streams, {0: {ChunkStream.VIDEO, ChunkStream.DEPTH}, 1: {ChunkStream.VIDEO}})
             finally:
                 readers.stop()
                 readers.join()
@@ -194,7 +194,7 @@ class RigTest(unittest.TestCase):
             played: list[Played] = []
             drifts: list[float] = []
             collect(play, played)
-            play.add_frame_callback(lambda cam, kind, image, frame, captured: drifts.append(play.get_drift()))
+            play.add_frame_callback(lambda cam, kind, image, confidence, frame, captured: drifts.append(play.get_drift()))
             play.start()
             try:
                 deadline = time.perf_counter() + 10.0

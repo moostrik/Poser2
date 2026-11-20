@@ -6,7 +6,7 @@ import unittest
 import numpy as np
 
 from modules.camera import FrameType
-from modules.recording import FrameMetadata, PlayClock
+from modules.recording import ChunkStream, FrameMetadata, PlayClock
 from modules.recording.player.frame_hand_over import FrameHandOver
 
 
@@ -16,9 +16,10 @@ def frames(times: list[float], latency: float = 0.03) -> list[FrameMetadata]:
 
 class FakeReaders:
     """A chunk's readers as the hand-over sees them: its number, each camera's streams, metadata and clock."""
-    def __init__(self, chunk: int = 0, times: dict[int, list[float]] | None = None) -> None:
+    def __init__(self, chunk: int = 0, times: dict[int, list[float]] | None = None, confidence: bool = False) -> None:
         self.chunk = chunk
-        self.types = {0: {FrameType.VIDEO, FrameType.DEPTH}, 1: {FrameType.VIDEO}}
+        self.streams = {0: {ChunkStream.VIDEO, ChunkStream.DEPTH} | ({ChunkStream.CONFIDENCE} if confidence else set()),
+                        1: {ChunkStream.VIDEO}}
         self.frames = {c: frames(t) for c, t in (times or {}).items()}
         self.clock = PlayClock(self.frames, {c: 0 for c in self.frames})
 
@@ -32,69 +33,86 @@ class FakeReaders:
 
 class FrameHandOverTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.hand_over = FrameHandOver(2, [FrameType.VIDEO, FrameType.DEPTH])
+        self.hand_over = FrameHandOver(2, [ChunkStream.VIDEO, ChunkStream.DEPTH, ChunkStream.CONFIDENCE])
         self.hand_over.start(FakeReaders(0, {0: [10.0, 10.02, 10.04, 10.06, 10.08, 10.10], 1: [10.0, 10.05, 10.1]}))  # pyright: ignore[reportArgumentType]
         self.out: list[tuple[int, FrameType]] = []
         self.out_cams: list[tuple[int, int, int]] = []
+        self.confidences: list[tuple[FrameType, int | None]] = []
         self.hand_over.frame_callbacks.append(self.on_frame)
 
-    def on_frame(self, cam: int, kind: FrameType, image: np.ndarray, metadata: FrameMetadata | None, captured: float | None) -> None:
+    def on_frame(self, cam: int, kind: FrameType, image: np.ndarray, confidence: np.ndarray | None, metadata: FrameMetadata | None,
+                 captured: float | None) -> None:
+        self.confidences.append((kind, None if confidence is None else int(confidence[0])))
         if cam == 0:
             self.out.append((int(image[0]), kind))
         self.out_cams.append((cam, int(image[1]), int(image[0])))
 
-    def push(self, frame_id: int, kind: FrameType, chunk: int = 0, cam: int = 0) -> None:
+    def push(self, frame_id: int, kind: ChunkStream, chunk: int = 0, cam: int = 0) -> None:
         self.hand_over.submit_frame(cam, kind, np.array([frame_id, chunk]), chunk, frame_id)
 
     def test_a_frame_goes_out_with_both_its_streams(self) -> None:
-        self.push(4, FrameType.VIDEO)
+        self.push(4, ChunkStream.VIDEO)
         self.assertEqual(self.out, [])
-        self.push(4, FrameType.DEPTH)
+        self.push(4, ChunkStream.DEPTH)
         self.assertEqual(self.out, [(4, FrameType.VIDEO), (4, FrameType.DEPTH)])
 
     def test_a_frame_older_than_one_gone_out_is_dropped_and_counted(self) -> None:
-        self.push(4, FrameType.VIDEO)
-        self.push(5, FrameType.VIDEO)
-        self.push(5, FrameType.DEPTH)       # 4 never gets its depth
-        self.push(4, FrameType.DEPTH)       # too late: 5 went out
+        self.push(4, ChunkStream.VIDEO)
+        self.push(5, ChunkStream.VIDEO)
+        self.push(5, ChunkStream.DEPTH)       # 4 never gets its depth
+        self.push(4, ChunkStream.DEPTH)       # too late: 5 went out
         self.assertEqual(self.out, [(5, FrameType.VIDEO), (5, FrameType.DEPTH)])
         self.assertEqual(self.hand_over.take_unpaired(), 1)
         self.assertEqual(self.hand_over.take_unpaired(), 0)
 
+    def test_a_depth_goes_out_with_its_confidence_once_all_three_are_in(self) -> None:
+        self.hand_over.start(FakeReaders(0, {0: [10.0, 10.02, 10.04]}, confidence=True))  # pyright: ignore[reportArgumentType]
+        self.push(1, ChunkStream.VIDEO)
+        self.push(1, ChunkStream.DEPTH)
+        self.assertEqual(self.out, [])
+        self.push(1, ChunkStream.CONFIDENCE)
+        self.assertEqual(self.out, [(1, FrameType.VIDEO), (1, FrameType.DEPTH)])       # the confidence is no frame
+        self.assertEqual(self.confidences, [(FrameType.VIDEO, None), (FrameType.DEPTH, 1)])
+
+    def test_a_chunk_without_confidence_hands_its_depth_with_none(self) -> None:
+        self.push(4, ChunkStream.VIDEO)
+        self.push(4, ChunkStream.DEPTH)
+        self.assertEqual(self.confidences, [(FrameType.VIDEO, None), (FrameType.DEPTH, None)])
+
     def test_another_chunk_s_frames_are_not_handed_over(self) -> None:
-        self.push(4, FrameType.VIDEO, chunk=1)
-        self.push(4, FrameType.DEPTH, chunk=1)
+        self.push(4, ChunkStream.VIDEO, chunk=1)
+        self.push(4, ChunkStream.DEPTH, chunk=1)
         self.assertEqual(self.out, [])
 
     def test_a_camera_without_depth_goes_out_with_its_color(self) -> None:
-        self.push(1, FrameType.VIDEO, cam=1)
+        self.push(1, ChunkStream.VIDEO, cam=1)
         self.assertEqual(self.out_cams, [(1, 0, 1)])
 
     def test_the_next_chunk_plays_beside_the_one_ending_each_camera_in_order(self) -> None:
         self.hand_over.follow(FakeReaders(1, {0: [10.12], 1: [10.15]}))  # pyright: ignore[reportArgumentType]
-        self.push(0, FrameType.VIDEO, chunk=1, cam=1)       # camera 1's chunk ended first: its next goes out
-        self.push(5, FrameType.VIDEO, chunk=0)              # camera 0 still plays the first
-        self.push(5, FrameType.DEPTH, chunk=0)
-        self.push(2, FrameType.VIDEO, chunk=0, cam=1)       # older than camera 1's frame gone out: dropped
+        self.push(0, ChunkStream.VIDEO, chunk=1, cam=1)       # camera 1's chunk ended first: its next goes out
+        self.push(5, ChunkStream.VIDEO, chunk=0)              # camera 0 still plays the first
+        self.push(5, ChunkStream.DEPTH, chunk=0)
+        self.push(2, ChunkStream.VIDEO, chunk=0, cam=1)       # older than camera 1's frame gone out: dropped
         self.assertEqual(self.out_cams, [(1, 1, 0), (0, 0, 5), (0, 0, 5)])
 
     def test_a_retired_chunk_s_frames_are_not_handed_over(self) -> None:
         readers = FakeReaders(1, {0: [10.12]})
         self.hand_over.follow(readers)  # pyright: ignore[reportArgumentType]
         self.hand_over.retire(readers)  # pyright: ignore[reportArgumentType]
-        self.push(0, FrameType.VIDEO, chunk=1, cam=1)
+        self.push(0, ChunkStream.VIDEO, chunk=1, cam=1)
         self.assertEqual(self.out_cams, [])
 
     def test_drift_is_the_recorded_time_between_the_cameras_in_ms(self) -> None:
-        self.push(2, FrameType.VIDEO)
-        self.push(2, FrameType.DEPTH)       # camera 0 at 10.04
-        self.push(1, FrameType.VIDEO, cam=1)    # camera 1 at 10.05
+        self.push(2, ChunkStream.VIDEO)
+        self.push(2, ChunkStream.DEPTH)       # camera 0 at 10.04
+        self.push(1, ChunkStream.VIDEO, cam=1)    # camera 1 at 10.05
         self.assertAlmostEqual(self.hand_over.drift, 10.0)
 
     def test_stopped_nothing_is_handed_over(self) -> None:
         self.hand_over.start(None)
-        self.push(4, FrameType.VIDEO)
-        self.push(4, FrameType.DEPTH)
+        self.push(4, ChunkStream.VIDEO)
+        self.push(4, ChunkStream.DEPTH)
         self.assertEqual(self.out, [])
 
 

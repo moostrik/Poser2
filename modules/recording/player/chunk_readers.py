@@ -7,7 +7,8 @@ cameras of a rig run unsynced, so a camera's frame of the same round is up to ha
 and each camera plays its frames captured from half a period before camera 0's first frame to half a period after
 its last; a range from a chunk's start or to its end takes every camera's from its start or to its end, where the
 recorder cut them all at one time. So cameras that dropped unlike frames start and end at one moment. A camera plays the streams it
-has: color, and depth where its chunk holds depth."""
+has (`ChunkStream`): color, depth where its chunk holds depth, and its confidence, decoded grey, where the chunk holds
+that too (`ChunkInfo.confidence`)."""
 
 import logging
 from collections.abc import Sequence
@@ -17,14 +18,14 @@ from typing import Callable, cast
 
 import numpy as np
 
-from modules.camera import CAPTURE_TOLERANCE, FrameType
+from modules.camera import CAPTURE_TOLERANCE
 from modules.video import Hardware, StreamFrameCallback, StreamReader
 
 from ..container import ChunkInfo, ChunkMetadata, ChunkStream, FrameMetadata, RecordingFolder, make_chunk_name, make_file_name, read_metadata
 from .play_clock import PlayClock
 
-# (cam_id, frame_type, frame, chunk_id, frame_id): a reader's frame, of the kind a chunk's readers read
-ChunkFrameCallback = Callable[[int, FrameType, np.ndarray, int, int], None]
+# (cam_id, stream, frame, chunk_id, frame_id): a reader's frame, of the stream it reads
+ChunkFrameCallback = Callable[[int, ChunkStream, np.ndarray, int, int], None]
 
 logger = logging.getLogger(__name__)
 
@@ -53,15 +54,15 @@ def first_at(frames: Sequence[FrameMetadata], timestamp: float) -> int:
 
 
 class ChunkReaders:
-    def __init__(self, folder: RecordingFolder, chunk: int, lo: int, hi: int | None, num_cams: int, types: list[FrameType],
+    def __init__(self, folder: RecordingFolder, chunk: int, lo: int, hi: int | None, num_cams: int, streams: list[ChunkStream],
                  frame_callback: ChunkFrameCallback, decoding: Decoding, known: 'ChunkReaders | None' = None) -> None:
         """The readers of `folder`'s `chunk`, camera 0's frames `lo` up to `hi` (None: to its end) and every other
-        camera's of the same moments, of the streams of `types` each camera has, each reader handing its frames to
+        camera's of the same moments, of the `streams` each camera has, each reader handing its frames to
         `frame_callback` on its own thread. `known`: readers of the same chunk of the same folder, whose metadata is
         taken instead of read again (a loop over one chunk, a seek in it)."""
         self.folder: RecordingFolder = folder
         self.chunk: int = chunk
-        self.types: dict[int, set[FrameType]] = {}      # each camera's streams: what its frames wait for
+        self.streams: dict[int, set[ChunkStream]] = {}      # each camera's streams: what its frames wait for
         self.metadata: dict[int, ChunkMetadata] = {}
         if known is not None and known.folder.path == folder.path and known.chunk == chunk:
             self.metadata = dict(known.metadata)
@@ -84,16 +85,17 @@ class ChunkReaders:
             path = folder.path / make_chunk_name(c, chunk)
             if path.is_file():
                 info: ChunkInfo | None = self.metadata[c].info if c in self.metadata else None
-                with_depth: bool = info is None or info.depth
-                for stream, t in enumerate((FrameType.VIDEO, FrameType.DEPTH)):
-                    if t in types and (t == FrameType.VIDEO or with_depth):
-                        self._load(c, t, path, stream, first, end, frame_callback, decoding, self.clock)
+                held: dict[ChunkStream, bool] = {ChunkStream.VIDEO: True, ChunkStream.DEPTH: info is None or info.depth,
+                                                 ChunkStream.CONFIDENCE: info is not None and info.depth and info.confidence}
+                for stream in streams:
+                    if held[stream]:
+                        self._load(c, stream, path, int(stream), first, end, frame_callback, decoding, self.clock)
                 continue
-            for t in types:
-                path = folder.path / make_file_name(c, ChunkStream[t.name], chunk, decoding.suffix)
+            for stream in streams:
+                path = folder.path / make_file_name(c, stream, chunk, decoding.suffix)
                 if path.is_file():
-                    self._load(c, t, path, 0, first, end, frame_callback, decoding, self.clock)
-                elif t == FrameType.VIDEO:
+                    self._load(c, stream, path, 0, first, end, frame_callback, decoding, self.clock)
+                elif stream == ChunkStream.VIDEO:
                     logger.warning(f"File {path} not found")
 
     def _range(self, cam_id: int, lo: int, hi: int | None) -> tuple[int, int | None]:
@@ -109,15 +111,17 @@ class ChunkReaders:
         end: int = first_at(own.frames, reference.frames[hi - 1].timestamp + half)
         return first, max(end, first)
 
-    def _load(self, cam_id: int, frame_type: FrameType, path: Path, stream: int, lo: int, hi: int | None,
+    def _load(self, cam_id: int, stream: ChunkStream, path: Path, index: int, lo: int, hi: int | None,
               frame_callback: ChunkFrameCallback, decoding: Decoding, clock: PlayClock | None) -> None:
-        color: bool = frame_type == FrameType.VIDEO and not decoding.gray
-        reader = StreamReader(cam_id, frame_type, cast(StreamFrameCallback, frame_callback), color, decoding.decoder,
-                              decoding.fps, stream, frame_type == FrameType.DEPTH, clock,
+        """A reader of `stream`, the file's stream `index`: the color as decoded, the depth as millimeters, the
+        confidence grey."""
+        color: bool = stream == ChunkStream.VIDEO and not decoding.gray
+        reader = StreamReader(cam_id, stream, cast(StreamFrameCallback, frame_callback), color, decoding.decoder,
+                              decoding.fps, index, stream == ChunkStream.DEPTH, clock,
                               color and decoding.nv12)
         reader.load(str(path), self.chunk, lo, hi)
         self._readers.append(reader)
-        self.types.setdefault(cam_id, set()).add(frame_type)
+        self.streams.setdefault(cam_id, set()).add(stream)
 
     def info(self, cam_id: int) -> ChunkInfo | None:
         """The chunk's fixed info for a camera; None for a recording without it."""

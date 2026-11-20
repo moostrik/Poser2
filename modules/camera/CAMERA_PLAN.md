@@ -20,12 +20,6 @@ so it goes the depth's whole way: camera, alignment, recording, view, motion. It
 as a frame of its own, so it is never paired with another frame's depth. A step in another thread's package is told to
 that thread when it is built.
 
-- **A4. Playing it.** The player goes by `ChunkStream` where it goes by `FrameType` now (its readers, its hand-over and
-  the frames waiting to be paired), and reads stream 2 grey where `ChunkInfo.confidence` says it is there. Its
-  hand-over hands the depth frame out with its confidence (`ClipFrameCallback`), which the replay camera puts on the
-  DEPTH `CameraFrame` and `RecordedPoses.set_clip_frame` takes as well (deep_flow, low_flow); a chunk without it plays
-  with None. Check: `test_round_trip` plays three streams back (the confidence on its depth frame, a seek whole in all
-  three), the replay camera's tests. RECORDING.md's playback.
 - **A5. The color in HEVC.** deep_flow's `recorder.video_codec` in its settings files from H264 to HEVC, so a chunk is one codec,
   smaller at the same quality **(deduction: HEVC is usually 30–50% smaller)**; `MP4` stays H.264, for any player; older
   recordings play as they are. The writer side is built (1670244c). Check, first: the iGPU encoder's load on the real
@@ -53,5 +47,5 @@ The recordings measured so far have no confidence, so the motion's A/B needs a n
 ## Rules it touches
 
 - Keep settings files in sync with code changes: A5, deep_flow's `video_codec`.
-- A step checked by a run or a test is one commit: A4–A6.
+- A step checked by a run or a test is one commit: A5–A6.
 - Separate what the code or a measurement shows from what is inferred: the probe, A5.

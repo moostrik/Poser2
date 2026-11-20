@@ -86,8 +86,8 @@ class RecordedPoses(FrameDictCallbackMixin):
 
     # ── The player's frames ────────────────────────────────────────────
 
-    def set_clip_frame(self, cam_id: int, frame_type: FrameType, image: np.ndarray, metadata: FrameMetadata | None,
-                       captured: float | None) -> None:
+    def set_clip_frame(self, cam_id: int, frame_type: FrameType, image: np.ndarray, confidence: np.ndarray | None,
+                       metadata: FrameMetadata | None, captured: float | None) -> None:
         """A `ClipFrameCallback`, on the player's thread: the frame's recorded poses kept by its capture on the
         play's clock."""
         if frame_type != FrameType.VIDEO or metadata is None or captured is None:

@@ -138,11 +138,12 @@ class Camera:
 
     # ── Hand-over ──────────────────────────────────────────────────────
 
-    def _clip_callback(self, cam_id: int, frame_type: FrameType, image: np.ndarray, metadata: FrameMetadata | None,
-                       captured: float | None) -> None:
+    def _clip_callback(self, cam_id: int, frame_type: FrameType, image: np.ndarray, confidence: np.ndarray | None,
+                       metadata: FrameMetadata | None, captured: float | None) -> None:
         """A clip frame, on the player's thread, to the callbacks: stamped with its capture on the play's clock,
-        or its hand-over for a recording without metadata, and its hand-over as its arrival. The player hands
-        a recorded frame's video first, so its depth takes the video's stamp: one capture, one time."""
+        or its hand-over for a recording without metadata, and its hand-over as its arrival; a depth with its
+        confidence. The player hands a recorded frame's video first, so its depth takes the video's stamp: one
+        capture, one time."""
         if not self.running or cam_id != self.cam_id:
             return
         arrival: float = time.perf_counter()
@@ -162,7 +163,8 @@ class Camera:
         intrinsics: list[list[float]] | None = info.intrinsics if info is not None else None
         nv12: bool = frame_type == FrameType.VIDEO and self.player.nv12
         frame = CameraFrame(cam_id=self.cam_id, kind=frame_type, image=image, timestamp=timestamp, nv12=nv12, flip_h=flip_h,
-                            homography=homography, readings=readings, intrinsics=intrinsics, alignment=alignment, arrival=arrival)
+                            homography=homography, readings=readings, intrinsics=intrinsics, alignment=alignment, arrival=arrival,
+                            confidence=confidence)
         for c in self.frame_callbacks:
             c(frame)
         if frame_type == FrameType.VIDEO and metadata is not None:

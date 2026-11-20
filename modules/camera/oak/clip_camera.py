@@ -67,7 +67,8 @@ class ClipCamera(Camera):
         self.clips = None
         super()._close()
 
-    def _clip_callback(self, cam_id: int, frame_type: FrameType, frame: np.ndarray, metadata: object, captured: float | None) -> None:
+    def _clip_callback(self, cam_id: int, frame_type: FrameType, frame: np.ndarray, confidence: np.ndarray | None, metadata: object,
+                       captured: float | None) -> None:
         """A decoded clip frame, into the device as the sensor would have sent it."""
         if not self.running or cam_id != self.cam_id or frame_type != FrameType.VIDEO or self.clips is None:
             return
@@ -102,7 +103,8 @@ class ClipCamera(Camera):
             self.cam_id, width, height, expected[0], expected[1],
         )
 
-    def _passthrough_callback(self, cam_id: int, frame_type: FrameType, frame: np.ndarray, metadata: object, captured: float | None) -> None:
+    def _passthrough_callback(self, cam_id: int, frame_type: FrameType, frame: np.ndarray, confidence: np.ndarray | None,
+                              metadata: object, captured: float | None) -> None:
         """Without a device: the clip frames go straight to the callbacks, no tracklets."""
         if cam_id != self.cam_id:
             return

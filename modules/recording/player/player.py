@@ -2,7 +2,7 @@
 (`PlayClock`), each frame handed over as late after its recorded capture as it came live, a frame's
 streams together (`FrameHandOver`), between in and out markers on the timeline, and the panel's playback
 readouts. It feeds a source (the oak `ClipCamera` or the replay camera). A chunk is one `.mkv` with color,
-depth when it was recorded, and metadata (`chunk`), or a color-only clip of before; a folder plays with the
+depth and its confidence when they were recorded, and metadata (`chunk`), or a color-only clip of before; a folder plays with the
 streams it has, whatever `video_frame_types` asks for. A chunk's readers are `ChunkReaders`; the folders,
 their markers and the timeline are `RecordingFolder` and `Timeline`.
 
@@ -23,7 +23,7 @@ from modules.camera import FrameType
 from modules.settings import BaseSettings, Field, Widget
 from modules.video import Hardware
 
-from ..container import ChunkInfo, ChunkStream, Container, RecordingFolder, Timeline, locate
+from ..container import ChunkInfo, ChunkStream, Container, RecordingFolder, Timeline, chunk_streams, locate
 from .chunk_readers import ChunkReaders, Decoding
 from .frame_hand_over import ClipFrameCallback, FrameHandOver
 
@@ -94,7 +94,7 @@ class Player(Thread):
         self.gray: bool = gray
         self.nv12: bool = nv12 and not gray
         self.num_cams: int = settings.num_cams
-        self.types: list[FrameType] = settings.video_frame_types
+        self.streams: list[ChunkStream] = chunk_streams(settings.video_frame_types)     # the streams it plays, those a chunk has
         self.fps: float = settings.fps
 
         self.running: bool = False
@@ -124,7 +124,7 @@ class Player(Thread):
         self.ending: ChunkReaders | None = None         # of the one before it, its last frames while the next plays,
         self.closing: list[ChunkReaders] = []           # and of those stopped, until their threads end
         self.known: ChunkReaders | None = None          # the last chunk played: its metadata for a seek after a stop
-        self.hand_over: FrameHandOver = FrameHandOver(self.num_cams, self.types)
+        self.hand_over: FrameHandOver = FrameHandOver(self.num_cams, self.streams)
 
         self.playback_lock: Lock = Lock()
         self.loop_callbacks: list[LoopCallback] = []
@@ -243,7 +243,7 @@ class Player(Thread):
         """The readers of the load chunk's frames `lo` up to `hi`."""
         known: ChunkReaders | None = self.playing or self.loading or self.known
         decoding = Decoding(self.gray, self.nv12, self.decoder, self.fps, self.suffix)
-        self.loading = ChunkReaders(self.folders[self.load_folder], self._get_load_chunk(), lo, hi, self.num_cams, self.types,
+        self.loading = ChunkReaders(self.folders[self.load_folder], self._get_load_chunk(), lo, hi, self.num_cams, self.streams,
                                     self.hand_over.submit_frame, decoding, known)
 
     def _start(self, loop: bool = True, follows: bool = False) -> None:
@@ -550,7 +550,7 @@ class Player(Thread):
     def _prepare_folder(self, name: str) -> None:
         """Probe every chunk's frame count and take up the recording's markers; the caller starts playback."""
         folder: RecordingFolder | None = self.folders.get(name)
-        chunk_frames: list[int] = folder.frame_counts(ChunkStream[self.types[0].name], self.suffix) if folder is not None else []
+        chunk_frames: list[int] = folder.frame_counts(ChunkStream.VIDEO, self.suffix) if folder is not None else []
         with self.playback_lock:
             self.timeline = Timeline.of(chunk_frames, self.settings.in_out)
         self.settings.max_chunks = len(chunk_frames)

@@ -10,8 +10,9 @@ from .tracklet import CameraTracklets
 
 CameraFrameCallback: TypeAlias = Callable[[CameraFrame], None]
 TrackletCallback: TypeAlias = Callable[[CameraTracklets], None]
-# A recorded frame: (cam_id, frame_type, image, what was recorded with it, its capture on the play's clock).
-ClipFrameCallback: TypeAlias = Callable[[int, FrameType, np.ndarray, object, float | None], None]
+# A recorded frame: (cam_id, frame_type, image, a DEPTH frame's confidence or None, what was recorded with it, its
+# capture on the play's clock).
+ClipFrameCallback: TypeAlias = Callable[[int, FrameType, np.ndarray, np.ndarray | None, object, float | None], None]
 
 
 class ClipSource(Protocol):

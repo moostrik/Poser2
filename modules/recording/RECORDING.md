@@ -151,6 +151,7 @@ crash left unmerged is merged beside the next recording.
 | A loop, a seek or another folder starts the clock anew, and is told        | the replay camera and `RecordedPoses` drop what waits (`add_jump_callback`)      |
 | Each camera's frames go out under its own lock, in chunk and frame order   | a camera never waits for another's; a frame older than one gone out is dropped   |
 | A camera plays the streams its chunk has                                   | a color-only camera plays beside one with depth                                  |
+| A depth frame goes out with its confidence, None where the chunk has none  | the confidence rides on its depth, never paired with another frame's             |
 | The markers, a seek and a scrub are places on camera 0's frames            | the other cameras play the same recorded moment, found by time                   |
 | A stop ends a reader's decoder                                             | a decoder that stalled cannot hold the player                                    |
 
@@ -159,6 +160,11 @@ Each camera plays its frames captured from half a period before camera 0's first
 period after its last; a range from a chunk's start or to its end takes every camera's whole, where the recorder
 cut them all at one time. How far the cameras play apart is `drift`, the recorded capture times of their last
 frames gone out, in ms. A clip without metadata plays at `fps`.
+
+The player goes by the chunk's streams (`ChunkStream`) in its readers, the frames waiting to be paired and its
+hand-over, and reads the confidence grey where `ChunkInfo.confidence` says the chunk has it. The hand-over turns them
+into the camera's frames: the color a VIDEO frame, the depth a DEPTH frame with its confidence (`ClipFrameCallback`),
+which the replay camera puts on the DEPTH `CameraFrame`.
 
 deep_flow's player decodes color to NV12 (`Player(nv12=True)`), as the camera hands it: half the bytes of BGR
 through the pipe, and live's upload path. A chunk's metadata is read once and kept for the chunk playing, the one
@@ -177,7 +183,7 @@ loaded and the last played, and its lines are parsed as the frames are read, so 
 ## The replay camera
 
 `replay.Camera` is a `CameraSource` without a device. Its frames come as the camera delivered them: `flip_h` as
-recorded, depth frames with the recorded alignment, and with `tilt` the homography of the recorded tilt plus the
+recorded, depth frames with the recorded alignment and confidence, and with `tilt` the homography of the recorded tilt plus the
 live offset on the recorded lens. That matches live's to within `TILT_STEP` (0.25°): live makes it from the IMU's
 newest tilt, the recording keeps the tilt read with the frame **(deduction)**.
 

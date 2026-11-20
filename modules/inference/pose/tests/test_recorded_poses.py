@@ -64,7 +64,7 @@ class RecordedPosesTest(unittest.TestCase):
         self.node.stop()
 
     def clip(self, captured: float, recorded: float, poses: dict | None, latency: float = 0.03) -> None:
-        self.node.set_clip_frame(0, FrameType.VIDEO, np.zeros(1), FrameMetadata(recorded, poses=poses, pose_latency=latency), captured)
+        self.node.set_clip_frame(0, FrameType.VIDEO, np.zeros(1), None, FrameMetadata(recorded, poses=poses, pose_latency=latency), captured)
 
     def test_the_recorded_box_and_points_play_after_their_latency(self) -> None:
         captured = time.perf_counter()

@@ -40,7 +40,7 @@ from modules.settings import BaseSettings, Field, Widget
 from modules.video import ClipCodec, DEPTH_CODEC, DEPTH_HARDWARE, Hardware, StreamWriter
 
 from ..container import DEPTH_SUFFIX, METADATA_LABEL, METADATA_SUFFIX, ChunkInfo, ChunkStream, Container, FrameMetadata, \
-    finish_unmerged, frame_line, info_line, keep_chunk, make_chunk_name, make_file_name, make_folder_name, merge_chunk
+    chunk_streams, finish_unmerged, frame_line, info_line, keep_chunk, make_chunk_name, make_file_name, make_folder_name, merge_chunk
 from .recording_sync import FramePoses, RecordedCapture, RecordingSync
 
 import logging
@@ -126,7 +126,7 @@ class Recorder(Thread):
             logger.warning("An mp4 chunk holds no depth: recording color only")
             self.types.remove(FrameType.DEPTH)
         self.with_depth: bool = FrameType.DEPTH in self.types
-        self.streams: list[ChunkStream] = [ChunkStream.VIDEO] + ([ChunkStream.DEPTH, ChunkStream.CONFIDENCE] if self.with_depth else [])
+        self.streams: list[ChunkStream] = chunk_streams(self.types)
         self.recorders: dict[int, dict[ChunkStream, StreamWriter]] = {}
         self.frames: dict[int, Queue[RecordedCapture]] = {}
         self._held_lock: Lock = Lock()

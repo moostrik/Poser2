@@ -1,5 +1,7 @@
 """The hand-over of a play's frames: each camera's frame out once all its own streams are in (color and, where its
-chunk has it, depth), with one stamp, its capture on the play's clock, and what the chunk keeps of it.
+chunk has them, depth and its confidence), with one stamp, its capture on the play's clock, and what the chunk keeps
+of it. The chunk's streams become the camera's frames here: the color a VIDEO frame, the depth a DEPTH frame with its
+confidence, None where the chunk has none.
 
 The streams' readers call `submit_frame` on their own threads. Each camera is handed over apart, under its own lock,
 as live: one camera's frames never wait for another's. A camera's frames leave in their order, the chunk's and then
@@ -16,28 +18,30 @@ from numpy import ndarray
 
 from modules.camera import FrameType
 
-from ..container import ChunkInfo, FrameMetadata
+from ..container import ChunkInfo, ChunkStream, FrameMetadata
 from .chunk_readers import ChunkReaders
 
 logger = logging.getLogger(__name__)
 
-# A clip frame as the player hands it over: (cam_id, frame_type, image, metadata, timestamp), the
-# metadata the chunk keeps of the frame and its capture on the play's clock (`PlayClock.capture`).
-# Both are None for a recording without metadata: the source it feeds stamps the frame at its
-# hand-over then.
-ClipFrameCallback: TypeAlias = Callable[[int, FrameType, ndarray, FrameMetadata | None, float | None], None]
+# A clip frame as the player hands it over: (cam_id, frame_type, image, confidence, metadata, timestamp), a DEPTH
+# frame's confidence (None for a VIDEO frame and a chunk without it), the metadata the chunk keeps of the frame and its
+# capture on the play's clock (`PlayClock.capture`). The last two are None for a recording without metadata: the
+# source it feeds stamps the frame at its hand-over then.
+ClipFrameCallback: TypeAlias = Callable[[int, FrameType, ndarray, ndarray | None, FrameMetadata | None, float | None], None]
+
+FRAME_TYPES: dict[ChunkStream, FrameType] = {ChunkStream.VIDEO: FrameType.VIDEO, ChunkStream.DEPTH: FrameType.DEPTH}
 
 
 class FrameHandOver:
-    def __init__(self, num_cams: int, types: list[FrameType]) -> None:
-        """`types`: the kinds in the order a frame's streams go out, VIDEO first: its readings set up what the
-        depth of the frame uses."""
-        self.types: list[FrameType] = types
+    def __init__(self, num_cams: int, streams: list[ChunkStream]) -> None:
+        """`streams`: in the order a frame's streams go out, VIDEO first: its readings set up what the depth of the
+        frame uses."""
+        self.streams: list[ChunkStream] = streams
         self.frame_callbacks: list[ClipFrameCallback] = []
         self._lock: Lock = Lock()                   # the chunks handed over and the counts
         self._camera_locks: dict[int, Lock] = defaultdict(Lock)     # one camera's frames out at a time, in order
         self._readers: dict[int, ChunkReaders] = {}         # the chunks whose frames go out, by number
-        self._waiting: dict[int, dict[tuple[int, int], dict[FrameType, ndarray]]] = defaultdict(dict)
+        self._waiting: dict[int, dict[tuple[int, int], dict[ChunkStream, ndarray]]] = defaultdict(dict)
         self._handed_over: dict[int, tuple[int, int]] = {}  # each camera's last frame gone out: (chunk, frame)
         self._recorded: dict[int, float] = {}               # and its recorded capture time
         self._unpaired: int = 0                     # frames dropped without their other stream, since taken
@@ -84,27 +88,27 @@ class FrameHandOver:
             unpaired, self._unpaired = self._unpaired, 0
         return unpaired
 
-    def submit_frame(self, cam_id: int, frame_type: FrameType, frame: ndarray, chunk_id: int, frame_id: int) -> None:
+    def submit_frame(self, cam_id: int, stream: ChunkStream, frame: ndarray, chunk_id: int, frame_id: int) -> None:
         """A stream's frame, on its reader's thread (`StreamFrameCallback`)."""
         with self._lock:
             readers: ChunkReaders | None = self._readers.get(chunk_id)
         if readers is None:
             return
-        if cam_id == 0 and frame_type == FrameType.VIDEO:
+        if cam_id == 0 and stream == ChunkStream.VIDEO:
             self.shown_frame = frame_id
         key: tuple[int, int] = (chunk_id, frame_id)
 
         with self._camera_locks[cam_id]:
             with self._lock:
-                cam_frames: dict[tuple[int, int], dict[FrameType, ndarray]] = self._waiting[cam_id]
-                cam_frames.setdefault(key, {})[frame_type] = frame
-                if any(t not in cam_frames[key] for t in readers.types.get(cam_id, ())):
+                cam_frames: dict[tuple[int, int], dict[ChunkStream, ndarray]] = self._waiting[cam_id]
+                cam_frames.setdefault(key, {})[stream] = frame
+                if any(s not in cam_frames[key] for s in readers.streams.get(cam_id, ())):
                     return
                 stale: list[tuple[int, int]] = [k for k in cam_frames if k < key]
                 for k in stale:
                     del cam_frames[k]
                 self._unpaired += len(stale)
-                frames: dict[FrameType, ndarray] = cam_frames.pop(key)
+                frames: dict[ChunkStream, ndarray] = cam_frames.pop(key)
                 if key <= self._handed_over.get(cam_id, (-1, -1)):
                     return          # a frame older than one gone out: the order holds
                 self._handed_over[cam_id] = key
@@ -114,7 +118,9 @@ class FrameHandOver:
             if metadata is not None:
                 with self._lock:
                     self._recorded[cam_id] = metadata.timestamp
-            for kind in self.types:
-                if kind in frames:
+            confidence: ndarray | None = frames.get(ChunkStream.CONFIDENCE)
+            for stream in self.streams:
+                kind: FrameType | None = FRAME_TYPES.get(stream)
+                if kind is not None and stream in frames:
                     for callback in self.frame_callbacks:
-                        callback(cam_id, kind, frames[kind], metadata, timestamp)
+                        callback(cam_id, kind, frames[stream], confidence if kind == FrameType.DEPTH else None, metadata, timestamp)

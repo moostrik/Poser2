@@ -32,9 +32,9 @@ class FakePlayer:
         return None
 
     def push(self, cam_id: int, image: np.ndarray, frame_type: FrameType = FrameType.VIDEO, captured: float | None = None,
-             metadata: FrameMetadata | None = None) -> None:
+             metadata: FrameMetadata | None = None, confidence: np.ndarray | None = None) -> None:
         for c in self.callbacks:
-            c(cam_id, frame_type, image, metadata, captured)
+            c(cam_id, frame_type, image, confidence, metadata, captured)
 
 
 class FakePersonDetector:
@@ -99,6 +99,13 @@ class ReplayCameraTest(unittest.TestCase):
         self.player.push(1, np.zeros((4, 6), dtype=np.uint16), FrameType.DEPTH)
         self.assertEqual([f.kind for f in self.frames], [FrameType.VIDEO, FrameType.DEPTH])
         self.assertEqual(self.frames[1].timestamp, self.frames[0].timestamp)
+
+    def test_a_recorded_depth_carries_its_confidence_and_one_without_none(self) -> None:
+        confidence = np.full((4, 6), 200, np.uint8)
+        self.player.push(1, np.zeros((4, 6), dtype=np.uint16), FrameType.DEPTH, confidence=confidence)
+        self.player.push(1, np.zeros((4, 6), dtype=np.uint16), FrameType.DEPTH)
+        self.assertIs(self.frames[0].confidence, confidence)
+        self.assertIsNone(self.frames[1].confidence)
 
     def test_the_detector_boxes_become_tracklets_with_their_frame_s_time(self) -> None:
         self.detector.report(1, [Rect(0.1, 0.2, 0.3, 0.4), Rect(0.5, 0.5, 0.2, 0.3)], 12.5)
