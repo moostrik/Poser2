@@ -6,6 +6,7 @@ modules/flow/FLUID_3D.md, "The fluid", "The inputs" and "The walls".
 """
 import math
 from dataclasses import replace
+from typing import TypedDict
 
 from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_REPEAT, GL_R16F, GL_R32F, GL_R8, GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
 
@@ -53,6 +54,26 @@ FLUID_PASSES: tuple[str, ...] = ('advect velocity', 'viscosity', 'vorticity', 'b
                                  'advect temperature', 'density', 'light', 'composite')     # a step's passes, each a GPU timer
 FULL_WIDTH_HALF_MAXIMUM: float = 2.0 * math.sqrt(2.0 * math.log(2.0))   # a gaussian's width at half its height, in sigmas
 CAUSTIC_NET_SIZE: int = 256   # the caustic net's texels across its tile
+
+
+class FaceAdvection(TypedDict):
+    """What every pass of the faces' advection takes."""
+    obstacle: Texture3D
+    cells: tuple[int, int, int]
+    cell: Cell
+    step: float
+    closed: tuple[bool, bool, bool]
+    has_obstacles: bool
+
+
+class FaceFinish(TypedDict):
+    """What the faces' last advection pass takes besides: the fade, the evaporation, the guard and the slip."""
+    dissipation: float
+    evaporation: float
+    evaporation_knee: float
+    guard: GuardSlot | None
+    wall_keep: float
+
 
 import logging
 logger = logging.getLogger(__name__)
@@ -504,12 +525,12 @@ class Fluid3D:
         fade, the evaporation, the guard, the top speed and the slip."""
         velocity = self.settings.velocity
         step = self._dt * velocity.advection_scale
-        common = dict(obstacle=self._obstacle, cells=self._cells, cell=self._cell, step=step,
-                      closed=self._closed, has_obstacles=self._has_obstacles)
-        finish = dict(dissipation=self._calculate_dissipation(self._dt, velocity.fade_time),
-                      evaporation=self._evaporation(self._dt, velocity.evaporation_time),
-                      evaporation_knee=velocity.evaporation_knee,
-                      guard=self._guard_slot('velocity'), wall_keep=self._wall_keep)
+        common = FaceAdvection(obstacle=self._obstacle, cells=self._cells, cell=self._cell, step=step,
+                               closed=self._closed, has_obstacles=self._has_obstacles)
+        finish = FaceFinish(dissipation=self._calculate_dissipation(self._dt, velocity.fade_time),
+                            evaporation=self._evaporation(self._dt, velocity.evaporation_time),
+                            evaporation_knee=velocity.evaporation_knee,
+                            guard=self._guard_slot('velocity'), wall_keep=self._wall_keep)
         self._faces.swap()
         source = self._faces.back
         if self.settings.velocity.advection != Advection.MACCORMACK:
@@ -720,7 +741,8 @@ class Fluid3D:
     @property
     def _closed(self) -> tuple[bool, bool, bool]:
         """Per axis, whether the box's walls are closed (`wall`), as every pass reading beyond the box takes them."""
-        return (self.settings.wall == WallMode.CLOSED,) * 3
+        closed: bool = self.settings.wall == WallMode.CLOSED
+        return (closed, closed, closed)
 
     @property
     def _face_shaders(self) -> tuple[ComputeShader, ...]:
@@ -828,8 +850,8 @@ class Fluid3D:
         density: Texture3D | None = self._density.weight
         lit = composite.light
         if not lit.enabled or density is None:
-            for light in self._light_volumes:
-                light.deallocate()
+            for volume in self._light_volumes:
+                volume.deallocate()
             return None
         share: int = int(lit.grid)
         size = (max(1, self._simulation_width // share), max(1, self._simulation_height // share), max(1, self._depth // share))

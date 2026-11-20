@@ -35,4 +35,4 @@ class BandpassTrails2D(ComputeShader):
         glUniform1f(self.get_uniform_loc("uSlowWeight"), slow_weight)
         glUniform2i(self.get_uniform_loc("uSize"), fast_out.width, fast_out.height)
         self.dispatch(fast_out.width, fast_out.height)
-        glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT)    # read next by textures and FBOs
+        glMemoryBarrier(int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_FRAMEBUFFER_BARRIER_BIT))    # read next by textures and FBOs

@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 from OpenGL.GL import (GL_FLOAT, GL_RED, GL_TEXTURE_2D, GL_TEXTURE_HEIGHT, GL_TEXTURE_WIDTH, GL_UNSIGNED_BYTE,
@@ -31,7 +32,7 @@ def read_level(texture: Texture, lod: int, kind: int = GL_UNSIGNED_BYTE, dtype: 
     glBindTexture(GL_TEXTURE_2D, texture.tex_id)
     width = int(glGetTexLevelParameteriv(GL_TEXTURE_2D, lod, GL_TEXTURE_WIDTH))
     height = int(glGetTexLevelParameteriv(GL_TEXTURE_2D, lod, GL_TEXTURE_HEIGHT))
-    data = glGetTexImage(GL_TEXTURE_2D, lod, GL_RED, kind)
+    data = cast(bytes, glGetTexImage(GL_TEXTURE_2D, lod, GL_RED, kind))
     glBindTexture(GL_TEXTURE_2D, 0)
     return np.frombuffer(data, dtype).reshape(height, width).copy()
 
@@ -77,5 +78,5 @@ class SolveCapture:
             return
         self._saved += 1
         path: Path = self._folder / f'solve_capture_{self._saved}.npz'
-        np.savez_compressed(path, solved=values, **settings, **inputs)
+        np.savez_compressed(path, allow_pickle=True, solved=values, **settings, **inputs)    # numpy's default, named
         logger.warning('Solve capture: %d wrong values, saved to %s', wrong, path)

@@ -6,6 +6,8 @@ color or warmth, so a frame's dye is not lost to the next one's; a velocity is t
 color goes with its amount: both are picked by the amount.
 """
 
+from OpenGL.GL import Constant
+
 from modules.gl import Style, SwapFbo, Texture
 from .shaders import LargerAmount
 
@@ -23,7 +25,7 @@ class FrameMax:
     def texture(self) -> Texture:
         return self._held
 
-    def allocate(self, width: int, height: int, internal_format: int) -> None:
+    def allocate(self, width: int, height: int, internal_format: Constant) -> None:
         self._held.allocate(width, height, internal_format)
         self._larger_shader.allocate()
 

@@ -9,6 +9,7 @@ from modules.gl import Fbo, SwapFbo, Texture, shaders
 
 class FlowUtil:
     """Static utility methods for flow FBO operations."""
+    _weighted_sum_shader: shaders.WeightedSum        # made on first use, `_weighted_sum`
 
     @staticmethod
     def zero(fbo: Fbo | SwapFbo) -> None:

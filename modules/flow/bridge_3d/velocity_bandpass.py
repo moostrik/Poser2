@@ -275,12 +275,13 @@ class VelocityBandpass(FlowBase):
 
         # The four parts, each its size and its velocity, in one dispatch; then the whole change and, with
         # `acceleration`, every reading over the band's width instead of the step peak, in one more
-        parts: tuple[Change, ...] = (Change.START, Change.BOW, Change.STOP, Change.WAKE)
-        speeds = tuple(self._speeds[part] for part in parts)
-        velocities = tuple(self._velocities[part] for part in parts)
+        sizes, parts, rates = self._speeds, self._velocities, self._accelerations
+        speeds: tuple[Texture, Texture, Texture, Texture] = (sizes[Change.START], sizes[Change.BOW], sizes[Change.STOP], sizes[Change.WAKE])
+        velocities: tuple[Texture, Texture, Texture, Texture] = (parts[Change.START], parts[Change.BOW], parts[Change.STOP], parts[Change.WAKE])
         self._changes_shader.use(self.fast, self.slow, self._region_fast_fbo, self._region_slow_fbo, self._region_speed_fbo,
                                  speeds, velocities, scale, s.start_region_weight, s.stop_region_weight, stop_lod)
-        accelerations = (self._change_acceleration_fbo, *(self._accelerations[part] for part in parts)) if acceleration else None
+        accelerations: tuple[Texture, Texture, Texture, Texture, Texture] | None = (
+            self._change_acceleration_fbo, rates[Change.START], rates[Change.BOW], rates[Change.STOP], rates[Change.WAKE]) if acceleration else None
         self._accelerations_shader.use(self.fast, self.slow, velocities, self._change_fbo, accelerations,
                                        scale, acceleration_scale, peak)
 

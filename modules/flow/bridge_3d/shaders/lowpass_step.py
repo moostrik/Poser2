@@ -56,4 +56,4 @@ class LowpassStep(ComputeShader):
         glUniform1f(self.get_uniform_loc("uRate"), rate)
         glUniform2i(self.get_uniform_loc("uSize"), trail_out.width, trail_out.height)
         self.dispatch(trail_out.width, trail_out.height)
-        glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT)    # read next by textures and FBOs
+        glMemoryBarrier(int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_FRAMEBUFFER_BARRIER_BIT))    # read next by textures and FBOs

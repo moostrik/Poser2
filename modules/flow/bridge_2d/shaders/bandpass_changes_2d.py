@@ -45,4 +45,4 @@ class BandpassChanges2D(ComputeShader):
         glUniform1f(self.get_uniform_loc("uFallLod"), fall_lod)
         glUniform2i(self.get_uniform_loc("uSize"), fast.width, fast.height)
         self.dispatch(fast.width, fast.height)
-        glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT)    # read next by textures and FBOs
+        glMemoryBarrier(int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_FRAMEBUFFER_BARRIER_BIT))    # read next by textures and FBOs

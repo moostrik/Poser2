@@ -38,7 +38,7 @@ class Legend:
         self._text: Text = Text()
         self._grid: LogGrid = LogGrid()
         self._key: ColormapKey = ColormapKey()
-        self._drawn: tuple[LegendKind | None, int, float, int, tuple[tuple[str, int, int], ...], str] | None = None   # what the FBO shows
+        self._drawn: tuple[LegendKind | None, int, int, float, int, tuple[tuple[str, int, int], ...], str] | None = None   # what the FBO shows
 
     @property
     def texture(self) -> Texture:
