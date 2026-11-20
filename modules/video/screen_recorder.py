@@ -22,7 +22,8 @@ import psutil
 
 from modules.settings import BaseSettings, Field, Group, Widget
 
-from .ffmpeg import ClipCodec, ClipInput, ClipWriter, Encoder
+from .clip_writer import ClipCodec, ClipInput, ClipWriter
+from .encoder import Encoder
 from .screen_format import BitDepth, Chroma, ScreenFormat
 from .screen_frame import ScreenFrame
 from .screen_frame_ring import ScreenFrameRing

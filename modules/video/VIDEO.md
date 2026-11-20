@@ -1,8 +1,10 @@
 # Video
 
-The video package writes and reads clips through ffmpeg (`ffmpeg.py`), the camera recordings' streams
-(`stream_writer.py`, `stream_reader.py`, `depth_frame.py`), and the screen recorder (`screen_recorder.py`,
-`screen_frame.py`, `screen_frame_ring.py`). This document holds the screen recorder's design.
+The video package writes and reads clips through ffmpeg, a file per subject: the process and its pipes
+(`process.py`), what ffprobe says (`probe.py`), the encoders (`encoder.py`), the clip writer (`clip_writer.py`), the
+clip decode (`clip_decode.py`), audio (`audio.py`) and the share clip (`share.py`); the camera recordings' streams
+(`stream_writer.py`, `stream_reader.py`, `depth_frame.py`); and the screen recorder (`screen_recorder.py`,
+`screen_format.py`, `screen_frame.py`, `screen_frame_ring.py`). This document holds the screen recorder's design.
 
 ## Screen recorder
 

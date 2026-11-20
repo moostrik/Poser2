@@ -70,6 +70,7 @@ class StreamReaderTest(unittest.TestCase):
         reader.load(self.path, 0)
         self.assertTrue(wait_for(reader.is_loaded))
         process = reader.ffmpeg_process
+        assert process is not None
         reader.stop()
         reader.join()
         self.assertIsNotNone(process.poll())

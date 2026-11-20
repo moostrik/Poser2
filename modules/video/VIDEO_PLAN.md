@@ -4,19 +4,18 @@
 
 The package runs ffmpeg two ways, and names the same hardware two ways. What the code shows:
 
-| Way                                  | Where                                                        | Does                                                                  |
-|--------------------------------------|--------------------------------------------------------------|-----------------------------------------------------------------------|
-| `ffmpeg.py`: `popen` + argument list | `ClipWriter`, `decode_clip`, audio, share, `probe`, trial    | the screen recorder, smile's clips and share, the recording's merge   |
-| ffmpeg-python (`import ffmpeg`)      | `StreamWriter`, `StreamReader` (2 pipelines, 3 probes)       | the camera recordings: write, read, frame count                       |
+| Way                                   | Where                                                     | Does                                                                |
+|---------------------------------------|-----------------------------------------------------------|---------------------------------------------------------------------|
+| `process.py`: `popen` + argument list | `ClipWriter`, `decode_clip`, audio, share, `probe`, trial | the screen recorder, smile's clips and share, the recording's merge |
+| ffmpeg-python (`import ffmpeg`)       | `StreamWriter`, `StreamReader` (2 pipelines, 3 probes)    | the camera recordings: write, read, frame count                     |
 
-| Names                                        | Values                                            | Hardware decode                     | Used by                    |
-|----------------------------------------------|---------------------------------------------------|-------------------------------------|----------------------------|
-| `ffmpeg.py` `Encoder`, `ClipCodec`           | AUTO, QSV, NVENC, CPU; H264, HEVC                 | `hwaccel_args(adapter)`: d3d11va    | screen recorder, smile     |
-| `codec.py` `CoderType`, `CoderFormat`        | CPU, GPU, iGPU; H264 = '.mp4', H265 = '.hevc'     | `hwaccel(decoder)`: d3d12va, 0 or 1 | recorder, player (presets) |
+| Names                                 | Values                                        | Hardware decode                     | Used by                    |
+|---------------------------------------|-----------------------------------------------|-------------------------------------|----------------------------|
+| `Encoder`, `ClipCodec`                | AUTO, QSV, NVENC, CPU; H264, HEVC             | `hwaccel_args(adapter)`: d3d11va    | screen recorder, smile     |
+| `codec.py` `CoderType`, `CoderFormat` | CPU, GPU, iGPU; H264 = '.mp4', H265 = '.hevc' | `hwaccel(decoder)`: d3d12va, 0 or 1 | recorder, player (presets) |
 
-- `ffmpeg.py` starts a process without a console window and reads and logs its errors. ffmpeg-python runs at
-  `-loglevel quiet`, so a failing camera encoder says nothing; it adds nothing `ffmpeg.py` does not do, and its
-  `import ffmpeg` resolves to our `ffmpeg.py` in pyright, so both stream files fail to type-check.
+- `process.py` starts a process without a console window and reads and logs its errors. ffmpeg-python runs at
+  `-loglevel quiet`, so a failing camera encoder says nothing; it adds nothing `process.py` does not do.
 - `CoderFormat` mixes a codec with a file suffix; chunks are `.mkv` whatever the codec. The player takes a color-only
   chunk's suffix from the codec (`player.py`), the recorder from the container, so an H.265 recording in the MP4
   container is written as `0_C_000.mp4` and looked for as `.hevc`.
@@ -24,16 +23,11 @@ The package runs ffmpeg two ways, and names the same hardware two ways. What the
   Nvidia GPU), from which the encoder follows with the codec, and the hardware decode alone.
 - `StreamReader` reads its decoder through Windows' default 4 KB pipe; `decode_clip` uses the 8 MB pipe, measured 6
   times faster for a clip. Whether it costs the player time is not measured.
-- `ffmpeg.py` holds many subjects: the process, the encoders, the clip writer, audio, share, the probes, the clip
-  decode.
 
 The target: one place starts ffmpeg and ffprobe, with one set of names. Each step is one commit and leaves the
 repository working; its own tests run with it. The runs in an app (the player's timing, a recording, the live run) and
 the depthai 2 venv's tests run once, after the last step, except where a step changes the real-time path (A3).
 
-- A1. `ffmpeg.py` split by subject, a pure move: process, probe, encoder, clip writer, clip decode, audio and share,
-  each file named after it; imports through `__init__.py` unchanged. VIDEO.md's file list. Check: guard and video
-  tests.
 - A2. One probe: any stream's size, fps, exact frame count (stored, else packets counted) and comment. `probe`,
   `read_comment`, `StreamReader.frame_count` and the reader's `_get_video_dimensions` become it; the recording tests'
   helpers, the seek test's packet listing included, start ffprobe through the process file. VIDEO.md. Check: video,
@@ -73,7 +67,6 @@ Assumed: hevc_qsv takes nv12, p010 and p012, not gray, so ffmpeg turns the confi
 - Remove obsolete pathways instead of leaving parallel ones: A3, A5
 - Name a concept after what it is in the domain; no synonyms, rename everywhere: A4
 - Keep presets in sync with code changes: A4, A6
-- Its files each hold one class or one subject: A1
 - Log exceptions with context; never fail silently: A5
 - Fix a type error at its cause: A5
 - A document describes what is built: every step
