@@ -98,6 +98,22 @@ class ShaderTest(unittest.TestCase):
             Shader.reload_marked()
         self.assertEqual(sorted(c.__name__ for c in self.compiles), ['_A', '_B'])
 
+    def test_an_error_in_an_include_names_that_file_and_line(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'common.glsl').write_text('float a;\nfloat b = oops;\n')
+            (root / 'main.frag').write_text('#version 460\n#include "common.glsl"\nvoid main() { bad; }\n')
+            read: list[Path] = []
+            source: str = Shader.read_shader_source(str(root / 'main.frag'), read)
+        self.assertEqual([path.name for path in read], ['main.frag', 'common.glsl'])
+        self.assertEqual(source.splitlines(), ['#version 460', '#line 1 1', 'float a;', 'float b = oops;', '#line 3 0',
+                                               'void main() { bad; }'])
+        log: str = ('1(2) : error C1008: undefined variable "oops"\n0(3) : error C1008: undefined variable "bad"\n'
+                    'a line without a location')
+        self.assertEqual(SHADER.name_error_lines(log, read).splitlines(),
+                         ['common.glsl(2) : error C1008: undefined variable "oops"',
+                          'main.frag(3) : error C1008: undefined variable "bad"', 'a line without a location'])
+
     def test_a_compute_shader_has_one_stage_its_comp_file(self) -> None:
         stages = _Compute._stages()
         self.assertEqual(len(stages), 1)

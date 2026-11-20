@@ -1,5 +1,6 @@
 import inspect
 import logging
+import re
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -13,6 +14,16 @@ from .file_watcher import monitor_path
 logger = logging.getLogger(__name__)
 
 SHARED_SHADERS: Path = Path(__file__).parent / "shaders"     # the shared includes and `_generic.vert`
+_LOG_LOCATION = re.compile(r'^(\d+)\((\d+)\)')               # NVIDIA's "file(line)" at the start of a log line
+
+
+def name_error_lines(log: str, files: list[Path]) -> str:
+    """A driver's compile log with each "k(line)" location named by its file, k the file's place in `files` (the
+    `#line` numbering of `Shader.read_shader_source`); a line without one is kept as it is."""
+    def name(match: re.Match[str]) -> str:
+        index: int = int(match.group(1))
+        return f"{files[index].name}({match.group(2)})" if index < len(files) else match.group(0)
+    return '\n'.join(_LOG_LOCATION.sub(name, line) for line in log.splitlines())
 
 
 @dataclass
@@ -113,11 +124,11 @@ class Shader():
     def _compile_into(cls, entry: _Program) -> bool:
         """Compile the class's program into `entry`; on failure the program it had stays. The files it reads, its
         includes too, are the ones whose change marks it."""
-        sources: list[tuple[int, Path, str]] = []
+        sources: list[tuple[int, Path, str, list[Path]]] = []
         files: set[Path] = set()
         for stage, path in cls._stages():
             read: list[Path] = []
-            sources.append((stage, path, cls.read_shader_source(str(path), read)))
+            sources.append((stage, path, cls.read_shader_source(str(path), read), read))
             files.update(read)
         with Shader._lock:
             entry.files = files
@@ -131,12 +142,13 @@ class Shader():
         return True
 
     @classmethod
-    def _compile(cls, sources: list[tuple[int, Path, str]]) -> int | None:
-        """A linked program from the stages' sources, or None after logging what failed."""
+    def _compile(cls, sources: list[tuple[int, Path, str, list[Path]]]) -> int | None:
+        """A linked program from the stages' sources, or None after logging what failed: a compile error by the file
+        and line it is in."""
         name: str = cls.__name__
         compiled: list[int] = []
         try:
-            for stage, path, source in sources:
+            for stage, path, source, read in sources:
                 if not source:
                     logger.error("%s: no shader source at %s", name, path)
                     return None
@@ -145,7 +157,8 @@ class Shader():
                 glShaderSource(shader, source)
                 glCompileShader(shader)
                 if not glGetShaderiv(shader, GL_COMPILE_STATUS):
-                    logger.error("%s: compile error in %s:\n%s", name, path.name, glGetShaderInfoLog(shader).decode())
+                    log: str = name_error_lines(glGetShaderInfoLog(shader).decode(), read)
+                    logger.error("%s: compile error in %s:\n%s", name, path.name, log)
                     return None
             program: int = cast(int, glCreateProgram())             # the stub says None; it is the id
             for shader in compiled:
@@ -186,9 +199,12 @@ class Shader():
     def read_shader_source(filename: str, read: list[Path] | None = None, _included: frozenset[str] = frozenset()) -> str:
         """Read shader source code from file; a line `#include "name.glsl"` is replaced by that file, beside
         the including one or else in `modules/gl/shaders` (as `position.glsl`), so passes can share one rule (each
-        file included once per shader). `read` gets each file read, the first one first."""
-        if read is not None:
-            read.append(Path(filename))
+        file included once per shader). `read` gets each file read, the first one first; an included file is framed by
+        `#line` directives numbering it by its place there, so a compile error names its file (`name_error_lines`)."""
+        if read is None:
+            read = []
+        index: int = len(read)
+        read.append(Path(filename))
         try:
             with open(filename, 'r', encoding='utf-8') as file:
                 source = file.read()
@@ -198,7 +214,7 @@ class Shader():
             return source
         folder: Path = Path(filename).parent
         lines: list[str] = []
-        for line in source.splitlines():
+        for number, line in enumerate(source.splitlines(), 1):
             stripped = line.strip()
             if stripped.startswith('#include "') and stripped.endswith('"'):
                 name: str = stripped[len('#include "'):-1]
@@ -206,11 +222,15 @@ class Shader():
                 if not Path(path).exists():
                     path = str(SHARED_SHADERS / name)
                 if path in _included:
+                    lines.append('')                    # the line count stays
                     continue
+                child: int = len(read)
                 included = Shader.read_shader_source(path, read, _included | {path})
                 if not included:
                     logger.error("%s: include %s not found", filename, name)
-                lines.append(included)
+                    lines.append('')
+                    continue
+                lines.extend((f'#line 1 {child}', included.rstrip('\n'), f'#line {number + 1} {index}'))
             else:
                 lines.append(line)
         return '\n'.join(lines)

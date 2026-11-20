@@ -9,8 +9,6 @@ measurement; E and H from the package scan of the same day. The lines are in wor
 Shaders reload at one point in the window loop, and each class's program is compiled once and shared by its
 objects (`Shader._programs`).
 
-- F3. A compile error names the real file and line: a `#line` per include and our own file table, NVIDIA's log prefix
-  rewritten, the raw log kept when it does not match. Test: an error in an include names that file and line.
 - F4. The uniforms are read once after linking; setting an unknown name warns once. Test: a misspelled uniform warns
   once.
 - F5. A save that arrives in two events or half-written is tried again on the next frame, not reported as a compile
