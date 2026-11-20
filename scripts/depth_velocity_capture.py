@@ -24,6 +24,7 @@ import time
 from argparse import ArgumentParser
 from enum import Enum
 from pathlib import Path
+from typing import cast
 
 os.environ.setdefault('DEPTHAI_LEVEL', 'error')
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -34,7 +35,7 @@ from OpenGL.GL import GL_FLOAT, GL_PACK_ALIGNMENT, GL_RGBA, GL_RGBA32F, GL_TEXTU
 from OpenGL.raw.GL.VERSION.GL_1_1 import glGetTexImage as raw_get_tex_image  # noqa: E402
 
 from modules.log_config import setup_logging, install_excepthooks  # noqa: E402
-from modules.gl import Fbo, Style  # noqa: E402
+from modules.gl import Fbo, Style, Texture  # noqa: E402
 from modules.flow import FlowUtil, LucasKanadeFlow3D  # noqa: E402
 from modules import render  # noqa: E402
 from apps.deep_flow.main import DeepFlowMain  # noqa: E402
@@ -50,7 +51,7 @@ def parsed(value: str, current: object) -> object:
         return kind[value.upper()] if not value.lstrip('-').isdigit() else kind(int(value))
     if isinstance(current, bool):
         return value.lower() in ('1', 'true', 'on', 'yes')
-    return type(current)(float(value))
+    return cast(type[float], type(current))(float(value))     # a number: int or float
 
 
 def main() -> int:
@@ -98,7 +99,9 @@ def main() -> int:
 
     render.frame_interval = gap_kept
 
-    def saved(self, depth, delta_time, view_span, depth_step, **flags) -> None:
+    def saved(self: LucasKanadeFlow3D, depth: Texture | None, delta_time: float, view_span: float,
+              depth_step: tuple[float, float], guarded: bool = False,
+              depth_range: tuple[float, float] = (0.0, 0.0)) -> None:
         if starting.is_set():                     # on the render thread: the loop starts here
             starting.clear()
             recording.set()
@@ -110,12 +113,12 @@ def main() -> int:
                          read('mask', mask, w, h)[..., 0].astype(np.float16) if mask is not None else np.ones((h, w), np.float16)))
             calls.append(dict(t=time.perf_counter(), delta_time=delta_time, gap=gaps[-1] if gaps else None,
                               view_span=view_span, depth_step=list(depth_step),
-                              depth_range=list(flags.get('depth_range', (0.0, 0.0))), width=w, height=h,
+                              depth_range=list(depth_range), width=w, height=h,
                               settings=self.settings.to_dict()))
             if args.seconds > 0.0 and calls[-1]['t'] - calls[0]['t'] >= args.seconds:
                 recording.clear()
                 done.set()
-        update(self, depth, delta_time, view_span, depth_step, **flags)
+        update(self, depth, delta_time, view_span, depth_step, guarded=guarded, depth_range=depth_range)
 
     LucasKanadeFlow3D.update = saved
     app = DeepFlowMain(simulation=True, interface=False)

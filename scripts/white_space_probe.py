@@ -22,6 +22,7 @@ import threading
 import time
 from argparse import ArgumentParser
 from pathlib import Path
+from typing import Protocol, cast
 
 ROOT = Path(__file__).resolve().parent.parent
 os.environ.setdefault('DEPTHAI_LEVEL', 'error')
@@ -32,13 +33,19 @@ OpenGL.ERROR_CHECKING = False
 import numpy as np  # noqa: E402
 
 from modules.log_config import setup_logging, install_excepthooks  # noqa: E402
-from modules.camera import CameraFrame, FrameType  # noqa: E402
+from modules.camera import CameraFrame, CameraFrameCallback, FrameType  # noqa: E402
 from modules.inference import SyncMessage  # noqa: E402
 from modules.pose import FrameDict  # noqa: E402
 from modules.settings import presets  # noqa: E402
 from modules.utils import PerformanceTimer  # noqa: E402
 from apps.white_space.main import WhiteSpaceMain  # noqa: E402
 from apps.white_space.settings import Stage  # noqa: E402
+
+
+class CallbackCamera(Protocol):
+    """A camera as every backend builds it, its frame callbacks a list."""
+    frame_callbacks: list[CameraFrameCallback]
+
 
 STARTUP: float = 30.0       # s the app takes at most to load its models and start playing
 
@@ -99,7 +106,8 @@ def main() -> int:
     ticks: list[float] = []
     waits: dict[str, list[float]] = {}                  # per hand-over (timer name), ms
 
-    for camera in app.cameras:
+    for source in app.cameras:
+        camera = cast(CallbackCamera, source)
         callbacks = list(camera.frame_callbacks)
 
         def hand_over(frame: CameraFrame, callbacks=callbacks) -> None:
@@ -119,9 +127,9 @@ def main() -> int:
 
     upload = app.uploader._upload
 
-    def timed_upload(frame_set: dict[int, CameraFrame]) -> None:
+    def timed_upload(frames: dict[int, CameraFrame]) -> None:
         start = time.perf_counter()
-        upload(frame_set)
+        upload(frames)
         if on.is_set():
             uploads.append((time.perf_counter() - start) * 1000.0)
     app.uploader._upload = timed_upload

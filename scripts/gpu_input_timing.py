@@ -59,7 +59,9 @@ def timed(name: str, step, runs: int) -> float:
     with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CUDA]) as profiler:
         step()
         torch.cuda.synchronize()
-    kernels = sum(1 for e in profiler.events() if e.device_type == torch.autograd.DeviceType.CUDA)
+    events = profiler.events()
+    assert events is not None                      # the profile has ended
+    kernels = sum(1 for e in events if e.device_type == torch.profiler.DeviceType.CUDA)
     print(f'  {name:44} {ms:6.3f} ms  {kernels:3d} GPU ops')
     return ms
 

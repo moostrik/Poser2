@@ -19,6 +19,7 @@ Then the step's GPU time, ms, mean and p95.
 import sys
 from argparse import ArgumentParser
 from pathlib import Path
+from typing import cast
 
 import glfw
 import numpy as np
@@ -38,7 +39,7 @@ def volume(texture: Texture3D, channels: int) -> np.ndarray:
     """A 3D texture as float32 (D, H, W, channels)."""
     glMemoryBarrier(GL_ALL_BARRIER_BITS)
     glBindTexture(GL_TEXTURE_3D, texture.tex_id)
-    data = glGetTexImage(GL_TEXTURE_3D, 0, GL_RGBA if channels == 4 else GL_RED, GL_FLOAT)
+    data = cast(bytes, glGetTexImage(GL_TEXTURE_3D, 0, GL_RGBA if channels == 4 else GL_RED, GL_FLOAT))
     glBindTexture(GL_TEXTURE_3D, 0)
     return np.frombuffer(data, np.float32).reshape(texture.depth, texture.height, texture.width, channels)
 
@@ -53,6 +54,7 @@ def residual(fluid) -> float:
 
 
 def main() -> int:
+    assert __doc__ is not None
     parser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('frames', type=Path)
     parser.add_argument('--side', action='append', default=[], metavar='NAME[:PATH=VALUE,...]')
@@ -65,7 +67,7 @@ def main() -> int:
     flow_settings.update_from_dict(recorded_settings(frames.calls[0]['settings']))
     flow = LucasKanadeFlow3D(flow_settings)
     flow.allocate(frames.width, frames.height)
-    sides = [Side(spec, tuple(args.output)) for spec in (args.side or ['preset'])]
+    sides = [Side(spec, tuple(args.output), 0.0) for spec in (args.side or ['preset'])]
     fast = windows(frames)['fast']
     rows: dict[str, dict[str, list[float]]] = {s.name: {k: [] for k in ('xy', 'z', 'body_xy', 'body_z', 'residual')} for s in sides}
     luminance, depth_texture, mask_texture = Texture(), Texture(), Texture()
@@ -81,7 +83,9 @@ def main() -> int:
             if not fast[k] or k % args.every:
                 continue
             row = rows[side.name]
-            velocity = volume(side.fluid.ports['velocity'].texture, 4)
+            velocity_texture = side.fluid.ports['velocity'].texture
+            assert isinstance(velocity_texture, Texture3D)
+            velocity = volume(velocity_texture, 4)
             speed = np.linalg.norm(velocity[..., :3], axis=-1)
             moving = speed > MOVING
             if moving.any():

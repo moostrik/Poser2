@@ -11,6 +11,7 @@ import argparse
 import sys
 import time
 from pathlib import Path
+from typing import cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -51,7 +52,7 @@ def gl_align(shader: DepthAlign, source: Image, nearest: Texture, aligned: Textu
     shader.use(source, nearest, aligned, to_ray, to_uv, homography, False)
     glFinish()
     glBindTexture(GL_TEXTURE_2D, aligned.tex_id)
-    data = glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT)
+    data = cast(bytes, glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT))
     glBindTexture(GL_TEXTURE_2D, 0)
     return np.frombuffer(data, np.float32).reshape(aligned.height, aligned.width)[::-1]     # texture rows run up
 

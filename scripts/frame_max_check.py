@@ -7,6 +7,7 @@ per pixel; the result is compared with numpy's pick. Needs a GL context (a hidde
 """
 import sys
 from pathlib import Path
+from typing import cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -32,7 +33,7 @@ def texture(values: np.ndarray, internal_format: int) -> Texture:
 def read(t: Texture, channels: int) -> np.ndarray:
     glFinish()
     glBindTexture(GL_TEXTURE_2D, t.tex_id)
-    data = glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA if channels == 4 else GL_RED, GL_FLOAT)
+    data = cast(bytes, glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA if channels == 4 else GL_RED, GL_FLOAT))
     glBindTexture(GL_TEXTURE_2D, 0)
     return np.frombuffer(data, np.float32).reshape((SIZE[1], SIZE[0], channels) if channels == 4 else (SIZE[1], SIZE[0]))
 

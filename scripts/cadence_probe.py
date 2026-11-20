@@ -27,6 +27,7 @@ import threading
 import time
 from argparse import ArgumentParser
 from pathlib import Path
+from typing import Protocol, cast
 
 ROOT = Path(__file__).resolve().parent.parent
 os.environ.setdefault('DEPTHAI_LEVEL', 'error')
@@ -37,14 +38,19 @@ OpenGL.ERROR_CHECKING = False
 import numpy as np  # noqa: E402
 
 from modules.log_config import setup_logging, install_excepthooks  # noqa: E402
-from modules.camera import CameraFrame, FrameType  # noqa: E402
+from modules.camera import CameraFrame, CameraFrameCallback, FrameType  # noqa: E402
 from modules.pose import FrameDict  # noqa: E402
-from modules.render import Motion3DLayer  # noqa: E402
+from modules.render import Motion3DLayer, MotionInput  # noqa: E402
 from modules.utils import PerformanceTimer  # noqa: E402
 from apps.deep_flow.main import DeepFlowMain  # noqa: E402
 from apps.deep_flow.settings import Stage  # noqa: E402
 
 STARTUP: float = 30.0       # s the app takes at most to load its models and start playing
+
+
+class CallbackCamera(Protocol):
+    """A camera as every backend builds it, its frame callbacks a list."""
+    frame_callbacks: list[CameraFrameCallback]
 
 
 def gaps(times: list[float]) -> dict:
@@ -94,7 +100,7 @@ def main() -> int:
     uploads: dict[str, list[float]] = {'color': [], 'depth': []}
     waits: dict[str, list[float]] = {}                  # per hand-over (timer name), ms
 
-    camera = app.cameras[0]
+    camera = cast(CallbackCamera, app.cameras[0])
     callbacks = list(camera.frame_callbacks)
 
     def hand_over(frame: CameraFrame) -> None:
@@ -136,9 +142,9 @@ def main() -> int:
 
     measure = Motion3DLayer._measure
 
-    def counted_measure(layer: Motion3DLayer, input, interval: float) -> None:
-        measure(layer, input, interval)
-        if on.is_set() and layer._cam_id == 0:
+    def counted_measure(self: Motion3DLayer, input: MotionInput, interval: float) -> None:
+        measure(self, input, interval)
+        if on.is_set() and self._cam_id == 0:
             motion.append(time.perf_counter())
     Motion3DLayer._measure = counted_measure
 

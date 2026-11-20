@@ -48,6 +48,7 @@ def median_ms(work, repeats: int, query: int) -> float:
 
 
 def main() -> None:
+    assert __doc__ is not None
     parser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('frames', type=Path)
     parser.add_argument('--frame', type=int, default=200)

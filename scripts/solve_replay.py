@@ -77,6 +77,7 @@ def report(path: Path, runs: int) -> None:
 
 
 def main() -> None:
+    assert __doc__ is not None
     parser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('captures', nargs='+', type=Path, help='a folder of solve_capture_*.npz, or the files')
     parser.add_argument('--runs', type=int, default=50, help='GPU solves per capture (default 50)')

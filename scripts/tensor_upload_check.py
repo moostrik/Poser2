@@ -9,6 +9,7 @@ copy waits for the tensor it copies.
 """
 import sys
 from pathlib import Path
+from typing import cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -47,7 +48,7 @@ for name, (channels, height, width, dtype) in cases.items():
         texture.update()
         glFinish()
         glBindTexture(GL_TEXTURE_2D, texture.tex_id)
-        read = np.frombuffer(glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT), np.float32).reshape(height, width, 4)
+        read = np.frombuffer(cast(bytes, glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT)), np.float32).reshape(height, width, 4)
         glBindTexture(GL_TEXTURE_2D, 0)
         read = read[::-1]                                           # GL rows run up, the tensor's down
         expected = tensor.float().cpu().numpy()

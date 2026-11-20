@@ -17,6 +17,7 @@ import os
 import random
 import sys
 from collections.abc import Callable
+from typing import Protocol
 
 import cv2
 import glfw
@@ -37,7 +38,7 @@ from modules.inference.preprocessing.shaders import DepthAlign  # noqa: E402
 from modules.render import PosePointLines  # noqa: E402
 from modules.render.modules.board.shaders import TimeSeries  # noqa: E402
 from modules.render.modules.pose.shaders import AddMix, Feature, LayerComposite, Window  # noqa: E402
-from modules.render.modules.flow.shaders import DepthColormap  # noqa: E402
+from modules.render.modules.flow.shaders import DepthColormap, DepthDrawMode  # noqa: E402
 from modules.render.general.screen_recording.shaders import RgbToYuv, YuvPlane  # noqa: E402
 from modules.utils import Color, Point2f, Quad, Rect  # noqa: E402
 
@@ -47,7 +48,7 @@ TOLERANCE: int = 1                  # per channel, of 255
 LUT: str = os.path.join('data', 'luts', 'Blockbuster.cube')
 
 
-def context() -> object:
+def context() -> glfw._GLFWwindowPointerT:
     """A hidden GL 4.6 window, current, with its `gl.Context`."""
     if not glfw.init():
         raise RuntimeError('GLFW did not start')
@@ -114,6 +115,11 @@ def pose() -> Points2D:
 Case = Callable[[dict[str, Texture]], None]
 
 
+class Allocated(Protocol):
+    """What a case allocates before it draws."""
+    def allocate(self) -> object: ...
+
+
 class HarnessFeature:
     """A feature of eight known values and scores, as `Feature` reads one."""
     values: np.ndarray = np.linspace(-0.8, 0.9, 8).astype(np.float32)
@@ -141,13 +147,13 @@ def exact_distance(field: DistanceField) -> None:
           f'{(error > 1e-3).mean() * 100:.2f}% of pixels off')
 
 
-def cases() -> dict[str, tuple[object, Case | None, Case | None]]:
+def cases() -> dict[str, tuple[Allocated | None, Case | None, Case | None]]:
     """Each case: the shader it allocates (None for one that is not a shader), its draw, and what it draws into its
     own targets before (an effect over a chain of passes)."""
     s = shaders
-    c: dict[str, tuple[object, Case | None, Case | None]] = {}
+    c: dict[str, tuple[Allocated | None, Case | None, Case | None]] = {}
 
-    def add(name: str, shader: object, draw: Case | None, prepare: Case | None = None) -> None:
+    def add(name: str, shader: Allocated | None, draw: Case | None, prepare: Case | None = None) -> None:
         c[name] = (shader, draw, prepare)
 
     # The texture's draws, through the context's Blit (no shader of their own to allocate)
@@ -281,10 +287,10 @@ def cases() -> dict[str, tuple[object, Case | None, Case | None]]:
     add('cel_shade', cel, lambda t: cel.use(t['gradient'], 1.2, 1.0, 0.0, 1.1, 5, 0.2, 1.5))
     depth_view = DepthColormap()
     for mode in range(3):
-        add(f'depth_view_{mode}', depth_view, lambda t, m=mode: depth_view.use(t['depth'], t['gradient'], 0.3, 0.8, m))
+        add(f'depth_view_{mode}', depth_view, lambda t, m=mode: depth_view.use(t['depth'], t['gradient'], 0.3, 0.8, DepthDrawMode(m)))
     for colormap in (Colormap.TURBO, Colormap.VIRIDIS):
         add(f'depth_view_{colormap.name.lower()}', depth_view,
-            lambda t, c=colormap: depth_view.use(t['depth'], t['gradient'], 0.3, 0.8, 1, c))
+            lambda t, c=colormap: depth_view.use(t['depth'], t['gradient'], 0.3, 0.8, DepthDrawMode.COLOR, c))
 
     quarter_turn = Quad(Point2f(1.0, 0.0), Point2f(1.0, 1.0), Point2f(0.0, 1.0), Point2f(0.0, 0.0))
     add('quarter_turn', None, lambda t: t['gradient'].draw(src=quarter_turn))

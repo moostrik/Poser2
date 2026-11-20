@@ -22,7 +22,7 @@ from OpenGL.GL import GL_NEAREST, GL_R32UI, GL_RED_INTEGER, GL_TEXTURE_2D, GL_UN
 import monitor_harness as mh  # noqa: E402
 from modules.flow import VelocityPeak, VelocityPeakSettings, histogram_grid, speed_percentile  # noqa: E402
 from modules.flow.visualization import HistogramCount  # noqa: E402
-from modules.flow.bridge_3d.velocity_peak import BINS, SPEED_HIGH, SPEED_LOW  # noqa: E402
+from modules.flow.bridge.velocity_peak import BINS, SPEED_HIGH, SPEED_LOW  # noqa: E402
 from modules.gl import Texture  # noqa: E402
 
 FPS = 60.0

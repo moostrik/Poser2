@@ -65,6 +65,7 @@ def fluid_at(overrides: list[str], warmup: float, advection: Advection = Advecti
 
 
 def main() -> None:
+    assert __doc__ is not None
     parser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--warmup', type=float, default=2.0)
     parser.add_argument('--repeats', type=int, default=40)

@@ -37,6 +37,7 @@ import sys
 import time
 from argparse import ArgumentParser
 from pathlib import Path
+from typing import Any, cast
 
 import cv2
 import glfw
@@ -46,7 +47,7 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_FLOAT, GL_FRAMEBUFFER, GL_R32F, G
                        glClear, glClearColor, glFinish, glReadPixels, glTexImage2D, glViewport)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from modules.gl import Context, Fbo, Texture  # noqa: E402
+from modules.gl import Context, Fbo, SwapFbo, Texture  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from measure_sums import MeasureSums, RegionTexture, SideSums, p99_of, region_bits  # noqa: E402
 from modules.flow import FlowUtil, LucasKanadeFlow3D, LucasKanadeFlow3DSettings, Patch, Visualizer  # noqa: E402
@@ -113,7 +114,7 @@ def read_back(texture: Texture) -> np.ndarray:
     return pixels
 
 
-def recorded_settings(recorded: dict) -> dict:
+def recorded_settings(recorded: dict[str, Any]) -> dict:
     """The settings a frame was saved with, as the settings' dict: saved flat before the groups, nested since."""
     result: dict = {}
     z_group = recorded.get('z')
@@ -662,7 +663,7 @@ def measure(captures: list[Path], specs: list[tuple[str, dict[str, object]]], ou
                 s = side.settings
                 to_px = (delta_time * w / (s.x_gain or 1.0), delta_time * w / (s.y_gain or 1.0), delta_time * w / (s.z_gain or 1.0))
                 first = side is sides[0] and weighed                  # the z position's weight is the view's, the first side's
-                estimate = side.flow.depth_velocity.difference
+                estimate = cast(SwapFbo, side.flow.depth_velocity.difference)      # its front and back
                 sums = summer.use(sums_of, side.flow.velocity, estimate, estimate.back, side.flow.z_position if first else None,
                                   region_texture, to_px, float(w), segment == 'still')
                 side.measures.add_sums(float(frames.t[k]), segment, sums, regions, milliseconds, first)
@@ -817,7 +818,7 @@ def main() -> int:
                     glViewport(i * panel_w, 0, panel_w, panel_h)
                     texture.draw()
             if args.snapshot is not None and k == len(frames) // 2:
-                pixels = np.frombuffer(glReadPixels(0, 0, panel_w * 2, panel_h, GL_RGB, GL_UNSIGNED_BYTE), np.uint8).reshape(panel_h, panel_w * 2, 3)
+                pixels = np.frombuffer(cast(bytes, glReadPixels(0, 0, panel_w * 2, panel_h, GL_RGB, GL_UNSIGNED_BYTE)), np.uint8).reshape(panel_h, panel_w * 2, 3)
                 cv2.imwrite(str(args.snapshot), np.flipud(pixels)[..., ::-1])
             glfw.swap_buffers(window)
             glfw.set_window_title(window, f'A | B   {VIEWS[controls["view"]]}   frame {k + 1}/{len(frames)}  {frames.t[k]:5.2f} s  {segment}'

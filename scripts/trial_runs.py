@@ -74,6 +74,7 @@ def run(label: str, changes: list[str], seconds: int, warmup: int) -> Path | Non
 
 
 def main() -> None:
+    assert __doc__ is not None
     parser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--run', action='append', required=True, help='label[:path=value,...]')
     parser.add_argument('--seconds', type=int, default=60)

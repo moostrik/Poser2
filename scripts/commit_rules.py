@@ -116,6 +116,7 @@ def held_commit() -> bool:
 
 
 def main() -> None:
+    assert __doc__ is not None
     parser: ArgumentParser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("commit", nargs="?", default="HEAD")
     parser.add_argument("--hook", action="store_true", help="print the JSON a Claude Code PostToolUse hook returns")

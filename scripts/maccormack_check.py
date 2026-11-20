@@ -19,6 +19,7 @@ Settings can be changed by path: `--set vorticity.strength_1=0.3`.
 import json
 import sys
 from argparse import ArgumentParser
+from enum import Enum
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -45,7 +46,9 @@ def preset_fluid() -> dict:
                 if found is not None:
                     return found
         return None
-    return find(json.loads(PRESET.read_text(encoding='utf-8')))
+    found = find(json.loads(PRESET.read_text(encoding='utf-8')))
+    assert found is not None, 'the preset has no fluid group'
+    return found
 
 
 def body(t: float, moving: bool) -> np.ndarray:
@@ -77,7 +80,7 @@ def fluid_settings(advection: Advection, overrides: list[str]) -> Fluid3DSetting
         current = getattr(target, name)
         if isinstance(current, bool):
             setattr(target, name, value in ('1', 'true', 'True'))
-        elif hasattr(type(current), '__members__'):         # an enum, by its name
+        elif isinstance(current, Enum):                     # an enum, by its name
             setattr(target, name, type(current)[value])
         else:
             setattr(target, name, type(current)(float(value)))
@@ -222,7 +225,7 @@ def run_swirl(advection: Advection, seconds: float, overrides: list[str]) -> lis
     fluid.allocate(2160, 3840)
     fluid.update(1.0 / FPS)
     velocity_volume = fluid._velocity
-    density_volume = fluid._simulation_density._density
+    density_volume = fluid._density._density
     velocity, density = swirl_start(velocity_volume.width, velocity_volume.height, velocity_volume.depth)
     upload(velocity_volume, velocity)
     if hasattr(fluid, '_faces'):
@@ -248,6 +251,7 @@ def run_swirl(advection: Advection, seconds: float, overrides: list[str]) -> lis
 
 
 def main() -> None:
+    assert __doc__ is not None
     parser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--test', choices=('swing', 'swirl'), default='swing')
     parser.add_argument('--seconds', type=float, default=10.0)

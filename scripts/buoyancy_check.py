@@ -26,6 +26,7 @@ OpenGL.ERROR_CHECKING = False  # as launcher.py runs the app; a glGetError per c
 import sys
 from argparse import ArgumentParser
 from pathlib import Path
+from typing import cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -107,7 +108,7 @@ def first_step(fluid: Fluid3D, inside: np.ndarray, expected: float) -> float:
     velocity = read(fluid._velocity)
     t = fluid.settings.gravity
     gravity = (t.x, t.y, t.z)
-    along = sum(velocity[..., i] * g for i, g in enumerate(gravity)) / max(sum(g * g for g in gravity), 1e-12)
+    along = cast(np.ndarray, sum(velocity[..., i] * g for i, g in enumerate(gravity))) / max(sum(g * g for g in gravity), 1e-12)
     return float(along[inside].mean()) / (expected * fluid._dt)
 
 
@@ -177,6 +178,7 @@ def dense(args, color_space: str, overrides: list[str]) -> None:
 
 
 def main() -> None:
+    assert __doc__ is not None
     parser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--radius', type=float, default=0.15)
     parser.add_argument('--warmth', type=float, default=0.75)

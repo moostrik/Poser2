@@ -144,6 +144,7 @@ def timing(rate: float, overrides: list[str]) -> None:
 
 
 def main() -> None:
+    assert __doc__ is not None
     parser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--rate', type=float, default=0.5)
     parser.add_argument('--time', action='store_true', help="the expansion's GPU time instead")

@@ -15,6 +15,7 @@ vortex 0.1 widths in radius, 0.3 widths/s at its edge, about the box's middle. E
 import sys
 from argparse import ArgumentParser
 from pathlib import Path
+from typing import cast
 
 import OpenGL
 OpenGL.ERROR_CHECKING = False
@@ -34,7 +35,7 @@ EDGE_SPEED: float = 0.3     # widths/s
 
 def read(texture, channels: int) -> np.ndarray:
     glBindTexture(GL_TEXTURE_3D, texture.tex_id)
-    data = glGetTexImage(GL_TEXTURE_3D, 0, GL_RGBA if channels == 4 else GL_RED, GL_FLOAT)
+    data = cast(bytes, glGetTexImage(GL_TEXTURE_3D, 0, GL_RGBA if channels == 4 else GL_RED, GL_FLOAT))
     glBindTexture(GL_TEXTURE_3D, 0)
     return np.frombuffer(data, np.float32).reshape(texture.depth, texture.height, texture.width, channels).copy()
 
@@ -93,6 +94,7 @@ def residual(fluid: Fluid3D) -> float:
 
 
 def main() -> None:
+    assert __doc__ is not None
     parser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--seconds', type=float, default=2.0)
     parser.add_argument('--set', action='append', default=[])

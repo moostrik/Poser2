@@ -34,7 +34,7 @@ PANEL: tuple[int, int] = (540, 960)         # a panel's size, about what a main-
 OUTPUT: tuple[int, int] = (2160, 3840)      # the layers' allocation size, what the monitor rendered at before
 
 
-def context() -> object:
+def context() -> glfw._GLFWwindowPointerT:
     """A hidden GL 4.6 window, current, with the fullscreen quad bound as the app binds it."""
     if not glfw.init():
         raise RuntimeError('GLFW did not start')
@@ -96,7 +96,7 @@ class Monitor:
         return pixels
 
 
-def gpu_ms(work: Callable[[], None], repeats: int = 20) -> float:
+def gpu_ms(work: Callable[[], object], repeats: int = 20) -> float:
     """The GPU time of `work`, the median of `repeats` runs (ms)."""
     query = glGenQueries(1)[0]
     times: list[float] = []

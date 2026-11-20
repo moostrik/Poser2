@@ -1,15 +1,25 @@
+from typing import Protocol
+
 from OpenGL.GL import glUniform1f, glUniform1fv, glUniform1i, glUniform2f, glUniform4fv, glUseProgram
 from modules.gl import Shader, draw_quad
 
 import numpy as np
 
-from modules.pose import BaseFeature
-
 import logging
 logger = logging.getLogger(__name__)
 
+class DrawnFeature(Protocol):
+    """What `Feature` reads of a pose feature."""
+    @property
+    def values(self) -> np.ndarray: ...
+    @property
+    def scores(self) -> np.ndarray: ...
+    def display_range(self) -> tuple[float, float]: ...
+    def __len__(self) -> int: ...
+
+
 class Feature(Shader):
-    def use(self, feature: BaseFeature, colors: list[tuple[float, float, float, float]],
+    def use(self, feature: DrawnFeature, colors: list[tuple[float, float, float, float]],
             line_width: float = 0.1, line_smooth: float = 0.01, use_scores: bool = False,
             display_range: tuple[float, float] | None = None,
             deltas: np.ndarray | None = None) -> None:
