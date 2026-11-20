@@ -12,7 +12,7 @@ import time
 from stupidArtnet import StupidArtnet
 
 from modules.settings import BaseSettings, Field, Widget, Access
-from modules.utils import Color
+from modules.utils import Color, wait_until
 from .net_probe import validate_connection
 
 import logging
@@ -387,8 +387,12 @@ class ArtNetBars:
         # Blackout before starting the loop
         self._blackout()
 
+        next_frame: float = time.perf_counter()
         while self._running:
             try:
+                # Cleared before the work, so a settings change that lands during it wakes the next wait
+                self._update_event.clear()
+
                 # Periodic dirty trigger: ensure send at least once per interval
                 current_time: float = time.perf_counter()
                 if current_time - self._last_periodic_time >= self._periodic_interval:
@@ -402,10 +406,13 @@ class ArtNetBars:
                     # Send outside lock to avoid blocking settings updates during I/O
                     self._send_frame()
 
-                # Wait for next frame or settings change
+                # Wait for the next frame on a fixed-rate schedule, or a settings change, which keeps the deadline
                 frame_time: float = 1.0 / self.settings.fps
-                self._update_event.wait(timeout=frame_time)
-                self._update_event.clear()
+                now: float = time.perf_counter()
+                if now - next_frame > frame_time:
+                    next_frame = now
+                if not wait_until(next_frame + frame_time, self._update_event.wait):
+                    next_frame += frame_time
             except socket.error as e:
                 logger.error(f"ArtNetBars ERROR: Socket error with exception: {e}")
                 self._running = False
