@@ -4,14 +4,6 @@ Shaders that reload and report errors well, fewer GL calls on the main thread, a
 F and G come from the Cinder research (2026-11-20), argued from the code and not measured, so G starts with a
 measurement; E and H from the package scan of the same day. The lines are in work order.
 
-## F. Shaders
-
-Shaders reload at one point in the window loop, and each class's program is compiled once and shared by its
-objects (`Shader._programs`).
-
-- F7. GL.md's Shaders section describes hot reload, `ComputeShader`, the program shared by a class's objects, the
-  reload point, F2 to F5, and the `_generic.vert` fallback as it is.
-
 ## G. Fewer GL calls
 
 Standard GL 4.5, not from Cinder. Each PyOpenGL call holds the GIL on the main thread; how much that costs is not

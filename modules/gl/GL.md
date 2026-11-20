@@ -56,6 +56,7 @@ The loop, each frame, in window 0's context:
 
 | Step                | What it does                                                                          |
 |---------------------|---------------------------------------------------------------------------------------|
+| shaders             | the programs a changed file marked, compiled again (see Shaders)                       |
 | monitors            | read again after a hot-plug (the monitor callback only marks it)                       |
 | settings            | each window's settings read and only what differs applied; a user's move or resize     |
 |                     | written to the settings once, as applied, and not applied back                         |
@@ -149,6 +150,16 @@ over a chain of passes owns its targets beside the shaders: `Bloom` (a dual-filt
 flooding).
 
 A shader's `.frag`, `.vert` or `.comp` source sits beside the `.py` that holds its class, named after it; the loader
-resolves it by that module name and falls back to `_generic.vert` for the vertex stage. A shader takes a color as a
+resolves it by that module name, and a shader without its own `.vert` takes the shared `shaders/_generic.vert`.
+`ComputeShader` is a `Shader` with one stage, its `.comp`. A shader object is its own; its class's program is compiled
+once, at the class's first `allocate`, shared by every object of the class (`Shader._programs`), and freed at its last
+`deallocate`. A uniform's location is read once after linking; a name the program does not have warns once.
+
+Hot reload, where an app turns it on (`Shader.enable_hot_reload`): the watcher's thread marks each program made from a
+changed file, an include or `_generic.vert` included, and the window loop compiles the marked programs again at the
+top of the next frame (`Shader.reload_marked`), once their files have been quiet for 0.1 s; a failed compile keeps the
+program it had, and a file that reads empty, a save under way, is tried again next frame. A compile error names the
+file and line it is in: each include is framed by `#line` directives that number it, and the driver's log is named by
+that table (`name_error_lines`). A shader takes a color as a
 `Color` and a rectangle as a `Rect`; a pass reads its input's texel size from the texture itself (`textureSize`). `scripts/shader_check.py`
 draws every shader of `modules/gl` once on known input and holds it to a reference image, within 1/255 per channel.
