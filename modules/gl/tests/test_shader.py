@@ -1,6 +1,7 @@
 """Shaders share their class's program and reload it at one point (GL and the compile mocked)."""
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -76,6 +77,26 @@ class ShaderTest(unittest.TestCase):
         Shader._on_file_changed(str(Path(__file__).with_name('other.frag')))
         Shader.reload_marked()
         self.assertEqual(self.compiles, [])
+
+    def test_an_edited_include_marks_every_shader_that_uses_it(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'common.glsl').write_text('float shared() { return 1.0; }\n')
+            for name in ('a', 'b', 'c'):
+                include = '#include "common.glsl"\n' if name != 'c' else ''
+                (root / f'{name}.frag').write_text(f'#version 460\n{include}void main() {{}}\n')
+
+            def shader_of(name: str) -> type:
+                return type(f'_{name.upper()}', (Shader,), {'_stages': classmethod(
+                    lambda cls, name=name: [(0, root / f'{name}.frag')])})
+
+            shaders = [shader_of(name)() for name in ('a', 'b', 'c')]
+            for shader in shaders:
+                shader.allocate()
+            self.compiles.clear()
+            Shader._on_file_changed(str(root / 'common.glsl'))
+            Shader.reload_marked()
+        self.assertEqual(sorted(c.__name__ for c in self.compiles), ['_A', '_B'])
 
     def test_a_compute_shader_has_one_stage_its_comp_file(self) -> None:
         stages = _Compute._stages()

@@ -61,7 +61,7 @@ class Shader():
             cls._compile_into(entry)
         if Shader._hot_reload_enabled:
             with Shader._lock:
-                Shader._watch_directory(cls._source_dir())
+                Shader._watch_files(entry.files)
         self.allocated = True
 
     def deallocate(self) -> None:
@@ -111,10 +111,17 @@ class Shader():
     # COMPILE
     @classmethod
     def _compile_into(cls, entry: _Program) -> bool:
-        """Compile the class's program into `entry`; on failure the program it had stays."""
-        stages: list[tuple[int, Path]] = cls._stages()
-        entry.files = {path for _, path in stages}
-        program: int | None = cls._compile(stages)
+        """Compile the class's program into `entry`; on failure the program it had stays. The files it reads, its
+        includes too, are the ones whose change marks it."""
+        sources: list[tuple[int, Path, str]] = []
+        files: set[Path] = set()
+        for stage, path in cls._stages():
+            read: list[Path] = []
+            sources.append((stage, path, cls.read_shader_source(str(path), read)))
+            files.update(read)
+        with Shader._lock:
+            entry.files = files
+        program: int | None = cls._compile(sources)
         if program is None:
             return False
         if entry.program is not None:
@@ -124,13 +131,12 @@ class Shader():
         return True
 
     @classmethod
-    def _compile(cls, stages: list[tuple[int, Path]]) -> int | None:
-        """A linked program from the stages' files, or None after logging what failed."""
+    def _compile(cls, sources: list[tuple[int, Path, str]]) -> int | None:
+        """A linked program from the stages' sources, or None after logging what failed."""
         name: str = cls.__name__
         compiled: list[int] = []
         try:
-            for stage, path in stages:
-                source: str = cls.read_shader_source(str(path))
+            for stage, path, source in sources:
                 if not source:
                     logger.error("%s: no shader source at %s", name, path)
                     return None
@@ -177,10 +183,12 @@ class Shader():
                 logger.error("%s reload failed; the previous program stays", shader_class.__name__)
 
     @staticmethod
-    def read_shader_source(filename: str, _included: frozenset[str] = frozenset()) -> str:
+    def read_shader_source(filename: str, read: list[Path] | None = None, _included: frozenset[str] = frozenset()) -> str:
         """Read shader source code from file; a line `#include "name.glsl"` is replaced by that file, beside
         the including one or else in `modules/gl/shaders` (as `position.glsl`), so passes can share one rule (each
-        file included once per shader)."""
+        file included once per shader). `read` gets each file read, the first one first."""
+        if read is not None:
+            read.append(Path(filename))
         try:
             with open(filename, 'r', encoding='utf-8') as file:
                 source = file.read()
@@ -199,7 +207,7 @@ class Shader():
                     path = str(SHARED_SHADERS / name)
                 if path in _included:
                     continue
-                included = Shader.read_shader_source(path, _included | {path})
+                included = Shader.read_shader_source(path, read, _included | {path})
                 if not included:
                     logger.error("%s: include %s not found", filename, name)
                 lines.append(included)
@@ -212,8 +220,8 @@ class Shader():
         """Watch the folders of every shader, so a changed file marks its programs for the next reload point."""
         with Shader._lock:
             Shader._hot_reload_enabled = True
-            for shader_class in Shader._programs:
-                Shader._watch_directory(shader_class._source_dir())
+            for entry in Shader._programs.values():
+                Shader._watch_files(entry.files)
             if Shader._directory_observers:
                 logger.info("Hot reload enabled for %s directories", len(Shader._directory_observers))
 
@@ -230,10 +238,11 @@ class Shader():
         logger.info("Hot reload disabled")
 
     @staticmethod
-    def _watch_directory(directory: Path) -> None:
-        """Start watching a folder, once; under the lock."""
-        if directory not in Shader._directory_observers:
-            Shader._directory_observers[directory] = monitor_path(str(directory), Shader._on_file_changed)
+    def _watch_files(files: set[Path]) -> None:
+        """Start watching the folders of these files, each once; under the lock."""
+        for directory in {path.parent for path in files}:
+            if directory not in Shader._directory_observers:
+                Shader._directory_observers[directory] = monitor_path(str(directory), Shader._on_file_changed)
 
     @staticmethod
     def _on_file_changed(filepath: str) -> None:
