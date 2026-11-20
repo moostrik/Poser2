@@ -337,7 +337,7 @@ class LowFlowRender(RenderBase):
         """The screen recording's tick, right after the main window is drawn: the main panel's layers at their shapes."""
         sources: list[render.ScreenRecordingSource] = [render.ScreenRecordingSource(self.L[layer_type][0], *self._layer_size(layer_type))
                                                        for layer_type in self._main_layers if 0 in self.L[layer_type]]
-        self.screen_recording.set_input(render.ScreenRecordingInput(sources, width, height, self.window_manager.frame_time))
+        self.screen_recording.set_input(render.ScreenRecordingInput(sources, width, height, self.window_manager.frame_timestamp))
         self.screen_recording.update()
 
     def _draw_panels(self, width: int, height: int) -> None:

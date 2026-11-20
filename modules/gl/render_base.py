@@ -34,7 +34,7 @@ class RenderBase(ABC):
 
     def _notify_update(self) -> None:
         """Dispatch all registered update callbacks with the frame's time. Call from update()."""
-        now = self.window_manager.frame_time
+        now = self.window_manager.frame_timestamp
         with self._update_lock:
             callbacks = list(self._update_callbacks)
         for callback in callbacks:

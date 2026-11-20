@@ -21,9 +21,6 @@ frame (deduction). G1 and G2 wait for the coordinator's call on whether that gai
 
 ## H. The package held to the rules
 
-- H5. `frame_time` becomes `frame_timestamp` (glossary: a stamp is `timestamp`): `render_base.py`,
-  `window_manager.py`, the low_flow and deep_flow renders, and `shaders.SimplexNoise.use` with its callers.
-  `artnet_bars.py`'s `frame_time`, a duration, stays.
 - H6. `Image`'s `channel_order` becomes an `IntEnum`, every caller with it.
 - H7. `__init__.py` drops the exports only gl's own tests use (`Window`, `WindowInput`, `WindowManager`, `Monitor`,
   `MonitorId`); the tests import them from their files.

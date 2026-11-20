@@ -42,7 +42,7 @@ class WindowManager:
         self._draw_timer = PerformanceTimer(name="Render draw", sample_count=200)
         self._interval_timer = PerformanceTimer(name="Render interval", sample_count=200)
         self._last_update: float = 0.0
-        self.frame_time: float = 0.0        # the current frame's stamp (perf_counter), set before its update
+        self.frame_timestamp: float = 0.0        # the current frame's stamp (perf_counter), set before its update
 
         self._loop_thread: Thread | None = None     # the thread that runs the loop, set by run()
         self._close_request = Event()               # stop(), Esc or a closed window asked the loop to end
@@ -234,7 +234,7 @@ class WindowManager:
                     logger.exception("Error in on_window_resize")
 
     def _update(self) -> None:
-        """Update renderer state. Called once per frame; ``frame_time`` is the frame's stamp."""
+        """Update renderer state. Called once per frame; ``frame_timestamp`` is the frame's stamp."""
         self._fps.processed()
         self.settings.avg_fps = int(self._fps.get_rate_average())
         self.settings.min_fps = int(self._fps.get_rate_minimum())
@@ -242,7 +242,7 @@ class WindowManager:
         if self._last_update:
             self._interval_timer.add_time((start - self._last_update) * 1000.0, report=False)
         self._last_update = start
-        self.frame_time = start
+        self.frame_timestamp = start
         try:
             self.renderer.update()
         except Exception:
