@@ -110,6 +110,38 @@ class TestWindowManager(unittest.TestCase):
         monitor_class.connected.assert_called_once()
         self.assertEqual(self.manager.settings.connected, 'M0 m 1920×1080')
 
+    def pace(self, times: list[float]) -> list[float]:
+        """The deadlines the pacing waits for, one frame ending at each of `times`."""
+        waits: list[float] = []
+        clock = iter(times)
+        with mock.patch.object(MODULE, 'perf_counter', lambda: next(clock)), \
+                mock.patch.object(self.manager, '_waker') as waker:
+            waker.wait.side_effect = lambda deadline: waits.append(round(deadline, 6))
+            for _ in times:
+                self.manager._pace()
+        return waits
+
+    def test_v_sync_on_a_shown_window_paces_the_loop_itself(self):
+        self.with_windows()
+        self.manager.settings.fps_limit = 100.0
+        self.assertEqual(self.pace([0.0, 0.01]), [])
+
+    def test_fps_limit_waits_for_an_absolute_deadline_and_resyncs_when_a_period_behind(self):
+        self.with_windows()
+        self.manager.settings.v_sync = False
+        self.manager.settings.fps_limit = 100.0
+        # on time, on time, late by less than a period (kept), then more than a period behind (resynced)
+        self.assertEqual(self.pace([0.0, 0.0101, 0.0205, 0.045]), [0.01, 0.02, 0.03, 0.055])
+
+    def test_every_window_hidden_runs_at_60_fps_without_a_limit(self):
+        windows = self.with_windows()
+        for window in windows:
+            window.shown = False
+        self.assertEqual(self.pace([0.0, 1 / 60]), [round(1 / 60, 6), round(2 / 60, 6)])
+        windows[0].shown = True
+        self.manager.settings.v_sync = False
+        self.assertEqual(self.pace([1.0]), [])                                # shown, no v-sync, no limit: free
+
     def test_f_toggles_the_fullscreen_of_the_window_with_focus_and_esc_closes(self):
         F, ESCAPE, PRESS = 70, 256, 1
         self.glfw.KEY_F, self.glfw.KEY_ESCAPE, self.glfw.PRESS = F, ESCAPE, PRESS

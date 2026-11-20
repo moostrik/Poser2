@@ -6,9 +6,6 @@ sources: `window_systems_research.md`. Windows now, Linux kept possible.
 
 ## C. Frame pacing
 
-- C1. `fps_limit` (0 = off) when v-sync is off or every window is hidden (then 60 when it is 0): an absolute
-  deadline on `perf_counter`, waited with the shared `modules.utils.Waker` (a high-resolution waitable timer);
-  no busy-wait.
 - C2. Run, 60 and 120 fps, v-sync off: frame-time jitter. A miss over 1 ms is fixed in `Waker` itself, with the
   thread that owns it.
 - C3. Run, v-sync on a show window: frame time and the frames the driver queues, with and without a GPU wait

@@ -10,7 +10,7 @@ import glfw
 
 if TYPE_CHECKING:
     from .render_base import RenderBase
-from modules.utils import FPS, PerformanceTimer
+from modules.utils import FPS, PerformanceTimer, Waker
 from .monitor import Monitor, MonitorId
 from .window import Window
 from .window_input import WindowInput
@@ -56,6 +56,8 @@ class WindowManager:
         self._monitors_changed: bool = False        # a hot-plug, handled at the top of the next frame
         self._monitor_cb = None                     # strong ref to the monitor callback (prevents GC)
         self._swap_intervals: tuple[bool, int] | None = None    # (v_sync, v_sync_window) as applied
+        self._waker = Waker()                       # the frame pacing's wait, ended at once by stop()
+        self._next_frame: float = 0.0               # the paced frame's deadline (perf_counter), 0 when not paced
 
         self._exit_callbacks: list[Callable[[], None]] = []
         self._callback_lock = Lock()
@@ -86,6 +88,7 @@ class WindowManager:
             if self._windows:
                 glfw.set_window_should_close(self._windows[0].handle, True)     # both allowed from any thread
                 glfw.post_empty_event()
+        self._waker.set()                               # a set() after the loop's close does nothing
         if self._loop_thread is None or current_thread() is self._loop_thread:
             return
         if not self._finished.wait(2.0):
@@ -149,6 +152,7 @@ class WindowManager:
                     window.destroy()
                 self._windows.clear()
                 glfw.terminate()
+            self._waker.close()
         except Exception:
             logger.exception("Error cleaning up GLFW")
         with self._callback_lock:
@@ -170,6 +174,7 @@ class WindowManager:
                 self._tick_windows()
                 self._update()
                 self._draw()
+                self._pace()
                 try:
                     glfw.poll_events()
                 except Exception:
@@ -243,6 +248,22 @@ class WindowManager:
             if window.index == v_sync_index:
                 window.make_current()
                 glfw.swap_buffers(window.handle)
+
+    def _pace(self) -> None:
+        """Without v-sync pacing the loop, a wait until the next frame's deadline at `fps_limit`: an absolute deadline
+        on perf_counter, a period on from the last, resynced when the loop is a period behind. Every window hidden
+        and `fps_limit` 0: 60 fps."""
+        s = self.settings
+        shown: list[Window] = [w for w in self._windows if w.shown]
+        v_synced: bool = s.v_sync and any(w.index == s.v_sync_window for w in shown)
+        rate: float = s.fps_limit if s.fps_limit > 0.0 else (0.0 if shown else 60.0)
+        if v_synced or rate <= 0.0:
+            self._next_frame = 0.0
+            return
+        period: float = 1.0 / rate
+        now: float = perf_counter()
+        self._next_frame = now + period if self._next_frame == 0.0 or now - self._next_frame > period else self._next_frame + period
+        self._waker.wait(self._next_frame)
 
     def _apply_swap_intervals(self) -> None:
         """V-sync on the v-sync window only, the others swapped without it; applied on a change."""
