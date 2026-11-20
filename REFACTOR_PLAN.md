@@ -14,8 +14,7 @@ What is to do now, across the threads, in order.
 
 | Who                 | What                                                                                     | After            |
 |---------------------|------------------------------------------------------------------------------------------|------------------|
-| Refactor            | `ArtNetBars` in numpy (B1)                                                               |                  |
-| Refactor            | What holds the GIL on a hot path: py-spy of each app (B2)                                |                  |
+| Refactor            | What holds the GIL on a hot path: py-spy of each app (B1)                                |                  |
 | Camera              | Depth confidence from the camera to the motion (CAMERA_PLAN.md A)                        |                  |
 | GL Window           | The window manager: GLFW on the main thread, one kind of window, frame pacing (GL_PLAN.md)| the camera plan |
 | Inference           | hd_trio and white_space at full batch: whether the STANDARD pose model goes (INFERENCE_PLAN.md C) |  |
@@ -50,7 +49,7 @@ Done: camera (14 Nov), render (its plan built and removed), hd_trio (G5). Held u
 - A3. `inout`
 - A4. `panel`
 - A5. `pose`; its `pipeline` changed with inference C4 (`SourceFramesCallback` and `AsyncInput` carry the capture
-  times, `dict[int, float]`). Its hot path, with B2's py-spy numbers: the steps run per player with a `Frame`
+  times, `dict[int, float]`). Its hot path, with B1's py-spy numbers: the steps run per player with a `Frame`
   replace each (white_space 37 a pose and 21 on the light tick), and every stage's `WindowTracker` writes ~18
   scalar features per player with a lock each, ~360 small writes a frame **(deduction)**. The fixes in view: one
   window buffer per stage holding all players, and fusing steps that run back to back (one smoother over several
@@ -105,12 +104,7 @@ at most one tick late, every recorder together), white_space's motor sim (its fa
 `perf_counter`, so a late wait does not move them), smile's start loop (a 20 ms poll for loaded clips, at start-up
 only).
 
-- B1. `ArtNetBars._compute_frame` (`modules/inout/artnet_bars.py`) fills the bar's DMX buffer in numpy, in place of
-  its Python loop over the pixels, four writes each. Byte-identical output: a test first pins today's buffer for a
-  few settings (fill levels and their rounding edges, channel orders, colors and strengths, pixel counts), passing
-  on the loop. A timing of `_compute_frame` before and after, in a script, is reported, not committed.
-
-- B2. What holds the GIL on a hot path: one `py-spy record --gil` of each app over 30 s after 10 s warm-up (deep_flow,
+- B1. What holds the GIL on a hot path: one `py-spy record --gil` of each app over 30 s after 10 s warm-up (deep_flow,
   low_flow, hd_trio in `-sim`; white_space and smile as far as they run without the rig). Every function that holds
   the GIL more than 1% of the run becomes a step here (numpy, a shader, or off the hot path), each on Matthias's go. A
   thread busy in pure Python delays every other thread's wake by up to one 15.6 ms tick **(seen with the Waker and
@@ -155,5 +149,5 @@ only).
 
 - `CLAUDE.md` Project shape and Packages, what a package holds: A
 - `CLAUDE.md` Concurrency, work that numpy or the GPU does faster is not done in a Python loop; the loop holds the GIL
-  and delays every other thread: B1, B2
+  and delays every other thread: B1
 - `CLAUDE.md` Settings, settings connect the user and a component, not two components: Parked
