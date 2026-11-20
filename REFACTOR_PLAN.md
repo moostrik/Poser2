@@ -14,19 +14,15 @@ What is to do now, across the threads, in order. Lines with the same number run 
 
 | # | Who                 | What                                                                                     | After            |
 |---|---------------------|------------------------------------------------------------------------------------------|------------------|
-| 1 | Screen Recorder     | One ffmpeg system (VIDEO_PLAN.md A)                                                      |                  |
-| 1 | Inference           | RAFT out, the log names the model file, RVM files `_fp16` (INFERENCE_PLAN.md A)          |                  |
-| 1 | Refactor            | The timing issue: the loops that only pace on `wait_until` (B1–B4)                       |                  |
-| 2 | Refactor            | The timing issue: measure a 1 ms system tick (`timeBeginPeriod(1)`) against `wait_until` (B6) |             |
-| 2 | Screen Recorder     | The timing issue: `wait_until` wakes at once on a new item                               | B6               |
-| 2 | Screen Recorder     | The tick when play stops; the player's decode on CPU or iGPU; the tests' type errors     | 1                |
-| 3 | Inference, Refactor | The timing issue: the loops a new item wakes (INFERENCE_PLAN.md B, B5)                   | 2                |
+| 1 | Refactor            | The timing issue: measure a 1 ms system tick (`timeBeginPeriod(1)`) (B1)               |                  |
+| 2 | Refactor            | The timing issue: ArtNetBars' frame tick (B2)                                            | 1                |
+| 3 | Inference, Refactor | The timing issue: the loops a new item wakes (INFERENCE_PLAN.md B, B's question)       | 1                |
 | 3 | Refactor            | Board held up to the rules, then one package at a time (A)                               |                  |
-| 4 | Camera              | Depth confidence from the camera to the motion (CAMERA_PLAN.md A)                        | video A5         |
-| – | Inference           | The pose model at HIGH in the presets; hd_trio's and white_space's resolution tested with several players | |
+| 4 | Camera              | Depth confidence from the camera to the motion (CAMERA_PLAN.md A)                        |                  |
 | 5 | GL Window           | The window manager: GLFW on the main thread, one kind of window, frame pacing (GL_PLAN.md)| the camera plan |
+| – | Inference           | hd_trio and white_space at full batch: whether the STANDARD pose model goes (INFERENCE_PLAN.md C) |  |
 | – | Low Flow            | The water's speed of sound in the 2D (LOW_FLOW_PLAN.md G4); what the view's 2.9 ms is    |                  |
-| – | You                 | The screen recorder's preview by eye; the checks at the rig (C)                          |                  |
+| – | You                 | The checks at the rig (C)                                                                |                  |
 
 ## Open questions
 
@@ -56,7 +52,8 @@ Done: camera (14 Nov), render (its plan built and removed), hd_trio (G5). Held u
 - A4. `panel`
 - A5. `pose`; its `pipeline` changed with inference C4 (`SourceFramesCallback` and `AsyncInput` carry the capture
   times, `dict[int, float]`)
-- A6. `recording`, with its plan's split test (RECORDING_PLAN.md 3)
+- A6. `recording`, with its plan's split test (RECORDING_PLAN.md 4); its plan's line 3 (the pose model's drops) goes with this plan's commit: it
+  assumes a pose every frame, and deep_flow poses every other frame
 - A7. `session`
 - A8. `settings`
 - A9. `tracker`; `TrackerFrameSource.submit(cam_timestamps)` changed with inference C4
@@ -64,28 +61,33 @@ Done: camera (14 Nov), render (its plan built and removed), hd_trio (G5). Held u
 - A11. `log_config.py`
 - A12. The apps: `deep_flow`, `smile`, `white_space`
 
-## B. Loops paced with `utils.wait_until`
+## B. The timing issue: Windows' 15.6 ms tick
 
 A wait's timeout ends on Windows' 15.6 ms tick (CLAUDE.md, Time), so a loop paced by one comes up to 15.6 ms late
 **(seen: 18 ms asked, 31.3 ms waited)**. `wait_until` sleeps its last ~17.5 ms, so a signal in that time wakes it up
 to ~17 ms late **(seen)**: it fits a loop that only paces, not one a new item must wake at once. Built: the recording
-player (`StreamReader`). In INFERENCE_PLAN.md B: `InferenceFrameSync`, `RecordedPoses`.
+player (`StreamReader`).
 
-- B1. `ArtNetBars` (`modules/inout/artnet_bars.py`): its frame tick; woken only by a settings change.
-- B2. The session's chunk timer (`modules/session/session.py`): woken only by stop.
-- B3. white_space's motor clock (`light/motor.py`): one tick per `light_rate`; woken only by stop and the simulate
-  setting. Checked at the rig with C1.
-- B4. smile's player (`player/player.py`): its 20 ms poll between cell starts; woken only by stop.
-- B5. The replay camera's tracklets (`modules/recording/replay/camera.py`) and smile's camera image rate
-  (`cam/camera.py`): a new item notifies each loop, so `wait_until` as it is would hold it up to 17 ms
-  **(deduction)**. They take the `woken` check the inference thread proposes for `wait_until` (1 ms steps in its
-  last stretch, the lock released between), or whatever that becomes.
+- B1. A 1 ms system tick, `timeBeginPeriod(1)` at the app's start, measured against `wait_until`: one deep_flow
+  `-sim` run with and without it, the player's frame gaps (mean, p95), the poses' arrival against their moment, the
+  process's CPU load, and whether the tick holds with the window minimized (Windows 11 drops the request of a hidden
+  window **(deduction)**).
+- B2. `ArtNetBars` (`modules/inout/artnet_bars.py`): its frame tick waits `1/fps` after its work, so its rate drifts
+  by the work as well as the tick, and `_update_event.clear()` after the wait drops a settings change that lands in
+  between **(seen)**. It waits for a fixed-rate deadline (`next += 1/fps`) and clears the event before its work.
+  Checked by its frame intervals logged before and after.
 
-- B6. A 1 ms system tick, `timeBeginPeriod(1)` at the app's start, measured against `wait_until`: one deep_flow
-  `-sim` run with and without it, the player's frame gaps (mean, p95), the poses' arrival against their moment and
-  the process's CPU load. If it fixes the woken loops on its own, they need no `woken` check.
+Not changed **(seen)**: the session's chunk timer (`chunk_start += chunk_length` keeps it from drifting; a split is
+at most one tick late, every recorder together), white_space's motor sim (its falls are interpolated from
+`perf_counter`, so a late wait does not move them), smile's start loop (a 20 ms poll for loaded clips, at start-up
+only).
 
-Checked by each package's tests; B5 also by one deep_flow `-sim` run, the tracklets' arrival against their moment.
+### Question
+
+- After B1: which loops a new item wakes still need `wait_until`'s `woken` check (1 ms steps in its last stretch,
+  the lock released between) — the replay camera's tracklets (`modules/recording/replay/camera.py`), smile's camera
+  image rate (`cam/camera.py`), and INFERENCE_PLAN.md B's `InferenceFrameSync` and `RecordedPoses` — or none, if the
+  1 ms tick fixes them; and whether B2 then waits with `wait_until` or a plain `Event.wait`.
 
 ## C. Checks at the rig
 
@@ -99,12 +101,6 @@ Checked by each package's tests; B5 also by one deep_flow `-sim` run, the trackl
 - C4. hd_trio: a live recording with `mirrored` on (a live frame comes with `flip_h` on, which a -sim clip does
   not); the fluid's look.
 
-## D. Pyright over the whole repository
-
-- The commit check and its CLAUDE.md line are the rules plan's; it gets D2's commit (bf7cc217), the command per venv,
-  `.venv-oak4/Scripts/python.exe -m pyright` (14.8 s) and `.venv/Scripts/python.exe -m pyright -p pyright.oak.json`
-  (1.4 s), and a run on five files, 2.1 s.
-
 ## Parked
 
 - hd_trio's render writes `fluid.density.fade_time` every tick from the player's motion, and its show stages write
@@ -116,5 +112,4 @@ Checked by each package's tests; B5 also by one deep_flow `-sim` run, the trackl
 
 - `CLAUDE.md` Project shape and Packages, what a package holds: A
 - `CLAUDE.md` Time, pace a loop with `utils.wait_until`: B
-- `CLAUDE.md` Types, fix a type error in order, suppress only as a last resort: D
 - `CLAUDE.md` Settings, settings connect the user and a component, not two components: Parked
