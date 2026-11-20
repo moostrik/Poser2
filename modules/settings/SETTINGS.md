@@ -119,4 +119,5 @@ timing adds to it. The most frequent writes are the pinned readouts, each once a
 | A write        | 153.3 ms  | 0.087 ms  | 3.27 µs   |
 | Its MRO scan   | 54.8 ms   | 0.031 ms  | 1.17 µs   |
 
-Below 0.1 ms a tick, the property names are not cached.
+Below 0.1 ms a tick, so no cache. A field's write looks in the fields first: the MRO scan runs only for a name
+that is no field, so a field's write no longer pays its row (not measured again).

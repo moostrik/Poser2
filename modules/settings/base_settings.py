@@ -76,20 +76,17 @@ class BaseSettings:
         if name.startswith("_"):
             object.__setattr__(self, name, value)
             return
-        if name in self._children:
-            raise AttributeError(
-                f"Cannot replace child '{name}' — mutate its fields instead"
-            )
-        # Allow @property setters defined on the class
-        for cls in type(self).__mro__:
-            if name in cls.__dict__ and isinstance(cls.__dict__[name], property):
-                cls.__dict__[name].fset(self, value)
-                return
-        if name not in self._fields:
-            raise AttributeError(
-                f"'{type(self).__name__}' has no setting '{name}'"
-            )
-        self._fields[name].set(self, value)
+        field = self._fields.get(name)
+        if field is not None:
+            field.set(self, value)
+            return
+        # A name the class declares with a setter (a property, a Group, which refuses a replacement): Python's own
+        if hasattr(getattr(type(self), name, None), "__set__"):
+            object.__setattr__(self, name, value)
+            return
+        raise AttributeError(
+            f"'{type(self).__name__}' has no setting '{name}'"
+        )
 
     def __getattr__(self, name):
         # Children are accessed via Group descriptors — they don't reach here.
