@@ -14,7 +14,6 @@ What is to do now, across the threads, in order. Lines with the same number run 
 
 | # | Who                 | What                                                                                     | After            |
 |---|---------------------|------------------------------------------------------------------------------------------|------------------|
-| 1 | Refactor            | Pyright clean outside the tests, package by package (D2, D3)                             |                  |
 | 1 | Screen Recorder     | One ffmpeg system (VIDEO_PLAN.md A)                                                      |                  |
 | 1 | Inference           | RAFT out, the log names the model file, RVM files `_fp16` (INFERENCE_PLAN.md A)          |                  |
 | 1 | Refactor            | The timing issue: the loops that only pace on `wait_until` (B1–B4)                       |                  |
@@ -102,20 +101,9 @@ Checked by each package's tests; B5 also by one deep_flow `-sim` run, the trackl
 
 ## D. Pyright over the whole repository
 
-Every file outside the tests type-checks clean, fixed in CLAUDE.md's order (annotation, narrowing, `cast`,
-suppression last). Tests are not checked. Clean now: `modules/recording` (f9211f41), `modules/video`.
-
-The count (D2, 20 Nov, **seen**): `.venv-oak4/Scripts/python.exe -m pyright` (`[tool.pyright]` names the venv,
-leaves out every `tests/`, `temp/` and `modules/camera/oak`), 14 s, 140 errors: flow 61, scripts 52, render 7,
-camera 5, panel 5, gl 4, deep_flow 3, hd_trio 1, white_space 1, settings 1. `.venv/Scripts/python.exe -m pyright -p
-pyright.oak.json` checks only `modules/camera/oak` in depthai 2: 1.2 s, 0 errors. Five files: 1.6 s.
-
-- D3. Each package's errors fixed, one commit per package, checked by pyright and the package's tests: `scripts`
-  (with `velocity_peak_check.py`, which imports the removed `modules.flow.bridge_3d.velocity_peak`), smile,
-  white_space, deep_flow, low_flow, hd_trio, then the modules in alphabetical order. The threads that own a package
-  are asked for feedback after its commit.
-- The commit check and its CLAUDE.md line are the rules plan's; it gets D2's commit, the command per venv and the
-  time of a run on a handful of files.
+- The commit check and its CLAUDE.md line are the rules plan's; it gets D2's commit (bf7cc217), the command per venv,
+  `.venv-oak4/Scripts/python.exe -m pyright` (14.8 s) and `.venv/Scripts/python.exe -m pyright -p pyright.oak.json`
+  (1.4 s), and a run on five files, 2.1 s.
 
 ## Parked
 
