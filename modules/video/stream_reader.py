@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 # reading for and says so with every frame, the kind being whatever the caller passed in.
 StreamFrameCallback = Callable[[int, object, np.ndarray, int, int], None]
 
+STALL_SECONDS: float = 3.0      # how long a read may wait for its frame before the reader logs a stalled decoder
+
 
 class FrameSchedule(Protocol):
     """When the readers of a recording hand their frames over, on `perf_counter`."""
@@ -73,6 +75,12 @@ class StreamReader:
         self.stop_event = Event()
         self._waker: Waker = Waker()      # wakes the play thread's wait for a frame's moment on stop
 
+        self._watch_thread: Thread | None = None
+        self._reading: Event = Event()          # a read waits for its frame
+        self._read_progress: Event = Event()    # set as a read starts and as it ends, and when the play ends
+        self._play_ended: Event = Event()
+
+        self.video_file: str = ''
         self.chunk_id: int
         self.start_frame: int = 0
         self.end_frame: int | None = None
@@ -103,7 +111,9 @@ class StreamReader:
             return
 
         self._play_thread = Thread(target=self._play)
+        self._watch_thread = Thread(target=self._watch, name='StreamReader watch')
         self._play_thread.start()
+        self._watch_thread.start()
 
     def stop(self) -> None:
         """End the reader for good. One that never played ends its decoder here: nothing else would,
@@ -126,6 +136,9 @@ class StreamReader:
         if self._play_thread is not None:
             self._play_thread.join()
             self._play_thread = None
+        if self._watch_thread is not None:
+            self._watch_thread.join()
+            self._watch_thread = None
         self._waker.close()
 
     def _load(self, video_file: str, chunk_id: int, start_frame: int = 0, end_frame: int | None = None) -> None:
@@ -168,6 +181,7 @@ class StreamReader:
         with self._load_lock:
             self.ffmpeg_process = ffmpeg_process
             self._frames_in = frames_in
+            self.video_file = video_file
             self.chunk_id = chunk_id
             self.start_frame = start_frame
             self.end_frame = end_frame
@@ -182,6 +196,19 @@ class StreamReader:
             for line in stderr:
                 if not self.stop_event.is_set():
                     logger.error('Decoder of %s: %s', video_file, line.decode(errors='replace').strip())
+
+    def _watch(self) -> None:
+        """Logs, once per stall, a read that waited `STALL_SECONDS` for its frame: a decoder that hangs gives no frame
+        and no error."""
+        logged: bool = False
+        while not self._play_ended.is_set():
+            if self._read_progress.wait(STALL_SECONDS):
+                self._read_progress.clear()
+                logged = False
+            elif self._reading.is_set() and not logged and not self.stop_event.is_set():
+                logger.error('Decoder of %s gave no frame for %.0f s: %s decode, %s', self.video_file, STALL_SECONDS,
+                             self.decoder.value, ' '.join(hwaccel_args(self.decoder)) or 'software')
+                logged = True
 
     def _close(self) -> None:
         with self._load_lock:
@@ -209,6 +236,8 @@ class StreamReader:
         frames_in = self._frames_in
         if self.ffmpeg_process is None or frames_in is None:
             logger.warning('video not loaded')
+            self._play_ended.set()
+            self._read_progress.set()
             return
         frame_interval: float = 1.0 / self.fps
 
@@ -224,7 +253,12 @@ class StreamReader:
             try:
                 # A bytearray, not bytes: an array over bytes is read-only, and torch warns on it
                 in_bytes = bytearray(self.bytes_per_frame)
-                if not self._read_frame(frames_in, in_bytes):
+                self._reading.set()
+                self._read_progress.set()
+                read: bool = self._read_frame(frames_in, in_bytes)
+                self._reading.clear()
+                self._read_progress.set()
+                if not read:
                     break       # the stream's end, or its decoder ended by `stop`
             except (OSError, ValueError) as e:
                 if not self.stop_event.is_set():
@@ -261,4 +295,6 @@ class StreamReader:
                 self._waker.wait(next_time)
             elif -remaining > frame_interval:
                 next_time = time.perf_counter()   # resync after a stall rather than bursting catch-up frames
+        self._play_ended.set()
+        self._read_progress.set()
         self._close()

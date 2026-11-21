@@ -1,14 +1,19 @@
-"""`StreamReader`: a range starts at its frame, no decoder outlives a reader, and a file's frame count is exact."""
+"""`StreamReader`: a range starts at its frame, no decoder outlives a reader, a stalled decoder is logged, and a file's
+frame count is exact."""
 
 import os
+import subprocess
+import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 import numpy as np
 
 from modules import video
-from modules.video import StreamReader
+from modules.video import StreamReader, stream_reader
+from modules.video.process import big_pipe
 
 
 def make_clip(path: str, frames: int) -> None:
@@ -151,6 +156,27 @@ class StreamReaderTest(unittest.TestCase):
         self.assertTrue(wait_for(lambda: not reader.is_playing()))
         reader.join()
         self.assertEqual(shapes, [(72, 64), (72, 64)])
+
+    def test_a_decoder_that_gives_no_frame_is_logged(self) -> None:
+        reader = self.reader()
+        frames_in, write_fd = big_pipe()
+        try:
+            process = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'], stdout=write_fd)
+        finally:
+            os.close(write_fd)
+        reader.ffmpeg_process, reader._frames_in = process, frames_in
+        reader.video_file, reader.chunk_id, reader.bytes_per_frame = 'silent.mp4', 0, 16
+        with mock.patch.object(stream_reader, 'STALL_SECONDS', 0.2), \
+                self.assertLogs('modules.video.stream_reader', 'ERROR') as logs:
+            reader.play()
+            logged: bool = wait_for(lambda: len(logs.output) > 0)
+            reader.stop()
+            reader.join()
+        self.assertTrue(logged)
+        self.assertIn('silent.mp4', logs.output[0])
+        self.assertIn('CPU', logs.output[0])
+        self.assertIsNotNone(process.poll())
+        self.assertEqual(self.frames, [])
 
     def test_a_range_counts_from_its_first_frame(self) -> None:
         reader = self.reader()

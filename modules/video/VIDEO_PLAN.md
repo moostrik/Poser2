@@ -3,16 +3,6 @@
 What is to be built in `modules/video`: ffmpeg, the clips and streams it writes and reads, and the screen recorder
 ([VIDEO.md](VIDEO.md)).
 
-## A. The iGPU decode of a large recording fails silently
-
-A1. `StreamReader` logs an error when its decoder gives no frame for a few seconds, naming the file, the decoder
-   and the device; it does not switch decoder or stop. Why: the Intel iGPU's d3d12va h264 decode hangs at 3088×2316
-   right after it starts: no frame, no error on stderr, ffmpeg never exits, so `_read_frame` waits forever and
-   `_log_errors` has nothing to log. HEVC at that size decodes on the iGPU, and the 4090 decodes both; 1280×960
-   h264 decodes on the iGPU; DXGI adapter 1 is the iGPU, 0 the 4090 **(seen, ffmpeg 100-frame decodes of synthetic
-   testsrc2 clips, 2026-11-21)**. Rule: "Log exceptions with context; never fail silently". A unit test feeds the
-   reader a process that never writes and checks the error is logged. Check: `test_stream_reader`.
-
 ## B. Names
 
 B1. The screen recorder's frame store is named after what it is in both modes: `ScreenFrameRing`
