@@ -11,8 +11,8 @@ from its first element, so a list default holds at least one. A write is coerced
 float, an enum is made from its name or value, a tuple or list builds a value object (`Color(r, g, b)`), a dict one
 with `from_dict`; anything else raises `TypeError`. A bool never passes for an int or a float.
 
-A write that changes the value fires the field's callbacks, outside the field's lock, each in a `try`: a failing
-callback is logged and the others still run. A list is handed out as a copy, so a change in place fires nothing;
+A write that changes the value fires the field's callbacks, a `utils.Broadcast` per field: called outside its
+lock, a failing callback is logged and the others still run. A list is handed out as a copy, so a change in place fires nothing;
 the whole list is written again.
 
 Every keyword but `default`, `access` and `saved` is a panel hint (`min`, `max`, `step`, `description`, `label`,

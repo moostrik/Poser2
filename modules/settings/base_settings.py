@@ -5,6 +5,8 @@ import logging
 import threading
 from typing import Any, ClassVar
 
+from modules.utils import Broadcast
+
 from .field import Field, Access
 from .group import Group
 from .widget import Widget
@@ -50,7 +52,7 @@ class BaseSettings:
                 self._fields[attr_name] = attr_value
                 default = attr_value.default
                 self._values[attr_name] = copy.deepcopy(default) if isinstance(default, list) else default
-                self._callbacks[attr_name] = []
+                self._callbacks[attr_name] = Broadcast(name=f"setting '{type(self).__name__}.{attr_name}'")
                 self._locks[attr_name] = threading.Lock()
             elif isinstance(attr_value, Group):
                 group_names[attr_name] = attr_value

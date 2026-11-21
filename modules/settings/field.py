@@ -169,25 +169,16 @@ class Field(Generic[T]):
         parent, with the parent; then call the callbacks."""
         value = self._coerce(value)
         changed = False
-        callbacks: list = []
         with obj._locks[self.name]:
             if obj._values[self.name] != value:
                 obj._values[self.name] = value
-                callbacks = list(obj._callbacks[self.name])
                 changed = True
-        if changed:
-            obj._propagate_shared_field(self.name)
-            if not from_parent:
-                obj._propagate_upward_field(self.name)
-        self._call(callbacks, value)
-
-    def _call(self, callbacks: list, value: Any) -> None:
-        """Call each of *callbacks* with *value*, outside the lock; a failing one is logged and the others go on."""
-        for callback in callbacks:
-            try:
-                callback(value)
-            except Exception:
-                logger.warning("Callback %r for setting '%s' raised an exception", callback, self.name, exc_info=True)
+        if not changed:
+            return
+        obj._propagate_shared_field(self.name)
+        if not from_parent:
+            obj._propagate_upward_field(self.name)
+        obj._callbacks[self.name](value)
 
     # -- Type coercion -------------------------------------------------------
 
@@ -269,9 +260,7 @@ class Field(Generic[T]):
         """Press a button: its callbacks are called with ``True`` and its value stays; the press is shared with the
         children but the one it came from and, unless it came from the parent, with the parent, so each callback
         runs once per press."""
-        with obj._locks[self.name]:
-            callbacks = list(obj._callbacks[self.name])
-        self._call(callbacks, True)
+        obj._callbacks[self.name](True)
         for child, child_name in obj._share_down.get(self.name, []):
             if child is not from_child and child_name in child._fields:
                 child._fields[child_name].fire(child, from_parent=True)
@@ -283,16 +272,10 @@ class Field(Generic[T]):
                     parent._fields[parent_name].fire(parent, from_child=obj)
 
     def bind(self, obj, callback) -> None:
-        with obj._locks[self.name]:
-            if callback not in obj._callbacks[self.name]:
-                obj._callbacks[self.name].append(callback)
+        obj._callbacks[self.name].add_callback(callback)
 
     def unbind(self, obj, callback) -> None:
-        with obj._locks[self.name]:
-            try:
-                obj._callbacks[self.name].remove(callback)
-            except ValueError:
-                pass
+        obj._callbacks[self.name].remove_callback(callback)
 
     # -- Serialization -------------------------------------------------------
 
