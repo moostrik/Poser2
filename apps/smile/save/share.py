@@ -1,8 +1,8 @@
-"""The share clip: the visitor's grin as the phone gets it to keep and share. The players' clip (silent,
+"""The share clip: the visitor's grin as the phone gets it to keep and share. The clip player's clip (silent,
 `grins/<style>/<id>.mp4`) with the visitor's track as its sound, tailored to the clip's length by the
-tape (modules/audio/tape.py: spun up over the first half second, wound down over the last) and a small
+tape (`audio/tape.py`: spun up over the first half second, wound down over the last) and a small
 watermark in the bottom right, "SMILE", a circled "ai" (the machine's mark) and "by" the artist's name; no
-caption, the joke is the room's. Built by the saver before the players' clip lands, the phone comes first."""
+caption, the joke is the room's. Built by the saver before the clip player's clip lands, the phone comes first."""
 
 import logging
 
@@ -33,7 +33,7 @@ def write_watermark(text: str, path: str) -> bool:
 
 def build_share(clip: str, track: str | None, offset: float, watermark: str | None, encoder: video.Hardware, out: str,
                 sample_rate: int = SAMPLE_RATE) -> None:
-    """Write the share clip `out` from the players' clip: `track` from `offset` s (the point the room heard
+    """Write the share clip `out` from the clip player's clip: `track` from `offset` s (the point the room heard
     when the grin started) on the tape, or silence without one; the `watermark` PNG (or None) in the bottom
     right. Raises when it fails."""
     info = video.probe(clip)

@@ -36,15 +36,15 @@ class GrinRate(Protocol):
 
 
 class ClipSaver:
-    """Saves each visitor for the players: the grin as an h264 mp4, the capture and the portrait as stills.
+    """Saves each visitor for the clip player: the grin as an h264 mp4, the capture and the portrait as stills.
 
     Files are built in output/temp/ and moved (an atomic rename) to output/grins/<style>/ and
-    output/portraits/<style>/ when the sequence ends complete, else deleted. The players read the
+    output/portraits/<style>/ when the sequence ends complete, else deleted. The clip player reads the
     style (A or B) from that folder. The clip and the portrait carry the visitor's record: how they
-    were made (modules/save/record.py). After the clip, the share clip for the visitor's phone
-    (modules/save/share.py, `shares/<style>/<id>.mp4`): the same grin with the visitor's track as its
+    were made (`save/record.py`). After the clip, the share clip for the visitor's phone
+    (`save/share.py`, `shares/<style>/<id>.mp4`): the same grin with the visitor's track as its
     sound (`submit_share`: the file and the point of it the room hears when the grin starts) on the tape, and
-    the watermark; the players' clip stays silent. The share clip is built first, the players' clip
+    the watermark; the clip player's clip stays silent. The share clip is built first, the clip player's clip
     lands after it: the visitor outside is waiting for theirs. The save thread is the only
     owner of the encoder process; the other threads only enqueue commands, in order."""
 
@@ -98,7 +98,7 @@ class ClipSaver:
         self.queue.put(('capture', capture))
 
     def submit_record(self, record: dict) -> None:
-        """How the visitor is made (modules/save/record.py): goes into the portrait and the clip, so
+        """How the visitor is made (`save/record.py`): goes into the portrait and the clip, so
         hand it over before the portrait."""
         if self._active():
             self.queue.put(('record', record))
@@ -126,7 +126,7 @@ class ClipSaver:
                 self._dropped = True
 
     def submit_close(self, keep: bool) -> None:
-        """Close the visitor's files: kept for the players when the sequence is complete, else deleted."""
+        """Close the visitor's files: kept for the clip player when the sequence is complete, else deleted."""
         if self._active():
             self.queue.put(('close', keep))
 
@@ -209,7 +209,7 @@ class ClipSaver:
             portraits: str = os.path.join(self.portraits_dir, style)
             os.makedirs(grins, exist_ok=True)
             os.makedirs(portraits, exist_ok=True)
-            # the stills first: the clip landing is what the players react to
+            # the stills first: the clip landing is what the clip player reacts to
             for name in ('_capture.jpg', '_portrait.jpg'):
                 if os.path.exists(temp[name]):
                     os.replace(temp[name], os.path.join(portraits, id + name))

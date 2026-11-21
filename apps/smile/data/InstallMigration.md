@@ -226,7 +226,7 @@ error and `exit 1`, `$LASTEXITCODE` checked after every `git`/`pip`/`tar` call) 
 
 ## 3. `scripts/install.bat`
 
-Keep the colour-echo style and sections; extra arguments go to the model tool (`scripts\install.bat --mirror E:\smile-models`).
+Keep the color-echo style and sections; extra arguments go to the model tool (`scripts\install.bat --mirror E:\smile-models`).
 
 1. Checks: `git`, `git lfs`, `py -3.12` (new), `ffmpeg` (warn only, as now).
 2. `git lfs pull`.

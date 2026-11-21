@@ -2,7 +2,8 @@
 
 Art installation: a camera captures a face, an image generator turns it into a portrait, and the
 result is shown with music (Max patch via OSC) and lights (Art-Net), and the grins of the visitors before
-play on two walls of screens. SMILE is `apps/smile/` of Poser2: `launcher.py -app smile` from the Poser2 root starts it
+play on two walls of screens. The person in SMILE is a "visitor", the one exception to the glossary's "player"
+([`smile.md`, Names](../../.claude/rules/smile.md)). SMILE is `apps/smile/` of Poser2: `launcher.py -app smile` from the Poser2 root starts it
 (`SmileMain` in `main.py`; its own arguments `-fs`, `-wc`, `-lm`, `-dw`, `-dh` follow the launcher's; the walls are windows 1
 and 2 of its render). Paths in this file are relative to `apps/smile/`; commands run from the Poser2 root with
 its `.venv` (`scripts/install.bat` there makes it, `apps/smile/scripts/install.bat` adds ComfyUI). Tests:
@@ -11,13 +12,13 @@ The app's packages are its own (`cam`, `face`, `comfy`, `render`, `player`, ...)
 `modules/utils` and `modules/logging` are Poser2's, shared with the other apps. `data/` is what the installation
 is given (settings files, models, workflow, audio, test photos), `output/` what it produces (git-ignored, safe to delete).
 `README.md` is for whoever installs or runs the installation: setup, scripts, the on-site checklist
-with the date each check passed, and the known limits; keep it current when any of that changes.
-The app runs under pythonw, without a console: say things with `logging`, never `print` (the log file
-in Poser2's `logs/` is the only place they show; unhandled exceptions of the threads and of the main
+with the date each check passed, and the known limits.
+The app's rules are in [`smile.md`](../../.claude/rules/smile.md). It runs under pythonw, without a console: the log file
+in Poser2's `logs/` is the only place its messages show; unhandled exceptions of the threads and of the main
 thread go there too, `modules.logging.install_excepthooks`, and each one is a line in
-`logs/crashes.log`, which every start reports as its first log line, `crash_summary`). ComfyUI's logs are in `output/logs/`. A worker thread's loop catches what its work
-raises, logs it (not at every round) and goes on: a thread that ends leaves an installation that looks
-alive and does nothing (the face finder: nobody is ever chosen; the generator: the flash stays).
+`logs/crashes.log`, which every start reports as its first log line, `crash_summary`. ComfyUI's logs are in `output/logs/`.
+A worker thread that ended would leave an installation that looks alive and does nothing (the face finder: nobody is
+ever chosen; the generator: the flash stays), so its loop logs what its work raises (not at every round) and goes on.
 
 ## Camera
 
@@ -44,9 +45,9 @@ panel's values) when no complete frame arrived for 5 s; the `device` readout fol
 the backend logs an error at start and stays unconnected. Every frame
 has the time it arrived (`Camera.frame()`, on `time.perf_counter()` like every stamp and timer of the sequence; a device frame the time its backend stamped): the face finder gets new frames only and its faces carry
 that time, so a camera that stopped never charges on its last frame, and the render shows
-`no camera frames` as its status line after 3 s without one (`Camera.stalled`). The camera settings (`Settings.camera`, `cam/settings.py`)
+`no camera frames` as its status line after 3 s without one (`Camera.stalled`). The camera settings (`Settings.setup.camera`, `cam/settings.py`)
 are the Vimba backend's `VimbaCameraSettings` with the app's source fields and the face settings
-(`camera.face`). Exposure, gain, white balance and colour (saturation, hue, gamma) are panel settings that
+(`camera.face`). Exposure, gain, white balance and color (saturation, hue, gamma) are panel settings that
 the backend's `SensorControl` writes to the Vimba camera (Mako G-125C) when they change, over what the camera's `UserSet2`
 loaded; a feature the camera model lacks is a warning, and so is a write the camera refuses, which is
 tried again (it does not switch the feature off). Exposure and gain each have auto, a manual
@@ -54,7 +55,7 @@ value (sent while auto is off), a limit for auto and a readout of what the camer
 autos aim for `target_brightness`, the exposure going up first and the gain after it. "Set WB" (white balance) lets the camera measure
 once and takes the ratios it found into the panel.
 The camera is a GigE camera on the PC's Ethernet adapter. Its `UserSet2` holds the region of interest, 1200x960 of the
-1292x964 sensor, centred (OffsetX 46, OffsetY 2): the render's 4:5 turned, whose view (`view.py`) is the whole frame, scaled by exactly
+1292x964 sensor, centered (OffsetX 46, OffsetY 2): the render's 4:5 turned, whose view (`view.py`) is the whole frame, scaled by exactly
 16/15 to 1024x1280 with nothing cropped; the log line at open shows the region the set loaded. It sends BGR, 3.5 MB per frame
 (104 MB/s at 30 fps, the panel's `fps`, also written by `SensorControl`; `UserSet2` holds 20; `readings.video_fps` is the rate of the frames
 that arrive complete; one that lost network packets arrives `Incomplete`, with part of an older image still in its buffer,
@@ -91,10 +92,10 @@ last frame at all when none did), its own camera frame cropped by
 (`RenderBoard.set_faces`): `CameraLayer` draws the camera in black and white (`face_color.frag`). Every face's
 box (the portrait crop's, upright: `FaceObservation.crop`) shows the face's distance from good
 (`render.face_effect`: dark, pixels, blur or fog, at `render.face_amount`), so a visitor sees
-whether they get closer; the subject's box turns to colour as the charge fills (`render.face_fill`:
+whether they get closer; the subject's box turns to color as the charge fills (`render.face_fill`:
 fade, rise, iris, trace or scan). `render.face_marks` switches all marks on or off: the subject's outline (from
-grey to `render.face_color` with the charge) and grey keypoints, the other faces in white, a
-rejected one in grey with its reject reason (the panel has the readout). They are part of the
+gray to `render.face_color` with the charge) and gray keypoints, the other faces in white, a
+rejected one in gray with its reject reason (the panel has the readout). They are part of the
 camera layer, so the flash fades them out with it. Marks are built in `face_marks.py`, drawn by `MarkDrawer`; a box that
 reaches past the image is drawn clamped to `BOX_PAD_PX` inside it (`fit_box`), so the subject's outline and fill stay whole.
 
@@ -109,20 +110,20 @@ provides; the models live in `ComfyUI/models` as ComfyUI has it, listed with siz
 `comfy/models.py` from a local folder when one is given, else from the source: the public URL, or for the three LoRAs the copy in
 `data/comfy/loras` (git LFS); a backup is a copy of the SMILE folder; `ComfyUI/` is git-ignored, API on
 127.0.0.1:8188), started by `scripts/start_comfy.bat`, with a log per start in `output/logs/comfy_*.log`. Every model is
-local and a run makes no internet calls; a model that is missing is an error (`HF_HUB_OFFLINE=1` in `start_comfy.bat`) and a WARNING in the SMILE log when the panel names it. Keep ComfyUI core and the node packs unmodified; depth comes from
+local and a run makes no internet calls; a model that is missing is an error (`HF_HUB_OFFLINE=1` in `start_comfy.bat`) and a WARNING in the SMILE log when the panel names it. ComfyUI core and the node packs are unmodified ([`smile.md`](../../.claude/rules/smile.md)); depth comes from
 ComfyUI's own Depth Anything 3 nodes. `comfy/`: `Generator` sends each capture to ComfyUI and turns its
 websocket events into `GeneratorMessage`s for the render (CAM_DEPTH → DIFFUSION → DIFF_LOOP → IDLE);
 `workflow.py` adapts the API export in `data/comfy/` (SMILE crops and rotates the face itself, so the export
-starts from the uploaded image; an old export's crop subgraph and video recorder are stripped; depth outputs added) and fills in every value from `GeneratorSettings` per run: the
-panel is the source of truth, the workflow only provides the structure. Each visitor gets one of two
+starts from the uploaded image; an old export's crop subgraph and video recorder are stripped; depth outputs added) and fills in every value from `GeneratorSettings` per run, so the
+workflow only provides the structure. Each visitor gets one of two
 styles (`style_a`, `style_b`, cycled by `styles.py`: `style_visitors_a` visitors in A, then `style_visitors_b` in B, or one of them for
-everyone with `style_mode` A or B; the style id is the movement id of the music): a style holds the describe settings (instruction, max tokens, repetition
+everyone with `style_mode` A or B; the style id is also the style's key in `data/audio/music_map.json`): a style holds the describe settings (instruction, max tokens, repetition
 penalty, prefix and suffix around the description), the style prompt, the negative and three LoRA
 slots (file and strength, filled into the workflow's three LoRA nodes; `none` or 0 is off). The model is
 shared by both styles (`generator.portrait`): the `checkpoint`, and a `distill_lora` (e.g. DMD2, on the
 model only, a node `build` adds in front of the style LoRAs) whose strength sets how far the checkpoint
-is distilled; steps, CFG, sampler and scheduler have to be set to match by hand. Keep one workflow per
-visitor: a second workflow in between drops the first from ComfyUI's cache and reloads the models.
+is distilled; steps, CFG, sampler and scheduler have to be set to match by hand. A visitor has one workflow:
+a second workflow in between would drop the first from ComfyUI's cache and reload the models.
 After every connect, a warm-up run on `data/comfy/warmup.jpg` (`build_warmup`: the same workflow
 with one sampler step and one grin frame) loads the models and proves the chain works (own limit
 `WARMUP_TIMEOUT`; a visitor has `connection.job_timeout`). Until `Generator.ready` no sequence starts (`Sequencer.blocked`,
@@ -149,8 +150,7 @@ ready. Keep no ComfyUI tab open on the installation, or exclude `127.0.0.1:8188`
 For tests in the ComfyUI page, `python -m apps.smile.comfy.testflow` writes `data/comfy/smile_test.json`
 (drag it into the page): what the app sends with a settings file's values, plus an input switch (the
 app's last capture; any other photo is cropped first with `python apps/smile/scripts/crop_faces.py`), previews and a video
-recorder from ComfyUI's own video nodes. Regenerate
-it after changing the workflow or the settings files instead of editing a copy by hand.
+recorder from ComfyUI's own video nodes; generated, so it follows the workflow and the settings files.
 Our own ComfyUI nodes live in `data/comfy/aiia_grin/` (`ComfyUI/custom_nodes/aiia_grin` is a junction to it: restart ComfyUI after a change).
 The grin's random picks are SMILE's (`Workflow._fill_grin`, from the visitor's seed): each value's peak between its min and max, and
 the moment of that peak within midpoint ± deviation, sent to Grin Frames as `<name>_peak` (without them the node draws its own moments).
@@ -225,16 +225,16 @@ first screen; with `last` it lights no place past that one and runs out at its l
 
 ## Recordings
 
-`save/clip_saver.py` saves each finished visitor for the players under `output/` (git-ignored):
+`save/clip_saver.py` saves each finished visitor for the clip player under `output/` (git-ignored):
 the grin as `grins/<style>/<id>.mp4` (silent h264 at the full portrait size, at `sequence.grin.fps`), the capture and the
 portrait as `portraits/<style>/<id>_capture.jpg` and `<id>_portrait.jpg`, and after the grin landed the phone's copy
 `shares/<style>/<id>.mp4` (`save/share.py`: the same grin re-encoded with the watermark, "SMILE", a circled "ai" and "by" the credit name as it is at
-that share, written again only when the name changed, in the bottom right, no caption, built before the players' clip lands, and the visitor's track as its sound: `ClipSaver.submit_share` from `Main` at DIFF_LOOP's start with the seconds
+that share, written again only when the name changed, in the bottom right, no caption, built before the clip player's clip lands, and the visitor's track as its sound: `ClipSaver.submit_share` from `Main` at DIFF_LOOP's start with the seconds
 since the flash, read with `video.read_audio`, played on the tape of `audio/tape.py`, the Max patch's spin-up over
 the first half second and a wind-down over the last, muxed by `video.make_share`; a share clip that fails is a warning and
-the players' clip goes to the phone instead). `<style>` is the visitor's
-style, `A` (colourful and happy) or `B` (monochrome and dark); the players read it from the folder, the id is the time. Files are built in `output/temp/`
-and renamed into place when the grin is complete, so the players never see a partial file
+the clip player's clip goes to the phone instead). `<style>` is the visitor's
+style, `A` (colorful and happy) or `B` (monochrome and dark); the clip player reads it from the folder, the id is the time. Files are built in `output/temp/`
+and renamed into place when the grin is complete, so the clip player never sees a partial file
 (a visitor that failed, or was reset, is closed and deleted there).
 The clip (its `comment` tag) and the portrait (JPEG comment segments) carry the visitor's **record** as JSON: id, style, description,
 the visitor's one seed (portrait, description and grin share it), the settings of its style (not the other's) and of the portrait
@@ -244,12 +244,11 @@ the ranges (`Generator.record`, handed to the saver with the final portrait). `s
 ranges closed on the drawn values, so loading it repeats the pose); dropping a clip or portrait on `scripts/clip_info.bat` opens it.
 Encoding and decoding run `ffmpeg`/`ffprobe` subprocesses through `modules/video` (ffmpeg
 must be on the PATH: the gyan.dev full build); the encoder is picked at startup by a trial encode
-(Intel Quick Sync on the iGPU, then Nvidia, then libx264; `sequence.saver.encoder` forces one). Never start
-those processes any other way: the apps run under pythonw, so they need `CREATE_NO_WINDOW` and no
-inherited handles. The clip player (`player/`: `Player`, one for the sphere, started and stopped by `Main`) decodes each of the newest clips once into RAM
+(Intel Quick Sync on the iGPU, then Nvidia, then libx264; `sequence.saver.encoder` forces one). `modules/video` starts them with `CREATE_NO_WINDOW` and no
+inherited handles, which the apps under pythonw need. The clip player (`player/`: `Player`, one for the sphere, started and stopped by `Main`) decodes each of the newest clips once into RAM
 (`ClipPool`, 512x640, about 200 MB per clip) and plays from memory on the 48 cells of the two walls (`sphere.CELLS` each, cell ids
 0-47, wall = id // 24; `ClipCells` plays them all from one thread, each cell on its own clock, and feeds the `Wall`s it is handed, `set_image`, and bang Max on 4115 for wall 0, 4116 for wall 1); the Walls tab
-(`player/settings.py`) has `pool` the clips kept, `recent`, `recycle_every` and `hwaccel` (read at the start), `fps` the playback
+(`player/settings.py`) has `pool` the clips kept, `recent`, `recycle_every` and `decoder` (read at the start), `fps` the playback
 speed (default 20, 0 = the clip's own rate), `spread` a random speed difference per play so the cells drift apart (default 0.1), `trail` a blend
 with the previous output (default 0: none), read at every play or frame.
 The pool (`pool`, default 30) is two lists. `recent`: the last `recent` recordings of the style (default 4), always playing on every
@@ -273,8 +272,8 @@ restarts everything (ComfyUI, Max, SMILE with its walls).
 
 ## Music
 
-`audio/music_map.py` picks the track of a visitor's movement from `data/audio/music_map.json` into
-`audio.music_id`. `modules.inout.OscSender` (`Settings.audio.osc`; the clip player builds an `OscSenderSettings` of its
+`audio/music_map.py` picks the track of a visitor's style from `data/audio/music_map.json` into
+`audio.music_id`. `modules.inout.OscSender` (`Settings.setup.audio.osc`; the clip player builds an `OscSenderSettings` of its
 own per wall for the `/bang`) sends what `Main.sequence_callback` queues every frame, the newest value per address:
 `/music_id`, `/state`, `/progress` and the Audio tab's controls `/sound`, `/music_volume`, `/laughter`,
 `/laughter_volume` (both levels in dB; the laughter gets a `dbtoa` in front of its linear multipliers). The panel is
@@ -282,7 +281,7 @@ their source: the patch's own controls follow it, and a control moved
 by hand in Max snaps back (the speaker button holds until the panel's `sound` changes: Max gets it through
 `change -1`, so the DSP is not started every frame). Bools go as ints: python-osc sends a bool as OSC True/False,
 which Max's toggles do not take. The patch `data/audio/Smile-Music-Player.maxpat` routes them off `udpreceive 4114`
-into its controls; the laughter samples are triggered by the players' `/bang` (4115, 4116) through a gate the
+into its controls; the laughter samples are triggered by the clip player's `/bang` (4115, 4116) through a gate the
 laughter switch controls.
 Three speakers on the Realtek jacks (Windows at Quadraphonic, 4 channels, so the black jack's left is 3; Max on
 `ad_portaudio Windows WASAPI` at 48000; the README has the steps, Max's `ad_mme` is stereo only): the music in
@@ -305,7 +304,7 @@ readable; Max rewrites the whole file when the patch is saved from Max.
 
 ## Online
 
-SMILE Online (branch `online`, a proof of concept): someone outside gets the eye when nobody inside has it. Three parts.
+SMILE Online: someone outside gets the eye when nobody inside has it. Three parts.
 `relay/` is a small aiohttp server that runs on the VPS or, for a test, on the PC (`scripts/start_relay.bat`): it serves
 the phone page (`relay/web/`: one camera frame with the terms over it and the bar under it, a field of smileys behind; it
 draws the judging itself from the face data), keeps the waiting line (`relay/line.py`, pure logic) and passes messages (`relay/server.py` has the protocol: JSON
@@ -331,7 +330,7 @@ the first connect, `/api/library`) at random, following `audio.laughter` through
 with the sequence; `ClipSaver`'s saved callback gives the files (the recording closes at the last grin frame, `Main.generator_callback`, while the
 grin still plays), which are uploaded at once (`Delivery`)
 and the `result` goes to the phone by its id, so it has the video when its turn ends and the next turn can start meanwhile. The phone sends its camera mirrored, as it
-shows it. The token is a file (`data/online_token.txt`, git-ignored), never a setting in a settings file.
+shows it. The token is a file, `data/online_token.txt` (git-ignored).
 The **online cell**: the screen `online.screen` (1-48, 0 = none; pick one off the scroll rows) of the walls shows a white card with the
 QR code to the phone page (`online.page`, empty = the relay's host, `Link.http_base`) and a line under it while SMILE Online is on
 and the relay connected, and the main screen (`CreditLayer.cell`: the caption, no QR code, no status line)

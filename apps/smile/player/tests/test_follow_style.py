@@ -1,4 +1,4 @@
-"""Tests for the players following SMILE's style: which clips the scanner hands to the pool and which the cells get."""
+"""Tests for the clip player following SMILE's style: which clips the scanner hands to the pool and which the cells get."""
 
 import os
 import tempfile

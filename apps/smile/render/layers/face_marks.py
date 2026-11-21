@@ -67,9 +67,9 @@ def face_fields(frame: FaceObservations, pad: Pad = NO_PAD) -> list[tuple[float,
 
 def build_marks(frame: FaceObservations, subject_color: Color = SUBJECT_COLOR, charge: float = 0.0, pad: Pad = NO_PAD) -> list[Mark]:
     """A mark per face (its box `pad` inside the image): rejected first, under everyone; the subject
-    last, drawn over all. A rejected face is labelled with the failed check, its value and the limit;
-    the panel has the readout. The subject's outline goes from grey to its color with the charge, its
-    dots are grey."""
+    last, drawn over all. A rejected face is labeled with the failed check, its value and the limit;
+    the panel has the readout. The subject's outline goes from gray to its color with the charge, its
+    dots are gray."""
     marks: list[Mark] = []
     for face in frame.faces:
         x0, y0, x1, y1 = fit_box(face.crop, pad)
@@ -91,8 +91,8 @@ def build_marks(frame: FaceObservations, subject_color: Color = SUBJECT_COLOR, c
 
 
 class SubjectMark:
-    """The chosen face's mark, without a label: the subject's box, its outline going from grey to the active
-    color with the charge and its dots grey. While the charge drains it stays on the face that is
+    """The chosen face's mark, without a label: the subject's box, its outline going from gray to the active
+    color with the charge and its dots gray. While the charge drains it stays on the face that is
     there, or else where it last was (then as far from good as can be); None once the charge is empty."""
 
     def __init__(self) -> None:

@@ -72,7 +72,7 @@ class SmileRender(RenderBase):
         self._output: Texture = self.layers.camera.texture
         self._freeze_fbo: Fbo = Fbo()
         self._frozen: bool = False
-        # the screen for the phones of SMILE Online: switched on and read by modules/online
+        # the screen for the phones of SMILE Online: switched on and read by `online/`
         self.grab: ScreenGrab = ScreenGrab()
         self._cell_view: Texture = self._output      # the output as the online cell shows it: no QR code, no status line
         # the walls of the sphere; which cell of which one is SMILE Online's is on the board

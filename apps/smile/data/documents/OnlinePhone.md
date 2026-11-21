@@ -2,7 +2,7 @@
 
 What a visitor's phone does during SMILE Online, as the visitor sees it (section 1) and as the machine does
 it (section 2). It is the reference for the phone side: the relay (`relay/`), SMILE's online side
-(`modules/online/`) and the page (`relay/web/`). The setup is in the README's SMILE ONLINE section and in
+(`online/`) and the page (`relay/web/`). The setup is in the README's SMILE ONLINE section and in
 `relay/README.md`.
 
 ## 1. The interaction
@@ -219,9 +219,9 @@ a media element: browsers silence one at the tape's low speeds, and Safari refus
 
 The recording closes when the last grin frame is saved (`Main.generator_callback`), while the grin still
 plays on the screens: the last frame exists before the sequence ends (see [Time](#time)). The saver builds the
-phone's clip first (`modules/save/share.py`: the grin re-encoded lighter, the track from the second the room
+phone's clip first (`save/share.py`: the grin re-encoded lighter, the track from the second the room
 heard at the grin's start, on the tape, spun up over its first half second and wound down over its last
-second, the watermark, no caption) and lands the players' silent clip after it. `Online` uploads the three
+second, the watermark, no caption) and lands the clip player's silent clip after it. `Online` uploads the three
 files as soon as they exist and sends `result`, addressed to the phone, so a phone finds it after its turn as
 well. The page downloads the video once, alone (nothing else is fetched meanwhile), plays it from that
 download after the wind-down and uses the same bytes for the share sheet, as a file named `smile_by_<name>`

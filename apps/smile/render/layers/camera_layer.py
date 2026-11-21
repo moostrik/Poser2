@@ -37,8 +37,8 @@ class CameraLayer(LayerBase):
     """The live camera in black and white. Every detected face's box (the portrait crop's) shows how
     far the face is from good (settings.face_effect), and the chosen face's turns to color as its
     charge fills (settings.face_fill). With settings.face_marks every detected face is marked: the chosen one with an
-    outline (from grey to the active color with the charge) and grey keypoints, the others in
-    white, a rejected one in grey with its reason. A box that reaches past the image is drawn up to a
+    outline (from gray to the active color with the charge) and gray keypoints, the others in
+    white, a rejected one in gray with its reason. A box that reaches past the image is drawn up to a
     padding inside it, so the chosen face's outline and fill stay whole. Keeps its last frame until
     render() is called again (the capture freeze).
     While the generator is not ready (the board's warm-up step) the whole image is in pixels instead,

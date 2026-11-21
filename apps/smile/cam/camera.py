@@ -1,7 +1,7 @@
 """The app's image source: the frames of a camera device (a `CameraSource`: the Vimba camera or the
 webcam, `modules/camera/`), or, with `use_image` on, an image from `input/`, whether a device was
 found or not; or, during an online turn, the frames of a phone (`set_online`, `submit_online_frame`: SMILE
-Online, modules/online/). The device and the phone only hand their newest frame over; this one's own thread hands
+Online, `online/`). The device and the phone only hand their newest frame over; this one's own thread hands
 the live one on whole, as a `CameraFrame`, to the callbacks, and paces the image input. A device frame keeps its
 turn and flips as flags, which who shows it applies; what the screen shows of a frame is the view (`view.py`).
 Every device frame also goes, as it came, to the device frame callbacks (the recorder), after the live path took it.
@@ -133,7 +133,7 @@ class Camera:
             self._handed = frame
         self._waker.set()
 
-    # ONLINE SOURCE: the frames of a phone during its turn (modules/online/), in place of the device
+    # ONLINE SOURCE: the frames of a phone during its turn (`online/`), in place of the device
     # and the image; the device keeps running underneath and is back the moment the turn ends
     @property
     def online(self) -> bool:

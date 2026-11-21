@@ -29,7 +29,7 @@ if not exist "%VENV_DIR%\Scripts\python.exe" (
 echo [92mgit, git lfs and the venv found[0m
 where ffmpeg >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [93mffmpeg is not on the PATH: visitors cannot be saved as clips and the players cannot play them.[0m
+    echo [93mffmpeg is not on the PATH: visitors cannot be saved as clips and the clip player cannot play them.[0m
     echo Download the "release full" build from https://www.gyan.dev/ffmpeg/builds/ , extract it and add its bin folder to the PATH.
 ) else (
     echo [92mffmpeg found[0m

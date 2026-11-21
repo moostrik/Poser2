@@ -115,7 +115,7 @@ class TestClipSaverStyle(unittest.TestCase):
             self.assertEqual(record.read(os.path.join(root, 'portraits', 'A', id + '_portrait.jpg')), expected)
             self.assertIsNotNone(cv2.imread(os.path.join(root, 'portraits', 'A', id + '_portrait.jpg')))
 
-    def test_the_share_clip_has_the_track_and_the_watermark_and_the_players_clip_is_silent(self):
+    def test_the_share_clip_has_the_track_and_the_watermark_and_the_clip_players_clip_is_silent(self):
         settings = SequencerSettings()
         settings.saver.encoder = video.Hardware.CPU
         settings.saver.enabled = True
@@ -154,7 +154,7 @@ class TestClipSaverStyle(unittest.TestCase):
                                        subprocess.DEVNULL, subprocess.PIPE, command=video.FFPROBE)
                 out, _ = process.communicate(timeout=30)
                 return json.loads(out)['streams']
-            self.assertEqual(audio_streams(clip), [])                 # the players' clip is silent
+            self.assertEqual(audio_streams(clip), [])                 # the clip player's clip is silent
             streams = audio_streams(shared)
             self.assertEqual(len(streams), 1)
             self.assertEqual(streams[0]['codec_name'], 'aac')
@@ -163,7 +163,7 @@ class TestClipSaverStyle(unittest.TestCase):
             for path in (clip, shared):
                 frames, fps = video.decode_clip(path, (32, 40))
                 self.assertEqual((len(frames), fps), (15, 10.0))
-            # the watermark is in the share clip's picture, bottom right: brighter than the grey frame there
+            # the watermark is in the share clip's picture, bottom right: brighter than the gray frame there
             frames, _ = video.decode_clip(shared, (64, 64))
             self.assertGreater(int(frames[7, 8:40, 0:40].max()), 160)       # the mark, 24 px up; wider than the 64 px frame, so it reaches the left
             self.assertLess(int(frames[7, 0:12, :].max()), 140)             # nothing over the top
@@ -183,7 +183,7 @@ class TestClipSaverStyle(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 video.transcode_aac(os.path.join(root, 'missing.mp3'), out)
 
-    def test_a_track_that_fails_leaves_the_players_clip_and_no_share_clip(self):
+    def test_a_track_that_fails_leaves_the_clip_players_clip_and_no_share_clip(self):
         settings = SequencerSettings()
         settings.saver.encoder = video.Hardware.CPU
         settings.saver.enabled = True

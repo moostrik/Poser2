@@ -448,7 +448,7 @@ class TestOnline(unittest.TestCase):
         self.step(seq=SequenceType.TIMEOUT)
         files, done = self.link.uploads[0]
         self.assertEqual([f[0] for f in files], ['portrait', 'grin'])
-        self.assertEqual(files[1], ('grin', 'v1', 'grins/A/v1.mp4'))     # no share clip: the players' clip
+        self.assertEqual(files[1], ('grin', 'v1', 'grins/A/v1.mp4'))     # no share clip: the clip player's clip
         done(True)
         result = self.link.last('result')
         self.assertEqual((result['id'], result['phone'], result['name'], result['ok']), ('v1', 'phone1', 'Name', True))
