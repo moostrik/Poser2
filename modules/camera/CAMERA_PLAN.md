@@ -25,7 +25,8 @@ The steps below are proposals from the scan of 2026-11-21; nothing is built. **(
   roll less `roll_offset`, into the readings. Each backend passes its `IMU_BOARD_ROLL`. Why: "Inside a package, code
   that does the same is written once"; `oak.Camera._imu_callback` and `oak4.Camera._imu_callback` are the same code,
   and `IMU_SMOOTHING` and `IMU_RATE_HZ` are set twice **(seen)**. The part that calls depthai
-  (`imu_rotation_to_camera`) stays in each backend. Tests: `geometry/tests/test_orientation.py` gains the readout.
+  (`imu_rotation_to_camera`) stays in each backend, and so does oak4's `tilt_correction.update`, which only the OAK4
+  calls **(seen: `oak4.Camera._imu_callback`)**. Tests: `geometry/tests/test_orientation.py` gains the readout.
 - B2. `cam_id` comes from the constructor in `oak.Camera`, `ClipCamera` and `oak4.Camera`, as in `vimba`, `webcam` and
   `replay.Camera`. Why: "Pass collaborators and fixed structure (counts known at startup) through constructors";
   the OAK backends count `Camera._next_cam_id` in creation order, a class-wide count that only holds while one app
@@ -35,8 +36,10 @@ The steps below are proposals from the scan of 2026-11-21; nothing is built. **(
 - B3. `oak.pipeline.WarpConfig` is named `MountConfig`, as `oak4.pipeline.MountConfig`. Why: "Similar things share
   the noun": both are "how a camera is mounted and what its lens is" **(seen)**; the OAK-D's adds tilt and keystone.
 - B4. `rotate90` is a `Field.INIT` field of `CameraSettings` beside the flips, off by default; `oak4`, `vimba` and
-  `webcam` read it there and lose their `rotate90` parameter, and smile's portrait mode decides only the screen.
-  smile's webcam gets its own `CameraSettings` group. The OAK-D applies no turn (its flips are baked into its warp,
+  `webcam` read it there and lose their `rotate90` parameter, smile's `_Oak4Settings` drops its copy **(seen:
+  `apps/smile/cam/settings.py`)**, and smile's portrait mode decides only the screen. smile's webcam gets its own
+  `CameraSettings` group. The replay camera takes the flag from the recording, so its `replay` group holds the key
+  unread **(seen: `modules/recording/replay/camera.py`)**. The OAK-D applies no turn (its flips are baked into its warp,
   whose columns are the panoramic tracker's bearings): it logs once that `rotate90` is not applied (his word,
   2026-11-21). Why: "Components take their settings object ... in the constructor"; today Vimba and the webcam take
   portrait mode **(seen: `apps/smile/main.py`)**. Settings files: smile's four turn on only `camera.rotate90`; every
@@ -65,23 +68,24 @@ The steps below are proposals from the scan of 2026-11-21; nothing is built. **(
   dict with string keys **(seen)**. Why: its two inputs come from the tracklets' and the poses' queues
   **(seen: `oak4/camera.py` `_tracker_callback`, `_poses_callback`)**, whose callbacks can run on two threads
   **(deduction: depthai's docs bring each device output to the host through its own `XLinkInHost`, a threaded host
-  node; neither the docs nor `.venv-oak4`'s stubs say which thread runs a callback)**; "Use `Lock` and `Event` for shared mutable state", "Prefer `IntEnum` over string
-  keys". No settings file runs the two-model chain today (CAMERA.md, what no settings file runs).
+  node; neither the docs nor `.venv-oak4`'s stubs say which thread runs a callback)**; "Use `Lock` and `Event` for
+  shared mutable state", "Prefer `IntEnum` over string keys". No settings file runs the two-model chain today
+  (CAMERA.md, what no settings file runs). Check: log `threading.get_ident()` in both callbacks during a two-model
+  chain run with the OAK4, on his go.
 - C8. "normalised" is spelled "normalized" in `tracklet.py`, `geometry/mirror.py`, `geometry/tilt_correction.py`,
   `oak4/models.py`, `oak4/pipeline.py`, `oak4/keypoint_join.py` **(seen)**. Why: the glossary's American spelling.
 
 ## D. The documents
 
-- D1. CAMERA.md names `CameraReadingsDraw`, not `CameraReadingsRenderer` **(seen: `modules/render/__init__.py`)**;
-  OAK4.md names `ViewDepth`, not `ViewDepthLayer` **(seen: deep_flow `view_depth.py`)**. Why: the document matches
-  the code.
+- D1. OAK4.md names `ViewDepth`, not `ViewDepthLayer` **(seen: deep_flow `view_depth.py`)**. Why: the document
+  matches the code.
 
 ## E. One host-side flip
 
 - E1. The host-side helpers are named after the flag they apply: `upright_image` → `oriented_image`, `upright_corners`
   → `oriented_corners`; `mirrored_roi` / `mirrored_keypoints` → `flip_h_roi` / `flip_h_keypoints`; `flipped_roi` /
   `flipped_keypoints` → `flip_v_roi` / `flip_v_keypoints`; `turned_roi` / `turned_keypoints` → `rotate90_roi` /
-  `rotate90_keypoints`; `geometry/mirror.py` → `geometry/flips.py`; the documents say `rotate90`, not "the turn". Why:
+  `rotate90_keypoints`; `geometry/mirror.py` → `geometry/flips.py`; CAMERA.md, OAK4.md and RECORDING.md say `rotate90`, not "the turn". Why:
   "use that one term everywhere": the frame's flags are `flip_h`, `flip_v`, `rotate90` **(seen: `frame.py`)**, and the
   three together are its orientation. `mirrored_image`, `mirrored_intrinsics`, `mirrored_alignment` and
   `mirrored_tracklets` are not renamed: the recorder is their only caller outside `modules/camera`, and E3 takes them
@@ -98,9 +102,11 @@ The steps below are proposals from the scan of 2026-11-21; nothing is built. **(
   the OAK-D, hd_trio's camera, bakes its flips into its warp and sets no flags **(seen: `oak/camera.py`
   `_emit_frame`, `oak/clip_camera.py`, `oak/pipeline.py` `build_warp_mesh`; hd_trio's recordings hold `flip_h: false`,
   so its replay sets none)**. A recording keeps the frame as delivered with its flags, and replay applies them.
-  `mirrored_image`, `mirrored_intrinsics`, `mirrored_alignment` and `mirrored_tracklets` go with it, with their tests
-  (`test_frame.py`, `geometry/tests/test_depth_projection.py`'s mirrored case) **(seen: no other caller)**.
-  RECORDING.md's section on it goes; hd_trio's `studio.json` and `umu.json` and deep_flow's and low_flow's
+  `RecorderSettings.mirrored` goes, and so does what `recorder.py`'s module docstring says of it.
+  `mirrored_image`, `mirrored_intrinsics`, `mirrored_alignment` and `mirrored_tracklets` go with it, with their tests:
+  `MirroredTest` in `recorder/tests/test_recorder.py`, the `mirrored_image` cases of `tests/test_frame.py` (its
+  `bgr_frame`, `oriented_image` and `oriented_corners` cases stay), and `geometry/tests/test_depth_projection.py`'s
+  mirrored case **(seen: no other caller)**. RECORDING.md's section on it goes; hd_trio's `studio.json` and `umu.json` and deep_flow's and low_flow's
   `studio.json` drop the key in the same commit. Why: "Remove obsolete pathways instead of leaving parallel legacy
   ones". Tests: the recorder's tests and pyright, and each of the four settings files loads without an unknown-key
   warning; no hd_trio run, as the path never ran there. Module Refactor agreed (2026-11-21).
@@ -109,16 +115,13 @@ The steps below are proposals from the scan of 2026-11-21; nothing is built. **(
 
 - F1. The `oak` backend stamps a frame and its tracklets with their capture, off the message's device timestamp as
   `oak4.messages.capture_time` does, instead of their arrival **(seen: `oak.Camera._emit_frame`,
-  `_tracker_callback`)**; depthai 2 messages carry one **(deduction)**. Why: camera.md, "Stamp a frame once ... with
-  its moment of capture where the device reports one". RECORDING_PLAN.md 2's OAK-D capture time is this step; it comes after the camera plan, in his order video, camera, recording. Test: an OAK-D, white_space
-  live, its latency reading against oak4's.
+  `_tracker_callback`)**; depthai 2 messages carry one **(seen: `getTimestampDevice` in `.venv`'s depthai stubs)**.
+  Why: camera.md, "Stamp a frame once ... with its moment of capture where the device reports one".
+  RECORDING_PLAN.md B's OAK-D capture time is this step; it comes after the camera plan, in his order video, camera,
+  recording. Test: an OAK-D, white_space live, its latency reading against oak4's.
 
 ## Open
 
-- The OAK4 at P2160 (2704 x 2160) in H.264 has not been replayed on the iGPU. Its d3d12va H.264 decode hangs
-  silently at 3088 x 2316, while HEVC at that size plays (the video scan, 2026-11-21). `FRAME_WIDTH_ALIGNMENT` in
-  `oak4/sensor.py` covers the width only. Test a P2160 H.264 clip on the iGPU, or record P2160 as HEVC? The codec is
-  the recording settings'.
 - The OAK4 is to run standalone, as an OAK App **(site fact)**. Depth alignment then needs a home: `ImageAlign` is
   the only alignment on the camera and fattens near objects ([Depth](oak4/OAK4.md#depth)), and its firmware cannot be
   changed. The options are to keep sending raw depth with its `DepthAlignment` to a PC that runs `DepthAlign`, or to
