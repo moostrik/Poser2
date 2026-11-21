@@ -109,9 +109,9 @@ class DeepFlowRender(RenderBase):
         # every monitor, so A and B keep one angle and one layer (nothing else in the main window takes it)
         self._drag: tuple[MouseButton, float, float] | None = None     # the button held and where the cursor was
         self._dragged: bool = False
-        self.window_manager.input.add_mouse_button_callback(self._on_mouse_button)
-        self.window_manager.input.add_mouse_move_callback(self._on_mouse_move)
-        self.window_manager.input.add_mouse_scroll_callback(self._on_mouse_scroll)
+        self.input.add_mouse_button_callback(self._on_mouse_button)
+        self.input.add_mouse_move_callback(self._on_mouse_move)
+        self.input.add_mouse_scroll_callback(self._on_mouse_scroll)
 
         # The screen recording: the main panel's layers, or the main window
         self.screen_recording: render.ScreenRecordingCompositor = render.ScreenRecordingCompositor(recorder_settings, screen_recordings)

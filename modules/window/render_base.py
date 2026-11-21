@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable
 
+from .window_input import WindowInput
 from .window_manager import WindowManager
 from .window_settings import WindowManagerSettings
 
@@ -11,6 +12,11 @@ class RenderBase(ABC):
     def __init__(self, windows: WindowManagerSettings) -> None:
         """`windows` an app's `windows` group: the window loop's settings and its windows."""
         self.window_manager: WindowManager = WindowManager(self, windows)
+
+    @property
+    def input(self) -> WindowInput:
+        """The windows' key, mouse and scroll input."""
+        return self.window_manager.input
 
     def add_update_callback(self, callback: Callable[[float], Any]) -> None:
         """Register a per-frame update callback; the loop calls it before the renderer's update with the frame's

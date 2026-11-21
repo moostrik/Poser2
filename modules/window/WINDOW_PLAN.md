@@ -7,9 +7,6 @@ commit, built on Matthias's go, checked by pyright and the window tests.
 
 The apps' render files are the Render thread's while it builds its plan; these steps touch them only once it is done.
 
-- B2. `RenderBase` forwards `input`, and deep_flow and smile use it instead of reaching into `window_manager`. Why:
-  `RenderBase` forwards `run`, `stop`, `window_size` and `add_exit_callback` but not `input`, two ways to one thing
-  (seen). Check: pyright.
 - B3. The loop gives the frame's time as Cinder's `App` does, forwarded by `RenderBase`: `frame_timestamp` (the
   frame's stamp, perf_counter, s), `frame_interval` (s since the last frame's stamp, 0 at the first) and
   `frame_count` (frames since the loop began), each set before the update. deep_flow and low_flow read

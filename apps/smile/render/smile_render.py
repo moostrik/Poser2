@@ -79,7 +79,7 @@ class SmileRender(RenderBase):
         self.walls: list[WallCompositor] = [WallCompositor(settings, walls_settings, list(range(sphere.CELLS)))
                                             for _ in range(sphere.WALLS)]
 
-        self.window_manager.input.add_key_callback(self._on_key)
+        self.input.add_key_callback(self._on_key)
 
     # MAIN THREAD
     def allocate(self) -> None:

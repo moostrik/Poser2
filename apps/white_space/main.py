@@ -216,7 +216,7 @@ class WhiteSpaceMain:
         self.conductor.add_update_callback(self._update_poses)
         self.conductor.add_update_callback(self.state_machine.update)
         self.render.add_exit_callback(self.stop)
-        self.render.window_manager.input.add_key_callback(self._on_key)
+        self.render.input.add_key_callback(self._on_key)
 
     def start(self) -> None:
         self.panel_server.start()
