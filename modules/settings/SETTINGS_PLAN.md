@@ -4,7 +4,6 @@ The package scan of 2026-11-20 (modules/settings held up to CLAUDE.md and its ru
 
 ## E. The package held up to the rules
 
-- E1. `__init__.py` drops `FieldAlias`: no other package imports it; `Field.as_` makes it.
 - E2. `BaseSettings.__getattr__` keeps only its "has no setting" raise: a field is a data descriptor, so its branch
   that returns a field's value is never reached.
 - E3. `Widget.log_position`, `log_value` and `log_step`, the log slider's arithmetic, move to `modules/panel`, where
