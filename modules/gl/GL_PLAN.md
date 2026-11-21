@@ -8,11 +8,6 @@ tasklist check that no app is running, unless Matthias says he is using the PC o
 
 ## A. A texture is made one way
 
-- A2. One table from an array to its internal format: `texture_format` looks the format up by the numpy element type
-  and the channel count, a torch tensor by the numpy type of its dtype, for `Image` and `Tensor`; `Tensor`'s two
-  `format_map`s become `pixel_format`. Why: `image._get_internal_format` and `tensor.infer_internal_format` hold the
-  same table twice, and `Tensor._update_with_pbo`/`_update_with_cpu` each rebuild the `format` column of `FORMATS`
-  (seen). Check: deep_flow -sim (Tensor's CUDA upload); hd_trio -sim (Image).
 - A3. `Tensor`'s conversion to the texture's element type is written once, for the PBO and the CPU path. Why:
   `_update_with_pbo` and `_update_with_cpu` hold the same uint8/half/float ladder (seen). Check: deep_flow -sim, the
   CUDA path; the CPU path runs only without CUDA interop and is not run.

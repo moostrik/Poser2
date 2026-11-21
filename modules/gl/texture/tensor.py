@@ -1,12 +1,14 @@
-# Standard library imports
 import logging
 from threading import Lock
 from typing import TYPE_CHECKING
 
-logger = logging.getLogger(__name__)
-
-# Third-party imports
 import numpy as np
+from OpenGL.GL import (Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_NONE, GL_PIXEL_UNPACK_BUFFER, GL_R32F, GL_STREAM_DRAW,
+                       glBindBuffer, glBufferData, glDeleteBuffers, glGenBuffers, glTextureSubImage2D)
+
+from .texture import Texture
+from .texture_format import array_format, bytes_per_channel as format_bytes_per_channel, channel_count, tensor_type
+
 try:
     import torch
     from . import cudart   # binds torch's CUDA runtime; fails without a CUDA torch
@@ -17,11 +19,7 @@ except (ImportError, OSError):
 if TYPE_CHECKING:
     import torch
 
-from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_PIXEL_UNPACK_BUFFER, GL_R16F, GL_R32F, GL_R8, GL_RED, GL_RG, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_STREAM_DRAW, glBindBuffer, glBufferData, glDeleteBuffers, glGenBuffers, glTextureSubImage2D
-
-# Local application imports
-from .texture import Texture
-from .texture_format import bytes_per_channel as format_bytes_per_channel, channel_count, tensor_type
+logger = logging.getLogger(__name__)
 
 
 def infer_internal_format(tensor: "torch.Tensor") -> Constant:
@@ -34,16 +32,10 @@ def infer_internal_format(tensor: "torch.Tensor") -> Constant:
         OpenGL internal format constant
     """
     channels: int = interleaved(tensor).shape[2] if len(tensor.shape) == 3 else 1
-
-    # Determine precision from dtype
-    if tensor.dtype == torch.uint8:
-        format_map = {1: GL_R8, 2: GL_RG8, 3: GL_RGB8, 4: GL_RGBA8}
-    elif tensor.dtype == torch.float16:
-        format_map = {1: GL_R16F, 2: GL_RG16F, 3: GL_RGB16F, 4: GL_RGBA16F}
-    else:  # torch.float32 or other
-        format_map = {1: GL_R32F, 2: GL_RG32F, 3: GL_RGB32F, 4: GL_RGBA32F}
-
-    return format_map.get(channels, GL_R32F)
+    # the numpy type of its dtype; any other than uint8 and float16 is held as float32
+    dtype = {torch.uint8: np.uint8, torch.float16: np.float16}.get(tensor.dtype, np.float32)
+    internal_format: Constant = array_format(dtype, channels)
+    return GL_R32F if internal_format == GL_NONE else internal_format
 
 
 def interleaved(tensor: "torch.Tensor") -> "torch.Tensor":
@@ -241,18 +233,11 @@ class Tensor(Texture):
         finally:
             cudart.unmap_resource(self._cuda_gl_resource, stream)
 
-        # Get channel count and GL type
-        channels = channel_count(self.internal_format)
-        gl_type = tensor_type(self.internal_format)
-
-        # Select upload format based on channel count
-        format_map = {1: GL_RED, 2: GL_RG, 3: GL_RGB, 4: GL_RGBA}
-        upload_format = format_map.get(channels, GL_RED)
-
-        # Upload PBO to texture (GPU-to-GPU via OpenGL driver); an error in it is logged at the call by GL's debug
-        # output, behind the window manager's `gl_debug`
+        # Upload PBO to texture (GPU-to-GPU via OpenGL driver), in the tensor's type; an error in it is logged at the
+        # call by GL's debug output, behind the window manager's `gl_debug`
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, self._pbo)
-        glTextureSubImage2D(self.tex_id, 0, 0, 0, self.width, self.height, upload_format, gl_type, None)
+        glTextureSubImage2D(self.tex_id, 0, 0, 0, self.width, self.height, self.format,
+                            tensor_type(self.internal_format), None)
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
 
     def _update_with_cpu(self, tensor: "torch.Tensor") -> None:
@@ -283,15 +268,8 @@ class Tensor(Texture):
             else:
                 tensor_np = tensor.float().cpu().numpy()
 
-        # Get channel count and GL type
-        channels = channel_count(self.internal_format)
-        gl_type = tensor_type(self.internal_format)
-
-        # Select upload format based on channel count
-        format_map = {1: GL_RED, 2: GL_RG, 3: GL_RGB, 4: GL_RGBA}
-        upload_format = format_map.get(channels, GL_RED)
-
-        # Upload to OpenGL texture; glTextureSubImage2D takes only a contiguous array, a strided one is copied once
-        glTextureSubImage2D(self.tex_id, 0, 0, 0, self.width, self.height, upload_format, gl_type,
-                            np.ascontiguousarray(tensor_np))
+        # Upload to OpenGL texture in the tensor's type; glTextureSubImage2D takes only a contiguous array, a strided
+        # one is copied once
+        glTextureSubImage2D(self.tex_id, 0, 0, 0, self.width, self.height, self.format,
+                            tensor_type(self.internal_format), np.ascontiguousarray(tensor_np))
 

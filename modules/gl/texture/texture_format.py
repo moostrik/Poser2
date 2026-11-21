@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 from typing import cast
 
+import numpy as np
 from OpenGL.GL import (Constant, GL_BGR, GL_BGRA, GL_FLOAT, GL_HALF_FLOAT, GL_NONE, GL_R16, GL_R16F, GL_R32F, GL_R32UI,
                        GL_R8, GL_RED, GL_RED_INTEGER, GL_RG, GL_RG16, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB, GL_RGB10_A2,
                        GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_UNSIGNED_BYTE,
@@ -47,6 +48,23 @@ FORMATS: dict[int, TextureFormat] = {int(internal): TextureFormat(*row) for inte
     (GL_RG16F,    (GL_RG,   GL_RG,   _F32, _F16, 2, 2)),
     (GL_RG32F,    (GL_RG,   GL_RG,   _F32, _F32, 2, 4)),
 )}
+
+
+ARRAY_FORMATS: dict[tuple[np.dtype, int], Constant] = {     # an array's element type and channels -> its texture
+    (np.dtype(np.uint8), 1): GL_R8,     (np.dtype(np.uint8), 2): GL_RG8,
+    (np.dtype(np.uint8), 3): GL_RGB8,   (np.dtype(np.uint8), 4): GL_RGBA8,
+    (np.dtype(np.float16), 1): GL_R16F, (np.dtype(np.float16), 2): GL_RG16F,
+    (np.dtype(np.float16), 3): GL_RGB16F, (np.dtype(np.float16), 4): GL_RGBA16F,
+    (np.dtype(np.float32), 1): GL_R32F, (np.dtype(np.float32), 2): GL_RG32F,
+    (np.dtype(np.float32), 3): GL_RGB32F, (np.dtype(np.float32), 4): GL_RGBA32F,
+}
+
+
+def array_format(dtype: np.dtype | type, channels: int) -> Constant:
+    """The internal format of a texture for an array of `dtype` with `channels` (1 for a 2D array); GL_NONE for one
+    the table does not hold."""
+    internal_format: Constant | None = ARRAY_FORMATS.get((np.dtype(dtype), channels))
+    return GL_NONE if internal_format is None else internal_format
 
 
 def texture_format(internal_format: Constant | int) -> TextureFormat | None:

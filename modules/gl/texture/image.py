@@ -3,12 +3,12 @@ from enum import IntEnum
 from threading import Lock
 
 import numpy as np
-from OpenGL.GL import (Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_NONE, GL_R16F, GL_R32F, GL_R8, GL_RG16F, GL_RG32F,
-                       GL_RG8, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA16F, GL_RGBA32F, GL_RGBA8)
+from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_NONE
 
 from modules.utils import Point2f, Quad, Rect
 from .fbo import Fbo
 from .texture import Texture
+from .texture_format import array_format
 
 logger = logging.getLogger(__name__)
 
@@ -21,40 +21,13 @@ def _turned(src: Quad) -> bool:
 
 
 def _get_internal_format(image: np.ndarray) -> Constant:
-    """Determine OpenGL internal format from NumPy array properties."""
-    if image.dtype == np.uint8:
-        if len(image.shape) == 2:  # Grayscale image
-            return GL_R8
-        elif len(image.shape) == 3:
-            if image.shape[2] == 2:  # RG image
-                return GL_RG8
-            elif image.shape[2] == 3:  # RGB image
-                return GL_RGB8
-            elif image.shape[2] == 4:  # RGBA image
-                return GL_RGBA8
-    elif image.dtype == np.float16:
-        if len(image.shape) == 2:  # Grayscale image
-            return GL_R16F
-        elif len(image.shape) == 3:
-            if image.shape[2] == 2:  # RG image
-                return GL_RG16F
-            elif image.shape[2] == 3:  # RGB image
-                return GL_RGB16F
-            elif image.shape[2] == 4:  # RGBA image
-                return GL_RGBA16F
-    elif image.dtype == np.float32:
-        if len(image.shape) == 2:  # Grayscale image
-            return GL_R32F
-        elif len(image.shape) == 3:
-            if image.shape[2] == 2:  # RG image
-                return GL_RG32F
-            elif image.shape[2] == 3:  # RGB image
-                return GL_RGB32F
-            elif image.shape[2] == 4:  # RGBA image
-                return GL_RGBA32F
-
-    logger.warning("image format not supported")
-    return GL_NONE
+    """The texture format of an image, (height, width) or (height, width, channels); GL_NONE, with a warning, for one
+    the format table does not hold."""
+    channels: int = image.shape[2] if image.ndim == 3 else 1 if image.ndim == 2 else 0
+    internal_format: Constant = array_format(image.dtype, channels)
+    if internal_format == GL_NONE:
+        logger.warning("image format not supported: %s, shape %s", image.dtype, image.shape)
+    return internal_format
 
 
 class ChannelOrder(IntEnum):
