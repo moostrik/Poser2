@@ -16,7 +16,7 @@ import numpy as np
 
 from modules.camera import upright_image
 from modules.inference.face import Face, FaceDetectorSettings, FaceFrame
-from modules.utils import Rect
+from modules.utils import Broadcast, Rect
 
 from ..view import view_rect
 
@@ -72,8 +72,7 @@ class FaceFinder(Thread):
         self._qualified: _Saved | None = None       # the last frame in which the subject qualified
         self._last: _Saved | None = None            # the last frame with a subject at all
         self._nose_ratio: float | None = None       # of the last subject, for the pitch calibration
-        self._callback_lock: Lock = Lock()
-        self._callbacks: list[FaceObservationsCallback] = []
+        self._callbacks: Broadcast[[FaceObservations]] = Broadcast(name='face')
         self.settings.bind(FaceFinderSettings.calibrate, self._on_calibrate)
 
     # ── Lifecycle ─────────────────────────────────────────────────────
@@ -158,13 +157,7 @@ class FaceFinder(Thread):
 
         observations = FaceObservations(tuple(self._observation(j, j is subject, width, height) for j in judged), frame.timestamp)
         s.result = self._result(observations.subject)
-        with self._callback_lock:
-            callbacks: list[FaceObservationsCallback] = list(self._callbacks)
-        for callback in callbacks:
-            try:
-                callback(observations)
-            except Exception:
-                logger.exception('Error in a face callback')
+        self._callbacks(observations)
         return observations
 
     def _observation(self, j: _Judged, subject: bool, width: float, height: float) -> FaceObservation:
@@ -223,15 +216,10 @@ class FaceFinder(Thread):
     # ── Callbacks ─────────────────────────────────────────────────────
 
     def add_frame_callback(self, callback: FaceObservationsCallback) -> None:
-        with self._callback_lock:
-            if callback not in self._callbacks:
-                self._callbacks.append(callback)
+        self._callbacks.add_callback(callback)
 
     def remove_frame_callback(self, callback: FaceObservationsCallback) -> None:
-        with self._callback_lock:
-            if callback in self._callbacks:
-                self._callbacks.remove(callback)
+        self._callbacks.remove_callback(callback)
 
     def clear_frame_callbacks(self) -> None:
-        with self._callback_lock:
-            self._callbacks = []
+        self._callbacks = Broadcast(name='face')

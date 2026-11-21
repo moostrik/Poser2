@@ -149,18 +149,21 @@ class TestCamera(unittest.TestCase):
         self.assertEqual(self.frames[1].image.shape, (24, 16, 3))
         self.assertEqual(threads, ['SmileCamera', 'SmileCamera'])
 
-    def test_a_failing_callback_is_logged_and_the_camera_goes_on(self):
+    def test_a_failing_callback_is_logged_and_the_next_one_still_called(self):
         device = FakeDevice()
         self.make(device)
 
         def fail(_frame) -> None:
             raise RuntimeError('a receiver failed')
-        self.camera.add_frame_callback(fail)
-        with self.assertLogs('apps.smile.cam.camera', level='ERROR'):
+        after: list[CameraFrame] = []
+        self.camera.clear_frame_callbacks()
+        self.camera.add_frame_callback(fail)                # first: the one after it still gets the frame
+        self.camera.add_frame_callback(after.append)
+        with self.assertLogs('modules.utils.broadcast', level='ERROR'):
             device.push(np.zeros((6, 8, 3), dtype=np.uint8))
-            self.assertTrue(wait_for(lambda: len(self.frames) == 1))
+            self.assertTrue(wait_for(lambda: len(after) == 1))
         device.push(np.zeros((6, 8, 3), dtype=np.uint8))
-        self.assertTrue(wait_for(lambda: len(self.frames) == 2))
+        self.assertTrue(wait_for(lambda: len(after) == 2))
 
     def test_a_missing_device_is_none_and_the_image_still_works(self):
         self.make(FakeDevice(connects=False))

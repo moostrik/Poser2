@@ -1,8 +1,10 @@
 from enum import IntEnum
 import time
-from threading import Lock, RLock
+from threading import RLock
 from typing import Callable
 import pytweening as easing
+
+from modules.utils import Broadcast
 
 from .settings import SequencerSettings, easing_function
 
@@ -260,9 +262,8 @@ class Sequencer():
 
     def __init__(self, settings: SequencerSettings) -> None:
         self.settings: SequencerSettings = settings
-        self._input_mutex: Lock = Lock()
         self._state_mutex: RLock = RLock()
-        self._message_callbacks: list[SequenceMessageCallback] = []
+        self._message_callbacks: Broadcast[[SequenceMessage]] = Broadcast(name='sequence message')
         self.message: SequenceMessage = SequenceMessage(SequenceType.NONE, 0.0)
 
         self._state: SequenceState = SequenceState()
@@ -447,18 +448,13 @@ class Sequencer():
         return max(min(duration, 6.0), 1.0)
 
     def _message_callback(self, message: SequenceMessage) -> None:
-        with self._input_mutex:
-            for c in self._message_callbacks: c(message)
+        self._message_callbacks(message)
 
     def add_message_callback(self, callback: SequenceMessageCallback) -> None:
-        with self._input_mutex:
-            self._message_callbacks.append(callback)
+        self._message_callbacks.add_callback(callback)
 
     def remove_message_callback(self, callback: SequenceMessageCallback) -> None:
-        with self._input_mutex:
-            if callback in self._message_callbacks:
-                self._message_callbacks.remove(callback)
+        self._message_callbacks.remove_callback(callback)
 
     def clear_message_callbacks(self) -> None:
-        with self._input_mutex:
-            self._message_callbacks = []
+        self._message_callbacks = Broadcast(name='sequence message')

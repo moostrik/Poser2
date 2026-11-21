@@ -25,6 +25,8 @@ import numpy as np
 import websocket
 from requests import RequestException
 
+from modules.utils import Broadcast
+
 from .client import ComfyClient, Event as ComfyEvent
 from ..sequence import GrinPlayer
 from .messages import GeneratorMessage, GeneratorState, GeneratorMessageCallback
@@ -65,7 +67,7 @@ class Generator(Thread):
         self.client: ComfyClient = ComfyClient(settings.connection.host, settings.connection.port)
 
         self._mutex: Lock = Lock()
-        self._callbacks: list[GeneratorMessageCallback] = []
+        self._callbacks: Broadcast[[GeneratorMessage]] = Broadcast(name='generator message')
         self._image: np.ndarray | None = None
         self._capture_depth: np.ndarray | None = None   # of the job that is running
         self._style: StyleSettings = self.styles.current()     # of the job that is running: the next visitor's may be picked already
@@ -122,12 +124,10 @@ class Generator(Thread):
         return {'description': self._style.description, **self._record}
 
     def add_message_callback(self, callback: GeneratorMessageCallback) -> None:
-        with self._mutex:
-            self._callbacks.append(callback)
+        self._callbacks.add_callback(callback)
 
     def clear_message_callbacks(self) -> None:
-        with self._mutex:
-            self._callbacks = []
+        self._callbacks = Broadcast(name='generator message')
 
     # THREAD
     def run(self) -> None:
@@ -218,10 +218,7 @@ class Generator(Thread):
     def _emit(self, message: GeneratorMessage) -> None:
         if self._silent or self._interrupt_event.is_set():
             return
-        with self._mutex:
-            callbacks = list(self._callbacks)
-        for c in callbacks:
-            c(message)
+        self._callbacks(message)
 
     def _generate(self, image: np.ndarray, timeout: float) -> str | None:
         """Run one job; returns why it was not made (a failure, or INTERRUPTED), or None when it was."""

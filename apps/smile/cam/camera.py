@@ -49,7 +49,7 @@ class Camera:
         self._folder: str = folder
 
         self._mutex: Lock = Lock()
-        self._callbacks: list[CameraFrameCallback] = []
+        self._callbacks: Broadcast[[CameraFrame]] = Broadcast(name='camera frame')
         self._device_callbacks: Broadcast[[CameraFrame]] = Broadcast(name='device frame')
         # the newest frame, stamped when it arrived; 0 before the first
         self._frame: CameraFrame = CameraFrame(0, FrameType.VIDEO, NO_FRAME, 0.0)
@@ -111,12 +111,10 @@ class Camera:
             return perf_counter() - self._frame.timestamp > STALLED_AFTER
 
     def add_frame_callback(self, callback: CameraFrameCallback) -> None:
-        with self._mutex:
-            self._callbacks.append(callback)
+        self._callbacks.add_callback(callback)
 
     def clear_frame_callbacks(self) -> None:
-        with self._mutex:
-            self._callbacks = []
+        self._callbacks = Broadcast(name='camera frame')
 
     def add_device_frame_callback(self, callback: CameraFrameCallback) -> None:
         """Every frame of the device as it came, on the device's thread, after the live path took it: the recorder's."""
@@ -191,9 +189,7 @@ class Camera:
     def _emit(self, frame: CameraFrame) -> None:
         with self._mutex:
             self._frame = frame
-            callbacks: list[CameraFrameCallback] = list(self._callbacks)
-        for c in callbacks:
-            c(frame)
+        self._callbacks(frame)
 
     # IMAGE SOURCE
     def scan(self) -> list[str]:

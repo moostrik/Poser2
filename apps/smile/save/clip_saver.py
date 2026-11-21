@@ -12,6 +12,7 @@ from . import share
 from .record import embed_jpeg
 from modules import video
 from modules.settings import BaseSettings, Field
+from modules.utils import Broadcast
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ class ClipSaver:
         self.queue: queue.Queue[Command] = queue.Queue(max_queue_size)
         self._share: tuple[str | None, float] | None = None   # the open visitor's track and offset (save thread)
         self._dropped: bool = False
-        self._saved_callbacks: list[SavedCallback] = []
+        self._saved_callbacks: Broadcast[[str, str, bool, str, str, str]] = Broadcast(name='saved')
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self._save_loop, name='ClipSaver')
         self.thread.start()
@@ -217,11 +218,7 @@ class ClipSaver:
                     os.remove(path)
                 except FileNotFoundError:
                     pass
-        for callback in list(self._saved_callbacks):
-            try:
-                callback(id, style, kept, grin, portrait, shared)
-            except Exception:
-                logger.exception('The saved callback failed for %s', id)
+        self._saved_callbacks(id, style, kept, grin, portrait, shared)
 
     def _build_share(self, id: str, style: str, grin: str, to_share: tuple[str | None, float] | None) -> str:
         """The share clip from the landed grin: its path, or '' when it could not be made (a warning)."""
@@ -243,8 +240,8 @@ class ClipSaver:
     def add_saved_callback(self, callback: SavedCallback) -> None:
         """Called on the save thread when a visitor's files are closed: (id, style, kept, grin path,
         portrait path, share path); the paths are empty when the files were not kept (the share path
-        also when it could not be made). Add before the first visitor: the save thread reads the list."""
-        self._saved_callbacks.append(callback)
+        also when it could not be made)."""
+        self._saved_callbacks.add_callback(callback)
 
     def _temp_path(self, id: str, suffix: str) -> str:
         return os.path.join(self.temp_dir, id + suffix)
