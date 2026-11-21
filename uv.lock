@@ -1019,7 +1019,6 @@ dependencies = [
     { name = "python-osc" },
     { name = "pytweening" },
     { name = "requests" },
-    { name = "stupidartnet" },
     { name = "tensorrt-cu13" },
     { name = "torch" },
     { name = "watchdog" },
@@ -1055,7 +1054,6 @@ requires-dist = [
     { name = "python-osc", specifier = ">=1.10" },
     { name = "pytweening", specifier = ">=1.2" },
     { name = "requests", specifier = ">=2.34" },
-    { name = "stupidartnet", specifier = ">=1.6" },
     { name = "tensorrt-cu13", specifier = "==11.4.0.106" },
     { name = "torch", specifier = "==2.14.1", index = "https://download.pytorch.org/whl/cu130" },
     { name = "watchdog", specifier = ">=6.0" },
@@ -1348,15 +1346,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/48/bb/3d8757f21e9a53d9035c9eb039a777047139a16bfdbedfc7a58241c3d914/starlette-1.10.0.tar.gz", hash = "sha256:b8399098d4c1e3522734f7235dc79b1fc967f96cf139c81e0fa30479e0685f9b", size = 2734356, upload-time = "2026-10-24T15:04:12.342Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/88/2e/947cfe02def9371c07cd5bf5b6b61c829e9aecb9904db02a66cfafbc1eec/starlette-1.10.0-py3-none-any.whl", hash = "sha256:478c0ab3b4ced6e82719849c118fa406f0278a3499c1a898cd15cd31bdc38ce4", size = 80571, upload-time = "2026-10-24T15:04:10.371Z" },
-]
-
-[[package]]
-name = "stupidartnet"
-version = "1.6.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/6e/41/ef5ac9d70b6694c41b21d42b2ba7b73772f4713f7b7c2b3c8b5c091ffe7f/stupidartnet-1.6.0.tar.gz", hash = "sha256:0e4c0cd0b662c2663ce0397d6f990dbae91576ad7c10230863e96d8d78c21845", size = 14892, upload-time = "2025-03-12T19:59:17.598Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/85/af/8ec0c05142bd915e9f95b85c238c0ae4a0ff61060c29b3b92a245b78139a/stupidartnet-1.6.0-py3-none-any.whl", hash = "sha256:b9b96fe23e759966b8692d99f0b6111f2b0a1b90b18e10a7bdc8a459ca3fe7c0", size = 12668, upload-time = "2025-03-12T19:59:16.453Z" },
 ]
 
 [[package]]

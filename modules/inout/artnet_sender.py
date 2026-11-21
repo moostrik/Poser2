@@ -1,23 +1,32 @@
-"""Art-Net sender: a thread that sends its owner's DMX packet to one or more consecutive universes. The owner fills
-the packet in `fill`, called from the thread before every tick."""
+"""Art-Net sender: a thread that sends its owner's DMX packet to one or more consecutive universes, as ArtDmx
+packets. The owner fills the packet in `fill`, called from the thread before every tick."""
 
 from collections import deque
 from enum import IntEnum
 from threading import Thread, Lock
 from typing import Callable
 import logging
+import socket
 import time
-
-from stupidArtnet import StupidArtnet
 
 from modules.settings import BaseSettings, Field, Widget
 from modules.utils import Waker
 from .net_probe import is_valid_ip
+from .osc_client import ERROR_LOG_INTERVAL
 
 logger = logging.getLogger(__name__)
 
 MAX_FPS: float = 44.0       # Hz: a DMX universe refreshes at most 44 times a second
 KEEP_ALIVE: float = 0.9     # s: Art-Net 4 has an unchanged universe resent every 800 to 1000 ms
+ARTNET_PORT: int = 6454
+MAX_CHANNELS: int = 512     # a DMX universe
+
+
+def artdmx_header(universe: int, size: int) -> bytes:
+    """An ArtDmx packet's 18 bytes before its data: the ID, the opcode (low byte first), the protocol version 14,
+    sequence 0 (off), physical port 0, the universe (low byte first) and the data's length (high byte first)."""
+    return (b'Art-Net\x00' + bytes([0x00, 0x50, 0x00, 14, 0, 0]) + bytes([universe & 0xFF, universe >> 8])
+            + bytes([size >> 8, size & 0xFF]))
 
 
 class ArtNetSenderSettings(BaseSettings):
@@ -51,12 +60,17 @@ class ArtNetSender:
         self.universes: int = universes
         self.flash: bool = flash
 
-        # even: StupidArtnet rounds its own size up to even and refuses a packet of another length
-        self.packet_size: int = channels + channels % 2
+        # even: an ArtDmx packet's data is an even number of channels, 2 to 512
+        self.packet_size: int = max(channels + channels % 2, 2)
+        if self.packet_size > MAX_CHANNELS:
+            raise ValueError(f'{channels} channels do not fit in a DMX universe ({MAX_CHANNELS})')
         self.packet: bytearray = bytearray(self.packet_size * universes)
 
-        self._lock: Lock = Lock()                           # the StupidArtnets and the frames
-        self._senders: list[StupidArtnet] = []
+        self._lock: Lock = Lock()                           # the socket, its target and the frames
+        self._socket: socket.socket | None = None
+        self._target: tuple[str, int] = ('', ARTNET_PORT)
+        self._headers: list[bytes] = []                     # one per universe
+        self._error_time: float = -ERROR_LOG_INTERVAL       # when a failed send was last logged
         self._frames: deque[_Frame] = deque()               # one per tick, before the packet
         self._last_sent: list[bytes | None] = [None] * universes    # None: send the packet on the next tick
         self._last_time: list[float] = [0.0] * universes
@@ -67,7 +81,9 @@ class ArtNetSender:
     def start(self) -> None:
         if self._running:
             return
-        self._update_senders()
+        with self._lock:
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._update_target()
         self._queue_off()
         self.settings.bind(ArtNetSenderSettings.ip, self._on_address)
         self.settings.bind(ArtNetSenderSettings.universe, self._on_address)
@@ -94,9 +110,9 @@ class ArtNetSender:
         except Exception:
             logger.exception('Art-Net: the blackout at stop failed')
         with self._lock:
-            for sender in self._senders:
-                sender.close()
-            self._senders = []
+            if self._socket is not None:
+                self._socket.close()
+                self._socket = None
         self._waker.close()
         self._waker = None
 
@@ -137,21 +153,32 @@ class ArtNetSender:
             return
         self.fill(self.packet)
         with self._lock:
-            for universe, sender in enumerate(self._senders):
+            for universe in range(len(self._headers)):
                 part = bytes(self.packet[universe * self.packet_size:(universe + 1) * self.packet_size])
                 if part != self._last_sent[universe] or now - self._last_time[universe] >= KEEP_ALIVE:
-                    sender.set(bytearray(part))
-                    sender.show()
+                    self._send(universe, part)
                     self._last_sent[universe] = part
                     self._last_time[universe] = now
 
     def _send_frame(self, frame: _Frame) -> None:
-        value: int = 255 if frame == _Frame.FLASH else 0
+        data: bytes = bytes([255 if frame == _Frame.FLASH else 0]) * self.packet_size
         with self._lock:
-            for universe, sender in enumerate(self._senders):
-                sender.set(bytearray([value]) * self.packet_size)
-                sender.show()
+            for universe in range(len(self._headers)):
+                self._send(universe, data)
                 self._last_sent[universe] = None
+
+    def _send(self, universe: int, data: bytes) -> None:
+        """One ArtDmx packet; a failed send is logged at most once per `ERROR_LOG_INTERVAL`. Called under the lock."""
+        if self._socket is None:
+            return
+        try:
+            self._socket.sendto(self._headers[universe] + data, self._target)
+        except OSError:
+            now: float = time.perf_counter()
+            if now - self._error_time > ERROR_LOG_INTERVAL:
+                self._error_time = now
+                logger.exception('Art-Net send to %s universe %s failed', self._target[0],
+                                 self.settings.universe + universe)
 
     def _queue_off(self) -> None:
         """The flash, where it is on, and the blackout, on the next ticks."""
@@ -161,7 +188,7 @@ class ArtNetSender:
             self._frames.append(_Frame.BLACKOUT)
 
     def _on_address(self, _=None) -> None:
-        self._update_senders()
+        self._update_target()
         if self.flash and self.settings.enabled:
             with self._lock:
                 self._frames.append(_Frame.FLASH)
@@ -173,17 +200,15 @@ class ArtNetSender:
             with self._lock:
                 self._frames.append(_Frame.FLASH)
 
-    def _update_senders(self) -> None:
+    def _update_target(self) -> None:
         ip: str = self.settings.ip
         universe: int = self.settings.universe
         if not is_valid_ip(ip) or not is_valid_universe(universe + self.universes - 1):
-            logger.warning('Invalid Art-Net address %s universe %s, keeping the current sender', ip, universe)
+            logger.warning('Invalid Art-Net address %s universe %s, keeping the current one', ip, universe)
             return
 
         with self._lock:
-            for sender in self._senders:
-                sender.close()
-            self._senders = [StupidArtnet(target_ip=ip, universe=universe + i, packet_size=self.packet_size,
-                                          fps=int(self.settings.fps)) for i in range(self.universes)]
+            self._target = (ip, ARTNET_PORT)
+            self._headers = [artdmx_header(universe + i, self.packet_size) for i in range(self.universes)]
             self._last_sent = [None] * self.universes
         logger.info('Art-Net sending to %s on universe %s (%s universes)', ip, universe, self.universes)

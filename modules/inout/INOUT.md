@@ -85,6 +85,7 @@ counted and warned about once.
 ## Art-Net out
 
 `ArtNetSender` calls its owner's `fill` before every tick, on its own thread, and sends the packet's part for each
+universe as an ArtDmx packet to port 6454, on one socket; a failed send is logged, at most once every 10 s. It sends a
 universe when it differs from what that universe last sent, and at least every 0.9 s: Art-Net 4 has a controller
 resend an unchanged universe every 800 to 1000 ms **(site fact)**. It ticks at `fps`, at most 44 a second, the most a DMX universe
 refreshes. A blackout goes out at start, when switched off and at stop. With the flash on (smile), a flash, all

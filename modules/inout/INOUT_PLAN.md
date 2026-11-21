@@ -5,14 +5,6 @@ What is not built in `modules/inout`, from the package scan of 2026-11-21. **(se
 
 ## A. Errors that never reach the log
 
-- A1. `ArtNetSender` writes its ArtDmx packet itself and sends it on its own socket. Why: `StupidArtnet.show`
-  catches `socket.error` and `print()`s it **(seen)**, so a failed Art-Net send never reaches the log, and smile has
-  no console (`.claude/rules/smile.md`); StupidArtnet's own thread, `fps` and `__del__` go unused **(seen)**. How: the
-  18-byte ArtDmx header (`Art-Net\0`, opcode 0x5000, protocol 14, sequence 0, physical 0, universe low byte first,
-  length high byte first) and the data, one UDP socket per sender to port 6454, a failed send logged at most every
-  10 s as `OscClient` does; `stupidArtnet` leaves `pyproject.toml`, its only user gone **(seen)**. Check: a unit test
-  that the packet equals StupidArtnet's for a few universes and sizes, so the wire is unchanged; `test_artnet_sender`;
-  hd_trio's `test_artnet_bars`; smile's tests.
 - A2. `OscReceiver`'s echo: a bad return address keeps the current one, and a failed echo is logged. Why:
   `_on_out_change` closes the return client before it builds the new one, so an `ip_out` that does not resolve
   leaves a closed client **(seen)**; every echo then raises `OSError` in `_handle`, before the callbacks, so they
@@ -40,8 +32,7 @@ What is not built in `modules/inout`, from the package scan of 2026-11-21. **(se
 
 ## The rules it touches
 
-- `CLAUDE.md` Error handling, log exceptions with context; never fail silently: A1, A2
-- `.claude/rules/smile.md`, the running app says things with `logging`, never `print`: A1
+- `CLAUDE.md` Error handling, log exceptions with context; never fail silently: A2
 - `CLAUDE.md` Composition and wiring, clean up in an explicit stop or teardown: B1
 - `CLAUDE.md` Docstrings, a docstring says what the thing is: B2
 - `.claude/rules/glossary.md`, the id of a tracked person is `track_id`: B2
