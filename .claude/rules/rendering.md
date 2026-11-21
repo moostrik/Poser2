@@ -22,7 +22,7 @@ paths:
 - `Layer`: owns its FBO or texture
 - `Draw`: draws into a target it is given and owns no texture
 - `Compositor`: owns an FBO and draws other layers into it
-- A layer hands out its Fbo or SwapFbo, not the texture inside it
+- A layer hands out its Fbo, SwapFbo or SwapTarget, never one buffer of a pair
 - Prefer to redraw a layer only when what it draws has changed
 - Prefer composition of layers over monolithic render passes
 - A swap buffer's other buffer, the previous one: `back` (`SwapFbo.back`, `SwapTexture3D.back`, `SwapTexture2DArray.back`); not `back_texture`. A texture object is passed as itself, never as a `.texture` of it; a layer's `texture` is the layer's output
