@@ -11,8 +11,6 @@ in the log. A rename or a text change needs no start. The whole of smile's tests
 
 ## C. Wiring and time
 
-- C5 The online cell's mode (`'clip'`, `'qr'`, `'screen'`) becomes an `IntEnum`, and cells are ints, not `str(i)` keys.
-  Tests: `player/tests` (`test_online_cell`), `online/tests`, `render/tests`.
 - C6 The 48 clip cells play from one thread: a heap of the cells by their next frame's deadline and one `Waker` for
   the earliest; at each wake the due cells hand their frame to their wall and take their next deadline. Each cell keeps
   its own clock, speed and spread (`fps`, `spread`), its clip order and its bang as now; the 48 `ClipLoader` threads go.
