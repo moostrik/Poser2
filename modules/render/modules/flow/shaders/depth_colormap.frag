@@ -2,7 +2,7 @@
 
 // Depth in meters as a picture. The range is depthai's `colorizeDepthFrame`: a log scale from nearDepth to farDepth,
 // through the colormap `map` (jet is depthai's). No depth (0) is transparent. The depth's confidence is its green:
-// COLOR_BY_CONFIDENCE draws the colormap as bright as it, CONFIDENCE draws it alone as grey from 0 black to 1 white.
+// COLOR_BY_CONFIDENCE draws the colormap as bright as it, CONFIDENCE draws it alone as gray from 0 black to 1 white.
 
 #include "colormap.glsl"
 
@@ -13,7 +13,7 @@ uniform float farDepth;
 uniform int mode;           // DepthDrawMode
 uniform int map;            // gl.Colormap
 
-const int GREY = 0;
+const int GRAY = 0;
 const int COLOR = 1;
 const int OVER_IMAGE = 2;
 const int CONFIDENCE = 3;
@@ -38,7 +38,7 @@ void main() {
         fragColor = vec4(vec3(confidence), 1.0);
     } else if (mode == COLOR_BY_CONFIDENCE) {
         fragColor = vec4(colormap(map, t) * confidence, 1.0);
-    } else if (mode == GREY) {
+    } else if (mode == GRAY) {
         fragColor = vec4(vec3(1.0 - t), 1.0);
     } else {
         fragColor = vec4(colormap(map, t), 1.0);

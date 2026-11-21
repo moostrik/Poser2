@@ -1,6 +1,6 @@
 """The 360-degree strip's own geometry: its rows, its extent, and the 0/360 join.
 
-x is centre azimuth, linear in degrees; y is the TANGENT of centre elevation, like the camera frames'
+x is center azimuth, linear in degrees; y is the TANGENT of center elevation, like the camera frames'
 rows. The projection between a camera's frame and the world — azimuth to column and back — is the
 tracker's (`modules/tracker/panoramic/projection.py`), since the tracker's azimuths and the stitch's
 placement must be one arithmetic. What is here only the display needs. `strip_y`, `camera_elevation` and `panorama_coverage` are transcribed
@@ -23,7 +23,7 @@ def strip_spans(x: float, width: float) -> list[tuple[float, float]]:
     dead-zone bands, the mark fields and the foot tick — and a band silently clipped at azimuth
     0 is invisible precisely where two cameras meet, which is where a reader is looking hardest.
 
-    `x` may be any real number (a band centred just past 0 starts negative); a `width` at or past
+    `x` may be any real number (a band centered just past 0 starts negative); a `width` at or past
     the whole strip is one full span, and a non-positive one draws nothing.
     """
     if width <= 0.0:
@@ -38,23 +38,23 @@ def strip_spans(x: float, width: float) -> list[tuple[float, float]]:
 
 def camera_elevation(elevation: float, bearing: float, camera_radius: float,
                      depth_radius: float) -> float:
-    """The elevation (degrees) a camera sees for a point the rig centre sees at `elevation`.
+    """The elevation (degrees) a camera sees for a point the rig center sees at `elevation`.
 
     The vertical half of the same triangle `azimuth_to_camera_x` solves horizontally, and it has
-    to be solved too: a camera `camera_radius` out from the centre is *closer* to the near wall of
+    to be solved too: a camera `camera_radius` out from the center is *closer* to the near wall of
     the assumed cylinder, so it sees the same standing person at a wider bearing AND a higher
     elevation. A point on that cylinder stands `h` above the lens plane at horizontal distance
-    `depth_radius` from the centre and `d` from the camera, so
+    `depth_radius` from the center and `d` from the camera, so
 
-        tan(e_camera) = h / d  and  tan(e_centre) = h / depth_radius
-        ->  tan(e_camera) = tan(e_centre) * depth_radius / d
+        tan(e_camera) = h / d  and  tan(e_center) = h / depth_radius
+        ->  tan(e_camera) = tan(e_center) * depth_radius / d
 
     and the height cancels: only the ratio of the two horizontal distances survives. The factor
     is `R / (R - r)` straight ahead — 1.19 at R 2.25 — falling toward 1 at the sides, exactly
     matching the horizontal compression, which is why re-projecting one axis without the other
     leaves everything in the panorama too tall for its width.
 
-    `depth_radius` is the caller's depth, as everywhere here; `bearing` is measured at the centre,
+    `depth_radius` is the caller's depth, as everywhere here; `bearing` is measured at the center,
     as `focus_distance` takes it.
     """
     distance: float = focus_distance(bearing, camera_radius, depth_radius)
@@ -64,13 +64,13 @@ def camera_elevation(elevation: float, bearing: float, camera_radius: float,
 
 
 def center_elevation(cam_elevation: float, cam_distance: float, center_dist: float) -> float:
-    """The elevation (degrees) the rig centre sees for a point a camera sees at `cam_elevation`.
+    """The elevation (degrees) the rig center sees for a point a camera sees at `cam_elevation`.
 
     The inverse of `camera_elevation`, for a point whose distance is actually known — a *person*,
     measured by the tracker, rather than the focus cylinder an image has to assume. One height, two
     horizontal distances, so the height cancels exactly as it does there:
 
-        tan(e_centre) = tan(e_camera) * cam_distance / center_dist
+        tan(e_center) = tan(e_camera) * cam_distance / center_dist
 
     Drawing a person through this and the image through `camera_elevation` is deliberate: the data
     lands where the tracker believes the person is, the pixels where the cylinder says, and a
@@ -83,12 +83,12 @@ def center_elevation(cam_elevation: float, cam_distance: float, center_dist: flo
 
 
 def strip_y(elevation: float, elevation_window: tuple[float, float]) -> float:
-    """Normalised, top-down y of a centre elevation (degrees) in the 360-degree STRIP.
+    """Normalised, top-down y of a center elevation (degrees) in the 360-degree STRIP.
 
     The strip's rows are tangents of elevation, like the camera frames' — a photograph's vertical,
     not a degree scale — so a person or a ceiling edge has the same shape in the strip as in the
     frames, and the vertical parallax term is a plain scale per column. `elevation_window` is the
-    strip's (top, bottom) at the rig centre (`elevation_window`). Transcribed into
+    strip's (top, bottom) at the rig center (`elevation_window`). Transcribed into
     `panoramic_stitch.frag`; keep the two in step.
     """
     top, bottom = elevation_window
@@ -100,7 +100,7 @@ def strip_y(elevation: float, elevation_window: tuple[float, float]) -> float:
 
 
 def strip_elevation(y: float, elevation_window: tuple[float, float]) -> float:
-    """The inverse of `strip_y`: a normalised strip y to a centre elevation (degrees)."""
+    """The inverse of `strip_y`: a normalised strip y to a center elevation (degrees)."""
     top, bottom = elevation_window
     tan_top, tan_bottom = math.tan(math.radians(top)), math.tan(math.radians(bottom))
     return math.degrees(math.atan(tan_top - y * (tan_top - tan_bottom)))
@@ -117,11 +117,11 @@ def strip_aspect_ratio(elevation_window: tuple[float, float]) -> float:
 
 def elevation_window(band: tuple[float, float], camera_radius: float,
                      focus_radius: float) -> tuple[float, float]:
-    """(top, bottom) elevation of the 360-degree strip, measured AT THE RIG CENTRE.
+    """(top, bottom) elevation of the 360-degree strip, measured AT THE RIG CENTER.
 
     `band` is the (bottom, top) the delivered frames carry, measured at the camera — the tracker's
-    published `angle_bottom` and `angle_top`. Converted to the centre's point of view, at the
-    bearing where the conversion is tightest. `tan(e_centre) = tan(e_cam) * d / focus_radius`, and
+    published `angle_bottom` and `angle_top`. Converted to the center's point of view, at the
+    bearing where the conversion is tightest. `tan(e_center) = tan(e_cam) * d / focus_radius`, and
     `d` is smallest straight ahead (`focus_radius - camera_radius`), so taking the window there
     guarantees every column of the strip is filled rather than fading to black near the camera axes.
 
@@ -146,7 +146,7 @@ def panorama_coverage(azimuth: float, num_cams: int, cam_fov: float, target_fov:
 
     At `camera_radius = 0` this is 2 within `(cam_fov - target_fov) / 2` of every seam and 1
     elsewhere. With the parallax correction on, the bands are narrower (a camera pushed outward
-    covers less of the cylinder as measured from the centre) but the shape is the same, and it is
+    covers less of the cylinder as measured from the center) but the shape is the same, and it is
     never 0 as long as the cameras' fields sum past 360.
     """
     return sum(

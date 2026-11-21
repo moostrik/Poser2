@@ -4,7 +4,7 @@ from modules.utils import Color
 
 from ....layer_base import LayerBase
 from .marks import Mark
-from .settings import LABEL_BG
+from .panorama_compositor_settings import LABEL_BG
 
 _LANE_TOP_PX: float = 25.0   # clear of the grid's azimuth labels along the top edge
 _LANE_GAP_PX: float = 2.0
@@ -18,7 +18,7 @@ class LabelRenderer(LayerBase):
     comes from, so two different people can never collide however they move, no label shifts when
     someone else arrives or leaves, and height becomes a second reading of *who* — useful where four
     track colours are hard to tell apart against a bright stitch. An unoccupied slot is simply a
-    gap. Marks outside the lanes — rejected detections and people waiting for a slot — are labelled
+    gap. Marks outside the lanes — rejected detections and people waiting for a slot — are labeled
     at the top of their own line instead (`_draw_line_label`).
 
     **x never moves.** The label anchors on its mark. It is never nudged sideways to make room,
@@ -62,7 +62,7 @@ class LabelRenderer(LayerBase):
         for group in self._by_world().values():
             count: int = len(group)
             for index, mark in enumerate(group):
-                # Only the outermost two of a world are labelled; a third view (which this rig's
+                # Only the outermost two of a world are labeled; a third view (which this rig's
                 # fields cannot produce) keeps its line and loses its text.
                 if 0 < index < count - 1:
                     continue
@@ -117,7 +117,7 @@ class LabelRenderer(LayerBase):
         """One slotted person's marks together, ordered left to right — the order the side rule
         needs. The group key is the world id — all waiting marks share `player` None, so the slot
         cannot group them — but the lane drawn is the player's. Rejected and waiting marks are
-        labelled at their line instead (`_draw_line_label`)."""
+        labeled at their line instead (`_draw_line_label`)."""
         grouped: dict[int, list[Mark]] = {}
         for mark in self._marks:
             if mark.rejected or mark.player is None:

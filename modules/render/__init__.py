@@ -10,9 +10,9 @@ from .modules.pose import       DataLayerSettings, ScalarFeatureSelect, LayerMod
                                 PoseRenderer, PoseRendererSettings, PoseCompositor, PoseCompositorSettings, \
                                 ViewPoseLayer, ViewPoseLayerSettings, PosePlacement, landmark_midpoint, \
                                 SimilaritySilhouetteLayer, SimilaritySilhouetteLayerSettings, PosePointLines
-from .modules.camera import     camera_image_layer, CameraReadingsLayer
+from .modules.camera import     camera_image_layer, CameraReadingsRenderer
 from .modules.tracker import    TrackerCompositor, TrackerCompositorSettings, TrackletRenderer, \
-                                PanoramaCompositor, PanoramaLayerSettings, PanoramaBlend, Part, \
+                                PanoramaCompositor, PanoramaCompositorSettings, PanoramaBlend, Part, \
                                 GridRenderer, LabelRenderer, MarkRenderer, SeamRenderer, \
                                 StitchRenderer, Mark, MarkContext, build_marks, strip_spans
 from .modules.inference import  CropLayer, crop_image_layer, segmentation_mask_layer, segmentation_foreground_layer, \

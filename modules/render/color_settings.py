@@ -22,7 +22,7 @@ class ColorSettings(BaseSettings):
     pose_left:   Field[Color] = Field(Color(1.0, 0.5, 0.0))  # Orange
     pose_right:  Field[Color] = Field(Color(0.0, 1.0, 1.0))  # Cyan
     pose_center: Field[Color] = Field(Color(1.0, 1.0, 1.0))  # White
-    history:     Field[Color] = Field(Color(0.5, 0.5, 0.5))  # Grey
+    history:     Field[Color] = Field(Color(0.5, 0.5, 0.5))  # Gray
 
     @property
     def track_colors(self) -> list[Color]:

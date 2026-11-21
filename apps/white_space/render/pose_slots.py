@@ -20,7 +20,7 @@ def longest_present(frames: dict[int, Frame], count: int = POSE_SLOTS) -> list[i
 
 def pose_slots(slots: list[int | None], frames: dict[int, Frame]) -> list[int | None]:
     """The slots this frame, from last frame's: a pose keeps its slot while it is among the
-    ``len(slots)`` longest present, so a neighbour leaving never moves it; a freed slot takes the
+    ``len(slots)`` longest present, so a neighbor leaving never moves it; a freed slot takes the
     longest-present pose not yet in one. ``None`` is an empty slot."""
     chosen = longest_present(frames, len(slots))
     kept: list[int | None] = [track_id if track_id in chosen else None for track_id in slots]

@@ -44,7 +44,7 @@ TRACK_COLOR_FEATURES = TRACK_FEATURES
 class AngleOffset(IntEnum):
     """Where the band seam sits when drawing ±π angles. NONE keeps it at ±π (the raised arm);
     HALF_PI shifts by -π/2 so it sits at -π/2 (the arm across the body) and the 0 → π arc runs
-    unbroken through the centre; PI shifts by π so it sits at 0 (the hanging arm)."""
+    unbroken through the center; PI shifts by π so it sits at 0 (the hanging arm)."""
     NONE =      0
     HALF_PI =   auto()
     PI =        auto()

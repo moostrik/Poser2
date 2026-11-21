@@ -14,15 +14,6 @@ The pixel buffer and fence code of `general/screen_recording` is not in this pla
 ## A. Code that does the same, written once
 
 
-## C. Names
-
-- **C1** These names change everywhere:
-  - `CameraReadingsLayer` becomes `CameraReadingsRenderer`; call sites: hd_trio's and white_space's renders. Why: it owns no texture, which rendering.md calls a `Renderer` (seen).
-  - `PanoramaLayerSettings` becomes `PanoramaCompositorSettings`, in `panoramic/panorama_compositor_settings.py`; call sites: white_space's settings and render. Why: the glossary says `<ClassName>Settings`, and `settings.py` is named after no class (seen).
-  - grey becomes gray, including `DepthDrawMode.GRAY`, which nothing outside render uses; centre becomes center, neighbour becomes neighbor, labelled becomes labeled. Why: the glossary's American spelling (seen).
-  - The settings files keep their group keys (`panorama`), so they need no migration (deduction: confirm in white_space's settings files).
-  - Check: pyright and the guard tests (glossary).
-
 ## D. Time
 
 - **D1** `PanoramaCompositor` takes the frame's time from white_space's render each tick (`set_frame_time`, from the window's `frame_time`) and hands it to `MarkContext`; `time.perf_counter()` goes.

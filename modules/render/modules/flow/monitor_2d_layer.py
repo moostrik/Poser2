@@ -19,8 +19,8 @@ from modules.settings import Field, BaseSettings, Group, Widget
 from ...layer_base import LayerBase
 from .shaders import DepthColormap, DepthDrawMode
 
-MAIN_TINT: str = "#4d5a4f"      # the main monitor's panel: a grey with a little green
-DEBUG_TINT: str = "#5e4b4b"     # the debug monitor's panel: a grey with a little red
+MAIN_TINT: str = "#4d5a4f"      # the main monitor's panel: a gray with a little green
+DEBUG_TINT: str = "#5e4b4b"     # the debug monitor's panel: a gray with a little red
 
 
 class FlowStage(IntEnum):
@@ -34,7 +34,7 @@ class FlowStage(IntEnum):
 
 class MonitorView(IntEnum):
     """How the monitor draws the channels, the most used first."""
-    COLORMAP = 0            # by the port's kind: a vector by its direction, an image as stored, a scalar centered on grey, a depth in its colormap as bright as its confidence (channel X: the colormap alone, Y: the confidence as grey)
+    COLORMAP = 0            # by the port's kind: a vector by its direction, an image as stored, a scalar centered on gray, a depth in its colormap as bright as its confidence (channel X: the colormap alone, Y: the confidence as gray)
     GLYPHS = auto()
     IMAGE = auto()          # the raw values as stored, for debugging
     HISTOGRAM = auto()
@@ -249,7 +249,7 @@ class Monitor2DLayer(LayerBase):
 
     def _render_depth(self, depth: Texture, depth_range: tuple[float, float], mode: DepthDrawMode, title: str) -> None:
         """A depth in `advanced.colormap`, on a log scale from its near to its far (its red), drawn as `mode` says:
-        alone, as bright as its confidence (its green), or the confidence alone as grey from 0 to 1."""
+        alone, as bright as its confidence (its green), or the confidence alone as gray from 0 to 1."""
         width, height = self._rendered_size
         if (self._depth_picture.width, self._depth_picture.height) != (width, height):
             self._depth_picture.deallocate()

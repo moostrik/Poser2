@@ -7,14 +7,14 @@ from modules.utils import Color, Rect
 from modules.tracker import PanoramicTrackerSettings, camera_azimuth
 
 from ....layer_base import LayerBase
-from .settings import PanoramaLayerSettings, \
+from .panorama_compositor_settings import PanoramaCompositorSettings, \
     AXIS_COLOR, GRID_COLOR, HORIZON_COLOR, HORIZON_PX, LABEL_BG, LABEL_FG, \
     OVERLAP_COLOR, SEAM_COLOR, ZONE_COLOR
 from .strip import strip_y
 
 
 class GridRenderer(LayerBase):
-    """Every reference line measured in the strip's own two axes — centre azimuth and centre
+    """Every reference line measured in the strip's own two axes — center azimuth and center
     elevation — against its degree labels. Anything defined on a camera's own frame has no single
     azimuth and lives in `SeamRenderer`, against the picture.
 
@@ -36,11 +36,11 @@ class GridRenderer(LayerBase):
     """
 
     def __init__(self, num_cams: int, target_fov: float, tracker: PanoramicTrackerSettings,
-                 settings: PanoramaLayerSettings) -> None:
+                 settings: PanoramaCompositorSettings) -> None:
         self._num_cams: int = max(1, num_cams)
         self._target_fov: float = target_fov        # the sector one camera owns
         self._tracker: PanoramicTrackerSettings = tracker
-        self._settings: PanoramaLayerSettings = settings
+        self._settings: PanoramaCompositorSettings = settings
         self._rect: shaders.FillRect = shaders.FillRect()
         self._text: Text = Text()
 
@@ -112,7 +112,7 @@ class GridRenderer(LayerBase):
             self._vertical(seam, 2.0 * px_x, SEAM_COLOR)
 
     def _zone_band(self) -> None:
-        """The tracked floor, as the band of elevations it subtends at the rig centre.
+        """The tracked floor, as the band of elevations it subtends at the rig center.
 
         A floor circle of radius `R` sits `atan(camera_height / R)` below the horizon, so the zone
         between two radii is a band of rows — the same at every azimuth, which is what makes it
@@ -143,7 +143,7 @@ class GridRenderer(LayerBase):
 
     def _horizontal(self, elevation: float, height: float, color: Color) -> None:
         # Rect y is top-down, and the window's top elevation is the strip's top row. The horizon is
-        # only at mid-height when the window is symmetric, which a tilted camera's is not. Centred
+        # only at mid-height when the window is symmetric, which a tilted camera's is not. Centered
         # on the elevation, so a thicker line does not drift below the row it marks.
         self._rect.use(Rect(0.0, self._elevation_y(elevation) - height / 2.0, 1.0, height), color)
 
@@ -153,7 +153,7 @@ class GridRenderer(LayerBase):
     def _draw_labels(self, spacing: float) -> None:
         """Degree labels along the top, the horizon named, and the geometry in the corner.
 
-        Labelled every other grid line when the spacing is fine, so they never collide.
+        Labeled every other grid line when the spacing is fine, so they never collide.
         """
         stride: float = spacing if spacing >= 15.0 else spacing * 2.0
         azimuth: float = 0.0
@@ -171,16 +171,16 @@ class GridRenderer(LayerBase):
         # drawn in, so a band's or a mark field's width can be read off the strip and checked against
         # the number that produced it.
         #
-        # `elev` is the STRIP's window — at the rig centre, at `focus_radius` — not the frame's.
+        # `elev` is the STRIP's window — at the rig center, at `focus_radius` — not the frame's.
         # It reads narrower than `rig.angle_bottom/top` (−17..47 against −21..52 here) because
-        # `elevation_window` converts the camera's band to the centre's view and takes the ratio at
+        # `elevation_window` converts the camera's band to the center's view and takes the ratio at
         # its tightest bearing, straight ahead, so no column of the strip fades to black. It
         # therefore moves with `focus_radius` while the rig's numbers do not.
         top, bottom = self._elevation_window
         seam = self._tracker.seam
         rig = self._tracker.rig
         # Radii throughout, so the zone here, a mark's `R` and a tape from the fixture are one
-        # number — `zone 1.5..3.5` and a person labelled `R3.5` are saying the same thing.
+        # number — `zone 1.5..3.5` and a person labeled `R3.5` are saying the same thing.
         footer: str = (f'R{self._settings.focus_radius:.2f}m  fov {self._tracker.fov:.0f}  '
                        f'tilt {self._settings.tilt:.0f}  elev {bottom:.0f}..{top:.0f}  '
                        f'zone {rig.zone_min_radius:.2f}..{rig.zone_max_radius:.2f}m  '

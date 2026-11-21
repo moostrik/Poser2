@@ -27,10 +27,10 @@ class PanoramicStitch(Shader):
             row_model: (horizon_row, focal_rows) — the frames' rows are tangents of elevation,
                 `row = horizon_row - focal_rows * tan(e)` (`projection.row_from_elevation`)
             target_fov: the sector one camera owns, 360 / num_cams (degrees)
-            camera_radius: camera distance from the rig centre (m); 0 disables the parallax term
+            camera_radius: camera distance from the rig center (m); 0 disables the parallax term
             focus_radius: radius of the play-zone cylinder the image is aligned for (m), passed
                 to `focusRadius` unchanged — everything here is a radius from the fixture axis
-            elevation_window: (top, bottom) elevation of the strip, measured at the rig centre
+            elevation_window: (top, bottom) elevation of the strip, measured at the rig center
             populated_band: (low, high) elevation the frames carry, at the camera — the window's
                 bottom and top rows; beyond it there is no row to read
             blend: how the overlap combines — a `PanoramaBlend` value, which IS the shader's

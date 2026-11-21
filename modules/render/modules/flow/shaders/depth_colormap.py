@@ -1,4 +1,4 @@
-"""DepthColormap: a depth in meters as a picture, through a colormap or grey, or its confidence as grey or as the
+"""DepthColormap: a depth in meters as a picture, through a colormap or gray, or its confidence as gray or as the
 colormap's brightness."""
 
 from enum import IntEnum
@@ -9,10 +9,10 @@ from modules.gl import Colormap, Shader, draw_quad, Texture
 
 class DepthDrawMode(IntEnum):
     """How DepthColormap draws a depth."""
-    GREY = 0            # near white, far black
+    GRAY = 0            # near white, far black
     COLOR = 1           # through the colormap
     OVER_IMAGE = 2      # through the colormap, over the image
-    CONFIDENCE = 3      # its confidence, green, as grey from 0 black to 1 white
+    CONFIDENCE = 3      # its confidence, green, as gray from 0 black to 1 white
     COLOR_BY_CONFIDENCE = 4     # through the colormap, as bright as its confidence
 
 

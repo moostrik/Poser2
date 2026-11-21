@@ -1,4 +1,4 @@
-"""CameraReadingsLayer — one camera's frame rate, tilt and roll error, over that camera's own view.
+"""CameraReadingsRenderer — one camera's frame rate, tilt and roll error, over that camera's own view.
 
 The pinned camera health only says OK or WARNING; this says which camera and which value, where the
 operator is already looking.
@@ -21,7 +21,7 @@ _UNMEASURED_COLOR: Color = Color(0.6, 0.6, 0.6)
 _BACKGROUND:       Color = Color(0.0, 0.0, 0.0, 0.6)
 
 
-class CameraReadingsLayer(LayerBase):
+class CameraReadingsRenderer(LayerBase):
     """Boxed labels in the view's top-left corner: the video frame rate, red when it is more than
     `FPS_TOLERANCE` off the configured `fps`; then the signed tilt error (measured − `tilt`) and
     the roll, each red when past `mount_tolerance`. A camera without an IMU reading shows `no IMU`

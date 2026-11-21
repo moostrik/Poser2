@@ -93,7 +93,7 @@ class HDTrioRender(RenderBase):
 
             tracker_compositor = self.L[Layers.tracker][i] = render.TrackerCompositor(  i, self.board,      cam_image.texture,          settings.preview.tracker,   settings.colors)
             pose_compositor = self.L[Layers.pose][i] =      render.PoseCompositor(      i, self.board,      cam_image.texture, cam_crop, settings.preview.pose,      settings.colors)
-            self.L[Layers.cam_readings][i] =                 render.CameraReadingsLayer( cameras[i], camera_health)
+            self.L[Layers.cam_readings][i] =                 render.CameraReadingsRenderer( cameras[i], camera_health)
 
             center_geometry = self.L[Layers.center_geometry][i] = CenterGeometry(    i, self.board,     cam_image.texture,          settings.center.geometry)
             center_mask =   self.L[Layers.center_mask][i] = CenterMaskLayer(        i, center_geometry, cam_mask,               SourceSpace.CROP, settings.center.mask)

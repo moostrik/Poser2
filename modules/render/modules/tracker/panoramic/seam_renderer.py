@@ -4,7 +4,7 @@ from modules.tracker import PanoramicTrackerSettings, camera_local_to_azimuth, w
 from modules.gl import shaders
 from modules.utils import Color, Rect
 from ....layer_base import LayerBase
-from .settings import PanoramaLayerSettings, DEAD_ZONE_COLOR
+from .panorama_compositor_settings import PanoramaCompositorSettings, DEAD_ZONE_COLOR
 from .strip import strip_spans
 
 
@@ -23,11 +23,11 @@ class SeamRenderer(LayerBase):
     """
 
     def __init__(self, num_cams: int, target_fov: float, tracker: PanoramicTrackerSettings,
-                 settings: PanoramaLayerSettings) -> None:
+                 settings: PanoramaCompositorSettings) -> None:
         self._num_cams: int = max(1, num_cams)
         self._target_fov: float = target_fov        # the sector one camera owns
         self._tracker: PanoramicTrackerSettings = tracker
-        self._settings: PanoramaLayerSettings = settings
+        self._settings: PanoramaCompositorSettings = settings
         self._rect: shaders.FillRect = shaders.FillRect()
         self._height: int = 1
         self._width: int = 1

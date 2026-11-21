@@ -19,7 +19,7 @@ from modules.tracker import PanoramicAnnotation, PanoramicTracker, PanoramicTrac
 from modules.utils import Rect
 
 
-# The White Space rig: four cameras, 127 degrees each, lenses 0.36 m out from the centre.
+# The White Space rig: four cameras, 127 degrees each, lenses 0.36 m out from the center.
 CAM_FOV: float = 127.0
 TARGET_FOV: float = 90.0
 CAMERA_RADIUS: float = 0.36
@@ -41,7 +41,7 @@ CONTEXT: MarkContext = MarkContext(
 
 WHITE: list[tuple[float, float, float, float]] = [(1.0, 1.0, 1.0, 1.0)]
 RED: list[tuple[float, float, float, float]] = [(1.0, 0.0, 0.0, 1.0)]
-GREY: tuple[float, float, float, float] = (0.6, 0.6, 0.6, 0.8)
+GRAY: tuple[float, float, float, float] = (0.6, 0.6, 0.6, 0.8)
 WAITING: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 0.8)
 
 
@@ -66,7 +66,7 @@ def observation(cam_id: int, local_angle: float, world_angle: float, *, overlap:
 
 
 def mark(tracklet: Tracklet, context: MarkContext = CONTEXT) -> Mark:
-    marks: list[Mark] = build_marks([tracklet], set(), WHITE, GREY, WAITING, context)
+    marks: list[Mark] = build_marks([tracklet], set(), WHITE, GRAY, WAITING, context)
     assert len(marks) == 1
     return marks[0]
 
@@ -101,7 +101,7 @@ class TestPlacement(unittest.TestCase):
         self.assertGreater(near.bottom_y, far.bottom_y)     # nearer feet are lower on the strip
 
     def test_someone_past_the_far_edge_reads_where_they_are(self) -> None:
-        """The distance is unclamped, so a person at R 5 is labelled R5.0 and their foot tick sits
+        """The distance is unclamped, so a person at R 5 is labeled R5.0 and their foot tick sits
         above the zone's R 3.5 row — which on the strip is what "no longer seen" looks like —
         instead of being piled up at the edge with everyone else beyond it."""
         on_axis: float = CAM_FOV / 2.0
@@ -122,7 +122,7 @@ class TestPlacement(unittest.TestCase):
 
     def test_a_removed_observation_makes_no_mark(self) -> None:
         removed = observation(0, 63.5, 45.0, overlap=False, status=TrackingStatus.REMOVED)
-        self.assertEqual(build_marks([removed], set(), WHITE, GREY, WAITING, CONTEXT), [])
+        self.assertEqual(build_marks([removed], set(), WHITE, GRAY, WAITING, CONTEXT), [])
 
 
 def rejected(reason: Rejection, **kwargs) -> Tracklet:
@@ -133,12 +133,12 @@ def rejected(reason: Rejection, **kwargs) -> Tracklet:
 
 
 class TestRejectedDetections(unittest.TestCase):
-    """A detection the tracker did not count is still a mark: a grey line, labelled with why."""
+    """A detection the tracker did not count is still a mark: a gray line, labeled with why."""
 
-    def test_it_is_a_grey_line_that_joins_nothing(self) -> None:
+    def test_it_is_a_gray_line_that_joins_nothing(self) -> None:
         m: Mark = mark(rejected(Rejection.SMALL))
         self.assertTrue(m.rejected)
-        self.assertEqual(m.color, GREY)
+        self.assertEqual(m.color, GRAY)
         self.assertEqual(m.field_color[3], 0.0)                     # no field
         self.assertAlmostEqual(m.field_w, 0.0, places=12)
         self.assertEqual(strip_spans(m.field_x, m.field_w), [])
@@ -151,15 +151,15 @@ class TestRejectedDetections(unittest.TestCase):
 
     def test_rejected_marks_are_drawn_first(self) -> None:
         marks = build_marks([observation(0, 63.5, 45.0, overlap=False), rejected(Rejection.YOUNG)],
-                            set(), WHITE, GREY, WAITING, CONTEXT)
+                            set(), WHITE, GRAY, WAITING, CONTEXT)
         self.assertEqual([m.rejected for m in marks], [True, False])
 
     def test_a_tracked_person_past_the_edge_keeps_their_own_mark(self) -> None:
-        # Rejected but holding a world: its own mark, not a grey line, and the label says why it is fading.
+        # Rejected but holding a world: its own mark, not a gray line, and the label says why it is fading.
         t: Tracklet = observation(0, 63.5, 45.0, overlap=False, status=TrackingStatus.LOST)
         assert isinstance(t.annotation, PanoramicAnnotation)
         t = replace(t, id=0, last_active=NOW, annotation=replace(t.annotation, rejected=Rejection.PAST_EDGE))
-        m: Mark = build_marks([t], set(), RED, GREY, WAITING, CONTEXT)[0]
+        m: Mark = build_marks([t], set(), RED, GRAY, WAITING, CONTEXT)[0]
         self.assertFalse(m.rejected)
         self.assertTrue(m.label.endswith(' past R3.5'))
         self.assertTrue(m.label.startswith('#0 c0'))
@@ -167,11 +167,11 @@ class TestRejectedDetections(unittest.TestCase):
 
 class TestWaitingForASlot(unittest.TestCase):
     """A person tracked but waiting for a player slot keeps their own line and field, in the
-    waiting colour and labelled `waiting` — on the strip, belonging to no slot yet."""
+    waiting colour and labeled `waiting` — on the strip, belonging to no slot yet."""
 
     def test_a_waiting_mark_has_the_waiting_colour_and_label(self) -> None:
         t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=False, player=None), id=6)
-        m: Mark = build_marks([t], set(), RED, GREY, WAITING, CONTEXT)[0]
+        m: Mark = build_marks([t], set(), RED, GRAY, WAITING, CONTEXT)[0]
         self.assertFalse(m.rejected)
         self.assertIsNone(m.player)
         self.assertEqual(m.color[:3], WAITING[:3])
@@ -184,7 +184,7 @@ class TestWaitingForASlot(unittest.TestCase):
         # the world id is unbounded and never displayed.
         colors = [(1.0, 0.0, 0.0, 1.0), (0.0, 1.0, 0.0, 1.0)]
         t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=False, player=1), id=7)
-        m: Mark = build_marks([t], set(), colors, GREY, WAITING, CONTEXT)[0]
+        m: Mark = build_marks([t], set(), colors, GRAY, WAITING, CONTEXT)[0]
         self.assertEqual(m.color[:3], (0.0, 1.0, 0.0))
         self.assertEqual(m.player, 1)
         self.assertEqual(m.world_id, 7)
@@ -192,13 +192,13 @@ class TestWaitingForASlot(unittest.TestCase):
 
 
 class TestLostFade(unittest.TestCase):
-    """A LOST observation's line fades from its world colour to grey over `lost_timeout`, and its
+    """A LOST observation's line fades from its world colour to gray over `lost_timeout`, and its
     field fades out, keeping its colour."""
 
     def lost(self, seconds_lost: float, status: TrackingStatus = TrackingStatus.LOST) -> Mark:
         t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=False, status=status),
                               id=0, last_active=NOW - seconds_lost)
-        return build_marks([t], set(), RED, GREY, WAITING, CONTEXT)[0]
+        return build_marks([t], set(), RED, GRAY, WAITING, CONTEXT)[0]
 
     def colour(self, seconds_lost: float, status: TrackingStatus = TrackingStatus.LOST):
         return self.lost(seconds_lost, status).color
@@ -212,20 +212,20 @@ class TestLostFade(unittest.TestCase):
     def test_a_lost_field_is_outlined_even_as_primary(self) -> None:
         t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=False, status=TrackingStatus.LOST),
                               id=0, last_active=NOW)
-        self.assertTrue(build_marks([t], {t.obs_id}, RED, GREY, WAITING, CONTEXT)[0].field_outline)
+        self.assertTrue(build_marks([t], {t.obs_id}, RED, GRAY, WAITING, CONTEXT)[0].field_outline)
 
     def test_fresh_is_the_world_colour(self) -> None:
         self.assertEqual(self.colour(0.0), (1.0, 0.0, 0.0, 0.8))
 
-    def test_at_the_timeout_it_is_grey(self) -> None:
+    def test_at_the_timeout_it_is_gray(self) -> None:
         r, g, b, a = self.colour(LOST_TIMEOUT)
-        self.assertAlmostEqual(r, GREY[0]); self.assertAlmostEqual(g, GREY[1]); self.assertAlmostEqual(b, GREY[2])
+        self.assertAlmostEqual(r, GRAY[0]); self.assertAlmostEqual(g, GRAY[1]); self.assertAlmostEqual(b, GRAY[2])
         self.assertEqual(self.colour(LOST_TIMEOUT * 3.0)[:3], self.colour(LOST_TIMEOUT)[:3])   # and stays
 
     def test_halfway_is_halfway(self) -> None:
         r, g, b, a = self.colour(LOST_TIMEOUT / 2.0)
-        self.assertAlmostEqual(r, (1.0 + GREY[0]) / 2.0)
-        self.assertAlmostEqual(g, GREY[1] / 2.0)
+        self.assertAlmostEqual(r, (1.0 + GRAY[0]) / 2.0)
+        self.assertAlmostEqual(g, GRAY[1] / 2.0)
         self.assertAlmostEqual(a, 0.8)
 
     def test_a_tracked_observation_does_not_fade(self) -> None:
@@ -238,8 +238,8 @@ class TestPassiveField(unittest.TestCase):
 
     def test_primary_filled_passive_outlined(self) -> None:
         t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=True), id=0)
-        primary: Mark = build_marks([t], {t.obs_id}, RED, GREY, WAITING, CONTEXT)[0]
-        passive: Mark = build_marks([t], set(), RED, GREY, WAITING, CONTEXT)[0]
+        primary: Mark = build_marks([t], {t.obs_id}, RED, GRAY, WAITING, CONTEXT)[0]
+        passive: Mark = build_marks([t], set(), RED, GRAY, WAITING, CONTEXT)[0]
         self.assertFalse(primary.field_outline)
         self.assertTrue(passive.field_outline)
         self.assertEqual(primary.field_color, passive.field_color)
@@ -258,7 +258,7 @@ class TestFieldWidth(unittest.TestCase):
 
     def test_outside_an_overlap_it_is_the_reacquire_angle(self) -> None:
         # A local-angle rule, converted to azimuth through the SAME cylinder the tracker corrects
-        # the azimuth at. The centre is further from the cylinder than the camera is, so the field
+        # the azimuth at. The center is further from the cylinder than the camera is, so the field
         # measures less than the rule: 5 deg of local angle is about 4.1 deg of azimuth at R 2.1
         # on the camera's own axis.
         m: Mark = mark(observation(0, 63.5, 45.0, overlap=False))
@@ -361,13 +361,13 @@ class TestTheWrap(unittest.TestCase):
 class TestZoneLines(unittest.TestCase):
     """The tracked zone as two rows on the strip — the arithmetic `GridRenderer._zone_lines` does.
 
-    A floor circle of constant radius subtends a constant depression at the rig centre, so each
+    A floor circle of constant radius subtends a constant depression at the rig center, so each
     edge of the zone is one straight row at every azimuth. They are the only lines on the strip
     measured in metres, which makes them the only ones a tape on the floor can check.
     """
 
     CAMERA_HEIGHT: float = 0.5
-    # The studio strip: P720 up 15 on 960 rows, re-projected to the centre for R 2.25.
+    # The studio strip: P720 up 15 on 960 rows, re-projected to the center for R 2.25.
     WINDOW: tuple[float, float] = (47.38, -17.13)
 
     def elevation(self, radius: float) -> float:
@@ -412,8 +412,8 @@ class TestZoneLines(unittest.TestCase):
         horizon_row, focal_rows = context.row_model
         for radius in (2.0, 2.25, 3.0):
             with self.subTest(radius=radius):
-                # Feet on the floor at this radius, with the camera at the centre (camera radius 0, so the
-                # camera distance and the centre radius are the same number).
+                # Feet on the floor at this radius, with the camera at the center (camera radius 0, so the
+                # camera distance and the center radius are the same number).
                 feet: float = row_from_elevation(self.elevation(radius), horizon_row, focal_rows)
                 t = observation(0, 63.5, 45.0, overlap=False, distance=radius,
                                 top=feet - 0.2, height=0.2)

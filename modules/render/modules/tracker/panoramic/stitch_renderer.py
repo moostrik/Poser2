@@ -4,7 +4,7 @@ from modules.tracker import PanoramicTrackerSettings
 
 from ....layer_base import LayerBase
 from .shaders import PanoramicStitch
-from .settings import PanoramaLayerSettings
+from .panorama_compositor_settings import PanoramaCompositorSettings
 
 
 class StitchRenderer(LayerBase):
@@ -18,7 +18,7 @@ class StitchRenderer(LayerBase):
     coincides. Wrong geometry: it ghosts, and *what* ghosts says *which* number is wrong.
 
     **Depth.** The image is stitched for one assumed depth, `focus_radius`, because a camera
-    0.36 m off centre genuinely sees a different bearing than its neighbour and only the distance
+    0.36 m off center genuinely sees a different bearing than its neighbor and only the distance
     to the subject resolves it. Nothing about a person feeds this — no box, no pose, no estimate —
     so nothing can fool it: the ghost at other depths is a known, bounded residual rather than a
     symptom.
@@ -27,10 +27,10 @@ class StitchRenderer(LayerBase):
     """
 
     def __init__(self, cam_textures: list[Texture], tracker: PanoramicTrackerSettings,
-                 settings: PanoramaLayerSettings) -> None:
+                 settings: PanoramaCompositorSettings) -> None:
         self._cam_textures: list[Texture] = cam_textures
         self._tracker: PanoramicTrackerSettings = tracker
-        self._settings: PanoramaLayerSettings = settings
+        self._settings: PanoramaCompositorSettings = settings
         self._stitch: PanoramicStitch = PanoramicStitch()
 
         # Handed down by the compositor, which owns the one copy of the strip's geometry.

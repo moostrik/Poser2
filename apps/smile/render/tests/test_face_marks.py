@@ -16,14 +16,14 @@ def observation(rejection: Rejection | None = None, subject: bool = False, eyes:
 
 
 class TestSubjectMark(unittest.TestCase):
-    def test_a_qualifying_subject_is_a_mark_without_label_and_with_grey_dots(self):
+    def test_a_qualifying_subject_is_a_mark_without_label_and_with_gray_dots(self):
         mark = SubjectMark().update(FaceObservations((observation(), observation(subject=True)), 10.0), 10.0, 1.0)
         self.assertEqual(mark.color, SUBJECT_COLOR)
         self.assertEqual(mark.dots, REJECTED_COLOR)
         self.assertEqual(mark.label, '')
         self.assertAlmostEqual(mark.w, 0.4)
 
-    def test_the_outline_goes_from_grey_to_the_active_color_with_the_charge(self):
+    def test_the_outline_goes_from_gray_to_the_active_color_with_the_charge(self):
         subject = SubjectMark()
         blue = (0.0, 0.0, 1.0, 1.0)
         good = FaceObservations((observation(subject=True),), 10.0)
@@ -98,7 +98,7 @@ class TestBuildMarks(unittest.TestCase):
         self.assertEqual(marks[ACCEPTED_COLOR].line, LINE_PX)
         self.assertEqual(marks[REJECTED_COLOR].line, LINE_PX)
 
-    def test_a_rejected_subject_is_thick_labelled_and_follows_the_charge(self):
+    def test_a_rejected_subject_is_thick_labeled_and_follows_the_charge(self):
         frame = FaceObservations((observation(Rejection.TURNED, subject=True, limit=20.0),), 0.0)
         mark = build_marks(frame)[0]
         self.assertEqual(mark.color, REJECTED_COLOR)

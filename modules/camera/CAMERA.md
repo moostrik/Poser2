@@ -211,7 +211,7 @@ panel.
 
 `CameraHealth` turns the cameras' readings into verdicts pinned on the panel, because the readings themselves sit
 on each camera's settings, deep in the panel, where a readout goes to be ignored; which camera and value is off is
-drawn on that camera's own view (`CameraReadingsLayer`).
+drawn on that camera's own view (`CameraReadingsRenderer`).
 
 | Verdict      | Holds when                                                                      |
 |--------------|---------------------------------------------------------------------------------|

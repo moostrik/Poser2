@@ -1,4 +1,4 @@
-"""Time Series Layer - values over time from the board, as labelled lanes."""
+"""Time Series Layer - values over time from the board, as labeled lanes."""
 
 # Standard library imports
 from enum import IntEnum
@@ -34,7 +34,7 @@ class TimeSeriesLayerSettings(BaseSettings):
 class TimeSeriesLayer(LayerBase):
     """Every series on the board in its own lane, newest on the right.
 
-    Lanes follow the series' IntEnum order, each named after its member and labelled with its last
+    Lanes follow the series' IntEnum order, each named after its member and labeled with its last
     value and the top of its scale. Updated only while drawn: it reads the board, it feeds nothing.
     """
 

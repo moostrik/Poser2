@@ -19,11 +19,11 @@ its **label**. Built once by the compositor for both `MarkRenderer` (line, tick,
   shows as a tick above the zone band.
 
 A mark's **field** is the join range that governs it, as a width (`_field`). A **rejected**
-detection is a grey line with no field, labelled with its rejection (`rejection_label`). A **LOST**
-mark keeps its line, fading to grey over `lost_timeout` while its field fades out (`_colors`).
+detection is a gray line with no field, labeled with its rejection (`rejection_label`). A **LOST**
+mark keeps its line, fading to gray over `lost_timeout` while its field fades out (`_colors`).
 The primary view of a person is drawn strong; the other views are **passive**. A mark's colour is
 its **player slot's**, the same index the pose figures use; a person tracked but **waiting** for a
-slot keeps their line and field in `waiting_color`, labelled `waiting`.
+slot keeps their line and field in `waiting_color`, labeled `waiting`.
 """
 
 # Standard library imports
@@ -49,7 +49,7 @@ class MarkContext:
     tick and passed in so this module stays pure.
 
     `row_model` is the frames' (horizon_row, focal_rows) (`projection.row_model`); `elevation_window` the
-    strip's (top, bottom) at the rig centre; `now` and `lost_timeout` time a LOST mark's fade.
+    strip's (top, bottom) at the rig center; `now` and `lost_timeout` time a LOST mark's fade.
     """
     cam_fov: float
     target_fov: float
@@ -81,7 +81,7 @@ class Mark:
     field_color: tuple[float, float, float, float]  # the field's world colour; alpha = how visible
     field_outline: bool                             # a passive or LOST view: outlined, not filled
     is_primary: bool
-    rejected: bool                                  # a detection a filter rejected: no world, grey
+    rejected: bool                                  # a detection a filter rejected: no world, gray
     label: str
 
 
@@ -131,7 +131,7 @@ def _mark(tracklet: Tracklet, primaries: set[int],
         top_y = _row_y(tracklet.roi.y, c, cylinder, c.parallax_radius)
         bottom_y = _row_y(roi_bottom, c, cylinder, c.parallax_radius)
 
-    # Rejected by a filter and never given a world: a grey line, no field, labelled with why.
+    # Rejected by a filter and never given a world: a gray line, no field, labeled with why.
     rejected: bool = annotation.rejected is not None and tracklet.id < 0
     is_primary: bool = tracklet.obs_id in primaries
     if rejected:
@@ -178,19 +178,19 @@ def _fade(tracklet: Tracklet, c: MarkContext) -> float:
     return min(1.0, max(0.0, c.now - tracklet.last_active) / max(1e-6, c.lost_timeout))
 
 
-def _colors(tracklet: Tracklet, is_primary: bool, base: Color, grey: Color,
+def _colors(tracklet: Tracklet, is_primary: bool, base: Color, gray: Color,
             c: MarkContext) -> tuple[Color, Color]:
     """(line, field) colours: the person's colour, alpha saying how much to trust it.
 
     A passive view has its line dimmed; its field is told apart by shape (`Mark.field_outline`). A
     **LOST** observation is still an identity the tracker holds, so it keeps its mark, dimmed, and
-    over `lost_timeout` its line fades to grey and its field fades out — fully grey is when a
-    rejected detection's grey line would take over.
+    over `lost_timeout` its line fades to gray and its field fades out — fully gray is when a
+    rejected detection's gray line would take over.
     """
     r, gr, b, a = base
     if tracklet.status == TrackingStatus.LOST:
         t: float = _fade(tracklet, c)
-        line: Color = (r + (grey[0] - r) * t, gr + (grey[1] - gr) * t, b + (grey[2] - b) * t,
+        line: Color = (r + (gray[0] - r) * t, gr + (gray[1] - gr) * t, b + (gray[2] - b) * t,
                        a * _PASSIVE_ALPHA)
         return line, (r, gr, b, 1.0 - t)
     return (r, gr, b, a if is_primary else a * _PASSIVE_ALPHA), (r, gr, b, 1.0)
@@ -239,7 +239,7 @@ def _field(annotation: PanoramicAnnotation, cam_id: int, c: MarkContext) -> tupl
     applies inside the overlap, but the seam rule is the one being tuned there.
     """
     if annotation.overlap:
-        # Symmetric about the mark, unclamped: its partner is in the neighbouring camera's field of view.
+        # Symmetric about the mark, unclamped: its partner is in the neighboring camera's field of view.
         half: float = c.link_angle / 2.0
         center: float = annotation.world_angle
         return (center - half, center + half)
@@ -247,7 +247,7 @@ def _field(annotation: PanoramicAnnotation, cam_id: int, c: MarkContext) -> tupl
     # A local-angle rule, carried into azimuth through the tracker's own map (`parallax_radius`), so
     # positions and widths take the same map and the overlap still answers the rule exactly — and
     # the field reads narrower than `reacquire_angle` on the degree grid. Clamped to the camera's own
-    # field of view, which cannot hide a real pair: both centres lie inside it.
+    # field of view, which cannot hide a real pair: both centers lie inside it.
     half_local: float = c.reacquire_angle / 2.0
     local: float = annotation.local_angle
     lo: float = camera_local_to_azimuth(max(0.0, local - half_local), cam_id, c.cam_fov,
@@ -258,7 +258,7 @@ def _field(annotation: PanoramicAnnotation, cam_id: int, c: MarkContext) -> tupl
 
 
 def _row_y(row: float, c: MarkContext, cam_distance: float, center_dist: float) -> float:
-    """A normalised frame row to a normalised strip y, converted to the rig centre through the given
+    """A normalised frame row to a normalised strip y, converted to the rig center through the given
     distances. Not clamped — an extrapolated box may run past the frame — the renderer clips."""
     cam_elevation: float = elevation_from_row(row, *c.row_model)
     return strip_y(center_elevation(cam_elevation, cam_distance, center_dist), c.elevation_window)

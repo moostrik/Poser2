@@ -27,7 +27,7 @@ PLAYHEAD_FEATURE_MAP: dict[IntEnum, type[BaseScalarFeature]] = {
     PlayheadFeatureSelect.PlayheadOffset: PlayheadOffset,
 }
 
-# The window's ground, behind and between the rows. Dark grey rather than black so a row's own
+# The window's ground, behind and between the rows. Dark gray rather than black so a row's own
 # black — an unlit camera, the panorama outside its elevation window — reads as content rather than
 # as a hole in the window, and the gaps between rows show where one ends.
 _BACKGROUND: tuple[float, float, float, float] = (0.15, 0.15, 0.15, 1.0)
@@ -69,7 +69,7 @@ class WhiteSpaceRender(RenderBase):
                 settings.preview.tracker,
                 settings.colors,
             )
-            self.L[Layers.cam_readings][i] = render.CameraReadingsLayer(cameras[i], camera_health)
+            self.L[Layers.cam_readings][i] = render.CameraReadingsRenderer(cameras[i], camera_health)
 
         # Row 5 — per-player: the player's crop, pose compositor + data overlays
         # cam_image[0] texture used as fallback for non-GPU crop path (GPU crop is default)
@@ -124,7 +124,7 @@ class WhiteSpaceRender(RenderBase):
         # GL reallocation, which only the main thread may do. The callback arrives on whichever
         # thread wrote the setting, so it raises a flag and `update()` acts on it.
         self._layout_dirty: bool = False
-        settings.panorama.bind(render.PanoramaLayerSettings.focus_radius, self._on_layout_setting)
+        settings.panorama.bind(render.PanoramaCompositorSettings.focus_radius, self._on_layout_setting)
         RenderSettings.camera_view.bind(settings, self._on_layout_setting)
         RenderSettings.layout.bind(settings, self._on_layout_setting)
 
@@ -237,7 +237,7 @@ class WhiteSpaceRender(RenderBase):
                 self._skeleton(track_id).allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
-        self.settings.panorama.unbind(render.PanoramaLayerSettings.focus_radius, self._on_layout_setting)
+        self.settings.panorama.unbind(render.PanoramaCompositorSettings.focus_radius, self._on_layout_setting)
         RenderSettings.camera_view.unbind(self.settings, self._on_layout_setting)
         RenderSettings.layout.unbind(self.settings, self._on_layout_setting)
         for cam_dict in self.L.values():

@@ -33,7 +33,7 @@ class MarkRenderer(LayerBase):
       overlap will be joined; two colours that overlap are two people it might confuse. Filled for
       the primary view, outlined for passive views and for LOST marks.
 
-    A rejected detection is its grey line and tick, no field. Owns no FBO: the compositor's is bound
+    A rejected detection is its gray line and tick, no field. Owns no FBO: the compositor's is bound
     when `draw()` is called.
     """
 
@@ -89,8 +89,8 @@ class MarkRenderer(LayerBase):
 
         Guarded on the **raw** row rather than the clipped one: a tick pinned to the strip's edge
         would claim a reading that was not made, and a person whose feet fall outside the window is
-        exactly the case where that matters. Centred on the row, so its thickness does not move the
-        reading, and centred on the line, so it reads as that person's. Nothing is drawn for feet
+        exactly the case where that matters. Centered on the row, so its thickness does not move the
+        reading, and centered on the line, so it reads as that person's. Nothing is drawn for feet
         that are not on the floor at all (`has_foot`).
         """
         if not mark.has_foot or not 0.0 < mark.bottom_y < 1.0:

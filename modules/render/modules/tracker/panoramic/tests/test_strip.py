@@ -14,7 +14,7 @@ from modules.tracker import azimuth_to_camera_x, camera_azimuth, center_distance
     row_from_elevation
 
 
-# The White Space rig, as measured: four OAK-D Pro W 0.36 m out from the centre, 127 degrees each.
+# The White Space rig, as measured: four OAK-D Pro W 0.36 m out from the center, 127 degrees each.
 NUM_CAMERAS: int = 4
 CAM_FOV: float = 127.0
 TARGET_FOV: float = 360.0 / NUM_CAMERAS
@@ -38,9 +38,9 @@ def _band(rows: int, tilt: float, src: tuple[int, int] = (1280, 720)) -> tuple[f
 class TestCameraElevation(unittest.TestCase):
     """Checked against a point placed in 3-D and projected from the camera directly.
 
-    Rig centre at the origin, camera `c` at `camera_radius` out along its own axis. A point on the
+    Rig center at the origin, camera `c` at `camera_radius` out along its own axis. A point on the
     focus cylinder at azimuth `a` and height `h` above the lens plane is at
-    `(R cos a, R sin a, h)`; the centre sees it at elevation `atan(h/R)` and the camera at
+    `(R cos a, R sin a, h)`; the center sees it at elevation `atan(h/R)` and the camera at
     `atan(h/d)` with `d` the horizontal distance between them. No formula from the module is
     reused to build the expectation.
     """
@@ -52,7 +52,7 @@ class TestCameraElevation(unittest.TestCase):
         dx: float = focus_radius * math.cos(a) - CAMERA_RADIUS * math.cos(center)
         dy: float = focus_radius * math.sin(a) - CAMERA_RADIUS * math.sin(center)
         horizontal: float = math.hypot(dx, dy)
-        return (math.degrees(math.atan(height / focus_radius)),      # seen from the centre
+        return (math.degrees(math.atan(height / focus_radius)),      # seen from the center
                 math.degrees(math.atan(height / horizontal)))        # seen from the camera
 
     def test_matches_a_point_projected_in_three_dimensions(self) -> None:
@@ -100,7 +100,7 @@ class TestCenterElevation(unittest.TestCase):
 
     def test_round_trips_against_camera_elevation(self) -> None:
         """On the focus cylinder the two functions are inverses: `camera_elevation` takes the
-        centre's view to the camera's, and this takes it back, given that point's real distances."""
+        center's view to the camera's, and this takes it back, given that point's real distances."""
         focus_radius: float = FOCUS_RADIUS
         for bearing in (-60.0, -25.0, 0.0, 25.0, 60.0):
             cam_distance: float = focus_distance(bearing, CAMERA_RADIUS, focus_radius)
@@ -111,7 +111,7 @@ class TestCenterElevation(unittest.TestCase):
                     msg=f'bearing {bearing} elevation {elevation}')
 
     def test_matches_a_point_projected_in_three_dimensions(self) -> None:
-        """Camera at the origin facing +x with the centre `camera_radius` behind it, a person `d` out
+        """Camera at the origin facing +x with the center `camera_radius` behind it, a person `d` out
         at camera bearing `theta`, standing `h` above the lens plane. The expectation is built from
         the two horizontal distances directly, reusing no formula from the module."""
         for theta in (-50.0, 0.0, 35.0):
@@ -142,10 +142,10 @@ class TestCenterElevation(unittest.TestCase):
 
 
 class TestElevationWindow(unittest.TestCase):
-    """The strip's vertical extent: what the frames carry, converted to the centre's view."""
+    """The strip's vertical extent: what the frames carry, converted to the center's view."""
 
     def test_the_band_is_the_frames_window(self) -> None:
-        """P720 aimed up 12 on 720 rows: the bottom row is the sensor's lowest reach on the centre
+        """P720 aimed up 12 on 720 rows: the bottom row is the sensor's lowest reach on the center
         column, 12 - 35.7 = -23.7, and the rows run up from there as tangents to 38.9."""
         low, high = _band(720, 12.0)
         self.assertAlmostEqual(low, -23.66, delta=0.01)
@@ -158,13 +158,13 @@ class TestElevationWindow(unittest.TestCase):
         self.assertGreater(high, 29.0)
 
     def test_window_is_the_row_the_strip_draws(self) -> None:
-        """P720 at tilt 12 on the R 2.25 cylinder, seen from the centre."""
+        """P720 at tilt 12 on the R 2.25 cylinder, seen from the center."""
         top, bottom = elevation_window(_band(720, 12.0), CAMERA_RADIUS, FOCUS_RADIUS)
         self.assertAlmostEqual(top, 34.1, delta=0.15)
         self.assertAlmostEqual(bottom, -20.2, delta=0.15)
 
     def test_the_window_is_narrower_than_the_band(self) -> None:
-        """The centre is farther from the cylinder than a camera is, so it sees the same content
+        """The center is farther from the cylinder than a camera is, so it sees the same content
         over a smaller angle. Both ends must move inward, never outward."""
         band: tuple[float, float] = _band(720, 12.0)
         top, bottom = elevation_window(band, CAMERA_RADIUS, FOCUS_RADIUS)
@@ -179,9 +179,9 @@ class TestElevationWindow(unittest.TestCase):
 
 
 class TestStripRows(unittest.TestCase):
-    """The strip's rows are tangents of centre elevation, the same shape as the frames' rows."""
+    """The strip's rows are tangents of center elevation, the same shape as the frames' rows."""
 
-    WINDOW = (45.0, -18.0)          # (top, bottom) at the rig centre, as `elevation_window` gives it
+    WINDOW = (45.0, -18.0)          # (top, bottom) at the rig center, as `elevation_window` gives it
 
     def test_round_trip(self) -> None:
         for e in (-18.0, -10.0, 0.0, 12.5, 30.0, 45.0):
@@ -242,7 +242,7 @@ class TestStripSpans(unittest.TestCase):
         self.assertAlmostEqual(spans[1][0], 0.0, places=12)
 
     def test_a_negative_left_edge_wraps_in(self) -> None:
-        # A bar centred just past azimuth 0 starts at a negative x, which is the common case.
+        # A bar centered just past azimuth 0 starts at a negative x, which is the common case.
         spans = strip_spans(-0.05, 0.1)
         self.assertAlmostEqual(sum(w for _x, w in spans), 0.1, places=12)
         self.assertAlmostEqual(spans[0][0], 0.95, places=12)
@@ -277,7 +277,7 @@ class TestCoverage(unittest.TestCase):
             self.assertEqual(self._coverage(axis, 0.0), 1, f'axis {axis}')
 
     def test_parallax_narrows_the_overlap_but_keeps_its_shape(self) -> None:
-        """A camera pushed 0.36 m outward covers less of the cylinder, measured from the centre —
+        """A camera pushed 0.36 m outward covers less of the cylinder, measured from the center —
         so the band where two cameras see the same place is narrower than the bare field says."""
         self.assertEqual(self._coverage(90.0), 2)
         self.assertEqual(self._coverage(45.0), 1)

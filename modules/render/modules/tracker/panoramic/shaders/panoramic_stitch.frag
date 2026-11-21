@@ -1,6 +1,6 @@
 #version 460 core
 
-// The four camera frames unwrapped into one 360-degree strip as the RIG CENTRE would see them:
+// The four camera frames unwrapped into one 360-degree strip as the RIG CENTER would see them:
 // x is azimuth, linear in degrees; y is the TANGENT of elevation (strip.strip_y), so the
 // strip's vertical is a photograph's, the same shape as the camera frames' rows.
 //
@@ -11,8 +11,8 @@
 // a wrong camera constant shows up as a ghost instead of being silently absorbed.
 //
 // BOTH AXES ARE RE-PROJECTED, and they have to be. A camera sits `cameraRadius` out from the
-// centre, so it sees a point on the focus cylinder at a wider bearing AND a higher elevation
-// than the centre does — by the same factor, R/d, which is 1.19 straight ahead at R 2.25 and
+// center, so it sees a point on the focus cylinder at a wider bearing AND a higher elevation
+// than the center does — by the same factor, R/d, which is 1.19 straight ahead at R 2.25 and
 // 1.08 at a seam. Re-projecting only the azimuth (which is all the tracker needs) would leave
 // everything in the strip 19% too tall for its width, and no single row aspect can undo that
 // because the factor varies across the frame.
@@ -40,10 +40,10 @@ uniform float camFov;      // one camera's horizontal field (degrees)
 uniform float horizonRow;  // the frames' rows are TANGENTS of elevation: row = horizonRow -
 uniform float focalRows;   //   focalRows * tan(e), normalised, 0 = top (projection.row_from_elevation)
 uniform float targetFov;   // the sector one camera owns, 360 / numCams (degrees)
-uniform float cameraRadius;  // camera distance from the rig centre (m)
+uniform float cameraRadius;  // camera distance from the rig center (m)
 uniform float focusRadius; // radius of the cylinder the image is aligned for (m), from the fixture axis
-uniform float elevTop;     // elevation of this strip's top row, at the centre (degrees)
-uniform float elevBottom;  // elevation of its bottom row, at the centre (degrees)
+uniform float elevTop;     // elevation of this strip's top row, at the center (degrees)
+uniform float elevBottom;  // elevation of its bottom row, at the center (degrees)
 uniform float camElevLo;   // the frames' window, at the camera (degrees): the bottom row is the
 uniform float camElevHi;   //   sensor's lowest reach, the top row whatever the rows reach
 uniform int   blendMode;
@@ -65,8 +65,8 @@ vec2 cameraUV(int cam, float azimuth, float elevation) {
                             - 2.0 * cameraRadius * focusRadius * cos(p)));
     if (d < 1e-6) return vec2(-1.0);
 
-    // The camera sits cameraRadius behind the centre, so its own bearing to the same point is
-    // wider than the centre's: theta = phi + asin(r * sin(phi) / d). Exact, not an expansion.
+    // The camera sits cameraRadius behind the center, so its own bearing to the same point is
+    // wider than the center's: theta = phi + asin(r * sin(phi) / d). Exact, not an expansion.
     float theta = phi;
     if (cameraRadius > 0.0) {
         theta = phi + degrees(asin(clamp(cameraRadius * sin(p) / d, -1.0, 1.0)));
@@ -77,7 +77,7 @@ vec2 cameraUV(int cam, float azimuth, float elevation) {
 
     // --- elevation: the same triangle, in the vertical plane ----------------------------
     // A point on the cylinder stands `h` above the lens plane at horizontal distance
-    // focusRadius from the centre and d from the camera, so tan(e_cam) = tan(e_centre) * R/d.
+    // focusRadius from the center and d from the camera, so tan(e_cam) = tan(e_center) * R/d.
     // The height itself cancels: only the ratio of the two distances survives.
     float eCam = degrees(atan(tan(radians(elevation)) * focusRadius / d));
     if (eCam < camElevLo || eCam > camElevHi) return vec2(-1.0);
@@ -92,7 +92,7 @@ vec2 cameraUV(int cam, float azimuth, float elevation) {
 
 void main() {
     float azimuth   = texCoord.x * 360.0;
-    // Rows are tangents of centre elevation: linear between tan(bottom) and tan(top).
+    // Rows are tangents of center elevation: linear between tan(bottom) and tan(top).
     float elevation = degrees(atan(mix(tan(radians(elevBottom)), tan(radians(elevTop)), texCoord.y)));
 
     vec3  peak   = vec3(0.0);
@@ -134,7 +134,7 @@ void main() {
     } else if (blendMode == BLEND_DIFFERENCE) {
         rgb = (count < 2.0) ? vec3(0.0) : abs(first - second);
     } else if (blendMode == BLEND_SPLIT) {
-        // The frames are mono, so the channels are free: one camera into red, its neighbour into
+        // The frames are mono, so the channels are free: one camera into red, its neighbor into
         // green. Which fringe leads says which camera is left of the other.
         rgb = (count < 2.0) ? peak : vec3(first.r, second.r, 0.0);
     } else if (blendMode == BLEND_STRIPE) {

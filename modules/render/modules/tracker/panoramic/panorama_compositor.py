@@ -15,7 +15,7 @@ from .mark_renderer import MarkRenderer
 from .seam_renderer import SeamRenderer
 from .stitch_renderer import StitchRenderer
 from .marks import Mark, MarkContext, build_marks
-from .settings import PanoramaLayerSettings, Part, REJECTED_COLOR, WAITING_COLOR
+from .panorama_compositor_settings import PanoramaCompositorSettings, Part, REJECTED_COLOR, WAITING_COLOR
 from .strip import elevation_window, strip_aspect_ratio
 
 
@@ -26,7 +26,7 @@ class PanoramaBoard(HasTracklets, HasObservations, Protocol):
 class PanoramaCompositor(LayerBase):
     """The 360-degree calibration display: one strip, one FBO, five renderers in a fixed order.
 
-    x is centre azimuth, linear in degrees, 0 at the left edge; y is the tangent of centre elevation
+    x is center azimuth, linear in degrees, 0 at the left edge; y is the tangent of center elevation
     (`strip.strip_y`), a photograph's vertical like the frames'. The image and the tracker's data are
     drawn on the same axes so a person's pixels and numbers are read in the same place — and which
     is wrong says whether to reach for `fov`/`tilt` or the `rig` metres.
@@ -39,13 +39,13 @@ class PanoramaCompositor(LayerBase):
 
     | drawn thing                        | x              | y                  | depth |
     |------------------------------------|----------------|--------------------|-------|
-    | image (`StitchRenderer`)           | centre azimuth | centre elevation   | `focus_radius` |
-    | dead zone (`SeamRenderer`)         | centre azimuth | — full height      | `focus_radius` |
-    | lattice, seam + axis lines (`Grid`)| centre azimuth | —                  | **exact** |
-    | overlap verticals (`Grid`)         | centre azimuth | —                  | `parallax_radius` |
-    | horizon, zone band (`Grid`)        | —              | centre elevation   | **exact** |
-    | mark: line, tick, field (`Mark`)   | centre azimuth | centre elevation   | x: `parallax_radius`, y: **the person's own distance** |
-    | label (`LabelRenderer`)            | centre azimuth | pixel lane by id   | `parallax_radius` |
+    | image (`StitchRenderer`)           | center azimuth | center elevation   | `focus_radius` |
+    | dead zone (`SeamRenderer`)         | center azimuth | — full height      | `focus_radius` |
+    | lattice, seam + axis lines (`Grid`)| center azimuth | —                  | **exact** |
+    | overlap verticals (`Grid`)         | center azimuth | —                  | `parallax_radius` |
+    | horizon, zone band (`Grid`)        | —              | center elevation   | **exact** |
+    | mark: line, tick, field (`Mark`)   | center azimuth | center elevation   | x: `parallax_radius`, y: **the person's own distance** |
+    | label (`LabelRenderer`)            | center azimuth | pixel lane by id   | `parallax_radius` |
 
     The picture's depth so a band lands on its pixels; the tracker's depth so marks and the overlap
     verticals agree with the azimuth it emits; the person's own distance for a mark's rows (`marks`).
@@ -57,13 +57,13 @@ class PanoramaCompositor(LayerBase):
 
     def __init__(self, board: PanoramaBoard, cam_textures: list[Texture], num_cams: int,
                  color_settings: ColorSettings, tracker: PanoramicTrackerSettings,
-                 settings: PanoramaLayerSettings) -> None:
+                 settings: PanoramaCompositorSettings) -> None:
         self._board: PanoramaBoard = board
         self.num_cams: int = max(1, num_cams)
         self.target_fov: float = 360.0 / self.num_cams    # the sector one camera owns: the tracker's own `360 / num_cams`
         self._color_settings: ColorSettings = color_settings
         self._tracker: PanoramicTrackerSettings = tracker
-        self._settings: PanoramaLayerSettings = settings
+        self._settings: PanoramaCompositorSettings = settings
 
         self._fbo: Fbo = Fbo()
         # Seams and grid depend only on settings, so they are drawn into this cache once and
@@ -118,7 +118,7 @@ class PanoramaCompositor(LayerBase):
 
     @property
     def elevation_window(self) -> tuple[float, float]:
-        """(top, bottom) elevation of the strip, measured at the rig centre."""
+        """(top, bottom) elevation of the strip, measured at the rig center."""
         return elevation_window(self.populated_band, self.camera_radius,
                                 max(1e-6, self._settings.focus_radius))
 

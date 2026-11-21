@@ -372,7 +372,7 @@ class RenderSettings(BaseSettings):
     beam_light_sim: Group[BeamLightSimSettings] = Group(BeamLightSimSettings)
     # Shared down from the root so the panorama can size itself to the picture the mount
     # actually delivers; it moves nothing, the warp has already levelled the frame.
-    panorama:    Group[render.PanoramaLayerSettings] = Group(render.PanoramaLayerSettings, share=[tilt])
+    panorama:    Group[render.PanoramaCompositorSettings] = Group(render.PanoramaCompositorSettings, share=[tilt])
     colors:      Group[render.ColorSettings] = Group(render.ColorSettings)
 
 
