@@ -21,6 +21,19 @@ class FieldAlias:
 T = TypeVar("T")
 
 
+def _enum_member(enum_type: type[Enum], value: Any) -> Enum:
+    """The member of *enum_type* named *value* (a str) or holding it; raises TypeError when there is none."""
+    if isinstance(value, str):
+        try:
+            return enum_type[value]
+        except KeyError:
+            raise TypeError(f"Cannot construct {enum_type.__name__} from name {value!r}") from None
+    try:
+        return enum_type(value)
+    except (ValueError, KeyError):
+        raise TypeError(f"Cannot construct {enum_type.__name__} from {value!r}") from None
+
+
 class Access(Enum):
     """Who writes a field, and whether the panel lets the user edit it (SETTINGS.md, Access)."""
     READ = "read"
@@ -191,21 +204,8 @@ class Field(Generic[T]):
         # Promote int → float (lossless)
         if self.type_ is float and isinstance(value, int):
             return float(value)
-        # Enum: reconstruct from name (str) or value (int, etc.)
         if isinstance(self.type_, type) and issubclass(self.type_, Enum):
-            if isinstance(value, str):
-                try:
-                    return self.type_[value]
-                except KeyError:
-                    raise TypeError(
-                        f"Cannot construct {self._type_name} from name {value!r}"
-                    )
-            try:
-                return self.type_(value)
-            except (ValueError, KeyError):
-                raise TypeError(
-                    f"Cannot construct {self._type_name} from {value!r}"
-                )
+            return _enum_member(self.type_, value)
         # tuple/list → positional-arg construction (e.g. Color(r, g, b), Point2f(x, y))
         if isinstance(value, (tuple, list)):
             try:
@@ -250,17 +250,8 @@ class Field(Generic[T]):
                     f"got non-integer float: {v!r}"
                 )
             return iv
-        # Enum element: reconstruct from name (str) or value (int)
         if isinstance(et, type) and issubclass(et, Enum):
-            if isinstance(v, str):
-                try:
-                    return et[v]
-                except KeyError:
-                    raise TypeError(f"Cannot construct {et.__name__} from name {v!r}")
-            try:
-                return et(v)
-            except (ValueError, KeyError):
-                raise TypeError(f"Cannot construct {et.__name__} from {v!r}")
+            return _enum_member(et, v)
         return et(v)
 
     # -- Callbacks -----------------------------------------------------------
