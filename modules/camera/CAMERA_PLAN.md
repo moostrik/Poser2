@@ -11,8 +11,6 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 
 ## C. Small fixes to the rules
 
-- C3. `vimba.SensorControl._read_actual` reports a failed exposure or gain read through `_problem`, as its other
-  reads do, not `except Exception: pass` **(seen)**. Why: "Log exceptions with context; never fail silently".
 - C4. The Vimba white balance fields take the backends' word, `balance`, in snake case: `WB_red` / `WB_blue` →
   `balance_red` / `balance_blue`, `manual_WB_red` / `manual_WB_blue` → `manual_balance_red` / `manual_balance_blue`,
   `auto_WB` → `auto_balance`, `set_WB` → `measure_balance` **(seen: `vimba/settings.py`)**. Why: PEP 8, and "use
@@ -91,7 +89,6 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 ## Rules it touches
 
 - Inside a package, code that does the same is written once: E2
-- Log exceptions with context; never fail silently: C3
 - Follow PEP 8; one term everywhere; keep settings files in sync: C4
 - Keep `Field` descriptions to one short line of panel text: C5
 - The glossary: C6, C8

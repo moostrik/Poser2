@@ -107,11 +107,12 @@ class SensorControl:
             s.readings.video_min_fps = round(1.0 / worst_gap, 1) if worst_gap > 0.0 else 0.0
         self._frames_time = now
 
-        try:
-            s.exposure = round(float(camera.get_feature_by_name('ExposureTimeAbs').get()))
-            s.gain = round(float(camera.get_feature_by_name('Gain').get()), 1)
-        except Exception:
-            pass
+        exposure: float | None = self._read(camera, 'ExposureTimeAbs')
+        if exposure is not None:
+            s.exposure = round(exposure)
+        gain: float | None = self._read(camera, 'Gain')
+        if gain is not None:
+            s.gain = round(gain, 1)
         red: float | None = self._get_ratio(camera, 'Red')
         blue: float | None = self._get_ratio(camera, 'Blue')
         if red is not None:
@@ -203,6 +204,16 @@ class SensorControl:
             return False
         self._problem(name, None)
         return True
+
+    def _read(self, camera: Any, name: str) -> float | None:
+        """A feature's value as the camera has it now; None, its trouble logged, when it cannot be read."""
+        try:
+            value: float = float(camera.get_feature_by_name(name).get())
+        except Exception as e:
+            self._problem(name, f'not readable: {e}')
+            return None
+        self._problem(name, None)
+        return value
 
     def _problem(self, name: str, problem: str | None) -> None:
         """A feature's trouble, logged when it is new, not at every retry (a camera that is away
