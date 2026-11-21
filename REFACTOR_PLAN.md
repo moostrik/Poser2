@@ -31,7 +31,7 @@ line by line (where the code belongs, leftovers, tests, pyright spelled out), it
 and plan. The scan changes nothing. A decided fix becomes a step in the package's plan (or this one), built on your
 go; what is not decided is a question. Rule findings go to the rules thread as "Rules that go" and "New rules".
 
-Done: inference (20 Nov), settings (21 Nov), board (21 Nov). Held up in their own plans: flow
+Done: inference (20 Nov), settings (21 Nov), board (21 Nov), logging (21 Nov). Held up in their own plans: flow
 (FLOW_PLAN.md J), gl's window manager (GL_PLAN.md, built 20 Nov).
 
 - A1. `camera`
@@ -59,30 +59,14 @@ Done: inference (20 Nov), settings (21 Nov), board (21 Nov). Held up in their ow
 - A10. `utils`; `Broadcast` (utils/broadcast.py, since 94c65c84) is the one callback list: copied under its lock, called outside it, a
   failing callback logged; each package's own callback lists move to it in that package's review.
 - A11. `video`
-- A12. `log_config.py`, scanned 21 Nov; its fixes:
-  - it becomes the package `modules/logging/`: setup.py (`ShortNameFormatter`, `FlushFileHandler`, `setup_logging`),
-    ring_buffer.py (`LogEntry`, `LogRingBuffer`, `get_log_buffer`), crash_log.py (the crash log,
-    `install_excepthooks`); its test moves to `modules/logging/tests/`; callers import names directly
-    (`from modules.logging import ...`); launcher.py, the scripts, modules/panel, tests and SMILE.md follow
-  - the short logger name is worked out in one place; `threading.Lock` on the one import line; `traceback` imported
-    at the top
-  - a module logger; `record_crash` logs its own failure instead of passing
-  - annotations for the log records and the crash parameters; `LogEntry` a typed `NamedTuple` (the panel's pipe
-    sends tuples)
-  - `setup_logging`'s `name` is required; the buffer and the app name stay module globals
-  - `get_entries_since` slices with `islice` instead of copying the deque
-  - tests for `LogRingBuffer` (cursor, eviction, `add`) and `ShortNameFormatter`
-  - docstrings say only what each thing is; the reasons are cut
-
-  Its check: its tests, the panel's tests, the guard tests, pyright, one deep_flow start.
-- A13. The apps: `deep_flow`, `smile`, `white_space`. white_space's checks at the rig, you there:
+- A12. The apps: `deep_flow`, `smile`, `white_space`. white_space's checks at the rig, you there:
   - live and back to back with `main`: its camera threads only hand over (under 1 ms per frame at p95), every sync
     runs the pose step, the pose latency and the light's tick no worse than on `main`, its tests pass
   - its clip camera (`oak.ClipCamera`), which needs an OAK
   - the playhead's smoothing (`playhead.tracking`, `speed_smoothing`) against the motor's phase: on `perf_counter`
     its error is 0.26° at p95 at 32 rpm against 4.3° on `monotonic` (simulated with the motor's own code,
     2026-11-13), so the smoothing may be stronger than it needs
-- A14. `hd_trio`, after its rebuild with the flow ([the flow's line I](modules/flow/FLOW_PLAN.md#i-the-2d-flow-follows-the-3d)), with its check at the rig: a live recording with `mirrored` on (a live frame
+- A13. `hd_trio`, after its rebuild with the flow ([the flow's line I](modules/flow/FLOW_PLAN.md#i-the-2d-flow-follows-the-3d)), with its check at the rig: a live recording with `mirrored` on (a live frame
   comes with `flip_h` on, which a -sim clip does not); the fluid's look
   - its render writes `fluid.density.fade_time` every tick from the player's motion, and its show stages write
     `similarity_scale` (and the center geometry's `stage`): settings used to carry values while running. They become
@@ -93,4 +77,4 @@ Done: inference (20 Nov), settings (21 Nov), board (21 Nov). Held up in their ow
 - `CLAUDE.md` Project shape and Packages, what a package holds: A
 - `CLAUDE.md` Concurrency, work that numpy or the GPU does faster is not done in a Python loop; the loop holds the GIL
   and delays every other thread: A3, A5
-- `CLAUDE.md` Settings, settings connect the user and a component, not two components: A14
+- `CLAUDE.md` Settings, settings connect the user and a component, not two components: A13
