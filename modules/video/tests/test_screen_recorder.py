@@ -418,7 +418,7 @@ class StateTest(unittest.TestCase):
     def test_a_failure_is_an_error_and_start_tries_again(self) -> None:
         ScreenRecorderRecordSettings.start.fire(self.settings.record)
         self.tick()
-        with self.assertLogs('modules.video.screen_recorder', 'ERROR'):
+        with self.assertLogs('modules.video.screen.screen_recorder', 'ERROR'):
             self.recorder.fail('no capture')
         self.assertIs(self.settings.record.state, ScreenRecorderState.ERROR)
         self.assertIsNone(self.recorder.capture_format)

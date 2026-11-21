@@ -11,9 +11,9 @@ from queue import Queue
 
 import numpy as np
 
-from .clip_writer import ClipInput, ClipWriter, stream_encode
+from ..clip_writer import ClipInput, ClipWriter, stream_encode
+from ..hardware import ClipCodec, Hardware
 from .depth_frame import DEPTH_PIX_FMT, DEPTH_QUALITY, depth_to_p012
-from .hardware import ClipCodec, Hardware
 
 logger = logging.getLogger(__name__)
 

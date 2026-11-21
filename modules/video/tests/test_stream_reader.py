@@ -12,8 +12,9 @@ from unittest import mock
 import numpy as np
 
 from modules import video
-from modules.video import StreamReader, stream_reader
+from modules.video import StreamReader
 from modules.video.process import big_pipe
+from modules.video.stream import stream_reader
 
 
 def make_clip(path: str, frames: int) -> None:
@@ -167,7 +168,7 @@ class StreamReaderTest(unittest.TestCase):
         reader.ffmpeg_process, reader._frames_in = process, frames_in
         reader.video_file, reader.chunk_id, reader.bytes_per_frame = 'silent.mp4', 0, 16
         with mock.patch.object(stream_reader, 'STALL_SECONDS', 0.2), \
-                self.assertLogs('modules.video.stream_reader', 'ERROR') as logs:
+                self.assertLogs('modules.video.stream.stream_reader', 'ERROR') as logs:
             reader.play()
             logged: bool = wait_for(lambda: len(logs.output) > 0)
             reader.stop()
@@ -187,7 +188,7 @@ class StreamReaderTest(unittest.TestCase):
         self.assertTrue(wait_for(reader.is_loaded))
         process = reader.ffmpeg_process
         assert process is not None
-        with self.assertLogs('modules.video.stream_reader', 'ERROR') as logs:
+        with self.assertLogs('modules.video.stream.stream_reader', 'ERROR') as logs:
             reader.play()
             self.assertTrue(wait_for(lambda: not reader.is_playing()))
             reader.join()

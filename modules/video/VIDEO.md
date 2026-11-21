@@ -112,7 +112,7 @@ the size to the first source's shape, or the window's with `main_window`. Sizes 
 
 ### How many seconds fit
 
-Quality is traded against length. `chroma` and `bit_depth` (`ScreenFormat`, `modules/video/screen_format.py`) pick
+Quality is traded against length. `chroma` and `bit_depth` (`ScreenFormat`, `modules/video/screen/screen_format.py`) pick
 the frame's layout, BT.709 video range always, one (rows, width) array of planes, top row first:
 
 | `chroma`, `bit_depth` | Planes                                          | Bytes/pixel | ffmpeg input | For                          |

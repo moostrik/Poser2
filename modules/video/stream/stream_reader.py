@@ -13,9 +13,9 @@ import time
 from modules.utils import Waker
 
 from .depth_frame import DEPTH_PIX_FMT, depth_frame_bytes, p012_to_depth
-from .hardware import Hardware, hwaccel_args
-from .probe import probe
-from .process import ErrorReader, big_pipe, popen, read_exactly
+from ..hardware import Hardware, hwaccel_args
+from ..probe import probe
+from ..process import ErrorReader, big_pipe, popen, read_exactly
 
 import logging
 logger = logging.getLogger(__name__)

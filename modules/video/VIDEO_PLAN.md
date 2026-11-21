@@ -7,15 +7,6 @@ What is to be built in `modules/video`: ffmpeg, the clips and streams it writes 
 
 E1. Check (built, its unit tests pass): smile `-sim` with one visitor, the share clip and `watermark.png` written.
 
-E2. The loose files are grouped by job, the root keeping ffmpeg itself (`process`, `hardware`, `encoder`, `probe`,
-   `clip_writer`, `clip_decode`, `audio`): `stream/` holds `stream_reader`, `stream_writer`, `depth_frame`; `screen/`
-   holds `screen_format`, `screen_frame`, `screen_frame_store`, `screen_recorder`, and `screen_size.py` for
-   `ScreenSize` and its size rules (`even`, `preset_size`, `matching_preset`), split out of the 39 KB
-   `screen_recorder.py`. The tests' imports from moved files (`test_depth_frame` imports `modules.video.depth_frame`)
-   and the paths VIDEO.md names (`modules/video/screen_format.py`) follow. Why: Packages, "A package with many loose
-   files groups them in folders by job" (16 files at the root today) and "Its files each hold one class or one
-   subject". Check: the video, recording and render unit tests and the guard tests.
-
 E3. `__init__.py` exports only what other packages use. Out, used by no other package on the PC's deep-flow
    **(seen, grep)**: `FFMPEG`, `hwaccel_args`, `HEVC_QUALITY`, `ClipInput`, `master_encode`, `stream_encode`,
    `DEPTH_PIX_FMT`, `DEPTH_QUALITY`, `depth_frame_bytes`, `depth_to_p012`, `p012_to_depth`, `ScreenFrameStore`,

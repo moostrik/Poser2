@@ -9,7 +9,7 @@ import numpy as np
 
 from modules import video
 from modules.video import StreamReader, StreamWriter, depth_frame_bytes, depth_to_p012, p012_to_depth
-from modules.video.depth_frame import DEPTH_CODEC, DEPTH_HARDWARE, DEPTH_STEP_MM
+from modules.video.stream.depth_frame import DEPTH_CODEC, DEPTH_HARDWARE, DEPTH_STEP_MM
 
 
 class PackingTest(unittest.TestCase):

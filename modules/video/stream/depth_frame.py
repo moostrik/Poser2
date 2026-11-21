@@ -6,7 +6,7 @@ frame the largest error was 24 mm and frame-to-frame noise grew from 8.6 to 9.0 
 
 import numpy as np
 
-from .hardware import ClipCodec, Hardware
+from ..hardware import ClipCodec, Hardware
 
 DEPTH_CODEC: ClipCodec = ClipCodec.HEVC
 DEPTH_HARDWARE: Hardware = Hardware.iGPU

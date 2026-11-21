@@ -22,10 +22,11 @@ import psutil
 
 from modules.settings import BaseSettings, Field, Group, Widget
 
-from .clip_writer import ClipInput, ClipWriter, master_encode
+from ..clip_writer import ClipInput, ClipWriter, master_encode
 from .screen_format import BitDepth, Chroma, ScreenFormat
 from .screen_frame import ScreenFrame
 from .screen_frame_store import ScreenFrameStore
+from .screen_size import ScreenSize, even, matching_preset, preset_size
 
 logger = logging.getLogger(__name__)
 
@@ -37,14 +38,6 @@ LOOK_BACK_MARGIN: float = 1.2   # the look-back ring's frames over `duration` at
 QUEUE_LIMIT: int = 3            # frames waiting for the recorder's thread; one more is dropped, the oldest
 ESTIMATE_INTERVAL: float = 1.0  # s between estimates of `max_duration`
 SHOW_INTERVAL: float = 0.25     # s between updates of the readouts
-
-
-class ScreenSize(Enum):
-    """A recording size preset, landscape (width, height); portrait swaps them."""
-    HD =     (1920, 1080)
-    QHD =    (2560, 1440)
-    UHD =    (3840, 2160)
-    CUSTOM = (0, 0)
 
 
 class ScreenRecorderState(Enum):
@@ -101,28 +94,6 @@ class ScreenRecorderSettings(BaseSettings):
     quality: Group[ScreenRecorderQualitySettings] = Group(ScreenRecorderQualitySettings, description="The frames' format, which sets the length")
     record:  Group[ScreenRecorderRecordSettings]  = Group(ScreenRecorderRecordSettings, description="Recording into RAM")
     take:    Group[ScreenRecorderTakeSettings]    = Group(ScreenRecorderTakeSettings, description="The held take: look, play, save")
-
-
-# SIZE RULES: width and height are the truth; the preset and portrait follow them
-
-def even(value: int) -> int:
-    """`value` rounded down to an even number of at least 2, as NV12 needs."""
-    return max(2, value - value % 2)
-
-
-def preset_size(size: ScreenSize, portrait: bool) -> tuple[int, int]:
-    """(width, height) of a preset, upright when `portrait`."""
-    width, height = size.value
-    return (height, width) if portrait else (width, height)
-
-
-def matching_preset(width: int, height: int) -> ScreenSize:
-    """The preset of this size in either orientation, else CUSTOM."""
-    landscape = (max(width, height), min(width, height))
-    for size in ScreenSize:
-        if size is not ScreenSize.CUSTOM and size.value == landscape:
-            return size
-    return ScreenSize.CUSTOM
 
 
 def frames_for(seconds: float, fps: float, frame_step: int) -> int:

@@ -8,7 +8,7 @@ the design and its reasons; how each part works is in its module's docstring:
 |------------------------------|----------------------------------------------------------------------|
 | what a chunk holds           | `container/chunk.py`                                                 |
 | a capture's parts together   | `recorder/recording_sync.py`, `modules/camera/sync/capture_match.py` |
-| writing                      | `recorder/recorder.py`, `modules/video/stream_writer.py`             |
+| writing                      | `recorder/recorder.py`, `modules/video/stream/stream_writer.py`      |
 | playing                      | `player/player.py` and [its parts](#the-players-parts)               |
 | the camera of a recording    | `replay/camera.py`, `replay/tracker.py`                              |
 | the poses of a recording     | `modules/inference/pose/recorded_poses.py`                           |
