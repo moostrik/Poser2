@@ -9,4 +9,4 @@ from .z_position_mix import ZPositionMix
 from .velocity_bandpass_region import VelocityBandpassRegion
 from .velocity_bandpass_region_mean import VelocityBandpassRegionMean
 from .velocity_bandpass_region_speed import VelocityBandpassRegionSpeed
-from .weighted_sum import WeightedSum
+from .source_mix import SourceMix

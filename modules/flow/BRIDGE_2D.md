@@ -19,7 +19,7 @@ runs, the mixes' order, the merge of a tick's frames, the ports, the timers. Its
 |------------------|----------------------|----------------------------------|
 | lowpass          | `VelocityLowpass2D`  | `VelocityLowpass`                |
 | bandpass         | `VelocityBandpass2D` | `VelocityBandpass`               |
-| the mixes        | `WeightedSum2D`      | `WeightedSum`, `ZPositionMix`    |
+| the mixes        | `SourceMix2D`        | `SourceMix`, `ZPositionMix`      |
 | the peak's count | `SpeedCount2D`       | `HistogramCount` (the monitors') |
 
 Each 2D filter has its own kernels, the 3D's twins without z: the lowpass `LowpassStep2D` and `LowpassBlur2D`, the

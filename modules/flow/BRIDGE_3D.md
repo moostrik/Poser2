@@ -126,7 +126,7 @@ the frame's dt and the lowpass uses the Ema's real step, the same integral, exac
 
 What the fluid takes is two systems, the two a solver tells apart, and the expansion, a source of volume,
 each output mixing the six readings, each reading at a share, 0 to 1, as the light renderer mixes its layers
-(`Bridge3D`, `WeightedSum`). The boundary is the body in the water, what the water is dragged toward: its
+(`Bridge3D`, `SourceMix`). The boundary is the body in the water, what the water is dragged toward: its
 velocity, and its dye and warmth, which have no force and are held at the body. The body force is the
 Navier–Stokes force term, what is added: an acceleration, which the water keeps after the body is gone, so a
 stop can throw the water on. The panel shows `filters` (`lowpass`, `bandpass`), then one subpanel per output,

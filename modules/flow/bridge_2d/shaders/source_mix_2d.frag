@@ -1,6 +1,6 @@
 #version 460 core
 
-// Weighted Sum 2D Shader
+// SourceMix2D
 // The 2D bridge's mix: up to seven sources, each times its weight, summed (RG); a source at weight 0 adds nothing.
 // With `lengths`, the length of each source's xy times its weight, summed, for an amount (red); a scalar source
 // (`scalars`, red alone, the mask) gives its red, read as red: a single-channel texture reads (r, r, r, 1). The

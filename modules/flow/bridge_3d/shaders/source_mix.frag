@@ -1,6 +1,6 @@
 #version 460 core
 
-// Weighted Sum Shader
+// SourceMix
 // The bridge's mix: up to seven sources, each times its weight, summed (RGB); a source at weight 0 adds
 // nothing. With `lengths`, the length of each source's xyz times its weight, summed, for an amount; a scalar
 // source (`scalars`, red alone, the mask) gives its red, read as red: a single-channel texture reads (r, r, r, 1).

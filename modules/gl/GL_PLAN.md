@@ -20,19 +20,6 @@ unless Matthias says he is using the PC or the app.
   each app (deep_flow with the particles on the weighted look and on SURFACE, low_flow, hd_trio, white_space,
   smile), no GL error.
 
-## G. Minor fixes found here, in flow's code
-
-Each gets the flow thread's feedback after its commit.
-
-- G2. The bridge's `WeightedSum` (`flow/bridge_3d/shaders/weighted_sum.py` and `.frag`) and `WeightedSum2D`
-  (`flow/bridge_2d/shaders/weighted_sum_2d.py` and `.frag`) are renamed `SourceMix` and `SourceMix2D`, class and
-  files (a shader's source is found by its module's name) and every call site, and `BRIDGE_2D.md` and `BRIDGE_3D.md`
-  name them so; `velocity_bandpass*.py`, `flow_util.py` and hd_trio's `smooth_trail.py` use gl's `shaders.WeightedSum`
-  and stay. Why: they mix the bridge's sources (up to seven, a weight each, a source as its red or its length, the sum
-  capped if asked), another operation than `gl.shaders.WeightedSum` (two images, each times its weight) under the
-  same name (seen); `shaders.Mix` is taken. Check: pyright, flow's tests, deep_flow -sim (the 3D bridge) and low_flow
-  -sim (the 2D bridge), no GL error.
-
 Form, done only in a commit that opens the file anyway, never as a step of its own: PEP 8 in `fbo.py` (the one-line
 `if`, the double spaces before `->`, a class docstring, the end-of-file newline); the two swap tests become one
 `test_swap.py` in a commit that changes `Swap` or them.

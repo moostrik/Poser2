@@ -6,7 +6,7 @@ from OpenGL.GL import GL_RG16F
 
 from modules.gl import Fbo, Texture
 from ..bridge import AmountMixSettings, Bridge, BridgeSettings, MixSettings, READINGS
-from .shaders import SpeedCount2D, WeightedSum2D
+from .shaders import SpeedCount2D, SourceMix2D
 from .velocity_bandpass_2d import VelocityBandpass2D
 from .velocity_lowpass_2d import VelocityLowpass2D
 
@@ -20,7 +20,7 @@ class Bridge2D(Bridge[VelocityLowpass2D, VelocityBandpass2D]):
         settings = settings or BridgeSettings()
         super().__init__(settings, VelocityLowpass2D(settings.filters.lowpass), VelocityBandpass2D(settings.filters.bandpass),
                          SpeedCount2D())
-        self._mix_shader: WeightedSum2D = WeightedSum2D()
+        self._mix_shader: SourceMix2D = SourceMix2D()
 
     # ========== Lifecycle ==========
 

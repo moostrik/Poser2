@@ -29,7 +29,7 @@ from .bridge import     Bridge, BridgeSettings, BridgeFiltersSettings, Lowpass, 
                         Change, FrameMax, VelocityPeak, VelocityPeakSettings, SpeedCount, speed_percentile, \
                         VelocityLowpassSettings, VelocityBandpassSettings
 from .bridge_2d import  Bridge2D, VelocityLowpass2D, VelocityBandpass2D, SpeedCount2D
-from .bridge_3d import  Bridge3D, Magnitude, VelocityMagnitude, VelocityLowpass, VelocityBandpass, ZPositionMix, WeightedSum
+from .bridge_3d import  Bridge3D, Magnitude, VelocityMagnitude, VelocityLowpass, VelocityBandpass, ZPositionMix, SourceMix
 
 # Visualization
 from .visualization import Visualizer, histogram_grid, histogram_volume_grid, Strip, ALL_CHANNELS, summary_grid, Legend, LegendKind, DrawnSize, \

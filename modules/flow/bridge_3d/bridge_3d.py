@@ -10,7 +10,7 @@ from modules.gl import Fbo, Texture
 from ..bridge import AmountMixSettings, Bridge, BridgeSettings, MixSettings, READINGS
 from ..port import Port, TextureKind
 from ..visualization import HistogramCount
-from .shaders import WeightedSum, ZPositionMix
+from .shaders import SourceMix, ZPositionMix
 from .velocity_bandpass import VelocityBandpass
 from .velocity_lowpass import VelocityLowpass
 
@@ -26,7 +26,7 @@ class Bridge3D(Bridge[VelocityLowpass, VelocityBandpass]):
                          HistogramCount())
         self._z_positions: dict[str, Fbo] = {name: Fbo() for name in self._outputs}     # red over green
         self._motion_z_position: Texture | None = None  # the motion's z position this step
-        self._mix_shader: WeightedSum = WeightedSum()
+        self._mix_shader: SourceMix = SourceMix()
         self._z_position_mix_shader: ZPositionMix = ZPositionMix()
 
     # ========== Outputs ==========
