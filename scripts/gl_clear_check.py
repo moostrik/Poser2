@@ -29,8 +29,8 @@ for i in range(3000):
         gc.collect()
     fbo.clear_all()
     glFinish()
-    for side in (0, 1):
-        values = fbo._fbos[side].read_to_numpy(flip=False)
+    for side, buffer in enumerate((fbo.current, fbo.back)):
+        values = buffer.read_to_numpy(flip=False)
         if values is None or not np.all(values[..., :2] == 0.0):
             bad += 1
             if bad <= 5:

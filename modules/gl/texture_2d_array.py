@@ -11,14 +11,14 @@ Usage:
     density_tex = Texture2DArray(wrap=GL_CLAMP_TO_BORDER, border_color=(0,0,0,0))
     density_tex.allocate(3840, 2160, 28, GL_RGBA16F)
 """
-from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_NONE, GL_ONE, GL_RED, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, glBindTexture, glClearTexImage, glDeleteTextures, glGenTextures, glGetTexImage, glTexImage3D, glTexParameterfv, glTexParameteri
+from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, glBindTexture, glTexImage3D
 import numpy as np
 
-from .texture import clear_value, get_numpy_dtype
-from .texture_format import channel_count, data_type as texture_data_type, pixel_format
+from .swap import Swap
+from .texture_base import TextureBase
 
 
-class Texture2DArray:
+class Texture2DArray(TextureBase):
     """2D array OpenGL texture (GL_TEXTURE_2D_ARRAY) for volumetric data.
 
     Same interface as Texture3D but backed by GL_TEXTURE_2D_ARRAY for
@@ -29,249 +29,57 @@ class Texture2DArray:
         GL_CLAMP_TO_EDGE              → Neumann / zero-gradient
     """
 
+    TARGET = GL_TEXTURE_2D_ARRAY
+    WRAP_AXES = (GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T)     # the layer index is not spatial
+
     def __init__(self,
                  interpolation: int = GL_LINEAR,
                  wrap: int = GL_CLAMP_TO_EDGE,
                  border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
-        """Initialize 2D array texture with configuration.
-
-        Args:
-            interpolation: Filter mode for min/mag (GL_LINEAR for bilinear, GL_NEAREST)
-            wrap: Wrap mode for S and T axes
-            border_color: RGBA color when wrap is GL_CLAMP_TO_BORDER
-        """
-        self.allocated: bool = False
-        self.width: int = 0
-        self.height: int = 0
+        """`interpolation`: GL_LINEAR for bilinear within a layer, or GL_NEAREST; `wrap`: on the S and T axes;
+        `border_color`: RGBA with GL_CLAMP_TO_BORDER."""
+        super().__init__(interpolation, wrap, border_color)
         self.depth: int = 0
-        self.internal_format: Constant | int = GL_NONE
-        self.format: Constant = GL_NONE
-        self.data_type: int = int(GL_NONE)
-        self.tex_id: int = 0
-        self._interpolation: int = interpolation
-        self._wrap: int = wrap
-        self._border_color: tuple[float, float, float, float] = border_color
 
     def allocate(self, width: int, height: int, depth: int, internal_format: Constant | int) -> None:
-        """Allocate 2D array texture with specified dimensions and format.
-
-        Args:
-            width: Texture width in texels
-            height: Texture height in texels
-            depth: Number of array layers
-            internal_format: OpenGL internal format (e.g., GL_RGBA16F, GL_R16F)
-        """
-        data_type = texture_data_type(internal_format)
-        if data_type == GL_NONE:
+        """The texture made at `width` × `height` pixels × `depth` layers in `internal_format`, cleared to 0."""
+        if not self._create(width, height, internal_format):
             return
-
-        self.width = width
-        self.height = height
         self.depth = depth
-        self.internal_format = internal_format
-        self.format = pixel_format(internal_format)
-        self.data_type = data_type
-        self.tex_id = glGenTextures(1)
-
-        glBindTexture(GL_TEXTURE_2D_ARRAY, self.tex_id)
-
-        # Wrap mode on S and T axes only (R is layer index, not spatial)
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, self._wrap)
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, self._wrap)
-
-        # Filtering (GL_LINEAR = bilinear within each layer)
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, self._interpolation)
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, self._interpolation)
-
-        # Border color (used when wrap = GL_CLAMP_TO_BORDER)
-        glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, self._border_color)
-
-        # Grayscale swizzle for single-channel formats
-        if self.format == GL_RED:
-            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_SWIZZLE_R, GL_RED)
-            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_SWIZZLE_G, GL_RED)
-            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_SWIZZLE_B, GL_RED)
-            glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_SWIZZLE_A, GL_ONE)
-
-        # Allocate storage (same call as 3D — target determines interpretation)
-        glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, self.internal_format,
-                     self.width, self.height, self.depth, 0,
+        glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, self.internal_format, self.width, self.height, self.depth, 0,
                      self.format, self.data_type, None)
-
         glBindTexture(GL_TEXTURE_2D_ARRAY, 0)
         self.allocated = True
         self.clear()
 
-    def set_wrap(self, wrap: int, border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
-        """Change XY (S+T) wrap mode at runtime (GL thread only). R axis is layer index, not spatial."""
-        if not self.allocated:
-            return
-        self._wrap = wrap
-        self._border_color = border_color
-        glBindTexture(GL_TEXTURE_2D_ARRAY, self.tex_id)
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, wrap)
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, wrap)
-        glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, border_color)
-        glBindTexture(GL_TEXTURE_2D_ARRAY, 0)
-
     def deallocate(self) -> None:
         """Release texture resources."""
-        if not self.allocated:
-            return
-        self.allocated = False
-        self.width = 0
-        self.height = 0
+        super().deallocate()
         self.depth = 0
-        self.internal_format: Constant | int = GL_NONE
-        self.format: Constant = GL_NONE
-        self.data_type: int = int(GL_NONE)
-        glDeleteTextures(1, [self.tex_id])
-        self.tex_id = 0
-
-    def bind(self) -> None:
-        """Bind as GL_TEXTURE_2D_ARRAY."""
-        glBindTexture(GL_TEXTURE_2D_ARRAY, self.tex_id)
-
-    def unbind(self) -> None:
-        """Unbind GL_TEXTURE_2D_ARRAY."""
-        glBindTexture(GL_TEXTURE_2D_ARRAY, 0)
-
-    def clear(self, r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 0.0) -> None:
-        """Clear entire 2D array texture to specified color (OpenGL 4.4+).
-
-        Args:
-            r, g, b, a: Clear color components [0.0, 1.0]
-        """
-        if not self.allocated:
-            return
-
-        channels: int = channel_count(self.internal_format)
-
-        clear_data = clear_value(self.data_type, channels, (r, g, b, a))
-
-        glClearTexImage(self.tex_id, 0, self.format, self.data_type, clear_data)
 
     def read_to_numpy(self, flip: bool = False) -> np.ndarray | None:
-        """Read 2D array texture data back to CPU as NumPy array.
-
-        Returns:
-            NumPy array with shape (depth, height, width [, channels]) or None
-        """
-        if not self.allocated:
-            return None
-
-        dtype = get_numpy_dtype(self.data_type)
-        if dtype is None:
-            return None
-
-        channels: int = channel_count(self.internal_format)
-
-        if channels == 1:
-            pixels = np.zeros((self.depth, self.height, self.width), dtype=dtype)
-        else:
-            pixels = np.zeros((self.depth, self.height, self.width, channels), dtype=dtype)
-
-        self.bind()
-        glGetTexImage(GL_TEXTURE_2D_ARRAY, 0, self.format, self.data_type, pixels)
-        self.unbind()
-
-        if flip:
-            pixels = pixels[:, ::-1, :]  # Flip Y per layer
+        """The layers read back to the CPU, (depth, height, width[, channels]); `flip` turns each layer's rows."""
+        pixels = self._read((self.depth, self.height, self.width))
+        if pixels is not None and flip:
+            pixels = pixels[:, ::-1, :]
         return pixels
 
 
-class SwapTexture2DArray(Texture2DArray):
-    """Double-buffered 2D array texture for ping-pong compute operations.
-
-    Same interface as SwapTexture3D but backed by GL_TEXTURE_2D_ARRAY.
-    Used as a Texture2DArray it is always its current buffer; `back` is the other one, read inside
-    the pass that writes the current, never kept.
-    """
+class SwapTexture2DArray(Swap[Texture2DArray], Texture2DArray):
+    """Double-buffered 2D array texture for ping-pong compute operations."""
 
     def __init__(self,
                  interpolation: int = GL_LINEAR,
                  wrap: int = GL_CLAMP_TO_EDGE,
                  border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
-        # no Texture2DArray.__init__: every field reads from the current buffer
-        self._textures: list[Texture2DArray] = [
-            Texture2DArray(interpolation, wrap, border_color),
-            Texture2DArray(interpolation, wrap, border_color)
-        ]
-        self._swap_state: int = 0
-
-    @property
-    def allocated(self) -> bool:
-        return self._textures[0].allocated and self._textures[1].allocated
-
-    @property
-    def width(self) -> int:
-        return self._textures[self._swap_state].width
-
-    @property
-    def height(self) -> int:
-        return self._textures[self._swap_state].height
+        Swap.__init__(self, Texture2DArray(interpolation, wrap, border_color),
+                      Texture2DArray(interpolation, wrap, border_color))
 
     @property
     def depth(self) -> int:
-        return self._textures[self._swap_state].depth
-
-    @property
-    def internal_format(self) -> Constant | int:
-        return self._textures[self._swap_state].internal_format
-
-    @property
-    def format(self) -> Constant:
-        return self._textures[self._swap_state].format
-
-    @property
-    def data_type(self) -> int:
-        return self._textures[self._swap_state].data_type
-
-    @property
-    def tex_id(self) -> int:
-        return self._textures[self._swap_state].tex_id
-
-    @property
-    def back(self) -> Texture2DArray:
-        """The other buffer, the previous one, to read while the current is written; it is the current one after the next swap."""
-        return self._textures[1 - self._swap_state]
+        return self.current.depth
 
     def allocate(self, width: int, height: int, depth: int, internal_format: Constant | int) -> None:
-        """Allocate both 2D array texture buffers."""
-        self._textures[0].allocate(width, height, depth, internal_format)
-        self._textures[1].allocate(width, height, depth, internal_format)
-
-    def deallocate(self) -> None:
-        """Deallocate both buffers."""
-        self._textures[0].deallocate()
-        self._textures[1].deallocate()
-
-    def swap(self) -> None:
-        """Swap front/back buffers."""
-        self._swap_state = 1 - self._swap_state
-
-    def bind(self) -> None:
-        """Bind current texture."""
-        self._textures[self._swap_state].bind()
-
-    def unbind(self) -> None:
-        """Unbind current texture."""
-        self._textures[self._swap_state].unbind()
-
-    def clear(self, r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 0.0) -> None:
-        """Clear current buffer."""
-        self._textures[self._swap_state].clear(r, g, b, a)
-
-    def clear_back(self, r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 0.0) -> None:
-        """Clear back buffer."""
-        self._textures[1 - self._swap_state].clear(r, g, b, a)
-
-    def set_wrap(self, wrap: int, border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
-        """Change XY wrap mode on both buffers at runtime (GL thread only)."""
-        self._textures[0].set_wrap(wrap, border_color)
-        self._textures[1].set_wrap(wrap, border_color)
-
-    def clear_all(self, r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 0.0) -> None:
-        """Clear both buffers."""
-        self._textures[0].clear(r, g, b, a)
-        self._textures[1].clear(r, g, b, a)
+        """Both buffers made."""
+        for buffer in self._buffers:
+            buffer.allocate(width, height, depth, internal_format)

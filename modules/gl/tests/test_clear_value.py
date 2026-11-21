@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 from OpenGL.GL import GL_FLOAT, GL_HALF_FLOAT, GL_UNSIGNED_BYTE, GL_UNSIGNED_SHORT
 
-from modules.gl.texture import clear_value
+from modules.gl.texture_base import clear_value
 
 
 class ClearValueTest(unittest.TestCase):

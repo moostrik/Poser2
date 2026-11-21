@@ -2,7 +2,7 @@
 
 Fewer GL calls on the main thread, and the package held to the rules and to the textbook layout. G comes from the
 Cinder research (2026-11-20), H from the package scan, I from the structure review of the same day. Work order:
-I6, G2, I5, I7: the shaders do not move after G1 edits them, G2's bind is written once on I6's base,
+G2, I5, I7: the shaders do not move after G1 edits them, G2's bind is written once on I6's base,
 and I5 moves the files after their edits. Before
 the first step, `shader_check.py --reference` makes the reference images at HEAD; every shader check compares
 against them. The checks that run
@@ -17,17 +17,13 @@ buffers, programs, the blend state, GL debugging), and the window side is a pack
 is. gl's loose files are grouped in folders by job; that comes from CLAUDE.md's package rules, not from Cinder,
 whose `gl` is flat.
 
-- I5. gl's loose files in folders by job: `texture/` (`texture`, `texture_3d`,
+- I5. gl's loose files in folders by job: `texture/` (`texture_base`, `swap`, `texture`, `texture_3d`,
   `texture_2d_array`, `texture_format`, `fbo`, `layered_fbo`, `image`, `tensor`, and `cudart`, its CUDA side),
   `shader/` (`shader`, `compute_shader`, `file_watcher`, and `storage_buffer`, the compute shaders' buffer),
   `state/` (`context`, `style`, `clear`) and `debug/` (`gl_debug`, `gl_state`, `gpu_timer`); `shaders/` stays the
   library of operations; `colormap` goes to `shaders/`
   beside `colormap.glsl`. The tests stay in `gl/tests`. `from modules.gl import …` stays for every
   name. Check: pyright, the guard tests, gl's tests, each app's main imported.
-- I6. One texture base: `TextureBase` (the GL name, size, format, wrap, filter, bind, clear, read) under `Texture`,
-  `Texture3D` and `Texture2DArray`. The pairs subclass what they swap, and callers pass a `SwapFbo` where an `Fbo`
-  goes, so a generic `Swap[T]` holds the pair and the swap, and `SwapFbo(Swap[Fbo], Fbo)`, `SwapTexture3D` and
-  `SwapTexture2DArray` stay as thin classes over it. Check: tests for clear, read and swap, and `shader_check.py`.
 - I7. `Style` becomes `BlendState` (GL.md's and Cinder's word), everywhere: the module `style.py`, its `Style`
   import alias, `StyleState`, `StyleStack`, `push_style`/`pop_style`, `Context`'s stack, `test_style`, their users
   and GL.md; the rules thread updates gl.md's line on it and adds `BlendState` (not `Style`) to the glossary in the

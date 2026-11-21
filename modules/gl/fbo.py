@@ -3,6 +3,7 @@ from OpenGL.GL import (Constant, GL_CLAMP_TO_EDGE, GL_COLOR_ATTACHMENT0, GL_COLO
                        glBindFramebuffer, glBindRenderbuffer, glClear, glClearColor, glDeleteFramebuffers, glDeleteRenderbuffers,
                        glFramebufferRenderbuffer, glFramebufferTexture2D, glGenFramebuffers, glGenRenderbuffers,
                        glRenderbufferStorage, glViewport)
+from .swap import Swap
 from .texture import Texture
 
 class Fbo(Texture):
@@ -58,104 +59,28 @@ class Fbo(Texture):
         """End drawing into this FBO: the window's framebuffer is bound again."""
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
-class SwapFbo(Fbo):
-    """Double-buffered FBO that swaps between two buffers.
-
-    Inherits from Fbo and delegates all properties to the current write buffer, so used as a
-    texture it is always its current buffer; `back` is the other one, the previous, read inside the
-    pass that writes the current, never kept.
-    """
+class SwapFbo(Swap[Fbo], Fbo):
+    """Double-buffered FBO: drawn into, it is its current buffer."""
 
     def __init__(self,
                  interpolation: int = GL_LINEAR,
                  wrap: int = GL_CLAMP_TO_EDGE,
                  border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)) -> None:
-        # Don't call super().__init__() - we manage internal FBOs
-        self._fbos: list[Fbo] = [Fbo(interpolation, wrap, border_color), Fbo(interpolation, wrap, border_color)]
-        self._swap_state: int = 0
+        Swap.__init__(self, Fbo(interpolation, wrap, border_color), Fbo(interpolation, wrap, border_color))
 
-    # Override all Fbo/Texture properties to delegate to current buffer
     @property
     def fbo_id(self) -> int:
-        return self._fbos[self._swap_state].fbo_id
-
-    @property
-    def tex_id(self) -> int:
-        return self._fbos[self._swap_state].tex_id
-
-    @property
-    def width(self) -> int:
-        return self._fbos[self._swap_state].width
-
-    @property
-    def height(self) -> int:
-        return self._fbos[self._swap_state].height
-
-    @property
-    def internal_format(self) -> Constant | int:
-        return self._fbos[self._swap_state].internal_format
-
-    @property
-    def format(self) -> Constant:
-        return self._fbos[self._swap_state].format
-
-    @property
-    def data_type(self) -> int:
-        return self._fbos[self._swap_state].data_type
-
-    @property
-    def allocated(self) -> bool:
-        return self._fbos[0].allocated and self._fbos[1].allocated
-
-    @property
-    def back(self) -> Fbo:
-        """The other buffer, the previous one, to read while the current is written; it is the current one after the next swap."""
-        return self._fbos[1 - self._swap_state]
+        return self.current.fbo_id
 
     def allocate(self, width: int, height: int, internal_format: Constant | int) -> None:
-        """Allocate both buffers with same parameters."""
-        self._fbos[0].allocate(width, height, internal_format)
-        self._fbos[1].allocate(width, height, internal_format)
-
-    def deallocate(self) -> None:
-        """Deallocate both buffers."""
-        self._fbos[0].deallocate()
-        self._fbos[1].deallocate()
-
-    def swap(self) -> None:
-        """Swap buffers (back becomes front)."""
-        self._swap_state = 1 - self._swap_state
+        """Both buffers made."""
+        for buffer in self._buffers:
+            buffer.allocate(width, height, internal_format)
 
     def begin(self) -> None:
         """Draw into the current buffer, its whole size the viewport."""
-        self._fbos[self._swap_state].begin()
+        self.current.begin()
 
     def end(self) -> None:
         """End rendering to current buffer."""
-        self._fbos[self._swap_state].end()
-
-    def bind(self) -> None:
-        """Bind current buffer's texture."""
-        self._fbos[self._swap_state].bind()
-
-    def unbind(self) -> None:
-        """Unbind current buffer's texture."""
-        self._fbos[self._swap_state].unbind()
-
-    def clear(self, r: float = 0, g: float = 0, b: float = 0, a: float = 0.0) -> None:
-        """Clear current buffer."""
-        self._fbos[self._swap_state].clear(r, g, b, a)
-
-    def clear_back(self, r: float = 0, g: float = 0, b: float = 0, a: float = 0.0) -> None:
-        """Clear previous buffer."""
-        self._fbos[1 - self._swap_state].clear(r, g, b, a)
-
-    def set_wrap(self, wrap: int, border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
-        """Change wrap mode on both buffers at runtime (GL thread only)."""
-        self._fbos[0].set_wrap(wrap, border_color)
-        self._fbos[1].set_wrap(wrap, border_color)
-
-    def clear_all(self, r: float = 0, g: float = 0, b: float = 0, a: float = 0.0) -> None:
-        """Clear both buffers (useful for initialization/reset)."""
-        self.clear(r, g, b, a)
-        self.clear_back(r, g, b, a)
+        self.current.end()

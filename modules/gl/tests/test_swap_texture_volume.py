@@ -13,17 +13,18 @@ class SwapTextureVolumeTest(unittest.TestCase):
         for owner_class, buffer_class in self.OWNERS:
             with self.subTest(owner_class.__name__):
                 owner = owner_class()
-                owner._textures[0].tex_id, owner._textures[1].tex_id = 3, 7
+                owner._buffers[0].tex_id, owner._buffers[1].tex_id = 3, 7
+                owner._buffers[0].depth, owner._buffers[1].depth = 16, 32
                 self.assertIsInstance(owner, buffer_class)
-                for expected in (7, 3, 7):
+                for expected in ((7, 32), (3, 16), (7, 32)):
                     owner.swap()
-                    self.assertEqual(owner.tex_id, expected)
+                    self.assertEqual((owner.tex_id, owner.depth), expected)
 
     def test_back_is_the_other_buffer(self) -> None:
         for owner_class, buffer_class in self.OWNERS:
             with self.subTest(owner_class.__name__):
                 owner = owner_class()
-                owner._textures[0].tex_id, owner._textures[1].tex_id = 3, 7
+                owner._buffers[0].tex_id, owner._buffers[1].tex_id = 3, 7
                 self.assertIsInstance(owner.back, buffer_class)
                 self.assertEqual(owner.back.tex_id, 7)
                 owner.swap()
