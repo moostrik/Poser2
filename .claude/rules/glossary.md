@@ -20,7 +20,7 @@ Names for things that more than one package uses. Each bullet gives the name and
 - Feature words in full: `Velocity`, `Symmetry`, `Confidence`, `Foreground`, `DenseFlow`, `MotionTime`, `Temperature`, `Compositor`, `Geometry`; not `Vel`, `Sym`, `Conf`, `Frg`, `DFlow`, `MTime`, `TEMP`, `Comp`, `Geom`
 - Exponential moving average: `Ema`; not `EMA`
 - An on/off switch: `enabled`; not `active`
-- A layer that owns no texture and draws into a target it is given: `Draw`; not `Renderer`
+- A class that draws into the target it is given and has no output of its own: `Draw`; not `Renderer`
 - American spelling: `center`, `visualization`, `color`; not `centre`, `visualisation`, `colour`
 
 ## Apps

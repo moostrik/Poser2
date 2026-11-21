@@ -19,8 +19,6 @@ What is next for smile, the app in [SMILE.md](SMILE.md); what spans the apps is 
   photo handed by a stand-in webcam, turned and flipped as the camera delivers.
 - README.md's SMILE Online section keeps a **not yet** list: unbuilt work in a document, which `docs.md` puts in
   the plan. Move its items here as steps?
-- `CaptionDraw` (`render/layers/caption_draw.py`) holds its font and title textures, where `rendering.md` has a
-  `Draw` own no texture: a name that fits better, or the textures handed in?
 
 ## The rules it touches
 
