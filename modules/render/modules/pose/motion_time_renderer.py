@@ -37,7 +37,7 @@ class MotionTimeRenderer(LayerBase):
         if self._motion_time is None or self._width == 0:
             return
 
-        # Draw text in bottom-left corner with padding
+        # Draw text in the top-left corner with padding
         # Note: y=0 is top of screen after coordinate flip in shader
         x = 20
         y = 20  # 20 pixels from top

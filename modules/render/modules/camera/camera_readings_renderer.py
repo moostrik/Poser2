@@ -1,8 +1,4 @@
-"""CameraReadingsRenderer — one camera's frame rate, tilt and roll error, over that camera's own view.
-
-The pinned camera health only says OK or WARNING; this says which camera and which value, where the
-operator is already looking.
-"""
+"""CameraReadingsRenderer: one camera's frame rate, tilt and roll error, over that camera's own view."""
 
 import math
 

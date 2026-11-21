@@ -5,7 +5,6 @@ from typing import Any
 
 from modules.settings import Field, BaseSettings
 from modules.gl import Fbo, Texture, clear_color
-from modules.utils import Rect
 from ...layer_base import LayerBase
 
 from ..pose import PoseBoxRenderer, PoseRenderer, PoseRendererSettings

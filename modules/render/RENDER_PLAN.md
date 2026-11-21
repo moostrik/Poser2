@@ -1,7 +1,6 @@
 # Render plan
 
-What is left to do in `modules/render`, from the package scan of 2026-11-21. Each step gives its why (the finding it
-rests on, seen in the code or a deduction) and its check. Callers are from the deep-flow copy of 2026-11-20.
+What is left to do in `modules/render`.
 
 These stay as they are, on the user's word:
 
@@ -10,45 +9,3 @@ These stay as they are, on the user's word:
 - `CropLayer` stays in `modules/inference`, because it cuts the image to an inference crop.
 
 The pixel buffer and fence code of `general/screen_recording` is not in this plan: `gl.PixelBufferPool` holds it, and `ScreenCapture` and `ScreenPreview` use it (GL plan D1, built in d1be9840). The pack and unpack alignment constants and their set-back in those two files go in GL's alignment item, where every transfer sets its own alignment.
-
-## A. Code that does the same, written once
-
-
-## E. Leftovers and documents
-
-- **E1** Leftovers go:
-  - stale docstrings: DataHub, GPUFrame, `CenterMaskLayer`, FeatureBand, the `Window` shader's base-class text and uniform list, `ColorSettings`'s history, `MotionTimeRenderer`'s bottom-left
-  - commented-out code and prints in the silhouette layer
-  - unused imports
-  - `TrackletRenderer`'s second `REMOVED` branch
-  - the `settings or …Settings()` fallbacks on required settings
-  - `LayerCompositor`'s `hasattr` filter
-  - the `LayerCompositor` "Usage:" block, and the reasons in `CameraReadingsRenderer`'s docstring (to `RENDER.md`)
-  - Why: "Remove obsolete pathways", and "A docstring says what the thing is" (seen).
-  - Check: pyright, and hd_trio -sim for the silhouette and the compositor (must look the same).
-- **E2** The documents:
-  - `RENDER.md` names `general/` as it is after B3, with `screen_recording/`.
-  - The panorama's reasons leave the docstrings of `PanoramaCompositor`, `PanoramaBlend` and `PanoramaCompositorSettings` for `apps/white_space/docs/CALIBRATION.md`, the one user's calibration document.
-  - Why: `RENDER.md` leaves out `screen_recording`, and those docstrings hold reasons and a table (seen).
-
-After the last step: all four apps start once.
-
-## Rules it touches
-
-- Packages: "Its files each hold one class or one subject, named after it"
-- Packages: "A package with many loose files groups them in folders by job"
-- Packages: "Prefer no folder for one or two files"
-- Packages: "Inside a package, code that does the same is written once"
-- Concurrency: "A callback list is a `utils.Broadcast`"
-- Concurrency: "A failing callback does not stop the others"
-- Composition and wiring: "Prefer composition over inheritance for runtime assembly"
-- Time: "Downstream of the camera, take time from the frame or the tick instead of reading a clock"
-- Docstrings: "A docstring says what the thing is"
-- Docstrings: "Reasons sit in the package's document, history in the commit"
-- API evolution: "Remove obsolete pathways instead of leaving parallel legacy ones"
-- API evolution: "Update all affected call sites in the same change"
-- gl.md: "Simple geometry, as from poses, is worked out on the CPU, in plain modules"
-- rendering.md: "`modules` holds the layers that draw a module's data, in a package named after the module"
-- rendering.md: "`Renderer`: draws into a target it is given and owns no texture"
-- glossary.md: "A settings class: `<ClassName>Settings`, after the class it configures"
-- glossary.md: "American spelling: `center`, `visualization`, `color`; not `centre`, `visualisation`, `colour`"

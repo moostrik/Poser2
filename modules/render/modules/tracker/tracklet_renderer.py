@@ -1,5 +1,3 @@
-# Standard library imports
-import numpy as np
 
 # Local application imports
 from modules.gl import Text, shaders
@@ -58,8 +56,6 @@ class TrackletRenderer(LayerBase):
             r, g, b, a = (0.0, 1.0, 0.0, a)
         if tracklet.status == TrackingStatus.LOST:
             r, g, b, a = (1.0, 0.0, 0.0, a)
-        if tracklet.status == TrackingStatus.REMOVED:
-            r, g, b, a = (1.0, 0.0, 0.0, 1.0)
 
         shader.use(tracklet.roi, Color(r, g, b, a))
 

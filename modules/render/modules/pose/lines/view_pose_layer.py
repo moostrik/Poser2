@@ -48,7 +48,7 @@ class ViewPoseLayer(LayerBase):
         self._circle_shader: shaders.FillCircles = shaders.FillCircles()
 
         # Configuration
-        self.settings: ViewPoseLayerSettings = settings or ViewPoseLayerSettings()
+        self.settings: ViewPoseLayerSettings = settings
         self._color_settings: ColorSettings = color_settings
 
     @property

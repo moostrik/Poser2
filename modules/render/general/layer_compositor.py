@@ -29,15 +29,6 @@ class LayerCompositor(LayerBase):
 
     Takes a list of layers, renders their textures to an internal FBO using
     the configured blend mode, then optionally applies a 3D LUT for color grading.
-
-    Usage:
-        layers = [fluid_layer, ms_mask_layer]
-        composite = LayerCompositor(layers, settings)
-        composite.allocate(width, height, GL_RGBA16F)
-
-        # Each frame:
-        composite.update()  # Composites layers
-        composite.draw()    # Draws with LUT applied
     """
 
     def __init__(
@@ -108,8 +99,7 @@ class LayerCompositor(LayerBase):
 
     def update(self) -> None:
         """Composite all layer textures to internal FBO."""
-        self.compose([(layer.texture, 1.0) for layer in self._layers
-                      if hasattr(layer, 'texture') and layer.texture.allocated])
+        self.compose([(layer.texture, 1.0) for layer in self._layers if layer.texture.allocated])
 
     def draw(self) -> None:
         """Draw the composited result with LUT applied."""

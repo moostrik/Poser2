@@ -1,9 +1,4 @@
-"""ColorSettings — reactive per-player track colors.
-
-Extracted into its own module to avoid circular imports between
-render_settings.py (which imports layer Settings classes) and the
-layer modules (which need ColorSettings at runtime).
-"""
+"""ColorSettings: the players' track colors, the pose's side colors and the history color."""
 
 from modules.settings import Field, BaseSettings
 from modules.utils import Color

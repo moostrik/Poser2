@@ -4,8 +4,6 @@
 from OpenGL.GL import GL_RGBA16F
 from pytweening import easeInOutSine, easeInSine
 import numpy as np
-from time import time
-import math
 
 # Local application imports
 from modules.gl import Fbo, SwapFbo, Texture, BlendState, shaders
@@ -118,7 +116,6 @@ class SimilaritySilhouetteLayer(LayerBase):
         similarities = np.clip((similarities - threshold) / (1.0 - threshold), 0.0, 1.0)
         similarities = np.power(similarities, exponent)
         motion_similarities = similarities * self.settings.similarity_scale
-        # print(motion)
 
         # Foreground blend: 0 if single person, otherwise Nth highest similarity
         lowest_similarity: float = 0.0
@@ -126,8 +123,6 @@ class SimilaritySilhouetteLayer(LayerBase):
             sorted_similarities = np.sort(motion_similarities)  # Ascending
             lowest_similarity = float(sorted_similarities[-(active_poses - 1)])
 
-        # foreground_blend: float = (lowest_similarity - 0.25) * 2.0
-        # foreground_blend = max(0.0, min(1.0, foreground_blend))
         foreground_threshold = self.settings.foreground_threshold
         foreground_blend: float = (lowest_similarity - foreground_threshold) / (1.0 - foreground_threshold)
         foreground_blend = max(0.0, min(1.0, foreground_blend))
@@ -160,18 +155,14 @@ class SimilaritySilhouetteLayer(LayerBase):
             foreground_blend,
         )
         self._blend_fbo.end()
-        # print(motion)
 
         # Step 3: Composite - own (dodged) + others (tinted)
         styled_textures: list[Texture] = [self._blend_fbo]
         weights: list[float] = [motion]
 
-        # BlendState.set_blend_mode(BlendState.BlendMode.ADD)
-
         for cam_id in other_cam_ids:
             styled_textures.append(self._tint_fbos[cam_id])
             weights.append(float(motion_similarities[cam_id]))
-            # weights.append(0.0)
 
         self._output_fbo.begin()
         self._shader.use(styled_textures, weights, self.settings.layered)

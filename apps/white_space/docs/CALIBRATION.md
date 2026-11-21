@@ -602,6 +602,8 @@ procedure assumes; the others are second opinions on the same seam:
 | `SPLIT`       | which way it is wrong — one camera red, the other green           |
 | `STRIPE`      | alternating columns, so a straight edge zigzags                   |
 
+`MAX` and `AVERAGE` merge the two views; the others compare them, and outside an overlap, where there is only one
+view, they show the plain picture, except `DIFFERENCE`, which goes black there so only the overlaps light up.
 `MIN` shows the dark double edge on bright content. Each camera runs its own auto-exposure, so in
 `DIFFERENCE` a brightness mismatch lifts the whole band off black. In `SPLIT` the leading fringe is the
 left camera. `STRIPE` is blind to exposure differences, so it is the mode for two cameras that disagree

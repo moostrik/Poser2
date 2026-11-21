@@ -24,7 +24,7 @@ class Feature(Shader):
             display_range: tuple[float, float] | None = None,
             deltas: np.ndarray | None = None) -> None:
         if not self.allocated or not self.shader_program:
-            logger.warning("FeatureBand shader not allocated or shader program missing.")
+            logger.warning("Feature shader not allocated or shader program missing.")
             return
 
         # Flatten values and scores to pass to shader

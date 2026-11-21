@@ -7,17 +7,8 @@ from modules.utils import Color
 
 
 class PanoramaBlend(IntEnum):
-    """How the two cameras' pixels combine where their fields overlap.
-
-    The value **is** the stitch shader's `blendMode` uniform, so these must stay in step with the
-    `#define`s at the top of `panoramic_stitch.frag`, the way `MAX_CAMS` already does. `MAX` stays
-    first and default: it is the plain picture, and the procedure in CALIBRATION.md is written
-    around reading it.
-
-    The first two merge the two views; the rest compare them, and outside an overlap — where there
-    is only one view to compare — they fall back to the plain picture, except `DIFFERENCE`, which
-    goes black so only the overlaps light up.
-    """
+    """How the two cameras' pixels combine where their fields overlap; the value is the stitch shader's `blendMode`,
+    one of the `#define`s in `panoramic_stitch.frag`. How to read each: apps/white_space/docs/CALIBRATION.md."""
     MAX        = 0        # the brighter of the two — a ghost reads as a doubled bright edge
     AVERAGE    = auto()   # both at half weight — a ghost reads as a soft double image
     MIN        = auto()   # the darker of the two — reads on bright content, where MAX saturates
@@ -40,12 +31,8 @@ class Part(IntEnum):
 
 
 class PanoramaCompositorSettings(BaseSettings):
-    """The stitched 360-degree calibration view and the tracker data drawn over it.
-
-    One display, one settings group: the image says whether the camera constants (`fov`, `tilt`)
-    are right, the marks over it say whether the distance model is. They share a vertical scale,
-    so a person's pixels and a person's numbers are compared in place.
-    """
+    """The stitched 360-degree calibration view and the tracker data drawn over it
+    (apps/white_space/docs/CALIBRATION.md, *Reading the panorama*)."""
     parts: Field[list[Part]] = Field([Part.image, Part.grid, Part.marks, Part.labels],
                                      description="Which pieces of the display to draw")
     blend: Field[PanoramaBlend] = Field(PanoramaBlend.MAX,

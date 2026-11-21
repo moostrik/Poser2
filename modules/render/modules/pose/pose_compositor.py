@@ -31,7 +31,7 @@ class PoseCompositor(LayerBase):
     def __init__(self, track_id: int, board: Any, cam_texture: Texture, gpu_crop: BoardImageLayer, settings: PoseCompositorSettings,
                  color_settings: ColorSettings) -> None:
         self._track_id: int = track_id
-        self.settings: PoseCompositorSettings = settings or PoseCompositorSettings()
+        self.settings: PoseCompositorSettings = settings
         self._fbo: Fbo = Fbo()
 
         # Camera crop layers (one of these will be used based on settings)

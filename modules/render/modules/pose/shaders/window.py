@@ -8,22 +8,8 @@ logger = logging.getLogger(__name__)
 
 
 class Window(Shader):
-    """Base class for feature window visualization shaders.
-
-    Provides common interface for rendering temporal feature windows as horizontal time series.
-    All window shaders expect GL_RG32F texture input where:
-    - R channel = feature value
-    - G channel = validity mask (0.0 or 1.0)
-
-    Standard uniforms:
-    - tex0: Input texture (feature_len x time x RG)
-    - sample_step: 1.0 / num_samples
-    - num_streams: Number of feature elements (height)
-    - stream_step: 1.0 / num_streams
-    - line_width: Line thickness in normalized coordinates
-    - output_aspect_ratio: width/height for aspect correction
-    - display_range: Max absolute value for normalization
-    """
+    """A feature window as horizontal time series, one stream per element, from an RG32F texture: R the value, G
+    its validity (0 or 1)."""
 
     def use(
         self,

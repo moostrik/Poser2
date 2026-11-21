@@ -23,32 +23,12 @@ class PanoramaBoard(HasTracklets, HasObservations, Protocol):
 
 
 class PanoramaCompositor(LayerBase):
-    """The 360-degree calibration display: one strip, one FBO, five renderers in a fixed order.
+    """The 360-degree calibration display: one strip, one FBO, five renderers in a fixed order, and the strip's
+    geometry, which it hands down to them; `aspect_ratio` is read by the render's row layout.
 
     x is center azimuth, linear in degrees, 0 at the left edge; y is the tangent of center elevation
-    (`strip.strip_y`), a photograph's vertical like the frames'. The image and the tracker's data are
-    drawn on the same axes so a person's pixels and numbers are read in the same place — and which
-    is wrong says whether to reach for `fov`/`tilt` or the `rig` metres.
-
-    **This class owns the strip's geometry** and hands it down, so nothing can drift. `aspect_ratio`
-    is read by the render's row layout.
-
-    **What varies between the renderers is the depth, not the space.** Two things on the strip are
-    comparable only if they also share a depth:
-
-    | drawn thing                        | x              | y                  | depth |
-    |------------------------------------|----------------|--------------------|-------|
-    | image (`StitchRenderer`)           | center azimuth | center elevation   | `focus_radius` |
-    | dead zone (`SeamRenderer`)         | center azimuth | — full height      | `focus_radius` |
-    | lattice, seam + axis lines (`Grid`)| center azimuth | —                  | **exact** |
-    | overlap verticals (`Grid`)         | center azimuth | —                  | `parallax_radius` |
-    | horizon, zone band (`Grid`)        | —              | center elevation   | **exact** |
-    | mark: line, tick, field (`Mark`)   | center azimuth | center elevation   | x: `parallax_radius`, y: **the person's own distance** |
-    | label (`LabelRenderer`)            | center azimuth | pixel lane by id   | `parallax_radius` |
-
-    The picture's depth so a band lands on its pixels; the tracker's depth so marks and the overlap
-    verticals agree with the azimuth it emits; the person's own distance for a mark's rows (`marks`).
-    Exact means no depth enters: a seam is a bearing, a floor circle a fixed depression.
+    (`strip.strip_y`). The depth each renderer assumes: apps/white_space/docs/CALIBRATION.md, *Two axes, and the depth
+    that varies*.
 
     Renderers own no FBO: each draws into this one between `begin()` and `end()`, in order, and an
     unticked `Part` is skipped entirely.

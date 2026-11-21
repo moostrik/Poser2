@@ -1,6 +1,6 @@
 # Local application imports
 from modules.board import HasFrames
-from modules.pose import Frame, BBox
+from modules.pose import BBox
 from modules.gl import shaders
 from ...layer_base import LayerBase
 from ...color_settings import ColorSettings
