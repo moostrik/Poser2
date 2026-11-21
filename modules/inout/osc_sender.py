@@ -5,15 +5,14 @@ from threading import Thread
 from time import perf_counter
 import logging
 
-from pythonosc import osc_bundle_builder, osc_message_builder
-
 from modules.settings import BaseSettings, Field, Widget
 from modules.utils import Waker
 from .osc_client import OscClient
+from .osc_encoder import encode_message
 
 logger = logging.getLogger(__name__)
 
-ArgValue = str | bytes | bool | int | float | list | tuple
+ArgValue = str | int | float | list | tuple     # a list or tuple goes as separate arguments; a bool is refused
 
 
 class OscSenderSettings(BaseSettings):
@@ -91,7 +90,7 @@ class OscSender:
         except Empty:
             pass
         if messages:
-            self._client.send(_build_bundle(_tick_messages(messages, self.events)))
+            self._client.send([_encode(address, args) for address, args in _tick_messages(messages, self.events)])
 
 
 def _tick_messages(messages: list[tuple[str, ArgValue]], events: tuple[str, ...]) -> list[tuple[str, ArgValue]]:
@@ -109,12 +108,6 @@ def _tick_messages(messages: list[tuple[str, ArgValue]], events: tuple[str, ...]
     return tick
 
 
-def _build_bundle(messages: list[tuple[str, ArgValue]]) -> bytes:
-    bundle = osc_bundle_builder.OscBundleBuilder(osc_bundle_builder.IMMEDIATELY)
-    for address, args in messages:
-        msg = osc_message_builder.OscMessageBuilder(address=address)
-        # a tuple or list goes as separate arguments (as one add_arg it would be an OSC array, which Max does not take)
-        for arg in (args if isinstance(args, (tuple, list)) else (args,)):
-            msg.add_arg(arg)
-        bundle.add_content(msg.build())
-    return bundle.build().dgram
+def _encode(address: str, args: ArgValue) -> bytes:
+    # a tuple or list goes as separate arguments (an OSC array, which Max does not take, would be one)
+    return encode_message(address, args if isinstance(args, (tuple, list)) else (args,))

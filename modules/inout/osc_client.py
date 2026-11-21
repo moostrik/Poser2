@@ -1,13 +1,15 @@
-"""OSC client: one UDP socket to its owner's `ip` and `port`, that sends an encoded datagram."""
+"""OSC client: one UDP socket to its owner's `ip` and `port`, that sends a bundle of encoded messages."""
 
 from ipaddress import ip_address
 from threading import Lock
 from time import perf_counter
+from typing import Sequence
 import logging
 import socket
 
 from modules.settings import BaseSettings, Field
 from .net_probe import is_valid_ip
+from .osc_encoder import encode_bundle
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +21,7 @@ def is_valid_port(port: int) -> bool:
 
 
 class OscClient:
-    """Sends datagrams to the address in its owner's settings. It binds the two fields at `start` and unbinds them at
+    """Sends bundles to the address in its owner's settings. It binds the two fields at `start` and unbinds them at
     `stop`; an invalid address keeps the current target. A failed send is logged, at most once per
     `ERROR_LOG_INTERVAL`, and the next one is sent."""
 
@@ -47,8 +49,12 @@ class OscClient:
                 self._socket.close()
                 self._socket = None
 
-    def send(self, datagram: bytes) -> bool:
-        """Sends `datagram`; False when there is no target or the send failed."""
+    def send(self, messages: Sequence[bytes]) -> bool:
+        """Sends the encoded messages as one bundle; False when there are none, there is no target or the send
+        failed."""
+        if not messages:
+            return False
+        datagram: bytes = encode_bundle(messages)
         with self._lock:
             if self._socket is None:
                 return False

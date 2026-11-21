@@ -78,20 +78,20 @@ class SoundExtras:
             ("/global/speaker/offset", (math.radians(self.settings.speaker_offset),)),
         ]
 
-    def angle_values(self, frame: Frame) -> list[float]:
+    def angle_values(self, frame: Frame) -> np.ndarray:
         """The angles, the four arm entries replaced by the joints' travel × π (see the class doc)."""
         values = frame[Angles].values.astype(np.float64)
         if ArmTravel in frame:
             values[:TravelElement.left_arm] = frame[ArmTravel].values[:TravelElement.left_arm] * math.pi
-        return values.tolist()
+        return values
 
     def player_messages(self, frame: Frame) -> list[OscMessage]:
         id: int = frame.track_id
-        arms = frame[ArmTravel].values[TravelElement.left_arm:].tolist() if ArmTravel in frame else [0.0, 0.0, 0.0]
+        arms: np.ndarray = frame[ArmTravel].values[TravelElement.left_arm:] if ArmTravel in frame else np.zeros(3, dtype=np.float32)
         return [
             # range [0, 1] - the whole arms: left, right (each the union of its shoulder's and its
             # elbow's travel) and their mean
-            (f"/pose/{id}/arm", tuple(float(value) for value in arms)),
+            (f"/pose/{id}/arm", (arms,)),
             # range [-1, 1] - the shoulders' signed travel difference, left less right: the higher arm
             (f"/pose/{id}/shoulder/difference", (float(frame[ShoulderDifference].value) if ShoulderDifference in frame else 0.0,)),
             (f"/pose/{id}/azimuth", (float(frame[Azimuth].value) if Azimuth in frame else np.nan,)),
@@ -102,7 +102,7 @@ class SoundExtras:
 
     def inactive_messages(self, id: int) -> list[OscMessage]:
         return [
-            (f"/pose/{id}/arm", (0.0, 0.0, 0.0)),
+            (f"/pose/{id}/arm", (np.zeros(3, dtype=np.float32),)),
             (f"/pose/{id}/shoulder/difference", (0.0,)),
             (f"/pose/{id}/azimuth", (0.0,)),
             (f"/pose/{id}/distance", (0.0,)),

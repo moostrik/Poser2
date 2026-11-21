@@ -19,8 +19,9 @@ ID = 2
 
 
 def _messages(messages: list[OscMessage]) -> dict[str, tuple]:
-    """Address → arguments."""
-    return {address: tuple(args) for address, args in messages}
+    """Address → arguments, a row's values each one argument as on the wire."""
+    return {address: tuple(value for arg in args for value in (arg.tolist() if isinstance(arg, np.ndarray) else (arg,)))
+            for address, args in messages}
 
 
 class SoundPosesTest(unittest.TestCase):

@@ -7,24 +7,6 @@ OSC: hd_trio, deep_flow, low_flow, white_space and smile. hd_trio's output stays
 Checks run in `.venv-oak4` (inout, deep_flow, low_flow, smile, pyright), except white_space's and hd_trio's tests,
 which need depthai 2 and run in `.venv`.
 
-## A. One OSC sender
-
-Every address `OscSound` and white_space's sender put on the wire stays, the deprecated and duplicate similarity
-rows included; the Max patches get a plan of their own.
-
-- A3. One OSC encoder, float rows with numpy. Why: `OscSound._add_active_frame_messages` and
-  `_add_inactive_frame_messages` pack every float with python-osc's `add_arg`, a Python loop over a few hundred
-  floats a tick, 5–20 ms of GIL a second **(deduction, not measured)**; `_send_bundle` reads python-osc's private
-  `bundle._contents`. How: `osc_encoder.py`, plain functions used by `OscClient`, encodes every argument type both
-  senders send (float, int, str, a tuple as
-  separate arguments, and a float row: type tags `'f' * n`, values `astype('>f4').tobytes()`) and a bundle from its
-  messages; bool and bytes leave `OscSender`'s `ArgValue` (a bool is an int to Python, and smile sends bools as
-  ints); both senders send
-  through it, and python-osc stays only for the receiver's server; a player's inactive reset is built once per
-  width and reused; white_space's extras from A2 hand their rows as arrays. Check: a unit test that the new bytes
-  equal python-osc's for the same messages, a NaN row, a tuple and `OscSender`'s mixed messages included, so hd_trio's wire
-  is unchanged; inout tests; white_space's tests; the GIL time in REFACTOR_PLAN's py-spy scan.
-
 ## B. OSC receiver
 
 - B1. Callbacks, teardown and port change. Why: `OscReceiver._handle` keeps callbacks in a plain list and catches
@@ -86,8 +68,6 @@ rows included; the Max patches get a plan of their own.
 
 ## Rules this plan touches
 
-- `CLAUDE.md` Packages, code that does the same is written once: A3
-- `CLAUDE.md` Concurrency, no Python loop for numpy's work: A3
 - `CLAUDE.md` Concurrency, a callback list is a `utils.Broadcast`; a failing callback does not stop the others: B1
 - `CLAUDE.md` Error handling, a thread's loop catches an exception per item and goes on: C2
 - `CLAUDE.md` Settings, bind() / unbind(): B1
