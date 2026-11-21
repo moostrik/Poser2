@@ -117,6 +117,12 @@ class TestFiles(StoreTest):
         path.write_text('{corrupt json!!', encoding='utf-8')
         with self.assertLogs('modules.settings.store', 'WARNING'):
             self.assertFalse(self.store.load(root, 'flow', 'bad'))
+        self.store.path('flow', 'list').write_text('[1, 2]', encoding='utf-8')
+        self.store.path('setup', 'list').parent.mkdir(parents=True)
+        self.store.path('setup', 'list').write_text('[1, 2]', encoding='utf-8')
+        for group in ('flow', 'setup'):
+            with self.subTest(group=group), self.assertLogs('modules.settings.store', 'WARNING'):
+                self.assertFalse(self.store.load(root, group, 'list'))
         self.assertEqual(root.to_dict(), Root().to_dict())
 
     def test_scan_lists_a_root_groups_names_sorted(self) -> None:

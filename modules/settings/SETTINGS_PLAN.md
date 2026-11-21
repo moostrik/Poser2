@@ -6,7 +6,6 @@ The package scan of 2026-11-20 (modules/settings held up to CLAUDE.md and its ru
 
 - E4. `widget.py`'s "Adding a widget" goes into SETTINGS.md; the `_propagate_*` docstrings and `Field.fire`'s say what
   each one is.
-- E5. `SettingsStore.load` logs and refuses a file whose JSON is not an object.
 - E6. `tests/test_reactive.py` is split by subject; its `Widget.accepts` tests, which `test_widget.py` holds, go.
 - E7. A field's callbacks are called by one function (the list copied under the lock, each call logged on failure),
   used by `Field._apply` and `Field.fire`; and share propagation carries its direction as an argument

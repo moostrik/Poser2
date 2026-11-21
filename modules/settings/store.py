@@ -83,6 +83,9 @@ class SettingsStore:
         except (json.JSONDecodeError, OSError):
             logger.warning("Settings file unreadable: %s", path)
             return False
+        if not isinstance(data, dict):
+            logger.warning("Settings file holds no JSON object: %s", path)
+            return False
         root.update_from_dict(data if group == SETUP else {group: data})
         logger.info("Loaded settings: %s", path)
         return True
