@@ -1,8 +1,9 @@
 """A camera frame as the contract hands it on: the image with its origin, kind and capture time."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 
+import cv2
 import numpy as np
 
 from modules.utils import Point2f, Quad
@@ -66,6 +67,14 @@ def mirrored_image(frame: CameraFrame) -> np.ndarray:
     width: int = image.shape[1]
     uv: np.ndarray = image[rows:].reshape(rows // 2, width // 2, 2)[:, ::-1]     # the pairs stay together
     return np.concatenate((image[:rows, ::-1], uv.reshape(rows // 2, width)))
+
+
+def bgr_frame(frame: CameraFrame) -> CameraFrame:
+    """The frame with its NV12 image converted to BGR, for a consumer that keeps the image on the host; any other
+    frame as it is. The flags stay: a turn would split NV12's interleaved chroma pairs, so it comes after this."""
+    if not frame.nv12:
+        return frame
+    return replace(frame, image=cv2.cvtColor(frame.image, cv2.COLOR_YUV2BGR_NV12), nv12=False)
 
 
 def upright_image(frame: CameraFrame) -> np.ndarray:

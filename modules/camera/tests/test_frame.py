@@ -1,11 +1,12 @@
-"""`mirrored_image` flips a frame in its own layout, NV12's chroma pairs kept pairs; `upright_image` and
-`upright_corners` apply the turn and the flips in the contract's order."""
+"""`mirrored_image` flips a frame in its own layout, NV12's chroma pairs kept pairs; `bgr_frame` converts an NV12
+frame to BGR; `upright_image` and `upright_corners` apply the turn and the flips in the contract's order."""
 
 import unittest
 
+import cv2
 import numpy as np
 
-from modules.camera import CameraFrame, FrameType, upright_corners, upright_image
+from modules.camera import CameraFrame, FrameType, bgr_frame, upright_corners, upright_image
 from modules.camera.frame import mirrored_image
 
 
@@ -34,6 +35,27 @@ class MirroredImageTest(unittest.TestCase):
                                       [[4, 3, 2, 1],
                                        [8, 7, 6, 5],
                                        [30, 40, 10, 20]])
+
+
+class BgrFrameTest(unittest.TestCase):
+    def test_a_bgr_or_gray_frame_is_handed_back_as_it_is(self) -> None:
+        frame = _frame(IMAGE)
+        self.assertIs(bgr_frame(frame), frame)
+
+    def test_an_nv12_frame_becomes_bgr_with_its_flags_kept(self) -> None:
+        bgr = np.zeros((4, 6, 3), np.uint8)
+        bgr[:, :3] = (255, 0, 0)        # blue on the left, red on the right
+        bgr[:, 3:] = (0, 0, 255)
+        i420 = cv2.cvtColor(bgr, cv2.COLOR_BGR2YUV_I420)        # Y, then U and V each a quarter
+        y, u, v = i420[:4], i420[4:5].reshape(2, 3), i420[5:6].reshape(2, 3)
+        nv12 = np.concatenate((y, np.stack((u, v), axis=-1).reshape(2, 6)))
+        converted = bgr_frame(_frame(nv12, nv12=True, rotate90=True, flip_h=True))
+        self.assertFalse(converted.nv12)
+        self.assertEqual((converted.rotate90, converted.flip_h), (True, True))
+        self.assertEqual(converted.image.shape, (4, 6, 3))
+        self.assertGreater(int(converted.image[0, 0, 0]), 200)     # blue stays left
+        self.assertGreater(int(converted.image[0, 5, 2]), 200)     # red stays right
+        self.assertEqual(upright_image(converted).shape, (6, 4, 3))
 
 
 class UprightImageTest(unittest.TestCase):

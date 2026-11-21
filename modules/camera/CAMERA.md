@@ -24,8 +24,9 @@ One job: hand an app a camera. That is three things.
   rides on it, on the depth's own view, never as a frame of its own; a backend without one gives None.
 - A camera hands its frames and its model's boxes and keypoints as delivered: the uploader straightens them on the
   GPU with the frame's `homography`, then turns them by `rotate90` (a transpose) and flips them by `flip_v` and
-  `flip_h`, in that order; off the GPU `mirrored_image` mirrors and `upright_image` turns and flips, and
-  `upright_corners` gives a drawing the same turn. One
+  `flip_h`, in that order; off the GPU `mirrored_image` mirrors, `bgr_frame` converts an NV12 frame (the OAK4's
+  color) to BGR, and `upright_image` turns and flips a BGR or gray one, after `bgr_frame` since a turn would split
+  NV12's chroma pairs; `upright_corners` gives a drawing the same turn. One
   `homography` array stands for one correction, so a consumer keeps what it derives from it until the array
   changes. A frame's `readings` and `intrinsics` are what a recording needs to redo the correction.
 - The tracklet callback gets every message, an empty one too: no player is a tick as well; a camera without a

@@ -5,7 +5,7 @@ from .cam import Camera
 from .view import cover
 from modules import recording
 from modules.recording import replay
-from modules.camera import CameraFrame, CameraSource, upright_image, vimba, webcam
+from modules.camera import CameraFrame, CameraSource, bgr_frame, upright_image, vimba, webcam
 from modules.session import Session
 from modules.inference import GpuImage, SerialUploader
 from modules.inference.face import FaceDetector
@@ -288,7 +288,7 @@ class SmileMain():
         if seq == SequenceType.CAPTURE:
             # the last frame of the recording in which the face qualified; without one the view of the newest camera
             # frame, turned, flipped and fitted here, once
-            cap_image: np.ndarray = cover(upright_image(self.camera.frame()), self.width, self.height)
+            cap_image: np.ndarray = cover(upright_image(bgr_frame(self.camera.frame())), self.width, self.height)
             portrait: np.ndarray | None = self.face_finder.best()
             if portrait is not None:
                 cap_image = portrait
