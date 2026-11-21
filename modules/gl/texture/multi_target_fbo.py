@@ -84,17 +84,26 @@ class SwapTarget(TextureSwap[Texture], Texture):
         self._index: int = index
 
     @property
-    def _buffers(self) -> tuple[Texture, Texture]:     # pyright: ignore[reportIncompatibleVariableOverride]
-        first, second = self._pair._buffers
-        return first.targets[self._index], second.targets[self._index]
-
-    @property
     def current(self) -> Texture:
         return self._pair.current.targets[self._index]
 
     @property
     def back(self) -> Texture:
         return self._pair.back.targets[self._index]
+
+    @property
+    def allocated(self) -> bool:
+        return self._pair.allocated
+
+    def clear_all(self, r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 0.0) -> None:
+        """This target of both framebuffers cleared."""
+        self.current.clear(r, g, b, a)
+        self.back.clear(r, g, b, a)
+
+    def set_wrap(self, wrap: int, border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
+        """This target's x and y wrap changed in both framebuffers (GL thread only)."""
+        self.current.set_wrap(wrap, border_color)
+        self.back.set_wrap(wrap, border_color)
 
     def swap(self) -> None:
         raise RuntimeError('a target swaps with its pair (SwapMultiTargetFbo.swap)')
