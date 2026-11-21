@@ -18,6 +18,14 @@ unless Matthias says he is using the PC or the app.
   2026-11-21; the shear, deduction); a read-back is written once (Motion's review of 46df3c07). After it, the render
   plan's E1 drops `ScreenCapture`'s and `ScreenPreview`'s set-back to 4. Check: shader_check.
 
+## F. A 2D swap of plain textures
+
+- F1. `SwapTexture` beside `SwapTexture3D`, on the `Swap[T]` base: a ping-pong pair of 2D textures without
+  framebuffers, exported from `gl`; `flow/motion/depth_velocity.py`'s `_estimate` uses it in place of its
+  `SwapFbo`. Why: since 46df3c07 depth_velocity draws into its estimate through a `MultiTargetFbo` per side, so the
+  `SwapFbo`'s two framebuffers are no longer drawn into; gl has no swap of plain 2D textures, only `SwapFbo`,
+  `SwapTexture3D` and `SwapTexture2DArray` (seen). Check: deep_flow -sim, the motion running, no GL error.
+
 Form, done only in a commit that opens the file anyway, never as a step of its own: PEP 8 in `fbo.py` (the one-line
 `if`, the double spaces before `->`, a class docstring, the end-of-file newline); the two swap tests become one
 `test_swap.py` in a commit that changes `Swap` or them.
@@ -31,6 +39,8 @@ Form, done only in a commit that opens the file anyway, never as a step of its o
 
 - CLAUDE.md: Inside a package, code that does the same is written once
 - CLAUDE.md: Use Python 3.12 and follow PEP 8
+- CLAUDE.md: Similar things share the noun and differ by a qualifier (`Frame`, `CameraFrame`)
+- CLAUDE.md: Remove obsolete pathways instead of leaving parallel legacy ones
 - CLAUDE.md: A plan step that is checked by a run or a test is one commit
 - gl.md: A texture is held in GL's row order
 - gl.md: Shaders get checked in a GPU harness
