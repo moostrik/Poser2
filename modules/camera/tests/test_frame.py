@@ -1,5 +1,5 @@
 """`mirrored_image` flips a frame in its own layout, NV12's chroma pairs kept pairs; `bgr_frame` converts an NV12
-frame to BGR; `oriented_image` and `oriented_corners` apply the turn and the flips in the contract's order."""
+frame to BGR; `oriented_image` and `oriented_corners` apply `rotate90` and the flips in the contract's order, NV12 in its own layout."""
 
 import unittest
 
@@ -58,7 +58,31 @@ class BgrFrameTest(unittest.TestCase):
         self.assertEqual(oriented_image(converted).shape, (6, 4, 3))
 
 
-class UprightImageTest(unittest.TestCase):
+def _nv12(bgr: np.ndarray) -> np.ndarray:
+    """`bgr` as NV12: the Y rows, then the U and V of each 2 x 2 block interleaved."""
+    height, width = bgr.shape[:2]
+    i420 = cv2.cvtColor(bgr, cv2.COLOR_BGR2YUV_I420)
+    u = i420[height:height + height // 4].reshape(height // 2, width // 2)
+    v = i420[height + height // 4:].reshape(height // 2, width // 2)
+    return np.concatenate((i420[:height], np.stack((u, v), axis=-1).reshape(height // 2, width)))
+
+
+class OrientedNv12Test(unittest.TestCase):
+    def test_nv12_oriented_is_bgr_oriented_for_every_flag_set(self) -> None:
+        rng = np.random.default_rng(1)
+        bgr = rng.integers(0, 256, (4, 8, 3), dtype=np.uint8).repeat(2, axis=0).repeat(2, axis=1)   # 8 x 16, flat blocks
+        nv12 = _nv12(bgr)
+        for rotate90 in (False, True):
+            for flip_v in (False, True):
+                for flip_h in (False, True):
+                    frame = _frame(nv12, nv12=True, rotate90=rotate90, flip_v=flip_v, flip_h=flip_h)
+                    oriented = oriented_image(frame)
+                    expected = oriented_image(bgr_frame(frame))
+                    np.testing.assert_array_equal(cv2.cvtColor(oriented, cv2.COLOR_YUV2BGR_NV12), expected,
+                                                  str((rotate90, flip_v, flip_h)))
+
+
+class OrientedImageTest(unittest.TestCase):
     def test_without_flags_the_image_is_the_frame_s(self) -> None:
         frame = _frame(IMAGE)
         self.assertIs(oriented_image(frame), frame.image)
@@ -78,9 +102,9 @@ class UprightImageTest(unittest.TestCase):
         self.assertTrue(upright.flags['C_CONTIGUOUS'])
 
 
-class UprightCornersTest(unittest.TestCase):
-    def test_each_corner_samples_the_pixel_upright_image_shows_there(self) -> None:
-        """A corner's source, read from the frame's image, is the upright image's pixel at that corner."""
+class OrientedCornersTest(unittest.TestCase):
+    def test_each_corner_samples_the_pixel_oriented_image_shows_there(self) -> None:
+        """A corner's source, read from the frame's image, is the oriented image's pixel at that corner."""
         for rotate90 in (False, True):
             for flip_v in (False, True):
                 for flip_h in (False, True):

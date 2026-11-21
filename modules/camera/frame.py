@@ -78,17 +78,28 @@ def bgr_frame(frame: CameraFrame) -> CameraFrame:
 
 
 def oriented_image(frame: CameraFrame) -> np.ndarray:
-    """The frame's BGR or gray image turned and flipped as its flags say, the homography left out; a new array where
-    a flag is set."""
-    assert not frame.nv12, 'oriented_image takes BGR or gray frames'
-    image: np.ndarray = frame.image
+    """The frame's image turned and flipped as its flags say, the homography left out, in the frame's own layout:
+    NV12 stays NV12, its chroma pairs kept pairs. A new array where a flag is set."""
+    if not (frame.rotate90 or frame.flip_v or frame.flip_h):
+        return frame.image
+    if not frame.nv12:
+        return np.ascontiguousarray(_oriented(frame.image, frame))
+    rows: int = frame.image.shape[0] * 2 // 3
+    width: int = frame.image.shape[1]
+    y: np.ndarray = _oriented(frame.image[:rows], frame)
+    uv: np.ndarray = _oriented(frame.image[rows:].reshape(rows // 2, width // 2, 2), frame)    # a pair is one pixel
+    return np.concatenate((y, uv.reshape(uv.shape[0], uv.shape[1] * 2)))
+
+
+def _oriented(image: np.ndarray, frame: CameraFrame) -> np.ndarray:
+    """`image` (rows, columns, ...) turned and flipped as the frame's flags say: a view."""
     if frame.rotate90:
         image = image.swapaxes(0, 1)
     if frame.flip_v:
         image = image[::-1]
     if frame.flip_h:
         image = image[:, ::-1]
-    return np.ascontiguousarray(image) if image is not frame.image else image
+    return image
 
 
 def oriented_corners(frame: CameraFrame) -> Quad:

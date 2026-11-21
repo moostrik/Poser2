@@ -11,12 +11,6 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 
 ## E. One host-side flip
 
-- E2. `oriented_image` applies `rotate90` and both flips in the frame's own layout, NV12 included (Y as a plain array,
-  UV as (H/2, W/2, 2)); `bgr_frame` stays. Why: "Inside a package, code that does the same is written once":
-  `mirrored_image` and `oriented_image` both flip on the host, and only `mirrored_image` takes NV12 **(seen:
-  `frame.py`)**. Every caller of `upright_image` converts with `bgr_frame` first **(seen: smile's face finder and
-  main)**, and `mirrored_image` goes in E3. Tests: `oriented_image` on NV12 against `bgr_frame` then `oriented_image`,
-  for all 8 flag sets.
 - E3. The recorder's `mirrored` option and `mirrored_capture` go: the option acts only on a frame with `flip_h`, and
   the OAK-D, hd_trio's camera, bakes its flips into its warp and sets no flags **(seen: `oak/camera.py`
   `_emit_frame`, `oak/clip_camera.py`, `oak/pipeline.py` `build_warp_mesh`; hd_trio's recordings hold `flip_h: false`,
@@ -51,6 +45,5 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 
 ## Rules it touches
 
-- Inside a package, code that does the same is written once: E2
 - Remove obsolete pathways instead of leaving parallel legacy ones: E3
 - Stamp a frame once, with its moment of capture where the device reports one: F1
