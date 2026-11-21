@@ -1,24 +1,19 @@
 """OSC sender: a thread that bundles what was queued since its last tick and sends it at the settings' rate."""
 
 from queue import Queue, Empty
-from threading import Thread, Lock
+from threading import Thread
 from time import perf_counter
-from typing import Any
 import logging
 
-from pythonosc.udp_client import SimpleUDPClient
-from pythonosc.osc_bundle import OscBundle
 from pythonosc import osc_bundle_builder, osc_message_builder
 
 from modules.settings import BaseSettings, Field, Widget
 from modules.utils import Waker
-from .net_probe import is_valid_ip
+from .osc_client import OscClient
 
 logger = logging.getLogger(__name__)
 
 ArgValue = str | bytes | bool | int | float | list | tuple
-
-ERROR_LOG_INTERVAL: float = 10.0    # s between the log lines of a send that keeps failing
 
 
 class OscSenderSettings(BaseSettings):
@@ -28,51 +23,58 @@ class OscSenderSettings(BaseSettings):
     fps:     Field[float] = Field(30.0, min=1.0, max=120.0, step=1.0, description="Bundles sent per second")
 
 
-def is_valid_port(port: int) -> bool:
-    return port in range(1, 65536)
-
-
-class OscSender(Thread):
+class OscSender:
     """Sends what `submit` queued as one bundle per tick, on a fixed-rate grid resynced after a late tick: of a
     state address only the newest value, of an event address (`events`) every message, since each one counts. An
     event goes out at once, with what else is queued; the grid keeps its phase."""
 
     def __init__(self, settings: OscSenderSettings, events: tuple[str, ...] = ()) -> None:
-        super().__init__()
         self.settings: OscSenderSettings = settings
         self.events: tuple[str, ...] = events
 
-        self.client: SimpleUDPClient | None = None
-
-        self.running: bool = False
-        self.queue: Queue = Queue()
-        self.mutex: Lock = Lock()
-        self.last_message_time: float = perf_counter()
-        self._error_time: float = 0.0       # when a failed send was last logged
+        self._client: OscClient = OscClient(settings, OscSenderSettings.ip, OscSenderSettings.port, 'OscSender')
+        self._queue: Queue[tuple[str, ArgValue]] = Queue()
+        self._running: bool = False
+        self._thread: Thread | None = None
         self._waker: Waker = Waker()        # set by an event and by stop: the loop sends, or ends, at once
 
+    @property
+    def running(self) -> bool:
+        return self._running
+
     def start(self) -> None:
-        if self.running:
+        if self._running:
             return
-        self._update_client()
-        self.settings.bind(OscSenderSettings.ip, self._on_address)
-        self.settings.bind(OscSenderSettings.port, self._on_address)
-        self.running = True
-        super().start()
+        self._client.start()
+        self._running = True
+        self._thread = Thread(target=self._run, daemon=True, name='OscSender')
+        self._thread.start()
 
     def stop(self) -> None:
-        if self.running:
-            self.settings.unbind(OscSenderSettings.ip, self._on_address)
-            self.settings.unbind(OscSenderSettings.port, self._on_address)
-            self.running = False
-            self._waker.set()
-            self.join()
-            self._waker.close()
+        if not self._running:
+            return
+        self._running = False
+        self._waker.set()
+        if self._thread is not None:
+            self._thread.join()
+            self._thread = None
+        self._waker.close()
+        self._client.stop()
 
-    def run(self) -> None:
+    def submit(self, address: str, args: ArgValue) -> None:
+        # only while the thread takes them: nothing empties the queue otherwise
+        if self.settings.enabled and self._running:
+            self._queue.put((address, args))
+            if address in self.events:
+                self._waker.set()
+
+    def _run(self) -> None:
         next_time: float = perf_counter()
-        while self.running:
-            self._send_queued()
+        while self._running:
+            try:
+                self._send_queued()
+            except Exception:
+                logger.exception('OscSender: a bundle was not sent')
             interval: float = 1.0 / max(self.settings.fps, 1.0)
             now: float = perf_counter()
             if now - next_time > interval:          # fell behind: resync instead of bursting
@@ -82,69 +84,37 @@ class OscSender(Thread):
 
     def _send_queued(self) -> None:
         """What was queued since the last send, as one bundle."""
-        data_list = []
+        messages: list[tuple[str, ArgValue]] = []
         try:
             while True:
-                data: Any = self.queue.get(False)
-                data_list.append(data)
+                messages.append(self._queue.get(False))
         except Empty:
             pass
+        if messages:
+            self._client.send(_build_bundle(_tick_messages(messages, self.events)))
 
-        if data_list:
-            relevant_data = self.get_last_data(data_list)
-            with self.mutex:
-                try:
-                    if self.client:
-                        bundle = self.build_bundle(relevant_data)
-                        self.client.send(bundle)
-                        self.last_message_time = perf_counter()
-                except Exception:
-                    # this bundle is lost, the next one is sent: a sender that stopped here would
-                    # stay silent for the rest of the run while its queue grows
-                    if perf_counter() - self._error_time > ERROR_LOG_INTERVAL:
-                        self._error_time = perf_counter()
-                        logger.exception('osc error, bundle not sent')
 
-    def get_last_data(self, data_list: list[tuple[str, ArgValue]]) -> list[tuple[str, ArgValue]]:
-        """The messages of a tick: every one of an event address, the newest value of the others."""
-        grouped_data: dict[str, list[ArgValue]] = {}
-        for address, args in data_list:
-            grouped_data.setdefault(address, []).append(args)
+def _tick_messages(messages: list[tuple[str, ArgValue]], events: tuple[str, ...]) -> list[tuple[str, ArgValue]]:
+    """The messages of a tick: every one of an event address, the newest value of the others."""
+    grouped: dict[str, list[ArgValue]] = {}
+    for address, args in messages:
+        grouped.setdefault(address, []).append(args)
 
-        processed_data: list[tuple[str, ArgValue]] = []
-        for address, args_list in grouped_data.items():
-            if address in self.events:
-                processed_data.extend((address, args) for args in args_list)
-            else:
-                processed_data.append((address, args_list[-1]))
-        return processed_data
+    tick: list[tuple[str, ArgValue]] = []
+    for address, args_list in grouped.items():
+        if address in events:
+            tick.extend((address, args) for args in args_list)
+        else:
+            tick.append((address, args_list[-1]))
+    return tick
 
-    def build_bundle(self, data_list: list[tuple[str, ArgValue]]) -> OscBundle:
-        bundle = osc_bundle_builder.OscBundleBuilder(osc_bundle_builder.IMMEDIATELY)
-        for address, args in data_list:
-            msg = osc_message_builder.OscMessageBuilder(address=address)
-            # a tuple or list goes as separate arguments (as one add_arg it would be an OSC array, which Max does not take)
-            for arg in (args if isinstance(args, (tuple, list)) else (args,)):
-                msg.add_arg(arg)
-            bundle.add_content(msg.build())
-        return bundle.build()
 
-    def submit(self, address: str, args: ArgValue) -> None:
-        # only while the thread takes them: nothing empties the queue otherwise
-        if self.settings.enabled and self.running:
-            self.queue.put((address, args))
-            if address in self.events:
-                self._waker.set()
-
-    def _on_address(self, _=None) -> None:
-        self._update_client()
-
-    def _update_client(self) -> None:
-        ip: str = self.settings.ip
-        port: int = self.settings.port
-        if not is_valid_ip(ip) or not is_valid_port(port):
-            logger.warning('Invalid OSC address %s:%s, keeping the current client', ip, port)
-            return
-        with self.mutex:
-            self.client = SimpleUDPClient(ip, port)
-        logger.info('Osc Client Sending to %s %s', ip, port)
+def _build_bundle(messages: list[tuple[str, ArgValue]]) -> bytes:
+    bundle = osc_bundle_builder.OscBundleBuilder(osc_bundle_builder.IMMEDIATELY)
+    for address, args in messages:
+        msg = osc_message_builder.OscMessageBuilder(address=address)
+        # a tuple or list goes as separate arguments (as one add_arg it would be an OSC array, which Max does not take)
+        for arg in (args if isinstance(args, (tuple, list)) else (args,)):
+            msg.add_arg(arg)
+        bundle.add_content(msg.build())
+    return bundle.build().dgram

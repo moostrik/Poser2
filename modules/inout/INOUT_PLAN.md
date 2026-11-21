@@ -12,17 +12,6 @@ which need depthai 2 and run in `.venv`.
 Every address `OscSound` and white_space's sender put on the wire stays, the deprecated and duplicate similarity
 rows included; the Max patches get a plan of their own.
 
-- A1. One OSC client under both senders. Why: `OscSender` and `OscSound` each keep their own client, address
-  binding, lock and error policy (`OscSender._update_client` / `_send_queued`, `OscSound._on_connection_change` /
-  `_run`); `OscSound` stops for the whole run when `validate_connection` fails at start and on the first
-  `socket.error`, and never unbinds `ip` / `port`. How: `osc_client.py` `OscClient`, used by both: binds the
-  owner's `ip` / `port` at start and unbinds them at stop, keeps the current client on an invalid address, logs a
-  failed send (throttled) and sends the next. `OscSoundSettings` gains `enabled`: switched off, `OscSound` sends
-  one blackout and then nothing; every app's settings files gain it. `OscSender` owns its thread instead of
-  subclassing `Thread`, its callers (smile) and tests updated; its queue, lock, client and helpers become private,
-  and its tests go through `OscClient` and the encoder. Check: inout tests, a new `OscSound` unit test
-  (a failed send does not stop it; bind at start, unbind at stop), white_space `test_osc_sound_poses`,
-  `test_osc_sound_globals`.
 - A2. White_space's sound sender by composition. Why: `OscSoundSender` subclasses `OscSound`, overrides its private
   `_build_bundle` and `_send_blackout` and copies their loops to add the dummy's slot. How: `OscSound` takes the slot
   count through its constructor (default `max_players`) and an optional extras object (a `Protocol`: globals,
@@ -102,18 +91,16 @@ rows included; the Max patches get a plan of their own.
 
 ## Rules this plan touches
 
-- `CLAUDE.md` Packages, code that does the same is written once: A1, A2, A3
+- `CLAUDE.md` Packages, code that does the same is written once: A2, A3
 - `CLAUDE.md` Concurrency, no Python loop for numpy's work: A3
 - `CLAUDE.md` Concurrency, a callback list is a `utils.Broadcast`; a failing callback does not stop the others: B1
-- `CLAUDE.md` Error handling, a thread's loop catches an exception per item and goes on: A1, C2
-- `CLAUDE.md` Settings, bind() / unbind(): A1, B1
-- `CLAUDE.md` Composition, prefer composition over inheritance: A1, A2, C1
+- `CLAUDE.md` Error handling, a thread's loop catches an exception per item and goes on: C2
+- `CLAUDE.md` Settings, bind() / unbind(): B1
+- `CLAUDE.md` Composition, prefer composition over inheritance: A2, C1
 - `CLAUDE.md` Composition and wiring, clean up in an explicit stop or teardown, never in `__del__`: C2
 - `CLAUDE.md` Time, `perf_counter()` for every stamp: B1
-- `CLAUDE.md` API evolution, remove obsolete pathways; keep settings files in sync: A1, C2, E1
+- `CLAUDE.md` API evolution, remove obsolete pathways; keep settings files in sync: C2, E1
 - `CLAUDE.md` Types, modern typing: B2
-- `CLAUDE.md` Packages, its `__init__.py` holds what other packages use: A1
 - `CLAUDE.md` Project shape, code only one app uses moves to that app: C2
 - `CLAUDE.md` Threads, the finder fixes a minor problem and asks the owning thread for feedback: E1
-- `.claude/rules/glossary.md`, an on/off switch is `enabled`: A1
 - `.claude/rules/docs.md`, a component is described in its own document: D1

@@ -215,6 +215,7 @@
         "verbose": false
       },
       "osc_sound_sender": {
+        "enabled": true,
         "stage": "LERP",
         "volume": 0.93,
         "speaker_offset": 0.0,

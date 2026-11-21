@@ -1,10 +1,8 @@
 from threading import Thread, Event, Lock
 from collections import deque
-import socket
 import time
 
 import numpy as np
-from pythonosc.udp_client import SimpleUDPClient
 from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
@@ -12,7 +10,7 @@ from modules.pose import Frame, FrameDict, Angles, AngleVelocity, AngleSymmetry,
 
 from modules.session import SequencerState
 from modules.settings import BaseSettings, Field, Widget
-from .net_probe import validate_connection
+from .osc_client import OscClient
 
 import logging
 logger = logging.getLogger(__name__)
@@ -23,6 +21,7 @@ logger = logging.getLogger(__name__)
 _NO_STATE = -1
 
 class OscSoundSettings(BaseSettings):
+    enabled: Field[bool]     = Field(True,                      widget=Widget.switch,       description="Send OSC to the sound; off sends one blackout")
     max_players: Field[int]  = Field(4,    min=1,    max=16,    access=Field.INIT,         description="Max number of player poses to send (IDs 0 to N-1)")
     ip: Field[str]           = Field("127.0.0.1",               widget=Widget.ip_field,     description="Target OSC IP address")
     port: Field[int]         = Field(9000, min=1024, max=65535, widget=Widget.number_field, description="Target OSC port")
@@ -43,13 +42,8 @@ class OscSound:
         self._frames: FrameDict = {}
         self._seq_state: SequencerState | None = None
         self._input_lock: Lock = Lock()
-        self._client_lock: Lock = Lock()
-        self._client: SimpleUDPClient = SimpleUDPClient(self.settings.ip, self.settings.port)
-
-        logger.info(f"OscSound client initialized to {self.settings.ip}:{self.settings.port}")
-
-        self.settings.bind(OscSoundSettings.ip, self._on_connection_change)
-        self.settings.bind(OscSoundSettings.port, self._on_connection_change)
+        self._client: OscClient = OscClient(settings, OscSoundSettings.ip, OscSoundSettings.port, 'OscSound')
+        self._blacked_out: bool = False     # switched off, the blackout went out: nothing more until switched on
 
         # Send-interval measurement (rolling window of inter-send gaps).
         self._last_send_time: float | None = None
@@ -83,43 +77,43 @@ class OscSound:
         if self._thread is not None and self._thread.is_alive():
             return
 
+        self._client.start()
         self._running = True
-        self._thread = Thread(target=self._run, daemon=True)
+        self._thread = Thread(target=self._run, daemon=True, name='OscSound')
         self._thread.start()
 
     def stop(self) -> None:
-        """Stop the OSC sender thread"""
+        """Stop the OSC sender thread; a blackout goes out unless one went out when it was switched off"""
+        if self._thread is None:
+            return
         self._running = False
         self._update_event.set()
-        if self._thread is not None:
-            self._thread.join(timeout=1.0)  # Wait up to 1 second for thread to exit
-            self._thread = None
-        try:
-            self._send_blackout()
-        except Exception as e:
-            logger.error(f"Error sending OscSound blackout: {e}")
+        self._thread.join()
+        self._thread = None
+        if not self._blacked_out:
+            try:
+                self._send_blackout()
+            except Exception:
+                logger.exception('OscSound: the blackout at stop was not sent')
+        self._client.stop()
 
     def _run(self) -> None:
-        """Main loop for sending OSC data at regular intervals"""
-        # Validate network and IP before starting
-        if not validate_connection(self.settings.ip, self.settings.port, "OscSound"):
-            self._running = False
-            return
-
+        """Sends a bundle for each submit; switched off, one blackout and then nothing"""
         while self._running:
             self._update_event.wait()
             self._update_event.clear()
-            if self._running:
-
-                self._record_interval()
-                try:
+            if not self._running:
+                break
+            try:
+                if self.settings.enabled:
+                    self._blacked_out = False
+                    self._record_interval()
                     self._send_data()
-                except socket.error as e:
-                    logger.error(f"OscSound Socket error with exception: {e}")
-                    self._running = False
-                    break
-                except Exception as e:
-                    logger.error(f"Error sending OscSound data: {e}")
+                elif not self._blacked_out:
+                    self._blacked_out = True
+                    self._send_blackout()
+            except Exception:
+                logger.exception('OscSound: a bundle was not sent')
 
     def _record_interval(self) -> None:
         """Track the gap between consecutive sends and publish mean/deviation (ms)."""
@@ -173,13 +167,7 @@ class OscSound:
 
     def _send_bundle(self, bundle: OscBundleBuilder) -> None:
         if bundle._contents:
-            with self._client_lock:
-                self._client.send(bundle.build())
-
-    def _on_connection_change(self, _=None) -> None:
-        with self._client_lock:
-            self._client = SimpleUDPClient(self.settings.ip, self.settings.port)
-        logger.info(f"Reconnected to {self.settings.ip}:{self.settings.port}")
+            self._client.send(bundle.build().dgram)
 
     def _add_global_messages(self, bundle_builder: OscBundleBuilder, frames: FrameDict, seq_state: SequencerState | None) -> None:
         """Tick-wide messages, built from the tick's frames and sequencer state. A None

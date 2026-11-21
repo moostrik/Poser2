@@ -441,6 +441,7 @@
     },
     "inout": {
       "osc_sound": {
+        "enabled": true,
         "max_players": 1,
         "ip": "127.0.0.1",
         "port": 9000,
