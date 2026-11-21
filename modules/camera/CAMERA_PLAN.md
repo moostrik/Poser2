@@ -11,8 +11,6 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 
 ## C. Small fixes to the rules
 
-- C6. `CameraHealth` keeps its settings as `self.settings`, not `self._settings` **(seen)**. Why: the glossary, "A
-  component's settings object: `settings` / `self.settings`".
 - C7. `KeypointJoin` takes a lock round its frames, and holds a frame's two halves in a small dataclass instead of a
   dict with string keys **(seen)**. Why: its two inputs come from the tracklets' and the poses' queues
   **(seen: `oak4/camera.py` `_tracker_callback`, `_poses_callback`)**, whose callbacks can run on two threads
@@ -82,7 +80,7 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 ## Rules it touches
 
 - Inside a package, code that does the same is written once: E2
-- The glossary: C6, C8
+- The glossary: C8
 - Use `Lock` and `Event` for shared mutable state; prefer `IntEnum` over string keys: C7
 - A document describes what is built: D1
 - Use that one term everywhere it appears: E1

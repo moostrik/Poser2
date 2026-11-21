@@ -53,20 +53,20 @@ class CameraHealth:
 
     def __init__(self, cameras: Sequence[RigCameraSettings], settings: CameraHealthSettings) -> None:
         self._cameras: Sequence[RigCameraSettings] = cameras
-        self._settings: CameraHealthSettings = settings
+        self.settings: CameraHealthSettings = settings
 
     def update(self, _now: float) -> None:
         """Recompute both verdicts. Cheap; call it on the render tick (the frame time is not needed: the
         verdicts read the cameras' readouts)."""
         mount_deviations: list[float] = [abs(value) for camera in self._cameras
                                          for value in mount_deviation(camera) if not math.isnan(value)]
-        self._settings.mount = all(value <= self._settings.mount_tolerance for value in mount_deviations)
-        self._settings.camera_fps = all(abs(fps_deviation(camera)) <= FPS_TOLERANCE for camera in self._cameras)
+        self.settings.mount = all(value <= self.settings.mount_tolerance for value in mount_deviations)
+        self.settings.camera_fps = all(abs(fps_deviation(camera)) <= FPS_TOLERANCE for camera in self._cameras)
         minimums: list[float] = [camera.readings.video_min_fps for camera in self._cameras]
-        self._settings.video_fps_avg = min((camera.readings.video_fps for camera in self._cameras), default=0.0)
-        self._settings.video_min_fps = min(minimums, default=0.0)
-        self._settings.video_rate = all(minimum >= MIN_RATE_FACTOR * camera.fps
+        self.settings.video_fps_avg = min((camera.readings.video_fps for camera in self._cameras), default=0.0)
+        self.settings.video_min_fps = min(minimums, default=0.0)
+        self.settings.video_rate = all(minimum >= MIN_RATE_FACTOR * camera.fps
                                         for camera, minimum in zip(self._cameras, minimums))
-        self._settings.video_latency = max((camera.readings.video_latency for camera in self._cameras), default=0.0)
-        self._settings.depth_latency = max((camera.readings.depth_latency for camera in self._cameras), default=0.0)
-        self._settings.link = ', '.join(sorted({camera.readings.link for camera in self._cameras if camera.readings.link}))
+        self.settings.video_latency = max((camera.readings.video_latency for camera in self._cameras), default=0.0)
+        self.settings.depth_latency = max((camera.readings.depth_latency for camera in self._cameras), default=0.0)
+        self.settings.link = ', '.join(sorted({camera.readings.link for camera in self._cameras if camera.readings.link}))
