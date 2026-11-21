@@ -94,7 +94,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Read `time.perf_counter()` for every stamp and duration; `time.time()` and `monotonic()` step 15.6 ms on Windows, coarser than a frame
 - A thread that waits for a moment waits on a `utils.Waker`; a wait's timeout (`Event.wait(t)`, `Queue.get(timeout=t)`) ends on Windows' 15.6 ms tick
 - Downstream of the camera, take time from the frame or the tick instead of reading a clock
-- Use the wall clock only for file names and log lines
+- A time that must hold outside the run comes from the wall clock
 
 ## Performance
 
