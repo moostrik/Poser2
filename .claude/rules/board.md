@@ -9,8 +9,7 @@ paths:
 
 ## Package
 
-- Each file holds one protocol and its mixin
-- `__init__.py` exports every protocol and mixin
+- Each file holds one slice: its protocol and its mixin
 - `modules/board/` holds what a module or more than one app reads; a slice only one app reads sits in `apps/<app>/board/`, as the same pair
 
 ## Protocol and mixin
