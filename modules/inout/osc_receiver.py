@@ -23,7 +23,6 @@ class OscReceiverSettings(BaseSettings):
     verbose:         Field[bool]  = Field(False,                                                    description="Log received messages")
     counter:         Field[int]   = Field(0,           min=0,    max=99999, widget=Widget.number,   access=Field.READ, description="Message activity")
     last_address:    Field[str]   = Field("",                                                       access=Field.READ, description="Last received OSC address")
-    last_time:       Field[float] = Field(0.0,                                                      access=Field.READ, description="When the last message came in (perf_counter, s)")
     unbound_counter: Field[int]   = Field(0,           min=0,    max=99999, widget=Widget.number,   access=Field.READ, description="Messages received on an address nothing is bound to")
     last_unbound:    Field[str]   = Field("",                                                       access=Field.READ, description="Last received OSC address nothing is bound to")
 
@@ -80,7 +79,6 @@ class OscReceiver:
             logger.info(f"{address} {args}")
         self.settings.counter      = (self.settings.counter + 1) % 100000
         self.settings.last_address = address
-        self.settings.last_time    = perf_counter()
         callbacks: Broadcast | None = self._bindings.get(address)
         if callbacks is not None:
             callbacks(*args)
