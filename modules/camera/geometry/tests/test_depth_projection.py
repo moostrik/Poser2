@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 from modules.camera import DepthAlignment, aligned_depth_size, depth_projection
-from modules.camera.geometry.mirror import mirrored_alignment
+from modules.camera.geometry.flips import mirrored_alignment
 
 DEPTH_SIZE: tuple[int, int] = (480, 300)
 DEPTH_LENS: list[list[float]] = [[212.4, 0.0, 240.6], [0.0, 212.4, 149.4], [0.0, 0.0, 1.0]]

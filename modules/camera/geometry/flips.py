@@ -10,12 +10,12 @@ from ..frame import DepthAlignment
 MIRROR_X: np.ndarray = np.diag([-1.0, 1.0, 1.0, 1.0])     # a 4x4 move's x turned over
 
 
-def mirrored_roi(roi: Rect) -> Rect:
+def flip_h_roi(roi: Rect) -> Rect:
     """A normalized box in the frame flipped left to right."""
     return Rect(1.0 - roi.x - roi.width, roi.y, roi.width, roi.height)
 
 
-def mirrored_keypoints(keypoints: np.ndarray | None) -> np.ndarray | None:
+def flip_h_keypoints(keypoints: np.ndarray | None) -> np.ndarray | None:
     """Keypoints (N, 3) with x flipped; the labels stay the model's."""
     if keypoints is None:
         return None
@@ -24,12 +24,12 @@ def mirrored_keypoints(keypoints: np.ndarray | None) -> np.ndarray | None:
     return mirrored
 
 
-def flipped_roi(roi: Rect) -> Rect:
+def flip_v_roi(roi: Rect) -> Rect:
     """A normalized box in the frame flipped top to bottom."""
     return Rect(roi.x, 1.0 - roi.y - roi.height, roi.width, roi.height)
 
 
-def flipped_keypoints(keypoints: np.ndarray | None) -> np.ndarray | None:
+def flip_v_keypoints(keypoints: np.ndarray | None) -> np.ndarray | None:
     """Keypoints (N, 3) with y flipped; the labels stay the model's."""
     if keypoints is None:
         return None
@@ -38,12 +38,12 @@ def flipped_keypoints(keypoints: np.ndarray | None) -> np.ndarray | None:
     return flipped
 
 
-def turned_roi(roi: Rect) -> Rect:
+def rotate90_roi(roi: Rect) -> Rect:
     """A normalized box in the frame turned as `CameraFrame.rotate90` turns it: transposed."""
     return Rect(roi.y, roi.x, roi.height, roi.width)
 
 
-def turned_keypoints(keypoints: np.ndarray | None) -> np.ndarray | None:
+def rotate90_keypoints(keypoints: np.ndarray | None) -> np.ndarray | None:
     """Keypoints (N, 3) in the transposed frame: x and y swapped; the labels stay the model's."""
     if keypoints is None:
         return None

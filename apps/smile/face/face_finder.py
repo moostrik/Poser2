@@ -14,7 +14,7 @@ from threading import Event, Lock, Thread
 
 import numpy as np
 
-from modules.camera import bgr_frame, upright_image
+from modules.camera import bgr_frame, oriented_image
 from modules.inference.face import Face, FaceDetectorSettings, FaceFrame
 from modules.utils import Broadcast, Rect
 
@@ -205,7 +205,7 @@ class FaceFinder(Thread):
         if saved is None or saved.frame.image.frame is None:
             return None
         s: FaceFinderSettings = self.settings
-        return portrait_crop(upright_image(bgr_frame(saved.frame.image.frame)), saved.face, s.zoom, s.offset, self._composition_width,
+        return portrait_crop(oriented_image(bgr_frame(saved.frame.image.frame)), saved.face, s.zoom, s.offset, self._composition_width,
                              self._composition_height)
 
     def reset(self) -> None:

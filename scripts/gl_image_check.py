@@ -1,5 +1,5 @@
 """Does `gl.Image` with a `src` draw as it must: the identity `src` as the plain upload, and a camera frame's
-`upright_corners` as the plain upload of its `upright_image`?
+`oriented_corners` as the plain upload of its `oriented_image`?
 
 An odd-sized BGR image (rows of 21 bytes, not a multiple of 4) through every flag set; each texture is read back and
 compared exactly.
@@ -15,14 +15,14 @@ import numpy as np  # noqa: E402
 from OpenGL.GL import glFinish  # noqa: E402
 
 import monitor_harness as mh  # noqa: E402
-from modules.camera import CameraFrame, FrameType, upright_corners, upright_image  # noqa: E402
+from modules.camera import CameraFrame, FrameType, oriented_corners, oriented_image  # noqa: E402
 from modules.gl import ChannelOrder, Image  # noqa: E402
 
 
 def uploaded(image: np.ndarray, frame: CameraFrame | None = None) -> np.ndarray:
-    """The image's texture as read back: plain, or with the frame's `upright_corners` as its `src`."""
+    """The image's texture as read back: plain, or with the frame's `oriented_corners` as its `src`."""
     texture = Image(ChannelOrder.BGR)
-    texture.set_from_image(image, upright_corners(frame) if frame is not None else None)
+    texture.set_from_image(image, oriented_corners(frame) if frame is not None else None)
     glFinish()
     pixels = texture.read_to_numpy()
     texture.deallocate()
@@ -37,7 +37,7 @@ for rotate90 in (False, True):
     for flip_v in (False, True):
         for flip_h in (False, True):
             frame = CameraFrame(0, FrameType.VIDEO, image, 0.0, rotate90=rotate90, flip_v=flip_v, flip_h=flip_h)
-            expected = uploaded(np.ascontiguousarray(upright_image(frame)))
+            expected = uploaded(np.ascontiguousarray(oriented_image(frame)))
             drawn = uploaded(image, frame)
             same = drawn.shape == expected.shape and np.array_equal(drawn, expected)
             failed += not same

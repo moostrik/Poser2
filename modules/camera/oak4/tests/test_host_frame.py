@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from modules.camera.geometry import corrected_keypoints, corrected_roi, mirrored_keypoints, mirrored_roi
+from modules.camera.geometry import corrected_keypoints, corrected_roi, flip_h_keypoints, flip_h_roi
 from modules.camera.oak4.messages import packed_nv12
 from modules.utils import Rect
 
@@ -26,15 +26,15 @@ class PackedNv12Test(unittest.TestCase):
 
 class MirrorTest(unittest.TestCase):
     def test_a_box_keeps_its_size_and_row(self) -> None:
-        roi = mirrored_roi(Rect(0.1, 0.2, 0.3, 0.4))
+        roi = flip_h_roi(Rect(0.1, 0.2, 0.3, 0.4))
         self.assertAlmostEqual(roi.x, 0.6)
         self.assertEqual((roi.y, roi.width, roi.height), (0.2, 0.3, 0.4))
 
     def test_keypoints_flip_x_only_and_leave_the_original(self) -> None:
         points = np.array([[0.25, 0.5, 0.9]], dtype=np.float32)
-        np.testing.assert_array_almost_equal(mirrored_keypoints(points), [[0.75, 0.5, 0.9]])
+        np.testing.assert_array_almost_equal(flip_h_keypoints(points), [[0.75, 0.5, 0.9]])
         self.assertEqual(points[0, 0], 0.25)
-        self.assertIsNone(mirrored_keypoints(None))
+        self.assertIsNone(flip_h_keypoints(None))
 
 
 class CorrectionTest(unittest.TestCase):

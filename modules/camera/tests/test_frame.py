@@ -1,12 +1,12 @@
 """`mirrored_image` flips a frame in its own layout, NV12's chroma pairs kept pairs; `bgr_frame` converts an NV12
-frame to BGR; `upright_image` and `upright_corners` apply the turn and the flips in the contract's order."""
+frame to BGR; `oriented_image` and `oriented_corners` apply the turn and the flips in the contract's order."""
 
 import unittest
 
 import cv2
 import numpy as np
 
-from modules.camera import CameraFrame, FrameType, bgr_frame, upright_corners, upright_image
+from modules.camera import CameraFrame, FrameType, bgr_frame, oriented_corners, oriented_image
 from modules.camera.frame import mirrored_image
 
 
@@ -55,24 +55,24 @@ class BgrFrameTest(unittest.TestCase):
         self.assertEqual(converted.image.shape, (4, 6, 3))
         self.assertGreater(int(converted.image[0, 0, 0]), 200)     # blue stays left
         self.assertGreater(int(converted.image[0, 5, 2]), 200)     # red stays right
-        self.assertEqual(upright_image(converted).shape, (6, 4, 3))
+        self.assertEqual(oriented_image(converted).shape, (6, 4, 3))
 
 
 class UprightImageTest(unittest.TestCase):
     def test_without_flags_the_image_is_the_frame_s(self) -> None:
         frame = _frame(IMAGE)
-        self.assertIs(upright_image(frame), frame.image)
+        self.assertIs(oriented_image(frame), frame.image)
 
     def test_the_turn_is_a_transpose(self) -> None:
-        np.testing.assert_array_equal(upright_image(_frame(IMAGE, rotate90=True)), [[1, 4], [2, 5], [3, 6]])
+        np.testing.assert_array_equal(oriented_image(_frame(IMAGE, rotate90=True)), [[1, 4], [2, 5], [3, 6]])
 
     def test_the_flips_come_after_the_turn(self) -> None:
-        np.testing.assert_array_equal(upright_image(_frame(IMAGE, rotate90=True, flip_v=True)), [[3, 6], [2, 5], [1, 4]])
-        np.testing.assert_array_equal(upright_image(_frame(IMAGE, rotate90=True, flip_h=True)), [[4, 1], [5, 2], [6, 3]])
+        np.testing.assert_array_equal(oriented_image(_frame(IMAGE, rotate90=True, flip_v=True)), [[3, 6], [2, 5], [1, 4]])
+        np.testing.assert_array_equal(oriented_image(_frame(IMAGE, rotate90=True, flip_h=True)), [[4, 1], [5, 2], [6, 3]])
 
     def test_a_color_image_keeps_its_channels(self) -> None:
         bgr = np.stack([IMAGE, IMAGE * 10, IMAGE * 20], axis=-1)
-        upright = upright_image(_frame(bgr, rotate90=True, flip_h=True))
+        upright = oriented_image(_frame(bgr, rotate90=True, flip_h=True))
         self.assertEqual(upright.shape, (3, 2, 3))
         np.testing.assert_array_equal(upright[0, 0], [4, 40, 80])
         self.assertTrue(upright.flags['C_CONTIGUOUS'])
@@ -85,8 +85,8 @@ class UprightCornersTest(unittest.TestCase):
             for flip_v in (False, True):
                 for flip_h in (False, True):
                     frame = _frame(IMAGE, rotate90=rotate90, flip_v=flip_v, flip_h=flip_h)
-                    upright = upright_image(frame)
-                    quad = upright_corners(frame)
+                    upright = oriented_image(frame)
+                    quad = oriented_corners(frame)
                     h, w = IMAGE.shape
                     for corner, (row, column) in ((quad.top_left, (0, 0)), (quad.top_right, (0, -1)),
                                                   (quad.bottom_right, (-1, -1)), (quad.bottom_left, (-1, 0))):

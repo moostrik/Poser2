@@ -77,10 +77,10 @@ def bgr_frame(frame: CameraFrame) -> CameraFrame:
     return replace(frame, image=cv2.cvtColor(frame.image, cv2.COLOR_YUV2BGR_NV12), nv12=False)
 
 
-def upright_image(frame: CameraFrame) -> np.ndarray:
+def oriented_image(frame: CameraFrame) -> np.ndarray:
     """The frame's BGR or gray image turned and flipped as its flags say, the homography left out; a new array where
     a flag is set."""
-    assert not frame.nv12, 'upright_image takes BGR or gray frames'
+    assert not frame.nv12, 'oriented_image takes BGR or gray frames'
     image: np.ndarray = frame.image
     if frame.rotate90:
         image = image.swapaxes(0, 1)
@@ -91,7 +91,7 @@ def upright_image(frame: CameraFrame) -> np.ndarray:
     return np.ascontiguousarray(image) if image is not frame.image else image
 
 
-def upright_corners(frame: CameraFrame) -> Quad:
+def oriented_corners(frame: CameraFrame) -> Quad:
     """Where in the frame's image (0..1, the origin top-left) each corner of the upright image comes from: its top
     left, top right, bottom right and bottom left, after the turn and the flips."""
     def source(x: float, y: float) -> Point2f:

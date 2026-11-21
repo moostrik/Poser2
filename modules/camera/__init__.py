@@ -1,6 +1,6 @@
 from .source import         CameraSource, CameraFrameCallback, TrackletCallback, ClipSource, ClipFrameCallback
 from .frame import          CAPTURE_TOLERANCE, FrameType, FrameReadings, DepthAlignment, CameraFrame, mirrored_image, \
-                            bgr_frame, upright_image, upright_corners
+                            bgr_frame, oriented_image, oriented_corners
 from .tracklet import       TrackingStatus, CameraTracklet, CameraTracklets, straightened_tracklets, mirrored_tracklets
 from .settings import       CameraSettings, CameraReadings, RigCameraSettings, RigCameraReadings
 from .camera_health import  CameraHealth, CameraHealthSettings, FPS_TOLERANCE, mount_deviation, fps_deviation

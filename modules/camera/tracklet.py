@@ -7,8 +7,8 @@ import numpy as np
 
 from modules.utils import Rect
 
-from .geometry import corrected_keypoints, corrected_roi, flipped_keypoints, flipped_roi, mirrored_keypoints, mirrored_roi, \
-    turned_keypoints, turned_roi
+from .geometry import corrected_keypoints, corrected_roi, flip_v_keypoints, flip_v_roi, flip_h_keypoints, flip_h_roi, \
+    rotate90_keypoints, rotate90_roi
 
 
 class TrackingStatus(Enum):
@@ -43,7 +43,7 @@ class CameraTracklets:
 
 def mirrored_tracklets(cam_tracklets: CameraTracklets) -> CameraTracklets:
     """The tracklets in their frame flipped left to right, not straightened: their boxes and keypoints mirrored."""
-    tracklets: list[CameraTracklet] = [replace(tracklet, roi=mirrored_roi(tracklet.roi), keypoints=mirrored_keypoints(tracklet.keypoints))
+    tracklets: list[CameraTracklet] = [replace(tracklet, roi=flip_h_roi(tracklet.roi), keypoints=flip_h_keypoints(tracklet.keypoints))
                                        for tracklet in cam_tracklets.tracklets]
     return replace(cam_tracklets, tracklets=tracklets)
 
@@ -58,10 +58,10 @@ def straightened_tracklets(cam_tracklets: CameraTracklets, homography: np.ndarra
         if homography is not None:
             roi, keypoints = corrected_roi(roi, homography), corrected_keypoints(keypoints, homography)
         if rotate90:
-            roi, keypoints = turned_roi(roi), turned_keypoints(keypoints)
+            roi, keypoints = rotate90_roi(roi), rotate90_keypoints(keypoints)
         if flip_v:
-            roi, keypoints = flipped_roi(roi), flipped_keypoints(keypoints)
+            roi, keypoints = flip_v_roi(roi), flip_v_keypoints(keypoints)
         if flip_h:
-            roi, keypoints = mirrored_roi(roi), mirrored_keypoints(keypoints)
+            roi, keypoints = flip_h_roi(roi), flip_h_keypoints(keypoints)
         tracklets.append(replace(tracklet, roi=roi, keypoints=keypoints))
     return replace(cam_tracklets, tracklets=tracklets, straightened=True)

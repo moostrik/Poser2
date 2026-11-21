@@ -12,7 +12,7 @@ import torch
 
 import torch.nn.functional as F
 
-from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, FrameType, TrackingStatus, upright_image
+from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, FrameType, TrackingStatus, oriented_image
 from modules.utils import Rect
 from modules.inference.tests.wait import wait_for
 
@@ -248,7 +248,7 @@ class ImageUploadTest(unittest.TestCase):
             frame = CameraFrame(0, FrameType.VIDEO, bgr, 1.0, rotate90=rotate90, flip_v=flip_v, flip_h=flip_h)
             images, ready = upload.upload([frame], stream, kernel=False)
             ready.synchronize()
-            expected = torch.from_numpy(upright_image(frame)[..., ::-1].copy()).permute(2, 0, 1).float() / 255.0     # RGB CHW
+            expected = torch.from_numpy(oriented_image(frame)[..., ::-1].copy()).permute(2, 0, 1).float() / 255.0     # RGB CHW
             self.assertEqual(tuple(images[0].shape), tuple(expected.shape))
             self.assertTrue(torch.allclose(images[0].float().cpu(), expected, atol=1e-3), (rotate90, flip_v, flip_h))
 

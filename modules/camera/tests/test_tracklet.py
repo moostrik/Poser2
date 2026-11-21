@@ -6,7 +6,7 @@ import unittest
 import numpy as np
 
 from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, FrameType, TrackingStatus, straightened_tracklets, \
-    upright_image
+    oriented_image
 from modules.camera.geometry import corrected_roi
 from modules.utils import Rect
 
@@ -35,7 +35,7 @@ class StraightenedTrackletsTest(unittest.TestCase):
         np.testing.assert_array_almost_equal(keypoints, [[1.0 - 0.35, 0.5, 0.9]])
 
     def test_turned_and_flipped_as_the_image_is(self) -> None:
-        """A box and a keypoint land where `upright_image` puts the pixels under them, for every flag set."""
+        """A box and a keypoint land where `oriented_image` puts the pixels under them, for every flag set."""
         height, width = 20, 40
         roi = Rect(0.1, 0.2, 0.3, 0.4)
         point = np.array([[5.5 / 40, 12.5 / 20, 0.9]], dtype=np.float32)      # the center of pixel (12, 5)
@@ -46,7 +46,7 @@ class StraightenedTrackletsTest(unittest.TestCase):
             for flip_v in (False, True):
                 for flip_h in (False, True):
                     flags = (rotate90, flip_v, flip_h)
-                    upright = upright_image(CameraFrame(0, FrameType.VIDEO, image, 0.0, rotate90=rotate90, flip_v=flip_v, flip_h=flip_h))
+                    upright = oriented_image(CameraFrame(0, FrameType.VIDEO, image, 0.0, rotate90=rotate90, flip_v=flip_v, flip_h=flip_h))
                     h, w = upright.shape
                     result = straightened_tracklets(message(roi, point), None, *flags).tracklets[0]
                     box = result.roi

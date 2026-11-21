@@ -11,16 +11,6 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 
 ## E. One host-side flip
 
-- E1. The host-side helpers are named after the flag they apply: `upright_image` → `oriented_image`, `upright_corners`
-  → `oriented_corners`; `mirrored_roi` / `mirrored_keypoints` → `flip_h_roi` / `flip_h_keypoints`; `flipped_roi` /
-  `flipped_keypoints` → `flip_v_roi` / `flip_v_keypoints`; `turned_roi` / `turned_keypoints` → `rotate90_roi` /
-  `rotate90_keypoints`; `geometry/mirror.py` → `geometry/flips.py`; CAMERA.md, OAK4.md and RECORDING.md say `rotate90`, not "the turn". Why:
-  "use that one term everywhere": the frame's flags are `flip_h`, `flip_v`, `rotate90` **(seen: `frame.py`)**, and the
-  three together are its orientation. `mirrored_image`, `mirrored_intrinsics`, `mirrored_alignment` and
-  `mirrored_tracklets` are not renamed: the recorder is their only caller outside `modules/camera`, and E3 takes them
-  away **(seen)**. Call sites: `tracklet.py`, oak4's `sensor_region`, smile's face finder and main, CAMERA.md, and the
-  tests of the camera, oak4, geometry and inference's uploader **(seen)**. Smile owns `rotate90` and the flips and
-  checks it once built.
 - E2. `oriented_image` applies `rotate90` and both flips in the frame's own layout, NV12 included (Y as a plain array,
   UV as (H/2, W/2, 2)); `bgr_frame` stays. Why: "Inside a package, code that does the same is written once":
   `mirrored_image` and `oriented_image` both flip on the host, and only `mirrored_image` takes NV12 **(seen:
@@ -62,6 +52,5 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 ## Rules it touches
 
 - Inside a package, code that does the same is written once: E2
-- Use that one term everywhere it appears: E1
 - Remove obsolete pathways instead of leaving parallel legacy ones: E3
 - Stamp a frame once, with its moment of capture where the device reports one: F1
