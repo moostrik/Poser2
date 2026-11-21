@@ -13,6 +13,6 @@ designed.
   semi-Lagrangian step leave unit 8 as it was (seen: `advect_faces_3d.py`, `.comp`). Harmless.
 - `DensityColor.mask` (hd_trio, unit 1): hd_trio builds its `BridgeInput` without a mask, so unit 1 gets texture 0
   and the shader reads it only under `has_mask` (seen: `hd_trio_render.py`, `density_color.py`, `.frag`). Harmless to
-  the GL; whether hd_trio's density should be gated by a player mask is hd_trio's question (open).
+  the GL; whether hd_trio's density should be gated by a player mask is hd_trio's question, for when hd_trio's turn comes (open).
 
 A probe that skips a sampler whose guard is off would show only real misses; a note, not a step.
