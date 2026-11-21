@@ -64,7 +64,7 @@ class DepthVelocity(FlowBase):
         return self._output
 
     @property
-    def difference(self) -> Texture:
+    def difference(self) -> SwapTarget:
         """The estimate (RGBA32F): z before the threshold in red (view widths per frame), its disparity
         (1/m) in green, the disparity's rate (1/m per second) in blue and the dead zone's anchor (m) in alpha."""
         return self._estimate

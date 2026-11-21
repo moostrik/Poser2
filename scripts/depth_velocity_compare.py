@@ -47,7 +47,7 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_FLOAT, GL_FRAMEBUFFER, GL_R32F, G
                        glClear, glClearColor, glFinish, glReadPixels, glTexImage2D, glViewport)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from modules.gl import Context, Fbo, SwapFbo, Texture  # noqa: E402
+from modules.gl import Context, Fbo, Texture  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from measure_sums import MeasureSums, RegionTexture, SideSums, p99_of, region_bits  # noqa: E402
 from modules.flow import FlowUtil, LucasKanadeFlow3D, LucasKanadeFlow3DSettings, Patch, Visualizer  # noqa: E402
@@ -682,7 +682,7 @@ def measure(captures: list[Path], specs: list[tuple[str, dict[str, object]]], ou
                 s = side.settings
                 to_px = (delta_time * w / (s.x_gain or 1.0), delta_time * w / (s.y_gain or 1.0), delta_time * w / (s.z_gain or 1.0))
                 first = side is sides[0] and weighed                  # the z position's weight is the view's, the first side's
-                estimate = cast(SwapFbo, side.flow.depth_velocity.difference)      # its front and back
+                estimate = side.flow.depth_velocity.difference      # its front and back
                 sums = summer.use(sums_of, side.flow.velocity, estimate, estimate.back, side.flow.z_position if first else None,
                                   region_texture, side.flow.depth_velocity.misses, to_px, float(w), segment == 'still')
                 side.measures.add_sums(float(frames.t[k]), segment, sums, regions, milliseconds, first)
