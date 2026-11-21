@@ -2,13 +2,13 @@
 
 import random
 import threading
-import time
 import unittest
 from functools import partial
 
 import numpy as np
 
 from modules.camera import CameraFrame, FrameType
+from modules.inference.tests.wait import wait_for
 
 from .. import CameraSync, CameraSyncSettings, SyncMessage
 from ..camera_sync import PHASE_FRAMES
@@ -136,9 +136,7 @@ class CameraSyncThreadTest(unittest.TestCase):
         self.sync.stop()
 
     def wait_for(self, count: int) -> None:
-        end: float = time.perf_counter() + 1.0
-        while len(self.fired) < count and time.perf_counter() < end:
-            time.sleep(0.001)
+        wait_for(lambda: len(self.fired) >= count, 1.0)
 
     def test_a_sync_fires_on_the_sync_thread(self) -> None:
         self.sync.submit(frame(0, 1.0))

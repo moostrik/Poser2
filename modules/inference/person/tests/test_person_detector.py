@@ -4,7 +4,6 @@ are checked without the real model (ONNX Runtime's CUDA provider)."""
 
 import os
 import tempfile
-import time
 import unittest
 
 import numpy as np
@@ -14,6 +13,7 @@ from onnx import TensorProto, helper, numpy_helper
 
 from modules.inference import GpuImage, ModelType
 from modules.inference.person import PersonDetector, Resolution, PersonDetectorSettings
+from modules.inference.tests.wait import wait_for
 from modules.utils import Rect
 
 WIDTH, HEIGHT = 512, 448
@@ -53,15 +53,6 @@ def uploaded(cam_id: int, height: int, width: int, timestamp: float) -> GpuImage
     ready = torch.cuda.Event()
     ready.record()
     return GpuImage(cam_id, timestamp, image, ready)
-
-
-def wait_for(condition, timeout: float = 5.0) -> bool:
-    end = time.perf_counter() + timeout
-    while time.perf_counter() < end:
-        if condition():
-            return True
-        time.sleep(0.01)
-    return condition()
 
 
 class PersonDetectorTest(unittest.TestCase):

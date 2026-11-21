@@ -14,6 +14,7 @@ import torch.nn.functional as F
 
 from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, FrameType, TrackingStatus
 from modules.utils import Rect
+from modules.inference.tests.wait import wait_for
 
 from .. import GpuDepth, GpuImage, ImageSnapshot, ImageUpload, SerialUploader, SerialUploaderSettings
 from ..image_upload import nv12_to_rgb, warp_grid
@@ -90,9 +91,7 @@ class HandOffTest(unittest.TestCase):
         self.uploader.stop()
 
     def wait_for(self, count: int) -> None:
-        end = time.perf_counter() + 5.0
-        while len(self.handed) < count and time.perf_counter() < end:
-            time.sleep(0.005)
+        wait_for(lambda: len(self.handed) >= count, 5.0)
 
     def test_frames_are_handed_on_in_order_on_the_uploader_s_thread(self) -> None:
         self.uploader.start()

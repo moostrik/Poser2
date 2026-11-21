@@ -9,6 +9,7 @@ import numpy as np
 from modules.camera import FrameType
 from modules.recording import FrameMetadata
 from modules.inference import RecordedPoses, RecordedPosesSettings
+from modules.inference.tests.wait import wait_for
 from modules.pose import BBox, Frame, FrameDict, FrameDictCallbackMixin, Points2D
 from modules.utils import Rect
 
@@ -38,15 +39,6 @@ class FakePose(FrameDictCallbackMixin):
     def start(self) -> None: ...
     def stop(self) -> None: ...
     def reset(self) -> None: ...
-
-
-def wait_for(condition, seconds: float = 2.0) -> bool:
-    end: float = time.perf_counter() + seconds
-    while time.perf_counter() < end:
-        if condition():
-            return True
-        time.sleep(0.002)
-    return condition()
 
 
 class RecordedPosesTest(unittest.TestCase):

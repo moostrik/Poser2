@@ -2,13 +2,13 @@
 its bound. Runs on a CUDA install."""
 
 import threading
-import time
 import unittest
 
 import numpy as np
 import torch
 
 from modules.camera import CameraFrame, FrameType
+from modules.inference.tests.wait import wait_for
 
 from .. import BatchUploader, GpuImage, ImageSnapshot
 from ..batch_uploader import WAITING
@@ -33,9 +33,7 @@ class BatchUploaderTest(unittest.TestCase):
         self.uploader.stop()
 
     def wait_for(self, count: int) -> None:
-        end: float = time.perf_counter() + 5.0
-        while len(self.snapshots) < count and time.perf_counter() < end:
-            time.sleep(0.005)
+        wait_for(lambda: len(self.snapshots) >= count, 5.0)
 
     def test_a_set_comes_out_as_its_images_and_one_snapshot(self) -> None:
         self.uploader.start()
