@@ -77,9 +77,7 @@ class Camera:
                 self._device.start()
             except Exception as e:
                 logger.warning('Camera %s failed to start: %s', self._device_name, e)
-            # also when it did not connect: a device that keeps trying (Vimba) delivers when it is there
-            if not self._device.connected:
-                logger.warning('No camera device (%s): only the image source is available', self._device_name)
+            # a device that opens on its own thread (Vimba, OAK4) is not connected yet: the readout says when it is
         self._show_device()
         self._running = True
         self._thread.start()
@@ -184,6 +182,10 @@ class Camera:
         """The device readout: its name while it is connected, `none` while it is not (yet, or any more)."""
         name: str = self._device_name if self._device is not None and self._device.connected else 'none'
         if name != self._device_shown:
+            if name != 'none':
+                logger.info('Camera device %s connected', name)
+            elif self._device_shown is not None:
+                logger.warning('Camera device %s gone: only the image source is available', self._device_shown)
             self._device_shown = name
             self.settings.device = name
 

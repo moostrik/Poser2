@@ -5,7 +5,7 @@ from .cam import Camera
 from .view import cover
 from modules import recording
 from modules.recording import replay
-from modules.camera import CameraFrame, CameraSource, bgr_frame, upright_image, vimba, webcam
+from modules.camera import CameraFrame, CameraSource, bgr_frame, upright_image, oak4, vimba, webcam
 from modules.session import Session
 from modules.inference import GpuImage, SerialUploader
 from modules.inference.face import FaceDetector
@@ -43,6 +43,7 @@ NO_CAMERA: str = 'no camera frames'
 class CamType(Enum):
     VIMBA   = 2
     WEB     = 3
+    OAK4    = 4
 
 
 def parse_args(args: list[str]) -> Namespace:
@@ -51,6 +52,7 @@ def parse_args(args: list[str]) -> Namespace:
     parser.add_argument('-dw',  '--width',          type=int,   default=1280,   help='image width (4:5 like the generated portraits; 1280 x 1024 is the display in portrait mode)')
     parser.add_argument('-dh',  '--height',         type=int,   default=1024,   help='image height')
     parser.add_argument('-wc',  '--webcam',         action='store_true',        help='use a webcam instead of the Vimba camera')
+    parser.add_argument('-oak', '--oak4',           action='store_true',        help='use the OAK4 instead of the Vimba camera')
     parser.add_argument('-lm',  '--landscape',      action='store_true',        help='landscape instead of portrait mode')
     parser.add_argument('-fs',  '--fullscreen',     action='store_true',        help='open borderless fullscreen, the walls too (the installation) instead of the window modes of the settings file')
     return parser.parse_args(args)
@@ -66,7 +68,7 @@ class SmileMain():
         self.portrait_mode: bool = not options.landscape
         if self.portrait_mode:
             self.width, self.height = self.height, self.width
-        cam_type: CamType = CamType.WEB if options.webcam else CamType.VIMBA
+        cam_type: CamType = CamType.OAK4 if options.oak4 else CamType.WEB if options.webcam else CamType.VIMBA
         fullscreen: bool = options.fullscreen
 
         # SETTINGS
@@ -115,6 +117,9 @@ class SmileMain():
             # without the Vimba 6 SDK (VIMBA_HOME, VimbaC) the backend logs an error at start: no device, the image still works
             device = vimba.Camera(self.settings.setup.camera, rotate90=self.portrait_mode)
             device_name = 'vimba'
+        elif cam_type == CamType.OAK4:
+            device = oak4.Camera(self.settings.setup.camera.oak4, rotate90=self.portrait_mode)
+            device_name = 'oak4'
         else:
             device = webcam.Camera(self.settings.setup.camera, rotate90=self.portrait_mode)
             device_name = 'webcam'

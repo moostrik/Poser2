@@ -4,5 +4,5 @@
 @echo off
 
 cd /d "%~dp0..\..\..\"
-.venv\Scripts\python.exe -m apps.smile.save.record "%~1" --open
+.venv-oak4\Scripts\python.exe -m apps.smile.save.record "%~1" --open
 if errorlevel 1 pause

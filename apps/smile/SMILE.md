@@ -4,9 +4,10 @@ Art installation: a camera captures a face, an image generator turns it into a p
 result is shown with music (Max patch via OSC) and lights (Art-Net), and the grins of the visitors before
 play on two walls of screens. The person in SMILE is a "visitor", the one exception to the glossary's "player"
 ([`smile.md`, Names](../../.claude/rules/smile.md)). SMILE is `apps/smile/` of Poser2: `launcher.py -app smile` from the Poser2 root starts it
-(`SmileMain` in `main.py`; its own arguments `-fs`, `-wc`, `-lm`, `-dw`, `-dh` follow the launcher's; the walls are windows 1
+(`SmileMain` in `main.py`; its own arguments `-fs`, `-wc`, `-oak`, `-lm`, `-dw`, `-dh` follow the launcher's; the walls are windows 1
 and 2 of its render). Paths in this file are relative to `apps/smile/`; commands run from the Poser2 root with
-its `.venv` (`scripts/install.bat` there makes it, `apps/smile/scripts/install.bat` adds ComfyUI). Tests:
+its `.venv-oak4`, the depthai 3 venv the OAK4 needs (`scripts/install.bat oak4` there makes it, `apps/smile/scripts/install.bat`
+adds ComfyUI). Tests:
 `python -m unittest discover -s apps/smile/<package>/tests -t .` (`tests`, `face`, `comfy`, ..., `relay`).
 The app's packages are its own (`cam`, `face`, `comfy`, `render`, `player`, ...); `modules/gl`, `modules/settings`,
 `modules/utils` and `modules/logging` are Poser2's, shared with the other apps. `data/` is what the installation
@@ -23,8 +24,10 @@ ever chosen; the generator: the flash stays), so its loop logs what its work rai
 ## Camera
 
 `cam/camera.py` is the one source the app reads: it wraps the device, a camera backend of `modules/camera/` on the
-camera contract (`modules.camera.vimba.Camera` default, `modules.camera.webcam.Camera` with `-wc`; both take
-`rotate90` for the portrait mode at construction), and an image source from `data/input/` that the panel's `use_image` switch puts in
+camera contract (`modules.camera.vimba.Camera` default, `modules.camera.webcam.Camera` with `-wc`,
+`modules.camera.oak4.Camera` with `-oak`; all take `rotate90` for the portrait mode at construction; the OAK4 has its own
+settings, `camera.oak4`: no model and no depth on the camera, `P2160`, its own flips and rate, its color frames NV12,
+which `bgr_frame` converts for the portrait crop), and an image source from `data/input/` that the panel's `use_image` switch puts in
 place of the device frames at any time. The device and the phone only hand their newest frame over; `Camera`'s own
 thread hands it on whole as a `CameraFrame` (`CameraFrameCallback`): to the render's camera image, and, while the
 camera states run, to the uploader of the faces. A device frame keeps its turn and flips as flags: the render's
