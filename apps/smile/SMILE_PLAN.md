@@ -5,11 +5,6 @@ What is next for smile, the app in [SMILE.md](SMILE.md); what spans the apps is 
 
 ## G. The OAK4 as a camera
 
-- G2 `modules/camera`: `bgr_frame(frame)`, the frame with its NV12 image converted to BGR (`nv12` off), any other
-  frame as it is. `upright_image` keeps its one job and its assert. The OAK4's color frames are NV12, so smile's
-  portrait crop (`FaceFinder.best`) and capture fallback (`Main`) call `upright_image(bgr_frame(frame))`. NV12 is
-  converted before the turn because a quarter turn would split its interleaved color pairs.
-  Tests: `modules/camera/tests`.
 - G3 smile runs in `.venv-oak4` for good: `scripts/startSMILE.bat`, `scripts/install.bat` (`VENV_DIR`),
   `scripts/clip_info.bat`, `scripts/make_test_workflow.bat` and README.md's commands. First check that the vendored
   Vimba code and the rest of smile's dependencies import there (the venvs differ only in depthai, `pyproject.toml`).
