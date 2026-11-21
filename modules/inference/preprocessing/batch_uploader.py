@@ -13,12 +13,12 @@ and hands each image on written, for the readers outside the package. No trackle
 import logging
 import time
 from collections import deque
-from threading import Condition, Lock, Thread
+from threading import Condition, Thread
 
 import torch
 
 from modules.camera import CameraFrame
-from modules.utils import PerformanceTimer
+from modules.utils import Broadcast, PerformanceTimer
 
 from .image_upload import ImageUpload
 from .source import CaptureCallback, GpuImage, GpuImageCallback, ImageDict, ImageSnapshot, ImageSnapshotCallback
@@ -42,11 +42,10 @@ class BatchUploader:
         self._set_wait: PerformanceTimer = PerformanceTimer(name="Wait upload set")
         self._timer: PerformanceTimer = PerformanceTimer(name="GPU Set Upload", sample_count=200, report_interval=100,
                                                          color="green", omit_init=25)
-        self._callback_lock: Lock = Lock()
-        self._image_callbacks: list[GpuImageCallback] = []         # run in registration order, on this thread
-        self._snapshot_callbacks: list[ImageSnapshotCallback] = [] # run in registration order, after the image callbacks
-        self._capture_callbacks: list[CaptureCallback] = []        # after the snapshot callbacks
-        self._finished_image_callbacks: list[GpuImageCallback] = []    # last, once the stream has run
+        self._image_callbacks: Broadcast[GpuImage] = Broadcast(name="BatchUploader image")
+        self._snapshot_callbacks: Broadcast[ImageSnapshot] = Broadcast(name="BatchUploader snapshot")
+        self._capture_callbacks: Broadcast[dict[int, float]] = Broadcast(name="BatchUploader capture")
+        self._finished_image_callbacks: Broadcast[GpuImage] = Broadcast(name="BatchUploader finished image")
         self._finish_timer: PerformanceTimer = PerformanceTimer(name="Wait upload finished")
 
     @property
@@ -56,27 +55,19 @@ class BatchUploader:
 
     def add_gpu_image_callback(self, callback: GpuImageCallback) -> None:
         """Every uploaded image, with its capture time and the event that says it is written, on this thread."""
-        with self._callback_lock:
-            if callback not in self._image_callbacks:
-                self._image_callbacks.append(callback)
+        self._image_callbacks.add_callback(callback)
 
     def add_snapshot_callback(self, callback: ImageSnapshotCallback) -> None:
         """Every uploaded set as an `ImageSnapshot`, on this thread, after the image callbacks."""
-        with self._callback_lock:
-            if callback not in self._snapshot_callbacks:
-                self._snapshot_callbacks.append(callback)
+        self._snapshot_callbacks.add_callback(callback)
 
     def add_capture_callback(self, callback: CaptureCallback) -> None:
         """Every uploaded set's capture times by cam_id, on this thread, after the snapshot callbacks."""
-        with self._callback_lock:
-            if callback not in self._capture_callbacks:
-                self._capture_callbacks.append(callback)
+        self._capture_callbacks.add_callback(callback)
 
     def add_finished_gpu_image_callback(self, callback: GpuImageCallback) -> None:
         """Every uploaded image, written, on this thread, last."""
-        with self._callback_lock:
-            if callback not in self._finished_image_callbacks:
-                self._finished_image_callbacks.append(callback)
+        self._finished_image_callbacks.add_callback(callback)
 
     # ── Lifecycle ─────────────────────────────────────────────────────
 
@@ -142,37 +133,16 @@ class BatchUploader:
 
         timestamps: dict[int, float] = {cam_id: frame.timestamp for cam_id, frame in frames.items()}
         snapshot: ImageSnapshot = (images, timestamps, ready)
-        with self._callback_lock:
-            image_callbacks: list[GpuImageCallback] = list(self._image_callbacks)
-            snapshot_callbacks: list[ImageSnapshotCallback] = list(self._snapshot_callbacks)
-            capture_callbacks: list[CaptureCallback] = list(self._capture_callbacks)
-            finished_callbacks: list[GpuImageCallback] = list(self._finished_image_callbacks)
         gpu_images: list[GpuImage] = [GpuImage(cam_id, timestamps[cam_id], image, ready, frames[cam_id])
                                       for cam_id, image in images.items()]
         for gpu_image in gpu_images:
-            for callback in image_callbacks:
-                try:
-                    callback(gpu_image)
-                except Exception:
-                    logger.exception("BatchUploader: error in an image callback")
-        for snapshot_callback in snapshot_callbacks:
-            try:
-                snapshot_callback(snapshot)
-            except Exception:
-                logger.exception("BatchUploader: error in a snapshot callback")
-        for capture_callback in capture_callbacks:
-            try:
-                capture_callback(timestamps)
-            except Exception:
-                logger.exception("BatchUploader: error in a capture callback")
-        if not finished_callbacks:
+            self._image_callbacks(gpu_image)
+        self._snapshot_callbacks(snapshot)
+        self._capture_callbacks(timestamps)
+        if not self._finished_image_callbacks:
             return
         finish_start: float = time.perf_counter()
         self._stream.synchronize()
         self._finish_timer.add_time((time.perf_counter() - finish_start) * 1000.0, report=False)
         for gpu_image in gpu_images:
-            for callback in finished_callbacks:
-                try:
-                    callback(gpu_image)
-                except Exception:
-                    logger.exception("BatchUploader: error in a finished image callback")
+            self._finished_image_callbacks(gpu_image)

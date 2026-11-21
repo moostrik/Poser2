@@ -9,14 +9,13 @@ found in, carried unread. A newer image of a camera replaces one still waiting: 
 
 import logging
 import time
-from threading import Lock
 
 import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
 
-from modules.utils import PerformanceTimer
+from modules.utils import Broadcast, PerformanceTimer
 
 from ..engine import Engine, ModelWorker, make_engine
 from ..preprocessing import GpuImage
@@ -50,19 +49,14 @@ class FaceDetector(ModelWorker[GpuImage, FaceDetectorSettings]):
         super().__init__(settings, "FaceDetector")
         self._detection: Engine = make_engine(settings.model_type, settings.model_file(DETECTION_MODEL))
         self._landmarks: Engine = make_engine(settings.model_type, settings.model_file(LANDMARKS_MODEL))
-        self._callback_lock: Lock = Lock()
-        self._callbacks: list[FaceFrameCallback] = []   # run in registration order, on this thread
+        self._callbacks: Broadcast[FaceFrame] = Broadcast(name="face")
         self._timer: PerformanceTimer = PerformanceTimer(name="Face Detection", sample_count=200, report_interval=100, color='magenta', omit_init=10)
 
     def add_face_callback(self, callback: FaceFrameCallback) -> None:
-        with self._callback_lock:
-            if callback not in self._callbacks:
-                self._callbacks.append(callback)
+        self._callbacks.add_callback(callback)
 
     def remove_face_callback(self, callback: FaceFrameCallback) -> None:
-        with self._callback_lock:
-            if callback in self._callbacks:
-                self._callbacks.remove(callback)
+        self._callbacks.remove_callback(callback)
 
     def submit(self, image: GpuImage) -> None:
         """An uploaded image to look at; the newest per camera is kept."""
@@ -75,13 +69,7 @@ class FaceDetector(ModelWorker[GpuImage, FaceDetectorSettings]):
             except Exception:
                 logger.exception("Face detector error")
                 continue
-            with self._callback_lock:
-                callbacks: list[FaceFrameCallback] = list(self._callbacks)
-            for callback in callbacks:
-                try:
-                    callback(frame)
-                except Exception:
-                    logger.exception("Error in a face callback")
+            self._callbacks(frame)
 
     def _setup(self) -> None:
         assert self._stream is not None

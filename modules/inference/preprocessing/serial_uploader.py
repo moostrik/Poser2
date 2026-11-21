@@ -5,7 +5,7 @@ arrival order."""
 import time
 import logging
 from collections import deque
-from threading import Condition, Lock, Thread
+from threading import Condition, Thread
 
 import numpy as np
 import torch
@@ -13,7 +13,7 @@ import torch
 from modules.camera import CAPTURE_TOLERANCE, CameraFrame, CameraTracklets, DepthAlignment, FrameType, TrackletCallback, \
     aligned_depth_size, depth_projection, straightened_tracklets
 from modules.settings import BaseSettings, Field
-from modules.utils import PerformanceTimer
+from modules.utils import Broadcast, PerformanceTimer
 from .depth_align import DepthAligner
 from .image_upload import ImageUpload
 from .source import CaptureCallback, GpuDepth, GpuDepthCallback, GpuImage, GpuImageCallback, ImageSnapshot, ImageSnapshotCallback
@@ -63,15 +63,14 @@ class SerialUploader:
             name="GPU Image Upload  ", sample_count=200, report_interval=100,
             color="green", omit_init=25,
         )
-        self._callback_lock: Lock = Lock()                          # the lists below
-        self._gpu_image_callbacks: list[GpuImageCallback] = []     # run in registration order, on this thread
-        self._snapshot_callbacks: list[ImageSnapshotCallback] = [] # run in registration order, on this thread
-        self._capture_callbacks: list[CaptureCallback] = []        # after the snapshot callbacks
-        self._finished_image_callbacks: list[GpuImageCallback] = []    # last, once the stream has run
-        self._gpu_depth_callbacks: list[GpuDepthCallback] = []     # run in registration order, on this thread
-        self._finished_depth_callbacks: list[GpuDepthCallback] = []    # after them, once the stream has run
+        self._gpu_image_callbacks: Broadcast[GpuImage] = Broadcast(name="SerialUploader image")
+        self._snapshot_callbacks: Broadcast[ImageSnapshot] = Broadcast(name="SerialUploader snapshot")
+        self._capture_callbacks: Broadcast[dict[int, float]] = Broadcast(name="SerialUploader capture")
+        self._finished_image_callbacks: Broadcast[GpuImage] = Broadcast(name="SerialUploader finished image")
+        self._gpu_depth_callbacks: Broadcast[GpuDepth] = Broadcast(name="SerialUploader depth")
+        self._finished_depth_callbacks: Broadcast[GpuDepth] = Broadcast(name="SerialUploader finished depth")
         self._finish_timer: PerformanceTimer = PerformanceTimer(name="Wait upload finished")
-        self._tracklet_callbacks: list[TrackletCallback] = []      # run in registration order, on this thread
+        self._tracklet_callbacks: Broadcast[CameraTracklets] = Broadcast(name="SerialUploader tracklet")
         self._queue: deque[tuple[CameraFrame, float]] = deque()            # each with the moment it was queued
         self._tracklets: deque[tuple[CameraTracklets, float]] = deque()    # never dropped: a tracker needs every message
         # How long a frame and a tracklet message wait in their queue for this thread (ms), as timer samples
@@ -120,9 +119,7 @@ class SerialUploader:
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
         """The camera's tracklets, straightened and mirrored as the images are, on this thread."""
-        with self._callback_lock:
-            if callback not in self._tracklet_callbacks:
-                self._tracklet_callbacks.append(callback)
+        self._tracklet_callbacks.add_callback(callback)
 
     def _run(self) -> None:
         while True:
@@ -165,44 +162,28 @@ class SerialUploader:
     def _hand_on_tracklets(self, cam_tracklets: CameraTracklets, homography: np.ndarray | None, flip_h: bool) -> None:
         if not cam_tracklets.straightened:
             cam_tracklets = straightened_tracklets(cam_tracklets, homography, flip_h)
-        with self._callback_lock:
-            tracklet_callbacks: list[TrackletCallback] = list(self._tracklet_callbacks)
-        for callback in tracklet_callbacks:
-            try:
-                callback(cam_tracklets)
-            except Exception:
-                logger.exception("Error in tracklet callback")
+        self._tracklet_callbacks(cam_tracklets)
 
     def add_gpu_image_callback(self, callback: GpuImageCallback) -> None:
         """Every uploaded image, with its capture time and the event that says it is written, on this thread."""
-        with self._callback_lock:
-            if callback not in self._gpu_image_callbacks:
-                self._gpu_image_callbacks.append(callback)
+        self._gpu_image_callbacks.add_callback(callback)
 
     def add_snapshot_callback(self, callback: ImageSnapshotCallback) -> None:
         """Every uploaded color image as an `ImageSnapshot` of one: the image, its capture
         time and the event that says it is written, on this thread, after the image callbacks."""
-        with self._callback_lock:
-            if callback not in self._snapshot_callbacks:
-                self._snapshot_callbacks.append(callback)
+        self._snapshot_callbacks.add_callback(callback)
 
     def add_capture_callback(self, callback: CaptureCallback) -> None:
         """Every uploaded color image's capture time by cam_id, a set of one, on this thread, after the snapshot callbacks."""
-        with self._callback_lock:
-            if callback not in self._capture_callbacks:
-                self._capture_callbacks.append(callback)
+        self._capture_callbacks.add_callback(callback)
 
     def add_finished_gpu_image_callback(self, callback: GpuImageCallback) -> None:
         """Every uploaded image, written, on this thread, last."""
-        with self._callback_lock:
-            if callback not in self._finished_image_callbacks:
-                self._finished_image_callbacks.append(callback)
+        self._finished_image_callbacks.add_callback(callback)
 
     def add_finished_gpu_depth_callback(self, callback: GpuDepthCallback) -> None:
         """Every uploaded depth frame, written, on this thread, after the depth callbacks."""
-        with self._callback_lock:
-            if callback not in self._finished_depth_callbacks:
-                self._finished_depth_callbacks.append(callback)
+        self._finished_depth_callbacks.add_callback(callback)
 
     def _finish(self) -> None:
         """This thread waits for its stream: what it queued is written."""
@@ -212,9 +193,7 @@ class SerialUploader:
 
     def add_gpu_depth_callback(self, callback: GpuDepthCallback) -> None:
         """Every uploaded depth frame, in its place among the images, with the event that says it is written, on this thread."""
-        with self._callback_lock:
-            if callback not in self._gpu_depth_callbacks:
-                self._gpu_depth_callbacks.append(callback)
+        self._gpu_depth_callbacks.add_callback(callback)
 
     def _upload(self, frame: CameraFrame) -> None:
         """A color frame to the GPU (`ImageUpload`, one frame), handed on as a `GpuImage` and as an `ImageSnapshot`
@@ -227,33 +206,12 @@ class SerialUploader:
 
         gpu_image: GpuImage = GpuImage(cam_id, frame.timestamp, rgb, ready, frame)
         snapshot: ImageSnapshot = ({cam_id: rgb}, {cam_id: frame.timestamp}, ready)
-        with self._callback_lock:
-            image_callbacks: list[GpuImageCallback] = list(self._gpu_image_callbacks)
-            snapshot_callbacks: list[ImageSnapshotCallback] = list(self._snapshot_callbacks)
-            capture_callbacks: list[CaptureCallback] = list(self._capture_callbacks)
-            finished_callbacks: list[GpuImageCallback] = list(self._finished_image_callbacks)
-        for callback in image_callbacks:
-            try:
-                callback(gpu_image)
-            except Exception:
-                logger.exception("Error in GPU image callback")
-        for snapshot_callback in snapshot_callbacks:
-            try:
-                snapshot_callback(snapshot)
-            except Exception:
-                logger.exception("Error in snapshot callback")
-        for capture_callback in capture_callbacks:
-            try:
-                capture_callback({cam_id: frame.timestamp})
-            except Exception:
-                logger.exception("Error in capture callback")
-        if finished_callbacks:
+        self._gpu_image_callbacks(gpu_image)
+        self._snapshot_callbacks(snapshot)
+        self._capture_callbacks({cam_id: frame.timestamp})
+        if self._finished_image_callbacks:
             self._finish()
-        for callback in finished_callbacks:
-            try:
-                callback(gpu_image)
-            except Exception:
-                logger.exception("Error in finished GPU image callback")
+            self._finished_image_callbacks(gpu_image)
 
     def _upload_depth(self, frame: CameraFrame) -> None:
         """A depth frame to the GPU: meters and its confidence, moved onto the color's view at its own grid, and handed on."""
@@ -285,18 +243,7 @@ class SerialUploader:
             self._image_upload.staging.queued(confidence_key, ready)
 
         gpu_depth: GpuDepth = GpuDepth(cam_id, frame.timestamp, depth, ready)
-        with self._callback_lock:
-            depth_callbacks: list[GpuDepthCallback] = list(self._gpu_depth_callbacks)
-            finished_callbacks: list[GpuDepthCallback] = list(self._finished_depth_callbacks)
-        for callback in depth_callbacks:
-            try:
-                callback(gpu_depth)
-            except Exception:
-                logger.exception("Error in GPU depth callback")
-        if finished_callbacks:
+        self._gpu_depth_callbacks(gpu_depth)
+        if self._finished_depth_callbacks:
             self._finish()
-        for callback in finished_callbacks:
-            try:
-                callback(gpu_depth)
-            except Exception:
-                logger.exception("Error in finished GPU depth callback")
+            self._finished_depth_callbacks(gpu_depth)

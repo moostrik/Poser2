@@ -1,13 +1,12 @@
 import logging
 import os
 import time
-from threading import Lock
 from typing import TypeAlias
 
 import torch
 
 from modules.pose import FrameDict
-from modules.utils import PerformanceTimer, Rect
+from modules.utils import Broadcast, PerformanceTimer, Rect
 
 from ..engine import Engine, ModelType, ModelWorker, make_engine
 from ..preprocessing import crop
@@ -44,8 +43,7 @@ class Segmenter(ModelWorker[Batch, SegmenterSettings]):
         self._reset_interval: int = settings.reset_interval
         self._batch_count: int = 0
 
-        self._callback_lock: Lock = Lock()
-        self._callbacks: list[ImageCallback] = []       # run in registration order
+        self._callbacks: Broadcast[FrameDict, ImageDict] = Broadcast(name="Segmentation mask")
 
         self._process_timer = PerformanceTimer(name="Segmentation", sample_count=1000, report_interval=100, color='cyan', omit_init=25)
 
@@ -76,23 +74,13 @@ class Segmenter(ModelWorker[Batch, SegmenterSettings]):
         self._put(0, (poses, track_ids, images, boxes, ready))
 
     def add_segmentation_callback(self, callback: ImageCallback) -> None:
-        with self._callback_lock:
-            if callback not in self._callbacks:
-                self._callbacks.append(callback)
+        self._callbacks.add_callback(callback)
 
     def remove_segmentation_callback(self, callback: ImageCallback) -> None:
-        with self._callback_lock:
-            if callback in self._callbacks:
-                self._callbacks.remove(callback)
+        self._callbacks.remove_callback(callback)
 
     def _notify_callbacks(self, poses: FrameDict, images: ImageDict) -> None:
-        with self._callback_lock:
-            callbacks: list[ImageCallback] = list(self._callbacks)
-        for callback in callbacks:
-            try:
-                callback(poses, images)
-            except Exception:
-                logger.exception("Segmentation: error in a mask callback")
+        self._callbacks(poses, images)
 
     def _process(self, items: dict[int, Batch]) -> None:
         poses, track_ids, images, boxes, ready = items[0]

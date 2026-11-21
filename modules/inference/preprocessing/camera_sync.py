@@ -14,12 +14,12 @@ import logging
 import math
 import time
 from collections import deque
-from threading import Condition, Lock, Thread
+from threading import Condition, Thread
 from typing import Callable, Generic, TypeVar
 
 from modules.camera import CameraFrame, CameraTracklets, FrameType
 from modules.settings import BaseSettings, Field
-from modules.utils import PerformanceTimer
+from modules.utils import Broadcast, PerformanceTimer
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +52,7 @@ class CameraSync(Generic[M]):
         self._open: dict[int, M] = {}                       # the set being filled
         self._open_round: int | None = None
 
-        self._callback_lock: Lock = Lock()
-        self._callbacks: list[SyncSetCallback[M]] = []      # run in registration order, with the set
+        self._callbacks: Broadcast[dict[int, M]] = Broadcast(name=self.name)
         self._wake: Condition = Condition()
         self._running: bool = False
         self._inbox: deque[tuple[M, float]] = deque()               # (message, the moment it was queued)
@@ -164,15 +163,7 @@ class CameraSync(Generic[M]):
 
     def add_set_callback(self, callback: SyncSetCallback[M]) -> None:
         """Every set, one message per camera by `cam_id`, on the deciding thread."""
-        with self._callback_lock:
-            if callback not in self._callbacks:
-                self._callbacks.append(callback)
+        self._callbacks.add_callback(callback)
 
     def _notify_callbacks(self, items: dict[int, M]) -> None:
-        with self._callback_lock:
-            callbacks: list[SyncSetCallback[M]] = list(self._callbacks)
-        for callback in callbacks:
-            try:
-                callback(dict(items))
-            except Exception:
-                logger.exception("%s: error in a sync callback", self.name)
+        self._callbacks(dict(items))

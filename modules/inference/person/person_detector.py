@@ -9,13 +9,12 @@ one still waiting: the latest wins, as in the other workers.
 
 import logging
 import time
-from threading import Lock
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 
-from modules.utils import PerformanceTimer, Rect
+from modules.utils import Broadcast, PerformanceTimer, Rect
 
 from ..engine import Engine, ModelWorker, make_engine
 from ..preprocessing import GpuImage
@@ -33,15 +32,12 @@ class PersonDetector(ModelWorker[GpuImage, PersonDetectorSettings]):
         self.height: int = settings.height
         self._engine: Engine = make_engine(settings.model_type, settings.model_file(settings.model))
 
-        self._callback_lock: Lock = Lock()
-        self._callbacks: list[DetectionCallback] = []   # run in registration order, on this thread
+        self._callbacks: Broadcast[Detection] = Broadcast(name="detection")
 
         self._timer: PerformanceTimer = PerformanceTimer(name="Person Detection", sample_count=1000, report_interval=100, color='magenta', omit_init=25)
 
     def add_detection_callback(self, callback: DetectionCallback) -> None:
-        with self._callback_lock:
-            if callback not in self._callbacks:
-                self._callbacks.append(callback)
+        self._callbacks.add_callback(callback)
 
     @property
     def enabled(self) -> bool:
@@ -79,14 +75,8 @@ class PersonDetector(ModelWorker[GpuImage, PersonDetectorSettings]):
             detections.append(Detection(cam_id=cam_id, timestamp=items[cam_id].timestamp, boxes=[Rect(*map(float, r)) for r in rects],
                                         scores=[float(s) for s in scores]))
         self._timer.add_time((time.perf_counter() - start) * 1000.0, report=self.settings.verbose)
-        with self._callback_lock:
-            callbacks = list(self._callbacks)
         for detection in detections:
-            for callback in callbacks:
-                try:
-                    callback(detection)
-                except Exception:
-                    logger.exception("Error in detection callback")
+            self._callbacks(detection)
 
     def _batch(self, images: list[GpuImage]) -> torch.Tensor:
         """The images stretched to the model's size, (N, 3, height, width) float32 RGB in [0, 1], on this

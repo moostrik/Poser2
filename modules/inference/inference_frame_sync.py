@@ -31,7 +31,7 @@ from typing import Any, Callable
 
 from modules.camera import CAPTURE_TOLERANCE, CaptureStream, MissedParts
 from modules.settings import BaseSettings, Field
-from modules.utils import PerformanceTimer, Waker
+from modules.utils import Broadcast, PerformanceTimer, Waker
 
 from .inference_frame import Depth, InferenceFrame, InferenceFrameCallback, InferenceResult, Masks, Poses
 from .preprocessing import GpuImage
@@ -102,13 +102,10 @@ class InferenceFrameSync:
         self._last: dict[int, float] = {}               # the capture time of each camera's last frame
         self._waiting: dict[int, _Waiting] = {}
         self._missed: MissedParts = MissedParts('Inference frame sync')
-        self._callback_lock: Lock = Lock()
-        self._callbacks: list[InferenceFrameCallback] = []     # run in registration order
+        self._callbacks: Broadcast[InferenceFrame] = Broadcast(name="inference frame")
 
     def add_frame_callback(self, callback: InferenceFrameCallback) -> None:
-        with self._callback_lock:
-            if callback not in self._callbacks:
-                self._callbacks.append(callback)
+        self._callbacks.add_callback(callback)
 
     # ── Lifecycle ──────────────────────────────────────────────────────
 
@@ -319,11 +316,5 @@ class InferenceFrameSync:
         if self.settings.dropped != dropped:
             self.settings.dropped = dropped
         self._missed.warn()
-        with self._callback_lock:
-            callbacks: list[InferenceFrameCallback] = list(self._callbacks)
         for frame in frames:
-            for callback in callbacks:
-                try:
-                    callback(frame)
-                except Exception:
-                    logger.exception('Error in an inference frame callback')
+            self._callbacks(frame)

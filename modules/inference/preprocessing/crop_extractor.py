@@ -10,7 +10,7 @@ from modules.pose import BBox, FrameDict, replace
 from modules.settings import BaseSettings, Field
 from .crop import AskedCallback, Image, CropImageDict, ImageCallback
 from .source import ImageDict, ImageSnapshot
-from modules.utils import PerformanceTimer, Rect, Point2f
+from modules.utils import Broadcast, PerformanceTimer, Rect, Point2f
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +52,13 @@ class CropExtractor:
         self.settings: CropExtractorSettings = settings
         self._sizes: tuple[CropExtractorSettings, ...] = (settings, *more)
         self._processed: int = 0                        # the processes taken, for each size's `interval`
-        self._callback_lock: Lock = Lock()
-        self._callbacks: dict[int, list[ImageCallback]] = {id(size): [] for size in self._sizes}   # per size, in registration order
-        self._asked_callbacks: dict[int, list[AskedCallback]] = {id(size): [] for size in self._sizes}
-        self._finished_callbacks: dict[int, list[ImageCallback]] = {id(size): [] for size in self._sizes}
+        # each size's callbacks, by the size's id
+        self._callbacks: dict[int, Broadcast[FrameDict, CropImageDict]] = {
+            id(size): Broadcast(name="crop") for size in self._sizes}
+        self._asked_callbacks: dict[int, Broadcast[float, int, FrameDict]] = {
+            id(size): Broadcast(name="crop asked") for size in self._sizes}
+        self._finished_callbacks: dict[int, Broadcast[FrameDict, CropImageDict]] = {
+            id(size): Broadcast(name="finished crop") for size in self._sizes}
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
         self._snapshot_lock: Lock = Lock()              # the uploader's thread keeps them, the frame source's takes them
         self._snapshots: deque[ImageSnapshot] = deque(maxlen=KEPT)
@@ -65,25 +68,19 @@ class CropExtractor:
         """The poses with their crops at `size` (one of the settings this was made with; the first by default), as
         soon as they are cut."""
         key: int = self._key(size)
-        with self._callback_lock:
-            if callback not in self._callbacks[key]:
-                self._callbacks[key].append(callback)
+        self._callbacks[key].add_callback(callback)
 
     def add_finished_image_callback(self, callback: ImageCallback, size: CropExtractorSettings | None = None) -> None:
         """The poses with their crops at `size` (the first by default), written: after the other callbacks, once the
         crop stream has run."""
         key: int = self._key(size)
-        with self._callback_lock:
-            if callback not in self._finished_callbacks[key]:
-                self._finished_callbacks[key].append(callback)
+        self._finished_callbacks[key].add_callback(callback)
 
     def add_asked_callback(self, callback: AskedCallback, size: CropExtractorSettings | None = None) -> None:
         """Per camera in each process, its capture time and the poses cut for its image at `size` (the first by
         default), none when the interval passed it; after the image callbacks."""
         key: int = self._key(size)
-        with self._callback_lock:
-            if callback not in self._asked_callbacks[key]:
-                self._asked_callbacks[key].append(callback)
+        self._asked_callbacks[key].add_callback(callback)
 
     def _key(self, size: CropExtractorSettings | None) -> int:
         key: int = id(size if size is not None else self.settings)
@@ -133,39 +130,21 @@ class CropExtractor:
 
         for size in due:
             cropped, crops = cut[id(size)]
-            with self._callback_lock:
-                callbacks: list[ImageCallback] = list(self._callbacks[id(size)])
-            for callback in callbacks:
-                try:
-                    callback(cropped, crops)
-                except Exception:
-                    logger.exception("Error in crop callback")
+            self._callbacks[id(size)](cropped, crops)
         for size in self._sizes:
             cropped = cut[id(size)][0] if id(size) in cut else {}
-            with self._callback_lock:
-                asked_callbacks: list[AskedCallback] = list(self._asked_callbacks[id(size)])
             for cam_id, timestamp in timestamps.items():
                 cam_asked: FrameDict = {track_id: pose for track_id, pose in cropped.items() if pose.cam_id == cam_id}
-                for asked_callback in asked_callbacks:
-                    try:
-                        asked_callback(timestamp, cam_id, cam_asked)
-                    except Exception:
-                        logger.exception("Error in asked callback")
+                self._asked_callbacks[id(size)](timestamp, cam_id, cam_asked)
 
-        with self._callback_lock:
-            finished: list[tuple[int, list[ImageCallback]]] = [(id(size), list(self._finished_callbacks[id(size)]))
-                                                               for size in due if self._finished_callbacks[id(size)]]
+        finished: list[int] = [id(size) for size in due if self._finished_callbacks[id(size)]]
         if finished:
             start: float = time.perf_counter()
             self._stream.synchronize()
             self._finish_timer.add_time((time.perf_counter() - start) * 1000.0, report=False)
-        for key, finished_callbacks in finished:
+        for key in finished:
             cropped, crops = cut[key]
-            for finished_callback in finished_callbacks:
-                try:
-                    finished_callback(cropped, crops)
-                except Exception:
-                    logger.exception("Error in finished crop callback")
+            self._finished_callbacks[key](cropped, crops)
 
     def _cut(self, size: CropExtractorSettings, frames: FrameDict, current: ImageDict,
              timestamps: dict[int, float], crops_ready: torch.cuda.Event) -> tuple[FrameDict, CropImageDict]:
