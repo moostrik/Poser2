@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import ctypes
+import logging
 from dataclasses import dataclass
 from enum import IntEnum
 
 import glfw
+
+logger = logging.getLogger(__name__)
 
 
 class MonitorId(IntEnum):
@@ -46,7 +49,8 @@ class Monitor:
                 x, y = glfw.get_monitor_pos(handle)
                 name = glfw.get_monitor_name(handle)
             except Exception:
-                continue        # pyGLFW raises for a monitor that is being disconnected
+                logger.debug("Monitor skipped: pyGLFW raised for it, as for a monitor being unplugged", exc_info=True)
+                continue
             if not mode:
                 continue
             monitor = Monitor(name.decode('utf-8', 'replace') if isinstance(name, bytes) else str(name or ''),

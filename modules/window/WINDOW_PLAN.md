@@ -3,12 +3,6 @@
 What is not built in `modules/window`, from the package scan of 2026-11-21. The steps are proposals; a step is one
 commit, built on Matthias's go, checked by pyright and the window tests.
 
-## A. Form
-
-- A2. `Monitor.connected` logs, at debug, a monitor it skips because pyGLFW raised for it (a monitor being
-  unplugged), instead of a bare `continue`. Why: "Log exceptions with context; never fail silently" (seen:
-  `monitor.py`).
-
 ## B. The loop and the apps
 
 The apps' render files are the Render thread's while it builds its plan; these steps touch them only once it is done.
