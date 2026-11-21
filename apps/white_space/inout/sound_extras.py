@@ -70,7 +70,7 @@ class SoundExtras:
             ("/global/sync", (0.0 if idle or light_frame is None else float(light_frame.sync),)),
             # Presence, not show state, so never zeroed on idle: the count of live players,
             # the dummy excluded — the same frames the active flags are built from.
-            ("/global/players", (sum(1 for id in range(self.settings.max_players) if id in frames),)),
+            ("/global/players", (sum(1 for track_id in range(self.settings.max_players) if track_id in frames),)),
             # Operator settings, not show state, so they are never zeroed on idle: the fader and
             # the speaker placement must read true whenever they are turned, show or no show.
             ("/global/volume", (float(self.settings.volume),)),
@@ -86,25 +86,25 @@ class SoundExtras:
         return values
 
     def player_messages(self, frame: Frame) -> list[OscMessage]:
-        id: int = frame.track_id
+        track_id: int = frame.track_id
         arms: np.ndarray = frame[ArmTravel].values[TravelElement.left_arm:] if ArmTravel in frame else np.zeros(3, dtype=np.float32)
         return [
             # range [0, 1] - the whole arms: left, right (each the union of its shoulder's and its
             # elbow's travel) and their mean
-            (f"/pose/{id}/arm", (arms,)),
+            (f"/pose/{track_id}/arm", (arms,)),
             # range [-1, 1] - the shoulders' signed travel difference, left less right: the higher arm
-            (f"/pose/{id}/shoulder/difference", (float(frame[ShoulderDifference].value) if ShoulderDifference in frame else 0.0,)),
-            (f"/pose/{id}/azimuth", (float(frame[Azimuth].value) if Azimuth in frame else np.nan,)),
+            (f"/pose/{track_id}/shoulder/difference", (float(frame[ShoulderDifference].value) if ShoulderDifference in frame else 0.0,)),
+            (f"/pose/{track_id}/azimuth", (float(frame[Azimuth].value) if Azimuth in frame else np.nan,)),
             # range [0, 1] - 0 at the zone's near edge, 1 at its far edge
-            (f"/pose/{id}/distance", (float(frame[Distance].value) if Distance in frame else np.nan,)),
-            (f"/pose/{id}/playhead/offset", (float(frame[PlayheadOffset].value) if PlayheadOffset in frame else np.nan,)),
+            (f"/pose/{track_id}/distance", (float(frame[Distance].value) if Distance in frame else np.nan,)),
+            (f"/pose/{track_id}/playhead/offset", (float(frame[PlayheadOffset].value) if PlayheadOffset in frame else np.nan,)),
         ]
 
-    def inactive_messages(self, id: int) -> list[OscMessage]:
+    def inactive_messages(self, track_id: int) -> list[OscMessage]:
         return [
-            (f"/pose/{id}/arm", (np.zeros(3, dtype=np.float32),)),
-            (f"/pose/{id}/shoulder/difference", (0.0,)),
-            (f"/pose/{id}/azimuth", (0.0,)),
-            (f"/pose/{id}/distance", (0.0,)),
-            (f"/pose/{id}/playhead/offset", (0.0,)),
+            (f"/pose/{track_id}/arm", (np.zeros(3, dtype=np.float32),)),
+            (f"/pose/{track_id}/shoulder/difference", (0.0,)),
+            (f"/pose/{track_id}/azimuth", (0.0,)),
+            (f"/pose/{track_id}/distance", (0.0,)),
+            (f"/pose/{track_id}/playhead/offset", (0.0,)),
         ]
