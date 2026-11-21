@@ -105,7 +105,7 @@ than the expected frame interval is a dropped frame. A camera frame has
 no other identity: `CameraFrame` and `InferenceFrame` carry a timestamp and no sequence number, because the
 device's sequence numbers skip on the depth while every frame arrives (`modules/camera/oak4/OAK4.md`).
 A source layer keeps the capture time of the frame it holds (`InferenceFrameImageLayer`, `InferenceFrameDepthLayer`,
-`SegmentationMaskLayer` and `SegmentationForegroundLayer` from `segmentation.Image.timestamp`), and a view (the
+the `BoardImageLayer`s of the segmentation mask and foreground from `segmentation.Image.timestamp`), and a view (the
 view stage, `ViewLayer`; hd_trio's `CenterCamLayer`, `CenterMaskLayer`, `CenterForegroundLayer`) forwards
 the stamp of the frame it drew, so the app reads it off the layer it takes the texture from
 (`HasCaptureTime`, `modules/render/layer_base.py`); deep_flow hands the motion its capture's own. The interval a measurement divides by is in

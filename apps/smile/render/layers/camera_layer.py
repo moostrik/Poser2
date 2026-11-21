@@ -8,7 +8,7 @@ from modules.utils import Color
 from ..settings import FaceEffect, FaceFill, RenderSettings
 from ..shaders import FaceColor
 
-from modules.render import CameraImageLayer, LayerBase
+from modules.render import BoardImageLayer, LayerBase
 from .mark_drawer import MarkDrawer
 from .face_marks import BOX_PAD_PX, FACES_STALE, LABEL_BG, REJECTED_COLOR, Mark, SubjectMark, build_marks, face_fields
 from .passes import blur, copy
@@ -44,8 +44,8 @@ class CameraLayer(LayerBase):
     While the generator is not ready (the board's warm-up step) the whole image is in pixels instead,
     blocks that tile the image whole and halve with every step of the warm-up, and no face is shown."""
 
-    def __init__(self, camera: CameraImageLayer, board: RenderBoard, settings: RenderSettings) -> None:
-        self._camera: CameraImageLayer = camera     # the camera's full frame, upright
+    def __init__(self, camera: BoardImageLayer, board: RenderBoard, settings: RenderSettings) -> None:
+        self._camera: BoardImageLayer = camera     # the camera's full frame, upright
         self._board: RenderBoard = board            # the faces and the warm-up
         self.settings: RenderSettings = settings
         self._subject: SubjectMark = SubjectMark()

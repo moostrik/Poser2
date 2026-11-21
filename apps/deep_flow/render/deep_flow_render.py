@@ -47,8 +47,8 @@ class DeepFlowRender(RenderBase):
         self._debug_monitors: dict[ChainLayers, dict[int, render.Monitor2DLayer]] = {}     # each stage's debug monitor
 
         for i in range(self.num_cams):
-            cam_image =     self.L[ChainLayers.cam_image][i] =   render.CameraImageLayer(    i, self.board)
-            cam_crop =      self.L[ChainLayers.cam_crop][i] =    render.CropImageLayer(      i, self.board)
+            cam_image =     self.L[ChainLayers.cam_image][i] =   render.camera_image_layer(i, self.board)
+            cam_crop =      self.L[ChainLayers.cam_crop][i] =    render.crop_image_layer(i, self.board)
             self.L[ChainLayers.inference_frame_image][i] =               render.InferenceFrameImageLayer()
             self.L[ChainLayers.inference_frame_depth][i] =               render.InferenceFrameDepthLayer()
 

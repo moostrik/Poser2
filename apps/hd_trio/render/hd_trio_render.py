@@ -86,10 +86,10 @@ class HDTrioRender(RenderBase):
 
         center_masks: dict[int, Texture] = {}
         for i in range(self.num_cams):
-            cam_image =     self.L[Layers.cam_image][i] =   render.CameraImageLayer(    i, self.board)
-            cam_mask =      self.L[Layers.cam_mask][i] =    render.SegmentationMaskLayer(i, self.board)
-            cam_foreground = self.L[Layers.cam_foreground][i] = render.SegmentationForegroundLayer(i, self.board)
-            cam_crop =      self.L[Layers.cam_crop][i] =    render.CropImageLayer(      i, self.board)
+            cam_image =     self.L[Layers.cam_image][i] =   render.camera_image_layer(i, self.board)
+            cam_mask =      self.L[Layers.cam_mask][i] =    render.segmentation_mask_layer(i, self.board)
+            cam_foreground = self.L[Layers.cam_foreground][i] = render.segmentation_foreground_layer(i, self.board)
+            cam_crop =      self.L[Layers.cam_crop][i] =    render.crop_image_layer(i, self.board)
 
             tracker_compositor = self.L[Layers.tracker][i] = render.TrackerCompositor(  i, self.board,      cam_image.texture,          settings.preview.tracker,   settings.colors)
             pose_compositor = self.L[Layers.pose][i] =      render.PoseCompositor(      i, self.board,      cam_image.texture, cam_crop, settings.preview.pose,      settings.colors)

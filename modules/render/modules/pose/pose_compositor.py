@@ -7,7 +7,8 @@ from modules.settings import Field, BaseSettings
 from modules.gl import Fbo, Texture
 from ...layer_base import LayerBase
 
-from ..inference import CropLayer, CropImageLayer
+from ..board import BoardImageLayer
+from ..inference import CropLayer
 from .pose_line_layer import PoseLineLayer, PoseLineLayerSettings
 from ...color_settings import ColorSettings
 from modules.utils import Color
@@ -27,7 +28,7 @@ class PoseCompositor(LayerBase):
     """The crop with the pose lines over it. `gpu_crop` is the app's crop source layer (the model's
     input), shared rather than uploaded a second time; the app updates it before this layer."""
 
-    def __init__(self, track_id: int, board: Any, cam_texture: Texture, gpu_crop: CropImageLayer, settings: PoseCompositorSettings,
+    def __init__(self, track_id: int, board: Any, cam_texture: Texture, gpu_crop: BoardImageLayer, settings: PoseCompositorSettings,
                  color_settings: ColorSettings) -> None:
         self._track_id: int = track_id
         self.settings: PoseCompositorSettings = settings or PoseCompositorSettings()
@@ -35,7 +36,7 @@ class PoseCompositor(LayerBase):
 
         # Camera crop layers (one of these will be used based on settings)
         self._cam_crop_layer: CropLayer = CropLayer(track_id, board, cam_texture)
-        self._gpu_crop_layer: CropImageLayer = gpu_crop
+        self._gpu_crop_layer: BoardImageLayer = gpu_crop
 
         # Pose lines, back to front: black 3x wide, white 2x, the track color 1x. Their stages and widths are
         # inputs, handed on from `settings` each update (`_set_inputs`).

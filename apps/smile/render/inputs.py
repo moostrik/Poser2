@@ -1,10 +1,10 @@
 """The render's textures of the board's images, made on the main thread: the camera's full uploaded frame (on the GPU
-already, `CameraImageLayer`) and the CPU images, each uploaded once when the board holds a new one."""
+already, `render.camera_image_layer`) and the CPU images, each uploaded once when the board holds a new one."""
 
 import numpy as np
 
 from modules.gl import ChannelOrder, Image
-from modules.render import CameraImageLayer
+from modules.render import BoardImageLayer, camera_image_layer
 
 from ..board import RenderBoard
 
@@ -14,7 +14,7 @@ class Inputs:
 
     def __init__(self, board: RenderBoard) -> None:
         self._board: RenderBoard = board
-        self.camera: CameraImageLayer = CameraImageLayer(0, board)     # the camera's full frame, upright
+        self.camera: BoardImageLayer = camera_image_layer(0, board)     # the camera's full frame, upright
         self.capture: Image =           Image(ChannelOrder.BGR)    # the captured face, display crop
         self.capture_depth: Image =     Image(ChannelOrder.BGR)    # depth of the capture, mask of the flash out
         self.diffusion: Image =         Image(ChannelOrder.BGR)    # generated previews, portrait and grin frames

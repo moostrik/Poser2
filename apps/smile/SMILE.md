@@ -170,7 +170,7 @@ it runs the `Sequencer` once per frame (it is the app clock:
 Art-Net, OSC and saving hang off its messages), then the stage for the current `SequenceType`
 (`stages.py`) renders the layers (`layers/`) and picks the one to show. What other threads make goes through the
 board (`board/`, `RenderBoard`), which the render reads at its tick: the camera's full frame as the uploader made it on
-the GPU (`modules/board`'s camera image, drawn by `CameraImageLayer`), and smile's own slices: the judged faces, the
+the GPU (`modules/board`'s camera image, drawn by `render.camera_image_layer`), and smile's own slices: the judged faces, the
 capture and its depth, the generator's image and depth, the status line and warm-up, the online cell. `inputs.py`
 uploads a board image once when it is new; the grin frames go
 through `sequence/grin_player.py`, a buffer the generator fills and the render plays on its own clock, with

@@ -9,12 +9,12 @@ from .modules.pose import       DataLayerSettings, ScalarFeatureSelect, LayerMod
                                 PoseRenderer, PoseRendererSettings, PoseCompositor, PoseCompositorSettings, \
                                 ViewPoseLayer, ViewPoseLayerSettings, PosePlacement, landmark_midpoint, \
                                 SimilaritySilhouetteLayer, SimilaritySilhouetteLayerSettings, PosePointLines
-from .modules.camera import     CameraImageLayer, CameraReadingsLayer
+from .modules.camera import     camera_image_layer, CameraReadingsLayer
 from .modules.tracker import    TrackerCompositor, TrackerCompositorSettings, TrackletRenderer, \
                                 PanoramaCompositor, PanoramaLayerSettings, PanoramaBlend, Part, \
                                 GridRenderer, LabelRenderer, MarkRenderer, SeamRenderer, \
                                 StitchRenderer, Mark, MarkContext, build_marks, strip_spans
-from .modules.inference import  CropLayer, CropImageLayer, SegmentationMaskLayer, SegmentationForegroundLayer, \
+from .modules.inference import  CropLayer, crop_image_layer, segmentation_mask_layer, segmentation_foreground_layer, \
                                 InferenceFrameImageLayer, InferenceFrameDepthLayer
 from .modules.flow import       StageLayer, StageLayerSettings, StageOutput, \
                                 ColorInput, ColorOutput, ColorLayer, ColorLayerSettings, \
@@ -27,7 +27,7 @@ from .modules.flow import       StageLayer, StageLayerSettings, StageOutput, \
                                 Monitor2DLayer, Monitor2DLayerSettings, Monitor3DLayer, Monitor3DLayerSettings, \
                                 MonitorInput, MonitorView, FlowStage, Channel, DepthColormap, DepthDrawMode, \
                                 MAIN_TINT, DEBUG_TINT
-from .modules.board import      TimeSeriesLayer, TimeSeriesLayerSettings
+from .modules.board import      BoardImageLayer, BoardImageRead, TimeSeriesLayer, TimeSeriesLayerSettings
 
 # general: the layers that draw no module's data
 from .general.composite import  LayerCompositor, LayerCompositorSettings
