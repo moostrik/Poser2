@@ -13,7 +13,7 @@ from enum import IntEnum, auto
 
 from OpenGL.GL import GL_RGBA16F, GL_VIEWPORT, glGetIntegerv, glViewport
 
-from modules.gl import Colormap, Fbo, Texture, Style
+from modules.gl import Colormap, Fbo, Texture, BlendState
 from modules.flow import Visualizer, Strip, ALL_CHANNELS, Legend, LegendKind, DrawnSize, Port, TextureKind, REFERENCE_STEP, ZPositionView
 from modules.settings import Field, BaseSettings, Group, Widget
 from ...layer_base import LayerBase
@@ -69,7 +69,7 @@ class Monitor2DAdvancedSettings(BaseSettings):
     """How the monitor draws: the channels, the scale, the glyphs' spacing, the legend and the blend."""
     channel: Field[Channel] =       Field(Channel.ALL, description="The channels drawn")
     scale: Field[float] =           Field(1.0, min=0.01, max=100.0, widget=Widget.log_slider, description="Multiplier on the values")
-    blend_mode: Field[Style.BlendMode] = Field(Style.BlendMode.ADD, description="How the monitor is drawn over the panel")
+    blend_mode: Field[BlendState.BlendMode] = Field(BlendState.BlendMode.ADD, description="How the monitor is drawn over the panel")
     glyph_spacing: Field[GlyphSpacing] = Field(GlyphSpacing.SPACING_32, description="Distance between glyphs (pixels)")
     colormap: Field[Colormap] =     Field(Colormap.JET, description="A depth's colors, from its near to its far")
     legend: Field[bool] =           Field(True, description="The overlay: titles, log axes and the color key")
@@ -280,19 +280,19 @@ class Monitor2DLayer(LayerBase):
             # Rendering into the port's FBOs sets the viewport to their size; the panel's comes back after
             self._resize(*size)
             self._rendered_size = size
-            Style.push_style()
-            Style.set_blend_mode(Style.BlendMode.DISABLED)
+            BlendState.push()
+            BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
             self._render()
-            Style.pop_style()
+            BlendState.pop()
             glViewport(int(viewport[0]), int(viewport[1]), int(viewport[2]), int(viewport[3]))
             self._rendered = True
         if self._port is None:
             return
-        Style.push_style()
-        Style.set_blend_mode(self.settings.advanced.blend_mode.premultiplied)     # every view draws its color times its coverage
+        BlendState.push()
+        BlendState.set_blend_mode(self.settings.advanced.blend_mode.premultiplied)     # every view draws its color times its coverage
         if self.texture.allocated:
             self.texture.draw()
         if self.settings.advanced.legend and self._legend.texture.allocated:
-            Style.set_blend_mode(Style.BlendMode.ALPHA)
+            BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
             self._legend.texture.draw()
-        Style.pop_style()
+        BlendState.pop()

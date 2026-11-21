@@ -20,7 +20,7 @@ import numpy as np
 
 # Local application imports
 from modules.flow import DepthView, HasPorts, Port, TextureKind, depth_step, fixed_window, place_points, view_span
-from modules.gl import Style, Texture
+from modules.gl import BlendState, Texture
 from modules.pose import BBox, Frame, Points2D
 from modules.render import StageLayer, StageOutput
 from modules.utils import Rect
@@ -171,8 +171,8 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         depth: Texture | None = input.depth if input.depth is not None and input.depth.allocated else None
         self._grid_size = (depth.width, depth.height) if depth is not None else (0, 0)
 
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
 
         # Who, where, how far, each once: the box's image and the depth inside it on the depth's own pixels, that
         # depth's outline moved onto the image's (the mask), the depth upscaled to the view where it is the player's
@@ -181,7 +181,7 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
         self._mask.guide(view, self._crop.depth, roi, self._grid_size[1])
         self._depth.upscale(depth, roi, self._mask.mask)
 
-        Style.pop_style()
+        BlendState.pop()
 
         self._pose_points = self._place_pose(input.pose)
 

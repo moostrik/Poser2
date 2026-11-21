@@ -4,7 +4,7 @@ from typing import Protocol
 
 # Local application imports
 from modules.board import HasObservations, HasTracklets
-from modules.gl import Fbo, Style, Texture, clear_color
+from modules.gl import Fbo, BlendState, Texture, clear_color
 from modules.tracker import PanoramicTrackerSettings, Tracklet, row_model
 
 from ....layer_base import LayerBase
@@ -204,9 +204,9 @@ class PanoramaCompositor(LayerBase):
         # already weighted by alpha: composite with ONE / ONE_MINUS_SRC_ALPHA, not SRC_ALPHA.
         # Leave the alpha blend on: the mark and label draws that follow count on it, as they did
         # when seams and grid drew here directly.
-        Style.set_blend_mode(Style.BlendMode.PREMULTIPLIED)
+        BlendState.set_blend_mode(BlendState.BlendMode.PREMULTIPLIED)
         self._static_fbo.draw()
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
 
     def _static_inputs(self, parts: list[Part], window: tuple[float, float]) -> tuple:
         """Everything the seam and grid renderers read, so a change redraws the cache."""

@@ -6,7 +6,7 @@ depth use stays as it is."""
 import numpy as np
 from OpenGL.GL import GL_R16F
 
-from modules.gl import Fbo, SwapFbo, Style, Texture, shaders
+from modules.gl import Fbo, SwapFbo, BlendState, Texture, shaders
 from modules.settings import BaseSettings, Field
 from ..port import Port, TextureKind
 from .white_balance import white_balance_matrix
@@ -86,8 +86,8 @@ class DensityColor:
 
     def process(self, image: Texture, mask: Texture) -> None:
         s: DensityColorSettings = self.settings
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         self._fbo.swap()
         self._fbo.begin()
         if s.enabled:
@@ -112,7 +112,7 @@ class DensityColor:
             self._fbo.begin()
             self._mask_shader.use(self._fbo.back, matte)
             self._fbo.end()
-        Style.pop_style()
+        BlendState.pop()
 
     def _white_balance_matrix(self, kelvin: float) -> np.ndarray:
         """The white balance's matrix for `kelvin`, made again only when it changes."""

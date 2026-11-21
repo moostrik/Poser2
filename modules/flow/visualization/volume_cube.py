@@ -6,7 +6,7 @@ slice, the selected layer is read where a ray crosses it and framed, opacity mov
 import numpy as np
 from OpenGL.GL import GL_RGBA8
 
-from modules.gl import Fbo, Style, Texture, Texture3D
+from modules.gl import Fbo, BlendState, Texture, Texture3D
 from ..port import LightPlace
 from .light_marks import light_marks
 from .orbit import Orbit, box_size
@@ -58,10 +58,10 @@ class VolumeCube:
         matrix: np.ndarray = orbit.view_projection(box, self._fbo.width / max(self._fbo.height, 1))
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._fbo.begin()
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         self._cube.use(volume, np.linalg.inv(matrix), box, scale, channel, color, STEPS, opacity, depth_fade, slice_z, slice_focus)
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
         if outlines:
             self._edges.use(matrix, box)
             if slice_z is not None:         # the layer's frame: the box's edges flattened to its depth
@@ -72,6 +72,6 @@ class VolumeCube:
                 for mark in light_marks(light, box):
                     self._edges.use(matrix @ mark, (1.0, 1.0, 1.0), LIGHT_COLOR)
             self._axes.use(matrix, box)
-        Style.pop_style()
+        BlendState.pop()
         self._fbo.end()
         return self._fbo

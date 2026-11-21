@@ -31,7 +31,7 @@ from apps.smile.render.shaders import FaceColor, FlashIn, FlashOut, Omission  # 
 from modules.flow import DepthCrop, DepthUpscale  # noqa: E402
 from modules.flow.shaders import AddRegion, ChannelAddRegion, ChannelSetRegion, SetRegion  # noqa: E402
 from modules.flow.visualization.shaders import ColormapKey  # noqa: E402
-from modules.gl import Colormap, Context, Fbo, Style, Text, Texture, shaders  # noqa: E402
+from modules.gl import Colormap, Context, Fbo, BlendState, Text, Texture, shaders  # noqa: E402
 from modules.gl.shaders.filter import KERNEL_SIGMA  # noqa: E402
 from modules.pose import PointLandmark, Points2D  # noqa: E402
 from modules.inference.preprocessing.shaders import DepthAlign  # noqa: E402
@@ -395,11 +395,11 @@ def run(reference: bool) -> int:
                 prepare(source)
             target.begin()
             glViewport(0, 0, SIZE, SIZE)
-            Style.push_style()
-            Style.set_blend_mode(Style.BlendMode.DISABLED)
+            BlendState.push()
+            BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
             target.clear(0.0, 0.0, 0.0, 0.0)
             draw(source)
-            Style.pop_style()
+            BlendState.pop()
             target.end()
             glFinish()
             image = target.read_to_numpy()

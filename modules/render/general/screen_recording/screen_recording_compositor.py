@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 from OpenGL.GL import glViewport
 
-from modules.gl import Style, Texture, clear_color
+from modules.gl import BlendState, Texture, clear_color
 from modules.utils import fill, fit
 from modules.video import ScreenRecorder, ScreenRecorderFrameSettings, ScreenRecorderSettings
 
@@ -91,14 +91,14 @@ class ScreenRecordingCompositor(LayerBase):
                 place = fill if self.settings.frame.fill else fit
                 capture.frame.begin()
                 clear_color()
-                Style.set_blend_mode(Style.BlendMode.DISABLED)
-                Style.push_style()
-                Style.set_blend_mode(Style.BlendMode.ADD)
+                BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
+                BlendState.push()
+                BlendState.set_blend_mode(BlendState.BlendMode.ADD)
                 for source in input.sources:
                     x, y, w, h = place(source.width, source.height, capture.width, capture.height)
                     glViewport(round(x), round(y), round(w), round(h))
                     source.layer.draw()
-                Style.pop_style()
+                BlendState.pop()
                 capture.frame.end()
             capture.capture(input.timestamp)
             glViewport(0, 0, input.window_width, input.window_height)
@@ -144,10 +144,10 @@ class ScreenRecordingCompositor(LayerBase):
             return
         x, y, w, h = fit(preview.width, preview.height, window_width, window_height)
         glViewport(round(x), round(y), round(w), round(h))
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         preview.fbo.draw()
-        Style.pop_style()
+        BlendState.pop()
         glViewport(0, 0, window_width, window_height)
 
     def _on_snap(self, _: bool) -> None:

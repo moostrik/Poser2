@@ -38,7 +38,7 @@ The monitor's panel group (`Monitor2DLayerSettings`, `Monitor3DLayerSettings`) s
 | `advanced.glyph_spacing` | 4, 8, 16, 32, 64, 128 (`GlyphSpacing`)                      | distance between glyphs (pixels)            |
 | `advanced.colormap`      | `Colormap`, `JET` (default)                                 | a depth's colors, from its near to its far  |
 | `advanced.legend`        | on (default), off                                           | the log axis, or the colormap's key         |
-| `advanced.blend_mode`    | a `Style.BlendMode`                                         | how the monitor is drawn over the panel     |
+| `advanced.blend_mode`    | a `BlendState.BlendMode`                                    | how the monitor is drawn over the panel     |
 
 An arrow reaches one spacing at speed 1 and at most two (the shader rolls its length off toward
 2), and its lines are spacing / 20 wide (`ARROW_WIDTH`), so the arrows keep their proportions at

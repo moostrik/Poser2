@@ -16,8 +16,8 @@ from OpenGL.GL import (GL_ARRAY_BUFFER, GL_FALSE, GL_FLOAT, GL_STATIC_DRAW, GL_T
                        glBindVertexArray, glBufferData, glDeleteBuffers, glDeleteVertexArrays, glDrawArrays,
                        glEnableVertexAttribArray, glGenBuffers, glGenVertexArrays, glVertexAttribPointer)
 
-from . import style
-from .style import StyleStack
+from . import blend_state
+from .blend_state import BlendStack
 
 if TYPE_CHECKING:
     from ..shaders import Blit
@@ -34,7 +34,7 @@ class Context:
     """One GL context's quad, `Blit` and blend state. `allocate` and `make_current` while that context is current."""
 
     def __init__(self) -> None:
-        self.style: StyleStack = StyleStack()
+        self.blend_state: BlendStack = BlendStack()
         self._quad_vao: int = 0
         self._quad_vbo: int = 0
         self._bound_vao: int = 0
@@ -70,7 +70,7 @@ class Context:
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         self._bound_vao = self._quad_vao
         self.make_current()
-        self.style.reset()
+        self.blend_state.reset()
         self._blit = Blit()
         self._blit.allocate()
 
@@ -90,10 +90,10 @@ class Context:
 
     def make_current(self) -> None:
         """This context's objects for the draws that follow, its GL context made current by the caller: the quad
-        bound, its blend state the one `Style` works on."""
+        bound, its blend state the one `BlendState` works on."""
         global _current
         _current = self
-        style.use(self.style)
+        blend_state.use(self.blend_state)
         self.bind_quad()
 
     def bind_quad(self) -> None:

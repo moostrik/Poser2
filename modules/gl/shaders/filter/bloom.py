@@ -2,7 +2,7 @@
 
 from OpenGL.GL import GL_RGBA16F
 
-from ... import Fbo, Style, Texture
+from ... import Fbo, BlendState, Texture
 from .dual_filter import DualFilter
 
 LEVELS: int = 5     # half sizes down: the glow reaches about 2^LEVELS pixels
@@ -11,7 +11,7 @@ LEVELS: int = 5     # half sizes down: the glow reaches about 2^LEVELS pixels
 class Bloom:
     """`process` draws the glow of `src`'s parts brighter than `threshold` into `texture`, at `src`'s size: down a
     chain of half sizes and up again, each level's blur added on the way up. Draw `texture` over the image with
-    `Style.BlendMode.ADD`."""
+    `BlendState.BlendMode.ADD`."""
 
     def __init__(self, levels: int = LEVELS) -> None:
         self._levels: int = levels
@@ -45,8 +45,8 @@ class Bloom:
     def process(self, src: Texture, threshold: float = 0.8) -> None:
         if not self.allocated or not src.allocated:
             return
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         source: Texture = src
         for i, target in enumerate(self._down):
             target.begin()
@@ -55,11 +55,11 @@ class Bloom:
             source = target
         for i in range(self._levels - 1, -1, -1):
             self._up[i].begin()
-            Style.set_blend_mode(Style.BlendMode.DISABLED)
+            BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
             self._shader.up(source)
             if i > 0:
-                Style.set_blend_mode(Style.BlendMode.SUM)       # the level's own blur added to what came up
+                BlendState.set_blend_mode(BlendState.BlendMode.SUM)       # the level's own blur added to what came up
                 self._down[i - 1].draw()
             self._up[i].end()
             source = self._up[i]
-        Style.pop_style()
+        BlendState.pop()

@@ -12,7 +12,7 @@ import logging
 from OpenGL.GL import GL_RGBA16F
 
 # Local application imports
-from modules.gl import Fbo, Style, Texture
+from modules.gl import Fbo, BlendState, Texture
 from modules.flow import HasPorts
 from ....flow import Fluid2D
 from ....settings import Fluid2DLayerSettings
@@ -40,7 +40,7 @@ class Fluid2DLayer(FluidLayer):
         self._warned_channels: bool = False
 
     @property
-    def blend_mode(self) -> Style.BlendMode:
+    def blend_mode(self) -> BlendState.BlendMode:
         return self.settings.blend_mode
 
     @property

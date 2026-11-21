@@ -2,7 +2,7 @@ import math
 import time
 
 from ...face import FaceObservations
-from modules.gl import Fbo, Image, Style, SwapFbo, Text, Texture, shaders
+from modules.gl import Fbo, Image, BlendState, SwapFbo, Text, Texture, shaders
 from modules.utils import Color
 from ..inputs import Faces
 from ..settings import FaceEffect, FaceFill, RenderSettings
@@ -124,14 +124,14 @@ class CameraLayer(LayerBase):
             face_marks: list[Mark] = build_marks(frame, (r, g, b, a), charge, pad) if frame is not None else []
             if subject is not None and (frame is None or frame.subject is None):
                 face_marks.append(subject)      # the face left: its mark stays while the charge drains
-            Style.set_blend_mode(Style.BlendMode.ALPHA)
+            BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
             for mark in face_marks:
                 # the trace is the chosen face's outline
                 self._drawer.draw(mark, self._width, self._height, marks, outline=not (mark.subject and fill is FaceFill.TRACE))
             for mark in face_marks:
                 if mark.label:
                     self._draw_label(mark, marks)
-            Style.set_blend_mode(Style.BlendMode.DISABLED)
+            BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         self._fbo.end()
 
     def _draw_label(self, mark: Mark, alpha: float) -> None:

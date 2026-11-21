@@ -16,7 +16,7 @@ from typing import Annotated
 
 from OpenGL.GL import GL_RGBA16F
 
-from modules.gl import Fbo, Texture, Style
+from modules.gl import Fbo, Texture, BlendState
 from modules.flow import HasPorts, Port, Ports, TextureKind
 from ....settings import BridgeLayerSettings
 from .shaders import DensityColor
@@ -144,15 +144,15 @@ class BridgeLayer(StageLayer[BridgeInput, BridgeOutput]):
             return
         self._follow_sizes(input.velocity)
 
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
 
         self._color.begin()
         self._color_shader.use(input.image, input.color, input.mask)
         self._color.end()
         self._bridge(input, self._color)
 
-        Style.pop_style()
+        BlendState.pop()
 
     def draw(self) -> None:
         """A stage draws nothing; a monitor draws its textures."""

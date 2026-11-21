@@ -10,7 +10,7 @@ import numpy as np
 from modules.utils import Color, Rect
 from OpenGL.GL import GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW, GL_FALSE, GL_FLOAT, glBindBuffer, glBufferData, glDeleteBuffers, glDeleteVertexArrays, glEnableVertexAttribArray, glGenBuffers, glGenVertexArrays, glVertexAttribPointer
 
-from ..state import context, style
+from ..state import blend_state, context
 from ..shaders.draw import FillRect, Glyphs
 from .font_atlas import FontAtlas
 from .text_layout import text_layout
@@ -141,7 +141,7 @@ class Text:
         if not len(vertices):
             return
 
-        style.set_blend_mode(style.BlendMode.ALPHA)
+        blend_state.set_blend_mode(blend_state.BlendMode.ALPHA)
 
         previous_vao: int = context().bind_vertex_array(self._vao)
         glBindBuffer(GL_ARRAY_BUFFER, self._vbo)
@@ -178,7 +178,7 @@ class Text:
         box_width = text_width + pad * 2
         box_height = text_height + pad * 2
 
-        style.set_blend_mode(style.BlendMode.ALPHA)
+        blend_state.set_blend_mode(blend_state.BlendMode.ALPHA)
 
         # Draw background box first, in 0..1 of the area
         self._box.use(Rect(box_x / screen_width, box_y / screen_height, box_width / screen_width, box_height / screen_height),

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_RGBA16F, glClear, glClearColor
 
-from modules.gl import Fbo, Texture, Style
+from modules.gl import Fbo, Texture, BlendState
 from ...layer_base import LayerBase
 from modules.settings import Field, BaseSettings, Group
 from ..grade import LutGrade, LutSettings
@@ -16,7 +16,7 @@ from ..grade import LutGrade, LutSettings
 
 class LayerCompositorSettings(BaseSettings):
     """Configuration for LayerCompositor."""
-    blend_mode: Field[Style.BlendMode] = Field(Style.BlendMode.ALPHA)
+    blend_mode: Field[BlendState.BlendMode] = Field(BlendState.BlendMode.ALPHA)
     lut:        Group[LutSettings]     = Group(LutSettings)
 
 
@@ -93,15 +93,15 @@ class LayerCompositor(LayerBase):
         glClearColor(0.0, 0.0, 0.0, 0.0)
         glClear(GL_COLOR_BUFFER_BIT)
 
-        Style.push_style()
-        Style.set_blend_mode(self.settings.blend_mode)
+        BlendState.push()
+        BlendState.set_blend_mode(self.settings.blend_mode)
 
         for tex, opacity in entries:
             if tex.allocated and opacity > 0:
                 tex.draw(opacity=opacity)
 
         self._composite_fbo.end()
-        Style.pop_style()
+        BlendState.pop()
 
     def set_layers(self, layers: list[LayerBase]) -> None:
         self._layers = layers

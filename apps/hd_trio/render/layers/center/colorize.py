@@ -2,7 +2,7 @@
 camera's track color, sharpened, and the mask as alpha; `CenterForegroundLayer` runs it on its cut-out."""
 
 # Local application imports
-from modules.gl import SwapFbo, Texture, Style, shaders
+from modules.gl import SwapFbo, Texture, BlendState, shaders
 from modules.render import ColorSettings
 from modules.utils import Color
 from ....settings import CenterForegroundLayerSettings
@@ -58,15 +58,15 @@ class Colorize:
         """`source` colorized, the player's colors on black, with `mask` as its alpha where `use_mask`; `source` as
         it is while not `enabled`."""
         s: CenterForegroundLayerSettings = self.settings
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
 
         if not s.enabled:
             self._effect_fbo.swap()
             self._effect_fbo.begin()
             source.draw()
             self._effect_fbo.end()
-            Style.pop_style()
+            BlendState.pop()
             return
 
         self._blend_fbo.swap()
@@ -98,4 +98,4 @@ class Colorize:
             self._mask_shader.use(self._effect_fbo.back, mask)
             self._effect_fbo.end()
 
-        Style.pop_style()
+        BlendState.pop()

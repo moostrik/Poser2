@@ -9,7 +9,7 @@ from OpenGL.GL import GL_RGBA8
 
 # Local application imports
 from modules.board import HasTimeSeries
-from modules.gl import Fbo, Image, Style, Text, Texture, clear_color
+from modules.gl import Fbo, Image, BlendState, Text, Texture, clear_color
 from modules.settings import BaseSettings, Field
 from modules.utils import Color, bin_samples, hold_gaps
 from ...layer_base import LayerBase
@@ -95,13 +95,13 @@ class TimeSeriesLayer(LayerBase):
         self._fbo.end()
 
     def draw(self) -> None:
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
         if self._fbo.allocated:
             self._fbo.draw()
         if self._labels and self._text.allocated and self._fbo.allocated:
             self._draw_labels()
-        Style.pop_style()
+        BlendState.pop()
 
     def _draw_labels(self) -> None:
         """Each lane's name, last value and scale, at its top left, in the layer's pixels: the labels scale with

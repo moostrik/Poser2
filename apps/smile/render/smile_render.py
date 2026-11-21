@@ -9,7 +9,7 @@ from .screen_grab import ScreenGrab
 from ..comfy.messages import GeneratorMessage, GeneratorState
 from ..face import FaceObservations
 from .. import sphere
-from modules.gl import Fbo, Shader, Style, Texture, clear_color
+from modules.gl import Fbo, Shader, BlendState, Texture, clear_color
 from modules.utils import fit
 from modules.window import RenderBase
 from ..player import WallRender, WallsSettings
@@ -106,7 +106,7 @@ class SmileRender(RenderBase):
         self._notify_update()
         self.inputs.update()
 
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         for layer in self._all_layers:
             layer.update()
 
@@ -184,7 +184,7 @@ class SmileRender(RenderBase):
     def draw(self, window: int, width: int, height: int) -> None:
         """Window 0 the output, windows 1-2 the walls."""
         clear_color(0, 0, 0, 1)
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         if window != 0:
             if window - 1 < len(self.walls):
                 self._draw_fit(self.walls[window - 1].texture, width, height)

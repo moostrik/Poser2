@@ -8,7 +8,7 @@ color goes with its amount: both are picked by the amount.
 
 from OpenGL.GL import Constant
 
-from modules.gl import Style, SwapFbo, Texture
+from modules.gl import BlendState, SwapFbo, Texture
 from .shaders import LargerAmount
 
 
@@ -44,21 +44,21 @@ class FrameMax:
     def hold(self, source: Texture) -> None:
         """Keep `source`, the first frame's output."""
         self.follow(source)
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         self._held.begin()
         source.draw()
         self._held.end()
-        Style.pop_style()
+        BlendState.pop()
 
     def take(self, source: Texture, amounts: tuple[Texture, Texture] | None = None) -> None:
         """Keep, per pixel, the larger of what it holds and `source`: by `amounts`, the held one's and the
         source's, or by the textures themselves without them."""
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         self._held.swap()
         held_amount, source_amount = amounts if amounts is not None else (self._held.back, source)
         self._held.begin()
         self._larger_shader.use(self._held.back, source, held_amount, source_amount)
         self._held.end()
-        Style.pop_style()
+        BlendState.pop()

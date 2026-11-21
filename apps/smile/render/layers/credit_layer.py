@@ -3,7 +3,7 @@ from enum import IntEnum
 from OpenGL.GL import glViewport
 
 from ...credit import FONT, TITLE_FONT, CreditLines, qr_image, title_image, wrap_balanced
-from modules.gl import ChannelOrder, Fbo, Image, Style, Text, Texture, shaders
+from modules.gl import ChannelOrder, Fbo, Image, BlendState, Text, Texture, shaders
 from modules.utils import Color
 from ..sequencer import SequenceType
 from ..settings import RenderSettings
@@ -162,7 +162,7 @@ class CreditLayer(LayerBase):
         lines: list[str] = wrap_balanced(self.settings.credit_line, measure, width)
         _, text_height = self._text.measure_text("Mg")
         top: int = MARGIN_PX
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
         if title and self._title.allocated:
             # the viewport's origin is the bottom left
             glViewport((self._width - self._title.width) // 2, self._height - top - self._title.height, self._title.width, self._title.height)
@@ -175,4 +175,4 @@ class CreditLayer(LayerBase):
             for dx, dy in OUTLINE:
                 self._text.draw_text(x + dx, y + dy, line, OUTLINE_COLOR, self._width, self._height)
             self._text.draw_text(x, y, line, TEXT_COLOR, self._width, self._height)
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)

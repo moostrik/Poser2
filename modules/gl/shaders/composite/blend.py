@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class BlendShaderMode(IntEnum):
     """The blend modes of `blend_modes.glsl`, by its numbers. Normal, add, multiply and screen are GL's own as well
-    (`Style.BlendMode`), which blends in the draw itself without a pass of its own."""
+    (`BlendState.BlendMode`), which blends in the draw itself without a pass of its own."""
     NORMAL       = 0
     ADD          = 1
     MULTIPLY     = 2

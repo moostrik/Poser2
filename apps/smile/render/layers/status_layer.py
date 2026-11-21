@@ -1,4 +1,4 @@
-from modules.gl import Fbo, Style, Text, Texture
+from modules.gl import Fbo, BlendState, Text, Texture
 from modules.utils import Color
 
 from .layer_base import LayerBase
@@ -42,8 +42,8 @@ class StatusLayer(LayerBase):
         _, text_height = self._text.measure_text(text)
         self._fbo.begin()
         source.draw()
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
         self._text.draw_box_text(MARGIN_PX, self._height - text_height - MARGIN_PX, text, TEXT_COLOR, BOX_COLOR,
                                  self._width, self._height)
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         self._fbo.end()

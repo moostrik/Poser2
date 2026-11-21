@@ -25,7 +25,7 @@ from OpenGL.GL import (GL_ALREADY_SIGNALED, GL_COLOR_BUFFER_BIT, GL_CONDITION_SA
                        glDeleteBuffers, glDeleteSync, glFenceSync, glGenBuffers, glMapBufferRange, glPixelStorei,
                        glReadPixels, glUnmapBuffer)
 
-from modules.gl import Fbo, Style
+from modules.gl import Fbo, BlendState
 from modules.utils import fill, fit
 from modules.video import BitDepth, Chroma, ScreenFormat, ScreenFrame, ScreenFrameCallback
 
@@ -202,12 +202,12 @@ class ScreenCapture:
                 self._skipped += 1
                 return
             skipped, self._skipped = self._skipped, 0
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         for plane in self._planes:
             plane.fbo.begin()
             self._shader.use(self.frame, plane.plane, plane.sample_max)
-        Style.pop_style()
+        BlendState.pop()
         glPixelStorei(GL_PACK_ALIGNMENT, 1)     # rows of any even width, unpadded
         glBindBuffer(GL_PIXEL_PACK_BUFFER, self._buffers[buffer])
         for plane in self._planes:

@@ -3,7 +3,7 @@
 from OpenGL.GL import GL_RGBA16F
 
 from modules import render
-from modules.gl import Fbo, Style, Texture, clear_color
+from modules.gl import Fbo, BlendState, Texture, clear_color
 from ....settings import InferenceFrameMonitorSettings, InferenceFrameView, ViewCropSettings
 
 DRAW_MODES: dict[InferenceFrameView, render.DepthDrawMode] = {InferenceFrameView.DEPTH: render.DepthDrawMode.COLOR,
@@ -45,8 +45,8 @@ class InferenceFrameMonitorLayer(render.LayerBase):
         if drawn == self._drawn or not self._fbo.allocated:
             return
         self._drawn = drawn
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         self._fbo.begin()
         clear_color()
         if show == InferenceFrameView.COLOR:
@@ -55,4 +55,4 @@ class InferenceFrameMonitorLayer(render.LayerBase):
         else:
             self._depth_colormap.use(self._depth.texture, self._image.texture, near, far, DRAW_MODES[show], s.colormap)
         self._fbo.end()
-        Style.pop_style()
+        BlendState.pop()

@@ -6,7 +6,7 @@ from typing import cast
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import clear_color, Style
+from modules.gl import clear_color, BlendState
 from modules.window import RenderBase
 from modules.camera import RigCameraSettings, CameraHealthSettings, mono_frame_size, delivered_height
 from modules.tracker import PanoramicTrackerSettings
@@ -251,7 +251,7 @@ class WhiteSpaceRender(RenderBase):
             self._layout_dirty = False
             self._rebuild_layout()
 
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
 
         hidden: set[Layers] = self._hidden_layers()
         for layer_type, cam_dict in self.L.items():
@@ -270,7 +270,7 @@ class WhiteSpaceRender(RenderBase):
 
     def draw(self, window: int, width: int, height: int) -> None:
         clear_color(*_BACKGROUND)
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
 
         # Every row is drawn if the layout holds it, so one pass serves both layouts.
 

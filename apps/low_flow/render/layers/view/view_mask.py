@@ -6,7 +6,7 @@ from OpenGL.GL import GL_R16F
 
 # Local application imports
 from modules.flow import Port, TextureKind
-from modules.gl import Fbo, Style, Tensor, Texture
+from modules.gl import Fbo, BlendState, Tensor, Texture
 from modules.inference import segmentation
 from modules.utils import Rect
 
@@ -52,9 +52,9 @@ class ViewMask:
         box: Rect = mask.box
         placed: Rect = Rect((box.x - window.x) / window.width, (box.y - window.y) / window.height,
                             box.width / window.width, box.height / window.height)
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         self._mask.begin()
         self._source.draw(dst=placed)
         self._mask.end()
-        Style.pop_style()
+        BlendState.pop()

@@ -5,7 +5,7 @@ The density volume holds the colored density (RGBA16F GL_TEXTURE_3D on the simul
 """
 
 # Local application imports
-from modules.gl import GpuTimer, Style, Texture
+from modules.gl import GpuTimer, BlendState, Texture
 from modules.flow import CompositeSettings, Fluid3D, Fluid3DSettings, HasPorts
 from modules.settings import Field, Group
 from ...general.grade import LutGrade, LutSettings
@@ -17,7 +17,7 @@ from .monitor_3d_layer import Monitor3DLayerSettings
 class Fluid3DCompositeSettings(CompositeSettings):
     """The fluid's composite, how the layer draws its picture over the layers before it, and the LUT it is drawn
     through."""
-    blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD, description="How the show is drawn over the layers before it")
+    blend_mode: Field[BlendState.BlendMode] =    Field(BlendState.BlendMode.ADD, description="How the show is drawn over the layers before it")
     lut: Group[LutSettings] =               Group(LutSettings)
 
 
@@ -43,7 +43,7 @@ class Fluid3DLayer(FluidLayer):
         self._grade: LutGrade = LutGrade(settings.composite.lut)
 
     @property
-    def blend_mode(self) -> Style.BlendMode:
+    def blend_mode(self) -> BlendState.BlendMode:
         """The panel's blend for a premultiplied picture: the composite's color is already times its coverage."""
         return self.settings.composite.blend_mode.premultiplied
 
@@ -73,11 +73,11 @@ class Fluid3DLayer(FluidLayer):
 
     def draw(self) -> None:
         """The show, through its LUT where one is picked."""
-        Style.push_style()
-        Style.set_blend_mode(self.blend_mode)
+        BlendState.push()
+        BlendState.set_blend_mode(self.blend_mode)
         if self.texture.allocated:
             self._grade.draw(self.texture)
-        Style.pop_style()
+        BlendState.pop()
 
     def reset(self) -> None:
         self._fluid.reset()

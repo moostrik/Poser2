@@ -1,7 +1,7 @@
 
 from .shader import Shader, ComputeShader, StorageBuffer
 from .state import Context, context, draw_quad, clear_color
-from .state import style as Style
+from .state import blend_state as BlendState
 
 # TEXTURE CLASSES
 from .texture import Texture, Texture3D, SwapTexture3D, Texture2DArray, SwapTexture2DArray, LayeredFbo, Fbo, SwapFbo, \

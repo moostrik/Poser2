@@ -8,7 +8,7 @@ from time import time
 import math
 
 # Local application imports
-from modules.gl import Fbo, SwapFbo, Texture, Style, shaders
+from modules.gl import Fbo, SwapFbo, Texture, BlendState, shaders
 from modules.board import HasFrames
 from modules.pose import Similarity, MotionGate, AngleMotion, Frame
 from modules.settings import Field, BaseSettings
@@ -23,7 +23,7 @@ class SimilaritySilhouetteLayerSettings(BaseSettings):
     """Configuration for SimilaritySilhouetteLayer."""
     stage:                  Field[int]   = Field(0, description="Pipeline stage for pose data")
     max_players:            Field[int]   = Field(3, access=Field.INIT)
-    blend_mode:             Field[Style.BlendMode] = Field(Style.BlendMode.ALPHA)
+    blend_mode:             Field[BlendState.BlendMode] = Field(BlendState.BlendMode.ALPHA)
     similarity_threshold:   Field[float] = Field(0.1, min=0.0, max=1.0, description="Similarity below this contributes nothing")
     motion_exponent:        Field[float] = Field(1.0, min=0.0, max=5.0, description="Similarity response curve")
     similarity_scale:       Field[float] = Field(1.0, min=0.0, max=1.0, description="0 = own silhouette only, 1 = full cross-camera response", access=Field.READWRITE)
@@ -139,8 +139,8 @@ class SimilaritySilhouetteLayer(LayerBase):
                 other_cam_ids.append(cam_id)
 
         # ---- Render pipeline ----
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
 
 
         # Step 1: Tint all cameras' masks
@@ -166,7 +166,7 @@ class SimilaritySilhouetteLayer(LayerBase):
         styled_textures: list[Texture] = [self._blend_fbo]
         weights: list[float] = [motion]
 
-        # Style.set_blend_mode(Style.BlendMode.ADD)
+        # BlendState.set_blend_mode(BlendState.BlendMode.ADD)
 
         for cam_id in other_cam_ids:
             styled_textures.append(self._tint_fbos[cam_id])
@@ -177,13 +177,13 @@ class SimilaritySilhouetteLayer(LayerBase):
         self._shader.use(styled_textures, weights, self.settings.layered)
         self._output_fbo.end()
 
-        Style.pop_style()
+        BlendState.pop()
 
     # ========== Rendering ==========
 
     def draw(self) -> None:
         """Draw with configured blend mode."""
-        Style.push_style()
-        Style.set_blend_mode(self.settings.blend_mode)
+        BlendState.push()
+        BlendState.set_blend_mode(self.settings.blend_mode)
         self._output_fbo.draw()
-        Style.pop_style()
+        BlendState.pop()

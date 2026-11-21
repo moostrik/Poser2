@@ -21,7 +21,7 @@ from OpenGL.GL import (GL_ALREADY_SIGNALED, GL_CONDITION_SATISFIED, GL_MAP_COHER
                        glBindBuffer, glBindTexture, glBufferStorage, glClientWaitSync, glDeleteBuffers, glDeleteSync,
                        glFenceSync, glGenBuffers, glMapBufferRange, glPixelStorei, glTexSubImage2D, glUnmapBuffer)
 
-from modules.gl import Fbo, Style
+from modules.gl import Fbo, BlendState
 from modules.video import ScreenFormat
 
 from .screen_capture import yuv_planes
@@ -159,12 +159,12 @@ class ScreenPreview:
         glPixelStorei(GL_UNPACK_ALIGNMENT, _UNPACK_ALIGNMENT)
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
         self._in_flight.append((buffer, glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0)))
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         self.fbo.begin()
         self._shader.use([plane.fbo for plane in self._planes], self._planes[0].sample_max)
         self.fbo.end()
-        Style.pop_style()
+        BlendState.pop()
         self.shown = key
 
     # ANY THREAD

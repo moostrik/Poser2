@@ -6,7 +6,7 @@ from typing import cast
 import numpy as np
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import Shader, Style, clear_color, Texture, shaders
+from modules.gl import Shader, BlendState, clear_color, Texture, shaders
 from modules.window import RenderBase
 from modules.board import HasFrames
 from modules.camera import RigCameraSettings, CameraHealthSettings
@@ -236,7 +236,7 @@ class HDTrioRender(RenderBase):
         self._wire_flow()
 
         # Layer updates
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
         seen: set[Layers] = set()
         for layer_type in self._update_layers + self._interface_layers + self._draw_layers + self._preview_layers:
             if layer_type not in seen:
@@ -272,7 +272,7 @@ class HDTrioRender(RenderBase):
     def _draw_panels(self, width: int, height: int) -> None:
         clear_color()
 
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
 
         for i in range(self.num_cams):
             track_rect: Rect = self.subdivision.get_rect('track', i)
@@ -292,10 +292,10 @@ class HDTrioRender(RenderBase):
         """A border around the current viewport, `width` by `height` pixels."""
         if width <= 0 or height <= 0:
             return
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
         self._border.use(Rect(0.0, 0.0, 1.0, 1.0), BORDER, BORDER_WIDTH / width, BORDER_WIDTH / height)
-        Style.pop_style()
+        BlendState.pop()
 
     def _draw_camera(self, cam_id: int) -> None:
         """A camera's show, in its own window."""
@@ -304,12 +304,12 @@ class HDTrioRender(RenderBase):
         if cam_id >= self.num_cams:
             return
 
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.ADD)
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.ADD)
 
         for layer_type in self._draw_layers:
             if cam_id in self.L[layer_type]:
                 self.L[layer_type][cam_id].draw()
 
-        Style.pop_style()
+        BlendState.pop()

@@ -13,7 +13,7 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import Annotated
 
-from modules.gl import Texture, Style
+from modules.gl import Texture, BlendState
 from modules.flow import TextureKind
 from ....settings import FluidLayerSettings
 from .stage_layer import StageLayer, StageOutput
@@ -87,24 +87,24 @@ class FluidLayer(StageLayer[FluidInput, FluidOutput]):
         if input is None:
             return
 
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         for injection in input.injections:
             if injection.boundary_velocity.allocated:      # a bridge that has not stepped yet has nothing to give
                 self._inject(injection)
         self._step(input.dt)
-        Style.pop_style()
+        BlendState.pop()
 
     # ========== Rendering ==========
 
     @property
     @abstractmethod
-    def blend_mode(self) -> Style.BlendMode:
+    def blend_mode(self) -> BlendState.BlendMode:
         """How the show is drawn over the layers drawn before it."""
 
     def draw(self) -> None:
-        Style.push_style()
-        Style.set_blend_mode(self.blend_mode)
+        BlendState.push()
+        BlendState.set_blend_mode(self.blend_mode)
         if self.texture.allocated:
             self.texture.draw()
-        Style.pop_style()
+        BlendState.pop()

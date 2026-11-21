@@ -17,7 +17,7 @@ import numpy as np
 
 # Local application imports
 from modules.flow import HasPorts, Port, TextureKind, fixed_window, place_points
-from modules.gl import Style, Texture
+from modules.gl import BlendState, Texture
 from modules.inference import segmentation
 from modules.pose import BBox, Frame, Points2D
 from modules.render import StageLayer, StageOutput
@@ -143,10 +143,10 @@ class ViewLayer(StageLayer[ViewInput, ViewOutput]):
 
         self._window = fixed_window(s.crop.center_x, s.crop.center_y, s.crop.height, view.width / view.height, image.width / image.height)
 
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         self._crop.crop(image, self._window)
-        Style.pop_style()
+        BlendState.pop()
         self._mask.place(input.mask, self._window)
 
         self._pose_points = self._place_pose(input.pose)

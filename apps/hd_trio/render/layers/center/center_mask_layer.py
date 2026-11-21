@@ -8,7 +8,7 @@ from OpenGL.GL import GL_R16F, GL_RG32F, GL_RGBA16F, GL_RGBA32F
 
 # Local application imports
 from modules.render import LayerBase, HasCaptureTime
-from modules.gl import Fbo, SwapFbo, Texture, Style, shaders
+from modules.gl import Fbo, SwapFbo, Texture, BlendState, shaders
 from .center_geometry import CenterGeometry, SourceSpace
 from modules.utils import Quad
 from ....settings import CenterMaskLayerSettings
@@ -118,8 +118,8 @@ class CenterMaskLayer(LayerBase):
             return
         self._timestamp = self._source.timestamp if isinstance(self._source, HasCaptureTime) else None
 
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
 
         # The source on the view, kept as it comes, and the ROI buffer the steps refine
         part: Quad = self._geometry.source_quad(self._space, source)
@@ -178,7 +178,7 @@ class CenterMaskLayer(LayerBase):
         self._mask_blur_fbo.draw()
         self._mask_fbo.end()
 
-        Style.pop_style()
+        BlendState.pop()
 
     def _view_per_source_pixel(self, part: Quad, source: Texture) -> float:
         """The view's pixels one pixel of the source spans: the view's height over the part's height in the source's

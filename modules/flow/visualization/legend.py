@@ -7,7 +7,7 @@ from enum import IntEnum, auto
 
 from OpenGL.GL import GL_RGBA8
 
-from modules.gl import Fbo, Style, Text, Texture
+from modules.gl import Fbo, BlendState, Text, Texture
 from modules.utils import Color
 from .log_axis import histogram_lines, strip_lines, value_limit, AxisLine
 from .shaders import LogGrid, ColormapKey
@@ -81,15 +81,15 @@ class Legend:
 
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._fbo.begin()
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)     # the shapes' alpha stored as is, for the blit to apply once
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)     # the shapes' alpha stored as is, for the blit to apply once
         if kind == LegendKind.COLORMAP:
             self._draw_key(channel, channels, scale, self._title_height(title))
         elif kind is not None:
             self._draw_axis(kind, channel, channels, scale, samples)
         self._draw_letters(letters)
         self._draw_title(title)
-        Style.pop_style()
+        BlendState.pop()
         self._fbo.end()
 
     def _draw_title(self, title: str) -> None:
@@ -97,7 +97,7 @@ class Legend:
         if not title or not self._text.allocated:
             return
         w, h = self._fbo.width, self._fbo.height
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
         text_w: int = self._text.measure_text(title)[0]
         self._text.draw_box_text((w - text_w) / 2, MARGIN, title, TEXT, BOX, w, h)
 
@@ -106,7 +106,7 @@ class Legend:
         if not letters or not self._text.allocated:
             return
         w, h = self._fbo.width, self._fbo.height
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
         for name, x, y in letters:
             text_w, text_h = self._text.measure_text(name)
             self._text.draw_box_text(x - text_w / 2, y - text_h / 2, name, TEXT, BOX, w, h)
@@ -121,7 +121,7 @@ class Legend:
         self._grid.use(lanes, [line.fraction for line in lines], kind == LegendKind.HISTOGRAM)
         if not self._text.allocated:
             return
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
         for lane in range(lanes):
             top: float = lane * h / lanes
             bottom: float = (lane + 1) * h / lanes
@@ -156,7 +156,7 @@ class Legend:
                       KEY_GAP / h)
         if not self._text.allocated:
             return
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
         text_h: int = self._text.measure_text('x')[1]
         for bar, name in enumerate(names):
             bar_top: float = h - top + bar * (KEY_BAR + KEY_GAP)    # in text's pixels, from the top

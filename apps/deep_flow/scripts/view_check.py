@@ -32,7 +32,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_FLOAT, GL_NEAREST, GL_RED, GL_RGBA,
 from scripts import monitor_harness as mh  # noqa: E402
 from modules.camera import CameraFrame, FrameType  # noqa: E402
 from modules.recording import ChunkStream, read_metadata  # noqa: E402
-from modules.gl import Style, Tensor, Texture  # noqa: E402
+from modules.gl import BlendState, Tensor, Texture  # noqa: E402
 from modules.inference import GpuDepth, GpuImage, SerialUploader, SerialUploaderSettings  # noqa: E402
 from apps.deep_flow.render.layers import EDGE, ViewInput, ViewLayer  # noqa: E402
 from apps.deep_flow.settings import ViewLayerSettings  # noqa: E402
@@ -80,8 +80,8 @@ def time_view(view: ViewLayer, color_stage: ColorLayer, image: Texture, depth: T
         view._made = None
         view.update()
 
-    Style.push_style()
-    Style.set_blend_mode(Style.BlendMode.DISABLED)
+    BlendState.push()
+    BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
     rows = [('crop, image and depth', lambda: crop.crop(image, depth, roi)),
             ('mask, the guide', lambda: mask.guide(crop.image, crop.depth, roi, view._grid_size[1])),
             ('depth, upscale and fill', lambda: view_depth.upscale(depth, roi, mask.mask)),
@@ -93,7 +93,7 @@ def time_view(view: ViewLayer, color_stage: ColorLayer, image: Texture, depth: T
             work()
         glFinish()
         print(f'{name:<24} {mh.gpu_ms(work, 40):7.3f} ms', flush=True)
-    Style.pop_style()
+    BlendState.pop()
 
 
 def main() -> int:

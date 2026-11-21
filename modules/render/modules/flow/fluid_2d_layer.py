@@ -6,7 +6,7 @@ density is held as its color times its coverage, and drawn, its picture, through
 """
 
 # Local application imports
-from modules.gl import GpuTimer, Style, Texture
+from modules.gl import GpuTimer, BlendState, Texture
 from modules.settings import Field, Group
 from modules.flow import Fluid2D, Fluid2DSettings, HasPorts
 from ...general.grade import LutGrade, LutSettings
@@ -18,7 +18,7 @@ class Fluid2DLayerSettings(Fluid2DSettings, FluidLayerSettings):
     """Configuration for Fluid2DLayer: the stage's settings and its fluid's own, one panel, the stage's first; the
     stage's width and height are the fluid's simulation grid; how the picture is drawn over the layers before it, and
     the LUT it is drawn through."""
-    blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD, newline=True, description="How the show is drawn over the layers before it")
+    blend_mode: Field[BlendState.BlendMode] =    Field(BlendState.BlendMode.ADD, newline=True, description="How the show is drawn over the layers before it")
     lut: Group[LutSettings] =               Group(LutSettings)
 
     monitor_main:  Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=MAIN_TINT)
@@ -38,7 +38,7 @@ class Fluid2DLayer(FluidLayer):
         self._grade: LutGrade = LutGrade(settings.lut)
 
     @property
-    def blend_mode(self) -> Style.BlendMode:
+    def blend_mode(self) -> BlendState.BlendMode:
         """The panel's blend for a premultiplied picture: the density is its color times its coverage."""
         return self.settings.blend_mode.premultiplied
 
@@ -68,11 +68,11 @@ class Fluid2DLayer(FluidLayer):
 
     def draw(self) -> None:
         """The show, through its LUT where one is picked."""
-        Style.push_style()
-        Style.set_blend_mode(self.blend_mode)
+        BlendState.push()
+        BlendState.set_blend_mode(self.blend_mode)
         if self.texture.allocated:
             self._grade.draw(self.texture)
-        Style.pop_style()
+        BlendState.pop()
 
     def reset(self) -> None:
         self._fluid.reset()

@@ -13,7 +13,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Annotated
 
-from modules.gl import Texture, Style
+from modules.gl import Texture, BlendState
 from modules.flow import TextureKind
 from modules.settings import Field, Group
 from .monitor_2d_layer import DEBUG_TINT, MAIN_TINT, Monitor2DLayerSettings
@@ -131,10 +131,10 @@ class BridgeLayer(StageLayer[BridgeInput, BridgeOutput]):
             return
         self._follow_sizes(input.velocity)
 
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         self._bridge(input)
-        Style.pop_style()
+        BlendState.pop()
 
     def draw(self) -> None:
         """A stage draws nothing; a monitor draws its textures."""

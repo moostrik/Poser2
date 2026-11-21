@@ -38,7 +38,7 @@ vec3 blendSetSat(vec3 c, float s) {
     return hi > lo ? (c - lo) * s / (hi - lo) : vec3(0.0);
 }
 
-// The mode numbers, as `gl.Style.BlendMode` numbers them
+// The mode numbers, as `gl.BlendState.BlendMode` numbers them
 const int BLEND_NORMAL = 0;
 const int BLEND_ADD = 1;
 const int BLEND_MULTIPLY = 2;

@@ -2,7 +2,7 @@
 
 from OpenGL.GL import GL_R32F, GL_RG32F
 
-from ... import Fbo, Style, SwapFbo, Texture
+from ... import Fbo, BlendState, SwapFbo, Texture
 from .jump_flood import JumpFlood
 
 
@@ -36,8 +36,8 @@ class DistanceField:
     def process(self, mask: Texture, threshold: float = 0.5) -> None:
         if not self.allocated or not mask.allocated:
             return
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         self._map.begin()
         self._shader.seed(mask, threshold)
         self._map.end()
@@ -55,4 +55,4 @@ class DistanceField:
         self._distance.begin()
         self._shader.distance(self._map)
         self._distance.end()
-        Style.pop_style()
+        BlendState.pop()

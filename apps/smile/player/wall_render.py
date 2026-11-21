@@ -11,7 +11,7 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA8, GL_RGBA16F, GL_SCISSOR_TES
 
 from ..credit import FONT, TITLE_FONT, qr_image, quiet_px, title_image, wrap_balanced
 from ..credit_scroll import TIMEOUT as SCROLL_TIMEOUT, name_strip, scroll_copies, scroll_gone
-from modules.gl import ChannelOrder, Fbo, Image, Shader, Style, SwapFbo, Text, Texture, shaders
+from modules.gl import ChannelOrder, Fbo, Image, Shader, BlendState, SwapFbo, Text, Texture, shaders
 from modules.utils import Color, Point2f, Quad
 from .settings import WallsSettings
 
@@ -264,7 +264,7 @@ class WallRender:
         else:
             self._credit_cell = None     # switched off: the card leaves at once, the clip under it goes on
 
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
 
         self._image_fbo.begin()
         for id in self._ids:
@@ -295,12 +295,12 @@ class WallRender:
             self._images[id].draw(src=QUARTER_TURN)
         # the clips' captions, over each cell's clip
         if captions:
-            Style.set_blend_mode(Style.BlendMode.ALPHA)
+            BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
             for id, line in captions.items():
                 if line:
                     glViewport(*self._rects[id])
                     self._caption_fbos[id].draw(src=QUARTER_TURN)
-            Style.set_blend_mode(Style.BlendMode.DISABLED)
+            BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         # the credit, over its cell's clip
         if self._credit_cell is not None:
             glViewport(*self._rects[self._credit_cell])
@@ -314,11 +314,11 @@ class WallRender:
                 self._online_view.draw(src=QUARTER_TURN)
         # the scrolling name, over the cells it is on now
         if scrolling:
-            Style.set_blend_mode(Style.BlendMode.ALPHA)
+            BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
             for id in scrolling:
                 glViewport(*self._rects[id])
                 self._scroll_fbos[id].draw(src=QUARTER_TURN)
-            Style.set_blend_mode(Style.BlendMode.DISABLED)
+            BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         # the cells the laughter test lights: white with the number, over everything, every frame
         for id in lit:
             glViewport(*self._rects[id])
@@ -340,10 +340,10 @@ class WallRender:
         if number > 0 and self._text.allocated:
             text: str = str(number)
             width, height = self._text.measure_text(text)
-            Style.set_blend_mode(Style.BlendMode.ALPHA)
+            BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
             self._text.draw_text((self.CELL_HEIGHT - width) / 2, (self.CELL_WIDTH - height) / 2, text, NUMBER_COLOR,
                                  self.CELL_HEIGHT, self.CELL_WIDTH)
-            Style.set_blend_mode(Style.BlendMode.DISABLED)
+            BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         self._number_fbo.end()
 
     def _draw_caption(self, id: str, line: str) -> None:
@@ -361,7 +361,7 @@ class WallRender:
             _, line_height = text.measure_text("Mg")
             bottom: list[str] = wrap_balanced(line, measure, width - 2 * CAPTION_MARGIN_PX)
             y: float = height - CAPTION_MARGIN_PX - len(bottom) * line_height
-            Style.set_blend_mode(Style.BlendMode.ALPHA)
+            BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
             if title.allocated:
                 # the viewport's origin is the bottom left
                 glViewport((width - title.width) // 2, height - CAPTION_MARGIN_PX - title.height, title.width, title.height)
@@ -372,7 +372,7 @@ class WallRender:
                 for dx, dy in CAPTION_OUTLINE:
                     text.draw_text(x + dx, y + i * line_height + dy, part, CAPTION_OUTLINE_COLOR, width, height)
                 text.draw_text(x, y + i * line_height, part, CAPTION_COLOR, width, height)
-            Style.set_blend_mode(Style.BlendMode.DISABLED)
+            BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         fbo.end()
 
     def _draw_scrolls(self, scrolls: list[Scroll], now_perf: float) -> list[str]:
@@ -412,10 +412,10 @@ class WallRender:
             for index, (strip, offset) in enumerate(strips):
                 # the strip's x = offset at the screen's left edge: the strip drawn whole, shifted left by it;
                 # the first pass straight into the cleared texture, another over it
-                Style.set_blend_mode(Style.BlendMode.ALPHA if index else Style.BlendMode.DISABLED)
+                BlendState.set_blend_mode(BlendState.BlendMode.ALPHA if index else BlendState.BlendMode.DISABLED)
                 glViewport(-round(offset), 0, strip.width, height)
                 strip.draw()
-            Style.set_blend_mode(Style.BlendMode.DISABLED)
+            BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
             glViewport(0, 0, width, height)
             fbo.end()
         return list(parts)
@@ -462,9 +462,9 @@ class WallRender:
             qr.draw()
             glViewport(0, 0, width, height)
         if name_width:
-            Style.set_blend_mode(Style.BlendMode.ALPHA)
+            BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
             text.draw_text((width - name_width) / 2, top + code + CREDIT_GAP_PX, line, CREDIT_NAME_COLOR, width, height)
-            Style.set_blend_mode(Style.BlendMode.DISABLED)
+            BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         fbo.end()
 
     # ANY THREAD

@@ -3,7 +3,7 @@
 from OpenGL.GL import GL_RGBA16F
 
 from modules import render
-from modules.gl import Fbo, Style, Texture, clear_color
+from modules.gl import Fbo, BlendState, Texture, clear_color
 
 
 class InferenceFrameMonitorLayer(render.LayerBase):
@@ -31,10 +31,10 @@ class InferenceFrameMonitorLayer(render.LayerBase):
         if timestamp == self._drawn or not self._fbo.allocated or not self._image.texture.allocated:
             return
         self._drawn = timestamp
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         self._fbo.begin()
         clear_color()
         self._image.texture.draw()
         self._fbo.end()
-        Style.pop_style()
+        BlendState.pop()

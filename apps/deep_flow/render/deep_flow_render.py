@@ -5,7 +5,7 @@ from typing import Callable, cast
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import GpuTimer, Shader, Style, clear_color, Texture, shaders
+from modules.gl import GpuTimer, Shader, BlendState, clear_color, Texture, shaders
 from modules.window import MouseButton, RenderBase
 from modules.video import ScreenRecorderSettings
 from modules.flow import Port, hold_tick
@@ -262,7 +262,7 @@ class DeepFlowRender(RenderBase):
             self._hold_show()
             return
 
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
         seen: set[ChainLayers] = set()
         for layer_type in TICK_LAYERS + self._main_layers + self._debug_layers:
             if layer_type in seen:
@@ -404,7 +404,7 @@ class DeepFlowRender(RenderBase):
         """The main and the debug panel's layers, side by side or stacked."""
         clear_color()
 
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
 
         main_rect: Rect = self.subdivision.get_rect('panels', 0)
         self._draw_fit(self._main_layers, main_rect.x, height - main_rect.y - main_rect.height, main_rect.width, main_rect.height, True)
@@ -417,13 +417,13 @@ class DeepFlowRender(RenderBase):
         """The show: the main panel's layers in order, each fit to `width` × `height` at its own shape."""
         clear_color()
 
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.ADD)
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.ADD)
 
         self._draw_fit(self._main_layers, 0, 0, width, height)
 
-        Style.pop_style()
+        BlendState.pop()
 
     def _draw_fit(self, layer_types: list[ChainLayers], x: float, y: float, width: float, height: float, border: bool = False,
                   debug: bool = False) -> None:
@@ -446,10 +446,10 @@ class DeepFlowRender(RenderBase):
         """A border around the current viewport, `width` by `height` pixels."""
         if width <= 0 or height <= 0:
             return
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
         self._border.use(Rect(0.0, 0.0, 1.0, 1.0), BORDER, BORDER_WIDTH / width, BORDER_WIDTH / height)
-        Style.pop_style()
+        BlendState.pop()
 
     def _layer_size(self, layer_type: ChainLayers) -> tuple[int, int]:
         """The shape of `layer_type`'s panel: its shape layer's texture, the output's without one."""

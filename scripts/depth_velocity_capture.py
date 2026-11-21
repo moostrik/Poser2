@@ -36,7 +36,7 @@ from OpenGL.GL import GL_FLOAT, GL_PACK_ALIGNMENT, GL_RGBA, GL_RGBA32F, GL_TEXTU
 from OpenGL.raw.GL.VERSION.GL_1_1 import glGetTexImage as raw_get_tex_image  # noqa: E402
 
 from modules.logging import setup_logging, install_excepthooks  # noqa: E402
-from modules.gl import Fbo, Style, Texture  # noqa: E402
+from modules.gl import Fbo, BlendState, Texture  # noqa: E402
 from modules.flow import FlowUtil, LucasKanadeFlow3D  # noqa: E402
 from modules import render  # noqa: E402
 from apps.deep_flow.main import DeepFlowMain  # noqa: E402
@@ -78,10 +78,10 @@ def main() -> int:
         if name not in targets:
             targets[name] = Fbo()
             targets[name].allocate(w, h, GL_RGBA32F)
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         FlowUtil.blit(targets[name], source)
-        Style.pop_style()
+        BlendState.pop()
         array = np.empty((h, w, 4), np.float32)
         glBindTexture(GL_TEXTURE_2D, targets[name].tex_id)
         glPixelStorei(GL_PACK_ALIGNMENT, 1)

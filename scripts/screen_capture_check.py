@@ -26,7 +26,7 @@ import numpy as np  # noqa: E402
 from OpenGL.GL import glFinish  # noqa: E402
 
 import monitor_harness as mh  # noqa: E402
-from modules.gl import Style  # noqa: E402
+from modules.gl import BlendState  # noqa: E402
 from modules.render import ScreenCapture, ScreenPreview  # noqa: E402
 from modules.video import BitDepth, Chroma, ScreenFormat, ScreenFrame  # noqa: E402
 
@@ -58,12 +58,12 @@ def picture() -> np.ndarray:
 
 
 def draw(capture: ScreenCapture, source) -> None:
-    Style.push_style()
-    Style.set_blend_mode(Style.BlendMode.DISABLED)
+    BlendState.push()
+    BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
     capture.frame.begin()
     source.draw()
     capture.frame.end()
-    Style.pop_style()
+    BlendState.pop()
 
 
 def wait_for(capture: ScreenCapture, frames: list[ScreenFrame], count: int) -> None:

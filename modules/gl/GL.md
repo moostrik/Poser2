@@ -45,11 +45,11 @@ makes one for it (`Context().allocate()`). A context holds what its GL context d
 | the quad           | the vertex array `draw_quad` draws, bound while the context is current   |
 | the bound vertex array | the one bound, kept so that no `glGet*` is asked                     |
 | `Blit`             | the shader a texture draws itself with                                   |
-| the blend state    | `Style`'s state and saved states, this context's alone                   |
+| the blend state    | `BlendState`'s state and saved states, this context's alone              |
 
 `gl.context()` is the one made current (`Context.make_current`, which the window manager calls with each window's
 GL context). Each context keeps its own blend state because GL keeps it per context: a state kept for the whole
-program goes wrong after a switch of window. Every blend change goes through `Style`, so the state it holds is the
+program goes wrong after a switch of window. Every blend change goes through `BlendState`, so the state it holds is the
 one GL has; `set_buffer_blend_mode` sets one draw buffer's blend alone.
 
 ## A texture draws itself
@@ -79,7 +79,7 @@ out in pixels on the CPU (`text_layout`), from the size its caller gives, and ha
 `composite` (the wipes among them). The package exports every one, so a caller writes `shaders.FillRect`; the kind
 orders the files, the operation names the shader. The shared GLSL includes sit at the top of `shaders/`:
 `position.glsl` (below), `color.glsl` (Rec. 709 luminance, the HSV conversions), `blend_modes.glsl` (the textbook
-blend modes, which the `Blend` shader draws by `BlendShaderMode`; GL's own blending, `Style.BlendMode`, does normal,
+blend modes, which the `Blend` shader draws by `BlendShaderMode`; GL's own blending, `BlendState.BlendMode`, does normal,
 add, multiply and screen in the draw itself, without a pass) and `colormap.glsl`, turbo, viridis and jet by the number `gl.Colormap` gives them. An effect that runs
 over a chain of passes owns its targets and sits in the kind of the shader it chains: `shaders.Bloom` in `filter`
 (a dual-filter chain) and `shaders.DistanceField` in `mask` (jump flooding).

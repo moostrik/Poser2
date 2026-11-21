@@ -2,7 +2,7 @@
 
 # Local application imports
 from modules.render import LayerBase, HasCaptureTime, ColorSettings
-from modules.gl import Fbo, Texture, Style, shaders
+from modules.gl import Fbo, Texture, BlendState, shaders
 from .center_geometry import CenterGeometry, SourceSpace
 from .colorize import Colorize
 from ....settings import CenterForegroundLayerSettings
@@ -73,8 +73,8 @@ class CenterForegroundLayer(LayerBase):
             return
         self._timestamp = self._source.timestamp if isinstance(self._source, HasCaptureTime) else None
 
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
 
         # Render foreground with its ROI
         self._roi_fbo.begin()
@@ -89,5 +89,5 @@ class CenterForegroundLayer(LayerBase):
             self._premultiplied_fbo.end()
             cut = self._premultiplied_fbo
 
-        Style.pop_style()
+        BlendState.pop()
         self._look.process(cut, self._mask_texture)

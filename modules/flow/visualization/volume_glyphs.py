@@ -6,7 +6,7 @@ import math
 
 from OpenGL.GL import GL_DEPTH_BUFFER_BIT, GL_DEPTH_TEST, GL_LESS, GL_RGBA8, glClear, glDepthFunc, glDisable, glEnable
 
-from modules.gl import Fbo, Style, Texture, Texture3D
+from modules.gl import Fbo, BlendState, Texture, Texture3D
 from .. import FlowUtil
 from .orbit import FOV, Orbit, box_size
 from .shaders import CubeAxes, CubeEdges, GlyphArrows, GlyphDots
@@ -66,8 +66,8 @@ class VolumeGlyphs:
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._fbo.begin()
         glClear(GL_DEPTH_BUFFER_BIT)
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         glEnable(GL_DEPTH_TEST)
         glDepthFunc(GL_LESS)
         pixels_per_unit: float = self._fbo.height * 0.5 / math.tan(FOV / 2.0)
@@ -79,6 +79,6 @@ class VolumeGlyphs:
             self._edges.use(matrix, box)
             self._axes.use(matrix, box)
         glDisable(GL_DEPTH_TEST)
-        Style.pop_style()
+        BlendState.pop()
         self._fbo.end()
         return self._fbo

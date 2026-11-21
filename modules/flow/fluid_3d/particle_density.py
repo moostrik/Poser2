@@ -12,7 +12,7 @@ from OpenGL.GL import (GL_COLOR, GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_
                        glDeleteFramebuffers, glDrawBuffers, glEnable, glFramebufferTexture2D, glGenFramebuffers,
                        glGetFloatv, glMemoryBarrier, glViewport)
 
-from modules.gl import GpuTimer, LayeredFbo, StorageBuffer, Style, Texture, Texture3D
+from modules.gl import GpuTimer, LayeredFbo, StorageBuffer, BlendState, Texture, Texture3D
 from ..port import Port
 from ..wall_mode import WallMode
 from .density_carrier import CarrierStep, DensityCarrier
@@ -200,15 +200,15 @@ class ParticleDensity(DensityCarrier):
         target.begin()
         glClearColor(0.0, 0.0, 0.0, 0.0)
         glClear(GL_COLOR_BUFFER_BIT)
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.SUM)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.SUM)
         self._sprites_shader.use(self._particles, self._ring, self._count, _SPRITES[particles.draw], slices=slices,
                                  scale=self._scale, ring_fade=particles.ring_fade, output_size=self._output,
                                  size=particles.size, streak=particles.streak, radius=particles.radius,
                                  reference_mass=self._reference_mass(), spread=particles.spread,
                                  fade_time=self.settings.density.fade_time, max_point_size=self._max_point_size,
                                  fog=look.fog if additive else (0.0, 0.0, 0.0))
-        Style.pop_style()
+        BlendState.pop()
         target.end()
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._draw_timer.end()
@@ -233,9 +233,9 @@ class ParticleDensity(DensityCarrier):
         glViewport(0, 0, width, height)
         glClearBufferfv(GL_COLOR, 0, (0.0, 0.0, 0.0, 0.0))
         glClearBufferfv(GL_COLOR, 1, (1.0, 1.0, 1.0, 1.0))
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.SUM)
-        Style.set_buffer_blend_mode(1, Style.BlendMode.REVEALAGE)   # the revealage: × (1 - alpha) per channel
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.SUM)
+        BlendState.set_buffer_blend_mode(1, BlendState.BlendMode.REVEALAGE)   # the revealage: × (1 - alpha) per channel
         self._sprites_shader.use(self._particles, self._ring, self._count, _SPRITES[particles.draw], slices=1,
                                  scale=self._scale, ring_fade=particles.ring_fade, output_size=self._output,
                                  size=particles.size, streak=particles.streak, radius=particles.radius,
@@ -243,7 +243,7 @@ class ParticleDensity(DensityCarrier):
                                  fade_time=self.settings.density.fade_time, max_point_size=self._max_point_size,
                                  fog=look.fog, weighted=True, emission=emission / self.settings.particles.slices,
                                  absorption=extinction / self.settings.particles.slices)
-        Style.pop_style()
+        BlendState.pop()
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._draw_timer.end()
@@ -306,14 +306,14 @@ class ParticleDensity(DensityCarrier):
         glViewport(0, 0, width, height)
         glClearBufferfv(GL_COLOR, 0, (1.0, 1.0, 1.0, 1.0))
         glClearBufferfv(GL_COLOR, 1, (0.0, 0.0, 0.0, 0.0))
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.SUM)
-        Style.set_buffer_blend_equation(0, Style.BlendEquation.MIN)
+        BlendState.push()
+        BlendState.set_blend_mode(BlendState.BlendMode.SUM)
+        BlendState.set_buffer_blend_equation(0, BlendState.BlendEquation.MIN)
         self._surface_shader.use(self._particles, self._ring, self._count, scale=self._scale, ring_fade=particles.ring_fade,
                                  output_size=self._output, z_per_pixel=1.0 / (width * self._z_extent),
                                  radius=particles.radius, reference_mass=self._reference_mass(), spread=particles.spread,
                                  fade_time=self.settings.density.fade_time, max_point_size=self._max_point_size)
-        Style.pop_style()
+        BlendState.pop()
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._draw_timer.end()

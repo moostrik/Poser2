@@ -15,7 +15,7 @@ from modules.tracker import OnePerCamTrackerSettings, TrackerFrameSourceSettings
 from modules.pose import nodes, trackers, window, analytics, RecorderSettings as PoseRecorderSettings
 from modules import inference
 from modules.session import SessionSettings
-from modules.gl import Style
+from modules.gl import BlendState
 from modules.window import WindowManagerSettings, WindowSettings
 from .flow import GradientFlowSettings, Fluid2DSettings, bridge_2d
 from .sequencer import SequencerSettings
@@ -425,7 +425,7 @@ class Bridge2DLayerSettings(BridgeLayerSettings):
 class Fluid2DLayerSettings(Fluid2DSettings, FluidLayerSettings):
     """Configuration for Fluid2DLayer: the stage's settings and its fluid's own, one panel, the stage's
     first; the stage's width and height are the fluid's simulation grid."""
-    blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD, newline=True, description="How the show is drawn over the layers before it")
+    blend_mode: Field[BlendState.BlendMode] =    Field(BlendState.BlendMode.ADD, newline=True, description="How the show is drawn over the layers before it")
 
 
 class LayerGroup(BaseSettings):
