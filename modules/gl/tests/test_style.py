@@ -53,6 +53,20 @@ class StyleTest(unittest.TestCase):
         self.assertEqual(self.calls(), ['glBlendFunc'])  # blending stays on: no enable
         self.assertEqual(self.stack.current.blend_mode, Style.BlendMode.ALPHA)
 
+    def test_a_buffers_equation_is_set_once_and_restored_by_pop(self) -> None:
+        for name in ('glBlendEquationi',):
+            patcher = mock.patch.object(STYLE, name, getattr(self.gl, name))
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        Style.push_style()
+        Style.set_buffer_blend_equation(0, Style.BlendEquation.MIN)
+        Style.set_buffer_blend_equation(0, Style.BlendEquation.MIN)
+        self.assertEqual(self.calls(), ['glBlendEquationi'])
+        self.gl.reset_mock()
+        Style.pop_style()
+        self.gl.glBlendEquationi.assert_called_once_with(0, Style.BlendEquation.ADD.value)
+        self.assertEqual(self.stack.current.buffer_equations, {})
+
     def test_a_pop_without_a_push_warns_and_keeps_the_state(self) -> None:
         Style.set_blend_mode(Style.BlendMode.ADD)
         with self.assertLogs(STYLE.logger, 'WARNING'):

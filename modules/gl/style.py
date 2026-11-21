@@ -3,7 +3,7 @@
 Each GL context holds its own `StyleStack` (`gl.Context`); this module's functions work on the current one's, so the
 state it holds is that context's and no `glGet*` is asked. Every blend change goes through this module.
 """
-from OpenGL.GL import GL_BLEND, GL_DST_COLOR, GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_SRC_COLOR, GL_SRC_ALPHA, GL_ZERO, glBlendFunc, glBlendFunci, glDisable, glEnable
+from OpenGL.GL import GL_BLEND, GL_DST_COLOR, GL_FUNC_ADD, GL_MAX, GL_MIN, GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_SRC_COLOR, GL_SRC_ALPHA, GL_ZERO, glBlendEquationi, glBlendFunc, glBlendFunci, glDisable, glEnable
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
@@ -39,15 +39,24 @@ class BlendMode(Enum):
         return self.value[1]
 
 
+class BlendEquation(Enum):
+    """How a blend combines the source and the destination of a draw buffer."""
+    ADD = GL_FUNC_ADD       # the factored terms summed: every blend mode
+    MIN = GL_MIN            # the smaller of the two, the factors ignored
+    MAX = GL_MAX            # the larger of the two, the factors ignored
+
+
 @dataclass
 class StyleState:
-    """A blend state: on or off, the mode of every draw buffer, and the buffers set to another mode."""
+    """A blend state: on or off, the mode of every draw buffer, the buffers set to another mode, and the buffers set to
+    another equation than ADD."""
     blend_enabled: bool = False
     blend_mode: BlendMode = BlendMode.ALPHA
     buffer_modes: dict[int, BlendMode] = field(default_factory=dict)
+    buffer_equations: dict[int, BlendEquation] = field(default_factory=dict)
 
     def copy(self) -> 'StyleState':
-        return StyleState(self.blend_enabled, self.blend_mode, dict(self.buffer_modes))
+        return StyleState(self.blend_enabled, self.blend_mode, dict(self.buffer_modes), dict(self.buffer_equations))
 
 
 _MAX_STYLE_HISTORY: int = 32
@@ -106,6 +115,11 @@ def pop_style() -> None:
         for buffer, mode in state.buffer_modes.items():
             glBlendFunci(buffer, mode.src_factor, mode.dst_factor)
 
+    for buffer in set(state.buffer_equations) | set(current.buffer_equations):
+        equation: BlendEquation = state.buffer_equations.get(buffer, BlendEquation.ADD)
+        if equation != current.buffer_equations.get(buffer, BlendEquation.ADD):
+            glBlendEquationi(buffer, equation.value)
+
     _stack.current = state
 
 
@@ -126,6 +140,17 @@ def set_blend_mode(mode: BlendMode) -> None:
         glBlendFunc(mode.src_factor, mode.dst_factor)
         current.blend_mode = mode
         current.buffer_modes = {}
+
+
+def set_buffer_blend_equation(buffer: int, equation: BlendEquation) -> None:
+    """Set the blend equation of draw buffer `buffer`; `pop_style` restores the one before."""
+    current: StyleState = _stack.current
+    if current.buffer_equations.get(buffer, BlendEquation.ADD) != equation:
+        glBlendEquationi(buffer, equation.value)
+        if equation == BlendEquation.ADD:
+            current.buffer_equations.pop(buffer, None)
+        else:
+            current.buffer_equations[buffer] = equation
 
 
 def set_buffer_blend_mode(buffer: int, mode: BlendMode) -> None:

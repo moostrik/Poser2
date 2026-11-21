@@ -5,10 +5,10 @@ through the grid's velocity, faded and drawn by `draw` and `overlap`. How and wh
 
 import math
 
-from OpenGL.GL import (GL_COLOR, GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_BUFFER_BIT,
-                       GL_FRAMEBUFFER, GL_FUNC_ADD, GL_MIN, GL_POINT_SIZE_RANGE, GL_PROGRAM_POINT_SIZE, GL_R32F,
-                       GL_RGBA16F, GL_RGBA32F, GL_TEXTURE_2D, GL_TEXTURE_FETCH_BARRIER_BIT, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT,
-                       glBindFramebuffer, glBlendEquationi, glClear, glClearBufferfv, glClearColor,
+from OpenGL.GL import (GL_COLOR, GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2,
+                       GL_COLOR_BUFFER_BIT, GL_FRAMEBUFFER, GL_POINT_SIZE_RANGE, GL_PROGRAM_POINT_SIZE, GL_R32F,
+                       GL_RGBA16F, GL_RGBA32F, GL_TEXTURE_2D, GL_TEXTURE_FETCH_BARRIER_BIT,
+                       GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, glBindFramebuffer, glClear, glClearBufferfv, glClearColor,
                        glDeleteFramebuffers, glDrawBuffers, glEnable, glFramebufferTexture2D, glGenFramebuffers,
                        glGetFloatv, glMemoryBarrier, glViewport)
 
@@ -308,12 +308,11 @@ class ParticleDensity(DensityCarrier):
         glClearBufferfv(GL_COLOR, 1, (0.0, 0.0, 0.0, 0.0))
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.SUM)
-        glBlendEquationi(0, GL_MIN)
+        Style.set_buffer_blend_equation(0, Style.BlendEquation.MIN)
         self._surface_shader.use(self._particles, self._ring, self._count, scale=self._scale, ring_fade=particles.ring_fade,
                                  output_size=self._output, z_per_pixel=1.0 / (width * self._z_extent),
                                  radius=particles.radius, reference_mass=self._reference_mass(), spread=particles.spread,
                                  fade_time=self.settings.density.fade_time, max_point_size=self._max_point_size)
-        glBlendEquationi(0, GL_FUNC_ADD)
         Style.pop_style()
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
