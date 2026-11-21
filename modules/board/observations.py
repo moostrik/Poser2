@@ -8,8 +8,7 @@ if TYPE_CHECKING:
 
 
 class HasObservations(Protocol):
-    """Every live per-camera observation from the panoramic tracker, one per camera that sees a player: the unfused
-    view, beside ``HasTracklets``' fused one; read by the calibration display."""
+    """Every live per-camera observation from the panoramic tracker, one per camera that sees a player."""
     def get_observations(self) -> list[Tracklet]: ...
     def set_observations(self, observations: list[Tracklet]) -> None: ...
 
@@ -23,8 +22,8 @@ class ObservationStoreMixin:
 
     def get_observations(self) -> list[Tracklet]:
         with self._observation_lock:
-            return list(self._observations)
+            return self._observations
 
     def set_observations(self, observations: list[Tracklet]) -> None:
         with self._observation_lock:
-            self._observations = list(observations)
+            self._observations = observations

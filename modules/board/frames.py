@@ -27,8 +27,8 @@ class FrameStoreMixin:
 
     def get_frames(self, stage: int) -> dict[int, Frame]:
         with self._frame_lock:
-            return dict(self._frames.get(stage, {}))
+            return self._frames.get(stage, {})
 
     def set_frames(self, stage: int, frames: dict[int, Frame]) -> None:
         with self._frame_lock:
-            self._frames[stage] = dict(frames)
+            self._frames[stage] = frames

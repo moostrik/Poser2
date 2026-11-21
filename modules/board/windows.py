@@ -19,11 +19,7 @@ class HasWindows(Protocol):
 
 
 class WindowStoreMixin:
-    """Thread-safe staged feature window access.
-
-    Stores one window source per stage (set once at wiring time); a read builds that one
-    window on demand in the source, so no per-frame window data crosses the board.
-    """
+    """Thread-safe storage of one window source per stage; a read gets its window from that source."""
 
     def __init__(self) -> None:
         self._window_lock = Lock()

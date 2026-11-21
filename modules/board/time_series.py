@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from enum import IntEnum
 from threading import Lock
-from typing import Protocol
-
-import numpy as np
+from typing import Protocol, TYPE_CHECKING
 
 from modules.utils import SampleRing
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 class HasTimeSeries(Protocol):

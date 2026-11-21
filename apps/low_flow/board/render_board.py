@@ -2,10 +2,8 @@
 
 from modules.board import (
     FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin, CameraTrackletStoreMixin,
-    TimeSeriesStoreMixin,
+    TimeSeriesStoreMixin, InferenceFrameStoreMixin,
 )
-
-from .inference_frames import InferenceFrameStoreMixin
 
 
 class RenderBoard(FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, InferenceFrameStoreMixin, CropImageStoreMixin,

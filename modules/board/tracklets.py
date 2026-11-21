@@ -22,8 +22,8 @@ class TrackletStoreMixin:
 
     def get_tracklets(self) -> dict[int, Tracklet]:
         with self._tracklet_lock:
-            return dict(self._tracklets)
+            return self._tracklets
 
     def set_tracklets(self, tracklets: dict[int, Tracklet]) -> None:
         with self._tracklet_lock:
-            self._tracklets = dict(tracklets)
+            self._tracklets = tracklets
