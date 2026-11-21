@@ -11,8 +11,6 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 
 ## C. Small fixes to the rules
 
-- C5. The fields without a description get one: `OakCameraSettings.square`, `yolo`, `model_path`,
-  `Oak4CameraSettings.model_path` **(seen)**. Why: "Keep `Field` descriptions to one short line of panel text".
 - C6. `CameraHealth` keeps its settings as `self.settings`, not `self._settings` **(seen)**. Why: the glossary, "A
   component's settings object: `settings` / `self.settings`".
 - C7. `KeypointJoin` takes a lock round its frames, and holds a frame's two halves in a small dataclass instead of a
@@ -84,7 +82,6 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 ## Rules it touches
 
 - Inside a package, code that does the same is written once: E2
-- Keep `Field` descriptions to one short line of panel text: C5
 - The glossary: C6, C8
 - Use `Lock` and `Event` for shared mutable state; prefer `IntEnum` over string keys: C7
 - A document describes what is built: D1

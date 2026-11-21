@@ -58,7 +58,7 @@ class Oak4CameraSettings(RigCameraSettings):
     depth_model:    Field[DepthModel] = Field(DepthModel.OFF, access=Field.INIT, description="Neural Depth size on the camera; larger is sharper and slower")
     resolution:     Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Delivered size on USB; the sensor mode follows it")
     ethernet_resolution: Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Delivered size on Ethernet, which has less room")
-    model_path:     Field[str]   = Field("data/models", access=Field.INIT)
+    model_path:     Field[str]   = Field("data/models", access=Field.INIT, description="Folder of the camera's model files")
 
     tilt:   Group[TiltCorrectionSettings] = Group(TiltCorrectionSettings)
     sensor: Group[SensorSettings] = Group(SensorSettings)
