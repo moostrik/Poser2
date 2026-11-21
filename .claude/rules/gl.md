@@ -2,6 +2,7 @@
 description: OpenGL: the main thread, resources, state, shaders
 paths:
   - "modules/gl/**"
+  - "modules/window/**"
   - "modules/render/**"
   - "modules/flow/**"
   - "apps/*/render/**"
