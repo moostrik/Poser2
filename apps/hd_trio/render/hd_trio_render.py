@@ -130,10 +130,8 @@ class HDTrioRender(Render):
         self.subdivision: render.Subdivision                # made in allocate, at window 0's size
 
         # The length of each tick, the flow's dt, held to twice the mean tick (`hold_tick`)
-        self._last_tick: float = 0.0
         self._tick_mean: float | None = None
         self._dt: float = 1.0 / 60.0
-        self.add_update_callback(self._measure_tick)
 
         # The border around each panel in the main window
         self._border: shaders.StrokeRect = shaders.StrokeRect()
@@ -172,11 +170,6 @@ class HDTrioRender(Render):
         self._border.deallocate()
         self._intro_player.close()
 
-    def _measure_tick(self, now: float) -> None:
-        if self._last_tick > 0.0:
-            self._dt, self._tick_mean = hold_tick(now - self._last_tick, self._tick_mean)
-        self._last_tick = now
-
     # ========== The flow's wiring ==========
 
     def _wire_flow(self) -> None:
@@ -214,6 +207,8 @@ class HDTrioRender(Render):
             fluid.set_input(FluidInput(dt, injections))
 
     def update(self) -> None:
+        if self.frame_interval > 0.0:
+            self._dt, self._tick_mean = hold_tick(self.frame_interval, self._tick_mean)
         self._update_layers = UPDATE_LAYERS
         self._draw_layers = self.settings.layer.select.final
         self._preview_layers = self.settings.layer.select.preview
@@ -245,8 +240,8 @@ class HDTrioRender(Render):
         # Intro sequence overlay — tick player while the white example is on screen
         if stage in INTRO_STAGES:
             if prev_stage not in INTRO_STAGES:  # first frame of intro sequence
-                self._intro_player.start(self._last_tick)
-            frames = self._intro_player.update(self._last_tick)
+                self._intro_player.start(self.frame_timestamp)
+            frames = self._intro_player.update(self.frame_timestamp)
             self._intro_proxy.set_frames(frames)
             for i in range(self.num_cams):
                 self._intro_geometries[i].update()

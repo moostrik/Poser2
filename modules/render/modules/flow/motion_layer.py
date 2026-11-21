@@ -6,7 +6,7 @@ from it, so an input built before the render loop names the object the stage bef
 
 `MotionLayer` is the shape the 2D and the 3D motion layer share: it measures once per camera frame,
 when the input's `timestamp` differs from the one it measured last, over the interval the stamps
-give (`frame_interval`). A frame is a picture with a capture time: without one (`timestamp` None) no
+give (`camera_frame_interval`). A frame is a picture with a capture time: without one (`timestamp` None) no
 camera frame is there yet, only a texture, so the motion stays at rest and counts nothing, and after a
 frame a None starts it over. It draws nothing; the monitors draw its output's `textures`."""
 
@@ -25,7 +25,7 @@ MAX_FRAME_INTERVAL: float = 0.5    # s: a longer gap between two captures is a p
 FRAME_INTERVAL_BAND: tuple[float, float] = (0.5, 2.0)  # a capture gap is held to this share of the expected frame interval
 
 
-def frame_interval(timestamp: float | None, last: float | None, fps: float, ticks: float, time_step: float) -> float:
+def camera_frame_interval(timestamp: float | None, last: float | None, fps: float, ticks: float, time_step: float) -> float:
     """The interval (s) a flow frame divides its motion by: the gap between the capture times `last`
     and `timestamp`, held to FRAME_INTERVAL_BAND of the expected frame interval, 1 / `fps`, the
     camera's set frame rate; a gap that is not a frame's (none, not finite, 0 or less, a pause or a
@@ -153,7 +153,7 @@ class MotionLayer(StageLayer[MotionInput, MotionOutput]):
         if input.timestamp != self._timestamp:
             BlendState.push()
             BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
-            interval: float = frame_interval(input.timestamp, self._timestamp, self.settings.fps, self._ticks, input.dt)
+            interval: float = camera_frame_interval(input.timestamp, self._timestamp, self.settings.fps, self._ticks, input.dt)
             self._timestamp = input.timestamp
             self._measure(input, interval)
             self._ticks = 0.0

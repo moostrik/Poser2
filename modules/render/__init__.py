@@ -19,7 +19,7 @@ from .modules.inference import  CropLayer, crop_image_layer, segmentation_mask_l
                                 InferenceFrameImageLayer, InferenceFrameDepthLayer
 from .modules.flow import       StageLayer, StageLayerSettings, StageOutput, \
                                 ColorInput, ColorOutput, ColorLayer, ColorLayerSettings, \
-                                MotionInput, MotionOutput, MotionLayer, MotionLayerSettings, frame_interval, \
+                                MotionInput, MotionOutput, MotionLayer, MotionLayerSettings, camera_frame_interval, \
                                 BridgeInput, BridgeOutput, BridgeLayer, BridgeLayerSettings, \
                                 Injection, FluidInput, FluidOutput, FluidLayer, FluidLayerSettings, \
                                 Motion2DLayer, Motion2DLayerSettings, Motion3DLayer, Motion3DLayerSettings, \

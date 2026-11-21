@@ -40,8 +40,9 @@ class WindowManager:
         self._update_timer = PerformanceTimer(name="Render update", sample_count=200)
         self._draw_timer = PerformanceTimer(name="Render draw", sample_count=200)
         self._interval_timer = PerformanceTimer(name="Render interval", sample_count=200)
-        self._last_update: float = 0.0
-        self.frame_timestamp: float = 0.0        # the current frame's stamp (perf_counter), set before its update
+        self.frame_timestamp: float = 0.0        # the current frame's stamp (perf_counter, s), set before its update
+        self.frame_interval: float = 0.0         # s from the last frame's stamp to this one's; 0 at the first frame
+        self.frame_count: int = 0                # the frames updated so far, this one included
 
         self._loop_thread: Thread | None = None     # the thread that runs the loop, set by run()
         self._close_request = Event()               # stop(), Esc or a closed window asked the loop to end
@@ -236,10 +237,11 @@ class WindowManager:
         self.settings.avg_fps = int(self._fps.get_rate_average())
         self.settings.min_fps = int(self._fps.get_rate_minimum())
         start = perf_counter()
-        if self._last_update:
-            self._interval_timer.add_time((start - self._last_update) * 1000.0, report=False)
-        self._last_update = start
+        self.frame_interval = start - self.frame_timestamp if self.frame_count else 0.0
+        if self.frame_count:
+            self._interval_timer.add_time(self.frame_interval * 1000.0, report=False)
         self.frame_timestamp = start
+        self.frame_count += 1
         self._update_callbacks(start)
         try:
             self.renderer.update()

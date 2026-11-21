@@ -76,10 +76,8 @@ class LowFlowRender(Render):
         self.subdivision: render.Subdivision                # made in allocate, at window 0's size
 
         # The length of each tick, the flow's dt, held to twice the mean tick (`hold_tick`)
-        self._last_tick: float = 0.0
         self._tick_mean: float | None = None
         self._dt: float = 1.0 / 60.0
-        self.add_update_callback(self._measure_tick)
 
         # A reset asked for from another thread, applied at the next update on the GL thread
         self._reset_flow: Event = Event()
@@ -183,11 +181,6 @@ class LowFlowRender(Render):
         self._border.deallocate()
         self._view_timer.deallocate()
 
-    def _measure_tick(self, now: float) -> None:
-        if self._last_tick > 0.0:
-            self._dt, self._tick_mean = hold_tick(now - self._last_tick, self._tick_mean)
-        self._last_tick = now
-
     def reset_flow(self) -> None:
         """Clear the motion, the bridge and the fluid at the next update; any thread."""
         self._reset_flow.set()
@@ -197,6 +190,8 @@ class LowFlowRender(Render):
                 for layer in (*self.L[key].values(), *self._debug_monitors.get(key, {}).values())]
 
     def update(self) -> None:
+        if self.frame_interval > 0.0:
+            self._dt, self._tick_mean = hold_tick(self.frame_interval, self._tick_mean)
         if self._reset_flow.is_set():
             self._reset_flow.clear()
             for layer_type in [ChainLayers.motion, ChainLayers.bridge, ChainLayers.fluid]:
@@ -276,7 +271,7 @@ class LowFlowRender(Render):
 
         motion = cast(render.Motion2DLayer, self.L[ChainLayers.motion][i])
         bridge = cast(render.Bridge2DLayer, self.L[ChainLayers.bridge][i])
-        interval: float = render.frame_interval(frame.timestamp, self._inference_frame_timestamps.get(i), self.flow.motion.fps, self._dt, self._dt)
+        interval: float = render.camera_frame_interval(frame.timestamp, self._inference_frame_timestamps.get(i), self.flow.motion.fps, self._dt, self._dt)
         self._inference_frame_timestamps[i] = frame.timestamp
         self.motion_rates.setdefault(i, FPS()).processed()
         output: ViewOutput = view.output
@@ -336,7 +331,7 @@ class LowFlowRender(Render):
         """The screen recording's tick, right after the main window is drawn: the main panel's layers at their shapes."""
         sources: list[render.ScreenRecordingSource] = [render.ScreenRecordingSource(self.L[layer_type][0], *self._layer_size(layer_type))
                                                        for layer_type in self._main_layers if 0 in self.L[layer_type]]
-        self.screen_recording.set_input(render.ScreenRecordingInput(sources, width, height, self.window_manager.frame_timestamp))
+        self.screen_recording.set_input(render.ScreenRecordingInput(sources, width, height, self.frame_timestamp))
         self.screen_recording.update()
 
     def _draw_panels(self, width: int, height: int) -> None:

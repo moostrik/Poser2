@@ -18,6 +18,21 @@ class Render(ABC):
         """The windows' key, mouse and scroll input."""
         return self.window_manager.input
 
+    @property
+    def frame_timestamp(self) -> float:
+        """The current frame's stamp (perf_counter, s), set before its update."""
+        return self.window_manager.frame_timestamp
+
+    @property
+    def frame_interval(self) -> float:
+        """Seconds from the last frame's stamp to this one's; 0 at the first frame."""
+        return self.window_manager.frame_interval
+
+    @property
+    def frame_count(self) -> int:
+        """The frames updated so far, this one included."""
+        return self.window_manager.frame_count
+
     def add_update_callback(self, callback: Callable[[float], Any]) -> None:
         """Register a per-frame update callback; the loop calls it before the renderer's update with the frame's
         time (perf_counter, the stamp of the frame's update), the clock of everything that advances on the render tick."""

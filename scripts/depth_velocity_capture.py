@@ -92,13 +92,13 @@ def main() -> int:
     update = LucasKanadeFlow3D.update
     held: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = []     # the frames, saved after the loop: saving in it costs captures
     gaps: list[float | None] = []                                   # each measure's gap between two capture times, as it is
-    frame_interval = render.frame_interval
+    camera_frame_interval = render.camera_frame_interval
 
     def gap_kept(timestamp, last, *rest) -> float:
         gaps.append(timestamp - last if timestamp is not None and last is not None else None)
-        return frame_interval(timestamp, last, *rest)
+        return camera_frame_interval(timestamp, last, *rest)
 
-    render.frame_interval = gap_kept
+    render.camera_frame_interval = gap_kept
 
     def saved(self: LucasKanadeFlow3D, depth: Texture | None, delta_time: float, view_span: float,
               depth_step: tuple[float, float], guarded: bool = False,

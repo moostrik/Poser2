@@ -1,6 +1,6 @@
 from .stage_layer import        StageLayer, StageLayerSettings, StageOutput
 from .color_layer import        ColorInput, ColorOutput, ColorLayer, ColorLayerSettings
-from .motion_layer import       MotionInput, MotionOutput, MotionLayer, MotionLayerSettings, frame_interval
+from .motion_layer import       MotionInput, MotionOutput, MotionLayer, MotionLayerSettings, camera_frame_interval
 from .bridge_layer import       BridgeInput, BridgeOutput, BridgeLayer, BridgeLayerSettings
 from .fluid_layer import        Injection, FluidInput, FluidOutput, FluidLayer, FluidLayerSettings
 from .motion_2d_layer import    Motion2DLayer, Motion2DLayerSettings
