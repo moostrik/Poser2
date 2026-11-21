@@ -135,7 +135,7 @@ class TestOnline(unittest.TestCase):
         self.online.update(self.now, SequenceMessage(seq, progress, initial, value), ready, busy)
 
     def go_idle(self) -> None:
-        self.settings.active = True
+        self.settings.enabled =True
         self.step()
 
     def start_turn(self) -> None:
@@ -183,7 +183,7 @@ class TestOnline(unittest.TestCase):
 
     def test_off_during_a_turn_ends_it_and_the_link(self):
         self.start_turn()
-        self.settings.active = False
+        self.settings.enabled =False
         self.step()
         self.assertEqual(self.link.last('turn_end')['reason'], 'reset')
         self.assertTrue(self.link.stopped)
@@ -404,7 +404,7 @@ class TestOnline(unittest.TestCase):
         self.assertFalse(self.link.last('eye')['laughter'])     # a change goes at once
 
     def test_the_relays_pass_is_kept_for_the_qr_code_until_the_link_stops(self):
-        self.settings.active = True
+        self.settings.enabled =True
         self.step()
         self.assertEqual(self.online.pass_value, '')
         self.link.on_message({'type': 'pass', 'value': 'abc'})
@@ -413,12 +413,12 @@ class TestOnline(unittest.TestCase):
         self.link.on_message({'type': 'pass', 'value': 'def'})      # the relay made a new one
         self.step()
         self.assertEqual(self.online.pass_value, 'def')
-        self.settings.active = False
+        self.settings.enabled =False
         self.step()
         self.assertEqual(self.online.pass_value, '')
 
     def test_the_invite_link_shows_in_the_panel_and_the_button_asks_for_a_new_one(self):
-        self.settings.active = True
+        self.settings.enabled =True
         self.settings.relay = 'wss://smile.example/ws/smile'
         self.step()
         self.assertEqual(self.settings.invite_link, '')
@@ -434,7 +434,7 @@ class TestOnline(unittest.TestCase):
         self.link.on_message({'type': 'invite', 'value': 'def'})
         self.step()
         self.assertEqual(self.settings.invite_link, 'https://smile.example/?pass=def')
-        self.settings.active = False
+        self.settings.enabled =False
         self.step()
         self.assertEqual(self.settings.invite_link, '')
 

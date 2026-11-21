@@ -132,7 +132,7 @@ class TestMaxControls(unittest.TestCase):
 
     def test_the_online_cell_follows_the_screen_setting_the_link_and_the_turn(self):
         online = self.settings.setup.online
-        online.active, online.screen = True, 27         # screen 27: wall 1, unit 1 output 3, cell 12
+        online.enabled, online.screen = True, 27        # screen 27: wall 1, unit 1 output 3, cell 12
         online.connected = False
         board: RenderBoard = self.app.board
         self.frame()

@@ -150,7 +150,7 @@
       "show_camera": false,
       "face_marks": true,
       "freeze": false,
-      "trail_active": true,
+      "trail_enabled": true,
       "trail": 0.99,
       "loop_trail": 0.8,
       "fade_blur": 0.9,

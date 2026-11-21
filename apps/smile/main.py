@@ -102,7 +102,7 @@ class SmileMain():
         # faces found on the GPU while the camera states run, and smile's choice of a subject among them
         self.uploader: SerialUploader = SerialUploader(self.settings.setup.camera.uploader)
         self.face_detector: FaceDetector = FaceDetector(self.settings.setup.camera.face_detector)
-        self.face: FaceFinder = FaceFinder(self.settings.setup.camera.face, self.settings.setup.camera.face_detector, portrait_width, portrait_height,
+        self.face_finder: FaceFinder =FaceFinder(self.settings.setup.camera.face, self.settings.setup.camera.face_detector, portrait_width, portrait_height,
                                            (self.width, self.height))
 
         # the camera device; the panel can switch to an image from input/ at any time. -sim plays a recording in its place
@@ -132,7 +132,7 @@ class SmileMain():
         # the name going round the walls while nobody is seen, planned here and handed to them every second
         self.credit_scroller: CreditScroller = CreditScroller(self.settings.setup.render, self.clip_player.scroll_loop)
         self._face_seen: float = time.perf_counter()    # the last qualifying face or visitor: the name waits from here
-        self.save: ClipSaver = ClipSaver(self.settings.setup.sequence.saver, self.settings.setup.sequence.grin,
+        self.clip_saver: ClipSaver =ClipSaver(self.settings.setup.sequence.saver, self.settings.setup.sequence.grin,
                                          lambda: str(self.settings.setup.render.credit_name))
         self._grin_saved: bool = False      # the visitor's grin was saved to its last frame
         self._saving: bool = False          # the visitor's files are open in the saver
@@ -142,11 +142,11 @@ class SmileMain():
         self._flash_time: float = 0.0       # when the flash started: the music starts then (Max, the phone, the clip's sound)
         self.lights: Lights = Lights(self.settings.setup.artnet, f'{DATA_PATH}/artnet.json')
         # SMILE Online: a turn for someone outside when the room's eye is free, stepped from sequence_callback
-        self.online: Online = Online(self.settings.setup.online, self.camera, self.sequencer, self.face, self.render.grab,
+        self.online: Online = Online(self.settings.setup.online, self.camera, self.sequencer, self.face_finder, self.render.grab,
                                      lambda: self.settings.setup.render.credit_name,
                                      lambda: (self.music_map.get_music_id(), self.music_map.track_path()),
                                      laughs=laugh_files, laughter=lambda: self.settings.setup.audio.laughter, pick=self.pick_style)
-        self.save.add_saved_callback(self.online.on_saved)
+        self.clip_saver.add_saved_callback(self.online.on_saved)
 
         self._stopping: bool = False
 
@@ -161,15 +161,15 @@ class SmileMain():
         self.generator.add_message_callback(self.generator_callback)
         self.generator.start()
 
-        self.face.add_frame_callback(self.face_callback)
-        self.face.add_frame_callback(self.board.set_faces)
-        self.face_detector.add_face_callback(self.face.submit)
+        self.face_finder.add_frame_callback(self.face_callback)
+        self.face_finder.add_frame_callback(self.board.set_faces)
+        self.face_detector.add_face_callback(self.face_finder.submit)
         self.uploader.add_gpu_image_callback(self._judge_image)
         self.uploader.add_finished_gpu_image_callback(self.board.set_camera_image)
-        self.face.start()
+        self.face_finder.start()
         self.face_detector.start()
         self.uploader.start()
-        self.save.start()
+        self.clip_saver.start()
 
         self.osc.start()
         self.lights.start()
@@ -199,8 +199,8 @@ class SmileMain():
                  self.camera.stop, self.recorder.stop,
                  self.generator.clear_message_callbacks, self.generator.stop,
                  self.uploader.stop, self.face_detector.stop,
-                 self.face.clear_frame_callbacks, self.face.stop,
-                 self.save.stop,
+                 self.face_finder.clear_frame_callbacks, self.face_finder.stop,
+                 self.clip_saver.stop,
                  self.panel_server.stop)
         try:
             for step in steps:
@@ -248,7 +248,7 @@ class SmileMain():
             self._flash_time = now
         if seq == SequenceType.DIFF_LOOP and message.initial:
             # the grin starts playing: the share clip gets the track from the point the room hears now
-            self.save.submit_share(self.music_map.track_path(), now - self._flash_time)
+            self.clip_saver.submit_share(self.music_map.track_path(), now - self._flash_time)
 
         audio = self.settings.setup.audio
         if audio.osc.enabled:
@@ -281,7 +281,7 @@ class SmileMain():
         self._online_cell()
 
         if seq == SequenceType.CAMERA_SHOW and message.initial:
-            self.face.reset()
+            self.face_finder.reset()
 
         # the camera states judge the camera's frames as they come (`_judge_image`)
         self._judging = SequenceType.CAMERA_SHOW <= seq <= SequenceType.CAMERA_DETECT
@@ -290,7 +290,7 @@ class SmileMain():
             # the last frame of the recording in which the face qualified; without one the view of the newest camera
             # frame, turned, flipped and fitted here, once
             cap_image: np.ndarray = cover(upright_image(self.camera.frame()), self.width, self.height)
-            portrait: np.ndarray | None = self.face.best()
+            portrait: np.ndarray | None = self.face_finder.best()
             if portrait is not None:
                 cap_image = portrait
             else:
@@ -307,7 +307,7 @@ class SmileMain():
             # generation would blend the previous visitor's last frame in
             self.board.set_capture(cap_image)
             self.board.set_diffusion_image(cap_image)
-            self.save.submit_open(cap_image, self.settings.setup.generator.style_current)
+            self.clip_saver.submit_open(cap_image, self.settings.setup.generator.style_current)
             self._saving = True
             self._grin_saved = False
             # a test run on images: the next visitor is the next file
@@ -319,14 +319,14 @@ class SmileMain():
             if message.initial == True and self._saving:
                 # still open here: a failed or stopped visitor has no complete grin, its folder is not kept
                 self._saving = False
-                self.save.submit_close(keep=self._grin_saved)
+                self.clip_saver.submit_close(keep=self._grin_saved)
 
         if seq == SequenceType.RESET:
             self.generator.interrupt()
             if self._saving:
                 # a reset before the result: the visitor's files are not kept
                 self._saving = False
-                self.save.submit_close(keep=False)
+                self.clip_saver.submit_close(keep=False)
 
     def _online_cell(self) -> None:
         """The online cell of the walls, every frame: the screen `online.screen` shows the QR code to the phone
@@ -339,7 +339,7 @@ class SmileMain():
         if 1 <= screen <= sphere.SCREENS:
             wall, cell = sphere.cell_of_screen(screen)
             # the card waits for the relay's pass: a code without one would open the expired page
-            mode = online_cell_mode(bool(online.active), bool(online.connected) and bool(pass_value), self.online.showing)
+            mode = online_cell_mode(bool(online.enabled), bool(online.connected) and bool(pass_value), self.online.showing)
         self.clip_player.online_cell = wall * sphere.CELLS + cell if mode != OnlineCellMode.CLIP else None
         page: str = str(online.page).strip() or http_base(str(online.relay)) + '/'
         if pass_value:
@@ -411,15 +411,15 @@ class SmileMain():
             return
         if message.state == GeneratorState.DIFFUSION and message.final:
             # the record first: it goes into the portrait and the clip
-            self.save.submit_record(self.generator.record())
-            self.save.submit_portrait(message.image)
+            self.clip_saver.submit_record(self.generator.record())
+            self.clip_saver.submit_portrait(message.image)
         if message.state == GeneratorState.DIFF_LOOP:
-            self.save.submit_frame(message.image)
+            self.clip_saver.submit_frame(message.image)
             if message.progress >= 1.0 and not self._grin_saved:
                 # the grin is complete: the recording closes now, while the grin still plays on the screens,
                 # so the share clip is built and on its way to a visitor outside before the turn is over
                 self._grin_saved = True
                 if self._saving:
                     self._saving = False
-                    self.save.submit_close(keep=True)
+                    self.clip_saver.submit_close(keep=True)
 

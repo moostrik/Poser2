@@ -1,5 +1,5 @@
 {
-	"0000": {"movement": "Smooth", "audio_ids": {
+	"0000": {"name": "Smooth", "music_ids": {
 		"0000": {"score": 1.0, "rejected": true},
 		"0001": {"score": 1.0, "rejected": false},
 		"0002": {"score": 1.0, "rejected": false},
@@ -77,7 +77,7 @@
 		"0074": {"score": 3.0, "rejected": false},
 		"0075": {"score": 1.5, "rejected": false},
 		"0076": {"score": 1.0, "rejected": true}}},
-	"0001": {"movement": "Party", "audio_ids": {
+	"0001": {"name": "Party", "music_ids": {
 		"0000": {"score": 1.0, "rejected": false},
 		"0001": {"score": 1.0, "rejected": true},
 		"0002": {"score": 1.0, "rejected": true},

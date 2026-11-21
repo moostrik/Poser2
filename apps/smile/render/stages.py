@@ -92,7 +92,7 @@ class DiffusionStage(Stage):
         if message.sequence_type == SequenceType.DIFF_LOOP:
             trail: float = s.loop_trail
         else:
-            trail = s.trail if s.trail_active else 0.0
+            trail = s.trail if s.trail_enabled else 0.0
         self.layers.diffusion.render(trail)
 
     @property

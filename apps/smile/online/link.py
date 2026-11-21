@@ -37,7 +37,7 @@ UPLOAD_TIMEOUT: float = 60.0
 STREAM_QUALITY: int = 70            # JPEG, the screen frames for the phone
 
 RelayMessageCallback = Callable[[dict], None]
-FrameCallback = Callable[[bytes], None]
+PhoneFrameCallback = Callable[[bytes], None]     # the phone's JPEG bytes from the relay
 DoneCallback = Callable[[bool], None]
 
 
@@ -63,12 +63,12 @@ def http_base(ws_url: str) -> str:
 
 
 class Link(Thread):
-    def __init__(self, url: str, token: str, on_message: RelayMessageCallback, on_frame: FrameCallback, name: str = 'online-link') -> None:
+    def __init__(self, url: str, token: str, on_message: RelayMessageCallback, on_frame: PhoneFrameCallback, name: str = 'online-link') -> None:
         super().__init__(name=name, daemon=True)
         self.url: str = url
         self.token: str = token
         self._on_message: RelayMessageCallback = on_message
-        self._on_frame: FrameCallback = on_frame
+        self._on_frame: PhoneFrameCallback = on_frame
         self._out: queue.Queue[str | bytes] = queue.Queue(maxsize=256)
         self._uploads: queue.Queue[tuple[list[tuple[str, str, str]], DoneCallback]] = queue.Queue()
         self._frame: tuple[np.ndarray, bool] | None = None      # the newest screen frame (RGBA, last) not sent yet

@@ -40,11 +40,11 @@ class OnlineCellMode(IntEnum):
     SCREEN = 2      # the main screen, as the phone sees it
 
 
-def online_cell_mode(active: bool, connected: bool, showing: bool) -> OnlineCellMode:
+def online_cell_mode(enabled: bool, connected: bool, showing: bool) -> OnlineCellMode:
     """What the online cell shows: a clip like any cell while SMILE Online is off or the relay is not there
     (`connected`: with its pass for the code's url), the QR card to the phone page while it waits for someone,
     the main screen during a turn."""
-    if not active or not connected:
+    if not enabled or not connected:
         return OnlineCellMode.CLIP
     return OnlineCellMode.SCREEN if showing else OnlineCellMode.QR
 

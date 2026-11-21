@@ -54,7 +54,7 @@ class MusicMap():
             logger.warning('Style %s is not in %s: no music', style_id, self._file_path)
             return 'none'
 
-        music_entries: dict = self._data[style_id]['audio_ids']
+        music_entries: dict = self._data[style_id]['music_ids']
         filtered_entries: dict = {}
         for e in music_entries:
             if not music_entries[e]['rejected']:

@@ -37,7 +37,7 @@ class RenderSettings(BaseSettings):
     face_effect:   Field[FaceEffect] = Field(FaceEffect.DARK, description="How a face's box shows its distance from good")
     face_amount:   Field[float] = Field(0.5, min=0.0, max=1.0, step=0.05, description="Strength of the effect on a face that is far from good")
     freeze:        Field[bool]  = Field(False, description="Hold the current frame")
-    trail_active:  Field[bool]  = Field(True, description="Blend new diffusion images over the previous ones")
+    trail_enabled: Field[bool]  = Field(True, description="Blend new diffusion images over the previous ones")
     trail:         Field[float] = Field(0.995, min=0.98, max=1.0, step=0.001, description="Trail amount")
     loop_trail:    Field[float] = Field(0.5, min=0.0, max=0.99, step=0.01, description="Trail while the grin animation plays (0 = none)")
     fade_blur:     Field[float] = Field(0.9, min=0.0, max=9.0, step=0.1, description="Blur per frame while fading the last image out (pixels)")

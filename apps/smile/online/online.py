@@ -100,7 +100,7 @@ class Online:
         self.settings: OnlineSettings = settings
         self.camera: Camera = camera
         self.sequencer: Sequencer = sequencer
-        self.face: FaceFinder = face
+        self.face_finder: FaceFinder = face
         self.grab: ScreenGrab = grab
         self._name: Name = name
         self._music: Music = music
@@ -227,7 +227,7 @@ class Online:
             id, style, kept, grin, portrait, shared = notes['saved']
             self._delivery.saved = (id, kept, grin, portrait, shared)
 
-        if not s.active:
+        if not s.enabled:
             if self._phase != Phase.OFF:
                 self._end_turn('reset')
                 self._stop_link()
@@ -484,7 +484,7 @@ class Online:
         self._phase = Phase.JUDGING
         self._showing = True
         self._charge = 0.0
-        self.face.reset()               # the room's last faces are not this visitor's
+        self.face_finder.reset()        # the room's last faces are not this visitor's
         self.camera.set_online(True)
         self.settings.turns += 1
         self._pick()                    # the style and the track now: the phone fetches the track during the judging

@@ -12,7 +12,7 @@ relay itself, `OnlinePhone.md` what happens on a phone.
 3. TLS in front, once: `tailscale serve --bg 8800`. The page is `https://iaai.tail63e3df.ts.net/`;
    `tailscale serve status` shows the proxy, `tailscale serve off` removes it. A phone opens its camera over
    HTTPS only.
-4. SMILE, Online tab: `relay` = `wss://iaai.tail63e3df.ts.net/ws/smile`, `active` on. SMILE goes through the
+4. SMILE, Online tab: `relay` = `wss://iaai.tail63e3df.ts.net/ws/smile`, `enabled` on. SMILE goes through the
    same name and proxy as the phones, so its websocket and its uploads run as they will on the VPS.
    `ws://127.0.0.1:8800/ws/smile`, the default, reaches the relay past the proxy and tests less.
 5. Phones on the tailnet open the page as it is. A phone without Tailscale needs `tailscale funnel 8800`
@@ -40,7 +40,7 @@ use root paths, so no code knows the name. Only the relay folder goes there, nev
    `apps\smile\relay` (the code, the page, the token) to `/home/smile/relay` and restarts the service; the VPS's
    own data (passes, visitors' files, log) is never touched. The first time `deploy_relay.bat --library` sends
    the PC relay's `data\tracks` and `data\laughs` too (64 MB), so the first visitors wait for no uploads.
-4. SMILE, Online tab: `relay` = `wss://smile.oostrik.net/ws/smile`, `page` empty, `active` on; saved in the
+4. SMILE, Online tab: `relay` = `wss://smile.oostrik.net/ws/smile`, `page` empty, `enabled` on; saved in the
    settings file. SMILE makes outgoing connections only; nothing on the installation is opened to the internet.
 5. On the VPS: `systemctl status smile-relay`, `journalctl -u smile-relay -f` and `/home/smile/relay/data/relay.log`
    say what the relay does; `systemctl status caddy` the proxy and its certificate.
