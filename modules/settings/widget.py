@@ -2,9 +2,6 @@
 
 The hint is pure data; the panel (``modules/panel/controls.py``) holds one builder per member.
 ``Widget.resolve()`` maps ``Widget.default`` to the member a field's type and parameters call for.
-
-Adding a widget: add the member here with its types in ``_TYPES``, register its builder in the
-panel, and add it to ``resolve()`` when it should be the pick for a type.
 """
 
 from __future__ import annotations

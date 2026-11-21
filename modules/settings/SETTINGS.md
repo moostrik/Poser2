@@ -21,6 +21,10 @@ descriptor neither clamps nor checks against them. `widget` picks the control; `
 type when it is `Widget.default`, and a widget that cannot show the type is refused at declaration.
 `saved=False` leaves the field out of the files.
 
+A new widget is a member of `Widget` with the types it shows in `_TYPES` (`modules/settings/widget.py`), a control
+registered for it in the panel (`modules/panel/controls.py`), and, when it should be the pick for a type, a case in
+`Widget.resolve`.
+
 A button (`widget=Widget.button`) is a `Field[bool]` that stays `False`: `fire()` calls its callbacks with `True`,
 down to the children it is shared to and up to its parent's field. A button is never saved.
 
