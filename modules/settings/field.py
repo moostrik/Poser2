@@ -34,6 +34,15 @@ def _enum_member(enum_type: type[Enum], value: Any) -> Enum:
         raise TypeError(f"Cannot construct {enum_type.__name__} from {value!r}") from None
 
 
+def _encode_one(value: Any) -> Any:
+    """One value as a settings file holds it: a value object as its dict, an Enum by its name, the rest as it is."""
+    if hasattr(value, "to_dict"):
+        return value.to_dict()
+    if isinstance(value, Enum):
+        return value.name
+    return value
+
+
 class Access(Enum):
     """Who writes a field, and whether the panel lets the user edit it (SETTINGS.md, Access)."""
     READ = "read"
@@ -293,28 +302,14 @@ class Field(Generic[T]):
     def encode(self, value: Any) -> Any:
         """*value* as a settings file holds it: an Enum by its name, a value object as its dict, a list
         element by element. ``set`` takes it back."""
-        if hasattr(value, "to_dict"):
-            return value.to_dict()
-        if isinstance(value, Enum):
-            return value.name
-        if isinstance(value, list):
-            result = []
-            for v in value:
-                if isinstance(v, Enum):
-                    result.append(v.name)
-                elif hasattr(v, 'to_dict'):
-                    result.append(v.to_dict())
-                elif isinstance(v, (int, float, str, bool, type(None))):
-                    result.append(v)
-                else:
-                    logger.warning(
-                        "Field '%s': list element %r (type %s) may not be "
-                        "JSON-serializable",
-                        self.name, v, type(v).__name__,
-                    )
-                    result.append(v)
-            return result
-        return value
+        if not isinstance(value, list):
+            return _encode_one(value)
+        result = [_encode_one(v) for v in value]
+        for v in result:
+            if not isinstance(v, (int, float, str, bool, dict, type(None))):
+                logger.warning("Field '%s': list element %r (type %s) may not be JSON-serializable",
+                               self.name, v, type(v).__name__)
+        return result
 
     def from_json_value(self, obj, raw) -> None:
         """Restore value from JSON, bypassing the INIT guard.
