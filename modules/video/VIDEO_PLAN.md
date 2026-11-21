@@ -3,10 +3,6 @@
 What is to be built in `modules/video`: ffmpeg, the clips and streams it writes and reads, and the screen recorder
 ([VIDEO.md](VIDEO.md)).
 
-## D. The stream threads
-
-D1's Linux run of test_stream_reader is open: the PC has no WSL.
-
 ## Rules
 
 - Log exceptions with context; never fail silently
