@@ -11,9 +11,6 @@ in the log. A rename or a text change needs no start. The whole of smile's tests
 
 ## B. How the packages split the work
 
-- B3 Every package's `__init__.py` exports what the others use (`comfy`, `online` export nothing now), and every
-  import goes through it: no more `.comfy.generator`, `.online.online`, `.render.smile_render` and the like.
-  Tests: all smile tests (every package's imports change).
 - B4 `render/layers/layer_base.py` goes, a drifted copy of `modules/render/layer_base.py`, and with it its `dirty`,
   which nothing reads; smile's seven layers and `SmileRender` take `modules.render.LayerBase`; `DataCache`, which no
   smile layer uses, leaves smile's exports. Tests: `render/tests`.
