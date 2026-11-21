@@ -11,14 +11,6 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 
 ## C. Small fixes to the rules
 
-- C7. `KeypointJoin` takes a lock round its frames, and holds a frame's two halves in a small dataclass instead of a
-  dict with string keys **(seen)**. Why: its two inputs come from the tracklets' and the poses' queues
-  **(seen: `oak4/camera.py` `_tracker_callback`, `_poses_callback`)**, whose callbacks can run on two threads
-  **(deduction: depthai's docs bring each device output to the host through its own `XLinkInHost`, a threaded host
-  node; neither the docs nor `.venv-oak4`'s stubs say which thread runs a callback)**; "Use `Lock` and `Event` for
-  shared mutable state", "Prefer `IntEnum` over string keys". No settings file runs the two-model chain today
-  (CAMERA.md, what no settings file runs). Check: log `threading.get_ident()` in both callbacks during a two-model
-  chain run with the OAK4, on his go.
 - C8. "normalised" is spelled "normalized" in `tracklet.py`, `geometry/mirror.py`, `geometry/tilt_correction.py`,
   `oak4/models.py`, `oak4/pipeline.py`, `oak4/keypoint_join.py` **(seen)**. Why: the glossary's American spelling.
 
@@ -81,7 +73,6 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 
 - Inside a package, code that does the same is written once: E2
 - The glossary: C8
-- Use `Lock` and `Event` for shared mutable state; prefer `IntEnum` over string keys: C7
 - A document describes what is built: D1
 - Use that one term everywhere it appears: E1
 - Remove obsolete pathways instead of leaving parallel legacy ones: E3
