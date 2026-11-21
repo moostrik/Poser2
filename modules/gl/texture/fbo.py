@@ -3,7 +3,7 @@ from OpenGL.GL import (Constant, GL_CLAMP_TO_EDGE, GL_COLOR_ATTACHMENT0, GL_COLO
                        glBindFramebuffer, glBindRenderbuffer, glClear, glClearColor, glDeleteFramebuffers, glDeleteRenderbuffers,
                        glFramebufferRenderbuffer, glFramebufferTexture2D, glGenFramebuffers, glGenRenderbuffers,
                        glRenderbufferStorage, glViewport)
-from .swap import Swap
+from .swap import TextureSwap
 from .texture import Texture
 
 class Fbo(Texture):
@@ -57,14 +57,14 @@ class Fbo(Texture):
         """End drawing into this FBO: the window's framebuffer is bound again."""
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
-class SwapFbo(Swap[Fbo], Fbo):
+class SwapFbo(TextureSwap[Fbo], Fbo):
     """Double-buffered FBO: drawn into, it is its current buffer."""
 
     def __init__(self,
                  interpolation: int = GL_LINEAR,
                  wrap: int = GL_CLAMP_TO_EDGE,
                  border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)) -> None:
-        Swap.__init__(self, Fbo(interpolation, wrap, border_color), Fbo(interpolation, wrap, border_color))
+        TextureSwap.__init__(self, Fbo(interpolation, wrap, border_color), Fbo(interpolation, wrap, border_color))
 
     @property
     def fbo_id(self) -> int:

@@ -22,6 +22,8 @@ PARTICLE_BYTES: int = 32        # position and mass/age (vec4), previous positio
 AMOUNT_FLOOR: float = 0.01      # the amount below which a texel spawns fewer particles, each at the floor's mass
 SMOOTH_SHARE: float = 0.5       # the surface's filter reaches this share of a sphere's radius each way
 SMOOTH_REACH: int = 2           # and at least these pixels
+SURFACE_DEPTH, SURFACE_THICKNESS, SURFACE_COLOR = 0, 1, 2      # the surface's targets (MIN, SUM, SUM)
+WEIGHTED_SUM, WEIGHTED_REVEAL = 0, 1                           # the weighted look's targets
 _BARRIER_FETCH_AND_IMAGE: int = int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
 
 _SPRITES: dict[ParticleDraw, int] = {ParticleDraw.POINTS: ParticleSprites.POINTS, ParticleDraw.STREAKS: ParticleSprites.STREAKS,
@@ -62,16 +64,12 @@ class ParticleDensity(DensityCarrier):
         self._seed: int = 0
         self._max_point_size: float = 64.0
         self._slices: LayeredFbo = LayeredFbo()
-        # The surface's targets: the spheres' nearest depth, their thickness, their color weighted; the smoothed depth
-        self._surface: MultiTargetFbo = MultiTargetFbo()
-        self._surface_depth: Texture = Texture()
-        self._surface_thickness: Texture = Texture()
-        self._surface_color: Texture = Texture()
+        # The surface's targets (SURFACE_DEPTH, _THICKNESS, _COLOR): the spheres' nearest depth, their thickness,
+        # their color weighted; the smoothed depth
+        self._surface: MultiTargetFbo = MultiTargetFbo(Texture(), Texture(), Texture())
         self._smoothed: tuple[Texture, Texture] = (Texture(), Texture())
-        # The weighted look's targets: the weighted emission and opacity, and the revealage
-        self._weighted: MultiTargetFbo = MultiTargetFbo()
-        self._weighted_sum: Texture = Texture()
-        self._weighted_reveal: Texture = Texture()
+        # The weighted look's targets (WEIGHTED_SUM, _REVEAL): the weighted emission and opacity, and the revealage
+        self._weighted: MultiTargetFbo = MultiTargetFbo(Texture(), Texture())
         self._emit_shader: ParticleEmit = ParticleEmit()
         self._ring_shader: ParticleRing = ParticleRing()
         self._advect_shader: ParticleAdvect = ParticleAdvect()
@@ -245,33 +243,26 @@ class ParticleDensity(DensityCarrier):
         self._draw_timer.end()
 
         self._march_timer.begin()
-        self._weighted_shader.use(self._weighted_sum, self._weighted_reveal, output)
+        self._weighted_shader.use(self._weighted.targets[WEIGHTED_SUM], self._weighted.targets[WEIGHTED_REVEAL], output)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._march_timer.end()
 
     def _allocate_weighted(self) -> None:
         width, height = self._output
-        self._weighted_sum.allocate(width, height, GL_RGBA32F)      # the weight reaches 3000: past a half float's sum
-        self._weighted_reveal.allocate(width, height, GL_RGBA16F)
-        self._weighted.allocate((self._weighted_sum, self._weighted_reveal))
+        self._weighted.allocate(width, height, (GL_RGBA32F, GL_RGBA16F))      # the weight reaches 3000: past a half float's sum
 
     def _deallocate_weighted(self) -> None:
         self._weighted.deallocate()
-        for texture in (self._weighted_sum, self._weighted_reveal):
-            texture.deallocate()
 
     def _allocate_surface(self) -> None:
         width, height = self._output
-        self._surface_depth.allocate(width, height, GL_R32F)
-        self._surface_thickness.allocate(width, height, GL_R32F)
-        self._surface_color.allocate(width, height, GL_RGBA16F)
+        self._surface.allocate(width, height, (GL_R32F, GL_R32F, GL_RGBA16F))
         for smoothed in self._smoothed:
             smoothed.allocate(width, height, GL_R32F)
-        self._surface.allocate((self._surface_depth, self._surface_thickness, self._surface_color))
 
     def _deallocate_surface(self) -> None:
         self._surface.deallocate()
-        for texture in (self._surface_depth, self._surface_thickness, self._surface_color, *self._smoothed):
+        for texture in self._smoothed:
             texture.deallocate()
 
     def _composite_surface(self, output: Texture, look: MarchLook) -> None:
@@ -302,7 +293,7 @@ class ParticleDensity(DensityCarrier):
         self._march_timer.begin()
         # The filter reaches half a sphere's radius each way, a sphere's depth its range: neighbors melt, a
         # drop's edge against the empty water stays
-        depth: Texture = self._surface_depth
+        depth: Texture = self._surface.targets[SURFACE_DEPTH]
         reach: int = max(SMOOTH_REACH, round(SMOOTH_SHARE * particles.radius))
         depth_range: float = 2.0 * particles.radius / (width * self._z_extent)
         for k in range(2 * int(particles.smooth)):
@@ -310,7 +301,7 @@ class ParticleDensity(DensityCarrier):
             self._smooth_shader.use(depth, target, k % 2 == 0, reach, 0.5 * reach, depth_range)
             glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
             depth = target
-        self._shade_shader.use(depth, self._surface_thickness, self._surface_color, output,
+        self._shade_shader.use(depth, self._surface.targets[SURFACE_THICKNESS], self._surface.targets[SURFACE_COLOR], output,
                                depth_per_pixel=width * self._z_extent, emission=emission / self.settings.particles.slices,
                                absorption=extinction / self.settings.particles.slices, fog=look.fog)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)

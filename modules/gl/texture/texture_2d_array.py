@@ -2,7 +2,7 @@
 from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, glBindTexture, glTexImage3D
 import numpy as np
 
-from .swap import Swap
+from .swap import TextureSwap
 from .texture_base import TextureBase
 
 
@@ -46,15 +46,15 @@ class Texture2DArray(TextureBase):
         return pixels
 
 
-class SwapTexture2DArray(Swap[Texture2DArray], Texture2DArray):
+class SwapTexture2DArray(TextureSwap[Texture2DArray], Texture2DArray):
     """Double-buffered 2D array texture for ping-pong compute operations."""
 
     def __init__(self,
                  interpolation: int = GL_LINEAR,
                  wrap: int = GL_CLAMP_TO_EDGE,
                  border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
-        Swap.__init__(self, Texture2DArray(interpolation, wrap, border_color),
-                      Texture2DArray(interpolation, wrap, border_color))
+        TextureSwap.__init__(self, Texture2DArray(interpolation, wrap, border_color),
+                             Texture2DArray(interpolation, wrap, border_color))
 
     @property
     def depth(self) -> int:

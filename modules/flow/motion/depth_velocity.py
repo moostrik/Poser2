@@ -6,7 +6,7 @@ modules/flow/MOTION.md, "z: the depth velocity".
 """
 from OpenGL.GL import GL_NEAREST, GL_R16F, GL_RG32F, GL_RGBA32F
 
-from modules.gl import Fbo, MultiTargetFbo, SwapFbo, Texture
+from modules.gl import Fbo, MultiTargetFbo, SwapMultiTargetFbo, SwapTarget, Texture
 from modules.settings import BaseSettings, Field
 from .. import FlowBase, FlowUtil, Port, TextureKind
 from .patch import Patch
@@ -34,8 +34,8 @@ class DepthVelocity(FlowBase):
     Pipeline, on each new flow frame:
         1. Take the depth and its confidence → the raw Fbo (RG32F, meters and 0 to 1, at the flow's size, nearest),
            and without its edges → the input SwapFbo
-        2. Correct the track carried from the last one → the estimate SwapFbo (RGBA32F: z, disparity, rate, anchor),
-           and its misses in a row beside it (R16F), both drawn at once (a MultiTargetFbo per side)
+        2. Correct the track carried from the last one → the track, a SwapMultiTargetFbo drawn at once: the estimate
+           (RGBA32F: z, disparity, rate, anchor) and its misses in a row (R16F)
         3. Take the noise floor off z → output_fbo (R16F)
     """
 
@@ -52,11 +52,11 @@ class DepthVelocity(FlowBase):
         self._threshold_shader: DepthThreshold = DepthThreshold()
 
         self._raw: Fbo = Fbo()                   # the depth and its confidence as they came, before the edges are taken off
-        self._estimate: SwapFbo = SwapFbo()
-        self._misses: tuple[Texture, Texture] = (Texture(GL_NEAREST), Texture(GL_NEAREST))   # beside the estimate's two
-        self._misses_of: dict[int, Texture] = {}     # each of the estimate's framebuffers' misses, by its id
-        self._targets: tuple[MultiTargetFbo, MultiTargetFbo] = (MultiTargetFbo(), MultiTargetFbo())
-        self._targets_of: dict[int, MultiTargetFbo] = {}     # each estimate buffer and its misses, drawn at once
+        # The track, swapped as one: the estimate (target 0) and its misses in a row (target 1), drawn at once
+        self._track: SwapMultiTargetFbo = SwapMultiTargetFbo(MultiTargetFbo(Texture(), Texture(GL_NEAREST)),
+                                                             MultiTargetFbo(Texture(), Texture(GL_NEAREST)))
+        self._estimate: SwapTarget = self._track.target(0)
+        self._misses: SwapTarget = self._track.target(1)
 
     @property
     def depth_velocity(self) -> Texture:
@@ -72,7 +72,7 @@ class DepthVelocity(FlowBase):
     @property
     def misses(self) -> Texture:
         """The track's misses in a row (R16F): 0 where it follows its measurement, 1 where it coasts."""
-        return self._misses_of[self._estimate.fbo_id]
+        return self._misses
 
     @property
     def ports(self) -> dict[str, Port]:
@@ -83,14 +83,7 @@ class DepthVelocity(FlowBase):
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         super().allocate(width, height, output_width, output_height)
         self._raw.allocate(width, height, GL_RG32F)
-        self._estimate.allocate(width, height, GL_RGBA32F)
-        self._misses_of = {}
-        self._targets_of = {}
-        for fbo, misses, targets in zip((self._estimate.current, self._estimate.back), self._misses, self._targets):
-            misses.allocate(width, height, GL_R16F)
-            targets.allocate((fbo, misses))
-            self._misses_of[fbo.fbo_id] = misses
-            self._targets_of[fbo.fbo_id] = targets
+        self._track.allocate(width, height, (GL_RGBA32F, GL_R16F))
         self._clear_track()
         self._step_filter_shader.allocate()
         self._velocity_shader.allocate()
@@ -99,13 +92,7 @@ class DepthVelocity(FlowBase):
     def deallocate(self) -> None:
         super().deallocate()
         self._raw.deallocate()
-        for targets in self._targets:
-            targets.deallocate()
-        self._targets_of = {}
-        self._estimate.deallocate()
-        for misses in self._misses:
-            misses.deallocate()
-        self._misses_of = {}
+        self._track.deallocate()
         self._step_filter_shader.deallocate()
         self._velocity_shader.deallocate()
         self._threshold_shader.deallocate()
@@ -117,8 +104,7 @@ class DepthVelocity(FlowBase):
     def _clear_track(self) -> None:
         """No track anywhere: the estimate and its misses 0."""
         self._estimate.clear_all()
-        for misses in self._misses:
-            misses.clear()
+        self._misses.clear_all()
 
     def update_depth(self, depth: Texture, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
                      smooth: float, halving_speed: float, rest_speed: float, threshold: float, edge: float, dead_zone: float,
@@ -157,13 +143,12 @@ class DepthVelocity(FlowBase):
         self._step_filter_shader.use(self._raw, step, edge)
         self._input_fbo.end()
 
-        self._estimate.swap()
-        targets: MultiTargetFbo = self._targets_of[self._estimate.fbo_id]     # the estimate and its misses
-        targets.begin()
+        self._track.swap()
+        self._track.current.begin()          # the estimate and its misses
         self._velocity_shader.use(self._input_fbo, self._estimate.back, smooth, halving_speed, rest_speed, max(delta_time, 1e-6),
-                                  view_span, step, window, edge, dead_zone, self._misses_of[self._estimate.back.fbo_id],
+                                  view_span, step, window, edge, dead_zone, self._misses.back,
                                   depth_noise, displacement, max_speed, guard)
-        targets.end()
+        self._track.current.end()
 
         self._output_fbo.begin()
         self._threshold_shader.use(self._estimate, threshold / max(width, 1))     # px as view widths

@@ -2,7 +2,7 @@
 from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_WRAP_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, glBindTexture, glTexImage3D, glTextureParameterfv, glTextureParameteri, glTextureSubImage3D
 import numpy as np
 
-from .swap import Swap
+from .swap import TextureSwap
 from .texture_base import TextureBase
 
 
@@ -60,7 +60,7 @@ class Texture3D(TextureBase):
         return pixels
 
 
-class SwapTexture3D(Swap[Texture3D], Texture3D):
+class SwapTexture3D(TextureSwap[Texture3D], Texture3D):
     """Double-buffered 3D texture for ping-pong compute operations: no FBO, every read and write through
     imageLoad/imageStore in compute shaders."""
 
@@ -68,7 +68,7 @@ class SwapTexture3D(Swap[Texture3D], Texture3D):
                  interpolation: int = GL_LINEAR,
                  wrap: int = GL_CLAMP_TO_EDGE,
                  border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
-        Swap.__init__(self, Texture3D(interpolation, wrap, border_color), Texture3D(interpolation, wrap, border_color))
+        TextureSwap.__init__(self, Texture3D(interpolation, wrap, border_color), Texture3D(interpolation, wrap, border_color))
 
     @property
     def depth(self) -> int:

@@ -1,20 +1,23 @@
-"""MultiTargetFbo: a framebuffer that draws into the textures it is given, two or more at once."""
+"""MultiTargetFbo: a framebuffer that owns two or more color targets and draws into them at once; SwapMultiTargetFbo,
+a ping-pong pair of them; SwapTarget, one target of such a pair, always its current framebuffer's."""
 
 from collections.abc import Sequence
 
-from OpenGL.GL import (GL_COLOR_ATTACHMENT0, GL_FRAMEBUFFER, GL_TEXTURE_2D, glBindFramebuffer, glDeleteFramebuffers,
-                       glDrawBuffers, glFramebufferTexture2D, glGenFramebuffers, glViewport)
+from OpenGL.GL import (Constant, GL_COLOR_ATTACHMENT0, GL_FRAMEBUFFER, GL_TEXTURE_2D, glBindFramebuffer,
+                       glDeleteFramebuffers, glDrawBuffers, glFramebufferTexture2D, glGenFramebuffers, glViewport)
 
+from .swap import Swap, TextureSwap
 from .texture import Texture
 
 
 class MultiTargetFbo:
-    """A framebuffer whose color targets are textures of the caller's, all of one size: a draw writes its output
-    `layout(location = i)` into target i. It owns no texture; `Fbo` is the one texture that draws into itself."""
+    """A framebuffer over color targets it owns, one size: a draw writes its output `layout(location = i)` into
+    target i. The caller makes the targets' `Texture`s (their filter and wrap) and gives them; `allocate` makes them at
+    a format each, `deallocate` frees them, and each is handed out by index (`targets[i]`)."""
 
-    def __init__(self) -> None:
+    def __init__(self, *targets: Texture) -> None:
         self.fbo_id: int = 0
-        self._targets: tuple[Texture, ...] = ()
+        self.targets: tuple[Texture, ...] = targets
 
     @property
     def allocated(self) -> bool:
@@ -22,31 +25,32 @@ class MultiTargetFbo:
 
     @property
     def width(self) -> int:
-        return self._targets[0].width if self._targets else 0
+        return self.targets[0].width
 
     @property
     def height(self) -> int:
-        return self._targets[0].height if self._targets else 0
+        return self.targets[0].height
 
-    def allocate(self, targets: Sequence[Texture]) -> None:
-        """The framebuffer over `targets`, allocated textures of one size, each its color attachment in order and
-        all of them drawn into."""
+    def allocate(self, width: int, height: int, formats: Sequence[Constant | int]) -> None:
+        """Each target made at `width` × `height` in its format, in order, and the framebuffer over all of them."""
         self.deallocate()
-        self._targets = tuple(targets)
-        attachments: list[int] = [int(GL_COLOR_ATTACHMENT0) + i for i in range(len(self._targets))]
+        for texture, internal_format in zip(self.targets, formats, strict=True):
+            texture.allocate(width, height, internal_format)
+        attachments: list[int] = [int(GL_COLOR_ATTACHMENT0) + i for i in range(len(self.targets))]
         self.fbo_id = int(glGenFramebuffers(1))
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
-        for attachment, texture in zip(attachments, self._targets):
+        for attachment, texture in zip(attachments, self.targets):
             glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, texture.tex_id, 0)
         glDrawBuffers(len(attachments), attachments)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
     def deallocate(self) -> None:
-        """The framebuffer freed; the targets are the caller's and stay."""
+        """The framebuffer and its targets freed."""
         if self.fbo_id:
             glDeleteFramebuffers(1, [self.fbo_id])
             self.fbo_id = 0
-        self._targets = ()
+        for texture in self.targets:
+            texture.deallocate()
 
     def begin(self) -> None:
         """Draw into the targets, their whole size the viewport."""
@@ -56,3 +60,47 @@ class MultiTargetFbo:
     def end(self) -> None:
         """The window's framebuffer bound again."""
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+
+class SwapMultiTargetFbo(Swap[MultiTargetFbo]):
+    """A ping-pong pair of `MultiTargetFbo`s, swapped as one: `current` drawn into, `back` read. `target(i)` is
+    target i of the pair, which stays its current framebuffer's across swaps."""
+
+    def allocate(self, width: int, height: int, formats: Sequence[Constant | int]) -> None:
+        """Both framebuffers made, their targets in `formats`."""
+        for buffer in self._buffers:
+            buffer.allocate(width, height, formats)
+
+    def target(self, index: int) -> 'SwapTarget':
+        return SwapTarget(self, index)
+
+
+class SwapTarget(TextureSwap[Texture], Texture):
+    """Target `index` of a `SwapMultiTargetFbo`: used as a texture it is the current framebuffer's, its `back` the
+    other's, so a port or a pass keeps it as it keeps a `SwapFbo`. It swaps with its pair, never alone."""
+
+    def __init__(self, pair: SwapMultiTargetFbo, index: int) -> None:
+        self._pair: SwapMultiTargetFbo = pair
+        self._index: int = index
+
+    @property
+    def _buffers(self) -> tuple[Texture, Texture]:     # pyright: ignore[reportIncompatibleVariableOverride]
+        first, second = self._pair._buffers
+        return first.targets[self._index], second.targets[self._index]
+
+    @property
+    def current(self) -> Texture:
+        return self._pair.current.targets[self._index]
+
+    @property
+    def back(self) -> Texture:
+        return self._pair.back.targets[self._index]
+
+    def swap(self) -> None:
+        raise RuntimeError('a target swaps with its pair (SwapMultiTargetFbo.swap)')
+
+    def allocate(self, width: int, height: int, internal_format: Constant | int) -> None:
+        raise RuntimeError('a target is made with its pair (SwapMultiTargetFbo.allocate)')
+
+    def deallocate(self) -> None:
+        raise RuntimeError('a target is freed with its pair (SwapMultiTargetFbo.deallocate)')

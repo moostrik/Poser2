@@ -4,34 +4,6 @@ What is not built in `modules/gl`. A step is one commit, built on Matthias's go,
 tests, gl's tests and the runs it names; a run happens at its step, after a tasklist check that no app is running,
 unless Matthias says he is using the PC or the app.
 
-## F. A framebuffer of several targets owns them, and swaps as one
-
-- F1. On c40e354c (the Fluid3D thread's surface color, a third target cleared each frame). `MultiTargetFbo` owns
-  its targets, as `Fbo` owns its one texture: `allocate(width, height, formats)` makes a texture per format and hands
-  each out by index (`targets[i]`, a `Texture`). In `texture/swap.py`, `Swap[T]` becomes the pair itself
-  (`current`, `back`, `swap`, `deallocate`, over anything allocated and freed) and `TextureSwap[T]` the texture
-  pair on top of it, with today's forwarding (`width`, `tex_id`, `bind`, `clear`, `set_wrap`, …), the base of
-  `SwapFbo`, `SwapTexture3D` and `SwapTexture2DArray`. In `texture/multi_target_fbo.py`, beside `MultiTargetFbo`,
-  `SwapMultiTargetFbo` is a `Swap` of two with its own `allocate(width, height, formats)`, and `target(i)` hands out
-  target i as a `SwapTarget`: a `Texture` that is always the current framebuffer's target i, as a `SwapFbo` is always
-  its current buffer, so a port keeps it. `gl` exports `MultiTargetFbo`, `SwapMultiTargetFbo` and `SwapTarget`.
-  `flow/motion/depth_velocity.py` holds its estimate and its misses as one `SwapMultiTargetFbo` (RGBA32F, R16F): it
-  draws into `current`, reads `back`, and its `estimate` port and `misses` are `target(0)` and `target(1)`, so
-  `_misses_of`, `_targets_of` and the lookup by `fbo_id` go. `flow/fluid_3d/particle_density.py`'s weighted look and
-  surface each own their targets (RGBA32F and RGBA16F; R32F, R32F and RGBA16F, as c40e354c allocates them), the
-  next passes reading them by index. GL.md's `MultiTargetFbo` paragraph says it owns its targets and swaps as one.
-  Why: since 46df3c07 each of depth_velocity's two `MultiTargetFbo`s keeps one raw buffer of the estimate's swap pair
-  (`_targets` from `(_estimate.current, _estimate.back)`), picked by the estimate's id each frame, against gl.md's
-  "Keep a swap pair itself, never one of its buffers"; a port is "the object itself, never a buffer taken from it"
-  (`flow/port.py`); a framebuffer owning its color targets is the textbook shape (Cinder's and openFrameworks' Fbo)
-  (seen: `multi_target_fbo.py`, `depth_velocity.py`; only particle_density reads its targets, no port holds them;
-  nothing else keeps a buffer of a swap pair, a search of 2026-11-21). Check: pyright, the guard, gl and flow tests;
-  deep_flow -sim with the motion, and the particles on the weighted look and on SURFACE, no GL error; and
-  depth_velocity's output (its `output_fbo`, the z velocity) compared with the code before F1, a scratch `git
-  archive` of HEAD run the same way (no checkout), on 20261112-125832_measure over the same 20 s from 10 s in: its
-  mean, p99 and the misses' share, within the spread of two runs of the code before; the motion's monitor by eye if
-  the runs do not line up.
-
 ## H. One framebuffer class
 
 - H1. After F1. `Fbo` and `MultiTargetFbo` become one `Fbo` with one or more color targets it owns, as Cinder's
