@@ -186,8 +186,8 @@ class Control:
         raise NotImplementedError
 
     def polls(self) -> bool:
-        """Whether the page polls this control: a field that something else than the panel may write."""
-        return self.settings.is_shared(self.name) or self.field.access is not Access.WRITE
+        """Whether the page polls this control: every field but an `INIT` one, which cannot change."""
+        return self.field.access is not Access.INIT
 
     # -- what every control shares --------------------------------------------
 

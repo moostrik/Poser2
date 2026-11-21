@@ -22,7 +22,7 @@ T = TypeVar("T")
 
 
 class Access(Enum):
-    """Who writes a field, and with it whether the panel polls it (SETTINGS.md, Access)."""
+    """Who writes a field, and whether the panel lets the user edit it (SETTINGS.md, Access)."""
     READ = "read"
     WRITE = "write"
     READWRITE = "readwrite"

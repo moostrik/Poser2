@@ -26,18 +26,18 @@ down to the children it is shared to and up to its parent's field. A button is n
 
 ## Access
 
-`access` says who writes a field, and with it whether the panel polls it.
+`access` says who writes a field: whether the panel lets the user edit it, and whether it can change at all.
 
 | Access      | The panel     | Polled | Written by                                   |
 |-------------|---------------|--------|----------------------------------------------|
 | `READ`      | shows it      | yes    | the code (a frame rate)                      |
-| `WRITE`     | edits it      | no     | the user alone                               |
+| `WRITE`     | edits it      | yes    | the user                                     |
 | `READWRITE` | edits it      | yes    | the user and the code (a window's size)      |
 | `INIT`      | a fixed label | no     | the files and the constructor, until `initialize()` |
 
-`WRITE` is the default: a field the code writes says `READ` or `READWRITE`, or the panel does not show the change. `READ`
-is a hint: the code may write any field. `INIT` is enforced: after
-`initialize()` a write raises `AttributeError` and a load skips the field.
+`WRITE` is the default. The panel polls every field but an `INIT` one, so a value the code writes shows whatever its
+access says; `READ` and `READWRITE` say the code writes it. `READ` is a hint: the code may write any field. `INIT` is
+enforced: after `initialize()` a write raises `AttributeError` and a load skips the field.
 
 ## Groups and sharing
 

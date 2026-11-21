@@ -6,10 +6,6 @@ The package scan of 2026-11-20 (modules/settings held up to CLAUDE.md and its ru
 
 - E4. `widget.py`'s "Adding a widget" goes into SETTINGS.md; the `_propagate_*` docstrings and `Field.fire`'s say what
   each one is.
-- E8. The panel polls every value control (`modules/panel/controls.py` `Control.polls()`; buttons and `INIT` fields
-  as now), so a value written by code shows whatever its access says; the polling runs in the panel's process, and
-  the app's side (`mirror.ValueDiff`) already compares every field. SETTINGS.md's Access section says so. Checked by
-  the panel tests.
 - E9. One map of a class's fields and groups, built once per class in `BaseSettings.__init_subclass__`:
   `BaseSettings.__init__`, `to_dict` and `Group.validate_wiring` read it, in place of their three walks of the MRO;
   `_get_group_descriptor` goes.

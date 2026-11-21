@@ -44,7 +44,8 @@ class TestControl(unittest.TestCase):
         self.assertEqual(gain.label, "Gain")
         self.assertFalse(gain.locked)
         self.assertTrue(gain.polled)        # READWRITE: the app may write it
-        self.assertFalse(FakeControl(self.probe, "level", self.probe.fields["level"]).polled)    # WRITE, the default: the user alone
+        self.assertTrue(FakeControl(self.probe, "level", self.probe.fields["level"]).polled)     # WRITE, the default: polled too
+        self.assertFalse(FakeControl(self.probe, "port", self.probe.fields["port"]).polled)      # INIT: cannot change
         self.assertEqual(gain.shown, 1.0)
         readout = FakeControl(self.probe, "readout", self.probe.fields["readout"])
         self.assertTrue(readout.locked)
