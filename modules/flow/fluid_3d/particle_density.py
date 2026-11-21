@@ -267,8 +267,7 @@ class ParticleDensity(DensityCarrier):
         self._surface_color.allocate(width, height, GL_RGBA16F)
         for smoothed in self._smoothed:
             smoothed.allocate(width, height, GL_R32F)
-        # drawn into: the depth and the thickness; the color was attached third but not drawn into, as it is now
-        self._surface.allocate((self._surface_depth, self._surface_thickness))
+        self._surface.allocate((self._surface_depth, self._surface_thickness, self._surface_color))
 
     def _deallocate_surface(self) -> None:
         self._surface.deallocate()
@@ -287,6 +286,7 @@ class ParticleDensity(DensityCarrier):
         self._surface.begin()
         glClearBufferfv(GL_COLOR, 0, (1.0, 1.0, 1.0, 1.0))
         glClearBufferfv(GL_COLOR, 1, (0.0, 0.0, 0.0, 0.0))
+        glClearBufferfv(GL_COLOR, 2, (0.0, 0.0, 0.0, 0.0))
         BlendState.push()
         BlendState.set_blend_mode(BlendState.BlendMode.SUM)
         BlendState.set_buffer_blend_equation(0, BlendState.BlendEquation.MIN)
