@@ -5,14 +5,6 @@ What is to be built in `modules/video`: ffmpeg, the clips and streams it writes 
 
 ## D. The stream threads
 
-D2. `StreamWriter` waits on its work instead of polling: a `None` put on the queue ends `_record` (no
-   `get(timeout=.1)`), `_drain` waits on `Queue.join` with `task_done` (no `sleep(0.01)` loop, which steps 15.6 ms on
-   Windows), and `is_recording` / `is_receiving` become `Event`s, as they are read on the camera's thread and written on
-   another **(seen)**. When the encoder dies, `_clear` marks every frame it drops done, and the end marker too, so
-   `stop` and `split` never hang on `Queue.join`. Why: Time, the Waker line and its 15.6 ms tick; Concurrency, "Use
-   `Lock` and `Event` for shared mutable state and lifecycle signals"; a `split` then returns as soon as the queue is
-   written, not up to 100 ms later per stream **(deduction)**. Check: the video and recording recorder unit tests.
-
 D3. `ScreenRecorder._run` waits for work or for the next estimate (`ESTIMATE_INTERVAL` left), not every `POLL`
    (50 ms); `POLL` goes **(seen)**. Why: it wakes 20 times a second with nothing to do. Check: `test_screen_recorder`.
 
