@@ -106,7 +106,6 @@ class SmileRender(RenderBase):
         # sequencer first: images handed over with a state change (the depth with CONTROL_0)
         # are then uploaded before the stage uses them
         message = self.sequencer.update(now)
-        self._notify_update()
         self.inputs.update()
 
         BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)

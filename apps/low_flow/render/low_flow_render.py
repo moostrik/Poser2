@@ -197,8 +197,6 @@ class LowFlowRender(RenderBase):
                 for layer in (*self.L[key].values(), *self._debug_monitors.get(key, {}).values())]
 
     def update(self) -> None:
-        self._notify_update()
-
         if self._reset_flow.is_set():
             self._reset_flow.clear()
             for layer_type in [ChainLayers.motion, ChainLayers.bridge, ChainLayers.fluid]:

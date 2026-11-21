@@ -245,7 +245,6 @@ class WhiteSpaceRender(RenderBase):
                 layer.deallocate()
 
     def update(self) -> None:
-        self._notify_update()
         cast(render.PanoramaCompositor, self.L[Layers.cam_panorama][0]).set_frame_timestamp(self.window_manager.frame_timestamp)
 
         if self._layout_dirty:

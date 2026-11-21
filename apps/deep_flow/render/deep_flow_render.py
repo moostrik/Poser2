@@ -245,8 +245,6 @@ class DeepFlowRender(RenderBase):
         self._reset_fluid.set()
 
     def update(self) -> None:
-        self._notify_update()
-
         if self._reset_fluid.is_set():
             self._reset_fluid.clear()
             for layer_type in [ChainLayers.motion, ChainLayers.bridge, ChainLayers.fluid]:

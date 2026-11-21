@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable
 
-from modules.utils import Broadcast
 from .window_manager import WindowManager
 from .window_settings import WindowManagerSettings
 
@@ -11,21 +10,16 @@ class RenderBase(ABC):
 
     def __init__(self, windows: WindowManagerSettings) -> None:
         """`windows` an app's `windows` group: the window loop's settings and its windows."""
-        self._update_callbacks: Broadcast[[float]] = Broadcast(name='update')     # run in registration order
         self.window_manager: WindowManager = WindowManager(self, windows)
 
     def add_update_callback(self, callback: Callable[[float], Any]) -> None:
-        """Register a per-frame update callback; it gets the frame's time (perf_counter, the stamp of the
-        frame's update), the clock of everything that advances on the render tick."""
-        self._update_callbacks.add_callback(callback)
+        """Register a per-frame update callback; the loop calls it before the renderer's update with the frame's
+        time (perf_counter, the stamp of the frame's update), the clock of everything that advances on the render tick."""
+        self.window_manager.add_update_callback(callback)
 
     def remove_update_callback(self, callback: Callable[[float], Any]) -> None:
         """Unregister a per-frame update callback."""
-        self._update_callbacks.remove_callback(callback)
-
-    def _notify_update(self) -> None:
-        """Dispatch all registered update callbacks with the frame's time. Call from update()."""
-        self._update_callbacks(self.window_manager.frame_timestamp)
+        self.window_manager.remove_update_callback(callback)
 
     def run(self) -> None:
         """The window loop on the calling thread, the main thread, until the windows close."""

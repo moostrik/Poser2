@@ -59,6 +59,7 @@ class WindowManager:
         self._next_frame: float = 0.0               # the paced frame's deadline (perf_counter), 0 when not paced
         self._swap_fences: list[object] = []        # a fence after each paced swap, the newest last
 
+        self._update_callbacks: Broadcast[[float]] = Broadcast(name='update')     # each frame, before the renderer's update
         self._exit_callbacks: Broadcast[[]] = Broadcast(name='exit')
 
         self._place_default: bool = False           # the button, applied at the tick
@@ -98,6 +99,12 @@ class WindowManager:
     def window_size(self, window: int) -> tuple[int, int]:
         """A window's framebuffer size (pixels), as the renderer knows it: from `allocate` on."""
         return self._sizes[window]
+
+    def add_update_callback(self, callback: Callable[[float], Any]) -> None:
+        self._update_callbacks.add_callback(callback)
+
+    def remove_update_callback(self, callback: Callable[[float], Any]) -> None:
+        self._update_callbacks.remove_callback(callback)
 
     def add_exit_callback(self, callback: Callable[[], Any]) -> None:
         self._exit_callbacks.add_callback(callback)
@@ -224,7 +231,7 @@ class WindowManager:
                     logger.exception("Error in on_window_resize")
 
     def _update(self) -> None:
-        """Update renderer state. Called once per frame; ``frame_timestamp`` is the frame's stamp."""
+        """The frame's update: the update callbacks with the frame's stamp, then the renderer's."""
         self._fps.processed()
         self.settings.avg_fps = int(self._fps.get_rate_average())
         self.settings.min_fps = int(self._fps.get_rate_minimum())
@@ -233,6 +240,7 @@ class WindowManager:
             self._interval_timer.add_time((start - self._last_update) * 1000.0, report=False)
         self._last_update = start
         self.frame_timestamp = start
+        self._update_callbacks(start)
         try:
             self.renderer.update()
         except Exception:

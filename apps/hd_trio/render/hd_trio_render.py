@@ -214,8 +214,6 @@ class HDTrioRender(RenderBase):
             fluid.set_input(FluidInput(dt, injections))
 
     def update(self) -> None:
-        self._notify_update()
-
         self._update_layers = UPDATE_LAYERS
         self._draw_layers = self.settings.layer.select.final
         self._preview_layers = self.settings.layer.select.preview

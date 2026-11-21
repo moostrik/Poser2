@@ -31,7 +31,7 @@ The loop, each frame, in window 0's context:
 | settings            | each window's settings read and only what differs applied; a user's move or resize     |
 |                     | written to the settings once, as applied, and not applied back                         |
 | sizes               | `on_window_resize(window, width, height)` for each framebuffer size that changed       |
-| update              | `renderer.update()` once                                                               |
+| update              | the update callbacks with the frame's stamp, then `renderer.update()` once            |
 | hold                | a wait on the fence of the paced swap before last: one frame in flight                 |
 | draw                | each shown window: its context current, `draw(window, width, height)`                 |
 | swap                | the shown windows, the `v_sync_window` last, with v-sync, and a fence after it         |

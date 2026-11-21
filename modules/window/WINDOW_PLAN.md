@@ -7,11 +7,6 @@ commit, built on Matthias's go, checked by pyright and the window tests.
 
 The apps' render files are the Render thread's while it builds its plan; these steps touch them only once it is done.
 
-- B1. The loop calls the update callbacks itself, with the frame's stamp, just before `renderer.update()`; the
-  renderers' `_notify_update()` calls go, and smile's sequencer then runs after the callbacks instead of before. Why:
-  four renderers call `_notify_update()` first thing in `update()` and smile after its sequencer, one call written five
-  times; "A producer calls its callbacks itself" (seen: the five apps' `update`). Check: pyright, the window tests, a
-  -sim of smile (the sequencer's order) and of deep_flow.
 - B2. `RenderBase` forwards `input`, and deep_flow and smile use it instead of reaching into `window_manager`. Why:
   `RenderBase` forwards `run`, `stop`, `window_size` and `add_exit_callback` but not `input`, two ways to one thing
   (seen). Check: pyright.
