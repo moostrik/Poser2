@@ -39,8 +39,10 @@ FRAME_CHECK: float = 0.5        # s between two looks at the time of the last fr
 class Camera(Thread):
     _next_cam_id = 0
 
-    def __init__(self, settings: Oak4CameraSettings) -> None:
+    def __init__(self, settings: Oak4CameraSettings, rotate90: bool = False) -> None:
         super().__init__()
+        self.rotate90: bool = rotate90      # carried on every frame as its flag (an app's portrait mode), fixed at start
+        self._tilt_warned: bool = False
         self.stop_event = Event()
         self.running: bool = False
         self._problem: str = ''             # why there are no frames, as logged; '' while they come
@@ -87,7 +89,8 @@ class Camera(Thread):
         self.control: SensorControl | None = None
         self.depth_control: DepthControl | None = None
         self.num_tracklets: int = 0
-        self.flip_on_host: bool = False
+        self.flip_h_on_host: bool = False
+        self.flip_v_on_host: bool = False
         self._frame_transformation: dai.ImgTransformation | None = None     # the delivered frame's, for the crops' keypoints
 
         # FPS
@@ -252,7 +255,8 @@ class Camera(Thread):
     def _setup_queues(self, outputs: PipelineOutputs) -> None:
         """The host's ends of the pipeline: the frames every camera has, the tracklets with a model,
         the depth with a depth model, the IMU, the camera's load, the sensor controls."""
-        self.flip_on_host = outputs.flip_on_host
+        self.flip_h_on_host = outputs.flip_h_on_host
+        self.flip_v_on_host = outputs.flip_v_on_host
         video: dai.MessageQueue = outputs.video.createOutputQueue(maxSize=QUEUE_SIZE, blocking=False)
         video.addCallback(self._video_callback)
         self.queues.append(video)
@@ -276,7 +280,7 @@ class Camera(Thread):
         self.queues.append(system)
         control: dai.InputQueue = outputs.control.createInputQueue()
         assert self.device is not None
-        self.control = SensorControl(self.settings, self.device, control, self.flip_on_host)
+        self.control = SensorControl(self.settings, self.device, control, self.rotate90, self.flip_v_on_host, self.flip_h_on_host)
         if outputs.depth_config is not None:
             self.depth_control = DepthControl(self.settings.depth, outputs.depth_config.createInputQueue())
 
@@ -456,13 +460,23 @@ class Camera(Thread):
                     confidence: ndarray | None = None) -> None:
         """The hand-over: the frame, with its capture time (`capture_time`) and its arrival, goes to every callback."""
         frame = CameraFrame(cam_id=self.cam_id, kind=kind, image=image, timestamp=timestamp,
-                            nv12=nv12, flip_h=self.flip_on_host, homography=self.tilt_correction.homography,
-                            readings=readings, intrinsics=self._intrinsics, alignment=alignment, arrival=arrival,
-                            confidence=confidence)
+                            nv12=nv12, rotate90=self.rotate90, flip_v=self.flip_v_on_host, flip_h=self.flip_h_on_host,
+                            homography=self._homography(), readings=readings, intrinsics=self._intrinsics,
+                            alignment=alignment, arrival=arrival, confidence=confidence)
         with self._callback_lock:
             callbacks: list[CameraFrameCallback] = list(self.frame_callbacks)
         for c in callbacks:
             c(frame)
+
+    def _homography(self) -> ndarray | None:
+        """The tilt correction's homography, none on a turned camera: on its side the IMU's tilt is a rotation about
+        the sensor's other axis, which the correction does not model. Tilt on with the turn is warned once."""
+        if not self.rotate90:
+            return self.tilt_correction.homography
+        if self.settings.tilt.enabled and not self._tilt_warned:
+            self._tilt_warned = True
+            logger.warning(f'{self.device_id} is turned (rotate90): its tilt correction is not applied')
+        return None
 
     def _emit_tracklets(self, tracklets: list[CameraTracklet], timestamp: float, arrival: float) -> None:
         if not self.running:

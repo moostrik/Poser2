@@ -14,6 +14,7 @@ COLOR_MODES: dict[CameraResolution, ColorCameraProperties.SensorResolution] = {
     CameraResolution.P720:  ColorCameraProperties.SensorResolution.THE_720_P,
     CameraResolution.P800:  ColorCameraProperties.SensorResolution.THE_800_P,
     CameraResolution.P1080: ColorCameraProperties.SensorResolution.THE_1080_P,
+    CameraResolution.P2160: ColorCameraProperties.SensorResolution.THE_4_K,
 }
 
 

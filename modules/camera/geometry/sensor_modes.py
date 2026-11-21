@@ -16,6 +16,7 @@ class CameraResolution(IntEnum):
     P720  = 0       # 1280 x 720   both sensors
     P800  = auto()  # 1280 x 800   both sensors; the OV9282 W's full readout
     P1080 = auto()  # 1920 x 1072  color only
+    P2160 = auto()  # 3840 x 2160  color only: the sensor's 4K mode
 
 
 # The delivered size of each mode, trimmed to the warp's alignment: 1080 rows are cropped to 1072.
@@ -23,11 +24,12 @@ RESOLUTION_SIZES: dict[CameraResolution, tuple[int, int]] = {
     CameraResolution.P720:  (1280,  720),
     CameraResolution.P800:  (1280,  800),
     CameraResolution.P1080: (1920, 1072),
+    CameraResolution.P2160: (3840, 2160),
 }
 
 MONO_RESOLUTIONS: frozenset[CameraResolution] = frozenset({CameraResolution.P720, CameraResolution.P800})
 COLOR_RESOLUTIONS: frozenset[CameraResolution] = frozenset({CameraResolution.P720, CameraResolution.P800,
-                                                             CameraResolution.P1080})
+                                                             CameraResolution.P1080, CameraResolution.P2160})
 
 _FALLBACK_RESOLUTION: CameraResolution = CameraResolution.P800     # a mono camera asked for a mode it has not
 _warned_resolutions: set[tuple[bool, CameraResolution]] = set()     # warned once each

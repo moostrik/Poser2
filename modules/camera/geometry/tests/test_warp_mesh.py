@@ -485,6 +485,8 @@ class FrameSizeTest(unittest.TestCase):
         self.assertEqual(mono_frame_size(CameraResolution.P800), (1280, 800))
         # 1080 is not divisible by the warp's 16-px alignment, so the preview is 1072 rows.
         self.assertEqual(color_frame_size(CameraResolution.P1080), (1920, 1072))
+        # the sensor's 4K mode: 2160 rows are on the alignment already
+        self.assertEqual(color_frame_size(CameraResolution.P2160), (3840, 2160))
 
     def test_the_square_crop_follows_the_label(self) -> None:
         for label, height in ((CameraResolution.P720, 720), (CameraResolution.P800, 800)):
@@ -548,10 +550,14 @@ class ResolutionTest(unittest.TestCase):
         self.assertEqual(len(captured.output), 1)
 
     def test_color_keeps_its_own_label(self) -> None:
-        self.assertEqual(
-            resolve_resolution(color=True, resolution=CameraResolution.P1080),
-            CameraResolution.P1080,
-        )
+        for label in (CameraResolution.P1080, CameraResolution.P2160):
+            self.assertEqual(resolve_resolution(color=True, resolution=label), label)
+
+    def test_mono_falls_back_from_the_4k_label(self) -> None:
+        from modules.camera.geometry.sensor_modes import _warned_resolutions
+        _warned_resolutions.discard((False, CameraResolution.P2160))
+        with self.assertLogs('modules.camera.geometry.sensor_modes', level='WARNING'):
+            self.assertEqual(resolve_resolution(color=False, resolution=CameraResolution.P2160), CameraResolution.P800)
 
     def test_the_bottom_reach_follows_the_label(self) -> None:
         """The 720-row mode is a center crop: 40 rows less below the axis, so the bottom of the

@@ -80,7 +80,7 @@ Auto exposure is on by default, and these settings in `sensor` shape it, live. M
 | `exposure_compensation` -9  | 2183  | 15.4      |
 | `exposure_compensation` +9  | 16585 | 42.4      |
 
-`exposure_region` is in fractions of the picture as shown, mirrored or not. The other new settings in `sensor` are `auto_exposure_lock`, `auto_balance_lock`, `anti_banding` and `chroma_denoise`.
+`exposure_region` is in fractions of the picture as shown, after the frame's turn and flips (`sensor_region` takes it back through them). The other new settings in `sensor` are `auto_exposure_lock`, `auto_balance_lock`, `anti_banding` and `chroma_denoise`.
 
 ### Tilt
 
@@ -157,6 +157,15 @@ With the 640x512 detector and depth, on the probe, about 3 s each on USB and 10 
 | `P1080`      | USB      | 1344x1072 | 37.7 ms | 39.2 ms | 43.5 ms | 60 fps | 1037 Mbit/s      |
 
 The link rates are calculated from the frame sizes **(deduction)**, before the chip's row padding. With depth, `P800` comes to 679 Mbit/s and `P1080` to 1145 Mbit/s, so `P1080` does not fit Ethernet's [expected 800 Mbit/s](#link).
+
+`P2160` runs the color sensor's 4K mode and is for USB only; Ethernet takes `ethernet_resolution`. Color alone at 30 fps, no model and no depth, on the probe, 10 s each on USB, auto exposure at 31.9 ms in both:
+
+| `resolution` | Link | Frame     | Color   | Rate   | Worst gap | Chip CPU | NV12 on the link |
+|--------------|------|-----------|---------|--------|-----------|----------|------------------|
+| `P1080`      | USB  | 1344x1072 | 36.6 ms | 30 fps | 66.7 ms   | 15 %     | 519 Mbit/s       |
+| `P2160`      | USB  | 2704x2160 | 66.6 ms | 30 fps | 66.7 ms   | 44 %     | 2102 Mbit/s      |
+
+`P2160` holds 30 fps and comes about 30 ms later than `P1080`; the cause of the extra time is not measured.
 
 ### Color path
 
@@ -291,7 +300,7 @@ Lens of the delivered frame, as tagged on a recording, in pixels:
 
 That gives a view of about 79.6° by 67.6° **(deduction)**, and `readings.fov_factory` reports the horizontal figure from the first frame's lens (`rectilinear_field`). The color frame takes its lens from the camera; `fov` and the `lens_*` settings shape only the grey frame's warp. The color sensor spans 95° and the stereo pair 127° (Luxonis docs), so the whole frame has depth. Depth has about 291 rows of real detail inside the 720 rows, since the frame spans about 775 of the 800 mono rows **(deduction)**.
 
-`HORIZONTAL_MIRROR` has no effect on this camera: the mirrored frame matches the plain one. So the PC mirrors, and the backend mirrors boxes and keypoints to match. There is no vertical flip for color: `flip_v` logs a warning and does nothing.
+`HORIZONTAL_MIRROR` has no effect on this camera: the mirrored frame matches the plain one. So a color frame leaves its flips to the PC: `flip_h` and `flip_v` go on the frame as its flags, and the uploader flips the image, boxes and keypoints to match. `Camera(settings, rotate90)` puts the app's quarter turn on every frame as its flag the same way, for an app in portrait mode; with the turn, the tilt correction is not applied (a warning when `tilt.enabled` is on), as on a camera on its side the IMU's tilt is a rotation about the sensor's other axis.
 
 ## Depth
 

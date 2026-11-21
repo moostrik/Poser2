@@ -11,7 +11,9 @@ class DeliveredSizeTest(unittest.TestCase):
     def test_the_direct_frame_is_about_five_by_four_on_a_width_the_decoder_plays(self) -> None:
         self.assertEqual(direct_size(CameraResolution.P720), (896, 720))
         self.assertEqual(delivered_size(True, CameraResolution.P720), (896, 720))
-        for resolution in (CameraResolution.P720, CameraResolution.P800, CameraResolution.P1080):
+        self.assertEqual(direct_size(CameraResolution.P1080), (1344, 1072))
+        self.assertEqual(direct_size(CameraResolution.P2160), (2704, 2160))
+        for resolution in (CameraResolution.P720, CameraResolution.P800, CameraResolution.P1080, CameraResolution.P2160):
             self.assertEqual(direct_size(resolution)[0] % FRAME_WIDTH_ALIGNMENT, 0)
 
     def test_a_grey_frame_keeps_the_full_width(self) -> None:

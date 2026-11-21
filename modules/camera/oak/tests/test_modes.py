@@ -15,6 +15,10 @@ class SensorModeTest(unittest.TestCase):
     def test_mono_falls_back_from_a_color_only_label(self) -> None:
         self.assertEqual(mono_mode(CameraResolution.P1080), mono_mode(CameraResolution.P800))
 
+    def test_every_color_label_has_its_mode(self) -> None:
+        for label in CameraResolution:
+            self.assertIsNotNone(color_mode(label))
+
 
 if __name__ == '__main__':
     unittest.main()

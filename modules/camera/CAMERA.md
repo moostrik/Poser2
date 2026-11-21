@@ -54,10 +54,11 @@ because `modules/pose` has a `resolution` of its own and the apps import both.
 | `P720`  | 1280 x 720  | both                                                   |
 | `P800`  | 1280 x 800  | both; the OV9282 W's full readout                      |
 | `P1080` | 1920 x 1072 | color only; 1080 cropped to the warp's alignment of 16 |
+| `P2160` | 3840 x 2160 | color only, the 4K mode; on the OAK4 USB only           |
 
 Both sensors have `THE_720_P` and `THE_800_P` in depthai 2.30, which lets one label span them; mono also has 400,
-480 and 1200 rows (the last for AR0234-class sensors) and color 4K upward, none offered until something needs
-them. A mono camera asked for `P1080` runs `P800` and says so once.
+480 and 1200 rows (the last for AR0234-class sensors) and color modes above 4K, none offered until something needs
+them. A mono camera asked for `P1080` or `P2160` runs `P800` and says so once.
 
 The delivered frame's height is derived, not set: its rows are tangents of elevation ([the rows](#the-rows)),
 which spend rows at the top, so a tilted camera's full reach needs more rows than the sensor has: 1152 at `P800`

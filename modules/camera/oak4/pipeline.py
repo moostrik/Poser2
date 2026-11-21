@@ -42,8 +42,8 @@ class MountConfig:
 
 @dataclass
 class PipelineOutputs:
-    """The pipeline's outputs and inputs the host reads and writes; `flip_on_host`: the host mirrors what the camera
-    delivers, frames and boxes alike."""
+    """The pipeline's outputs and inputs the host reads and writes; `flip_h_on_host` and `flip_v_on_host`: the flips
+    the camera leaves to the frame's flags, for its frames and boxes alike (a color frame's; the grey warp flips)."""
     video: dai.Node.Output
     control: dai.Node.Input
     imu: dai.Node.Output
@@ -52,7 +52,8 @@ class PipelineOutputs:
     poses: dai.Node.Output | None = None
     depth: dai.Node.Output | None = None
     depth_config: dai.Node.Input | None = None
-    flip_on_host: bool = False
+    flip_h_on_host: bool = False
+    flip_v_on_host: bool = False
 
 
 def delivered_size(color: bool, resolution: CameraResolution, frame_height: int = 0) -> tuple[int, int]:
@@ -82,8 +83,6 @@ def build_pipeline(
     camera: dai.node.Camera = pipeline.create(dai.node.Camera).build(SENSOR_SOCKET)
     frames: dai.Node.Output
     if color:
-        if mount.flip_v:
-            logger.warning('flip_v is ignored: a color frame is only mirrored left to right')
         frames = camera.requestOutput(out_size, dai.ImgFrame.Type.NV12, dai.ImgResizeMode.CROP, fps=fps, enableUndistortion=True)
     else:
         frames = add_warp(pipeline, camera.requestOutput(src_size, dai.ImgFrame.Type.GRAY8, fps=fps), src_size, out_size, mount)
@@ -99,7 +98,8 @@ def build_pipeline(
     if depth_model != DepthModel.OFF:
         depth, depth_config = add_depth(pipeline, fps, depth_model)
     return PipelineOutputs(video=frames, control=camera.inputControl, imu=imu, system=add_system_logger(pipeline),
-                           tracklets=tracklets, poses=poses, depth=depth, depth_config=depth_config, flip_on_host=color and mount.flip_h)
+                           tracklets=tracklets, poses=poses, depth=depth, depth_config=depth_config,
+                           flip_h_on_host=color and mount.flip_h, flip_v_on_host=color and mount.flip_v)
 
 
 def add_warp(pipeline: dai.Pipeline, source: dai.Node.Output, src_size: tuple[int, int],
