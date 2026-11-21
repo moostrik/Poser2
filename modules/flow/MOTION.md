@@ -38,29 +38,35 @@ displacement, and each measurement only corrects them (an alpha–beta filter) o
 rest and shortens as x/y moves. The steps, in the order they run, each with its settings; the panel holds
 them in that order, a line each for the surface, the smoothing and the cut:
 
-| Step            | Settings                                | What it does                                                                   |
-|-----------------|-----------------------------------------|--------------------------------------------------------------------------------|
-| step filter     | `edge`                                  | no depth where 3 × 3 samples span a step past `edge`, the silhouette's flicker |
-| window          | `window`, `edge`                        | the mean disparity of the samples within `edge` of the pixel's depth           |
-| another surface | `max_speed`                             | the track starts over where the depth jumps or slides faster than a body moves |
-| smoothing       | `smooth`, `rest_speed`, `halving_speed` | the time the track follows over, long at rest, short as x/y or the track moves |
-| dead zone       | `dead_zone`                             | z 0 while the depth stays within it of its anchor; 0 by default                |
-| cut             | `threshold`                             | z below it is noise, taken off                                                 |
+| Step        | Settings                                | What it does                                                                   |
+|-------------|-----------------------------------------|--------------------------------------------------------------------------------|
+| step filter | `edge`                                  | no depth where 3 × 3 samples span a step past `edge`, the silhouette's flicker |
+| window      | `window`, `edge`                        | the mean disparity of the measured samples within `edge` of the pixel's depth  |
+| gate        | `max_speed`, `depth_noise`              | a measurement past a body's motion and its noise is a miss; two start over     |
+| smoothing   | `smooth`, `rest_speed`, `halving_speed` | the time the track follows over, long at rest, short as x/y or the track moves |
+| dead zone   | `dead_zone`                             | z 0 while the depth stays within it of its anchor; 0 by default                |
+| cut         | `threshold`                             | z below it is noise, taken off                                                 |
 
 The parts:
 
-| Part        | How                                                                                                                  | Why                                                                |
-|-------------|----------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------|
-| disparity   | the track holds 1 / depth                                                                                            | stereo noise is about constant in disparity                        |
-| measurement | the mean disparity of the window's samples within `edge`, by their share                                             | a thin window at a silhouette corrects little                      |
-| carry       | from where the pixel was a displacement back, the texels within `max_speed` × the frame's time of the measurement    | a sliding surface keeps its depth; nothing crosses another surface |
-| restart     | a miss past `max_speed` × the frame's time, or a filtered rate past `max_speed`                                      | a limb passing; a sloped edge sliding off adds up to 9–11 m/s      |
-| the time    | `smooth` over 1 + speed / `halving_speed`, the 1€ filter's rule, the speed the larger of x/y's and the track's own z | quiet at rest, little lag in a motion, no coast at a stop          |
-| `dead_zone` | an anchor: z is 0 within it, past it z is whole; 0 by default                                                        | a surface's depth wanders by a few mm, unsmoothed                  |
+| Part        | How                                                                                                                  | Why                                                                     |
+|-------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------|
+| disparity   | the track holds 1 / depth                                                                                            | stereo noise is about constant in disparity                             |
+| measurement | the mean disparity of the window's measured samples within `edge`, by their share; filled depth left out             | a thin window at a silhouette corrects little; a guess corrects nothing |
+| noise       | a sample's σ `depth_noise` over its confidence squared, the mean's the root of their squares' sum over their count   | the camera says where it is unsure; a mean is surer than a sample       |
+| gate        | `max_speed` × the frame's time as disparity at the depth, plus 3 σ of the mean                                       | a tracker's validation gate (Bar-Shalom): motion plus noise             |
+| carry       | from where the pixel was a displacement back, the texels within the gate; none: the nearest, a miss                  | a sliding surface keeps its depth; nothing crosses another surface      |
+| miss        | a measurement outside the gate, or none: the track predicts on uncorrected; a second in a row starts it over         | one noisy frame does not throw the track away ("M of N")                |
+| restart     | a second miss, or a filtered rate past `max_speed`                                                                   | a limb passing; a sloped edge sliding off adds up to 9–11 m/s           |
+| the time    | `smooth` over 1 + speed / `halving_speed`, the 1€ filter's rule, the speed the larger of x/y's and the track's own z | quiet at rest, little lag in a motion, no coast at a stop               |
+| `dead_zone` | an anchor: z is 0 within it, past it z is whole; 0 by default                                                        | a surface's depth wanders by a few mm, unsmoothed                       |
 
-Within a frame `edge` tells two surfaces apart, between frames `max_speed`: a body moves at most `max_speed` ×
-the frame's time (12 cm at 50 fps), so a depth further from the prediction is another surface, and a filtered
-rate past it is a surface sliding away (each step small against the prediction). 0 checks neither. The time is
+Within a frame `edge` tells two surfaces apart, between frames the gate: a body moves at most `max_speed` ×
+the frame's time (12 cm at 50 fps), and the measurement is off by its noise, so a depth further from the
+prediction than both is a miss, and the second in a row another surface; a filtered rate past `max_speed` is a
+surface sliding away (each step small against the prediction). The gate is in disparity, where stereo noise is
+about constant, so it holds at any distance; the confidence widens it where the camera is unsure. The misses in a
+row sit beside the track, a second target of the same pass. 0 `max_speed` gates nothing. The time is
 the 1€ filter's (Casiez, Roussel, Vogel 2012), opened by the larger of x/y's speed and the track's own: x/y's is
 the largest displacement of the 3 × 3 texels, the track's its carried rate as z in px per frame, the filter's
 estimate as in the original, not the measurement, so z's noise does not open it; `rest_speed` comes off the speed,
@@ -68,7 +74,7 @@ so x/y's noise at rest opens nothing. x/y's opens it as a motion starts, the tra
 estimate has followed the stop; 0 `halving_speed` is `smooth` throughout. With `smooth` above 0 the carry takes each texel's depth a frame
 on by its rate. The anchor follows z past the dead zone, so a motion loses only its first `dead_zone`; with z
 smoothed it costs z and lag and adds no quiet, so it is 0 by default. The step filter is `DepthStepFilter`. z
-comes in view widths per frame, over the metres one view width spans at the depth (`view_span` per metre), and
+comes in view widths per frame, over the meters one view width spans at the depth (`view_span` per meter), and
 `threshold` comes off it. With `smooth` 0 and a full window it is the plain change between two frames.
 
 ### The 3D velocity
@@ -78,7 +84,7 @@ per second, times `x_gain`, `y_gain`, `z_gain`, gated as below. The tracks are c
 solved, before `xy.threshold`: a slide too slow for the output still moves them, or on a slope it would read
 as z. With `smooth_like_z`, x/y goes through z's filter over z's `smooth`, so both lag alike: a displacement is a step
 of position, so with a steady frame interval and a full z window x/y answers a change of speed exactly as z does. The settings in flow
-pixels go with the flow's resolution; those in metres and milliseconds do not.
+pixels go with the flow's resolution; those in meters and milliseconds do not.
 
 ### The 2D velocity
 
@@ -106,7 +112,7 @@ the stamp of the frame it drew, so the app reads it off the layer it takes the t
 [FLOW.md's two clocks](FLOW.md#inputs-and-outputs).
 
 `DepthView(texture, view_span, depth_step)` (`modules/flow/motion/depth_view.py`) is the depth on
-the flow's view: the texture, the metres one view width spans per metre of depth, and the uv
+the flow's view: the texture, the meters one view width spans per meter of depth, and the uv
 between two depth samples. The view stage makes it (`ViewOutput.depth`): the depth read into the
 view's crop across a surface, the `view_span` from the crop and the camera's horizontal field of
 view it takes at construction, and the `depth_step` from the aligned depth's grid and the crop
@@ -187,6 +193,7 @@ larger on show). A level doubles the motion the solve follows, about 2 × 2^(lev
 |---------------|--------------|-----------------|-----|---------------------------------------|
 | edge          | 0.1 m        | 0.05–0.3 (0.01) | A   | the edge noise 40% below 0.3 m        |
 | window        | 7×7          | 1×1–9×9         | A   | the edge noise a quarter of 1×1       |
+| depth_noise   | 10 mm at 1 m | 1–50 (0.5)      | C7  | the floor's still noise at 1.25 m     |
 | max_speed     | 6 m/s        | 0–20 (0.5)      | A   | without it a sliding arm's z 2.5×     |
 | smooth        | 100 ms       | 0–500 (1)       | A   | the still z noise 31× below the raw   |
 | rest_speed    | 0.5 px/frame | 0–5 (0.05)      | A   | above x/y's noise at rest             |
@@ -425,6 +432,24 @@ larger on show). A level doubles the motion the solve follows, about 2 × 2^(lev
   `levels` 5 finds a fast x/y that 4 misses (kept past the raw row's); for z it gains 1 ms since C5, and its
   stop on hands is later, not explained yet. `threshold` 1 quarters z's still noise for 3% of z.
 
+- The depth's confidence, C6 (each window sample weighted by it, tried and undone) and C7 (the gate), a result,
+  2026-11-21, one run on `measure_confidence` (crop far 1.7 m, the floor in the mask, the settings file's values),
+  as used / thresholds 0; C6 at 7e7aa395, C7 at its commit, one miss a run with the constant at 1. Restarts and
+  coasting in % of the core's tracks a frame, lag against the raw row, stop the ms after a move's end:
+
+  | Row               | restarts rest / moving | coasting rest / moving | z noise edge | z kept      | z lag     | z stop  |
+  |-------------------|------------------------|------------------------|--------------|-------------|-----------|---------|
+  | old gate (C6 off) | 0.041 / 0.152          |                        | 1.03 / 1.53  | .757 / .806 | 0.3 / 0.4 | 32 / 51 |
+  | C6 weights on     | 0.039 / 0.126          |                        | 0.92 / 1.42  | .737 / .787 | 0.8 / 1.0 | 55 / 83 |
+  | C7, 1 miss        | 0.026 / 0.117          |                        | 0.98 / 1.48  | .763 / .813 | 0.3 / 0.5 | 28 / 32 |
+  | C7, 2 misses      | 0.008 / 0.098          | 0.015 / 0.038          | 0.99 / 1.49  | .763 / .812 | 0.5 / 0.6 | 28 / 51 |
+
+  z's still noise inside is the same in every row (0.40 / 0.90), as are x/y's values. C6's weights left the filled
+  edge of a moving silhouette at weight 0, coasting on its rate past the stop **(deduction)**. The gate in
+  disparity with filled depth out of the window restarts a third less at rest and stops sooner; the second miss
+  takes four in five restarts at rest away, for 0.15 ms of lag. The floor's depth spread at rest, 10.4 mm over
+  the depth squared, is the player's at full confidence (10 mm), 12.6 mm at confidence 0.8–0.95 and 24 under 0.8.
+
 Beside the velocity the 3D motion hands out where the body is now in the box's depth, `z_position`
 (`ZPosition`): from the depth track's disparity, (depth − near) / (far − near) over the player's depth
 range, the depth source's `near` and `far` (`DepthView`), 0 front to 1 back, times its weight in red and
@@ -451,10 +476,10 @@ memories set a non-finite value to 0 and count it into the motion's `FiniteGuard
 Measured in a hidden window at 448 × 800, 40 frames at 25 fps: a NaN mask over 200 × 200 px gave
 1 000 000 non-finite velocity values in the first second, zeroed, the velocity finite after; the x/y
 filter's memory filled with NaN, 358 400 displacement values once, every pixel, and the filter went on
-from 0. z's memory filled with NaN was counted 0 times and the velocity stayed finite: the carry takes
-a track's texel only within `max_speed` × the frame's time of the measurement, a comparison a NaN fails, so the
-track starts over and the NaN is gone without a non-finite value written (with `max_speed` 0 the carry takes
-every texel, so the guard counts it).
+from 0. z's memory filled with NaN was counted 0 times and the velocity stayed finite (before C7): the carry
+took a track's texel only within the gate, a comparison a NaN fails, so the track started over. Since C7 a carry
+with no texel in the gate takes the nearest one as a miss, so a NaN track coasts a frame and the guard counts it
+**(deduction, not measured again)**.
 
 ## Debugging a solve
 

@@ -137,7 +137,7 @@ class LucasKanadeFlow3D:
         """Measure between the newest two frames.
 
         Args:
-            depth: Meters in red, the camera's confidence in green (each depth sample weighted by it); None without depth (z is 0)
+            depth: Meters in red, the camera's confidence in green (it sizes z's gate); None without depth (z is 0)
             delta_time: Seconds since the previous frame
             view_span: Metres one view width spans per metre of depth, for z
             depth_step: uv between two depth samples in the flow's view, for z
@@ -160,7 +160,7 @@ class LucasKanadeFlow3D:
         if depth is not None:
             self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, z_s.window, z_s.smooth, z_s.halving_speed,
                                               z_s.rest_speed, z_s.threshold, z_s.edge, z_s.dead_zone, solved, z_s.max_speed,
-                                              self._slot('depth_velocity', guarded), z_s.weighted)
+                                              self._slot('depth_velocity', guarded), z_s.depth_noise / 1000.0)
 
         xy: Texture = self._flow.displacement
         if s.smooth_like_z:

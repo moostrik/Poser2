@@ -14,6 +14,7 @@ layout(binding = 1) uniform sampler2D estimate;     // the depth velocity's: z (
 layout(binding = 2) uniform sampler2D before;       // the estimate the frame before
 layout(binding = 3) uniform sampler2D z_position;   // its weight in green
 layout(binding = 4) uniform sampler2D regions;      // the bits above, over 255 (R8)
+layout(binding = 5) uniform sampler2D misses;       // the depth velocity's misses in a row
 
 layout(std430, binding = 0) writeonly buffer Partials { float uPartials[]; };   // SUMS a workgroup
 layout(std430, binding = 1) buffer Histograms { uint uHistograms[]; };          // HISTOGRAMS × BINS
@@ -23,7 +24,7 @@ uniform float width;         // px a view width
 uniform bool still;          // the frame is in the still part: its histograms filled
 uniform bool weighed;        // z_position bound
 
-const int SUMS = 12;
+const int SUMS = 13;
 const int BINS = 4096;
 const float BIN = 1.0 / 128.0;                       // px per frame a bin; the last holds all past it
 
@@ -62,6 +63,7 @@ void main() {
                 sums[9] += 1.0;
                 if (track.b == 0.0 && track.g > 0.0) sums[10] += 1.0;     // that now has no rate: it started over
             }
+            if (texelFetch(misses, at, 0).r > 0.0) sums[12] += 1.0;       // coasting through a miss
         }
         if (moving) {
             sums[4] += 1.0;

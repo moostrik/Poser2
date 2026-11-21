@@ -13,7 +13,7 @@ from OpenGL.GL import (GL_DYNAMIC_READ, GL_R8, GL_SHADER_STORAGE_BARRIER_BIT, GL
 
 from modules.gl import ComputeShader, Texture
 
-SUMS: int = 12
+SUMS: int = 13
 BINS: int = 4096
 BIN: float = 1.0 / 128.0           # px per frame a bin
 HISTOGRAMS: tuple[str, ...] = ('xy inside', 'xy edge', 'z inside', 'z edge', 'z table')
@@ -80,10 +80,10 @@ class MeasureSums(ComputeShader):
     """The sums of one side's frame into its `SideSums` (one program for every side)."""
 
     def use(self, buffers: SideSums, velocity: Texture, estimate: Texture, before: Texture, z_position: Texture | None,
-            regions: Texture, to_px: tuple[float, float, float], width: float, still: bool) -> np.ndarray:
+            regions: Texture, misses: Texture, to_px: tuple[float, float, float], width: float, still: bool) -> np.ndarray:
         """Sum one frame; the frame's sums (SUMS), the workgroups' added."""
         glUseProgram(self.shader_program)
-        for unit, texture in enumerate((velocity, estimate, before, z_position, regions)):
+        for unit, texture in enumerate((velocity, estimate, before, z_position, regions, misses)):
             glActiveTexture(int(GL_TEXTURE0) + unit)
             glBindTexture(GL_TEXTURE_2D, texture.tex_id if texture is not None else 0)
         glUniform3f(self.get_uniform_loc('to_px'), *to_px)

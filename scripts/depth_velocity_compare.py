@@ -22,7 +22,7 @@ rises above the still part's for a while, and a move's fast half is where it ste
 Each loop prints, for A and B, in the still part: x/y and z as the fluid gets them, at the edge (0–6
 px inside the mask) and inside (12 px and more), and z on the table (outside, 16 px and more); per
 move, the body's x/y and z in its slow and fast half and fast over slow, how its z follows its real
-depth change, and the frames x/y takes to stop after it; the restarts of the depth velocity, and the
+depth change, and the frames x/y takes to stop after it; the restarts of the depth velocity and its coasting, and the
 flow's time on the GPU per frame; then the one results table's row (`ROW`), with the share of the mask
 without a z position and the mask's fit to the image's edges. `--fast` runs one loop without the window, as fast as it goes;
 with `--fast`, several captures, `--side NAME:PATH=VALUE,...` or `--out FILE` measure every side on every capture
@@ -335,6 +335,7 @@ class Measures:
         self.body_depth: list[float] = []
         self.times: list[float] = []
         self.restarts: dict[str, list[float]] = {'still': [], 'moving': []}
+        self.coasting: dict[str, list[float]] = {'still': [], 'moving': []}     # the core's share coasting through a miss
         self.milliseconds: list[float] = []
         self.fluid_z: list[float] = []           # z as the fluid gets it, inside, px per frame
         self.signed_z: list[float] = []          # the same with its sign, over the pixels that move in the loop: the pixels' noise cancels, the moving part's z stays
@@ -352,6 +353,8 @@ class Measures:
             self.fit.append(regions['fit'])
         if segment and held > 0:
             self.restarts['still' if segment == 'still' else 'moving'].append(sums[10] / held)
+        if segment and core > 0:
+            self.coasting['still' if segment == 'still' else 'moving'].append(sums[12] / core)
         self.milliseconds.append(milliseconds)
         self.times.append(t)
         self.segments.append(segment)
@@ -365,11 +368,12 @@ class Measures:
 
     def add(self, t: float, segment: str, xy: np.ndarray, track: np.ndarray, z: np.ndarray, depth: np.ndarray, mask: np.ndarray,
             moved: np.ndarray, milliseconds: float, weight: np.ndarray | None = None,
-            luminance: np.ndarray | None = None, signed_z: np.ndarray | None = None, regions: dict | None = None) -> None:
+            luminance: np.ndarray | None = None, signed_z: np.ndarray | None = None, regions: dict | None = None,
+            misses: np.ndarray | None = None) -> None:
         """`xy` and `z` are as the fluid gets them, in px per frame; `track` is the depth velocity's state; `mask`
         the player's pixels (the mask above 0.5); `moved` the pixels that move in the loop; `weight` the z
         position's, 0 where the motion has no depth for a pixel; `luminance` for the mask's fit to the image's
-        edges."""
+        edges; `misses` the depth velocity's misses in a row."""
         if segment and weight is not None and mask.any():
             self.without_z.append(float(np.mean(weight[mask] <= 0.0)))
         if regions is None:
@@ -384,6 +388,8 @@ class Measures:
                 restarted = float(np.mean((track[..., 2] == 0.0)[held] & (track[..., 1][held] > 0)))
                 self.restarts['still' if segment == 'still' else 'moving'].append(restarted)
         self._before = track
+        if misses is not None and segment and core.any():
+            self.coasting['still' if segment == 'still' else 'moving'].append(float(np.mean(misses[core] > 0.0)))
         self.milliseconds.append(milliseconds)
         self.times.append(t)
         self.segments.append(segment)
@@ -436,6 +442,7 @@ class Measures:
                          f'z {halves(body_z, slow, fast)}, moving {halves(moving_z, slow, fast)}, real {halves(real, slow, fast)} | '
                          f'z/real {np.dot(z, r) / max(np.dot(r, r), 1e-12):.2f} (corr {np.corrcoef(z, r)[0, 1]:.2f}) | {stop}')
         lines.append('restarts ' + ', '.join(f'{name} {np.mean(v) * 100:.2f}%' for name, v in self.restarts.items() if v))
+        lines.append('coasting ' + ', '.join(f'{name} {np.mean(v) * 100:.2f}%' for name, v in self.coasting.items() if v))
         lines.append(f'{np.median(self.milliseconds):.2f} ms per frame')
         lines.append(self.row(segments))
         return '\n    '.join([' | '.join(lines[:5])] + lines[5:])
@@ -484,6 +491,8 @@ class Measures:
             result['z/real'] = result['z corr'] = float('nan')
         for name, shares in self.restarts.items():
             result[f'restarts {name}'] = float(np.mean(shares)) * 100.0 if shares else float('nan')     # % of the core's tracks
+        for name, shares in self.coasting.items():
+            result[f'coasting {name}'] = float(np.mean(shares)) * 100.0 if shares else float('nan')     # % of the core
         result['no z position'] = float(np.mean(self.without_z)) if self.without_z else float('nan')
         result['fit'] = float(np.mean(self.fit)) if self.fit else float('nan')
         result['ms'] = float(np.median(self.milliseconds))
@@ -625,6 +634,7 @@ class Side:
 COLUMNS: tuple[str, ...] = ('xy noise', 'xy slow', 'xy fast', 'xy fast/noise', 'xy kept', 'xy lag', 'xy stop', 'xy noise edge',
                             'z noise', 'z slow', 'z fast', 'z fast/noise', 'z kept', 'z lag', 'z stop', 'z noise edge',
                             'z part still', 'z part fast', 'z/real', 'z corr', 'restarts still', 'restarts moving',
+                            'coasting still', 'coasting moving',
                             'no z position', 'fit', 'ms')
 
 
@@ -674,7 +684,7 @@ def measure(captures: list[Path], specs: list[tuple[str, dict[str, object]]], ou
                 first = side is sides[0] and weighed                  # the z position's weight is the view's, the first side's
                 estimate = cast(SwapFbo, side.flow.depth_velocity.difference)      # its front and back
                 sums = summer.use(sums_of, side.flow.velocity, estimate, estimate.back, side.flow.z_position if first else None,
-                                  region_texture, to_px, float(w), segment == 'still')
+                                  region_texture, side.flow.depth_velocity.misses, to_px, float(w), segment == 'still')
                 side.measures.add_sums(float(frames.t[k]), segment, sums, regions, milliseconds, first)
         for side, sums_of in zip(sides, buffers):
             side.measures.histograms = sums_of.histograms()
@@ -814,8 +824,9 @@ def main() -> int:
             z = side.z_px(velocity, frames.calls[k]['delta_time'], w)       # as the fluid gets it: weighted by the mask
             track = read_back(side.flow.depth_velocity.difference)
             weight = read_back(side.flow.z_position)[..., 1] if 'depth_range' in frames.calls[k] else None
+            misses = read_back(side.flow.depth_velocity.misses)[..., 0]
             side.measures.add(float(frames.t[k]), segment, xy, track, z, depth, mask, frames.moved, milliseconds,
-                              weight, lum)
+                              weight, lum, misses=misses)
 
         if not args.fast:
             shown = [side.show(controls['view'], depth_texture, controls['scale'], w) for side in sides]
