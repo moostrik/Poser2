@@ -1,5 +1,5 @@
-"""The clip player of the sphere: one pool of clips for the 48 cells of the two walls, each cell playing
-on its own thread, into the walls it is handed (`Wall`, the render's `WallCompositor`s, shown in SMILE's windows 1
+"""The clip player of the sphere: one pool of clips for the 48 cells of the two walls, the cells playing
+from one thread (`ClipCells`), into the walls it is handed (`Wall`, the render's `WallCompositor`s, shown in SMILE's windows 1
 and 2). No window and no OSC in here but the `/bang` to the Max patch; SMILE's laughter test and scrolling name call
 `light` and `scroll_loop` directly."""
 
@@ -16,7 +16,7 @@ from modules import video
 
 from .. import sphere
 from ..credit import CreditLines
-from .clip_loader import ClipLoader
+from .clip_cells import ClipCell, ClipCells
 from .clip_pool import Clip, ClipPool, next_start
 from .folder_scanner import FolderScanner
 from .settings import WallsSettings
@@ -76,13 +76,9 @@ class Player:
         self.pool: ClipPool = ClipPool(pool_size, cell_size, decoder, recent)
         self.scanner: FolderScanner = FolderScanner(os.path.join(root, 'grins'), self.pool, pool_size, recent, float(settings.recycle_every))
 
-        self.loaders: list[ClipLoader] = []
-        for id in ids:
-            wall, cell = divmod(id, CELLS)
-            loader = ClipLoader(id, self.pool, settings, sphere.sector_of_cell(wall, cell))
-            loader.add_image_callback(self._on_image)
-            loader.add_loader_callback(self._on_play)
-            self.loaders.append(loader)
+        self.cells: ClipCells = ClipCells([(id, sphere.sector_of_cell(*divmod(id, CELLS))) for id in ids], self.pool, settings)
+        self.cells.add_image_callback(self._on_image)
+        self.cells.add_play_callback(self._on_play)
 
         # a log line every STATS_INTERVAL: frames delivered per cell, clips in the pool
         self._frames: int = 0
@@ -99,8 +95,7 @@ class Player:
     def start(self) -> None:
         self.pool.start()
         self.scanner.start()
-        for l in self.loaders:
-            l.start()
+        self.cells.start()
         for osc in self.osc:
             osc.start()
         self._stats_thread.start()
@@ -110,19 +105,19 @@ class Player:
     def _start_loop(self) -> None:
         """Give every cell its first clip: each clip as it is loaded, in a random cell. With fewer
         clips than cells, go round the loaded clips again, START_DELAY apart."""
-        empty: list[ClipLoader] = list(self.loaders)
+        empty: list[ClipCell] = list(self.cells.cells.values())
         random.shuffle(empty)
         started: set[str] = set()
         last_start: float = 0.0
         while empty and not self._stats_stop.is_set():
             clip: Clip | None = next_start(self.pool.clips(), started)
             if clip is not None and (not started or time.perf_counter() - last_start >= MIN_START_GAP):
-                loader: ClipLoader = empty.pop()
-                self.pool.use(clip, loader.sector)
-                loader.assign(clip)
+                cell: ClipCell = empty.pop()
+                self.pool.use(clip, cell.sector)
+                self.cells.assign(cell.id, clip)
                 started.add(clip.id)
                 last_start = time.perf_counter()
-                logger.info('Cell %d of %d starts on %s', len(self.loaders) - len(empty), len(self.loaders), clip.id)
+                logger.info('Cell %d of %d starts on %s', len(self.cells.cells) - len(empty), len(self.cells.cells), clip.id)
                 continue
             if clip is None and started and self.pool.idle and time.perf_counter() - last_start >= START_DELAY:
                 started.clear()     # every loaded clip has started a cell: round again from the first
@@ -136,8 +131,8 @@ class Player:
         self._stats_stop.set()
         for osc in self.osc:
             osc.stop()
-        for l in self.loaders:
-            l.stop()
+        self._start_thread.join()
+        self.cells.stop()
         self.scanner.stop()
         self.pool.stop()
 
@@ -147,7 +142,7 @@ class Player:
                 frames, self._frames = self._frames, 0
             shown, most = self.pool.spread()
             logger.info('%.1f frames/s per cell, %d clips on %d cells: %d shown, most %dx',
-                        frames / STATS_INTERVAL / len(self.loaders), len(self.pool), len(self.loaders), shown, most)
+                        frames / STATS_INTERVAL / len(self.cells.cells), len(self.pool), len(self.cells.cells), shown, most)
 
     def is_running(self) -> bool:
         return self._running
@@ -168,7 +163,7 @@ class Player:
         if self.walls[wall].scroll_loop(word, speed, gap, size, ring, started, list(cells), last):
             logger.info('Scrolling name %s going round over wall %d cells %s', word, wall + 1, ', '.join(f'{cell}@{place}' for cell, place in cells))
 
-    # THE LOADERS' THREADS
+    # THE CELLS' THREAD
     def _on_image(self, id: int, image: np.ndarray, initial: bool) -> None:
         wall, cell = self._place(id)
         self.walls[wall].set_image(cell, image, initial)

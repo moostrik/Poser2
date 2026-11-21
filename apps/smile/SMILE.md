@@ -248,7 +248,7 @@ must be on the PATH: the gyan.dev full build); the encoder is picked at startup 
 those processes any other way: the apps run under pythonw, so they need `CREATE_NO_WINDOW` and no
 inherited handles. The clip player (`player/`: `Player`, one for the sphere, started and stopped by `Main`) decodes each of the newest clips once into RAM
 (`ClipPool`, 512x640, about 200 MB per clip) and plays from memory on the 48 cells of the two walls (`sphere.CELLS` each, cell ids
-0-47, wall = id // 24; the loaders feed the `Wall`s it is handed, `set_image`, and bang Max on 4115 for wall 0, 4116 for wall 1); the Walls tab
+0-47, wall = id // 24; `ClipCells` plays them all from one thread, each cell on its own clock, and feeds the `Wall`s it is handed, `set_image`, and bang Max on 4115 for wall 0, 4116 for wall 1); the Walls tab
 (`player/settings.py`) has `pool` the clips kept, `recent`, `recycle_every` and `hwaccel` (read at the start), `fps` the playback
 speed (default 20, 0 = the clip's own rate), `spread` a random speed difference per play so the cells drift apart (default 0.1), `trail` a blend
 with the previous output (default 0: none), read at every play or frame.
