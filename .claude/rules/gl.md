@@ -28,6 +28,7 @@ paths:
 - All OpenGL calls execute on the main thread, in the window loop
 - Create textures, FBOs and shaders at setup or on a resize, not per frame
 - Pair every creation with its destruction
+- A texture, framebuffer or buffer is made by one of gl's classes
 - Set the GL state a draw needs where it draws (blend, depth, viewport)
 - Change the blend state only through `BlendState`, which keeps it without `glGet*`
 - Prefer not to read back from the GPU or wait on it inside a frame
