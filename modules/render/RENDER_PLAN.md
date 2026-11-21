@@ -13,9 +13,6 @@ The pixel buffer and fence code of `general/screen_recording` is not in this pla
 
 ## A. Code that does the same, written once
 
-- **A1** `ScreenCapture` hands its frames out through a `utils.Broadcast`, which replaces `_callbacks`, `_callback_lock` and the copy in `poll`. With no callback registered, the frame is released at once, as now.
-  - Why: a hand-rolled callback list, where one failing callback stops the ones after it (seen).
-  - Check: `modules/render/tests` and a short screen recording take in deep_flow -sim.
 - **A2** One layer for an image taken from the board replaces the copied update in `CameraImageLayer`, `CropImageLayer`, `SegmentationMaskLayer` and `SegmentationForegroundLayer`. It is built with the board read it shows (a callable) and its texture's wrap and border. It caches the read, clears on lost, keeps the stream (`record_stream`), uploads, and keeps the `timestamp` where the read has one. The four class names go: one class takes the read, and four snake_case builder functions in render's `modules/camera` and `modules/inference` (`camera_image_layer(cam_id, board)`, `crop_image_layer`, `segmentation_mask_layer`, `segmentation_foreground_layer`) build it, so the call sites stay readable. `InferenceFrameImageLayer` and `InferenceFrameDepthLayer` keep their own shape: they are handed a frame and tell it by its timestamp.
   - Why: the four repeat one update, and the mask and foreground layers differ only in the field they read and their border (seen).
   - Call sites: the four apps' renders (all use the camera image and crops; hd_trio also uses the mask and foreground) and `PoseCompositor`.

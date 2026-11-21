@@ -20,7 +20,7 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER,
                        glClear, glClearColor, glPixelStorei, glReadPixels)
 
 from modules.gl import BlendState, Fbo, PixelBufferPool
-from modules.utils import fill, fit
+from modules.utils import Broadcast, fill, fit
 from modules.video import BitDepth, Chroma, ScreenFormat, ScreenFrame, ScreenFrameCallback
 
 from .shaders import RgbToYuv, YuvPlane
@@ -79,8 +79,7 @@ class ScreenCapture:
         self._free: deque[int] = deque()
         self._lent: int = 0
         self._skipped: int = 0                      # ticks left out since the last frame went out
-        self._callbacks: list[ScreenFrameCallback] = []
-        self._callback_lock: Lock = Lock()
+        self._callbacks: Broadcast[ScreenFrame] = Broadcast(name="screen frame")
 
     @property
     def allocated(self) -> bool:
@@ -101,14 +100,10 @@ class ScreenCapture:
             return self._lent > 0 or bool(self._in_flight)
 
     def add_screen_frame_callback(self, callback: ScreenFrameCallback) -> None:
-        with self._callback_lock:
-            if callback not in self._callbacks:
-                self._callbacks.append(callback)
+        self._callbacks.add_callback(callback)
 
     def remove_screen_frame_callback(self, callback: ScreenFrameCallback) -> None:
-        with self._callback_lock:
-            if callback in self._callbacks:
-                self._callbacks.remove(callback)
+        self._callbacks.remove_callback(callback)
 
     # MAIN THREAD
 
@@ -204,12 +199,10 @@ class ScreenCapture:
             with self._lock:
                 self._lent += 1
             frame = ScreenFrame(self._arrays[buffer], timestamp, skipped, partial(self._give_back, buffer))
-            with self._callback_lock:
-                callbacks = list(self._callbacks)
-            if not callbacks:
+            if self._callbacks:
+                self._callbacks(frame)
+            else:
                 frame.release()
-            for callback in callbacks:
-                callback(frame)
 
     # ANY THREAD
 
