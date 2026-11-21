@@ -41,7 +41,7 @@ class InjectBinary3D(ComputeShader):
         input_2d.bind(0)
 
         # Bind 3D volume as read-write image (R8 format)
-        self.bind_image_3d_readwrite(0, volume, GL_R8)
+        self.bind_image_readwrite(0, volume, GL_R8)
 
         # Uniforms
         glUniform3i(self.get_uniform_loc("uSize"),

@@ -52,7 +52,7 @@ class Inject3D(ComputeShader):
         input_2d.bind(0)
 
         # Bind 3D volume as read-write image
-        self.bind_image_3d_readwrite(0, volume, internal_format)
+        self.bind_image_readwrite(0, volume, internal_format)
 
         # Uniforms
         bind_z_position(self, 1, z_position)

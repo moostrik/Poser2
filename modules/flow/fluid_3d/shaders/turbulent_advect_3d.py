@@ -27,7 +27,7 @@ class TurbulentAdvect3D(ComputeShader):
         noise.bind(4)
         displacement_a.bind(5)
         displacement_b.bind(6)
-        self.bind_image_3d_write(0, result, GL_R16F)
+        self.bind_image_write(0, result, GL_R16F)
         glUniform1f(self.get_uniform_loc("uTimestep"), timestep)
         glUniform3f(self.get_uniform_loc("uRdx"), *rdx)
         glUniform3f(self.get_uniform_loc("uExtent"), *extent)

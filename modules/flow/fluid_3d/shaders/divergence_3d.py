@@ -45,5 +45,5 @@ class Divergence3D(ComputeShader):
             glUniform1f(self.get_uniform_loc('uExpansionRate'), rate)
             if mean is not None:
                 mean.bind_base(1)
-        self.bind_image_3d_write(0, divergence_out, GL_R16F)
+        self.bind_image_write(0, divergence_out, GL_R16F)
         self.dispatch(*cells)

@@ -17,8 +17,8 @@ class Prolong3D(ComputeShader):
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
-        self.bind_image_3d_read(1, coarse, GL_R32F)
-        self.bind_image_3d_readwrite(0, fine, GL_R32F)
+        self.bind_image_read(1, coarse, GL_R32F)
+        self.bind_image_readwrite(0, fine, GL_R32F)
         glUniform3i(self.get_uniform_loc("uFineSize"), fine.width, fine.height, fine.depth)
         glUniform3i(self.get_uniform_loc("uCoarseSize"), coarse.width, coarse.height, coarse.depth)
         glUniform3i(self.get_uniform_loc("uClosed"), *(int(c) for c in closed))

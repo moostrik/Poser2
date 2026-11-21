@@ -44,7 +44,7 @@ class VorticityCurl3D(ComputeShader):
         bind_walls(self, closed)
         bind_obstacle(self, obstacle, has_obstacles)
         for unit in range(count):
-            self.bind_image_3d_write(unit, curls[unit], GL_RGBA16F)
+            self.bind_image_write(unit, curls[unit], GL_RGBA16F)
 
         # each radius in cells per axis, at least one: the curl cannot be measured closer
         half_rdx_inv: list[float] = []

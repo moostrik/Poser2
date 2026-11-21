@@ -41,7 +41,7 @@ class Buoyancy3D(ComputeShader):
         temperature.bind(0)
         density.bind(1)
         obstacle.bind(2)
-        self.bind_image_3d_write(0, force_out, GL_RGBA16F)
+        self.bind_image_write(0, force_out, GL_RGBA16F)
 
         glUniform1f(self.get_uniform_loc("uSigma"), sigma)
         glUniform1f(self.get_uniform_loc("uKappa"), kappa)

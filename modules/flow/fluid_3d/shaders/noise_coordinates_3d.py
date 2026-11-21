@@ -20,7 +20,7 @@ class NoiseCoordinates3D(ComputeShader):
         glUseProgram(self.shader_program)
         velocity.bind(0)
         source.bind(1)
-        self.bind_image_3d_write(0, result, GL_RGBA16F)
+        self.bind_image_write(0, result, GL_RGBA16F)
         glUniform1f(self.get_uniform_loc("uTimestep"), timestep)
         glUniform3f(self.get_uniform_loc("uRdx"), *rdx)
         glUniform1i(self.get_uniform_loc("uReset"), int(reset))

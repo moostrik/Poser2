@@ -39,4 +39,4 @@ def bind_obstacle(shader: ComputeShader, obstacle: Texture3D, has_obstacles: boo
 
 def bind_face_writes(shader: ComputeShader, faces: Texture3D, in_place: bool = False) -> None:
     """The faces written (`store_faces`); read too where the shader works in place (`FACES_IN_PLACE`)."""
-    shader.bind_image_3d(FACE_IMAGE_UNIT, faces, GL_READ_WRITE if in_place else GL_WRITE_ONLY, GL_RGBA16F)
+    shader.bind_image(FACE_IMAGE_UNIT, faces, GL_READ_WRITE if in_place else GL_WRITE_ONLY, GL_RGBA16F)

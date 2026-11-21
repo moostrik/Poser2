@@ -19,7 +19,7 @@ class LightBlur3D(ComputeShader):
         glUseProgram(self.shader_program)
         source.bind(0)
         direct.bind(1)
-        self.bind_image_3d_write(0, result, GL_RGBA16F)
+        self.bind_image_write(0, result, GL_RGBA16F)
         glUniform3i(self.get_uniform_loc("uSize"), result.width, result.height, result.depth)
         glUniform1i(self.get_uniform_loc("uAxis"), axis)
         glUniform1f(self.get_uniform_loc("uScattering"), scattering)

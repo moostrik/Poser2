@@ -1,29 +1,18 @@
-"""ComputeShader - Base class for OpenGL compute shaders.
-
-Extends Shader with compute-specific functionality:
-- .comp file discovery and compilation
-- glDispatchCompute with automatic workgroup calculation
-- Image binding helpers for imageLoad/imageStore
-- Memory barriers for synchronization
-
-Usage:
-    class MyCompute(ComputeShader):
-        def use(self, input_tex: Texture, output_tex: Texture):
-            glUseProgram(self.shader_program)
-            self.bind_image_read(0, input_tex)
-            self.bind_image_write(1, output_tex)
-            glUniform1f(self.get_uniform_loc("uParam"), 1.0)
-            self.dispatch(output_tex.width, output_tex.height)
-"""
+"""ComputeShader: a shader of one stage, its `.comp`: the dispatch over a size, the image binds of any texture kind
+and the memory barriers."""
 from __future__ import annotations
 
 import math
 from pathlib import Path
 
-from OpenGL.GL import GL_ALL_BARRIER_BITS, GL_COMPUTE_SHADER, GL_FALSE, GL_MAX_COMPUTE_WORK_GROUP_COUNT, GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, GL_MAX_COMPUTE_WORK_GROUP_SIZE, GL_READ_ONLY, GL_READ_WRITE, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_SHADER_STORAGE_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, GL_TRUE, GL_WRITE_ONLY, glBindImageTexture, glDispatchCompute, glGetIntegeri_v, glGetIntegerv, glMemoryBarrier
+from OpenGL.GL import (GL_ALL_BARRIER_BITS, GL_COMPUTE_SHADER, GL_FALSE, GL_MAX_COMPUTE_WORK_GROUP_COUNT,
+                       GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, GL_MAX_COMPUTE_WORK_GROUP_SIZE, GL_READ_ONLY,
+                       GL_READ_WRITE, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_SHADER_STORAGE_BARRIER_BIT,
+                       GL_TEXTURE_2D, GL_TEXTURE_FETCH_BARRIER_BIT, GL_TRUE, GL_WRITE_ONLY, glBindImageTexture,
+                       glDispatchCompute, glGetIntegeri_v, glGetIntegerv, glMemoryBarrier)
 
 from .shader import Shader
-from ..texture import Texture, Texture3D, Texture2DArray
+from ..texture.texture_base import TextureBase
 
 
 class ComputeShader(Shader):
@@ -72,92 +61,25 @@ class ComputeShader(Shader):
 
     # ========== Image Binding Methods ==========
 
-    def bind_image(self, unit: int, texture: Texture, access: int,
-                   internal_format: int | None = None) -> None:
-        """Bind texture as image for imageLoad/imageStore.
-
-        Args:
-            unit: Image unit (0, 1, 2, ...)
-            texture: Texture to bind
-            access: GL_READ_ONLY, GL_WRITE_ONLY, or GL_READ_WRITE
-            internal_format: Override format (defaults to texture's format)
-        """
+    def bind_image(self, unit: int, texture: TextureBase, access: int, internal_format: int | None = None) -> None:
+        """`texture` bound to image `unit` for imageLoad/imageStore, level 0, all its layers when it has them (a 3D
+        or array texture); `access` GL_READ_ONLY, GL_WRITE_ONLY or GL_READ_WRITE; `internal_format` the image's
+        format, the texture's own without it."""
         fmt = internal_format if internal_format is not None else texture.internal_format
-        glBindImageTexture(unit, texture.tex_id, 0, GL_FALSE, 0, access, fmt)
+        layered = GL_FALSE if texture.TARGET == GL_TEXTURE_2D else GL_TRUE
+        glBindImageTexture(unit, texture.tex_id, 0, layered, 0, access, fmt)
 
-    def bind_image_read(self, unit: int, texture: Texture,
-                        internal_format: int | None = None) -> None:
-        """Bind texture as read-only image."""
+    def bind_image_read(self, unit: int, texture: TextureBase, internal_format: int | None = None) -> None:
+        """`texture` bound to image `unit`, read only."""
         self.bind_image(unit, texture, GL_READ_ONLY, internal_format)
 
-    def bind_image_write(self, unit: int, texture: Texture,
-                         internal_format: int | None = None) -> None:
-        """Bind texture as write-only image."""
+    def bind_image_write(self, unit: int, texture: TextureBase, internal_format: int | None = None) -> None:
+        """`texture` bound to image `unit`, write only."""
         self.bind_image(unit, texture, GL_WRITE_ONLY, internal_format)
 
-    def bind_image_readwrite(self, unit: int, texture: Texture,
-                             internal_format: int | None = None) -> None:
-        """Bind texture as read-write image (for in-place operations)."""
+    def bind_image_readwrite(self, unit: int, texture: TextureBase, internal_format: int | None = None) -> None:
+        """`texture` bound to image `unit`, read and written (in place)."""
         self.bind_image(unit, texture, GL_READ_WRITE, internal_format)
-
-    # ========== 3D Image Binding Methods ==========
-
-    def bind_image_3d(self, unit: int, texture: Texture3D, access: int,
-                      internal_format: int | None = None) -> None:
-        """Bind 3D texture as layered image for imageLoad/imageStore.
-
-        Args:
-            unit: Image unit (0, 1, 2, ...)
-            texture: Texture3D to bind
-            access: GL_READ_ONLY, GL_WRITE_ONLY, or GL_READ_WRITE
-            internal_format: Override format (defaults to texture's format)
-        """
-        fmt = internal_format if internal_format is not None else texture.internal_format
-        glBindImageTexture(unit, texture.tex_id, 0, GL_TRUE, 0, access, fmt)
-
-    def bind_image_3d_read(self, unit: int, texture: Texture3D,
-                           internal_format: int | None = None) -> None:
-        """Bind 3D texture as read-only layered image."""
-        self.bind_image_3d(unit, texture, GL_READ_ONLY, internal_format)
-
-    def bind_image_3d_write(self, unit: int, texture: Texture3D,
-                            internal_format: int | None = None) -> None:
-        """Bind 3D texture as write-only layered image."""
-        self.bind_image_3d(unit, texture, GL_WRITE_ONLY, internal_format)
-
-    def bind_image_3d_readwrite(self, unit: int, texture: Texture3D,
-                                internal_format: int | None = None) -> None:
-        """Bind 3D texture as read-write layered image."""
-        self.bind_image_3d(unit, texture, GL_READ_WRITE, internal_format)
-
-
-    def bind_image_2d_array(self, unit: int, texture: Texture2DArray, access: int,
-                            internal_format: int | None = None) -> None:
-        """Bind 2D array texture as layered image for imageLoad/imageStore.
-
-        Args:
-            unit: Image unit (0, 1, 2, ...)
-            texture: Texture2DArray to bind
-            access: GL_READ_ONLY, GL_WRITE_ONLY, or GL_READ_WRITE
-            internal_format: Override format (defaults to texture's format)
-        """
-        fmt = internal_format if internal_format is not None else texture.internal_format
-        glBindImageTexture(unit, texture.tex_id, 0, GL_TRUE, 0, access, fmt)
-
-    def bind_image_2d_array_read(self, unit: int, texture: Texture2DArray,
-                                 internal_format: int | None = None) -> None:
-        """Bind 2D array texture as read-only layered image."""
-        self.bind_image_2d_array(unit, texture, GL_READ_ONLY, internal_format)
-
-    def bind_image_2d_array_write(self, unit: int, texture: Texture2DArray,
-                                  internal_format: int | None = None) -> None:
-        """Bind 2D array texture as write-only layered image."""
-        self.bind_image_2d_array(unit, texture, GL_WRITE_ONLY, internal_format)
-
-    def bind_image_2d_array_readwrite(self, unit: int, texture: Texture2DArray,
-                                      internal_format: int | None = None) -> None:
-        """Bind 2D array texture as read-write layered image."""
-        self.bind_image_2d_array(unit, texture, GL_READ_WRITE, internal_format)
 
     # ========== Memory Barriers ==========
 

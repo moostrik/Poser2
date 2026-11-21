@@ -59,8 +59,8 @@ class JacobiPressure3D(ComputeShader):
         obstacle.bind(1)
 
         # Images
-        self.bind_image_3d(0, pressure_in, GL_READ_ONLY, GL_R32F)
-        self.bind_image_3d(1, pressure_out, GL_WRITE_ONLY, GL_R32F)
+        self.bind_image(0, pressure_in, GL_READ_ONLY, GL_R32F)
+        self.bind_image(1, pressure_out, GL_WRITE_ONLY, GL_R32F)
 
         # Uniforms
         glUniform3f(self.get_uniform_loc("uAlpha"), alpha_x, alpha_y, alpha_z)

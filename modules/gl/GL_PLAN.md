@@ -7,13 +7,6 @@ shader_check compares with references made at HEAD before the first step. A run 
 tasklist check that no app is running, unless Matthias says he is using the PC or the app.
 
 
-## B. A compute shader binds an image one way
-
-- B1. `ComputeShader.bind_image`, `bind_image_read`, `bind_image_write` and `bind_image_readwrite` take any texture
-  kind, layered when its `TARGET` is not GL_TEXTURE_2D; the `bind_image_3d*` and `bind_image_2d_array*` families go
-  and their 36 call sites use the four. Why: the three families have the same body but for `layered` (seen,
-  `compute_shader.py`). Check: shader_check; deep_flow -sim (the fluid, the bridge, the motion).
-
 ## C. Text's font in its package
 
 - C1. `RobotoMono-Regular.ttf` moves from `data/` into `gl/text` with its licence (Apache 2.0) beside it, and `Text`

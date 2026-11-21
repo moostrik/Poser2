@@ -31,7 +31,7 @@ class LightVolume3D(ComputeShader):
             return
         glUseProgram(self.shader_program)
         density.bind(0)
-        self.bind_image_3d_write(0, light, GL_RGBA16F)
+        self.bind_image_write(0, light, GL_RGBA16F)
         glUniform3i(self.get_uniform_loc("uSize"), light.width, light.height, light.depth)
         glUniform3f(self.get_uniform_loc("uBox"), *box)
         glUniform1i(self.get_uniform_loc("uPoint"), int(point))

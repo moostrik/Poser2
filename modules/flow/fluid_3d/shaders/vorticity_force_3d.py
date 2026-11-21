@@ -39,7 +39,7 @@ class VorticityForce3D(ComputeShader):
         for k, unit in enumerate((0, 2, 3)):
             curls[min(k, count - 1)].bind(unit)     # an unused slot repeats the last
         obstacle.bind(1)
-        self.bind_image_3d_write(0, force_out, GL_RGBA16F)
+        self.bind_image_write(0, force_out, GL_RGBA16F)
 
         glUniform3f(self.get_uniform_loc("uHalfRdxInv"), 0.5 / cell[0], 0.5 / cell[1], 0.5 / cell[2])
         glUniform1i(self.get_uniform_loc("uCount"), count)

@@ -47,9 +47,9 @@ class LayerLight3D(ComputeShader):
         has_sky: bool = sky is not None and sky_fill > 0.0
         if has_sky and sky is not None:
             sky.bind(2)
-        self.bind_image_3d_write(0, direct, GL_RGBA16F)
+        self.bind_image_write(0, direct, GL_RGBA16F)
         if rays is not None:
-            self.bind_image_3d_write(2, rays, GL_RGBA16F)
+            self.bind_image_write(2, rays, GL_RGBA16F)
         glUniform3i(self.get_uniform_loc("uSize"), direct.width, direct.height, direct.depth)
         glUniform1f(self.get_uniform_loc("uOctaves"), octaves)
         glUniform1f(self.get_uniform_loc("uPowder"), powder)

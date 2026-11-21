@@ -59,7 +59,7 @@ class MacCormack3D(ComputeShader):
         source.bind(1)
         forward.bind(2)
         obstacle.bind(3)
-        self.bind_image_3d_write(0, result, internal_format)
+        self.bind_image_write(0, result, internal_format)
 
         glUniform1f(self.get_uniform_loc("uTimestep"), timestep)
         rdx_y = aspect          # a width per second of y crosses width / height of the uv

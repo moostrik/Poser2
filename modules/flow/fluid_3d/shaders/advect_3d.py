@@ -65,7 +65,7 @@ class Advect3D(ComputeShader):
         obstacle.bind(2)
 
         # Bind output as 3D image (separate from input)
-        self.bind_image_3d_write(0, result_write, internal_format)
+        self.bind_image_write(0, result_write, internal_format)
 
         # Uniforms
         glUniform1f(self.get_uniform_loc("uTimestep"), timestep)

@@ -26,7 +26,7 @@ class InjectDensity3D(ComputeShader):
         glUseProgram(self.shader_program)
         amount.bind(0)
         color.bind(2)
-        self.bind_image_3d_readwrite(0, volume, GL_RGBA16F)
+        self.bind_image_readwrite(0, volume, GL_RGBA16F)
         bind_z_position(self, 1, z_position)
         glUniform1f(self.get_uniform_loc("uSpread"), spread)
         glUniform1f(self.get_uniform_loc("uStrength"), strength)

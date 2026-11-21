@@ -17,8 +17,8 @@ class VelocityAverage3D(ComputeShader):
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
-        self.bind_image_3d_read(0, velocity, GL_RGBA16F)
-        self.bind_image_3d_write(1, average, GL_RGBA16F)
+        self.bind_image_read(0, velocity, GL_RGBA16F)
+        self.bind_image_write(1, average, GL_RGBA16F)
         glUniform3i(self.get_uniform_loc("uSize"), velocity.width, velocity.height, velocity.depth)
         glUniform1i(self.get_uniform_loc("uLayers"), average.depth)
         self.dispatch(average.width, average.height, average.depth)

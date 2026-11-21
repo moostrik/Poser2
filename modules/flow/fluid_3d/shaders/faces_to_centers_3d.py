@@ -20,5 +20,5 @@ class FacesToCenters3D(ComputeShader):
         glUseProgram(self.shader_program)
         cells = (centers.width, centers.height, centers.depth)
         bind_faces(self, faces, cells)
-        self.bind_image_3d_write(0, centers, GL_RGBA16F)
+        self.bind_image_write(0, centers, GL_RGBA16F)
         self.dispatch(*cells)
