@@ -20,10 +20,6 @@ unless Matthias says he is using the PC or the app.
   each app (deep_flow with the particles on the weighted look and on SURFACE, low_flow, hd_trio, white_space,
   smile), no GL error.
 
-Form, done only in a commit that opens the file anyway, never as a step of its own: PEP 8 in `fbo.py` (the one-line
-`if`, the double spaces before `->`, a class docstring, the end-of-file newline); the two swap tests become one
-`test_swap.py` in a commit that changes `Swap` or them.
-
 ## Rules this plan touches
 
 - CLAUDE.md: Inside a package, code that does the same is written once

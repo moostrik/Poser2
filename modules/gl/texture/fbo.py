@@ -6,7 +6,10 @@ from OpenGL.GL import (Constant, GL_CLAMP_TO_EDGE, GL_COLOR_ATTACHMENT0, GL_COLO
 from .swap import TextureSwap
 from .texture import Texture
 
+
 class Fbo(Texture):
+    """A framebuffer that owns its one color texture, the texture it is, and optionally a depth buffer."""
+
     def __init__(self,
                  interpolation: int = GL_LINEAR,
                  wrap: int = GL_CLAMP_TO_EDGE,
@@ -18,10 +21,10 @@ class Fbo(Texture):
         self._depth: bool = depth
         self._depth_id: int = 0
 
-
     def allocate(self, width: int, height: int, internal_format: Constant | int) -> None:
         super().allocate(width, height, internal_format)
-        if not self.allocated: return
+        if not self.allocated:
+            return
 
         self.fbo_id = glGenFramebuffers(1)
 
@@ -48,14 +51,15 @@ class Fbo(Texture):
             self._depth_id = 0
         super().deallocate()
 
-    def begin(self)  -> None:
+    def begin(self) -> None:
         """Draw into this FBO, its whole size the viewport."""
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
         glViewport(0, 0, self.width, self.height)
 
-    def end(self)  -> None:
+    def end(self) -> None:
         """End drawing into this FBO: the window's framebuffer is bound again."""
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
 
 class SwapFbo(TextureSwap[Fbo], Fbo):
     """Double-buffered FBO: drawn into, it is its current buffer."""
