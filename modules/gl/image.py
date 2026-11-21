@@ -192,9 +192,10 @@ class Image(Fbo):
         # Upload image data to source texture into its storage (faster than glTexImage2D)
         # numpy rows are tightly packed; OpenGL's default row alignment of 4 bytes shears any image
         # whose row isn't a multiple of 4 bytes (e.g. an 878 px wide BGR image)
+        # glTextureSubImage2D takes only a contiguous array; a strided one (a transposed view) is copied here once
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
         glTextureSubImage2D(self._source.tex_id, 0, 0, 0, width, height,
-                            self._source.format, self._source.data_type, image)
+                            self._source.format, self._source.data_type, np.ascontiguousarray(image))
 
         # Render flipped to FBO using modern shader
         self.begin()

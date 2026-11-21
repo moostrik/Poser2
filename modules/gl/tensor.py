@@ -291,6 +291,7 @@ class Tensor(Texture):
         format_map = {1: GL_RED, 2: GL_RG, 3: GL_RGB, 4: GL_RGBA}
         upload_format = format_map.get(channels, GL_RED)
 
-        # Upload to OpenGL texture
-        glTextureSubImage2D(self.tex_id, 0, 0, 0, self.width, self.height, upload_format, gl_type, tensor_np)
+        # Upload to OpenGL texture; glTextureSubImage2D takes only a contiguous array, a strided one is copied once
+        glTextureSubImage2D(self.tex_id, 0, 0, 0, self.width, self.height, upload_format, gl_type,
+                            np.ascontiguousarray(tensor_np))
 
