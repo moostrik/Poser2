@@ -6,9 +6,10 @@ The package scan of 2026-11-20 (modules/settings held up to CLAUDE.md and its ru
 
 - E4. `widget.py`'s "Adding a widget" goes into SETTINGS.md; the `_propagate_*` docstrings and `Field.fire`'s say what
   each one is.
-- E12. A missing setup file starts the app on its defaults with a warning, as smile does, in place of refusing the
-  start: `SettingsStore.load_startup` logs and goes on, and the four mains (deep_flow, low_flow, hd_trio,
-  white_space) start on the defaults; the panel's Save then writes the file. Checked by the store's tests.
+- E13. A shared button runs each callback once per press, wherever it is pressed: a press on a child goes up to the
+  parent and from there down to the other children, not back down into the child it came from, which today runs
+  its callbacks twice. Test: a press on a child and a press on the parent each run every callback once; checked by
+  the settings tests and the tests of deep_flow, low_flow and hd_trio, whose session buttons are shared.
 
 Each is checked by the settings and panel tests and pyright; no app run.
 

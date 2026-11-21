@@ -181,9 +181,14 @@ class TestStartup(StoreTest):
         self.store.load_startup(other)
         self.assertEqual(other.to_dict(), root.to_dict())
 
-    def test_without_the_setup_file_the_start_stops(self) -> None:
-        with self.assertLogs('modules.settings.store', 'WARNING'), self.assertRaises(FileNotFoundError):
-            self.store.load_startup(Root())
+    def test_without_the_setup_file_the_start_goes_on_from_the_defaults(self) -> None:
+        root = Root()
+        with self.assertLogs('modules.settings.store', 'WARNING') as logs:
+            self.store.load_startup(root)
+        self.assertTrue(any("setup starts on its defaults" in line for line in logs.output))
+        self.assertEqual(root.to_dict(), Root().to_dict())
+        self.store.save(root, 'setup', self.store.startup('setup'))       # the panel's Save writes the file
+        self.assertTrue(self.store.path('setup', 'studio').exists())
 
     def test_without_another_root_groups_file_its_defaults_stay(self) -> None:
         root = Root()

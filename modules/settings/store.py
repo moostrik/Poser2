@@ -113,11 +113,9 @@ class SettingsStore:
             raise
 
     def load_startup(self, root: BaseSettings) -> None:
-        """Load each root group's startup file, the setup's first; raises ``FileNotFoundError`` without the setup's.
-        Another root group without its file keeps its defaults."""
-        name = self.startup(SETUP)
-        if not self.load(root, SETUP, name):
-            raise FileNotFoundError(f"No setup file at {self.path(SETUP, name)}")
-        for group in root.children:
-            if group != SETUP:
-                self.load(root, group, self.startup(group))
+        """Load each root group's startup file, the setup's first. A root group without its file keeps its defaults,
+        logged; the panel's Save then writes it."""
+        for group in [SETUP] + [group for group in root.children if group != SETUP]:
+            name = self.startup(group)
+            if not self.load(root, group, name):
+                logger.warning("No %s file '%s': %s starts on its defaults", group, name, group)

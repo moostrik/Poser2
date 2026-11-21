@@ -71,10 +71,7 @@ class SmileMain():
         self.settings.setup.panel.title = 'SMILE'
         self.settings.setup.panel.port = 667
         self.store = SettingsStore(f'{DATA_PATH}/settings', default_startup='Smile')
-        try:
-            self.store.load_startup(self.settings)
-        except FileNotFoundError:
-            logger.warning('No setup file at %s, using defaults', self.store.path('setup', self.store.startup('setup')))
+        self.store.load_startup(self.settings)
         if not interface:
             self.settings.setup.panel.browser = False  # launcher override; the settings file cannot turn it back on
         if fullscreen:

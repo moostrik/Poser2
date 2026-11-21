@@ -90,8 +90,8 @@ apps/<app>/data/settings/
 setup's file is the root's dict without the other root groups, so a root field keeps its key beside `setup`.
 `load(root, group, name)` loads a file through `update_from_dict`, so loading one root group leaves every other field
 as it was. A root group not named in `.startup.json` starts on the store's default name (`studio`; smile's `Smile`).
-`load_startup(root)` loads the setup first, then the other root groups; a missing setup file stops the start
-(`FileNotFoundError`), a missing file of another group is logged and its defaults stay. A name is refused when it is
+`load_startup(root)` loads the setup first, then the other root groups; a root group without its file is logged and
+starts on its defaults, and the panel's Save then writes the file. A name is refused when it is
 empty, holds a path separator or starts with a dot.
 
 The panel shows a row for each root group (`modules/panel/file_controls.py`) and a tab for each child of a root
