@@ -178,6 +178,25 @@ class StreamReaderTest(unittest.TestCase):
         self.assertIsNotNone(process.poll())
         self.assertEqual(self.frames, [])
 
+    def test_a_frame_callback_that_raises_is_logged_and_the_reader_plays_on(self) -> None:
+        def fail(_c, _t, _f, _chunk, frame_id: int) -> None:
+            self.frames.append(frame_id)
+            raise ValueError('callback broke')
+        reader = StreamReader(0, 'video', fail, True, fps=1000.0)
+        reader.load(self.path, 0, 0, 5)
+        self.assertTrue(wait_for(reader.is_loaded))
+        process = reader.ffmpeg_process
+        assert process is not None
+        with self.assertLogs('modules.video.stream_reader', 'ERROR') as logs:
+            reader.play()
+            self.assertTrue(wait_for(lambda: not reader.is_playing()))
+            reader.join()
+        self.assertEqual(self.frames, [0, 1, 2, 3, 4])
+        self.assertEqual(len(logs.output), 5)
+        self.assertIn('callback broke', logs.output[0])
+        self.assertIsNotNone(process.poll())
+        self.assertFalse(reader.is_loaded())
+
     def test_a_range_counts_from_its_first_frame(self) -> None:
         reader = self.reader()
         reader.load(self.path, 0, 12, 15)

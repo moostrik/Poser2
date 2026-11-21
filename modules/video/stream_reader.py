@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 StreamFrameCallback = Callable[[int, object, np.ndarray, int, int], None]
 
 STALL_SECONDS: float = 3.0      # how long a read may wait for its frame before the reader logs a stalled decoder
+CLOSE_TIMEOUT: float = 5.0      # s a terminated decoder may take to end before it is killed
 
 
 class FrameSchedule(Protocol):
@@ -206,21 +207,36 @@ class StreamReader:
                 logged = True
 
     def _close(self) -> None:
+        """End the decoder: the pipe is closed first, so a decoder blocked writing into it ends on `terminate` too;
+        one that has not ended after `CLOSE_TIMEOUT` s is killed."""
         with self._load_lock:
             process, self.ffmpeg_process = self.ffmpeg_process, None
             frames_in, self._frames_in = self._frames_in, None
-        if process is not None:
-            process.terminate()
-            process.wait()
         if frames_in is not None:
             frames_in.close()
+        if process is not None:
+            process.terminate()
+            try:
+                process.wait(timeout=CLOSE_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                logger.warning('Decoder of %s did not end on terminate, killed', self.video_file)
+                process.kill()
+                process.wait()
 
     def _play(self) -> None:
+        try:
+            self._play_frames()
+        except Exception as e:
+            logger.error('Reader of %s failed: %s', self.video_file, e)
+        finally:
+            self._play_ended.set()
+            self._read_progress.set()
+            self._close()
+
+    def _play_frames(self) -> None:
         frames_in = self._frames_in
         if self.ffmpeg_process is None or frames_in is None:
             logger.warning('video not loaded')
-            self._play_ended.set()
-            self._read_progress.set()
             return
         frame_interval: float = 1.0 / self.fps
 
@@ -267,7 +283,10 @@ class StreamReader:
                     break               # stopped while it waited
                 next_time = due
 
-            self.frame_callback(self.cam_id, self.frame_type, frame, self.chunk_id, frame_count)
+            try:
+                self.frame_callback(self.cam_id, self.frame_type, frame, self.chunk_id, frame_count)
+            except Exception as e:
+                logger.error('Frame callback failed on frame %d of %s: %s', frame_count, self.video_file, e)
             frame_count += 1
 
             if due is not None:
@@ -278,6 +297,3 @@ class StreamReader:
                 self._waker.wait(next_time)
             elif -remaining > frame_interval:
                 next_time = time.perf_counter()   # resync after a stall rather than bursting catch-up frames
-        self._play_ended.set()
-        self._read_progress.set()
-        self._close()

@@ -5,16 +5,6 @@ What is to be built in `modules/video`: ffmpeg, the clips and streams it writes 
 
 ## D. The stream threads
 
-D1. `StreamReader._play` ends cleanly whatever happens: the frame callback is called in a `try` that logs and goes
-   on, and `_close` runs in a `finally`. Today an exception in the callback ends the thread and leaves ffmpeg running
-   **(seen)**. `_close` closes the pipe before it waits for ffmpeg, with a timeout: on Linux `terminate` is a SIGTERM
-   that ffmpeg handles, and it stays blocked writing into the full pipe while `_close` waits forever; four
-   `test_stream_reader` tests hang and fail on Linux for this **(seen in a run, Python 3.13 on Linux; on Windows
-   `terminate` kills at once)**. Why: Error handling, "A thread's loop catches an exception per item, logs it and goes
-   on"; Concurrency, "A failing callback does not stop the others"; keep Linux possible. A new test has a frame
-   callback that raises: the reader logs it, plays on, and leaves no ffmpeg running. Check: `test_stream_reader` on
-   Windows, and on Linux (a cloud copy), where the hang shows.
-
 D2. `StreamWriter` waits on its work instead of polling: a `None` put on the queue ends `_record` (no
    `get(timeout=.1)`), `_drain` waits on `Queue.join` with `task_done` (no `sleep(0.01)` loop, which steps 15.6 ms on
    Windows), and `is_recording` / `is_receiving` become `Event`s, as they are read on the camera's thread and written on
