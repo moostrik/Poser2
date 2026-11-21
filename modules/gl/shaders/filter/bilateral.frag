@@ -1,6 +1,6 @@
 #version 460 core
 
-uniform sampler2D src;
+layout(binding = 0) uniform sampler2D src;
 uniform int radius;         // pixels each side
 uniform float sigmaSpace;   // pixels
 uniform float sigmaColor;   // color difference, 0..1

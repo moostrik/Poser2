@@ -34,7 +34,6 @@ class Dampen(Shader):
         # Bind texture
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, src.tex_id)
-        glUniform1i(self.get_uniform_loc("src"), 0)
 
         # Set uniforms
         glUniform1f(self.get_uniform_loc("uThreshold"), threshold)

@@ -27,8 +27,8 @@ class BandpassTrails2D(ComputeShader):
         if not all(texture.allocated for texture in (velocity, fast, slow, fast_out, slow_out)):
             return
         glUseProgram(self.shader_program)
-        for unit, (texture, name) in enumerate(((velocity, "uVelocity"), (fast, "uFast"), (slow, "uSlow"))):
-            self.bind_texture(unit, texture, name)
+        for unit, texture in enumerate((velocity, fast, slow)):
+            self.bind_texture(unit, texture)
         self.bind_image_write(0, fast_out)
         self.bind_image_write(1, slow_out)
         glUniform1f(self.get_uniform_loc("uFastWeight"), fast_weight)

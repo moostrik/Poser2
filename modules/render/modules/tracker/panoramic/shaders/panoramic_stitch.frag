@@ -34,7 +34,7 @@
 // Column width (output pixels) of one BLEND_STRIPE band.
 #define STRIPE_PX 8.0
 
-uniform sampler2D tex[MAX_CAMS];
+layout(binding = 0) uniform sampler2D tex[MAX_CAMS];
 uniform int   numCams;
 uniform float camFov;      // one camera's horizontal field (degrees)
 uniform float horizonRow;  // the frames' rows are TANGENTS of elevation: row = horizonRow -

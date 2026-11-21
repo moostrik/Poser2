@@ -9,10 +9,10 @@ in vec2 texCoord;
 out vec2 fragColor;
 
 // Input textures
-uniform sampler2D uVelocity;    // Current velocity field (RG32F) - not used but passed for consistency
-uniform sampler2D uTemperature; // Temperature field (R32F)
-uniform sampler2D uDensity;     // Density field (RGBA32F)
-uniform sampler2D uObstacle;    // Obstacle mask (R8, CLAMP_TO_BORDER=1)
+layout(binding = 0) uniform sampler2D uVelocity;    // Current velocity field (RG32F) - not used but passed for consistency
+layout(binding = 1) uniform sampler2D uTemperature; // Temperature field (R32F)
+layout(binding = 2) uniform sampler2D uDensity;     // Density field (RGBA32F)
+layout(binding = 3) uniform sampler2D uObstacle;    // Obstacle mask (R8, CLAMP_TO_BORDER=1)
 uniform bool uHasObstacles;     // Skip obstacle checks when false
 
 // Parameters

@@ -16,10 +16,8 @@ class LargerAmount(Shader):
             return
 
         glUseProgram(self.shader_program)
-        for unit, (name, texture) in enumerate((('held', held), ('source', source), ('heldAmount', held_amount),
-                                                ('sourceAmount', source_amount))):
+        for unit, texture in enumerate((held, source, held_amount, source_amount)):
             glActiveTexture((GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3)[unit])
             glBindTexture(GL_TEXTURE_2D, texture.tex_id)
-            glUniform1i(self.get_uniform_loc(name), unit)
 
         draw_quad()

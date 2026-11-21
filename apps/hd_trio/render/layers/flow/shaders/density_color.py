@@ -25,8 +25,6 @@ class DensityColor(Shader):
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, mask.tex_id if has_mask and mask is not None else 0)
 
-        glUniform1i(self.get_uniform_loc("image"), 0)
-        glUniform1i(self.get_uniform_loc("mask"), 1)
         glUniform1i(self.get_uniform_loc("has_image"), int(has_image))
         glUniform1i(self.get_uniform_loc("has_mask"), int(has_mask))
         glUniform3f(self.get_uniform_loc("color"), *color)

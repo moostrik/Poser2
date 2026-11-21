@@ -1,6 +1,6 @@
 """ChromaKey: a mask from how far each pixel's chroma is from a key color's."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform3f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform3f, glUseProgram
 from modules.utils import Color
 from ... import Shader, draw_quad, Texture
 
@@ -21,7 +21,6 @@ class ChromaKey(Shader):
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, src.tex_id)
-        glUniform1i(self.get_uniform_loc("src"), 0)
         glUniform3f(self.get_uniform_loc("key"), key.r, key.g, key.b)
         glUniform1f(self.get_uniform_loc("threshold"), threshold)
         glUniform1f(self.get_uniform_loc("softness"), max(softness, 1e-4))

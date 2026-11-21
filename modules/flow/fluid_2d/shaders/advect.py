@@ -56,15 +56,12 @@ class Advect(Shader):
         # Bind textures
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, velocity.tex_id)
-        glUniform1i(self.get_uniform_loc("uVelocity"), 0)
 
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, source.tex_id)
-        glUniform1i(self.get_uniform_loc("uSource"), 1)
 
         glActiveTexture(GL_TEXTURE2)
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
-        glUniform1i(self.get_uniform_loc("uObstacle"), 2)
 
         # Set uniforms
         glUniform1f(self.get_uniform_loc("uTimestep"), timestep)

@@ -3,7 +3,7 @@
 // Jump flooding (Rong and Tan, "Jump Flooding in GPU with Applications to Voronoi Diagram and Distance Transform",
 // I3D 2006). The map holds each pixel's nearest seed in texel coordinates, -1 for none.
 
-uniform sampler2D src;      // seed: the mask; step and distance: the map (RG32F)
+layout(binding = 0) uniform sampler2D src;     // seed: the mask; step and distance: the map (RG32F)
 uniform int stage;          // 0 seed, 1 step, 2 distance
 uniform float threshold;    // seed: the mask's red that makes a seed
 uniform int jump;           // step: pixels to look away

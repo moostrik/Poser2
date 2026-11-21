@@ -8,8 +8,8 @@
 
 #include "position.glsl"
 
-uniform sampler2D depth;        // meters on the camera image in red, 0 for none; the confidence 0 to 1 in green
-uniform sampler2D mask;         // the player's mask in the view (red, 0 to 1)
+layout(binding = 0) uniform sampler2D depth;        // meters on the camera image in red, 0 for none; the confidence 0 to 1 in green
+layout(binding = 1) uniform sampler2D mask;        // the player's mask in the view (red, 0 to 1)
 uniform vec4 roi;               // the view's window on the depth, x, y, width, height in 0..1, origin top-left
 uniform float tolerance;
 uniform float near;             // the player's depth range (m)

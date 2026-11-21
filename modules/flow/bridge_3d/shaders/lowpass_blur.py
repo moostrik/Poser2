@@ -32,7 +32,7 @@ class LowpassBlur(ComputeShader):
         glUseProgram(self.shader_program)
         fields: int = 0
         for unit, source, target in slots:
-            self.bind_texture(unit, source, f"uSource{unit}")
+            self.bind_texture(unit, source)
             self.bind_image_write(unit, target)
             fields |= 1 << unit
         glUniform1i(self.get_uniform_loc("uFields"), fields)

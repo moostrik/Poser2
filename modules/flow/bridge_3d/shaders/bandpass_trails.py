@@ -30,13 +30,12 @@ class BandpassTrails(ComputeShader):
         if not all(texture.allocated for texture in textures):
             return
         glUseProgram(self.shader_program)
-        for unit, (texture, name) in enumerate(((velocity, "uVelocity"), (fast, "uFast"), (slow, "uSlow"),
-                                                (fast_z_position, "uFastZPosition"), (slow_z_position, "uSlowZPosition"))):
-            self.bind_texture(unit, texture, name)
+        for unit, texture in enumerate((velocity, fast, slow, fast_z_position, slow_z_position)):
+            self.bind_texture(unit, texture)
         has_current: bool = current is not None and current.allocated
         if has_current:
             assert current is not None
-            self.bind_texture(5, current, "uCurrent")
+            self.bind_texture(5, current)
         glUniform1i(self.get_uniform_loc("uHasCurrent"), int(has_current))
         for unit, texture in enumerate((fast_out, slow_out, fast_z_position_out, slow_z_position_out)):
             self.bind_image_write(unit, texture)

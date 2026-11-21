@@ -17,8 +17,8 @@ class LightBlur3D(ComputeShader):
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
-        self.bind_texture_3d(0, source, "uSource")
-        self.bind_texture_3d(1, direct, "uDirect")
+        self.bind_texture_3d(0, source)
+        self.bind_texture_3d(1, direct)
         self.bind_image_3d_write(0, result, GL_RGBA16F)
         glUniform3i(self.get_uniform_loc("uSize"), result.width, result.height, result.depth)
         glUniform1i(self.get_uniform_loc("uAxis"), axis)

@@ -9,7 +9,7 @@ in vec2 texCoord;
 out vec4 fragColor;
 
 // Input texture
-uniform sampler2D uObstacle; // Obstacle mask (R8: 1.0 = obstacle, 0.0 = fluid)
+layout(binding = 0) uniform sampler2D uObstacle; // Obstacle mask (R8: 1.0 = obstacle, 0.0 = fluid)
 
 void main() {
     vec2 st = texCoord;

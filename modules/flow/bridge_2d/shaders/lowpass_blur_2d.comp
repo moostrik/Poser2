@@ -11,8 +11,8 @@ const int TILE = 16;
 const int MAX_RADIUS = 8;                       // LowpassBlur2D.MAX_RADIUS
 const int SPAN = TILE + 2 * MAX_RADIUS;
 
-uniform sampler2D uSource0;
-uniform sampler2D uSource1;
+layout(binding = 0) uniform sampler2D uSource0;
+layout(binding = 1) uniform sampler2D uSource1;
 layout(rg16f, binding = 0) writeonly uniform image2D uTarget0;
 layout(rg16f, binding = 1) writeonly uniform image2D uTarget1;
 uniform int uFields;                            // the slots blurred, a bit each

@@ -4,7 +4,7 @@
 // The 2D density as the picture: held in Oklab, (L, a, b) × its amount and its amount, turned back to RGB divided by
 // its amount, turned, multiplied again, premultiplied as it was; held in RGB, as it is.
 
-uniform sampler2D uDensity;    // the density (premultiplied)
+layout(binding = 0) uniform sampler2D uDensity;   // the density (premultiplied)
 uniform bool uOklab;           // the density holds Oklab
 
 in vec2 texCoord;

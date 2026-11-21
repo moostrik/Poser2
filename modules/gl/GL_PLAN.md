@@ -2,7 +2,7 @@
 
 Fewer GL calls on the main thread, and the package held to the rules and to the textbook layout. G comes from the
 Cinder research (2026-11-20), H from the package scan, I from the structure review of the same day. Work order:
-G1, I6, G2, I5, I7: the shaders do not move after G1 edits them, G2's bind is written once on I6's base,
+I6, G2, I5, I7: the shaders do not move after G1 edits them, G2's bind is written once on I6's base,
 and I5 moves the files after their edits. Before
 the first step, `shader_check.py --reference` makes the reference images at HEAD; every shader check compares
 against them. The checks that run
@@ -43,10 +43,6 @@ per app (about 45 s each) checks G1, I6 and G2 together: at each draw and dispat
 has a texture at its unit, the GL calls a frame against G0's, and no GL error in the log; a fault it finds is fixed
 in a commit of its own.
 
-- G1. `layout(binding = N)` on samplers: no `glUniform1i` per texture, per pass, per frame. The one shader below
-  `#version 420` (hd_trio's `temperature_bridge_shader.frag`, 410) is raised; `bind_texture*` of `Shader` and
-  `ComputeShader` lose their `uniform_name`, and every caller with them. Check: each sampler's binding equal to
-  the unit its Python binds (a scan of the shader files), and `scripts/shader_check.py`.
 - G2. Direct state access: `glBindTextureUnit` for a texture's bind and `glTextureSubImage2D` for its upload; the CUDA
   upload in `tensor.py` from 6 calls to about 3, its `glGetError` behind the debug flag. Every caller of
   `Texture.bind`/`unbind` moves with it. Check: `scripts/shader_check.py`, then the -sim runs above.

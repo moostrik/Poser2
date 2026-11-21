@@ -29,7 +29,7 @@ class HistogramCountVolume(ComputeShader):
             return
 
         glUseProgram(self.shader_program)
-        self.bind_texture_3d(0, volume, "tex0")
+        self.bind_texture_3d(0, volume)
         self.bind_image_readwrite(0, histogram, GL_R32UI)
         glUniform1f(self.get_uniform_loc("scale"), scale)
         glUniform3i(self.get_uniform_loc("samples"), *samples)

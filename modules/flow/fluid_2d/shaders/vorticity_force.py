@@ -28,10 +28,8 @@ class VorticityForce(Shader):
 
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, curl.tex_id)
-        glUniform1i(self.get_uniform_loc("uCurl"), 0)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
-        glUniform1i(self.get_uniform_loc("uObstacle"), 1)
 
         glUniform2f(self.get_uniform_loc("uHalfRdxInv"), 0.5 / cell[0], 0.5 / cell[1])
         glUniform1i(self.get_uniform_loc("uCount"), count)

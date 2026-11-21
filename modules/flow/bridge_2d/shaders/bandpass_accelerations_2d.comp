@@ -9,12 +9,12 @@
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
-uniform sampler2D uFast;            // the fast trail (xy)
-uniform sampler2D uSlow;            // the slow trail
-uniform sampler2D uStart;           // the parts as velocities
-uniform sampler2D uBow;
-uniform sampler2D uStop;
-uniform sampler2D uWake;
+layout(binding = 0) uniform sampler2D uFast;            // the fast trail (xy)
+layout(binding = 1) uniform sampler2D uSlow;            // the slow trail
+layout(binding = 2) uniform sampler2D uStart;           // the parts as velocities
+layout(binding = 3) uniform sampler2D uBow;
+layout(binding = 4) uniform sampler2D uStop;
+layout(binding = 5) uniform sampler2D uWake;
 uniform float uScale;               // 1 / the trails' step peak
 uniform float uAccelerationScale;   // 1 / the band's width
 uniform float uPartScale;           // uAccelerationScale × the step peak

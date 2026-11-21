@@ -3,7 +3,7 @@
 // A mask's edge softened inward: the mask blurred is 0.5 on its edge, so 2 × blurred − 1 is 0 there and outside
 // it, and rises to 1 inside over about two sigmas of the blur (erf).
 
-uniform sampler2D blurred;
+layout(binding = 0) uniform sampler2D blurred;
 
 in vec2 texCoord;
 out vec4 fragColor;

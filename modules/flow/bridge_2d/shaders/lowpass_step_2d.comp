@@ -8,8 +8,8 @@
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
-uniform sampler2D uTrail;           // the trail before (RG16F, xy widths/s), 0 outside
-uniform sampler2D uVelocity;        // the input velocity (xy widths/s)
+layout(binding = 0) uniform sampler2D uTrail;          // the trail before (RG16F, xy widths/s), 0 outside
+layout(binding = 1) uniform sampler2D uVelocity;       // the input velocity (xy widths/s)
 uniform vec2 uCarry;                // uv per frame per unit of trail velocity, times the advect amount; 0 none
 uniform float uAttack;              // what remains of the trail where the speed rises
 uniform float uRelease;             // what remains elsewhere

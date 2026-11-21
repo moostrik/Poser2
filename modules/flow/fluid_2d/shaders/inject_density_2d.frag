@@ -5,9 +5,9 @@
 // (premultiplied by its alpha, the coverage) times its amount (density_blend.glsl), blended into each texel by
 // uStrength (× uRelease where it falls); with uOklab the source turned into Oklab first, (L, a, b) × its amount.
 
-uniform sampler2D uDensity;    // the density before (RGBA, premultiplied)
-uniform sampler2D uAmount;     // the bridge's amount, red
-uniform sampler2D uColor;      // its color, premultiplied by its alpha
+layout(binding = 0) uniform sampler2D uDensity;    // the density before (RGBA, premultiplied)
+layout(binding = 1) uniform sampler2D uAmount;     // the bridge's amount, red
+layout(binding = 2) uniform sampler2D uColor;     // its color, premultiplied by its alpha
 uniform float uStrength;       // over, fill: the drag's share this step; add: dt
 uniform float uRelease;        // the release's share this step where the texel falls; 0 = never falls
 uniform bool  uOklab;          // the density holds Oklab

@@ -1,4 +1,4 @@
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUseProgram
 from ... import Shader, draw_quad, Texture
 
 import logging
@@ -21,7 +21,6 @@ class Hsl(Shader):
         glBindTexture(GL_TEXTURE_2D, src.tex_id)
 
         # Configure shader uniforms (using cached locations)
-        glUniform1i(self.get_uniform_loc("src"), 0)
         glUniform1f(self.get_uniform_loc("hue"), hue)
         glUniform1f(self.get_uniform_loc("saturation"), saturation)
         glUniform1f(self.get_uniform_loc("lightness"), lightness)

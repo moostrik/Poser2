@@ -6,9 +6,9 @@
 in vec2 texCoord;
 out vec2 fragColor;
 
-uniform sampler2D uVelocity;   // Current velocity (RG32F)
-uniform sampler2D uPressure;   // Pressure field (R32F)
-uniform sampler2D uObstacle;   // Obstacle mask (R8, CLAMP_TO_BORDER=1)
+layout(binding = 0) uniform sampler2D uVelocity;   // Current velocity (RG32F)
+layout(binding = 1) uniform sampler2D uPressure;   // Pressure field (R32F)
+layout(binding = 2) uniform sampler2D uObstacle;   // Obstacle mask (R8, CLAMP_TO_BORDER=1)
 uniform bool uHasObstacles;    // Skip obstacle checks when false
 
 uniform vec2 uHalfRdxInv;  // (0.5/gridScale_x, 0.5/gridScale_y) for aspect correction

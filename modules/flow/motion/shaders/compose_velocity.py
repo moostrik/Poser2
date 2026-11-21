@@ -30,13 +30,10 @@ class ComposeVelocity(Shader):
         if z is not None:
             glActiveTexture(GL_TEXTURE1)
             glBindTexture(GL_TEXTURE_2D, z.tex_id)
-            glUniform1i(self.get_uniform_loc("tex1"), 1)
         if mask is not None:
             glActiveTexture(GL_TEXTURE2)
             glBindTexture(GL_TEXTURE_2D, mask.tex_id)
-            glUniform1i(self.get_uniform_loc("tex2"), 2)
 
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniform1i(self.get_uniform_loc("has_depth"), 1 if z is not None else 0)
         glUniform1i(self.get_uniform_loc("has_mask"), 1 if mask is not None else 0)
         glUniform3f(self.get_uniform_loc("strength"), *strength)

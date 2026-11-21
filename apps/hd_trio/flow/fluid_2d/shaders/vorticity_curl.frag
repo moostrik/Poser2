@@ -9,8 +9,8 @@ in vec2 texCoord;
 out float fragColor;
 
 // Input textures
-uniform sampler2D uVelocity; // Velocity field (RG32F)
-uniform sampler2D uObstacle; // Obstacle mask (1.0 = obstacle, 0.0 = fluid)
+layout(binding = 0) uniform sampler2D uVelocity; // Velocity field (RG32F)
+layout(binding = 1) uniform sampler2D uObstacle; // Obstacle mask (1.0 = obstacle, 0.0 = fluid)
 uniform bool uHasObstacles;  // Skip obstacle checks when false
 
 // Parameters

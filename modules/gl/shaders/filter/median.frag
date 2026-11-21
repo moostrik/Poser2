@@ -2,7 +2,7 @@
 
 // The 3 x 3 median by McGuire's exchange network ("A Fast, Small-Radius GPU Median Filter", ShaderX6)
 
-uniform sampler2D src;
+layout(binding = 0) uniform sampler2D src;
 
 in vec2 texCoord;
 out vec4 fragColor;

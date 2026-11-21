@@ -1,7 +1,7 @@
 """ColorMatrix: every pixel's RGB through a 3 x 3 matrix and an offset; `saturation_matrix` keeps luminance."""
 
 import numpy as np
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, GL_TRUE, glActiveTexture, glBindTexture, glUniform1i, glUniform3f, glUniformMatrix3fv, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, GL_TRUE, glActiveTexture, glBindTexture, glUniform3f, glUniformMatrix3fv, glUseProgram
 from ... import Shader, draw_quad, Texture
 
 import logging
@@ -28,7 +28,6 @@ class ColorMatrix(Shader):
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, src.tex_id)
-        glUniform1i(self.get_uniform_loc("src"), 0)
         glUniformMatrix3fv(self.get_uniform_loc("matrix"), 1, GL_TRUE, np.ascontiguousarray(matrix, dtype=np.float32))
         glUniform3f(self.get_uniform_loc("offset"), *offset)
         draw_quad()

@@ -1,6 +1,6 @@
 #version 460 core
 
-uniform sampler2D src;
+layout(binding = 0) uniform sampler2D src;
 uniform float amount;
 #define texelSize (1.0 / vec2(textureSize(src, 0)))
 

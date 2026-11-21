@@ -10,9 +10,9 @@
 // A coarser pixel's center lies in the middle of the two it covers, its edges clamped; rows count from the bottom,
 // as GL holds a texture.
 
-uniform sampler2D tex0;     // 0: the finer level (or the read); 1: this level's push; 2: the read (meters, confidence)
-uniform sampler2D tex1;     // 1, 2: the coarser pulled level
-uniform sampler2D tex2;     // 2: the mask (red, 0 to 1)
+layout(binding = 0) uniform sampler2D tex0;     // 0: the finer level (or the read); 1: this level's push; 2: the read (meters, confidence)
+layout(binding = 1) uniform sampler2D tex1;     // 1, 2: the coarser pulled level
+layout(binding = 2) uniform sampler2D tex2;    // 2: the mask (red, 0 to 1)
 uniform int stage;
 uniform bool first;         // 0: tex0 is the read, meters in red
 

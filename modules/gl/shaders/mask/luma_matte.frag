@@ -3,7 +3,7 @@
 // A matte from the color's brightness, its brightest channel (HSV's value): darkness becomes transparency. The
 // alpha becomes 1 − amount + amount × that brightness, times the alpha it had; the color as it is.
 
-uniform sampler2D src;
+layout(binding = 0) uniform sampler2D src;
 uniform float amount;
 
 in vec2 texCoord;

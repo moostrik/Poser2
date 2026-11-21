@@ -51,7 +51,6 @@ class PanoramicStitch(Shader):
             source: Texture = textures[unit] if unit < num_cams else textures[0]
             glActiveTexture(int(GL_TEXTURE0) + unit)
             glBindTexture(GL_TEXTURE_2D, source.tex_id if source.allocated else 0)
-            glUniform1i(self.get_uniform_loc(f"tex[{unit}]"), unit)
 
         glUniform1i(self.get_uniform_loc("numCams"), num_cams)
         glUniform1f(self.get_uniform_loc("camFov"), cam_fov)

@@ -7,7 +7,7 @@ One draw per string instead of one per glyph keeps the main thread's Python/GL s
 — and with it its GIL exposure — flat in the text length.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, GL_TRIANGLES, glActiveTexture, glBindTexture, glDrawArrays, glUniform1i, glUniform4f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, GL_TRIANGLES, glActiveTexture, glBindTexture, glDrawArrays, glUniform4f, glUseProgram
 from modules.utils import Color
 from ...shader import Shader
 
@@ -32,7 +32,6 @@ class Glyphs(Shader):
 
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, atlas_texture_id)
-        glUniform1i(self.get_uniform_loc("atlas"), 0)
 
         glUniform4f(self.get_uniform_loc("color"), *color)
 

@@ -1,6 +1,6 @@
 """Depth Crop shader: the camera's depth inside the view's box on its own pixels."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform4f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform4f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 from modules.utils import Rect
 
@@ -19,7 +19,6 @@ class DepthCrop(Shader):
 
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, depth.tex_id)
-        glUniform1i(self.get_uniform_loc("depth"), 0)
 
         glUniform4f(self.get_uniform_loc("roi"), roi.x, roi.y, roi.width, roi.height)
         glUniform1f(self.get_uniform_loc("near"), near)

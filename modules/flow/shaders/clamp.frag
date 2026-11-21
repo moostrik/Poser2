@@ -3,7 +3,7 @@
 // Clamp Shader
 // Clamps all RGBA channels to a min/max range
 
-uniform sampler2D src;
+layout(binding = 0) uniform sampler2D src;
 uniform float minVal;
 uniform float maxVal;
 

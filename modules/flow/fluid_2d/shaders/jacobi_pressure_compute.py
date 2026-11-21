@@ -90,11 +90,9 @@ class JacobiPressureCompute(ComputeShader):
         # Bind textures via samplers (for filtered access to divergence, obstacles)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, divergence.tex_id)
-        glUniform1i(self.get_uniform_loc("uDivergence"), 0)
 
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
-        glUniform1i(self.get_uniform_loc("uObstacle"), 1)
 
         # Bind pressure textures as images for imageLoad/imageStore
         self.bind_image_read(0, pressure_in, GL_R32F)

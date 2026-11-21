@@ -1,7 +1,7 @@
 #version 460 core
 
-uniform sampler2D src;
-uniform sampler3D lut;
+layout(binding = 0) uniform sampler2D src;
+layout(binding = 1) uniform sampler3D lut;
 uniform float strength;
 uniform vec3 domainMin;
 uniform vec3 domainMax;

@@ -1,6 +1,6 @@
 #version 460 core
 
-uniform sampler2D src;
+layout(binding = 0) uniform sampler2D src;
 uniform float levels;       // 2 or more
 
 in vec2 texCoord;

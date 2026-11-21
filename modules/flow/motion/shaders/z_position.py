@@ -22,11 +22,9 @@ class ZPosition(Shader):
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, track.tex_id)
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
         if mask is not None:
             glActiveTexture(GL_TEXTURE1)
             glBindTexture(GL_TEXTURE_2D, mask.tex_id)
-            glUniform1i(self.get_uniform_loc("tex1"), 1)
         glUniform1i(self.get_uniform_loc("has_mask"), 1 if mask is not None else 0)
         glUniform1f(self.get_uniform_loc("near"), near)
         glUniform1f(self.get_uniform_loc("far"), far)

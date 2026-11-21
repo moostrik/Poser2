@@ -4,8 +4,8 @@
 // Ported from ofxFlowTools ftDensityBridgeShader.h
 // Combines RGB density with velocity magnitude to drive alpha channel
 
-uniform sampler2D tex0;  // Density RGB input
-uniform sampler2D tex1;  // Velocity RG input
+layout(binding = 0) uniform sampler2D tex0;  // Density RGB input
+layout(binding = 1) uniform sampler2D tex1;  // Velocity RG input
 uniform float speed;     // Speed multiplier for alpha
 
 in vec2 texCoord;

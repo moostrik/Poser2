@@ -31,16 +31,12 @@ class Buoyancy(Shader):
 
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, temperature.tex_id)
-        glUniform1i(self.get_uniform_loc("uTemperature"), 0)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, density.tex_id)
-        glUniform1i(self.get_uniform_loc("uDensity"), 1)
         glActiveTexture(GL_TEXTURE2)
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
-        glUniform1i(self.get_uniform_loc("uObstacle"), 2)
         glActiveTexture(GL_TEXTURE3)
         glBindTexture(GL_TEXTURE_2D, velocity.tex_id if velocity is not None else temperature.tex_id)
-        glUniform1i(self.get_uniform_loc("uVelocity"), 3)
         glUniform1i(self.get_uniform_loc("uAdd"), int(velocity is not None))
 
         glUniform1f(self.get_uniform_loc("uSigma"), sigma)

@@ -9,8 +9,8 @@ in vec2 texCoord;
 out vec4 fragColor;
 
 // Input textures
-uniform sampler2D uBase;  // Base obstacle texture
-uniform sampler2D uBlend; // Blend obstacle texture (will be rounded to 0 or 1)
+layout(binding = 0) uniform sampler2D uBase;  // Base obstacle texture
+layout(binding = 1) uniform sampler2D uBlend; // Blend obstacle texture (will be rounded to 0 or 1)
 
 void main() {
     vec2 st = texCoord;

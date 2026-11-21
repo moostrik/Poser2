@@ -10,10 +10,10 @@
 in vec2 texCoord;
 out vec2 fragColor;
 
-uniform sampler2D uTemperature; // Temperature (R16F)
-uniform sampler2D uDensity;     // Density (RGBA16F, premultiplied; its amount in alpha)
-uniform sampler2D uObstacle;    // Obstacle mask (R8, CLAMP_TO_BORDER=1)
-uniform sampler2D uVelocity;    // With uAdd: the velocity (RG16F) the force is added to
+layout(binding = 0) uniform sampler2D uTemperature; // Temperature (R16F)
+layout(binding = 1) uniform sampler2D uDensity;     // Density (RGBA16F, premultiplied; its amount in alpha)
+layout(binding = 2) uniform sampler2D uObstacle;    // Obstacle mask (R8, CLAMP_TO_BORDER=1)
+layout(binding = 3) uniform sampler2D uVelocity;   // With uAdd: the velocity (RG16F) the force is added to
 uniform bool uHasObstacles;     // Skip obstacle checks when false
 uniform bool uAdd;              // The velocity plus the force × uStrength, else the force
 

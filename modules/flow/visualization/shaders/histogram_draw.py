@@ -29,7 +29,6 @@ class HistogramDraw(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, histogram.tex_id)
 
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniform1i(self.get_uniform_loc("channel"), channel)
         glUniform1i(self.get_uniform_loc("channels"), channels)
         glUniform1f(self.get_uniform_loc("total"), float(total))

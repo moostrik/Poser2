@@ -33,11 +33,9 @@ class VorticityCurl(Shader):
         # Bind textures
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, velocity.tex_id)
-        glUniform1i(self.get_uniform_loc("uVelocity"), 0)
 
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
-        glUniform1i(self.get_uniform_loc("uObstacle"), 1)
 
         # Set uniform
         glUniform1f(self.get_uniform_loc("uRadius"), radius)

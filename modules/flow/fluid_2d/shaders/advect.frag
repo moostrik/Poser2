@@ -10,9 +10,9 @@
 in vec2 texCoord;
 out vec4 fragColor;
 
-uniform sampler2D uVelocity;   // Velocity field (RG16F), widths/s
-uniform sampler2D uSource;     // Field to advect (any format)
-uniform sampler2D uObstacle;   // Obstacle mask (R8 or R32F)
+layout(binding = 0) uniform sampler2D uVelocity;   // Velocity field (RG16F), widths/s
+layout(binding = 1) uniform sampler2D uSource;     // Field to advect (any format)
+layout(binding = 2) uniform sampler2D uObstacle;  // Obstacle mask (R8 or R32F)
 uniform bool uHasObstacles;    // Skip obstacle checks when false
 
 uniform float uTimestep;       // dt * advection_scale

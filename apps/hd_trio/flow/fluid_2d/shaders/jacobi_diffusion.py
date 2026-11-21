@@ -46,11 +46,9 @@ class JacobiDiffusion(Shader):
         # Bind textures
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, source.tex_id)
-        glUniform1i(self.get_uniform_loc("uSource"), 0)
 
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
-        glUniform1i(self.get_uniform_loc("uObstacle"), 1)
 
         # Set uniforms
         glUniform2f(self.get_uniform_loc("uAlpha"), alpha_x, alpha_y)

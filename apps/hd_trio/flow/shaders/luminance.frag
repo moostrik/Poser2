@@ -2,7 +2,7 @@
 
 #include "color.glsl"
 
-uniform sampler2D tex0;
+layout(binding = 0) uniform sampler2D tex0;
 
 in vec2 texCoord;
 out vec4 fragColor;

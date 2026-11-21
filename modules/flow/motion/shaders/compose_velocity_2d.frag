@@ -4,8 +4,8 @@
 // A flow's 2D velocity: its x/y times its strength, 0 where it is not finite, counted by the guard: the bridges feed
 // back, so one such pixel would stay and spread through their blur. With has_mask, times the mask
 
-uniform sampler2D tex0;  // x/y RG
-uniform sampler2D tex1;  // mask R (0 to 1), read only with has_mask
+layout(binding = 0) uniform sampler2D tex0;  // x/y RG
+layout(binding = 1) uniform sampler2D tex1; // mask R (0 to 1), read only with has_mask
 uniform bool has_mask;
 uniform vec2 strength;   // Multiplier on x and y
 

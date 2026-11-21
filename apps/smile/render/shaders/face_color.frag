@@ -17,8 +17,8 @@ const int IRIS = 2;
 const int TRACE = 3;
 const int SCAN = 4;
 
-uniform sampler2D src;
-uniform sampler2D blurred;         // a blurred src, for the blur effect
+layout(binding = 0) uniform sampler2D src;
+layout(binding = 1) uniform sampler2D blurred;         // a blurred src, for the blur effect
 uniform vec2 resolution;            // of the output, in pixels
 
 uniform vec4 fields[MAX_FIELDS];    // the boxes of the detected faces: x, y, width, height (normalized, top-left origin, Y-down)

@@ -30,7 +30,7 @@ class LightVolume3D(ComputeShader):
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
-        self.bind_texture_3d(0, density, "uDensity")
+        self.bind_texture_3d(0, density)
         self.bind_image_3d_write(0, light, GL_RGBA16F)
         glUniform3i(self.get_uniform_loc("uSize"), light.width, light.height, light.depth)
         glUniform3f(self.get_uniform_loc("uBox"), *box)

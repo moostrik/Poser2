@@ -5,8 +5,8 @@
 // and the last column gets one bar per lane, the frame-wide mean amount of that channel on a log
 // axis of three decades; a lane for each channel the texture holds, or one channel's lane at full height
 
-uniform sampler2D tex0;  // Previous strip
-uniform sampler2D tex1;  // Summary, its top mip the mean amount of (x, y, z, w)
+layout(binding = 0) uniform sampler2D tex0;  // Previous strip
+layout(binding = 1) uniform sampler2D tex1; // Summary, its top mip the mean amount of (x, y, z, w)
 uniform float scale;     // Multiplier on the bars
 uniform int channel;     // 0 to 3 for one lane, 4 for all the texture holds
 uniform int channels;    // The channels the texture holds, x first, 1 to 4

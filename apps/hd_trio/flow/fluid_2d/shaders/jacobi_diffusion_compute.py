@@ -88,7 +88,6 @@ class JacobiDiffusionCompute(ComputeShader):
         # Bind textures via samplers
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
-        glUniform1i(self.get_uniform_loc("uObstacle"), 0)
 
         # Bind velocity textures as images
         self.bind_image_read(0, velocity_in, GL_RG16F)

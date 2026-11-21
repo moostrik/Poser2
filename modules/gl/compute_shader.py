@@ -20,7 +20,7 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
-from OpenGL.GL import GL_ALL_BARRIER_BITS, GL_COMPUTE_SHADER, GL_FALSE, GL_MAX_COMPUTE_WORK_GROUP_COUNT, GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, GL_MAX_COMPUTE_WORK_GROUP_SIZE, GL_READ_ONLY, GL_READ_WRITE, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_SHADER_STORAGE_BARRIER_BIT, GL_TEXTURE0, GL_TEXTURE_2D, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_3D, GL_TEXTURE_FETCH_BARRIER_BIT, GL_TRUE, GL_WRITE_ONLY, glActiveTexture, glBindImageTexture, glBindTexture, glDispatchCompute, glGetIntegeri_v, glGetIntegerv, glMemoryBarrier, glUniform1i
+from OpenGL.GL import GL_ALL_BARRIER_BITS, GL_COMPUTE_SHADER, GL_FALSE, GL_MAX_COMPUTE_WORK_GROUP_COUNT, GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, GL_MAX_COMPUTE_WORK_GROUP_SIZE, GL_READ_ONLY, GL_READ_WRITE, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_SHADER_STORAGE_BARRIER_BIT, GL_TEXTURE0, GL_TEXTURE_2D, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_3D, GL_TEXTURE_FETCH_BARRIER_BIT, GL_TRUE, GL_WRITE_ONLY, glActiveTexture, glBindImageTexture, glBindTexture, glDispatchCompute, glGetIntegeri_v, glGetIntegerv, glMemoryBarrier
 
 from .shader import Shader
 from .texture import Texture
@@ -134,45 +134,22 @@ class ComputeShader(Shader):
 
     # ========== Texture Sampling (for hybrid read) ==========
 
-    def bind_texture(self, unit: int, texture: Texture, uniform_name: str) -> None:
-        """Bind 2D texture for sampler access (traditional texture() calls).
-
-        Useful when you need filtered sampling alongside image access.
-
-        Args:
-            unit: Texture unit (0, 1, 2, ...)
-            texture: Texture to bind
-            uniform_name: Name of sampler uniform in shader
-        """
+    def bind_texture(self, unit: int, texture: Texture) -> None:
+        """Bind a 2D texture to the unit its sampler names with `layout(binding = unit)`."""
         glActiveTexture(int(GL_TEXTURE0) + unit)
         glBindTexture(GL_TEXTURE_2D, texture.tex_id)
-        glUniform1i(self.get_uniform_loc(uniform_name), unit)
 
-    def bind_texture_3d(self, unit: int, texture: Texture3D, uniform_name: str) -> None:
-        """Bind 3D texture for sampler3D access (trilinear filtered sampling).
-
-        Args:
-            unit: Texture unit (0, 1, 2, ...)
-            texture: Texture3D to bind
-            uniform_name: Name of sampler3D uniform in shader
-        """
+    def bind_texture_3d(self, unit: int, texture: Texture3D) -> None:
+        """Bind a 3D texture to the unit its sampler3D names with `layout(binding = unit)`."""
         glActiveTexture(int(GL_TEXTURE0) + unit)
         glBindTexture(GL_TEXTURE_3D, texture.tex_id)
-        glUniform1i(self.get_uniform_loc(uniform_name), unit)
 
     # ========== 2D Array Texture Binding Methods ==========
 
-    def bind_texture_2d_array(self, unit: int, texture: Texture2DArray, uniform_name: str) -> None:
-        """Bind 2D array texture for sampler2DArray access.
-
-        Args:
-            unit: Texture unit (0, 1, 2, ...)
-            texture: Texture2DArray to bind
-            uniform_name: Name of sampler2DArray uniform in shader
-        """
+    def bind_texture_2d_array(self, unit: int, texture: Texture2DArray) -> None:
+        """Bind a 2D array texture to the unit its sampler2DArray names with `layout(binding = unit)`."""
         glActiveTexture(int(GL_TEXTURE0) + unit)
         glBindTexture(GL_TEXTURE_2D_ARRAY, texture.tex_id)
-        glUniform1i(self.get_uniform_loc(uniform_name), unit)
 
     def bind_image_2d_array(self, unit: int, texture: Texture2DArray, access: int,
                             internal_format: int | None = None) -> None:

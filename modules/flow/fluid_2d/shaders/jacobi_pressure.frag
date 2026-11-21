@@ -6,9 +6,9 @@
 in vec2 texCoord;
 out vec4 fragColor;
 
-uniform sampler2D uSource;      // Previous pressure estimate (R32F)
-uniform sampler2D uDivergence;  // Velocity divergence (R32F)
-uniform sampler2D uObstacle;    // Obstacle mask (R8, CLAMP_TO_BORDER=1)
+layout(binding = 0) uniform sampler2D uSource;      // Previous pressure estimate (R32F)
+layout(binding = 1) uniform sampler2D uDivergence;  // Velocity divergence (R32F)
+layout(binding = 2) uniform sampler2D uObstacle;   // Obstacle mask (R8, CLAMP_TO_BORDER=1)
 uniform bool uHasObstacles;     // Skip obstacle checks when false
 
 #include "walls_2d.glsl"

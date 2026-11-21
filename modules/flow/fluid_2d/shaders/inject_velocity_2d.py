@@ -32,8 +32,6 @@ class InjectVelocity2D(Shader):
         glBindTexture(GL_TEXTURE_2D, velocity.tex_id)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, source.tex_id)
-        glUniform1i(self.get_uniform_loc("uVelocity"), 0)
-        glUniform1i(self.get_uniform_loc("uSource"), 1)
         glUniform1i(self.get_uniform_loc("uMode"), int(mode))
         glUniform1f(self.get_uniform_loc("uGain"), gain)
         glUniform1f(self.get_uniform_loc("uShare"), share)

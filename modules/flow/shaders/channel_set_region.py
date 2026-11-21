@@ -43,8 +43,6 @@ class ChannelSetRegion(Shader):
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, src.tex_id)
 
-        glUniform1i(self.get_uniform_loc("dst"), 0)
-        glUniform1i(self.get_uniform_loc("src"), 1)
         glUniform1i(self.get_uniform_loc("channel"), channel)
         glUniform1f(self.get_uniform_loc("strength"), strength)
         glUniform4f(self.get_uniform_loc("region"), x, y, w, h)

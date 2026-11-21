@@ -4,7 +4,7 @@ Sets a specific region of destination to source texture.
 Source is stretched to fill the target region. Outside region is preserved.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform4f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform4f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging
@@ -42,8 +42,6 @@ class SetRegion(Shader):
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, src.tex_id)
 
-        glUniform1i(self.get_uniform_loc("dst"), 0)
-        glUniform1i(self.get_uniform_loc("src"), 1)
         glUniform1f(self.get_uniform_loc("strength"), strength)
         glUniform4f(self.get_uniform_loc("region"), x, y, w, h)
 

@@ -6,8 +6,8 @@
 // times its weight in red, the weight in green. The weight is the mask's (1 without one), and 0 without depth:
 // no z position, not the front.
 
-uniform sampler2D tex0;  // the depth track (RGBA32F): its disparity (1/m) in green
-uniform sampler2D tex1;  // mask R (0 to 1), read only with has_mask
+layout(binding = 0) uniform sampler2D tex0;  // the depth track (RGBA32F): its disparity (1/m) in green
+layout(binding = 1) uniform sampler2D tex1; // mask R (0 to 1), read only with has_mask
 uniform bool has_mask;
 uniform float near;      // m, the range's front
 uniform float far;       // m, its back

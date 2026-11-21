@@ -57,7 +57,6 @@ class RgbToYuv(Shader):
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, src.tex_id)
-        glUniform1i(self.get_uniform_loc("src"), 0)
         glUniform1i(self.get_uniform_loc("plane"), int(plane))
         # Row-major rows read as GLSL columns, so `matrix[i]` in the shader is row i (Y, Cb, Cr)
         matrix, offset = BT709[sample_max]

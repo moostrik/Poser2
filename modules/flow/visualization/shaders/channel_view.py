@@ -30,7 +30,6 @@ class ChannelView(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, texture.tex_id)
 
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniform1f(self.get_uniform_loc("scale"), scale)
         glUniform1i(self.get_uniform_loc("channel"), channel)
         glUniform1i(self.get_uniform_loc("colormap"), 1 if colormap else 0)

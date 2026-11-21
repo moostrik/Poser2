@@ -9,8 +9,8 @@ out vec4 fragColor;
 
 const int MAX_CURLS = 3;     // VorticityCurl.MAX_CURLS
 
-uniform sampler2D uVelocity; // Velocity field (RG16F), widths/s
-uniform sampler2D uObstacle; // Obstacle mask (1.0 = obstacle, 0.0 = fluid)
+layout(binding = 0) uniform sampler2D uVelocity; // Velocity field (RG16F), widths/s
+layout(binding = 1) uniform sampler2D uObstacle; // Obstacle mask (1.0 = obstacle, 0.0 = fluid)
 uniform bool uHasObstacles;  // Skip obstacle checks when false
 
 uniform int  uCount;                     // the curls, 1 to MAX_CURLS

@@ -2,7 +2,7 @@
 
 #include "color.glsl"
 
-uniform sampler2D src;
+layout(binding = 0) uniform sampler2D src;
 uniform float threshold;
 uniform float softness;
 uniform bool invert;

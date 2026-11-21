@@ -6,8 +6,8 @@
 
 #include "colormap.glsl"
 
-uniform sampler2D depth;
-uniform sampler2D image;
+layout(binding = 0) uniform sampler2D depth;
+layout(binding = 1) uniform sampler2D image;
 uniform float nearDepth;
 uniform float farDepth;
 uniform int mode;           // DepthDrawMode

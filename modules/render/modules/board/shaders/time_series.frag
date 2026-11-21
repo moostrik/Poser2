@@ -4,7 +4,7 @@
 // One lane per series, newest on the right: each column holds the lowest and highest sample of its
 // slice of time, normalized to the lane, so a band covers what happened and a spike stays visible
 
-uniform sampler2D   ranges;           // RG: lowest, highest per column (x) and lane (y); negative = no sample
+layout(binding = 0) uniform sampler2D   ranges;          // RG: lowest, highest per column (x) and lane (y); negative = no sample
 uniform int         numLanes;
 uniform int         numColumns;
 uniform float       lineWidth;     // in lane heights

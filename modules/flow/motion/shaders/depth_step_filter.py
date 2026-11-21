@@ -3,7 +3,7 @@
 The depth without its edges, where its 3×3 depth samples span two surfaces.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform2f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -28,7 +28,6 @@ class DepthStepFilter(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, depth.tex_id)
 
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniform2f(self.get_uniform_loc("depth_step"), *depth_step)
         glUniform1f(self.get_uniform_loc("tolerance"), tolerance)
 

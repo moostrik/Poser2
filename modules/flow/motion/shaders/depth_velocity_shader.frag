@@ -25,10 +25,10 @@
 // With `dead_zone` above 0, z is 0 while the tracked depth stays within it of its anchor; past it, z at its
 // full speed, and the anchor follows at `dead_zone` behind (a backlash); a track that starts over is anchored anew.
 
-uniform sampler2D tex0;  // Depth now R (m), its confidence G (0 to 1, 0 where the view filled it)
-uniform sampler2D tex1;  // The track the frame before: z, disparity (1/m), rate (1/m per second), anchor (m)
-uniform sampler2D misses;           // The track's misses in a row the frame before
-uniform sampler2D displacement;     // uv per frame (RG), with warp
+layout(binding = 0) uniform sampler2D tex0;  // Depth now R (m), its confidence G (0 to 1, 0 where the view filled it)
+layout(binding = 1) uniform sampler2D tex1;  // The track the frame before: z, disparity (1/m), rate (1/m per second), anchor (m)
+layout(binding = 3) uniform sampler2D misses;           // The track's misses in a row the frame before
+layout(binding = 2) uniform sampler2D displacement;    // uv per frame (RG), with warp
 uniform bool warp;
 uniform vec2 depth_step; // uv between two depth samples
 uniform int window;      // Radius in depth samples

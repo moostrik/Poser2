@@ -6,7 +6,7 @@
 // front), reaches one cell at a speed of 1 and rolls off toward two, and thickens with its length up
 // to full at one cell; below a tenth of a cell long (at least 2 px) it is a dot. Colored by its direction
 
-uniform sampler3D tex0;         // The velocity (xyz)
+layout(binding = 0) uniform sampler3D tex0;        // The velocity (xyz)
 uniform mat4 view_projection;   // the box's space to clip space
 uniform vec3 box;               // the box's size, its width 1
 uniform ivec3 grid;             // the grid points across, down and deep

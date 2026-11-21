@@ -1,7 +1,7 @@
 #version 460 core
 
-uniform sampler2D src;
-uniform sampler2D dst;
+layout(binding = 0) uniform sampler2D src;
+layout(binding = 1) uniform sampler2D dst;
 uniform float fade;
 
 in vec2 texCoord;

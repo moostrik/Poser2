@@ -36,11 +36,9 @@ class MacCormack2D(Shader):
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
-        for unit, (texture, name) in enumerate(((velocity, "uVelocity"), (source, "uSource"), (forward, "uForward"),
-                                                (obstacle, "uObstacle"))):
+        for unit, texture in enumerate((velocity, source, forward, obstacle)):
             glActiveTexture((GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3)[unit])
             glBindTexture(GL_TEXTURE_2D, texture.tex_id)
-            glUniform1i(self.get_uniform_loc(name), unit)
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
         glUniform1i(self.get_uniform_loc("uClosed"), int(closed))
         glUniform1f(self.get_uniform_loc("uWallKeep"), wall_keep)

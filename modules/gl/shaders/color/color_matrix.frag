@@ -1,6 +1,6 @@
 #version 460 core
 
-uniform sampler2D src;
+layout(binding = 0) uniform sampler2D src;
 uniform mat3 matrix;
 uniform vec3 offset;
 

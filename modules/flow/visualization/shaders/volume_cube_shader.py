@@ -46,7 +46,6 @@ class VolumeCubeShader(Shader):
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_3D, volume.tex_id)
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniformMatrix4fv(self.get_uniform_loc("inverse_view_projection"), 1, GL_TRUE, inverse_view_projection.astype(np.float32))
         glUniform3f(self.get_uniform_loc("box"), *box)
         glUniform1f(self.get_uniform_loc("scale"), scale)

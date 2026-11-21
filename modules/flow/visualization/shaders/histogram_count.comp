@@ -10,7 +10,7 @@
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
-uniform sampler2D tex0;     // The texture counted
+layout(binding = 0) uniform sampler2D tex0;    // The texture counted
 uniform float scale;        // Multiplier on the values
 uniform ivec2 samples;      // The grid of samples, across and down
 uniform bool speed;         // Count the length of xyz on a log scale

@@ -31,8 +31,8 @@ class BandpassAccelerations(ComputeShader):
         if not self.allocated or not self.shader_program or not fast.allocated or not slow.allocated:
             return
         glUseProgram(self.shader_program)
-        for unit, (texture, name) in enumerate(((fast, "uFast"), (slow, "uSlow"), *zip(velocities, ("uStart", "uBow", "uStop", "uWake")))):
-            self.bind_texture(unit, texture, name)
+        for unit, texture in enumerate((fast, slow, *velocities)):
+            self.bind_texture(unit, texture)
         self.bind_image_write(0, change)
         if accelerations is not None:
             for unit, texture in enumerate(accelerations, start=1):

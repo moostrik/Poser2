@@ -41,7 +41,7 @@ class Divergence3D(ComputeShader):
         glUniform1i(self.get_uniform_loc('uSubtractMean'), int(expansion is not None and expansion[2] is not None))
         if expansion is not None:
             volume, rate, mean = expansion
-            self.bind_texture_3d(3, volume, 'uExpansion')
+            self.bind_texture_3d(3, volume)
             glUniform1f(self.get_uniform_loc('uExpansionRate'), rate)
             if mean is not None:
                 mean.bind_base(1)

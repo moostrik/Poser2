@@ -1,7 +1,7 @@
 #version 460 core
 
-uniform sampler2D src;
-uniform sampler2D blueNoise;    // 64 x 64 thresholds 0..1
+layout(binding = 0) uniform sampler2D src;
+layout(binding = 1) uniform sampler2D blueNoise;   // 64 x 64 thresholds 0..1
 uniform float levels;           // the output's steps per channel: 255 for 8 bits
 uniform int pattern;            // DitherPattern: 0 ordered, 1 blue noise
 

@@ -1,6 +1,6 @@
 #version 460 core
 
-uniform sampler2D src;
+layout(binding = 0) uniform sampler2D src;
 #define texelSize (1.0 / vec2(textureSize(src, 0)))
 uniform vec2 direction;     // (1, 0) across, (0, 1) down
 uniform float spacing;      // texels between taps, 1 for the kernel as written

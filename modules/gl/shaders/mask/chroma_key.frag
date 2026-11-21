@@ -1,6 +1,6 @@
 #version 460 core
 
-uniform sampler2D src;
+layout(binding = 0) uniform sampler2D src;
 uniform vec3 key;
 uniform float threshold;
 uniform float softness;

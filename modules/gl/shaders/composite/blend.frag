@@ -2,8 +2,8 @@
 
 #include "blend_modes.glsl"
 
-uniform sampler2D src;      // the layer
-uniform sampler2D dst;      // the base
+layout(binding = 0) uniform sampler2D src;      // the layer
+layout(binding = 1) uniform sampler2D dst;     // the base
 uniform int mode;           // BlendShaderMode
 uniform float amount;       // the layer's opacity
 

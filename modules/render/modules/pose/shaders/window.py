@@ -60,7 +60,6 @@ class Window(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
 
-        glUniform1i(self.get_uniform_loc("src"), 0)
         glUniform1i(self.get_uniform_loc("numStreams"), num_streams)
         glUniform1f(self.get_uniform_loc("streamStep"), stream_step)
         glUniform1f(self.get_uniform_loc("lineWidth"), line_width)

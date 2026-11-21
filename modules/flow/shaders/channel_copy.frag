@@ -3,8 +3,8 @@
 // Channel Copy Shader
 // Copies single-channel texture to specific RGBA channel while preserving others
 
-uniform sampler2D dst;      // Existing RGBA texture (to preserve other channels)
-uniform sampler2D src;      // Single-channel source (R32F)
+layout(binding = 0) uniform sampler2D dst;      // Existing RGBA texture (to preserve other channels)
+layout(binding = 1) uniform sampler2D src;     // Single-channel source (R32F)
 uniform int channel;        // Target channel: 0=R, 1=G, 2=B, 3=A
 
 in vec2 texCoord;

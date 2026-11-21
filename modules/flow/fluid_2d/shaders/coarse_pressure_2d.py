@@ -21,7 +21,7 @@ class CoarsePressure2D(ComputeShader):
             return
         alpha = (1.0 / (cell[0] * cell[0]), 1.0 / (cell[1] * cell[1]))
         glUseProgram(self.shader_program)
-        self.bind_texture(0, divergence, "uDivergence")
+        self.bind_texture(0, divergence)
         self.bind_image_readwrite(0, pressure, GL_R32F)
         glUniform2f(self.get_uniform_loc("uAlpha"), *alpha)
         glUniform1f(self.get_uniform_loc("uBeta"), 1.0 / (2.0 * sum(alpha) + screening))

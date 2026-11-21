@@ -6,8 +6,8 @@
 in vec2 texCoord;
 out float fragColor;
 
-uniform sampler2D uVelocity;   // Velocity field (RG32F)
-uniform sampler2D uObstacle;   // Obstacle mask (R8, CLAMP_TO_BORDER=1)
+layout(binding = 0) uniform sampler2D uVelocity;   // Velocity field (RG32F)
+layout(binding = 1) uniform sampler2D uObstacle;   // Obstacle mask (R8, CLAMP_TO_BORDER=1)
 uniform bool uHasObstacles;    // Skip obstacle checks when false
 
 uniform vec2 uHalfRdxInv;  // (0.5/gridScale_x, 0.5/gridScale_y) for aspect correction

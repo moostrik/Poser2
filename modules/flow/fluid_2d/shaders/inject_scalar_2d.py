@@ -32,8 +32,6 @@ class InjectScalar2D(Shader):
         glBindTexture(GL_TEXTURE_2D, field.tex_id)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, input.tex_id)
-        glUniform1i(self.get_uniform_loc("uField"), 0)
-        glUniform1i(self.get_uniform_loc("uInput"), 1)
         glUniform1i(self.get_uniform_loc("uMode"), int(mode))
         glUniform1f(self.get_uniform_loc("uStrength"), strength)
         glUniform1f(self.get_uniform_loc("uGain"), gain)

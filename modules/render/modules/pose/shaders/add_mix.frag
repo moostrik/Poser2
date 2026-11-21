@@ -1,7 +1,7 @@
 #version 460 core
 
-uniform sampler2D dst;              // the base
-uniform sampler2D src;              // the foreground
+layout(binding = 0) uniform sampler2D dst;              // the base
+layout(binding = 1) uniform sampler2D src;             // the foreground
 uniform float blend;
 uniform float addCurve = 0.3;       // Higher = additive peaks later
 uniform float blendCurve = 1.5;     // Higher = the foreground comes in later

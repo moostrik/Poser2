@@ -17,8 +17,8 @@ class ParticleWeighted(ComputeShader):
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
-        self.bind_texture(0, weighted_sum, "uWeightedSum")
-        self.bind_texture(1, reveal, "uReveal")
+        self.bind_texture(0, weighted_sum)
+        self.bind_texture(1, reveal)
         self.bind_image_write(0, output, GL_RGBA16F)
         glUniform2i(self.get_uniform_loc("uOutputSize"), output.width, output.height)
         self.dispatch(output.width, output.height)

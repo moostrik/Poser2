@@ -28,8 +28,6 @@ class DepthColormap(Shader):
         glBindTexture(GL_TEXTURE_2D, depth.tex_id)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, image.tex_id)
-        glUniform1i(self.get_uniform_loc("depth"), 0)
-        glUniform1i(self.get_uniform_loc("image"), 1)
         glUniform1f(self.get_uniform_loc("nearDepth"), near)
         glUniform1f(self.get_uniform_loc("farDepth"), far)
         glUniform1i(self.get_uniform_loc("mode"), mode)

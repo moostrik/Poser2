@@ -38,9 +38,9 @@ class Buoyancy3D(ComputeShader):
 
         glUseProgram(self.shader_program)
 
-        self.bind_texture_3d(0, temperature, "uTemperature")
-        self.bind_texture_3d(1, density, "uDensity")
-        self.bind_texture_3d(2, obstacle, "uObstacle")
+        self.bind_texture_3d(0, temperature)
+        self.bind_texture_3d(1, density)
+        self.bind_texture_3d(2, obstacle)
         self.bind_image_3d_write(0, force_out, GL_RGBA16F)
 
         glUniform1f(self.get_uniform_loc("uSigma"), sigma)

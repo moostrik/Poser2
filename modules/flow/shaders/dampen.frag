@@ -13,7 +13,7 @@
  *   true  → magnitude from .rgba (density — alpha is real data)
  */
 
-uniform sampler2D src;
+layout(binding = 0) uniform sampler2D src;
 uniform float uThreshold;
 uniform float uDampenFactor;
 uniform bool uIncludeAlpha;

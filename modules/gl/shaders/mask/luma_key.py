@@ -20,7 +20,6 @@ class LumaKey(Shader):
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, src.tex_id)
-        glUniform1i(self.get_uniform_loc("src"), 0)
         glUniform1f(self.get_uniform_loc("threshold"), threshold)
         glUniform1f(self.get_uniform_loc("softness"), max(softness, 1e-4))
         glUniform1i(self.get_uniform_loc("invert"), int(invert))

@@ -19,8 +19,8 @@ class ResidualRestrict2D(ComputeShader):
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
-        self.bind_texture(0, divergence, "uDivergence")
-        self.bind_texture(1, obstacle, "uObstacle")
+        self.bind_texture(0, divergence)
+        self.bind_texture(1, obstacle)
         self.bind_image_read(0, pressure, GL_R32F)
         self.bind_image_write(1, coarse, GL_R32F)
         glUniform2f(self.get_uniform_loc("uAlpha"), 1.0 / (cell[0] * cell[0]), 1.0 / (cell[1] * cell[1]))

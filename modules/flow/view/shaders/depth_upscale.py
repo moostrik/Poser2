@@ -1,6 +1,6 @@
 """Depth Upscale shader: the aligned depth upscaled to the view where it is the player's and the mask is."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform4f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform4f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 from modules.utils import Rect
 
@@ -20,10 +20,8 @@ class DepthUpscale(Shader):
 
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, depth.tex_id)
-        glUniform1i(self.get_uniform_loc("depth"), 0)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, mask.tex_id)
-        glUniform1i(self.get_uniform_loc("mask"), 1)
 
         glUniform4f(self.get_uniform_loc("roi"), roi.x, roi.y, roi.width, roi.height)
         glUniform1f(self.get_uniform_loc("tolerance"), tolerance)

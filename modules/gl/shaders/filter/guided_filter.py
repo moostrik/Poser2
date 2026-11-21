@@ -37,11 +37,9 @@ class GuidedFilter(Shader):
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
         if tex1 is not None:
             glActiveTexture(GL_TEXTURE1)
             glBindTexture(GL_TEXTURE_2D, tex1.tex_id)
-            glUniform1i(self.get_uniform_loc("tex1"), 1)
         glUniform1i(self.get_uniform_loc("stage"), stage)
         glUniform2f(self.get_uniform_loc("direction"), *((1.0, 0.0) if horizontal else (0.0, 1.0)))
         glUniform1i(self.get_uniform_loc("radius"), radius)

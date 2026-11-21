@@ -1,6 +1,6 @@
 """WeightedSum: two images, each times its weight, summed: `a * a_weight + b * b_weight`."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUseProgram
 from ... import Shader, draw_quad, Texture
 
 import logging
@@ -21,11 +21,9 @@ class WeightedSum(Shader):
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, a.tex_id)
-        glUniform1i(self.get_uniform_loc("a"), 0)
         glUniform1f(self.get_uniform_loc("aWeight"), a_weight)
         if b is not None:
             glActiveTexture(GL_TEXTURE1)
             glBindTexture(GL_TEXTURE_2D, b.tex_id)
-            glUniform1i(self.get_uniform_loc("b"), 1)
         glUniform1f(self.get_uniform_loc("bWeight"), b_weight if b is not None else 0.0)
         draw_quad()

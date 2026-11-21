@@ -83,7 +83,7 @@ class LightSweep3D(ComputeShader):
             return
         axis, direction, slope, start, count, step = sweep_lines(size, toward, cell)
         glUseProgram(self.shader_program)
-        self.bind_texture_3d(0, density, "uDensity")
+        self.bind_texture_3d(0, density)
         self.bind_image_3d_write(0, light, GL_RGBA16F)
         glUniform3i(self.get_uniform_loc("uSize"), *size)
         glUniform1i(self.get_uniform_loc("uAxis"), axis)

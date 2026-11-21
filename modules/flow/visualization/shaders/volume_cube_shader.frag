@@ -8,7 +8,7 @@
 // slice is a sample as any other, at 1 it shows its amount as its opacity and the rest none. Out comes
 // the premultiplied color and its coverage
 
-uniform sampler3D tex0;               // The volume
+layout(binding = 0) uniform sampler3D tex0;              // The volume
 uniform mat4 inverse_view_projection; // clip space back to the box's space
 uniform vec3 box;                     // the box's size, its width 1
 uniform float scale;                  // Multiplier on the values; at 1 after it, a sample is full

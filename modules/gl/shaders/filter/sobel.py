@@ -22,7 +22,6 @@ class Sobel(Shader):
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, src.tex_id)
-        glUniform1i(self.get_uniform_loc("src"), 0)
         glUniform1f(self.get_uniform_loc("threshold"), threshold)
         glUniform1f(self.get_uniform_loc("strength"), strength)
         glUniform1i(self.get_uniform_loc("invert"), 1 if invert else 0)

@@ -11,6 +11,7 @@ from modules.gl import Texture, Texture3D, ComputeShader
 
 IDENTITY: tuple[float, ...] = (1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
 LUMINANCE: tuple[float, float, float] = (0.2126, 0.7152, 0.0722)    # Rec. 709: how bright a color is seen
+CAUSTIC_NET_UNIT: int = 4       # light.glsl's uCausticNet
 
 
 def half_extinction(distance: float) -> float:
@@ -110,8 +111,8 @@ def _cross(a: tuple[float, ...], b: tuple[float, ...]) -> tuple[float, float, fl
     return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
 
 
-def bind_light(shader: ComputeShader, light: CompositeLight, net: Texture | None, unit: int) -> None:
-    """The uniforms `light.glsl` reads, the caustic net on texture `unit`."""
+def bind_light(shader: ComputeShader, light: CompositeLight, net: Texture | None) -> None:
+    """The uniforms `light.glsl` reads, the caustic net on its unit."""
     glUniform1i(shader.get_uniform_loc("uPoint"), int(light.point))
     glUniform3f(shader.get_uniform_loc("uVector"), *light.vector)
     glUniform3f(shader.get_uniform_loc("uBox"), *light.box)
@@ -125,9 +126,7 @@ def bind_light(shader: ComputeShader, light: CompositeLight, net: Texture | None
     for name, tile in zip(("uNetX", "uNetY", "uNetZ"), net_tiles(light.vector, light.box, light.caustic_size)):
         glUniform2f(shader.get_uniform_loc(name), *tile)
     if on and net is not None:
-        shader.bind_texture(unit, net, "uCausticNet")
-    else:       # its own unit even unread: a sampler2D on a unit with a sampler3D fails the dispatch
-        glUniform1i(shader.get_uniform_loc("uCausticNet"), unit)
+        shader.bind_texture(CAUSTIC_NET_UNIT, net)
 
 
 class Composite3D(ComputeShader):
@@ -152,7 +151,7 @@ class Composite3D(ComputeShader):
 
         glUseProgram(self.shader_program)
 
-        self.bind_texture_3d(0, density, "uDensity")
+        self.bind_texture_3d(0, density)
         self.bind_image_write(0, output_2d, GL_RGBA16F)
 
         glUniform1i(self.get_uniform_loc("uDepth"), density.depth)
@@ -164,19 +163,17 @@ class Composite3D(ComputeShader):
         glUniform1i(self.get_uniform_loc("uSplit"), int(color is not None))
         glUniform1i(self.get_uniform_loc("uOklab"), int(oklab))
         if color is not None:
-            self.bind_texture_3d(1, color, "uColor")
+            self.bind_texture_3d(1, color)
         direct: Texture3D | None = light.direct if light is not None else None
         rays: Texture3D | None = light.rays if light is not None else None
         glUniform1i(self.get_uniform_loc("uLit"), int(direct is not None))
         glUniform1i(self.get_uniform_loc("uHasRays"), int(rays is not None))
         if light is not None:
             glUniform1f(self.get_uniform_loc("uIntensity"), light.intensity)
-            bind_light(self, light, light.net, 4)
-        else:       # the net's sampler on its own unit, unread
-            glUniform1i(self.get_uniform_loc("uCausticNet"), 4)
+            bind_light(self, light, light.net)
         if direct is not None:
-            self.bind_texture_3d(2, direct, "uDirect")
+            self.bind_texture_3d(2, direct)
         if rays is not None:
-            self.bind_texture_3d(3, rays, "uRays")
+            self.bind_texture_3d(3, rays)
 
         self.dispatch(output_2d.width, output_2d.height)

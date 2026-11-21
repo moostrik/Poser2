@@ -13,7 +13,7 @@ uniform float uCausticDepth;  // widths down the light's way over which the net 
 uniform vec2  uNetX;          // a sun's net: its tile coordinates per uvw x, y and z, the net laid across its way
 uniform vec2  uNetY;
 uniform vec2  uNetZ;
-uniform sampler2D uCausticNet; // the net, tileable, its mean 1
+layout(binding = 4) uniform sampler2D uCausticNet; // the net, tileable, its mean 1; unit 4 in every shader that includes this
 
 // Toward the light from a place, unit
 vec3 to_light(vec3 uvw) {

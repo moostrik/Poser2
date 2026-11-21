@@ -12,7 +12,7 @@ layout(local_size_x = 16, local_size_y = 16) in;
 layout(r32ui, binding = 0) uniform coherent uimage2D nearest;
 layout(r32f, binding = 1) uniform writeonly image2D aligned;
 
-uniform sampler2D depth;        // meters on the depth camera's view, 0 for no depth
+layout(binding = 0) uniform sampler2D depth;       // meters on the depth camera's view, 0 for no depth
 uniform mat3 toRay;             // depth pixel to its ray at unit depth
 uniform mat4x3 toUv;            // point to the video frame's homogeneous uv; z is the depth along the video axis
 uniform mat3 toCorrected;       // uv to straightened uv

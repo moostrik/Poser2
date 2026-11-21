@@ -36,9 +36,6 @@ class DisplacementFilter(Shader):
         glActiveTexture(GL_TEXTURE2)
         glBindTexture(GL_TEXTURE_2D, carry.tex_id)
 
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
-        glUniform1i(self.get_uniform_loc("tex1"), 1)
-        glUniform1i(self.get_uniform_loc("carry"), 2)
         glUniform1f(self.get_uniform_loc("smoothing"), smooth)
         glUniform1f(self.get_uniform_loc("rest_speed"), rest_speed)
         glUniform1f(self.get_uniform_loc("halving_speed"), halving_speed)

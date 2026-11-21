@@ -46,11 +46,9 @@ class Divergence(Shader):
         # Bind textures
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, velocity.tex_id)
-        glUniform1i(self.get_uniform_loc("uVelocity"), 0)
 
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
-        glUniform1i(self.get_uniform_loc("uObstacle"), 1)
 
         # 1 / (2 × the cell), widths: a central difference over two cells
         half_rdx_x = 0.5 / cell[0]
@@ -63,7 +61,6 @@ class Divergence(Shader):
             assert expansion is not None
             glActiveTexture(GL_TEXTURE2)
             glBindTexture(GL_TEXTURE_2D, expansion.tex_id)
-            glUniform1i(self.get_uniform_loc("uExpansion"), 2)
             glUniform1f(self.get_uniform_loc("uRate"), rate)
             glUniform1i(self.get_uniform_loc("uSubtractMean"), int(mean is not None))
             if mean is not None:

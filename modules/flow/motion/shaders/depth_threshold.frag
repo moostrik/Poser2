@@ -3,7 +3,7 @@
 // Depth Threshold Shader
 // Takes the noise floor off a signed field, continuously.
 
-uniform sampler2D tex0;  // Motion toward the camera R
+layout(binding = 0) uniform sampler2D tex0; // Motion toward the camera R
 uniform float threshold; // Size taken off, in the field's units
 
 in vec2 texCoord;

@@ -10,8 +10,8 @@ out vec2 fragColor;
 
 const int MAX_CURLS = 3;     // VorticityCurl.MAX_CURLS
 
-uniform sampler2D uCurl;     // each confinement's curl, one channel each (RGBA16F)
-uniform sampler2D uObstacle; // Obstacle mask (R8, CLAMP_TO_BORDER=1)
+layout(binding = 0) uniform sampler2D uCurl;     // each confinement's curl, one channel each (RGBA16F)
+layout(binding = 1) uniform sampler2D uObstacle; // Obstacle mask (R8, CLAMP_TO_BORDER=1)
 uniform bool uHasObstacles;  // Skip obstacle checks when false
 
 uniform vec2  uHalfRdxInv;               // 0.5 / the cell, widths, on x and y

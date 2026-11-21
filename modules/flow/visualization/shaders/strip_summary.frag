@@ -3,7 +3,7 @@
 // Strip Summary Shader
 // A texture's channels as amounts, in one small texture whose top mip is their mean
 
-uniform sampler2D tex0;  // The texture plotted
+layout(binding = 0) uniform sampler2D tex0; // The texture plotted
 
 in vec2 texCoord;
 out vec4 fragColor;

@@ -3,7 +3,7 @@
 // The dual filter (Marius Bjørge, "Bandwidth-Efficient Rendering", SIGGRAPH 2015). The bilinear filter averages four
 // texels in each tap placed between them.
 
-uniform sampler2D src;
+layout(binding = 0) uniform sampler2D src;
 uniform bool upsample;
 uniform float threshold;        // down only: 0 or more keeps what is brighter than it (the bloom's bright pass)
 #define halfTexel (0.5 / vec2(textureSize(src, 0)))

@@ -1,7 +1,7 @@
-#version 410 core
+#version 460 core
 
-uniform sampler2D uColor;      // Color input (RGB: R=warm, G=neutral, B=cold)
-uniform sampler2D uMask;       // Velocity magnitude mask (R32F)
+layout(binding = 0) uniform sampler2D uColor;      // Color input (RGB: R=warm, G=neutral, B=cold)
+layout(binding = 1) uniform sampler2D uMask;       // Velocity magnitude mask (R32F)
 uniform float uScale;          // Output multiplier
 
 in vec2 texCoord;

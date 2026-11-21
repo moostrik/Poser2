@@ -4,7 +4,7 @@
 // A texture's channels as an image or as a colormap centered on mid grey, all of them or one; a channel the
 // texture does not have reads as sampled (a one-channel texture's grey swizzle repeats x, w is 1)
 
-uniform sampler2D tex0;
+layout(binding = 0) uniform sampler2D tex0;
 uniform float scale;     // Multiplier on the values
 uniform int channel;     // 0 to 3 for x, y, z, w; 4 for all
 uniform bool colormap;     // Centered on mid grey: x, y, z as red, green, blue, w as grey

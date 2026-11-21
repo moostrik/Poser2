@@ -1,4 +1,4 @@
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform2f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging
@@ -25,9 +25,6 @@ class Omission(Shader):
         glBindTexture(GL_TEXTURE_2D, mask.tex_id)
 
         # Configure shader uniforms (using cached locations)
-        glUniform1i(self.get_uniform_loc("src"), 0)
-        glUniform1i(self.get_uniform_loc("dst"), 1)
-        glUniform1i(self.get_uniform_loc("mask"), 2)
         glUniform1f(self.get_uniform_loc("bloom"), bloom)
         glUniform1f(self.get_uniform_loc("omission"), omission)
         glUniform2f(self.get_uniform_loc("resolution"), tex0.width, tex0.height)

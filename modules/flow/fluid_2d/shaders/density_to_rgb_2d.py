@@ -13,6 +13,5 @@ class DensityToRgb2D(Shader):
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, density.tex_id)
-        glUniform1i(self.get_uniform_loc("uDensity"), 0)
         glUniform1i(self.get_uniform_loc("uOklab"), int(oklab))
         draw_quad()

@@ -4,7 +4,7 @@
 // A z position as a monitor draws it: red the z position (red over green, 0 front to 1 back), green its
 // weight; 0 where it has none
 
-uniform sampler2D tex0;     // a z position: red the z position times its weight, green the weight
+layout(binding = 0) uniform sampler2D tex0;    // a z position: red the z position times its weight, green the weight
 
 in vec2 texCoord;
 out vec4 fragColor;

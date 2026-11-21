@@ -34,9 +34,8 @@ class BandpassChanges2D(ComputeShader):
         if not self.allocated or not self.shader_program or not fast.allocated or not slow.allocated:
             return
         glUseProgram(self.shader_program)
-        for unit, (texture, name) in enumerate(((fast, "uFast"), (slow, "uSlow"), (rise_fast, "uRiseFast"),
-                                                (rise_slow, "uRiseSlow"), (fall_speeds, "uFallSpeeds"))):
-            self.bind_texture(unit, texture, name)
+        for unit, texture in enumerate((fast, slow, rise_fast, rise_slow, fall_speeds)):
+            self.bind_texture(unit, texture)
         for unit, texture in enumerate((*speeds, *velocities)):
             self.bind_image_write(unit, texture)
         glUniform1f(self.get_uniform_loc("uScale"), scale)

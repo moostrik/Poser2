@@ -6,13 +6,13 @@
 // source (`scalars`, red alone, the mask) gives its red, read as red: a single-channel texture reads (r, r, r, 1).
 // The sources share one unit, so the weights are shares, not gains. With `capped` the sum is held at 1, a presence.
 
-uniform sampler2D tex0;
-uniform sampler2D tex1;
-uniform sampler2D tex2;
-uniform sampler2D tex3;
-uniform sampler2D tex4;
-uniform sampler2D tex5;
-uniform sampler2D tex6;
+layout(binding = 0) uniform sampler2D tex0;
+layout(binding = 1) uniform sampler2D tex1;
+layout(binding = 2) uniform sampler2D tex2;
+layout(binding = 3) uniform sampler2D tex3;
+layout(binding = 4) uniform sampler2D tex4;
+layout(binding = 5) uniform sampler2D tex5;
+layout(binding = 6) uniform sampler2D tex6;
 uniform float weights[7];
 uniform bool scalars[7];
 uniform bool lengths;

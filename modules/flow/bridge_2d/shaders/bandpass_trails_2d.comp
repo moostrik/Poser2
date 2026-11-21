@@ -6,9 +6,9 @@
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
-uniform sampler2D uVelocity;        // the input velocity (xy widths/s)
-uniform sampler2D uFast;            // the fast trail before
-uniform sampler2D uSlow;            // the slow trail before
+layout(binding = 0) uniform sampler2D uVelocity;       // the input velocity (xy widths/s)
+layout(binding = 1) uniform sampler2D uFast;           // the fast trail before
+layout(binding = 2) uniform sampler2D uSlow;           // the slow trail before
 uniform float uFastWeight;          // what remains of the fast trail a step
 uniform float uSlowWeight;          // and of the slow one
 uniform ivec2 uSize;

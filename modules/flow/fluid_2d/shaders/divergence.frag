@@ -9,10 +9,10 @@
 in vec2 texCoord;
 out float fragColor;
 
-uniform sampler2D uVelocity;   // Velocity field (RG32F)
-uniform sampler2D uObstacle;   // Obstacle mask (R8, CLAMP_TO_BORDER=1)
+layout(binding = 0) uniform sampler2D uVelocity;   // Velocity field (RG32F)
+layout(binding = 1) uniform sampler2D uObstacle;   // Obstacle mask (R8, CLAMP_TO_BORDER=1)
 uniform bool uHasObstacles;    // Skip obstacle checks when false
-uniform sampler2D uExpansion;  // The expansion, a presence 0 to 1 (R16F); read with uHasExpansion
+layout(binding = 2) uniform sampler2D uExpansion; // The expansion, a presence 0 to 1 (R16F); read with uHasExpansion
 uniform bool uHasExpansion;
 uniform float uRate;           // The expansion's rate, 1/s
 uniform bool uSubtractMean;    // The expansion's mean (uMean) taken off first

@@ -37,10 +37,8 @@ class FaceColor(Shader):
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, blurred.tex_id if blurred is not None and blurred.allocated else src.tex_id)
-        glUniform1i(self.get_uniform_loc("blurred"), 1)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, src.tex_id)
-        glUniform1i(self.get_uniform_loc("src"), 0)
         glUniform2f(self.get_uniform_loc("resolution"), float(width), float(height))
 
         if fields:

@@ -1,8 +1,8 @@
 #version 460 core
 
-uniform sampler2D src;
-uniform sampler2D dst;
-uniform sampler2D gradient;
+layout(binding = 0) uniform sampler2D src;
+layout(binding = 1) uniform sampler2D dst;
+layout(binding = 2) uniform sampler2D gradient;
 uniform float progress;     // 0: all src, 1: all dst
 uniform float softness;     // the edge's width, in gradient values
 

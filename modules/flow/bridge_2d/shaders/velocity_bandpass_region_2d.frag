@@ -7,7 +7,7 @@
 // moving pixels: a limb arriving in the region adds moving pixels at its speed and leaves that mean as it was; a
 // limb speeding up raises it
 
-uniform sampler2D tex0;     // The flow's velocity RG
+layout(binding = 0) uniform sampler2D tex0;    // The flow's velocity RG
 
 in vec2 texCoord;
 out vec4 fragColor;

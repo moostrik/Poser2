@@ -40,7 +40,6 @@ class WeightedSum(Shader):
             scalar[unit] = int(len(sources) - scalars <= unit < len(sources))
             glActiveTexture(UNITS[unit])
             glBindTexture(GL_TEXTURE_2D, texture.tex_id)
-            glUniform1i(self.get_uniform_loc(f"tex{unit}"), unit)
         glUniform1fv(self.get_uniform_loc("weights"), MAX_SOURCES, weights)
         glUniform1iv(self.get_uniform_loc("scalars"), MAX_SOURCES, scalar)
         glUniform1i(self.get_uniform_loc("lengths"), int(lengths))

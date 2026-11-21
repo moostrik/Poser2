@@ -2,7 +2,7 @@
 
 // A mask's 0.5 threshold, its edge antialiased over the pixel the threshold crosses (`fwidth`).
 
-uniform sampler2D tex0;
+layout(binding = 0) uniform sampler2D tex0;
 
 in vec2 texCoord;
 out vec4 fragColor;

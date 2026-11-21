@@ -1,6 +1,6 @@
 """DensityColorize shader - Map density channels to track colors."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUniform4f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform4f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -23,7 +23,6 @@ class DensityColorize(Shader):
         # Bind density texture
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, density.tex_id)
-        glUniform1i(self.get_uniform_loc("density"), 0)
 
         # Set color uniforms (pad to 4 if fewer provided)
         padded_colors = list(colors) + [(0.0, 0.0, 0.0, 0.0)] * (4 - len(colors))

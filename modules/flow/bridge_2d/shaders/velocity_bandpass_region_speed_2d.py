@@ -3,7 +3,7 @@
 Writes the speeds of the two trails, for a fall's region means.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -24,6 +24,4 @@ class VelocityBandpassRegionSpeed2D(Shader):
         glBindTexture(GL_TEXTURE_2D, fast.tex_id)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, slow.tex_id)
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
-        glUniform1i(self.get_uniform_loc("tex1"), 1)
         draw_quad()

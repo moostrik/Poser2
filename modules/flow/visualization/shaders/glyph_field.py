@@ -40,7 +40,6 @@ class GlyphField(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, texture.tex_id)
 
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniform1i(self.get_uniform_loc("xyz"), 1 if xyz else 0)
         glUniform1i(self.get_uniform_loc("dots"), 1 if dots else 0)
         glUniform1i(self.get_uniform_loc("push"), 1 if push else 0)

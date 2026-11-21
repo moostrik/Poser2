@@ -1,6 +1,6 @@
 #version 460 core
 
-uniform sampler2D src;
+layout(binding = 0) uniform sampler2D src;
 uniform float amount;
 uniform float radius;       // where the darkening starts, 0..1 of the half diagonal
 uniform float softness;     // over how much of the half diagonal it reaches full

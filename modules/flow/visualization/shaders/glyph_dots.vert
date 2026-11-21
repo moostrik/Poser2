@@ -4,7 +4,7 @@
 // index, so the draw reads no vertex buffer; its size on screen the value's (half a cell at 1, small
 // values small), its color the colormap's
 
-uniform sampler3D tex0;         // The volume
+layout(binding = 0) uniform sampler3D tex0;        // The volume
 uniform mat4 view_projection;   // the box's space to clip space
 uniform vec3 box;               // the box's size, its width 1
 uniform ivec3 grid;             // the grid points across, down and deep

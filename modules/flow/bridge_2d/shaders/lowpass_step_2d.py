@@ -33,8 +33,8 @@ class LowpassStep2D(ComputeShader):
         if not all(texture.allocated for texture in (trail, velocity, trail_out)):
             return
         glUseProgram(self.shader_program)
-        self.bind_texture(0, trail, "uTrail")
-        self.bind_texture(1, velocity, "uVelocity")
+        self.bind_texture(0, trail)
+        self.bind_texture(1, velocity)
         self.bind_image_write(0, trail_out)
         if acceleration_out is not None:
             self.bind_image_write(1, acceleration_out)

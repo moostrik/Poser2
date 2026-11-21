@@ -2,8 +2,8 @@
 
 #include "position.glsl"
 
-uniform sampler2D dst;
-uniform sampler2D src;
+layout(binding = 0) uniform sampler2D dst;
+layout(binding = 1) uniform sampler2D src;
 uniform int channel;       // 0=R, 1=G, 2=B, 3=A
 uniform float strength;
 uniform vec4 region;       // x, y, w, h in 0..1 of the target, origin top-left

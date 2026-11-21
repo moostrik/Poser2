@@ -49,7 +49,7 @@ class AdvectFaces3D(ComputeShader):
         bind_obstacle(self, obstacle, has_obstacles)
         bind_face_writes(self, result)
         if predictor is not None:
-            self.bind_texture_3d(8, predictor, 'uPred')
+            self.bind_texture_3d(8, predictor)
         glUniform1i(self.get_uniform_loc('uMode'), mode)
         glUniform1i(self.get_uniform_loc('uClamp'), int(clamp))
         glUniform1f(self.get_uniform_loc('uTimestep'), step)

@@ -7,7 +7,7 @@
 // height (4:2:0), each sample the average of its 2 x 2 source pixels; 2: Cb and 3: Cr at the frame's size (4:4:4);
 // 4: Cb, Y, Cr in red, green and blue at the frame's size (4:4:4 packed, as xv30le reads it).
 
-uniform sampler2D src;
+layout(binding = 0) uniform sampler2D src;
 uniform int plane;
 uniform mat3 matrix;    // rows: Y, Cb, Cr coefficients on RGB 0..1, scaled to video range
 uniform vec3 offset;    // 16, 128, 128 as normalized samples of the plane's bit depth

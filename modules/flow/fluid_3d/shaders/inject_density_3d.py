@@ -24,8 +24,8 @@ class InjectDensity3D(ComputeShader):
         if not self.allocated or not self.shader_program or not amount.allocated or not color.allocated:
             return
         glUseProgram(self.shader_program)
-        self.bind_texture(0, amount, "uAmount")
-        self.bind_texture(2, color, "uColor")
+        self.bind_texture(0, amount)
+        self.bind_texture(2, color)
         self.bind_image_3d_readwrite(0, volume, GL_RGBA16F)
         bind_z_position(self, 1, z_position)
         glUniform1f(self.get_uniform_loc("uSpread"), spread)

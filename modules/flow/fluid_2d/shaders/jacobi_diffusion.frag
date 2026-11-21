@@ -9,8 +9,8 @@ in vec2 texCoord;
 out vec4 fragColor;
 
 // Input textures
-uniform sampler2D uSource;    // Previous iteration of field to diffuse
-uniform sampler2D uObstacle;  // Obstacle mask (R8, CLAMP_TO_BORDER=1)
+layout(binding = 0) uniform sampler2D uSource;    // Previous iteration of field to diffuse
+layout(binding = 1) uniform sampler2D uObstacle; // Obstacle mask (R8, CLAMP_TO_BORDER=1)
 uniform bool uHasObstacles;   // Skip obstacle checks when false
 
 // Parameters

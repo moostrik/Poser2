@@ -9,8 +9,8 @@ in vec2 texCoord;
 out vec2 fragColor;
 
 // Input textures
-uniform sampler2D uCurl; // Curl magnitude field (R32F)
-uniform sampler2D uObstacle; // Obstacle mask (R8, CLAMP_TO_BORDER=1)
+layout(binding = 0) uniform sampler2D uCurl; // Curl magnitude field (R32F)
+layout(binding = 1) uniform sampler2D uObstacle; // Obstacle mask (R8, CLAMP_TO_BORDER=1)
 uniform bool uHasObstacles;  // Skip obstacle checks when false
 
 // Parameters

@@ -49,8 +49,6 @@ class Dither(Shader):
         glBindTexture(GL_TEXTURE_2D, src.tex_id)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, self._blue_noise.tex_id)
-        glUniform1i(self.get_uniform_loc("src"), 0)
-        glUniform1i(self.get_uniform_loc("blueNoise"), 1)
         glUniform1f(self.get_uniform_loc("levels"), float((1 << bits) - 1))
         glUniform1i(self.get_uniform_loc("pattern"), pattern)
         draw_quad()

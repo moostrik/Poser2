@@ -1,4 +1,4 @@
-from OpenGL.GL import GL_FRAMEBUFFER, GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindFramebuffer, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram, glViewport
+from OpenGL.GL import GL_FRAMEBUFFER, GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindFramebuffer, glBindTexture, glUniform1f, glUniform2f, glUseProgram, glViewport
 from modules.gl import Shader, draw_quad, Fbo, Texture
 
 class LightSimulation(Shader):
@@ -19,7 +19,6 @@ class LightSimulation(Shader):
 
         # Configure shader uniforms
         glUniform2f(self.get_uniform_loc("resolution"), float(fbo.width), float(fbo.height))
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniform1f(self.get_uniform_loc("texWidth"), width)
 
         # Render

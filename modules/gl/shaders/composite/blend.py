@@ -55,8 +55,6 @@ class Blend(Shader):
         glBindTexture(GL_TEXTURE_2D, src.tex_id)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, dst.tex_id)
-        glUniform1i(self.get_uniform_loc("src"), 0)
-        glUniform1i(self.get_uniform_loc("dst"), 1)
         glUniform1i(self.get_uniform_loc("mode"), mode)
         glUniform1f(self.get_uniform_loc("amount"), amount)
         draw_quad()

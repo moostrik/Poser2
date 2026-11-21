@@ -3,7 +3,7 @@
 Normalizes vectors to unit length.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging
@@ -29,5 +29,4 @@ class Normalize(Shader):
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, source.tex_id)
-        glUniform1i(self.get_uniform_loc("tex"), 0)
         draw_quad()

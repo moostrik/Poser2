@@ -1,4 +1,4 @@
-from OpenGL.GL import GL_CLAMP_TO_EDGE, GL_FLOAT, GL_LINEAR, GL_RGB, GL_RGB32F, GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_WRAP_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, glActiveTexture, glBindTexture, glDeleteTextures, glGenTextures, glTexImage3D, glTexParameteri, glUniform1f, glUniform1i, glUniform3f, glUseProgram
+from OpenGL.GL import GL_CLAMP_TO_EDGE, GL_FLOAT, GL_LINEAR, GL_RGB, GL_RGB32F, GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_WRAP_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, glActiveTexture, glBindTexture, glDeleteTextures, glGenTextures, glTexImage3D, glTexParameteri, glUniform1f, glUniform3f, glUseProgram
 from ... import Shader, draw_quad, Texture
 import numpy as np
 from pathlib import Path
@@ -230,8 +230,6 @@ class Lut(Shader):
         glBindTexture(GL_TEXTURE_3D, self._lut_tex_id)
 
         # Configure shader uniforms
-        glUniform1i(self.get_uniform_loc("src"), 0)
-        glUniform1i(self.get_uniform_loc("lut"), 1)
         glUniform1f(self.get_uniform_loc("strength"), strength)
         glUniform3f(self.get_uniform_loc("domainMin"), *self._domain_min)
         glUniform3f(self.get_uniform_loc("domainMax"), *self._domain_max)

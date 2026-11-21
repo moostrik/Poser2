@@ -8,8 +8,8 @@
 //   1 ADD    the body force: the bridge's acceleration × uStrength (weight × gain × dt) added
 // Both read the bridge's texture at the cell's place on the image plane.
 
-uniform sampler2D uVelocity;   // the velocity before (RG)
-uniform sampler2D uSource;       // the bridge's velocity or acceleration (RG)
+layout(binding = 0) uniform sampler2D uVelocity;   // the velocity before (RG)
+layout(binding = 1) uniform sampler2D uSource;      // the bridge's velocity or acceleration (RG)
 uniform int   uMode;           // 0 DRAG, 1 ADD
 uniform float uGain;           // DRAG
 uniform float uShare;          // DRAG: 1 - exp(-dt / velocity_drag)

@@ -1,6 +1,6 @@
 """Displacement threshold shader: the noise floor taken off a displacement."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -22,7 +22,6 @@ class DisplacementThreshold(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, displacement.tex_id)
 
-        glUniform1i(self.get_uniform_loc("displacement"), 0)
         glUniform1f(self.get_uniform_loc("threshold"), threshold)
 
         draw_quad()

@@ -3,8 +3,8 @@
 // Velocity Bandpass Region Speed 2D Shader
 // The speeds of the two trails, whose mip levels are a region's mean speeds: what a fall reads
 
-uniform sampler2D tex0;  // Fast trail RG
-uniform sampler2D tex1;  // Slow trail RG
+layout(binding = 0) uniform sampler2D tex0;  // Fast trail RG
+layout(binding = 1) uniform sampler2D tex1;  // Slow trail RG
 
 in vec2 texCoord;
 out vec4 fragColor;

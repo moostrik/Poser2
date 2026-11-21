@@ -31,7 +31,6 @@ class GlyphDots(Shader):
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_3D, volume.tex_id)
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniformMatrix4fv(self.get_uniform_loc("view_projection"), 1, GL_TRUE, view_projection.astype(np.float32))
         glUniform3f(self.get_uniform_loc("box"), *box)
         glUniform3i(self.get_uniform_loc("grid"), *grid)

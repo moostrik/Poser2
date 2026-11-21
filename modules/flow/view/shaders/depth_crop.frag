@@ -6,7 +6,7 @@
 
 #include "position.glsl"
 
-uniform sampler2D depth;        // metres on the camera image, 0 for none
+layout(binding = 0) uniform sampler2D depth;       // metres on the camera image, 0 for none
 uniform vec4 roi;               // the box's sides on the depth, x, y, width, height in 0..1, origin top-left
 uniform float near;             // the box's front (m)
 uniform float far;              // its back (m)

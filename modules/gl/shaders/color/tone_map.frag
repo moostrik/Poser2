@@ -1,6 +1,6 @@
 #version 460 core
 
-uniform sampler2D src;
+layout(binding = 0) uniform sampler2D src;
 uniform int operator;       // ToneMapOperator: 0 Reinhard, 1 ACES
 uniform float exposure;
 

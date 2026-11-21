@@ -3,10 +3,10 @@
 // Per pixel, the one of two with the larger amount, as it is; an amount is the size of its red (warm or cold
 // alike), read from the texture itself or from the amount it is paired with.
 
-uniform sampler2D held;
-uniform sampler2D source;
-uniform sampler2D heldAmount;
-uniform sampler2D sourceAmount;
+layout(binding = 0) uniform sampler2D held;
+layout(binding = 1) uniform sampler2D source;
+layout(binding = 2) uniform sampler2D heldAmount;
+layout(binding = 3) uniform sampler2D sourceAmount;
 
 in vec2 texCoord;
 out vec4 fragColor;

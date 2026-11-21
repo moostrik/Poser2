@@ -4,7 +4,7 @@ Combines RGB color interpretation with velocity magnitude mask.
 R=warm, G=neutral dampening, B=cold
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging
@@ -37,8 +37,6 @@ class TemperatureBridgeShader(Shader):
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, mask.tex_id)
 
-        glUniform1i(self.get_uniform_loc("uColor"), 0)
-        glUniform1i(self.get_uniform_loc("uMask"), 1)
         glUniform1f(self.get_uniform_loc("uScale"), scale)
 
         # Draw

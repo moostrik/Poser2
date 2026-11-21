@@ -34,12 +34,10 @@ class ChannelAdd(Shader):
         # Bind destination (existing RGBA)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, dst.tex_id)
-        glUniform1i(self.get_uniform_loc("dst"), 0)
 
         # Bind source (single-channel)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, src.tex_id)
-        glUniform1i(self.get_uniform_loc("src"), 1)
 
         # Set channel uniform
         glUniform1i(self.get_uniform_loc("channel"), channel)

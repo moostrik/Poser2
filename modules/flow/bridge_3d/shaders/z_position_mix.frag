@@ -8,22 +8,22 @@
 // the slow's. The mask's share, its value at the share, reads the motion's z position now. Out: red the
 // z position times its weight, green the weight.
 
-uniform sampler2D tex0;     // the readings: trail, change, start, bow, stop, wake (xyz)
-uniform sampler2D tex1;
-uniform sampler2D tex2;
-uniform sampler2D tex3;
-uniform sampler2D tex4;
-uniform sampler2D tex5;
+layout(binding = 0) uniform sampler2D tex0;     // the readings: trail, change, start, bow, stop, wake (xyz)
+layout(binding = 1) uniform sampler2D tex1;
+layout(binding = 2) uniform sampler2D tex2;
+layout(binding = 3) uniform sampler2D tex3;
+layout(binding = 4) uniform sampler2D tex4;
+layout(binding = 5) uniform sampler2D tex5;
 uniform float shares[6];
-uniform sampler2D trail;            // the lowpass's trail (xyz)
-uniform sampler2D fast;             // the bandpass's fast trail
-uniform sampler2D slow;             // its slow trail
-uniform sampler2D trail_z_position; // their z positions (red over green)
-uniform sampler2D fast_z_position;
-uniform sampler2D slow_z_position;
-uniform sampler2D mask;             // the player's mask (red, 0 to 1)
+layout(binding = 6) uniform sampler2D trail;            // the lowpass's trail (xyz)
+layout(binding = 7) uniform sampler2D fast;             // the bandpass's fast trail
+layout(binding = 8) uniform sampler2D slow;             // its slow trail
+layout(binding = 9) uniform sampler2D trail_z_position; // their z positions (red over green)
+layout(binding = 10) uniform sampler2D fast_z_position;
+layout(binding = 11) uniform sampler2D slow_z_position;
+layout(binding = 12) uniform sampler2D mask;             // the player's mask (red, 0 to 1)
 uniform float mask_share;           // its share; 0 reads neither it nor the z position
-uniform sampler2D z_position;       // the motion's z position now (red over green)
+layout(binding = 13) uniform sampler2D z_position;       // the motion's z position now (red over green)
 
 in vec2 texCoord;
 out vec4 fragColor;

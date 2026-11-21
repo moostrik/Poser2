@@ -11,10 +11,10 @@
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
-uniform sampler2D uTrail;           // the trail before (RGBA16F, xyz widths/s), 0 outside
-uniform sampler2D uZPosition;       // its z position before (RG32F), 0 outside
-uniform sampler2D uVelocity;        // the input velocity (xyz widths/s)
-uniform sampler2D uCurrent;         // the motion's z position now (red over green), read with uHasCurrent
+layout(binding = 0) uniform sampler2D uTrail;           // the trail before (RGBA16F, xyz widths/s), 0 outside
+layout(binding = 1) uniform sampler2D uZPosition;       // its z position before (RG32F), 0 outside
+layout(binding = 2) uniform sampler2D uVelocity;        // the input velocity (xyz widths/s)
+layout(binding = 3) uniform sampler2D uCurrent;        // the motion's z position now (red over green), read with uHasCurrent
 uniform bool uHasCurrent;
 uniform vec2 uCarry;                // uv per frame per unit of trail velocity, times the advect amount; 0 none
 uniform float uAttack;              // what remains of the trail where the speed rises

@@ -51,7 +51,6 @@ class Inject3D(ComputeShader):
         # Bind 2D input as sampler
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, input_2d.tex_id)
-        glUniform1i(self.get_uniform_loc("uInput"), 0)
 
         # Bind 3D volume as read-write image
         self.bind_image_3d_readwrite(0, volume, internal_format)

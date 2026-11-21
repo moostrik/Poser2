@@ -1,6 +1,6 @@
 #version 460 core
 
-uniform sampler2D src;
+layout(binding = 0) uniform sampler2D src;
 uniform mat3 white_balance;     // on linear sRGB: the chosen light's white to 6500 K's
 uniform float exposure;
 uniform float offset;

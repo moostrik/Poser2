@@ -40,15 +40,12 @@ class Gradient(Shader):
         # Bind textures
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, velocity.tex_id)
-        glUniform1i(self.get_uniform_loc("uVelocity"), 0)
 
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, pressure.tex_id)
-        glUniform1i(self.get_uniform_loc("uPressure"), 1)
 
         glActiveTexture(GL_TEXTURE2)
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
-        glUniform1i(self.get_uniform_loc("uObstacle"), 2)
 
         # Set uniforms (aspect-corrected grid scales)
         half_rdx_x = 0.5 / grid_scale

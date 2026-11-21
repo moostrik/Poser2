@@ -7,9 +7,9 @@
 // 1 plane: Cb, Y, Cr in red, green, blue (4:4:4 packed); 2: Y, and Cb Cr interleaved at half size (4:2:0);
 // 3: Y, Cb and Cr (4:4:4).
 
-uniform sampler2D plane0;
-uniform sampler2D plane1;
-uniform sampler2D plane2;
+layout(binding = 0) uniform sampler2D plane0;
+layout(binding = 1) uniform sampler2D plane1;
+layout(binding = 2) uniform sampler2D plane2;
 uniform int num_planes;
 uniform mat3 matrix;            // rows: R, G, B coefficients on Y Cb Cr 0..1, the inverse of `RgbToYuv`'s
 uniform vec3 offset;            // 16, 128, 128 as normalized samples of the planes

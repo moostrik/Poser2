@@ -17,7 +17,7 @@ def bind_cells(shader: ComputeShader, cells: tuple[int, int, int]) -> None:
 
 def bind_faces(shader: ComputeShader, faces: Texture3D, cells: tuple[int, int, int]) -> None:
     """The faces read (`faces.glsl`'s sampler) and the cell counts."""
-    shader.bind_texture_3d(FACE_SAMPLER_UNIT, faces, 'uFaces')
+    shader.bind_texture_3d(FACE_SAMPLER_UNIT, faces)
     bind_cells(shader, cells)
 
 
@@ -34,7 +34,7 @@ def bind_walls(shader: ComputeShader, closed: tuple[bool, bool, bool]) -> None:
 def bind_obstacle(shader: ComputeShader, obstacle: Texture3D, has_obstacles: bool) -> None:
     """The obstacle mask (R8 at the cells) and whether it is read."""
     glUniform1i(shader.get_uniform_loc('uHasObstacles'), int(has_obstacles))
-    shader.bind_texture_3d(2, obstacle, 'uObstacle')
+    shader.bind_texture_3d(2, obstacle)
 
 
 def bind_face_writes(shader: ComputeShader, faces: Texture3D, in_place: bool = False) -> None:

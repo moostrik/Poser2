@@ -27,7 +27,6 @@ class ToneMap(Shader):
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, src.tex_id)
-        glUniform1i(self.get_uniform_loc("src"), 0)
         glUniform1i(self.get_uniform_loc("operator"), operator)
         glUniform1f(self.get_uniform_loc("exposure"), exposure)
         draw_quad()

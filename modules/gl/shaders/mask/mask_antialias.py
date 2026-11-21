@@ -1,6 +1,6 @@
 """MaskAntialias: a mask thresholded at 0.5, its edge antialiased over one pixel."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUseProgram
 from ... import Shader, draw_quad, Texture
 
 import logging
@@ -21,5 +21,4 @@ class MaskAntialias(Shader):
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
         draw_quad()

@@ -10,7 +10,7 @@
 // off toward 2 cells. A scalar is a dot in each cell, its color the colormap's (centered on grey),
 // its radius the value's size, half a cell at 1, small values small
 
-uniform sampler2D tex0;
+layout(binding = 0) uniform sampler2D tex0;
 uniform bool xyz;                   // A 3D velocity: z in the blue channel
 uniform bool dots;                  // A scalar: dots, not arrows
 uniform bool push;                  // An acceleration: filled arrowheads, not line arrows

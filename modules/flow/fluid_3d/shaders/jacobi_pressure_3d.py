@@ -55,8 +55,8 @@ class JacobiPressure3D(ComputeShader):
         glUseProgram(self.shader_program)
 
         # Samplers
-        self.bind_texture_3d(0, divergence, "uDivergence")
-        self.bind_texture_3d(1, obstacle, "uObstacle")
+        self.bind_texture_3d(0, divergence)
+        self.bind_texture_3d(1, obstacle)
 
         # Images
         self.bind_image_3d(0, pressure_in, GL_READ_ONLY, GL_R32F)

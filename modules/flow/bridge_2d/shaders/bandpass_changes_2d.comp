@@ -12,11 +12,11 @@
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
-uniform sampler2D uFast;            // the fast trail (xy)
-uniform sampler2D uSlow;            // the slow trail
-uniform sampler2D uRiseFast;        // a rise's region: its mean moving velocity through the fast trail, a texel per region
-uniform sampler2D uRiseSlow;        // and through the slow trail
-uniform sampler2D uFallSpeeds;      // a fall's region: mean speeds, fast R, slow G, with mipmaps
+layout(binding = 0) uniform sampler2D uFast;           // the fast trail (xy)
+layout(binding = 1) uniform sampler2D uSlow;           // the slow trail
+layout(binding = 2) uniform sampler2D uRiseFast;       // a rise's region: its mean moving velocity through the fast trail, a texel per region
+layout(binding = 3) uniform sampler2D uRiseSlow;       // and through the slow trail
+layout(binding = 4) uniform sampler2D uFallSpeeds;     // a fall's region: mean speeds, fast R, slow G, with mipmaps
 uniform float uScale;               // 1 / the trails' step peak; 0 = no changes
 uniform float uRiseWeight;          // start_region_weight
 uniform float uFallWeight;          // stop_region_weight

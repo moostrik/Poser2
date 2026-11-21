@@ -32,7 +32,6 @@ class TimeSeries(Shader):
         glBindTexture(GL_TEXTURE_2D, ranges.tex_id)
 
         padded: list[float] = [component for color in (colors * 8)[:8] for component in color]
-        glUniform1i(self.get_uniform_loc("ranges"), 0)
         glUniform1i(self.get_uniform_loc("numLanes"), num_lanes)
         glUniform1i(self.get_uniform_loc("numColumns"), num_columns)
         glUniform1f(self.get_uniform_loc("lineWidth"), line_width)

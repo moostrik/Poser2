@@ -29,7 +29,7 @@ class HistogramCount(ComputeShader):
             return
 
         glUseProgram(self.shader_program)
-        self.bind_texture(0, texture, "tex0")
+        self.bind_texture(0, texture)
         self.bind_image_readwrite(0, histogram, GL_R32UI)
         glUniform1f(self.get_uniform_loc("scale"), scale)
         glUniform2i(self.get_uniform_loc("samples"), *samples)

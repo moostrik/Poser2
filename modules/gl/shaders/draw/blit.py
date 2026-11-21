@@ -1,6 +1,6 @@
 """Blit: a texture drawn into the target, or a part of it into a part of the target."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2fv, glUniform4f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform2fv, glUniform4f, glUseProgram
 from modules.utils import Quad, Rect
 from ... import Shader, draw_quad, Texture
 
@@ -27,7 +27,6 @@ class Blit(Shader):
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, src.tex_id)
-        glUniform1i(self.get_uniform_loc("src"), 0)
         glUniform1f(self.get_uniform_loc("opacity"), opacity)
         glUniform4f(self.get_uniform_loc("dstRect"), d.x, d.y, d.width, d.height)
         glUniform2fv(self.get_uniform_loc("srcQuad"), 4, [*quad.top_left, *quad.top_right, *quad.bottom_right, *quad.bottom_left])

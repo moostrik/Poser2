@@ -3,8 +3,8 @@
 // Optical Flow Shader - Multi-Scale via Mipmaps
 // Computes Lucas-Kanade style optical flow at multiple scales
 
-uniform sampler2D tex0;  // Current frame (luminance) - needs mipmaps!
-uniform sampler2D tex1;  // Previous frame (luminance) - needs mipmaps!
+layout(binding = 0) uniform sampler2D tex0;  // Current frame (luminance) - needs mipmaps!
+layout(binding = 1) uniform sampler2D tex1;  // Previous frame (luminance) - needs mipmaps!
 
 uniform vec2 offset;     // Gradient sample offset (normalized)
 uniform float threshold; // Motion threshold

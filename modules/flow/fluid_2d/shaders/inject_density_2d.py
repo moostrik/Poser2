@@ -28,10 +28,9 @@ class InjectDensity2D(Shader):
         if not all(texture.allocated for texture in (density, amount, color)):
             return
         glUseProgram(self.shader_program)
-        for unit, (texture, name) in enumerate(((density, "uDensity"), (amount, "uAmount"), (color, "uColor"))):
+        for unit, texture in enumerate((density, amount, color)):
             glActiveTexture((GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2)[unit])
             glBindTexture(GL_TEXTURE_2D, texture.tex_id)
-            glUniform1i(self.get_uniform_loc(name), unit)
         glUniform1f(self.get_uniform_loc("uStrength"), strength)
         glUniform1f(self.get_uniform_loc("uRelease"), release)
         glUniform1i(self.get_uniform_loc("uOklab"), int(oklab))

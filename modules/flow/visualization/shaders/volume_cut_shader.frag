@@ -7,7 +7,7 @@
 // the right and y up. A velocity's components follow the picture's axes, so arrows on a cut point
 // as the motion does in it: in the top x and away from the viewer (-z), in the side z and y.
 
-uniform sampler3D tex0;  // The volume
+layout(binding = 0) uniform sampler3D tex0; // The volume
 uniform int mode;        // 0 slice, 1 front, 2 top, 3 side
 uniform float position;  // The slice's place, 0 (front) to 1 (back); the nearest layer is drawn
 uniform bool use_max;    // The projection's max, else its mean

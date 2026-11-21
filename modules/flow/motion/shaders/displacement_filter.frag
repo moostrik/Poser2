@@ -9,9 +9,9 @@
 // filtered one, px per frame (0 halving: `smoothing` throughout).
 // Out: the filtered displacement (RG, uv per frame) and the position error (BA, uv).
 
-uniform sampler2D tex0;  // The measured displacement (RG, uv per frame)
-uniform sampler2D tex1;  // The filter the frame before: displacement RG, position error BA
-uniform sampler2D carry; // The displacement the state is carried by, the speed read from (RG, uv per frame)
+layout(binding = 0) uniform sampler2D tex0;  // The measured displacement (RG, uv per frame)
+layout(binding = 1) uniform sampler2D tex1;  // The filter the frame before: displacement RG, position error BA
+layout(binding = 2) uniform sampler2D carry;// The displacement the state is carried by, the speed read from (RG, uv per frame)
 uniform float smoothing;    // Time followed over at rest (ms); 0 takes the measurement whole
 uniform float rest_speed;   // speed below which it is at rest (px per frame)
 uniform float halving_speed; // speed past rest_speed at which the time is half (px per frame); 0 off

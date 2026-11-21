@@ -1,7 +1,7 @@
 #version 460 core
 
-uniform sampler2D tex0;
-uniform sampler2D tex1;
+layout(binding = 0) uniform sampler2D tex0;
+layout(binding = 1) uniform sampler2D tex1;
 uniform float flash;
 
 in vec2 texCoord;

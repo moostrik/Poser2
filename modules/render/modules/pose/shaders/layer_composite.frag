@@ -6,7 +6,7 @@ in vec2 texCoord;
 out vec4 fragColor;
 
 // All 3 layers: pre-styled RGBA (already tinted)
-uniform sampler2D layers[3];
+layout(binding = 0) uniform sampler2D layers[3];
 uniform float weights[3];
 uniform float layered;      // 0 = additive, 1 = the first in front
 

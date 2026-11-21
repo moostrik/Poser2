@@ -30,10 +30,9 @@ class PushPull(Shader):
         if not self.allocated or not self.shader_program or not all(t.allocated for t in textures):
             return
         glUseProgram(self.shader_program)
-        for index, (unit, texture) in enumerate(zip((GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2), textures)):
+        for unit, texture in zip((GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2), textures):
             glActiveTexture(unit)
             glBindTexture(GL_TEXTURE_2D, texture.tex_id)
-            glUniform1i(self.get_uniform_loc(f"tex{index}"), index)
         glUniform1i(self.get_uniform_loc("stage"), stage)
         glUniform1i(self.get_uniform_loc("first"), int(first))
         draw_quad()

@@ -2,8 +2,8 @@
 
 // tex0 times tex1's red: a mask by a mask, or a color image by a mask, premultiplied (RGB and alpha alike).
 
-uniform sampler2D tex0;      // Color or mask
-uniform sampler2D tex1;      // Mask, red
+layout(binding = 0) uniform sampler2D tex0;      // Color or mask
+layout(binding = 1) uniform sampler2D tex1;     // Mask, red
 
 in vec2 texCoord;
 out vec4 fragColor;

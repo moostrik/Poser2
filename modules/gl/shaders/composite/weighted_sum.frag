@@ -1,7 +1,7 @@
 #version 460 core
 
-uniform sampler2D a;
-uniform sampler2D b;
+layout(binding = 0) uniform sampler2D a;
+layout(binding = 1) uniform sampler2D b;
 uniform float aWeight;
 uniform float bWeight;      // 0: b is not read
 

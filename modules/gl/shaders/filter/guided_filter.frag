@@ -9,8 +9,8 @@
 // The mask's edge then runs where the guide's edges run, at the guide's resolution; where the guide is flat
 // (its variance under ε) the mask is only averaged.
 
-uniform sampler2D tex0;     // stage 0: the guide (RGB); 1: the field to average; 2: the means; 3: the coefficients' means
-uniform sampler2D tex1;     // stage 0: the mask (R); 3: the guide (RGB)
+layout(binding = 0) uniform sampler2D tex0;    // stage 0: the guide (RGB); 1: the field to average; 2: the means; 3: the coefficients' means
+layout(binding = 1) uniform sampler2D tex1;    // stage 0: the mask (R); 3: the guide (RGB)
 uniform int stage;
 uniform vec2 direction;     // stage 1: (1, 0) or (0, 1)
 uniform int radius;         // stage 1: pixels each side

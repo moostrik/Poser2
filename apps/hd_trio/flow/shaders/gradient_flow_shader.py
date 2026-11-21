@@ -4,7 +4,7 @@ The brightness change along the brightness gradient between two frames, over thr
 Ported from ofxFlowTools ftOpticalFlowShader.h
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform2f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging
@@ -46,8 +46,6 @@ class GradientFlowShader(Shader):
         glBindTexture(GL_TEXTURE_2D, prev_tex.tex_id)
 
         # Configure shader uniforms (using cached locations)
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
-        glUniform1i(self.get_uniform_loc("tex1"), 1)
 
         # Convert pixel offset to normalized coordinates
         offset_x = float(offset) / curr_tex.width

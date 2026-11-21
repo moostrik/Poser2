@@ -5,9 +5,9 @@
 // the guard: the bridges feed back, so one such pixel would stay and spread through their blur.
 // With has_mask, times the mask
 
-uniform sampler2D tex0;  // x/y RG
-uniform sampler2D tex1;  // z R, read only with has_depth
-uniform sampler2D tex2;  // mask R (0 to 1), read only with has_mask
+layout(binding = 0) uniform sampler2D tex0;  // x/y RG
+layout(binding = 1) uniform sampler2D tex1;  // z R, read only with has_depth
+layout(binding = 2) uniform sampler2D tex2; // mask R (0 to 1), read only with has_mask
 uniform bool has_depth;
 uniform bool has_mask;
 uniform vec3 strength;   // Multiplier on x, y and z

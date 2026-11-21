@@ -35,7 +35,6 @@ class YuvToRgb(Shader):
         for unit in range(3):
             glActiveTexture(int(GL_TEXTURE0) + unit)
             glBindTexture(GL_TEXTURE_2D, planes[min(unit, len(planes) - 1)].tex_id)
-            glUniform1i(self.get_uniform_loc(f"plane{unit}"), unit)
         glActiveTexture(GL_TEXTURE0)
         glUniform1i(self.get_uniform_loc("num_planes"), len(planes))
         # Row-major rows read as GLSL columns, so `matrix[i]` in the shader is row i (R, G, B)

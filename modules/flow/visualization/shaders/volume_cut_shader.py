@@ -30,7 +30,6 @@ class VolumeCutShader(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_3D, volume.tex_id)
 
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniform1i(self.get_uniform_loc("mode"), mode)
         glUniform1f(self.get_uniform_loc("position"), position)
         glUniform1i(self.get_uniform_loc("use_max"), 1 if use_max else 0)

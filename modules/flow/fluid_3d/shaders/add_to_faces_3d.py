@@ -28,7 +28,7 @@ class AddToFaces3D(ComputeShader):
         """`force` (RGBA at the cells, widths/s²) × `strength` (dt) added, each face its two cells' mean."""
         if not self._begin(FORCE, faces, (force.width, force.height, force.depth), obstacle, closed, has_obstacles):
             return
-        self.bind_texture_3d(0, force, 'uForce')
+        self.bind_texture_3d(0, force)
         glUniform1f(self.get_uniform_loc('uStrength'), strength)
         self._dispatch()
 
@@ -39,8 +39,8 @@ class AddToFaces3D(ComputeShader):
         × `strength` (dt) added, each face its two cells' mean; the warmth read only while `sigma` is above 0."""
         if not self._begin(BUOYANCY, faces, cells, obstacle, closed, has_obstacles):
             return
-        self.bind_texture_3d(5, temperature, 'uTemperature')
-        self.bind_texture_3d(6, density, 'uDensity')
+        self.bind_texture_3d(5, temperature)
+        self.bind_texture_3d(6, density)
         glUniform1f(self.get_uniform_loc('uSigma'), sigma)
         glUniform1f(self.get_uniform_loc('uKappa'), kappa)
         glUniform3f(self.get_uniform_loc('uGravity'), *gravity)
@@ -89,7 +89,6 @@ class AddToFaces3D(ComputeShader):
     def _bind_input(self, texture: Texture, spread: float, z_position: Texture | None) -> None:
         glActiveTexture(int(GL_TEXTURE0) + 1)
         glBindTexture(GL_TEXTURE_2D, texture.tex_id)
-        glUniform1i(self.get_uniform_loc('uInput'), 1)
         bind_z_position(self, 3, z_position)
         glUniform1f(self.get_uniform_loc('uSpread'), spread)
 

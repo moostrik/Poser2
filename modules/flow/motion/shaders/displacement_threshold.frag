@@ -4,7 +4,7 @@
 // below it is 0. Below the threshold is the solve's jitter on a still surface, not motion. The
 // direction is kept, and what is above stays continuous.
 
-uniform sampler2D displacement;
+layout(binding = 0) uniform sampler2D displacement;
 uniform float threshold;    // px per frame
 
 in vec2 texCoord;

@@ -1,6 +1,6 @@
 """LayerComposite: up to three styled layers, added or each over the next."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -25,7 +25,6 @@ class LayerComposite(Shader):
             glActiveTexture(int(GL_TEXTURE0) + i)
             if i < len(textures):
                 glBindTexture(GL_TEXTURE_2D, textures[i].tex_id)
-            glUniform1i(self.get_uniform_loc(f"layers[{i}]"), i)
 
         # Weights
         for i in range(3):

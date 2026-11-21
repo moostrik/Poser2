@@ -1,8 +1,8 @@
 #version 460 core
 
-uniform sampler2D src;
-uniform sampler2D dst;
-uniform sampler2D mask;
+layout(binding = 0) uniform sampler2D src;
+layout(binding = 1) uniform sampler2D dst;
+layout(binding = 2) uniform sampler2D mask;
 uniform float bloom;
 uniform float omission;
 uniform vec2 resolution;

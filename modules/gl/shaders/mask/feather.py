@@ -2,7 +2,7 @@
 
 import logging
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUseProgram
 
 from ... import Shader, draw_quad, Texture
 
@@ -23,5 +23,4 @@ class Feather(Shader):
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, blurred.tex_id)
-        glUniform1i(self.get_uniform_loc("blurred"), 0)
         draw_quad()

@@ -3,8 +3,8 @@
 // The color a bridge's density carries: the image (or white) times a tint, gated by the mask's red,
 // RGB and alpha alike.
 
-uniform sampler2D image;     // The picture whose RGB colors the density
-uniform sampler2D mask;      // The player's mask, red
+layout(binding = 0) uniform sampler2D image;     // The picture whose RGB colors the density
+layout(binding = 1) uniform sampler2D mask;      // The player's mask, red
 uniform bool has_image;
 uniform bool has_mask;
 uniform vec3 color;          // The tint; the color alone without an image

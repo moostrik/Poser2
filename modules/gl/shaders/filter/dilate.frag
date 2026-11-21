@@ -1,6 +1,6 @@
 #version 460 core
 
-uniform sampler2D src;      // Input mask texture (red channel)
+layout(binding = 0) uniform sampler2D src;      // Input mask texture (red channel)
 uniform float radius;        // Dilation radius (typically 1.0 for multi-pass)
 #define texelSize (1.0 / vec2(textureSize(src, 0)))
 

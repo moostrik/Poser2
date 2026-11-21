@@ -20,10 +20,10 @@
 in vec2 texCoord;
 out vec4 fragColor;
 
-uniform sampler2D uVelocity;   // Velocity field (RG16F), widths/s
-uniform sampler2D uSource;     // The field before the step
-uniform sampler2D uForward;    // The semi-Lagrangian predictor
-uniform sampler2D uObstacle;   // Obstacle mask (R8)
+layout(binding = 0) uniform sampler2D uVelocity;   // Velocity field (RG16F), widths/s
+layout(binding = 1) uniform sampler2D uSource;     // The field before the step
+layout(binding = 2) uniform sampler2D uForward;    // The semi-Lagrangian predictor
+layout(binding = 3) uniform sampler2D uObstacle;  // Obstacle mask (R8)
 uniform bool uHasObstacles;
 
 uniform float uTimestep;       // dt * advection_scale

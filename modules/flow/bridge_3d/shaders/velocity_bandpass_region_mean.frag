@@ -4,7 +4,7 @@
 // A region's mean velocity over its moving pixels: the region texture's sums at the region's mip level
 // over its moving share; 0 where nothing in the region moves
 
-uniform sampler2D tex0;  // Region texture: velocity * moving RGB, moving A, with mipmaps
+layout(binding = 0) uniform sampler2D tex0; // Region texture: velocity * moving RGB, moving A, with mipmaps
 uniform float lod;       // Mip level of a region
 
 in vec2 texCoord;

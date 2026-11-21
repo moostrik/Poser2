@@ -2,7 +2,7 @@
 
 in vec2 texCoord;
 
-uniform sampler2D atlas;
+layout(binding = 0) uniform sampler2D atlas;
 uniform vec4 color;
 
 out vec4 fragColor;

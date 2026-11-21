@@ -36,5 +36,5 @@ class Gradient3D(ComputeShader):
         bind_walls(self, closed)
         bind_obstacle(self, obstacle, has_obstacles)
         bind_face_writes(self, result)
-        self.bind_texture_3d(0, pressure, "uPressure")
+        self.bind_texture_3d(0, pressure)
         self.dispatch(cells[0] + 1, cells[1] + 1, cells[2] + 1)

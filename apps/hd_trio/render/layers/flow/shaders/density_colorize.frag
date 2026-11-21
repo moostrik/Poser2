@@ -9,7 +9,7 @@ in vec2 texCoord;
 out vec4 fragColor;
 
 // Input textures
-uniform sampler2D density;     // Density field (RGBA16F) - each channel is a different track
+layout(binding = 0) uniform sampler2D density;     // Density field (RGBA16F) - each channel is a different track
 
 // Track colors - up to 4 tracks mapped to RGBA channels
 uniform vec4 colors[4];

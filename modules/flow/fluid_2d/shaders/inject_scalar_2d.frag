@@ -7,8 +7,8 @@
 //             target is further from 0 than the field on its side: a warm target only warms, a cold one only cools,
 //             so the field never falls toward a fainter body; only where the input is not 0
 
-uniform sampler2D uField;      // the field before (red)
-uniform sampler2D uInput;      // the scalar, red
+layout(binding = 0) uniform sampler2D uField;      // the field before (red)
+layout(binding = 1) uniform sampler2D uInput;     // the scalar, red
 uniform int   uMode;           // 0 ADD, 1 FILL
 uniform float uStrength;       // ADD: the weight; FILL: the drag's share × the weight
 uniform float uGain;           // FILL: the input times this, at most ±1, is the target

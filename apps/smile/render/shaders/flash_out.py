@@ -1,4 +1,4 @@
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging
@@ -25,9 +25,6 @@ class FlashOut(Shader):
         glBindTexture(GL_TEXTURE_2D, tex2.tex_id)
 
         # Configure shader uniforms (using cached locations)
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
-        glUniform1i(self.get_uniform_loc("tex1"), 1)
-        glUniform1i(self.get_uniform_loc("tex2"), 2)
         glUniform1f(self.get_uniform_loc("flash"), flash)
 
         # Render

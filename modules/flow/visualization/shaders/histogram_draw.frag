@@ -5,7 +5,7 @@
 // log of the count against the log of the samples. A lane for each channel the texture holds, x on
 // top, or one channel's lane at full height
 
-uniform usampler2D tex0;    // The bins, one row per channel
+layout(binding = 0) uniform usampler2D tex0;   // The bins, one row per channel
 uniform int channel;        // 0 to 3 for one channel, 4 for all the texture holds
 uniform int channels;       // The channels the texture holds, x first, 1 to 4
 uniform float total;        // Samples counted, the count at full height

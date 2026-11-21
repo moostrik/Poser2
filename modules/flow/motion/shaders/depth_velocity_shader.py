@@ -59,10 +59,6 @@ class DepthVelocityShader(Shader):
             glActiveTexture(GL_TEXTURE2)
             glBindTexture(GL_TEXTURE_2D, displacement.tex_id)
 
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
-        glUniform1i(self.get_uniform_loc("tex1"), 1)
-        glUniform1i(self.get_uniform_loc("displacement"), 2)
-        glUniform1i(self.get_uniform_loc("misses"), 3)
         glUniform1i(self.get_uniform_loc("warp"), int(warp))
         glUniform2f(self.get_uniform_loc("depth_step"), *depth_step)
         glUniform1i(self.get_uniform_loc("window"), window)

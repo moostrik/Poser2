@@ -8,12 +8,12 @@
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
-uniform sampler2D uVelocity;        // the input velocity (xyz widths/s)
-uniform sampler2D uFast;            // the fast trail before
-uniform sampler2D uSlow;            // the slow trail before
-uniform sampler2D uFastZPosition;   // their z positions before (RG32F)
-uniform sampler2D uSlowZPosition;
-uniform sampler2D uCurrent;         // the motion's z position now (red over green), read with uHasCurrent
+layout(binding = 0) uniform sampler2D uVelocity;        // the input velocity (xyz widths/s)
+layout(binding = 1) uniform sampler2D uFast;            // the fast trail before
+layout(binding = 2) uniform sampler2D uSlow;            // the slow trail before
+layout(binding = 3) uniform sampler2D uFastZPosition;   // their z positions before (RG32F)
+layout(binding = 4) uniform sampler2D uSlowZPosition;
+layout(binding = 5) uniform sampler2D uCurrent;        // the motion's z position now (red over green), read with uHasCurrent
 uniform bool uHasCurrent;
 uniform float uFastWeight;          // what remains of the fast trail a step
 uniform float uSlowWeight;          // and of the slow one

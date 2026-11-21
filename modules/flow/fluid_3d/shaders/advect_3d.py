@@ -60,9 +60,9 @@ class Advect3D(ComputeShader):
         glUseProgram(self.shader_program)
 
         # Bind input volumes as samplers (trilinear filtering)
-        self.bind_texture_3d(0, velocity, "uVelocity")
-        self.bind_texture_3d(1, source_read, "uSource")
-        self.bind_texture_3d(2, obstacle, "uObstacle")
+        self.bind_texture_3d(0, velocity)
+        self.bind_texture_3d(1, source_read)
+        self.bind_texture_3d(2, obstacle)
 
         # Bind output as 3D image (separate from input)
         self.bind_image_3d_write(0, result_write, internal_format)
@@ -79,7 +79,7 @@ class Advect3D(ComputeShader):
         glUniform3i(self.get_uniform_loc("uClosed"), *(int(c) for c in closed))
         glUniform1i(self.get_uniform_loc("uFromFaces"), int(faces is not None))
         if faces is not None:
-            self.bind_texture_3d(4, faces, "uFaces")
+            self.bind_texture_3d(4, faces)
             glUniform3i(self.get_uniform_loc("uCells"), faces.width - 1, faces.height - 1, faces.depth - 1)
         if guard is not None:
             guard.use(self.get_uniform_loc("uGuardSlot"))

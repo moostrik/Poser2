@@ -41,10 +41,8 @@ class VorticityCurl(Shader):
 
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, velocity.tex_id)
-        glUniform1i(self.get_uniform_loc("uVelocity"), 0)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
-        glUniform1i(self.get_uniform_loc("uObstacle"), 1)
 
         glUniform1i(self.get_uniform_loc("uCount"), count)
         glUniform2fv(self.get_uniform_loc("uRadius"), self.MAX_CURLS, reaches)

@@ -37,8 +37,8 @@ class VorticityForce3D(ComputeShader):
         glUseProgram(self.shader_program)
 
         for k, unit in enumerate((0, 2, 3)):
-            self.bind_texture_3d(unit, curls[min(k, count - 1)], f"uCurl{k}")     # an unused slot repeats the last
-        self.bind_texture_3d(1, obstacle, "uObstacle")
+            self.bind_texture_3d(unit, curls[min(k, count - 1)])     # an unused slot repeats the last
+        self.bind_texture_3d(1, obstacle)
         self.bind_image_3d_write(0, force_out, GL_RGBA16F)
 
         glUniform3f(self.get_uniform_loc("uHalfRdxInv"), 0.5 / cell[0], 0.5 / cell[1], 0.5 / cell[2])

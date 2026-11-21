@@ -1,6 +1,6 @@
 """GradientWipe: a wipe from one image to another in the order a gradient image gives."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUseProgram
 from ... import Shader, draw_quad, Texture
 
 import logging
@@ -23,9 +23,6 @@ class GradientWipe(Shader):
         for unit, texture in enumerate((src, dst, gradient)):
             glActiveTexture((GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2)[unit])
             glBindTexture(GL_TEXTURE_2D, texture.tex_id)
-        glUniform1i(self.get_uniform_loc("src"), 0)
-        glUniform1i(self.get_uniform_loc("dst"), 1)
-        glUniform1i(self.get_uniform_loc("gradient"), 2)
         glUniform1f(self.get_uniform_loc("progress"), progress)
         glUniform1f(self.get_uniform_loc("softness"), softness)
         draw_quad()
