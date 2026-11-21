@@ -8,13 +8,13 @@ and 2 of its render). Paths in this file are relative to `apps/smile/`; commands
 its `.venv` (`scripts/install.bat` there makes it, `apps/smile/scripts/install.bat` adds ComfyUI). Tests:
 `python -m unittest discover -s apps/smile/<package>/tests -t .` (`tests`, `face`, `comfy`, ..., `relay`).
 The app's packages are its own (`cam`, `face`, `comfy`, `render`, `player`, ...); `modules/gl`, `modules/settings`,
-`modules/utils` and `modules/log_config.py` are Poser2's, shared with the other apps. `data/` is what the installation
+`modules/utils` and `modules/logging` are Poser2's, shared with the other apps. `data/` is what the installation
 is given (settings files, models, workflow, audio, test photos), `output/` what it produces (git-ignored, safe to delete).
 `README.md` is for whoever installs or runs the installation: setup, scripts, the on-site checklist
 with the date each check passed, and the known limits; keep it current when any of that changes.
 The app runs under pythonw, without a console: say things with `logging`, never `print` (the log file
 in Poser2's `logs/` is the only place they show; unhandled exceptions of the threads and of the main
-thread go there too, `log_config.install_excepthooks`, and each one is a line in
+thread go there too, `modules.logging.install_excepthooks`, and each one is a line in
 `logs/crashes.log`, which every start reports as its first log line, `crash_summary`). ComfyUI's logs are in `output/logs/`. A worker thread's loop catches what its work
 raises, logs it (not at every round) and goes on: a thread that ends leaves an installation that looks
 alive and does nothing (the face finder: nobody is ever chosen; the generator: the flash stays).

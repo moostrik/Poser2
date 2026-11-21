@@ -32,7 +32,7 @@ import OpenGL  # noqa: E402
 OpenGL.ERROR_CHECKING = False
 import numpy as np  # noqa: E402
 
-from modules.log_config import setup_logging, install_excepthooks  # noqa: E402
+from modules.logging import setup_logging, install_excepthooks  # noqa: E402
 from modules.camera import CameraFrame, CameraFrameCallback, FrameType  # noqa: E402
 from modules.pose import FrameDict  # noqa: E402
 from modules.settings import BaseSettings, SettingsStore  # noqa: E402
