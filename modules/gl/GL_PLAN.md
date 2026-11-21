@@ -32,6 +32,22 @@ unless Matthias says he is using the PC or the app.
   mean, p99 and the misses' share, within the spread of two runs of the code before; the motion's monitor by eye if
   the runs do not line up.
 
+## H. One framebuffer class
+
+- H1. After F1. `Fbo` and `MultiTargetFbo` become one `Fbo` with one or more color targets it owns, as Cinder's
+  `gl::Fbo`: `allocate(width, height, formats)`, a format per target, target 0 the texture the `Fbo` is (so every
+  caller that draws it, binds it or passes it as a texture keeps working), the others by index; `SwapFbo` and
+  `SwapMultiTargetFbo` become one swap pair of it, with F1's `target(i)`. Every caller moves with it: the ones with
+  one target change only if they name its format by keyword (93 files name `Fbo` or `SwapFbo`: 35 in the apps, 53 in
+  the modules, 5 in the scripts), the ones with several (depth_velocity, particle_density) take the one class.
+  `LayeredFbo` stays as it is: it is one target of another texture kind (a `Texture2DArray`), attached with all its
+  layers (`glFramebufferTexture`) and drawn per layer by `gl_Layer`, so one `Fbo` would have to become generic over
+  the texture kind for it (deduction). Why: two classes for one thing, a framebuffer that owns its color targets,
+  differing only in their count; the textbook class is one (Cinder's `gl::Fbo` with `Fbo::Format`'s color textures)
+  (seen: `fbo.py`, `multi_target_fbo.py` after F1). Check: pyright, the guard and gl tests, shader_check, and a -sim of
+  each app (deep_flow with the particles on the weighted look and on SURFACE, low_flow, hd_trio, white_space,
+  smile), no GL error.
+
 ## G. Minor fixes found here, in flow's code
 
 Each gets the flow thread's feedback after its commit.
