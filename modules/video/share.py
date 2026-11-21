@@ -1,13 +1,11 @@
 """The share clip: a clip re-encoded with overlays and a sound track, for a phone."""
 
-import subprocess
-
 import numpy as np
 
 from .encoder import H264_OPTIONS
 from .hardware import ClipCodec, Hardware, encoder_name
 from .probe import probe
-from .process import error_text, popen
+from .process import run
 
 
 # the share clip for a phone: lighter than the players' clip, it travels
@@ -41,12 +39,7 @@ def make_share(video: str, overlays: list[tuple[str, str]], pcm: np.ndarray, rat
             '-map', f'{audio_index}:a:0', *([] if overlays else ['-map', '0:v:0']),
             '-c:v', codec, *quality, '-pix_fmt', pix_fmt, '-c:a', 'aac', '-b:a', '128k',
             '-shortest', '-movflags', '+faststart', *metadata, out]
-    process = popen(args, subprocess.PIPE, subprocess.DEVNULL)
     try:
-        _, err = process.communicate(input=np.ascontiguousarray(pcm, dtype=np.float32).tobytes(), timeout=120)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.communicate()
-        raise RuntimeError(f'ffmpeg did not finish the share clip of {video}')
-    if process.returncode != 0:
-        raise RuntimeError(f'ffmpeg could not make the share clip of {video}: {error_text(err)}')
+        run(args, np.ascontiguousarray(pcm, dtype=np.float32).tobytes(), timeout=120)
+    except RuntimeError as e:
+        raise RuntimeError(f'could not make the share clip of {video}: {e}') from e

@@ -1,11 +1,10 @@
 """What ffprobe says about a clip: one video stream's size, rate and exact frame count, and the clip's comment."""
 
 import json
-import subprocess
 from dataclasses import dataclass
 from fractions import Fraction
 
-from .process import FFPROBE, error_text, popen
+from .process import FFPROBE, run
 
 
 @dataclass(frozen=True)
@@ -20,10 +19,10 @@ class StreamInfo:
 
 
 def _ffprobe(args: list[str], path: str) -> dict:
-    process = popen([*args, '-of', 'json', path], subprocess.DEVNULL, subprocess.PIPE, command=FFPROBE)
-    out, err = process.communicate(timeout=60)
-    if process.returncode != 0:
-        raise RuntimeError(f'ffprobe failed on {path}: {error_text(err)}')
+    try:
+        out = run([*args, '-of', 'json', path], timeout=60, command=FFPROBE)
+    except RuntimeError as e:
+        raise RuntimeError(f'could not probe {path}: {e}') from e
     return json.loads(out)
 
 

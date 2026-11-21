@@ -15,7 +15,7 @@ from modules.utils import Waker
 from .depth_frame import DEPTH_PIX_FMT, depth_frame_bytes, p012_to_depth
 from .hardware import Hardware, hwaccel_args
 from .probe import probe
-from .process import big_pipe, popen
+from .process import ErrorReader, big_pipe, popen, read_exactly
 
 import logging
 logger = logging.getLogger(__name__)
@@ -170,8 +170,7 @@ class StreamReader:
                 ffmpeg_process = popen(args, subprocess.DEVNULL, write_fd)
             finally:
                 os.close(write_fd)      # the child has its own copy; ours must close for the read to reach the end
-            Thread(target=self._log_errors, args=(ffmpeg_process, video_file), name='StreamReader errors',
-                   daemon=True).start()
+            ErrorReader(ffmpeg_process, lambda line: self._log_error(video_file, line), name='StreamReader errors')
         except OSError as e:
             logger.error('Error loading %s: %s', video_file, e)
             if frames_in is not None:
@@ -188,14 +187,10 @@ class StreamReader:
         if self.stop_event.is_set():
             self._close()
 
-    def _log_errors(self, process: subprocess.Popen, video_file: str) -> None:
-        """ffmpeg's error lines, read as they come so its pipe never fills, and logged unless the reader was
-        stopped (an ended decoder may say so); the pipe is closed at its end, when the decoder ends."""
-        assert process.stderr is not None
-        with process.stderr as stderr:
-            for line in stderr:
-                if not self.stop_event.is_set():
-                    logger.error('Decoder of %s: %s', video_file, line.decode(errors='replace').strip())
+    def _log_error(self, video_file: str, line: bytes) -> None:
+        """One of ffmpeg's error lines, logged unless the reader was stopped (an ended decoder may say so)."""
+        if not self.stop_event.is_set():
+            logger.error('Decoder of %s: %s', video_file, line.decode(errors='replace').strip())
 
     def _watch(self) -> None:
         """Logs, once per stall, a read that waited `STALL_SECONDS` for its frame: a decoder that hangs gives no frame
@@ -220,18 +215,6 @@ class StreamReader:
         if frames_in is not None:
             frames_in.close()
 
-    @staticmethod
-    def _read_frame(frames_in: io.FileIO, frame: bytearray) -> bool:
-        """Fill `frame` from the pipe, which hands over what it holds per read; False at the stream's end."""
-        view = memoryview(frame)
-        got = 0
-        while got < len(view):
-            n = frames_in.readinto(view[got:])
-            if not n:
-                return False
-            got += n
-        return True
-
     def _play(self) -> None:
         frames_in = self._frames_in
         if self.ffmpeg_process is None or frames_in is None:
@@ -255,7 +238,7 @@ class StreamReader:
                 in_bytes = bytearray(self.bytes_per_frame)
                 self._reading.set()
                 self._read_progress.set()
-                read: bool = self._read_frame(frames_in, in_bytes)
+                read: bool = read_exactly(frames_in, memoryview(in_bytes)) == len(in_bytes)
                 self._reading.clear()
                 self._read_progress.set()
                 if not read:

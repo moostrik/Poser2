@@ -8,6 +8,11 @@ import io
 import os
 import shutil
 import subprocess
+from threading import Thread
+from typing import IO, Callable
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 CREATE_NO_WINDOW: int = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
@@ -52,3 +57,62 @@ def big_pipe() -> tuple[io.FileIO, int]:
 
 def error_text(output: bytes | None) -> str:
     return (output or b'').decode(errors='replace').strip()
+
+
+def run(args: list[str], stdin_bytes: bytes | None = None, timeout: float = 60.0, command: str = FFMPEG) -> bytes:
+    """Run ffmpeg (or ffprobe) to its end, `stdin_bytes` fed to it; its output. Kills it after `timeout` s. Raises
+    RuntimeError with its error text when it fails or is killed, OSError when it cannot start."""
+    stdin = subprocess.DEVNULL if stdin_bytes is None else subprocess.PIPE
+    process = popen(args, stdin, subprocess.PIPE, command=command)
+    try:
+        out, err = process.communicate(stdin_bytes, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.communicate()
+        raise RuntimeError(f'{command} did not finish in {timeout:g} s')
+    if process.returncode != 0:
+        raise RuntimeError(f'{command} failed: {error_text(err) or f"exit code {process.returncode}"}')
+    return out
+
+
+def read_exactly(file: io.RawIOBase, view: memoryview) -> int:
+    """Fill `view` from an unbuffered pipe, which hands over what it holds per read; the bytes filled, short only at
+    the pipe's end."""
+    got = 0
+    while got < len(view):
+        n = file.readinto(view[got:])
+        if not n:
+            break
+        got += n
+    return got
+
+
+class ErrorReader:
+    """A process's error output, read on its own thread as it comes, so its pipe never fills and stops the process;
+    each line goes to `on_line`, or without it is kept for `text`. The pipe is closed at its end, when the process
+    ends."""
+
+    def __init__(self, process: subprocess.Popen, on_line: Callable[[bytes], None] | None = None,
+                 name: str = 'ffmpeg errors') -> None:
+        assert process.stderr is not None
+        self._stderr: IO[bytes] = process.stderr
+        self._on_line: Callable[[bytes], None] | None = on_line
+        self._lines: list[bytes] = []
+        self._thread: Thread = Thread(target=self._read, name=name, daemon=True)
+        self._thread.start()
+
+    def _read(self) -> None:
+        with self._stderr as stderr:
+            for line in stderr:
+                if self._on_line is not None:
+                    try:
+                        self._on_line(line)
+                    except Exception as e:
+                        logger.error('Error line callback failed: %s', e)
+                else:
+                    self._lines.append(line)
+
+    def text(self, timeout: float = 5.0) -> str:
+        """The error output kept, once the pipe reached its end or `timeout` s passed."""
+        self._thread.join(timeout)
+        return error_text(b''.join(self._lines))

@@ -3,20 +3,6 @@
 What is to be built in `modules/video`: ffmpeg, the clips and streams it writes and reads, and the screen recorder
 ([VIDEO.md](VIDEO.md)).
 
-## C. One way to run ffmpeg
-
-C1. `process.py` gets the three things the package now writes several times, and every caller uses them:
-   - `run(args, stdin_bytes, timeout, command)`: start, feed, wait, kill on timeout, raise with ffmpeg's error text.
-     It replaces the copies in `audio.transcode_aac`, `audio.read_audio`, `share.make_share`, `encoder.encoder_works`
-     and `probe._ffprobe` **(seen)**. `_ffprobe` today lets `TimeoutExpired` out without killing ffprobe, so a hung
-     probe leaves a process behind **(seen)**.
-   - `read_exactly(file, view)`: fill a buffer from the pipe, short only at its end. It replaces
-     `clip_decode._read_exactly`, the fill loop in `decode_clip` and `StreamReader._read_frame` **(seen)**.
-   - the stderr reader thread, which `decode_clip`, `ClipWriter._start` and `StreamReader._load` each start their own
-     way **(seen)**; StreamReader keeps logging line by line.
-   Why: CLAUDE.md Packages, "Inside a package, code that does the same is written once"; one place gets timeouts and
-   kills right. Check: the video unit tests, and smile's `save` tests (share, audio).
-
 ## D. The stream threads
 
 D1. `StreamReader._play` ends cleanly whatever happens: the frame callback is called in a `try` that logs and goes

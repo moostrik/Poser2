@@ -1,9 +1,8 @@
 """The h264 encoder a clip is written with on each chip, and the trial that picks a chip whose encoder works."""
 
 import logging
-import subprocess
 from .hardware import ClipCodec, Hardware, encoder_name
-from .process import available, error_text, popen
+from .process import available, run
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +26,12 @@ def encoder_works(hardware: Hardware) -> bool:
     args = ['-nostdin', '-f', 'lavfi', '-i', f'color=c=gray:size={TRIAL_SIZE}x{TRIAL_SIZE}:rate=15', '-frames:v', '1',
             '-c:v', codec, *quality, '-pix_fmt', pix_fmt, '-f', 'null', '-']
     try:
-        process = popen(args, subprocess.DEVNULL, subprocess.DEVNULL)
-        _, err = process.communicate(timeout=20)
-    except (OSError, subprocess.TimeoutExpired) as e:
+        run(args, timeout=20)
+    except OSError as e:
         logger.warning('%s trial failed: %s', hardware.value, e)
         return False
-    if process.returncode != 0:
-        logger.info('%s not usable: %s', hardware.value, error_text(err))
+    except RuntimeError as e:
+        logger.info('%s not usable: %s', hardware.value, e)
         return False
     return True
 

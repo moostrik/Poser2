@@ -4,7 +4,6 @@ for a clip, an HEVC master, a camera recording's stream."""
 import logging
 import os
 import subprocess
-import threading
 from enum import Enum
 from typing import BinaryIO
 
@@ -12,7 +11,7 @@ import numpy as np
 
 from .encoder import H264_OPTIONS
 from .hardware import ClipCodec, Hardware, encoder_name
-from .process import error_text, pipe, popen
+from .process import ErrorReader, pipe, popen
 
 logger = logging.getLogger(__name__)
 
@@ -95,8 +94,7 @@ class ClipWriter:
         self._size: tuple[int, int] = (0, 0)
         self._process: subprocess.Popen | None = None
         self._stdin: BinaryIO | None = None
-        self._errors: list[bytes] = []
-        self._error_reader: threading.Thread | None = None
+        self._errors: ErrorReader | None = None
 
     def _frame_size(self, image: np.ndarray) -> tuple[int, int]:
         """(width, height) of the picture in `image`; bgr24 and gray are cropped to even, a YUV input must be even
@@ -151,16 +149,7 @@ class ClipWriter:
         finally:
             os.close(read_fd)       # the child has its own copy; ours must close for its read to reach the end
         self._stdin = os.fdopen(write_fd, 'wb', buffering=0)
-        stderr = self._process.stderr
-        assert stderr is not None
-        # read while the frames go in: an encoder that writes a line per frame would fill its pipe and stop
-        self._error_reader = threading.Thread(target=self._read_errors, args=(stderr,), name='ffmpeg errors', daemon=True)
-        self._error_reader.start()
-
-    def _read_errors(self, stderr: BinaryIO) -> None:
-        """ffmpeg's error output to its end, when the process ends; the pipe is closed then."""
-        with stderr:
-            self._errors.append(stderr.read())
+        self._errors = ErrorReader(self._process)
 
     def _end(self, timeout: float) -> str:
         """Close the pipe and wait for ffmpeg; its error output. Kills it after `timeout` s."""
@@ -180,11 +169,9 @@ class ClipWriter:
             process.wait()
             self.failed = True
             return 'did not finish, killed'
-        if self._error_reader is not None:
-            self._error_reader.join(timeout=5)
         if process.returncode != 0:
             self.failed = True
-        return error_text(b''.join(self._errors))
+        return self._errors.text() if self._errors is not None else ''
 
     def close(self) -> bool:
         """Finish the file. True when it is complete and has frames."""
