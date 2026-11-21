@@ -127,7 +127,7 @@ class ScreenPreview:
             buffer, key = self._written.popleft()
             self._wake.notify()
         self._pixels.bind(buffer)
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)   # rows of any even width, unpadded
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)   # rows of any width, unpadded
         for plane in self._planes:
             glBindTexture(GL_TEXTURE_2D, plane.fbo.tex_id)
             glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, plane.width, plane.height, plane.read_format, plane.sample_type,

@@ -184,7 +184,7 @@ class ScreenCapture:
             plane.fbo.begin()
             self._shader.use(self.frame, plane.plane, plane.sample_max)
         BlendState.pop()
-        glPixelStorei(GL_PACK_ALIGNMENT, 1)     # rows of any even width, unpadded
+        glPixelStorei(GL_PACK_ALIGNMENT, 1)     # rows of any width, unpadded
         self._pixels.bind(buffer)
         for plane in self._planes:
             glBindFramebuffer(GL_READ_FRAMEBUFFER, plane.fbo.fbo_id)
