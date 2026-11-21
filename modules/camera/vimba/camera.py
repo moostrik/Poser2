@@ -4,12 +4,12 @@
 import logging
 import time
 from dataclasses import dataclass
-from threading import Thread, Lock
+from threading import Thread
 from typing import Any
 
 import numpy as np
 
-from modules.utils import Waker
+from modules.utils import Broadcast, Waker
 
 from .. import CameraFrame, CameraReadings, FrameType, CameraFrameCallback, TrackletCallback
 
@@ -122,8 +122,7 @@ class Camera(Thread):
 
         self._last_frame: float = 0.0           # the arrival of the newest complete frame (perf_counter)
 
-        self._callback_lock: Lock = Lock()
-        self.frame_callbacks: list[CameraFrameCallback] = []
+        self.frame_callbacks: Broadcast[[CameraFrame]] = Broadcast(name='Vimba frame')
 
         # frame rate, exposure, white balance and color: sent to the camera when the settings change, checked every frame
         self.control: SensorControl = SensorControl(settings)
@@ -145,9 +144,7 @@ class Camera(Thread):
         return self.camera is not None
 
     def add_frame_callback(self, callback: CameraFrameCallback) -> None:
-        with self._callback_lock:
-            if callback not in self.frame_callbacks:
-                self.frame_callbacks.append(callback)
+        self.frame_callbacks.add_callback(callback)
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
         pass    # no detector on this camera: nothing to deliver
@@ -286,12 +283,6 @@ class Camera(Thread):
 
     def _emit(self, image: np.ndarray, arrival: float) -> None:
         """The frame becomes the contract's: as delivered, its turn and flips as flags, stamped with its arrival."""
-        frame = CameraFrame(cam_id=self.cam_id, kind=FrameType.VIDEO, image=image, timestamp=arrival,
-                            rotate90=self.rotate90, flip_v=self.settings.flip_v, flip_h=self.settings.flip_h)
-        with self._callback_lock:
-            callbacks: list[CameraFrameCallback] = list(self.frame_callbacks)
-        for callback in callbacks:
-            try:
-                callback(frame)
-            except Exception:
-                logger.exception('Vimba camera: a frame callback failed')
+        self.frame_callbacks(CameraFrame(cam_id=self.cam_id, kind=FrameType.VIDEO, image=image, timestamp=arrival,
+                                         rotate90=self.rotate90, flip_v=self.settings.flip_v,
+                                         flip_h=self.settings.flip_h))

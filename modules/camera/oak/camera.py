@@ -2,7 +2,7 @@
 
 import logging
 import time
-from threading import Thread, Event, Lock
+from threading import Thread, Event
 from typing import cast
 
 import depthai as dai
@@ -12,7 +12,7 @@ from .. import CameraResolution, CameraFrame, RigCameraReadings, CameraTracklet,
     TrackletCallback
 from ..geometry import orientation_from_gravity, mode_size, frame_size, frame_window, frame_coverage, coverage_summary, \
     delivered_height, lens_field, lens_deviation, imu_to_camera, unroll_imu_frame
-from modules.utils import FPS, Rect
+from modules.utils import Broadcast, FPS, Rect
 
 from .control import SensorControl
 from .device import get_device_list, log_connected_sensors, read_lens_calibration
@@ -73,9 +73,8 @@ class Camera(Thread):
         self.tracklet_fps: FPS = FPS()
 
         # CALLBACKS (run in registration order)
-        self._callback_lock: Lock = Lock()
-        self.frame_callbacks: list[CameraFrameCallback] = []
-        self.tracklet_callbacks: list[TrackletCallback] = []
+        self.frame_callbacks: Broadcast[[CameraFrame]] = Broadcast(name='OAK-D frame')
+        self.tracklet_callbacks: Broadcast[[CameraTracklets]] = Broadcast(name='OAK-D tracklets')
 
         # MOUNT READOUT — the gravity vector, smoothed, and how to get it into the camera's frame.
         # A tripod does not move, so a single sample is almost all noise; the average is the
@@ -144,9 +143,8 @@ class Camera(Thread):
             queue.close()
         self.queues.clear()
 
-        with self._callback_lock:
-            self.frame_callbacks.clear()
-            self.tracklet_callbacks.clear()
+        self.frame_callbacks.clear()
+        self.tracklet_callbacks.clear()
 
         logger.info(f'{self.device_id} CLOSED')
 
@@ -276,29 +274,17 @@ class Camera(Thread):
 
     def _emit_frame(self, kind: FrameType, image: ndarray) -> None:
         """The hand-over: the frame gets its host time here and goes to every callback."""
-        frame = CameraFrame(cam_id=self.cam_id, kind=kind, image=image, timestamp=time.perf_counter())
-        with self._callback_lock:
-            callbacks: list[CameraFrameCallback] = list(self.frame_callbacks)
-        for c in callbacks:
-            c(frame)
+        self.frame_callbacks(CameraFrame(cam_id=self.cam_id, kind=kind, image=image, timestamp=time.perf_counter()))
 
     def _emit_tracklets(self, tracklets: list[CameraTracklet], timestamp: float) -> None:
         if not self.running:
             return
-        message = CameraTracklets(cam_id=self.cam_id, timestamp=timestamp, tracklets=tracklets)
-        with self._callback_lock:
-            callbacks: list[TrackletCallback] = list(self.tracklet_callbacks)
-        for c in callbacks:
-            c(message)
+        self.tracklet_callbacks(CameraTracklets(cam_id=self.cam_id, timestamp=timestamp, tracklets=tracklets))
 
     # ── CameraSource ───────────────────────────────────────────────────
 
     def add_frame_callback(self, callback: CameraFrameCallback) -> None:
-        with self._callback_lock:
-            if callback not in self.frame_callbacks:
-                self.frame_callbacks.append(callback)
+        self.frame_callbacks.add_callback(callback)
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
-        with self._callback_lock:
-            if callback not in self.tracklet_callbacks:
-                self.tracklet_callbacks.append(callback)
+        self.tracklet_callbacks.add_callback(callback)

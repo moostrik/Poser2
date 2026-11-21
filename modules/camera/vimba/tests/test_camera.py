@@ -93,8 +93,10 @@ class TestVimbaCam(unittest.TestCase):
     def test_a_failing_callback_does_not_stop_the_others(self):
         def fail(frame: CameraFrame) -> None:
             raise RuntimeError('a consumer failed')
-        self.cam.frame_callbacks.insert(0, fail)
-        with self.assertLogs('modules.camera.vimba.camera', 'ERROR'):
+        self.cam.frame_callbacks.clear()
+        self.cam.add_frame_callback(fail)
+        self.cam.add_frame_callback(self.frames.append)
+        with self.assertLogs('modules.utils.broadcast', 'ERROR'):
             self.cam._frame_handler(self.camera, FakeFrame(10))
         self.assertEqual(len(self.frames), 1)
 

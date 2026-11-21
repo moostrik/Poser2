@@ -39,18 +39,18 @@ class RetryTest(unittest.TestCase):
         camera = Camera(Oak4CameraSettings())
         callback = lambda frame: None
         camera.add_frame_callback(callback)
-        callbacks_at_try: list[int] = []
+        callbacks_at_try: list[bool] = []
 
         def no_device(verbose: bool) -> list[str]:
-            callbacks_at_try.append(len(camera.frame_callbacks))
+            callbacks_at_try.append(bool(camera.frame_callbacks))
             if len(callbacks_at_try) == 3:
                 camera.stop()
             return []
 
         with patch(f'{CAMERA}.get_device_list', no_device):
             camera.run()
-        self.assertEqual(callbacks_at_try, [1, 1, 1])
-        self.assertEqual(camera.frame_callbacks, [])
+        self.assertEqual(callbacks_at_try, [True, True, True])
+        self.assertFalse(camera.frame_callbacks)
 
     def test_a_problem_logs_once(self) -> None:
         camera = Camera(Oak4CameraSettings())
@@ -110,7 +110,7 @@ class RetryTest(unittest.TestCase):
             camera.run()
         self.assertEqual(len(builds), 1)
         self.assertFalse(camera.connected)
-        self.assertEqual(camera.frame_callbacks, [])
+        self.assertFalse(camera.frame_callbacks)
 
     @patch(f'{CAMERA}.FRAME_TIMEOUT', 0.01)
     def test_frames_that_stop_open_the_camera_again(self) -> None:
@@ -146,10 +146,10 @@ class ConnectedTest(unittest.TestCase):
     def test_a_closed_camera_is_not_running_and_keeps_its_callbacks(self) -> None:
         camera = Camera(Oak4CameraSettings())
         camera.running = True
-        camera.frame_callbacks.append(lambda frame: None)
+        camera.add_frame_callback(lambda frame: None)
         camera._close()
         self.assertFalse(camera.running)
-        self.assertEqual(len(camera.frame_callbacks), 1)
+        self.assertTrue(camera.frame_callbacks)
 
 
 if __name__ == '__main__':

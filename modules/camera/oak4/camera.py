@@ -5,7 +5,7 @@ import logging
 import math
 import time
 from pathlib import Path
-from threading import Thread, Event, Lock
+from threading import Thread, Event
 from typing import cast
 
 import depthai as dai
@@ -15,7 +15,7 @@ from .. import CameraResolution, CameraFrame, DepthAlignment, FrameReadings, Rig
     TrackletCallback, TiltCorrection
 from ..geometry import orientation_from_gravity, frame_window, frame_coverage, coverage_summary, delivered_height, lens_field, \
     rectilinear_field, lens_deviation, imu_to_camera, unroll_imu_frame
-from modules.utils import FPS, Rect
+from modules.utils import Broadcast, FPS, Rect
 
 from .control import DepthControl, SensorControl
 from .device import get_device_list, find_device, link_name, link_resolution, log_connected_sensors, read_lens_calibration, CameraLink
@@ -99,9 +99,8 @@ class Camera(Thread):
         self.depth_fps: FPS = FPS()
 
         # CALLBACKS (run in registration order)
-        self._callback_lock: Lock = Lock()
-        self.frame_callbacks: list[CameraFrameCallback] = []
-        self.tracklet_callbacks: list[TrackletCallback] = []
+        self.frame_callbacks: Broadcast[[CameraFrame]] = Broadcast(name='OAK4 frame')
+        self.tracklet_callbacks: Broadcast[[CameraTracklets]] = Broadcast(name='OAK4 tracklets')
 
         # MOUNT READOUT — the gravity vector, smoothed, and how to get it into the camera's frame.
         self._imu_rotation: list[list[float]] | None = None
@@ -139,9 +138,8 @@ class Camera(Thread):
             except Exception as e:
                 self._warn(f'camera error: {e}')
             self.stop_event.wait(RETRY_INTERVAL)
-        with self._callback_lock:
-            self.frame_callbacks.clear()
-            self.tracklet_callbacks.clear()
+        self.frame_callbacks.clear()
+        self.tracklet_callbacks.clear()
 
     def _watch_frames(self) -> None:
         """Until told to stop, or until the frames have stopped: a cable, its power, a crashed device."""
@@ -459,14 +457,11 @@ class Camera(Thread):
                     readings: FrameReadings | None = None, alignment: DepthAlignment | None = None,
                     confidence: ndarray | None = None) -> None:
         """The hand-over: the frame, with its capture time (`capture_time`) and its arrival, goes to every callback."""
-        frame = CameraFrame(cam_id=self.cam_id, kind=kind, image=image, timestamp=timestamp,
-                            nv12=nv12, rotate90=self.rotate90, flip_v=self.flip_v_on_host, flip_h=self.flip_h_on_host,
-                            homography=self._homography(), readings=readings, intrinsics=self._intrinsics,
-                            alignment=alignment, arrival=arrival, confidence=confidence)
-        with self._callback_lock:
-            callbacks: list[CameraFrameCallback] = list(self.frame_callbacks)
-        for c in callbacks:
-            c(frame)
+        self.frame_callbacks(CameraFrame(cam_id=self.cam_id, kind=kind, image=image, timestamp=timestamp,
+                                         nv12=nv12, rotate90=self.rotate90, flip_v=self.flip_v_on_host,
+                                         flip_h=self.flip_h_on_host, homography=self._homography(), readings=readings,
+                                         intrinsics=self._intrinsics, alignment=alignment, arrival=arrival,
+                                         confidence=confidence))
 
     def _homography(self) -> ndarray | None:
         """The tilt correction's homography, none on a turned camera: on its side the IMU's tilt is a rotation about
@@ -481,20 +476,13 @@ class Camera(Thread):
     def _emit_tracklets(self, tracklets: list[CameraTracklet], timestamp: float, arrival: float) -> None:
         if not self.running:
             return
-        message = CameraTracklets(cam_id=self.cam_id, timestamp=timestamp, tracklets=tracklets, arrival=arrival)
-        with self._callback_lock:
-            callbacks: list[TrackletCallback] = list(self.tracklet_callbacks)
-        for c in callbacks:
-            c(message)
+        self.tracklet_callbacks(CameraTracklets(cam_id=self.cam_id, timestamp=timestamp, tracklets=tracklets,
+                                                arrival=arrival))
 
     # ── CameraSource ───────────────────────────────────────────────────
 
     def add_frame_callback(self, callback: CameraFrameCallback) -> None:
-        with self._callback_lock:
-            if callback not in self.frame_callbacks:
-                self.frame_callbacks.append(callback)
+        self.frame_callbacks.add_callback(callback)
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
-        with self._callback_lock:
-            if callback not in self.tracklet_callbacks:
-                self.tracklet_callbacks.append(callback)
+        self.tracklet_callbacks.add_callback(callback)

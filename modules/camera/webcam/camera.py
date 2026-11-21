@@ -4,13 +4,13 @@ cannot be opened is a warning and the camera stays unconnected: a webcam is not 
 
 import logging
 import time
-from threading import Lock, Thread
+from threading import Thread
 
 import cv2
 import numpy as np
 
 from .. import CameraFrame, CameraReadings, CameraSettings, FrameType, CameraFrameCallback, TrackletCallback
-from modules.utils import FPS
+from modules.utils import Broadcast, FPS
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +26,7 @@ class Camera(Thread):
         self.rotate90: bool = rotate90
         self.index: int = index                 # the device's index for OpenCV
 
-        self._callback_lock: Lock = Lock()
-        self.frame_callbacks: list[CameraFrameCallback] = []
+        self.frame_callbacks: Broadcast[[CameraFrame]] = Broadcast(name='webcam frame')
         self.video_fps: FPS = FPS()
 
         self.running: bool = False
@@ -42,9 +41,7 @@ class Camera(Thread):
         return self._capture is not None
 
     def add_frame_callback(self, callback: CameraFrameCallback) -> None:
-        with self._callback_lock:
-            if callback not in self.frame_callbacks:
-                self.frame_callbacks.append(callback)
+        self.frame_callbacks.add_callback(callback)
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
         pass    # no detector on this camera: nothing to deliver
@@ -90,9 +87,6 @@ class Camera(Thread):
         self.video_fps.processed()
         self.settings.readings.video_fps = self.video_fps.get_rate_average()
         self.settings.readings.video_min_fps = self.video_fps.get_rate_minimum()
-        frame = CameraFrame(cam_id=self.cam_id, kind=FrameType.VIDEO, image=image, timestamp=time.perf_counter(),
-                            rotate90=self.rotate90, flip_v=self.settings.flip_v, flip_h=self.settings.flip_h)
-        with self._callback_lock:
-            callbacks: list[CameraFrameCallback] = list(self.frame_callbacks)
-        for callback in callbacks:
-            callback(frame)
+        self.frame_callbacks(CameraFrame(cam_id=self.cam_id, kind=FrameType.VIDEO, image=image,
+                                         timestamp=time.perf_counter(), rotate90=self.rotate90,
+                                         flip_v=self.settings.flip_v, flip_h=self.settings.flip_h))

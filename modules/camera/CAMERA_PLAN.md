@@ -9,16 +9,6 @@ smile, `vimba` and `webcam` by smile. That is general code with one user, which 
 The steps below are proposals from the scan of 2026-11-21; nothing is built. **(seen)** is read in the code,
 **(deduction)** inferred.
 
-## A. One callback list
-
-- A1. Each backend's frame and tracklet callbacks become a `utils.Broadcast` (`oak.Camera`, and `ClipCamera` through
-  it, `oak4.Camera`, `vimba.Camera`, `webcam.Camera`), with `add_frame_callback` and `add_tracklet_callback` handing
-  on to it. Why: "A callback list is a `utils.Broadcast`" and "A failing callback does not stop the others". Today
-  four backends each keep a list, a lock and the same add and emit code **(seen)**; in `oak`, `oak4` and `webcam` a
-  callback that raises skips the rest and lands in depthai's or the capture thread **(seen: `_emit_frame`,
-  `_emit_tracklets`, `_emit`)**; only Vimba catches it **(seen)**. CAMERA.md's contract line on callbacks follows.
-  Tests: the camera, vimba and webcam tests; oak4's in `.venv-oak4`.
-
 ## B. Written once
 
 - B1. The mount readout, one class in `geometry/orientation.py`: the gravity vector smoothed, its tilt and roll, the
