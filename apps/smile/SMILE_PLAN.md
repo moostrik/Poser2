@@ -5,12 +5,11 @@ What is next for smile, the app in [SMILE.md](SMILE.md); what spans the apps is 
 
 ## G. The OAK4 as a camera
 
-- G4 The OAK4 live check with a visitor, on the connected OAK4 (now unturned): `-oak -lm` (landscape) and `-oak`
-  (portrait, the frames turned): the face marks and the capture turned as the screen is, one visitor through each;
-  at `P2160` and 30 fps the face finding and the upload keep up, no frames dropped; a recording at `P2160` and its
-  `-sim`. The iGPU decoder stalled on a 3088 × 2316 recording in A3 (`VIDEO_PLAN.md` A1): if a `P2160` recording does
-  not play with it, `-sim` plays it on the CPU decoder (the simulator's `decoder`) and the step says so.
-  Done so far (G3): one `-oak -lm` start without a visitor, USB, 30 fps (lowest 27.6), 65 ms, 2704 × 2160, upright.
+- G4 At `P2160` and 30 fps with a visitor in front of the OAK4, the face finding and the upload keep up: the camera's
+  `video_min_fps` and the uploader's dropped count read during the camera states, one live `-oak` start.
+  Done: live `-oak` starts with a visitor through (19:26 and 19:42, a clip saved each); a `P2160` recording
+  (`20261121-194424_Oak-D Test`, 2704 × 2160, unturned) played with `-sim` on the iGPU decoder, a visitor through,
+  the screen and capture upright. The OAK4 turned on its side is the camera's orientation plan's (`CAMERA_PLAN.md`).
 
 ## Open questions
 
