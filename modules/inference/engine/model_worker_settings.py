@@ -1,6 +1,6 @@
 from modules.settings import BaseSettings, Field
 
-from .model_types import ModelType
+from .model_type import ModelType
 
 
 class ModelWorkerSettings(BaseSettings):

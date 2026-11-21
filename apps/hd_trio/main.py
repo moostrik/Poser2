@@ -140,7 +140,7 @@ class HDTrioMain:
         if self.person_detector is not None:
             self.uploader.add_gpu_image_callback(self.person_detector.submit)
         self.uploader.add_finished_gpu_image_callback(self.board.set_camera_image)
-        self.uploader.add_snapshot_callback(self.crops.submit_snapshot)
+        self.uploader.add_snapshot_callback(self.crops.set_snapshot)
         self.uploader.add_capture_callback(self.frame_source.submit)
 
         # The segmentation and the board read the segmentation's crops, cut from the same images and boxes as the pose model's

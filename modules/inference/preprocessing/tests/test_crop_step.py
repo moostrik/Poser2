@@ -32,7 +32,7 @@ class CropStepTest(unittest.TestCase):
 
     def upload_two(self, crops: CropExtractor) -> dict[int, float]:
         """The first image's capture times, a newer image uploaded after it; both snapshots kept by `crops`."""
-        self.uploader.add_snapshot_callback(crops.submit_snapshot)
+        self.uploader.add_snapshot_callback(crops.set_snapshot)
         self.uploader._upload(CameraFrame(0, FrameType.VIDEO, np.zeros((48, 64, 3), np.uint8), 1.0))
         given = self.snapshots[-1][1]
         self.uploader._upload(CameraFrame(0, FrameType.VIDEO, np.zeros((48, 64, 3), np.uint8), 2.0))
@@ -129,7 +129,7 @@ class CropStepTest(unittest.TestCase):
         crops.add_image_callback(estimator.submit)
         out: list = []
         estimator.add_frames_callback(out.append)
-        self.uploader.add_snapshot_callback(crops.submit_snapshot)
+        self.uploader.add_snapshot_callback(crops.set_snapshot)
         self.uploader._upload(CameraFrame(0, FrameType.VIDEO, np.zeros((48, 64, 3), np.uint8), 1.0))
         n: int = len(PointLandmark)
         keypoints = Points2D.from_xy_arrays(np.full(n, 0.5), np.full(n, 0.5), np.full(n, 0.9, np.float32))

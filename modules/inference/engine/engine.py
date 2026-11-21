@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 
 import torch
 
-from .model_types import ModelType
+from .model_type import ModelType
 
 
 class Engine(ABC):

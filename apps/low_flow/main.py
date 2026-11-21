@@ -151,7 +151,7 @@ class LowFlowMain:
         self.uploader.add_finished_gpu_image_callback(self.inference_frame_sync.submit_image)
         self.uploader.add_finished_gpu_image_callback(self.board.set_camera_image)
         self.uploader.add_finished_gpu_image_callback(self._on_image)
-        self.uploader.add_snapshot_callback(self.crops.submit_snapshot)
+        self.uploader.add_snapshot_callback(self.crops.set_snapshot)
         self.uploader.add_capture_callback(self.frame_source.submit)
 
         # INFERENCE FRAME SYNC — each uploaded image and its masks, as one frame on the board

@@ -49,7 +49,7 @@ in any order unless they are synchronized so
   stream and hands the images and the depth on written (`add_finished_gpu_image_callback`,
   `add_finished_gpu_depth_callback`), only when such a callback is registered. The readers in the package are queued
   before that wait, so none of them waits for it.
-- The crop step keeps the uploader's last snapshots (`submit_snapshot`), takes the poses with the capture times
+- The crop step keeps the uploader's last snapshots (`set_snapshot`), takes the poses with the capture times
   they are for, which the frame source and the pose pipeline carry without the images, and cuts from exactly the
   images of those times, never a newer one, at each size it was made with (the pose model's, and where a segmentation runs, its own), from one box per
   player. It keeps three snapshots (`KEPT`): the frame source's waiting bangs (`TrackerFrameSource`'s `WAITING`) and

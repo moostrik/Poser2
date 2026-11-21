@@ -31,7 +31,7 @@ class CropExtractorSettings(BaseSettings):
 class CropExtractor:
     """The crop step: every pose's box cut out of the images it is for, at each size it is given, in one pass.
 
-    `submit_snapshot` takes each `ImageSnapshot` from the uploader and keeps the last `KEPT`, by their capture times.
+    `set_snapshot` takes each `ImageSnapshot` from the uploader and keeps the last `KEPT`, by their capture times.
     `process` takes the poses with the capture times they are for (carried by the frame source and the pipeline),
     finds the snapshot of those times and cuts each pose's box from exactly its images, at every size
     (`CropExtractorSettings`: the pose model's, and, where a segmentation runs, its own), from the one image and box.
@@ -88,7 +88,7 @@ class CropExtractor:
             raise ValueError("CropExtractor: no crops at that size; it cuts the sizes it was made with")
         return key
 
-    def submit_snapshot(self, snapshot: ImageSnapshot) -> None:
+    def set_snapshot(self, snapshot: ImageSnapshot) -> None:
         """An uploader's snapshot (its snapshot callback), kept for the poses of its capture times; the oldest of
         `KEPT` goes."""
         with self._snapshot_lock:
