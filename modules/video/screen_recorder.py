@@ -35,7 +35,6 @@ FPS_SMOOTH: float = 0.05        # share of a new tick interval in the measured r
 BLOCK_AHEAD: float = 0.5        # share of a block left when the next one is added
 LOOK_BACK_MARGIN: float = 1.2   # the look-back ring's frames over `duration` at the rate measured, for faster ticks
 QUEUE_LIMIT: int = 3            # frames waiting for the recorder's thread; one more is dropped, the oldest
-POLL: float = 0.05              # s the thread waits for work before it looks again
 ESTIMATE_INTERVAL: float = 1.0  # s between estimates of `max_duration`
 SHOW_INTERVAL: float = 0.25     # s between updates of the readouts
 
@@ -631,7 +630,7 @@ class ScreenRecorder:
         while True:
             with self._wake:
                 if not (self._queue or self._take is not None or self._free or self._exit.is_set()):
-                    self._wake.wait(POLL)
+                    self._wake.wait(max(0.0, estimated_at + ESTIMATE_INTERVAL - time.perf_counter()))
                 if self._exit.is_set() and self._take is None and not self._free:
                     return
                 frames = list(self._queue)

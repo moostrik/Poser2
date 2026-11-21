@@ -3,11 +3,6 @@
 What is to be built in `modules/video`: ffmpeg, the clips and streams it writes and reads, and the screen recorder
 ([VIDEO.md](VIDEO.md)).
 
-## D. The stream threads
-
-D3. `ScreenRecorder._run` waits for work or for the next estimate (`ESTIMATE_INTERVAL` left), not every `POLL`
-   (50 ms); `POLL` goes **(seen)**. Why: it wakes 20 times a second with nothing to do. Check: `test_screen_recorder`.
-
 ## E. The tree and what the package exports
 
 E1. `share.py` (`make_share`) moves to smile's `apps/smile/save/share.py`, its only caller, with `_SHARE_QUALITY`
