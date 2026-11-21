@@ -73,6 +73,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Share runtime data through `modules/board/` protocol + mixin pairs
 - A value derived from pose data, a threshold on it included (a gate, a dead zone), is the pipeline's and so are its settings; the show owns only what it does with it: timings, looks, sound
 - Fix a problem where it is made, not where it shows
+- Clean up in an explicit stop or teardown, never in `__del__`
 
 ## Concurrency
 

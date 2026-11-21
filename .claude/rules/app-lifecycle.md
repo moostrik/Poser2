@@ -21,7 +21,6 @@ paths:
 
 - Stop external inputs and background workers cleanly
 - Release resources in deterministic order
-- Prefer explicit stop/teardown paths over implicit garbage-collection cleanup
 
 ## Settings boundaries
 
