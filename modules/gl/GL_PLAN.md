@@ -8,9 +8,6 @@ tasklist check that no app is running, unless Matthias says he is using the PC o
 
 ## A. A texture is made one way
 
-- A3. `Tensor`'s conversion to the texture's element type is written once, for the PBO and the CPU path. Why:
-  `_update_with_pbo` and `_update_with_cpu` hold the same uint8/half/float ladder (seen). Check: deep_flow -sim, the
-  CUDA path; the CPU path runs only without CUDA interop and is not run.
 - A4. `Image` compares an upload with its own size and format and its source's size; `_cached_width`,
   `_cached_height`, `_cached_turned` and `_cached_format` go, and it reallocates through its own `allocate`. Why:
   `Image` is the `Fbo` it fills and holds its source, so the cache repeats their sizes and format; since 56dbac09

@@ -190,35 +190,7 @@ class Tensor(Texture):
         PyTorch CUDA tensor → PBO (device-to-device) → GL texture (all on GPU).
         Preserves uint8, FP16, or FP32 precision based on internal format.
         """
-        # Convert to appropriate dtype based on internal format
-        bytes_per_channel = format_bytes_per_channel(self.internal_format)
-
-        if bytes_per_channel == 1:  # uint8
-            target_dtype = torch.uint8
-            if tensor.dtype in (torch.float16, torch.float32):
-                # Convert float [0.0, 1.0] to uint8 [0, 255]
-                tensor = (tensor.clamp(0.0, 1.0) * 255.0).to(torch.uint8)
-            elif tensor.dtype != torch.uint8:
-                tensor = tensor.to(torch.uint8)
-        elif bytes_per_channel == 2:  # FP16
-            target_dtype = torch.float16
-            if tensor.dtype == torch.uint8:
-                tensor = tensor.float() / 255.0
-                tensor = tensor.half()
-            elif tensor.dtype != torch.float16:
-                tensor = tensor.half()
-        else:  # FP32
-            target_dtype = torch.float32
-            if tensor.dtype == torch.uint8:
-                tensor = tensor.float() / 255.0
-            elif tensor.dtype != torch.float32:
-                tensor = tensor.float()
-
-        # Channels last, then flipped vertically to match OpenGL/FBO/Image convention
-        tensor = torch.flip(interleaved(tensor), [0])
-
-        # Ensure contiguous memory for GPU copy
-        tensor = tensor.contiguous()
+        tensor = self._converted(tensor).contiguous()
 
         # Map the PBO on the current stream, queue the copy of the tensor into it there, unmap: the copy runs after
         # the conversions above on the same stream, and the unmap has it done before OpenGL reads the PBO, so the
@@ -240,33 +212,29 @@ class Tensor(Texture):
                             tensor_type(self.internal_format), None)
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
 
+    def _converted(self, tensor: "torch.Tensor") -> "torch.Tensor":
+        """The tensor in the texture's element type (uint8 0..255 from a float 0..1, a float 0..1 from uint8), its
+        channels last and its rows flipped to GL's order, for either upload."""
+        bytes_per_channel = format_bytes_per_channel(self.internal_format)
+        if bytes_per_channel == 1:
+            if tensor.dtype in (torch.float16, torch.float32):
+                tensor = (tensor.clamp(0.0, 1.0) * 255.0).to(torch.uint8)
+            elif tensor.dtype != torch.uint8:
+                tensor = tensor.to(torch.uint8)
+        else:
+            if tensor.dtype == torch.uint8:
+                tensor = tensor.float() / 255.0
+            target = torch.float16 if bytes_per_channel == 2 else torch.float32
+            if tensor.dtype != target:
+                tensor = tensor.to(target)
+        return torch.flip(interleaved(tensor), [0])
+
     def _update_with_cpu(self, tensor: "torch.Tensor") -> None:
         """Fallback: CPU transfer (GPU → CPU → GPU).
 
         Preserves uint8, FP16, or FP32 precision based on internal format.
         """
-        # Channels last, then flipped vertically to match OpenGL/FBO/Image convention
-        tensor = torch.flip(interleaved(tensor), [0])
-
-        # Convert to appropriate dtype and move to CPU
-        bytes_per_channel = format_bytes_per_channel(self.internal_format)
-
-        if bytes_per_channel == 1:  # uint8
-            if tensor.dtype in (torch.float16, torch.float32):
-                # Convert float [0.0, 1.0] to uint8 [0, 255]
-                tensor_np = (tensor.clamp(0.0, 1.0) * 255.0).to(torch.uint8).cpu().numpy()
-            else:
-                tensor_np = tensor.to(torch.uint8).cpu().numpy()
-        elif bytes_per_channel == 2:  # FP16
-            if tensor.dtype == torch.uint8:
-                tensor_np = (tensor.float() / 255.0).half().cpu().numpy()
-            else:
-                tensor_np = tensor.half().cpu().numpy()
-        else:  # FP32
-            if tensor.dtype == torch.uint8:
-                tensor_np = (tensor.float() / 255.0).cpu().numpy()
-            else:
-                tensor_np = tensor.float().cpu().numpy()
+        tensor_np = self._converted(tensor).cpu().numpy()
 
         # Upload to OpenGL texture in the tensor's type; glTextureSubImage2D takes only a contiguous array, a strided
         # one is copied once
