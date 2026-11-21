@@ -13,7 +13,7 @@ operator saw.
 |-----|------------------------------------------------------------------------------|-----------------------------------|----------------------------------------------------|
 | A   | [The measurements](#a-the-measurements)                                      | built                             | [FLOW.md](FLOW.md#the-goals)                       |
 | B   | [The view](#b-the-view)                                                      | built                             | [VIEW.md](VIEW.md)                                 |
-| C   | [The motion](#c-the-motion)                                                  | built; C2 the values, C3 range    | [MOTION.md](MOTION.md)                             |
+| C   | [The motion](#c-the-motion)                                                  | built; C2 values, C3 range, C6    | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; D6 the checks              | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | built; E6 the app's check         | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | F1, F2 white                      | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
@@ -69,10 +69,35 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
   the track's own speed (2026-11-18) it lags 4 ms on hands at a still noise of 0.64, 0.25 lags 2 ms at 3.7.
   `levels` 5 measured again after C5 (MOTION.md): x/y follows 20% more, z 1 ms less lag, a later stop on hands; the defaults then set with Matthias at the PC, MOTION.md's reasons following, the settings file
   when he saves it.
-- **C3.** The range. `edge`, `max_speed` and the thresholds are in metres or px, tuned at 0.65–1.5 m; stereo
+- **C3.** The range. `edge`, `max_speed` and the thresholds are in meters or px, tuned at 0.65–1.5 m; stereo
   noise grows with the square of the distance, so at 2–3.5 m they may need to be in disparity, and a depth's
   noise from frame to frame may come near `max_speed`'s 12 cm and start the track over at rest **(deduction)**.
   A recording at 2–3.5 m, with the camera in its place, and they measured there.
+
+The depth's confidence, after the camera plan's A1–A6 ([CAMERA_PLAN.md](../camera/CAMERA_PLAN.md#a-depth-confidence-to-the-motion)):
+the view's depth arrives RG, meters in red and the camera's confidence (0 to 1) in green, 0 where the view filled
+it, 1 for a recording without one. Today z's window mean counts every sample within `edge` alike, the filled ones
+too, so a guessed depth corrects the track as much as a measured one **(deduction: B2's fill feeds the window)**.
+
+- **C6.** The window weighted by confidence. The confidence comes in with the depth and stays with it:
+  `DepthVelocity`'s `raw` and `input` become RG32F, `depth_step_filter.frag` keeps green with red (0 where it drops
+  the depth), and both ports become `TextureKind.DEPTH` so the monitor shows green. In `depth_velocity_shader.frag`
+  each sample within `edge` adds its confidence times its disparity, and the measurement is that sum over the
+  confidences; `share` becomes the summed confidence over the window's samples, so a window of filled or unsure
+  depth corrects the track little and it coasts on its rate, as a thin window does now. A window whose confidence
+  sums to 0 has no measurement: the track starts over with no rate, as one without a surface does, so a filled hole
+  never holds the last z. The center's depth still sets `edge`. One switch for the measuring, `weighted` in
+  `DepthVelocitySettings`, on by default; off takes 1 for every sample, as now. After the rows the switch goes: the
+  weights stay always on if they win, the step is undone if not. `depth_velocity_capture.py` saves the depth's two
+  channels, `depth_velocity_compare.py` uploads them and adds the sides `weights off` and `weights on`; the shader's
+  header and `update_depth`'s docstring follow. Check: `motion_bridge_pass_check.py` as before; the pass's ms
+  again; one capture with filled pixels (green 0): z there 0 with weights on, no held z; then the result on two new
+  recordings with confidence, hands and measure, thresholds 0 and as used, rows in MOTION.md's table: still noise,
+  z kept, lag and stop, and the noise at the player's edge, where the camera's confidence is lowest **(deduction:
+  stereo fails at depth edges)**. MOTION.md's z section after.
+- Question, after C6's rows: is the confidence linear enough as a weight? The probe's ran 73 to 255, median 230,
+  so the surest and the least sure differ only 3.5 times (CAMERA_PLAN.md's probe); if C6 shows
+  little, a floor below which a sample counts 0, as a setting with its own rows.
 
 ## D. The bridge
 
@@ -212,7 +237,11 @@ The cameras:
 - A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
-- Compare a result only with rows of the same recording, settings and code paths: C2.
-- Ask to measure a time again when its pass's code or size changes: D6.
+- Compare a result only with rows of the same recording, settings and code paths: C2, C6.
+- Ask to measure a time again when its pass's code or size changes: D6, C6.
+- A measured table names its kind, date, commit, recording and settings: C6's rows.
+- A step checked by a run or a test is one commit: C6, the shader, the switch and the scripts together.
+- Remove obsolete pathways instead of leaving parallel legacy ones: C6's switch goes after its rows.
+- An on/off switch: `enabled` (glossary): C6's `weighted` switches one part of the step, not the component.
 
 Not designed yet, so their rules are not named: C3, F1, F2, H1.
