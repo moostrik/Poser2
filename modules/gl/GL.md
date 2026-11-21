@@ -14,7 +14,20 @@ The GL serves a pipeline of 2D shader steps; a volumetric step is 3D only within
 the poses and the rectangles, is worked out on the CPU and handed to a shader ready to place, so a draw needs no
 matrix and no state per target. Each GL call and state switch costs CPU time on the main thread, so the GL keeps
 their number low: it holds GL's state on the application side and asks no
-`glGet*`.
+`glGet*`. One PyOpenGL call costs 0.4 to 0.7 µs on the main thread (measured 2026-11-20).
+
+GL calls a frame, -sim, counted over 20 s from 10 s in. Before: 2026-11-20, a sampler's unit set by `glUniform1i` and
+a texture bound by `glActiveTexture` + `glBindTexture`. Now: 2026-11-21 at 839c2623, `layout(binding)` and
+`glBindTextureUnit`, GL debug output on (which changes the time, not the count). white_space's before ran from the
+recording's start, its now from 0.08, where several players are in view.
+
+| App         | Recording                  | Before | Now  | Texture binds now |
+|-------------|----------------------------|--------|------|-------------------|
+| deep_flow   | `20261112-125832_measure`  | 2338   | 1713 | 293               |
+| white_space | `20261024-164009_ICK`      | 1000   | 812  | 69                |
+| low_flow    | `20261112-125832_measure`  |        | 1312 | 182               |
+| hd_trio     | `intro_1`                  |        | 2230 | 316               |
+| smile       | none: no camera, the image |        | 643  | 77                |
 
 ## The context
 

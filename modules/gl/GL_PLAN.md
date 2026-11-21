@@ -1,13 +1,8 @@
 # GL plan
 
-Fewer GL calls on the main thread, and the package held to the rules and to the textbook layout. G comes from the
-Cinder research (2026-11-20), H from the package scan, I from the structure review of the same day. Work order:
-G2, I5, I7: the shaders do not move after G1 edits them, G2's bind is written once on I6's base,
-and I5 moves the files after their edits. Before
-the first step, `shader_check.py --reference` makes the reference images at HEAD; every shader check compares
-against them. The checks that run
-the GPU (`shader_check.py`, the -sim runs) wait for a time Matthias is away from the PC; a step with such a check is
-committed after it passes.
+The package held to the rules and to the textbook layout, from the structure review of 2026-11-20. Work order: I5,
+I7: I5 moves the files after their edits. The checks that run the GPU wait for a time Matthias is away from the PC; a
+step with such a check is committed after it passes.
 
 ## I. The package's structure
 
@@ -29,23 +24,8 @@ whose `gl` is flat.
   and GL.md; the rules thread updates gl.md's line on it and adds `BlendState` (not `Style`) to the glossary in the
   same work, and the coordinator is told when it is built. Check: pyright, the guard tests, gl's tests.
 
-## G. Fewer GL calls
-
-Standard GL 4.5, not from Cinder. Measured (G0, 2026-11-20, -sim, 20 s from 10 s): white_space makes 1000 GL calls a
-frame, 72 of them sampler units and 153 texture binds; deep_flow 2338, 509 sampler units and 608 binds. One PyOpenGL
-call costs 0.4 to 0.7 µs on the main thread, so all of them take about 0.4 ms (white_space) and 1.3 ms (deep_flow) a
-frame (deduction). G1 and G2 are built as the textbook way, G1 after I4 and G2 after I6. After G2, one -sim run
-per app (about 45 s each) checks G1, I6 and G2 together: at each draw and dispatch every sampler the program reads
-has a texture at its unit, the GL calls a frame against G0's, and no GL error in the log; a fault it finds is fixed
-in a commit of its own.
-
-- G2 is built (direct state access for binds and uploads); the -sim run per app above is still to run.
-
 ## Rules this plan touches
 
-- gl.md: Prefer as few GL calls and state switches as possible
-- gl.md: Prefer not to read back from the GPU or wait on it inside a frame
-- gl.md: All OpenGL calls execute on the main thread, in the window loop
 - gl.md: Name a shader's `.frag`/`.vert`/`.comp` source after the `.py` file that holds its class, beside it; the loader resolves it by that module name
 - gl.md: A shader is named after the operation it does; the `shaders` package in front says what it is (`shaders.PosePointLines`)
 - gl.md: Shaders get checked in a GPU harness
@@ -59,14 +39,11 @@ in a commit of its own.
 - CLAUDE.md: Inside a package, code that does the same is written once
 - CLAUDE.md: Its tests sit in its `tests/` folder
 - CLAUDE.md: Its shaders sit in its `shaders/` folder
-- CLAUDE.md: Downstream of the camera, take time from the frame or the tick instead of reading a clock
 - glossary.md: `BlendState`, not `Style` (I7, by the rules thread)
 - CLAUDE.md: Apps and modules import another package from its `__init__.py`, never from its internal files
 - CLAUDE.md: Inside a package, its subpackages included, import relatively; tests may import absolutely
 - CLAUDE.md: Name a concept after what it is in the domain, and use that one term everywhere it appears
 - CLAUDE.md: Use no synonyms for one concept across modules; when a term changes, rename it everywhere in the same change
-- CLAUDE.md: Prefer the design with the lower latency, measured in the context of the app
 - CLAUDE.md: Update all affected call sites in the same change
 - CLAUDE.md: Remove obsolete pathways instead of leaving parallel legacy ones
-- CLAUDE.md: Run a test of the app or a GPU harness only on the user's go, and only what the plan names
 - CLAUDE.md: A commit leaves no pyright errors
