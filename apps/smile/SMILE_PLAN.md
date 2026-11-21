@@ -9,17 +9,6 @@ A step that moves or rewires code also starts smile once: ComfyUI first (`script
 takes a recorded visitor through (flash, portrait, grin, bloom, the clip saved and on the walls) and leaves no error
 in the log. A rename or a text change needs no start. The whole of smile's tests run after the last step.
 
-## D. Names
-
-- D1 Renames, settings files migrated in the same commit:
-  - `online.active` to `online.enabled`, `render.trail_active` to `render.trail_enabled` (`Smile.json`)
-  - `FrameCallback` in `online.link` (the phone's JPEG bytes from the relay) qualified as `PhoneFrameCallback`
-  - `music_map.json`: each style's `movement` (its label, which no code reads) to `name`, its `audio_ids` to
-    `music_ids`, and the read in `music_map.py` with it
-  - in `Main`: `self.face` to `self.face_finder`, `self.save` to `self.clip_saver`
-
-  Tests: `tests`, `audio/tests`, `cam/tests`, `online/tests`.
-
 ## E. One place for each fact
 
 - E1 The caption and the QR card are drawn once (now in the credit layer and again in the wall compositor);
