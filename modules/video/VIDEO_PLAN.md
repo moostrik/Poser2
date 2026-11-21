@@ -3,9 +3,9 @@
 What is to be built in `modules/video`: ffmpeg, the clips and streams it writes and reads, and the screen recorder
 ([VIDEO.md](VIDEO.md)).
 
-## E. The tree and what the package exports
+## D. The stream threads
 
-E1. Check (built, its unit tests pass): smile `-sim` with one visitor, the share clip and `watermark.png` written.
+D1's Linux run of test_stream_reader is open: the PC has no WSL.
 
 ## Rules
 
