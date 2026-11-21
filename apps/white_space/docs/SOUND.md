@@ -4,8 +4,8 @@ What the sound synth in Max receives from the app, for whoever builds the Max pa
 two engines: the values that drive the light synth (`POSE_INSTRUMENT.md`, *The body*) go to Max
 unchanged, from the same frames the light reads.
 
-The sender is `OscSoundSender` (`inout/osc_sound_sender.py`), which extends `OscSound`
-(`modules/inout/osc_sound.py`). Its settings are `inout.osc_sound_sender`.
+The sender is `OscSound` (`modules/inout/osc_sound.py`), with White Space's own messages from
+`SoundExtras` (`inout/sound_extras.py`). Its settings are `inout.osc_sound_sender`.
 
 ## Conversion table
 
@@ -43,7 +43,7 @@ body*): the calibrated angle through the pipeline's dead zones, so a hanging arm
 and a raised one exactly ±π, and the two fixed points are the same for sound and light. The other
 five entries are the calibrated angles as they are. Every entry goes out signed: the sign is the
 side of the body the limb passes. The light takes the absolute over π; Max does the same to read
-an arm as the light reads it. `OscSoundSender._angle_values` builds the list.
+an arm as the light reads it. `SoundExtras.angle_values` builds the list.
 
 `/pose/{id}/arm` carries three values, unsigned: the left and the right arm, each the weighted
 union of its shoulder's and its elbow's travel (the lift `pose.arm_travel_extractor.elbow_lift`),

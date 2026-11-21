@@ -12,7 +12,7 @@ from modules.camera.oak import Camera, ClipCamera
 from modules.recording import Player, Recorder as VideoRecorder, replay
 from modules.settings import SettingsStore
 from modules.panel import PanelServer
-from modules.inout import OscReceiver
+from modules.inout import OscReceiver, OscSound
 from modules.tracker import PanoramicTracker, TrackerFrameSource
 from modules.pose import FrameDict, features, has_points
 from modules.pose.pipeline import Domain, PosePipeline
@@ -23,7 +23,7 @@ from .board import RenderBoard
 from .pose import Dummy, dummy_id
 from .pose.pipeline import pipeline_spec      # not through the package: it reads the settings, which read the package
 from .light import Conductor, Tick
-from .inout import OscLightSender, OscSoundSender, UdpLightReceiver
+from .inout import OscLightSender, SoundExtras, UdpLightReceiver
 from .render import WhiteSpaceRender
 from .settings import Settings, Stage
 from .statemachine import StateMachine
@@ -67,7 +67,8 @@ class WhiteSpaceMain:
 
         # RECORDING (independent of the show — works stand-alone and during session mode)
         self.session = Session(self.settings.setup.session.control)
-        self.osc_sound_sender = OscSoundSender(self.settings.setup.inout.osc_sound_sender)
+        self.sound_extras = SoundExtras(self.settings.setup.inout.osc_sound_sender)
+        self.osc_sound_sender = OscSound(self.settings.setup.inout.osc_sound_sender, self.sound_extras.slot_count, self.sound_extras)
         # The dummy has its own id above the live players: a source of the LERP stage, polled on the light
         # tick, so it is a pose like any other from there.
         self.dummy = Dummy(self.settings.setup.pose_instrument.dummy, ps.angle_extractor, ps.angle_calibrator, dummy_id(max_players),
@@ -189,7 +190,7 @@ class WhiteSpaceMain:
         self.osc_sound_receiver.bind("/WS/idle/blue/left",  self._on_sound_level_left)
         self.osc_sound_receiver.bind("/WS/idle/blue/right", self._on_sound_level_right)
         self.conductor.add_light_frame_callback(self.osc_light_sender.submit_light_frame)
-        self.conductor.add_light_frame_callback(self.osc_sound_sender.set_light_frame)
+        self.conductor.add_light_frame_callback(self.sound_extras.set_light_frame)
 
         # STATE MACHINE — the show's single decision maker; commands the Conductor through
         # its three channels (look, layer resets, motor) and emits state to board + OSC.

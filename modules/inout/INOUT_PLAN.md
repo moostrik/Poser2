@@ -12,11 +12,6 @@ which need depthai 2 and run in `.venv`.
 Every address `OscSound` and white_space's sender put on the wire stays, the deprecated and duplicate similarity
 rows included; the Max patches get a plan of their own.
 
-- A2. White_space's sound sender by composition. Why: `OscSoundSender` subclasses `OscSound`, overrides its private
-  `_build_bundle` and `_send_blackout` and copies their loops to add the dummy's slot. How: `OscSound` takes the slot
-  count through its constructor (default `max_players`) and an optional extras object (a `Protocol`: globals,
-  per-player messages, inactive messages, angle values); white_space passes its `/global/*` and per-player
-  messages. Check: white_space `test_osc_sound_poses`, `test_osc_sound_globals`.
 - A3. One OSC encoder, float rows with numpy. Why: `OscSound._add_active_frame_messages` and
   `_add_inactive_frame_messages` pack every float with python-osc's `add_arg`, a Python loop over a few hundred
   floats a tick, 5–20 ms of GIL a second **(deduction, not measured)**; `_send_bundle` reads python-osc's private
@@ -91,12 +86,12 @@ rows included; the Max patches get a plan of their own.
 
 ## Rules this plan touches
 
-- `CLAUDE.md` Packages, code that does the same is written once: A2, A3
+- `CLAUDE.md` Packages, code that does the same is written once: A3
 - `CLAUDE.md` Concurrency, no Python loop for numpy's work: A3
 - `CLAUDE.md` Concurrency, a callback list is a `utils.Broadcast`; a failing callback does not stop the others: B1
 - `CLAUDE.md` Error handling, a thread's loop catches an exception per item and goes on: C2
 - `CLAUDE.md` Settings, bind() / unbind(): B1
-- `CLAUDE.md` Composition, prefer composition over inheritance: A2, C1
+- `CLAUDE.md` Composition, prefer composition over inheritance: C1
 - `CLAUDE.md` Composition and wiring, clean up in an explicit stop or teardown, never in `__del__`: C2
 - `CLAUDE.md` Time, `perf_counter()` for every stamp: B1
 - `CLAUDE.md` API evolution, remove obsolete pathways; keep settings files in sync: C2, E1

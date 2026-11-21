@@ -11,30 +11,26 @@ frames: live slots only, true show or no show, 0 only when the frames are gone (
 import math
 import unittest
 
-from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
-
+from modules.inout import OscSound
 from modules.pose import Frame, FrameDict
 from modules.session import SequencerState
 
-from apps.white_space.inout.osc_sound_sender import OscSoundSender
+from apps.white_space.inout import SoundExtras
 from apps.white_space.light import Tick
 from apps.white_space.light.frame import LightFrame
 from apps.white_space.settings import _OscSoundSettings
 
 
-def _globals(sender: OscSoundSender, seq_state=None, frames: FrameDict = {}) -> dict[str, float]:
+def _globals(sender: OscSound, seq_state=None, frames: FrameDict = {}) -> dict[str, float]:
     """Address → first argument, for the bundle's global messages."""
-    builder = OscBundleBuilder(IMMEDIATELY)
-    sender._add_global_messages(builder, frames, seq_state)
-    bundle = builder.build()
-    return {bundle.content(i).address: bundle.content(i).params[0]
-            for i in range(bundle.num_contents)}
+    return {address: args[0] for address, args in sender._global_messages(frames, seq_state)}
 
 
 class SoundGlobalsTest(unittest.TestCase):
     def setUp(self) -> None:
         self.settings = _OscSoundSettings()
-        self.sender = OscSoundSender(self.settings)
+        self.extras = SoundExtras(self.settings)
+        self.sender = OscSound(self.settings, self.extras.slot_count, self.extras)
 
     def test_volume_and_speaker_offset_are_sent(self) -> None:
         messages = _globals(self.sender)
@@ -66,7 +62,7 @@ class SoundGlobalsTest(unittest.TestCase):
         state, so idle (no sequencer state) zeroes it like the playhead and the motor."""
         light_frame = LightFrame(360, Tick(0.0, 1 / 32, index=0))
         light_frame.sync = 0.7
-        self.sender.set_light_frame(light_frame)
+        self.extras.set_light_frame(light_frame)
         seq = SequencerState(stage=4, stage_progress=0.5, progress=0.5, elapsed=10.0, active=True)
         self.assertAlmostEqual(_globals(self.sender, seq)["/global/sync"], 0.7, places=6)
         self.assertEqual(_globals(self.sender, None)["/global/sync"], 0.0)

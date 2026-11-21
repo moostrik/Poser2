@@ -828,7 +828,7 @@ author in azimuth, and the sender applies the projection offset and interlace on
 
 Max spatialises over the four speakers (site fact). It receives, all azimuths produced here:
 `/global/playhead`, `/pose/N/azimuth`, `/pose/N/playhead/offset`, plus the state
-(`inout/osc_sound_sender.py`, `modules/inout/osc_sound.py`). With the speakers placed by the layout
+(`inout/sound_extras.py`, `modules/inout/osc_sound.py`). With the speakers placed by the layout
 there is nothing to tune on the Max side.
 
 Two settings of our own, in `inout.osc_sound_sender`, sent in every bundle:
