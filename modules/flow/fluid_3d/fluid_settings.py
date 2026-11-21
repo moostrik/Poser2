@@ -215,7 +215,7 @@ class CompositeSettings(BaseSettings):
     fog: Field[float]               = Field(1.0,  min=0.01, max=1000.0, widget=Widget.log_slider, color="blue-grey", description="Widths of water that dim light to half")
     tint: Field[Color]              = Field(Color(1.0, 1.0, 1.0), widget=Widget.color,         description="The water's color, the hue light turns in it; white = none")
     clear_below: Field[float]       = Field(0.0,  min=0.0,  max=1.0,    color="blue-grey",      description="Dye (0 to 1) below which it fades softly out of sight; 0 = off")
-    light: Group[LightSettings]     = Group(LightSettings)
+    light: Group[LightSettings]     = Group(LightSettings, description="The light on the density and in the water: sun or lamp, shadows, caustics and scattering")
 
 
 class Fluid3DSettings(BaseSettings):

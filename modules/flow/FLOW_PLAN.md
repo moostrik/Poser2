@@ -16,7 +16,7 @@ operator saw.
 | C   | [The motion](#c-the-motion)                                                  | built; C2 values, C3 range        | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; D6 the checks              | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | built; E6 the app's check         | [FLUID_3D.md](FLUID_3D.md)                         |
-| F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | F1, F2 white, F3 by eye           | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
+| F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | F1, F2 white                      | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
 | H   | [One unit across the stages](#h-one-unit-across-the-stages)                  | not started                       | [FLOW.md](FLOW.md)                                 |
 | I   | [The 2D flow follows the 3D](#i-the-2d-flow-follows-the-3d)                  | in low_flow's plan                | [FLOW.md](FLOW.md)                                 |
 | J   | [Every setting and its description](#j-every-setting-and-its-description)    | last, after the refactor          | `CLAUDE.md`, `.claude/rules`                       |
@@ -132,8 +132,6 @@ What is built: [FLUID_3D.md](FLUID_3D.md#the-density).
   piles up does it whiten. If the march is ink, white comes another way, the background through thin density, and
   the step is planned again. Checked in the app: at 0 the colors as stored; turned up, the dense cores whiten and
   the thin edges stay colored.
-- **F3.** The particle surface's color, built (2026-11-21): the surface's dye base its spheres' color, black
-  before. Checked by eye in deep_flow, the particles on SURFACE.
 
 ## H. One unit across the stages
 
