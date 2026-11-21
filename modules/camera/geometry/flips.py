@@ -1,13 +1,9 @@
-"""Boxes, keypoints, lenses and depth alignments as they are in the frame flipped left to right; boxes and keypoints
-also in the frame flipped top to bottom and turned (transposed)."""
+"""Boxes and keypoints as they are in the frame flipped left to right (`flip_h`), top to bottom (`flip_v`) and turned
+(`rotate90`, transposed)."""
 
 import numpy as np
 
 from modules.utils import Rect
-
-from ..frame import DepthAlignment
-
-MIRROR_X: np.ndarray = np.diag([-1.0, 1.0, 1.0, 1.0])     # a 4x4 move's x turned over
 
 
 def flip_h_roi(roi: Rect) -> Rect:
@@ -50,22 +46,3 @@ def rotate90_keypoints(keypoints: np.ndarray | None) -> np.ndarray | None:
     turned: np.ndarray = keypoints.copy()
     turned[:, [0, 1]] = keypoints[:, [1, 0]]
     return turned
-
-
-def mirrored_intrinsics(intrinsics: list[list[float]], width: int) -> list[list[float]]:
-    """A 3x3 lens as it is for the frame `width` px flipped left to right."""
-    mirrored: list[list[float]] = [list(row) for row in intrinsics]
-    mirrored[0][2] = width - mirrored[0][2]
-    return mirrored
-
-
-def mirrored_alignment(alignment: DepthAlignment, width: int) -> DepthAlignment:
-    """The alignment of a depth frame `width` px flipped left to right: both lenses' centers mirrored and the
-    move turned with them."""
-    def mirrored(lens: list[list[float]], size: int) -> list[list[float]]:
-        flipped: list[list[float]] = [list(row) for row in lens]
-        flipped[0][2] = size - 1 - flipped[0][2]
-        return flipped
-    to_color: np.ndarray = MIRROR_X @ np.array(alignment.to_color, dtype=np.float64) @ MIRROR_X
-    return DepthAlignment(mirrored(alignment.intrinsics, width), mirrored(alignment.color_intrinsics, alignment.color_size[0]),
-                          alignment.color_size, to_color.tolist())

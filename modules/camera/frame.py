@@ -57,18 +57,6 @@ class CameraFrame:
     confidence: np.ndarray | None = None    # DEPTH: uint8 (H, W) on the depth's view, higher surer; None where the source has none
 
 
-def mirrored_image(frame: CameraFrame) -> np.ndarray:
-    """The frame's image flipped left to right, in the frame's own layout. A new array: an uploader
-    flips on the GPU instead, so this is for a consumer that keeps the image on the host."""
-    image: np.ndarray = frame.image
-    if not frame.nv12:
-        return image[:, ::-1].copy()
-    rows: int = image.shape[0] * 2 // 3
-    width: int = image.shape[1]
-    uv: np.ndarray = image[rows:].reshape(rows // 2, width // 2, 2)[:, ::-1]     # the pairs stay together
-    return np.concatenate((image[:rows, ::-1], uv.reshape(rows // 2, width)))
-
-
 def bgr_frame(frame: CameraFrame) -> CameraFrame:
     """The frame with its NV12 image converted to BGR, for a consumer that keeps the image on the host; any other
     frame as it is. The flags stay: a turn would split NV12's interleaved chroma pairs, so it comes after this."""

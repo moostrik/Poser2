@@ -25,17 +25,9 @@ plays. The camera cannot straighten its color frame itself (the oak4's `Warp` ta
 is aligned on the GPU, where it is straightened with the color), so straightening and mirroring are the uploader's,
 live and in -sim alike, and a recording made before them plays through the same path as the camera. The tracklets
 are stored as the camera gave them for the same reason: the uploader straightens them with the homography of the
-frame they were found in (`SerialUploader.submit_tracklets`).
-
-With the recorder's `mirrored` on, a recording holds the image as shown instead: a frame still to be mirrored is
-stored mirrored, with its lens, its depth, the depth's alignment and confidence, and its tracklets' boxes and keypoints, and
-`flip_h` is off, so a playback hands it on as stored. The poses are stored as they come, found on the uploaded,
-mirrored image already. hd_trio records so: its clips play mirrored in any player, as all its recordings have, and
-its research data holds video and poses in one image. Nothing is straightened in it (its tilt is 0); a camera that
-is straightened would be mirrored before its straightening, which then no longer matches its homography
-**(deduction)**, so an app that straightens records with `mirrored` off. `mirrored` bakes only `flip_h`, and only into
-a frame that is not turned: the turn and `flip_v` stay flags, and so does a turned frame's mirror. smile, whose
-frames are turned, records with `mirrored` off.
+frame they were found in (`SerialUploader.submit_tracklets`). A frame's `rotate90`, `flip_v` and `flip_h` are
+stored with it, and replay applies them. The OAK-D bakes its flips into its warp and sets no flags, so hd_trio's
+clips play mirrored in any player, as shown.
 
 Every part carries its capture time (`timestamp`) and the moment the backend handed it over (`arrival`), on
 `perf_counter`. Their difference, the latency, is stored with the part, so a playback hands each part as late after

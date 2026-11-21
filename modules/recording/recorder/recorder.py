@@ -15,16 +15,12 @@ chunk hold the same frames. A split cuts every camera's chunk at one capture tim
 the new chunk with its first capture after it. On stop no frame is taken any more, and the captures
 still waiting are settled by the parts that still come, for at most `STOP_WAIT`. Recordings hold what
 the camera delivered, not straightened, turned or mirrored, so the correction can still be tuned on them;
-`rotate90`, `flip_v` and `flip_h` say the frames are still to be turned and flipped. With `mirrored` a frame still
-to be mirrored is stored mirrored instead, with its depth, lens, alignment and tracklets to match, and `flip_h` off:
-the recording is the image as shown (the poses are found on it already). `mirrored` bakes only `flip_h`, and only
-into a frame that is not turned: the turn and `flip_v` stay flags, and so does the mirror of a turned frame. What a capture went without is counted on the panel
-and warned of. Every stream shares `keyframe_interval`: a seek in a chunk goes to a color keyframe, so a
+`rotate90`, `flip_v` and `flip_h` say the frames are still to be turned and flipped, and replay applies them. What a
+capture went without is counted on the panel and warned of. Every stream shares `keyframe_interval`: a seek in a chunk goes to a color keyframe, so a
 depth stream with its keyframes elsewhere comes back with its references missing. The depth's confidence rides on
 its depth frame and goes into a stream of its own when the chunk's first depth has one (`ChunkInfo.confidence`), so
 every stream of a chunk holds the same frames: a later depth without one gets 255, sure."""
 
-from dataclasses import replace
 from threading import Thread, Lock, Event
 from pathlib import Path
 import time
@@ -34,8 +30,7 @@ from typing import TextIO
 
 import numpy as np
 
-from modules.camera import CameraFrame, CameraTracklets, FrameType, mirrored_alignment, mirrored_image, mirrored_intrinsics, \
-    mirrored_tracklets
+from modules.camera import CameraFrame, CameraTracklets, FrameType
 from modules.pose import FrameDict
 from modules.settings import BaseSettings, Field, Widget
 from modules.video import ClipCodec, DEPTH_CODEC, DEPTH_HARDWARE, Hardware, StreamWriter
@@ -60,7 +55,6 @@ class RecorderSettings(BaseSettings):
     container:          Field[Container]        = Field(Container.MKV, access=Field.INIT, description="Chunk file: mkv with depth and metadata, or mp4 with the metadata beside")
     video_quality:      Field[int]              = Field(0, min=0, max=51, access=Field.INIT, description="Video constant quality, lower is better (0 = encoder default)")
     video_frame_types:  Field[list[FrameType]]  = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record", visible=False)
-    mirrored:           Field[bool]             = Field(False, access=Field.INIT, description="Store the frames mirrored, as shown")
 
     # ── Recording controls ────────────────────────────────────────────
     enabled:            Field[bool]             = Field(True, widget=Widget.switch, description="Enable video recording")
@@ -84,23 +78,6 @@ STOP_WAIT: float = 1.0          # s a stopping recording waits for the parts its
 SPLIT_WAIT: float = 1.0         # s a split waits for a camera's first capture after its time, before it cuts that camera's chunk anyway
 HELD: int = 1 << 30             # bytes waiting for the encoders, queued here and in the writers: 1 GB, some 6 s of four cameras with depth
 SURE: int = 255                 # the confidence of a depth that came without one, in a chunk that records it
-
-
-def mirrored_capture(capture: RecordedCapture) -> RecordedCapture:
-    """A capture as shown: its frames flipped left to right with their lens and the depth's alignment and
-    confidence, its tracklets' boxes and keypoints mirrored, `flip_h` off; the poses as they are, found on the
-    mirrored image."""
-    video: CameraFrame = capture.video
-    width: int = video.image.shape[1]
-    video = replace(video, image=mirrored_image(video), flip_h=False,
-                    intrinsics=mirrored_intrinsics(video.intrinsics, width) if video.intrinsics is not None else None)
-    depth: CameraFrame | None = capture.depth
-    if depth is not None:
-        depth = replace(depth, image=mirrored_image(depth), flip_h=False,
-                        alignment=mirrored_alignment(depth.alignment, depth.image.shape[1]) if depth.alignment is not None else None,
-                        confidence=depth.confidence[:, ::-1].copy() if depth.confidence is not None else None)
-    tracklets: CameraTracklets | None = mirrored_tracklets(capture.tracklets) if capture.tracklets is not None else None
-    return replace(capture, video=video, depth=depth, tracklets=tracklets)
 
 
 def _latency(arrival: float | None, timestamp: float) -> float | None:
@@ -393,8 +370,6 @@ class Recorder(Thread):
                     self._queued_bytes -= capture.nbytes
                 if self._split_at is not None and capture.video.timestamp > self._split_at and self.chunks[c] == split_from:
                     self._split_camera(c)
-                if self.settings.mirrored and capture.video.flip_h and not capture.video.rotate90:
-                    capture = mirrored_capture(capture)
                 self.recorders[c][ChunkStream.VIDEO].submit_frame(capture.video.image, capture.video.nv12)
                 depth: CameraFrame | None = capture.depth
                 if self.metadata_frames.get(c, 0) == 0:     # the chunk's first capture says whether it records a confidence

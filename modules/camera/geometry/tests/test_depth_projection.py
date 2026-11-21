@@ -5,7 +5,6 @@ import unittest
 import numpy as np
 
 from modules.camera import DepthAlignment, aligned_depth_size, depth_projection
-from modules.camera.geometry.flips import mirrored_alignment
 
 DEPTH_SIZE: tuple[int, int] = (480, 300)
 DEPTH_LENS: list[list[float]] = [[212.4, 0.0, 240.6], [0.0, 212.4, 149.4], [0.0, 0.0, 1.0]]
@@ -41,13 +40,6 @@ class DepthProjectionTest(unittest.TestCase):
         uv, depth = land(None, (374, 300), (10.0, 20.0), 2.0)
         np.testing.assert_array_almost_equal(uv, (10.5 / 374, 20.5 / 300))
         self.assertAlmostEqual(depth, 2.0)
-
-    def test_mirrored_depth_lands_mirrored(self) -> None:
-        mirrored: DepthAlignment = mirrored_alignment(ALIGNMENT, DEPTH_SIZE[0])
-        uv, depth = land(ALIGNMENT, DEPTH_SIZE, (100.0, 80.0), 1.2)
-        mirrored_uv, mirrored_depth = land(mirrored, DEPTH_SIZE, (DEPTH_SIZE[0] - 1 - 100.0, 80.0), 1.2)
-        np.testing.assert_array_almost_equal(mirrored_uv, (1.0 - uv[0], uv[1]))
-        self.assertAlmostEqual(mirrored_depth, depth)
 
     def test_the_aligned_size_has_the_rows_and_the_video_aspect(self) -> None:
         self.assertEqual(aligned_depth_size(DEPTH_SIZE, ALIGNMENT), (374, 300))

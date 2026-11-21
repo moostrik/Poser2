@@ -109,7 +109,6 @@
           "VIDEO",
           "DEPTH"
         ],
-        "mirrored": false,
         "enabled": true,
         "output_path": "recordings",
         "name": ""

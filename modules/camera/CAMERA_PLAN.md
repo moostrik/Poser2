@@ -9,21 +9,6 @@ smile, `vimba` and `webcam` by smile. That is general code with one user, which 
 The steps below are what is left of the scan of 2026-11-21. **(seen)** is read in the code,
 **(deduction)** inferred.
 
-## E. One host-side flip
-
-- E3. The recorder's `mirrored` option and `mirrored_capture` go: the option acts only on a frame with `flip_h`, and
-  the OAK-D, hd_trio's camera, bakes its flips into its warp and sets no flags **(seen: `oak/camera.py`
-  `_emit_frame`, `oak/clip_camera.py`, `oak/pipeline.py` `build_warp_mesh`; hd_trio's recordings hold `flip_h: false`,
-  so its replay sets none)**. A recording keeps the frame as delivered with its flags, and replay applies them.
-  `RecorderSettings.mirrored` goes, and so does what `recorder.py`'s module docstring says of it.
-  `mirrored_image`, `mirrored_intrinsics`, `mirrored_alignment` and `mirrored_tracklets` go with it, with their tests:
-  `MirroredTest` in `recorder/tests/test_recorder.py`, the `mirrored_image` cases of `tests/test_frame.py` (its
-  `bgr_frame`, `oriented_image` and `oriented_corners` cases stay), and `geometry/tests/test_depth_projection.py`'s
-  mirrored case **(seen: no other caller)**. RECORDING.md's section on it goes; hd_trio's `studio.json` and `umu.json` and deep_flow's and low_flow's
-  `studio.json` drop the key in the same commit. Why: "Remove obsolete pathways instead of leaving parallel legacy
-  ones". Tests: the recorder's tests and pyright, and each of the four settings files loads without an unknown-key
-  warning; no hd_trio run, as the path never ran there. Module Refactor agreed (2026-11-21).
-
 ## F. With an OAK-D at the PC
 
 - F1. The `oak` backend stamps a frame and its tracklets with their capture, off the message's device timestamp as
@@ -45,5 +30,4 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 
 ## Rules it touches
 
-- Remove obsolete pathways instead of leaving parallel legacy ones: E3
 - Stamp a frame once, with its moment of capture where the device reports one: F1

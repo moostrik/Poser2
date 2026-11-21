@@ -15,7 +15,7 @@ from modules import video
 from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, FrameType, TrackingStatus
 from modules.recording import ChunkStream, RecorderSettings
 from modules.recording.recorder import RecordedCapture
-from modules.recording.recorder.recorder import RecState, mirrored_capture
+from modules.recording.recorder.recorder import RecState
 from modules.recording.tests.recordings import LENS, video_frame, recorder
 from modules.utils import Rect
 
@@ -102,7 +102,7 @@ class _Writer(video.StreamWriter):
 
 
 def _half_lit(flip_h: bool) -> RecordedCapture:
-    """A capture still to be mirrored or not: its left half lit, one tracklet on the left."""
+    """A capture with its flag: its left half lit, one tracklet on the left."""
     image: np.ndarray = np.zeros((4, 8, 3), np.uint8)
     image[:, :4] = 255
     frame = CameraFrame(0, FrameType.VIDEO, image, 1.0, flip_h=flip_h, intrinsics=LENS)
@@ -110,48 +110,22 @@ def _half_lit(flip_h: bool) -> RecordedCapture:
     return RecordedCapture(frame, None, CameraTracklets(0, 1.0, [tracklet]))
 
 
-class MirroredTest(unittest.TestCase):
-    def _written(self, mirrored: bool, flip_h: bool) -> tuple[np.ndarray, list[str]]:
-        """What the recorder's thread writes of one capture: the image and the metadata lines."""
+class DeliveredTest(unittest.TestCase):
+    def test_a_frame_is_stored_as_the_camera_delivered_it_with_its_flag(self) -> None:
         rec = recorder([FrameType.VIDEO])
-        rec.settings.mirrored = mirrored
         writer = _Writer()
         rec.recorders[0] = {ChunkStream.VIDEO: writer}
         lines = io.StringIO()
         rec.metadata[0] = lines
         rec.metadata_frames[0] = 0
         rec.chunks[0] = 0
-        rec.frames[0].put(_half_lit(flip_h))
+        rec.frames[0].put(_half_lit(True))
         rec._write_queued()
         rec.settings.unbind(RecorderSettings.start, rec._on_start)
-        return writer.images[0], lines.getvalue().splitlines()
-
-    def test_on_a_frame_still_to_be_mirrored_is_stored_mirrored_with_its_tracklets_and_flip_h_off(self) -> None:
-        image, lines = self._written(mirrored=True, flip_h=True)
-        self.assertTrue(np.all(image[:, 4:] == 255) and np.all(image[:, :4] == 0))      # the lit half on the right
-        info, frame = json.loads(lines[0]), json.loads(lines[1])
-        self.assertFalse(info['flip_h'])
-        self.assertAlmostEqual(info['intrinsics'][0][2], 8 - LENS[0][2])                # the lens's center mirrored
-        self.assertAlmostEqual(frame['tracklets'][0]['roi'][0], 0.6)                     # 1 - 0.1 - 0.3
-
-    def test_off_a_frame_is_stored_as_the_camera_delivered_it(self) -> None:
-        image, lines = self._written(mirrored=False, flip_h=True)
-        self.assertTrue(np.all(image[:, :4] == 255))
-        self.assertTrue(json.loads(lines[0])['flip_h'])
-
-    def test_on_a_frame_not_to_be_mirrored_is_stored_as_it_is(self) -> None:
-        image, lines = self._written(mirrored=True, flip_h=False)
-        self.assertTrue(np.all(image[:, :4] == 255))
-        self.assertFalse(json.loads(lines[0])['flip_h'])
-
-    def test_the_depth_s_confidence_is_mirrored_with_its_depth(self) -> None:
-        confidence: np.ndarray = np.zeros((4, 8), np.uint8)
-        confidence[:, :4] = 200
-        depth = CameraFrame(0, FrameType.DEPTH, np.zeros((4, 8), np.uint16), 1.0, flip_h=True, confidence=confidence)
-        mirrored = mirrored_capture(RecordedCapture(_half_lit(True).video, depth, None))
-        assert mirrored.depth is not None and mirrored.depth.confidence is not None
-        self.assertTrue(np.all(mirrored.depth.confidence[:, 4:] == 200) and np.all(mirrored.depth.confidence[:, :4] == 0))
-        self.assertTrue(np.all(confidence[:, :4] == 200))      # the camera's frame as it was
+        self.assertTrue(np.all(writer.images[0][:, :4] == 255))
+        info, frame = json.loads(lines.getvalue().splitlines()[0]), json.loads(lines.getvalue().splitlines()[1])
+        self.assertTrue(info['flip_h'])
+        self.assertAlmostEqual(frame['tracklets'][0]['roi'][0], 0.1)
 
 
 if __name__ == '__main__':

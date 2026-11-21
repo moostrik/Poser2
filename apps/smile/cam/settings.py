@@ -17,7 +17,7 @@ from ..face import FaceFinderSettings
 
 
 class _RecorderSettings(RecorderSettings):
-    """smile records the device's color as a clip any player plays, the metadata beside it: no depth, no mirror baked in."""
+    """smile records the device's color as a clip any player plays, the metadata beside it: no depth."""
     container: Field[Container] = Field(Container.MP4, access=Field.INIT, visible=False, description="Chunk file: mp4 with the metadata beside")
 
 

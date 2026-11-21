@@ -764,7 +764,6 @@
           "VIDEO"
         ],
         "container": "MP4",
-        "mirrored": true,
         "enabled": false
       },
       "pose": {
