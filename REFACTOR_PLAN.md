@@ -59,7 +59,22 @@ Done: inference (20 Nov), settings (21 Nov), board (21 Nov). Held up in their ow
 - A10. `utils`; `Broadcast` (utils/broadcast.py, since 94c65c84) is the one callback list: copied under its lock, called outside it, a
   failing callback logged; each package's own callback lists move to it in that package's review.
 - A11. `video`
-- A12. `log_config.py`
+- A12. `log_config.py`, scanned 21 Nov; its fixes:
+  - it becomes the package `modules/logging/`: setup.py (`ShortNameFormatter`, `FlushFileHandler`, `setup_logging`),
+    ring_buffer.py (`LogEntry`, `LogRingBuffer`, `get_log_buffer`), crash_log.py (the crash log,
+    `install_excepthooks`); its test moves to `modules/logging/tests/`; callers import names directly
+    (`from modules.logging import ...`); launcher.py, the scripts, modules/panel, tests and SMILE.md follow
+  - the short logger name is worked out in one place; `threading.Lock` on the one import line; `traceback` imported
+    at the top
+  - a module logger; `record_crash` logs its own failure instead of passing
+  - annotations for the log records and the crash parameters; `LogEntry` a typed `NamedTuple` (the panel's pipe
+    sends tuples)
+  - `setup_logging`'s `name` is required; the buffer and the app name stay module globals
+  - `get_entries_since` slices with `islice` instead of copying the deque
+  - tests for `LogRingBuffer` (cursor, eviction, `add`) and `ShortNameFormatter`
+  - docstrings say only what each thing is; the reasons are cut
+
+  Its check: its tests, the panel's tests, the guard tests, pyright, one deep_flow start.
 - A13. The apps: `deep_flow`, `smile`, `white_space`. white_space's checks at the rig, you there:
   - live and back to back with `main`: its camera threads only hand over (under 1 ms per frame at p95), every sync
     runs the pose step, the pose latency and the light's tick no worse than on `main`, its tests pass
