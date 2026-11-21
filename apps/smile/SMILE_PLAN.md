@@ -5,18 +5,9 @@ What is next for smile, the app in [SMILE.md](SMILE.md); what spans the apps is 
 
 Each step is one commit. Every step runs the guard tests, the tests of the smile packages it touches and pyright.
 A step that moves or rewires code also starts smile once: ComfyUI first (`scripts/start_comfy.bat`), then
-`launcher.py -app smile -sim` on a recording (from A3 on); it reaches the camera screen with the walls playing,
+`launcher.py -app smile -sim` on a recording; it reaches the camera screen with the walls playing,
 takes a recorded visitor through (flash, portrait, grin, bloom, the clip saved and on the walls) and leaves no error
 in the log. A rename or a text change needs no start. The whole of smile's tests run after the last step.
-
-## A. Camera frames, recording and -sim
-
-- A3 `-sim`: `Main` uses the `simulation` it takes and ignores now; it builds a recording `Player` and a
-  `replay.Camera` and hands it to `Camera` as the device, with the player's panel tab. A recorded face qualifies by
-  itself, so the whole path runs. `-sim` gets a `simulator` group for the `Player` (as deep_flow's) and a
-  `RigCameraSettings` group for the replay camera under smile's camera settings, both read only in `-sim`; no module
-  changes.
-  Check: the start check above, on an A2 recording.
 
 ## B. How the packages split the work
 
@@ -106,7 +97,7 @@ in the log. A rename or a text change needs no start. The whole of smile's tests
 ## Open questions
 
 - Recordings of real visitors: a few recorded with the Vimba camera (or a webcam) at the PC or on site, the camera
-  in portrait. The PC the plan was built on has neither; its one recording (`data/recordings/20261121-105120`) is a
+  in portrait. The PC the plan was built on has neither; its one recording (`data/recordings/20261121-110540`, 1280 × 960) is a
   photo handed by a stand-in webcam, turned and flipped as the camera delivers.
 
 ## The rules it touches
