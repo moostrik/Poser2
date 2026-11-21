@@ -37,9 +37,10 @@ class Texture(TextureBase):
         if pixels is not None:
             glTextureSubImage2D(self.tex_id, 0, 0, 0, self.width, self.height, self.format, self.data_type, pixels)
 
-    def read_to_numpy(self, flip: bool = True) -> np.ndarray | None:
-        """The texture read back to the CPU, (height, width[, channels]); `flip` turns GL's rows to the image's."""
-        pixels = self._read((self.height, self.width))
+    def read_to_numpy(self, flip: bool = True, level: int = 0) -> np.ndarray | None:
+        """The texture's mip `level` read back to the CPU, (height, width[, channels]) of that level, halved per
+        level; `flip` turns GL's rows to the image's."""
+        pixels = self._read((max(1, self.height >> level), max(1, self.width >> level)), level)
         if pixels is not None and flip:
             pixels = np.flipud(pixels)
         return pixels

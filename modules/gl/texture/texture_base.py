@@ -8,7 +8,7 @@ import numpy as np
 from OpenGL.GL import (Constant, GL_FLOAT, GL_HALF_FLOAT, GL_NONE, GL_ONE, GL_RED, GL_TEXTURE_BORDER_COLOR,
                        GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B,
                        GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T,
-                       GL_UNPACK_ALIGNMENT, GL_UNSIGNED_BYTE, GL_UNSIGNED_INT_2_10_10_10_REV, GL_UNSIGNED_SHORT,
+                       GL_PACK_ALIGNMENT, GL_UNPACK_ALIGNMENT, GL_UNSIGNED_BYTE, GL_UNSIGNED_INT_2_10_10_10_REV, GL_UNSIGNED_SHORT,
                        glBindTexture, glBindTextureUnit, glClearTexImage, glDeleteTextures, glGenTextures,
                        glGetTextureImage, glPixelStorei, glTexParameterfv, glTexParameteri, glTextureParameterfv,
                        glTextureParameteri)
@@ -150,9 +150,9 @@ class TextureBase:
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1)      # numpy rows are tightly packed; GL's default of 4 shears odd rows
         return np.ascontiguousarray(array)
 
-    def _read(self, shape: tuple[int, ...]) -> np.ndarray | None:
-        """Level 0 read back to the CPU, an array of `shape` with the channels last when there is more than one;
-        None when not allocated or of a data type NumPy does not have."""
+    def _read(self, shape: tuple[int, ...], level: int = 0) -> np.ndarray | None:
+        """Mip `level` read back to the CPU, an array of `shape` (that level's) with the channels last when there is
+        more than one, its rows packed; None when not allocated or of a data type NumPy does not have."""
         if not self.allocated:
             return None
         dtype = get_numpy_dtype(self.data_type)
@@ -161,5 +161,6 @@ class TextureBase:
             return None
         channels: int = channel_count(self.internal_format)
         pixels = np.zeros(shape if channels == 1 else (*shape, channels), dtype=dtype)
-        glGetTextureImage(self.tex_id, 0, self.format, self.data_type, pixels.nbytes, pixels)
+        glPixelStorei(GL_PACK_ALIGNMENT, 1)        # numpy rows are tightly packed, as the upload's
+        glGetTextureImage(self.tex_id, level, self.format, self.data_type, pixels.nbytes, pixels)
         return pixels

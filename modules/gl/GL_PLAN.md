@@ -4,26 +4,6 @@ What is not built in `modules/gl`. A step is one commit, built on Matthias's go,
 tests, gl's tests and the runs it names; a run happens at its step, after a tasklist check that no app is running,
 unless Matthias says he is using the PC or the app.
 
-## E. Every pixel transfer sets its own alignment
-
-- E1. `Tensor._update_with_pbo` and `Tensor._update_with_cpu` set their own unpack alignment at the transfer, as
-  `Texture.upload` does; `TextureBase._read` sets its own pack alignment, and `Texture.read_to_numpy` takes a mip
-  level (`level`, 0 by default; the 3D and array reads stay at level 0, as an array keeps its layers at every
-  level). `flow/motion/solve_capture.read_level` reads through it with `flip=False` (it keeps GL's row order), in
-  place of its own bind and `glGetTexImage`; its `kind` and `dtype` go, as its R8 and depth reads are the textures'
-  own types. `apps/deep_flow/scripts/view_check.read` reads through it where its channels are the texture's; should
-  the level turn out more than a small change, they set the pack alignment at their own read instead.
-  `flow/bridge/velocity_peak` stays as it is (one row of 256 × R32UI, the same bytes at any alignment). In the same
-  commit, `render/general/screen_recording/screen_capture.py` and `screen_preview.py` lose `_PACK_ALIGNMENT`,
-  `_UNPACK_ALIGNMENT` and their set-back to 4 after their own transfers, which kept GL's default for the transfers
-  that did not set theirs; the render thread checks those two files afterwards. Why: these transfers rely on the
-  alignment GL has at the moment, 4 by default or 1 as `Texture.upload` and `Image` leave it, so a row whose bytes
-  are not a multiple of 4 (an R8 or RGB8 texture of odd width) comes out sheared at 4 (seen: the transfers, a scan of
-  2026-11-21; the shear, deduction); a read-back is written once (Motion's review of 46df3c07). Check: shader_check
-  (`read_to_numpy`); deep_flow -sim (Tensor's uploads); a -sim with the screen recorder making a take and playing it
-  back (capture and preview). `solve_capture` (only with `POSER_SOLVE_CAPTURE` set) and `view_check` (a script) are
-  not run.
-
 ## F. A framebuffer of several targets owns them, and swaps as one
 
 - F1. On c40e354c (the Fluid3D thread's surface color, a third target cleared each frame). `MultiTargetFbo` owns

@@ -28,7 +28,6 @@ from .shaders import RgbToYuv, YuvPlane
 logger = logging.getLogger(__name__)
 
 POOL: int = 4               # pixel buffers: one being read back, the rest with the recorder or waiting for it
-_PACK_ALIGNMENT: int = 4    # GL's default, which nothing else in the apps changes: set back after the capture's reads
 
 
 class _Plane:
@@ -191,7 +190,6 @@ class ScreenCapture:
             glBindFramebuffer(GL_READ_FRAMEBUFFER, plane.fbo.fbo_id)
             glReadPixels(0, 0, plane.width, plane.height, plane.read_format, plane.sample_type, plane.offset)
         self._pixels.unbind()
-        glPixelStorei(GL_PACK_ALIGNMENT, _PACK_ALIGNMENT)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         self._pixels.fence(buffer)
         self._in_flight.append((buffer, timestamp, skipped))

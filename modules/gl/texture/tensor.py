@@ -4,7 +4,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from OpenGL.GL import (Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_NONE, GL_PIXEL_UNPACK_BUFFER, GL_R32F, GL_STREAM_DRAW,
-                       glBindBuffer, glBufferData, glDeleteBuffers, glGenBuffers, glTextureSubImage2D)
+                       GL_UNPACK_ALIGNMENT, glBindBuffer, glBufferData, glDeleteBuffers, glGenBuffers,
+                       glPixelStorei, glTextureSubImage2D)
 
 from .texture import Texture
 from .texture_format import array_format, bytes_per_channel as format_bytes_per_channel, channel_count, tensor_type
@@ -208,6 +209,7 @@ class Tensor(Texture):
         # Upload PBO to texture (GPU-to-GPU via OpenGL driver), in the tensor's type; an error in it is logged at the
         # call by GL's debug output, behind the window manager's `gl_debug`
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, self._pbo)
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)      # the tensor's rows are tightly packed
         glTextureSubImage2D(self.tex_id, 0, 0, 0, self.width, self.height, self.format,
                             tensor_type(self.internal_format), None)
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
@@ -237,7 +239,8 @@ class Tensor(Texture):
         tensor_np = self._converted(tensor).cpu().numpy()
 
         # Upload to OpenGL texture in the tensor's type; glTextureSubImage2D takes only a contiguous array, a strided
-        # one is copied once
+        # one is copied once; its rows are tightly packed
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
         glTextureSubImage2D(self.tex_id, 0, 0, 0, self.width, self.height, self.format,
                             tensor_type(self.internal_format), np.ascontiguousarray(tensor_np))
 

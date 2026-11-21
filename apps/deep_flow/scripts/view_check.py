@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 import cv2  # noqa: E402
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
-from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_FLOAT, GL_NEAREST, GL_RED, GL_RGBA, GL_TEXTURE_2D, glBindTexture, glFinish, glGetTexImage  # noqa: E402
+from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_FLOAT, GL_NEAREST, GL_PACK_ALIGNMENT, GL_RED, GL_RGBA, GL_TEXTURE_2D, glBindTexture, glFinish, glGetTexImage, glPixelStorei  # noqa: E402
 
 from scripts import monitor_harness as mh  # noqa: E402
 from modules.camera import CameraFrame, FrameType  # noqa: E402
@@ -64,6 +64,7 @@ def read(texture: Texture, channels: int = 1) -> np.ndarray:
     """A texture's pixels, rows down."""
     glFinish()
     glBindTexture(GL_TEXTURE_2D, texture.tex_id)
+    glPixelStorei(GL_PACK_ALIGNMENT, 1)        # the rows packed, as numpy holds them
     data = cast(bytes, glGetTexImage(GL_TEXTURE_2D, 0, GL_RED if channels == 1 else GL_RGBA, GL_FLOAT))
     glBindTexture(GL_TEXTURE_2D, 0)
     shape = (texture.height, texture.width) if channels == 1 else (texture.height, texture.width, 4)

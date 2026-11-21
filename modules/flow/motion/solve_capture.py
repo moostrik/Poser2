@@ -12,11 +12,8 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import cast
 
 import numpy as np
-from OpenGL.GL import (GL_FLOAT, GL_RED, GL_TEXTURE_2D, GL_TEXTURE_HEIGHT, GL_TEXTURE_WIDTH, GL_UNSIGNED_BYTE,
-                       glBindTexture, glGetTexImage, glGetTexLevelParameteriv)
 
 from modules.gl import Texture
 
@@ -27,14 +24,12 @@ MAX_CAPTURES: int = 3
 WRONG_STEP: float = 0.5         # uv a frame: a solve step past half the image is no motion
 
 
-def read_level(texture: Texture, lod: int, kind: int = GL_UNSIGNED_BYTE, dtype: type = np.uint8) -> np.ndarray:
-    """One mip level of a single-channel texture (rows bottom first, as GL holds them)."""
-    glBindTexture(GL_TEXTURE_2D, texture.tex_id)
-    width = int(glGetTexLevelParameteriv(GL_TEXTURE_2D, lod, GL_TEXTURE_WIDTH))
-    height = int(glGetTexLevelParameteriv(GL_TEXTURE_2D, lod, GL_TEXTURE_HEIGHT))
-    data = cast(bytes, glGetTexImage(GL_TEXTURE_2D, lod, GL_RED, kind))
-    glBindTexture(GL_TEXTURE_2D, 0)
-    return np.frombuffer(data, dtype).reshape(height, width).copy()
+def read_level(texture: Texture, lod: int) -> np.ndarray:
+    """One mip level of a texture's first channel, in its own type (rows bottom first, as GL holds them)."""
+    pixels = texture.read_to_numpy(flip=False, level=lod)
+    if pixels is None:
+        return np.zeros((0, 0), np.float32)
+    return pixels[..., 0] if pixels.ndim == 3 else pixels
 
 
 class SolveCapture:
@@ -62,7 +57,7 @@ class SolveCapture:
             inputs[f'current_{lod}'] = read_level(current, lod)
             inputs[f'previous_{lod}'] = read_level(previous, lod)
         if depth is not None and depth.allocated:
-            inputs['depth'] = read_level(depth, 0, GL_FLOAT, np.float32)
+            inputs['depth'] = read_level(depth, 0)
         return inputs
 
     def after(self, inputs: dict[str, np.ndarray] | None, solved: Texture, settings: dict[str, float]) -> None:

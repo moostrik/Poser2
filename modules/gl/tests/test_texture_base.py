@@ -24,7 +24,7 @@ def allocated(texture, tex_id: int, internal_format: int, fmt: int, depth: int =
 class TextureBaseTest(unittest.TestCase):
     def setUp(self) -> None:
         self.gl = mock.MagicMock()
-        for name in ('glClearTexImage', 'glGetTextureImage', 'glBindTextureUnit'):
+        for name in ('glClearTexImage', 'glGetTextureImage', 'glBindTextureUnit', 'glPixelStorei'):
             patcher = mock.patch.object(BASE, name, getattr(self.gl, name))
             patcher.start()
             self.addCleanup(patcher.stop)

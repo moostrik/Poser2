@@ -26,7 +26,6 @@ from .shaders import YuvToRgb
 logger = logging.getLogger(__name__)
 
 BUFFERS: int = 2            # one written by the preview's thread while the other is uploaded
-_UNPACK_ALIGNMENT: int = 4  # GL's default, which nothing else in the apps changes: set back after the uploads
 
 
 class ScreenPreview:
@@ -134,7 +133,6 @@ class ScreenPreview:
             glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, plane.width, plane.height, plane.read_format, plane.sample_type,
                             ctypes.c_void_p(plane.offset))
         glBindTexture(GL_TEXTURE_2D, 0)
-        glPixelStorei(GL_UNPACK_ALIGNMENT, _UNPACK_ALIGNMENT)
         self._pixels.unbind()
         self._pixels.fence(buffer)
         self._in_flight.append(buffer)
