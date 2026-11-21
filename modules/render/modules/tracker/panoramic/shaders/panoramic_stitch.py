@@ -1,6 +1,6 @@
 """Unwrap the rig's camera frames into one 360-degree strip."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import glBindTextureUnit, glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging
@@ -49,8 +49,7 @@ class PanoramicStitch(Shader):
         num_cams: int = min(len(textures), MAX_CAMS)
         for unit in range(MAX_CAMS):
             source: Texture = textures[unit] if unit < num_cams else textures[0]
-            glActiveTexture(int(GL_TEXTURE0) + unit)
-            glBindTexture(GL_TEXTURE_2D, source.tex_id if source.allocated else 0)
+            glBindTextureUnit(unit, source.tex_id if source.allocated else 0)
 
         glUniform1i(self.get_uniform_loc("numCams"), num_cams)
         glUniform1f(self.get_uniform_loc("camFov"), cam_fov)
@@ -66,5 +65,3 @@ class PanoramicStitch(Shader):
         glUniform1i(self.get_uniform_loc("blendMode"), int(blend))
 
         draw_quad()
-
-        glActiveTexture(GL_TEXTURE0)

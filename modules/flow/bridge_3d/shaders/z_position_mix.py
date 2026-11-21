@@ -1,6 +1,6 @@
 """Z Position Mix shader: an output's z position from its readings'."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1fv, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1fv, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -23,8 +23,7 @@ class ZPositionMix(Shader):
         glUseProgram(self.shader_program)
         mask_textures: tuple[Texture, Texture] = (mask[0], mask[1]) if mask is not None else (trails[0], z_positions[0])
         for unit, texture in enumerate((*(texture for texture, _ in readings), *trails, *z_positions, *mask_textures)):
-            glActiveTexture(int(GL_TEXTURE0) + unit)
-            glBindTexture(GL_TEXTURE_2D, texture.tex_id)
+            texture.bind(unit)
         glUniform1fv(self.get_uniform_loc("shares"), 6, [share for _, share in readings])
         glUniform1f(self.get_uniform_loc("mask_share"), mask[2] if mask is not None else 0.0)
         draw_quad()

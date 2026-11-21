@@ -2,7 +2,7 @@
 
 from enum import IntEnum
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Shader, Texture, draw_quad
 
 
@@ -28,10 +28,8 @@ class InjectScalar2D(Shader):
         if not self.allocated or not self.shader_program or not field.allocated or not input.allocated:
             return
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, field.tex_id)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, input.tex_id)
+        field.bind(0)
+        input.bind(1)
         glUniform1i(self.get_uniform_loc("uMode"), int(mode))
         glUniform1f(self.get_uniform_loc("uStrength"), strength)
         glUniform1f(self.get_uniform_loc("uGain"), gain)

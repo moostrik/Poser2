@@ -12,5 +12,5 @@ def bind_z_position(shader: ComputeShader, unit: int, z_position: Texture | None
     has: bool = z_position is not None and z_position.allocated
     if has:
         assert z_position is not None
-        shader.bind_texture(unit, z_position)
+        z_position.bind(unit)
     glUniform1i(shader.get_uniform_loc("uHasZPosition"), int(has))

@@ -32,7 +32,7 @@ class BandpassAccelerations(ComputeShader):
             return
         glUseProgram(self.shader_program)
         for unit, texture in enumerate((fast, slow, *velocities)):
-            self.bind_texture(unit, texture)
+            texture.bind(unit)
         self.bind_image_write(0, change)
         if accelerations is not None:
             for unit, texture in enumerate(accelerations, start=1):

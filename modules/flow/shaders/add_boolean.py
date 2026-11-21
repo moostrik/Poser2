@@ -1,6 +1,6 @@
 """AddBoolean shader - Boolean union of obstacle masks."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUseProgram
+from OpenGL.GL import glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -24,11 +24,8 @@ class AddBoolean(Shader):
         glUseProgram(self.shader_program)
 
         # Bind textures
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, base.tex_id)
-
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, blend.tex_id)
+        base.bind(0)
+        blend.bind(1)
 
         # Draw fullscreen quad
         draw_quad()

@@ -1,6 +1,6 @@
 """MacCormack2D - the MacCormack correction of a 2D semi-Lagrangian advection, limited (Selle et al. 2008)."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUniform2f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 from ...finite_guard import GuardSlot
@@ -37,8 +37,7 @@ class MacCormack2D(Shader):
             return
         glUseProgram(self.shader_program)
         for unit, texture in enumerate((velocity, source, forward, obstacle)):
-            glActiveTexture((GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3)[unit])
-            glBindTexture(GL_TEXTURE_2D, texture.tex_id)
+            texture.bind(unit)
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
         glUniform1i(self.get_uniform_loc("uClosed"), int(closed))
         glUniform1f(self.get_uniform_loc("uWallKeep"), wall_keep)

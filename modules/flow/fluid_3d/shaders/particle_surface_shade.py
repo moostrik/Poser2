@@ -14,9 +14,9 @@ class ParticleSurfaceShade(ComputeShader):
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
-        self.bind_texture(0, depth)
-        self.bind_texture(1, thickness)
-        self.bind_texture(2, color)
+        depth.bind(0)
+        thickness.bind(1)
+        color.bind(2)
         self.bind_image_write(0, output, GL_RGBA16F)
         glUniform2i(self.get_uniform_loc("uSize"), output.width, output.height)
         glUniform1f(self.get_uniform_loc("uDepthPerPixel"), depth_per_pixel)

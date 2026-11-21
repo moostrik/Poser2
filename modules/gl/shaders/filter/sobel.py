@@ -1,6 +1,6 @@
 """Sobel: the Sobel edge magnitude of the input's luminance, as lines past a threshold."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUseProgram
 from ... import Shader, draw_quad, Texture
 
 import logging
@@ -20,8 +20,7 @@ class Sobel(Shader):
             return
 
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, src.tex_id)
+        src.bind(0)
         glUniform1f(self.get_uniform_loc("threshold"), threshold)
         glUniform1f(self.get_uniform_loc("strength"), strength)
         glUniform1i(self.get_uniform_loc("invert"), 1 if invert else 0)

@@ -4,7 +4,7 @@ Converts RGB image to single-channel luminance for optical flow input.
 Ported from ofxFlowTools ftRGB2LuminanceShader.h
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUseProgram
+from OpenGL.GL import glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging
@@ -32,8 +32,7 @@ class Luminance(Shader):
         glUseProgram(self.shader_program)
 
         # Bind input texture
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, source_tex.tex_id)
+        source_tex.bind(0)
 
         # Configure shader uniforms (using cached locations)
 

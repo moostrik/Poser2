@@ -37,13 +37,13 @@ class LowpassStep(ComputeShader):
         if not all(texture.allocated for texture in (trail, z_position, velocity, trail_out, z_position_out)):
             return
         glUseProgram(self.shader_program)
-        self.bind_texture(0, trail)
-        self.bind_texture(1, z_position)
-        self.bind_texture(2, velocity)
+        trail.bind(0)
+        z_position.bind(1)
+        velocity.bind(2)
         has_current: bool = current is not None and current.allocated
         if has_current:
             assert current is not None
-            self.bind_texture(3, current)
+            current.bind(3)
         glUniform1i(self.get_uniform_loc("uHasCurrent"), int(has_current))
         self.bind_image_write(0, trail_out)
         self.bind_image_write(1, z_position_out)

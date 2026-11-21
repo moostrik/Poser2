@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import math
 
-from OpenGL.GL import GL_RG32F, GL_TEXTURE_2D, GL_WRITE_ONLY, glActiveTexture, glBindTexture, glDispatchCompute, \
-    glUniform1f, glUniform1i, glUseProgram, GL_TEXTURE0
+from OpenGL.GL import GL_RG32F, GL_WRITE_ONLY, glBindTextureUnit, glDispatchCompute, glUniform1f, glUniform1i, glUseProgram
 
 from modules.gl import ComputeShader, Texture
 
@@ -33,8 +32,7 @@ class LucasKanadeTile(ComputeShader):
             return
         glUseProgram(self.shader_program)
         for unit, texture in enumerate((previous, current, estimate)):
-            glActiveTexture(int(GL_TEXTURE0) + unit)
-            glBindTexture(GL_TEXTURE_2D, texture.tex_id if texture is not None else 0)
+            glBindTextureUnit(unit, texture.tex_id if texture is not None else 0)
         glUniform1i(self.get_uniform_loc("has_estimate"), int(estimate is not None))
         glUniform1i(self.get_uniform_loc("level"), level)
         glUniform1i(self.get_uniform_loc("window"), window)

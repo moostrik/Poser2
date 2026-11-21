@@ -17,7 +17,7 @@ class CompositeOver(ComputeShader):
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
-        self.bind_texture(0, over)
+        over.bind(0)
         self.bind_image_readwrite(0, output, GL_RGBA16F)
         glUniform2i(self.get_uniform_loc("uOutputSize"), output.width, output.height)
         self.dispatch(output.width, output.height)

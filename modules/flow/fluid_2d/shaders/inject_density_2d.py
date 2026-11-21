@@ -1,6 +1,6 @@
 """Inject Density 2D shader: the bridge's dye into the 2D density by the blend."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Shader, Texture, draw_quad
 from ...density_blend import DensityBlend
 
@@ -29,8 +29,7 @@ class InjectDensity2D(Shader):
             return
         glUseProgram(self.shader_program)
         for unit, texture in enumerate((density, amount, color)):
-            glActiveTexture((GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2)[unit])
-            glBindTexture(GL_TEXTURE_2D, texture.tex_id)
+            texture.bind(unit)
         glUniform1f(self.get_uniform_loc("uStrength"), strength)
         glUniform1f(self.get_uniform_loc("uRelease"), release)
         glUniform1i(self.get_uniform_loc("uOklab"), int(oklab))

@@ -4,8 +4,7 @@ RGB."""
 import logging
 
 import numpy as np
-from OpenGL.GL import (GL_FALSE, GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i,
-                       glUniform3fv, glUniformMatrix3fv, glUseProgram)
+from OpenGL.GL import GL_FALSE, glUniform1i, glUniform3fv, glUniformMatrix3fv, glUseProgram
 
 from modules.gl import Shader, draw_quad, Texture
 
@@ -33,9 +32,7 @@ class YuvToRgb(Shader):
 
         glUseProgram(self.shader_program)
         for unit in range(3):
-            glActiveTexture(int(GL_TEXTURE0) + unit)
-            glBindTexture(GL_TEXTURE_2D, planes[min(unit, len(planes) - 1)].tex_id)
-        glActiveTexture(GL_TEXTURE0)
+            planes[min(unit, len(planes) - 1)].bind(unit)
         glUniform1i(self.get_uniform_loc("num_planes"), len(planes))
         # Row-major rows read as GLSL columns, so `matrix[i]` in the shader is row i (R, G, B)
         glUniformMatrix3fv(self.get_uniform_loc("matrix"), 1, GL_FALSE, INVERSE[sample_max])

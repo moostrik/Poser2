@@ -3,7 +3,7 @@
 Computes vector magnitude (length) for each pixel.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUseProgram
+from OpenGL.GL import glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging
@@ -27,6 +27,5 @@ class MagnitudeShader(Shader):
             return
 
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, src.tex_id)
+        src.bind(0)
         draw_quad()

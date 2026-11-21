@@ -8,7 +8,7 @@ Uses 16x16 workgroups with 1-pixel halo (18x18 shared memory) for fast neighbor 
 """
 from __future__ import annotations
 
-from OpenGL.GL import GL_R32F, GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUniform2i, glUseProgram
+from OpenGL.GL import GL_R32F, glUniform1f, glUniform1i, glUniform2f, glUniform2i, glUseProgram
 
 from modules.gl import Texture, ComputeShader
 
@@ -88,11 +88,8 @@ class JacobiPressureCompute(ComputeShader):
         glUniform1i(self.get_uniform_loc("uClosed"), int(closed))
 
         # Bind textures via samplers (for filtered access to divergence, obstacles)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, divergence.tex_id)
-
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
+        divergence.bind(0)
+        obstacle.bind(1)
 
         # Bind pressure textures as images for imageLoad/imageStore
         self.bind_image_read(0, pressure_in, GL_R32F)

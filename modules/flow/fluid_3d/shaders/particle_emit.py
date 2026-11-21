@@ -45,8 +45,8 @@ class ParticleEmit(ComputeShader):
         if not self.allocated or not self.shader_program or not amount.allocated or not color.allocated:
             return
         glUseProgram(self.shader_program)
-        self.bind_texture(0, color)
-        self.bind_texture(2, amount)
+        color.bind(0)
+        amount.bind(2)
         particles.bind_base(0)
         ring.bind_base(1)
         glUniform1f(self.get_uniform_loc("uStrength"), strength)

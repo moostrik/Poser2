@@ -1,6 +1,6 @@
 """Push-pull shader: a depth's holes filled from the depth around them (Gortler et al. 1996), its passes."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUseProgram
+from OpenGL.GL import glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 PUSH: int = 0
@@ -30,9 +30,8 @@ class PushPull(Shader):
         if not self.allocated or not self.shader_program or not all(t.allocated for t in textures):
             return
         glUseProgram(self.shader_program)
-        for unit, texture in zip((GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2), textures):
-            glActiveTexture(unit)
-            glBindTexture(GL_TEXTURE_2D, texture.tex_id)
+        for unit, texture in enumerate(textures[:3]):
+            texture.bind(unit)
         glUniform1i(self.get_uniform_loc("stage"), stage)
         glUniform1i(self.get_uniform_loc("first"), int(first))
         draw_quad()

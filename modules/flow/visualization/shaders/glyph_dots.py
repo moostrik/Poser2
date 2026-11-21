@@ -4,8 +4,7 @@ A scalar volume as 3D dots on a grid, sized and colored by the value, in one dra
 """
 
 import numpy as np
-from OpenGL.GL import (GL_POINTS, GL_PROGRAM_POINT_SIZE, GL_TEXTURE0, GL_TEXTURE_3D, GL_TRUE, glActiveTexture,
-                       glBindTexture, glDisable, glDrawArrays, glEnable, glUniform1f, glUniform1i, glUniform3f,
+from OpenGL.GL import (GL_POINTS, GL_PROGRAM_POINT_SIZE, GL_TRUE, glDisable, glDrawArrays, glEnable, glUniform1f, glUniform1i, glUniform3f,
                        glUniform3i, glUniformMatrix4fv, glUseProgram)
 from modules.gl import Shader, Texture3D
 
@@ -29,8 +28,7 @@ class GlyphDots(Shader):
         if not self.allocated or not self.shader_program or not volume.allocated:
             return
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_3D, volume.tex_id)
+        volume.bind(0)
         glUniformMatrix4fv(self.get_uniform_loc("view_projection"), 1, GL_TRUE, view_projection.astype(np.float32))
         glUniform3f(self.get_uniform_loc("box"), *box)
         glUniform3i(self.get_uniform_loc("grid"), *grid)
@@ -40,4 +38,3 @@ class GlyphDots(Shader):
         glEnable(GL_PROGRAM_POINT_SIZE)
         glDrawArrays(GL_POINTS, 0, grid[0] * grid[1] * grid[2])
         glDisable(GL_PROGRAM_POINT_SIZE)
-        glBindTexture(GL_TEXTURE_3D, 0)

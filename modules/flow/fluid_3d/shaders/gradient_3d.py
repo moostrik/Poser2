@@ -1,7 +1,7 @@
 """Gradient3D - the pressure's gradient subtracted from the velocity on the cells' faces."""
 from __future__ import annotations
 
-from OpenGL.GL import glUniform1f, glUseProgram
+from OpenGL.GL import glUseProgram
 
 from modules.gl import Texture3D, ComputeShader
 from .face_binding import Cell, bind_cell, bind_face_writes, bind_faces, bind_obstacle, bind_walls
@@ -36,5 +36,5 @@ class Gradient3D(ComputeShader):
         bind_walls(self, closed)
         bind_obstacle(self, obstacle, has_obstacles)
         bind_face_writes(self, result)
-        self.bind_texture_3d(0, pressure)
+        pressure.bind(0)
         self.dispatch(cells[0] + 1, cells[1] + 1, cells[2] + 1)

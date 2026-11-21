@@ -1,6 +1,6 @@
 """Levels: input black and white points and gamma, then output black and white points."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUseProgram
+from OpenGL.GL import glUniform1f, glUseProgram
 from ... import Shader, draw_quad, Texture
 
 import logging
@@ -19,8 +19,7 @@ class Levels(Shader):
         if not src.allocated:
             return
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, src.tex_id)
+        src.bind(0)
         glUniform1f(self.get_uniform_loc("inBlack"), in_black)
         glUniform1f(self.get_uniform_loc("inWhite"), in_white)
         glUniform1f(self.get_uniform_loc("gamma"), gamma)

@@ -5,7 +5,7 @@ import logging
 from enum import IntEnum
 
 import numpy as np
-from OpenGL.GL import (GL_FALSE, GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i,
+from OpenGL.GL import (GL_FALSE, glUniform1i,
                        glUniform3fv, glUniformMatrix3fv, glUseProgram)
 
 from modules.gl import Shader, draw_quad, Texture
@@ -55,8 +55,7 @@ class RgbToYuv(Shader):
             return
 
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, src.tex_id)
+        src.bind(0)
         glUniform1i(self.get_uniform_loc("plane"), int(plane))
         # Row-major rows read as GLSL columns, so `matrix[i]` in the shader is row i (Y, Cb, Cr)
         matrix, offset = BT709[sample_max]

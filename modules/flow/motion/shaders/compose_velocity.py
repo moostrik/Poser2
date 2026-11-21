@@ -1,6 +1,6 @@
 """Compose Velocity shader: a flow's x/y and z as one 3D velocity."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUniform3f, glUseProgram
+from OpenGL.GL import glUniform1i, glUniform3f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 from ...finite_guard import GuardSlot
 
@@ -25,14 +25,11 @@ class ComposeVelocity(Shader):
 
         glUseProgram(self.shader_program)
 
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, xy.tex_id)
+        xy.bind(0)
         if z is not None:
-            glActiveTexture(GL_TEXTURE1)
-            glBindTexture(GL_TEXTURE_2D, z.tex_id)
+            z.bind(1)
         if mask is not None:
-            glActiveTexture(GL_TEXTURE2)
-            glBindTexture(GL_TEXTURE_2D, mask.tex_id)
+            mask.bind(2)
 
         glUniform1i(self.get_uniform_loc("has_depth"), 1 if z is not None else 0)
         glUniform1i(self.get_uniform_loc("has_mask"), 1 if mask is not None else 0)

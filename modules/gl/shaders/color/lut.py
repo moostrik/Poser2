@@ -1,4 +1,4 @@
-from OpenGL.GL import GL_CLAMP_TO_EDGE, GL_FLOAT, GL_LINEAR, GL_RGB, GL_RGB32F, GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_WRAP_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, glActiveTexture, glBindTexture, glDeleteTextures, glGenTextures, glTexImage3D, glTexParameteri, glUniform1f, glUniform3f, glUseProgram
+from OpenGL.GL import GL_CLAMP_TO_EDGE, GL_FLOAT, GL_LINEAR, GL_RGB, GL_RGB32F, GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_WRAP_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, glBindTexture, glBindTextureUnit, glDeleteTextures, glGenTextures, glTexImage3D, glTexParameteri, glUniform1f, glUniform3f, glUseProgram
 from ... import Shader, draw_quad, Texture
 import numpy as np
 from pathlib import Path
@@ -221,13 +221,9 @@ class Lut(Shader):
         # Activate shader program
         glUseProgram(self.shader_program)
 
-        # Bind input texture to unit 0
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, src.tex_id)
-
-        # Bind LUT 3D texture to unit 1
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_3D, self._lut_tex_id)
+        # Bind input texture to unit 0, the LUT 3D texture to unit 1
+        src.bind(0)
+        glBindTextureUnit(1, self._lut_tex_id)
 
         # Configure shader uniforms
         glUniform1f(self.get_uniform_loc("strength"), strength)
@@ -236,8 +232,3 @@ class Lut(Shader):
 
         # Render
         draw_quad()
-
-        # Unbind 3D texture (optional but clean)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_3D, 0)
-        glActiveTexture(GL_TEXTURE0)

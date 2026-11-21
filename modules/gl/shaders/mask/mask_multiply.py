@@ -1,6 +1,6 @@
 """MaskMultiply: an image times a mask's red, every channel."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUseProgram
+from OpenGL.GL import glUseProgram
 from ... import Shader, draw_quad, Texture
 
 import logging
@@ -19,8 +19,6 @@ class MaskMultiply(Shader):
             return
 
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, tex1.tex_id)
+        tex0.bind(0)
+        tex1.bind(1)
         draw_quad()

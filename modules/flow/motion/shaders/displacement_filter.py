@@ -1,6 +1,6 @@
 """Displacement filter shader: x/y through the depth track's filter over z's time, so it lags as z does."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 from ...finite_guard import GuardSlot
 
@@ -29,12 +29,9 @@ class DisplacementFilter(Shader):
 
         glUseProgram(self.shader_program)
 
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, displacement.tex_id)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, state.tex_id)
-        glActiveTexture(GL_TEXTURE2)
-        glBindTexture(GL_TEXTURE_2D, carry.tex_id)
+        displacement.bind(0)
+        state.bind(1)
+        carry.bind(2)
 
         glUniform1f(self.get_uniform_loc("smoothing"), smooth)
         glUniform1f(self.get_uniform_loc("rest_speed"), rest_speed)

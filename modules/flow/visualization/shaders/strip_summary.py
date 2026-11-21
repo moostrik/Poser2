@@ -3,7 +3,7 @@
 A texture's channels as amounts, in one small texture whose top mip is their mean.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUseProgram
+from OpenGL.GL import glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -18,8 +18,7 @@ class StripSummary(Shader):
 
         glUseProgram(self.shader_program)
 
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, texture.tex_id)
+        texture.bind(0)
 
 
         draw_quad()

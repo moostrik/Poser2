@@ -1,6 +1,6 @@
 """Median: each pixel the median of its 3 x 3 neighborhood, per channel."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUseProgram
+from OpenGL.GL import glUseProgram
 from ... import Shader, draw_quad, Texture
 
 import logging
@@ -18,6 +18,5 @@ class Median(Shader):
         if not src.allocated:
             return
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, src.tex_id)
+        src.bind(0)
         draw_quad()

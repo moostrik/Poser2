@@ -20,7 +20,7 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
-from OpenGL.GL import GL_ALL_BARRIER_BITS, GL_COMPUTE_SHADER, GL_FALSE, GL_MAX_COMPUTE_WORK_GROUP_COUNT, GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, GL_MAX_COMPUTE_WORK_GROUP_SIZE, GL_READ_ONLY, GL_READ_WRITE, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_SHADER_STORAGE_BARRIER_BIT, GL_TEXTURE0, GL_TEXTURE_2D, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_3D, GL_TEXTURE_FETCH_BARRIER_BIT, GL_TRUE, GL_WRITE_ONLY, glActiveTexture, glBindImageTexture, glBindTexture, glDispatchCompute, glGetIntegeri_v, glGetIntegerv, glMemoryBarrier
+from OpenGL.GL import GL_ALL_BARRIER_BITS, GL_COMPUTE_SHADER, GL_FALSE, GL_MAX_COMPUTE_WORK_GROUP_COUNT, GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, GL_MAX_COMPUTE_WORK_GROUP_SIZE, GL_READ_ONLY, GL_READ_WRITE, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_SHADER_STORAGE_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, GL_TRUE, GL_WRITE_ONLY, glBindImageTexture, glDispatchCompute, glGetIntegeri_v, glGetIntegerv, glMemoryBarrier
 
 from .shader import Shader
 from .texture import Texture
@@ -132,24 +132,6 @@ class ComputeShader(Shader):
         """Bind 3D texture as read-write layered image."""
         self.bind_image_3d(unit, texture, GL_READ_WRITE, internal_format)
 
-    # ========== Texture Sampling (for hybrid read) ==========
-
-    def bind_texture(self, unit: int, texture: Texture) -> None:
-        """Bind a 2D texture to the unit its sampler names with `layout(binding = unit)`."""
-        glActiveTexture(int(GL_TEXTURE0) + unit)
-        glBindTexture(GL_TEXTURE_2D, texture.tex_id)
-
-    def bind_texture_3d(self, unit: int, texture: Texture3D) -> None:
-        """Bind a 3D texture to the unit its sampler3D names with `layout(binding = unit)`."""
-        glActiveTexture(int(GL_TEXTURE0) + unit)
-        glBindTexture(GL_TEXTURE_3D, texture.tex_id)
-
-    # ========== 2D Array Texture Binding Methods ==========
-
-    def bind_texture_2d_array(self, unit: int, texture: Texture2DArray) -> None:
-        """Bind a 2D array texture to the unit its sampler2DArray names with `layout(binding = unit)`."""
-        glActiveTexture(int(GL_TEXTURE0) + unit)
-        glBindTexture(GL_TEXTURE_2D_ARRAY, texture.tex_id)
 
     def bind_image_2d_array(self, unit: int, texture: Texture2DArray, access: int,
                             internal_format: int | None = None) -> None:

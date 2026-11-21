@@ -2,7 +2,7 @@
 
 from enum import IntEnum
 
-from OpenGL.GL import GL_NEAREST, GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import GL_NEAREST, glUniform1f, glUniform1i, glUseProgram
 from ... import Shader, draw_quad, Texture
 from ...image import Image
 from .blue_noise import blue_noise
@@ -45,10 +45,8 @@ class Dither(Shader):
         if not src.allocated or not self._blue_noise.allocated:
             return
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, src.tex_id)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, self._blue_noise.tex_id)
+        src.bind(0)
+        self._blue_noise.bind(1)
         glUniform1f(self.get_uniform_loc("levels"), float((1 << bits) - 1))
         glUniform1i(self.get_uniform_loc("pattern"), pattern)
         draw_quad()

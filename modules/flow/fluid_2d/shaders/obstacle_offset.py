@@ -1,6 +1,6 @@
 """ObstacleOffset shader - Precompute neighbor obstacle flags."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUseProgram
+from OpenGL.GL import glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -23,8 +23,7 @@ class ObstacleOffset(Shader):
         glUseProgram(self.shader_program)
 
         # Bind texture
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
+        obstacle.bind(0)
 
         # Draw fullscreen quad
         draw_quad()

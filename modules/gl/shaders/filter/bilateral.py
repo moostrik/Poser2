@@ -1,6 +1,6 @@
 """Bilateral: a blur that keeps edges, each neighbor weighted by its distance and by how alike its color is."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUseProgram
 from ... import Shader, draw_quad, Texture
 
 import logging
@@ -19,8 +19,7 @@ class Bilateral(Shader):
         if not src.allocated:
             return
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, src.tex_id)
+        src.bind(0)
         glUniform1i(self.get_uniform_loc("radius"), max(radius, 0))
         glUniform1f(self.get_uniform_loc("sigmaSpace"), max(sigma_space, 1e-4))
         glUniform1f(self.get_uniform_loc("sigmaColor"), max(sigma_color, 1e-4))

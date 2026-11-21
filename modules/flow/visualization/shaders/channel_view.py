@@ -3,7 +3,7 @@
 Draws a texture's channels as an image or as a colormap centered on mid grey, all of them or one.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -27,8 +27,7 @@ class ChannelView(Shader):
 
         glUseProgram(self.shader_program)
 
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, texture.tex_id)
+        texture.bind(0)
 
         glUniform1f(self.get_uniform_loc("scale"), scale)
         glUniform1i(self.get_uniform_loc("channel"), channel)

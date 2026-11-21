@@ -39,8 +39,8 @@ class ExpansionMean3D(ComputeShader):
             return
         cells: tuple[int, int, int] = (expansion.width, expansion.height, expansion.depth)
         glUseProgram(self.shader_program)
-        self.bind_texture_3d(0, expansion)
-        self.bind_texture_3d(2, obstacle)
+        expansion.bind(0)
+        obstacle.bind(2)
         glUniform3i(self.get_uniform_loc('uCells'), *cells)
         glUniform1i(self.get_uniform_loc('uHasObstacles'), int(has_obstacles))
         partials.bind_base(0)

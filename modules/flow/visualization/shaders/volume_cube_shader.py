@@ -7,8 +7,7 @@ amount its opacity; with the slice on, the selected layer read solid and the res
 from enum import IntEnum
 
 import numpy as np
-from OpenGL.GL import (GL_TEXTURE0, GL_TEXTURE_3D, GL_TRUE, glActiveTexture, glBindTexture, glUniform1f, glUniform1i,
-                       glUniform3f, glUniformMatrix4fv, glUseProgram)
+from OpenGL.GL import GL_TRUE, glUniform1f, glUniform1i, glUniform3f, glUniformMatrix4fv, glUseProgram
 from modules.gl import Shader, Texture3D, draw_quad
 
 
@@ -44,8 +43,7 @@ class VolumeCubeShader(Shader):
         if not self.allocated or not self.shader_program or not volume.allocated:
             return
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_3D, volume.tex_id)
+        volume.bind(0)
         glUniformMatrix4fv(self.get_uniform_loc("inverse_view_projection"), 1, GL_TRUE, inverse_view_projection.astype(np.float32))
         glUniform3f(self.get_uniform_loc("box"), *box)
         glUniform1f(self.get_uniform_loc("scale"), scale)
@@ -58,4 +56,3 @@ class VolumeCubeShader(Shader):
         glUniform1f(self.get_uniform_loc("slice_z"), 0.5 if slice_z is None else slice_z)
         glUniform1f(self.get_uniform_loc("slice_focus"), slice_focus)
         draw_quad()
-        glBindTexture(GL_TEXTURE_3D, 0)

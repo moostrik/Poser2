@@ -1,6 +1,6 @@
 """AddMix: the foreground added to the base, then mixed toward the foreground, both by one blend."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUseProgram
+from OpenGL.GL import glUniform1f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -11,11 +11,8 @@ class AddMix(Shader):
     def use(self, base: Texture, foreground: Texture, blend: float) -> None:
         glUseProgram(self.shader_program)
 
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, base.tex_id)
-
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, foreground.tex_id)
+        base.bind(0)
+        foreground.bind(1)
 
         glUniform1f(self.get_uniform_loc("blend"), blend)
 

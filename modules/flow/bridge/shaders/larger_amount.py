@@ -1,7 +1,6 @@
 """Larger Amount shader: per pixel, the one of two textures with the larger amount."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE_2D, glActiveTexture, glBindTexture, \
-    glUniform1i, glUseProgram
+from OpenGL.GL import glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -17,7 +16,6 @@ class LargerAmount(Shader):
 
         glUseProgram(self.shader_program)
         for unit, texture in enumerate((held, source, held_amount, source_amount)):
-            glActiveTexture((GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3)[unit])
-            glBindTexture(GL_TEXTURE_2D, texture.tex_id)
+            texture.bind(unit)
 
         draw_quad()

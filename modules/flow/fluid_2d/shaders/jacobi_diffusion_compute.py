@@ -8,7 +8,7 @@ Uses 16x16 workgroups with 1-pixel halo (18x18 shared memory) for fast neighbor 
 """
 from __future__ import annotations
 
-from OpenGL.GL import GL_RG16F, GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUniform2i, glUseProgram
+from OpenGL.GL import GL_RG16F, glUniform1f, glUniform1i, glUniform2f, glUniform2i, glUseProgram
 
 from modules.gl import Texture, ComputeShader
 
@@ -87,8 +87,7 @@ class JacobiDiffusionCompute(ComputeShader):
         glUniform1f(self.get_uniform_loc("uWallKeep"), wall_keep)
 
         # Bind textures via samplers
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
+        obstacle.bind(0)
 
         # Bind velocity textures as images
         self.bind_image_read(0, velocity_in, GL_RG16F)

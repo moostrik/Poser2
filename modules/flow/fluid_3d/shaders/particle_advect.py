@@ -23,7 +23,7 @@ class ParticleAdvect(ComputeShader):
             return
         glUseProgram(self.shader_program)
         particles.bind_base(0)
-        self.bind_texture_3d(0, velocity)
+        velocity.bind(0)
         glUniform1f(self.get_uniform_loc("uTimestep"), timestep)
         glUniform3f(self.get_uniform_loc("uRdx"), 1.0, aspect,
                     1.0 / z_extent if z_extent > 0.0 else 1.0)

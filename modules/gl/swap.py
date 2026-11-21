@@ -65,11 +65,8 @@ class Swap(Generic[T]):
         for buffer in self._buffers:
             buffer.deallocate()
 
-    def bind(self) -> None:
-        self.current.bind()
-
-    def unbind(self) -> None:
-        self.current.unbind()
+    def bind(self, unit: int) -> None:
+        self.current.bind(unit)
 
     def clear(self, r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 0.0) -> None:
         """The current buffer cleared."""

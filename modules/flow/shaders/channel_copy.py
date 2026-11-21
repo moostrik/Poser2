@@ -3,7 +3,7 @@
 Copies a single-channel texture to a specific channel of an RGBA destination.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUseProgram
+from OpenGL.GL import glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging
@@ -31,12 +31,10 @@ class ChannelCopy(Shader):
         glUseProgram(self.shader_program)
 
         # Bind destination (existing RGBA)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, dst.tex_id)
+        dst.bind(0)
 
         # Bind source (single-channel)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, src.tex_id)
+        src.bind(1)
 
         # Set channel uniform
         glUniform1i(self.get_uniform_loc("channel"), channel)

@@ -10,7 +10,7 @@ Usage:
     pressure_tex = Texture3D(wrap=GL_CLAMP_TO_EDGE)   # Neumann BC
     pressure_tex.allocate(256, 192, 32, GL_R16F)
 """
-from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_WRAP_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, glBindTexture, glTexImage3D, glTexParameterfv, glTexParameteri
+from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_WRAP_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, glBindTexture, glTexImage3D, glTextureParameterfv, glTextureParameteri
 import numpy as np
 
 from .swap import Swap
@@ -53,10 +53,8 @@ class Texture3D(TextureBase):
         """Change Z (R) wrap mode at runtime independently from XY (GL thread only)."""
         if not self.allocated:
             return
-        glBindTexture(GL_TEXTURE_3D, self.tex_id)
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, wrap)
-        glTexParameterfv(GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, border_color)
-        glBindTexture(GL_TEXTURE_3D, 0)
+        glTextureParameteri(self.tex_id, GL_TEXTURE_WRAP_R, wrap)
+        glTextureParameterfv(self.tex_id, GL_TEXTURE_BORDER_COLOR, border_color)
 
     def deallocate(self) -> None:
         """Release texture resources."""

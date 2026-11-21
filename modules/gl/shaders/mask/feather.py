@@ -2,7 +2,7 @@
 
 import logging
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUseProgram
+from OpenGL.GL import glUseProgram
 
 from ... import Shader, draw_quad, Texture
 
@@ -21,6 +21,5 @@ class Feather(Shader):
             logger.warning("Feather shader: input texture not allocated.")
             return
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, blurred.tex_id)
+        blurred.bind(0)
         draw_quad()

@@ -1,6 +1,6 @@
 """The color a bridge's density carries: the image's RGB, or white without one, times a tint and the mask."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUniform3f, glUseProgram
+from OpenGL.GL import glBindTextureUnit, glUniform1i, glUniform3f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging
@@ -20,10 +20,8 @@ class DensityColor(Shader):
 
         glUseProgram(self.shader_program)
 
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, image.tex_id if has_image and image is not None else 0)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, mask.tex_id if has_mask and mask is not None else 0)
+        glBindTextureUnit(0, image.tex_id if has_image and image is not None else 0)
+        glBindTextureUnit(1, mask.tex_id if has_mask and mask is not None else 0)
 
         glUniform1i(self.get_uniform_loc("has_image"), int(has_image))
         glUniform1i(self.get_uniform_loc("has_mask"), int(has_mask))

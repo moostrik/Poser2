@@ -1,4 +1,4 @@
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUniform4fv, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUniform2f, glUniform4fv, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import numpy as np
@@ -57,8 +57,7 @@ class Window(Shader):
 
         glUseProgram(self.shader_program)
 
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
+        tex0.bind(0)
 
         glUniform1i(self.get_uniform_loc("numStreams"), num_streams)
         glUniform1f(self.get_uniform_loc("streamStep"), stream_step)

@@ -1,6 +1,6 @@
 """Buoyancy shader - the density's weight and the warmth's lift along gravity, an acceleration (widths/s²)."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUniform2f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -29,14 +29,10 @@ class Buoyancy(Shader):
         glUseProgram(self.shader_program)
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
 
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, temperature.tex_id)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, density.tex_id)
-        glActiveTexture(GL_TEXTURE2)
-        glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
-        glActiveTexture(GL_TEXTURE3)
-        glBindTexture(GL_TEXTURE_2D, velocity.tex_id if velocity is not None else temperature.tex_id)
+        temperature.bind(0)
+        density.bind(1)
+        obstacle.bind(2)
+        (velocity if velocity is not None else temperature).bind(3)
         glUniform1i(self.get_uniform_loc("uAdd"), int(velocity is not None))
 
         glUniform1f(self.get_uniform_loc("uSigma"), sigma)

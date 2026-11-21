@@ -3,7 +3,7 @@ colormap's brightness."""
 
 from enum import IntEnum
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Colormap, Shader, draw_quad, Texture
 
 
@@ -24,10 +24,8 @@ class DepthColormap(Shader):
             return
 
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, depth.tex_id)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, image.tex_id)
+        depth.bind(0)
+        image.bind(1)
         glUniform1f(self.get_uniform_loc("nearDepth"), near)
         glUniform1f(self.get_uniform_loc("farDepth"), far)
         glUniform1i(self.get_uniform_loc("mode"), mode)

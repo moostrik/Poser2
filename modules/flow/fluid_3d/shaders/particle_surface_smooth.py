@@ -15,7 +15,7 @@ class ParticleSurfaceSmooth(ComputeShader):
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
-        self.bind_texture(0, depth)
+        depth.bind(0)
         self.bind_image_write(0, result, GL_R32F)
         glUniform2i(self.get_uniform_loc("uSize"), result.width, result.height)
         glUniform2i(self.get_uniform_loc("uDirection"), 1 if horizontal else 0, 0 if horizontal else 1)

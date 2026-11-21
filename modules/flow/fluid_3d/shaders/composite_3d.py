@@ -126,7 +126,7 @@ def bind_light(shader: ComputeShader, light: CompositeLight, net: Texture | None
     for name, tile in zip(("uNetX", "uNetY", "uNetZ"), net_tiles(light.vector, light.box, light.caustic_size)):
         glUniform2f(shader.get_uniform_loc(name), *tile)
     if on and net is not None:
-        shader.bind_texture(CAUSTIC_NET_UNIT, net)
+        net.bind(CAUSTIC_NET_UNIT)
 
 
 class Composite3D(ComputeShader):
@@ -151,7 +151,7 @@ class Composite3D(ComputeShader):
 
         glUseProgram(self.shader_program)
 
-        self.bind_texture_3d(0, density)
+        density.bind(0)
         self.bind_image_write(0, output_2d, GL_RGBA16F)
 
         glUniform1i(self.get_uniform_loc("uDepth"), density.depth)
@@ -163,7 +163,7 @@ class Composite3D(ComputeShader):
         glUniform1i(self.get_uniform_loc("uSplit"), int(color is not None))
         glUniform1i(self.get_uniform_loc("uOklab"), int(oklab))
         if color is not None:
-            self.bind_texture_3d(1, color)
+            color.bind(1)
         direct: Texture3D | None = light.direct if light is not None else None
         rays: Texture3D | None = light.rays if light is not None else None
         glUniform1i(self.get_uniform_loc("uLit"), int(direct is not None))
@@ -172,8 +172,8 @@ class Composite3D(ComputeShader):
             glUniform1f(self.get_uniform_loc("uIntensity"), light.intensity)
             bind_light(self, light, light.net)
         if direct is not None:
-            self.bind_texture_3d(2, direct)
+            direct.bind(2)
         if rays is not None:
-            self.bind_texture_3d(3, rays)
+            rays.bind(3)
 
         self.dispatch(output_2d.width, output_2d.height)

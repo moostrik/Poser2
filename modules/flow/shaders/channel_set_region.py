@@ -4,7 +4,7 @@ Sets a specific channel at a specific region to source texture.
 Source R channel replaces the target channel.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform4f, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUniform4f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging
@@ -38,10 +38,8 @@ class ChannelSetRegion(Shader):
 
         glUseProgram(self.shader_program)
 
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, dst.tex_id)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, src.tex_id)
+        dst.bind(0)
+        src.bind(1)
 
         glUniform1i(self.get_uniform_loc("channel"), channel)
         glUniform1f(self.get_uniform_loc("strength"), strength)

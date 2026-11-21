@@ -33,7 +33,7 @@ class DepthAlign(ComputeShader):
         to_corrected: np.ndarray = IDENTITY if homography is None else homography.astype(np.float32)
 
         glUseProgram(self.shader_program)
-        self.bind_texture(0, depth)
+        depth.bind(0)
         self.bind_image_readwrite(0, nearest, GL_R32UI)
         self.bind_image_write(1, aligned, GL_R32F)
         glUniformMatrix3fv(self.get_uniform_loc("toRay"), 1, GL_TRUE, np.ascontiguousarray(to_ray, dtype=np.float32))

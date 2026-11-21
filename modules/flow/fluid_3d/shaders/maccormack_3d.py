@@ -55,10 +55,10 @@ class MacCormack3D(ComputeShader):
 
         glUseProgram(self.shader_program)
 
-        self.bind_texture_3d(0, velocity)
-        self.bind_texture_3d(1, source)
-        self.bind_texture_3d(2, forward)
-        self.bind_texture_3d(3, obstacle)
+        velocity.bind(0)
+        source.bind(1)
+        forward.bind(2)
+        obstacle.bind(3)
         self.bind_image_3d_write(0, result, internal_format)
 
         glUniform1f(self.get_uniform_loc("uTimestep"), timestep)
@@ -72,7 +72,7 @@ class MacCormack3D(ComputeShader):
         glUniform3i(self.get_uniform_loc("uClosed"), *(int(c) for c in closed))
         glUniform1i(self.get_uniform_loc("uFromFaces"), int(faces is not None))
         if faces is not None:
-            self.bind_texture_3d(4, faces)
+            faces.bind(4)
             glUniform3i(self.get_uniform_loc("uCells"), faces.width - 1, faces.height - 1, faces.depth - 1)
         if guard is not None:
             guard.use(self.get_uniform_loc("uGuardSlot"))

@@ -1,7 +1,7 @@
 """InjectBinary3D - Project 2D binary mask into all layers of a 3D R8 volume."""
 from __future__ import annotations
 
-from OpenGL.GL import GL_R8, GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUniform3i, glUseProgram
+from OpenGL.GL import GL_R8, glUniform1i, glUniform3i, glUseProgram
 
 from modules.gl import Texture, Texture3D, ComputeShader
 
@@ -38,8 +38,7 @@ class InjectBinary3D(ComputeShader):
         glUseProgram(self.shader_program)
 
         # Bind 2D input as sampler
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, input_2d.tex_id)
+        input_2d.bind(0)
 
         # Bind 3D volume as read-write image (R8 format)
         self.bind_image_3d_readwrite(0, volume, GL_R8)

@@ -29,7 +29,7 @@ class SpeedCount2D(ComputeShader):
             return
         low, high = speed if speed is not None else SPEED_DEFAULT
         glUseProgram(self.shader_program)
-        self.bind_texture(0, texture)
+        texture.bind(0)
         self.bind_image_readwrite(0, histogram, GL_R32UI)
         glUniform1f(self.get_uniform_loc("scale"), scale)
         glUniform2i(self.get_uniform_loc("samples"), *samples)

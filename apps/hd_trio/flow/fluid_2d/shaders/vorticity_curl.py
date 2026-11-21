@@ -1,6 +1,6 @@
 """VorticityCurl shader - Compute curl of velocity field."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUniform2f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -31,11 +31,8 @@ class VorticityCurl(Shader):
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
 
         # Bind textures
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, velocity.tex_id)
-
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
+        velocity.bind(0)
+        obstacle.bind(1)
 
         # Set uniform
         glUniform1f(self.get_uniform_loc("uRadius"), radius)

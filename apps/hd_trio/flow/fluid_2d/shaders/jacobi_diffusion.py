@@ -1,6 +1,6 @@
 """JacobiDiffusion shader - Iterative diffusion solver for velocity viscosity."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUniform2f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -44,11 +44,8 @@ class JacobiDiffusion(Shader):
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
 
         # Bind textures
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, source.tex_id)
-
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
+        source.bind(0)
+        obstacle.bind(1)
 
         # Set uniforms
         glUniform2f(self.get_uniform_loc("uAlpha"), alpha_x, alpha_y)

@@ -33,8 +33,8 @@ class SorPressure3D(ComputeShader):
             return
         alpha = (1.0 / (cell[0] * cell[0]), 1.0 / (cell[1] * cell[1]), 1.0 / (cell[2] * cell[2]))
         glUseProgram(self.shader_program)
-        self.bind_texture_3d(0, divergence)
-        self.bind_texture_3d(1, obstacle)
+        divergence.bind(0)
+        obstacle.bind(1)
         self.bind_image_3d_readwrite(0, pressure, GL_R32F)
         glUniform3f(self.get_uniform_loc("uAlpha"), *alpha)
         glUniform1f(self.get_uniform_loc("uBeta"), 1.0 / (2.0 * sum(alpha) + screening))

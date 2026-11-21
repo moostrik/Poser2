@@ -1,6 +1,6 @@
 """VorticityForce shader - the vorticity confinements' force × dt, summed."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1fv, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import glUniform1fv, glUniform1i, glUniform2f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 from .vorticity_curl import VorticityCurl
@@ -26,10 +26,8 @@ class VorticityForce(Shader):
         glUseProgram(self.shader_program)
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
 
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, curl.tex_id)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
+        curl.bind(0)
+        obstacle.bind(1)
 
         glUniform2f(self.get_uniform_loc("uHalfRdxInv"), 0.5 / cell[0], 0.5 / cell[1])
         glUniform1i(self.get_uniform_loc("uCount"), count)

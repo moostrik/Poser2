@@ -3,7 +3,7 @@
 Clamps all texture channels to a specified min/max range.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUseProgram
+from OpenGL.GL import glUniform1f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging
@@ -31,8 +31,7 @@ class Clamp(Shader):
         glUseProgram(self.shader_program)
 
         # Bind texture
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, src.tex_id)
+        src.bind(0)
 
         # Set uniforms
         glUniform1f(self.get_uniform_loc("minVal"), min_val)

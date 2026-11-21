@@ -26,7 +26,6 @@ class Fbo(Texture):
         self.fbo_id = glGenFramebuffers(1)
 
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
-        self.bind()
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.tex_id, 0)
         if self._depth:
             self._depth_id = glGenRenderbuffers(1)
@@ -39,7 +38,6 @@ class Fbo(Texture):
         glClear(int(GL_COLOR_BUFFER_BIT) | (int(GL_DEPTH_BUFFER_BIT) if self._depth else 0))
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
-        self.unbind()
 
     def deallocate(self) -> None:
         if self.fbo_id:

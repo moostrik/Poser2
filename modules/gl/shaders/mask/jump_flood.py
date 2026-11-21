@@ -1,6 +1,6 @@
 """JumpFlood: the jump flooding algorithm's passes (Rong and Tan 2006), a mask's nearest-pixel map in log2 passes."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUseProgram
 from ... import Shader, draw_quad, Texture
 
 import logging
@@ -34,8 +34,7 @@ class JumpFlood(Shader):
         if not src.allocated:
             return
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, src.tex_id)
+        src.bind(0)
         glUniform1i(self.get_uniform_loc("stage"), stage)
         glUniform1f(self.get_uniform_loc("threshold"), threshold)
         glUniform1i(self.get_uniform_loc("jump"), jump)

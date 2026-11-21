@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from enum import IntEnum
 
-from OpenGL.GL import GL_R16F, GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform3i, glUseProgram
+from OpenGL.GL import GL_R16F, glUniform1f, glUniform1i, glUniform3i, glUseProgram
 
 from modules.gl import Texture, Texture3D, ComputeShader
 from .z_position_binding import bind_z_position
@@ -49,8 +49,7 @@ class Inject3D(ComputeShader):
         glUseProgram(self.shader_program)
 
         # Bind 2D input as sampler
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, input_2d.tex_id)
+        input_2d.bind(0)
 
         # Bind 3D volume as read-write image
         self.bind_image_3d_readwrite(0, volume, internal_format)

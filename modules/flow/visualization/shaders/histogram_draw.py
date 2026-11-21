@@ -3,7 +3,7 @@
 Draws the bins `HistogramCount` filled: a lane per channel the texture holds, or one channel's lane.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -26,8 +26,7 @@ class HistogramDraw(Shader):
 
         glUseProgram(self.shader_program)
 
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, histogram.tex_id)
+        histogram.bind(0)
 
         glUniform1i(self.get_uniform_loc("channel"), channel)
         glUniform1i(self.get_uniform_loc("channels"), channels)

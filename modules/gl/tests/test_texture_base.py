@@ -5,7 +5,7 @@ import sys
 import unittest
 from unittest import mock
 
-from OpenGL.GL import GL_FLOAT, GL_R16F, GL_RED, GL_RGBA, GL_RGBA16F, GL_TEXTURE_2D, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_3D
+from OpenGL.GL import GL_FLOAT, GL_R16F, GL_RED, GL_RGBA, GL_RGBA16F
 
 from modules.gl import SwapFbo, SwapTexture3D, Texture, Texture2DArray, Texture3D
 
@@ -24,7 +24,7 @@ def allocated(texture, tex_id: int, internal_format: int, fmt: int, depth: int =
 class TextureBaseTest(unittest.TestCase):
     def setUp(self) -> None:
         self.gl = mock.MagicMock()
-        for name in ('glClearTexImage', 'glGetTexImage', 'glBindTexture'):
+        for name in ('glClearTexImage', 'glGetTextureImage', 'glBindTextureUnit'):
             patcher = mock.patch.object(BASE, name, getattr(self.gl, name))
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -43,21 +43,29 @@ class TextureBaseTest(unittest.TestCase):
         Texture3D().clear(1.0)
         self.gl.glClearTexImage.assert_not_called()
 
-    def test_each_kind_reads_on_its_target_in_its_shape(self) -> None:
-        cases = ((allocated(Texture(), 5, GL_RGBA16F, GL_RGBA), GL_TEXTURE_2D, (2, 4, 4)),
-                 (allocated(Texture3D(), 6, GL_R16F, GL_RED, 3), GL_TEXTURE_3D, (3, 2, 4)),
-                 (allocated(Texture2DArray(), 7, GL_RGBA16F, GL_RGBA, 3), GL_TEXTURE_2D_ARRAY, (3, 2, 4, 4)))
-        for texture, target, shape in cases:
+    def test_each_kind_reads_its_texture_in_its_shape(self) -> None:
+        cases = ((allocated(Texture(), 5, GL_RGBA16F, GL_RGBA), (2, 4, 4)),
+                 (allocated(Texture3D(), 6, GL_R16F, GL_RED, 3), (3, 2, 4)),
+                 (allocated(Texture2DArray(), 7, GL_RGBA16F, GL_RGBA, 3), (3, 2, 4, 4)))
+        for texture, shape in cases:
             with self.subTest(type(texture).__name__):
-                self.gl.glGetTexImage.reset_mock()
+                self.gl.glGetTextureImage.reset_mock()
                 pixels = texture.read_to_numpy()
                 assert pixels is not None
                 self.assertEqual(pixels.shape, shape)
-                self.assertEqual(self.gl.glGetTexImage.call_args.args[0], target)
+                tex_id, level, _, _, size, _ = self.gl.glGetTextureImage.call_args.args
+                self.assertEqual((tex_id, level, size), (texture.tex_id, 0, pixels.nbytes))
+
+    def test_each_kind_binds_to_the_unit_it_is_given(self) -> None:
+        for texture in (allocated(Texture(), 5, GL_RGBA16F, GL_RGBA), allocated(Texture3D(), 6, GL_RGBA16F, GL_RGBA, 3),
+                        allocated(Texture2DArray(), 7, GL_RGBA16F, GL_RGBA, 3)):
+            with self.subTest(type(texture).__name__):
+                texture.bind(3)
+                self.gl.glBindTextureUnit.assert_called_with(3, texture.tex_id)
 
     def test_a_2d_read_is_flipped_to_the_images_rows(self) -> None:
         texture = allocated(Texture(), 5, GL_R16F, GL_RED)
-        self.gl.glGetTexImage.side_effect = lambda target, level, fmt, data_type, pixels: pixels.__setitem__(0, 1.0)
+        self.gl.glGetTextureImage.side_effect = lambda tex, level, fmt, data_type, size, pixels: pixels.__setitem__(0, 1.0)
         rows = texture.read_to_numpy()
         assert rows is not None
         self.assertEqual((rows[0, 0], rows[-1, 0]), (0.0, 1.0))

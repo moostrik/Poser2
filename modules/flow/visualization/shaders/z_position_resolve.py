@@ -1,6 +1,6 @@
 """Z Position Resolve shader: a z position as a monitor draws it."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUseProgram
+from OpenGL.GL import glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -11,6 +11,5 @@ class ZPositionResolve(Shader):
         if not self.allocated or not self.shader_program or not z_position.allocated:
             return
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, z_position.tex_id)
+        z_position.bind(0)
         draw_quad()

@@ -1,4 +1,4 @@
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform2f, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform2f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging
@@ -17,12 +17,9 @@ class Omission(Shader):
         glUseProgram(self.shader_program)
 
         # Bind input textures
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, tex1.tex_id)
-        glActiveTexture(GL_TEXTURE2)
-        glBindTexture(GL_TEXTURE_2D, mask.tex_id)
+        tex0.bind(0)
+        tex1.bind(1)
+        mask.bind(2)
 
         # Configure shader uniforms (using cached locations)
         glUniform1f(self.get_uniform_loc("bloom"), bloom)

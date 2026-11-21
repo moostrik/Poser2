@@ -3,7 +3,7 @@
 Writes the flow's velocity where a pixel moves and whether it moves, for a rise's region means.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUseProgram
+from OpenGL.GL import glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -19,6 +19,5 @@ class VelocityBandpassRegion2D(Shader):
         if not self.allocated or not self.shader_program or not velocity.allocated:
             return
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, velocity.tex_id)
+        velocity.bind(0)
         draw_quad()

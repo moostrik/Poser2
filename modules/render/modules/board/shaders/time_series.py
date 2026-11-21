@@ -3,7 +3,7 @@
 Draws one lane per series from the per-column lowest and highest samples.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform4fv, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUniform4fv, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -28,8 +28,7 @@ class TimeSeries(Shader):
 
         glUseProgram(self.shader_program)
 
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, ranges.tex_id)
+        ranges.bind(0)
 
         padded: list[float] = [component for color in (colors * 8)[:8] for component in color]
         glUniform1i(self.get_uniform_loc("numLanes"), num_lanes)

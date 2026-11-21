@@ -35,7 +35,7 @@ class BandpassChanges(ComputeShader):
             return
         glUseProgram(self.shader_program)
         for unit, texture in enumerate((fast, slow, rise_fast, rise_slow, fall_speeds)):
-            self.bind_texture(unit, texture)
+            texture.bind(unit)
         for unit, texture in enumerate((*speeds, *velocities)):
             self.bind_image_write(unit, texture)
         glUniform1f(self.get_uniform_loc("uScale"), scale)

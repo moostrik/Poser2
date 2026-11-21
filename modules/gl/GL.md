@@ -69,7 +69,8 @@ over a chain of passes owns its targets and sits in the kind of the shader it ch
 A shader's `.frag`, `.vert` or `.comp` source sits beside the `.py` that holds its class, named after it; the loader
 resolves it by that module name, and a shader without its own `.vert` takes the shared `shaders/_generic.vert`.
 Every sampler names its texture unit in the source, `layout(binding = N)`, and the Python binds its texture to that
-unit; no pass sets a sampler's unit with `glUniform1i`. A sampler in a shared include has one unit in every shader
+unit with `texture.bind(N)`, one `glBindTextureUnit`; no pass sets a sampler's unit with `glUniform1i` or changes
+the active unit. An upload writes a texture by its name (`glTextureSubImage2D`), without binding it. A sampler in a shared include has one unit in every shader
 that includes it.
 `ComputeShader` is a `Shader` with one stage, its `.comp`. A shader object is its own; its class's program is compiled
 once, at the class's first `allocate`, shared by every object of the class (`Shader._programs`), and freed at its last

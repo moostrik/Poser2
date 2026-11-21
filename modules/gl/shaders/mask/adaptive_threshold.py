@@ -1,6 +1,6 @@
 """AdaptiveThreshold: a threshold set per pixel by its neighborhood's mean and variance."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUseProgram
 from ... import Shader, draw_quad, Texture
 
 import logging
@@ -21,8 +21,7 @@ class AdaptiveThreshold(Shader):
             return
 
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, src.tex_id)
+        src.bind(0)
         glUniform1f(self.get_uniform_loc("threshold"), threshold)
         glUniform1f(self.get_uniform_loc("detailBoost"), detail_boost)
         glUniform1f(self.get_uniform_loc("radius"), radius)

@@ -3,7 +3,7 @@
 
 from typing import Sequence
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1fv, glUniform1i, glUniform2f, glUniform4f, glUniform4fv, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1fv, glUniform1i, glUniform2f, glUniform4f, glUniform4fv, glUseProgram
 from modules.gl import Shader, Texture, draw_quad
 
 import logging
@@ -35,10 +35,8 @@ class FaceColor(Shader):
 
         fields = fields[:MAX_FIELDS]
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, blurred.tex_id if blurred is not None and blurred.allocated else src.tex_id)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, src.tex_id)
+        (blurred if blurred is not None and blurred.allocated else src).bind(1)
+        src.bind(0)
         glUniform2f(self.get_uniform_loc("resolution"), float(width), float(height))
 
         if fields:

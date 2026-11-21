@@ -26,7 +26,7 @@ class FboTest(unittest.TestCase):
         # the texture under the framebuffer: allocated without GL
         allocate = mock.patch.object(TEXTURE.Texture, 'allocate', lambda tex, w, h, f: setattr(tex, 'allocated', True))
         deallocate = mock.patch.object(TEXTURE.Texture, 'deallocate', lambda tex: setattr(tex, 'allocated', False))
-        for patcher in (allocate, deallocate, mock.patch.object(FBO.Fbo, 'bind'), mock.patch.object(FBO.Fbo, 'unbind')):
+        for patcher in (allocate, deallocate):
             patcher.start()
             self.addCleanup(patcher.stop)
 

@@ -39,9 +39,7 @@ per app (about 45 s each) checks G1, I6 and G2 together: at each draw and dispat
 has a texture at its unit, the GL calls a frame against G0's, and no GL error in the log; a fault it finds is fixed
 in a commit of its own.
 
-- G2. Direct state access: `glBindTextureUnit` for a texture's bind and `glTextureSubImage2D` for its upload; the CUDA
-  upload in `tensor.py` from 6 calls to about 3, its `glGetError` behind the debug flag. Every caller of
-  `Texture.bind`/`unbind` moves with it. Check: `scripts/shader_check.py`, then the -sim runs above.
+- G2 is built (direct state access for binds and uploads); the -sim run per app above is still to run.
 
 ## Rules this plan touches
 

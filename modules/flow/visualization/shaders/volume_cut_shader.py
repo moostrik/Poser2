@@ -3,7 +3,7 @@
 A volume drawn flat: a slice at one layer, or its projection along one axis, the max or the mean.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_3D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Shader, Texture3D, draw_quad
 
 
@@ -27,8 +27,7 @@ class VolumeCutShader(Shader):
 
         glUseProgram(self.shader_program)
 
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_3D, volume.tex_id)
+        volume.bind(0)
 
         glUniform1i(self.get_uniform_loc("mode"), mode)
         glUniform1f(self.get_uniform_loc("position"), position)
@@ -36,4 +35,3 @@ class VolumeCutShader(Shader):
         glUniform1i(self.get_uniform_loc("velocity"), 1 if velocity else 0)
 
         draw_quad()
-        glBindTexture(GL_TEXTURE_3D, 0)

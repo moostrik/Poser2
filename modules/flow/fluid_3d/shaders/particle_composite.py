@@ -14,7 +14,7 @@ class ParticleComposite(ComputeShader):
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
-        self.bind_texture_2d_array(0, slices)
+        slices.bind(0)
         self.bind_image_write(0, output, GL_RGBA16F)
         glUniform1i(self.get_uniform_loc("uDepth"), depth)
         glUniform2i(self.get_uniform_loc("uOutputSize"), output.width, output.height)

@@ -17,7 +17,7 @@ except (ImportError, OSError):
 if TYPE_CHECKING:
     import torch
 
-from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_HALF_FLOAT, GL_LINEAR, GL_PIXEL_UNPACK_BUFFER, GL_R16F, GL_R32F, GL_R8, GL_RED, GL_RG, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_STREAM_DRAW, GL_TEXTURE_2D, GL_UNSIGNED_BYTE, glBindBuffer, glBindTexture, glBufferData, glDeleteBuffers, glGenBuffers, glGetError, glTexSubImage2D
+from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_PIXEL_UNPACK_BUFFER, GL_R16F, GL_R32F, GL_R8, GL_RED, GL_RG, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_STREAM_DRAW, glBindBuffer, glBufferData, glDeleteBuffers, glGenBuffers, glTextureSubImage2D
 
 # Local application imports
 from .texture import Texture
@@ -188,12 +188,9 @@ class Tensor(Texture):
                 self._update_with_cpu(tensor)
             else:
                 self._update_with_pbo(tensor)
-        except Exception as e:
+        except Exception:
             logger.exception("update() error, tensor shape: %s", tensor.shape if tensor is not None else 'None')
-        finally:
-            # Ensure clean OpenGL state
-            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
-            glBindTexture(GL_TEXTURE_2D, 0)
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)     # an upload that raised leaves no PBO bound
 
     def _update_with_pbo(self, tensor: "torch.Tensor") -> None:
         """GPU-to-GPU copy using CUDA-OpenGL interop.
@@ -252,18 +249,10 @@ class Tensor(Texture):
         format_map = {1: GL_RED, 2: GL_RG, 3: GL_RGB, 4: GL_RGBA}
         upload_format = format_map.get(channels, GL_RED)
 
-        # Upload PBO to texture (GPU-to-GPU via OpenGL driver)
+        # Upload PBO to texture (GPU-to-GPU via OpenGL driver); an error in it is logged at the call by GL's debug
+        # output, behind the window manager's `gl_debug`
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, self._pbo)
-        self.bind()
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.width, self.height, upload_format, gl_type, None)
-
-        # Check for OpenGL errors
-        err = glGetError()
-        if err != 0:
-            type_name = 'uint8' if gl_type == GL_UNSIGNED_BYTE else ('FP16' if gl_type == GL_HALF_FLOAT else 'FP32')
-            logger.error("OpenGL error after glTexSubImage2D: %s (channels=%s, format=%s, type=%s)", err, channels, upload_format, type_name)
-
-        self.unbind()
+        glTextureSubImage2D(self.tex_id, 0, 0, 0, self.width, self.height, upload_format, gl_type, None)
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
 
     def _update_with_cpu(self, tensor: "torch.Tensor") -> None:
@@ -303,7 +292,5 @@ class Tensor(Texture):
         upload_format = format_map.get(channels, GL_RED)
 
         # Upload to OpenGL texture
-        self.bind()
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.width, self.height, upload_format, gl_type, tensor_np)
-        self.unbind()
+        glTextureSubImage2D(self.tex_id, 0, 0, 0, self.width, self.height, upload_format, gl_type, tensor_np)
 

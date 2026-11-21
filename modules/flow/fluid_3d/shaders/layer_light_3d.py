@@ -40,13 +40,13 @@ class LayerLight3D(ComputeShader):
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
-        self.bind_texture_3d(0, light.volume)
+        light.volume.bind(0)
         glUniformMatrix4fv(self.get_uniform_loc("uLightMap"), 1, GL_TRUE, np.asarray(light.light_map, np.float32))
         glUniformMatrix4fv(self.get_uniform_loc("uSkyMap"), 1, GL_TRUE, np.asarray(sky_map, np.float32))
         bind_light(self, light, light.net)
         has_sky: bool = sky is not None and sky_fill > 0.0
         if has_sky and sky is not None:
-            self.bind_texture_3d(2, sky)
+            sky.bind(2)
         self.bind_image_3d_write(0, direct, GL_RGBA16F)
         if rays is not None:
             self.bind_image_3d_write(2, rays, GL_RGBA16F)

@@ -1,6 +1,6 @@
 """Divergence shader - Compute divergence of velocity field."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUniform2f, glUseProgram
 from modules.gl import Shader, StorageBuffer, draw_quad, Texture
 
 import logging
@@ -44,11 +44,8 @@ class Divergence(Shader):
         glUniform1f(self.get_uniform_loc("uWallKeep"), wall_keep)
 
         # Bind textures
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, velocity.tex_id)
-
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
+        velocity.bind(0)
+        obstacle.bind(1)
 
         # 1 / (2 × the cell), widths: a central difference over two cells
         half_rdx_x = 0.5 / cell[0]
@@ -59,8 +56,7 @@ class Divergence(Shader):
         glUniform1i(self.get_uniform_loc("uHasExpansion"), int(has_expansion))
         if has_expansion:
             assert expansion is not None
-            glActiveTexture(GL_TEXTURE2)
-            glBindTexture(GL_TEXTURE_2D, expansion.tex_id)
+            expansion.bind(2)
             glUniform1f(self.get_uniform_loc("uRate"), rate)
             glUniform1i(self.get_uniform_loc("uSubtractMean"), int(mean is not None))
             if mean is not None:

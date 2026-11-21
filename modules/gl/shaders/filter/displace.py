@@ -1,6 +1,6 @@
 """Displace: an image's pixels moved by a displacement map."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUseProgram
+from OpenGL.GL import glUniform1f, glUseProgram
 from ... import Shader, draw_quad, Texture
 
 import logging
@@ -18,9 +18,7 @@ class Displace(Shader):
         if not src.allocated or not map.allocated:
             return
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, src.tex_id)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, map.tex_id)
+        src.bind(0)
+        map.bind(1)
         glUniform1f(self.get_uniform_loc("amount"), amount)
         draw_quad()

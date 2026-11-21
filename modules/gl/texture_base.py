@@ -8,8 +8,9 @@ import numpy as np
 from OpenGL.GL import (Constant, GL_FLOAT, GL_HALF_FLOAT, GL_NONE, GL_ONE, GL_RED, GL_TEXTURE_BORDER_COLOR,
                        GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B,
                        GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNSIGNED_BYTE,
-                       GL_UNSIGNED_INT_2_10_10_10_REV, GL_UNSIGNED_SHORT, glBindTexture, glClearTexImage, glDeleteTextures,
-                       glGenTextures, glGetTexImage, glTexParameterfv, glTexParameteri)
+                       GL_UNSIGNED_INT_2_10_10_10_REV, GL_UNSIGNED_SHORT, glBindTexture, glBindTextureUnit, glClearTexImage,
+                       glDeleteTextures, glGenTextures, glGetTextureImage, glTexParameterfv, glTexParameteri,
+                       glTextureParameterfv, glTextureParameteri)
 
 from .texture_format import channel_count, data_type as texture_data_type, pixel_format
 
@@ -111,11 +112,9 @@ class TextureBase:
             return
         self._wrap = wrap
         self._border_color = border_color
-        glBindTexture(self.TARGET, self.tex_id)
-        glTexParameteri(self.TARGET, GL_TEXTURE_WRAP_S, wrap)
-        glTexParameteri(self.TARGET, GL_TEXTURE_WRAP_T, wrap)
-        glTexParameterfv(self.TARGET, GL_TEXTURE_BORDER_COLOR, border_color)
-        glBindTexture(self.TARGET, 0)
+        glTextureParameteri(self.tex_id, GL_TEXTURE_WRAP_S, wrap)
+        glTextureParameteri(self.tex_id, GL_TEXTURE_WRAP_T, wrap)
+        glTextureParameterfv(self.tex_id, GL_TEXTURE_BORDER_COLOR, border_color)
 
     def deallocate(self) -> None:
         if not self.allocated:
@@ -129,11 +128,9 @@ class TextureBase:
         glDeleteTextures(1, [self.tex_id])
         self.tex_id = 0
 
-    def bind(self) -> None:
-        glBindTexture(self.TARGET, self.tex_id)
-
-    def unbind(self) -> None:
-        glBindTexture(self.TARGET, 0)
+    def bind(self, unit: int) -> None:
+        """Bound to texture `unit` for sampling, its sampler's `layout(binding = unit)` (glBindTextureUnit)."""
+        glBindTextureUnit(unit, self.tex_id)
 
     def clear(self, r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 0.0) -> None:
         """Every texel set to the color, its channels from 0 to 1 (glClearTexImage, GL 4.4)."""
@@ -153,7 +150,5 @@ class TextureBase:
             return None
         channels: int = channel_count(self.internal_format)
         pixels = np.zeros(shape if channels == 1 else (*shape, channels), dtype=dtype)
-        self.bind()
-        glGetTexImage(self.TARGET, 0, self.format, self.data_type, pixels)
-        self.unbind()
+        glGetTextureImage(self.tex_id, 0, self.format, self.data_type, pixels.nbytes, pixels)
         return pixels

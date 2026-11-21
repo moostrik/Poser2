@@ -4,7 +4,7 @@ order."""
 import logging
 
 import numpy as np
-from OpenGL.GL import (GL_TEXTURE0, GL_TEXTURE_2D, GL_TRUE, glActiveTexture, glBindTexture, glUniform1f,
+from OpenGL.GL import (GL_TRUE, glUniform1f,
                        glUniformMatrix3fv, glUseProgram)
 
 from ... import Shader, draw_quad, Texture
@@ -24,8 +24,7 @@ class Grade(Shader):
             logger.warning("Grade shader: input texture not allocated.")
             return
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, src.tex_id)
+        src.bind(0)
         glUniformMatrix3fv(self.get_uniform_loc("white_balance"), 1, GL_TRUE, white_balance)
         glUniform1f(self.get_uniform_loc("exposure"), exposure)
         glUniform1f(self.get_uniform_loc("offset"), offset)

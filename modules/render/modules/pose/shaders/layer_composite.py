@@ -1,6 +1,6 @@
 """LayerComposite: up to three styled layers, added or each over the next."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUseProgram
+from OpenGL.GL import glUniform1f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -21,10 +21,8 @@ class LayerComposite(Shader):
         glUseProgram(self.shader_program)
 
         # Bind textures to slots 0-2
-        for i in range(3):
-            glActiveTexture(int(GL_TEXTURE0) + i)
-            if i < len(textures):
-                glBindTexture(GL_TEXTURE_2D, textures[i].tex_id)
+        for i, texture in enumerate(textures[:3]):
+            texture.bind(i)
 
         # Weights
         for i in range(3):

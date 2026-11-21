@@ -5,7 +5,7 @@ disparity carried along the motion and corrected by the mean over a window of de
 gate, with the misses in a row beside it.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUniform2f, glUseProgram
 
 from modules.gl import Shader, draw_quad, Texture
 from ...finite_guard import GuardSlot
@@ -46,18 +46,14 @@ class DepthVelocityShader(Shader):
 
         glUseProgram(self.shader_program)
 
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, depth.tex_id)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, track.tex_id)
-        glActiveTexture(GL_TEXTURE3)
-        glBindTexture(GL_TEXTURE_2D, misses.tex_id)
+        depth.bind(0)
+        track.bind(1)
+        misses.bind(3)
 
         warp: bool = displacement is not None and displacement.allocated
         if warp:
             assert displacement is not None
-            glActiveTexture(GL_TEXTURE2)
-            glBindTexture(GL_TEXTURE_2D, displacement.tex_id)
+            displacement.bind(2)
 
         glUniform1i(self.get_uniform_loc("warp"), int(warp))
         glUniform2f(self.get_uniform_loc("depth_step"), *depth_step)

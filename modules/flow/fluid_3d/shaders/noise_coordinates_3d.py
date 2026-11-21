@@ -18,8 +18,8 @@ class NoiseCoordinates3D(ComputeShader):
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
-        self.bind_texture_3d(0, velocity)
-        self.bind_texture_3d(1, source)
+        velocity.bind(0)
+        source.bind(1)
         self.bind_image_3d_write(0, result, GL_RGBA16F)
         glUniform1f(self.get_uniform_loc("uTimestep"), timestep)
         glUniform3f(self.get_uniform_loc("uRdx"), *rdx)

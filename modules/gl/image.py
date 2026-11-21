@@ -1,4 +1,4 @@
-from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_NONE, GL_ONE, GL_R16F, GL_R32F, GL_R8, GL_RED, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNPACK_ALIGNMENT, glBindTexture, glGenTextures, glPixelStorei, glTexImage2D, glTexParameterf, glTexParameterfv, glTexParameteri, glTexSubImage2D
+from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_NONE, GL_ONE, GL_R16F, GL_R32F, GL_R8, GL_RED, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNPACK_ALIGNMENT, glBindTexture, glGenTextures, glPixelStorei, glTexImage2D, glTexParameterf, glTexParameterfv, glTexParameteri, glTextureSubImage2D
 import logging
 from .fbo import Fbo
 from .texture import Texture
@@ -189,14 +189,12 @@ class Image(Fbo):
         if not self.allocated:
             return
 
-        # Upload image data to source texture using glTexSubImage2D (faster than glTexImage2D)
+        # Upload image data to source texture into its storage (faster than glTexImage2D)
         # numpy rows are tightly packed; OpenGL's default row alignment of 4 bytes shears any image
         # whose row isn't a multiple of 4 bytes (e.g. an 878 px wide BGR image)
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
-        self._source.bind()
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height,
-                        self._source.format, self._source.data_type, image)
-        self._source.unbind()
+        glTextureSubImage2D(self._source.tex_id, 0, 0, 0, width, height,
+                            self._source.format, self._source.data_type, image)
 
         # Render flipped to FBO using modern shader
         self.begin()

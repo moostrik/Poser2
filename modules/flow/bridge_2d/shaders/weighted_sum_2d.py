@@ -4,11 +4,10 @@ The 2D bridge's mix: up to seven sources, each times its weight, summed; or, for
 source's xy times its weight, summed.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4, GL_TEXTURE5, GL_TEXTURE6, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1fv, glUniform1i, glUniform1iv, glUseProgram
+from OpenGL.GL import glUniform1fv, glUniform1i, glUniform1iv, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 MAX_SOURCES: int = 7
-UNITS: tuple[int, ...] = (GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4, GL_TEXTURE5, GL_TEXTURE6)
 
 
 class WeightedSum2D(Shader):
@@ -36,8 +35,7 @@ class WeightedSum2D(Shader):
             texture, weight = sources[unit] if unit < len(sources) else (sources[0][0], 0.0)
             weights[unit] = weight
             scalar[unit] = int(len(sources) - scalars <= unit < len(sources))
-            glActiveTexture(UNITS[unit])
-            glBindTexture(GL_TEXTURE_2D, texture.tex_id)
+            texture.bind(unit)
         glUniform1fv(self.get_uniform_loc("weights"), MAX_SOURCES, weights)
         glUniform1iv(self.get_uniform_loc("scalars"), MAX_SOURCES, scalar)
         glUniform1i(self.get_uniform_loc("lengths"), int(lengths))

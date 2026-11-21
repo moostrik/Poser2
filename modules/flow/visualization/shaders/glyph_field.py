@@ -4,7 +4,7 @@ Glyphs on a grid, procedural, without geometry shaders: arrows for a velocity, d
 Ported from ofxFlowTools visualization concepts.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, GL_VIEWPORT, glActiveTexture, glBindTexture, glGetIntegerv, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import GL_VIEWPORT,glGetIntegerv, glUniform1f, glUniform1i, glUniform2f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -37,8 +37,7 @@ class GlyphField(Shader):
 
         viewport = glGetIntegerv(GL_VIEWPORT)
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, texture.tex_id)
+        texture.bind(0)
 
         glUniform1i(self.get_uniform_loc("xyz"), 1 if xyz else 0)
         glUniform1i(self.get_uniform_loc("dots"), 1 if dots else 0)

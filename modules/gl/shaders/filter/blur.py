@@ -1,6 +1,6 @@
 """Blur: one pass of a separable Gaussian blur, across or down."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform2f, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform2f, glUseProgram
 from ... import Shader, draw_quad, Texture
 
 import logging
@@ -22,8 +22,7 @@ class Blur(Shader):
             return
 
         glUseProgram(self.shader_program)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, src.tex_id)
+        src.bind(0)
         glUniform2f(self.get_uniform_loc("direction"), *((1.0, 0.0) if horizontal else (0.0, 1.0)))
         glUniform1f(self.get_uniform_loc("spacing"), sigma / KERNEL_SIGMA)
         draw_quad()
