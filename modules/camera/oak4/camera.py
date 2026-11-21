@@ -13,6 +13,7 @@ from numpy import ndarray
 
 from .. import CameraResolution, CameraFrame, DepthAlignment, FrameReadings, RigCameraReadings, CameraTracklet, CameraTracklets, FrameType, CameraFrameCallback, \
     TrackletCallback, TiltCorrection
+from ..capture_clock import capture_time, smoothed_latency
 from ..geometry import MountReadout, frame_window, frame_coverage, coverage_summary, delivered_height, lens_field, \
     rectilinear_field, lens_deviation
 from modules.utils import Broadcast, FPS, Rect
@@ -20,7 +21,7 @@ from modules.utils import Broadcast, FPS, Rect
 from .control import DepthControl, SensorControl
 from .device import get_device_list, find_device, link_name, link_resolution, log_connected_sensors, read_lens_calibration, CameraLink
 from .imu import imu_rotation_to_camera, IMU_BOARD_ROLL
-from .messages import packed_nv12, smoothed_latency, capture_time
+from .messages import packed_nv12
 from .models import ModelChain, model_archives, TRACKING_STATUS, tracklet_keypoints, keypoints_in_frame
 from .sensor import SENSOR_SOCKET, requested_size, DepthModel
 from .pipeline import build_pipeline, delivered_size, MountConfig, PipelineOutputs, DEPTH_STREAM, CONFIDENCE_STREAM

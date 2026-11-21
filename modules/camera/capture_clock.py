@@ -1,10 +1,11 @@
-"""What a depthai 2 message holds, as the backend hands it on: its moment of capture and its latency."""
+"""A depthai message's moment of capture and its latency on our clock, for the OAK backends (depthai 2 and 3 alike).
+Only the backends import it: the contract (`__init__.py`) never loads depthai."""
 
 import logging
 import time
 from collections.abc import Callable
 from datetime import timedelta
-from typing import cast
+from typing import Protocol, cast
 
 import depthai as dai
 
@@ -16,9 +17,15 @@ _future_capture_warned: bool = False     # a capture time after now is logged on
 clock_now: Callable[[], timedelta] = cast(Callable[[], timedelta], dai.Clock.now)  # static; the stub says a method
 
 
-def capture_time(message: dai.ImgFrame | dai.Tracklets) -> float:
-    """The message's moment of capture on `time.perf_counter()`: now less the message's age on depthai's clock,
-    which holds the device's capture time on the host's. A capture time after now cannot be, so such a message is
+class TimedMessage(Protocol):
+    """A depthai message: its capture on depthai's clock."""
+    def getTimestamp(self) -> timedelta: ...
+
+
+def capture_time(message: TimedMessage) -> float:
+    """The message's moment of capture (the end of the exposure) on `time.perf_counter()`: now less the message's age
+    on depthai's clock, which holds the device's capture time on the host's. The two clocks need no common origin; on
+    Windows they are one counter, 3 µs apart (OAK4.md). A capture time after now cannot be, so such a message is
     stamped with its arrival instead."""
     global _future_capture_warned
     now: float = time.perf_counter()
@@ -32,7 +39,7 @@ def capture_time(message: dai.ImgFrame | dai.Tracklets) -> float:
     return now
 
 
-def smoothed_latency(previous: float, message: dai.ImgFrame | dai.Tracklets) -> float:
+def smoothed_latency(previous: float, message: TimedMessage) -> float:
     """The latency reading in ms after this message, capture to arrival, on depthai's clock because the message's
     timestamp is. A reading for the panel; the frame's time is `capture_time`."""
     latency: float = (clock_now() - message.getTimestamp()).total_seconds() * 1000.0

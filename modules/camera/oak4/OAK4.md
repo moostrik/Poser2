@@ -104,7 +104,7 @@ Latency is `dai.Clock.now()` minus the message's timestamp, on depthai's clock, 
 
 ### Capture time
 
-Every frame and tracklet message is stamped with its moment of capture on `perf_counter` (`messages.capture_time`): now less the message's latency. The message's timestamp is the end of the exposure. Color and depth of one capture carry the same time, so time pairs them (`CAPTURE_TOLERANCE`, 2 ms). Sequence numbers do not: depth's skip while every frame arrives.
+Every frame and tracklet message is stamped with its moment of capture on `perf_counter` (`capture_clock.capture_time`): now less the message's latency. The message's timestamp is the end of the exposure. Color and depth of one capture carry the same time, so time pairs them (`CAPTURE_TOLERANCE`, 2 ms). Sequence numbers do not: depth's skip while every frame arrives.
 
 Measured over 90 s, deep_flow's setup (P720 color NV12 at 60 fps, the detector, NEURAL_480, flood light 1.0), USB:
 

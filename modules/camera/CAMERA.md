@@ -300,7 +300,8 @@ whatever blob is in use. The input size is read off the blob, so a file name and
 | `camera_health.py`   | `CameraHealth`, `CameraHealthSettings`                                                       |
 | `capture_match.py`   | `CaptureStream`, `MissedParts`: the parts of a capture matched by time, for the syncs        |
 | `depthai_backend.py` | `oak_backend`, `require_backend`                                                             |
-| `geometry/`          | `sensor_modes`, `lens`, `frame_window`, `warp`, `orientation`, `tilt_correction`, `mirror`,  |
+| `capture_clock.py`   | `capture_time`, `smoothed_latency`: a depthai message's capture and latency, for both OAKs   |
+| `geometry/`          | `sensor_modes`, `lens`, `frame_window`, `warp`, `orientation`, `tilt_correction`, `flips`,   |
 |                      | `depth_projection`                                                                           |
 | `oak/`               | the OAK-D: `camera`, `clip_camera`, `control`, `pipeline`, `settings`, `sensor`, `device`,   |
 |                      | `imu`, `models`                                                                              |

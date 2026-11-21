@@ -9,6 +9,7 @@ from numpy import ndarray
 
 from .. import CameraResolution, CameraFrame, RigCameraReadings, CameraTracklet, CameraTracklets, FrameType, CameraFrameCallback, \
     TrackletCallback
+from ..capture_clock import capture_time, smoothed_latency
 from ..geometry import MountReadout, mode_size, frame_size, frame_window, frame_coverage, coverage_summary, \
     delivered_height, lens_field, lens_deviation
 from modules.utils import Broadcast, FPS, Rect
@@ -16,7 +17,6 @@ from modules.utils import Broadcast, FPS, Rect
 from .control import SensorControl
 from .device import get_device_list, log_connected_sensors, read_lens_calibration
 from .imu import imu_rotation_to_camera, IMU_BOARD_ROLL
-from .messages import capture_time, smoothed_latency
 from .models import TRACKING_STATUS
 from .pipeline import build_pipeline, MountConfig, VIDEO_STREAM, TRACKLETS_STREAM, IMU_STREAM, CONTROL_STREAM
 from .settings import OakCameraSettings
