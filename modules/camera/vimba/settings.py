@@ -17,8 +17,8 @@ class VimbaCameraSettings(CameraSettings):
     dropped_frames:    Field[int]   = Field(0, access=Field.READ, newline=True, description="Frames that arrived incomplete and were skipped, since the start")
     exposure:          Field[float] = Field(0.0, access=Field.READ, description="Exposure time the camera uses now, in µs")
     gain:              Field[float] = Field(0.0, access=Field.READ, description="Gain the camera uses now, in dB")
-    WB_red:            Field[float] = Field(0.0, access=Field.READ, description="White balance red ratio the camera uses now")
-    WB_blue:           Field[float] = Field(0.0, access=Field.READ, description="White balance blue ratio the camera uses now")
+    balance_red:       Field[float] = Field(0.0, access=Field.READ, description="White balance red ratio the camera uses now")
+    balance_blue:      Field[float] = Field(0.0, access=Field.READ, description="White balance blue ratio the camera uses now")
 
     # exposure and gain: auto lengthens the exposure first (up to its max), then adds gain
     target_brightness: Field[int]   = Field(40, min=0, max=100, step=1, newline=True, description="Brightness that auto exposure and auto gain aim for (0-100)")
@@ -31,10 +31,10 @@ class VimbaCameraSettings(CameraSettings):
     auto_gain:         Field[bool]  = Field(False, widget=Widget.switch, description="Automatic gain")
     gain_max:          Field[float] = Field(15.0, min=0.0, max=30.0, step=0.1, description="Most gain auto may add, in dB")
 
-    manual_WB_red:     Field[float] = Field(1.0, min=0.5, max=4.0, step=0.01, newline=True, description="White balance red ratio (auto off)", access=Field.READWRITE)
-    manual_WB_blue:    Field[float] = Field(1.0, min=0.5, max=4.0, step=0.01, description="White balance blue ratio (auto off)", access=Field.READWRITE)
-    auto_WB:           Field[bool]  = Field(False, widget=Widget.switch, description="Continuous automatic white balance")
-    set_WB:            Field[bool]  = Field(False, widget=Widget.button, description="Measure the white balance once and keep it (auto off)")
+    manual_balance_red:  Field[float] = Field(1.0, min=0.5, max=4.0, step=0.01, newline=True, description="White balance red ratio (auto off)", access=Field.READWRITE)
+    manual_balance_blue: Field[float] = Field(1.0, min=0.5, max=4.0, step=0.01, description="White balance blue ratio (auto off)", access=Field.READWRITE)
+    auto_balance:      Field[bool]  = Field(False, widget=Widget.switch, description="Continuous automatic white balance")
+    measure_balance:   Field[bool]  = Field(False, widget=Widget.button, description="Measure the white balance once and keep it (auto off)")
 
     saturation:    Field[float]     = Field(1.0, min=0.0, max=2.0, step=0.01, newline=True, description="Color saturation (1 = unchanged)")
     hue:           Field[float]     = Field(0.0, min=-40.0, max=40.0, step=0.5, description="Hue rotation in degrees")

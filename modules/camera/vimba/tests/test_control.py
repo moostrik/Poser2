@@ -73,7 +73,7 @@ class TestSensorControl(unittest.TestCase):
         self.control.close()
 
     def test_sends_everything_once_then_only_what_changed(self):
-        self.settings.manual_WB_red = 1.5
+        self.settings.manual_balance_red = 1.5
         self.control.update(self.camera)
         self.assertEqual(self.camera.written('GainAuto'), ['Off'])
         self.assertEqual(self.camera.written('AcquisitionFrameRateAbs'), [30.0])     # `fps`
@@ -128,8 +128,8 @@ class TestSensorControl(unittest.TestCase):
         self.camera.ratios = {'Red': 1.61, 'Blue': 2.04}
         self.control._read_next = 0.0
         self.control.update(self.camera)
-        self.assertEqual(self.settings.WB_red, 1.61)
-        self.assertEqual(self.settings.WB_blue, 2.04)
+        self.assertEqual(self.settings.balance_red, 1.61)
+        self.assertEqual(self.settings.balance_blue, 2.04)
 
     def test_the_frame_rate_and_the_dropped_frames_are_counted(self):
         self.control.update(self.camera)
@@ -158,7 +158,7 @@ class TestSensorControl(unittest.TestCase):
 
     def test_clamps_to_the_range_of_the_feature(self):
         self.settings.gamma = 3.0
-        self.settings.manual_WB_blue = 0.5
+        self.settings.manual_balance_blue = 0.5
         self.control.update(self.camera)
         self.assertEqual(self.camera.written('Gamma'), [1.5])
         self.assertEqual(self.camera.ratios['Blue'], 0.8)
@@ -169,7 +169,7 @@ class TestSensorControl(unittest.TestCase):
         self.control.update(camera)
         self.assertEqual(camera.written('Saturation'), [1.0])
         self.settings.hue = 20.0
-        self.settings.manual_WB_red = 2.0
+        self.settings.manual_balance_red = 2.0
         self.control.update(camera)
         self.assertEqual(camera.written('Hue'), [])
         self.assertEqual(camera.ratios['Red'], 1.0)
@@ -188,7 +188,7 @@ class TestSensorControl(unittest.TestCase):
         self.control._retry = {key: 0.0 for key in self.control._retry}
         self.control.update(self.camera)
         self.assertEqual(self.camera.written('Hue'), [10.0])
-        self.settings.manual_WB_red = 2.0
+        self.settings.manual_balance_red = 2.0
         self.control.update(self.camera)
         self.assertEqual(self.camera.ratios['Red'], 2.0)
 
@@ -212,25 +212,25 @@ class TestSensorControl(unittest.TestCase):
         self.assertEqual(len(logs.output), 1)
 
     def test_auto_owns_the_ratios_and_the_panel_takes_them_back(self):
-        self.settings.auto_WB = True
-        self.settings.manual_WB_red = 2.0
+        self.settings.auto_balance = True
+        self.settings.manual_balance_red = 2.0
         self.control.update(self.camera)
         self.assertEqual(self.camera.written('BalanceWhiteAuto'), ['Continuous'])
         self.assertEqual(self.camera.written('BalanceRatioAbs'), [])
 
-        self.settings.auto_WB = False
+        self.settings.auto_balance = False
         self.control.update(self.camera)
         self.assertEqual(self.camera.written('BalanceWhiteAuto'), ['Continuous', 'Off'])
         self.assertEqual(self.camera.ratios['Red'], 2.0)
 
     def test_set_white_balance_measures_once_and_stores_the_ratios(self):
         self.control.update(self.camera)
-        VimbaCameraSettings.set_WB.fire(self.settings)
+        VimbaCameraSettings.measure_balance.fire(self.settings)
         self.control.update(self.camera)
         self.assertEqual(self.camera.features['BalanceWhiteAuto'].value, 'Once')
 
         # still measuring: the panel's ratios are not sent
-        self.settings.manual_WB_red = 2.5
+        self.settings.manual_balance_red = 2.5
         self.control.update(self.camera)
         self.assertEqual(self.camera.ratios['Red'], 1.0)
 
@@ -238,8 +238,8 @@ class TestSensorControl(unittest.TestCase):
         self.camera.ratios = {'Red': 1.83, 'Blue': 2.41}
         self.camera.features['BalanceWhiteAuto'].value = 'Off'
         self.control.update(self.camera)
-        self.assertEqual(self.settings.manual_WB_red, 1.83)
-        self.assertEqual(self.settings.manual_WB_blue, 2.41)
+        self.assertEqual(self.settings.manual_balance_red, 1.83)
+        self.assertEqual(self.settings.manual_balance_blue, 2.41)
 
         self.camera.writes.clear()
         self.control.update(self.camera)

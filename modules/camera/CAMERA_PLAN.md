@@ -11,11 +11,6 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 
 ## C. Small fixes to the rules
 
-- C4. The Vimba white balance fields take the backends' word, `balance`, in snake case: `WB_red` / `WB_blue` →
-  `balance_red` / `balance_blue`, `manual_WB_red` / `manual_WB_blue` → `manual_balance_red` / `manual_balance_blue`,
-  `auto_WB` → `auto_balance`, `set_WB` → `measure_balance` **(seen: `vimba/settings.py`)**. Why: PEP 8, and "use
-  that one term everywhere": `oak` and `oak4` say `balance`, `auto_balance`. smile's `Smile.json`, `Studio.json` and
-  `GenerationTest.json` hold the keys and are migrated; `Grintest.json` has none **(seen)**.
 - C5. The fields without a description get one: `OakCameraSettings.square`, `yolo`, `model_path`,
   `Oak4CameraSettings.model_path` **(seen)**. Why: "Keep `Field` descriptions to one short line of panel text".
 - C6. `CameraHealth` keeps its settings as `self.settings`, not `self._settings` **(seen)**. Why: the glossary, "A
@@ -89,7 +84,6 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 ## Rules it touches
 
 - Inside a package, code that does the same is written once: E2
-- Follow PEP 8; one term everywhere; keep settings files in sync: C4
 - Keep `Field` descriptions to one short line of panel text: C5
 - The glossary: C6, C8
 - Use `Lock` and `Event` for shared mutable state; prefer `IntEnum` over string keys: C7

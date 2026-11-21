@@ -210,7 +210,7 @@ and the flips are flags on the frame, applied where it is shown. A feature the c
 camera refuses (a value it does not take, a control channel that timed out) or a failed read is a warning once per
 reason, and is tried again, not switched off. Exposure and gain each have auto, a manual value sent while auto is
 off, a limit for auto and a readout of what the camera uses; both autos aim for `target_brightness`, exposure
-first and gain after it. "Set WB" lets the camera measure its white balance once and takes the ratios into the
+first and gain after it. `measure_balance` lets the camera measure its white balance once and takes the ratios into the
 panel.
 
 ## The cameras' health

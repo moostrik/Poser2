@@ -35,10 +35,10 @@ class SensorControl:
         self._frame_at: float | None = None     # when the last complete frame arrived
         self._worst_gap: float = 0.0            # longest wait between two complete frames since the last read
 
-        self.settings.bind(VimbaCameraSettings.set_WB, self._on_wb_set)
+        self.settings.bind(VimbaCameraSettings.measure_balance, self._on_measure_balance)
 
     def close(self) -> None:
-        self.settings.unbind(VimbaCameraSettings.set_WB, self._on_wb_set)
+        self.settings.unbind(VimbaCameraSettings.measure_balance, self._on_measure_balance)
 
     def reset(self) -> None:
         """The camera was opened and its user set loaded (at the start, or again after its frames
@@ -116,20 +116,20 @@ class SensorControl:
         red: float | None = self._get_ratio(camera, 'Red')
         blue: float | None = self._get_ratio(camera, 'Blue')
         if red is not None:
-            s.WB_red = round(red, 2)
+            s.balance_red = round(red, 2)
         if blue is not None:
-            s.WB_blue = round(blue, 2)
+            s.balance_blue = round(blue, 2)
 
     def _white_balance(self, camera: Any) -> None:
         s: VimbaCameraSettings = self.settings
-        wb_auto: bool = s.auto_WB
-        self._sync('wb_auto', wb_auto, lambda v: self._set(camera, 'BalanceWhiteAuto', 'Continuous' if v else 'Off'))
-        if wb_auto:
+        balance_auto: bool = s.auto_balance
+        self._sync('balance_auto', balance_auto, lambda v: self._set(camera, 'BalanceWhiteAuto', 'Continuous' if v else 'Off'))
+        if balance_auto:
             # the camera owns the ratios: the panel's are sent again when auto goes off
             self._measure.clear()
             self._measure_end = None
-            self._applied.pop('wb_red', None)
-            self._applied.pop('wb_blue', None)
+            self._applied.pop('balance_red', None)
+            self._applied.pop('balance_blue', None)
             return
 
         if self._measure.is_set():
@@ -140,8 +140,8 @@ class SensorControl:
             self._measuring(camera)
             return
 
-        self._sync('wb_red', float(s.manual_WB_red), lambda v: self._set_ratio(camera, 'Red', v))
-        self._sync('wb_blue', float(s.manual_WB_blue), lambda v: self._set_ratio(camera, 'Blue', v))
+        self._sync('balance_red', float(s.manual_balance_red), lambda v: self._set_ratio(camera, 'Red', v))
+        self._sync('balance_blue', float(s.manual_balance_blue), lambda v: self._set_ratio(camera, 'Blue', v))
 
     def _measuring(self, camera: Any) -> None:
         """Wait for the camera to finish its measurement, then take its ratios into the panel."""
@@ -162,11 +162,11 @@ class SensorControl:
         red: float | None = self._get_ratio(camera, 'Red')
         blue: float | None = self._get_ratio(camera, 'Blue')
         if red is not None:
-            s.manual_WB_red = round(red, 2)
-            self._applied['wb_red'] = float(s.manual_WB_red)
+            s.manual_balance_red = round(red, 2)
+            self._applied['balance_red'] = float(s.manual_balance_red)
         if blue is not None:
-            s.manual_WB_blue = round(blue, 2)
-            self._applied['wb_blue'] = float(s.manual_WB_blue)
+            s.manual_balance_blue = round(blue, 2)
+            self._applied['balance_blue'] = float(s.manual_balance_blue)
 
     def _sync(self, key: str, value: Any, write: Callable[[Any], Any]) -> None:
         """Write the value when it is not the one the camera has. A write that did not get through is
@@ -257,5 +257,5 @@ class SensorControl:
         self._problem(name, None)
         return value
 
-    def _on_wb_set(self, _: Any = None) -> None:
+    def _on_measure_balance(self, _: Any = None) -> None:
         self._measure.set()
