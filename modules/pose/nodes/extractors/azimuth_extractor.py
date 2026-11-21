@@ -14,7 +14,7 @@ class AzimuthExtractor(FilterNode):
     ``column_to_azimuth(cam_id, x)`` maps a normalised image column of a camera to a world
     azimuth in radians; it is the camera geometry, injected so this module stays camera-agnostic.
     ``BBox`` must be the crop rect the keypoints are normalised in, so a keypoint's image column
-    is ``bbox.x + point.x * bbox.width`` and the box centre's is ``bbox.x + bbox.width / 2``.
+    is ``bbox.x + point.x * bbox.width`` and the box center's is ``bbox.x + bbox.width / 2``.
 
     ``BBoxAzimuth`` is shifted by the difference between the two columns' azimuths rather than
     replaced by the eyes' own, so whatever the producer did to it (fusing two cameras' views at a
@@ -39,7 +39,7 @@ class AzimuthExtractor(FilterNode):
         return replace(pose, {Azimuth: Azimuth.from_value(bbox_azimuth.value + delta, bbox_azimuth.score)})
 
     def _eye_delta(self, pose: Frame) -> float:
-        """Azimuth of the eye column less that of the box centre; 0.0 without a box or eyes."""
+        """Azimuth of the eye column less that of the box center; 0.0 without a box or eyes."""
         rect = pose[BBox].to_rect()
         if math.isnan(rect.x) or math.isnan(rect.width):
             return 0.0

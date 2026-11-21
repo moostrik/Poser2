@@ -780,7 +780,7 @@ def head_row(height_m: float, distance: float) -> float:
 def synth_observation(cam_id: int, world_azimuth: float, radius: float,
                       person_height: float | None = None) -> tuple[Rect, float]:
     """Build the ROI a camera on the rig would report for a person standing at
-    ``world_azimuth`` degrees, ``radius`` m from the rig centre. Returns the ROI and the true
+    ``world_azimuth`` degrees, ``radius`` m from the rig center. Returns the ROI and the true
     camera->person distance.
 
     Inverts the tracker's own projection so the parallax correction can be checked against
@@ -840,7 +840,7 @@ class TestOverlapBand(unittest.TestCase):
         self.assertGreater(g.overlap_azimuth, g.overlap_band)
 
     def test_zero_camera_radius_is_the_bare_field_at_any_zone(self) -> None:
-        # With the cameras at the centre there is no depth question left to ask, so the band is
+        # With the cameras at the center there is no depth question left to ask, so the band is
         # exact and the whole derivation collapses. This is why the FOV-110 fixtures above, which
         # leave `camera_radius` at 0, are untouched by any of this.
         for zone in ((1.5, 3.5), (1.0, 50.0), (0.5, 0.75)):
@@ -986,7 +986,7 @@ class TestRigParallax(unittest.TestCase):
         self.assertAlmostEqual(world, expected, places=6)
 
     def test_column_to_azimuth_is_the_box_center_chain(self) -> None:
-        # A keypoint's column goes through the same projection as a box centre, so the two are
+        # A keypoint's column goes through the same projection as a box center, so the two are
         # comparable — the premise of shifting a pose's azimuth by their difference.
         g = self.make_rig()
         for cam_id in range(4):
@@ -1291,7 +1291,7 @@ class TestRejectedDetections(RigTrackerCase):
         observation = self.tracker.observations.live(0, 1)
         assert observation is not None and isinstance(observation.annotation, PanoramicAnnotation)
         self.assertEqual(observation.annotation.rejected, Rejection.PAST_EDGE)
-        self.assertEqual(self.rejected(), {})                    # one mark, not a second grey line
+        self.assertEqual(self.rejected(), {})                    # one mark, not a second gray line
         self.seen(3.0)
         observation = self.tracker.observations.live(0, 1)
         assert observation is not None and isinstance(observation.annotation, PanoramicAnnotation)
@@ -1299,7 +1299,7 @@ class TestRejectedDetections(RigTrackerCase):
 
     def test_a_tracked_person_whose_box_shrinks_goes_lost_on_their_own_mark(self) -> None:
         # The same as walking out: LOST, the clock not restarted, rejection kept — not frozen as TRACKED
-        # beside a grey duplicate.
+        # beside a gray duplicate.
         self.seen(3.0, seconds_ago=0.5)
         before = self.tracker.observations.live(0, 1)
         self.seen(3.0, height=self.settings.height_filter / 2.0)
@@ -1553,7 +1553,7 @@ class TestRigHeight(unittest.TestCase):
         self.assertTrue(height_is_measured(g.estimate_height(tall)))
 
     def test_two_cameras_at_a_seam_agree_in_metres(self) -> None:
-        """The point of measuring in metres. A person in an overlap but off the seam centre is at
+        """The point of measuring in metres. A person in an overlap but off the seam center is at
         genuinely different distances from the two cameras, so their pixel box heights differ —
         which a gate on frame fractions could not tell from two different people — while the
         measured heights agree exactly. The azimuths keep both boxes wholly inside both frames:
@@ -1791,7 +1791,7 @@ class TestReachReadouts(unittest.TestCase):
     mistake in `camera_bearing`, `focus_distance` or the bisection shows up here.
     """
 
-    # A frame TALLER than the sensor's reach: P720 at tilt 15 fills 944 rows on the centre column,
+    # A frame TALLER than the sensor's reach: P720 at tilt 15 fills 944 rows on the center column,
     # so on the 960 it delivers (aligned to 16) the sensor ends the picture at the top — and its top
     # edge falls toward the sides. The configuration where the seam reach differs most from the axis.
     SRC = (1280, 720)

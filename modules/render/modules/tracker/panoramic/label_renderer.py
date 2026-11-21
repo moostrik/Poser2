@@ -14,10 +14,10 @@ _MARK_GAP_PX: float = 6.0    # between a label and the line it belongs to
 class LabelRenderer(LayerBase):
     """Each mark's label, laid out so labels never overlap and never lie about a bearing.
 
-    **Height is the player slot.** A label's lane is its player slot, the same index its colour
+    **Height is the player slot.** A label's lane is its player slot, the same index its color
     comes from, so two different people can never collide however they move, no label shifts when
     someone else arrives or leaves, and height becomes a second reading of *who* — useful where four
-    track colours are hard to tell apart against a bright stitch. An unoccupied slot is simply a
+    track colors are hard to tell apart against a bright stitch. An unoccupied slot is simply a
     gap. Marks outside the lanes — rejected detections and people waiting for a slot — are labeled
     at the top of their own line instead (`_draw_line_label`).
 

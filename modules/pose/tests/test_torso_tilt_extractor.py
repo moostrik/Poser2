@@ -34,7 +34,7 @@ def _frame(hip_mid: tuple[float, float], shoulder_mid: tuple[float, float],
 
 
 def _lean(angle: float, spine: float = 0.4) -> Frame:
-    """Hips at the crop centre, shoulders ``spine`` (isotropic units) up the spine leaning
+    """Hips at the crop center, shoulders ``spine`` (isotropic units) up the spine leaning
     ``angle`` radians toward image right — built in isotropic space, then squashed back
     to crop coordinates (y × aspect) so the extractor has to undo it."""
     hx, hy = 0.5, 0.7

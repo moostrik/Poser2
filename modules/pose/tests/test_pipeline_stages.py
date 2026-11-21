@@ -293,7 +293,7 @@ class PipelineStagesTest(unittest.TestCase):
         self.assertEqual({ft for ft in FEATURES if ft in f}, expected)
 
     def test_azimuth_is_derived_at_clean_and_carried_to_lerp(self) -> None:
-        # The skeleton's eyes sit on the box centre and the test projection is the identity, so the eye
+        # The skeleton's eyes sit on the box center and the test projection is the identity, so the eye
         # azimuth equals the bbox azimuth wherever it exists.
         for _, _, f in self._frames('raw'):
             self.assertNotIn(Azimuth, f)

@@ -153,9 +153,9 @@ class RigSync:
     def _publish_reach(self) -> None:
         """How near the fixture a person can stand and still be in frame — the tilt's trade, live.
 
-        Feet on the camera axis only: the frame is pinned at the sensor's lowest centre-column
+        Feet on the camera axis only: the frame is pinned at the sensor's lowest center-column
         reach, so the bottom row is covered at every bearing. Raised hands on the axis and on the
-        seam, the worse of the seam's two sides (a lens-centre offset makes them differ): the
+        seam, the worse of the seam's two sides (a lens-center offset makes them differ): the
         sensor's top edge falls toward the frame edges, and a seam is where people cross.
         """
         top, bottom = self._picture_edges

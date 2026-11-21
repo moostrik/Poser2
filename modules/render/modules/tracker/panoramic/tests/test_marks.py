@@ -2,7 +2,7 @@
 
 `marks.py` is arithmetic with no GL in it, which is why it can be tested at all — the renderers
 around it cannot be, without a context. What is worth pinning here is the part a reader of the
-display has to be able to trust: **two fields of one colour that overlap are two observations the
+display has to be able to trust: **two fields of one color that overlap are two observations the
 tracker will join.** That is a claim about two separate pieces of code agreeing, so it is asserted
 against `Tracker`'s own gate rather than against a second copy of the same comparison.
 """
@@ -167,7 +167,7 @@ class TestRejectedDetections(unittest.TestCase):
 
 class TestWaitingForASlot(unittest.TestCase):
     """A person tracked but waiting for a player slot keeps their own line and field, in the
-    waiting colour and labeled `waiting` — on the strip, belonging to no slot yet."""
+    waiting color and labeled `waiting` — on the strip, belonging to no slot yet."""
 
     def test_a_waiting_mark_has_the_waiting_colour_and_label(self) -> None:
         t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=False, player=None), id=6)
@@ -180,7 +180,7 @@ class TestWaitingForASlot(unittest.TestCase):
         self.assertTrue(m.label.endswith(' waiting'))
 
     def test_the_colour_and_label_are_the_slot_not_the_world(self) -> None:
-        # The same index the pose figures colour by, so the strip and the pose row cannot disagree;
+        # The same index the pose figures color by, so the strip and the pose row cannot disagree;
         # the world id is unbounded and never displayed.
         colors = [(1.0, 0.0, 0.0, 1.0), (0.0, 1.0, 0.0, 1.0)]
         t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=False, player=1), id=7)
@@ -192,8 +192,8 @@ class TestWaitingForASlot(unittest.TestCase):
 
 
 class TestLostFade(unittest.TestCase):
-    """A LOST observation's line fades from its world colour to gray over `lost_timeout`, and its
-    field fades out, keeping its colour."""
+    """A LOST observation's line fades from its world color to gray over `lost_timeout`, and its
+    field fades out, keeping its color."""
 
     def lost(self, seconds_lost: float, status: TrackingStatus = TrackingStatus.LOST) -> Mark:
         t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=False, status=status),
@@ -229,7 +229,7 @@ class TestLostFade(unittest.TestCase):
         self.assertAlmostEqual(a, 0.8)
 
     def test_a_tracked_observation_does_not_fade(self) -> None:
-        # Only LOST fades; an active passive view keeps its colour at the passive alpha however old.
+        # Only LOST fades; an active passive view keeps its color at the passive alpha however old.
         self.assertEqual(self.colour(LOST_TIMEOUT, status=TrackingStatus.TRACKED), (1.0, 0.0, 0.0, 0.8))
 
 

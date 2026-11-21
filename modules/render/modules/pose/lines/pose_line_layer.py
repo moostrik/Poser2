@@ -20,9 +20,9 @@ class PoseLineLayerSettings(BaseSettings):
 class PoseLineLayer(LayerBase):
     """A track's pose lines. `stage`, `line_width` and `line_smooth` (pixels) are inputs its owner sets."""
 
-    def __init__(self, track_id: int, board: HasFrames, settings: PoseLineLayerSettings | None = None, *, stage: int = 0,
+    def __init__(self, track_id: int, board: HasFrames, settings: PoseLineLayerSettings, *, stage: int = 0,
                  line_width: float = 4.0, line_smooth: float = 2.0) -> None:
-        self.settings: PoseLineLayerSettings = settings or PoseLineLayerSettings()
+        self.settings: PoseLineLayerSettings = settings
         self.stage: int = stage
         self.line_width: float = line_width
         self.line_smooth: float = line_smooth

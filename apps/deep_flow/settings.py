@@ -68,12 +68,12 @@ class _CameraHealthSettings(CameraHealthSettings):
 class Oak4Group(BaseSettings):
     num_cams:       Field[int]               = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
     fps:                Field[float]             = Field(60.0, min=1.0, max=120.0, access=Field.INIT, description="Camera frame rate")
-    keyframe_interval:  Field[int]               = Field(60, access=Field.INIT, visible=False, description="Keyframe interval in frames, the same for colour and depth")
+    keyframe_interval:  Field[int]               = Field(60, access=Field.INIT, visible=False, description="Keyframe interval in frames, the same for color and depth")
     color:              Field[bool]              = Field(True, access=Field.INIT, description="Enable color capture")
     resolution:         Field[CameraResolution]  = Field(CameraResolution.P1080, access=Field.INIT, description="Delivered size on USB; the sensor mode follows it")
     sim_enabled:        Field[bool]              = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path:         Field[str]               = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
-    fov:                Field[float]             = Field(80.0, access=Field.INIT, description="Field (°) the grey frame's warp spans across the sensor width; color brings its own lens")
+    fov:                Field[float]             = Field(80.0, access=Field.INIT, description="Field (°) the gray frame's warp spans across the sensor width; color brings its own lens")
 
     start:              Field[bool]              = Field(False, widget=Widget.button, description="Start recording")
     stop:               Field[bool]              = Field(False, widget=Widget.button, description="Stop recording")

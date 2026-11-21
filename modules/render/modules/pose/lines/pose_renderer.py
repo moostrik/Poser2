@@ -18,9 +18,9 @@ class PoseRendererSettings(BaseSettings):
 class PoseRenderer(LayerBase):
     """The pose lines of a camera's tracks. `stage` and `line_width` (pixels) are inputs its owner sets."""
 
-    def __init__(self, cam_id: int, board: HasFrames, color_settings: ColorSettings | None = None, settings: PoseRendererSettings | None = None,
+    def __init__(self, cam_id: int, board: HasFrames, settings: PoseRendererSettings, color_settings: ColorSettings | None = None,
                  *, stage: int = 0, line_width: float = 1.0) -> None:
-        self.settings: PoseRendererSettings = settings or PoseRendererSettings()
+        self.settings: PoseRendererSettings = settings
         self.stage: int = stage
         self.line_width: float = line_width
         self._board: HasFrames = board

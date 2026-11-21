@@ -28,11 +28,11 @@ class RigSettings(BaseSettings):
     """The installation in metres: where the lenses are (``camera_``), and where people are tracked
     (``zone_``). Measured and taped, not tuned.
 
-    **Every length is a radius from the fixture axis** — the physical centre the installation is
+    **Every length is a radius from the fixture axis** — the physical center the installation is
     taped from — and the same number goes into `Rig`, `projection`, the stitch shader and the
     panorama's ``R`` label, unconverted. (``camera_height`` is a height.)
 
-    What depends on them: the parallax correction (the lenses sit ``camera_radius`` out, not at a shared centre;
+    What depends on them: the parallax correction (the lenses sit ``camera_radius`` out, not at a shared center;
     ``camera_radius`` 0 disables it), the parallax depth and overlap band derived from the zone
     (`Rig._update_parallax_depth`), and the far edge past which ``zone_filter`` ignores people.
 
@@ -85,7 +85,7 @@ class TrackerSettings(BaseSettings):
     lens_fov: Field[float] = Field(0.0, access=Field.INIT, description="Lens field (°) across the sensor width, shared; 0 = fov")
     lens_center_x: Field[float] = Field(0.0, access=Field.INIT, description="Optical center offset (px), shared")
     lens_center_y: Field[float] = Field(0.0, access=Field.INIT, description="Optical center offset (px), shared")
-    # The intake's filters. A detection one rejects is drawn grey on the panorama, labelled with the
+    # The intake's filters. A detection one rejects is drawn gray on the panorama, labelled with the
     # filter; a person already tracked goes LOST instead, their own label naming it.
     age_filter: Field[int] = Field(5, min=0, max=9, step=1,
                                    description="Minimum device track age (frames) before a detection counts")

@@ -21,7 +21,7 @@ its **label**. Built once by the compositor for both `MarkRenderer` (line, tick,
 A mark's **field** is the join range that governs it, as a width (`_field`). A **rejected**
 detection is a gray line with no field, labeled with its rejection (`rejection_label`). A **LOST**
 mark keeps its line, fading to gray over `lost_timeout` while its field fades out (`_colors`).
-The primary view of a person is drawn strong; the other views are **passive**. A mark's colour is
+The primary view of a person is drawn strong; the other views are **passive**. A mark's color is
 its **player slot's**, the same index the pose figures use; a person tracked but **waiting** for a
 slot keeps their line and field in `waiting_color`, labeled `waiting`.
 """
@@ -69,7 +69,7 @@ class MarkContext:
 class Mark:
     """Where one observation lands on the strip, and what its label says."""
     world_id: int                                   # groups one person's views; never displayed
-    player: int | None                              # the slot the colour and label lane come from
+    player: int | None                              # the slot the color and label lane come from
     cam_id: int
     x: float                                        # normalised strip x, from the world azimuth
     top_y: float                                    # normalised strip y of the box's top row
@@ -77,8 +77,8 @@ class Mark:
     has_foot: bool                                  # whether `bottom_y` is a floor reading at all
     field_x: float                                  # left edge of the field...
     field_w: float                                  # ... and its width; both normalised strip x
-    color: tuple[float, float, float, float]        # the line's colour, alpha carrying confidence
-    field_color: tuple[float, float, float, float]  # the field's world colour; alpha = how visible
+    color: tuple[float, float, float, float]        # the line's color, alpha carrying confidence
+    field_color: tuple[float, float, float, float]  # the field's world color; alpha = how visible
     field_outline: bool                             # a passive or LOST view: outlined, not filled
     is_primary: bool
     rejected: bool                                  # a detection a filter rejected: no world, gray
@@ -140,8 +140,8 @@ def _mark(tracklet: Tracklet, primaries: set[int],
         field_color: tuple[float, float, float, float] = (*rejected_color[:3], 0.0)
     else:
         field_lo, field_hi = _field(annotation, tracklet.cam_id, c)
-        # The player slot's colour — the index the pose figures use — so the strip and the pose row
-        # can never disagree about who is who. Waiting for a slot: its own colour, belonging to
+        # The player slot's color — the index the pose figures use — so the strip and the pose row
+        # can never disagree about who is who. Waiting for a slot: its own color, belonging to
         # nobody downstream yet.
         if annotation.player is not None and colors:
             base: Color = colors[annotation.player % len(colors)]
@@ -180,7 +180,7 @@ def _fade(tracklet: Tracklet, c: MarkContext) -> float:
 
 def _colors(tracklet: Tracklet, is_primary: bool, base: Color, gray: Color,
             c: MarkContext) -> tuple[Color, Color]:
-    """(line, field) colours: the person's colour, alpha saying how much to trust it.
+    """(line, field) colors: the person's color, alpha saying how much to trust it.
 
     A passive view has its line dimmed; its field is told apart by shape (`Mark.field_outline`). A
     **LOST** observation is still an identity the tracker holds, so it keeps its mark, dimmed, and
@@ -231,7 +231,7 @@ def _field(annotation: PanoramicAnnotation, cam_id: int, c: MarkContext) -> tupl
     """(low, high) azimuth of the field: the rule that decides what this observation may be joined to.
 
     **A pair test**: both rules are `|Δ| ≤ angle`, so fields `angle` wide touch exactly when the
-    difference equals the angle — two fields of one colour that overlap are two observations the
+    difference equals the angle — two fields of one color that overlap are two observations the
     tracker will join.
 
     Inside the overlap the seam rule is drawn (`seam.link_angle`, world azimuth); outside it the only

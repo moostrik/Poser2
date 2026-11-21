@@ -47,11 +47,11 @@ class PanoramaCompositorSettings(BaseSettings):
                                               description="Draw every camera's own view, not just the primary")
 
 
-# Fixed meanings, so not in ColorSettings: those are per-player track colours a user may tune, and
+# Fixed meanings, so not in ColorSettings: those are per-player track colors a user may tune, and
 # a reader has to be able to tell a seam from an axis from the horizon.
 GRID_COLOR:    Color = Color(1.0, 1.0, 1.0, 0.18)
 HORIZON_COLOR: Color = Color(0.3, 1.0, 0.3, 1.0)    # its own hue, opaque
-HORIZON_PX:    float = 1.0                        # the colour sets it apart, not the width
+HORIZON_PX:    float = 1.0                        # the color sets it apart, not the width
 SEAM_COLOR:    Color = Color(1.0, 0.35, 0.0, 0.75)  # sector boundary
 AXIS_COLOR:    Color = Color(0.0, 0.7, 1.0, 0.6)    # camera optical axis
 # Yellow is permissive (a second camera sees here), red prohibitive (no new person is born here).
@@ -64,11 +64,11 @@ DEAD_ZONE_COLOR: Color = Color(1.0, 0.15, 0.1, 0.10)  # no births here
 # where the tracker works — the overlap bounds it in azimuth, the zone in distance.
 ZONE_COLOR:     Color = Color(1.0, 0.85, 0.0, 0.10)
 # A rejected detection — too young, too small, a new one in the dead zone, past the far edge.
-# Gray because it belongs to nobody: every track colour means a person. Also the colour a LOST mark's
+# Gray because it belongs to nobody: every track color means a person. Also the color a LOST mark's
 # line fades toward, so a person walking out ends where their gray line begins.
 REJECTED_COLOR: tuple[float, float, float, float] = (0.6, 0.6, 0.6, 0.8)
 # A person tracked but waiting for a free player slot: a real identity, belonging to no slot yet, so
-# neither a track colour nor the rejection gray. White, at the passive line's alpha.
+# neither a track color nor the rejection gray. White, at the passive line's alpha.
 WAITING_COLOR: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 0.8)
 LABEL_FG:      Color = Color(1.0, 1.0, 1.0, 1.0)
 LABEL_BG:      Color = Color(0.0, 0.0, 0.0, 0.6)

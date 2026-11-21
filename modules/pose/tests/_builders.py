@@ -43,7 +43,7 @@ def points(coords: dict[PointLandmark, tuple[float, float]], scores: dict[PointL
     return Points2D(v, s)
 
 
-# A standing figure in physical (square-pixel) units, facing the camera, centred on x = 0.5.
+# A standing figure in physical (square-pixel) units, facing the camera, centered on x = 0.5.
 _P = PointLandmark
 _STANDING: dict[PointLandmark, tuple[float, float]] = {
     _P.nose:           (0.50, 0.16),

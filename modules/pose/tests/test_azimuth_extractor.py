@@ -45,7 +45,7 @@ class AzimuthExtractorTest(unittest.TestCase):
         self.assertAlmostEqual(self._azimuth(_frame()), 0.5, places=5)
 
     def test_shift_is_eye_midpoint_offset_through_projection(self) -> None:
-        # Midpoint 0.7 of a 0.4-wide box is 0.08 image widths right of centre → 0.08 * K rad.
+        # Midpoint 0.7 of a 0.4-wide box is 0.08 image widths right of center → 0.08 * K rad.
         out = self._azimuth(_frame(left_eye_x=0.6, right_eye_x=0.8))
         self.assertAlmostEqual(out, 0.5 + 0.2 * 0.4 * K, places=5)
 

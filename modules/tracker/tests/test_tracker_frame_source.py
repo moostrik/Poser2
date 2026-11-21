@@ -101,7 +101,7 @@ class TestFrameContents(TrackerFrameSourceCase):
         # A frame twice as wide as high; the box is a square quarter of it. The crop window, aspect
         # 1:2 about the box, is the frame's full height and a quarter of its width, and becomes the
         # pose's box; a keypoint at the box's top-left corner lands at the window's left edge, a
-        # quarter down, and one at the box's centre in the window's centre.
+        # quarter down, and one at the box's center in the window's center.
         self.settings.crop_aspect = 0.5
         poses = TrackerFrameSource(self.settings, max_players=4, frame_aspect=2.0)
         keypoints = np.full((17, 3), (0.375, 0.5, 0.9), dtype=np.float32)

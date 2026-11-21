@@ -150,7 +150,7 @@ class Recorder(Thread):
             if self.with_depth:
                 self.recorders[c][ChunkStream.DEPTH] = StreamWriter(DEPTH_CODEC, DEPTH_HARDWARE, settings.keyframe_interval)
                 self.recorders[c][ChunkStream.CONFIDENCE] = StreamWriter(DEPTH_CODEC, DEPTH_HARDWARE, settings.keyframe_interval,
-                                                                         b_frames=False)     # grey, seeks with the depth
+                                                                         b_frames=False)     # gray, seeks with the depth
 
         if self.with_depth and settings.keyframe_interval <= 0:
             logger.warning("keyframe_interval 0 with depth: each encoder picks its own keyframes, so seeking will show the wrong depth")

@@ -36,7 +36,7 @@ class TrackerCompositor(LayerBase):
         self._bbox_renderer_B: PoseBoxRenderer = PoseBoxRenderer(cam_id, board, color_settings)
 
         pose_settings: PoseRendererSettings = PoseRendererSettings(line_smooth=0.0, use_scores=False, use_bbox=True)
-        self._pose_renderer: PoseRenderer = PoseRenderer(cam_id, board, color_settings=None, settings=pose_settings)
+        self._pose_renderer: PoseRenderer = PoseRenderer(cam_id, board, pose_settings)
         self._set_inputs()
 
     @property

@@ -100,7 +100,7 @@ def assign(cost: np.ndarray) -> list[tuple[int, int]]:
 
 
 class _Kalman:
-    """SORT's constant-velocity filter on a box as centre, area and aspect ratio."""
+    """SORT's constant-velocity filter on a box as center, area and aspect ratio."""
 
     def __init__(self, box: np.ndarray) -> None:
         self.F = np.eye(7)
@@ -132,7 +132,7 @@ class _Kalman:
 
 
 def _to_state(box: np.ndarray) -> np.ndarray:
-    """x0, y0, x1, y1 to centre x, centre y, area, aspect ratio."""
+    """x0, y0, x1, y1 to center x, center y, area, aspect ratio."""
     w = box[2] - box[0]
     h = box[3] - box[1]
     return np.array([box[0] + w / 2, box[1] + h / 2, w * h, w / h if h > 0 else 0.0])

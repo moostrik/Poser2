@@ -15,7 +15,7 @@ from modules.tracker.panoramic.rig import Rig
 from modules.utils import Rect
 
 
-# The White Space rig, as measured: four OAK-D Pro W 0.36 m out from the centre, 127 degrees each.
+# The White Space rig, as measured: four OAK-D Pro W 0.36 m out from the center, 127 degrees each.
 NUM_CAMERAS: int = 4
 CAM_FOV: float = 127.0
 TARGET_FOV: float = 360.0 / NUM_CAMERAS
@@ -73,7 +73,7 @@ class TestRoundTripAgainstRig(unittest.TestCase):
     """Forward through the tracker, back through the projection, land on the column you started from."""
 
     def _forward(self, rig: Rig, x: float, cam_id: int, depth_radius: float) -> float:
-        """The world azimuth the tracker gives a box centred at column `x`. Uses the `Rig`'s own
+        """The world azimuth the tracker gives a box centered at column `x`. Uses the `Rig`'s own
         public chain, not a re-implementation.
 
         The tracker corrects at its derived `parallax_radius`, so the fixture sets the zone to
@@ -147,7 +147,7 @@ class TestRoundTripAgainstRig(unittest.TestCase):
 
 
 class TestCenterDistance(unittest.TestCase):
-    """A person's distance from the rig centre, given their distance from a camera."""
+    """A person's distance from the rig center, given their distance from a camera."""
 
     def test_straight_ahead_adds_the_camera_radius(self) -> None:
         self.assertAlmostEqual(center_distance(0.0, 3.0, CAMERA_RADIUS), 3.0 + CAMERA_RADIUS, places=12)
@@ -162,8 +162,8 @@ class TestCenterDistance(unittest.TestCase):
             self.assertAlmostEqual(center_distance(bearing, 2.0, 0.0), 2.0, places=12)
 
     def test_inverts_focus_distance_on_the_cylinder(self) -> None:
-        """`focus_distance` goes centre-bearing -> camera-distance; this goes camera-bearing ->
-        centre-distance. Feed one the other's answer and the focus radius must come back."""
+        """`focus_distance` goes center-bearing -> camera-distance; this goes camera-bearing ->
+        center-distance. Feed one the other's answer and the focus radius must come back."""
         focus_radius: float = FOCUS_RADIUS
         for center_bearing in (0.0, 20.0, 55.0):
             d: float = focus_distance(center_bearing, CAMERA_RADIUS, focus_radius)
@@ -259,7 +259,7 @@ class TestCameraLocalToAzimuth(unittest.TestCase):
 
     def test_a_camera_spans_less_than_its_field_at_the_focus_depth(self) -> None:
         """The free check in CALIBRATION.md, at this file's focus depth: 127 degrees of lens covers
-        110.5 degrees of the strip at R 2.25, because the camera sits 0.36 m outside the centre."""
+        110.5 degrees of the strip at R 2.25, because the camera sits 0.36 m outside the center."""
         for cam_id in range(NUM_CAMERAS):
             left: float = camera_local_to_azimuth(0.0, cam_id, CAM_FOV, TARGET_FOV,
                                                   CAMERA_RADIUS, FOCUS_RADIUS)
@@ -276,7 +276,7 @@ class TestCameraLocalToAzimuth(unittest.TestCase):
             self.assertAlmostEqual(bare, CAM_FOV, places=9)  # camera_radius 0: the bare field
 
     def test_zero_camera_radius_is_the_plain_offset(self) -> None:
-        # With the cameras at the centre there is no triangle left: the projection collapses to
+        # With the cameras at the center there is no triangle left: the projection collapses to
         # `target_fov * cam_id + local - (cam_fov - target_fov) / 2`, which is how the azimuth frame
         # is defined (CALIBRATION.md, *One frame: azimuth*).
         for cam_id in range(NUM_CAMERAS):
@@ -310,7 +310,7 @@ class TestCameraAzimuth(unittest.TestCase):
         )
 
     def test_agrees_with_the_forward_model_at_frame_center(self) -> None:
-        # The frame centre is the camera's axis at any camera radius and any depth — the one bearing the
+        # The frame center is the camera's axis at any camera radius and any depth — the one bearing the
         # parallax triangle leaves alone.
         rig: Rig = _rig()
         for cam_id in range(NUM_CAMERAS):

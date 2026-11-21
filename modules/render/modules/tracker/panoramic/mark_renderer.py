@@ -21,7 +21,7 @@ _OUTLINE_ALPHA: float = 0.6
 
 class MarkRenderer(LayerBase):
     """Every observation's mark, not one per person: each camera's own view of a seam person stands
-    beside the other's in the same world colour, which the fused `world_angle` hides everywhere else.
+    beside the other's in the same world color, which the fused `world_angle` hides everywhere else.
     What a mark's position means is in `marks`; its label is `LabelRenderer`'s.
 
     Per mark:
@@ -29,8 +29,8 @@ class MarkRenderer(LayerBase):
     - **The line**, head to foot elevation; 2 px for the primary view, 1 px for the passive views.
     - **The foot tick** at the foot row: the instrument. Stand on a taped R 1.5 or R 3.5 circle and
       the tick must land on that edge of the grid's zone band.
-    - **The field**, the join range as a width (`marks._field`): two fields of one colour that
-      overlap will be joined; two colours that overlap are two people it might confuse. Filled for
+    - **The field**, the join range as a width (`marks._field`): two fields of one color that
+      overlap will be joined; two colors that overlap are two people it might confuse. Filled for
       the primary view, outlined for passive views and for LOST marks.
 
     A rejected detection is its gray line and tick, no field. Owns no FBO: the compositor's is bound

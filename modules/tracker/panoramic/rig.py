@@ -92,8 +92,8 @@ class Rig:
     def column_to_azimuth(self, cam_id: int, x: float) -> float:
         """World azimuth (degrees, [0, 360)) of a normalised column of camera `cam_id`.
 
-        The chain `calc_angle` puts a box centre through, so a keypoint's column and its box
-        centre's are directly comparable in world degrees.
+        The chain `calc_angle` puts a box center through, so a keypoint's column and its box
+        center's are directly comparable in world degrees.
         """
         return self._local_to_azimuth(x * self.cam_fov, cam_id)
 
@@ -118,9 +118,9 @@ class Rig:
         `distance = camera_height * focal / (foot_px - horizon_px)`. Nothing about the person enters
         it — raised arms or bending over change a box's height, not its feet. The tilt is inside the
         window (`set_window`, derived with the warp's own `frame_window`): the horizon is not the
-        centre row, and none of this holds on footage that has not been through the warp.
+        center row, and none of this holds on footage that has not been through the warp.
 
-        The frame's bottom row bounds it from below (the sensor's lowest reach on the centre column);
+        The frame's bottom row bounds it from below (the sensor's lowest reach on the center column);
         anyone closer has their feet below the frame. A box may extend past the frame edge — the
         detector extrapolates a partly visible person — and the formula is continuous across it, but
         it is a guess there.
@@ -196,7 +196,7 @@ class Rig:
         return height if 0.0 < height < _MAX_HEIGHT else math.nan
 
     def _calc_local_angle(self, roi: Rect) -> float:
-        """The bearing of the box centre within this camera's field. Exact: the frame is
+        """The bearing of the box center within this camera's field. Exact: the frame is
         cylindrical."""
         normalized_x: float = roi.x + roi.width / 2.0
         return normalized_x * self.cam_fov
@@ -260,7 +260,7 @@ class Rig:
 
         **`overlap_band`, a local angle, at the zone's far edge**, where a camera's coverage of the
         room is widest (see `_update_parallax_depth` for why the far edge). The neighbour's field
-        begins `target_fov - half_span` off this camera's axis, with `half_span` the centre azimuth
+        begins `target_fov - half_span` off this camera's axis, with `half_span` the center azimuth
         from the axis to the field edge; `azimuth_to_camera_x` turns that back into a local angle.
 
         **`overlap_azimuth`, the same threshold in azimuth at `parallax_radius`**, because that is

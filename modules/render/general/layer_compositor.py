@@ -34,7 +34,7 @@ class LayerCompositor(LayerBase):
     def __init__(
         self,
         layers: list[LayerBase],
-        settings: LayerCompositorSettings | None = None
+        settings: LayerCompositorSettings
     ) -> None:
         """Initialize LayerCompositor.
 
@@ -43,7 +43,7 @@ class LayerCompositor(LayerBase):
             settings: Layer configuration
         """
         self._layers: list[LayerBase] = layers
-        self.settings: LayerCompositorSettings = settings or LayerCompositorSettings()
+        self.settings: LayerCompositorSettings = settings
 
         # Composition FBO (before LUT)
         self._composite_fbo: Fbo = Fbo()

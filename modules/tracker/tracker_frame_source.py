@@ -223,7 +223,7 @@ class TrackerFrameSource(Thread):
 
     def keypoint_window(self, roi: Rect, keypoints: np.ndarray) -> tuple[Rect, Points2D]:
         """The window the host crop would cut for this box, normalised to the frame, and the camera's
-        keypoints normalised to it: the box padded, then grown to `crop_aspect` about its centre, the
+        keypoints normalised to it: the box padded, then grown to `crop_aspect` about its center, the
         aspect judged in the frame's own proportions (`frame_aspect`)."""
         aspect: float = self.settings.crop_aspect
         padding: float = self.settings.crop_padding

@@ -7,7 +7,7 @@ cameras of a rig run unsynced, so a camera's frame of the same round is up to ha
 and each camera plays its frames captured from half a period before camera 0's first frame to half a period after
 its last; a range from a chunk's start or to its end takes every camera's from its start or to its end, where the
 recorder cut them all at one time. So cameras that dropped unlike frames start and end at one moment. A camera plays the streams it
-has (`ChunkStream`): color, depth where its chunk holds depth, and its confidence, decoded grey, where the chunk holds
+has (`ChunkStream`): color, depth where its chunk holds depth, and its confidence, decoded gray, where the chunk holds
 that too (`ChunkInfo.confidence`)."""
 
 import logging
@@ -114,7 +114,7 @@ class ChunkReaders:
     def _load(self, cam_id: int, stream: ChunkStream, path: Path, index: int, lo: int, hi: int | None,
               frame_callback: ChunkFrameCallback, decoding: Decoding, clock: PlayClock | None) -> None:
         """A reader of `stream`, the file's stream `index`: the color as decoded, the depth as millimeters, the
-        confidence grey."""
+        confidence gray."""
         color: bool = stream == ChunkStream.VIDEO and not decoding.gray
         reader = StreamReader(cam_id, stream, cast(StreamFrameCallback, frame_callback), color, decoding.decoder,
                               decoding.fps, index, stream == ChunkStream.DEPTH, clock,

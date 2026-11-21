@@ -1,13 +1,13 @@
 """Projection between a camera's own frame and the world seen from the fixture axis.
 
-A camera's column (local angle) to world azimuth and back, camera distance to centre distance, and
+A camera's column (local angle) to world azimuth and back, camera distance to center distance, and
 the frame's rows to elevation and back. `camera_local_to_azimuth` (forward, what `Rig.calc_angle`
 uses) and `azimuth_to_camera_x` (inverse, what the stitch uses) are one triangle, so the tracker's
 azimuths and the stitch's placement are the same arithmetic; the round-trip tests guard that.
 `local = x * cam_fov` exactly, because the delivered frame is cylindrical.
 
 The camera sits `camera_radius` out from the fixture axis, facing outward. A point at camera bearing
-θ and camera distance d is seen from the centre at φ, by the law of sines:
+θ and camera distance d is seen from the center at φ, by the law of sines:
 
     sin(θ - φ) = r · sin(φ) / d
 
@@ -34,7 +34,7 @@ _EDGE_TOLERANCE: float = 1e-6
 def camera_azimuth(cam_id: int, target_fov: float) -> float:
     """World azimuth (degrees) a camera's optical axis points at.
 
-    Falls out of the azimuth frame's own definition at the frame centre:
+    Falls out of the azimuth frame's own definition at the frame center:
     `target_fov * cam_id + cam_fov / 2 - (cam_fov - target_fov) / 2` collapses to
     `target_fov * (cam_id + 0.5)`, independent of the lens. With four
     cameras the axes are at 45, 135, 225 and 315, and the sector boundaries they meet on — the
@@ -54,8 +54,8 @@ def focus_distance(bearing: float, camera_radius: float, depth_radius: float) ->
     The depth is the **caller's** choice — the picture's, the tracker's, the zone's — and this
     answers for whichever one it is handed.
 
-    `bearing` is measured **at the rig centre**, which is what an output column of the panorama
-    gives directly. The law of cosines on the centre/camera/cylinder triangle. Symmetric about the
+    `bearing` is measured **at the rig center**, which is what an output column of the panorama
+    gives directly. The law of cosines on the center/camera/cylinder triangle. Symmetric about the
     camera's axis, and **smallest straight ahead** — the camera is pushed toward the wall it faces,
     so its own axis is the short ray: `depth_radius - camera_radius` dead ahead against
     `+ camera_radius` behind (`test_closest_straight_ahead_farthest_behind`).
@@ -67,11 +67,11 @@ def focus_distance(bearing: float, camera_radius: float, depth_radius: float) ->
 
 
 def camera_bearing(center_bearing: float, camera_radius: float, distance: float) -> float:
-    """The bearing (degrees) off a camera's own axis of a point the centre sees `center_bearing`
+    """The bearing (degrees) off a camera's own axis of a point the center sees `center_bearing`
     off that axis, `distance` m from the camera.
 
-    Wider than the centre's, because the camera sits `camera_radius` out toward the point:
-    `theta = phi + asin(r · sin(phi) / d)`, the law of sines on the centre/camera/point triangle.
+    Wider than the center's, because the camera sits `camera_radius` out toward the point:
+    `theta = phi + asin(r · sin(phi) / d)`, the law of sines on the center/camera/point triangle.
     """
     if camera_radius <= 0.0 or distance <= 1e-9:
         return center_bearing
@@ -110,7 +110,7 @@ def camera_local_to_azimuth(local: float, cam_id: int, cam_fov: float, target_fo
     A point at camera bearing `θ = local - cam_fov/2` on the cylinder of radius `R` is `d` away:
 
         d = -r·cos θ + √(R² - r²·sin² θ)        (law of cosines)
-        φ = atan2(d·sin θ, d·cos θ + r)          (its bearing from the centre)
+        φ = atan2(d·sin θ, d·cos θ + r)          (its bearing from the center)
 
     At `camera_radius = 0` this is the plain offset `target_fov * cam_id + local -
     (cam_fov - target_fov) / 2` that defines the azimuth frame. Callers use different depths —
@@ -130,11 +130,11 @@ def camera_local_to_azimuth(local: float, cam_id: int, cam_fov: float, target_fo
 
 
 def center_distance(bearing: float, cam_distance: float, camera_radius: float) -> float:
-    """A person's horizontal distance from the RIG CENTRE (m).
+    """A person's horizontal distance from the RIG CENTER (m).
 
     `bearing` is measured at the camera, off its own optical axis — what the tracker's
-    `local_angle - cam_fov / 2` gives. The camera faces radially outward with the centre
-    `camera_radius` behind it, so the person sits at `(d*cos(b) + r, d*sin(b))` from the centre. The
+    `local_angle - cam_fov / 2` gives. The camera faces radially outward with the center
+    `camera_radius` behind it, so the person sits at `(d*cos(b) + r, d*sin(b))` from the center. The
     same triangle `camera_local_to_azimuth` solves for the bearing, solved here for the length
     instead. Used for the far-edge test, the panorama label's `R` and the pose's `Distance` —
     never a placement.
