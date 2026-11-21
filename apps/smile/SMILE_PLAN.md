@@ -9,13 +9,6 @@ A step that moves or rewires code also starts smile once: ComfyUI first (`script
 takes a recorded visitor through (flash, portrait, grin, bloom, the clip saved and on the walls) and leaves no error
 in the log. A rename or a text change needs no start. The whole of smile's tests run after the last step.
 
-## C. Wiring and time
-
-- C6 The 48 clip cells play from one thread: a heap of the cells by their next frame's deadline and one `Waker` for
-  the earliest; at each wake the due cells hand their frame to their wall and take their next deadline. Each cell keeps
-  its own clock, speed and spread (`fps`, `spread`), its clip order and its bang as now; the 48 `ClipLoader` threads go.
-  Check: the start check, the 48 cells playing and drifting apart as before; `player/tests`.
-
 ## D. Names
 
 - D1 Renames, settings files migrated in the same commit:
