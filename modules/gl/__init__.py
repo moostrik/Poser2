@@ -5,7 +5,7 @@ from .state import blend_state as BlendState
 
 # TEXTURE CLASSES
 from .texture import Texture, Texture3D, SwapTexture3D, Texture2DArray, SwapTexture2DArray, LayeredFbo, \
-    MultiTargetFbo, SwapMultiTargetFbo, SwapTarget, Fbo, SwapFbo, ChannelOrder, Image, Tensor, PixelBufferPool
+    Fbo, SwapFbo, SwapTarget, ChannelOrder, Image, Tensor, PixelBufferPool
 
 # SHADERS (after the texture classes: they import `Texture` from this package)
 from . import shaders

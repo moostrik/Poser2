@@ -1,10 +1,11 @@
 """A swap pair is its current buffer; `back` is the other one, and they trade places at a swap: the texture pairs
-(SwapFbo, SwapTexture3D, SwapTexture2DArray) and a SwapMultiTargetFbo's targets (GL not called)."""
+(SwapFbo, SwapTexture3D, SwapTexture2DArray) and a SwapFbo's targets (GL not called)."""
 
 import unittest
 
-from modules.gl import (Fbo, MultiTargetFbo, SwapFbo, SwapMultiTargetFbo, SwapTexture2DArray, SwapTexture3D, Texture,
-                        Texture2DArray, Texture3D)
+from OpenGL.GL import GL_NEAREST
+
+from modules.gl import Fbo, SwapFbo, SwapTexture2DArray, SwapTexture3D, Texture2DArray, Texture3D
 
 
 class SwapTest(unittest.TestCase):
@@ -57,7 +58,8 @@ class SwapTest(unittest.TestCase):
                 self.assertFalse(hasattr(pair_class(), 'texture'))
 
     def test_a_target_of_a_framebuffer_pair_follows_its_current_framebuffer(self) -> None:
-        pair = SwapMultiTargetFbo(MultiTargetFbo(Texture(), Texture()), MultiTargetFbo(Texture(), Texture()))
+        pair = SwapFbo(extra_targets=(GL_NEAREST,))
+        self.assertIs(pair.current.targets[0], pair.current)
         target = pair.target(1)
         first = pair.current.targets[1]
         self.assertIs(target.current, first)

@@ -60,11 +60,13 @@ type, made contiguous and byte-aligned there; a texture made with `bgr` takes it
 A volume is a `Texture2DArray` where the 3D texture's tiling is slow at its size, layers of 2D tiles; it filters
 within a layer, not between layers, so a shader that reads between layers mixes them itself **(site fact)**.
 
-A draw into two or more textures at once goes through a `MultiTargetFbo`: a framebuffer that owns its color
-targets, as an `Fbo` owns its one, made at a format each, one size, output `layout(location = i)` into target i,
-handed out by index. A ping-pong pair of them is a `SwapMultiTargetFbo`, swapped as one; its `target(i)` is a
-`SwapTarget`, a texture that is always the current framebuffer's target i, so a port or a pass keeps the target as
-it keeps a `SwapFbo`, never one buffer of the pair. `Swap` is the pair itself, `TextureSwap` the pair of textures
+An `Fbo` is a framebuffer that owns its color targets, one or more, one size, and is its target 0: the texture a
+pass writes, so a pass hands the `Fbo` on as that texture. A draw writes its output `layout(location = i)` into
+target i, `targets[i]`, made at a format each (`allocate(width, height, formats)`), so one draw fills several
+textures in one pass. A ping-pong pair of them is a `SwapFbo`, swapped as one and used as its current target 0; its
+`target(i)` is a `SwapTarget`, a texture that is always the current framebuffer's target i, so a port or a pass
+keeps the pair or the target, never one buffer of the pair. `LayeredFbo` is the framebuffer over all layers of a
+`Texture2DArray`, for the 3D steps. `Swap` is the pair itself, `TextureSwap` the pair of textures
 `SwapFbo`, `SwapTexture3D` and `SwapTexture2DArray` stand on.
 
 A readback or an upload that must not wait goes through a `PixelBufferPool`: pixel buffers of one size on the pack

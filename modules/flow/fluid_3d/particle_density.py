@@ -5,11 +5,11 @@ through the grid's velocity, faded and drawn by `draw` and `overlap`. How and wh
 
 import math
 
-from OpenGL.GL import (GL_COLOR, GL_COLOR_BUFFER_BIT, GL_POINT_SIZE_RANGE, GL_PROGRAM_POINT_SIZE, GL_R32F,
+from OpenGL.GL import (GL_COLOR, GL_COLOR_BUFFER_BIT, GL_LINEAR, GL_POINT_SIZE_RANGE, GL_PROGRAM_POINT_SIZE, GL_R32F,
                        GL_RGBA16F, GL_RGBA32F, GL_TEXTURE_FETCH_BARRIER_BIT, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT,
                        glClear, glClearBufferfv, glClearColor, glEnable, glGetFloatv, glMemoryBarrier)
 
-from modules.gl import GpuTimer, LayeredFbo, MultiTargetFbo, StorageBuffer, BlendState, Texture, Texture3D
+from modules.gl import Fbo, GpuTimer, LayeredFbo, StorageBuffer, BlendState, Texture, Texture3D
 from ..port import Port
 from ..wall_mode import WallMode
 from .density_carrier import CarrierStep, DensityCarrier
@@ -66,10 +66,10 @@ class ParticleDensity(DensityCarrier):
         self._slices: LayeredFbo = LayeredFbo()
         # The surface's targets (SURFACE_DEPTH, _THICKNESS, _COLOR): the spheres' nearest depth, their thickness,
         # their color weighted; the smoothed depth
-        self._surface: MultiTargetFbo = MultiTargetFbo(Texture(), Texture(), Texture())
+        self._surface: Fbo = Fbo(extra_targets=(GL_LINEAR, GL_LINEAR))
         self._smoothed: tuple[Texture, Texture] = (Texture(), Texture())
         # The weighted look's targets (WEIGHTED_SUM, _REVEAL): the weighted emission and opacity, and the revealage
-        self._weighted: MultiTargetFbo = MultiTargetFbo(Texture(), Texture())
+        self._weighted: Fbo = Fbo(extra_targets=(GL_LINEAR,))
         self._emit_shader: ParticleEmit = ParticleEmit()
         self._ring_shader: ParticleRing = ParticleRing()
         self._advect_shader: ParticleAdvect = ParticleAdvect()
