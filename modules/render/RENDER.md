@@ -58,11 +58,11 @@ varies*). The layout's reasons:
 
 ## Kinds of layer
 
-| Kind         | Output             | Draws                     |
+| Kind         | Owns               | Draws                     |
 |--------------|--------------------|---------------------------|
-| `Layer`      | its Fbo or texture | into its own              |
-| `Draw`       | none               | into a target it is given |
-| `Compositor` | its Fbo            | other layers into it      |
+| `Layer`      | its FBO or texture | into its own              |
+| `Draw`       | no target          | into a target it is given |
+| `Compositor` | an FBO             | other layers into it      |
 
 A layer hands out its Fbo or SwapFbo, not the texture inside it.
 

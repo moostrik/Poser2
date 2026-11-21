@@ -19,9 +19,9 @@ paths:
 
 ## Layers
 
-- `Layer`: owns its output, an Fbo or texture, and draws into it
-- `Draw`: has no output of its own; it draws into the target it is given
-- `Compositor`: owns its output Fbo and draws other layers into it
+- `Layer`: owns its FBO or texture
+- `Draw`: draws into a target it is given and owns none
+- `Compositor`: owns an FBO and draws other layers into it
 - A layer hands out its Fbo, SwapFbo or SwapTarget, never one buffer of a pair
 - Prefer to redraw a layer only when what it draws has changed
 - Prefer composition of layers over monolithic render passes
