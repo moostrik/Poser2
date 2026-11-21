@@ -60,6 +60,7 @@ class PanoramaCompositor(LayerBase):
                  settings: PanoramaLayerSettings) -> None:
         self._board: PanoramaBoard = board
         self.num_cams: int = max(1, num_cams)
+        self.target_fov: float = 360.0 / self.num_cams    # the sector one camera owns: the tracker's own `360 / num_cams`
         self._color_settings: ColorSettings = color_settings
         self._tracker: PanoramicTrackerSettings = tracker
         self._settings: PanoramaLayerSettings = settings
@@ -71,8 +72,8 @@ class PanoramaCompositor(LayerBase):
         self._static_key: tuple | None = None
 
         self._stitch: StitchRenderer = StitchRenderer(cam_textures, tracker, settings)
-        self._seams: SeamRenderer = SeamRenderer(self.num_cams, tracker, settings)
-        self._grid: GridRenderer = GridRenderer(self.num_cams, tracker, settings)
+        self._seams: SeamRenderer = SeamRenderer(self.num_cams, self.target_fov, tracker, settings)
+        self._grid: GridRenderer = GridRenderer(self.num_cams, self.target_fov, tracker, settings)
         self._marks: MarkRenderer = MarkRenderer()
         self._labels: LabelRenderer = LabelRenderer()
 
@@ -92,11 +93,6 @@ class PanoramaCompositor(LayerBase):
     @property
     def texture(self) -> Texture:
         return self._fbo
-
-    @property
-    def target_fov(self) -> float:
-        """The sector one camera owns — the tracker's own `360 / num_cams`."""
-        return 360.0 / self.num_cams
 
     @property
     def camera_radius(self) -> float:

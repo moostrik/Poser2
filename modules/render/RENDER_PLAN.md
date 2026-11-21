@@ -13,9 +13,6 @@ The pixel buffer and fence code of `general/screen_recording` is not in this pla
 
 ## A. Code that does the same, written once
 
-- **A5** `PanoramaCompositor` computes the camera's sector (`target_fov`) once and hands it to `GridRenderer` and `SeamRenderer`.
-  - Why: `360 / num_cams` is written three times, while the compositor says it owns the strip's geometry (seen).
-  - Check: the panoramic tests, and white_space -sim with the panorama shown.
 
 ## B. The tree
 

@@ -35,9 +35,10 @@ class GridRenderer(LayerBase):
     wrong elevation.
     """
 
-    def __init__(self, num_cams: int, tracker: PanoramicTrackerSettings,
+    def __init__(self, num_cams: int, target_fov: float, tracker: PanoramicTrackerSettings,
                  settings: PanoramaLayerSettings) -> None:
         self._num_cams: int = max(1, num_cams)
+        self._target_fov: float = target_fov        # the sector one camera owns
         self._tracker: PanoramicTrackerSettings = tracker
         self._settings: PanoramaLayerSettings = settings
         self._rect: shaders.FillRect = shaders.FillRect()
@@ -46,11 +47,6 @@ class GridRenderer(LayerBase):
         self._width: int = 1
         self._height: int = 1
         self._elevation_window: tuple[float, float] = (0.0, 0.0)
-
-    @property
-    def _target_fov(self) -> float:
-        """The sector one camera owns — the tracker's own `360 / num_cams`."""
-        return 360.0 / self._num_cams
 
     def set_geometry(self, elevation_window: tuple[float, float]) -> None:
         self._elevation_window = elevation_window

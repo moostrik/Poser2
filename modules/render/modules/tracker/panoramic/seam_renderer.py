@@ -22,18 +22,15 @@ class SeamRenderer(LayerBase):
     Drawn faintly, beneath the grid.
     """
 
-    def __init__(self, num_cams: int, tracker: PanoramicTrackerSettings,
+    def __init__(self, num_cams: int, target_fov: float, tracker: PanoramicTrackerSettings,
                  settings: PanoramaLayerSettings) -> None:
         self._num_cams: int = max(1, num_cams)
+        self._target_fov: float = target_fov        # the sector one camera owns
         self._tracker: PanoramicTrackerSettings = tracker
         self._settings: PanoramaLayerSettings = settings
         self._rect: shaders.FillRect = shaders.FillRect()
         self._height: int = 1
         self._width: int = 1
-
-    @property
-    def _target_fov(self) -> float:
-        return 360.0 / self._num_cams
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._rect.allocate()
