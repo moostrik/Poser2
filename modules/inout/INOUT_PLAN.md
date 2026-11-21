@@ -7,11 +7,6 @@ OSC: hd_trio, deep_flow, low_flow, white_space and smile. hd_trio's output stays
 Checks run in `.venv-oak4` (inout, deep_flow, low_flow, smile, pyright), except white_space's and hd_trio's tests,
 which need depthai 2 and run in `.venv`.
 
-## D. Document
-
-- D1. `INOUT.md`: the senders and receivers, which app uses which, and the OSC addresses each one puts on the wire
-  (the contract with the Max patches), now spread over docstrings and comments. Why: the package has no document.
-
 ## E. Apps
 
 - E1. smile's walls' bang senders in the settings tree. Why: `Player.__init__` (`apps/smile/player/player.py`)
