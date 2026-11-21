@@ -5,23 +5,6 @@ What is next for smile, the app in [SMILE.md](SMILE.md); what spans the apps is 
 
 ## G. The OAK4 as a camera
 
-- G1 `modules/camera/oak4`:
-  - a `rotate90` argument, carried on every frame as the flag, as the Vimba and webcam backends do; no pixel work on
-    the camera's thread. `flip_v` is carried as a flag for color too, beside `flip_h` (now ignored for color in
-    `pipeline.py`): turn and `flip_h` make one quarter turn, turn and `flip_v` the other.
-  - tilt correction and `rotate90` together: a warning, and no homography. On a camera on its side the IMU's tilt is a
-    rotation about the sensor's other axis, which the correction does not model.
-  - a mode `P2160` in `geometry/sensor_modes.py`, color only, on the sensor's 4K mode: 2160 rows (already on the
-    warp's alignment of 16), delivered by `direct_size` as 2704 × 2160 (5:4, the width on 16). USB only: on Ethernet
-    the camera takes `ethernet_resolution`, as now. `CameraResolution` is shared with the OAK-D backend:
-    `modules/camera/oak/sensor.py`'s `COLOR_MODES` gets `P2160` (`THE_4_K`).
-  - CAMERA.md's mode table and OAK4.md's frame size section say so; OAK4.md says the exposure region is in the
-    delivered frame's coordinates, before the turn.
-
-  Check: the oak4 backend's tests in `.venv-oak4` and the OAK-D backend's in `.venv`, with `P2160` cases in
-  `test_warp_mesh` and `test_frame_size`; on the connected OAK4 over USB 3 at `P2160` and 30 fps, the rate held, the
-  color latency and the link's Mbit/s (about 2.1 Gbit/s of NV12, calculated), a row in OAK4.md's frame size table. If
-  `P2160` does not hold 30 fps on USB, the step ends with those numbers and takes `P1440` (1440 rows) instead.
 - G2 `modules/camera`: `bgr_frame(frame)`, the frame with its NV12 image converted to BGR (`nv12` off), any other
   frame as it is. `upright_image` keeps its one job and its assert. The OAK4's color frames are NV12, so smile's
   portrait crop (`FaceFinder.best`) and capture fallback (`Main`) call `upright_image(bgr_frame(frame))`. NV12 is
