@@ -1,5 +1,4 @@
 # Standard library imports
-from dataclasses import dataclass
 from enum import IntEnum
 from typing import cast
 
@@ -8,13 +7,14 @@ import numpy as np
 
 # Local application imports
 from modules.board import HasWindows
-from modules.gl import Fbo, Texture, Image, clear_color, Text
-from modules.utils import Color, Rect
+from modules.gl import Texture, Image, clear_color
+from modules.utils import Rect
 from modules.pose import FeatureWindow, BaseScalarFeature
 from modules.settings import BaseSettings
-from ...layer_base import LayerBase, DataCache
+from ...layer_base import LayerBase
 from .shaders import Window
-from .data_layer_settings import DataLayerSettingsProtocol, LayerMode, FEATURE_MAP, TRACK_COLOR_FEATURES, AngleOffset, has_pi_range, offset_angles
+from .data_layer_settings import DataLayerSettingsProtocol, LayerMode, FEATURE_MAP, AngleOffset, has_pi_range, offset_angles
+from .feature_plot import FeaturePlot
 from ...color_settings import ColorSettings
 
 
@@ -23,88 +23,66 @@ class FeatureWindowLayer(LayerBase):
 
     Displays feature values as horizontal lines (one per feature element),
     with time flowing left-to-right. Sources data from various window trackers
-    via DataHub per-track windows.
+    via the board's per-track windows.
     """
-    LAYER_MODE: LayerMode = LayerMode.WINDOW
 
     def __init__(self, track_id: int, board: HasWindows, settings: BaseSettings, color_settings: ColorSettings,
                  feature_map: dict[IntEnum, type[BaseScalarFeature]] = FEATURE_MAP) -> None:
         self._track_id: int = track_id
         self._board: HasWindows = board
         self.settings: DataLayerSettingsProtocol = cast(DataLayerSettingsProtocol, settings)
-        self._color_settings: ColorSettings = color_settings
-        self._feature_map: dict[IntEnum, type[BaseScalarFeature]] = feature_map
-        self._was_active: bool = False
-
-        self._fbo: Fbo = Fbo()
-        self._label_fbo: Fbo = Fbo()
+        self._plot: FeaturePlot[FeatureWindow] = FeaturePlot(LayerMode.WINDOW, self.settings, color_settings, feature_map,
+                                                             draw_labels=True, font_size=30)
         self._image: Image = Image()
-        self._data_cache: DataCache[FeatureWindow] = DataCache()
-        self._labels: list[str] = []
 
         self._width: int = 0
         self._height: int = 0
         self._stream_step_pixels: float = 0.0
 
-        self.draw_labels: bool = True
-
         self._shader: Window = Window()
-        self._text_renderer: Text = Text()
-
-    @property
-    def _is_active(self) -> bool:
-        return self.settings.mode == self.LAYER_MODE
 
     @property
     def texture(self) -> Texture:
-        return self._fbo
+        return self._plot.fbo
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         if width is None or height is None or internal_format is None:
             return
         self._width = width
         self._height = height
-        self._fbo.allocate(width, height, internal_format)
-        self._label_fbo.allocate(width, height, internal_format)
-        self._text_renderer.allocate(font_size=30)
+        self._plot.allocate(width, height, internal_format)
         self._shader.allocate()
 
     def deallocate(self) -> None:
-        self._fbo.deallocate()
-        self._label_fbo.deallocate()
+        self._plot.deallocate()
         self._image.deallocate()
         self._shader.deallocate()
-        self._text_renderer.deallocate()
 
     def clear(self) -> None:
         """Clear cached data."""
-        self._data_cache = DataCache()
-        self._labels = []
+        self._plot.clear()
 
     def draw(self) -> None:
-        if not self._is_active:
-            return
-        if self._fbo.allocated:
-            self._fbo.draw()
-            if self.draw_labels and self.settings.render_labels:
-                self._label_fbo.draw()
+        self._plot.draw()
+
+    def _label_place(self, i: int, count: int, rect: Rect) -> tuple[int, int]:
+        """Label i of a window: at the left, beside its stream."""
+        step: float = self._stream_step_pixels
+        return int(rect.x + 10), int(rect.y + rect.height - (rect.height - (i + 0.5) * step) - 7)
 
     def update(self) -> None:
-        """Update visualization from DataHub FeatureWindow."""
-        active = self._is_active
-        if self._was_active and not active:
-            self.clear()
-        self._was_active = active
-        if not active:
+        """Update visualization from the board's FeatureWindow."""
+        if not self._plot.update_active():
             return
-        # feature_field maps to feature type for DataHub lookup
-        feature_type = self._feature_map[self.settings.feature_field]
+        # feature_field maps to feature type for the board's lookup
+        feature_type = self._plot.feature_map[self.settings.feature_field]
         window: FeatureWindow | None = self._board.get_window(
             self.settings.stage, self._track_id, feature_type
         )
-        self._data_cache.set(window)
+        cache = self._plot.data_cache
+        cache.set(window)
 
-        if self._data_cache.idle or window is None:
+        if cache.idle or window is None:
             return
 
         # Convert numpy arrays to image format: (feature_len, time, 2)
@@ -121,18 +99,16 @@ class FeatureWindowLayer(LayerBase):
         self._image.set_image(stream_image)
         self._image.update()
 
-
         # Use window's display_range
         display_range = window.display_range
 
-        colors = self._resolve_colors()
-
         # Render using shader
-        self._fbo.begin()
+        fbo = self._plot.fbo
+        fbo.begin()
         clear_color()
         num_samples = stream_image.shape[1]  # time (width)
         num_streams = stream_image.shape[0]  # feature_len (height)
-        output_aspect = self._fbo.width / self._fbo.height
+        output_aspect = fbo.width / fbo.height
 
         # Constrain stream height to 20% of layer width
         max_stream_step = 0.2 * output_aspect
@@ -144,47 +120,12 @@ class FeatureWindowLayer(LayerBase):
             num_samples,
             num_streams,
             stream_step,
-            line_width=self.settings.line_width / self._fbo.height,
+            line_width=self.settings.line_width / fbo.height,
             output_aspect_ratio=output_aspect,
             display_range=display_range,
-            colors=colors,
+            colors=self._plot.colors(),
         )
-        self._fbo.end()
-
-        # Render labels if changed
-        if self.settings.render_labels:
-            labels: list[str] = window.feature_names
-            if labels != self._labels:
-                self._render_labels_static(self._label_fbo, labels, self._stream_step_pixels)
-                self._labels = labels
-
-    def _render_labels_static(self, fbo: Fbo, feature_names: list[str], step: float) -> None:
-        """Render feature labels overlay."""
-        rect = Rect(0, 0, fbo.width, fbo.height)
-
-        fbo.begin()
-        clear_color()
-
-        feature_num: int = len(feature_names)
-        colors = self._resolve_colors()
-
-        for i in range(feature_num):
-            string: str = feature_names[i]
-            x: int = int(rect.x + 10)
-            y: int = int(rect.y + rect.height - (rect.height - (i + 0.5) * step) - 7)
-            clr: int = i % len(colors)
-
-            self._text_renderer.draw_box_text(
-                x, y, string, Color(*colors[clr]), Color(0.0, 0.0, 0.0, 0.66),
-                screen_width=fbo.width, screen_height=fbo.height
-            )
-
         fbo.end()
 
-    def _resolve_colors(self) -> list[tuple[float, float, float, float]]:
-        if self.settings.use_history_color:
-            return [self._color_settings.history.to_tuple()]
-        feature_type = self._feature_map[self.settings.feature_field]
-        if feature_type in TRACK_COLOR_FEATURES:
-            return self._color_settings.track_color_tuples
-        return self._color_settings.default_color_tuples
+        if self.settings.render_labels:
+            self._plot.update_labels(window.feature_names, self._label_place)

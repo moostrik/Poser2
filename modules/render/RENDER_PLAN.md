@@ -13,10 +13,6 @@ The pixel buffer and fence code of `general/screen_recording` is not in this pla
 
 ## A. Code that does the same, written once
 
-- **A3** `FeatureFrameLayer` and `FeatureWindowLayer` share their mode check, colors, clear, draw and label drawing once, by composition.
-  - Why: `_is_active`, `clear`, `draw` and `_resolve_colors` are the same word for word, and the label drawing differs only in where a label sits (seen).
-  - Call sites: the four apps.
-  - Check: white_space -sim, hd_trio -sim and deep_flow -sim, with the data layers in frame and window mode.
 - **A4** The pose box-to-image transform becomes one method on `Points2D` (`modules/pose/features/points_2d.py`). It takes the box (`Rect`) and gives the points in image coordinates, keeping their scores. `PoseRenderer` and `PoseLineLayer` use it, and their `_transform_to_image_space` goes.
   - Why: `_transform_to_image_space` is written twice, and gl.md says "Simple geometry, as from poses, is worked out on the CPU, in plain modules" (seen).
   - Check: a new unit test in `modules/pose/tests`, and white_space -sim.
