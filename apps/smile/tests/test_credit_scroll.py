@@ -7,27 +7,12 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from apps.smile.credit_scroll import (SCREEN_PX, CreditScroller, RingPath, last_place, name_strip, parse_rows, plan_loops,
-                                   row_screens, screen_cell, scroll_copies, scroll_gone, scroll_offset)
+from apps.smile.credit_scroll import (CreditScroller, RingPath, last_place, name_strip, parse_rows, plan_loops, scroll_copies,
+                                   scroll_gone, scroll_offset)
+from apps.smile.sphere import SCREEN_WIDTH as SCREEN_PX
 
 
 class TestRows(unittest.TestCase):
-    def test_the_middle_rows_have_twelve_screens_and_the_outer_ones_six(self):
-        self.assertEqual(row_screens(1), [1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45])
-        self.assertEqual(row_screens(3), [3, 7, 11, 15, 19, 23, 27, 31, 35, 39, 43, 47])
-        self.assertEqual(row_screens(0), [0, 8, 16, 24, 32, 40])
-        self.assertEqual(row_screens(4), [4, 12, 20, 28, 36, 44])
-        # every screen is in exactly one row
-        self.assertEqual(sorted(s for row in range(5) for s in row_screens(row)), list(range(48)))
-
-    def test_a_screen_is_a_cell_of_a_wall_by_the_wiring(self):
-        self.assertEqual(screen_cell(0), (0, 0))
-        self.assertEqual(screen_cell(1), (0, 6))     # screen 2: unit 1 output 2, grid row 1
-        self.assertEqual(screen_cell(4), (0, 1))     # screen 5: unit 2 output 1
-        self.assertEqual(screen_cell(23), (0, 23))
-        self.assertEqual(screen_cell(24), (1, 0))
-        self.assertEqual(screen_cell(47), (1, 23))
-
     def test_the_rows_setting_is_parsed_leniently(self):
         self.assertEqual(parse_rows("1,3"), [1, 3])
         self.assertEqual(parse_rows(" 3 1 1"), [3, 1])
@@ -38,14 +23,14 @@ class TestRows(unittest.TestCase):
 class TestPath(unittest.TestCase):
     def test_the_path_goes_down_the_ribs_from_the_camera_and_round(self):
         # the ribs count to the camera's left, the visitor's right, and the word moves to the visitor's left
-        self.assertEqual(RingPath(1).screens, [1, 45, 41, 37, 33, 29, 25, 21, 17, 13, 9, 5])
-        self.assertEqual(RingPath(1, reverse=True).screens, [1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45])
-        self.assertEqual(RingPath(0).screens, [0, 40, 32, 24, 16, 8])
+        self.assertEqual(RingPath(1).screens, [2, 46, 42, 38, 34, 30, 26, 22, 18, 14, 10, 6])
+        self.assertEqual(RingPath(1, reverse=True).screens, [2, 6, 10, 14, 18, 22, 26, 30, 34, 38, 42, 46])
+        self.assertEqual(RingPath(0).screens, [1, 41, 33, 25, 17, 9])
         self.assertEqual(RingPath(1).count, 12)
         self.assertEqual(RingPath(4).count, 6)
 
     def test_each_wall_gets_its_own_cells_with_their_place_round_the_ring(self):
-        path = RingPath(1)       # screens (from 0) 1 | 45, 41, 37, 33, 29, 25 | 21, 17, 13, 9, 5: height 1, grid row 1
+        path = RingPath(1)       # screens 2 | 46, 42, 38, 34, 30, 26 | 22, 18, 14, 10, 6: height 1, grid row 1
         self.assertEqual(path.cells(0), [(6, 0), (11, 7), (10, 8), (9, 9), (8, 10), (7, 11)])
         self.assertEqual(path.cells(1), [(11, 1), (10, 2), (9, 3), (8, 4), (7, 5), (6, 6)])
         self.assertEqual(sorted(place for wall in (0, 1) for _, place in path.cells(wall)), list(range(12)))

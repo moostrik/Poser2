@@ -2,23 +2,19 @@ from enum import IntEnum
 
 from OpenGL.GL import glViewport
 
-from ...credit import FONT, TITLE_FONT, CreditLines, qr_image, title_image, wrap_balanced
-from modules.gl import ChannelOrder, Fbo, Image, BlendState, Text, Texture, shaders
-from modules.utils import Color
+from ...credit import CreditLines
+from modules.gl import Fbo, Texture, shaders
 from ...sequence import SequenceType
 from ..settings import RenderSettings
 
 from modules.render import LayerBase
+from .caption_renderer import CaptionRenderer
 from .passes import copy
+from .qr_code_layer import QrCodeLayer
 
 FONT_SIZE: int = 96
-TITLE_PX: int = round(FONT_SIZE / TITLE_FONT)      # the title's capitals as tall as the line's
 MARGIN_PX: int = 40             # from the image's edges
-LINE_SPACING: float = 1.0       # of the text's height
 OUTLINE_PX: int = 5             # the black edge round the letters, as on a meme
-TEXT_COLOR: Color = Color(1.0, 1.0, 1.0)
-OUTLINE_COLOR: Color = Color(0.0, 0.0, 0.0)
-OUTLINE: list[tuple[int, int]] = [(x, y) for x in (-OUTLINE_PX, 0, OUTLINE_PX) for y in (-OUTLINE_PX, 0, OUTLINE_PX) if x or y]
 FADE_S: float = 0.5             # the caption fades in and out over this time
 
 # the caption is shown with the visitor's portrait: from the first generated image, while the grin plays and
@@ -72,10 +68,8 @@ class CreditLayer(LayerBase):
         self._clean: Fbo = Fbo()            # and without the title: the phone's copy
         self._targets: dict[CreditView, Fbo] = {CreditView.ROOM: self._fbo, CreditView.CELL: self._cell, CreditView.PHONE: self._clean}
         self._mix: shaders.Mix = shaders.Mix()
-        self._text: Text = Text()
-        self._title: Image = Image(ChannelOrder.BGR)
-        self._qr: Image = Image(ChannelOrder.BGR)
-        self._qr_key: tuple[str, int] | None = None
+        self._caption: CaptionRenderer = CaptionRenderer(FONT_SIZE, OUTLINE_PX, MARGIN_PX)
+        self._qr: QrCodeLayer = QrCodeLayer()
         self._width: int = 1
         self._height: int = 1
 
@@ -88,8 +82,7 @@ class CreditLayer(LayerBase):
         self._cell.allocate(width, height, internal_format)
         self._clean.allocate(width, height, internal_format)
         self._mix.allocate()
-        if self._text.allocate(FONT, FONT_SIZE):
-            self._title.set_image(title_image('', TITLE_PX, outline_ratio=OUTLINE_PX / TITLE_PX))
+        self._caption.allocate()
 
     def deallocate(self) -> None:
         self._base.deallocate()
@@ -98,17 +91,12 @@ class CreditLayer(LayerBase):
         self._cell.deallocate()
         self._clean.deallocate()
         self._mix.deallocate()
-        self._text.deallocate()
-        self._title.deallocate()
+        self._caption.deallocate()
         self._qr.deallocate()
 
     def update(self) -> None:
-        self._title.update()
-        key: tuple[str, int] = (self.settings.credit_url, self.settings.credit_size)
-        if key != self._qr_key:
-            self._qr_key = key
-            self._qr.set_image(qr_image(*key))     # uploaded below, at its own size
-        self._qr.update()
+        self._caption.update()
+        self._qr.set(str(self.settings.credit_url), int(self.settings.credit_size))
 
     @property
     def texture(self) -> Texture:
@@ -133,11 +121,11 @@ class CreditLayer(LayerBase):
         target: Fbo = self._targets[view]
         self._base.begin()
         source.draw()
-        qr: int = self._qr.width if self._qr.allocated and view == CreditView.ROOM else 0
+        qr: int = self._qr.size if view == CreditView.ROOM else 0
         if qr:
             # the viewport's origin is the bottom left
             glViewport(self._width - MARGIN_PX - qr, MARGIN_PX, qr, qr)
-            self._qr.draw()
+            self._qr.texture.draw()
             glViewport(0, 0, self._width, self._height)
         self._base.end()
         if alpha <= 0.0:
@@ -145,7 +133,7 @@ class CreditLayer(LayerBase):
             return
         self._card.begin()
         self._base.draw()
-        self._draw_caption(view != CreditView.PHONE)
+        self._caption.draw(str(self.settings.credit_line), self._width, self._height, title=view != CreditView.PHONE)
         self._card.end()
         target.begin()
         self._mix.use(self._base, self._card, alpha)
@@ -154,25 +142,3 @@ class CreditLayer(LayerBase):
     def new_visitor(self) -> None:
         """Draw the line under the title for the visitor that is captured now."""
         self.settings.credit_line = self._lines.pick()
-
-    def _draw_caption(self, title: bool) -> None:
-        measure = lambda line: self._text.measure_text(line)[0]
-        width: int = self._width - 2 * MARGIN_PX
-        # the title, then the line under it; a line that is too wide for the image wraps
-        lines: list[str] = wrap_balanced(self.settings.credit_line, measure, width)
-        _, text_height = self._text.measure_text("Mg")
-        top: int = MARGIN_PX
-        BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
-        if title and self._title.allocated:
-            # the viewport's origin is the bottom left
-            glViewport((self._width - self._title.width) // 2, self._height - top - self._title.height, self._title.width, self._title.height)
-            self._title.draw()
-            glViewport(0, 0, self._width, self._height)
-            top += self._title.height
-        for i, line in enumerate(lines):
-            x: float = (self._width - measure(line)) / 2
-            y: float = top + i * text_height * LINE_SPACING
-            for dx, dy in OUTLINE:
-                self._text.draw_text(x + dx, y + dy, line, OUTLINE_COLOR, self._width, self._height)
-            self._text.draw_text(x, y, line, TEXT_COLOR, self._width, self._height)
-        BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)

@@ -7,13 +7,13 @@ from typing import Callable
 
 from .. import sphere
 
+from .music_map import LAUGHTER_FOLDER
 from .settings import AudioSettings
 
 logger = logging.getLogger(__name__)
 
 SCREENS: int = sphere.SCREENS   # the sphere: two walls of CELLS
 CELLS: int = sphere.CELLS       # cells per wall
-SAMPLE_FOLDER: str = 'apps/smile/data/audio/laughter'
 SAMPLE_TYPES: tuple[str, ...] = ('.wav', '.aif', '.aiff', '.mp3', '.flac', '.m4a', '.ogg')
 
 Send = Callable[[int, int, float, int], None]   # wall, cell, seconds, the number to show: the light on the wall
@@ -44,7 +44,7 @@ class LaughterTest:
     never raises there: a light or bang that fails is one warning per switch-on."""
 
     def __init__(self, settings: AudioSettings, send: Send | None = None, bang: Bang | None = None,
-                 folder: str = SAMPLE_FOLDER) -> None:
+                 folder: str = LAUGHTER_FOLDER) -> None:
         self.settings: AudioSettings = settings
         self._send: Send = send if send is not None else (lambda wall, cell, seconds, number: None)
         self._bang: Bang = bang if bang is not None else (lambda index, sample: None)

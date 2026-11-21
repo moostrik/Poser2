@@ -22,29 +22,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# the sphere and the wiring of its screens to the walls' cells are in `apps.smile.sphere`; here a screen
-# is counted from 0 (the sphere's number minus 1)
-ROWS: int = sphere.HEIGHTS
-SCREENS: int = sphere.SCREENS
-CELLS: int = sphere.CELLS
-WALLS: int = sphere.WALLS
-SCREEN_PX: int = 512            # a screen's width, in the wall's pixels (the clip's upright 512 x 640)
-SCREEN_HEIGHT_PX: int = 640
-
 DEFAULT_ROWS: str = "1,3"       # the rings with 12 screens, leaving the middle one to the clips
 DEFAULT_GAP_PX: int = 288       # the wall between two screens, found on site 2026-10-25
 SEND_EVERY: float = 1.0         # a loop is renewed every second
 TIMEOUT: float = 3.0            # the walls drop a loop that was not renewed for this long (the switch off, the test on)
-
-
-def row_screens(row: int) -> list[int]:
-    """The screens (from 0) of ring `row` in order round the sphere: 12 for rows 1 to 3, 6 for 0 and 4."""
-    return [screen - 1 for screen in sphere.row_screens(row)]
-
-
-def screen_cell(screen: int) -> tuple[int, int]:
-    """The wall (0 or 1) and its cell of a screen (from 0), by the wiring."""
-    return sphere.cell_of_screen(screen + 1)
 
 
 def parse_rows(text: str) -> list[int]:
@@ -55,7 +36,7 @@ def parse_rows(text: str) -> list[int]:
             row: int = int(part)
         except ValueError:
             continue
-        if 0 <= row < ROWS and row not in rows:
+        if 0 <= row < sphere.HEIGHTS and row not in rows:
             rows.append(row)
     return rows
 
@@ -70,18 +51,18 @@ class RingPath:
 
     @property
     def screens(self) -> list[int]:
-        ring: list[int] = row_screens(self.row)
+        ring: list[int] = sphere.row_screens(self.row)
         step: int = 1 if self.reverse else -1
         return [ring[(step * i) % len(ring)] for i in range(len(ring))]
 
     @property
     def count(self) -> int:
-        return len(row_screens(self.row))
+        return len(sphere.row_screens(self.row))
 
     def cells(self, wall: int) -> list[tuple[int, int]]:
         """The cells of `wall` on the ring, each with its place round it (0: the rib at the camera)."""
         return [(cell, place) for place, screen in enumerate(self.screens)
-                for w, cell in [screen_cell(screen)] if w == wall]
+                for w, cell in [sphere.cell_of_screen(screen)] if w == wall]
 
 
 def plan_loops(rows: list[int], words: list[str], reverse: bool) -> list[tuple[str, RingPath]]:
@@ -92,7 +73,7 @@ def plan_loops(rows: list[int], words: list[str], reverse: bool) -> list[tuple[s
     return [(words[index % len(words)], RingPath(row, reverse)) for index, row in enumerate(rows)]
 
 
-def scroll_offset(place: int, travelled: float, gap_px: float, screen_px: int = SCREEN_PX) -> float:
+def scroll_offset(place: int, travelled: float, gap_px: float, screen_px: int = sphere.SCREEN_WIDTH) -> float:
     """Where the screen at `place` is in the word's texture after the word moved `travelled` px: the texture
     x at the screen's left edge. The word reads left to right and moves to the left, as a ticker, so it
     enters the first screen at its right edge and the next screen lies beyond the first one's left edge, a
@@ -101,7 +82,7 @@ def scroll_offset(place: int, travelled: float, gap_px: float, screen_px: int = 
 
 
 def scroll_copies(place: int, ring: int, travelled: float, gap_px: float, strip_px: int, last: int | None = None,
-                  screen_px: int = SCREEN_PX) -> list[float]:
+                  screen_px: int = sphere.SCREEN_WIDTH) -> list[float]:
     """The offsets (`scroll_offset`) of the word on the screen at `place` of a ring of `ring` screens: this lap's
     and the tail of the lap before. `travelled` is not wrapped, so a screen is counted on from lap to lap: one
     before the first lap has nothing on it, so the word enters at the first screen's side, and neither has one
@@ -118,12 +99,12 @@ def scroll_copies(place: int, ring: int, travelled: float, gap_px: float, strip_
     return offsets
 
 
-def last_place(travelled: float, gap_px: float, screen_px: int = SCREEN_PX) -> int:
+def last_place(travelled: float, gap_px: float, screen_px: int = sphere.SCREEN_WIDTH) -> int:
     """The screen, counted on from lap to lap, that the head of a word has reached: where it leaves."""
     return int(travelled // (screen_px + gap_px))
 
 
-def scroll_gone(last: int, travelled: float, gap_px: float, strip_px: int, screen_px: int = SCREEN_PX) -> bool:
+def scroll_gone(last: int, travelled: float, gap_px: float, strip_px: int, screen_px: int = sphere.SCREEN_WIDTH) -> bool:
     """Whether the tail of a leaving word has passed the left side of its `last` screen."""
     return scroll_offset(last, travelled, gap_px, screen_px) >= strip_px
 
@@ -212,10 +193,10 @@ class CreditScroller:
         gap: int = int(settings.credit_scroll_gap)
         speeds: tuple[float, float] = (float(settings.credit_scroll_speed_1), float(settings.credit_scroll_speed_2))
         for index, (word, path) in enumerate(loops):
-            speed: float = max(1.0, speeds[min(index, 1)] * SCREEN_PX)
+            speed: float = max(1.0, speeds[min(index, 1)] * sphere.SCREEN_WIDTH)
             start: float = self.word_start(index, speed, now)
             last: int | None = last_place((now - start) * speed, gap) if leaving else None
-            for wall in range(WALLS):
+            for wall in range(sphere.WALLS):
                 cells: list[tuple[int, int]] = path.cells(wall)
                 if cells:
                     try:

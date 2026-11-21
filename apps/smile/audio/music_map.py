@@ -3,12 +3,13 @@ import logging
 import os
 import random
 
+from ..paths import DATA
 from .settings import AudioSettings
 
 logger = logging.getLogger(__name__)
 
-MUSIC_FOLDER: str = 'apps/smile/data/audio/SMILE-BS-Music'    # the tracks, named "<music id> <title>.mp3", as the Max patch reads them
-LAUGHTER_FOLDER: str = 'apps/smile/data/audio/laughter'        # the laughter samples (mp3 and wav), as the Max patch reads them
+MUSIC_FOLDER: str = f'{DATA}/audio/SMILE-BS-Music'     # the tracks, named "<music id> <title>.mp3", as the Max patch reads them
+LAUGHTER_FOLDER: str = f'{DATA}/audio/laughter'         # the laughter samples (mp3 and wav), as the Max patch reads them
 
 
 def track_path(music_id: str, folder: str = MUSIC_FOLDER) -> str | None:

@@ -27,6 +27,8 @@ OUTPUTS: int = 4                        # grid rows: a unit's outputs
 SECTORS: int = 3                        # the sphere in thirds, 4 ribs each: a visitor standing anywhere sees one whole
 CELL_WIDTH: int = 640                   # a cell of a wall's grid, px: a screen on its side
 CELL_HEIGHT: int = 512
+SCREEN_WIDTH: int = CELL_HEIGHT         # a screen upright, px: its cell turned a quarter
+SCREEN_HEIGHT: int = CELL_WIDTH
 
 
 def rib_height(screen: int) -> tuple[int, int]:

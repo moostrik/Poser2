@@ -22,6 +22,7 @@ from .save import ClipSaver
 from .lights import Lights
 from .online import Online, http_base
 from .player import OnlineCellMode, Player, online_cell_mode
+from .paths import DATA
 from . import sphere
 from modules.settings import SettingsStore
 from modules.panel import PanelServer
@@ -33,8 +34,6 @@ import time
 import numpy as np
 
 logger = logging.getLogger(__name__)
-
-DATA_PATH = 'apps/smile/data'
 
 # a visitor the generator has not ended this long after its own limit (connection.job_timeout) is ended
 # here: the generator answers by itself unless its thread is stuck, and then the flash would stay
@@ -74,7 +73,7 @@ class SmileMain():
         self.settings = Settings()
         self.settings.setup.panel.title = 'SMILE'
         self.settings.setup.panel.port = 667
-        self.store = SettingsStore(f'{DATA_PATH}/settings', default_startup='Smile')
+        self.store = SettingsStore(f'{DATA}/settings', default_startup='Smile')
         self.store.load_startup(self.settings)
         if not interface:
             self.settings.setup.panel.browser = False  # launcher override; the settings file cannot turn it back on
@@ -109,7 +108,7 @@ class SmileMain():
         self.recording_player: recording.Player | None = None
         device: CameraSource
         if simulation:
-            self.recording_player = recording.Player(self.settings.setup.camera.simulator, data_path=DATA_PATH)
+            self.recording_player = recording.Player(self.settings.setup.camera.simulator, data_path=DATA)
             device = replay.Camera(self.recording_player, self.settings.setup.camera.replay, None, None)
             device_name = 'replay'
         elif cam_type == CamType.VIMBA:
@@ -121,11 +120,11 @@ class SmileMain():
             device_name = 'webcam'
         self.camera: Camera = Camera(self.settings.setup.camera, device, device_name)
         # the device's frames as they came, recorded after the live path took them, in chunks the session splits
-        self.recorder: recording.Recorder = recording.Recorder(self.settings.setup.camera.recorder, data_path=DATA_PATH)
+        self.recorder: recording.Recorder = recording.Recorder(self.settings.setup.camera.recorder, data_path=DATA)
         self.session: Session = Session(self.settings.setup.camera.control)
         self.camera.add_device_frame_callback(self.recorder.submit_frame)
 
-        self.music_map: MusicMap = MusicMap(self.settings.setup.audio, f'{DATA_PATH}/audio/music_map.json')
+        self.music_map: MusicMap = MusicMap(self.settings.setup.audio, f'{DATA}/audio/music_map.json')
         self.osc: OscSender = OscSender(self.settings.setup.audio.osc, events=('/test_bang',))
         # the laughter test, stepped from sequence_callback: it lights the walls' cells and bangs Max
         self.laughter_test: LaughterTest = LaughterTest(self.settings.setup.audio, send=self.clip_player.light, bang=self._test_bang)
@@ -140,7 +139,7 @@ class SmileMain():
         self._judging: bool = False         # the camera states: the camera's frames go to the faces (the render's thread sets it)
         self._visitor_start: float | None = None    # the capture of the visitor the generator is working on
         self._flash_time: float = 0.0       # when the flash started: the music starts then (Max, the phone, the clip's sound)
-        self.lights: Lights = Lights(self.settings.setup.artnet, f'{DATA_PATH}/artnet.json')
+        self.lights: Lights = Lights(self.settings.setup.artnet, f'{DATA}/artnet.json')
         # SMILE Online: a turn for someone outside when the room's eye is free, stepped from sequence_callback
         self.online: Online = Online(self.settings.setup.online, self.camera, self.sequencer, self.face_finder, self.render.grab,
                                      lambda: self.settings.setup.render.credit_name,

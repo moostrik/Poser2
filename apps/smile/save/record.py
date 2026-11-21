@@ -16,6 +16,8 @@ import os
 from modules.settings import SettingsStore
 from modules import video
 
+from ..paths import DATA
+
 SOI: bytes = b'\xff\xd8'
 COM: int = 0xFE
 SOS: int = 0xDA
@@ -93,7 +95,7 @@ def main() -> None:
     text: str = json.dumps(record, indent=2, ensure_ascii=False)
 
     if args.setup:
-        store = SettingsStore('apps/smile/data/settings')
+        store = SettingsStore(f'{DATA}/settings')
         store.validate_name(args.setup)
         setup_path = store.path('setup', args.setup)
         setup_path.parent.mkdir(parents=True, exist_ok=True)

@@ -15,6 +15,7 @@ import os
 
 from .workflow import Workflow, _find
 from modules.settings import SettingsStore
+from ..paths import DATA
 from ..settings import Settings, SetupSettings
 
 CAPTURE: str = 'smile_capture.png'      # the name Generator uploads every capture under
@@ -58,11 +59,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description='Write the test workflow for the ComfyUI page')
     parser.add_argument('--setup', default='Smile', help='the setup file with the values to fill in')
     parser.add_argument('-s', '--style', default='a', choices=['a', 'b'], help='which of the two styles')
-    parser.add_argument('-o', '--out', default='apps/smile/data/comfy/smile_test.json', help='file to write')
+    parser.add_argument('-o', '--out', default=f'{DATA}/comfy/smile_test.json', help='file to write')
     args = parser.parse_args()
 
     settings = Settings()
-    if not SettingsStore('apps/smile/data/settings').load(settings, 'setup', args.setup):
+    if not SettingsStore(f'{DATA}/settings').load(settings, 'setup', args.setup):
         raise SystemExit(f'could not load setup file {args.setup}')
     workflow: dict = make_test_workflow(settings.setup.generator.connection.workflow, settings.setup, args.style)
     os.makedirs(os.path.dirname(args.out) or '.', exist_ok=True)

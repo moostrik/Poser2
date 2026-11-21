@@ -208,7 +208,7 @@ to the clip), drawn into a transparent portrait texture per cell (`WallComposito
 a test keeps the file equal to it) all come from it; a cabling that differs is changed there.
 The **scrolling name** (`credit_scroll.py`, no GL): while the installation is idle each word of `credit_name` goes round its own ring of the sphere, the first word on the
 first of `credit_scroll_rows` (`plan_loops`, `RingPath`: all the ring's screens from the rib at the camera down the rib numbers, since the ribs count to the camera's left,
-the visitor's right, and a ticker moves to the visitor's left; `reverse` the other way round; `row_screens`, `screen_cell`, screens counted from 0 there). `CreditScroller`
+the visitor's right, and a ticker moves to the visitor's left; `reverse` the other way round; the screens and their cells from `sphere.py`). `CreditScroller`
 (stepped from `Main.sequence_callback` with the frame's tick, `SequenceMessage.timestamp`; blocked during the laughter test and until `credit_scroll_idle` seconds after `Main._face_seen`, the last qualifying face or sequence frame outside
 the camera states, since the face finder gets no frames there) hands each wall its own cells with their place round the ring every `SEND_EVERY`
 second (`send_loops` to `Player.scroll_loop`: wall, word, px/s, gap, size, the ring's screens, `started` the time the loop began, the cells with their places, `last`),

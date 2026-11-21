@@ -11,13 +11,15 @@ import cv2
 import freetype
 import numpy as np
 
+from .paths import DATA
+
 logger = logging.getLogger(__name__)
 
 NAME: str = "Matthias Oostrik"
 LINE: str = "loves your smile!"             # the line under SMILE(ai) when the lines file has none
-LINES: str = "apps/smile/data/credit_lines.txt"        # one line each, blank lines and # comments skipped
+LINES: str = f"{DATA}/credit_lines.txt"     # one line each, blank lines and # comments skipped
 URL: str = "https://oostrik.net/smile"
-FONT: str = "apps/smile/data/Bangers-Regular.ttf"     # a comic book font: the credit is a joke (SIL Open Font License)
+FONT: str = f"{DATA}/Bangers-Regular.ttf"   # a comic book font: the credit is a joke (SIL Open Font License)
 
 QUIET_MODULES: int = 4      # white modules around the code: scanners need them (the QR standard's quiet zone)
 

@@ -16,6 +16,7 @@ from modules import video
 
 from .. import sphere
 from ..credit import CreditLines
+from ..paths import OUTPUT
 from .clip_cells import ClipCell, ClipCells
 from .clip_pool import Clip, ClipPool, next_start
 from .folder_scanner import FolderScanner
@@ -50,7 +51,7 @@ def online_cell_mode(enabled: bool, connected: bool, showing: bool) -> OnlineCel
 
 
 class Player:
-    def __init__(self, settings: WallsSettings, walls: list[Wall], lines: CreditLines, root: str = 'apps/smile/output/') -> None:
+    def __init__(self, settings: WallsSettings, walls: list[Wall], lines: CreditLines, root: str = OUTPUT) -> None:
         self.settings: WallsSettings = settings
         self.walls: list[Wall] = walls
         # the Max patch places a clip's laugh by the cell its play starts in: `/bang <cell>` to the wall's port

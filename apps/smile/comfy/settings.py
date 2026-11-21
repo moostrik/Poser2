@@ -9,11 +9,13 @@ from enum import Enum
 
 from modules.settings import BaseSettings, Field, Group, Widget
 
+from ..paths import DATA
+
 
 class ConnectionSettings(BaseSettings):
     host:          Field[str]   = Field("127.0.0.1", access=Field.INIT, widget=Widget.ip_field, description="ComfyUI server address")
     port:          Field[int]   = Field(8188, access=Field.INIT, widget=Widget.number_field, description="ComfyUI server port")
-    workflow:      Field[str]   = Field("apps/smile/data/comfy/smile_workflow.json", access=Field.INIT, description="Workflow in ComfyUI API format (structure only)")
+    workflow:      Field[str]   = Field(f"{DATA}/comfy/smile_workflow.json", access=Field.INIT, description="Workflow in ComfyUI API format (structure only)")
     connected:     Field[bool]  = Field(False, access=Field.READ, description="Connected to ComfyUI")
     status:        Field[str]   = Field("", access=Field.READ, description="Generator status")
     last_duration: Field[float] = Field(0.0, access=Field.READ, pinned=True, description="Duration of the last generation (s)")

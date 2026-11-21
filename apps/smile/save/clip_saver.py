@@ -9,6 +9,7 @@ import logging
 from typing import Callable, Protocol
 
 from . import share
+from ..paths import OUTPUT
 from .record import embed_jpeg
 from modules import video
 from modules.settings import BaseSettings, Field
@@ -47,7 +48,7 @@ class ClipSaver:
     lands after it: the visitor outside is waiting for theirs. The save thread is the only
     owner of the encoder process; the other threads only enqueue commands, in order."""
 
-    def __init__(self, settings: ClipSaverSettings, grin: GrinRate, credit_name: Callable[[], str], root: str = 'apps/smile/output/',
+    def __init__(self, settings: ClipSaverSettings, grin: GrinRate, credit_name: Callable[[], str], root: str = OUTPUT,
                  max_queue_size: int = 64) -> None:
         self.settings: ClipSaverSettings = settings
         self._grin: GrinRate = grin             # the clip's fps, read at each visitor's open

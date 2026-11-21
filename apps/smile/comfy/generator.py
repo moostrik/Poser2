@@ -28,6 +28,7 @@ from requests import RequestException
 from modules.utils import Broadcast
 
 from .client import ComfyClient, Event as ComfyEvent
+from ..paths import DATA
 from ..sequence import GrinPlayer
 from .messages import GeneratorMessage, GeneratorState, GeneratorMessageCallback
 from .settings import GeneratorSettings, StyleSettings
@@ -36,7 +37,7 @@ from .workflow import NO_LORA, Workflow
 
 logger = logging.getLogger(__name__)
 
-WARMUP_IMAGE: str = 'apps/smile/data/comfy/warmup.jpg'
+WARMUP_IMAGE: str = f'{DATA}/comfy/warmup.jpg'
 WARMUP_TIMEOUT: float = 300.0   # s; the warm-up loads every model, a visitor has connection.job_timeout
 WARMUP_RETRY: float = 5.0       # s before a failed warm-up is tried again
 RECONNECT_INTERVAL: float = 2.0

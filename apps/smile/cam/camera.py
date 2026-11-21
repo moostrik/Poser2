@@ -20,13 +20,14 @@ from typing import Any
 import cv2
 import numpy as np
 
+from ..paths import DATA
 from .settings import CameraSettings
 from modules.camera import CameraFrame, CameraFrameCallback, CameraSource, FrameType
 from modules.utils import Broadcast, Waker
 
 logger = logging.getLogger(__name__)
 
-IMAGE_FOLDER: str = 'apps/smile/data/input'
+IMAGE_FOLDER: str = f'{DATA}/input'
 IMAGE_EXTENSIONS: tuple[str, ...] = ('.jpg', '.jpeg', '.png')
 IMAGE_FPS: float = 25.0
 STALLED_AFTER: float = 3.0      # s without a frame: the source has stopped

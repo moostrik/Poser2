@@ -27,6 +27,7 @@ import cv2
 from .client import ComfyClient, Event
 from .generator import WARMUP_IMAGE, WARMUP_TIMEOUT
 from .workflow import NO_LORA, Workflow
+from ..paths import DATA
 from ..settings import Settings
 from modules.settings import SettingsStore
 
@@ -35,7 +36,7 @@ logger = logging.getLogger('smoke')
 ROOT: Path = Path(__file__).resolve().parents[3]       # the Poser2 root: the app runs from it
 APP: Path = ROOT / 'apps' / 'smile'
 START_TIMEOUT: float = 240.0        # s for ComfyUI to answer /system_stats (the packs import torch, insightface, transformers)
-SETTINGS: str = 'apps/smile/data/settings'     # the app's settings folder
+SETTINGS: str = f'{DATA}/settings'     # the app's settings folder
 SETUP: str = 'Smile'
 
 

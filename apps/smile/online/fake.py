@@ -20,6 +20,7 @@ import cv2
 import numpy as np
 
 from .link import Link, encode, read_token
+from .settings import TOKEN_FILE
 
 logger = logging.getLogger('fake-smile')
 
@@ -200,7 +201,7 @@ class FakeSmile:
 def main() -> None:
     parser = argparse.ArgumentParser(description='a stand-in for SMILE at the relay')
     parser.add_argument('--relay', default='ws://127.0.0.1:8800/ws/smile')
-    parser.add_argument('--token-file', default='apps/smile/data/online_token.txt')
+    parser.add_argument('--token-file', default=TOKEN_FILE)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
     token: str = read_token(args.token_file)

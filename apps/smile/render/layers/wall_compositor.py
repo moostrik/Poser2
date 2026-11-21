@@ -9,12 +9,14 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA8, GL_RGBA16F, GL_SCISSOR_TES
                        glDisable, glEnable, glScissor, glViewport)
 
 from ... import sphere
-from ...credit import FONT, TITLE_FONT, qr_image, quiet_px, title_image, wrap_balanced
+from ...credit import FONT
 from ...credit_scroll import TIMEOUT as SCROLL_TIMEOUT, name_strip, scroll_copies, scroll_gone
 from ...player import OnlineCellMode, WallsSettings
 from modules.gl import ChannelOrder, Fbo, Image, Shader, BlendState, SwapFbo, Text, Texture, shaders
 from modules.utils import Color, Point2f, Quad
 from ..settings import RenderSettings
+from .caption_renderer import CaptionRenderer
+from .qr_code_layer import QrCodeLayer
 
 # A texture turned a quarter counterclockwise, its top along the cell's left edge: the cell's corners in the texture
 QUARTER_TURN: Quad = Quad(Point2f(1.0, 0.0), Point2f(1.0, 1.0), Point2f(0.0, 1.0), Point2f(0.0, 0.0))
@@ -35,13 +37,8 @@ ONLINE_LINE: str = 'SMILE from your phone'
 
 # a clip's caption, in the clip's upright 512 x 640: SMILE(ai) over the top, the line along the bottom, as on the main screen
 CAPTION_PX: int = 44
-CAPTION_TITLE_PX: int = round(CAPTION_PX / TITLE_FONT)
 CAPTION_MARGIN_PX: int = 20
 CAPTION_OUTLINE_PX: int = 3
-CAPTION_COLOR: Color = Color(1.0, 1.0, 1.0)
-CAPTION_OUTLINE_COLOR: Color = Color(0.0, 0.0, 0.0)
-CAPTION_OUTLINE: list[tuple[int, int]] = [(x, y) for x in (-CAPTION_OUTLINE_PX, 0, CAPTION_OUTLINE_PX)
-                                          for y in (-CAPTION_OUTLINE_PX, 0, CAPTION_OUTLINE_PX) if x or y]
 
 
 class Scroll:
@@ -145,7 +142,7 @@ class WallCompositor:
         self._credit_cell: int | None = None
         self._credit_left: int | None = None
         self._credit_fbo: Fbo = Fbo()
-        self._credit_qr: Image = Image(ChannelOrder.BGR)
+        self._credit_qr: QrCodeLayer = QrCodeLayer()
         self._credit_key: tuple[str, str] | None = None     # the url and name the card was drawn with
         self._credit_name_text: Text = Text()
         # the online cell: its card like the credit's, and the main screen's picture during a turn
@@ -154,7 +151,7 @@ class WallCompositor:
         self._online_view: Texture | None = None
         self._online_page: str = ''
         self._online_fbo: Fbo = Fbo()
-        self._online_qr: Image = Image(ChannelOrder.BGR)
+        self._online_qr: QrCodeLayer = QrCodeLayer()
         self._online_key: str | None = None                 # the url the card was drawn with
         self._online_text: Text = Text()
         # the clips' captions: per cell a line, drawn with the title into a transparent portrait texture when
@@ -162,8 +159,7 @@ class WallCompositor:
         self._captions: dict[int, str] = {id: '' for id in ids}
         self._caption_drawn: dict[int, str | None] = {id: None for id in ids}
         self._caption_fbos: dict[int, Fbo] = {id: Fbo() for id in ids}
-        self._caption_text: Text = Text()
-        self._caption_title: Image = Image(ChannelOrder.BGR)
+        self._caption: CaptionRenderer = CaptionRenderer(CAPTION_PX, CAPTION_OUTLINE_PX, CAPTION_MARGIN_PX)
         # the scrolling name: the words going round, a strip texture per word and size in use, and per cell a
         # transparent portrait texture with the parts of the strips on that screen
         self._scrolls: list[Scroll] = []
@@ -189,9 +185,7 @@ class WallCompositor:
         self._credit_key = self._online_key = None
         for fbo in self._caption_fbos.values():
             fbo.allocate(self.CELL_HEIGHT, self.CELL_WIDTH, GL_RGBA8)
-        if self._caption_text.allocate(FONT, CAPTION_PX):
-            self._caption_title.set_image(title_image('', CAPTION_TITLE_PX, outline_ratio=CAPTION_OUTLINE_PX / CAPTION_TITLE_PX))
-        else:
+        if not self._caption.allocate():
             logger.warning('No font for the captions: the clips play without')
         for fbo in self._scroll_fbos.values():
             fbo.allocate(self.CELL_HEIGHT, self.CELL_WIDTH, GL_RGBA8)
@@ -209,8 +203,7 @@ class WallCompositor:
         self._online_fbo.deallocate()
         self._online_qr.deallocate()
         self._online_text.deallocate()
-        self._caption_text.deallocate()
-        self._caption_title.deallocate()
+        self._caption.deallocate()
         for fbo in self._caption_fbos.values():
             fbo.deallocate()
         for fbo in self._scroll_fbos.values():
@@ -257,7 +250,7 @@ class WallCompositor:
         starts = [id for id in starts if id != online]
         for image in self._images.values():
             image.update()
-        self._caption_title.update()
+        self._caption.update()
         if credit:
             self._credit_cell, self._credit_left = next_credit_cell(self._credit_cell, self._credit_left, flashes, online)
         else:
@@ -353,25 +346,8 @@ class WallCompositor:
         fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 0.0)
         glClear(GL_COLOR_BUFFER_BIT)
-        text: Text = self._caption_text
-        title: Image = self._caption_title
-        if text.allocated and line:
-            measure = lambda part: text.measure_text(part)[0]
-            _, line_height = text.measure_text("Mg")
-            bottom: list[str] = wrap_balanced(line, measure, width - 2 * CAPTION_MARGIN_PX)
-            y: float = height - CAPTION_MARGIN_PX - len(bottom) * line_height
-            BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
-            if title.allocated:
-                # the viewport's origin is the bottom left
-                glViewport((width - title.width) // 2, height - CAPTION_MARGIN_PX - title.height, title.width, title.height)
-                title.draw()
-                glViewport(0, 0, width, height)
-            for i, part in enumerate(bottom):
-                x: float = (width - measure(part)) / 2
-                for dx, dy in CAPTION_OUTLINE:
-                    text.draw_text(x + dx, y + i * line_height + dy, part, CAPTION_OUTLINE_COLOR, width, height)
-                text.draw_text(x, y + i * line_height, part, CAPTION_COLOR, width, height)
-            BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
+        if self._caption.allocated and line:
+            self._caption.draw(line, width, height, bottom=True)
         fbo.end()
 
     def _draw_scrolls(self, scrolls: list[Scroll], now_perf: float) -> list[int]:
@@ -432,14 +408,13 @@ class WallCompositor:
             self._online_key = url
             self._draw_card(self._online_fbo, self._online_qr, self._online_text, url, ONLINE_LINE)
 
-    def _draw_card(self, fbo: Fbo, qr: Image, text: Text, url: str, line: str) -> None:
+    def _draw_card(self, fbo: Fbo, qr: QrCodeLayer, text: Text, url: str, line: str) -> None:
         """A card texture: white, the QR code of `url` and `line` under it as wide as the code, together in
         the middle (the line's font at the size that makes it the code's width)."""
-        image: np.ndarray = qr_image(url, CREDIT_QR_PX)
-        qr.set_image(image)
-        qr.update()
-        quiet: int = quiet_px(image)
-        code: int = (qr.width if qr.allocated else 0) - 2 * quiet
+        qr.set(url, CREDIT_QR_PX)
+        size: int = qr.size
+        quiet: int = qr.quiet
+        code: int = size - 2 * quiet if size else 0
         text.deallocate()
         name_width = name_height = 0
         if line and code > 0 and text.allocate(FONT, CREDIT_PROBE_PX):
@@ -453,12 +428,11 @@ class WallCompositor:
         fbo.begin()
         glClearColor(1.0, 1.0, 1.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
-        size: int = qr.width if qr.allocated else 0
         top: float = (height - code - CREDIT_GAP_PX - name_height) / 2       # of the code, from the top
         if size:
             # the viewport's origin is the bottom left
             glViewport((width - size) // 2, round(height - top + quiet - size), size, size)
-            qr.draw()
+            qr.texture.draw()
             glViewport(0, 0, width, height)
         if name_width:
             BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
