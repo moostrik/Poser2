@@ -1,7 +1,4 @@
-"""GPU-based text rendering using VAO and font texture atlas.
-
-Uses freetype-py to generate a font atlas at allocation time.
-"""
+"""Text: strings drawn from a font atlas (freetype-py, made at allocate), one draw a string, with an optional box."""
 
 import ctypes
 from pathlib import Path
@@ -16,24 +13,11 @@ from .font_atlas import FontAtlas
 from .text_layout import text_layout
 
 
-# Default font path
-DEFAULT_FONT = "data/RobotoMono-Regular.ttf"
+DEFAULT_FONT: Path = Path(__file__).with_name("RobotoMono-Regular.ttf")    # beside it, its licence RobotoMono-OFL.txt
 
 
 class Text:
-    """GPU-based text renderer using texture atlas.
-
-    Renders text strings using a pre-built font texture atlas.
-    Supports colored text with optional background boxes.
-
-    Example:
-        renderer = Text()
-        renderer.allocate("path/to/font.ttf", 16)
-        renderer.draw_box_text(10, 10, "Hello World",
-                               Color(1, 1, 1), Color(0, 0, 0, 0.6),
-                               screen_width, screen_height)
-        renderer.deallocate()
-    """
+    """A text renderer: strings in a color from its font atlas, each one draw, optionally on a box."""
 
     # Default padding around text for background box (in pixels)
     BOX_PADDING = 3
@@ -54,7 +38,7 @@ class Text:
         """Initialize text rendering resources.
 
         Args:
-            font_path: Path to TTF font file (defaults to RobotoMono-Regular.ttf)
+            font_path: Path to TTF font file (defaults to Roboto Mono, beside this module)
             font_size: Font size in pixels
 
         Returns:

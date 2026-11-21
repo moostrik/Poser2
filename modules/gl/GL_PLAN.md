@@ -7,16 +7,6 @@ shader_check compares with references made at HEAD before the first step. A run 
 tasklist check that no app is running, unless Matthias says he is using the PC or the app.
 
 
-## C. Text's font in its package
-
-- C1. `RobotoMono-Regular.ttf` moves from `data/` into `gl/text` with its licence (Apache 2.0) beside it, and `Text`
-  finds it beside `text.py`; the three pose layers that pass its path (`render/modules/pose/feature_frame_layer.py`,
-  `feature_window_layer.py`, `motion_time_renderer.py`) take the default. Why: `Text.DEFAULT_FONT` is
-  `data/RobotoMono-Regular.ttf`, found from the working directory, outside the package that uses it, and no licence
-  for it is in the repo (seen). Check: shader_check (Text); a text draw in hd_trio -sim (the pose layers' text).
-
-GL.md says what each step adds where it is described: the font's place under text.
-
 Form, done only in a commit that opens the file anyway, never as a step of its own: PEP 8 in `fbo.py` and
 the imports of `image.py` and `tensor.py` (with A1 to A4); the docstrings of `Texture3D` and `Texture2DArray` (with
 A1), `ComputeShader` (with B1) and `Text` (with C1) say what the thing is, the 3D-tiling reason going to GL.md; the

@@ -28,7 +28,7 @@ class MotionTimeRenderer(LayerBase):
         if width and height:
             self._width = width
             self._height = height
-        self._text_renderer.allocate("data/RobotoMono-Regular.ttf", font_size=40)
+        self._text_renderer.allocate(font_size=40)
 
     def deallocate(self) -> None:
         self._text_renderer.deallocate()

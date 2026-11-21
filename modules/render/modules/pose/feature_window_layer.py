@@ -66,7 +66,7 @@ class FeatureWindowLayer(LayerBase):
         self._height = height
         self._fbo.allocate(width, height, internal_format)
         self._label_fbo.allocate(width, height, internal_format)
-        self._text_renderer.allocate("data/RobotoMono-Regular.ttf", font_size=30)
+        self._text_renderer.allocate(font_size=30)
         self._shader.allocate()
 
     def deallocate(self) -> None:
