@@ -11,7 +11,7 @@ from modules.gl import Fbo, Shader, BlendState, Texture, clear_color
 from modules.render import LayerBase
 from modules.utils import fit
 from modules.window import RenderBase
-from ..player import WallsSettings
+from ..player import OnlineCellMode, WallsSettings
 from .inputs import Inputs
 from .layers import (BloomLayer, CameraLayer, CreditLayer, CreditView, DiffusionLayer, FlashLayer, RevealLayer,
                      StatusLayer, WallCompositor, caption_shown, copy, fade_step, new_line_due)
@@ -76,7 +76,7 @@ class SmileRender(RenderBase):
         self.grab: ScreenGrab = ScreenGrab()
         self._cell_view: Texture = self._output      # the output as the online cell shows it: no QR code, no status line
         # the walls of the sphere; which cell of which one is SMILE Online's is on the board
-        self.walls: list[WallCompositor] = [WallCompositor(settings, walls_settings, [str(i) for i in range(sphere.CELLS)])
+        self.walls: list[WallCompositor] = [WallCompositor(settings, walls_settings, list(range(sphere.CELLS)))
                                             for _ in range(sphere.WALLS)]
 
         self.window_manager.input.add_key_callback(self._on_key)
@@ -148,7 +148,7 @@ class SmileRender(RenderBase):
             if grab:
                 self._credit.render(self._output, 0.0 if self.grab.clean else self._credit_alpha, CreditView.PHONE)
                 self.grab.grab(self._credit.clean)
-            if online is not None and online.mode == 'screen':
+            if online is not None and online.mode == OnlineCellMode.SCREEN:
                 self._credit.render(self._output, self._credit_alpha, CreditView.CELL)
             self._cell_view = self._credit.cell
             self._credit.render(self._output, self._credit_alpha)
@@ -164,7 +164,8 @@ class SmileRender(RenderBase):
         windows = self.windows.windows
         for index, wall in enumerate(self.walls):
             if online is not None and online.wall == index:
-                wall.set_online(str(online.cell), online.mode, self._cell_view if online.mode == 'screen' else None, online.page)
+                wall.set_online(online.cell, online.mode, self._cell_view if online.mode == OnlineCellMode.SCREEN else None,
+                                online.page)
             else:
                 wall.set_online(None)
             if index + 1 < len(windows) and windows[index + 1].enabled:

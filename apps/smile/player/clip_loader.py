@@ -9,7 +9,7 @@ from modules.utils import Waker
 from .clip_pool import ClipPool, Clip
 from .settings import WallsSettings
 
-ImageCallback= Callable[[str, np.ndarray, bool], None]
+ImageCallback= Callable[[int, np.ndarray, bool], None]
 
 LoaderCallback= Callable[[int], None]     # the cell a play starts in
 
@@ -26,7 +26,7 @@ class ClipLoader(Thread):
     on its own clock, one after the other, at the speed the settings say at each play (`fps`, `spread`).
     `sector` is the cell's third of the sphere, which the pool keeps every recent recording on."""
 
-    def __init__(self, id: str, pool: ClipPool, settings: WallsSettings, sector: int = 0) -> None:
+    def __init__(self, id: int, pool: ClipPool, settings: WallsSettings, sector: int = 0) -> None:
         super().__init__()
         self._callback_mutex: Lock = Lock()
         self._stop_event: Event = Event()
@@ -34,7 +34,7 @@ class ClipLoader(Thread):
         self._message_callbacks: list[ImageCallback] = []
         self._loader_callbacks: list[LoaderCallback] = []
 
-        self._id: str = id
+        self._id: int = id
         self.pool: ClipPool = pool
         self.settings: WallsSettings = settings   # fps (0 plays each clip at its own rate) and spread (a fraction)
         self.sector: int = sector
@@ -76,7 +76,7 @@ class ClipLoader(Thread):
         interval: float = 1.0 / play_rate(float(self.settings.fps), clip.fps, float(self.settings.spread))
         count: int = len(clip.frames)
         # the cell this play starts in: the Max patch places the laugh by the cell's screen
-        self._loader_callback(int(self._id))
+        self._loader_callback(self._id)
         for i in range(count):
             if self._stop_event.is_set():
                 return

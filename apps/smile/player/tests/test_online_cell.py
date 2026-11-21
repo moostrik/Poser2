@@ -3,15 +3,15 @@
 import unittest
 from unittest import mock
 
-from apps.smile.player.player import Player, online_cell_mode
+from apps.smile.player.player import OnlineCellMode, Player, online_cell_mode
 
 
 class TestOnlineCellMode(unittest.TestCase):
     def test_a_clip_while_off_or_without_the_relay_the_card_while_free_the_screen_during_a_turn(self):
-        self.assertEqual(online_cell_mode(False, True, True), 'clip')
-        self.assertEqual(online_cell_mode(True, False, False), 'clip')
-        self.assertEqual(online_cell_mode(True, True, False), 'qr')
-        self.assertEqual(online_cell_mode(True, True, True), 'screen')
+        self.assertIs(online_cell_mode(False, True, True), OnlineCellMode.CLIP)
+        self.assertIs(online_cell_mode(True, False, False), OnlineCellMode.CLIP)
+        self.assertIs(online_cell_mode(True, True, False), OnlineCellMode.QR)
+        self.assertIs(online_cell_mode(True, True, True), OnlineCellMode.SCREEN)
 
 
 class TestPlaysOnTheOnlineCell(unittest.TestCase):
@@ -28,7 +28,7 @@ class TestPlaysOnTheOnlineCell(unittest.TestCase):
     def test_a_play_bangs_max_and_captions_the_cell_on_its_wall(self):
         self.clip_player._on_play(30)                    # wall 1, cell 6
         self.clip_player.osc[1].submit.assert_called_once_with('/bang', 6)
-        self.walls[1].set_caption.assert_called_once_with('6', 'a line')
+        self.walls[1].set_caption.assert_called_once_with(6, 'a line')
         self.clip_player.osc[0].submit.assert_not_called()
 
     def test_the_online_cells_play_is_nobodys(self):

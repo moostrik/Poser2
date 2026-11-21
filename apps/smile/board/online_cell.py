@@ -1,15 +1,20 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from threading import Lock
-from typing import Protocol
+from typing import Protocol, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..player import OnlineCellMode
 
 
 @dataclass(frozen=True)
 class OnlineCell:
-    """SMILE Online's cell of the walls: the wall, its cell, what it shows (`qr`, the card with the code to `page`, or
-    `screen`, the main screen as the phone sees it) and the phone page."""
+    """SMILE Online's cell of the walls: the wall, its cell, what it shows (`QR`, the card with the code to `page`, or
+    `SCREEN`, the main screen as the phone sees it) and the phone page."""
     wall: int
     cell: int
-    mode: str
+    mode: OnlineCellMode
     page: str
 
 

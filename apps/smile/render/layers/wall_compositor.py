@@ -11,7 +11,7 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA8, GL_RGBA16F, GL_SCISSOR_TES
 from ... import sphere
 from ...credit import FONT, TITLE_FONT, qr_image, quiet_px, title_image, wrap_balanced
 from ...credit_scroll import TIMEOUT as SCROLL_TIMEOUT, name_strip, scroll_copies, scroll_gone
-from ...player import WallsSettings
+from ...player import OnlineCellMode, WallsSettings
 from modules.gl import ChannelOrder, Fbo, Image, Shader, BlendState, SwapFbo, Text, Texture, shaders
 from modules.utils import Color, Point2f, Quad
 from ..settings import RenderSettings
@@ -51,14 +51,14 @@ class Scroll:
     to leave, until it has run out at the left side of the screen `last`. Every time is
     `time.perf_counter()`, the scroller's and the frames'."""
 
-    def __init__(self, name: str, speed: float, gap: float, size: int, ring: int, cells: list[tuple[str, int]],
+    def __init__(self, name: str, speed: float, gap: float, size: int, ring: int, cells: list[tuple[int, int]],
                  started: float, expires: float) -> None:
         self.name: str = name
         self.speed: float = speed
         self.gap: float = gap
         self.size: int = size
         self.ring: int = ring
-        self.cells: list[tuple[str, int]] = cells
+        self.cells: list[tuple[int, int]] = cells
         self.started: float = started
         self.expires: float = expires
         self.last: int | None = None
@@ -71,7 +71,7 @@ class Scroll:
         return max(0.0, now_perf - self.started) * self.speed
 
 
-def lit_cells(lit: dict[str, float], now: float) -> list[str]:
+def lit_cells(lit: dict[int, float], now: float) -> list[int]:
     """The cells lit at `now` (id -> the time its light ends), in the order they were lit; the ones
     that ended are dropped from `lit`."""
     for id in [id for id, until in lit.items() if until <= now]:
@@ -79,8 +79,8 @@ def lit_cells(lit: dict[str, float], now: float) -> list[str]:
     return list(lit)
 
 
-def next_credit_cell(current: str | None, left: str | None, started: list[str],
-                     exclude: str | None = None) -> tuple[str | None, str | None]:
+def next_credit_cell(current: int | None, left: int | None, started: list[int],
+                     exclude: int | None = None) -> tuple[int | None, int | None]:
     """The credit's cell and the cell it last left, after the cells in `started` started a clip this frame.
     The credit stays for one play: it leaves its cell when the next clip starts there, and takes a cell
     whose clip starts, never the one it just left (with none, it waits for the next start). It never
@@ -88,7 +88,7 @@ def next_credit_cell(current: str | None, left: str | None, started: list[str],
     if current is not None and (current in started or current == exclude):
         current, left = None, current
     if current is None:
-        candidates: list[str] = [id for id in started if id != left and id != exclude]
+        candidates: list[int] = [id for id in started if id != left and id != exclude]
         if candidates:
             current = random.choice(candidates)
     return current, left
@@ -112,23 +112,23 @@ class WallCompositor:
     CELL_WIDTH: int = sphere.CELL_WIDTH
     CELL_HEIGHT: int = sphere.CELL_HEIGHT
 
-    def __init__(self, settings: RenderSettings, walls_settings: WallsSettings, ids: list[str]) -> None:
+    def __init__(self, settings: RenderSettings, walls_settings: WallsSettings, ids: list[int]) -> None:
         self.settings: RenderSettings = settings       # the credit fields
         self.walls_settings: WallsSettings = walls_settings   # the trail
 
         self.width: int = self.COLUMNS * self.CELL_WIDTH
         self.height: int = ceil(len(ids) / self.COLUMNS) * self.CELL_HEIGHT
 
-        self._ids: list[str] = ids
-        self._images: dict[str, Image] = {id: Image(ChannelOrder.BGR) for id in ids}
+        self._ids: list[int] = ids
+        self._images: dict[int, Image] = {id: Image(ChannelOrder.BGR) for id in ids}
         # 1: first image of a sequence arrived (flash white), 2: flashed (draw the image directly), 0: playing
-        self._initials: dict[str, int] = {id: 0 for id in ids}
-        self._lit: dict[str, float] = {}       # cells the laughter test lights: id -> when the light ends
-        self._numbers: dict[str, int] = {}     # and the screen number each shows (0: none)
+        self._initials: dict[int, int] = {id: 0 for id in ids}
+        self._lit: dict[int, float] = {}       # cells the laughter test lights: id -> when the light ends
+        self._numbers: dict[int, int] = {}     # and the screen number each shows (0: none)
         self._mutex: Lock = Lock()
 
         # cell rectangles in framebuffer pixels (origin bottom left), cell 0 at the top left
-        self._rects: dict[str, tuple[int, int, int, int]] = {}
+        self._rects: dict[int, tuple[int, int, int, int]] = {}
         for i, id in enumerate(ids):
             column: int = i % self.COLUMNS
             row: int = i // self.COLUMNS
@@ -142,15 +142,15 @@ class WallCompositor:
         self._number_fbo: Fbo = Fbo()
         self._text: Text = Text()
         # the credit: drawn upright into a portrait texture like the number, on the cell `_credit_cell`
-        self._credit_cell: str | None = None
-        self._credit_left: str | None = None
+        self._credit_cell: int | None = None
+        self._credit_left: int | None = None
         self._credit_fbo: Fbo = Fbo()
         self._credit_qr: Image = Image(ChannelOrder.BGR)
         self._credit_key: tuple[str, str] | None = None     # the url and name the card was drawn with
         self._credit_name_text: Text = Text()
         # the online cell: its card like the credit's, and the main screen's picture during a turn
-        self._online_cell: str | None = None
-        self._online_mode: str = 'clip'
+        self._online_cell: int | None = None
+        self._online_mode: OnlineCellMode = OnlineCellMode.CLIP
         self._online_view: Texture | None = None
         self._online_page: str = ''
         self._online_fbo: Fbo = Fbo()
@@ -159,16 +159,16 @@ class WallCompositor:
         self._online_text: Text = Text()
         # the clips' captions: per cell a line, drawn with the title into a transparent portrait texture when
         # it changes, and blitted over the cell turned like the clip
-        self._captions: dict[str, str] = {id: '' for id in ids}
-        self._caption_drawn: dict[str, str | None] = {id: None for id in ids}
-        self._caption_fbos: dict[str, Fbo] = {id: Fbo() for id in ids}
+        self._captions: dict[int, str] = {id: '' for id in ids}
+        self._caption_drawn: dict[int, str | None] = {id: None for id in ids}
+        self._caption_fbos: dict[int, Fbo] = {id: Fbo() for id in ids}
         self._caption_text: Text = Text()
         self._caption_title: Image = Image(ChannelOrder.BGR)
         # the scrolling name: the words going round, a strip texture per word and size in use, and per cell a
         # transparent portrait texture with the parts of the strips on that screen
         self._scrolls: list[Scroll] = []
         self._scroll_strips: dict[tuple[str, int], Image] = {}
-        self._scroll_fbos: dict[str, Fbo] = {id: Fbo() for id in ids}
+        self._scroll_fbos: dict[int, Fbo] = {id: Fbo() for id in ids}
 
     @property
     def texture(self) -> Texture:
@@ -221,10 +221,11 @@ class WallCompositor:
         for image in self._images.values():
             image.deallocate()
 
-    def set_online(self, cell: str | None, mode: str = 'clip', view: Texture | None = None, page: str = '') -> None:
+    def set_online(self, cell: int | None, mode: OnlineCellMode = OnlineCellMode.CLIP, view: Texture | None = None,
+                   page: str = '') -> None:
         """The online cell for the frames from now on (main thread, before `update`): None for none, else
-        the cell and what it shows, `qr` (the card with the code to `page`) or `screen` (`view`, the main screen)."""
-        self._online_cell = cell if mode != 'clip' else None
+        the cell and what it shows, `QR` (the card with the code to `page`) or `SCREEN` (`view`, the main screen)."""
+        self._online_cell = cell if mode != OnlineCellMode.CLIP else None
         self._online_mode = mode
         self._online_view = view
         self._online_page = page
@@ -234,10 +235,10 @@ class WallCompositor:
         credit: bool = bool(settings.credit_qr_walls)
         caption: bool = bool(settings.credit_walls)
         trail: float = float(self.walls_settings.trail)
-        online: str | None = self._online_cell
+        online: int | None = self._online_cell
 
-        flashes: list[str] = []
-        starts: list[str] = []
+        flashes: list[int] = []
+        starts: list[int] = []
         with self._mutex:
             for id in self._ids:
                 if self._initials[id] == 2:
@@ -246,10 +247,10 @@ class WallCompositor:
                 elif self._initials[id] == 1:
                     self._initials[id] = 2
                     flashes.append(id)
-            lit: list[str] = lit_cells(self._lit, time.perf_counter())
-            numbers: dict[str, int] = {id: self._numbers.get(id, 0) for id in lit}
+            lit: list[int] = lit_cells(self._lit, time.perf_counter())
+            numbers: dict[int, int] = {id: self._numbers.get(id, 0) for id in lit}
             self._numbers = numbers
-            captions: dict[str, str] = {id: c for id, c in self._captions.items() if id != online} if caption else {}
+            captions: dict[int, str] = {id: c for id, c in self._captions.items() if id != online} if caption else {}
             scrolls: list[Scroll] = list(self._scrolls)
         # the online cell shows no clip: no white frame there, and its clip's start is nobody's
         flashes = [id for id in flashes if id != online]
@@ -276,13 +277,13 @@ class WallCompositor:
             self._draw_number(numbers[lit[-1]])
         if credit:
             self._update_credit()
-        if online is not None and self._online_mode == 'qr':
+        if online is not None and self._online_mode == OnlineCellMode.QR:
             self._update_online_card()
         for id, line in captions.items():
             if line != self._caption_drawn[id]:
                 self._draw_caption(id, line)
                 self._caption_drawn[id] = line
-        scrolling: list[str] = self._draw_scrolls(scrolls, time.perf_counter()) if scrolls else []
+        scrolling: list[int] = self._draw_scrolls(scrolls, time.perf_counter()) if scrolls else []
 
         self._trail_fbo.swap()
         self._trail_fbo.begin()
@@ -306,7 +307,7 @@ class WallCompositor:
         # the online cell: the card, or the main screen turned like a clip
         if online is not None:
             glViewport(*self._rects[online])
-            if self._online_mode == 'qr':
+            if self._online_mode == OnlineCellMode.QR:
                 self._online_fbo.draw(src=QUARTER_TURN)
             elif self._online_view is not None and self._online_view.allocated:
                 self._online_view.draw(src=QUARTER_TURN)
@@ -344,7 +345,7 @@ class WallCompositor:
             BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         self._number_fbo.end()
 
-    def _draw_caption(self, id: str, line: str) -> None:
+    def _draw_caption(self, id: int, line: str) -> None:
         """The cell's caption texture: transparent, SMILE(ai) over the top and the line in even lines along
         the bottom, white with a black edge."""
         fbo: Fbo = self._caption_fbos[id]
@@ -373,12 +374,12 @@ class WallCompositor:
             BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         fbo.end()
 
-    def _draw_scrolls(self, scrolls: list[Scroll], now_perf: float) -> list[str]:
+    def _draw_scrolls(self, scrolls: list[Scroll], now_perf: float) -> list[int]:
         """The cells the scrolling name is on at `now_perf` (`time.perf_counter()`), each cell's texture filled
         with its part of every word that crosses it; a loop that ran out or that the scroller stopped renewing
         is dropped, and so is a strip no loop uses."""
         width, height = self.CELL_HEIGHT, self.CELL_WIDTH     # the screen upright: its width is the cell's height
-        parts: dict[str, list[tuple[Image, float]]] = {}     # per cell: the strips on it with their offsets
+        parts: dict[int, list[tuple[Image, float]]] = {}     # per cell: the strips on it with their offsets
         keys: set[tuple[str, int]] = set()
         for scroll in scrolls:
             key: tuple[str, int] = (scroll.name, scroll.size)
@@ -466,12 +467,12 @@ class WallCompositor:
         fbo.end()
 
     # ANY THREAD
-    def set_image(self, id: str, image: np.ndarray, initial: bool) -> None:
+    def set_image(self, id: int, image: np.ndarray, initial: bool) -> None:
         self._images[id].set_image(image)
         with self._mutex:
             self._initials[id] = int(initial)
 
-    def set_caption(self, id: str, line: str) -> None:
+    def set_caption(self, id: int, line: str) -> None:
         """The caption's line on a cell from now on, shown while `credit_walls` is on (any thread); an unknown id is ignored."""
         if id not in self._rects:
             return
@@ -479,7 +480,7 @@ class WallCompositor:
             self._captions[id] = line
 
     def scroll_loop(self, name: str, speed: float, gap: float, size: int, ring: int, started: float,
-                    cells: list[tuple[str, int]], last: int | None = None) -> bool:
+                    cells: list[tuple[int, int]], last: int | None = None) -> bool:
         """A word going round a ring of `ring` screens (any thread, the scroller renews it every second):
         `started` is when it began by `time.perf_counter()`, so the position comes from the clock and a resend moves
         nothing. The loop ends when no message renews it for `SCROLL_TIMEOUT`, or with `last` when the word
@@ -499,7 +500,7 @@ class WallCompositor:
             self._scrolls.append(Scroll(name, speed, gap, size, ring, cells, started, expires))
         return True
 
-    def light(self, id: str, seconds: float, number: int = 0) -> None:
+    def light(self, id: int, seconds: float, number: int = 0) -> None:
         """Light a cell white with the screen's `number` (0: none) for `seconds` (the laughter test); an
         unknown id is ignored."""
         if id not in self._rects:

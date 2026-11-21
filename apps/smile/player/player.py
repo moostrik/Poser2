@@ -8,6 +8,7 @@ import os
 import random
 import threading
 import time
+from enum import IntEnum
 
 import numpy as np
 
@@ -32,13 +33,20 @@ BANG_PORT: int = 4115           # the Max patch's `udpreceive` for wall 0's `/ba
 CELLS: int = sphere.CELLS       # per wall
 
 
-def online_cell_mode(active: bool, connected: bool, showing: bool) -> str:
+class OnlineCellMode(IntEnum):
+    """What SMILE Online's cell of the walls shows."""
+    CLIP = 0        # a clip, like any cell
+    QR = 1          # the card with the QR code to the phone page
+    SCREEN = 2      # the main screen, as the phone sees it
+
+
+def online_cell_mode(active: bool, connected: bool, showing: bool) -> OnlineCellMode:
     """What the online cell shows: a clip like any cell while SMILE Online is off or the relay is not there
     (`connected`: with its pass for the code's url), the QR card to the phone page while it waits for someone,
     the main screen during a turn."""
     if not active or not connected:
-        return 'clip'
-    return 'screen' if showing else 'qr'
+        return OnlineCellMode.CLIP
+    return OnlineCellMode.SCREEN if showing else OnlineCellMode.QR
 
 
 class Player:
@@ -58,7 +66,7 @@ class Player:
 
         self._running: bool = False
 
-        ids: list[str] = [str(i) for i in range(len(walls) * CELLS)]
+        ids: list[int] = list(range(len(walls) * CELLS))
 
         # the clips are decoded once into RAM at the size the cells show them (the portrait is turned a quarter)
         cell_size: tuple[int, int] = (sphere.CELL_HEIGHT, sphere.CELL_WIDTH)
@@ -70,7 +78,7 @@ class Player:
 
         self.loaders: list[ClipLoader] = []
         for id in ids:
-            wall, cell = divmod(int(id), CELLS)
+            wall, cell = divmod(id, CELLS)
             loader = ClipLoader(id, self.pool, settings, sphere.sector_of_cell(wall, cell))
             loader.add_image_callback(self._on_image)
             loader.add_loader_callback(self._on_play)
@@ -151,19 +159,19 @@ class Player:
 
     def light(self, wall: int, cell: int, seconds: float, number: int = 0) -> None:
         """The laughter test: the cell white with the screen's `number` for `seconds`."""
-        self.walls[wall].light(str(cell), seconds, number)
+        self.walls[wall].light(cell, seconds, number)
 
     def scroll_loop(self, wall: int, word: str, speed: float, gap: float, size: int, ring: int, started: float,
                     cells: list[tuple[int, int]], last: int | None) -> None:
         """The scrolling name: a word going round a ring, with the wall's cells on it and their places, until
         it leaves at the screen `last`."""
-        if self.walls[wall].scroll_loop(word, speed, gap, size, ring, started, [(str(cell), place) for cell, place in cells], last):
+        if self.walls[wall].scroll_loop(word, speed, gap, size, ring, started, list(cells), last):
             logger.info('Scrolling name %s going round over wall %d cells %s', word, wall + 1, ', '.join(f'{cell}@{place}' for cell, place in cells))
 
     # THE LOADERS' THREADS
-    def _on_image(self, id: str, image: np.ndarray, initial: bool) -> None:
-        wall, cell = self._place(int(id))
-        self.walls[wall].set_image(str(cell), image, initial)
+    def _on_image(self, id: int, image: np.ndarray, initial: bool) -> None:
+        wall, cell = self._place(id)
+        self.walls[wall].set_image(cell, image, initial)
         with self._frames_lock:
             self._frames += 1
 
@@ -178,4 +186,4 @@ class Player:
         self.osc[wall].submit('/bang', index)
         with self._lines_lock:
             line: str = self._lines.pick()
-        self.walls[wall].set_caption(str(index), line)
+        self.walls[wall].set_caption(index, line)

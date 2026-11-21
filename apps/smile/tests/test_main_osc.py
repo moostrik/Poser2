@@ -11,6 +11,7 @@ import numpy as np
 
 from apps.smile.board import OnlineCell, RenderBoard
 from apps.smile.main import SmileMain
+from apps.smile.player import OnlineCellMode
 from modules.camera import CameraFrame, FrameType
 from apps.smile.settings import Settings
 from modules.inout import OscSenderSettings
@@ -144,11 +145,11 @@ class TestMaxControls(unittest.TestCase):
         self.app.online.pass_value = 'abc'
         self.frame()
         self.assertEqual(self.app.clip_player.online_cell, 24 + 12)     # the clip player's cells count over both walls
-        self.assertEqual(board.get_online_cell(), OnlineCell(1, 12, 'qr', 'http://127.0.0.1:8800/?pass=abc'))
+        self.assertEqual(board.get_online_cell(), OnlineCell(1, 12, OnlineCellMode.QR, 'http://127.0.0.1:8800/?pass=abc'))
         self.app.online.showing = True
         online.page = ' https://smile.example/ '
         self.frame()
-        self.assertEqual(board.get_online_cell(), OnlineCell(1, 12, 'screen', 'https://smile.example/?pass=abc'))
+        self.assertEqual(board.get_online_cell(), OnlineCell(1, 12, OnlineCellMode.SCREEN, 'https://smile.example/?pass=abc'))
         online.screen = 0
         self.frame()
         self.assertIsNone(self.app.clip_player.online_cell)

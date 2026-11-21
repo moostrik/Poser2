@@ -21,7 +21,7 @@ from .credit_scroll import CreditScroller
 from .save import ClipSaver
 from .lights import Lights
 from .online import Online, http_base
-from .player import Player, online_cell_mode
+from .player import OnlineCellMode, Player, online_cell_mode
 from . import sphere
 from modules.settings import SettingsStore
 from modules.panel import PanelServer
@@ -333,18 +333,18 @@ class SmileMain():
         page while SMILE Online waits for someone, the main screen during a turn, a clip like any cell otherwise."""
         online = self.settings.setup.online
         screen: int = int(online.screen)
-        mode: str = 'clip'
+        mode: OnlineCellMode = OnlineCellMode.CLIP
         wall = cell = 0
         pass_value: str = self.online.pass_value
         if 1 <= screen <= sphere.SCREENS:
             wall, cell = sphere.cell_of_screen(screen)
             # the card waits for the relay's pass: a code without one would open the expired page
             mode = online_cell_mode(bool(online.active), bool(online.connected) and bool(pass_value), self.online.showing)
-        self.clip_player.online_cell = wall * sphere.CELLS + cell if mode != 'clip' else None
+        self.clip_player.online_cell = wall * sphere.CELLS + cell if mode != OnlineCellMode.CLIP else None
         page: str = str(online.page).strip() or http_base(str(online.relay)) + '/'
         if pass_value:
             page += ('&' if '?' in page else '?') + 'pass=' + pass_value
-        self.board.set_online_cell(OnlineCell(wall, cell, mode, page) if mode != 'clip' else None)
+        self.board.set_online_cell(OnlineCell(wall, cell, mode, page) if mode != OnlineCellMode.CLIP else None)
 
     def _limit_visitor(self, seq: SequenceType, now: float) -> None:
         """End a visitor the generator did not end: it does so itself at connection.job_timeout, so
