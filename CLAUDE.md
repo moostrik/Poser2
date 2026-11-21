@@ -55,6 +55,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Settings connect the user and a component, not two components
 - Components that `bind()` must `unbind()` the same callbacks on teardown
 - Treat `Field.READ` values as snapshots; copy arrays before handing them to another thread
+- Prefer a description for every field and panel shown to the user
 - Keep `Field` descriptions to one short line of panel text: what the value is and its unit
 - Prefer the textbook unit for a quantity (seconds, meters, radians, pixels)
 - A setting follows the quantity it controls, in a form that is easy to set (ms for a short time, degrees for an angle)
