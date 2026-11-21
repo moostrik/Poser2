@@ -118,7 +118,7 @@ class SmileMain():
             device = vimba.Camera(self.settings.setup.camera, rotate90=self.portrait_mode)
             device_name = 'vimba'
         elif cam_type == CamType.OAK4:
-            device = oak4.Camera(self.settings.setup.camera.oak4, rotate90=self.portrait_mode)
+            device = oak4.Camera(self.settings.setup.camera.oak4, rotate90=self.settings.setup.camera.oak4.rotate90)
             device_name = 'oak4'
         else:
             device = webcam.Camera(self.settings.setup.camera, rotate90=self.portrait_mode)

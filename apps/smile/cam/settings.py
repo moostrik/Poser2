@@ -23,9 +23,11 @@ class _RecorderSettings(RecorderSettings):
 
 class _Oak4Settings(Oak4CameraSettings):
     """smile's OAK4: color frames only, no model and no depth on the camera (smile finds the faces), at the sensor's
-    4K mode, since the portrait is cut from the full frame. Tilt correction stays off: smile needs none."""
+    4K mode, since the portrait is cut from the full frame. Tilt correction stays off: smile needs none. Its turn is
+    how it is mounted, not the app's portrait mode: the view cuts the portrait out of an upright landscape frame."""
     model_chain: Field[ModelChain] = Field(ModelChain.OFF, access=Field.INIT, visible=False, description="Models on the camera: none")
     resolution:  Field[CameraResolution] = Field(CameraResolution.P2160, access=Field.INIT, description="Delivered size on USB; the sensor mode follows it")
+    rotate90:    Field[bool] = Field(False, access=Field.INIT, description="The camera mounted on its side, turned a quarter")
 
 
 class CameraSettings(VimbaCameraSettings):
