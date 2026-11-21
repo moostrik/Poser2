@@ -5,9 +5,6 @@ What is not built in `modules/inout`, from the package scan of 2026-11-21. **(se
 
 ## B. Clean-up
 
-- B1. `OscSender` makes its `Waker` at start. Why: `__init__` makes it and `stop` closes it only when the sender
-  ran **(seen)**, so smile's two wall senders keep their handles when the clip player is not started (no wall
-  window) **(seen)**. How: made in `start` and closed in `stop`, as `ArtNetSender` does. Check: `test_osc_sender`.
 - B2. `OscSound`'s docstring and slot names. Why: its docstring says it sends "at a configurable frame rate"; it
   sends one bundle per `submit_frames` **(seen)**; a slot is `id` in `_inactive_messages`, `_tick_messages` and
   `OscSoundExtras.inactive_messages`, where the glossary's term is `track_id` **(seen)**. How: the docstring says
@@ -23,7 +20,6 @@ What is not built in `modules/inout`, from the package scan of 2026-11-21. **(se
 
 ## The rules it touches
 
-- `CLAUDE.md` Composition and wiring, clean up in an explicit stop or teardown: B1
 - `CLAUDE.md` Docstrings, a docstring says what the thing is: B2
 - `.claude/rules/glossary.md`, the id of a tracked person is `track_id`: B2
 - `CLAUDE.md` Performance, avoid unnecessary copies: B3

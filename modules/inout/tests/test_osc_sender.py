@@ -94,6 +94,13 @@ class TestSender(unittest.TestCase):
         self.sender.stop()
         self.assertLess(time.perf_counter() - start, 0.1)
 
+    def test_its_waker_lives_from_start_to_stop(self):
+        self.assertIsNone(self.sender._waker)               # a sender that never runs holds no handles
+        self.sender.start()
+        self.assertIsNotNone(self.sender._waker)
+        self.sender.stop()
+        self.assertIsNone(self.sender._waker)
+
     def test_it_binds_the_address_at_start_and_unbinds_it_at_stop(self):
         self.sender.start()
         self.sender.stop()

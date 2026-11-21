@@ -35,7 +35,7 @@ class OscSender:
         self._queue: Queue[tuple[str, ArgValue]] = Queue()
         self._running: bool = False
         self._thread: Thread | None = None
-        self._waker: Waker = Waker()        # set by an event and by stop: the loop sends, or ends, at once
+        self._waker: Waker | None = None    # set by an event and by stop: the loop sends, or ends, at once
 
     @property
     def running(self) -> bool:
@@ -45,29 +45,33 @@ class OscSender:
         if self._running:
             return
         self._client.start()
+        self._waker = Waker()
         self._running = True
-        self._thread = Thread(target=self._run, daemon=True, name='OscSender')
+        self._thread = Thread(target=self._run, args=(self._waker,), daemon=True, name='OscSender')
         self._thread.start()
 
     def stop(self) -> None:
         if not self._running:
             return
         self._running = False
+        assert self._waker is not None
         self._waker.set()
         if self._thread is not None:
             self._thread.join()
             self._thread = None
         self._waker.close()
+        self._waker = None
         self._client.stop()
 
     def submit(self, address: str, args: ArgValue) -> None:
         # only while the thread takes them: nothing empties the queue otherwise
-        if self.settings.enabled and self._running:
+        waker: Waker | None = self._waker
+        if self.settings.enabled and self._running and waker is not None:
             self._queue.put((address, args))
             if address in self.events:
-                self._waker.set()
+                waker.set()
 
-    def _run(self) -> None:
+    def _run(self, waker: Waker) -> None:
         next_time: float = perf_counter()
         while self._running:
             try:
@@ -78,7 +82,7 @@ class OscSender:
             now: float = perf_counter()
             if now - next_time > interval:          # fell behind: resync instead of bursting
                 next_time = now
-            if not self._waker.wait(next_time + interval):
+            if not waker.wait(next_time + interval):
                 next_time += interval
 
     def _send_queued(self) -> None:
