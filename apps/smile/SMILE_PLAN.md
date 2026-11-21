@@ -11,13 +11,6 @@ in the log. A rename or a text change needs no start. The whole of smile's tests
 
 ## C. Wiring and time
 
-- C4 `ClipSaver` makes its folders, picks its encoder and starts its thread in `start()`, not in its constructor;
-  `Main` starts it with the other workers after the wiring. It reads the credit name at each share, through a getter
-  as `Online` has, and writes `watermark.png` again only when the name differs from the file's. The frame's tick is
-  `SmileRender.update`: it reads `perf_counter()` once and hands that time to `Sequencer.update(now)`,
-  `GrinPlayer.update(now)`, the credit and the screen grab; `SequenceMessage` carries it as `timestamp`, and `Main`
-  takes its time from the message. Tests: `save/tests` (a `ClipSaver` built without a thread; a share after a name
-  change carries the new name), `sequence/tests` stepping time without sleeping, `render/tests`, `tests`.
 - C5 The online cell's mode (`'clip'`, `'qr'`, `'screen'`) becomes an `IntEnum`, and cells are ints, not `str(i)` keys.
   Tests: `player/tests` (`test_online_cell`), `online/tests`, `render/tests`.
 - C6 The 48 clip cells play from one thread: a heap of the cells by their next frame's deadline and one `Waker` for
