@@ -29,7 +29,7 @@ paths:
 - Create textures, FBOs and shaders at setup or on a resize, not per frame
 - Pair every creation with its destruction
 - Set the GL state a draw needs where it draws (blend, depth, viewport)
-- Change the blend state only through `Style`, which keeps it without `glGet*`
+- Change the blend state only through `BlendState`, which keeps it without `glGet*`
 - Prefer not to read back from the GPU or wait on it inside a frame
 - Name a shader's `.frag`/`.vert`/`.comp` source after the `.py` file that holds its class, beside it; the loader resolves it by that module name
 - A shader is named after the operation it does; the `shaders` package in front says what it is (`shaders.PosePointLines`)
