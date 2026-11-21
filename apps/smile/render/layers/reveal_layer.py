@@ -1,7 +1,7 @@
 from modules.gl import Fbo, Image, SwapFbo, Texture, shaders
 
 from ..shaders import FlashOut
-from .layer_base import LayerBase
+from modules.render import LayerBase
 from .passes import blur, copy
 
 MASK_SIGMA: float = 9.0     # the mask's softening (pixels)

@@ -1,7 +1,7 @@
 from modules.gl import Fbo, BlendState, Text, Texture
 from modules.utils import Color
 
-from .layer_base import LayerBase
+from modules.render import LayerBase
 
 FONT_SIZE: int = 18
 MARGIN_PX: float = 16.0

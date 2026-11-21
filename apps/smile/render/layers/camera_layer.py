@@ -8,7 +8,7 @@ from ..inputs import Faces
 from ..settings import FaceEffect, FaceFill, RenderSettings
 from ..shaders import FaceColor
 
-from .layer_base import LayerBase
+from modules.render import LayerBase
 from .mark_drawer import MarkDrawer
 from .face_marks import BOX_PAD_PX, FACES_STALE, LABEL_BG, REJECTED_COLOR, Mark, SubjectMark, build_marks, face_fields
 from .passes import blur, copy

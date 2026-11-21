@@ -1,7 +1,7 @@
 from modules.gl import Fbo, Image, Texture
 
 from ..shaders import FlashIn
-from .layer_base import LayerBase
+from modules.render import LayerBase
 
 
 class FlashLayer(LayerBase):

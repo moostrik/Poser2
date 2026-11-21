@@ -8,7 +8,7 @@ from modules.utils import Color
 from ...sequence import SequenceType
 from ..settings import RenderSettings
 
-from .layer_base import LayerBase
+from modules.render import LayerBase
 from .passes import copy
 
 FONT_SIZE: int = 96

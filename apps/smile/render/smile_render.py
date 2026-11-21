@@ -10,11 +10,12 @@ from ..face import FaceObservations
 from .. import sphere
 from modules.camera import CameraFrame, upright_corners
 from modules.gl import Fbo, Shader, BlendState, Texture, clear_color
+from modules.render import LayerBase
 from modules.utils import fit
 from modules.window import RenderBase
 from ..player import WallsSettings
 from .inputs import Inputs
-from .layers import (BloomLayer, CameraLayer, CreditLayer, CreditView, DiffusionLayer, FlashLayer, LayerBase, RevealLayer,
+from .layers import (BloomLayer, CameraLayer, CreditLayer, CreditView, DiffusionLayer, FlashLayer, RevealLayer,
                      StatusLayer, WallCompositor, caption_shown, copy, fade_step, new_line_due)
 from ..sequence import GrinPlayer, SequenceType, Sequencer
 from .settings import RenderSettings, WindowsSettings

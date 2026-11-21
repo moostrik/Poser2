@@ -1,6 +1,6 @@
 from modules.gl import Image, SwapFbo, Texture, shaders
 
-from .layer_base import LayerBase
+from modules.render import LayerBase
 from .passes import blur, copy
 
 
