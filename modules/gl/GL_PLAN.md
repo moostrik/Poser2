@@ -15,8 +15,10 @@ unless Matthias says he is using the PC or the app.
   stays as it is (one row of 256 × R32UI, the same bytes at any alignment). Why: these transfers rely on the
   alignment GL has at the moment, 4 by default or 1 as `Texture.upload` and `Image` leave it, so a row whose bytes
   are not a multiple of 4 (an R8 or RGB8 texture of odd width) comes out sheared at 4 (seen: the transfers, a scan of
-  2026-11-21; the shear, deduction); a read-back is written once (Motion's review of 46df3c07). After it, the render
-  plan's E1 drops `ScreenCapture`'s and `ScreenPreview`'s set-back to 4. Check: shader_check.
+  2026-11-21; the shear, deduction); a read-back is written once (Motion's review of 46df3c07). In the same commit,
+  `render/general/screen_recording/screen_capture.py` and `screen_preview.py` lose `_PACK_ALIGNMENT`,
+  `_UNPACK_ALIGNMENT` and their set-back to 4 after their own transfers, which kept GL's default for the transfers
+  that did not set theirs; the render thread checks those two files afterwards. Check: shader_check.
 
 ## F. A 2D swap of plain textures
 
