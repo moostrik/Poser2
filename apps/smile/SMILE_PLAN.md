@@ -9,12 +9,6 @@ A step that moves or rewires code also starts smile once: ComfyUI first (`script
 takes a recorded visitor through (flash, portrait, grin, bloom, the clip saved and on the walls) and leaves no error
 in the log. A rename or a text change needs no start. The whole of smile's tests run after the last step.
 
-## B. How the packages split the work
-
-- B4 `render/layers/layer_base.py` goes, a drifted copy of `modules/render/layer_base.py`, and with it its `dirty`,
-  which nothing reads; smile's seven layers and `SmileRender` take `modules.render.LayerBase`; `DataCache`, which no
-  smile layer uses, leaves smile's exports. Tests: `render/tests`.
-
 ## C. Wiring and time
 
 - C1 The view: the fit to the output size becomes a plain geometry module, which the render's camera layer draws on
