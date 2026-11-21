@@ -261,7 +261,7 @@ def cases() -> dict[str, tuple[Allocated | None, Case | None, Case | None]]:
     add('channel_add_region', channel_add,
         lambda t: channel_add.use(t['gradient'], t['soft'], 2, 0.2, 0.5, 0.5, 0.4, 0.5))
     upscale = DepthUpscale()
-    add('depth_upscale', upscale, lambda t: upscale.use(t['depth'], Rect(0.2, 0.3, 0.5, 0.6), 0.1, t['soft'], 0.5, 2.0))
+    add('depth_upscale', upscale, lambda t: upscale.use(t['depth_confidence'], Rect(0.2, 0.3, 0.5, 0.6), 0.1, t['soft'], 0.5, 2.0))
     crop = DepthCrop()
     add('depth_crop', crop, lambda t: crop.use(t['depth'], Rect(0.2, 0.3, 0.5, 0.6), 0.5, 2.0))
     key = ColormapKey()
