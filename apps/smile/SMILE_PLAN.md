@@ -11,29 +11,8 @@ in the log. A rename or a text change needs no start. The whole of smile's tests
 
 ## A. Camera frames, recording and -sim
 
-- A1 The frames as delivered, end to end. The Vimba and webcam backends hand every frame on as the sensor gives it;
-  their `_emit` turns (`cv2.transpose` under `rotate90`) and flips (`flip_v`, `flip_h`) each frame on the CPU in the
-  camera's thread now, against `CameraFrame`'s "as delivered" and "the camera's thread runs only the camera".
-  `CameraFrame` gains `rotate90` (a transpose, as `cv2.transpose`) and `flip_v` beside `flip_h`, applied in one
-  order: the homography, then the turn, then `flip_v`, then `flip_h`; its docstring says so. Every consumer applies
-  them once:
-  - `ImageUpload`, in its CUDA kernel and its torch path; a turned frame comes out with width and height swapped
-  - smile's `cam` passes the device's `CameraFrame`s on unchanged, and `Main` hands the uploader that frame, not a
-    `CameraFrame` rebuilt without the flags
-  - the render's camera layer applies them at its upload
-  - the portrait cut turns and flips the CPU frame once, at the capture
-  - the recorder stores `rotate90` and `flip_v` in a recording's info line beside `flip_h`
-    ([RECORDING.md](../../modules/recording/RECORDING.md)), and the replay camera hands them on; an older recording
-    reads them as off. The recorder's `mirrored` option bakes only `flip_h` into the pixels and leaves the turn and
-    `flip_v` as flags; smile records with `mirrored` off
-
-  The backends' flip tests check the flags instead of the pixels. Smile is the only user.
-  Check: the camera, inference and recording tests and pyright; the upload kernel held to its torch reference for the
-  turn and `flip_v` (`scripts/gpu_input_timing.py`); a recorder-to-replay round trip of the flags; on your go, a smile
-  `-wc` start in portrait and in landscape, with the screen, the face marks and the capture the right way up, and
-  deep_flow and white_space `-sim` starts showing their frames unchanged.
-- A2 (after A1, so the recordings hold the frames as delivered, their turn and flips as flags)
-  smile records its camera device's frames as they come, before `Camera` fits them to the output size, with
+- A2 smile records its camera device's frames as they come, with their turn and flips as flags, before `Camera`
+  fits them to the output size, with
   `modules/recording`'s `Recorder` (`MP4` container: color only, no depth, tracklets or poses; a part a camera
   never sent is not waited for) and a `Session` on the `control` group that splits it into chunks, as deep_flow has;
   the device's frames go to the live path first and to the recorder after it. Recordings go to
@@ -75,9 +54,9 @@ in the log. A rename or a text change needs no start. The whole of smile's tests
 
 - C1 The view: the fit to the output size becomes a plain geometry module, which the render's camera layer draws on
   the GPU; the face finder maps the detector's faces (found on the full frame) into it, counting a face only inside
-  and measuring `OUTSIDE` against the view's edge; `cover` runs once, at the capture. The `input/` image and the
-  phone hand `CameraFrame`s too, `cam` passes the live one on through `CameraFrameCallback`, and smile's own
-  `FrameCallback` goes.
+  and measuring `OUTSIDE` against the view's edge; `cover` runs once, at the capture. `cam` hands the full
+  `CameraFrame`s on, and the uploader takes them through `cam`'s `CameraFrameCallback`, not from `Main` polling
+  `camera.frame()`.
   Check: the start check; `cam/tests`, `face/tests` (a frame larger than the view), `render/tests`, `save/tests`,
   `tests`; a test of the view geometry.
 - C2 A board, `apps/smile/board/`, in place of `SmileRender`'s setters and its `Inputs` and `Faces`: `modules/board`'s
@@ -151,9 +130,7 @@ in the log. A rename or a text change needs no start. The whole of smile's tests
 - `CLAUDE.md` Types, `IntEnum` over string keys: C5
 - `glossary.md`, `enabled` not `active`, `FrameCallback` for the pose frame and every other frame type qualified,
   `timestamp`, American spelling; `smile.md`, `music_id` / `style_id`: B2, C4, D1, F1
-- `camera.md`, the camera's thread runs only the camera, and `modules/camera`'s `CameraFrame`, a frame as delivered: A1, C1
-- `gl.md`, a CPU image is flipped once, at its upload: A1
-- `CLAUDE.md` API evolution, update all affected call sites in the same change: A1
+- `camera.md`, the camera's thread runs only the camera, and `modules/camera`'s `CameraFrame`, a frame as delivered: C1
 - `CLAUDE.md` Testing, geometry in plain modules, drawing in renderers: C1
 - `smile.md`, `sphere.py` is the one place that knows the sphere: B1, E1
 - `docs.md`, each fact in one place: F1
