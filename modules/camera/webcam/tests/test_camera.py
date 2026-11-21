@@ -71,17 +71,19 @@ class TestWebCamera(unittest.TestCase):
         self.assertGreater(self.settings.readings.video_fps, 0.0)
         self.assertGreater(self.settings.readings.video_min_fps, 0.0)
 
-    def test_rotates_and_flips(self):
-        settings = CameraSettings(flip_h=True)  # after the turn the band is a column on the left; mirrored, on the right
+    def test_the_frame_carries_its_turn_and_flips(self):
+        settings = CameraSettings(flip_h=True, flip_v=True)
         settings.initialize()
         self.camera = Camera(settings, rotate90=True)
         self.camera.add_frame_callback(self.frames.append)
         self.camera.start()
         self.assertTrue(wait_for(lambda: bool(self.frames)))
-        image = self.frames[0].image
-        self.assertEqual(image.shape, (6, 4, 3))
-        self.assertEqual(int(image[0, 0, 0]), 0)
-        self.assertEqual(int(image[0, 3, 0]), 255)
+        frame = self.frames[0]
+        self.assertEqual(frame.image.shape, (4, 6, 3))      # as delivered: the band still across the top
+        self.assertEqual(int(frame.image[0, 0, 0]), 255)
+        self.assertTrue(frame.rotate90)
+        self.assertTrue(frame.flip_v)
+        self.assertTrue(frame.flip_h)
 
     def test_stop_releases_the_device(self):
         self.camera = Camera(self.settings)

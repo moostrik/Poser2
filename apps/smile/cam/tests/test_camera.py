@@ -40,8 +40,9 @@ class FakeDevice:
     def add_frame_callback(self, callback) -> None:
         self.callbacks.append(callback)
 
-    def push(self, image: np.ndarray) -> None:
-        frame = CameraFrame(cam_id=0, kind=FrameType.VIDEO, image=image, timestamp=time.perf_counter())
+    def push(self, image: np.ndarray, rotate90: bool = False, flip_h: bool = False) -> None:
+        frame = CameraFrame(cam_id=0, kind=FrameType.VIDEO, image=image, timestamp=time.perf_counter(),
+                            rotate90=rotate90, flip_h=flip_h)
         for c in self.callbacks:
             c(frame)
 
@@ -62,7 +63,7 @@ class TestCamera(unittest.TestCase):
             cv2.imwrite(os.path.join(self.folder, name), np.full((30, 20, 3), value, dtype=np.uint8))
         self.settings = CameraSettings()
         self.settings.initialize()
-        self.frames: list[np.ndarray] = []
+        self.frames: list[CameraFrame] = []
         self.camera: Camera | None = None
 
     def tearDown(self):
@@ -90,33 +91,42 @@ class TestCamera(unittest.TestCase):
         frame[4:8] = 255                    # a band across the middle
         device.push(frame)
         self.assertTrue(wait_for(lambda: len(self.frames) == 1))     # fitted and handed on by the camera's own thread
-        shown = self.camera.frame()[0]
+        shown = self.camera.frame().image
         self.assertEqual(shown.shape, (6, 8, 3))
         self.assertEqual(int(shown[0, 0, 0]), 0)
         self.assertEqual(int(shown[3, 0, 0]), 255)
 
         self.settings.use_image = True
         device.push(frame)
-        self.assertTrue(wait_for(lambda: len(self.frames) > 1 and self.frames[-1] is not shown))
-        image = self.camera.frame()[0]
+        self.assertTrue(wait_for(lambda: len(self.frames) > 1 and self.frames[-1].image is not shown))
+        image = self.camera.frame().image
         self.assertEqual(image.shape, (6, 8, 3))
         self.assertEqual(int(image[0, 0, 0]), 100)     # a.jpg, at the output size
+
+    def test_a_turned_frame_is_fitted_to_the_turned_size_and_keeps_its_flags(self):
+        device = FakeDevice()
+        self.make(device)
+        device.push(np.zeros((16, 12, 3), dtype=np.uint8), rotate90=True, flip_h=True)
+        self.assertTrue(wait_for(lambda: len(self.frames) == 1))
+        frame = self.frames[0]
+        self.assertEqual(frame.image.shape, (8, 6, 3))      # 6 x 8 once turned: the output size
+        self.assertTrue(frame.rotate90 and frame.flip_h)
 
     def test_a_frame_has_the_time_it_arrived(self):
         device = FakeDevice()
         self.make(device)
-        self.assertEqual(self.camera.frame()[1], 0.0)      # no frame yet
+        self.assertEqual(self.camera.frame().timestamp, 0.0)      # no frame yet
         self.assertTrue(self.camera.stalled)
         frame = np.zeros((6, 8, 3), dtype=np.uint8)
         before = time.perf_counter()
         device.push(frame)
-        self.assertTrue(wait_for(lambda: self.camera.frame()[1] != 0.0))
-        image, arrived = self.camera.frame()
-        self.assertIs(image, frame)
-        self.assertGreaterEqual(arrived, before)
+        self.assertTrue(wait_for(lambda: self.camera.frame().timestamp != 0.0))
+        shown = self.camera.frame()
+        self.assertIs(shown.image, frame)
+        self.assertGreaterEqual(shown.timestamp, before)
         self.assertFalse(self.camera.stalled)
         # a camera that stops keeps its last frame, with the time of that frame
-        self.assertEqual(self.camera.frame()[1], arrived)
+        self.assertEqual(self.camera.frame().timestamp, shown.timestamp)
 
     def test_device_and_phone_frames_are_fitted_on_the_cameras_thread(self):
         threads: list[str] = []
@@ -128,7 +138,7 @@ class TestCamera(unittest.TestCase):
         self.camera.set_online(True)
         self.camera.submit_online_frame(np.zeros((24, 16, 3), dtype=np.uint8))
         self.assertTrue(wait_for(lambda: len(self.frames) == 2))
-        self.assertEqual(self.frames[1].shape, (6, 8, 3))
+        self.assertEqual(self.frames[1].image.shape, (6, 8, 3))
         self.assertEqual(threads, ['SmileCamera', 'SmileCamera'])
 
     def test_a_failing_callback_is_logged_and_the_camera_goes_on(self):
@@ -160,7 +170,7 @@ class TestCamera(unittest.TestCase):
         self.assertTrue(wait_for(lambda: self.settings.device == 'fake'))
         frame = np.zeros((6, 8, 3), dtype=np.uint8)
         device.push(frame)
-        self.assertTrue(wait_for(lambda: self.camera.frame()[0] is frame))
+        self.assertTrue(wait_for(lambda: self.camera.frame().image is frame))
         device.connects = False                 # and gone again
         self.assertTrue(wait_for(lambda: self.settings.device == 'none'))
 
@@ -168,7 +178,7 @@ class TestCamera(unittest.TestCase):
         self.make(FakeDevice())
         self.settings.use_image = True
         self.settings.image = 'b.jpg'
-        self.assertTrue(wait_for(lambda: self.frames and int(self.frames[-1][0, 0, 0]) == 200))
+        self.assertTrue(wait_for(lambda: self.frames and int(self.frames[-1].image[0, 0, 0]) == 200))
 
     def test_reload_picks_up_a_new_file_and_keeps_the_selection(self):
         self.make(FakeDevice())

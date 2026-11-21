@@ -14,10 +14,11 @@ it a capture is dropped whole, before any part of it is written, so every stream
 chunk hold the same frames. A split cuts every camera's chunk at one capture time: a camera goes on in
 the new chunk with its first capture after it. On stop no frame is taken any more, and the captures
 still waiting are settled by the parts that still come, for at most `STOP_WAIT`. Recordings hold what
-the camera delivered, not straightened and not mirrored, so the correction can still be tuned on them;
-`flip_h` says the frames are still to be mirrored. With `mirrored` a frame still to be mirrored is stored
-mirrored instead, with its depth, lens, alignment and tracklets to match, and `flip_h` off: the recording
-is the image as shown (the poses are found on it already). What a capture went without is counted on the panel
+the camera delivered, not straightened, turned or mirrored, so the correction can still be tuned on them;
+`rotate90`, `flip_v` and `flip_h` say the frames are still to be turned and flipped. With `mirrored` a frame still
+to be mirrored is stored mirrored instead, with its depth, lens, alignment and tracklets to match, and `flip_h` off:
+the recording is the image as shown (the poses are found on it already). `mirrored` bakes only `flip_h`, and only
+into a frame that is not turned: the turn and `flip_v` stay flags, and so does the mirror of a turned frame. What a capture went without is counted on the panel
 and warned of. Every stream shares `keyframe_interval`: a seek in a chunk goes to a color keyframe, so a
 depth stream with its keyframes elsewhere comes back with its references missing. The depth's confidence rides on
 its depth frame and goes into a stream of its own when the chunk's first depth has one (`ChunkInfo.confidence`), so
@@ -392,7 +393,7 @@ class Recorder(Thread):
                     self._queued_bytes -= capture.nbytes
                 if self._split_at is not None and capture.video.timestamp > self._split_at and self.chunks[c] == split_from:
                     self._split_camera(c)
-                if self.settings.mirrored and capture.video.flip_h:
+                if self.settings.mirrored and capture.video.flip_h and not capture.video.rotate90:
                     capture = mirrored_capture(capture)
                 self.recorders[c][ChunkStream.VIDEO].submit_frame(capture.video.image, capture.video.nv12)
                 depth: CameraFrame | None = capture.depth
@@ -417,7 +418,8 @@ class Recorder(Thread):
             height: int = frame.image.shape[0] * 2 // 3 if frame.nv12 else frame.image.shape[0]
             alignment = capture.depth.alignment if capture.depth is not None else None
             file.write(info_line(ChunkInfo(frame.image.shape[1], height, frame.intrinsics, frame.flip_h, self.settings.fps,
-                                           alignment, capture.depth is not None, self.with_confidence.get(cam_id, False))))
+                                           alignment, capture.depth is not None, self.with_confidence.get(cam_id, False),
+                                           frame.rotate90, frame.flip_v)))
         tracklets: CameraTracklets | None = capture.tracklets
         poses: FramePoses | None = capture.poses
         file.write(frame_line(count, FrameMetadata(

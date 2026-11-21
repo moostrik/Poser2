@@ -7,7 +7,10 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
+import numpy as np
+
 from apps.smile.main import SmileMain
+from modules.camera import CameraFrame, FrameType
 from apps.smile.settings import Settings
 from modules.inout import OscSenderSettings
 from apps.smile.render.sequencer import SequenceMessage, SequenceType
@@ -37,7 +40,8 @@ class TestMaxControls(unittest.TestCase):
         self.app = SimpleNamespace(
             settings=self.settings, generator=mock.Mock(ready=True),
             # a Mock attribute is truthy: the camera must really not be stalled
-            camera=SimpleNamespace(frame=lambda: (None, 0.0), stalled=False, next_image=mock.Mock()),
+            camera=SimpleNamespace(frame=lambda: CameraFrame(0, FrameType.VIDEO, np.zeros((4, 4, 3), np.uint8), 0.0),
+                                   stalled=False, next_image=mock.Mock()),
             render=mock.Mock(), lights=mock.Mock(), face=mock.Mock(), save=mock.Mock(), sequencer=mock.Mock(),
             music_map=mock.Mock(get_music_id=lambda: '0001'), osc=mock.Mock(), laughter_test=mock.Mock(),
             _limit_visitor=lambda seq: None,

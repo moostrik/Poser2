@@ -26,7 +26,9 @@ camera contract (`modules.camera.vimba.Camera` default, `modules.camera.webcam.C
 `rotate90` for the portrait mode at construction), and an image source from `data/input/` that the panel's `use_image` switch puts in
 place of the device frames at any time. The device and the phone only hand their newest frame over; `Camera`'s own
 thread fits every frame to the render size with `cover()` (scaled to fill it, the middle kept, no distortion) and
-hands it on; the backends only rotate and flip. A missing device is a warning and `device: none`, never an
+hands it on as a `CameraFrame`. A device frame keeps its turn and flips as flags: it is fitted to the size it has
+once turned, the render's camera image applies them in its upload, the uploader of the faces on the GPU, and the
+capture turns its CPU frame once. A missing device is a warning and `device: none`, never an
 automatic switch to the image. The Vimba backend's thread keeps the camera: `start()` makes the first try, and
 the thread searches again every 5 s while there is none and opens it again (user set, packet size, the
 panel's values) when no complete frame arrived for 5 s; the `device` readout follows its `connected`. Without the Vimba SDK

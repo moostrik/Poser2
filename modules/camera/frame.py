@@ -5,6 +5,8 @@ from enum import Enum
 
 import numpy as np
 
+from modules.utils import Point2f, Quad
+
 
 CAPTURE_TOLERANCE: float = 0.002   # s: frames of one capture carry timestamps this close (OAK4: 0.12 ms apart)
 
@@ -35,14 +37,18 @@ class DepthAlignment:
 
 @dataclass(frozen=True)
 class CameraFrame:
-    """One frame from one camera, as delivered: nothing straightened, nothing mirrored."""
+    """One frame from one camera, as delivered: nothing straightened, turned or mirrored. Who shows it applies, in
+    this order: the homography, the turn (`rotate90`, a transpose: rows become columns), the vertical flip
+    (`flip_v`), the mirror (`flip_h`)."""
     cam_id: int
     kind: FrameType
     image: np.ndarray                       # BGR uint8 (H, W, 3) or gray (H, W); NV12 (H * 3 / 2, W) with `nv12`; DEPTH: uint16 mm, 0 none
     timestamp: float                        # its capture, s on `perf_counter`; its arrival where the backend cannot know it
     nv12: bool = False                      # packed NV12: the Y rows, then the interleaved UV rows
     flip_h: bool = False                    # still to be mirrored
-    homography: np.ndarray | None = None    # still to be straightened with, uv to uv, before the mirror
+    homography: np.ndarray | None = None    # still to be straightened with, uv to uv, before the turn and the flips
+    rotate90: bool = False                  # still to be transposed: shown W x H as H x W
+    flip_v: bool = False                    # still to be flipped top to bottom
     readings: FrameReadings | None = None
     intrinsics: list[list[float]] | None = None     # its 3x3 lens, px
     alignment: DepthAlignment | None = None # a DEPTH frame on its own camera's view; None: on the video's already
@@ -60,3 +66,29 @@ def mirrored_image(frame: CameraFrame) -> np.ndarray:
     width: int = image.shape[1]
     uv: np.ndarray = image[rows:].reshape(rows // 2, width // 2, 2)[:, ::-1]     # the pairs stay together
     return np.concatenate((image[:rows, ::-1], uv.reshape(rows // 2, width)))
+
+
+def upright_image(frame: CameraFrame) -> np.ndarray:
+    """The frame's BGR or gray image turned and flipped as its flags say, the homography left out. A new array where
+    a flag is set: an uploader does this on the GPU, so this is for a consumer that keeps the image on the host."""
+    assert not frame.nv12, 'upright_image takes BGR or gray frames'
+    image: np.ndarray = frame.image
+    if frame.rotate90:
+        image = image.swapaxes(0, 1)
+    if frame.flip_v:
+        image = image[::-1]
+    if frame.flip_h:
+        image = image[:, ::-1]
+    return np.ascontiguousarray(image) if image is not frame.image else image
+
+
+def upright_corners(frame: CameraFrame) -> Quad:
+    """Where in the frame's image (0..1, the origin top-left) each corner of the upright image comes from: its top
+    left, top right, bottom right and bottom left, after the turn and the flips."""
+    def source(x: float, y: float) -> Point2f:
+        if frame.flip_h:
+            x = 1.0 - x
+        if frame.flip_v:
+            y = 1.0 - y
+        return Point2f(y, x) if frame.rotate90 else Point2f(x, y)
+    return Quad(source(0.0, 0.0), source(1.0, 0.0), source(1.0, 1.0), source(0.0, 1.0))

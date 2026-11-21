@@ -13,6 +13,7 @@ from threading import Event, Lock, Thread
 
 import numpy as np
 
+from modules.camera import upright_image
 from modules.inference.face import Face, FaceDetectorSettings, FaceFrame
 
 from .portrait import crop_edge, portrait_box, portrait_crop
@@ -182,13 +183,15 @@ class FaceFinder(Thread):
 
     def best(self) -> np.ndarray | None:
         """The portrait crop of the last frame in which the subject qualified, else of the last frame
-        with a face, cut from that frame's own CPU frame; None when no face was seen since the reset."""
+        with a face, cut from that frame's own CPU frame, turned and flipped as the faces were found; None when no
+        face was seen since the reset."""
         with self._saved_lock:
             saved: _Saved | None = self._qualified if self._qualified is not None else self._last
         if saved is None or saved.frame.image.frame is None:
             return None
         s: FaceFinderSettings = self.settings
-        return portrait_crop(saved.frame.image.frame.image, saved.face, s.zoom, s.offset, self._composition_width, self._composition_height)
+        return portrait_crop(upright_image(saved.frame.image.frame), saved.face, s.zoom, s.offset, self._composition_width,
+                             self._composition_height)
 
     def reset(self) -> None:
         with self._saved_lock:

@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from threading import Thread, Lock
 from typing import Any
 
-import cv2
 import numpy as np
 
 from modules.utils import Waker
@@ -111,8 +110,8 @@ def setup_camera(camera: Any, user_set: str | None) -> CameraSetup:
 
 
 class Camera(Thread):
-    """A `CameraSource` on a Vimba camera. `rotate90` turns every frame (portrait mode, fixed at
-    start); the flips come from the settings, per frame. No detector: no tracklets."""
+    """A `CameraSource` on a Vimba camera. Every frame carries `rotate90` (portrait mode, fixed at start) and the
+    flips of the settings, per frame, as flags. No detector: no tracklets."""
 
     def __init__(self, settings: VimbaCameraSettings, rotate90: bool = False, cam_id: int = 0) -> None:
         super().__init__(name='VimbaCamera', daemon=True)
@@ -286,14 +285,9 @@ class Camera(Thread):
             logger.warning('Vimba camera: failed to grab a frame: %s', e)
 
     def _emit(self, image: np.ndarray, arrival: float) -> None:
-        """The frame becomes the contract's: rotated and flipped, stamped with its arrival."""
-        if self.rotate90:
-            image = cv2.transpose(image)
-        if self.settings.flip_v:
-            image = cv2.flip(image, 0)
-        if self.settings.flip_h:
-            image = cv2.flip(image, 1)
-        frame = CameraFrame(cam_id=self.cam_id, kind=FrameType.VIDEO, image=image, timestamp=arrival)
+        """The frame becomes the contract's: as delivered, its turn and flips as flags, stamped with its arrival."""
+        frame = CameraFrame(cam_id=self.cam_id, kind=FrameType.VIDEO, image=image, timestamp=arrival,
+                            rotate90=self.rotate90, flip_v=self.settings.flip_v, flip_h=self.settings.flip_h)
         with self._callback_lock:
             callbacks: list[CameraFrameCallback] = list(self.frame_callbacks)
         for callback in callbacks:

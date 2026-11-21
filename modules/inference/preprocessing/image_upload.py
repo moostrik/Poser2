@@ -1,12 +1,13 @@
 """ImageUpload: camera color frames onto the GPU, the work both uploaders share.
 
 One frame, or a stack of frames of one size and layout, goes through a pinned staging buffer to the GPU, is
-converted there (NV12, BGR or mono) to float16 RGB CHW in [0, 1], straightened by its camera's homography and
-mirrored when its frame says so, and comes out with one event recorded after it on the caller's stream. A stack is
-one copy and one CUDA kernel compiled at runtime (`SOURCE`, `cuda_kernels`), which does all three per output pixel.
-Where the kernel cannot be compiled (logged once), or with `kernel` off, the same runs as torch ops: the conversion
-and the straightening over the whole stack (the cameras' grids stacked), the mirror per mirrored camera; they are the
-reference `scripts/gpu_input_timing.py` holds the kernel to. Neither the caller's thread nor this waits for the GPU
+converted there (NV12, BGR or mono) to float16 RGB CHW in [0, 1], straightened by its camera's homography, then
+turned and flipped as its frame says (`CameraFrame`'s order: the turn, `flip_v`, `flip_h`), and comes out with one
+event recorded after it on the caller's stream; a turned frame comes out with its width and height swapped. A stack
+is one copy and one CUDA kernel compiled at runtime (`SOURCE`, `cuda_kernels`), which does it all per output pixel.
+Where the kernel cannot be compiled (logged once), with `kernel` off, or for a stack of turned and unturned frames,
+the same runs as torch ops: the conversion and the straightening over the whole stack (the cameras' grids stacked),
+the turn and the flips per frame; they are the reference `scripts/gpu_input_timing.py` holds the kernel to. Neither the caller's thread nor this waits for the GPU
 while it has room: a frame goes through its cameras' ring of staging buffers (`staging_ring.py`). Not thread-safe: one uploader's thread uses it."""
 
 import ctypes
@@ -27,16 +28,18 @@ MAX_STACK: int = 8          # the frames one kernel launch takes
 BLOCK: tuple[int, int] = (16, 16)
 NV12, BGR, MONO = 0, 1, 2   # the layouts the kernel reads
 
-# One thread per output pixel of one frame of the stack (rows of all frames one after the other): the mirror picks the
-# straightened pixel, the straightening the place in the camera frame it came from (`warp_grid`'s, sampled bilinearly
-# with zeros outside, as `grid_sample` does), and each of the four pixels around it is converted from the layout to
-# RGB and rounded to float16, as the torch path converts before it straightens. Out: float16 RGB (N, 3, H, W).
+# One thread per output pixel of one frame of the stack (rows of all frames one after the other): the flips and the
+# turn, undone in reverse, pick the straightened pixel, the straightening the place in the camera frame it came from
+# (`warp_grid`'s, sampled bilinearly with zeros outside, as `grid_sample` does), and each of the four pixels around it
+# is converted from the layout to RGB and rounded to float16, as the torch path converts before it straightens.
+# Out: float16 RGB (N, 3, H, W), H and W swapped when the stack is turned.
 SOURCE: str = r"""
 #define MAX_STACK 8
 struct Stack {
     float inverse[MAX_STACK][9];    // row-major 3x3: straightened uv to the camera frame's uv
-    int straighten[MAX_STACK], flip_h[MAX_STACK];
-    int count, width, height, layout;   // layout: 0 NV12, 1 BGR, 2 mono
+    int straighten[MAX_STACK], flip_h[MAX_STACK], flip_v[MAX_STACK];
+    int count, width, height, layout;   // the frames' own size; layout: 0 NV12, 1 BGR, 2 mono
+    int rotate90;                       // every frame of the stack turned: out is height wide, width high
 };
 
 __device__ float rounded(float value) {     // to float16 and back
@@ -71,17 +74,21 @@ extern "C" __global__ void upload(const unsigned char* frames, unsigned short* o
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int w = s.width, h = s.height;
-    if (x >= w || row >= h * s.count) return;
-    int n = row / h, y = row - n * h;
+    int ow = s.rotate90 ? h : w, oh = s.rotate90 ? w : h;      // the output's size
+    if (x >= ow || row >= oh * s.count) return;
+    int n = row / oh, y = row - n * oh;
     long frame_bytes = s.layout == 0 ? (long)w * h * 3 / 2 : s.layout == 1 ? (long)w * h * 3 : (long)w * h;
     const unsigned char* frame = frames + n * frame_bytes;
-    int xs = s.flip_h[n] ? w - 1 - x : x;      // the mirror: the straightened pixel this one shows
+    int xf = s.flip_h[n] ? ow - 1 - x : x;      // the mirror undone
+    int yf = s.flip_v[n] ? oh - 1 - y : y;      // the vertical flip undone
+    int xs = s.rotate90 ? yf : xf;              // the turn undone: the straightened pixel this one shows
+    int ys = s.rotate90 ? xf : yf;
     float rgb[3] = {0.0f, 0.0f, 0.0f};
     if (!s.straighten[n]) {
-        pixel(frame, xs, y, s, rgb);
+        pixel(frame, xs, ys, s, rgb);
     } else {
         const float* m = s.inverse[n];
-        float u = (xs + 0.5f) / w, v = (y + 0.5f) / h;
+        float u = (xs + 0.5f) / w, v = (ys + 0.5f) / h;
         float sz = m[6] * u + m[7] * v + m[8];
         if (sz > 0.0f) {
             float ix = (m[0] * u + m[1] * v + m[2]) / sz * w - 0.5f;
@@ -102,7 +109,7 @@ extern "C" __global__ void upload(const unsigned char* frames, unsigned short* o
     for (int c = 0; c < 3; ++c) {
         unsigned short bits;
         asm("cvt.rn.f16.f32 %0, %1;" : "=h"(bits) : "f"(rgb[c]));
-        out[((long)(n * 3 + c) * h + y) * w + x] = bits;
+        out[((long)(n * 3 + c) * oh + y) * ow + x] = bits;
     }
 }
 """
@@ -111,8 +118,8 @@ extern "C" __global__ void upload(const unsigned char* frames, unsigned short* o
 class _Stack(ctypes.Structure):
     """`SOURCE`'s `Stack`, passed to the kernel by value."""
     _fields_ = [('inverse', (ctypes.c_float * 9) * MAX_STACK), ('straighten', ctypes.c_int * MAX_STACK),
-                ('flip_h', ctypes.c_int * MAX_STACK), ('count', ctypes.c_int), ('width', ctypes.c_int),
-                ('height', ctypes.c_int), ('layout', ctypes.c_int)]
+                ('flip_h', ctypes.c_int * MAX_STACK), ('flip_v', ctypes.c_int * MAX_STACK), ('count', ctypes.c_int),
+                ('width', ctypes.c_int), ('height', ctypes.c_int), ('layout', ctypes.c_int), ('rotate90', ctypes.c_int)]
 
 
 def nv12_to_rgb(y: torch.Tensor, uv: torch.Tensor) -> torch.Tensor:
@@ -145,6 +152,16 @@ def warp_grid(homography: torch.Tensor, height: int, width: int) -> torch.Tensor
     return uv.unsqueeze(0)
 
 
+def upright(image: torch.Tensor, frame: CameraFrame) -> torch.Tensor:
+    """A straightened (C, H, W) image turned and flipped as its frame says, in `CameraFrame`'s order; contiguous."""
+    if frame.rotate90:
+        image = image.transpose(-1, -2)
+    dims: list[int] = ([-2] if frame.flip_v else []) + ([-1] if frame.flip_h else [])
+    if dims:
+        return image.flip(dims)
+    return image.contiguous()
+
+
 class ImageUpload:
     """See the module docstring."""
 
@@ -158,8 +175,9 @@ class ImageUpload:
     def upload(self, frames: list[CameraFrame], stream: torch.cuda.Stream,
                kernel: bool = True) -> tuple[list[torch.Tensor], torch.cuda.Event]:
         """`frames`, color frames of one size and layout, onto the GPU on `stream`: each one's image, float16 RGB CHW
-        in [0, 1], straightened and mirrored, in the frames' order, and the event recorded after them all. With
-        `kernel`, as one CUDA kernel; without, or where it cannot be compiled, as torch ops."""
+        in [0, 1], straightened, turned and flipped, in the frames' order, and the event recorded after them all. With
+        `kernel`, as one CUDA kernel; without, where it cannot be compiled, or for a stack of turned and unturned
+        frames, as torch ops."""
         first: np.ndarray = frames[0].image
         cam_ids: tuple[int, ...] = tuple(frame.cam_id for frame in frames)
         staging: torch.Tensor = self.staging.buffer(cam_ids, (len(frames), *first.shape), torch.from_numpy(first[:0]).dtype)
@@ -168,7 +186,8 @@ class ImageUpload:
         with torch.cuda.stream(stream):
             gpu: torch.Tensor = staging.cuda(non_blocking=True)
             images: list[torch.Tensor] | None = None
-            if kernel and not self._kernel_failed and len(frames) <= MAX_STACK and gpu.dtype == torch.uint8:
+            turns: set[bool] = {frame.rotate90 for frame in frames}
+            if kernel and not self._kernel_failed and len(frames) <= MAX_STACK and gpu.dtype == torch.uint8 and len(turns) == 1:
                 try:
                     images = self._upload_kernel(gpu, frames, stream)
                 except (CudaKernelError, OSError):
@@ -182,21 +201,24 @@ class ImageUpload:
         return images, ready
 
     def _upload_kernel(self, gpu: torch.Tensor, frames: list[CameraFrame], stream: torch.cuda.Stream) -> list[torch.Tensor]:
-        """The stack converted, straightened and mirrored by `SOURCE`'s one kernel."""
+        """The stack, all turned or none, converted, straightened, turned and flipped by `SOURCE`'s one kernel."""
         first: CameraFrame = frames[0]
         layout: int = NV12 if first.nv12 else MONO if gpu.ndim == 3 else BGR
         height: int = gpu.shape[1] * 2 // 3 if layout == NV12 else gpu.shape[1]
         width: int = gpu.shape[2]
         stack = _Stack()
         stack.count, stack.width, stack.height, stack.layout = len(frames), width, height, layout
+        stack.rotate90 = int(first.rotate90)
         for index, frame in enumerate(frames):
             stack.flip_h[index] = int(frame.flip_h)
+            stack.flip_v[index] = int(frame.flip_v)
             if frame.homography is not None:
                 stack.straighten[index] = 1
                 for i, value in enumerate(self._inverse(frame)):
                     stack.inverse[index][i] = value
-        out: torch.Tensor = torch.empty((len(frames), 3, height, width), dtype=torch.float16, device='cuda')
-        grid: tuple[int, int] = ((width + BLOCK[0] - 1) // BLOCK[0], (height * len(frames) + BLOCK[1] - 1) // BLOCK[1])
+        out_height, out_width = (width, height) if first.rotate90 else (height, width)
+        out: torch.Tensor = torch.empty((len(frames), 3, out_height, out_width), dtype=torch.float16, device='cuda')
+        grid: tuple[int, int] = ((out_width + BLOCK[0] - 1) // BLOCK[0], (out_height * len(frames) + BLOCK[1] - 1) // BLOCK[1])
         self._kernels.launch('upload', grid, BLOCK, [ctypes.c_void_p(gpu.data_ptr()), ctypes.c_void_p(out.data_ptr()), stack], stream)
         return [out[index] for index in range(len(frames))]
 
@@ -210,7 +232,7 @@ class ImageUpload:
         return cached[1]
 
     def _upload_torch(self, gpu: torch.Tensor, frames: list[CameraFrame]) -> list[torch.Tensor]:
-        """The stack converted, straightened and mirrored by torch ops."""
+        """The stack converted, straightened, turned and flipped by torch ops."""
         rgb: torch.Tensor = self._converted(gpu, frames)
         straightened: list[int] = [index for index, frame in enumerate(frames) if frame.homography is not None]
         if len(straightened) == len(frames):        # every camera (the rig's case): the whole stack, no gather
@@ -221,7 +243,7 @@ class ImageUpload:
             warped: torch.Tensor = F.grid_sample(rgb[straightened].float(), self._grids(selected, rgb.shape[2], rgb.shape[3]),
                                                  align_corners=False).to(dtype=torch.float16)
             rgb[straightened] = warped
-        return [rgb[index].flip(-1) if frame.flip_h else rgb[index] for index, frame in enumerate(frames)]
+        return [upright(rgb[index], frame) for index, frame in enumerate(frames)]
 
     def _converted(self, gpu: torch.Tensor, frames: list[CameraFrame]) -> torch.Tensor:
         """The stack (N, …) as uploaded, to float16 RGB (N, 3, H, W) in [0, 1]."""

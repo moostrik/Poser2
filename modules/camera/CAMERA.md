@@ -23,7 +23,9 @@ One job: hand an app a camera. That is three things.
   within `CAPTURE_TOLERANCE` (2 ms; on the OAK4 0.12 ms apart), so time pairs them. A depth frame's `confidence`
   rides on it, on the depth's own view, never as a frame of its own; a backend without one gives None.
 - A camera hands its frames and its model's boxes and keypoints as delivered: the uploader straightens them on the
-  GPU with the frame's `homography`, then mirrors them by `flip_h`; off the GPU `mirrored_image` mirrors. One
+  GPU with the frame's `homography`, then turns them by `rotate90` (a transpose) and flips them by `flip_v` and
+  `flip_h`, in that order; off the GPU `mirrored_image` mirrors and `upright_image` turns and flips, and
+  `upright_corners` gives a drawing the same turn. One
   `homography` array stands for one correction, so a consumer keeps what it derives from it until the array
   changes. A frame's `readings` and `intrinsics` are what a recording needs to redo the correction.
 - The tracklet callback gets every message, an empty one too: no player is a tick as well; a camera without a
@@ -189,14 +191,14 @@ The Vimba backend runs one Allied Vision Mako G-125C over GigE through the Vimba
 `vimba/vimbapython/`, which needs the Vimba 6 SDK (`VIMBA_HOME`, VimbaC). Its thread keeps the camera: `start()`
 makes the first try, the thread searches again every `RETRY_INTERVAL` while there is none, and opens it again (user
 set, packet size, the panel's values) when no complete frame came for `FRAME_TIMEOUT`; `connected` follows it. The
-frames come on Vimba's own thread, which copies, rotates and flips them, stamps them with their arrival and hands
-them over; the camera's thread sends the panel's values to the camera and watches that frames arrive.
+frames come on Vimba's own thread, which copies them, marks them with the turn (`rotate90`, fixed at construction)
+and the panel's flips as flags, stamps them with their arrival and hands them over; the camera's thread sends the panel's values to the camera and watches that frames arrive.
 Without the SDK the binding cannot load: `start()` logs an error and the camera stays unconnected, so an app with
 another image source still runs.
 
 The panel is the source of truth: every feature is sent once after the camera opens, over what its user set
 loaded. The rate and the flips are live: the camera takes a new frame rate at any time (`AcquisitionFrameRateAbs`)
-and the flips are done on the host. A feature the camera model does not have is a warning, once; a write the
+and the flips are flags on the frame, applied where it is shown. A feature the camera model does not have is a warning, once; a write the
 camera refuses (a value it does not take, a control channel that timed out) or a failed read is a warning once per
 reason, and is tried again, not switched off. Exposure and gain each have auto, a manual value sent while auto is
 off, a limit for auto and a readout of what the camera uses; both autos aim for `target_brightness`, exposure

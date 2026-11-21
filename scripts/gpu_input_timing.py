@@ -68,7 +68,7 @@ def timed(name: str, step, runs: int) -> float:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument('recording', nargs='?', default='20261111-123241')
+    parser.add_argument('recording', nargs='?', default='20261112-125832_measure')
     parser.add_argument('--runs', type=int, default=200)
     args = parser.parse_args()
     chunk = RECORDINGS / args.recording / '0_000.mkv'
@@ -117,21 +117,25 @@ def main() -> int:
     live += timed('NV12 to RGB half', convert_nv12, args.runs)
     print(f'  {"live (NV12), with straighten and mirror":44} {live + total - timed("(BGR copy and convert, again)", lambda: (pinned_bgr.cuda(non_blocking=True), convert_bgr()), args.runs):6.3f} ms')
 
-    # The upload as one kernel against its torch ops: the same frames, straightened and mirrored, the image's
-    # largest difference (1/255 is one step of the camera's 8 bits) and each one's GPU time from the staging copy on
+    # The upload as one kernel against its torch ops: the same frames, straightened, then mirrored, or turned and
+    # flipped both ways, the image's largest difference (1/255 is one step of the camera's 8 bits) and each one's
+    # GPU time from the staging copy on
     upload = ImageUpload()
     stream = torch.cuda.current_stream()
-    print('the upload, one kernel against torch ops (straightened, mirrored)')
-    for name, image, nv12_layout in (('BGR', bgr, False), ('NV12', nv12, True)):
-        frame = CameraFrame(cam_id=0, kind=FrameType.VIDEO, image=image, timestamp=0.0, nv12=nv12_layout, flip_h=True,
-                            homography=homography)
-        kernel_image = upload.upload([frame], stream, kernel=True)[0][0].float()
-        torch_image = upload.upload([frame], stream, kernel=False)[0][0].float()
-        difference = float((kernel_image - torch_image).abs().max())
-        kernel_ms = timed(f'{name}: one kernel', lambda: upload.upload([frame], stream, kernel=True), args.runs)
-        torch_ms = timed(f'{name}: torch ops', lambda: upload.upload([frame], stream, kernel=False), args.runs)
-        print(f'  {name}: largest difference {difference:.6f} ({difference * 255.0:.3f} of 1/255), '
-              f'{"within" if difference <= 1.0 / 255.0 else "BEYOND"} 1/255; {torch_ms - kernel_ms:.3f} ms less GPU')
+    print('the upload, one kernel against torch ops (straightened, then turned and flipped)')
+    for rotate90, flip_v, flip_h in ((False, False, True), (True, False, False), (True, True, True), (False, True, False)):
+        label: str = '+'.join(name for name, on in (('rotate90', rotate90), ('flip_v', flip_v), ('flip_h', flip_h)) if on)
+        for name, image, nv12_layout in (('BGR', bgr, False), ('NV12', nv12, True)):
+            frame = CameraFrame(cam_id=0, kind=FrameType.VIDEO, image=image, timestamp=0.0, nv12=nv12_layout,
+                                homography=homography, rotate90=rotate90, flip_v=flip_v, flip_h=flip_h)
+            kernel_image = upload.upload([frame], stream, kernel=True)[0][0].float()
+            torch_image = upload.upload([frame], stream, kernel=False)[0][0].float()
+            assert kernel_image.shape == torch_image.shape, (kernel_image.shape, torch_image.shape)
+            difference = float((kernel_image - torch_image).abs().max())
+            kernel_ms = timed(f'{name} {label}: one kernel', lambda: upload.upload([frame], stream, kernel=True), args.runs)
+            torch_ms = timed(f'{name} {label}: torch ops', lambda: upload.upload([frame], stream, kernel=False), args.runs)
+            print(f'  {name} {label} {tuple(kernel_image.shape)}: largest difference {difference:.6f} ({difference * 255.0:.3f} of 1/255), '
+                  f'{"within" if difference <= 1.0 / 255.0 else "BEYOND"} 1/255; {torch_ms - kernel_ms:.3f} ms less GPU')
 
     # A player about a third of the frame wide and most of its height, padded as the settings file pads
     roi = (width * 0.30, height * 0.05, width * 0.40, height * 0.90)

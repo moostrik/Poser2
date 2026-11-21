@@ -5,13 +5,15 @@ import subprocess
 import tempfile
 import time
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 
 from modules import video
-from modules.camera import CameraFrame, FrameType
+from modules.camera import CameraFrame, FrameType, RigCameraSettings
 from modules.recording import Container, read_metadata
+from modules.recording.replay import Camera
 from modules.recording.tests.recordings import FPS, Played, cam_frame, cam_tracklets, collect, player, record
 
 COUNT: int = 30
@@ -76,6 +78,45 @@ class Mp4Test(unittest.TestCase):
         self.assertIsNotNone(first[3][5].tracklets)
         captures = np.array([p[4] for p in first[5:]], dtype=np.float64)       # on the play's clock, 1/60 s apart
         np.testing.assert_allclose(np.diff(captures), 1.0 / FPS, atol=1e-6)
+
+    def test_the_turn_and_the_flips_come_back_as_flags(self) -> None:
+        """Turned and flipped frames, as smile's camera delivers them, are stored as delivered and play out of the
+        replay camera with the same flags."""
+        def turned(rec) -> None:
+            for i in range(COUNT):
+                rec.submit_frame(replace(cam_frame(0, 100, 100.0 + i / FPS), rotate90=True, flip_v=True, flip_h=True))
+                time.sleep(0.003)
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            root = Path(folder)
+            recording = record(root, [FrameType.VIDEO], 1, turned, container=Container.MP4)
+            metadata = read_metadata(recording / '0_C_000.mp4')
+            assert metadata.info is not None
+            self.assertEqual((metadata.info.width, metadata.info.height), (320, 240))     # as delivered
+            self.assertTrue(metadata.info.rotate90 and metadata.info.flip_v and metadata.info.flip_h)
+
+            play = player(root, 1)
+            play.settings.folder = recording.name
+            settings = RigCameraSettings()
+            settings.initialize()
+            camera = Camera(play, settings, None, None)
+            frames: list[CameraFrame] = []
+            camera.add_frame_callback(frames.append)
+            camera.start()
+            play.start()
+            try:
+                deadline = time.perf_counter() + 10.0
+                while len(frames) < 5 and time.perf_counter() < deadline:
+                    time.sleep(0.01)
+            finally:
+                play.settings.stop = True
+                play.stop()
+                camera.stop()
+                camera.join()
+        self.assertGreaterEqual(len(frames), 5)
+        for frame in frames:
+            self.assertEqual(frame.image.shape[:2], (240, 320))
+            self.assertTrue(frame.rotate90 and frame.flip_v and frame.flip_h)
 
 
 if __name__ == '__main__':

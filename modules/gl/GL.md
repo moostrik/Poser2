@@ -70,7 +70,9 @@ in `shaders/position.glsl`: `clipPosition` for a vertex, `topLeft` for a texture
 (`#include "position.glsl"`; the loader finds it in `shaders/` from any package). A pass that fills its target
 places nothing and draws the quad in −1..1 through `_generic.vert`.
 
-A texture is held in GL's row order; a CPU image is flipped once, at its upload (`Image`, `Tensor`). Text is laid
+A texture is held in GL's row order; a CPU image is flipped once, at its upload (`Image`, `Tensor`). An image
+still to be turned or flipped, a camera's frame as delivered, is turned in that same draw: `Image.set_image` takes
+the `src` `Quad` it is drawn from, and a quarter turn swaps the texture's width and height. Text is laid
 out in pixels on the CPU (`text_layout`), from the size its caller gives, and handed to the shader in 0..1.
 
 ## Shaders

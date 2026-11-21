@@ -63,15 +63,18 @@ class TestVimbaCam(unittest.TestCase):
         self.assertGreaterEqual(self.frames[0].timestamp, before)
         self.assertLessEqual(self.frames[0].timestamp, time.perf_counter())
 
-    def test_the_frame_is_rotated_and_flipped(self):
+    def test_the_frame_carries_its_turn_and_flips(self):
         self.cam.rotate90 = True
         self.settings.flip_h = True
         buffer = FakeFrame(0)
         buffer.buffer[0, 0] = 7                             # top left
         self.cam._frame_handler(self.camera, buffer)
-        image = self.frames[0].image
-        self.assertEqual(image.shape, (6, 4, 3))
-        self.assertEqual(int(image[0, 3, 0]), 7)             # transposed: top left, then flipped: top right
+        frame = self.frames[0]
+        self.assertEqual(frame.image.shape, (4, 6, 3))      # as delivered
+        self.assertEqual(int(frame.image[0, 0, 0]), 7)
+        self.assertTrue(frame.rotate90)
+        self.assertTrue(frame.flip_h)
+        self.assertFalse(frame.flip_v)
 
     def test_an_incomplete_frame_is_skipped_counted_and_given_back(self):
         frame = FakeFrame(10, complete=False)

@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 class Camera(Thread):
-    """A `CameraSource` on a webcam. `rotate90` turns every frame (portrait mode, fixed at start);
-    the flips come from the settings, per frame. No detector: no tracklets."""
+    """A `CameraSource` on a webcam. Every frame carries `rotate90` (portrait mode, fixed at start) and the flips of
+    the settings, per frame, as flags. No detector: no tracklets."""
 
     def __init__(self, settings: CameraSettings, rotate90: bool = False, cam_id: int = 0, index: int = 0) -> None:
         super().__init__(name='WebCamera', daemon=True)
@@ -85,17 +85,13 @@ class Camera(Thread):
             capture.release()
 
     def _emit(self, image: np.ndarray) -> None:
-        """The frame becomes the contract's: rotated and flipped, with its host time on the one clock."""
-        if self.rotate90:
-            image = cv2.transpose(image)
-        if self.settings.flip_v:
-            image = cv2.flip(image, 0)
-        if self.settings.flip_h:
-            image = cv2.flip(image, 1)
+        """The frame becomes the contract's: as delivered, its turn and flips as flags, with its host time on the one
+        clock."""
         self.video_fps.processed()
         self.settings.readings.video_fps = self.video_fps.get_rate_average()
         self.settings.readings.video_min_fps = self.video_fps.get_rate_minimum()
-        frame = CameraFrame(cam_id=self.cam_id, kind=FrameType.VIDEO, image=image, timestamp=time.perf_counter())
+        frame = CameraFrame(cam_id=self.cam_id, kind=FrameType.VIDEO, image=image, timestamp=time.perf_counter(),
+                            rotate90=self.rotate90, flip_v=self.settings.flip_v, flip_h=self.settings.flip_h)
         with self._callback_lock:
             callbacks: list[CameraFrameCallback] = list(self.frame_callbacks)
         for callback in callbacks:

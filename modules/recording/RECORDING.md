@@ -20,7 +20,7 @@ next is in [RECORDING_PLAN.md](RECORDING_PLAN.md).
 
 ## What is recorded
 
-A recording holds what the camera delivered, nothing straightened and nothing mirrored, and only what its playback
+A recording holds what the camera delivered, nothing straightened, turned or mirrored, and only what its playback
 plays. The camera cannot straighten its color frame itself (the oak4's `Warp` takes grey frames only, and the depth
 is aligned on the GPU, where it is straightened with the color), so straightening and mirroring are the uploader's,
 live and in -sim alike, and a recording made before them plays through the same path as the camera. The tracklets
@@ -33,7 +33,9 @@ stored mirrored, with its lens, its depth, the depth's alignment and confidence,
 mirrored image already. hd_trio records so: its clips play mirrored in any player, as all its recordings have, and
 its research data holds video and poses in one image. Nothing is straightened in it (its tilt is 0); a camera that
 is straightened would be mirrored before its straightening, which then no longer matches its homography
-**(deduction)**, so an app that straightens records with `mirrored` off.
+**(deduction)**, so an app that straightens records with `mirrored` off. `mirrored` bakes only `flip_h`, and only into
+a frame that is not turned: the turn and `flip_v` stay flags, and so does a turned frame's mirror. smile, whose
+frames are turned, records with `mirrored` off.
 
 Every part carries its capture time (`timestamp`) and the moment the backend handed it over (`arrival`), on
 `perf_counter`. Their difference, the latency, is stored with the part, so a playback hands each part as late after
@@ -73,7 +75,7 @@ The metadata, attached or beside, is the same lines:
 |------------|------------------------------------------------------------------------------------------|
 | info line  | width, height, the lens (`intrinsics`), `fps`, the depth's alignment                     |
 | info line  | `depth`, `confidence`: the chunk holds a depth stream, and its confidence                |
-| info line  | `flip_h`: the frames are still to be mirrored, as in `CameraFrame`                       |
+| info line  | `rotate90`, `flip_v`, `flip_h`: still to be turned and flipped, as in `CameraFrame`      |
 | per frame  | its number, `timestamp` (the capture)                                                    |
 | per frame  | tilt and roll (°), exposure (µs), ISO (`FrameReadings`), null without                    |
 | per frame  | `video_latency` (s): the frame's arrival minus its capture                               |
@@ -96,6 +98,7 @@ The metadata, attached or beside, is the same lines:
   many chunk files, ffmpeg changes a file's tags only by writing the whole file anew, and `mkvpropedit`, which
   edits them in place, is not installed.
 - A recording of the layout before this one plays wrong: its `flip_h` meant "mirrored before storing".
+- A chunk recorded before `rotate90` and `flip_v` reads them as off.
 
 ## Recording
 
@@ -182,8 +185,8 @@ loaded and the last played, and its lines are parsed as the frames are read, so 
 
 ## The replay camera
 
-`replay.Camera` is a `CameraSource` without a device. Its frames come as the camera delivered them: `flip_h` as
-recorded, depth frames with the recorded alignment and confidence, and with `tilt` the homography of the recorded tilt plus the
+`replay.Camera` is a `CameraSource` without a device. Its frames come as the camera delivered them: the turn and the
+flips as recorded, depth frames with the recorded alignment and confidence, and with `tilt` the homography of the recorded tilt plus the
 live offset on the recorded lens. That matches live's to within `TILT_STEP` (0.25°): live makes it from the IMU's
 newest tilt, the recording keeps the tilt read with the frame **(deduction)**.
 

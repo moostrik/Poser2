@@ -6,8 +6,9 @@ which re-encodes nothing and takes moments. The fixed info of the chunk goes int
 where any tool can read it; the per-frame lines go in as an attachment. The streams are `ChunkStream`'s: 0 color,
 1 depth, 2 the depth's confidence.
 
-Nothing in a chunk is straightened or mirrored: the frames and the tracklets are as the camera
-delivered them, and `flip_h` says the frames are still to be mirrored, as `CameraFrame.flip_h` does.
+Nothing in a chunk is straightened, turned or mirrored: the frames and the tracklets are as the camera
+delivered them, and `rotate90`, `flip_v` and `flip_h` say the frames are still to be turned and flipped, as
+`CameraFrame`'s do; a chunk recorded before them reads them as off.
 One line per frame, in the frames' order, so a line's place is its frame's number.
 """
 
@@ -100,6 +101,8 @@ class ChunkInfo:
     depth_alignment: DepthAlignment | None = None
     depth: bool = True
     confidence: bool = False
+    rotate90: bool = False
+    flip_v: bool = False
 
 
 # A frame's poses by track_id: the box they were found in (x, y, width, height, float32 (4,)) and the
@@ -133,7 +136,7 @@ def info_line(info: ChunkInfo) -> str:
     alignment: dict | None = asdict(info.depth_alignment) if info.depth_alignment is not None else None
     return json.dumps({'width': info.width, 'height': info.height, 'intrinsics': info.intrinsics,
                        'flip_h': info.flip_h, 'fps': info.fps, 'depth_alignment': alignment, 'depth': info.depth,
-                       'confidence': info.confidence}) + '\n'
+                       'confidence': info.confidence, 'rotate90': info.rotate90, 'flip_v': info.flip_v}) + '\n'
 
 
 def chunk_info(values: dict) -> ChunkInfo:
@@ -252,7 +255,7 @@ def merge_chunk(video: Path, depth: Path | None, confidence: Path | None, metada
         alignment: dict | None = asdict(info.depth_alignment) if info.depth_alignment is not None else None
         for key, value in (('width', info.width), ('height', info.height), ('fps', info.fps), ('flip_h', info.flip_h),
                            ('intrinsics', json.dumps(info.intrinsics)), ('depth_alignment', json.dumps(alignment)), ('depth', info.depth),
-                           ('confidence', info.confidence)):
+                           ('confidence', info.confidence), ('rotate90', info.rotate90), ('flip_v', info.flip_v)):
             tags += ['-metadata', f'{key}={value}']
     streams: list[Path] = [video] + ([depth] if depth is not None else []) + \
         ([confidence] if depth is not None and confidence is not None else [])     # no confidence without its depth

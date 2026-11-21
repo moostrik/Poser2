@@ -2,7 +2,7 @@
 and the grins of the visitors before play on the two walls of the sphere (README.md, SMILE.md)."""
 
 from .cam import Camera
-from modules.camera import CameraFrame, FrameType, vimba, webcam
+from modules.camera import CameraFrame, upright_image, vimba, webcam
 from modules.inference import SerialUploader
 from modules.inference.face import FaceDetector
 from .face import FaceFinder, FaceObservations
@@ -209,7 +209,7 @@ class SmileMain():
         self.render.set_status(status)
         self.render.set_warmup(self.generator.warmup)
 
-        cam_image, cam_time = self.camera.frame()
+        cam_frame: CameraFrame = self.camera.frame()
         artnet_progress: float = message.progress
         if seq == SequenceType.TIMEOUT:
             artnet_progress = 1.0
@@ -258,14 +258,15 @@ class SmileMain():
         if seq == SequenceType.CAMERA_SHOW and message.initial:
             self.face.reset()
 
-        if seq >= SequenceType.CAMERA_SHOW and seq <= SequenceType.CAMERA_DETECT and cam_time > self._face_frame_time:
+        if seq >= SequenceType.CAMERA_SHOW and seq <= SequenceType.CAMERA_DETECT and cam_frame.timestamp > self._face_frame_time:
             # new frames only, with the time they arrived: a camera that stopped then stops charging
-            self._face_frame_time = cam_time
-            self.uploader.submit_frame(CameraFrame(0, FrameType.VIDEO, cam_image, cam_time))
+            self._face_frame_time = cam_frame.timestamp
+            self.uploader.submit_frame(cam_frame)
 
         if seq == SequenceType.CAPTURE:
-            # the last frame of the recording in which the face qualified; the full camera frame without one
-            cap_image: np.ndarray = cam_image
+            # the last frame of the recording in which the face qualified; the full camera frame without one, turned
+            # and flipped here, once
+            cap_image: np.ndarray = upright_image(cam_frame)
             portrait: np.ndarray | None = self.face.best()
             if portrait is not None:
                 cap_image = portrait

@@ -2,7 +2,7 @@
 delivered them, and the players in them as the camera's tracklets, so `-sim` needs no OAK plugged in.
 
 A frame is stamped with its capture on the play's clock (`PlayClock`), arriving as late after it as it
-came live, and goes on as the camera delivered it: `flip_h` as recorded, depth frames with the recorded
+came live, and goes on as the camera delivered it: the turn and the flips as recorded, depth frames with the recorded
 alignment, and with `tilt` the homography of the recorded tilt plus the live offset on the recorded lens. It
 carries the recorded readings and lens, so a recording played can be recorded again as it was.
 The device's warp is not applied here: a replay plays what was recorded.
@@ -164,7 +164,8 @@ class Camera:
         nv12: bool = frame_type == FrameType.VIDEO and self.player.nv12
         frame = CameraFrame(cam_id=self.cam_id, kind=frame_type, image=image, timestamp=timestamp, nv12=nv12, flip_h=flip_h,
                             homography=homography, readings=readings, intrinsics=intrinsics, alignment=alignment, arrival=arrival,
-                            confidence=confidence)
+                            confidence=confidence, rotate90=info.rotate90 if info is not None else False,
+                            flip_v=info.flip_v if info is not None else False)
         for c in self.frame_callbacks:
             c(frame)
         if frame_type == FrameType.VIDEO and metadata is not None:

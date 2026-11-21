@@ -9,6 +9,7 @@ from .screen_grab import ScreenGrab
 from ..comfy.messages import GeneratorMessage, GeneratorState
 from ..face import FaceObservations
 from .. import sphere
+from modules.camera import CameraFrame, upright_corners
 from modules.gl import Fbo, Shader, BlendState, Texture, clear_color
 from modules.utils import fit
 from modules.window import RenderBase
@@ -209,8 +210,9 @@ class SmileRender(RenderBase):
             self.sequencer.start_sequence()
 
     # ANY THREAD
-    def set_cam_image(self, image: np.ndarray) -> None:
-        self.inputs.camera.set_image(image)
+    def set_cam_image(self, frame: CameraFrame) -> None:
+        """A camera frame, its turn and flips applied in its upload."""
+        self.inputs.camera.set_image(frame.image, upright_corners(frame))
 
     def set_cap_image(self, image: np.ndarray) -> None:
         """A new visitor's capture. It is the first diffusion image too, until the generator sends
