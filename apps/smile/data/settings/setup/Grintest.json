@@ -7,6 +7,7 @@
       "image_next": false,
       "flip_h": false,
       "flip_v": false,
+      "rotate90": true,
       "auto_gain": true,
       "target_brightness": 33,
       "face_detector": {

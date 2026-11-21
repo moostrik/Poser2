@@ -54,6 +54,9 @@ class Camera(Thread):
             lens_center_x=settings.lens_center_x,
             lens_center_y=settings.lens_center_y,
         )
+        if settings.rotate90:
+            # the flips are baked into the warp, whose columns are the panoramic tracker's bearings: no turn on top
+            logger.warning(f'{self.device_id}: rotate90 is not applied on an OAK-D')
         self.frame_height: int = delivered_height(self.color, self.resolution, self.mount.fov_h, self.mount.tilt,
                                                   self.mount.lens_fov, self.mount.lens_center)
 

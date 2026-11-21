@@ -300,7 +300,7 @@ Lens of the delivered frame, as tagged on a recording, in pixels:
 
 That gives a view of about 79.6° by 67.6° **(deduction)**, and `readings.fov_factory` reports the horizontal figure from the first frame's lens (`rectilinear_field`). The color frame takes its lens from the camera; `fov` and the `lens_*` settings shape only the grey frame's warp. The color sensor spans 95° and the stereo pair 127° (Luxonis docs), so the whole frame has depth. Depth has about 291 rows of real detail inside the 720 rows, since the frame spans about 775 of the 800 mono rows **(deduction)**.
 
-`HORIZONTAL_MIRROR` has no effect on this camera: the mirrored frame matches the plain one. So a color frame leaves its flips to the PC: `flip_h` and `flip_v` go on the frame as its flags, and the uploader flips the image, boxes and keypoints to match. `Camera(settings, rotate90)` puts the app's quarter turn on every frame as its flag the same way, for an app in portrait mode; with the turn, the tilt correction is not applied (a warning when `tilt.enabled` is on), as on a camera on its side the IMU's tilt is a rotation about the sensor's other axis.
+`HORIZONTAL_MIRROR` has no effect on this camera: the mirrored frame matches the plain one. So a color frame leaves its flips to the PC: `flip_h` and `flip_v` go on the frame as its flags, and the uploader flips the image, boxes and keypoints to match. The settings' `rotate90`, a camera mounted on its side, goes on every frame as its flag the same way; with the turn, the tilt correction is not applied (a warning when `tilt.enabled` is on), as on a camera on its side the IMU's tilt is a rotation about the sensor's other axis.
 
 ## Depth
 

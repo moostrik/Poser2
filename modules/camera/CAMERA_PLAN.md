@@ -6,21 +6,8 @@ match) is read by every app and by inference, recording, tracker and render. The
 camera, used now by the apps that have it: `oak` by white_space and hd_trio, `oak4` by deep_flow, low_flow and
 smile, `vimba` and `webcam` by smile. That is general code with one user, which stays.
 
-The steps below are proposals from the scan of 2026-11-21; nothing is built. **(seen)** is read in the code,
+The steps below are what is left of the scan of 2026-11-21. **(seen)** is read in the code,
 **(deduction)** inferred.
-
-## B. Written once
-
-- B4. `rotate90` is a `Field.INIT` field of `CameraSettings` beside the flips, off by default; `oak4`, `vimba` and
-  `webcam` read it there and lose their `rotate90` parameter, smile's `_Oak4Settings` drops its copy **(seen:
-  `apps/smile/cam/settings.py`)**, and smile's portrait mode decides only the screen. smile's webcam gets its own
-  `CameraSettings` group. The replay camera takes the flag from the recording, so its `replay` group holds the key
-  unread **(seen: `modules/recording/replay/camera.py`)**. The OAK-D applies no turn (its flips are baked into its warp,
-  whose columns are the panoramic tracker's bearings): it logs once that `rotate90` is not applied (his word,
-  2026-11-21). Why: "Components take their settings object ... in the constructor"; today Vimba and the webcam take
-  portrait mode **(seen: `apps/smile/main.py`)**. Settings files: smile's four turn on only `camera.rotate90`; every
-  other app's gain it, off. Call sites: smile's main, oak4's, vimba's and webcam's tests. Tests: those, smile's; smile
-  -sim on 20261121-110540 portrait and `-lm`, on his go.
 
 ## C. Small fixes to the rules
 
@@ -108,11 +95,7 @@ The steps below are proposals from the scan of 2026-11-21; nothing is built. **(
 
 ## Rules it touches
 
-- A callback list is a `utils.Broadcast`; a failing callback does not stop the others: A1
-- Inside a package, code that does the same is written once: B1, E2
-- Pass collaborators and fixed structure through constructors: B2
-- Similar things share the noun: B3
-- Components take their settings object in the constructor: B4
+- Inside a package, code that does the same is written once: E2
 - A thread that waits for a moment waits on a `utils.Waker`: C1
 - Read `time.perf_counter()` for every stamp and duration: C2
 - Log exceptions with context; never fail silently: C3

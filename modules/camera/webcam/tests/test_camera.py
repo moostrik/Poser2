@@ -72,9 +72,9 @@ class TestWebCamera(unittest.TestCase):
         self.assertGreater(self.settings.readings.video_min_fps, 0.0)
 
     def test_the_frame_carries_its_turn_and_flips(self):
-        settings = CameraSettings(flip_h=True, flip_v=True)
+        settings = CameraSettings(flip_h=True, flip_v=True, rotate90=True)
         settings.initialize()
-        self.camera = Camera(settings, rotate90=True)
+        self.camera = Camera(settings)
         self.camera.add_frame_callback(self.frames.append)
         self.camera.start()
         self.assertTrue(wait_for(lambda: bool(self.frames)))

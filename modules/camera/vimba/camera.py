@@ -110,14 +110,14 @@ def setup_camera(camera: Any, user_set: str | None) -> CameraSetup:
 
 
 class Camera(Thread):
-    """A `CameraSource` on a Vimba camera. Every frame carries `rotate90` (portrait mode, fixed at start) and the
-    flips of the settings, per frame, as flags. No detector: no tracklets."""
+    """A `CameraSource` on a Vimba camera. Every frame carries the settings' `rotate90` and flips as flags. No
+    detector: no tracklets."""
 
-    def __init__(self, settings: VimbaCameraSettings, rotate90: bool = False, cam_id: int = 0) -> None:
+    def __init__(self, settings: VimbaCameraSettings, cam_id: int = 0) -> None:
         super().__init__(name='VimbaCamera', daemon=True)
         self.settings: VimbaCameraSettings = settings
         self.cam_id: int = cam_id
-        self.rotate90: bool = rotate90
+        self.rotate90: bool = settings.rotate90     # how the camera is mounted, fixed at start
         self.serial: str | None = None          # the camera's serial; None: the first camera found
 
         self._last_frame: float = 0.0           # the arrival of the newest complete frame (perf_counter)

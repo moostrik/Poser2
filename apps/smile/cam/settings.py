@@ -1,10 +1,10 @@
-"""SMILE's camera settings: the Vimba camera's (`VimbaCameraSettings`, also read by the webcam for
-its flips) with the app's sources around it, the image from `input/` and the device readout, the OAK4's own (its
-flips, rate and sensor, read with `-oak`), the faces' settings (the upload, the detector and smile's face finder), the
+"""SMILE's camera settings: the Vimba camera's (`VimbaCameraSettings`) with the app's sources around it, the image
+from `input/` and the device readout, the OAK4's own (its mount, rate and sensor, read with `-oak`), the webcam's own
+(its mount and rate, read with `-wc`), the faces' settings (the upload, the detector and smile's face finder), the
 recording of the device's frames (the recorder and the session that splits it into chunks, started and stopped by one
 pair of buttons), and, read only in -sim, the player of a recording and the replay camera it feeds."""
 
-from modules.camera import CameraResolution, RigCameraSettings
+from modules import camera
 from modules.camera.oak4 import ModelChain, Oak4CameraSettings
 from modules.camera.vimba import VimbaCameraSettings
 from modules.inference import SerialUploaderSettings
@@ -23,11 +23,9 @@ class _RecorderSettings(RecorderSettings):
 
 class _Oak4Settings(Oak4CameraSettings):
     """smile's OAK4: color frames only, no model and no depth on the camera (smile finds the faces), at the sensor's
-    4K mode, since the portrait is cut from the full frame. Tilt correction stays off: smile needs none. Its turn is
-    how it is mounted, not the app's portrait mode: the view cuts the portrait out of an upright landscape frame."""
+    4K mode, since the portrait is cut from the full frame. Tilt correction stays off: smile needs none."""
     model_chain: Field[ModelChain] = Field(ModelChain.OFF, access=Field.INIT, visible=False, description="Models on the camera: none")
-    resolution:  Field[CameraResolution] = Field(CameraResolution.P2160, access=Field.INIT, description="Delivered size on USB; the sensor mode follows it")
-    rotate90:    Field[bool] = Field(False, access=Field.INIT, description="The camera mounted on its side, turned a quarter")
+    resolution:  Field[camera.CameraResolution] = Field(camera.CameraResolution.P2160, access=Field.INIT, description="Delivered size on USB; the sensor mode follows it")
 
 
 class CameraSettings(VimbaCameraSettings):
@@ -46,11 +44,12 @@ class CameraSettings(VimbaCameraSettings):
     split:         Field[bool]      = Field(False, widget=Widget.button, description="Split chunk", visible=False)
     split_seconds: Field[float]     = Field(60, min=1, max=60, widget=Widget.number, description="Split the recording into chunks of this length (s)")
 
-    oak4:          Group[_Oak4Settings] = Group(_Oak4Settings)              # -oak: the OAK4, its own flips and rate
+    oak4:          Group[_Oak4Settings] = Group(_Oak4Settings)              # -oak: the OAK4, its own mount and rate
+    webcam:        Group[camera.CameraSettings] = Group(camera.CameraSettings)  # -wc: the webcam, its own mount and rate
     uploader:      Group[SerialUploaderSettings] = Group(SerialUploaderSettings)    # the frames to judge onto the GPU
     face_detector: Group[FaceDetectorSettings] = Group(FaceDetectorSettings)        # the faces and what they measure
     face:          Group[FaceFinderSettings] = Group(FaceFinderSettings)            # SMILE's choice of a subject and its crop, the image ComfyUI starts from
     control:       Group[SessionSettings] = Group(SessionSettings, share=[start, stop, split, split_seconds])   # splits the recording into chunks
     recorder:      Group[_RecorderSettings] = Group(_RecorderSettings, share=[start, stop, split])             # the device's frames as they come
     simulator:     Group[PlayerSettings] = Group(PlayerSettings)          # -sim: the recording played in place of the device
-    replay:        Group[RigCameraSettings] = Group(RigCameraSettings)    # -sim: the camera the recording's frames come from
+    replay:        Group[camera.RigCameraSettings] = Group(camera.RigCameraSettings)    # -sim: the camera the recording's frames come from

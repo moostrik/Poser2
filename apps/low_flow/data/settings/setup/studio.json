@@ -14,6 +14,7 @@
       "cam_0": {
         "flip_h": true,
         "flip_v": false,
+        "rotate90": false,
         "lens_fov": 0.0,
         "lens_center_x": 0.0,
         "lens_center_y": 0.0,

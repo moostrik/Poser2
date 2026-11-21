@@ -37,9 +37,9 @@ FRAME_CHECK: float = 0.5        # s between two looks at the time of the last fr
 
 
 class Camera(Thread):
-    def __init__(self, settings: Oak4CameraSettings, rotate90: bool = False, cam_id: int = 0) -> None:
+    def __init__(self, settings: Oak4CameraSettings, cam_id: int = 0) -> None:
         super().__init__()
-        self.rotate90: bool = rotate90      # carried on every frame as its flag (an app's portrait mode), fixed at start
+        self.rotate90: bool = settings.rotate90     # carried on every frame as its flag: how the camera is mounted
         self._tilt_warned: bool = False
         self.stop_event = Event()
         self.running: bool = False

@@ -25,10 +25,11 @@ ever chosen; the generator: the flash stays), so its loop logs what its work rai
 
 `cam/camera.py` is the one source the app reads: it wraps the device, a camera backend of `modules/camera/` on the
 camera contract (`modules.camera.vimba.Camera` default, `modules.camera.webcam.Camera` with `-wc`,
-`modules.camera.oak4.Camera` with `-oak`; the Vimba camera and the webcam take `rotate90` for the portrait mode at
-construction; the OAK4 has its own settings, `camera.oak4`: no model and no depth on the camera, `P2160`, its own flips,
-rate and turn (`rotate90`, how it is mounted, off for an upright camera, whose landscape frame the view cuts the
-portrait from), its color frames NV12, which `bgr_frame` converts for the portrait crop), and an image source from `data/input/` that the panel's `use_image` switch puts in
+`modules.camera.oak4.Camera` with `-oak`; each reads its `rotate90` from its own settings, how it is mounted, and the
+portrait mode decides only the screen: the Vimba camera from `camera`, turned on its side so it delivers an upright
+portrait frame in either screen mode, the webcam from `camera.webcam`, the OAK4 from `camera.oak4`, both upright, whose
+landscape frame the view cuts the portrait from; the OAK4's settings also hold no model and no depth on the camera,
+`P2160`, its own flips and rate, its color frames NV12, which `bgr_frame` converts for the portrait crop), and an image source from `data/input/` that the panel's `use_image` switch puts in
 place of the device frames at any time. The device and the phone only hand their newest frame over; `Camera`'s own
 thread hands it on whole as a `CameraFrame` (`CameraFrameCallback`): to the render's camera image, and, while the
 camera states run, to the uploader of the faces. A device frame keeps its turn and flips as flags: the render's

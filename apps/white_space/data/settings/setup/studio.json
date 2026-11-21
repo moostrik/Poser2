@@ -242,6 +242,7 @@
         "device_id": "14442C101136D1D200",
         "flip_h": true,
         "flip_v": false,
+        "rotate90": false,
         "keystone": 0.0,
         "readings": {
           "roll_offset": -1.0
@@ -268,6 +269,7 @@
         "device_id": "14442C10F124D9D600",
         "flip_h": true,
         "flip_v": false,
+        "rotate90": false,
         "keystone": 0.0,
         "readings": {
           "roll_offset": -0.9051853884475903
@@ -294,6 +296,7 @@
         "device_id": "14442C10110AD3D200",
         "flip_h": true,
         "flip_v": false,
+        "rotate90": false,
         "keystone": 0.0,
         "readings": {
           "roll_offset": -2.2458989103710865
@@ -320,6 +323,7 @@
         "device_id": "14442C1031DDD2D200",
         "flip_h": true,
         "flip_v": false,
+        "rotate90": false,
         "keystone": 0.0,
         "readings": {
           "roll_offset": -0.6983032787353464

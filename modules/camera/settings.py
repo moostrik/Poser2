@@ -36,6 +36,7 @@ class CameraSettings(BaseSettings):
     fps:            Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera FPS")
     flip_h:         Field[bool]  = Field(False, access=Field.INIT, description="Flip horizontal")
     flip_v:         Field[bool]  = Field(False, access=Field.INIT, description="Flip vertical")
+    rotate90:       Field[bool]  = Field(False, access=Field.INIT, description="The camera mounted on its side, turned a quarter")
 
     readings:     Group[CameraReadings]     = Group(CameraReadings)
 

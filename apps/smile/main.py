@@ -117,13 +117,13 @@ class SmileMain():
             device_name = 'replay'
         elif cam_type == CamType.VIMBA:
             # without the Vimba 6 SDK (VIMBA_HOME, VimbaC) the backend logs an error at start: no device, the image still works
-            device = vimba.Camera(self.settings.setup.camera, rotate90=self.portrait_mode)
+            device = vimba.Camera(self.settings.setup.camera)
             device_name = 'vimba'
         elif cam_type == CamType.OAK4:
-            device = oak4.Camera(self.settings.setup.camera.oak4, rotate90=self.settings.setup.camera.oak4.rotate90)
+            device = oak4.Camera(self.settings.setup.camera.oak4)
             device_name = 'oak4'
         else:
-            device = webcam.Camera(self.settings.setup.camera, rotate90=self.portrait_mode)
+            device = webcam.Camera(self.settings.setup.camera.webcam)
             device_name = 'webcam'
         self.camera: Camera = Camera(self.settings.setup.camera, device, device_name)
         # the device's frames as they came, recorded after the live path took them, in chunks the session splits

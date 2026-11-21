@@ -16,14 +16,14 @@ logger = logging.getLogger(__name__)
 
 
 class Camera(Thread):
-    """A `CameraSource` on a webcam. Every frame carries `rotate90` (portrait mode, fixed at start) and the flips of
-    the settings, per frame, as flags. No detector: no tracklets."""
+    """A `CameraSource` on a webcam. Every frame carries the settings' `rotate90` and flips as flags. No detector: no
+    tracklets."""
 
-    def __init__(self, settings: CameraSettings, rotate90: bool = False, cam_id: int = 0, index: int = 0) -> None:
+    def __init__(self, settings: CameraSettings, cam_id: int = 0, index: int = 0) -> None:
         super().__init__(name='WebCamera', daemon=True)
         self.settings: CameraSettings = settings
         self.cam_id: int = cam_id
-        self.rotate90: bool = rotate90
+        self.rotate90: bool = settings.rotate90     # how the camera is mounted, fixed at start
         self.index: int = index                 # the device's index for OpenCV
 
         self.frame_callbacks: Broadcast[[CameraFrame]] = Broadcast(name='webcam frame')

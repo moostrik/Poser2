@@ -36,6 +36,9 @@ One job: hand an app a camera. That is three things.
 - A backend's settings extend `CameraSettings` or `RigCameraSettings` with its device's fields, so the settings file keys
   stay flat: `cam_0.fov` and `cam_0.readings.roll_offset` are the same keys for every rig backend. A backend whose
   device takes a field live redeclares it without `Field.INIT`; the panel shows the backend's fields first.
+- `CameraSettings` holds the mount every camera has: `flip_h`, `flip_v` and `rotate90`, a camera on its side, which go
+  on its frames as flags. The OAK-D bakes its flips into its warp, whose columns are the panoramic tracker's
+  bearings, and applies no turn: it logs once that `rotate90` is not applied.
 - Nothing in the show reads a rig camera's readings: they are for setting the rig up. A backend fills what its
   device measures and leaves the rest at its default, NaN for the angles. `roll_offset` sits with the readings,
   beside the roll it corrects.
@@ -196,8 +199,8 @@ The Vimba backend runs one Allied Vision Mako G-125C over GigE through the Vimba
 `vimba/vimbapython/`, which needs the Vimba 6 SDK (`VIMBA_HOME`, VimbaC). Its thread keeps the camera: `start()`
 makes the first try, the thread searches again every `RETRY_INTERVAL` while there is none, and opens it again (user
 set, packet size, the panel's values) when no complete frame came for `FRAME_TIMEOUT`; `connected` follows it. The
-frames come on Vimba's own thread, which copies them, marks them with the turn (`rotate90`, fixed at construction)
-and the panel's flips as flags, stamps them with their arrival and hands them over; the camera's thread sends the panel's values to the camera and watches that frames arrive.
+frames come on Vimba's own thread, which copies them, marks them with the settings' `rotate90` and flips as
+flags, stamps them with their arrival and hands them over; the camera's thread sends the panel's values to the camera and watches that frames arrive.
 Without the SDK the binding cannot load: `start()` logs an error and the camera stays unconnected, so an app with
 another image source still runs.
 
