@@ -54,10 +54,14 @@ Done: inference (20 Nov), settings (21 Nov), board (21 Nov), logging (21 Nov). H
 - A6. `recording`, with its plan's split test (RECORDING_PLAN.md 4); its plan's line 3 (the pose model's drops) goes with this plan's commit: it
   assumes a pose every frame, and deep_flow poses every other frame
 - A7. `render`
+  - `general/composite/layer_compositor.py` and `general/grade/lut_grade.py` move directly into `general/`
+    (rendering.md since 1f734374: a category no longer has to hold packages, only `modules` holds one per module;
+    CLAUDE.md Packages prefers no folder for one or two files, and each holds one; `general/screen_recording/` stays)
 - A8. `session`
 - A9. `tracker`; `TrackerFrameSource.submit(cam_timestamps)` changed with inference C4
 - A10. `utils`; `Broadcast` (utils/broadcast.py, since 94c65c84) is the one callback list: copied under its lock, called outside it, a
-  failing callback logged; each package's own callback lists move to it in that package's review.
+  failing callback logged; each package's own callback lists move to it in that package's review. CLAUDE.md
+  Concurrency now says "A callback list is a `utils.Broadcast`" (1f734374).
 - A11. `video`
 - A12. The apps: `deep_flow`, `smile`, `white_space`. white_space's checks at the rig, you there:
   - live and back to back with `main`: its camera threads only hand over (under 1 ms per frame at p95), every sync
