@@ -11,14 +11,6 @@ in the log. A rename or a text change needs no start. The whole of smile's tests
 
 ## A. Camera frames, recording and -sim
 
-- A2 smile records its camera device's frames as they come, with their turn and flips as flags, before `Camera`
-  fits them to the output size, with
-  `modules/recording`'s `Recorder` (`MP4` container: color only, no depth, tracklets or poses; a part a camera
-  never sent is not waited for) and a `Session` on the `control` group that splits it into chunks, as deep_flow has;
-  the device's frames go to the live path first and to the recorder after it. Recordings go to
-  `apps/smile/data/recordings/` (git-ignored); the recorder's panel tab as in the other apps.
-  Check: smile with `-wc`, one visitor through the Sequence tab's `start`, recorded; the recording plays in a video
-  player. A few visitors are then recorded at the PC or on site.
 - A3 `-sim`: `Main` uses the `simulation` it takes and ignores now; it builds a recording `Player` and a
   `replay.Camera` and hands it to `Camera` as the device, with the player's panel tab. A recorded face qualifies by
   itself, so the whole path runs. `-sim` gets a `simulator` group for the `Player` (as deep_flow's) and a
@@ -113,7 +105,9 @@ in the log. A rename or a text change needs no start. The whole of smile's tests
 
 ## Open questions
 
-- None.
+- Recordings of real visitors: a few recorded with the Vimba camera (or a webcam) at the PC or on site, the camera
+  in portrait. The PC the plan was built on has neither; its one recording (`data/recordings/20261121-105120`) is a
+  photo handed by a stand-in webcam, turned and flipped as the camera delivers.
 
 ## The rules it touches
 
