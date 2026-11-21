@@ -14,16 +14,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 class OscReceiverSettings(BaseSettings):
-    port_in         = Field(9000,        min=1024, max=65535, widget=Widget.number,   description="Incoming OSC port")
-    return_messages = Field(True,                                                     description="Echo received messages back to sender")
-    port_out        = Field(9001,        min=1024, max=65535, widget=Widget.number,   description="Outgoing OSC port")
-    ip_out          = Field("127.0.0.1",                     widget=Widget.ip_field, description="Outgoing OSC IP address")
-    verbose         = Field(False,                                                    description="Log received messages")
-    counter         = Field(0,           min=0,    max=99999, widget=Widget.number,   access=Field.READ, description="Message activity")
-    last_address    = Field("",                                                       access=Field.READ, description="Last received OSC address")
-    last_time       = Field(0.0,                                                      access=Field.READ, description="When the last message came in (perf_counter, s)")
-    unbound_counter = Field(0,           min=0,    max=99999, widget=Widget.number,   access=Field.READ, description="Messages received on an address nothing is bound to")
-    last_unbound    = Field("",                                                       access=Field.READ, description="Last received OSC address nothing is bound to")
+    port_in:         Field[int]   = Field(9000,        min=1024, max=65535, widget=Widget.number,   description="Incoming OSC port")
+    return_messages: Field[bool]  = Field(True,                                                     description="Echo received messages back to sender")
+    port_out:        Field[int]   = Field(9001,        min=1024, max=65535, widget=Widget.number,   description="Outgoing OSC port")
+    ip_out:          Field[str]   = Field("127.0.0.1",                     widget=Widget.ip_field, description="Outgoing OSC IP address")
+    verbose:         Field[bool]  = Field(False,                                                    description="Log received messages")
+    counter:         Field[int]   = Field(0,           min=0,    max=99999, widget=Widget.number,   access=Field.READ, description="Message activity")
+    last_address:    Field[str]   = Field("",                                                       access=Field.READ, description="Last received OSC address")
+    last_time:       Field[float] = Field(0.0,                                                      access=Field.READ, description="When the last message came in (perf_counter, s)")
+    unbound_counter: Field[int]   = Field(0,           min=0,    max=99999, widget=Widget.number,   access=Field.READ, description="Messages received on an address nothing is bound to")
+    last_unbound:    Field[str]   = Field("",                                                       access=Field.READ, description="Last received OSC address nothing is bound to")
 
 
 class OscReceiver:

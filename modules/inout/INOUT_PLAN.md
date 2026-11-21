@@ -7,11 +7,6 @@ OSC: hd_trio, deep_flow, low_flow, white_space and smile. hd_trio's output stays
 Checks run in `.venv-oak4` (inout, deep_flow, low_flow, smile, pyright), except white_space's and hd_trio's tests,
 which need depthai 2 and run in `.venv`.
 
-## B. OSC receiver
-
-- B2. `OscReceiverSettings` fields typed. Why: its fields have no `Field[T]` annotation, unlike every other settings
-  class in the package. How: annotate them. Check: pyright.
-
 ## C. Art-Net
 
 - C1. `ArtNetSender` for both apps: universes, a flash switch, sends on a change, blackouts. Why: hd_trio's bars send one packet to two
@@ -65,7 +60,6 @@ which need depthai 2 and run in `.venv`.
 - `CLAUDE.md` Composition, prefer composition over inheritance: C1
 - `CLAUDE.md` Composition and wiring, clean up in an explicit stop or teardown, never in `__del__`: C2
 - `CLAUDE.md` API evolution, remove obsolete pathways; keep settings files in sync: C2, E1
-- `CLAUDE.md` Types, modern typing: B2
 - `CLAUDE.md` Project shape, code only one app uses moves to that app: C2
 - `CLAUDE.md` Threads, the finder fixes a minor problem and asks the owning thread for feedback: E1
 - `.claude/rules/docs.md`, a component is described in its own document: D1
