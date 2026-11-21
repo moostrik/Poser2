@@ -138,14 +138,17 @@ class Player:
         self.pool.stop()
 
     def _stats_loop(self) -> None:
+        full: bool = False      # the window just measured began with every cell playing
         while not self._stats_stop.wait(STATS_INTERVAL):
             with self._frames_lock:
                 frames, self._frames = self._frames, 0
             shown, most = self.pool.spread()
             rate: float = frames / STATS_INTERVAL / len(self.cells.cells)
             fps: float = float(self.settings.fps)
-            # a rate well below the setting, once every cell plays, is worth a line; the rest is for debugging
-            slow: bool = self._all_playing.is_set() and fps > 0 and rate < fps * (1.0 - SLOW_MARGIN)
+            # a rate well below the setting over a window with every cell playing is worth a line; the rest is for
+            # debugging
+            slow: bool = full and fps > 0 and rate < fps * (1.0 - SLOW_MARGIN)
+            full = self._all_playing.is_set()
             logger.log(logging.WARNING if slow else logging.DEBUG, '%.1f frames/s per cell%s, %d clips on %d cells: %d shown, most %dx',
                        rate, f' (fps {fps:g})' if slow else '', len(self.pool), len(self.cells.cells), shown, most)
 
