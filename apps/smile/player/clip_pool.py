@@ -249,8 +249,10 @@ class ClipPool:
                 (self._archive or self._recent).pop(0)      # the oldest leaves; a loader mid-clip keeps its own reference
             count: int = len(self._recent) + len(self._archive)
             joined: str = 'recent' if clip in self._recent else 'archive'
-        logger.info('Clip %s %s: %d frames at %g fps, %s%s, %d in the pool', clip.style, clip.id,
-                    len(clip.frames), clip.fps, joined, ' (reused)' if reused else '', count)
+        # a visitor's new recording is news; the archive's clips come and go all the time (recycling)
+        logger.log(logging.INFO if joined == 'recent' and not reused else logging.DEBUG,
+                   'Clip %s %s: %d frames at %g fps, %s%s, %d in the pool', clip.style, clip.id,
+                   len(clip.frames), clip.fps, joined, ' (reused)' if reused else '', count)
 
     def _join_archive(self, clip: Clip) -> None:
         """Onto the end of the archive, level with its least played clip. A clip from `recent` was

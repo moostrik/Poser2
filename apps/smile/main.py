@@ -62,6 +62,8 @@ class SmileMain():
     def __init__(self, simulation: bool = False, interface: bool = True, args: list[str] = []) -> None:
         self.is_running: bool = False
         self.is_finished: bool = False
+        # the HTTP client's line per request to ComfyUI and the relay: dozens per visitor, of no use in the log
+        logging.getLogger('urllib3').setLevel(logging.WARNING)
         options: Namespace = parse_args(args)
         self.width: int = round(options.width / 4) * 4
         self.height: int = round(options.height / 4) * 4

@@ -28,6 +28,7 @@ from modules.inout import OscSender
 logger = logging.getLogger(__name__)
 
 STATS_INTERVAL: float = 10.0    # s between the log lines with the frame rates
+SLOW_MARGIN: float = 0.1        # a rate this fraction below `fps` is a warning
 START_DELAY: float = 0.5        # s between two cells starting when the loaded clips go round again
 MIN_START_GAP: float = 0.1      # s at least between two cells starting, when clips load faster than that
 CELLS: int = sphere.CELLS       # per wall
@@ -80,6 +81,7 @@ class Player:
         self._frames: int = 0
         self._frames_lock = threading.Lock()
         self._stats_stop = threading.Event()
+        self._all_playing = threading.Event()   # every cell has its first clip: the rate is a full one from then on
         self._stats_thread = threading.Thread(target=self._stats_loop, name='PlayerStats', daemon=True)
         # the cells start one by one, each on the next clip that is loaded
         self._start_thread = threading.Thread(target=self._start_loop, name='PlayerStart', daemon=True)
@@ -113,7 +115,10 @@ class Player:
                 self.cells.assign(cell.id, clip)
                 started.add(clip.id)
                 last_start = time.perf_counter()
-                logger.info('Cell %d of %d starts on %s', len(self.cells.cells) - len(empty), len(self.cells.cells), clip.id)
+                logger.debug('Cell %d of %d starts on %s', len(self.cells.cells) - len(empty), len(self.cells.cells), clip.id)
+                if not empty:
+                    logger.info('%d cells playing, %d clips', len(self.cells.cells), len(self.pool))
+                    self._all_playing.set()
                 continue
             if clip is None and started and self.pool.idle and time.perf_counter() - last_start >= START_DELAY:
                 started.clear()     # every loaded clip has started a cell: round again from the first
@@ -137,8 +142,12 @@ class Player:
             with self._frames_lock:
                 frames, self._frames = self._frames, 0
             shown, most = self.pool.spread()
-            logger.info('%.1f frames/s per cell, %d clips on %d cells: %d shown, most %dx',
-                        frames / STATS_INTERVAL / len(self.cells.cells), len(self.pool), len(self.cells.cells), shown, most)
+            rate: float = frames / STATS_INTERVAL / len(self.cells.cells)
+            fps: float = float(self.settings.fps)
+            # a rate well below the setting, once every cell plays, is worth a line; the rest is for debugging
+            slow: bool = self._all_playing.is_set() and fps > 0 and rate < fps * (1.0 - SLOW_MARGIN)
+            logger.log(logging.WARNING if slow else logging.DEBUG, '%.1f frames/s per cell%s, %d clips on %d cells: %d shown, most %dx',
+                       rate, f' (fps {fps:g})' if slow else '', len(self.pool), len(self.cells.cells), shown, most)
 
     def is_running(self) -> bool:
         return self._running
