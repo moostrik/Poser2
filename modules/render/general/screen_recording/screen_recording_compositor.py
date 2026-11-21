@@ -91,7 +91,6 @@ class ScreenRecordingCompositor(LayerBase):
                 place = fill if self.settings.frame.fill else fit
                 capture.frame.begin()
                 clear_color()
-                BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
                 BlendState.push()
                 BlendState.set_blend_mode(BlendState.BlendMode.ADD)
                 for source in input.sources:
