@@ -11,11 +11,6 @@ in the log. A rename or a text change needs no start. The whole of smile's tests
 
 ## C. Wiring and time
 
-- C2 A board, `apps/smile/board/`, in place of `SmileRender`'s setters and its `Inputs` and `Faces`: `modules/board`'s
-  `CameraImageStoreMixin` holds the full uploaded frame, so the render no longer uploads it a second time, and smile's
-  own slices hold the faces, the capture and its depth, the generator's images, the status and warm-up, and the online
-  cell. The generator's `CAM_DEPTH` still starts the reveal through `Main`. Check: the start check; `render/tests`,
-  `tests`, a test per slice.
 - C3 The five callback lists (`Camera`, `FaceFinder`, `Generator`, `Sequencer`, `ClipSaver`) become `utils.Broadcast`:
   callbacks run outside the lock, and one that fails no longer stops the others; `ClipLoader`'s go with C6.
   Tests: `cam/tests`, `face/tests`, `comfy/tests`, `sequence/tests`, `save/tests`; a test that a failing callback
