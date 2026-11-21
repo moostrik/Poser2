@@ -34,7 +34,7 @@ class FlowStage(IntEnum):
 
 class MonitorView(IntEnum):
     """How the monitor draws the channels, the most used first."""
-    COLORMAP = 0            # by the port's kind: a vector by its direction, an image as stored, a scalar centered on grey, a depth in its colormap (channel Y: its confidence as grey)
+    COLORMAP = 0            # by the port's kind: a vector by its direction, an image as stored, a scalar centered on grey, a depth in its colormap as bright as its confidence (channel X: the colormap alone, Y: the confidence as grey)
     GLYPHS = auto()
     IMAGE = auto()          # the raw values as stored, for debugging
     HISTOGRAM = auto()
@@ -203,7 +203,11 @@ class Monitor2DLayer(LayerBase):
             return
         texture: Texture = self._flat(port, view)
         if view == MonitorView.COLORMAP and port.kind == TextureKind.DEPTH and port.depth_range is not None:
-            mode: DepthDrawMode = DepthDrawMode.CONFIDENCE if channel == Channel.Y else DepthDrawMode.COLOR
+            mode: DepthDrawMode = DepthDrawMode.COLOR            # channel X, and ALL of a depth without a confidence
+            if channel == Channel.Y:
+                mode = DepthDrawMode.CONFIDENCE
+            elif channel == Channel.ALL and channels > 1:
+                mode = DepthDrawMode.COLOR_BY_CONFIDENCE
             self._render_depth(texture, port.depth_range, mode, title=self._title(port))
             return
         self._visualizer.resize(*self._rendered_size)
@@ -244,8 +248,8 @@ class Monitor2DLayer(LayerBase):
         return f"{self.stage.name.lower()} / {name}{per_step}"
 
     def _render_depth(self, depth: Texture, depth_range: tuple[float, float], mode: DepthDrawMode, title: str) -> None:
-        """A depth in `advanced.colormap`, on a log scale from its near to its far (its red); or with `mode`
-        CONFIDENCE its confidence (its green) as grey from 0 to 1."""
+        """A depth in `advanced.colormap`, on a log scale from its near to its far (its red), drawn as `mode` says:
+        alone, as bright as its confidence (its green), or the confidence alone as grey from 0 to 1."""
         width, height = self._rendered_size
         if (self._depth_picture.width, self._depth_picture.height) != (width, height):
             self._depth_picture.deallocate()

@@ -22,7 +22,7 @@ from typing import Protocol
 import cv2
 import glfw
 import numpy as np
-from OpenGL.GL import (GL_FLOAT, GL_R8, GL_R32F, GL_RED, GL_RGBA, GL_RGBA8, GL_TEXTURE_2D, GL_UNPACK_ALIGNMENT,
+from OpenGL.GL import (GL_FLOAT, GL_R8, GL_R32F, GL_RED, GL_RG, GL_RG32F, GL_RGBA, GL_RGBA8, GL_TEXTURE_2D, GL_UNPACK_ALIGNMENT,
                        GL_UNSIGNED_BYTE, glBindTexture, glFinish, glPixelStorei, glTexSubImage2D, glViewport)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -77,20 +77,22 @@ def texture(pixels: np.ndarray) -> Texture:
     return tex
 
 
-def depth_texture(meters: np.ndarray) -> Texture:
-    """A one-channel float texture holding `meters`, row 0 at GL's bottom."""
+def depth_texture(meters: np.ndarray, confidence: np.ndarray | None = None) -> Texture:
+    """A float texture holding `meters`, row 0 at GL's bottom: one channel, or two with `confidence` in green."""
     tex = Texture()
-    tex.allocate(meters.shape[1], meters.shape[0], GL_R32F)
+    tex.allocate(meters.shape[1], meters.shape[0], GL_R32F if confidence is None else GL_RG32F)
+    pixels: np.ndarray = meters if confidence is None else np.dstack([meters, confidence])
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
     glBindTexture(GL_TEXTURE_2D, tex.tex_id)
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, meters.shape[1], meters.shape[0], GL_RED, GL_FLOAT,
-                    np.ascontiguousarray(meters, dtype=np.float32))
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, meters.shape[1], meters.shape[0], GL_RED if confidence is None else GL_RG,
+                    GL_FLOAT, np.ascontiguousarray(pixels, dtype=np.float32))
     glBindTexture(GL_TEXTURE_2D, 0)
     return tex
 
 
 def inputs() -> dict[str, Texture]:
-    """The known inputs: a color gradient, a second image, a soft round mask, a hard-edged one, and a depth."""
+    """The known inputs: a color gradient, a second image, a soft round mask, a hard-edged one, and a depth, also
+    with a confidence that rises down the picture."""
     y, x = np.mgrid[0:SIZE, 0:SIZE].astype(np.float32) / (SIZE - 1)
     gradient = np.dstack([x, y, 1.0 - x, 0.5 + 0.5 * x]) * 255
     checker = ((np.floor(x * 8) + np.floor(y * 8)) % 2).astype(np.float32)
@@ -101,7 +103,7 @@ def inputs() -> dict[str, Texture]:
     depth = 0.2 + 0.5 * x + 0.2 * (radius < 0.25)      # a slope with a step, under 1 so the RGBA8 target holds it
     return {'gradient': texture(gradient.astype(np.uint8)), 'second': texture(second.astype(np.uint8)),
             'soft': texture(soft.astype(np.uint8)), 'hard': texture(hard.astype(np.uint8)),
-            'depth': depth_texture(depth)}
+            'depth': depth_texture(depth), 'depth_confidence': depth_texture(depth, y)}
 
 
 def pose() -> Points2D:
@@ -288,6 +290,9 @@ def cases() -> dict[str, tuple[Allocated | None, Case | None, Case | None]]:
     depth_view = DepthColormap()
     for mode in range(3):
         add(f'depth_view_{mode}', depth_view, lambda t, m=mode: depth_view.use(t['depth'], t['gradient'], 0.3, 0.8, DepthDrawMode(m)))
+    for mode in (DepthDrawMode.CONFIDENCE, DepthDrawMode.COLOR_BY_CONFIDENCE):
+        add(f'depth_view_{mode.name.lower()}', depth_view,
+            lambda t, m=mode: depth_view.use(t['depth_confidence'], t['gradient'], 0.3, 0.8, m))
     for colormap in (Colormap.TURBO, Colormap.VIRIDIS):
         add(f'depth_view_{colormap.name.lower()}', depth_view,
             lambda t, c=colormap: depth_view.use(t['depth'], t['gradient'], 0.3, 0.8, DepthDrawMode.COLOR, c))

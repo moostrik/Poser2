@@ -1,4 +1,5 @@
-"""DepthColormap: a depth in meters as a picture, through a colormap or grey, or its confidence as grey."""
+"""DepthColormap: a depth in meters as a picture, through a colormap or grey, or its confidence as grey or as the
+colormap's brightness."""
 
 from enum import IntEnum
 
@@ -12,6 +13,7 @@ class DepthDrawMode(IntEnum):
     COLOR = 1           # through the colormap
     OVER_IMAGE = 2      # through the colormap, over the image
     CONFIDENCE = 3      # its confidence, green, as grey from 0 black to 1 white
+    COLOR_BY_CONFIDENCE = 4     # through the colormap, as bright as its confidence
 
 
 class DepthColormap(Shader):
