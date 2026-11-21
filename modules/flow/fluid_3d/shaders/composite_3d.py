@@ -111,22 +111,31 @@ def _cross(a: tuple[float, ...], b: tuple[float, ...]) -> tuple[float, float, fl
     return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
 
 
-def bind_light(shader: ComputeShader, light: CompositeLight, net: Texture | None) -> None:
-    """The uniforms `light.glsl` reads, the caustic net on its unit."""
+def caustics_on(light: CompositeLight, net: Texture | None) -> bool:
+    """Whether the caustic net is drawn: its contrast above 0 and a net to read."""
+    return light.caustics > 0.0 and net is not None and net.allocated
+
+
+def bind_caustic_net(shader: ComputeShader, light: CompositeLight, net: Texture | None) -> None:
+    """The uniforms `light.glsl`'s `caustic_net` reads: the light's place and the net's tiles, the net on its unit."""
     glUniform1i(shader.get_uniform_loc("uPoint"), int(light.point))
     glUniform3f(shader.get_uniform_loc("uVector"), *light.vector)
     glUniform3f(shader.get_uniform_loc("uBox"), *light.box)
+    glUniform1f(shader.get_uniform_loc("uCausticSize"), light.caustic_size)
+    for name, tile in zip(("uNetX", "uNetY", "uNetZ"), net_tiles(light.vector, light.box, light.caustic_size)):
+        glUniform2f(shader.get_uniform_loc(name), *tile)
+    if caustics_on(light, net) and net is not None:
+        net.bind(CAUSTIC_NET_UNIT)
+
+
+def bind_light(shader: ComputeShader, light: CompositeLight, net: Texture | None) -> None:
+    """All the uniforms `light.glsl` reads: the caustic net's, the phase's and the net's contrast."""
+    bind_caustic_net(shader, light, net)
     glUniform1f(shader.get_uniform_loc("uAnisotropy"), light.anisotropy)
     glUniform1f(shader.get_uniform_loc("uBackScattering"), light.back_scattering)
     glUniform1f(shader.get_uniform_loc("uSunPhase"), sun_phase(light.vector, light.anisotropy, light.back_scattering))
-    on: bool = light.caustics > 0.0 and net is not None and net.allocated
-    glUniform1f(shader.get_uniform_loc("uCaustics"), light.caustics if on else 0.0)
-    glUniform1f(shader.get_uniform_loc("uCausticSize"), light.caustic_size)
+    glUniform1f(shader.get_uniform_loc("uCaustics"), light.caustics if caustics_on(light, net) else 0.0)
     glUniform1f(shader.get_uniform_loc("uCausticDepth"), light.caustic_depth)
-    for name, tile in zip(("uNetX", "uNetY", "uNetZ"), net_tiles(light.vector, light.box, light.caustic_size)):
-        glUniform2f(shader.get_uniform_loc(name), *tile)
-    if on and net is not None:
-        net.bind(CAUSTIC_NET_UNIT)
 
 
 class Composite3D(ComputeShader):
@@ -170,7 +179,7 @@ class Composite3D(ComputeShader):
         glUniform1i(self.get_uniform_loc("uHasRays"), int(rays is not None))
         if light is not None:
             glUniform1f(self.get_uniform_loc("uIntensity"), light.intensity)
-            bind_light(self, light, light.net)
+            bind_caustic_net(self, light, light.net)
         if direct is not None:
             direct.bind(2)
         if rays is not None:
