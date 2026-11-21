@@ -24,7 +24,7 @@ class Fluid3DCompositeSettings(CompositeSettings):
 class Fluid3DLayerSettings(Fluid3DSettings, FluidLayerSettings):
     """Configuration for Fluid3DLayer: the stage's settings and its fluid's own, one panel, the stage's
     first; the fluid's width, height and depth are the stage's working size."""
-    composite: Group[Fluid3DCompositeSettings] = Group(Fluid3DCompositeSettings, description="The density marched into the picture: its glow, opacity, fog and light, the blend and the LUT")
+    composite: Group[Fluid3DCompositeSettings] = Group(Fluid3DCompositeSettings, description="The density marched into the picture: its glow, opacity, fog, tint, faint-dye fade and light, the blend and the LUT")
 
     monitor_main:  Group[Monitor3DLayerSettings] = Group(Monitor3DLayerSettings, last=True, tint=MAIN_TINT, description="The fluid stage's monitor in the main panel")
     monitor_debug: Group[Monitor3DLayerSettings] = Group(Monitor3DLayerSettings, last=True, tint=DEBUG_TINT, description="The fluid stage's monitor in the debug panel")
