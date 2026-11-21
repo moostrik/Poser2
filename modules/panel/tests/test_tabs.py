@@ -50,16 +50,16 @@ class TestTabs(unittest.TestCase):
     def test_a_tab_per_child_of_a_root_group(self):
         root = Rooted()
         self.assertEqual(tab_entries(root), [
-            TabEntry("setup.camera", "setup", root.setup.camera),
-            TabEntry("setup.pose", "setup", root.setup.pose),
-            TabEntry("flow.view", "flow", root.flow.view),
+            TabEntry("setup.camera", root.setup.camera),
+            TabEntry("setup.pose", root.setup.pose),
+            TabEntry("flow.view", root.flow.view),
         ])
 
     def test_a_placed_root_group_has_no_tabs_and_follows_its_card(self):
         root = Placed()
         self.assertEqual(tab_entries(root), [
-            TabEntry("setup.camera", "setup", root.setup.camera),
-            TabEntry("setup.pose", "setup", root.setup.pose),
+            TabEntry("setup.camera", root.setup.camera),
+            TabEntry("setup.pose", root.setup.pose),
         ])
         self.assertEqual(placements(root), {"setup.camera": [(root.flow, "view")]})
 

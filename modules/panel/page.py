@@ -88,9 +88,8 @@ ACCESS_CLASS = {
 
 
 class TabEntry(NamedTuple):
-    """One tab: its path from the root, which is its state key, its root group and its settings."""
+    """One tab: its path from the root, which is its state key, and its settings."""
     path: str
-    group: str
     settings: BaseSettings
 
 
@@ -104,9 +103,9 @@ def _after(root: BaseSettings, group: str) -> str:
 
 
 def tab_entries(root: BaseSettings) -> list[TabEntry]:
-    """The tabs: the children of each root group, grouped under it; only those with visible content. A root group
+    """The tabs: the children of each root group, in order; only those with visible content. A root group
     whose children follow a card (`Group.after`) has no tabs."""
-    return [TabEntry(f"{group}.{name}", group, child)
+    return [TabEntry(f"{group}.{name}", child)
             for group, groups in root.children.items() if not _after(root, group)
             for name, child in groups.children.items() if has_visible_content(child)]
 
@@ -357,13 +356,7 @@ class TabBar:
         self.buttons: dict[HideToggle, ui.button] = {}
 
         with ui.tabs().classes("w-full bg-[#121212] rounded").props("dense active-color=primary no-indicator") as self.tabs:
-            labelled: bool = len({entry.group for entry in entries}) > 1    # a root group's name only beside another's
-            group = ""
             for entry in entries:
-                if entry.group != group:
-                    group = entry.group
-                    if labelled:
-                        ui.label(generate_label(group).upper()).classes("text-xs text-grey-6 px-2 self-center")
                 tab = ui.tab(entry.path, label=generate_label(entry.path.rsplit(".", 1)[-1]))
                 tab.on("click", partial(self.select, entry.path))
                 self.tab_of[entry.path] = tab
@@ -381,7 +374,7 @@ class TabBar:
         """The tab panels, one per entry, each holding its settings' body with the tab's hidden
         types applied; the active tab's panel is shown."""
         with ui.tab_panels(self.tabs, value=self.tab_of[self.active]).classes("w-full bg-grey-10 rounded ").style("padding-bottom: 320px;"):
-            for name, _, settings in entries:
+            for name, settings in entries:
                 with ui.tab_panel(self.tab_of[name]) as panel:
                     for toggle in TOGGLES:
                         if self.state.hidden(name, toggle.key, toggle.default):
