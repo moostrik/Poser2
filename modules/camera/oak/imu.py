@@ -1,12 +1,10 @@
-"""The OAK-D's IMU: its rate, its smoothing, and its turn on the board against the camera."""
+"""The OAK-D's IMU: its turn on the board against the camera."""
 
 from depthai import Device
 
 import logging
 logger = logging.getLogger(__name__)
 
-IMU_RATE_HZ: int = 5
-IMU_SMOOTHING: float = 0.1      # how hard each sample pulls the average: the camera is on a tripod, a reading is mostly noise
 IMU_BOARD_ROLL: float = -90.0   # the IMU's turn on the board about the optical axis, measured (CAMERA.md, the mount readout)
 
 

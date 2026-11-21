@@ -160,7 +160,10 @@ missing, and nothing in the show reads it.
 put on one axis. The IMU's vector reaches the camera's frame through the rotation of the device's IMU-to-camera
 calibration (a missing matrix passes the vector as it is, right where the frames agree) and the board's mounting
 turn about the optical axis (`IMU_BOARD_ROLL`, measured on the OAK-D; turning by the angle maps a roll φ to φ minus
-the angle).
+the angle). `geometry.MountReadout` does this for both OAK backends: each sample into the camera's frame, an
+exponential average (`IMU_SMOOTHING`) at `IMU_RATE_HZ`, since a tripod does not move and one sample is mostly noise,
+and its tilt and its roll less `roll_offset` into the readings. Each backend passes its `IMU_BOARD_ROLL` and its
+board's extrinsics.
 
 ## The tilt correction
 

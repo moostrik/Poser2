@@ -11,12 +11,6 @@ The steps below are proposals from the scan of 2026-11-21; nothing is built. **(
 
 ## B. Written once
 
-- B1. The mount readout, one class in `geometry/orientation.py`: the gravity vector smoothed, its tilt and roll, the
-  roll less `roll_offset`, into the readings. Each backend passes its `IMU_BOARD_ROLL`. Why: "Inside a package, code
-  that does the same is written once"; `oak.Camera._imu_callback` and `oak4.Camera._imu_callback` are the same code,
-  and `IMU_SMOOTHING` and `IMU_RATE_HZ` are set twice **(seen)**. The part that calls depthai
-  (`imu_rotation_to_camera`) stays in each backend, and so does oak4's `tilt_correction.update`, which only the OAK4
-  calls **(seen: `oak4.Camera._imu_callback`)**. Tests: `geometry/tests/test_orientation.py` gains the readout.
 - B2. `cam_id` comes from the constructor in `oak.Camera`, `ClipCamera` and `oak4.Camera`, as in `vimba`, `webcam` and
   `replay.Camera`. Why: "Pass collaborators and fixed structure (counts known at startup) through constructors";
   the OAK backends count `Camera._next_cam_id` in creation order, a class-wide count that only holds while one app

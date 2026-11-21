@@ -11,7 +11,8 @@ import unittest
 
 from modules.camera import CameraHealth, CameraHealthSettings, RigCameraReadings, RigCameraSettings, mount_deviation, \
     fps_deviation
-from modules.camera.geometry import orientation_from_gravity
+from modules.camera.geometry import MountReadout, orientation_from_gravity, unroll_imu_frame
+from modules.camera.geometry.orientation import IMU_SMOOTHING
 from modules.settings import Field
 
 
@@ -69,6 +70,39 @@ class TestOrientationFromGravity(unittest.TestCase):
     def test_a_dead_sensor_reads_nan_not_zero(self) -> None:
         tilt, roll = orientation_from_gravity(0.0, 0.0, 0.0)
         self.assertTrue(math.isnan(tilt) and math.isnan(roll))
+
+
+class TestMountReadout(unittest.TestCase):
+    def _readings(self, roll_offset: float = 0.0) -> RigCameraReadings:
+        readings = RigCameraReadings()
+        readings.initialize()
+        readings.roll_offset = roll_offset
+        return readings
+
+    def test_no_sample_sets_nothing(self) -> None:
+        readings = self._readings()
+        self.assertIsNone(MountReadout(readings, 0.0).update([]))
+        self.assertTrue(math.isnan(readings.tilt_measured))
+
+    def test_the_first_sample_is_the_reading(self) -> None:
+        readings = self._readings()
+        tilt = MountReadout(readings, 0.0).update([gravity(10.0, 3.0)])
+        assert tilt is not None
+        self.assertAlmostEqual(tilt, 10.0, places=6)
+        self.assertAlmostEqual(readings.tilt_measured, 10.0, places=6)
+        self.assertAlmostEqual(readings.roll_measured, 3.0, places=6)
+
+    def test_a_later_sample_pulls_the_average_by_the_smoothing(self) -> None:
+        readout = MountReadout(self._readings(), 0.0)
+        readout.update([(0.0, 1.0, 0.0)])
+        readout.update([(1.0, 1.0, 0.0)])
+        assert readout.gravity is not None
+        self.assertAlmostEqual(readout.gravity[0], IMU_SMOOTHING, places=9)
+
+    def test_the_roll_offset_and_the_board_roll_come_off_the_roll(self) -> None:
+        readings = self._readings(roll_offset=2.0)
+        MountReadout(readings, 90.0).update([unroll_imu_frame(gravity(0.0, 5.0), -90.0)])
+        self.assertAlmostEqual(readings.roll_measured, 3.0, places=6)
 
 
 class _TiltedCamera(RigCameraSettings):

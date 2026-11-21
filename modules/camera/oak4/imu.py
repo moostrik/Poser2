@@ -1,13 +1,10 @@
-"""The OAK4's IMU: its rate, its smoothing, and its turn on the board against the camera."""
+"""The OAK4's IMU: its turn on the board against the camera."""
 
 import logging
 
 import depthai as dai
 
 logger = logging.getLogger(__name__)
-
-IMU_RATE_HZ: int = 5
-IMU_SMOOTHING: float = 0.1      # how hard each sample pulls the average: the camera is on a tripod, a reading is mostly noise
 
 # The turn the board mounts the IMU at about the optical axis: a half turn on the OAK4, measured (an upright OAK4
 # Pro W read a roll of -178.6 with this at 0); the OAK-D's is a quarter turn. A board constant, not a unit's

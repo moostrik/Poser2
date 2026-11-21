@@ -3,20 +3,19 @@
 import logging
 import time
 from threading import Thread, Event
-from typing import cast
 
 import depthai as dai
 from numpy import ndarray
 
 from .. import CameraResolution, CameraFrame, RigCameraReadings, CameraTracklet, CameraTracklets, FrameType, CameraFrameCallback, \
     TrackletCallback
-from ..geometry import orientation_from_gravity, mode_size, frame_size, frame_window, frame_coverage, coverage_summary, \
-    delivered_height, lens_field, lens_deviation, imu_to_camera, unroll_imu_frame
+from ..geometry import MountReadout, mode_size, frame_size, frame_window, frame_coverage, coverage_summary, \
+    delivered_height, lens_field, lens_deviation
 from modules.utils import Broadcast, FPS, Rect
 
 from .control import SensorControl
 from .device import get_device_list, log_connected_sensors, read_lens_calibration
-from .imu import imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL
+from .imu import imu_rotation_to_camera, IMU_BOARD_ROLL
 from .models import TRACKING_STATUS
 from .pipeline import build_pipeline, WarpConfig, VIDEO_STREAM, TRACKLETS_STREAM, IMU_STREAM, CONTROL_STREAM
 from .settings import OakCameraSettings
@@ -76,11 +75,7 @@ class Camera(Thread):
         self.frame_callbacks: Broadcast[[CameraFrame]] = Broadcast(name='OAK-D frame')
         self.tracklet_callbacks: Broadcast[[CameraTracklets]] = Broadcast(name='OAK-D tracklets')
 
-        # MOUNT READOUT — the gravity vector, smoothed, and how to get it into the camera's frame.
-        # A tripod does not move, so a single sample is almost all noise; the average is the
-        # signal. State lives here and not on the settings object, which stays pure data.
-        self._imu_rotation: list[list[float]] | None = None
-        self._gravity: tuple[float, float, float] | None = None
+        self.mount_readout: MountReadout = MountReadout(self.settings.readings, IMU_BOARD_ROLL)
 
     @property
     def readings(self) -> RigCameraReadings:
@@ -225,7 +220,7 @@ class Camera(Thread):
             logger.debug(f'{self.device_id} lens: field {field:.1f} deg across {src[0]} px, '
                          f'center offset ({cx - (src[0] - 1) / 2.0:+.1f}, {cy - (src[1] - 1) / 2.0:+.1f}) px; '
                          f'{error:.2f} deg off the shared lens')
-        self._imu_rotation = imu_rotation_to_camera(self.device, socket, self.device_id)
+        self.mount_readout.imu_rotation = imu_rotation_to_camera(self.device, socket, self.device_id)
 
     # ── The device's callbacks: the hand-over to the contract ──────────
 
@@ -252,25 +247,7 @@ class Camera(Thread):
         self._emit_tracklets(tracklets, now)
 
     def _imu_callback(self, msg) -> None:
-        for packet in msg.packets:
-            raw = packet.acceleroMeter
-            vector: tuple[float, float, float] = unroll_imu_frame(
-                imu_to_camera((raw.x, raw.y, raw.z), self._imu_rotation), IMU_BOARD_ROLL)
-            if self._gravity is None:
-                self._gravity = vector
-            else:
-                a: float = IMU_SMOOTHING
-                self._gravity = cast(tuple[float, float, float], tuple(
-                    previous + a * (current - previous)
-                    for previous, current in zip(self._gravity, vector)
-                ))
-        if self._gravity is None:
-            return
-        tilt, roll = orientation_from_gravity(*self._gravity)
-        # Tilt gets no offset: there is no way to measure true tilt on site, so there would be
-        # nothing to calibrate it against.
-        self.settings.readings.tilt_measured = tilt
-        self.settings.readings.roll_measured = roll - self.settings.readings.roll_offset
+        self.mount_readout.update([(p.acceleroMeter.x, p.acceleroMeter.y, p.acceleroMeter.z) for p in msg.packets])
 
     def _emit_frame(self, kind: FrameType, image: ndarray) -> None:
         """The hand-over: the frame gets its host time here and goes to every callback."""
