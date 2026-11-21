@@ -1,5 +1,5 @@
 """Tests for the Vimba frame path against a fake frame (no camera, no thread started), and for the
-thread that opens the camera again against a fake camera (no Vimba system started). They need the
+thread that opens the camera again against a fake camera (no Vimba system started). All but the mount's need the
 binding, so they run where the Vimba SDK is installed."""
 
 import contextlib
@@ -35,6 +35,26 @@ class FakeCamera:
 
     def queue_frame(self, frame: FakeFrame) -> None:
         self.queued.append(frame)
+
+
+class TestMount(unittest.TestCase):
+    """The hand-over's flags, without the SDK: the frame keeps its pixels and carries the settings' mount."""
+
+    def test_rotate90_from_the_settings_goes_on_the_frame_with_its_pixels_as_delivered(self):
+        settings = VimbaCameraSettings(rotate90=True)
+        settings.initialize()
+        cam = Camera(settings)
+        frames: list[CameraFrame] = []
+        cam.add_frame_callback(frames.append)
+        image = np.arange(4 * 6 * 3, dtype=np.uint8).reshape(4, 6, 3)
+        try:
+            cam._emit(image, 1.0)
+        finally:
+            cam.stop()
+            cam.join()
+        self.assertEqual(len(frames), 1)
+        self.assertTrue(frames[0].rotate90)
+        np.testing.assert_array_equal(frames[0].image, image)
 
 
 @unittest.skipIf(VIMBA_ERROR is not None, 'Vimba is not installed')
