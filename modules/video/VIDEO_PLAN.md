@@ -5,13 +5,7 @@ What is to be built in `modules/video`: ffmpeg, the clips and streams it writes 
 
 ## E. The tree and what the package exports
 
-E1. `share.py` (`make_share`) moves to smile's `apps/smile/save/share.py`, its only caller, with `_SHARE_QUALITY`
-   **(seen: no other caller)**, beside `ClipSaver`. It then imports `modules.video` only through its `__init__.py`:
-   `encoder_name` stays exported, and `H264_OPTIONS` and C1's `run` are exported for it. Smile's
-   `save/tests` and SMILE.md, where it names the share clip's place, change in the same commit. Why: the share clip's
-   overlays and its quality for a phone are smile's decisions, and the package is ffmpeg for any app; smile's thread
-   agrees. Check: smile's `save` tests, and smile `-sim` with one visitor, the share clip and `watermark.png`
-   written.
+E1. Check (built, its unit tests pass): smile `-sim` with one visitor, the share clip and `watermark.png` written.
 
 E2. The loose files are grouped by job, the root keeping ffmpeg itself (`process`, `hardware`, `encoder`, `probe`,
    `clip_writer`, `clip_decode`, `audio`): `stream/` holds `stream_reader`, `stream_writer`, `depth_frame`; `screen/`

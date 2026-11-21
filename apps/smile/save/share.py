@@ -20,6 +20,13 @@ WATERMARK_PX: int = 28          # the watermark's ink height, on the 896 x 1120 
 WATERMARK_ALPHA: float = 0.8
 SOURCE_MARGIN: float = 1.4      # the track read is this much longer than the clip: the spin-up runs at up to 1.5x
 
+# the share clip for a phone: lighter than the players' clip, it travels
+_SHARE_QUALITY: dict[video.Hardware, list[str]] = {
+    video.Hardware.iGPU: ['-global_quality', '27'],
+    video.Hardware.GPU:  ['-preset', 'p4', '-rc', 'vbr', '-cq', '27', '-b:v', '0'],
+    video.Hardware.CPU:  ['-crf', '25', '-preset', 'veryfast', '-threads', '4'],
+}
+
 
 def write_watermark(text: str, path: str) -> bool:
     """The watermark, the machine's title with "by" the artist's name, as a PNG file for ffmpeg; False when it
@@ -48,4 +55,34 @@ def build_share(clip: str, track: str | None, offset: float, watermark: str | No
         audio = np.zeros((round(seconds * sample_rate), 2), np.float32)
     pcm: np.ndarray = resample(audio, speed_curve(duration, sample_rate), sample_rate)
     overlays: list[tuple[str, str]] = [(watermark, 'W-w-24:H-h-24')] if watermark else []
-    video.make_share(clip, overlays, pcm, sample_rate, encoder, out)
+    make_share(clip, overlays, pcm, sample_rate, encoder, out)
+
+
+def make_share(clip: str, overlays: list[tuple[str, str]], pcm: np.ndarray, rate: int, hardware: video.Hardware,
+               out: str) -> None:
+    """Write `out`: the clip re-encoded with the `overlays` (PNGs with alpha, each with its place as ffmpeg's
+    overlay takes it, e.g. 'W-w-24:H-h-24') and `pcm` ((n, 2) float32 at `rate`) as its sound, cut to the
+    shorter of the two; the clip's comment tag is kept. Raises when ffmpeg fails."""
+    codec = video.encoder_name(video.ClipCodec.H264, hardware)
+    _, pix_fmt = video.H264_OPTIONS[hardware]
+    quality: list[str] = _SHARE_QUALITY[hardware]
+    comment: str | None = video.probe(clip).comment
+    metadata: list[str] = ['-metadata', f'comment={comment}'] if comment else []
+    inputs: list[str] = ['-i', clip]
+    chain: list[str] = []
+    last: str = '[0:v]'
+    for n, (png, place) in enumerate(overlays, start=1):
+        inputs += ['-i', png]
+        label: str = f'[v{n}]' if n < len(overlays) else ''
+        chain.append(f'{last}[{n}:v]overlay={place}{label}')
+        last = label
+    filters: list[str] = ['-filter_complex', ';'.join(chain)] if chain else []
+    audio_index: int = len(overlays) + 1
+    args = ['-y', *inputs, '-f', 'f32le', '-ar', str(rate), '-ac', '2', '-i', 'pipe:0', *filters,
+            '-map', f'{audio_index}:a:0', *([] if overlays else ['-map', '0:v:0']),
+            '-c:v', codec, *quality, '-pix_fmt', pix_fmt, '-c:a', 'aac', '-b:a', '128k',
+            '-shortest', '-movflags', '+faststart', *metadata, out]
+    try:
+        video.run(args, np.ascontiguousarray(pcm, dtype=np.float32).tobytes(), timeout=120)
+    except RuntimeError as e:
+        raise RuntimeError(f'could not make the share clip of {clip}: {e}') from e

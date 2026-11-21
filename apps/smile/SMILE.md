@@ -235,7 +235,7 @@ portrait as `portraits/<style>/<id>_capture.jpg` and `<id>_portrait.jpg`, and af
 `shares/<style>/<id>.mp4` (`save/share.py`: the same grin re-encoded with the watermark, "SMILE", a circled "ai" and "by" the credit name as it is at
 that share, written again only when the name changed, in the bottom right, no caption, built before the clip player's clip lands, and the visitor's track as its sound: `ClipSaver.submit_share` from `Main` at DIFF_LOOP's start with the seconds
 since the flash, read with `video.read_audio`, played on the tape of `audio/tape.py`, the Max patch's spin-up over
-the first half second and a wind-down over the last, muxed by `video.make_share`; a share clip that fails is a warning and
+the first half second and a wind-down over the last, muxed by `make_share` through `modules/video`'s ffmpeg; a share clip that fails is a warning and
 the clip player's clip goes to the phone instead). `<style>` is the visitor's
 style, `A` (colorful and happy) or `B` (monochrome and dark); the clip player reads it from the folder, the id is the time. Files are built in `output/temp/`
 and renamed into place when the grin is complete, so the clip player never sees a partial file
