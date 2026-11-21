@@ -4,8 +4,6 @@ The package scan of 2026-11-20 (modules/settings held up to CLAUDE.md and its ru
 
 ## E. The package held up to the rules
 
-- E2. `BaseSettings.__getattr__` keeps only its "has no setting" raise: a field is a data descriptor, so its branch
-  that returns a field's value is never reached.
 - E3. `Widget.log_position`, `log_value` and `log_step`, the log slider's arithmetic, move to `modules/panel`, where
   `controls.py` `LogSlider` calls them; `test_log_slider.py` moves to `modules/panel/tests`.
 - E4. `widget.py`'s "Adding a widget" goes into SETTINGS.md; the `_propagate_*` docstrings and `Field.fire`'s say what

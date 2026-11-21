@@ -89,11 +89,7 @@ class BaseSettings:
         )
 
     def __getattr__(self, name):
-        # Children are accessed via Group descriptors — they don't reach here.
-        # Fallback — normally the descriptor __get__ handles known fields.
-        fields = object.__getattribute__(self, "_fields")
-        if name in fields:
-            return object.__getattribute__(self, "_values")[name]
+        """A name that is no field, group or attribute: refused."""
         raise AttributeError(
             f"'{type(self).__name__}' has no setting '{name}'"
         )
