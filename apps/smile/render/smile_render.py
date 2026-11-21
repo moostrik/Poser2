@@ -100,8 +100,8 @@ class SmileRender(Render):
             wall.deallocate()
 
     def update(self) -> None:
-        # the frame's tick: the one clock read of the frame, handed to all that steps with it
-        now: float = time.perf_counter()
+        # the frame's stamp, from the loop, handed to all that steps with it
+        now: float = self.frame_timestamp
         self._play_grin(now)
         # sequencer first: images handed over with a state change (the depth with CONTROL_0)
         # are then uploaded before the stage uses them
