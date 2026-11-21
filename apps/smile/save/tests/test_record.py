@@ -8,7 +8,7 @@ import unittest
 import cv2
 import numpy as np
 
-from apps.smile.comfy.settings import GeneratorSettings
+from apps.smile.comfy import GeneratorSettings
 from apps.smile.save import record
 
 

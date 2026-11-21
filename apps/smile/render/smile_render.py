@@ -5,7 +5,7 @@ import numpy as np
 from OpenGL.GL import GL_RGBA32F, glViewport
 
 from .screen_grab import ScreenGrab
-from ..comfy.messages import GeneratorMessage, GeneratorState
+from ..comfy import GeneratorMessage, GeneratorState
 from ..face import FaceObservations
 from .. import sphere
 from modules.camera import CameraFrame, upright_corners

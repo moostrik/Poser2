@@ -5,7 +5,7 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
-from apps.smile.comfy.settings import GeneratorSettings
+from apps.smile.comfy import GeneratorSettings
 from apps.smile.main import VISITOR_MARGIN, SmileMain
 from apps.smile.sequence import SequenceType
 

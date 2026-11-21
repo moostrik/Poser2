@@ -11,16 +11,14 @@ from modules.inference.face import FaceDetector
 from .face import FaceFinder, FaceObservations
 from .render import SmileRender
 from .sequence import CAMERA_STATES, AnimationType, AnimationTypeNames, GrinPlayer, Sequencer, SequenceMessage, SequenceType
-from .comfy.generator import Generator
-from .comfy.messages import GeneratorMessage, GeneratorState
+from .comfy import Generator, GeneratorMessage, GeneratorState
 from modules.inout import OscSender
 from .audio import LaughterTest, MusicMap, laugh_files
 from .credit import CreditLines
 from .credit_scroll import CreditScroller
 from .save import ClipSaver
 from .lights import Lights
-from .online.online import Online
-from .online.link import http_base
+from .online import Online, http_base
 from .player import Player, online_cell_mode
 from . import sphere
 from modules.settings import SettingsStore

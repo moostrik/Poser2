@@ -11,7 +11,7 @@ import subprocess
 import cv2
 import numpy as np
 
-from apps.smile.comfy.settings import GeneratorSettings
+from apps.smile.comfy import GeneratorSettings
 from apps.smile.sequence import SequencerSettings
 from apps.smile.save import record
 from apps.smile.save.clip_saver import ClipSaver

@@ -4,11 +4,11 @@ from modules.settings import BaseSettings, Group
 from modules.panel import PanelSettings
 from .render import RenderSettings, WindowsSettings
 from .sequence import SequencerSettings
-from .comfy.settings import GeneratorSettings
+from .comfy import GeneratorSettings
 from .cam import CameraSettings
 from .audio import AudioSettings
 from modules.inout import ArtNetSenderSettings
-from .online.settings import OnlineSettings
+from .online import OnlineSettings
 from .player import WallsSettings
 
 
