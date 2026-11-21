@@ -11,8 +11,6 @@ The steps below are proposals from the scan of 2026-11-21; nothing is built. **(
 
 ## B. Written once
 
-- B3. `oak.pipeline.WarpConfig` is named `MountConfig`, as `oak4.pipeline.MountConfig`. Why: "Similar things share
-  the noun": both are "how a camera is mounted and what its lens is" **(seen)**; the OAK-D's adds tilt and keystone.
 - B4. `rotate90` is a `Field.INIT` field of `CameraSettings` beside the flips, off by default; `oak4`, `vimba` and
   `webcam` read it there and lose their `rotate90` parameter, smile's `_Oak4Settings` drops its copy **(seen:
   `apps/smile/cam/settings.py`)**, and smile's portrait mode decides only the screen. smile's webcam gets its own

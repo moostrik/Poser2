@@ -13,7 +13,7 @@ import cv2
 import numpy as np
 
 from modules.camera.oak.pipeline import (
-    WarpConfig, build_warp_mesh, find_keystone_warp, find_keystone_warp_square,
+    MountConfig, build_warp_mesh, find_keystone_warp, find_keystone_warp_square,
     KEYSTONE_MESH_W, KEYSTONE_MESH_H,
 )
 from modules.camera.geometry import WARP_MESH
@@ -108,8 +108,8 @@ class KeystoneIsTheOldBuilderTest(unittest.TestCase):
 class BuildWarpMeshSelectsTest(unittest.TestCase):
     """`build_warp_mesh` hands each camera the one correction it uses."""
 
-    def _mount(self, tilt: float, keystone: float, flip_h: bool = True) -> WarpConfig:
-        return WarpConfig(flip_h=flip_h, flip_v=False, tilt=tilt, keystone=keystone, fov_h=127.0)
+    def _mount(self, tilt: float, keystone: float, flip_h: bool = True) -> MountConfig:
+        return MountConfig(flip_h=flip_h, flip_v=False, tilt=tilt, keystone=keystone, fov_h=127.0)
 
     def test_keystone_alone_uses_the_old_builder_square(self) -> None:
         # deep_flow: 1280x720 mode, square 720 output, keystone -0.22, flip_h.

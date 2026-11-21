@@ -12,11 +12,11 @@ import depthai as dai
 
 from modules.camera import CameraResolution
 from modules.camera.oak import pipeline as oak_pipeline
-from modules.camera.oak.pipeline import WarpConfig, build_pipeline, VIDEO_STREAM, TRACKLETS_STREAM, IMU_STREAM, \
+from modules.camera.oak.pipeline import MountConfig, build_pipeline, VIDEO_STREAM, TRACKLETS_STREAM, IMU_STREAM, \
     CONTROL_STREAM, CLIPS_STREAM
 
 
-MOUNT = WarpConfig(flip_h=True, flip_v=False, tilt=0.0, keystone=0.0, fov_h=127.0)
+MOUNT = MountConfig(flip_h=True, flip_v=False, tilt=0.0, keystone=0.0, fov_h=127.0)
 
 
 def build(**kwargs) -> dai.Pipeline:

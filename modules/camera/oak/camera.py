@@ -17,7 +17,7 @@ from .control import SensorControl
 from .device import get_device_list, log_connected_sensors, read_lens_calibration
 from .imu import imu_rotation_to_camera, IMU_BOARD_ROLL
 from .models import TRACKING_STATUS
-from .pipeline import build_pipeline, WarpConfig, VIDEO_STREAM, TRACKLETS_STREAM, IMU_STREAM, CONTROL_STREAM
+from .pipeline import build_pipeline, MountConfig, VIDEO_STREAM, TRACKLETS_STREAM, IMU_STREAM, CONTROL_STREAM
 from .settings import OakCameraSettings
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ class Camera(Thread):
         self.yolo: bool =               settings.yolo
         self.resolution: CameraResolution = settings.resolution
 
-        self.mount: WarpConfig = WarpConfig(
+        self.mount: MountConfig = MountConfig(
             flip_h=settings.flip_h,
             flip_v=settings.flip_v,
             tilt=settings.tilt,

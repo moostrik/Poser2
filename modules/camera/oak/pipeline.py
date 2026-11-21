@@ -28,7 +28,7 @@ CLIPS_STREAM: str = 'clips'             # the clip camera's frames, in
 
 
 @dataclass
-class WarpConfig:
+class MountConfig:
     """How a camera is mounted and what its lens is, as the warp needs it."""
     flip_h: bool
     flip_v: bool
@@ -62,7 +62,7 @@ def build_pipeline(
     square: bool,
     yolo: bool,
     resolution: CameraResolution,
-    mount: WarpConfig,
+    mount: MountConfig,
     frame_height: int = 0,
     clips: bool = False,
     warp_clips: bool = False,
@@ -124,7 +124,7 @@ def add_clip_input(pipeline: dai.Pipeline, src_size: tuple[int, int], out_size: 
 
 
 def add_warp(pipeline: dai.Pipeline, source: dai.Node.Output, src_size: tuple[int, int], out_size: tuple[int, int],
-             color: bool, mount: WarpConfig, clips: bool) -> dai.Node.Output:
+             color: bool, mount: MountConfig, clips: bool) -> dai.Node.Output:
     """The warp from the sensor's frame to the delivered one; for clips, only the part a
     recording does not carry yet (`clip_warp_mesh`). Returns its output."""
     warp: dai.node.Warp = pipeline.create(dai.node.Warp)
@@ -197,7 +197,7 @@ def find_warp(
     src_size: tuple[int, int],
     out_size: tuple[int, int],
     mode_width: int,
-    mount: WarpConfig,
+    mount: MountConfig,
     mesh_w: int = WARP_MESH,
     mesh_h: int = WARP_MESH,
 ) -> list[dai.Point2f]:
@@ -211,11 +211,11 @@ def clip_warp_mesh(
     src_size: tuple[int, int],
     out_size: tuple[int, int],
     mode_width: int,
-    mount: WarpConfig,
+    mount: MountConfig,
 ) -> tuple[list[dai.Point2f], int, int]:
     """The warp mesh for a raw clip (`clip_warp`): the reprojection and the tilt without the flips and the crop the
     clip already carries; with its mesh size."""
-    clip_mount = WarpConfig(flip_h=False, flip_v=False,
+    clip_mount = MountConfig(flip_h=False, flip_v=False,
                             tilt=-mount.tilt if mount.flip_v else mount.tilt,
                             keystone=0.0,           # a recording is already post-keystone
                             fov_h=mount.fov_h,
@@ -318,7 +318,7 @@ def find_keystone_warp_square(src_width, src_height, square_size, width_offset, 
     return mesh_points
 
 
-def _report_lens_reach(src_size: tuple[int, int], mode_width: int, mount: WarpConfig) -> None:
+def _report_lens_reach(src_size: tuple[int, int], mode_width: int, mount: MountConfig) -> None:
     """Log where the lens reaches less than half of `fov` on a side of its center: the edge columns near the
     horizon go black there; over 3 px it warns."""
     if mount.lens_fov <= 0.0:
@@ -342,7 +342,7 @@ def build_warp_mesh(
     src_size: tuple[int, int],
     out_size: tuple[int, int],
     mode_width: int,
-    mount: WarpConfig,
+    mount: MountConfig,
 ) -> tuple[list[dai.Point2f], int, int]:
     """The mesh of the one correction a camera uses, (mesh, mesh_w, mesh_h) for `setWarpMesh`: the keystone
     only for a non-zero `keystone` alone, else the warp; both set warns and takes the tilt."""
