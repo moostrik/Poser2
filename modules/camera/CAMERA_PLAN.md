@@ -6,6 +6,10 @@ every app and by inference, recording, tracker and render. The backends are each
 the apps that have it: `oak` by white_space and hd_trio, `oak4` by deep_flow, `vimba` and `webcam` by smile. That is
 general code with one user, which stays.
 
+## A. The frames as delivered
+
+The frames-as-delivered step moved to [apps/smile/SMILE_PLAN.md](../../apps/smile/SMILE_PLAN.md) A1.
+
 ## Open
 
 - The OAK4 is to run standalone, as an OAK App **(site fact)**. Depth alignment then needs a home: `ImageAlign` is
