@@ -52,6 +52,14 @@ GL context). Each context keeps its own blend state because GL keeps it per cont
 program goes wrong after a switch of window. Every blend change goes through `BlendState`, so the state it holds is the
 one GL has; `set_buffer_blend_mode` sets one draw buffer's blend alone.
 
+## The textures
+
+`Texture`, `Texture3D` and `Texture2DArray` share `TextureBase`: the GL name, size, format, wrap and filter, `bind`,
+`clear` and the read back. CPU data goes into a texture through `upload(array)`, the array of its size in its upload
+type, made contiguous and byte-aligned there; a texture made with `bgr` takes it in BGR order, an OpenCV image's.
+A volume is a `Texture2DArray` where the 3D texture's tiling is slow at its size, layers of 2D tiles; it filters
+within a layer, not between layers, so a shader that reads between layers mixes them itself **(site fact)**.
+
 ## A texture draws itself
 
 `texture.draw(dst, src, opacity)` draws a texture, an `Fbo`, a `SwapFbo` or an `Image` into the bound target, as

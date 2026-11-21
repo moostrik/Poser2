@@ -9,8 +9,8 @@ The composite marches the fine density's layers, its color the density's color Ã
 place."""
 
 import numpy as np
-from OpenGL.GL import (GL_CLAMP_TO_BORDER, GL_FLOAT, GL_R16F, GL_REPEAT, GL_RGBA, GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT,
-                       GL_TEXTURE_3D, GL_TEXTURE_FETCH_BARRIER_BIT, glBindTexture, glMemoryBarrier, glTexSubImage3D)
+from OpenGL.GL import (GL_CLAMP_TO_BORDER, GL_R16F, GL_REPEAT, GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT,
+                       GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier)
 
 from modules.gl import Texture, Texture3D, SwapTexture3D
 from ..port import ColorSpace, Port, TextureKind
@@ -64,9 +64,7 @@ class FineDensity(DensityCarrier):
             displacement.clear_all()
         tile = np.concatenate((swirl_noise(NOISE_SIZE, *NOISE_BAND), np.zeros((NOISE_SIZE,) * 3 + (1,), np.float32)), axis=-1)
         self._noise.allocate(NOISE_SIZE, NOISE_SIZE, NOISE_SIZE, GL_RGBA16F)
-        glBindTexture(GL_TEXTURE_3D, self._noise.tex_id)
-        glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0, NOISE_SIZE, NOISE_SIZE, NOISE_SIZE, GL_RGBA, GL_FLOAT, np.ascontiguousarray(tile))
-        glBindTexture(GL_TEXTURE_3D, 0)
+        self._noise.upload(tile)
         self._clock = 0.0
         for shader in (self._inject_shader, self._average_shader, self._composite_shader, self._coordinates_shader,
                        self._turbulent_shader):

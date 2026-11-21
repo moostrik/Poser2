@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 
 import freetype
 import numpy as np
-from OpenGL.GL import GL_CLAMP_TO_EDGE, GL_LINEAR, GL_R8, GL_RED, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNSIGNED_BYTE, glBindTexture, glDeleteTextures, glGenTextures, glTexImage2D, glTexParameteri
+from OpenGL.GL import GL_R8
+
+from ..texture import Texture
 
 
 @dataclass
@@ -38,7 +40,7 @@ class FontAtlas:
     """
 
     def __init__(self) -> None:
-        self.texture_id: int = 0
+        self.texture: Texture = Texture()     # GL_R8, clamped and linear
         self.atlas_width: int = 0
         self.atlas_height: int = 0
         self.glyphs: dict[str, GlyphMetrics] = {}
@@ -151,27 +153,15 @@ class FontAtlas:
         self.line_height = max_height
 
         # Upload to GPU
-        self.texture_id = glGenTextures(1)
-        glBindTexture(GL_TEXTURE_2D, self.texture_id)
-        glTexImage2D(
-            GL_TEXTURE_2D, 0, GL_R8,
-            self.atlas_width, self.atlas_height, 0,
-            GL_RED, GL_UNSIGNED_BYTE, atlas
-        )
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-        glBindTexture(GL_TEXTURE_2D, 0)
+        self.texture.allocate(self.atlas_width, self.atlas_height, GL_R8)
+        self.texture.upload(atlas)
 
         self.allocated = True
         return True
 
     def deallocate(self) -> None:
         """Release GPU resources."""
-        if self.texture_id:
-            glDeleteTextures([self.texture_id])
-            self.texture_id = 0
+        self.texture.deallocate()
         self.glyphs.clear()
         self.allocated = False
 

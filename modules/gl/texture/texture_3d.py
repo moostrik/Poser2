@@ -1,16 +1,5 @@
-"""Texture3D - 3D texture (GL_TEXTURE_3D) for volumetric fluid simulation.
-
-Supports trilinear filtering between depth layers and per-field wrap modes
-for implicit boundary conditions (no explicit obstacle border needed).
-
-Usage:
-    velocity_tex = Texture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0,0,0,0))
-    velocity_tex.allocate(256, 192, 32, GL_RGBA16F)  # u,v,w + spare
-
-    pressure_tex = Texture3D(wrap=GL_CLAMP_TO_EDGE)   # Neumann BC
-    pressure_tex.allocate(256, 192, 32, GL_R16F)
-"""
-from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_WRAP_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, glBindTexture, glTexImage3D, glTextureParameterfv, glTextureParameteri
+"""Texture3D: a 3D texture (GL_TEXTURE_3D), filtered trilinearly, and its ping-pong pair."""
+from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_WRAP_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, glBindTexture, glTexImage3D, glTextureParameterfv, glTextureParameteri, glTextureSubImage3D
 import numpy as np
 
 from .swap import Swap
@@ -18,13 +7,7 @@ from .texture_base import TextureBase
 
 
 class Texture3D(TextureBase):
-    """3D OpenGL texture (GL_TEXTURE_3D) for volumetric data.
-
-    Wrap modes control boundary conditions:
-        GL_CLAMP_TO_BORDER + (0,0,0,0) → Dirichlet / no-slip (velocity, density)
-        GL_CLAMP_TO_EDGE              → Neumann / zero-gradient (pressure, temperature)
-        GL_CLAMP_TO_BORDER + (1,0,0,0) → out-of-bounds = obstacle (obstacle mask)
-    """
+    """A 3D texture (GL_TEXTURE_3D) of width × height × depth texels, its wrap on all three axes."""
 
     TARGET = GL_TEXTURE_3D
     WRAP_AXES = (GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_TEXTURE_WRAP_R)
@@ -48,6 +31,14 @@ class Texture3D(TextureBase):
         glBindTexture(GL_TEXTURE_3D, 0)
         self.allocated = True
         self.clear()
+
+    def upload(self, array: np.ndarray) -> None:
+        """`array`, (depth, height, width[, channels]) of the volume's size in its upload type, written into it
+        (glTextureSubImage3D)."""
+        texels = self._upload_contiguous(array)
+        if texels is not None:
+            glTextureSubImage3D(self.tex_id, 0, 0, 0, 0, self.width, self.height, self.depth, self.format,
+                                self.data_type, texels)
 
     def set_wrap_z(self, wrap: int, border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
         """Change Z (R) wrap mode at runtime independently from XY (GL thread only)."""

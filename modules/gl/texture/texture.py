@@ -1,4 +1,4 @@
-from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, glBindTexture, glTexImage2D
+from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, glBindTexture, glTexImage2D, glTextureSubImage2D
 import numpy as np
 
 from modules.utils import Quad, Rect
@@ -15,10 +15,12 @@ class Texture(TextureBase):
     def __init__(self,
                  interpolation: int = GL_LINEAR,
                  wrap: int = GL_CLAMP_TO_EDGE,
-                 border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)) -> None:
+                 border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0),
+                 bgr: bool = False) -> None:
         """`interpolation`: GL_LINEAR or GL_NEAREST; `wrap`: on both axes (GL_CLAMP_TO_EDGE, GL_REPEAT,
-        GL_MIRRORED_REPEAT, GL_CLAMP_TO_BORDER); `border_color`: RGBA with GL_CLAMP_TO_BORDER."""
-        super().__init__(interpolation, wrap, border_color)
+        GL_MIRRORED_REPEAT, GL_CLAMP_TO_BORDER); `border_color`: RGBA with GL_CLAMP_TO_BORDER; `bgr`: its uploads in
+        BGR order."""
+        super().__init__(interpolation, wrap, border_color, bgr)
 
     def allocate(self, width: int, height: int, internal_format: Constant | int) -> None:
         """The texture made at `width` × `height` pixels in `internal_format` (GL_RGB8, GL_RGBA16F, …)."""
@@ -27,6 +29,13 @@ class Texture(TextureBase):
         glTexImage2D(GL_TEXTURE_2D, 0, self.internal_format, self.width, self.height, 0, self.format, self.data_type, None)
         glBindTexture(GL_TEXTURE_2D, 0)
         self.allocated = True
+
+    def upload(self, array: np.ndarray) -> None:
+        """`array`, (height, width[, channels]) of the texture's size in its upload type, written into it as it is,
+        row 0 at GL's first row (glTextureSubImage2D)."""
+        pixels = self._upload_contiguous(array)
+        if pixels is not None:
+            glTextureSubImage2D(self.tex_id, 0, 0, 0, self.width, self.height, self.format, self.data_type, pixels)
 
     def read_to_numpy(self, flip: bool = True) -> np.ndarray | None:
         """The texture read back to the CPU, (height, width[, channels]); `flip` turns GL's rows to the image's."""

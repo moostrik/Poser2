@@ -1,16 +1,4 @@
-"""Texture2DArray - 2D texture array (GL_TEXTURE_2D_ARRAY) for volumetric data.
-
-Each layer is a standard 2D texture with optimal 2D tiling/swizzle layout,
-avoiding the 3D tile pathology that causes performance cliffs at certain
-GL_TEXTURE_3D volume sizes.
-
-Unlike GL_TEXTURE_3D, sampler2DArray does NOT trilinearly interpolate
-between layers — callers must handle Z interpolation manually in GLSL.
-
-Usage:
-    density_tex = Texture2DArray(wrap=GL_CLAMP_TO_BORDER, border_color=(0,0,0,0))
-    density_tex.allocate(3840, 2160, 28, GL_RGBA16F)
-"""
+"""Texture2DArray: a 2D array texture (GL_TEXTURE_2D_ARRAY), layers of 2D textures, and its ping-pong pair."""
 from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, glBindTexture, glTexImage3D
 import numpy as np
 
@@ -19,15 +7,8 @@ from .texture_base import TextureBase
 
 
 class Texture2DArray(TextureBase):
-    """2D array OpenGL texture (GL_TEXTURE_2D_ARRAY) for volumetric data.
-
-    Same interface as Texture3D but backed by GL_TEXTURE_2D_ARRAY for
-    optimal per-layer 2D memory tiling.
-
-    Wrap modes control boundary conditions (S/T only — R axis is layer index):
-        GL_CLAMP_TO_BORDER + (0,0,0,0) → Dirichlet / no-slip (density)
-        GL_CLAMP_TO_EDGE              → Neumann / zero-gradient
-    """
+    """A 2D array texture (GL_TEXTURE_2D_ARRAY) of width × height pixels × depth layers, as `Texture3D`'s interface;
+    filtered within a layer, not between layers, its wrap on x and y."""
 
     TARGET = GL_TEXTURE_2D_ARRAY
     WRAP_AXES = (GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T)     # the layer index is not spatial

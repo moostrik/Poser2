@@ -1,12 +1,14 @@
-from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_NONE, GL_ONE, GL_R16F, GL_R32F, GL_R8, GL_RED, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNPACK_ALIGNMENT, glBindTexture, glGenTextures, glPixelStorei, glTexImage2D, glTexParameterf, glTexParameterfv, glTexParameteri, glTextureSubImage2D
 import logging
+from enum import IntEnum
+from threading import Lock
+
+import numpy as np
+from OpenGL.GL import (Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_NONE, GL_R16F, GL_R32F, GL_R8, GL_RG16F, GL_RG32F,
+                       GL_RG8, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA16F, GL_RGBA32F, GL_RGBA8)
+
+from modules.utils import Point2f, Quad, Rect
 from .fbo import Fbo
 from .texture import Texture
-from .texture_format import data_type as texture_data_type, pixel_format
-from modules.utils import Point2f, Quad, Rect
-import numpy as np
-from threading import Lock
-from enum import IntEnum
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +83,8 @@ class Image(Fbo):
         self._needs_update: bool = False
         self._mutex: Lock = Lock()
         self._channel_order: ChannelOrder = channel_order
-        self._source: Texture = Texture(interpolation, wrap, border_color)  # Private texture for numpy upload
+        self._source: Texture = Texture(interpolation, wrap, border_color,     # the upload's, in the image's order
+                                        bgr=channel_order == ChannelOrder.BGR)
         # Cache last uploaded dimensions/format to avoid redundant checks
         self._cached_width: int = 0
         self._cached_height: int = 0
@@ -130,37 +133,8 @@ class Image(Fbo):
         self._allocate_source(width, height, internal_format)
 
     def _allocate_source(self, width: int, height: int, internal_format: Constant | int) -> None:
-        """Allocate the internal source texture with BGR channel order support."""
-        data_type: int = texture_data_type(internal_format)
-        if data_type == GL_NONE:
-            return
-
-        self._source.width = width
-        self._source.height = height
-        self._source.internal_format = internal_format
-        self._source.format = pixel_format(internal_format, bgr=self._channel_order == ChannelOrder.BGR)
-        self._source.data_type = data_type
-        self._source.tex_id = glGenTextures(1)
-
-        glBindTexture(GL_TEXTURE_2D, self._source.tex_id)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, self._wrap)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, self._wrap)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, self._interpolation)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, self._interpolation)
-        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, self._border_color)
-
-        # Set the swizzle mask for grayscale textures
-        if self._source.format == GL_RED:
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, GL_RED)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_RED)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_B, GL_RED)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ONE)
-
-        glTexImage2D(GL_TEXTURE_2D, 0, self._source.internal_format, width, height, 0,
-                     self._source.format, self._source.data_type, None)
-        glBindTexture(GL_TEXTURE_2D, 0)
-
-        self._source.allocated = True
+        """The source texture the image is uploaded into, in the image's channel order."""
+        self._source.allocate(width, height, internal_format)
 
     def deallocate(self) -> None:
         """Deallocate source texture and FBO."""
@@ -209,13 +183,7 @@ class Image(Fbo):
         if not self.allocated:
             return
 
-        # Upload image data to source texture into its storage (faster than glTexImage2D)
-        # numpy rows are tightly packed; OpenGL's default row alignment of 4 bytes shears any image
-        # whose row isn't a multiple of 4 bytes (e.g. an 878 px wide BGR image)
-        # glTextureSubImage2D takes only a contiguous array; a strided one (a transposed view) is copied here once
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
-        glTextureSubImage2D(self._source.tex_id, 0, 0, 0, width, height,
-                            self._source.format, self._source.data_type, np.ascontiguousarray(image))
+        self._source.upload(image)
 
         # Render flipped to FBO using modern shader; the source's rows are the image's bottom to top
         self.begin()

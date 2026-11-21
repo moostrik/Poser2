@@ -1,5 +1,5 @@
-from OpenGL.GL import GL_CLAMP_TO_EDGE, GL_FLOAT, GL_LINEAR, GL_RGB, GL_RGB32F, GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_WRAP_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, glBindTexture, glBindTextureUnit, glDeleteTextures, glGenTextures, glTexImage3D, glTexParameteri, glUniform1f, glUniform3f, glUseProgram
-from ... import Shader, draw_quad, Texture
+from OpenGL.GL import GL_RGB32F, glUniform1f, glUniform3f, glUseProgram
+from ... import Shader, draw_quad, Texture, Texture3D
 import numpy as np
 from pathlib import Path
 
@@ -15,7 +15,7 @@ class Lut(Shader):
 
     def __init__(self) -> None:
         super().__init__()
-        self._lut_tex_id: int = 0
+        self._lut: Texture3D = Texture3D()     # clamped and linear
         self._lut_size: int = 0
         self._lut_title: str = ""
         self._lut_loaded: bool = False
@@ -153,45 +153,19 @@ class Lut(Shader):
         return lut_array, size, title, domain_min, domain_max
 
     def _create_lut_texture(self, lut_data: np.ndarray, size: int) -> bool:
-        """Create a 3D texture from LUT data."""
+        """The LUT's 3D texture, `size`³ in RGB32F, clamped and linear, filled with `lut_data`."""
         try:
-            self._lut_tex_id = glGenTextures(1)
-            glBindTexture(GL_TEXTURE_3D, self._lut_tex_id)
-
-            # Set texture parameters - use linear interpolation for smooth color transitions
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE)
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-
-            # Upload 3D texture data
-            glTexImage3D(
-                GL_TEXTURE_3D,
-                0,  # mipmap level
-                GL_RGB32F,  # internal format
-                size, size, size,  # dimensions
-                0,  # border
-                GL_RGB,  # format
-                GL_FLOAT,  # type
-                lut_data
-            )
-
-            glBindTexture(GL_TEXTURE_3D, 0)
-            return True
-
+            self._lut.allocate(size, size, size, GL_RGB32F)
+            self._lut.upload(lut_data)
+            return self._lut.allocated
         except Exception as e:
             logger.error("Failed to create 3D texture: %s", e)
-            if self._lut_tex_id:
-                glDeleteTextures(1, [self._lut_tex_id])
-                self._lut_tex_id = 0
+            self._lut.deallocate()
             return False
 
     def _deallocate_lut_texture(self) -> None:
         """Clean up the LUT 3D texture."""
-        if self._lut_tex_id:
-            glDeleteTextures(1, [self._lut_tex_id])
-            self._lut_tex_id = 0
+        self._lut.deallocate()
         self._lut_loaded = False
         self._lut_size = 0
 
@@ -223,7 +197,7 @@ class Lut(Shader):
 
         # Bind input texture to unit 0, the LUT 3D texture to unit 1
         src.bind(0)
-        glBindTextureUnit(1, self._lut_tex_id)
+        self._lut.bind(1)
 
         # Configure shader uniforms
         glUniform1f(self.get_uniform_loc("strength"), strength)

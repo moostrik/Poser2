@@ -8,16 +8,6 @@ tasklist check that no app is running, unless Matthias says he is using the PC o
 
 ## A. A texture is made one way
 
-- A1. `Texture` and `Texture3D` take CPU data in one method, `upload(array)` (`glTextureSubImage2D`/`3D`, the
-  array made contiguous, the unpack alignment set to 1 there); `TextureBase` takes the pixel format in BGR order
-  when asked (`bgr`), for an OpenCV image. `FontAtlas` holds a `Texture` (GL_R8), `Lut` a `Texture3D` (GL_RGB32F),
-  `Image` its source as a `Texture` with `bgr`, and `flow/fluid_3d/fine_density.py` uploads its noise volume with
-  `upload`, in place of their own GL calls; `FontAtlas.texture_id` becomes that texture, and `shaders.Glyphs.use`
-  takes it. Why: `Lut._create_lut_texture`, `FontAtlas.allocate` and `Image._allocate_source` each repeat
-  `TextureBase._create` with raw GL calls, and fine_density binds to upload; `texture_id` is a second name for
-  `tex_id`; only `Image.set_from_image` sets the unpack alignment, and the atlas's width is any power of two (seen).
-  Check: shader_check (Lut, Text); hd_trio -sim (the feature windows' `Image`); smile -sim (its camera `Image`,
-  turned); deep_flow -sim (fine density).
 - A2. One table from an array to its internal format: `texture_format` looks the format up by the numpy element type
   and the channel count, a torch tensor by the numpy type of its dtype, for `Image` and `Tensor`; `Tensor`'s two
   `format_map`s become `pixel_format`. Why: `image._get_internal_format` and `tensor.infer_internal_format` hold the

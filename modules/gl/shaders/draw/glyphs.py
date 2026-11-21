@@ -7,9 +7,10 @@ One draw per string instead of one per glyph keeps the main thread's Python/GL s
 — and with it its GIL exposure — flat in the text length.
 """
 
-from OpenGL.GL import GL_TRIANGLES, glBindTextureUnit, glDrawArrays, glUniform4f, glUseProgram
+from OpenGL.GL import GL_TRIANGLES, glDrawArrays, glUniform4f, glUseProgram
 from modules.utils import Color
 from ...shader import Shader
+from ...texture import Texture
 
 
 class Glyphs(Shader):
@@ -17,20 +18,20 @@ class Glyphs(Shader):
 
     def use(self, vertex_count: int,
             color: Color,
-            atlas_texture_id: int) -> None:
+            atlas: Texture) -> None:
         """Draw ``vertex_count`` vertices of pre-uploaded glyph quads.
 
         Args:
             vertex_count: Number of vertices in the bound VAO (6 per glyph)
             color: the text's color
-            atlas_texture_id: OpenGL texture ID of font atlas
+            atlas: the font atlas
         """
         if not self.allocated or not self.shader_program or vertex_count <= 0:
             return
 
         glUseProgram(self.shader_program)
 
-        glBindTextureUnit(0, atlas_texture_id)
+        atlas.bind(0)
 
         glUniform4f(self.get_uniform_loc("color"), *color)
 

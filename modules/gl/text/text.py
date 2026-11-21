@@ -147,7 +147,7 @@ class Text:
         glBindBuffer(GL_ARRAY_BUFFER, self._vbo)
         glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_DYNAMIC_DRAW)
         glBindBuffer(GL_ARRAY_BUFFER, 0)
-        self._glyphs.use(len(vertices), color, self._atlas.texture_id)
+        self._glyphs.use(len(vertices), color, self._atlas.texture)
         context().bind_vertex_array(previous_vao)
 
     def draw_box_text(self, x: float, y: float, text: str,

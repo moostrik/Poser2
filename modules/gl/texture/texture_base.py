@@ -7,10 +7,11 @@ from typing import ClassVar
 import numpy as np
 from OpenGL.GL import (Constant, GL_FLOAT, GL_HALF_FLOAT, GL_NONE, GL_ONE, GL_RED, GL_TEXTURE_BORDER_COLOR,
                        GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B,
-                       GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNSIGNED_BYTE,
-                       GL_UNSIGNED_INT_2_10_10_10_REV, GL_UNSIGNED_SHORT, glBindTexture, glBindTextureUnit, glClearTexImage,
-                       glDeleteTextures, glGenTextures, glGetTextureImage, glTexParameterfv, glTexParameteri,
-                       glTextureParameterfv, glTextureParameteri)
+                       GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T,
+                       GL_UNPACK_ALIGNMENT, GL_UNSIGNED_BYTE, GL_UNSIGNED_INT_2_10_10_10_REV, GL_UNSIGNED_SHORT,
+                       glBindTexture, glBindTextureUnit, glClearTexImage, glDeleteTextures, glGenTextures,
+                       glGetTextureImage, glPixelStorei, glTexParameterfv, glTexParameteri, glTextureParameterfv,
+                       glTextureParameteri)
 
 from .texture_format import channel_count, data_type as texture_data_type, pixel_format
 
@@ -66,9 +67,10 @@ class TextureBase:
     TARGET: ClassVar[int]                   # GL_TEXTURE_2D, GL_TEXTURE_3D, GL_TEXTURE_2D_ARRAY
     WRAP_AXES: ClassVar[tuple[int, ...]]    # the axes it is made wrapping
 
-    def __init__(self, interpolation: int, wrap: int, border_color: tuple[float, float, float, float]) -> None:
+    def __init__(self, interpolation: int, wrap: int, border_color: tuple[float, float, float, float],
+                 bgr: bool = False) -> None:
         """`interpolation`: the min and mag filter; `wrap`: on every axis of WRAP_AXES; `border_color`: with
-        GL_CLAMP_TO_BORDER."""
+        GL_CLAMP_TO_BORDER; `bgr`: its uploads in BGR order, an OpenCV image's."""
         self.allocated: bool = False
         self.width: int = 0
         self.height: int = 0
@@ -79,6 +81,7 @@ class TextureBase:
         self._interpolation: int = interpolation
         self._wrap: int = wrap
         self._border_color: tuple[float, float, float, float] = border_color
+        self._bgr: bool = bgr
 
     def _create(self, width: int, height: int, internal_format: Constant | int) -> bool:
         """The texture made and bound, its wrap, filter, border and a red one's grayscale swizzle set; the caller
@@ -89,7 +92,7 @@ class TextureBase:
         self.width = width
         self.height = height
         self.internal_format = internal_format
-        self.format = pixel_format(internal_format)
+        self.format = pixel_format(internal_format, bgr=self._bgr)
         self.data_type = data_type
         self.tex_id = int(glGenTextures(1))
 
@@ -138,6 +141,14 @@ class TextureBase:
             return
         clear_data = clear_value(self.data_type, channel_count(self.internal_format), (r, g, b, a))
         glClearTexImage(self.tex_id, 0, self.format, self.data_type, clear_data)
+
+    def _upload_contiguous(self, array: np.ndarray) -> np.ndarray | None:
+        """`array` ready for an upload: contiguous (a strided one copied once), its rows byte-aligned; None when not
+        allocated."""
+        if not self.allocated:
+            return None
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)      # numpy rows are tightly packed; GL's default of 4 shears odd rows
+        return np.ascontiguousarray(array)
 
     def _read(self, shape: tuple[int, ...]) -> np.ndarray | None:
         """Level 0 read back to the CPU, an array of `shape` with the channels last when there is more than one;
