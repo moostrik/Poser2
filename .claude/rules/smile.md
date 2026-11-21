@@ -23,6 +23,7 @@ paths:
 
 ## Names
 
+- The person in SMILE is a "visitor"; a player plays clips
 - One of windows 1 and 2, which drive 24 screens of the sphere: `wall` (`sphere.WALLS`, `WallRender`, `walls`, "On walls"); not `player`, `PLAYERS`, `PlayerRender`, "player walls"
 - The held grin player: `grin_player`; the clip player: `clip_player`
 - The image generator: `generator` (`GeneratorMessage`, `GeneratorState`, settings group `generator`); not `diffuse`, `diffusion_callback`, `pipeline`, `GenMessage`. `DIFFUSION` stays as a state name
