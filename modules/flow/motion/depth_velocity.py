@@ -4,10 +4,9 @@ per pixel a disparity and its rate, carried along the x/y displacement and corre
 step filter before it and a dead zone after it. How and why:
 modules/flow/MOTION.md, "z: the depth velocity".
 """
-from OpenGL.GL import (GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_FRAMEBUFFER, GL_NEAREST, GL_R16F, GL_RG32F, GL_RGBA32F,
-                       GL_TEXTURE_2D, glBindFramebuffer, glDrawBuffers, glFramebufferTexture2D)
+from OpenGL.GL import GL_NEAREST, GL_R16F, GL_RG32F, GL_RGBA32F
 
-from modules.gl import Fbo, SwapFbo, Texture
+from modules.gl import Fbo, MultiTargetFbo, SwapFbo, Texture
 from modules.settings import BaseSettings, Field
 from .. import FlowBase, FlowUtil, Port, TextureKind
 from .patch import Patch
@@ -36,7 +35,7 @@ class DepthVelocity(FlowBase):
         1. Take the depth and its confidence → the raw Fbo (RG32F, meters and 0 to 1, at the flow's size, nearest),
            and without its edges → the input SwapFbo
         2. Correct the track carried from the last one → the estimate SwapFbo (RGBA32F: z, disparity, rate, anchor),
-           and its misses in a row beside it (R16F, a second target of the same framebuffer)
+           and its misses in a row beside it (R16F), both drawn at once (a MultiTargetFbo per side)
         3. Take the noise floor off z → output_fbo (R16F)
     """
 
@@ -56,6 +55,8 @@ class DepthVelocity(FlowBase):
         self._estimate: SwapFbo = SwapFbo()
         self._misses: tuple[Texture, Texture] = (Texture(GL_NEAREST), Texture(GL_NEAREST))   # beside the estimate's two
         self._misses_of: dict[int, Texture] = {}     # each of the estimate's framebuffers' misses, by its id
+        self._targets: tuple[MultiTargetFbo, MultiTargetFbo] = (MultiTargetFbo(), MultiTargetFbo())
+        self._targets_of: dict[int, MultiTargetFbo] = {}     # each estimate buffer and its misses, drawn at once
 
     @property
     def depth_velocity(self) -> Texture:
@@ -84,13 +85,12 @@ class DepthVelocity(FlowBase):
         self._raw.allocate(width, height, GL_RG32F)
         self._estimate.allocate(width, height, GL_RGBA32F)
         self._misses_of = {}
-        for fbo, misses in ((self._estimate, self._misses[0]), (self._estimate.back, self._misses[1])):
+        self._targets_of = {}
+        for fbo, misses, targets in zip((self._estimate.current, self._estimate.back), self._misses, self._targets):
             misses.allocate(width, height, GL_R16F)
-            glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo_id)
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, misses.tex_id, 0)
-            glDrawBuffers(2, [GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1])
+            targets.allocate((fbo, misses))
             self._misses_of[fbo.fbo_id] = misses
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+            self._targets_of[fbo.fbo_id] = targets
         self._clear_track()
         self._step_filter_shader.allocate()
         self._velocity_shader.allocate()
@@ -99,6 +99,9 @@ class DepthVelocity(FlowBase):
     def deallocate(self) -> None:
         super().deallocate()
         self._raw.deallocate()
+        for targets in self._targets:
+            targets.deallocate()
+        self._targets_of = {}
         self._estimate.deallocate()
         for misses in self._misses:
             misses.deallocate()
@@ -155,11 +158,12 @@ class DepthVelocity(FlowBase):
         self._input_fbo.end()
 
         self._estimate.swap()
-        self._estimate.begin()
+        targets: MultiTargetFbo = self._targets_of[self._estimate.fbo_id]     # the estimate and its misses
+        targets.begin()
         self._velocity_shader.use(self._input_fbo, self._estimate.back, smooth, halving_speed, rest_speed, max(delta_time, 1e-6),
                                   view_span, step, window, edge, dead_zone, self._misses_of[self._estimate.back.fbo_id],
                                   depth_noise, displacement, max_speed, guard)
-        self._estimate.end()
+        targets.end()
 
         self._output_fbo.begin()
         self._threshold_shader.use(self._estimate, threshold / max(width, 1))     # px as view widths

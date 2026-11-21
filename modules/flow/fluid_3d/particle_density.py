@@ -5,14 +5,11 @@ through the grid's velocity, faded and drawn by `draw` and `overlap`. How and wh
 
 import math
 
-from OpenGL.GL import (GL_COLOR, GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2,
-                       GL_COLOR_BUFFER_BIT, GL_FRAMEBUFFER, GL_POINT_SIZE_RANGE, GL_PROGRAM_POINT_SIZE, GL_R32F,
-                       GL_RGBA16F, GL_RGBA32F, GL_TEXTURE_2D, GL_TEXTURE_FETCH_BARRIER_BIT,
-                       GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, glBindFramebuffer, glClear, glClearBufferfv, glClearColor,
-                       glDeleteFramebuffers, glDrawBuffers, glEnable, glFramebufferTexture2D, glGenFramebuffers,
-                       glGetFloatv, glMemoryBarrier, glViewport)
+from OpenGL.GL import (GL_COLOR, GL_COLOR_BUFFER_BIT, GL_POINT_SIZE_RANGE, GL_PROGRAM_POINT_SIZE, GL_R32F,
+                       GL_RGBA16F, GL_RGBA32F, GL_TEXTURE_FETCH_BARRIER_BIT, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT,
+                       glClear, glClearBufferfv, glClearColor, glEnable, glGetFloatv, glMemoryBarrier)
 
-from modules.gl import GpuTimer, LayeredFbo, StorageBuffer, BlendState, Texture, Texture3D
+from modules.gl import GpuTimer, LayeredFbo, MultiTargetFbo, StorageBuffer, BlendState, Texture, Texture3D
 from ..port import Port
 from ..wall_mode import WallMode
 from .density_carrier import CarrierStep, DensityCarrier
@@ -66,13 +63,13 @@ class ParticleDensity(DensityCarrier):
         self._max_point_size: float = 64.0
         self._slices: LayeredFbo = LayeredFbo()
         # The surface's targets: the spheres' nearest depth, their thickness, their color weighted; the smoothed depth
-        self._surface_fbo: int = 0
+        self._surface: MultiTargetFbo = MultiTargetFbo()
         self._surface_depth: Texture = Texture()
         self._surface_thickness: Texture = Texture()
         self._surface_color: Texture = Texture()
         self._smoothed: tuple[Texture, Texture] = (Texture(), Texture())
         # The weighted look's targets: the weighted emission and opacity, and the revealage
-        self._weighted_fbo: int = 0
+        self._weighted: MultiTargetFbo = MultiTargetFbo()
         self._weighted_sum: Texture = Texture()
         self._weighted_reveal: Texture = Texture()
         self._emit_shader: ParticleEmit = ParticleEmit()
@@ -224,13 +221,12 @@ class ParticleDensity(DensityCarrier):
         particles = self.settings.particles
         extinction, emission = look.absorption, look.emission * look.absorption     # thin density's glow over the view
         width, height = self._output
-        if not self._weighted_fbo or (self._weighted_sum.width, self._weighted_sum.height) != (width, height):
+        if not self._weighted.allocated or (self._weighted.width, self._weighted.height) != (width, height):
             self._deallocate_weighted()
             self._allocate_weighted()
 
         self._draw_timer.begin()
-        glBindFramebuffer(GL_FRAMEBUFFER, self._weighted_fbo)
-        glViewport(0, 0, width, height)
+        self._weighted.begin()
         glClearBufferfv(GL_COLOR, 0, (0.0, 0.0, 0.0, 0.0))
         glClearBufferfv(GL_COLOR, 1, (1.0, 1.0, 1.0, 1.0))
         BlendState.push()
@@ -244,7 +240,7 @@ class ParticleDensity(DensityCarrier):
                                  fog=look.fog, weighted=True, emission=emission / self.settings.particles.slices,
                                  absorption=extinction / self.settings.particles.slices)
         BlendState.pop()
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        self._weighted.end()
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._draw_timer.end()
 
@@ -257,17 +253,10 @@ class ParticleDensity(DensityCarrier):
         width, height = self._output
         self._weighted_sum.allocate(width, height, GL_RGBA32F)      # the weight reaches 3000: past a half float's sum
         self._weighted_reveal.allocate(width, height, GL_RGBA16F)
-        self._weighted_fbo = int(glGenFramebuffers(1))
-        glBindFramebuffer(GL_FRAMEBUFFER, self._weighted_fbo)
-        for attachment, texture in ((GL_COLOR_ATTACHMENT0, self._weighted_sum), (GL_COLOR_ATTACHMENT1, self._weighted_reveal)):
-            glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, texture.tex_id, 0)
-        glDrawBuffers(2, [GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1])
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        self._weighted.allocate((self._weighted_sum, self._weighted_reveal))
 
     def _deallocate_weighted(self) -> None:
-        if self._weighted_fbo:
-            glDeleteFramebuffers(1, [self._weighted_fbo])
-            self._weighted_fbo = 0
+        self._weighted.deallocate()
         for texture in (self._weighted_sum, self._weighted_reveal):
             texture.deallocate()
 
@@ -278,18 +267,11 @@ class ParticleDensity(DensityCarrier):
         self._surface_color.allocate(width, height, GL_RGBA16F)
         for smoothed in self._smoothed:
             smoothed.allocate(width, height, GL_R32F)
-        self._surface_fbo = int(glGenFramebuffers(1))
-        glBindFramebuffer(GL_FRAMEBUFFER, self._surface_fbo)
-        for attachment, texture in ((GL_COLOR_ATTACHMENT0, self._surface_depth), (GL_COLOR_ATTACHMENT1, self._surface_thickness),
-                                    (GL_COLOR_ATTACHMENT2, self._surface_color)):
-            glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, texture.tex_id, 0)
-        glDrawBuffers(2, [GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1])
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        # drawn into: the depth and the thickness; the color was attached third but not drawn into, as it is now
+        self._surface.allocate((self._surface_depth, self._surface_thickness))
 
     def _deallocate_surface(self) -> None:
-        if self._surface_fbo:
-            glDeleteFramebuffers(1, [self._surface_fbo])
-            self._surface_fbo = 0
+        self._surface.deallocate()
         for texture in (self._surface_depth, self._surface_thickness, self._surface_color, *self._smoothed):
             texture.deallocate()
 
@@ -297,13 +279,12 @@ class ParticleDensity(DensityCarrier):
         particles = self.settings.particles
         extinction, emission = look.absorption, look.emission * look.absorption     # thin density's glow over the view
         width, height = self._output
-        if not self._surface_fbo or (self._surface_depth.width, self._surface_depth.height) != (width, height):
+        if not self._surface.allocated or (self._surface.width, self._surface.height) != (width, height):
             self._deallocate_surface()
             self._allocate_surface()
 
         self._draw_timer.begin()
-        glBindFramebuffer(GL_FRAMEBUFFER, self._surface_fbo)
-        glViewport(0, 0, width, height)
+        self._surface.begin()
         glClearBufferfv(GL_COLOR, 0, (1.0, 1.0, 1.0, 1.0))
         glClearBufferfv(GL_COLOR, 1, (0.0, 0.0, 0.0, 0.0))
         BlendState.push()
@@ -314,7 +295,7 @@ class ParticleDensity(DensityCarrier):
                                  radius=particles.radius, reference_mass=self._reference_mass(), spread=particles.spread,
                                  fade_time=self.settings.density.fade_time, max_point_size=self._max_point_size)
         BlendState.pop()
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        self._surface.end()
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._draw_timer.end()
 

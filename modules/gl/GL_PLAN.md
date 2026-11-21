@@ -15,20 +15,7 @@ tasklist check that no app is running, unless Matthias says he is using the PC o
   `data/RobotoMono-Regular.ttf`, found from the working directory, outside the package that uses it, and no licence
   for it is in the repo (seen). Check: shader_check (Text); a text draw in hd_trio -sim (the pose layers' text).
 
-## D. Every GL object from gl's classes
-
-- D2. `MultiTargetFbo` in `texture/multi_target_fbo.py`, exported from `gl`: a framebuffer that draws into the
-  textures it is given, two or more at once (`begin`/`end`, its draw buffers set at `allocate`), and owns no
-  texture; `Fbo`, one texture that draws into itself, stays as it is. `flow/fluid_3d/particle_density.py`
-  (`_weighted_fbo`, `_surface_fbo`, two targets each) uses it, and `flow/motion/depth_velocity.py` one per side of its
-  ping-pong (`_estimate` with `misses[0]`, `_estimate.back` with `misses[1]`), swapped together, in place of the
-  `misses` it attaches to each buffer of a `SwapFbo` by `fbo_id`. Why: the same gl.md line; particle_density makes
-  two framebuffers with `glGenFramebuffers`, and depth_velocity attaches a second target to a `gl.Fbo` from outside
-  gl, with its own `glDrawBuffers` (seen); extra targets on `Fbo` would mix its own texture with other ones in
-  `begin`, `clear` and `deallocate` (deduction). Check: deep_flow -sim (the particles, the motion).
-
-GL.md says what each step adds where it is described: `MultiTargetFbo` beside the textures, the font's place under
-text.
+GL.md says what each step adds where it is described: the font's place under text.
 
 Form, done only in a commit that opens the file anyway, never as a step of its own: PEP 8 in `fbo.py` and
 the imports of `image.py` and `tensor.py` (with A1 to A4); the docstrings of `Texture3D` and `Texture2DArray` (with
