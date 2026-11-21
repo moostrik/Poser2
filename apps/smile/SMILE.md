@@ -162,8 +162,10 @@ the render as a texture. `render/smile_render.py` runs the `Sequencer` once per 
 Art-Net, OSC and saving hang off its messages), then the stage for the current `SequenceType`
 (`stages.py`) renders the layers (`layers/`) and picks the one to show. Images from other threads go
 through `inputs.py` (`Image.set_image`, uploaded on the main thread); the grin frames go
-through `grin_player.py`, a buffer the generator fills and the render plays on its own clock, with
-its timings in the sequence settings. At the capture the diffusion layer starts over from it
+through `sequence/grin_player.py`, a buffer the generator fills and the render plays on its own clock, with
+its timings in the sequence settings' `grin` group. The `sequence/` package holds the sequencer and the grin player
+with their settings, the Sequence tab: the cycle's steps, with the grin's playback (`grin`) and the saver
+(`saver`, `ClipSaverSettings` beside `ClipSaver`) as its cards. At the capture the diffusion layer starts over from it
 (`FlashStage` seeds it, and the capture is the diffusion input until the generator sends an image), so
 a generation that fails shows the capture as its result and nothing of the previous visitor.
 `render.show_camera` draws the raw camera on top and starts
@@ -216,7 +218,7 @@ first screen; with `last` it lights no place past that one and runs out at its l
 ## Recordings
 
 `save/clip_saver.py` saves each finished visitor for the players under `output/` (git-ignored):
-the grin as `grins/<style>/<id>.mp4` (silent h264 at the full portrait size, at `grin_fps`), the capture and the
+the grin as `grins/<style>/<id>.mp4` (silent h264 at the full portrait size, at `sequence.grin.fps`), the capture and the
 portrait as `portraits/<style>/<id>_capture.jpg` and `<id>_portrait.jpg`, and after the grin landed the phone's copy
 `shares/<style>/<id>.mp4` (`save/share.py`: the same grin re-encoded with the watermark, "SMILE", a circled "ai" and "by" the credit name, in the bottom
 right, no caption, built before the players' clip lands, and the visitor's track as its sound: `ClipSaver.submit_share` from `Main` at DIFF_LOOP's start with the seconds
@@ -234,7 +236,7 @@ the ranges (`Generator.record`, handed to the saver with the final portrait). `s
 ranges closed on the drawn values, so loading it repeats the pose); dropping a clip or portrait on `scripts/clip_info.bat` opens it.
 Encoding and decoding run `ffmpeg`/`ffprobe` subprocesses through `modules/video` (ffmpeg
 must be on the PATH: the gyan.dev full build); the encoder is picked at startup by a trial encode
-(Intel Quick Sync on the iGPU, then Nvidia, then libx264; `sequence.encoder` forces one). Never start
+(Intel Quick Sync on the iGPU, then Nvidia, then libx264; `sequence.saver.encoder` forces one). Never start
 those processes any other way: the apps run under pythonw, so they need `CREATE_NO_WINDOW` and no
 inherited handles. The clip player (`player/`: `Player`, one for the sphere, started and stopped by `Main`) decodes each of the newest clips once into RAM
 (`ClipPool`, 512x640, about 200 MB per clip) and plays from memory on the 48 cells of the two walls (`sphere.CELLS` each, cell ids

@@ -10,7 +10,7 @@ import cv2
 from apps.smile.credit import (LINE, LINES, QUIET_MODULES, TITLE_FONT, URL, CreditLines, qr_image, quiet_px, title_image,
                                wrap_balanced)
 from apps.smile.render.layers.credit_layer import FADE_S, SHOWN, caption_shown, fade_step, new_line_due
-from apps.smile.render.sequencer import SequenceType
+from apps.smile.sequence import SequenceType
 
 
 class TestTitle(unittest.TestCase):

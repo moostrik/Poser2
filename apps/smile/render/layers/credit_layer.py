@@ -5,7 +5,7 @@ from OpenGL.GL import glViewport
 from ...credit import FONT, TITLE_FONT, CreditLines, qr_image, title_image, wrap_balanced
 from modules.gl import ChannelOrder, Fbo, Image, BlendState, Text, Texture, shaders
 from modules.utils import Color
-from ..sequencer import SequenceType
+from ...sequence import SequenceType
 from ..settings import RenderSettings
 
 from .layer_base import LayerBase

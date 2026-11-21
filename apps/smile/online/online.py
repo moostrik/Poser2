@@ -34,7 +34,8 @@ from ..cam import Camera
 from ..face import FaceFinder, FaceObservations, rejection_label
 from .link import Link, http_base, read_token
 from .settings import OnlineSettings
-from ..render import CAMERA_STATES, ScreenGrab, SequenceMessage, Sequencer, SequenceType
+from ..render import ScreenGrab
+from ..sequence import CAMERA_STATES, SequenceMessage, Sequencer, SequenceType
 
 logger = logging.getLogger(__name__)
 

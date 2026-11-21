@@ -126,21 +126,25 @@
     },
     "sequence": {
       "pause": false,
-      "save": true,
-      "encoder": "AUTO",
       "flash_in": 0.5,
       "flash_in_ease": "QUAD_IN",
       "flash_hold": 0.5,
       "flash_out_auto": true,
       "flash_out": 4.1507823944091795,
       "flash_out_ease": "SINE_OUT",
-      "grin_delay": 0.5,
-      "grin_fps": 13.0,
       "timeout": 1.0,
       "bloom": 0.4,
       "bloom_ease": "QUAD_IN",
       "fade": 1.1,
-      "fade_ease": "CUBIC_OUT"
+      "fade_ease": "CUBIC_OUT",
+      "grin": {
+        "delay": 0.5,
+        "fps": 13.0
+      },
+      "saver": {
+        "enabled": true,
+        "encoder": "AUTO"
+      }
     },
     "render": {
       "show_camera": false,

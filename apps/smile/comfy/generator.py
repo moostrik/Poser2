@@ -26,7 +26,7 @@ import websocket
 from requests import RequestException
 
 from .client import ComfyClient, Event as ComfyEvent
-from ..render import GrinPlayer
+from ..sequence import GrinPlayer
 from .messages import GeneratorMessage, GeneratorState, GeneratorMessageCallback
 from .settings import GeneratorSettings, StyleSettings
 from .styles import Styles

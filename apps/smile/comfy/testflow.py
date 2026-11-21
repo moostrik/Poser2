@@ -46,7 +46,7 @@ def make_test_workflow(workflow_path: str, settings: SetupSettings, style: str =
     overlay: str = _find(source, title='Overlay')
     for node_id in (overlay, _find(source, title='Overlay preview')):
         workflow[node_id] = copy.deepcopy(source[node_id])
-    workflow[VIDEO] = {'class_type': 'CreateVideo', 'inputs': {'images': [wf.grin, 0], 'fps': settings.sequence.grin_fps},
+    workflow[VIDEO] = {'class_type': 'CreateVideo', 'inputs': {'images': [wf.grin, 0], 'fps': settings.sequence.grin.fps},
                        '_meta': {'title': 'Grin video'}}
     workflow[VIDEO_FILE] = {'class_type': 'SaveVideo', 'inputs': {'video': [VIDEO, 0], 'filename_prefix': 'smile_test',
                                                                   'format': 'mp4', 'codec': 'h264'},

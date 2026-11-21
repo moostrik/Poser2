@@ -5,8 +5,7 @@ from unittest import mock
 
 import numpy as np
 
-from apps.smile.render.grin_player import MARGIN, MIN_FRAMES, GrinPlayer
-from apps.smile.render.settings import SequencerSettings
+from apps.smile.sequence.grin_player import MARGIN, MIN_FRAMES, GrinPlayer, GrinPlayerSettings
 
 TICK: float = 1 / 60    # the render's frame time
 
@@ -21,12 +20,12 @@ def index_of(image: np.ndarray) -> int:
 
 class TestGrinPlayer(unittest.TestCase):
     def setUp(self):
-        self.settings = SequencerSettings()
-        self.settings.grin_fps = 15.0
-        self.settings.grin_delay = 1.0
+        self.settings = GrinPlayerSettings()
+        self.settings.fps = 15.0
+        self.settings.delay = 1.0
         self.grin_player = GrinPlayer(self.settings)
         self.now = 0.0
-        patcher = mock.patch('apps.smile.render.grin_player.time.perf_counter', lambda: self.now)
+        patcher = mock.patch('apps.smile.sequence.grin_player.time.perf_counter', lambda: self.now)
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -61,19 +60,19 @@ class TestGrinPlayer(unittest.TestCase):
     def assert_steady(self, shown: list[tuple[float, int]]) -> None:
         """From the second frame on (the first is the hold): every frame, in order, one interval apart."""
         self.assertEqual([index for _, index in shown], list(range(len(shown))))
-        interval: float = 1 / self.settings.grin_fps
+        interval: float = 1 / self.settings.fps
         for (a, _), (b, _) in zip(shown[1:], shown[2:]):
             self.assertAlmostEqual(b - a, interval, delta=TICK + 1e-6)
 
     def test_first_frame_at_once_then_held_for_the_delay(self):
         shown = self.play(total=30, made_fps=100.0, hold=True, first=0.5)
         self.assertAlmostEqual(shown[0][0], 0.5, delta=TICK)
-        self.assertAlmostEqual(shown[1][0], 0.5 + self.settings.grin_delay, delta=TICK + 1e-6)
+        self.assertAlmostEqual(shown[1][0], 0.5 + self.settings.delay, delta=TICK + 1e-6)
         self.assert_steady(shown)
 
     def test_the_hold_counts_from_the_portrait(self):
         shown = self.play(total=30, made_fps=100.0, hold=True, first=0.5, portrait=0.2)
-        self.assertAlmostEqual(shown[1][0], 0.2 + self.settings.grin_delay, delta=TICK + 1e-6)
+        self.assertAlmostEqual(shown[1][0], 0.2 + self.settings.delay, delta=TICK + 1e-6)
 
     def test_every_frame_once_in_order_at_the_playback_speed(self):
         shown = self.play(total=60, made_fps=100.0, hold=False)
@@ -167,11 +166,11 @@ class TestGrinPlayer(unittest.TestCase):
 
     def test_reports_the_speed_and_the_waits(self):
         self.play(total=100, made_fps=10.0, hold=True, first=0.5, portrait=0.2)
-        self.assertAlmostEqual(self.settings.grin_made_fps, 10.0, delta=0.1)
+        self.assertAlmostEqual(self.settings.made_fps, 10.0, delta=0.1)
         # the last frame arrives at 0.5 + 9.9 s and has its turn 98 / 15 s after the start; the waits count from the portrait
         needed: float = 0.5 + 99 / 10.0 + MARGIN - 98 / 15.0 - 0.2
-        self.assertAlmostEqual(self.settings.grin_buffer_wait, needed, delta=0.05)
-        self.assertAlmostEqual(self.settings.grin_start_wait, needed, delta=0.1)
+        self.assertAlmostEqual(self.settings.buffer_wait, needed, delta=0.05)
+        self.assertAlmostEqual(self.settings.start_wait, needed, delta=0.1)
 
 
 if __name__ == '__main__':

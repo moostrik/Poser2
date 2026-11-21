@@ -13,7 +13,7 @@ from apps.smile.main import SmileMain
 from modules.camera import CameraFrame, FrameType
 from apps.smile.settings import Settings
 from modules.inout import OscSenderSettings
-from apps.smile.render.sequencer import SequenceMessage, SequenceType
+from apps.smile.sequence import SequenceMessage, SequenceType
 from modules.settings import SettingsStore
 
 

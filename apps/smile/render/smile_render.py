@@ -4,7 +4,6 @@ import glfw
 import numpy as np
 from OpenGL.GL import GL_RGBA32F, glViewport
 
-from .grin_player import GrinPlayer
 from .screen_grab import ScreenGrab
 from ..comfy.messages import GeneratorMessage, GeneratorState
 from ..face import FaceObservations
@@ -14,12 +13,11 @@ from modules.gl import Fbo, Shader, BlendState, Texture, clear_color
 from modules.utils import fit
 from modules.window import RenderBase
 from ..player import WallsSettings
-from ..settings import WindowsSettings
 from .inputs import Inputs
 from .layers import (BloomLayer, CameraLayer, CreditLayer, CreditView, DiffusionLayer, FlashLayer, LayerBase, RevealLayer,
                      StatusLayer, WallCompositor, caption_shown, copy, fade_step, new_line_due)
-from .sequencer import SequenceType, Sequencer
-from .settings import RenderSettings
+from ..sequence import GrinPlayer, SequenceType, Sequencer
+from .settings import RenderSettings, WindowsSettings
 from .stages import STAGES, Layers, Stage
 
 # 32 bit: the trail (0.995) adds steps too small for half floats

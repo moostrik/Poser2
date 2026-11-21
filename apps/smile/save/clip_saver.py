@@ -6,12 +6,12 @@ import os
 import datetime
 import json
 import logging
-from typing import Callable
+from typing import Callable, Protocol
 
-from ..render import SequencerSettings
 from . import share
 from .record import embed_jpeg
 from modules import video
+from modules.settings import BaseSettings, Field
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,18 @@ Command = tuple
 SavedCallback = Callable[[str, str, bool, str, str, str], None]   # id, style, kept, grin path, portrait path, share path
 
 STYLES: tuple[str, ...] = ('A', 'B')
+
+
+class ClipSaverSettings(BaseSettings):
+    """Whether each finished visitor is saved, and the chip its grin clip is encoded on."""
+    enabled: Field[bool]           = Field(True, pinned=True, label="Save visitors", description="Save each finished visitor's grin, capture and portrait to output/")
+    encoder: Field[video.Hardware] = Field(video.Hardware.AUTO, access=Field.INIT, label="Encoder", description="The chip the grin clip is encoded on (Auto tries the iGPU, the GPU, the CPU)")
+
+
+class GrinRate(Protocol):
+    """What the saver reads of the grin's playback settings: the speed its clip is written at (the sequence's
+    `GrinPlayerSettings`, which the saver cannot import: the sequence's settings hold the saver's)."""
+    fps: Field[float]
 
 
 class ClipSaver:
@@ -34,8 +46,10 @@ class ClipSaver:
     lands after it: the visitor outside is waiting for theirs. The save thread is the only
     owner of the encoder process; the other threads only enqueue commands, in order."""
 
-    def __init__(self, settings: SequencerSettings, root: str = 'apps/smile/output/', max_queue_size: int = 64, watermark: str = '') -> None:
-        self.settings: SequencerSettings = settings
+    def __init__(self, settings: ClipSaverSettings, grin: GrinRate, root: str = 'apps/smile/output/', max_queue_size: int = 64,
+                 watermark: str = '') -> None:
+        self.settings: ClipSaverSettings = settings
+        self._grin: GrinRate = grin             # the clip's fps, read at each visitor's open
         self.temp_dir: str = os.path.join(root, 'temp')
         self.grins_dir: str = os.path.join(root, 'grins')
         self.portraits_dir: str = os.path.join(root, 'portraits')
@@ -50,10 +64,10 @@ class ClipSaver:
         if self._watermark and not share.write_watermark(watermark, self._watermark):
             self._watermark = None
 
-        self.enabled: bool = video.available()
-        if not self.enabled:
+        self.available: bool = video.available()       # ffmpeg is there
+        if not self.available:
             logger.error('ffmpeg not found on the PATH: visitors are not saved')
-        self.encoder: video.Hardware = video.pick_encoder(settings.encoder) if self.enabled else video.Hardware.CPU
+        self.encoder: video.Hardware = video.pick_encoder(settings.encoder) if self.available else video.Hardware.CPU
         logger.info('Clip encoder: %s', self.encoder.value)
 
         self.queue: queue.Queue[Command] = queue.Queue(max_queue_size)
@@ -63,7 +77,7 @@ class ClipSaver:
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self._save_loop, name='ClipSaver')
         self.thread.start()
-        self.settings.bind(SequencerSettings.save, self._on_save)
+        self.settings.bind(ClipSaverSettings.enabled, self._on_save)
 
     # ANY THREAD
 
@@ -73,7 +87,7 @@ class ClipSaver:
         if not self._active():
             return
         id: str = self._create_sequence_id()
-        self.queue.put(('open', id, float(self.settings.grin_fps), style or STYLES[0]))
+        self.queue.put(('open', id, float(self._grin.fps), style or STYLES[0]))
         self.queue.put(('capture', capture))
 
     def submit_record(self, record: dict) -> None:
@@ -110,13 +124,13 @@ class ClipSaver:
             self.queue.put(('close', keep))
 
     def stop(self) -> None:
-        self.settings.unbind(SequencerSettings.save, self._on_save)
+        self.settings.unbind(ClipSaverSettings.enabled, self._on_save)
         self.queue.put(('close', False))
         self.stop_event.set()
         self.thread.join()
 
     def _active(self) -> bool:
-        return self.enabled and bool(self.settings.save)
+        return self.available and bool(self.settings.enabled)
 
     def _on_save(self, value: bool) -> None:
         # switching off drops the unfinished visitor; switching on waits for the next capture

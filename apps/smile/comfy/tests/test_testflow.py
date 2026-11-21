@@ -19,7 +19,7 @@ class TestTestflow(unittest.TestCase):
     def setUp(self):
         self.settings = Settings().setup
         self.settings.generator.portrait.fixed_seed = True       # the app's build is then repeatable
-        self.settings.sequence.grin_fps = 13.0
+        self.settings.sequence.grin.fps = 13.0
         self.wf = Workflow(WORKFLOW)
         p = self.settings.generator
         self.app = self.wf.build(CAPTURE, p.style_b, p)

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from modules.gl import Texture
 from .inputs import Inputs
 from .layers import BloomLayer, CameraLayer, DiffusionLayer, FlashLayer, RevealLayer
-from .sequencer import CAPTURE_AT, SequenceMessage, SequenceType
+from ..sequence import CAPTURE_AT, SequenceMessage, SequenceType
 from .settings import RenderSettings
 
 

@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 
 from apps.smile.comfy.settings import GeneratorSettings
-from apps.smile.render.settings import SequencerSettings
+from apps.smile.sequence import SequencerSettings
 from apps.smile.save import record
 from apps.smile.save.clip_saver import ClipSaver
 from modules import video
@@ -23,10 +23,10 @@ class TestClipSaverStyle(unittest.TestCase):
 
     def test_a_kept_visitor_lands_in_its_style_folders(self):
         settings = SequencerSettings()
-        settings.encoder = video.Hardware.CPU
-        settings.save = True
+        settings.saver.encoder = video.Hardware.CPU
+        settings.saver.enabled = True
         with tempfile.TemporaryDirectory() as root:
-            saver = ClipSaver(settings, root=root)
+            saver = ClipSaver(settings.saver, settings.grin, root=root)
             try:
                 image = np.full((64, 64, 3), 128, np.uint8)
                 saver.submit_open(image, 'B')
@@ -52,12 +52,12 @@ class TestClipSaverStyle(unittest.TestCase):
 
     def test_the_record_is_in_the_clip_and_the_portrait(self):
         settings = SequencerSettings()
-        settings.encoder = video.Hardware.CPU
-        settings.save = True
+        settings.saver.encoder = video.Hardware.CPU
+        settings.saver.enabled = True
         made = {'description': 'a face, "quoted"', 'seed': 7, 'grin': {'smile': 2.0},
                 'settings': {'generator': GeneratorSettings().to_dict()}}
         with tempfile.TemporaryDirectory() as root:
-            saver = ClipSaver(settings, root=root)
+            saver = ClipSaver(settings.saver, settings.grin, root=root)
             try:
                 image = np.full((64, 64, 3), 128, np.uint8)
                 saver.submit_open(image, 'A')
@@ -78,9 +78,9 @@ class TestClipSaverStyle(unittest.TestCase):
 
     def test_the_share_clip_has_the_track_and_the_watermark_and_the_players_clip_is_silent(self):
         settings = SequencerSettings()
-        settings.encoder = video.Hardware.CPU
-        settings.save = True
-        settings.grin_fps = 10.0
+        settings.saver.encoder = video.Hardware.CPU
+        settings.saver.enabled = True
+        settings.grin.fps = 10.0
         made = {'description': 'a face', 'seed': 7}
         with tempfile.TemporaryDirectory() as root:
             # a two second tone stands in for the track
@@ -90,7 +90,7 @@ class TestClipSaverStyle(unittest.TestCase):
             process.communicate(timeout=30)
             self.assertEqual(process.returncode, 0)
             saved = []
-            saver = ClipSaver(settings, root=root, watermark='Test Name')
+            saver = ClipSaver(settings.saver, settings.grin, root=root, watermark='Test Name')
             saver.add_saved_callback(lambda *args: saved.append(args))
             try:
                 image = np.full((64, 64, 3), 128, np.uint8)
@@ -146,11 +146,11 @@ class TestClipSaverStyle(unittest.TestCase):
 
     def test_a_track_that_fails_leaves_the_players_clip_and_no_share_clip(self):
         settings = SequencerSettings()
-        settings.encoder = video.Hardware.CPU
-        settings.save = True
+        settings.saver.encoder = video.Hardware.CPU
+        settings.saver.enabled = True
         with tempfile.TemporaryDirectory() as root:
             saved = []
-            saver = ClipSaver(settings, root=root)
+            saver = ClipSaver(settings.saver, settings.grin, root=root)
             saver.add_saved_callback(lambda *args: saved.append(args))
             try:
                 image = np.full((64, 64, 3), 128, np.uint8)

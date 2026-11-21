@@ -9,8 +9,7 @@ from unittest import mock
 from apps.smile.comfy.client import Event
 from apps.smile.comfy.generator import NO_EVENTS, SILENT_AFTER, Generator, NoEvents
 from apps.smile.comfy.settings import GeneratorSettings
-from apps.smile.render.grin_player import GrinPlayer
-from apps.smile.render.settings import SequencerSettings
+from apps.smile.sequence import GrinPlayer, GrinPlayerSettings
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))     # apps/smile
 WORKFLOW = os.path.join(ROOT, 'data', 'comfy', 'smile_workflow.json')
@@ -54,7 +53,7 @@ class TestGenerator(unittest.TestCase):
     def setUp(self):
         self.settings = GeneratorSettings()
         self.settings.connection.workflow = WORKFLOW
-        self.generator = Generator(self.settings, GrinPlayer(SequencerSettings()))
+        self.generator = Generator(self.settings, GrinPlayer(GrinPlayerSettings()))
         self.clock = FakeClock()
         patcher = mock.patch('apps.smile.comfy.generator.time', self.clock)
         patcher.start()

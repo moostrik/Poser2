@@ -11,7 +11,7 @@ import time
 import numpy as np
 
 from modules.inout import ArtNetSender, ArtNetSenderSettings
-from .render import AnimationType
+from .sequence import AnimationType
 
 logger = logging.getLogger(__name__)
 

@@ -146,8 +146,6 @@
     },
     "sequence": {
       "pause": false,
-      "save": true,
-      "encoder": "AUTO",
       "charge": 2.0,
       "drain": 4.0,
       "charge_ease": "LINEAR",
@@ -157,13 +155,19 @@
       "flash_out_auto": false,
       "flash_out": 3.0,
       "flash_out_ease": "LINEAR",
-      "grin_delay": 0.0,
-      "grin_fps": 12.0,
       "timeout": 1.0,
       "bloom": 0.4,
       "bloom_ease": "QUAD_IN",
       "fade": 1.1,
-      "fade_ease": "CUBIC_OUT"
+      "fade_ease": "CUBIC_OUT",
+      "grin": {
+        "delay": 0.0,
+        "fps": 12.0
+      },
+      "saver": {
+        "enabled": true,
+        "encoder": "AUTO"
+      }
     },
     "render": {
       "show_camera": false,

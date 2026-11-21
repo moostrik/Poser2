@@ -9,8 +9,8 @@ from modules.session import Session
 from modules.inference import SerialUploader
 from modules.inference.face import FaceDetector
 from .face import FaceFinder, FaceObservations
-from .render import CAMERA_STATES, AnimationType, AnimationTypeNames, GrinPlayer, RenderSettings, Sequencer, SequenceMessage, \
-    SequenceType, SmileRender
+from .render import SmileRender
+from .sequence import CAMERA_STATES, AnimationType, AnimationTypeNames, GrinPlayer, Sequencer, SequenceMessage, SequenceType
 from .comfy.generator import Generator
 from .comfy.messages import GeneratorMessage, GeneratorState
 from modules.inout import OscSender
@@ -87,7 +87,7 @@ class SmileMain():
 
         self.sequencer: Sequencer = Sequencer(self.settings.setup.sequence)
         # the generator fills the grin player with the grin frames, the render plays them on its own clock
-        self.grin_player: GrinPlayer = GrinPlayer(self.settings.setup.sequence)
+        self.grin_player: GrinPlayer = GrinPlayer(self.settings.setup.sequence.grin)
         self.render: SmileRender = SmileRender(self.settings.setup.render, self.settings.setup.windows, self.settings.setup.walls, self.sequencer, self.grin_player, self.width, self.height)
         # the clip player of the sphere's walls: one pool for the 48 cells of the render's two walls
         self.clip_player: Player = Player(self.settings.setup.walls, list(self.render.walls),
@@ -128,7 +128,8 @@ class SmileMain():
         # the name going round the walls while nobody is seen, planned here and handed to them every second
         self.credit_scroller: CreditScroller = CreditScroller(self.settings.setup.render, self.clip_player.scroll_loop)
         self._face_seen: float = time.perf_counter()    # the last qualifying face or visitor: the name waits from here
-        self.save: ClipSaver = ClipSaver(self.settings.setup.sequence, watermark=self.settings.setup.render.credit_name)
+        self.save: ClipSaver = ClipSaver(self.settings.setup.sequence.saver, self.settings.setup.sequence.grin,
+                                         watermark=self.settings.setup.render.credit_name)
         self._grin_saved: bool = False      # the visitor's grin was saved to its last frame
         self._saving: bool = False          # the visitor's files are open in the saver
         self._style_picked: bool = False    # the style of the next visitor is picked: until the flash

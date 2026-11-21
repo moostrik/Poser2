@@ -5,7 +5,7 @@ render frame which frame is due, so every frame shows equally long whatever the 
 
 A clip shows its first frame at once and holds it: the sequence is still DIFFUSION then, so the
 render blends it over the portrait as one more generation step. The clip plays when the hold is over
-(settings.grin_delay, counted from the portrait) and, at the speed the frames come in, the last one will
+(settings.delay, counted from the portrait) and, at the speed the frames come in, the last one will
 be there before its turn. A grin can't end before ComfyUI has made its last frame, so that wait
 costs no time: it only moves the pause to the front.
 """
@@ -16,16 +16,25 @@ from threading import Lock
 
 import numpy as np
 
-from .settings import SequencerSettings
+from modules.settings import BaseSettings, Field
 
 MIN_FRAMES: int = 8     # frames needed to measure how fast they come in
 RATE_FRAMES: int = 30   # that speed is measured over the newest frames
 MARGIN: float = 0.2     # spare time between the arrival of the last frame and its turn (s)
 
 
+class GrinPlayerSettings(BaseSettings):
+    """The grin's playback: its hold on the portrait, its speed, and how the last grin came in."""
+    delay:       Field[float] = Field(1.0, min=0.0, max=5.0, step=0.1, newline=True, row_label="Grin", label="Delay (s)", description="Shortest hold on the portrait before the grin plays, for the blend (s)")
+    fps:         Field[float] = Field(15.0, min=5.0, max=30.0, step=1.0, label="Fps", description="Grin playback speed (frames per second)")
+    made_fps:    Field[float] = Field(0.0, access=Field.READ, label="Made fps", description="Speed at which ComfyUI made the last grin (frames per second)")
+    buffer_wait: Field[float] = Field(0.0, access=Field.READ, label="Buffer wait (s)", description="Wait the last grin needed to play without stalling (s)")
+    start_wait:  Field[float] = Field(0.0, access=Field.READ, label="Start wait (s)", description="Wait before the last grin played: the longer of delay and buffer wait (s)")
+
+
 class GrinPlayer():
-    def __init__(self, settings: SequencerSettings) -> None:
-        self.settings: SequencerSettings = settings
+    def __init__(self, settings: GrinPlayerSettings) -> None:
+        self.settings: GrinPlayerSettings = settings
         self._mutex: Lock = Lock()
         self._frames: deque[np.ndarray] = deque()
         self._open: bool = False            # a clip is being made or played
@@ -44,7 +53,7 @@ class GrinPlayer():
 
     # GENERATOR THREAD
     def begin(self, total: int, hold: bool) -> None:
-        """A new clip of *total* frames; with *hold* it waits at least settings.grin_delay on its first frame."""
+        """A new clip of *total* frames; with *hold* it waits at least settings.delay on its first frame."""
         with self._mutex:
             self._reset()
             self._open = True
@@ -88,8 +97,8 @@ class GrinPlayer():
             # the earliest start at which the last frame arrived before its turn
             needed: float = max(self._last + MARGIN - self._play_time(self._added), self._measurable)
             buffer_wait: float = max(needed - self._origin, 0.0)
-        self.settings.grin_made_fps = round(made_fps, 1)
-        self.settings.grin_buffer_wait = round(buffer_wait, 2)
+        self.settings.made_fps = round(made_fps, 1)
+        self.settings.buffer_wait = round(buffer_wait, 2)
 
     def clear(self) -> None:
         """Drop the clip (reset, failure)."""
@@ -134,7 +143,7 @@ class GrinPlayer():
                 elif now > self._next:
                     self._next = now    # ran dry: go on with the next frame when it arrives, without catching up in a burst
         if start_wait is not None:
-            self.settings.grin_start_wait = round(start_wait, 2)
+            self.settings.start_wait = round(start_wait, 2)
         return frame
 
     @property
@@ -163,7 +172,7 @@ class GrinPlayer():
         self._next = None
 
     def _fps(self) -> float:
-        return max(self.settings.grin_fps, 1.0)
+        return max(self.settings.fps, 1.0)
 
     def _rate(self) -> float:
         """Frames per second as the newest frames came in; 0 when that can't be told yet.
@@ -178,7 +187,7 @@ class GrinPlayer():
 
     def _ready(self, now: float) -> bool:
         assert self._origin is not None
-        if self._hold and now - self._origin < self.settings.grin_delay:
+        if self._hold and now - self._origin < self.settings.delay:
             return False
         if self._ended or self._added >= self._total:
             return True

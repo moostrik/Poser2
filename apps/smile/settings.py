@@ -1,22 +1,15 @@
 """Root settings tree for SMILE. Each module adds its settings as a Group here."""
 
-from modules.window import WindowManagerSettings, WindowSettings
 from modules.settings import BaseSettings, Group
 from modules.panel import PanelSettings
-from .render import RenderSettings, SequencerSettings
+from .render import RenderSettings, WindowsSettings
+from .sequence import SequencerSettings
 from .comfy.settings import GeneratorSettings
 from .cam import CameraSettings
 from .audio import AudioSettings
 from modules.inout import ArtNetSenderSettings
 from .online.settings import OnlineSettings
 from .player import WallsSettings
-
-
-class WindowsSettings(WindowManagerSettings):
-    """The render's windows: window 0 the operator's, windows 1-2 the walls (`sphere.WALLS`)"""
-    window_0: Group[WindowSettings]        = Group(WindowSettings)
-    window_1: Group[WindowSettings]        = Group(WindowSettings)
-    window_2: Group[WindowSettings]        = Group(WindowSettings)
 
 
 class SetupSettings(BaseSettings):
