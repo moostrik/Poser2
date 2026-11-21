@@ -11,12 +11,10 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 
 ## F. With an OAK-D at the PC
 
-- F1. The `oak` backend stamps a frame and its tracklets with their capture, off the message's device timestamp as
-  `oak4.messages.capture_time` does, instead of their arrival **(seen: `oak.Camera._emit_frame`,
-  `_tracker_callback`)**; depthai 2 messages carry one **(seen: `getTimestampDevice` in `.venv`'s depthai stubs)**.
-  Why: camera.md, "Stamp a frame once ... with its moment of capture where the device reports one".
-  RECORDING_PLAN.md B's OAK-D capture time is this step; it comes after the camera plan, in his order video, camera,
-  recording. Test: an OAK-D, white_space live, its latency reading against oak4's.
+- F1. The live check of the OAK-D's capture stamp, which is built (`oak/messages.py`, as oak4's): an OAK-D,
+  white_space live, its frames' and tracklets' latency readings against oak4's. Waits for an OAK-D at the PC: none
+  was attached on 2026-11-22 **(seen: depthai 2 found no device)**. RECORDING_PLAN.md B's OAK-D capture time is this
+  step.
 
 ## Open
 

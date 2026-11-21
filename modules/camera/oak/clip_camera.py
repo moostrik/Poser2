@@ -105,10 +105,12 @@ class ClipCamera(Camera):
 
     def _passthrough_callback(self, cam_id: int, frame_type: FrameType, frame: np.ndarray, confidence: np.ndarray | None,
                               metadata: object, captured: float | None) -> None:
-        """Without a device: the clip frames go straight to the callbacks, no tracklets."""
+        """Without a device: the clip frames go straight to the callbacks, no tracklets, stamped with their recorded
+        capture on the play's clock, or with their arrival for a recording without one."""
         if cam_id != self.cam_id:
             return
-        self._emit_frame(frame_type, frame)
+        arrival: float = perf_counter()
+        self._emit_frame(frame_type, frame, captured if captured is not None else arrival, arrival)
 
     @staticmethod
     def to_planar(arr: np.ndarray, shape: tuple) -> np.ndarray:

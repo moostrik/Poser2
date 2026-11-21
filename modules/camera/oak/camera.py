@@ -16,6 +16,7 @@ from modules.utils import Broadcast, FPS, Rect
 from .control import SensorControl
 from .device import get_device_list, log_connected_sensors, read_lens_calibration
 from .imu import imu_rotation_to_camera, IMU_BOARD_ROLL
+from .messages import capture_time, smoothed_latency
 from .models import TRACKING_STATUS
 from .pipeline import build_pipeline, MountConfig, VIDEO_STREAM, TRACKLETS_STREAM, IMU_STREAM, CONTROL_STREAM
 from .settings import OakCameraSettings
@@ -224,38 +225,46 @@ class Camera(Thread):
     # ── The device's callbacks: the hand-over to the contract ──────────
 
     def _video_callback(self, msg: dai.ImgFrame) -> None:
+        arrival: float = time.perf_counter()
+        timestamp: float = capture_time(msg)
+        readings: RigCameraReadings = self.settings.readings
         self.video_fps.processed()
-        self.settings.readings.video_fps = self.video_fps.get_rate_average()
-        self.settings.readings.video_min_fps = self.video_fps.get_rate_minimum()
+        readings.video_fps = self.video_fps.get_rate_average()
+        readings.video_min_fps = self.video_fps.get_rate_minimum()
+        readings.video_latency = smoothed_latency(readings.video_latency, msg)
         if self.control is not None:
             self.control.readback(msg)
-        self._emit_frame(FrameType.VIDEO, msg.getCvFrame())
+        self._emit_frame(FrameType.VIDEO, msg.getCvFrame(), timestamp, arrival)
 
-    def _tracker_callback(self, msg: dai.RawTracklets) -> None:
-        """The output queue's callback: the hand-over, where depthai's tracklets become the
-        contract's and the message gets its host time."""
+    def _tracker_callback(self, msg: dai.Tracklets) -> None:
+        """The output queue's callback: the hand-over, where depthai's tracklets become the contract's, stamped with
+        their capture (`capture_time`)."""
+        arrival: float = time.perf_counter()
+        timestamp: float = capture_time(msg)
         self.tracklet_fps.processed()
         self.settings.readings.tracker_fps = self.tracklet_fps.get_rate_average()
-        now: float = time.perf_counter()
+        self.settings.readings.tracker_latency = smoothed_latency(self.settings.readings.tracker_latency, msg)
         tracklets: list[CameraTracklet] = [
             CameraTracklet(cam_id=self.cam_id, id=t.id, status=TRACKING_STATUS[t.status],
-                           roi=Rect(t.roi.x, t.roi.y, t.roi.width, t.roi.height), age=t.age, timestamp=now)
+                           roi=Rect(t.roi.x, t.roi.y, t.roi.width, t.roi.height), age=t.age, timestamp=timestamp)
             for t in msg.tracklets]
         self.num_tracklets = len(tracklets)
         self.settings.readings.tracklets = self.num_tracklets
-        self._emit_tracklets(tracklets, now)
+        self._emit_tracklets(tracklets, timestamp, arrival)
 
     def _imu_callback(self, msg) -> None:
         self.mount_readout.update([(p.acceleroMeter.x, p.acceleroMeter.y, p.acceleroMeter.z) for p in msg.packets])
 
-    def _emit_frame(self, kind: FrameType, image: ndarray) -> None:
-        """The hand-over: the frame gets its host time here and goes to every callback."""
-        self.frame_callbacks(CameraFrame(cam_id=self.cam_id, kind=kind, image=image, timestamp=time.perf_counter()))
+    def _emit_frame(self, kind: FrameType, image: ndarray, timestamp: float, arrival: float) -> None:
+        """The hand-over: the frame, with its capture time (`capture_time`) and its arrival, goes to every callback."""
+        self.frame_callbacks(CameraFrame(cam_id=self.cam_id, kind=kind, image=image, timestamp=timestamp,
+                                         arrival=arrival))
 
-    def _emit_tracklets(self, tracklets: list[CameraTracklet], timestamp: float) -> None:
+    def _emit_tracklets(self, tracklets: list[CameraTracklet], timestamp: float, arrival: float) -> None:
         if not self.running:
             return
-        self.tracklet_callbacks(CameraTracklets(cam_id=self.cam_id, timestamp=timestamp, tracklets=tracklets))
+        self.tracklet_callbacks(CameraTracklets(cam_id=self.cam_id, timestamp=timestamp, tracklets=tracklets,
+                                                arrival=arrival))
 
     # ── CameraSource ───────────────────────────────────────────────────
 

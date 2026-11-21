@@ -18,8 +18,8 @@ One job: hand an app a camera. That is three things.
 - A camera's callbacks are a `utils.Broadcast`: they run on the backend's own thread in registration order, a
   callback can be registered at any time, and one that raises is logged while the others still run.
 - A frame or tracklet message is stamped once, at hand-over, with its capture where the backend knows it (the end
-  of the exposure, oak4), else its arrival, on `perf_counter`; where the two differ it also carries its arrival, so
-  its latency needs no clock read downstream. A depth frame and the video frame of one capture carry timestamps
+  of the exposure, oak4; the device's timestamp on depthai's clock, oak), else its arrival, on `perf_counter`; where
+  the two differ it also carries its arrival, so its latency needs no clock read downstream. A depth frame and the video frame of one capture carry timestamps
   within `CAPTURE_TOLERANCE` (2 ms; on the OAK4 0.12 ms apart), so time pairs them. A depth frame's `confidence`
   rides on it, on the depth's own view, never as a frame of its own; a backend without one gives None.
 - A camera hands its frames and its model's boxes and keypoints as delivered: the uploader straightens them on the
