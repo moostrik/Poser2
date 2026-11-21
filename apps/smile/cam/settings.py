@@ -1,13 +1,21 @@
 """SMILE's camera settings: the Vimba camera's (`VimbaCameraSettings`, also read by the webcam for
-its flips) with the app's sources around it, the image from `input/` and the device readout, and the
-faces' settings: the upload, the detector and smile's face finder."""
+its flips) with the app's sources around it, the image from `input/` and the device readout, the
+faces' settings (the upload, the detector and smile's face finder), and the recording of the device's frames
+(the recorder and the session that splits it into chunks, started and stopped by one pair of buttons)."""
 
 from modules.camera.vimba import VimbaCameraSettings
 from modules.inference import SerialUploaderSettings
 from modules.inference.face import FaceDetectorSettings
+from modules.recording import Container, RecorderSettings
+from modules.session import SessionSettings
 from modules.settings import Field, Group, Widget
 
 from ..face import FaceFinderSettings
+
+
+class _RecorderSettings(RecorderSettings):
+    """smile records the device's color as a clip any player plays, the metadata beside it: no depth, no mirror baked in."""
+    container: Field[Container] = Field(Container.MP4, access=Field.INIT, visible=False, description="Chunk file: mp4 with the metadata beside")
 
 
 class CameraSettings(VimbaCameraSettings):
@@ -21,6 +29,13 @@ class CameraSettings(VimbaCameraSettings):
 
     device:        Field[str]       = Field("none", access=Field.READ, newline=True, description="Camera device in use")
 
+    start:         Field[bool]      = Field(False, widget=Widget.button, newline=True, description="Start recording the device's frames")
+    stop:          Field[bool]      = Field(False, widget=Widget.button, description="Stop recording")
+    split:         Field[bool]      = Field(False, widget=Widget.button, description="Split chunk", visible=False)
+    split_seconds: Field[float]     = Field(60, min=1, max=60, widget=Widget.number, description="Split the recording into chunks of this length (s)")
+
     uploader:      Group[SerialUploaderSettings] = Group(SerialUploaderSettings)    # the frames to judge onto the GPU
     face_detector: Group[FaceDetectorSettings] = Group(FaceDetectorSettings)        # the faces and what they measure
     face:          Group[FaceFinderSettings] = Group(FaceFinderSettings)            # SMILE's choice of a subject and its crop, the image ComfyUI starts from
+    control:       Group[SessionSettings] = Group(SessionSettings, share=[start, stop, split, split_seconds])   # splits the recording into chunks
+    recorder:      Group[_RecorderSettings] = Group(_RecorderSettings, share=[start, stop, split])             # the device's frames as they come

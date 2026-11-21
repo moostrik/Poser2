@@ -112,6 +112,18 @@ class TestCamera(unittest.TestCase):
         self.assertEqual(frame.image.shape, (8, 6, 3))      # 6 x 8 once turned: the output size
         self.assertTrue(frame.rotate90 and frame.flip_h)
 
+    def test_every_device_frame_goes_to_the_recorder_as_it_came(self):
+        device = FakeDevice()
+        recorded: list[CameraFrame] = []
+        self.make(device)
+        self.camera.add_device_frame_callback(recorded.append)
+        image = np.zeros((16, 12, 3), dtype=np.uint8)
+        device.push(image, rotate90=True)
+        self.settings.use_image = True          # the live path shows the image: the device is still recorded
+        device.push(image, rotate90=True)
+        self.assertEqual(len(recorded), 2)
+        self.assertTrue(all(frame.image is image and frame.rotate90 for frame in recorded))
+
     def test_a_frame_has_the_time_it_arrived(self):
         device = FakeDevice()
         self.make(device)

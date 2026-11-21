@@ -5,6 +5,7 @@ output/*
 !output/.gitkeep
 data/input/*
 !data/input/.gitkeep
+data/recordings/
 data/settings/.*
 comfy/models/
 /ComfyUI/

@@ -4,7 +4,8 @@ found or not; or, during an online turn, the frames of a phone (`set_online`, `s
 Online, modules/online/). The device and the phone only hand their newest frame over; this one's own thread fits
 every frame to the output size (`cover`: scaled to fill it, the middle kept, no distortion) and hands it to the
 callbacks as a `CameraFrame`, and paces the image input. A device frame keeps its turn and flips as flags, fitted
-to the output size as it will be shown, turned; who shows it applies them. A missing device is a warning
+to the output size as it will be shown, turned; who shows it applies them. Every device frame also goes, as it
+came, to the device frame callbacks (the recorder), after the live path took it. A missing device is a warning
 and the `device` readout says `none`; there is no automatic fallback to the image, so a failed
 camera on site stays visible. The device is kept when it did not connect: one that keeps trying
 (Vimba) delivers when it is there, and the readout follows it. Every frame has the time it arrived
@@ -23,7 +24,7 @@ import numpy as np
 
 from .settings import CameraSettings
 from modules.camera import CameraFrame, CameraFrameCallback, CameraSource, FrameType
-from modules.utils import Waker
+from modules.utils import Broadcast, Waker
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,7 @@ class Camera:
 
         self._mutex: Lock = Lock()
         self._callbacks: list[CameraFrameCallback] = []
+        self._device_callbacks: Broadcast[[CameraFrame]] = Broadcast(name='device frame')
         # the newest frame, stamped when it arrived; 0 before the first
         self._frame: CameraFrame = CameraFrame(0, FrameType.VIDEO, np.zeros((self._height, self._width, 3), dtype=np.uint8), 0.0)
         self._image: np.ndarray | None = None
@@ -140,11 +142,16 @@ class Camera:
         with self._mutex:
             self._callbacks = []
 
+    def add_device_frame_callback(self, callback: CameraFrameCallback) -> None:
+        """Every frame of the device as it came, on the device's thread, after the live path took it: the recorder's."""
+        self._device_callbacks.add_callback(callback)
+
     def _on_device_frame(self, frame: CameraFrame) -> None:
-        """On the device's thread: the frame handed over as it is, with the time its backend stamped."""
-        if self.settings.use_image or self._online:
-            return
-        self._hand_over(frame)
+        """On the device's thread: the frame handed over as it is, with the time its backend stamped, then to the
+        device frame callbacks."""
+        if not (self.settings.use_image or self._online):
+            self._hand_over(frame)
+        self._device_callbacks(frame)
 
     def _hand_over(self, frame: CameraFrame) -> None:
         with self._lock:

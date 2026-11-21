@@ -3,6 +3,8 @@ and the grins of the visitors before play on the two walls of the sphere (README
 
 from .cam import Camera
 from modules.camera import CameraFrame, upright_image, vimba, webcam
+from modules.recording import Recorder
+from modules.session import Session
 from modules.inference import SerialUploader
 from modules.inference.face import FaceDetector
 from .face import FaceFinder, FaceObservations
@@ -105,6 +107,10 @@ class SmileMain():
             device = webcam.Camera(self.settings.setup.camera, rotate90=self.portrait_mode)
             device_name = 'webcam'
         self.camera: Camera = Camera(self.settings.setup.camera, (self.width, self.height), device, device_name)
+        # the device's frames as they came, recorded after the live path took them, in chunks the session splits
+        self.recorder: Recorder = Recorder(self.settings.setup.camera.recorder, data_path=DATA_PATH)
+        self.session: Session = Session(self.settings.setup.camera.control)
+        self.camera.add_device_frame_callback(self.recorder.submit_frame)
 
         self.music_map: MusicMap = MusicMap(self.settings.setup.audio, f'{DATA_PATH}/audio/music_map.json')
         self.osc: OscSender = OscSender(self.settings.setup.audio.osc, events=('/test_bang',))
@@ -131,6 +137,7 @@ class SmileMain():
         self._stopping: bool = False
 
     def start(self) -> None:
+        self.recorder.start()
         self.camera.add_frame_callback(self.render.set_cam_image)
         self.camera.start()
 
@@ -170,7 +177,7 @@ class SmileMain():
         # first: stops the sequencer callbacks
         steps = (self.sequencer.clear_message_callbacks, self.render.stop, self.clip_player.stop, self.sequencer.close,
                  self.online.stop, self.lights.stop, self.osc.stop,
-                 self.camera.stop,
+                 self.camera.stop, self.recorder.stop,
                  self.generator.clear_message_callbacks, self.generator.stop,
                  self.uploader.stop, self.face_detector.stop,
                  self.face.clear_frame_callbacks, self.face.stop,
