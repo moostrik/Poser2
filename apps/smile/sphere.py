@@ -25,6 +25,8 @@ CELLS: int = SCREENS // WALLS           # 24 per wall
 COLUMNS: int = 6                        # the wall's grid: Datapath units
 OUTPUTS: int = 4                        # grid rows: a unit's outputs
 SECTORS: int = 3                        # the sphere in thirds, 4 ribs each: a visitor standing anywhere sees one whole
+CELL_WIDTH: int = 640                   # a cell of a wall's grid, px: a screen on its side
+CELL_HEIGHT: int = 512
 
 
 def rib_height(screen: int) -> tuple[int, int]:

@@ -1,6 +1,4 @@
-"""SMILE's main screen. `SmileRender` is imported from `render.smile_render`: it composites the walls
-(`player.WallRender`), which draw with this package's shaders, so exporting it here would make the two
-packages import each other."""
+"""SMILE's main screen and the walls' compositing (`layers.WallCompositor`), drawn by `SmileRender`."""
 
 from .settings import Easing, FaceEffect, FaceFill, RenderSettings, SequencerSettings, easing_function
 from .sequencer import (CAMERA_STATES, CAPTURE_AT, AnimationType, AnimationTypeNames, Sequencer, SequenceMessage,
@@ -8,3 +6,4 @@ from .sequencer import (CAMERA_STATES, CAPTURE_AT, AnimationType, AnimationTypeN
 from .grin_player import GrinPlayer
 from .inputs import Faces, Inputs
 from .screen_grab import ScreenGrab
+from .smile_render import SmileRender

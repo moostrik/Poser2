@@ -1,5 +1,5 @@
 """The credit: a QR code to the project page and the artist's name on one changing cell of each wall
-(`WallRender`), and the machine's joke, SMILE(ai) with a line from the lines file, shown with the result on the
+(`WallCompositor`), and the machine's joke, SMILE(ai) with a line from the lines file, shown with the result on the
 main screen (`CreditLayer`) and on the walls' captions. No GL here."""
 
 import logging

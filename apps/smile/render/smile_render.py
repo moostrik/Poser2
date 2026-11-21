@@ -13,11 +13,11 @@ from modules.camera import CameraFrame, upright_corners
 from modules.gl import Fbo, Shader, BlendState, Texture, clear_color
 from modules.utils import fit
 from modules.window import RenderBase
-from ..player import WallRender, WallsSettings
+from ..player import WallsSettings
 from ..settings import WindowsSettings
 from .inputs import Inputs
 from .layers import (BloomLayer, CameraLayer, CreditLayer, CreditView, DiffusionLayer, FlashLayer, LayerBase, RevealLayer,
-                     StatusLayer, caption_shown, copy, fade_step, new_line_due)
+                     StatusLayer, WallCompositor, caption_shown, copy, fade_step, new_line_due)
 from .sequencer import SequenceType, Sequencer
 from .settings import RenderSettings
 from .stages import STAGES, Layers, Stage
@@ -30,7 +30,7 @@ class SmileRender(RenderBase):
     """The installation display. Runs the sequencer every frame (it is the app clock), then lets the
     stage of the current sequence state render the layers, and fits its output in the window.
     The grin frames come from the grin player, which is asked every frame for the one that is due.
-    The two walls of the sphere (`walls`, `WallRender`) are composited after it, each shown in the
+    The two walls of the sphere (`walls`, `WallCompositor`) are composited after it, each shown in the
     window of its own: window 1 is wall 0, screens 1-24, window 2 wall 1;
     the online cell of one of them shows the output without the QR code during an online turn.
     Keys: Enter starts a sequence; F fullscreen, Esc quit (the window manager)."""
@@ -76,7 +76,8 @@ class SmileRender(RenderBase):
         self.grab: ScreenGrab = ScreenGrab()
         self._cell_view: Texture = self._output      # the output as the online cell shows it: no QR code, no status line
         # the walls of the sphere, and which cell of which one is SMILE Online's (wall, cell, mode, page)
-        self.walls: list[WallRender] = [WallRender(settings, walls_settings, [str(i) for i in range(sphere.CELLS)]) for _ in range(sphere.WALLS)]
+        self.walls: list[WallCompositor] = [WallCompositor(settings, walls_settings, [str(i) for i in range(sphere.CELLS)])
+                                            for _ in range(sphere.WALLS)]
         self._online: tuple[int, int, str, str] | None = None
 
         self.window_manager.input.add_key_callback(self._on_key)

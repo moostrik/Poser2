@@ -3,23 +3,21 @@ from math import ceil
 import random
 from threading import Lock
 import time
-from typing import TYPE_CHECKING
 
 import numpy as np
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA8, GL_RGBA16F, GL_SCISSOR_TEST, glClear, glClearColor,
                        glDisable, glEnable, glScissor, glViewport)
 
-from ..credit import FONT, TITLE_FONT, qr_image, quiet_px, title_image, wrap_balanced
-from ..credit_scroll import TIMEOUT as SCROLL_TIMEOUT, name_strip, scroll_copies, scroll_gone
+from ... import sphere
+from ...credit import FONT, TITLE_FONT, qr_image, quiet_px, title_image, wrap_balanced
+from ...credit_scroll import TIMEOUT as SCROLL_TIMEOUT, name_strip, scroll_copies, scroll_gone
+from ...player import WallsSettings
 from modules.gl import ChannelOrder, Fbo, Image, Shader, BlendState, SwapFbo, Text, Texture, shaders
 from modules.utils import Color, Point2f, Quad
-from .settings import WallsSettings
+from ..settings import RenderSettings
 
 # A texture turned a quarter counterclockwise, its top along the cell's left edge: the cell's corners in the texture
 QUARTER_TURN: Quad = Quad(Point2f(1.0, 0.0), Point2f(1.0, 1.0), Point2f(0.0, 1.0), Point2f(0.0, 0.0))
-
-if TYPE_CHECKING:
-    from ..render import RenderSettings
 
 logger = logging.getLogger(__name__)
 
@@ -96,8 +94,8 @@ def next_credit_cell(current: str | None, left: str | None, started: list[str],
     return current, left
 
 
-class WallRender:
-    """One wall of the sphere: grin sequences in a grid of cells, each image turned a quarter, with a trail
+class WallCompositor:
+    """One wall of the sphere, the clip player's `Wall`: grin sequences in a grid of cells, each image turned a quarter, with a trail
     over the whole grid, composited into `texture` on the main thread (`update`) and shown in one of SMILE's
     windows 1 and 2. A cell flashes white for one frame when its next sequence starts, and is white with
     its screen's number while the laughter test lights it (`light`). One cell shows the artist's name and
@@ -110,11 +108,11 @@ class WallRender:
     cell (`set_online`) shows the QR code to the phone page with a line under it while SMILE Online waits
     for someone, and the main screen's picture, turned like a clip, during an online turn."""
 
-    COLUMNS: int = 6
-    CELL_WIDTH: int = 640
-    CELL_HEIGHT: int = 512
+    COLUMNS: int = sphere.COLUMNS
+    CELL_WIDTH: int = sphere.CELL_WIDTH
+    CELL_HEIGHT: int = sphere.CELL_HEIGHT
 
-    def __init__(self, settings: 'RenderSettings', walls_settings: WallsSettings, ids: list[str]) -> None:
+    def __init__(self, settings: RenderSettings, walls_settings: WallsSettings, ids: list[str]) -> None:
         self.settings: RenderSettings = settings       # the credit fields
         self.walls_settings: WallsSettings = walls_settings   # the trail
 

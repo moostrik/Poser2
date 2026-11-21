@@ -70,7 +70,7 @@ FLOW_BANNED: list[tuple[str, str]] = [
 # an app's own terms (smile's in .claude/rules/smile.md): banned in that app's code and settings files
 APP_BANNED: dict[str, list[tuple[str, str]]] = {
     'smile': [
-        ('wall, not player (WallRender, WALLS)', r'PlayerRender|PLAYERS|PlayersSettings|credit_(qr_)?players'),
+        ('wall, not player (WallCompositor, WALLS)', r'PlayerRender|PLAYERS|PlayersSettings|credit_(qr_)?players'),
         ('generator, not diffuse / GenMessage / pipeline', r'diffuse|GenMessage|GenState|PipelineSettings|^pipeline$'),
         ('bloom / fade, not destroy / destruct', r'[Dd]estruct|destroy_'),
         ('music_id, not audio_id', r'audio_id'),

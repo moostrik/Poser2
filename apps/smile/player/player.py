@@ -1,14 +1,13 @@
 """The clip player of the sphere: one pool of clips for the 48 cells of the two walls, each cell playing
-on its own thread, the walls composited by `WallRender` into SMILE's windows 1 and 2. No window and no
-OSC in here but the `/bang` to the Max patch; SMILE's laughter test and scrolling name call `light` and
-`scroll_loop` directly."""
+on its own thread, into the walls it is handed (`Wall`, the render's `WallCompositor`s, shown in SMILE's windows 1
+and 2). No window and no OSC in here but the `/bang` to the Max patch; SMILE's laughter test and scrolling name call
+`light` and `scroll_loop` directly."""
 
 import logging
 import os
 import random
 import threading
 import time
-from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -17,15 +16,12 @@ from modules import video
 from .. import sphere
 from ..credit import CreditLines
 from .clip_loader import ClipLoader
-from .wall_render import WallRender
 from .clip_pool import Clip, ClipPool, next_start
 from .folder_scanner import FolderScanner
 from .settings import WallsSettings
+from .wall import Wall
 
 from modules.inout import OscSender, OscSenderSettings
-
-if TYPE_CHECKING:
-    from ..render import RenderSettings
 
 logger = logging.getLogger(__name__)
 
@@ -46,16 +42,16 @@ def online_cell_mode(active: bool, connected: bool, showing: bool) -> str:
 
 
 class Player:
-    def __init__(self, settings: WallsSettings, walls: list[WallRender], render_settings: 'RenderSettings', root: str = 'apps/smile/output/') -> None:
+    def __init__(self, settings: WallsSettings, walls: list[Wall], lines: CreditLines, root: str = 'apps/smile/output/') -> None:
         self.settings: WallsSettings = settings
-        self.walls: list[WallRender] = walls
+        self.walls: list[Wall] = walls
         # the Max patch places a clip's laugh by the cell its play starts in: `/bang <cell>` to the wall's port
         self.osc: list[OscSender] = []
         for wall in range(len(walls)):
             osc_settings = OscSenderSettings()
             osc_settings.port = BANG_PORT + wall
             self.osc.append(OscSender(osc_settings, events=('/bang',)))
-        self._lines: CreditLines = CreditLines(str(render_settings.credit_lines))     # the captions' lines, one at random per play
+        self._lines: CreditLines = lines        # the captions' lines, one at random per play
         self._lines_lock = threading.Lock()
         # the cell (0 to 47) that is SMILE Online's: no bang and no caption for the clip playing on unseen
         self.online_cell: int | None = None
@@ -65,7 +61,7 @@ class Player:
         ids: list[str] = [str(i) for i in range(len(walls) * CELLS)]
 
         # the clips are decoded once into RAM at the size the cells show them (the portrait is turned a quarter)
-        cell_size: tuple[int, int] = (WallRender.CELL_HEIGHT, WallRender.CELL_WIDTH)
+        cell_size: tuple[int, int] = (sphere.CELL_HEIGHT, sphere.CELL_WIDTH)
         decoder: video.Hardware = settings.decoder
         pool_size: int = int(settings.pool)
         recent: int = int(settings.recent)

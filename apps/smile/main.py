@@ -9,12 +9,13 @@ from modules.session import Session
 from modules.inference import SerialUploader
 from modules.inference.face import FaceDetector
 from .face import FaceFinder, FaceObservations
-from .render.smile_render import SmileRender
-from .render import CAMERA_STATES, AnimationType, AnimationTypeNames, GrinPlayer, RenderSettings, Sequencer, SequenceMessage, SequenceType
+from .render import CAMERA_STATES, AnimationType, AnimationTypeNames, GrinPlayer, RenderSettings, Sequencer, SequenceMessage, \
+    SequenceType, SmileRender
 from .comfy.generator import Generator
 from .comfy.messages import GeneratorMessage, GeneratorState
 from modules.inout import OscSender
 from .audio import LaughterTest, MusicMap, laugh_files
+from .credit import CreditLines
 from .credit_scroll import CreditScroller
 from .save import ClipSaver
 from .lights import Lights
@@ -89,7 +90,8 @@ class SmileMain():
         self.grin_player: GrinPlayer = GrinPlayer(self.settings.setup.sequence)
         self.render: SmileRender = SmileRender(self.settings.setup.render, self.settings.setup.windows, self.settings.setup.walls, self.sequencer, self.grin_player, self.width, self.height)
         # the clip player of the sphere's walls: one pool for the 48 cells of the render's two walls
-        self.clip_player: Player = Player(self.settings.setup.walls, self.render.walls, self.settings.setup.render)
+        self.clip_player: Player = Player(self.settings.setup.walls, list(self.render.walls),
+                                          CreditLines(str(self.settings.setup.render.credit_lines)))
         self.generator: Generator = Generator(self.settings.setup.generator, self.grin_player)
         # the face crop is the image ComfyUI generates from, so it has the workflow's portrait size
         portrait_width, portrait_height = self.generator.workflow.portrait_size

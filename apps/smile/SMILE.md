@@ -172,7 +172,8 @@ no new sequence while it is on (`Sequencer.blocked`). Shaders are
 The two **walls** of the sphere are windows 1 and 2 of the same `WindowManager` (`windows.window_1` is wall 0, screens
 1-24, `window_2` wall 1; each with its own monitor and `fullscreen`, forced on by `-fs` like window 0; a window whose
 monitor is missing waits small on the primary one, and moves back when it is plugged in). `SmileRender.walls` are two
-`WallRender`s (`player/wall_render.py`, no window of their own) composited in `update()` after the main screen, a wall
+`WallCompositor`s (`render/layers/wall_compositor.py`, no window of their own) composited in `update()` after the main
+screen, a wall
 only while its window is shown, and `draw` blits a wall in its window. The windows and the render loop are described in
 `modules/window/WINDOW.md`.
 
@@ -189,7 +190,7 @@ and also without the title into `CreditLayer.clean`, the phone's copy, whose pag
 for one play: it takes a cell when a clip starts there and leaves at that cell's next start (`next_credit_cell`, never the online cell), so no
 clip start flashes over it; `credit_qr_walls` switches it (the walls read the Render tab's fields every frame), off takes the card away at once. With `credit_walls`
 on, every cell shows a caption over its clip, the title over the top and a random line from the same file along the bottom, new at every play (`Player._on_play`, not tied
-to the clip), drawn into a transparent portrait texture per cell (`WallRender._draw_caption`).
+to the clip), drawn into a transparent portrait texture per cell (`WallCompositor._draw_caption`).
 `sphere.py` is the one place that knows the sphere and its wiring: 12 ribs holding 5 and 3 screens by turn, heights 0 (top) to 4
 (heights 1 to 3 have 12 screens, 0 and 4 have 6), screens numbered down each rib (1-5, 6-8, 9-13 …, the ribs counting to the left, so rib r is at -30r degrees), and screen s on Datapath unit
 ⌈s/4⌉ output ((s-1) mod 4)+1, unit n = grid column n-1, output k = grid row k-1 (`screen_of_cell`, `cell_of_screen`, `row_screens`,
@@ -204,7 +205,7 @@ second (`send_loops` to `Player.scroll_loop`: wall, word, px/s, gap, size, the r
 each word at its own speed (`credit_scroll_speed_1`, `_2`; a speed changed in the panel moves the start
 so the word goes on from where it is, `word_start`). Blocked or switched off, each loop gets one message with `last`, the screen its head has reached (`last_place`, counted on from lap to lap), and nothing more;
 `credit_scroll_last` is the readout. The walls
-(`WallRender.scroll_loop`, `_draw_scrolls`) take the position from that and the clock, `time.perf_counter()` like the
+(`WallCompositor.scroll_loop`, `_draw_scrolls`) take the position from that and the clock, `time.perf_counter()` like the
 scroller's (a renewal moves nothing; on Windows `time.time()` moves in 15.6 ms steps, coarser than a frame), and drop a
 loop no message renewed for `TIMEOUT`. They draw a word as a ticker reading left to right and moving left: `name_strip` renders it once with freetype into one long BGRA image,
 640 high, the ink `credit_scroll_size` tall in the vertical middle, white with a black edge (not the font atlas: too big at that size); each cell on the ring blits the strip
@@ -237,7 +238,7 @@ must be on the PATH: the gyan.dev full build); the encoder is picked at startup 
 those processes any other way: the apps run under pythonw, so they need `CREATE_NO_WINDOW` and no
 inherited handles. The clip player (`player/`: `Player`, one for the sphere, started and stopped by `Main`) decodes each of the newest clips once into RAM
 (`ClipPool`, 512x640, about 200 MB per clip) and plays from memory on the 48 cells of the two walls (`sphere.CELLS` each, cell ids
-0-47, wall = id // 24; the loaders feed `WallRender.set_image` and bang Max on 4115 for wall 0, 4116 for wall 1); the Walls tab
+0-47, wall = id // 24; the loaders feed the `Wall`s it is handed, `set_image`, and bang Max on 4115 for wall 0, 4116 for wall 1); the Walls tab
 (`player/settings.py`) has `pool` the clips kept, `recent`, `recycle_every` and `hwaccel` (read at the start), `fps` the playback
 speed (default 20, 0 = the clip's own rate), `spread` a random speed difference per play so the cells drift apart (default 0.1), `trail` a blend
 with the previous output (default 0: none), read at every play or frame.
@@ -326,7 +327,7 @@ QR code to the phone page (`online.page`, empty = the relay's host, `Link.http_b
 and the relay connected, and the main screen (`CreditLayer.cell`: the caption, no QR code, no status line)
 from the judging to the phone's last frame (`Online.showing`), then the card again; off or disconnected it is a clip cell like any
 (`online_cell_mode` in `player.py`). `Main._online_cell` sets it every frame: `Player.online_cell` (no bang, no caption: its clip plays
-unseen) and `SmileRender.set_online_cell`, which the walls take in `update()` (`WallRender.set_online`).
+unseen) and `SmileRender.set_online_cell`, which the walls take in `update()` (`WallCompositor.set_online`).
 Tests: `relay/tests` (the line, the server on aiohttp's test server, the page's files: `test_web.py`) and `online/tests`
 (a fake link and camera).
 
