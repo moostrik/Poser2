@@ -3,7 +3,7 @@
 import copy
 import logging
 import threading
-from typing import Any
+from typing import Any, ClassVar
 
 from .field import Field, Access
 from .group import Group
@@ -15,6 +15,25 @@ logger = logging.getLogger(__name__)
 class BaseSettings:
     """A reactive data container: its `Field` and `Group` class attributes are its values and its children."""
 
+    # The class's fields and groups by name, base classes' first; a name a subclass declares again keeps the base's
+    # place and takes the subclass's descriptor. Built once per class (`__init_subclass__`).
+    _descriptors: ClassVar[dict[str, Field | Group]] = {}
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        mro: tuple[type, ...] = cls.__mro__
+        names: dict[str, None] = {}
+        for klass in reversed(mro):
+            for name, value in vars(klass).items():
+                if not name.startswith("_") and isinstance(value, (Field, Group)):
+                    names.setdefault(name, None)
+        descriptors: dict[str, Field | Group] = {}
+        for name in names:
+            value = next(vars(klass)[name] for klass in mro if name in vars(klass))
+            if isinstance(value, (Field, Group)):
+                descriptors[name] = value
+        cls._descriptors = descriptors
+
     def __init__(self, **kwargs):
         object.__setattr__(self, "_initialized", False)
         object.__setattr__(self, "_share_down", {})     # parent_name → [(child, child_name), ...]
@@ -25,18 +44,8 @@ class BaseSettings:
         object.__setattr__(self, "_locks", {})
         object.__setattr__(self, "_children", {})
 
-        # Collect Field and Group descriptors from the class hierarchy, base classes first, so a
-        # panel and a settings file list a base's fields before a subclass's; a name a subclass declares
-        # again keeps the base's place and takes the subclass's descriptor
-        mro: tuple[type, ...] = type(self).__mro__
-        names: dict[str, None] = {}
-        for cls in reversed(mro):
-            for attr_name, attr_value in vars(cls).items():
-                if not attr_name.startswith("_") and isinstance(attr_value, (Field, Group)):
-                    names.setdefault(attr_name, None)
         group_names: dict[str, Group] = {}
-        for attr_name in names:
-            attr_value = next(vars(cls)[attr_name] for cls in mro if attr_name in vars(cls))
+        for attr_name, attr_value in type(self)._descriptors.items():
             if isinstance(attr_value, Field):
                 self._fields[attr_name] = attr_value
                 default = attr_value.default
@@ -57,9 +66,7 @@ class BaseSettings:
         # Create children from Group descriptors (after kwargs so shared fields have updated values); a group
         # declared `last` after the others, a subclass's included
         for attr_name in sorted(group_names, key=lambda name: group_names[name].last):     # stable: declared order kept
-            group_desc = self._get_group_descriptor(attr_name)
-            if group_desc is None:
-                continue
+            group_desc = group_names[attr_name]
             group_desc.validate_wiring(self)
             share_kwargs = group_desc.build_share_kwargs(self)
             child = group_desc.settings_type(**share_kwargs)
@@ -183,9 +190,9 @@ class BaseSettings:
                 continue
             result[name] = field.to_json_value(self)
         for name, child in self._children.items():
-            desc = self._get_group_descriptor(name)
+            desc = type(self)._descriptors.get(name)
             # Exclude shared child fields (parent owns them)
-            shared = set(desc.share_map.values()) if desc is not None else set()
+            shared = set(desc.share_map.values()) if isinstance(desc, Group) else set()
             result[name] = child.to_dict(_exclude=shared)
         return result
 
@@ -263,16 +270,6 @@ class BaseSettings:
         if parent_field is None or (parent_field.access is Access.INIT and parent._initialized):
             return
         parent_field._apply(parent, self._values[child_name])
-
-    # -- Helpers -------------------------------------------------------------
-
-    def _get_group_descriptor(self, name: str) -> Group | None:
-        """Look up a Group descriptor from the class hierarchy, or None."""
-        for cls in type(self).__mro__:
-            attr = vars(cls).get(name)
-            if isinstance(attr, Group):
-                return attr
-        return None
 
     # -- Equality ------------------------------------------------------------
 

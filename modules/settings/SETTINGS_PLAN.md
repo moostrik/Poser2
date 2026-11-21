@@ -6,9 +6,6 @@ The package scan of 2026-11-20 (modules/settings held up to CLAUDE.md and its ru
 
 - E4. `widget.py`'s "Adding a widget" goes into SETTINGS.md; the `_propagate_*` docstrings and `Field.fire`'s say what
   each one is.
-- E9. One map of a class's fields and groups, built once per class in `BaseSettings.__init_subclass__`:
-  `BaseSettings.__init__`, `to_dict` and `Group.validate_wiring` read it, in place of their three walks of the MRO;
-  `_get_group_descriptor` goes.
 - E10. One enum coercion (a member from its name or value), used by `Field._coerce` and `_coerce_element`.
 - E11. `Field.encode` encodes a list's elements through the same function as a value.
 - E12. A missing setup file starts the app on its defaults with a warning, as smile does, in place of refusing the

@@ -99,11 +99,8 @@ class Group(Generic[T]):
         - the field types don't match
         - one side is ``INIT`` and the other is not (INIT must be symmetric)
         """
-        child_fields = {
-            name: f for cls in self.settings_type.__mro__
-            for name, f in vars(cls).items()
-            if isinstance(f, Field)
-        }
+        descriptors: dict[str, Any] = getattr(self.settings_type, "_descriptors")    # a BaseSettings subclass's map
+        child_fields = {name: f for name, f in descriptors.items() if isinstance(f, Field)}
 
         for parent_name, child_name in self.share_map.items():
             if parent_name not in owner._fields:
