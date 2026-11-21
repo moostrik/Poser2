@@ -2,8 +2,9 @@
 and the grins of the visitors before play on the two walls of the sphere (README.md, SMILE.md)."""
 
 from .cam import Camera
-from modules.camera import CameraFrame, upright_image, vimba, webcam
-from modules.recording import Recorder
+from modules import recording
+from modules.recording import replay
+from modules.camera import CameraFrame, CameraSource, upright_image, vimba, webcam
 from modules.session import Session
 from modules.inference import SerialUploader
 from modules.inference.face import FaceDetector
@@ -98,8 +99,14 @@ class SmileMain():
         self.face_detector: FaceDetector = FaceDetector(self.settings.setup.camera.face_detector)
         self.face: FaceFinder = FaceFinder(self.settings.setup.camera.face, self.settings.setup.camera.face_detector, portrait_width, portrait_height)
 
-        # the camera device; the panel can switch to an image from input/ at any time
-        if cam_type == CamType.VIMBA:
+        # the camera device; the panel can switch to an image from input/ at any time. -sim plays a recording in its place
+        self.recording_player: recording.Player | None = None
+        device: CameraSource
+        if simulation:
+            self.recording_player = recording.Player(self.settings.setup.camera.simulator, data_path=DATA_PATH)
+            device = replay.Camera(self.recording_player, self.settings.setup.camera.replay, None, None)
+            device_name = 'replay'
+        elif cam_type == CamType.VIMBA:
             # without the Vimba 6 SDK (VIMBA_HOME, VimbaC) the backend logs an error at start: no device, the image still works
             device = vimba.Camera(self.settings.setup.camera, rotate90=self.portrait_mode)
             device_name = 'vimba'
@@ -108,7 +115,7 @@ class SmileMain():
             device_name = 'webcam'
         self.camera: Camera = Camera(self.settings.setup.camera, (self.width, self.height), device, device_name)
         # the device's frames as they came, recorded after the live path took them, in chunks the session splits
-        self.recorder: Recorder = Recorder(self.settings.setup.camera.recorder, data_path=DATA_PATH)
+        self.recorder: recording.Recorder = recording.Recorder(self.settings.setup.camera.recorder, data_path=DATA_PATH)
         self.session: Session = Session(self.settings.setup.camera.control)
         self.camera.add_device_frame_callback(self.recorder.submit_frame)
 
@@ -140,6 +147,8 @@ class SmileMain():
         self.recorder.start()
         self.camera.add_frame_callback(self.render.set_cam_image)
         self.camera.start()
+        if self.recording_player is not None:
+            self.recording_player.start()       # after the replay camera hooked into it
 
         self.generator.add_message_callback(self.render.set_generator_message)
         self.generator.add_message_callback(self.generator_callback)
@@ -177,6 +186,7 @@ class SmileMain():
         # first: stops the sequencer callbacks
         steps = (self.sequencer.clear_message_callbacks, self.render.stop, self.clip_player.stop, self.sequencer.close,
                  self.online.stop, self.lights.stop, self.osc.stop,
+                 *((self.recording_player.stop,) if self.recording_player is not None else ()),
                  self.camera.stop, self.recorder.stop,
                  self.generator.clear_message_callbacks, self.generator.stop,
                  self.uploader.stop, self.face_detector.stop,

@@ -31,7 +31,10 @@ once turned, the render's camera image applies them in its upload, the uploader 
 capture turns its CPU frame once. The camera's `start` and `stop` record the device's frames as they came, after the
 live path took them (`Camera.add_device_frame_callback`), with `modules/recording`'s `Recorder`: an `MP4` chunk any
 player plays with its metadata beside it, the turn and the flips as flags, split into chunks of `split_seconds` by a
-`Session` (`camera.control`), in `data/recordings/`. A missing device is a warning and `device: none`, never an
+`Session` (`camera.control`), in `data/recordings/`. `-sim` plays a recording in the device's place: a recording
+`Player` (`camera.simulator`, its folder chosen in the panel) feeds a `replay.Camera` (`camera.replay`), whose
+frames come as the camera delivered them; a recorded face qualifies by itself, so the whole sequence runs. A missing
+device is a warning and `device: none`, never an
 automatic switch to the image. The Vimba backend's thread keeps the camera: `start()` makes the first try, and
 the thread searches again every 5 s while there is none and opens it again (user set, packet size, the
 panel's values) when no complete frame arrived for 5 s; the `device` readout follows its `connected`. Without the Vimba SDK

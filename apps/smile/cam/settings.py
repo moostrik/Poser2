@@ -1,12 +1,14 @@
 """SMILE's camera settings: the Vimba camera's (`VimbaCameraSettings`, also read by the webcam for
 its flips) with the app's sources around it, the image from `input/` and the device readout, the
-faces' settings (the upload, the detector and smile's face finder), and the recording of the device's frames
-(the recorder and the session that splits it into chunks, started and stopped by one pair of buttons)."""
+faces' settings (the upload, the detector and smile's face finder), the recording of the device's frames
+(the recorder and the session that splits it into chunks, started and stopped by one pair of buttons), and, read only
+in -sim, the player of a recording and the replay camera it feeds."""
 
+from modules.camera import RigCameraSettings
 from modules.camera.vimba import VimbaCameraSettings
 from modules.inference import SerialUploaderSettings
 from modules.inference.face import FaceDetectorSettings
-from modules.recording import Container, RecorderSettings
+from modules.recording import Container, PlayerSettings, RecorderSettings
 from modules.session import SessionSettings
 from modules.settings import Field, Group, Widget
 
@@ -39,3 +41,5 @@ class CameraSettings(VimbaCameraSettings):
     face:          Group[FaceFinderSettings] = Group(FaceFinderSettings)            # SMILE's choice of a subject and its crop, the image ComfyUI starts from
     control:       Group[SessionSettings] = Group(SessionSettings, share=[start, stop, split, split_seconds])   # splits the recording into chunks
     recorder:      Group[_RecorderSettings] = Group(_RecorderSettings, share=[start, stop, split])             # the device's frames as they come
+    simulator:     Group[PlayerSettings] = Group(PlayerSettings)          # -sim: the recording played in place of the device
+    replay:        Group[RigCameraSettings] = Group(RigCameraSettings)    # -sim: the camera the recording's frames come from
