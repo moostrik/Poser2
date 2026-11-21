@@ -8,13 +8,13 @@ from modules.gl import Shader, draw_quad, Texture
 
 
 class DepthStepFilter(Shader):
-    """Writes the depth (R, m) with 0 where its 3×3 depth samples span a step beyond the tolerance."""
+    """Writes the depth (R, m) and its confidence (G) with 0 where its 3×3 depth samples span a step beyond the tolerance."""
 
     def use(self, depth: Texture, depth_step: tuple[float, float], tolerance: float) -> None:
         """Take the edges off.
 
         Args:
-            depth: Depth (m), 0 where there is none
+            depth: Depth (m) in red, 0 where there is none; its confidence (0 to 1) in green
             depth_step: uv between two depth samples
             tolerance: A step beyond this is two surfaces (m)
         """

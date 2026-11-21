@@ -4,14 +4,16 @@
 // One frame of the depth track, in disparity (1 / depth): the track the frame before, carried from
 // where the pixel was `displacement` (uv per frame) back, predicted on by its rate and corrected by
 // the new measurement, an alpha–beta filter. The measurement is the mean disparity over a window of
-// depth samples, of those within `edge` of the pixel's depth (not the background beside the player);
-// it corrects by alpha and beta times the share of the window it holds, so a thin window corrects little.
+// depth samples, of those within `edge` of the pixel's depth (not the background beside the player),
+// with `weighted` each by its confidence (0 where the view filled the depth); it corrects by alpha and
+// beta times the share of the window it holds, the summed confidence over the window's samples, so a
+// thin or unsure window corrects little. A window that holds no confidence leaves the pixel empty.
 // Within a frame `edge` tells two surfaces apart; between frames `max_speed`: the track is read linear
 // between the texels whose depth, a frame on by its rate, lies within `max_speed` × `delta_time` of the
 // measurement, so a track is never carried across another surface, and without one there, or with a
 // filtered rate past `max_speed` (a depth sliding away too fast), it starts over with no rate (a limb
 // passing over the pixel). 0 `max_speed` checks neither. Without depth at the pixel or without a span,
-// it is empty. z is the rate over the metres one view width spans there, `depth × view_span`, in view
+// it is empty. z is the rate over the meters one view width spans there, `depth × view_span`, in view
 // widths per frame. Depth is read nearest, so an edge never reads as a distance in between.
 // The time the track follows over is the 1€ filter's (Casiez, Roussel, Vogel 2012): `smoothing` at rest,
 // over 1 + speed / `halving_speed` in a motion, past `rest_speed`: the speed the larger of x/y's here (its 3×3
@@ -19,7 +21,8 @@
 // z is 0 while the tracked depth stays within it of its anchor; past it, z at its full speed, and the
 // anchor follows at `dead_zone` behind (a backlash); a track that starts over is anchored anew.
 
-uniform sampler2D tex0;  // Depth now R (m)
+uniform sampler2D tex0;  // Depth now R (m), its confidence G (0 to 1)
+uniform bool weighted;   // Each depth sample weighted by its confidence; off all alike
 uniform sampler2D tex1;  // The track the frame before: z, disparity (1/m), rate (1/m per second), anchor (m)
 uniform sampler2D displacement;     // uv per frame (RG), with warp
 uniform bool warp;
@@ -47,10 +50,11 @@ vec4 guard(vec4 value) {
     return vec4(0.0);
 }
 
-float depth_at(vec2 uv) {
+// The depth and its confidence at uv
+vec2 sample_at(vec2 uv) {
     ivec2 size = textureSize(tex0, 0);
     ivec2 texel = clamp(ivec2(floor(uv * vec2(size))), ivec2(0), size - 1);
-    return texelFetch(tex0, texel, 0).r;
+    return texelFetch(tex0, texel, 0).rg;
 }
 
 // The track's disparity, rate and anchor (xyz) at `position` (texels, centers at integers), of the
@@ -91,26 +95,31 @@ float xy_speed(vec2 size) {
 
 // One frame of the track into fragColor
 void step_track() {
-    float center = depth_at(texCoord);
+    float center = sample_at(texCoord).r;
     if (center <= 0.0 || view_span <= 0.0) {
         fragColor = vec4(0.0);
         return;
     }
 
     float total = 0.0;
-    int kept = 0;
+    float weights = 0.0;
     for (int j = -window; j <= window; j++) {
         for (int i = -window; i <= window; i++) {
-            float sample_depth = depth_at(texCoord + vec2(i, j) * depth_step);
-            if (sample_depth > 0.0 && abs(sample_depth - center) <= edge) {
-                total += 1.0 / sample_depth;
-                kept++;
+            vec2 depth_sample = sample_at(texCoord + vec2(i, j) * depth_step);
+            if (depth_sample.r > 0.0 && abs(depth_sample.r - center) <= edge) {
+                float weight = weighted ? depth_sample.g : 1.0;
+                total += weight / depth_sample.r;
+                weights += weight;
             }
         }
     }
+    if (weights <= 0.0) {                       // only filled depth here: nothing measured
+        fragColor = vec4(0.0);
+        return;
+    }
     float side = float(2 * window + 1);
-    float measurement = total / float(max(kept, 1));
-    float share = float(kept) / (side * side);
+    float measurement = total / weights;
+    float share = weights / (side * side);
 
     bool smoothed = smoothing > 0.0;
     vec2 moved = warp ? texture(displacement, texCoord).xy : vec2(0.0);

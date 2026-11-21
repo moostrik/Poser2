@@ -4,7 +4,7 @@ per pixel a disparity and its rate, carried along the x/y displacement and corre
 before it and a dead zone after it. How and why:
 modules/flow/MOTION.md, "z: the depth velocity".
 """
-from OpenGL.GL import GL_R16F, GL_R32F, GL_RGBA32F
+from OpenGL.GL import GL_R16F, GL_RG32F, GL_RGBA32F
 
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import BaseSettings, Field
@@ -19,6 +19,7 @@ class DepthVelocitySettings(BaseSettings):
     runs it, a line each: the surface, the smoothing, the cut."""
     edge:           Field[float] = Field(0.1, min=0.05, max=0.3, step=0.01, description="z: a depth step past this, in m, is another surface (lower: cleaner edges)")
     window:         Field[Patch] = Field(Patch.SEVEN, min=Patch.ONE, max=Patch.NINE, description="z: depth samples averaged (larger: less noise, small parts blur)")
+    weighted:       Field[bool]  = Field(False, description="z: each depth sample weighted by the camera's confidence, filled depth 0 (off: all alike)")
     max_speed:      Field[float] = Field(6.0, min=0.0, max=20.0, step=0.5, description="z: faster than this, in m/s, is another surface, the track starts over (0: no check)")
     smooth:         Field[float] = Field(100.0, min=0.0, max=500.0, step=1.0, newline=True, description="z: smoothing time at rest, in ms; 0 the change of two frames (higher: less noise at rest)")
     rest_speed:     Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="speed below which the motion counts as at rest, in px/frame")
@@ -31,8 +32,8 @@ class DepthVelocity(FlowBase):
     """Signed motion toward the camera in view widths per frame (R16F), positive toward it.
 
     Pipeline, on each new flow frame:
-        1. Take the depth → the raw Fbo (R32F, metres, at the flow's size, nearest), and without
-           its edges → the input SwapFbo
+        1. Take the depth and its confidence → the raw Fbo (RG32F, meters and 0 to 1, at the flow's size, nearest),
+           and without its edges → the input SwapFbo
         2. Correct the track carried from the last one → the estimate SwapFbo (RGBA32F: z, disparity, rate, anchor)
         3. Take the noise floor off z → output_fbo (R16F)
     """
@@ -40,16 +41,16 @@ class DepthVelocity(FlowBase):
     def __init__(self) -> None:
         super().__init__()
 
-        self._input_internal_format = GL_R32F
+        self._input_internal_format = GL_RG32F
         self._output_internal_format = GL_R16F
-        self._input_kind = TextureKind.SCALAR
+        self._input_kind = TextureKind.DEPTH
         self._output_kind = TextureKind.SCALAR
 
         self._step_filter_shader: DepthStepFilter = DepthStepFilter()
         self._velocity_shader: DepthVelocityShader = DepthVelocityShader()
         self._threshold_shader: DepthThreshold = DepthThreshold()
 
-        self._raw: Fbo = Fbo()                   # the depth as it came, before its edges are taken off
+        self._raw: Fbo = Fbo()                   # the depth and its confidence as they came, before the edges are taken off
         self._estimate: SwapFbo = SwapFbo()
 
     @property
@@ -66,12 +67,12 @@ class DepthVelocity(FlowBase):
     @property
     def ports(self) -> dict[str, Port]:
         """`input` is the depth with its edges taken off, `raw` as it came."""
-        return {'raw': Port(self._raw, TextureKind.SCALAR), **super().ports,
+        return {'raw': Port(self._raw, TextureKind.DEPTH), **super().ports,
                 'estimate': Port(self._estimate, TextureKind.SCALAR)}
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         super().allocate(width, height, output_width, output_height)
-        self._raw.allocate(width, height, GL_R32F)
+        self._raw.allocate(width, height, GL_RG32F)
         self._estimate.allocate(width, height, GL_RGBA32F)
         self._estimate.clear_all()
         self._step_filter_shader.allocate()
@@ -92,11 +93,12 @@ class DepthVelocity(FlowBase):
 
     def update_depth(self, depth: Texture, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
                      smooth: float, halving_speed: float, rest_speed: float, threshold: float, edge: float, dead_zone: float,
-                     displacement: Texture | None = None, max_speed: float = 0.0, guard: GuardSlot | None = None) -> None:
+                     displacement: Texture | None = None, max_speed: float = 0.0, guard: GuardSlot | None = None,
+                     weighted: bool = False) -> None:
         """Advance on a new flow frame: correct the track by the new depth, then take the noise floor off.
 
         Args:
-            depth: Metres in red, 0 where there is none
+            depth: Meters in red, 0 where there is none; the camera's confidence (0 to 1) in green, 0 where the view filled it
             delta_time: Seconds since the last depth
             view_span: Metres one view width spans per metre of depth; 0 or less reads no motion
             depth_step: uv between two depth samples in the flow's view; 0 takes one flow texel
@@ -113,6 +115,7 @@ class DepthVelocity(FlowBase):
             max_speed: The fastest a body part moves in depth (m/s): a jump between frames or a speed past it
                 is another surface, the track starts over; 0 is no check
             guard: The depth velocity's slot in the motion's FiniteGuard: a non-finite track 0 and counted; None no guard
+            weighted: Each depth sample in the window weighted by its confidence; False all alike
         """
         if not self._allocated:
             return
@@ -128,7 +131,7 @@ class DepthVelocity(FlowBase):
         self._estimate.swap()
         self._estimate.begin()
         self._velocity_shader.use(self._input_fbo, self._estimate.back, smooth, halving_speed, rest_speed, max(delta_time, 1e-6),
-                                  view_span, step, window, edge, dead_zone, displacement, max_speed, guard)
+                                  view_span, step, window, edge, dead_zone, displacement, max_speed, guard, weighted)
         self._estimate.end()
 
         self._output_fbo.begin()

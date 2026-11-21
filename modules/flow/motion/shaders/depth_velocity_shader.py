@@ -16,11 +16,12 @@ class DepthVelocityShader(Shader):
 
     def use(self, depth: Texture, track: Texture, smooth: float, halving_speed: float, rest_speed: float, delta_time: float,
             view_span: float, depth_step: tuple[float, float], window: int, edge: float, dead_zone: float,
-            displacement: Texture | None = None, max_speed: float = 0.0, guard: GuardSlot | None = None) -> None:
+            displacement: Texture | None = None, max_speed: float = 0.0, guard: GuardSlot | None = None,
+            weighted: bool = False) -> None:
         """Correct the track by the new depth into the bound target.
 
         Args:
-            depth: Depth now (m)
+            depth: Depth now (m) in red, its confidence (0 to 1) in green
             track: The track the frame before
             smooth: Time the track follows over at rest (ms); 0 takes the measurement whole
             halving_speed: speed (the larger of x/y's and the track's own) past `rest_speed` at which that time is half (px per frame); 0 is `smooth` throughout
@@ -34,6 +35,7 @@ class DepthVelocityShader(Shader):
             displacement: uv per frame; when given, the track is carried from where each pixel came from
             max_speed: The fastest a body part moves in depth (m/s): a jump or a speed past it starts the track over. 0 is no check
             guard: The depth velocity's slot in the motion's FiniteGuard; None no guard
+            weighted: Each depth sample weighted by its confidence; False all alike
         """
         if not self.allocated or not self.shader_program:
             return
@@ -59,6 +61,7 @@ class DepthVelocityShader(Shader):
         glUniform1i(self.get_uniform_loc("warp"), int(warp))
         glUniform2f(self.get_uniform_loc("depth_step"), *depth_step)
         glUniform1i(self.get_uniform_loc("window"), window)
+        glUniform1i(self.get_uniform_loc("weighted"), int(weighted))
         glUniform1f(self.get_uniform_loc("edge"), edge)
         glUniform1f(self.get_uniform_loc("smoothing"), smooth)
         glUniform1f(self.get_uniform_loc("halving_speed"), halving_speed)

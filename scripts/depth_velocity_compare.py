@@ -42,7 +42,7 @@ from typing import Any, cast
 import cv2
 import glfw
 import numpy as np
-from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_FLOAT, GL_FRAMEBUFFER, GL_R32F, GL_RED, GL_RGB, GL_RGBA32F,
+from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_FLOAT, GL_FRAMEBUFFER, GL_R32F, GL_RED, GL_RG, GL_RG32F, GL_RGB, GL_RGBA32F,
                        GL_TEXTURE_2D, GL_UNSIGNED_BYTE, glBindFramebuffer, glBindTexture,
                        glClear, glClearColor, glFinish, glReadPixels, glTexImage2D, glViewport)
 
@@ -90,12 +90,14 @@ def context(visible: bool, width: int, height: int):
 
 
 def upload(texture: Texture, array: np.ndarray) -> None:
-    """One channel, float32, into an R32F texture."""
+    """One channel (H, W) or two (H, W, 2), float32, into an R32F or RG32F texture."""
     h, w = array.shape[:2]
-    if not texture.allocated or texture.width != w or texture.height != h:
-        texture.allocate(w, h, GL_R32F)
+    two: bool = array.ndim == 3
+    internal_format, pixel_format = (GL_RG32F, GL_RG) if two else (GL_R32F, GL_RED)
+    if not texture.allocated or texture.width != w or texture.height != h or texture.internal_format != internal_format:
+        texture.allocate(w, h, internal_format)
     glBindTexture(GL_TEXTURE_2D, texture.tex_id)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, w, h, 0, GL_RED, GL_FLOAT, np.ascontiguousarray(array, dtype=np.float32))
+    glTexImage2D(GL_TEXTURE_2D, 0, internal_format, w, h, 0, pixel_format, GL_FLOAT, np.ascontiguousarray(array, dtype=np.float32))
     glBindTexture(GL_TEXTURE_2D, 0)
 
 
@@ -218,6 +220,13 @@ class Frames:
             depth = np.where(np.load(depth_mask), depth, 0.0).astype(np.float32)
         return (np.load(self.folder / f'luminance_{k:04d}.npy').astype(np.float32), depth,
                 np.load(self.folder / f'mask_{k:04d}.npy').astype(np.float32))
+
+    def with_confidence(self, k: int, depth: np.ndarray) -> np.ndarray:
+        """The depth (H, W) with its confidence (H, W, 2), as the motion gets it: 0 to 1, 0 where the view filled
+        the depth; 1 where the capture has none."""
+        saved: Path = self.folder / f'confidence_{k:04d}.npy'
+        confidence = np.load(saved).astype(np.float32) if saved.exists() else np.ones_like(depth)
+        return np.dstack((depth, confidence))
 
     def motion(self) -> np.ndarray:
         """Per frame, the mean luminance change in the mask since the frame before (0 to 1). Also
@@ -648,7 +657,7 @@ def measure(captures: list[Path], specs: list[tuple[str, dict[str, object]]], ou
         region_texture = RegionTexture()
         for k in range(len(frames)):
             lum, depth, mask = frames.load(k)
-            upload(luminance, lum); upload(depth_texture, depth); upload(mask_texture, mask)
+            upload(luminance, lum); upload(depth_texture, frames.with_confidence(k, depth)); upload(mask_texture, mask)
             segment = frames.segment(k)
             regions = frame_regions(segment, depth, mask > 0.5, lum, frames.excluded)
             region_texture.upload(region_bits(regions, frames.moved, mask > 0.5))
@@ -758,7 +767,7 @@ def main() -> int:
 
     def feed(k: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         lum, depth, mask = frames.load(k)
-        upload(luminance, lum); upload(depth_texture, depth); upload(mask_texture, mask)
+        upload(luminance, lum); upload(depth_texture, frames.with_confidence(k, depth)); upload(mask_texture, mask)
         return lum, depth, mask > 0.5
 
     loop, k, started = 1, 0, time.perf_counter()

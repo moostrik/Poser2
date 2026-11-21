@@ -13,7 +13,7 @@ operator saw.
 |-----|------------------------------------------------------------------------------|-----------------------------------|----------------------------------------------------|
 | A   | [The measurements](#a-the-measurements)                                      | built                             | [FLOW.md](FLOW.md#the-goals)                       |
 | B   | [The view](#b-the-view)                                                      | built                             | [VIEW.md](VIEW.md)                                 |
-| C   | [The motion](#c-the-motion)                                                  | built; C2 values, C3 range, C6    | [MOTION.md](MOTION.md)                             |
+| C   | [The motion](#c-the-motion)                                                  | built; C2 values, C3 range, C7    | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; D6 the checks              | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | built; E6 the app's check         | [FLUID_3D.md](FLUID_3D.md)                         |
 | F   | [The 3D fluid's look at 4K](#f-the-3d-fluids-look-at-4k)                     | F1, F2 white                      | [FLUID_3D.md](FLUID_3D.md), [TIMING.md](TIMING.md) |
@@ -79,25 +79,45 @@ the view's depth arrives RG, meters in red and the camera's confidence (0 to 1) 
 it, 1 for a recording without one. Today z's window mean counts every sample within `edge` alike, the filled ones
 too, so a guessed depth corrects the track as much as a measured one **(deduction: B2's fill feeds the window)**.
 
-- **C6.** The window weighted by confidence. The confidence comes in with the depth and stays with it:
-  `DepthVelocity`'s `raw` and `input` become RG32F, `depth_step_filter.frag` keeps green with red (0 where it drops
-  the depth), and both ports become `TextureKind.DEPTH` so the monitor shows green. In `depth_velocity_shader.frag`
-  each sample within `edge` adds its confidence times its disparity, and the measurement is that sum over the
-  confidences; `share` becomes the summed confidence over the window's samples, so a window of filled or unsure
-  depth corrects the track little and it coasts on its rate, as a thin window does now. A window whose confidence
-  sums to 0 has no measurement: the track starts over with no rate, as one without a surface does, so a filled hole
-  never holds the last z. The center's depth still sets `edge`. One switch for the measuring, `weighted` in
-  `DepthVelocitySettings`, on by default; off takes 1 for every sample, as now. After the rows the switch goes: the
-  weights stay always on if they win, the step is undone if not. `depth_velocity_capture.py` saves the depth's two
-  channels, `depth_velocity_compare.py` uploads them and adds the sides `weights off` and `weights on`; the shader's
-  header and `update_depth`'s docstring follow. Check: `motion_bridge_pass_check.py` as before; the pass's ms
-  again; one capture with filled pixels (green 0): z there 0 with weights on, no held z; then the result on two new
-  recordings with confidence, hands and measure, thresholds 0 and as used, rows in MOTION.md's table: still noise,
-  z kept, lag and stop, and the noise at the player's edge, where the camera's confidence is lowest **(deduction:
-  stereo fails at depth edges)**. MOTION.md's z section after.
-- Question, after C6's rows: is the confidence linear enough as a weight? The probe's ran 73 to 255, median 230,
-  so the surest and the least sure differ only 3.5 times (CAMERA_PLAN.md's probe); if C6 shows
-  little, a floor below which a sample counts 0, as a setting with its own rows.
+Tried and undone (2026-11-21), C6: each sample of z's window weighted by its confidence, a window with no
+confidence empty. Measured on `measure_confidence` (crop far 1.7 m, the floor in, the settings file's values), off
+against on, as used / thresholds 0: z noise at the edge 1.03 → 0.92 / 1.53 → 1.42, restarts moving 0.15 → 0.13%
+of the tracks a frame, at rest 0.041 → 0.039%, z inside at rest the same; z kept 0.757 → 0.737, z's stop 32 → 55 ms
+/ 51 → 83 ms. Not a win: the filled edge of a moving silhouette, weight 0, coasts on its rate past the stop
+**(deduction)**. Its carrying of the confidence (`raw` and `input` RG32F, the step filter keeping green, the ports
+`TextureKind.DEPTH`, the capture and the compare taking it) is committed with C6 and `weighted` off, and is C7's base.
+
+- **C7.** The gate as the textbook has it (Bar-Shalom, a tracker's validation gate): one test of the measurement
+  against the prediction, in disparity, sized by the measurement's expected noise, and a track that coasts through
+  a miss before it starts over. Today the gate is a fixed distance in meters (`max_speed × dt`), so stereo noise,
+  which grows with the square of the depth, trips it more the farther the player stands (C3), and one miss starts
+  the track over, z 0 and its rate from nothing, which at the edge is part of z's noise.
+  - The noise: stereo depth noise is about constant in disparity, a sample's σ = `depth_noise` (m at 1 m depth,
+    which is 1/m in disparity) over its confidence squared. Measured on `measure_confidence`'s still part (2.8–4.6 s,
+    1.25 m), the depth's spread over time over its square: the floor 10.4 mm (11.8 at confidence 0.8–0.95), the
+    player 10 mm at 0.95–1, 12.6 at 0.8–0.95, 24 under 0.8; the floor, which does not sway, is as noisy as the
+    player, so this is the camera's. The confidence tells the noise and widens the gate where it is low.
+  - The measurement is the window's mean, so its σ is the samples' over the root of their count: σ_mean =
+    √(Σ σᵢ²) / n over the n samples kept. The gate is on that, not on one sample's σ.
+  - The gate: the residual within `max_speed × dt / depth²` (the motion a body part makes, in disparity) plus
+    `gate` × σ_mean (3, the textbook's). `max_speed` keeps its meaning and unit; the jump in `carried()` takes the
+    same gate.
+  - Coasting: a measurement outside the gate, or a window with no measured depth (filled), is a miss: the track
+    predicts on with no correction and counts it; after `coast` misses in a row (2, "M of N"; 1 is today's) it
+    starts over. Its cost: where another surface really comes over the pixel (a hand passing), the old track
+    coasts `coast` − 1 frames before it starts over. The count is a second target of the same pass (R8UI, its own
+    swap), as the track's four channels are full; the dead zone stays as it is (Matthias, 2026-11-21). `Fbo` and
+    `SwapFbo` hold one color target, so the two targets are a framebuffer of the motion's own, as
+    `ParticleDensity`'s.
+  - The window: a filled sample (confidence 0) is left out, a measured one counts whole, as the confidence now
+    sizes the gate.
+  - The rate check after the filter stays (a physical limit, not a gate).
+  Settings in `DepthVelocitySettings`: `depth_noise` (mm at 1 m, 10 by default, the floor's), `gate` (σ), `coast`
+  (frames); `weighted` goes. The compare gets a column `coasting`: the share of the core's tracks in a miss, at
+  rest and moving. Check: unit tests none (a shader); the rows on `measure_confidence` and a hands recording with
+  confidence, against C6's off side (`weighted` off), as used and thresholds 0, `coast` 1 and 2:
+  restarts and coasting at rest and moving, z's noise inside and at the edge, z kept, lag and stop; the pass's
+  ms. A recording at 2–3.5 m then answers C3 with the same rows. MOTION.md's z section after.
 
 ## D. The bridge
 
@@ -237,11 +257,11 @@ The cameras:
 - A `Field` description is one short line of panel text: J1.
 - A built step leaves the plan; plans and commits: one commit per checked step, on the user's literal "go".
 
-- Compare a result only with rows of the same recording, settings and code paths: C2, C6.
-- Ask to measure a time again when its pass's code or size changes: D6, C6.
-- A measured table names its kind, date, commit, recording and settings: C6's rows.
-- A step checked by a run or a test is one commit: C6, the shader, the switch and the scripts together.
-- Remove obsolete pathways instead of leaving parallel legacy ones: C6's switch goes after its rows.
-- An on/off switch: `enabled` (glossary): C6's `weighted` switches one part of the step, not the component.
+- Compare a result only with rows of the same recording, settings and code paths: C2, C6, C7.
+- Ask to measure a time again when its pass's code or size changes: D6, C7.
+- A measured table names its kind, date, commit, recording and settings: C6's and C7's rows.
+- A step checked by a run or a test is one commit: C6, C7.
+- Remove obsolete pathways instead of leaving parallel legacy ones: C7, `weighted` and the fixed gate go.
+- A setting's default is the textbook value: C7's `gate` 3 σ; `depth_noise` from a measurement.
 
 Not designed yet, so their rules are not named: C3, F1, F2, H1.

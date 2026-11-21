@@ -6,7 +6,8 @@
 Runs deep_flow on the recording (as -sim, without the panel), from the start of its loop to the next, or
 for its first `--seconds`, with the settings file's settings and the Lucas–Kanade flow. Each measure of the flow is
 saved to OUT/NAME (the recording's name without `--name`): `luminance_NNNN.npy` (the newest luminance frame,
-0 to 1), `depth_NNNN.npy` (the depth it got, m, at the flow's size, before the step filter), `mask_NNNN.npy`
+0 to 1), `depth_NNNN.npy` (the depth it got, m, at the flow's size, before the step filter), `confidence_NNNN.npy`
+(the depth's confidence, 0 to 1, 0 where the view filled the depth), `mask_NNNN.npy`
 (the player's mask, 0 to 1, the weight of each pixel), and `calls.json`: each
 measure's arguments and its moment, `t`, in seconds, and the flow's settings; and `capture.json`: the recording,
 the commit, `--set` and the view's settings it ran with. The compare replays them from
@@ -89,7 +90,7 @@ def main() -> int:
         return array
 
     update = LucasKanadeFlow3D.update
-    held: list[tuple[np.ndarray, np.ndarray, np.ndarray]] = []     # the frames, saved after the loop: saving in it costs captures
+    held: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = []     # the frames, saved after the loop: saving in it costs captures
     gaps: list[float | None] = []                                   # each measure's gap between two capture times, as it is
     frame_interval = render.frame_interval
 
@@ -109,7 +110,9 @@ def main() -> int:
             luminance = self.luminance
             w, h = luminance.width, luminance.height
             mask = self._mask if self._mask is not None and self._mask.allocated else None
-            held.append((read('luminance', luminance, w, h)[..., 0].copy(), read('depth', depth, w, h)[..., 0].copy(),
+            depth_read = read('depth', depth, w, h)
+            held.append((read('luminance', luminance, w, h)[..., 0].copy(), depth_read[..., 0].copy(),
+                         depth_read[..., 1].astype(np.float16),
                          read('mask', mask, w, h)[..., 0].astype(np.float16) if mask is not None else np.ones((h, w), np.float16)))
             calls.append(dict(t=time.perf_counter(), delta_time=delta_time, gap=gaps[-1] if gaps else None,
                               view_span=view_span, depth_step=list(depth_step),
@@ -152,9 +155,10 @@ def main() -> int:
                     break                         # a call back sooner is its start's again, not the next loop
             recording.clear()
             time.sleep(0.2)                       # the main thread's last measure is in
-            for index, (luminance, depth, mask) in enumerate(held[:len(calls)]):
+            for index, (luminance, depth, confidence, mask) in enumerate(held[:len(calls)]):
                 np.save(out_dir / f'luminance_{index:04d}.npy', luminance)
                 np.save(out_dir / f'depth_{index:04d}.npy', depth)
+                np.save(out_dir / f'confidence_{index:04d}.npy', confidence)
                 np.save(out_dir / f'mask_{index:04d}.npy', mask)
             del calls[len(held):]
             (out_dir / 'calls.json').write_text(json.dumps(calls, default=str))
