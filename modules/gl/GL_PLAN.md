@@ -1,16 +1,23 @@
 # GL plan
 
-Proposed by the package scan of 2026-11-21, on the code at c5d86a7d, with the rules thread's sanity check and the
-plan analysis folded in. The why of each step is the finding it rests on, marked seen (in the code) or deduction.
-Every step is one commit and is checked by pyright, the guard tests and gl's tests, and by the runs it names;
-shader_check compares with references made at HEAD before the first step. A run happens at its step, after a
-tasklist check that no app is running, unless Matthias says he is using the PC or the app.
+What is not built in `modules/gl`. A step is one commit, built on Matthias's go, checked by pyright, the guard
+tests, gl's tests and the runs it names; a run happens at its step, after a tasklist check that no app is running,
+unless Matthias says he is using the PC or the app.
 
+## E. Every pixel transfer sets its own alignment
 
-Form, done only in a commit that opens the file anyway, never as a step of its own: PEP 8 in `fbo.py` and
-the imports of `image.py` and `tensor.py` (with A1 to A4); the docstrings of `Texture3D` and `Texture2DArray` (with
-A1), `ComputeShader` (with B1) and `Text` (with C1) say what the thing is, the 3D-tiling reason going to GL.md; the
-two swap tests become one `test_swap.py` in a commit that changes `Swap` or them.
+- E1. `Tensor._update_with_pbo`, `Tensor._update_with_cpu` and `TextureBase._read` set their own unpack or pack
+  alignment at the transfer, as `Texture.upload` does; `flow/motion/solve_capture.read_level` and
+  `apps/deep_flow/scripts/view_check.read` set the pack alignment at their read, or read through `TextureBase._read`;
+  `flow/bridge/velocity_peak` stays as it is (one row of 256 × R32UI, the same bytes at any alignment). Why: these
+  transfers rely on the alignment GL has at the moment, 4 by default or 1 as `Texture.upload` and `Image` leave it,
+  so a row whose bytes are not a multiple of 4 (an R8 or RGB8 texture of odd width) comes out sheared at 4 (seen:
+  the transfers, a scan of 2026-11-21; the shear, deduction). After it, the render plan's E1 drops
+  `ScreenCapture`'s and `ScreenPreview`'s set-back to 4. Check: shader_check.
+
+Form, done only in a commit that opens the file anyway, never as a step of its own: PEP 8 in `fbo.py` (the one-line
+`if`, the double spaces before `->`, a class docstring, the end-of-file newline); the two swap tests become one
+`test_swap.py` in a commit that changes `Swap` or them.
 
 ## Questions
 
@@ -20,17 +27,7 @@ two swap tests become one `test_swap.py` in a commit that changes `Swap` or them
 ## Rules this plan touches
 
 - CLAUDE.md: Inside a package, code that does the same is written once
-- CLAUDE.md: Similar things share the noun and differ by a qualifier (`Frame`, `CameraFrame`)
-- CLAUDE.md: Use no synonyms for one concept across modules; when a term changes, rename it everywhere in the same change
-- CLAUDE.md: Remove obsolete pathways instead of leaving parallel legacy ones
-- CLAUDE.md: Update all affected call sites in the same change
-- CLAUDE.md: A docstring says what the thing is
-- CLAUDE.md: Reasons sit in the package's document, history in the commit
 - CLAUDE.md: Use Python 3.12 and follow PEP 8
 - CLAUDE.md: A plan step that is checked by a run or a test is one commit
-- CLAUDE.md: Run a test of the app or a GPU harness only on the user's go, and only what the plan names
-- gl.md: A texture, framebuffer or buffer is made by one of gl's classes
-- gl.md: Pair every creation with its destruction
+- gl.md: A texture is held in GL's row order
 - gl.md: Shaders get checked in a GPU harness
-- docs.md: A component is described in its own document; other documents link to it
-- plans.md: A change that is already worked out is costly to get: keep it
