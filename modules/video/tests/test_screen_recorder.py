@@ -115,7 +115,7 @@ class StateTest(unittest.TestCase):
         FakeClip.clips = []
         self.settings = ScreenRecorderSettings()
         self.settings.frame.width, self.settings.frame.height = WIDTH, HEIGHT
-        self.free = 1 << 40         # bytes of free RAM before the ring
+        self.free = 1 << 40         # bytes of free RAM before the store
         self.recorder = ScreenRecorder(self.settings, 'unused', FakeClip, lambda: self.free - self._ring_bytes())
         self.recorder.start()
         self.tick_count = 0
@@ -130,7 +130,7 @@ class StateTest(unittest.TestCase):
         self.recorder.stop()
 
     def _ring_bytes(self) -> int:
-        return self.recorder._ring.nbytes
+        return self.recorder._store.nbytes
 
     def frame(self, tick: int, timestamp: float) -> ScreenFrame:
         """A frame at the size the capture is made at, as a real capture hands it over."""
@@ -206,7 +206,7 @@ class StateTest(unittest.TestCase):
         self.assertEqual(clip.quality, 18)
         self.discard(ScreenRecorderState.IDLE)
         self.assertIsNone(self.recorder.capture_format)
-        self.assertEqual(self.recorder._ring.num_slots, 0)
+        self.assertEqual(self.recorder._store.num_slots, 0)
         self.tick_until(lambda: self.lent == 0)     # every frame given back
 
     def test_start_is_refused_while_held(self) -> None:
@@ -293,7 +293,7 @@ class StateTest(unittest.TestCase):
         self.free = int(self.settings.record.ram_reserve * GB) + 150 * FRAME_BYTES     # room for two one-second blocks
         ScreenRecorderRecordSettings.start.fire(self.settings.record)
         clip = self.save_held()
-        blocks = self.recorder._ring.num_slots
+        blocks = self.recorder._store.num_slots
         self.assertEqual(len(clip.frames), blocks)      # every slot of the two blocks
         self.assertGreater(blocks, 100)
 
@@ -321,8 +321,8 @@ class StateTest(unittest.TestCase):
         self.settings.quality.bit_depth = BitDepth.BIT_8
         clip = self.save_held()
         self.assertEqual(clip.format, wanted)
-        self.assertEqual(self.recorder._ring.shape, wanted.shape)
-        self.assertEqual(self.recorder._ring.frame(0).dtype, np.uint16)
+        self.assertEqual(self.recorder._store.shape, wanted.shape)
+        self.assertEqual(self.recorder._store.frame(0).dtype, np.uint16)
         self.discard(ScreenRecorderState.IDLE)
 
     def shown_tick(self) -> int:
@@ -336,7 +336,7 @@ class StateTest(unittest.TestCase):
         self.settings.record.duration = 0.5
         ScreenRecorderRecordSettings.start.fire(self.settings.record)
         self.tick_until(lambda: self.settings.record.state is ScreenRecorderState.HELD)
-        return [tick_of(self.recorder._ring.frame(slot)) for slot in self.recorder._held_slots]
+        return [tick_of(self.recorder._store.frame(slot)) for slot in self.recorder._held_slots]
 
     def test_play_shows_the_held_frames_at_their_times_looping_between_in_and_out(self) -> None:
         held = self.hold_half_a_second()
@@ -387,13 +387,13 @@ class StateTest(unittest.TestCase):
         self.ticks(10)
         self.assertFalse(self.recorder.capturing)          # look back pauses while the take is held
         frames = self.save_held().frames
-        self.assertGreater(self.recorder._ring.num_slots, len(frames))
+        self.assertGreater(self.recorder._store.num_slots, len(frames))
         self.assertEqual(self.span(frames), 0.5)
         self.assertEqual(np.diff(frames).tolist(), [1] * (len(frames) - 1))
         self.assertLessEqual(frames[-1], held_at)
-        slots = self.recorder._ring.num_slots
-        self.discard(ScreenRecorderState.RECORDING)         # emptied, and recording on in the same ring
-        self.assertEqual(self.recorder._ring.num_slots, slots)
+        slots = self.recorder._store.num_slots
+        self.discard(ScreenRecorderState.RECORDING)         # emptied, and recording on in the same store
+        self.assertEqual(self.recorder._store.num_slots, slots)
         self.tick_until(lambda: self.stored() >= 5)
         ScreenRecorderRecordSettings.stop.fire(self.settings.record)
         self.tick()
@@ -403,15 +403,15 @@ class StateTest(unittest.TestCase):
 
     def test_look_back_off_frees_the_ring(self) -> None:
         self.settings.record.look_back = True
-        self.tick_until(lambda: self.recorder._ring.num_slots > 0)
+        self.tick_until(lambda: self.recorder._store.num_slots > 0)
         self.settings.record.look_back = False
         self.tick_until(lambda: self.settings.record.state is ScreenRecorderState.IDLE)
-        self.assertEqual(self.recorder._ring.num_slots, 0)
+        self.assertEqual(self.recorder._store.num_slots, 0)
         self.assertEqual(FakeClip.clips, [])
 
     def test_a_size_change_remakes_the_look_back_ring(self) -> None:
         self.settings.record.look_back = True
-        self.tick_until(lambda: self.recorder._ring.num_slots > 0)
+        self.tick_until(lambda: self.recorder._store.num_slots > 0)
         self.settings.frame.width = 16
         self.tick_until(lambda: self.recorder.capture_format == ScreenFormat(16, HEIGHT) and self.stored() > 0)
 
@@ -433,7 +433,7 @@ class StateTest(unittest.TestCase):
         self.recorder.stop()
         self.assertEqual(len(FakeClip.clips), 1)
         self.assertGreaterEqual(len(FakeClip.clips[0].frames), 10)
-        self.assertEqual(self.recorder._ring.num_slots, 0)
+        self.assertEqual(self.recorder._store.num_slots, 0)
         self.assertEqual(self.lent, 0)
 
     def test_exit_while_held_writes_a_take_never_saved(self) -> None:

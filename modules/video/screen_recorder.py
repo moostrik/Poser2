@@ -1,8 +1,8 @@
-"""ScreenRecorder: records the screen frames the screen capture hands over into a ring in RAM, holds a take, and
+"""ScreenRecorder: records the screen frames the screen capture hands over into RAM, holds a take, and
 encodes the parts asked for to HEVC mp4s.
 
 The capture (main thread) calls `submit_screen_frame` with each finished frame; the recorder's own thread copies
-it into its ring (`ScreenFrameRing`, plain RAM, grown by one-second blocks) and gives the capture's buffer back. The
+it into its store (`ScreenFrameStore`, plain RAM, grown by one-second blocks) and gives the capture's buffer back. The
 render tick (`update`) runs the states: it says whether to capture this tick (`capturing`) and at which size
 (`capture_format`), and acts on the buttons, which only set Events. Design and reasons: modules/video/VIDEO.md.
 """
@@ -25,7 +25,7 @@ from modules.settings import BaseSettings, Field, Group, Widget
 from .clip_writer import ClipInput, ClipWriter, master_encode
 from .screen_format import BitDepth, Chroma, ScreenFormat
 from .screen_frame import ScreenFrame
-from .screen_frame_ring import ScreenFrameRing
+from .screen_frame_store import ScreenFrameStore
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ class ScreenRecorderRecordSettings(BaseSettings):
     duration:     Field[float]               = Field(0.0, min=0.0, max=120.0, description="Recording length (s); 0 or above the maximum uses the maximum")
     ram_reserve:  Field[float]               = Field(8.0, min=1.0, max=64.0, description="RAM left free for Windows and the app (GB)")
     state:        Field[ScreenRecorderState] = Field(ScreenRecorderState.IDLE, access=Field.READ, description="Idle, recording, held, encoding")
-    recorded:     Field[float]               = Field(0.0, access=Field.READ, description="Seconds in the ring (s)")
+    recorded:     Field[float]               = Field(0.0, access=Field.READ, description="Seconds in the store (s)")
     dropped:      Field[int]                 = Field(0, access=Field.READ, description="Frames of this take left out: no buffer free, or the queue full")
 
 
@@ -160,8 +160,8 @@ def hevc_clip(path: str, fps: float, quality: int, screen_format: ScreenFormat) 
 
 
 class _Take:
-    """One encode: the ring's slots in recorded order, their timestamps, the file, the frames' format, the frames
-    left out, and whether the ring is freed after it."""
+    """One encode: the store's slots in recorded order, their timestamps, the file, the frames' format, the frames
+    left out, and whether the store is freed after it."""
 
     def __init__(self, slots: list[int], stamps: list[float], path: str, screen_format: ScreenFormat, dropped: int,
                  free_after: bool) -> None:
@@ -184,7 +184,7 @@ class ScreenRecorder:
         self._folder: Path = Path(folder)
         self._clip_sink: ClipSinkFactory = clip_sink
         self._free_memory: Callable[[], int] = free_memory
-        self._ring: ScreenFrameRing = ScreenFrameRing()
+        self._store: ScreenFrameStore = ScreenFrameStore()
 
         self._start_requested: Event = Event()
         self._stop_requested: Event = Event()
@@ -196,21 +196,21 @@ class ScreenRecorder:
         self._lock: Lock = Lock()
         self._wake: Condition = Condition(self._lock)
         self._queue: deque[ScreenFrame] = deque()
-        self._accepting: bool = False       # frames go into the ring
+        self._accepting: bool = False       # frames go into the store
         self._take_id: int = 0              # a new one at each begin and discard: frames of an old one are let go
         self._take_start: float = 0.0       # frames from before it are let go
         self._look_back: bool = False
         self._limit: float = 0.0            # s a take spans, by its frames' times; 0: until the memory stops it
-        self._target: int = 0               # slots the ring grows to; 0: as many as the memory holds
-        self._written: int = 0              # frames stored since the ring was emptied
+        self._target: int = 0               # slots the store grows to; 0: as many as the memory holds
+        self._written: int = 0              # frames stored since the store was emptied
         self._stamps: list[float] = []      # each slot's frame's timestamp
         self._first: float | None = None    # the take's first timestamp
         self._writing: int | None = None    # the slot a frame is being copied into
-        self._complete: bool = False        # the ring grows no more
+        self._complete: bool = False        # the store grows no more
         self._reached: bool = False         # the duration or the memory ends the take
         self._dropped: int = 0              # frames of this take left out
         self._take: _Take | None = None     # handed to the thread to encode
-        self._free: bool = False            # the thread is to free the ring without an encode
+        self._free: bool = False            # the thread is to free the store without an encode
         self._failed: bool = False          # the last take was not written
         self._done: Event = Event()         # the thread finished a take or a free
 
@@ -283,14 +283,14 @@ class ScreenRecorder:
         if index > 0 and moment - self._held_stamps[index - 1] < self._held_stamps[index] - moment:
             index -= 1      # the nearer of the two frames around the moment
         slot = self._held_slots[index]
-        return slot, self._ring.frame(slot)
+        return slot, self._store.frame(slot)
 
     def start(self) -> None:
         self._thread.start()
 
     def stop(self) -> None:
         """Stop the recording: a take in progress is written up to its last stored frame, and a held take none of
-        whose parts is written yet is written whole; then the frames waiting are let go and the ring freed."""
+        whose parts is written yet is written whole; then the frames waiting are let go and the store freed."""
         self.settings.record.unbind(ScreenRecorderRecordSettings.start, self._on_start)
         self.settings.record.unbind(ScreenRecorderRecordSettings.stop, self._on_stop)
         self.settings.take.unbind(ScreenRecorderTakeSettings.save, self._on_save)
@@ -311,7 +311,7 @@ class ScreenRecorder:
         if self._thread.is_alive():
             self._thread.join()
         self._release_queue()
-        self._ring.clear()
+        self._store.clear()
 
     def fail(self, message: str) -> None:
         """A failure outside the recorder, as the capture's allocation: logged once, ERROR; main thread."""
@@ -438,7 +438,7 @@ class ScreenRecorder:
             return self._take is not None or self._free or bool(self._queue)
 
     def _begin(self, timestamp: float, look_back: bool) -> None:
-        """Start filling an empty ring in the format set now; the capture is made in it (`capture_format`), the thread
+        """Start filling an empty store in the format set now; the capture is made in it (`capture_format`), the thread
         adds the blocks."""
         self._format = self._format_wanted()
         self._error_logged = False
@@ -448,7 +448,7 @@ class ScreenRecorder:
         maximum = self.settings.quality.max_duration
         limit = self._duration if self._duration > 0.0 and (maximum <= 0.0 or self._duration <= maximum) else 0.0
         target = frames_for(limit * LOOK_BACK_MARGIN, self._fps, self._frame_step) if look_back and limit else 0
-        self._ring.clear(self._format.shape, self._format.dtype)
+        self._store.clear(self._format.shape, self._format.dtype)
         with self._lock:
             self._take_id += 1
             self._take_start = timestamp
@@ -467,13 +467,13 @@ class ScreenRecorder:
                     self._format.width, self._format.height, self._format.chroma.name, self._format.bit_depth)
 
     def _hold(self) -> None:
-        """Hold the frames in the ring, oldest first (in look back those of the last `duration` seconds), for in and
-        out to be set on them; frames still on their way are let go, and a ring without frames is freed."""
+        """Hold the frames in the store, oldest first (in look back those of the last `duration` seconds), for in and
+        out to be set on them; frames still on their way are let go, and a store without frames is freed."""
         with self._lock:
             self._accepting = False
             written, stamps = self._written, list(self._stamps)
             writing, look_back, limit = self._writing, self._look_back, self._limit
-        slots = self._ring.num_slots
+        slots = self._store.num_slots
         held = min(written, slots)
         first = written - held
         order = [(first + n) % slots for n in range(held)] if look_back else list(range(held))
@@ -533,7 +533,7 @@ class ScreenRecorder:
         self._hand_over([self._held_slots[n] for n in kept], [self._held_stamps[n] for n in kept], free_after=False)
 
     def _discard(self) -> None:
-        """Let the held take go: a look-back ring is emptied and records on, any other ring is freed."""
+        """Let the held take go: a look-back ring is emptied and records on, any other store is freed."""
         self._held_slots, self._held_stamps = [], []
         self.settings.take.playhead = [0.0, 0.0]
         if self._look_back and self.settings.record.look_back:
@@ -550,7 +550,7 @@ class ScreenRecorder:
         self._let_go()
 
     def _let_go(self) -> None:
-        """Have the thread free the ring; the take ends there (`_finish`)."""
+        """Have the thread free the store; the take ends there (`_finish`)."""
         with self._wake:
             self._accepting = False
             self._free = True
@@ -558,7 +558,7 @@ class ScreenRecorder:
         self._set_state(ScreenRecorderState.ENCODING)
 
     def _hand_over(self, slots: list[int], stamps: list[float], free_after: bool) -> None:
-        """Hand frames of the ring, in their order, to the thread to encode into a new file."""
+        """Hand frames of the store, in their order, to the thread to encode into a new file."""
         stamp = datetime.now().strftime('%Y%m%d-%H%M%S')
         name = f'{stamp}_{self.settings.take.name}' if self.settings.take.name else stamp
         path = self._folder / f'{name}.mp4'
@@ -638,7 +638,7 @@ class ScreenRecorder:
                 self._queue.clear()
                 take, free = self._take, self._free
             for frame in frames:
-                self._store(frame)
+                self._store_frame(frame)
             if take is not None:
                 self._write(take)
             elif free:
@@ -655,8 +655,8 @@ class ScreenRecorder:
         for frame in frames:
             frame.release()
 
-    def _store(self, frame: ScreenFrame) -> None:
-        """Copy a frame into its slot in the ring, growing the ring ahead, and give the capture's buffer back."""
+    def _store_frame(self, frame: ScreenFrame) -> None:
+        """Copy a frame into its slot in the store, growing the store ahead, and give the capture's buffer back."""
         try:
             with self._lock:
                 if not self._accepting or frame.timestamp < self._take_start:
@@ -664,10 +664,10 @@ class ScreenRecorder:
                 take_id, look_back = self._take_id, self._look_back
                 written, target = self._written, self._target
                 self._dropped += frame.skipped
-            if frame.data.shape != self._ring.shape:
+            if frame.data.shape != self._store.shape:
                 return
             self._grow(written, target)
-            slots = self._ring.num_slots
+            slots = self._store.num_slots
             with self._lock:
                 complete = self._complete
                 if look_back and complete and slots:
@@ -679,7 +679,7 @@ class ScreenRecorder:
                         self._reached = True        # the memory is reached
                     return
                 self._writing = slot
-            np.copyto(self._ring.frame(slot), frame.data)
+            np.copyto(self._store.frame(slot), frame.data)
             with self._lock:
                 self._writing = None
                 if not self._accepting or self._take_id != take_id:
@@ -702,7 +702,7 @@ class ScreenRecorder:
         with self._lock:
             if self._complete:
                 return
-        slots = self._ring.num_slots
+        slots = self._store.num_slots
         block = max(1, round(self._fps / max(1, self._frame_step)))
         if slots and written < slots - block * BLOCK_AHEAD:
             return
@@ -713,31 +713,31 @@ class ScreenRecorder:
                     self._complete = True
                 return
         try:
-            if self._free_memory() - block * self._ring.frame_bytes < int(self.settings.record.ram_reserve * GB):
-                logger.info('Screen recording ring full at %d frames: free RAM reached the reserve', slots)
+            if self._free_memory() - block * self._store.frame_bytes < int(self.settings.record.ram_reserve * GB):
+                logger.info('Screen recording store full at %d frames: free RAM reached the reserve', slots)
                 with self._lock:
                     self._complete = True
                 return
-            self._ring.add_block(block)
+            self._store.add_block(block)
         except (MemoryError, ValueError) as e:
-            logger.warning('Screen recording ring stops at %d frames: %s', slots, e)
+            logger.warning('Screen recording store stops at %d frames: %s', slots, e)
             with self._lock:
                 self._complete = True
 
     def _estimate(self) -> None:
-        """`max_duration`: what the free RAM, with the ring's own, holds above `ram_reserve`."""
+        """`max_duration`: what the free RAM, with the store's own, holds above `ram_reserve`."""
         frame_bytes = self._format_wanted().frame_bytes
         try:
             free = self._free_memory()
         except Exception as e:
             logger.debug('Screen recorder could not read the free RAM: %s', e)
             return
-        usable = max(0, free + self._ring.nbytes - int(self.settings.record.ram_reserve * GB))
+        usable = max(0, free + self._store.nbytes - int(self.settings.record.ram_reserve * GB))
         rate = frame_bytes * self._fps / max(1, self.settings.quality.frame_step)
         self.settings.quality.max_duration = round(usable / rate, 1)
 
     def _write(self, take: _Take) -> None:
-        """Encode the take at the rate it was recorded at, then free the ring when the take says so."""
+        """Encode the take at the rate it was recorded at, then free the store when the take says so."""
         started = time.perf_counter()
         count = len(take.slots)
         span = take.stamps[-1] - take.stamps[0] if count > 1 else 0.0
@@ -751,7 +751,7 @@ class ScreenRecorder:
             sink = self._clip_sink(take.path, fps, self.settings.take.quality, take.format)
             sink.comment = comment
             for slot in take.slots:
-                sink.add(self._ring.frame(slot))
+                sink.add(self._store.frame(slot))
             ok = sink.close()
         except Exception as e:
             logger.error('Screen recording encode of %s failed: %s', take.path, e)
@@ -761,20 +761,20 @@ class ScreenRecorder:
         else:
             logger.error('Screen recording %s not written', take.path)
         if take.free_after:
-            self._free_ring()
+            self._free_store()
         with self._lock:
             self._take = None
             self._failed = not ok
         self._done.set()
 
     def _release(self) -> None:
-        self._free_ring()
+        self._free_store()
         with self._lock:
             self._free = False
         self._done.set()
 
-    def _free_ring(self) -> None:
-        self._ring.clear()
+    def _free_store(self) -> None:
+        self._store.clear()
         with self._lock:
             self._written = 0
             self._stamps = []

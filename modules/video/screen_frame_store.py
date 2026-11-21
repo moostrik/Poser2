@@ -1,13 +1,13 @@
-"""ScreenFrameRing: the screen recorder's frames in plain RAM, in blocks added one at a time."""
+"""ScreenFrameStore: the screen recorder's frames in plain RAM, in blocks added one at a time."""
 
 from threading import Lock
 
 import numpy as np
 
 
-class ScreenFrameRing:
+class ScreenFrameStore:
     """Slots of one frame shape, in numpy blocks of plain (pageable) RAM: a block allocates without locking any page,
-    and the memory goes back when the ring is cleared. Blocks are added and the ring cleared by one thread; a slot
+    and the memory goes back when the store is cleared. Blocks are added and the store cleared by one thread; a slot
     is read on any."""
 
     def __init__(self) -> None:
@@ -44,7 +44,7 @@ class ScreenFrameRing:
                 self._dtype = np.dtype(dtype)
 
     def add_block(self, slots: int) -> None:
-        """Grow the ring by `slots` frames; raises MemoryError when the system has no room."""
+        """Grow the store by `slots` frames; raises MemoryError when the system has no room."""
         block = np.empty((slots, *self._shape), self._dtype)
         with self._lock:
             self._blocks.append(block)
@@ -56,4 +56,4 @@ class ScreenFrameRing:
                 if slot < block.shape[0]:
                     return block[slot]
                 slot -= block.shape[0]
-        raise IndexError('screen frame slot outside the ring')
+        raise IndexError('screen frame slot outside the store')

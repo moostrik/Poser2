@@ -4,7 +4,7 @@ The video package writes and reads clips through ffmpeg, a file per subject: the
 (`process.py`), what ffprobe says (`probe.py`), the encoders (`encoder.py`), the clip writer (`clip_writer.py`), the
 clip decode (`clip_decode.py`), audio (`audio.py`) and the share clip (`share.py`); the camera recordings' streams
 (`stream_writer.py`, `stream_reader.py`, `depth_frame.py`); and the screen recorder (`screen_recorder.py`,
-`screen_format.py`, `screen_frame.py`, `screen_frame_ring.py`). This document holds the screen recorder's design.
+`screen_format.py`, `screen_frame.py`, `screen_frame_store.py`). This document holds the screen recorder's design.
 
 `probe` is the one question to ffprobe: a video stream's size, frame rate and exact frame count (the count an mp4
 stores, else the packets counted, which reads an mkv or a raw stream without decoding it) and the clip's comment
@@ -63,8 +63,8 @@ The 8 MB pipe left the first row as it was through the default pipe.
 Each render tick the layers an app records are drawn into the screen frame, an Fbo of the recording's size;
 `ScreenCapture` (`modules/render/general/screen_recording/`) converts it to its YUV planes (`chroma`: 4:4:4 or 4:2:0;
 `bit_depth`: 8 or 10), reads them back into RAM and hands
-each finished frame (`ScreenFrame`) to the `ScreenRecorder`, whose thread copies it into a ring in RAM. When the
-ring is full, the duration is reached or Stop is pressed, recording stops and the take is held: in and out are set
+each finished frame (`ScreenFrame`) to the `ScreenRecorder`, whose thread copies it into a store in RAM. When the
+store is full, the duration is reached or Stop is pressed, recording stops and the take is held: in and out are set
 on it, and each `save` has the recorder's thread encode the frames between them to an HEVC mp4 with NVENC;
 `discard` frees the memory. The main thread never waits on the GPU, the copy or the encoder.
 
@@ -144,15 +144,15 @@ more (HD is a quarter of UHD's bytes).
 All rows are **(deduction)**: computed from the frame sizes, not measured. The PC has 96 GB of RAM, 74 GB free with
 the app off, and a 4090 with 24 GB **(measured 2026-11-19)**.
 
-The ring is plain RAM (`ScreenFrameRing`, numpy blocks): a block allocates without locking any page, and its
-memory goes back when the ring is cleared. It is not pinned: pinning a one-second block (about 750 MB at UHD60)
+The store is plain RAM (`ScreenFrameStore`, numpy blocks): a block allocates without locking any page, and its
+memory goes back when the store is cleared. It is not pinned: pinning a one-second block (about 750 MB at UHD60)
 locks every page and serializes the driver with the GPU, which stalled the render tick once a second
-**(seen in low_flow, 2026-11-19)**. Video memory gave the ring nothing back for its length: the render tick does
+**(seen in low_flow, 2026-11-19)**. Video memory gave the store nothing back for its length: the render tick does
 the same work either way, the encode needs every frame in RAM, and the fluid and the models use the card's memory.
 
-The ring grows while it records, in blocks of one second. The recorder's thread adds the next block when half of
+The store grows while it records, in blocks of one second. The recorder's thread adds the next block when half of
 the last one is left, after reading the RAM available to processes (psutil), so what the rest of the app holds is
-counted. When the next block would leave less than `ram_reserve` free (default 8 GB), the ring grows no more and
+counted. When the next block would leave less than `ram_reserve` free (default 8 GB), the store grows no more and
 the recording stops when it is full. The check runs once per recorded second and Start makes no large allocation.
 
 A run in deep_flow (`-sim`, 20261112-130105_show, UHD portrait at 4:2:0, 60 Hz with v_sync, `ram_reserve` 10 GB,
@@ -191,12 +191,12 @@ At the heaviest read-back, 4:4:4 at 10 bits (33.2 MB a frame, E2) **(measured 20
 The 15 s take, 882 frames at 58.73 fps, encoded in 24.0 s: 36.8 frames/s, as at 8 bits (HEVC Rext,
 `yuv444p10le`, 61.1 MB).
 
-`max_duration` is the estimate (free RAM + the ring's own − `ram_reserve`) / (bytes per frame × measured ticks/s /
+`max_duration` is the estimate (free RAM + the store's own − `ram_reserve`) / (bytes per frame × measured ticks/s /
 `frame_step`), refreshed once a second. `duration` 0, or above `max_duration`, records until the memory stops it.
 
 `duration` is counted in time, by the frames' own timestamps: a take ends at the first frame whose time is
 `duration` after the first frame's, so it spans `duration` whatever the tick rate does while it records. The
-blocks are sized by the rate measured at Start; they are only chunks of memory, and the ring grows by as many
+blocks are sized by the rate measured at Start; they are only chunks of memory, and the store grows by as many
 as the take needs.
 
 ### Capture, on the main thread
@@ -214,7 +214,7 @@ as the take needs.
 - `poll`, on every tick, checks the oldest fences without waiting; once one has passed, the frame goes to the
   callbacks (`add_screen_frame_callback`, a list with its own lock) as a `ScreenFrame`: the mapped buffer as an
   array, its tick's `timestamp`, and the ticks skipped before it. The buffer is lent until the frame's `release`.
-  A frame enters the ring one to two ticks after it was drawn.
+  A frame enters the store one to two ticks after it was drawn.
 - With all four buffers lent the capture leaves the tick out; the next frame carries the count (`skipped`).
 - The compositor makes the capture in the recorder's format when a take begins (`ScreenRecorder.capture_format`) and
   frees it after; never while a frame is lent or a read-back is on its way, as its memory would go under a reader.
@@ -229,7 +229,7 @@ as the take needs.
 ### The hand-over, to the recorder's thread
 
 - `ScreenRecorder.submit_screen_frame` enqueues the frame and returns; a frame no take wants is given back at once.
-- The recorder's thread copies each frame into its slot in the ring and gives the buffer back. A full queue (three
+- The recorder's thread copies each frame into its slot in the store and gives the buffer back. A full queue (three
   frames) drops its oldest frame and gives its buffer back. Frames left out, by the queue or by the capture with no
   buffer free, are counted for the take (`dropped`), shown on the panel and written in the file's comment.
 - Frames still on their way when a take is held, or from before a take began, are given back unused.
@@ -244,8 +244,8 @@ as the take needs.
   sees them. 4:4:4 input is encoded as HEVC 4:4:4 (Range Extensions), P010 as HEVC Main 10. NVENC does not take
   `xv30le`, so ffmpeg unpacks it to `yuv444p16le` on the CPU, which costs only the encode's time. HEVC because fine
   detail at 4K needs fewer bits than h264 for the same quality.
-- Each slot of the ring is written to the pipe as it is.
-- After the last frame the pipe is closed and ffmpeg waited for; the ring stays held.
+- Each slot of the store is written to the pipe as it is.
+- After the last frame the pipe is closed and ffmpeg waited for; the store stays held.
 - The thread makes no GL call; it touches only RAM and the pipe. NVENC is its own unit on the card, so the show
   runs on while it encodes.
 
@@ -254,10 +254,10 @@ gets `_2`, and so on.
 
 ### The held take
 
-A held take keeps its ring until `discard`. The `in_out` timeline (the player's `Widget.timeline`, with its
+A held take keeps its store until `discard`. The `in_out` timeline (the player's `Widget.timeline`, with its
 `playhead`, `scrub` and `seek` fields) spans the take's length by its frames' times; `save` writes the frames whose
 times lie between in and out, and the take stays held, so a second part can be saved from it. `discard` frees the
-ring, or in look back empties it and records on. Start is refused while a take is held. The playhead follows the
+store, or in look back empties it and records on. Start is refused while a take is held. The playhead follows the
 dragged marker, or the place on the bar pressed, so it shows where the take is looked at. `scrub` and `seek` are
 bound, because the panel writes them back to −1 at once.
 
@@ -298,12 +298,12 @@ seen once after play did not come back in these four.
 
 ### Look back
 
-With `look_back` on the ring records all the time, the newest frame replacing the oldest. It holds 1.2 ×
+With `look_back` on the store records all the time as a ring, the newest frame replacing the oldest. It holds 1.2 ×
 `duration` at the rate measured when it is made (`LOOK_BACK_MARGIN`), so ticks faster than that still leave
 it the last `duration` seconds; with `duration` 0 it holds what the memory holds. Stop holds the frames whose
 times lie in the last `duration` seconds, as it holds a recording; `save` only writes a held take, oldest first (see the held take); a slot being written over at that
-moment is left out. The ring pauses while the take is held and records on after `discard`; it is blind for that
-time, because recording on in a second ring would need the memory twice. It holds its memory while the switch is
+moment is left out. The store pauses while the take is held and records on after `discard`; it is blind for that
+time, because recording on in a second store would need the memory twice. It holds its memory while the switch is
 on; a change of size or duration empties it and makes it again.
 
 ### Time
@@ -320,12 +320,12 @@ mean and the worst gap and the frames dropped go in the log line and the file's 
 | IDLE      | nothing held; Start, or look back on, begins                 |
 | RECORDING | frames are captured and stored each tick                     |
 | HELD      | the take waits for in, out, `save` and `discard`             |
-| ENCODING  | the thread encodes a part, or frees the ring                 |
+| ENCODING  | the thread encodes a part, or frees the store                |
 | ERROR     | a failed capture or encode; only Start retries               |
 
 A failure (no ffmpeg, no NVENC, a capture that cannot be made) is logged once, shown as ERROR, and the show
 runs on. At exit a recording in progress is written up to its last stored frame, and a held take none of whose
-parts is written yet is written whole; the thread is joined, every frame is given back and the ring freed, then the
+parts is written yet is written whole; the thread is joined, every frame is given back and the store freed, then the
 main thread frees the capture.
 
 ### Limits
@@ -348,14 +348,14 @@ main thread frees the capture.
 
 ### Constraints from the alternatives
 
-- The ring is RAM, not GL textures or buffers: a GL ring would be read back on the main thread while the show
+- The store is RAM, not GL textures or buffers: a GL store would be read back on the main thread while the show
   runs, and the encode thread cannot touch GL.
-- The ring is not pinned (above).
+- The store is not pinned (above).
 - The encode runs after the recording, not live: live it would push ~750 MB/s **(deduction)** through a pipe and
   NVENC while the show runs.
 - The planes are made in a fragment shader, not a compute shader: GLSL has no byte arrays, and packing four pixels
   per integer would force widths to multiples of 4.
-- The ring holds YUV planes, not RGBA: 4:4:4 is 3 bytes a pixel against 4, and 4:2:0 gives 2.7× the seconds.
+- The store holds YUV planes, not RGBA: 4:4:4 is 3 bytes a pixel against 4, and 4:2:0 gives 2.7× the seconds.
 - 4:4:4 at 10 bits is packed in one plane, not three 16-bit planes: the read-back runs on the GPU's graphics queue
   at about 12 GB/s, so its time follows its bytes. Three 16-bit planes (49.8 MB at UHD) took 4.1 ms of GPU a frame
   and slowed the show (19.0 ms mean tick, 6 frames dropped in 15 s); packed (33.2 MB) it takes 2.6 ms, against 2.1 ms

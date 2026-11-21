@@ -11,5 +11,5 @@ from .stream_writer import StreamWriter
 from .stream_reader import StreamReader, StreamFrameCallback, FrameSchedule
 from .screen_format import BitDepth, Chroma, ScreenFormat
 from .screen_frame import ScreenFrame, ScreenFrameCallback
-from .screen_frame_ring import ScreenFrameRing
+from .screen_frame_store import ScreenFrameStore
 from .screen_recorder import ScreenRecorder, ScreenRecorderSettings, ScreenRecorderFrameSettings, ScreenRecorderQualitySettings, ScreenRecorderRecordSettings, ScreenRecorderTakeSettings, ScreenRecorderState, ScreenSize, ClipSink, even, preset_size, matching_preset, frames_for

@@ -3,16 +3,6 @@
 What is to be built in `modules/video`: ffmpeg, the clips and streams it writes and reads, and the screen recorder
 ([VIDEO.md](VIDEO.md)).
 
-## B. Names
-
-B1. The screen recorder's frame store is named after what it is in both modes: `ScreenFrameRing`
-   (`screen_frame_ring.py`), the recorder's `_ring` and `_free_ring`, the tests that name them and VIDEO.md; it
-   becomes `ScreenFrameStore` (`screen_frame_store.py`), the recorder's `_store` and `_free_store`. Why: the class
-   holds frame slots in blocks added one at a time (`ScreenFrameRing.add_block`, `frame`); only in look-back mode
-   does `ScreenRecorder` use them as a ring (`slot = written % slots`, the newest frame over the oldest), while a
-   normal take fills them once and stops when the memory is reached (`self._reached`) **(seen, `screen_recorder.py`)**.
-   Check: the video unit tests.
-
 ## C. One way to run ffmpeg
 
 C1. `process.py` gets the three things the package now writes several times, and every caller uses them:
