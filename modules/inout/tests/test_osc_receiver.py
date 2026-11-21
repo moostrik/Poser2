@@ -70,6 +70,24 @@ class TestReceiver(unittest.TestCase):
         self.assertTrue(self.got.is_set())
         self.assertEqual(self.received[0], (0.25,))
 
+    def test_a_failed_echo_is_logged_and_the_callbacks_still_run(self):
+        self.settings.return_messages = True
+        self.settings.ip_out = '255.255.255.255'            # a broadcast address: a socket without SO_BROADCAST refuses
+        self.receiver.bind('/level', self.callback)
+        self.receiver.start()
+        with self.assertLogs('modules.inout.osc_receiver', 'ERROR'):
+            self.send('/level', 0.5)
+            self.assertTrue(self.got.wait(2.0))
+            time.sleep(0.05)                                # the echo comes after the callbacks
+        self.assertEqual(self.received, [(0.5,)])
+
+    def test_an_invalid_return_address_keeps_the_current_one(self):
+        self.receiver.start()
+        client = self.receiver._return_client
+        with self.assertLogs('modules.inout.osc_receiver', 'WARNING'):
+            self.settings.ip_out = 'not an address'
+        self.assertIs(self.receiver._return_client, client)
+
     def test_it_binds_its_settings_at_start_and_unbinds_them_at_stop(self):
         self.receiver.start()
         self.receiver.stop()

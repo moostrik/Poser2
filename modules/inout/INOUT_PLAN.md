@@ -3,15 +3,6 @@
 What is not built in `modules/inout`, from the package scan of 2026-11-21. **(seen)** is read in the code,
 **(deduction)** is inferred.
 
-## A. Errors that never reach the log
-
-- A2. `OscReceiver`'s echo: a bad return address keeps the current one, and a failed echo is logged. Why:
-  `_on_out_change` closes the return client before it builds the new one, so an `ip_out` that does not resolve
-  leaves a closed client **(seen)**; every echo then raises `OSError` in `_handle`, before the callbacks, so they
-  are skipped, and socketserver's `handle_error` prints the traceback to stderr **(seen)**. How: an invalid address
-  keeps the current client, as `OscClient` does; the echo after the callbacks, its `OSError` logged at most every
-  10 s. Check: a loopback test: an unsendable `ip_out` keeps the callbacks running and is logged.
-
 ## B. Clean-up
 
 - B1. `OscSender` makes its `Waker` at start. Why: `__init__` makes it and `stop` closes it only when the sender
@@ -32,7 +23,6 @@ What is not built in `modules/inout`, from the package scan of 2026-11-21. **(se
 
 ## The rules it touches
 
-- `CLAUDE.md` Error handling, log exceptions with context; never fail silently: A2
 - `CLAUDE.md` Composition and wiring, clean up in an explicit stop or teardown: B1
 - `CLAUDE.md` Docstrings, a docstring says what the thing is: B2
 - `.claude/rules/glossary.md`, the id of a tracked person is `track_id`: B2

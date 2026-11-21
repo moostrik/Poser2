@@ -9,6 +9,8 @@ from pythonosc.dispatcher import Dispatcher
 
 from modules.settings import BaseSettings, Field, Widget
 from modules.utils import Broadcast
+from .net_probe import is_valid_ip
+from .osc_client import ERROR_LOG_INTERVAL, is_valid_port
 
 import logging
 logger = logging.getLogger(__name__)
@@ -27,8 +29,9 @@ class OscReceiverSettings(BaseSettings):
 
 
 class OscReceiver:
-    """Calls what is bound to an address with the arguments of each message to it, on the server's thread. It binds
-    its settings at `start` and unbinds them at `stop`; a port change restarts the server with the same bindings."""
+    """Calls what is bound to an address with the arguments of each message to it, on the server's thread, then
+    echoes the message to the return address. It binds its settings at `start` and unbinds them at `stop`; a port
+    change restarts the server with the same bindings, and an invalid return address keeps the current one."""
 
     def __init__(self, settings: OscReceiverSettings) -> None:
         self.settings: OscReceiverSettings = settings
@@ -36,6 +39,7 @@ class OscReceiver:
         self._warned_unbound: set[str] = set()
         self._client_lock: Lock = Lock()
         self._return_client: SimpleUDPClient | None = None
+        self._echo_error_time: float = -ERROR_LOG_INTERVAL     # when a failed echo was last logged
         self._server_lock: Lock = Lock()     # the server, and the bindings it maps
         self._server: BlockingOSCUDPServer | None = None
         self._running: bool = False
@@ -74,16 +78,28 @@ class OscReceiver:
     def _handle(self, address: str, *args) -> None:
         if self.settings.verbose:
             logger.info(f"{address} {args}")
-        if self.settings.return_messages:
-            with self._client_lock:
-                if self._return_client is not None:
-                    self._return_client.send_message(address, args)
         self.settings.counter      = (self.settings.counter + 1) % 100000
         self.settings.last_address = address
         self.settings.last_time    = perf_counter()
         callbacks: Broadcast | None = self._bindings.get(address)
         if callbacks is not None:
             callbacks(*args)
+        if self.settings.return_messages:
+            self._echo(address, args)
+
+    def _echo(self, address: str, args: tuple) -> None:
+        """The message back to the return address; a failed echo is logged at most once per `ERROR_LOG_INTERVAL`."""
+        with self._client_lock:
+            if self._return_client is None:
+                return
+            try:
+                self._return_client.send_message(address, args)
+            except OSError:
+                now: float = perf_counter()
+                if now - self._echo_error_time > ERROR_LOG_INTERVAL:
+                    self._echo_error_time = now
+                    logger.exception('OSC receiver: the echo of %s to %s:%s failed', address, self.settings.ip_out,
+                                     self.settings.port_out)
 
     def _handle_unbound(self, address: str, *args) -> None:
         if self.settings.verbose:
@@ -106,11 +122,17 @@ class OscReceiver:
         return server
 
     def _on_out_change(self, _=None) -> None:
+        ip: str = self.settings.ip_out
+        port: int = self.settings.port_out
+        if not is_valid_ip(ip) or not is_valid_port(port):
+            logger.warning('OSC receiver: invalid return address %s:%s, keeping the current one', ip, port)
+            return
+        client = SimpleUDPClient(ip, port)
         with self._client_lock:
             if self._return_client is not None:
                 self._return_client.close()
-            self._return_client = SimpleUDPClient(self.settings.ip_out, self.settings.port_out)
-        logger.info(f"Return address updated to {self.settings.ip_out}:{self.settings.port_out}")
+            self._return_client = client
+        logger.info(f"Return address updated to {ip}:{port}")
 
     def _on_in_change(self, _=None) -> None:
         # off the caller's thread: a shutdown waits for the server's loop to end

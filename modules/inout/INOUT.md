@@ -78,8 +78,9 @@ while it is switched off or not running.
 ## OSC in
 
 `OscReceiver` serves `port_in` and calls the callbacks bound to an address, a `utils.Broadcast` each, on the server's
-thread: a failing callback is logged and the next still runs. With `return_messages` it echoes each message to
-`ip_out`:`port_out`. A port change restarts the server with the same bindings. An address nothing is bound to is
+thread: a failing callback is logged and the next still runs. With `return_messages` it then echoes each message to
+`ip_out`:`port_out`; an invalid return address keeps the current one, and a failed echo is logged, at most once
+every 10 s. A port change restarts the server with the same bindings. An address nothing is bound to is
 counted and warned about once.
 
 ## Art-Net out
