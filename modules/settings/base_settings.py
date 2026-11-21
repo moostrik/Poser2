@@ -88,7 +88,7 @@ class BaseSettings:
             f"'{type(self).__name__}' has no setting '{name}'"
         )
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         """A name that is no field, group or attribute: refused."""
         raise AttributeError(
             f"'{type(self).__name__}' has no setting '{name}'"
