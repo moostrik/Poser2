@@ -24,17 +24,26 @@ unless Matthias says he is using the PC or the app.
   back (capture and preview). `solve_capture` (only with `POSER_SOLVE_CAPTURE` set) and `view_check` (a script) are
   not run.
 
-## F. A 2D swap of plain textures
+## F. A framebuffer of several targets owns them, and swaps as one
 
-- F1. `SwapTexture` beside `SwapTexture3D`, on the `Swap[T]` base: a ping-pong pair of 2D textures without
-  framebuffers, exported from `gl`; `flow/motion/depth_velocity.py`'s `_estimate` uses it in place of its
-  `SwapFbo`, and keys its misses and its targets (`_misses_of`, `_targets_of`) by the estimate's `tex_id`, as a
-  `SwapTexture` has no `fbo_id`. In the same commit, `.claude/rules/rendering.md`'s line on a swap pair's `back`
-  names `SwapTexture.back` beside `SwapFbo.back`, `SwapTexture3D.back` and `SwapTexture2DArray.back`, and the rules
-  thread is asked for feedback. Why: since 46df3c07 depth_velocity draws into its estimate through a
-  `MultiTargetFbo` per side, so the `SwapFbo`'s two framebuffers are no longer drawn into; gl has no swap of plain 2D
-  textures, only `SwapFbo`, `SwapTexture3D` and `SwapTexture2DArray` (seen). Check: deep_flow -sim, the motion
-  running, no GL error.
+- F1. `MultiTargetFbo` owns its targets, as `Fbo` owns its one texture: `allocate(width, height, formats)` makes a
+  texture per format and hands each out by index (`targets[i]`, a `Texture`). `Swap` is split into the pair itself
+  (`current`, `back`, `swap`, generic over anything allocated and freed) and, on top of it, the texture pair's
+  forwarding (`width`, `tex_id`, `bind`, `clear`, …) that `SwapFbo`, `SwapTexture3D` and `SwapTexture2DArray` keep;
+  a pair of `MultiTargetFbo`s is the first kind. `flow/motion/depth_velocity.py` holds its estimate and its misses as
+  one such pair: it draws into `current`, reads `back`, and its `estimate` port and `misses` take `current.targets[0]`
+  and `[1]` when they are asked for, so `_misses_of`, `_targets_of` and the lookup by `fbo_id` go.
+  `flow/fluid_3d/particle_density.py`'s weighted look and surface each own their targets the same way (the formats
+  RGBA32F and RGBA16F; R32F and R32F), the smooth and shade passes reading them by index; the surface's third
+  target stays the Fluid3D thread's fix, which after F1 is one more format there (RGBA16F) and its clear. In the same
+  commit `.claude/rules/rendering.md`'s line on a swap pair's `back` and GL.md's `MultiTargetFbo` paragraph say that
+  a framebuffer of several targets owns them and swaps as one, and the rules thread is asked for feedback. Why: since 46df3c07 each of depth_velocity's two
+  `MultiTargetFbo`s keeps one raw buffer of the estimate's swap pair (`_targets` from `(_estimate.current,
+  _estimate.back)`), picked by the estimate's id each frame, the kind of stored buffer of a pair that went wrong
+  before; a framebuffer owning its color targets is the textbook shape (Cinder's and openFrameworks' Fbo) (seen:
+  `multi_target_fbo.py`, `depth_velocity.py`; only particle_density reads its targets, no port holds them; nothing
+  else keeps a buffer of a swap pair, a search of 2026-11-21). Check: pyright, the guard, gl and flow tests;
+  deep_flow -sim with the motion, and the particles on the weighted look and on SURFACE, no GL error.
 
 ## G. Minor fixes found here, in flow's code
 
@@ -42,8 +51,8 @@ Each gets the flow thread's feedback after its commit.
 
 - G1. `ParticleSurface`'s unused `uOutputSize` goes: its declaration in `flow/fluid_3d/shaders/particle_surface.frag`,
   the `glUniform2f` and the `output_size` parameter of `ParticleSurface.use`, and the argument
-  `particle_density._composite_surface` passes. It is built before the Fluid3D thread's fix of the surface's third
-  target, which changes the same function. Why: the fragment shader declares it and reads it nowhere, the vertex
+  `particle_density._composite_surface` passes. It is built before F1 and the Fluid3D thread's fix of the surface's
+  third target, which change the same functions; the order is G1, F1, then the Fluid3D fix. Why: the fragment shader declares it and reads it nowhere, the vertex
   shader does not have it, so the program leaves it out and the set warns (seen, D2's deep_flow -sim, 2026-11-21).
   Check: pyright, flow's tests, deep_flow -sim with the particles on SURFACE, no GL error.
 - G2. The bridge's `WeightedSum` (`flow/bridge_3d/shaders/weighted_sum.py` and `.frag`) and `WeightedSum2D`
