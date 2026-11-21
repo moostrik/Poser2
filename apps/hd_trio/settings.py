@@ -9,7 +9,7 @@ from modules.camera import CameraHealthSettings, CameraResolution
 from modules.camera.oak import OakCameraSettings
 from modules.recording import PlayerSettings, RecorderSettings
 from modules import render
-from modules.inout import OscSoundSettings, ArtNetBarsSettings, OscReceiverSettings
+from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.utils import Color
 from modules.tracker import OnePerCamTrackerSettings, TrackerFrameSourceSettings
 from modules.pose import nodes, trackers, window, analytics, RecorderSettings as PoseRecorderSettings
@@ -18,6 +18,7 @@ from modules.session import SessionSettings
 from modules.gl import BlendState
 from modules.window import WindowManagerSettings, WindowSettings
 from .flow import GradientFlowSettings, Fluid2DSettings, bridge_2d
+from .artnet_bars import ArtNetBarsSettings
 from .sequencer import SequencerSettings
 
 

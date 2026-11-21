@@ -150,11 +150,10 @@
       },
       "artnet_0": {
         "enabled": true,
-        "verbose": false,
         "ip": "10.0.0.4",
-        "base_universe": 0,
+        "universe": 0,
         "channel_order": "GRBW",
-        "fps": 40,
+        "fps": 40.0,
         "pixels": 94,
         "color": {
           "r": 1.0,
@@ -168,11 +167,10 @@
       },
       "artnet_1": {
         "enabled": true,
-        "verbose": false,
         "ip": "10.0.0.5",
-        "base_universe": 0,
+        "universe": 0,
         "channel_order": "GRBW",
-        "fps": 40,
+        "fps": 40.0,
         "pixels": 94,
         "color": {
           "r": 0.0,
@@ -186,11 +184,10 @@
       },
       "artnet_2": {
         "enabled": true,
-        "verbose": false,
         "ip": "10.0.0.6",
-        "base_universe": 0,
+        "universe": 0,
         "channel_order": "GRBW",
-        "fps": 40,
+        "fps": 40.0,
         "pixels": 94,
         "color": {
           "r": 0.68,

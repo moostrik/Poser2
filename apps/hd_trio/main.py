@@ -9,7 +9,7 @@ from modules.camera.oak import Camera, ClipCamera
 from modules.recording import Player, Recorder as VideoRecorder, replay
 from modules.settings import SettingsStore
 from modules.panel import PanelServer
-from modules.inout import OscSound, ArtNetBars, OscReceiver
+from modules.inout import OscSound, OscReceiver
 from modules.tracker import OnePerCamTracker, TrackerFrameSource
 from modules.pose import nodes, features, analytics, FrameDict, has_points, Recorder as PoseRecorder, RecorderSettings as PoseRecorderSettings
 from modules.pose.pipeline import Domain, PosePipeline
@@ -17,6 +17,7 @@ from modules.inference import pose, segmentation, person, BatchUploader, CameraS
 from modules.session import Session, SessionSettings, SequencerState
 from modules.window import WindowManagerSettings
 
+from .artnet_bars import ArtNetBars
 from .board import RenderBoard
 from .pose.pipeline import pipeline_spec
 from .sequencer import Sequencer

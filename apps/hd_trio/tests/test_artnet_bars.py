@@ -1,9 +1,9 @@
-"""Tests for the Art-Net bars' DMX buffer: one bar's pixels, lit from the bottom (the bars are never started: no
-network)."""
+"""Tests for the Art-Net bars' packet: one bar's pixels, lit from the bottom, the same on both bars' universes (the
+bars are never started: no network)."""
 
 import unittest
 
-from modules.inout import ArtNetBars, ArtNetBarsSettings, ChannelOrder
+from apps.hd_trio.artnet_bars import ArtNetBars, ArtNetBarsSettings, ChannelOrder
 from modules.utils import Color
 
 
@@ -44,19 +44,26 @@ CASES = [
 ]
 
 
+def filled(b: ArtNetBars) -> bytes:
+    b.fill(b.sender.packet)
+    return bytes(b.sender.packet)
+
+
 class TestArtNetBarsFrame(unittest.TestCase):
-    def test_the_buffer_is_the_bar_lit_from_the_bottom(self):
+    def test_each_bar_is_lit_from_the_bottom(self):
         for case in CASES:
             with self.subTest(case=case):
-                b = bars(*case)
-                b._compute_frame()
-                self.assertEqual(bytes(b._buffer), expected(*case))
+                self.assertEqual(filled(bars(*case)), expected(*case) * 2)
 
     def test_the_loop_s_known_bytes(self):
         # two pixels lit of three, GRBW: green, red, blue, white
         b = bars(3, ChannelOrder.GRBW, Color(0.2, 0.6, 1.0), 0.0, 1.0, 0.5)
-        b._compute_frame()
-        self.assertEqual(bytes(b._buffer), bytes([153, 51, 255, 0, 153, 51, 255, 0, 0, 0, 0, 0]))
+        self.assertEqual(filled(b), bytes([153, 51, 255, 0, 153, 51, 255, 0, 0, 0, 0, 0]) * 2)
+
+    def test_the_bars_go_on_two_universes_without_the_flash(self):
+        b = bars(3, ChannelOrder.GRBW, Color(0.2, 0.6, 1.0), 0.0, 1.0, 0.5)
+        self.assertEqual(b.sender.universes, 2)
+        self.assertFalse(b.sender.flash)
 
 
 if __name__ == '__main__':

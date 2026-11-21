@@ -4,7 +4,7 @@
 
 On Windows a wait's timeout ends on the system's 15.6 ms tick (CLAUDE.md, Time). A `utils.Waker` waits on a
 high-resolution waitable timer and an event together, so a wait ends at its deadline or at a wake. Every loop on a
-deadline waits on one: the recording player, `ArtNetBars`, `ArtNetSender`, `OscSender`, the replay camera's
+deadline waits on one: the recording player, `ArtNetSender`, `OscSender`, the replay camera's
 tracklets, smile's camera and clip cells, the Vimba camera's control loop, `InferenceFrameSync`, `RecordedPoses`.
 white_space's light clock waits on one until 1 ms before its deadline and spins the rest, as LAYERS.md's
 *The light clock* measures.
