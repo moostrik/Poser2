@@ -34,8 +34,8 @@ unless Matthias says he is using the PC or the app.
   one such pair: it draws into `current`, reads `back`, and its `estimate` port and `misses` take `current.targets[0]`
   and `[1]` when they are asked for, so `_misses_of`, `_targets_of` and the lookup by `fbo_id` go.
   `flow/fluid_3d/particle_density.py`'s weighted look and surface each own their targets the same way (the formats
-  RGBA32F and RGBA16F; R32F and R32F), the smooth and shade passes reading them by index; the surface's third
-  target stays the Fluid3D thread's fix, which after F1 is one more format there (RGBA16F) and its clear. In the same
+  RGBA32F and RGBA16F; R32F, R32F and RGBA16F, the surface's third target from the Fluid3D thread's fix, which comes
+  first), the smooth and shade passes reading them by index. In the same
   commit `.claude/rules/rendering.md`'s line on a swap pair's `back` and GL.md's `MultiTargetFbo` paragraph say that
   a framebuffer of several targets owns them and swaps as one, and the rules thread is asked for feedback. Why: since 46df3c07 each of depth_velocity's two
   `MultiTargetFbo`s keeps one raw buffer of the estimate's swap pair (`_targets` from `(_estimate.current,
@@ -51,8 +51,9 @@ Each gets the flow thread's feedback after its commit.
 
 - G1. `ParticleSurface`'s unused `uOutputSize` goes: its declaration in `flow/fluid_3d/shaders/particle_surface.frag`,
   the `glUniform2f` and the `output_size` parameter of `ParticleSurface.use`, and the argument
-  `particle_density._composite_surface` passes. It is built before F1 and the Fluid3D thread's fix of the surface's
-  third target, which change the same functions; the order is G1, F1, then the Fluid3D fix. Why: the fragment shader declares it and reads it nowhere, the vertex
+  `particle_density._composite_surface` passes. The Fluid3D thread's fix of the surface's third target goes first,
+  on the current code (the third target and its clear); G1 and F1 build on top of it, and nothing here touches
+  `particle_density.py` before that commit is in. Why: the fragment shader declares it and reads it nowhere, the vertex
   shader does not have it, so the program leaves it out and the set warns (seen, D2's deep_flow -sim, 2026-11-21).
   Check: pyright, flow's tests, deep_flow -sim with the particles on SURFACE, no GL error.
 - G2. The bridge's `WeightedSum` (`flow/bridge_3d/shaders/weighted_sum.py` and `.frag`) and `WeightedSum2D`
