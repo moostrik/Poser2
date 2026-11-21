@@ -4,10 +4,10 @@ import sys
 import unittest
 from unittest import mock
 
-from modules.gl.window_input import WindowInput
+from modules.window.window_input import WindowInput
 
-MODULE = sys.modules['modules.gl.window_input']
-LOGGER: str = 'modules.gl.window_input'
+MODULE = sys.modules['modules.window.window_input']
+LOGGER: str = 'modules.window.window_input'
 
 
 class TestWindowInput(unittest.TestCase):

@@ -6,7 +6,8 @@ from typing import cast
 import numpy as np
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import RenderBase, Shader, Style, clear_color, Texture, shaders
+from modules.gl import Shader, Style, clear_color, Texture, shaders
+from modules.window import RenderBase
 from modules.board import HasFrames
 from modules.camera import RigCameraSettings, CameraHealthSettings
 from modules.flow import hold_tick

@@ -2,7 +2,8 @@
 camera, as the cube colored by the port's kind or as stored, with a slice in focus, or as glyphs; its front
 flat for the strip. The mouse turns and zooms the camera and steps the slice."""
 
-from modules.gl import Texture, Texture3D, MouseButton
+from modules.gl import Texture, Texture3D
+from modules.window import MouseButton
 from modules.flow import LegendKind, Port, TextureKind, ColorSpace, VolumeCut, VolumeCube, CubeColor, VolumeGlyphs, Cut, Orbit, \
                          PITCH_LIMIT, ZOOM_LIMITS, box_size, axis_labels
 from modules.settings import Field, BaseSettings, Group, Widget

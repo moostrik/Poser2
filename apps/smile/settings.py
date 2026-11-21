@@ -1,6 +1,6 @@
 """Root settings tree for SMILE. Each module adds its settings as a Group here."""
 
-from modules.gl import WindowManagerSettings, WindowSettings
+from modules.window import WindowManagerSettings, WindowSettings
 from modules.settings import BaseSettings, Group
 from modules.panel import PanelSettings
 from .render import RenderSettings, SequencerSettings

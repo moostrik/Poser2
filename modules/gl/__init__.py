@@ -1,9 +1,6 @@
 
-from .render_base import RenderBase
 from .shader import Shader
 from .compute_shader import ComputeShader
-from .window_settings import WindowSettings, WindowManagerSettings
-from .window_input import MouseButton
 from . import style as Style
 from .context import Context, context, draw_quad
 from .clear import clear_color
@@ -33,3 +30,4 @@ from .text import Text
 # PROFILING
 from .gpu_timer import GpuTimer
 from .gl_state import gl_state
+from .gl_debug import enable_debug_output

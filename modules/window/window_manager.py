@@ -11,10 +11,9 @@ import glfw
 
 if TYPE_CHECKING:
     from .render_base import RenderBase
+from modules.gl import Shader, enable_debug_output
 from modules.utils import FPS, PerformanceTimer, Waker
-from .gl_debug import enable_debug_output
 from .monitor import Monitor
-from .shader import Shader
 from .window import Window
 from .window_input import WindowInput
 from .window_settings import WindowManagerSettings, WindowSettings

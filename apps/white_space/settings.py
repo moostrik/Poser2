@@ -16,7 +16,7 @@ from modules.tracker import PanoramicTrackerSettings, TrackerFrameSourceSettings
 from modules.pose import nodes, trackers, window, analytics
 from modules import inference
 from modules.session import SessionSettings
-from modules.gl import WindowManagerSettings, WindowSettings
+from modules.window import WindowManagerSettings, WindowSettings
 from .light import LightSettings, PoseInstrumentSettings
 from .inout import OscLightSenderSettings, UdpLightReceiverSettings
 from .pose import HitSyncSettings, NeutralWeightSettings

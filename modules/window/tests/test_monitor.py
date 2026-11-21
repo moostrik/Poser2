@@ -6,9 +6,9 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
-from modules.gl.monitor import Monitor
+from modules.window.monitor import Monitor
 
-MODULE = sys.modules['modules.gl.monitor']
+MODULE = sys.modules['modules.window.monitor']
 
 
 def handle(n: int):

@@ -26,7 +26,8 @@ from OpenGL.GL import (GL_FLOAT, GL_FRAMEBUFFER, GL_QUERY_RESULT, GL_R32F, GL_RE
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from modules.flow import REFERENCE_STEP, Cut, OnDemand, Port, TextureKind, VolumeCut  # noqa: E402
-from modules.gl import Context, Fbo, MouseButton, Texture, Texture3D  # noqa: E402
+from modules.gl import Context, Fbo, Texture, Texture3D  # noqa: E402
+from modules.window import MouseButton  # noqa: E402
 from modules.render import Channel, FlowStage, MonitorInput, Monitor3DLayer, Monitor3DLayerSettings, MonitorView  # noqa: E402
 
 OUT: str = os.path.join('temp', 'monitor_harness')

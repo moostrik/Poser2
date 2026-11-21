@@ -8,13 +8,13 @@ import time
 import unittest
 from unittest import mock
 
-from modules.gl import WindowManagerSettings, WindowSettings
-from modules.gl.monitor import Monitor, MonitorId
-from modules.gl.window_manager import WindowManager
+from modules.window import WindowManagerSettings, WindowSettings
+from modules.window.monitor import Monitor, MonitorId
+from modules.window.window_manager import WindowManager
 from modules.settings import Group
 
-MODULE = sys.modules['modules.gl.window_manager']     # the module: the package exports the class under its name
-LOGGER: str = 'modules.gl.window_manager'
+MODULE = sys.modules['modules.window.window_manager']
+LOGGER: str = 'modules.window.window_manager'
 DISCONNECTED: int = 0x00040002
 
 

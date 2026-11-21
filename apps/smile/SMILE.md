@@ -146,9 +146,9 @@ the moment of that peak within midpoint ± deviation, sent to Grin Frames as `<n
 
 ## Render
 
-OpenGL engine: Poser2's `modules/gl/` (glfw, GL 4.6 core, the window loop of `WindowManager` on the main thread). The render loop goes on when `update`, `draw`, an event callback (key, mouse, window, monitor) or
+OpenGL engine: Poser2's `modules/gl/` (GL 4.6 core) and `modules/window/` (glfw, the window loop of `WindowManager` on the main thread). The render loop goes on when `update`, `draw`, an event callback (key, mouse, window, monitor) or
 a deferred settings call raises: it is logged, and a monitor that is unplugged does not close the app
-(`modules/gl/tests/test_window_manager.py`). The render is the display's 1024 x 1280 (`main.py` defaults, swapped by the
+(`modules/window/tests/test_window_manager.py`). The render is the display's 1024 x 1280 (`main.py` defaults, swapped by the
 default portrait mode): the same 4:5 as the workflow's 896 x 1120 portrait, which stays at the size SDXL is best at and fills
 the render as a texture. `render/smile_render.py` runs the `Sequencer` once per frame (it is the app clock:
 Art-Net, OSC and saving hang off its messages), then the stage for the current `SequenceType`
@@ -166,7 +166,7 @@ The two **walls** of the sphere are windows 1 and 2 of the same `WindowManager` 
 monitor is missing waits small on the primary one, and moves back when it is plugged in). `SmileRender.walls` are two
 `WallRender`s (`player/wall_render.py`, no window of their own) composited in `update()` after the main screen, a wall
 only while its window is shown, and `draw` blits a wall in its window. The windows and the render loop are described in
-`modules/gl/GL.md`.
+`modules/window/WINDOW.md`.
 
 ## Credit
 

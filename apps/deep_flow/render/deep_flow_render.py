@@ -5,7 +5,8 @@ from typing import Callable, cast
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import GpuTimer, RenderBase, Shader, Style, clear_color, fit, Texture, MouseButton, shaders
+from modules.gl import GpuTimer, Shader, Style, clear_color, fit, Texture, shaders
+from modules.window import MouseButton, RenderBase
 from modules.video import ScreenRecorderSettings
 from modules.flow import Port, hold_tick
 from modules.inference import InferenceFrame, Poses

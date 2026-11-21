@@ -5,7 +5,7 @@ from typing import Callable
 
 import glfw
 
-from .context import Context
+from modules.gl import Context
 from .monitor import Monitor, MonitorId
 from .window_settings import WindowSettings
 

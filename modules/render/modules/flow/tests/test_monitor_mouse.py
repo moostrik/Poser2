@@ -4,7 +4,7 @@ settings, so the panel shows them and a settings file keeps them. The flat monit
 
 import unittest
 
-from modules.gl import MouseButton
+from modules.window import MouseButton
 from modules.render import FlowStage, Monitor2DLayer, Monitor2DLayerSettings, Monitor3DLayer, Monitor3DLayerSettings
 
 

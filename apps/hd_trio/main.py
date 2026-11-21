@@ -15,7 +15,7 @@ from modules.pose import nodes, features, analytics, FrameDict, has_points, Reco
 from modules.pose.pipeline import Domain, PosePipeline
 from modules.inference import pose, segmentation, person, BatchUploader, CameraSync, CropExtractor
 from modules.session import Session, SessionSettings, SequencerState
-from modules.gl import WindowManagerSettings
+from modules.window import WindowManagerSettings
 
 from .board import RenderBoard
 from .pose.pipeline import pipeline_spec

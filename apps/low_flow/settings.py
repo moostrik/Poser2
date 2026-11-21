@@ -17,7 +17,7 @@ from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import OnePerCamTrackerSettings, TrackerFrameSourceSettings
 from modules.pose import nodes, window
 from modules import inference
-from modules.gl import WindowManagerSettings, WindowSettings
+from modules.window import WindowManagerSettings, WindowSettings
 from modules.video import ScreenRecorderSettings
 
 

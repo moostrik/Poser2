@@ -6,7 +6,8 @@ from typing import cast
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import RenderBase, clear_color, Style
+from modules.gl import clear_color, Style
+from modules.window import RenderBase
 from modules.camera import RigCameraSettings, CameraHealthSettings, mono_frame_size, delivered_height
 from modules.tracker import PanoramicTrackerSettings
 from modules.pose import BaseScalarFeature, nodes

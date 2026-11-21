@@ -15,7 +15,8 @@ from modules.tracker import OnePerCamTrackerSettings, TrackerFrameSourceSettings
 from modules.pose import nodes, trackers, window, analytics, RecorderSettings as PoseRecorderSettings
 from modules import inference
 from modules.session import SessionSettings
-from modules.gl import Style, WindowManagerSettings, WindowSettings
+from modules.gl import Style
+from modules.window import WindowManagerSettings, WindowSettings
 from .flow import GradientFlowSettings, Fluid2DSettings, bridge_2d
 from .sequencer import SequencerSettings
 

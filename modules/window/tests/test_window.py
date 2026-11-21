@@ -5,11 +5,11 @@ import sys
 import unittest
 from unittest import mock
 
-from modules.gl import WindowSettings
-from modules.gl.monitor import Monitor, MonitorId
-from modules.gl.window import Window
+from modules.window import WindowSettings
+from modules.window.monitor import Monitor, MonitorId
+from modules.window.window import Window
 
-MODULE = sys.modules['modules.gl.window']
+MODULE = sys.modules['modules.window.window']
 
 
 def monitor(name: str, x: int, y: int, width: int = 1920, height: int = 1080) -> Monitor:

@@ -2,7 +2,7 @@
 
 Fewer GL calls on the main thread, and the package held to the rules and to the textbook layout. G comes from the
 Cinder research (2026-11-20), H from the package scan, I from the structure review of the same day. Work order:
-I1 to I4, G1, I6, G2, I5, I7: the shaders do not move after G1 edits them, G2's bind is written once on I6's base,
+I2 to I4, G1, I6, G2, I5, I7: the shaders do not move after G1 edits them, G2's bind is written once on I6's base,
 and I5 moves the files after their edits. Before
 the first step, `shader_check.py --reference` makes the reference images at HEAD; every shader check compares
 against them. The checks that run
@@ -17,11 +17,6 @@ buffers, programs, the blend state, GL debugging), and the window side is a pack
 is. gl's loose files are grouped in folders by job; that comes from CLAUDE.md's package rules, not from Cinder,
 whose `gl` is flat.
 
-- I1. `modules/window/` (new package): `render_base`, `window_manager`, `window`, `window_input`, `window_settings`,
-  `monitor`, their tests in its `tests/` (window, window_input, window_manager, monitor), and GL.md's "The windows" as its document, `WINDOW.md`. `window` imports `gl`, never the
-  reverse. Every importer moves: `RenderBase` in the five app renderers, `WindowSettings` and `WindowManagerSettings`
-  in the five apps' settings and hd_trio's main, `MouseButton` in deep_flow's renderer, the probe scripts; gl.md's
-  thread rule names the window loop. Check: pyright, the guard tests, window's tests, each app's main imported.
 - I2. `fit`, `fill` (rectangle layout) and `lfo` move to `modules/utils`, beside `Rect`, with `test_fit`; about 19
   importers follow. `lfo` reads `perf_counter()` itself; it becomes `lfo(time, frequency, phase)` and its callers
   pass the tick's time. Check: pyright, the guard tests, utils' tests.
