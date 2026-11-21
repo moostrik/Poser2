@@ -9,14 +9,6 @@ A step that moves or rewires code also starts smile once: ComfyUI first (`script
 takes a recorded visitor through (flash, portrait, grin, bloom, the clip saved and on the walls) and leaves no error
 in the log. A rename or a text change needs no start. The whole of smile's tests run after the last step.
 
-## E. One place for each fact
-
-- E1 The caption and the QR card are drawn once (now in the credit layer and again in the wall compositor);
-  `credit_scroll.py`'s zero-based screen numbering (`row_screens`, `screen_cell`) and its repeated constants move
-  into `sphere.py`; the data, output and recording paths (`apps/smile/data/…` in six places, `apps/smile/output/` in
-  two, `apps/smile/data/recordings/`) are written in one place.
-  Tests: `tests` (`test_sphere`, `test_credit_scroll`), `player/tests`, `render/tests`, `save/tests`.
-
 ## F. Documents
 
 - F1 SMILE.md and README.md: the settings paths (`Settings.setup.camera`, `Settings.setup.audio.osc`), `decoder` for
