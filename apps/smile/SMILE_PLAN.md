@@ -11,10 +11,6 @@ in the log. A rename or a text change needs no start. The whole of smile's tests
 
 ## C. Wiring and time
 
-- C3 The five callback lists (`Camera`, `FaceFinder`, `Generator`, `Sequencer`, `ClipSaver`) become `utils.Broadcast`:
-  callbacks run outside the lock, and one that fails no longer stops the others; `ClipLoader`'s go with C6.
-  Tests: `cam/tests`, `face/tests`, `comfy/tests`, `sequence/tests`, `save/tests`; a test that a failing callback
-  leaves the next one called.
 - C4 `ClipSaver` makes its folders, picks its encoder and starts its thread in `start()`, not in its constructor;
   `Main` starts it with the other workers after the wiring. It reads the credit name at each share, through a getter
   as `Online` has, and writes `watermark.png` again only when the name differs from the file's. The frame's tick is
