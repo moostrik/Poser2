@@ -9,13 +9,6 @@ which need depthai 2 and run in `.venv`.
 
 ## B. OSC receiver
 
-- B1. Callbacks, teardown and port change. Why: `OscReceiver._handle` keeps callbacks in a plain list and catches
-  only `TypeError`, so any other error skips the address's later callbacks; `__init__` binds `ip_out`, `port_out`
-  and `port_in` and nothing unbinds them; `_on_in_change` swaps `self.server` from another thread without a lock
-  while `bind` reads it (the race is a deduction); `last_time` is stamped with `time()`. How: a `utils.Broadcast`
-  per address, bind at `start` and unbind at `stop`, the swap under a lock, `perf_counter()` for the stamp and
-  `last_time`'s description to match. Check: a loopback test: a bound callback gets its arguments, a failing
-  callback does not stop the next, a port change keeps the bindings.
 - B2. `OscReceiverSettings` fields typed. Why: its fields have no `Field[T]` annotation, unlike every other settings
   class in the package. How: annotate them. Check: pyright.
 
@@ -68,12 +61,9 @@ which need depthai 2 and run in `.venv`.
 
 ## Rules this plan touches
 
-- `CLAUDE.md` Concurrency, a callback list is a `utils.Broadcast`; a failing callback does not stop the others: B1
 - `CLAUDE.md` Error handling, a thread's loop catches an exception per item and goes on: C2
-- `CLAUDE.md` Settings, bind() / unbind(): B1
 - `CLAUDE.md` Composition, prefer composition over inheritance: C1
 - `CLAUDE.md` Composition and wiring, clean up in an explicit stop or teardown, never in `__del__`: C2
-- `CLAUDE.md` Time, `perf_counter()` for every stamp: B1
 - `CLAUDE.md` API evolution, remove obsolete pathways; keep settings files in sync: C2, E1
 - `CLAUDE.md` Types, modern typing: B2
 - `CLAUDE.md` Project shape, code only one app uses moves to that app: C2

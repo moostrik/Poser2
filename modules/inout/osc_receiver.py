@@ -1,14 +1,14 @@
 
 from threading import Thread, Lock
-from time import time
+from time import perf_counter
 from typing import Callable
-
 
 from pythonosc.udp_client import SimpleUDPClient
 from pythonosc.osc_server import BlockingOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
 
 from modules.settings import BaseSettings, Field, Widget
+from modules.utils import Broadcast
 
 import logging
 logger = logging.getLogger(__name__)
@@ -21,54 +21,69 @@ class OscReceiverSettings(BaseSettings):
     verbose         = Field(False,                                                    description="Log received messages")
     counter         = Field(0,           min=0,    max=99999, widget=Widget.number,   access=Field.READ, description="Message activity")
     last_address    = Field("",                                                       access=Field.READ, description="Last received OSC address")
-    last_time       = Field(0.0,                                                      access=Field.READ, description="Wall-clock time of last received message")
+    last_time       = Field(0.0,                                                      access=Field.READ, description="When the last message came in (perf_counter, s)")
     unbound_counter = Field(0,           min=0,    max=99999, widget=Widget.number,   access=Field.READ, description="Messages received on an address nothing is bound to")
     last_unbound    = Field("",                                                       access=Field.READ, description="Last received OSC address nothing is bound to")
 
 
 class OscReceiver:
+    """Calls what is bound to an address with the arguments of each message to it, on the server's thread. It binds
+    its settings at `start` and unbinds them at `stop`; a port change restarts the server with the same bindings."""
 
     def __init__(self, settings: OscReceiverSettings) -> None:
         self.settings: OscReceiverSettings = settings
-        self._bindings: dict[str, list[Callable]] = {}
+        self._bindings: dict[str, Broadcast] = {}
         self._warned_unbound: set[str] = set()
-        self.client_lock = Lock()
-        self.osc_return_client = SimpleUDPClient(settings.ip_out, settings.port_out)
-        self.server: BlockingOSCUDPServer | None = None
-
-        settings.bind(OscReceiverSettings.ip_out,         self._on_out_change)
-        settings.bind(OscReceiverSettings.port_out,       self._on_out_change)
-        settings.bind(OscReceiverSettings.port_in,        self._on_in_change)
+        self._client_lock: Lock = Lock()
+        self._return_client: SimpleUDPClient | None = None
+        self._server_lock: Lock = Lock()     # the server, and the bindings it maps
+        self._server: BlockingOSCUDPServer | None = None
+        self._running: bool = False
 
     def start(self) -> None:
-        self.server = self._start_server(self.settings.port_in)
+        self._on_out_change()
+        with self._server_lock:
+            self._running = True
+            self._server = self._start_server(self.settings.port_in)
+        self.settings.bind(OscReceiverSettings.ip_out,   self._on_out_change)
+        self.settings.bind(OscReceiverSettings.port_out, self._on_out_change)
+        self.settings.bind(OscReceiverSettings.port_in,  self._on_in_change)
 
     def stop(self) -> None:
-        if self.server is not None:
-            self.server.shutdown()
-            self.server = None
+        self.settings.unbind(OscReceiverSettings.ip_out,   self._on_out_change)
+        self.settings.unbind(OscReceiverSettings.port_out, self._on_out_change)
+        self.settings.unbind(OscReceiverSettings.port_in,  self._on_in_change)
+        with self._server_lock:
+            self._running = False
+            if self._server is not None:
+                _close(self._server)
+                self._server = None
+        with self._client_lock:
+            if self._return_client is not None:
+                self._return_client.close()
+                self._return_client = None
 
     def bind(self, address: str, callback: Callable) -> None:
-        if address not in self._bindings:
-            self._bindings[address] = []
-            if self.server is not None:
-                self.server.dispatcher.map(address, self._handle)
-        self._bindings[address].append(callback)
+        with self._server_lock:
+            if address not in self._bindings:
+                self._bindings[address] = Broadcast(name=f'OSC {address}')
+                if self._server is not None:
+                    self._server.dispatcher.map(address, self._handle)
+            self._bindings[address].add_callback(callback)
 
     def _handle(self, address: str, *args) -> None:
         if self.settings.verbose:
             logger.info(f"{address} {args}")
         if self.settings.return_messages:
-            with self.client_lock:
-                self.osc_return_client.send_message(address, args)
+            with self._client_lock:
+                if self._return_client is not None:
+                    self._return_client.send_message(address, args)
         self.settings.counter      = (self.settings.counter + 1) % 100000
         self.settings.last_address = address
-        self.settings.last_time    = time()
-        for callback in self._bindings.get(address, []):
-            try:
-                callback(*args)
-            except TypeError as e:
-                logger.warning(f"Argument mismatch for '{address}': {e}")
+        self.settings.last_time    = perf_counter()
+        callbacks: Broadcast | None = self._bindings.get(address)
+        if callbacks is not None:
+            callbacks(*args)
 
     def _handle_unbound(self, address: str, *args) -> None:
         if self.settings.verbose:
@@ -80,26 +95,40 @@ class OscReceiver:
         self.settings.last_unbound    = address
 
     def _start_server(self, port: int) -> BlockingOSCUDPServer:
+        """A server on `port` that maps every bound address; called under the server lock."""
         dispatcher = Dispatcher()
         for address in self._bindings:
             dispatcher.map(address, self._handle)
         dispatcher.set_default_handler(self._handle_unbound)
         server = BlockingOSCUDPServer(('0.0.0.0', port), dispatcher)
-        Thread(target=server.serve_forever, daemon=True).start()
+        Thread(target=server.serve_forever, daemon=True, name=f'OscReceiver-{port}').start()
         logger.info(f"listening on port {port}")
         return server
 
     def _on_out_change(self, _=None) -> None:
-        with self.client_lock:
-            self.osc_return_client = SimpleUDPClient(self.settings.ip_out, self.settings.port_out)
+        with self._client_lock:
+            if self._return_client is not None:
+                self._return_client.close()
+            self._return_client = SimpleUDPClient(self.settings.ip_out, self.settings.port_out)
         logger.info(f"Return address updated to {self.settings.ip_out}:{self.settings.port_out}")
 
     def _on_in_change(self, _=None) -> None:
-        if self.server is None:
-            return
-        old_server = self.server
-        def _restart() -> None:
-            if old_server is not None:
-                old_server.shutdown()
-            self.server = self._start_server(self.settings.port_in)
-        Thread(target=_restart, daemon=True).start()
+        # off the caller's thread: a shutdown waits for the server's loop to end
+        Thread(target=self._restart, daemon=True, name='OscReceiver-restart').start()
+
+    def _restart(self) -> None:
+        with self._server_lock:
+            if not self._running:
+                return
+            if self._server is not None:
+                _close(self._server)
+            try:
+                self._server = self._start_server(self.settings.port_in)
+            except OSError:
+                self._server = None
+                logger.exception('OSC receiver: port %s cannot be opened', self.settings.port_in)
+
+
+def _close(server: BlockingOSCUDPServer) -> None:
+    server.shutdown()
+    server.server_close()
