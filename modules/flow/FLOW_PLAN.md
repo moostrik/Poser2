@@ -100,22 +100,22 @@ of the tracks a frame, at rest 0.041 → 0.039%, z inside at rest the same; z ke
   - The measurement is the window's mean, so its σ is the samples' over the root of their count: σ_mean =
     √(Σ σᵢ²) / n over the n samples kept. The gate is on that, not on one sample's σ.
   - The gate: the residual within `max_speed × dt / depth²` (the motion a body part makes, in disparity) plus
-    `gate` × σ_mean (3, the textbook's). `max_speed` keeps its meaning and unit; the jump in `carried()` takes the
+    3 × σ_mean (the textbook's 3 σ, a constant in the shader). `max_speed` keeps its meaning and unit; the jump in `carried()` takes the
     same gate.
   - Coasting: a measurement outside the gate, or a window with no measured depth (filled), is a miss: the track
-    predicts on with no correction and counts it; after `coast` misses in a row (2, "M of N"; 1 is today's) it
+    predicts on with no correction and counts it; after 2 misses in a row (the textbook's "M of N", a constant; 1 is today's) it
     starts over. Its cost: where another surface really comes over the pixel (a hand passing), the old track
-    coasts `coast` − 1 frames before it starts over. The count is a second target of the same pass (R8UI, its own
+    coasts one frame before it starts over. The count is a second target of the same pass (R8UI, its own
     swap), as the track's four channels are full; the dead zone stays as it is (Matthias, 2026-11-21). `Fbo` and
     `SwapFbo` hold one color target, so the two targets are a framebuffer of the motion's own, as
     `ParticleDensity`'s.
   - The window: a filled sample (confidence 0) is left out, a measured one counts whole, as the confidence now
     sizes the gate.
   - The rate check after the filter stays (a physical limit, not a gate).
-  Settings in `DepthVelocitySettings`: `depth_noise` (mm at 1 m, 10 by default, the floor's), `gate` (σ), `coast`
-  (frames); `weighted` goes. The compare gets a column `coasting`: the share of the core's tracks in a miss, at
+  One setting in `DepthVelocitySettings`, `depth_noise` (mm at 1 m, 10 by default, the floor's), the camera's own
+  noise, which changes with the camera and its mode; `weighted` goes, so the count stays as it is. The compare gets a column `coasting`: the share of the core's tracks in a miss, at
   rest and moving. Check: unit tests none (a shader); the rows on `measure_confidence` and a hands recording with
-  confidence, against C6's off side (`weighted` off), as used and thresholds 0, `coast` 1 and 2:
+  confidence, against C6's off side (`weighted` off), as used and thresholds 0, the misses before a restart 1 and 2 (a constant changed for the run, not committed):
   restarts and coasting at rest and moving, z's noise inside and at the edge, z kept, lag and stop; the pass's
   ms. A recording at 2–3.5 m then answers C3 with the same rows. MOTION.md's z section after.
 
@@ -262,6 +262,6 @@ The cameras:
 - A measured table names its kind, date, commit, recording and settings: C6's and C7's rows.
 - A step checked by a run or a test is one commit: C6, C7.
 - Remove obsolete pathways instead of leaving parallel legacy ones: C7, `weighted` and the fixed gate go.
-- A setting's default is the textbook value: C7's `gate` 3 σ; `depth_noise` from a measurement.
+- A setting's default is the textbook value: C7's 3 σ and 2 misses constants; `depth_noise` from a measurement.
 
 Not designed yet, so their rules are not named: C3, F1, F2, H1.
