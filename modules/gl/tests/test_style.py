@@ -7,7 +7,7 @@ from unittest import mock
 
 from modules.gl import Style
 
-STYLE = sys.modules['modules.gl.style']
+STYLE = sys.modules['modules.gl.state.style']
 
 
 class StyleTest(unittest.TestCase):

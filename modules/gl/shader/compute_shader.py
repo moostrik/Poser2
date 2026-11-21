@@ -23,9 +23,7 @@ from pathlib import Path
 from OpenGL.GL import GL_ALL_BARRIER_BITS, GL_COMPUTE_SHADER, GL_FALSE, GL_MAX_COMPUTE_WORK_GROUP_COUNT, GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, GL_MAX_COMPUTE_WORK_GROUP_SIZE, GL_READ_ONLY, GL_READ_WRITE, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_SHADER_STORAGE_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, GL_TRUE, GL_WRITE_ONLY, glBindImageTexture, glDispatchCompute, glGetIntegeri_v, glGetIntegerv, glMemoryBarrier
 
 from .shader import Shader
-from .texture import Texture
-from .texture_3d import Texture3D
-from .texture_2d_array import Texture2DArray
+from ..texture import Texture, Texture3D, Texture2DArray
 
 
 class ComputeShader(Shader):

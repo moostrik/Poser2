@@ -64,7 +64,7 @@ The strip starts over when `stage`, `texture` or `channel` changes, or when `vie
   the colormap's key and its legend's names are those channels; a channel the port does not hold
   draws nothing. A shader writes 0 in a channel nothing reads.
 - In the other views a channel the texture does not have reads as sampled: a one-channel texture
-  repeats x in y and z (its grey swizzle, `modules/gl/texture.py`), a two-channel one has z 0. So a
+  repeats x in y and z (its grey swizzle, `modules/gl/texture/texture_base.py`), a two-channel one has z 0. So a
   one-channel texture would draw arrows along the diagonal; the glyphs draw it as dots, whatever its
   port's kind.
 - An acceleration (widths/s²) is drawn in every view as the velocity it adds in one reference step,

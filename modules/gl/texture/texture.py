@@ -2,7 +2,7 @@ from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_LINEAR, GL_TEXTURE_2D, GL_T
 import numpy as np
 
 from modules.utils import Quad, Rect
-from .context import context
+from ..state.context import context
 from .texture_base import TextureBase
 
 

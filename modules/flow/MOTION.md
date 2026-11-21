@@ -496,7 +496,7 @@ not at the solve. `gl_state()` (`modules/gl`) returns the GL state a pass runs w
   cleared buffer: a clear handed a temporary array for its color sometimes left garbage at startup,
   the bit pattern of 100 or 1.75 in one channel, 7 of 8 starts, and the whole pyramid took it as the
   start, every x/y arrow the same ("all arrows up"); with the `smooth_like_z` filter it stuck until a reset.
-  Every clear to 0 now passes no memory (`clear_value`, `modules/gl/texture.py`).
+  Every clear to 0 now passes no memory (`clear_value`, `modules/gl/texture/texture_base.py`).
 
 - The false z at an edge cannot be told from a push by time. Restarting the track where the depth
   changed past a fixed step over 2 frames cuts the edge z, and a push's z by 26%.

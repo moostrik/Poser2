@@ -14,7 +14,7 @@ from .file_watcher import monitor_path
 
 logger = logging.getLogger(__name__)
 
-SHARED_SHADERS: Path = Path(__file__).parent / "shaders"     # the shared includes and `_generic.vert`
+SHARED_SHADERS: Path = Path(__file__).parent.parent / "shaders"     # the shared includes and `_generic.vert`
 SETTLE: float = 0.1                 # s after a file's last event before its programs compile again: a save is whole
 READ_RETRIES: int = 30              # frames a program whose file reads empty is tried again before the error
 _LOG_LOCATION = re.compile(r'^(\d+)\((\d+)\)')               # NVIDIA's "file(line)" at the start of a log line

@@ -8,6 +8,11 @@ state, and the shaders that are useful to any app. The window loop and the windo
 ([WINDOW.md](../window/WINDOW.md)), which draws with `gl`. A layer that draws a module's data sits in
 `modules/render`, an app's own shader in that app.
 
+Its files sit in folders by job: `texture/` (the texture kinds on `TextureBase`, their `Swap` pairs, `Fbo`,
+`LayeredFbo`, the uploads `Image` and `Tensor` with its CUDA side), `shader/` (`Shader`, `ComputeShader`, the file
+watcher, `StorageBuffer`), `state/` (`Context`, the blend state, the clear), `debug/` (GL's debug output, `gl_state`,
+`GpuTimer`), `text/` and `shaders/`. Every name is used as `gl.<Name>`, from the package.
+
 ## What it serves
 
 The GL serves a pipeline of 2D shader steps; a volumetric step is 3D only within its own pass. Geometry, such as

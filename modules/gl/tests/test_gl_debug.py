@@ -6,7 +6,7 @@ from unittest import mock
 from OpenGL.GL import GL_DEBUG_OUTPUT, GL_DEBUG_OUTPUT_SYNCHRONOUS, GL_DEBUG_SEVERITY_HIGH, GL_DEBUG_SEVERITY_MEDIUM, \
     GL_DEBUG_SEVERITY_NOTIFICATION
 
-import modules.gl.gl_debug as GL_DEBUG
+import modules.gl.debug.gl_debug as GL_DEBUG
 
 
 def message(text: str) -> tuple[bytes, int]:

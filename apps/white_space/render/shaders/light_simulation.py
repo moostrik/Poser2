@@ -1,4 +1,4 @@
-from OpenGL.GL import GL_FRAMEBUFFER, glBindFramebuffer,glUniform1f, glUniform2f, glUseProgram, glViewport
+from OpenGL.GL import GL_FRAMEBUFFER, glBindFramebuffer, glUniform1f, glUniform2f, glUseProgram, glViewport
 from modules.gl import Shader, draw_quad, Fbo, Texture
 
 class LightSimulation(Shader):

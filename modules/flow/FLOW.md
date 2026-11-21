@@ -294,7 +294,7 @@ fluids are two implementations. The visualization is shared because it is not a 
 draws the port it is given by its channels, whatever the stage: arrows of a 2-channel velocity
 are 2D and of a 3- or 4-channel one 3D (`Visualizer.process_glyphs`).
 The shader loader finds a shader's source by its `.py` module name beside it
-(`modules/gl/shader.py`), so moved shaders need no edit.
+(`modules/gl/shader/shader.py`), so moved shaders need no edit.
 
 ## The input's cadence
 

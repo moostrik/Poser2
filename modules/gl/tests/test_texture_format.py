@@ -8,7 +8,7 @@ from OpenGL.GL import (GL_BGR, GL_BGRA, GL_FLOAT, GL_HALF_FLOAT, GL_NONE, GL_R16
                        GL_RGB32F, GL_RGB8, GL_RGBA, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_UNSIGNED_BYTE, GL_UNSIGNED_INT,
                        GL_UNSIGNED_INT_2_10_10_10_REV, GL_UNSIGNED_SHORT)
 
-from modules.gl.texture_format import bytes_per_channel, channel_count, data_type, pixel_format, tensor_type
+from modules.gl.texture.texture_format import bytes_per_channel, channel_count, data_type, pixel_format, tensor_type
 
 # Texture's get_format and get_data_type, each format it handled
 TEXTURE = {
@@ -51,7 +51,7 @@ class TextureFormatTest(unittest.TestCase):
                              (channels, size, kind), internal)
 
     def test_an_unknown_format_warns_and_falls_back(self) -> None:
-        with self.assertLogs('modules.gl.texture_format', 'WARNING'):
+        with self.assertLogs('modules.gl.texture.texture_format', 'WARNING'):
             self.assertEqual(pixel_format(12345), GL_NONE)
 
 

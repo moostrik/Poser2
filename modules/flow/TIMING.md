@@ -21,7 +21,7 @@ from the numbers.
 | `v_sync`          | off, so the frame rate shows the headroom                                               |
 | Warm-up, duration | 10 s running before the first sample, then 60 s                                         |
 
-Every number is a mean and a p95 in ms over the run. A GPU time is a `GpuTimer` (`modules/gl/gpu_timer.py`),
+Every number is a mean and a p95 in ms over the run. A GPU time is a `GpuTimer` (`modules/gl/debug/gpu_timer.py`),
 two GL timestamps around a block, so blocks nest: `GPU fluid` holds its passes, `GPU bridge` its
 filters. A timestamp pair is the GPU's wall time between the two, so it includes the CUDA work the
 GPU runs in between: the pose's TensorRT kernels share the GPU, and the fluid's passes read longer
@@ -692,7 +692,7 @@ the 20 ms a frame; the pose 25 a second, at its interval. The render runs over t
 `GPU fluid` holds the whole step, its passes without timers of their own.
 
 `GPU view` brackets `ViewLayer.update`: the crop and `ViewMask.place`, which has the CUDA stream wait for the
-segmentation's `ready` event, copies the mask into a GL pixel buffer and unmaps it (`modules/gl/tensor.py`); the
+segmentation's `ready` event, copies the mask into a GL pixel buffer and unmaps it (`modules/gl/texture/tensor.py`); the
 unmap has OpenGL wait for that stream, so the timer's end waits until the segmentation's GPU work is done. Its
 2.89 ms is mostly that wait. The view's own work, a crop and a mask drawn at 448 × 800, is under 0.1 ms
 **(deduction)**: deep_flow's view, a crop with its depth and a fill, takes 0.19, its crop alone 0.016

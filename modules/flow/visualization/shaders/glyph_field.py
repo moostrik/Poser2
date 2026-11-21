@@ -4,7 +4,7 @@ Glyphs on a grid, procedural, without geometry shaders: arrows for a velocity, d
 Ported from ofxFlowTools visualization concepts.
 """
 
-from OpenGL.GL import GL_VIEWPORT,glGetIntegerv, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import GL_VIEWPORT, glGetIntegerv, glUniform1f, glUniform1i, glUniform2f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 

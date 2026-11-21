@@ -4,7 +4,7 @@ from enum import IntEnum
 
 from OpenGL.GL import GL_NEAREST, glUniform1f, glUniform1i, glUseProgram
 from ... import Shader, draw_quad, Texture
-from ...image import Image
+from ...texture import Image
 from .blue_noise import blue_noise
 
 import logging

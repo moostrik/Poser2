@@ -1,28 +1,18 @@
 
-from .shader import Shader
-from .compute_shader import ComputeShader
-from . import style as Style
-from .context import Context, context, draw_quad
-from .clear import clear_color
-from .colormap import Colormap
+from .shader import Shader, ComputeShader, StorageBuffer
+from .state import Context, context, draw_quad, clear_color
+from .state import style as Style
 
 # TEXTURE CLASSES
-from .texture import Texture
-from .texture_3d import Texture3D, SwapTexture3D
-from .texture_2d_array import Texture2DArray, SwapTexture2DArray
-from .layered_fbo import LayeredFbo
-from .fbo import Fbo, SwapFbo
-from .storage_buffer import StorageBuffer
-from .image import ChannelOrder, Image
-from .tensor import Tensor
+from .texture import Texture, Texture3D, SwapTexture3D, Texture2DArray, SwapTexture2DArray, LayeredFbo, Fbo, SwapFbo, \
+    ChannelOrder, Image, Tensor
 
 # SHADERS (after the texture classes: they import `Texture` from this package)
 from . import shaders
+from .shaders.colormap import Colormap
 
 # TEXT RENDERING
 from .text import Text
 
 # PROFILING
-from .gpu_timer import GpuTimer
-from .gl_state import gl_state
-from .gl_debug import enable_debug_output
+from .debug import GpuTimer, gl_state, enable_debug_output

@@ -1,7 +1,7 @@
 """ColorMatrix: every pixel's RGB through a 3 x 3 matrix and an offset; `saturation_matrix` keeps luminance."""
 
 import numpy as np
-from OpenGL.GL import GL_TRUE,glUniform3f, glUniformMatrix3fv, glUseProgram
+from OpenGL.GL import GL_TRUE, glUniform3f, glUniformMatrix3fv, glUseProgram
 from ... import Shader, draw_quad, Texture
 
 import logging

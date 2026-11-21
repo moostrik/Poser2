@@ -8,7 +8,7 @@ from unittest import mock
 
 from modules.gl import ComputeShader, Shader
 
-SHADER = sys.modules['modules.gl.shader']
+SHADER = sys.modules['modules.gl.shader.shader']
 ACTIVE_UNIFORMS = Shader._active_uniforms           # the real one; the tests' setUp mocks it
 SOURCE: str = '#version 460\nvoid main() {}\n'
 

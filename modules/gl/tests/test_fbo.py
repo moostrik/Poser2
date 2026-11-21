@@ -8,8 +8,8 @@ from OpenGL.GL import GL_RGBA8
 
 from modules.gl import Fbo
 
-FBO = sys.modules['modules.gl.fbo']
-TEXTURE = sys.modules['modules.gl.texture']
+FBO = sys.modules['modules.gl.texture.fbo']
+TEXTURE = sys.modules['modules.gl.texture.texture']
 
 
 class FboTest(unittest.TestCase):

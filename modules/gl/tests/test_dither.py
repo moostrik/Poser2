@@ -14,7 +14,7 @@ class DitherTest(unittest.TestCase):
         self.noise = mock.MagicMock(return_value='noise')
         for patcher in (mock.patch.object(Shader, '_compile', classmethod(lambda cls, sources: 1)),
                         mock.patch.object(Shader, '_active_uniforms', staticmethod(lambda program: {})),
-                        mock.patch.object(sys.modules['modules.gl.shader'], 'glDeleteProgram'),
+                        mock.patch.object(sys.modules['modules.gl.shader.shader'], 'glDeleteProgram'),
                         mock.patch.object(DITHER, 'blue_noise', self.noise),
                         mock.patch.object(DITHER, 'Image', side_effect=lambda **_: mock.MagicMock())):
             patcher.start()

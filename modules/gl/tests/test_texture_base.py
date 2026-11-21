@@ -9,7 +9,7 @@ from OpenGL.GL import GL_FLOAT, GL_R16F, GL_RED, GL_RGBA, GL_RGBA16F
 
 from modules.gl import SwapFbo, SwapTexture3D, Texture, Texture2DArray, Texture3D
 
-BASE = sys.modules['modules.gl.texture_base']
+BASE = sys.modules['modules.gl.texture.texture_base']
 
 
 def allocated(texture, tex_id: int, internal_format: int, fmt: int, depth: int = 0):

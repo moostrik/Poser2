@@ -1,24 +1,11 @@
 # GL plan
 
-The package held to the rules and to the textbook layout, from the structure review of 2026-11-20. Work order: I5,
-I7: I5 moves the files after their edits. The checks that run the GPU wait for a time Matthias is away from the PC; a
-step with such a check is committed after it passes.
+The package held to the rules and to the textbook layout, from the structure review of 2026-11-20.
 
 ## I. The package's structure
 
-`modules/gl` holds the window side, text, two effects and helpers beside its GL resources, flat in its root, and writes
-the texture classes and their ping-pong pairs three times each. The target: `gl` holds GL (context, textures,
-buffers, programs, the blend state, GL debugging), and the window side is a package of its own, as Cinder's `app`
-is. gl's loose files are grouped in folders by job; that comes from CLAUDE.md's package rules, not from Cinder,
-whose `gl` is flat.
+`gl`'s blend state is called `Style`, where GL.md and Cinder call it the blend state.
 
-- I5. gl's loose files in folders by job: `texture/` (`texture_base`, `swap`, `texture`, `texture_3d`,
-  `texture_2d_array`, `texture_format`, `fbo`, `layered_fbo`, `image`, `tensor`, and `cudart`, its CUDA side),
-  `shader/` (`shader`, `compute_shader`, `file_watcher`, and `storage_buffer`, the compute shaders' buffer),
-  `state/` (`context`, `style`, `clear`) and `debug/` (`gl_debug`, `gl_state`, `gpu_timer`); `shaders/` stays the
-  library of operations; `colormap` goes to `shaders/`
-  beside `colormap.glsl`. The tests stay in `gl/tests`. `from modules.gl import …` stays for every
-  name. Check: pyright, the guard tests, gl's tests, each app's main imported.
 - I7. `Style` becomes `BlendState` (GL.md's and Cinder's word), everywhere: the module `style.py`, its `Style`
   import alias, `StyleState`, `StyleStack`, `push_style`/`pop_style`, `Context`'s stack, `test_style`, their users
   and GL.md; the rules thread updates gl.md's line on it and adds `BlendState` (not `Style`) to the glossary in the
