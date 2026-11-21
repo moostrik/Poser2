@@ -68,7 +68,7 @@ def timed(name: str, step, runs: int) -> float:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument('recording', nargs='?', default='20261112-125832_measure')
+    parser.add_argument('recording', nargs='?', default='20261111-123241')
     parser.add_argument('--runs', type=int, default=200)
     args = parser.parse_args()
     chunk = RECORDINGS / args.recording / '0_000.mkv'

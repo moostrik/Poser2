@@ -118,10 +118,10 @@ class BatchUploader:
 
     def _upload(self, frames: dict[int, CameraFrame]) -> None:
         start: float = time.perf_counter()
-        # One stack per size and layout: the four cameras of a rig make one
+        # One stack per size, layout and turn: the four cameras of a rig make one
         stacks: dict[tuple, list[CameraFrame]] = {}
         for frame in frames.values():
-            stacks.setdefault((frame.image.shape, frame.image.dtype, frame.nv12), []).append(frame)
+            stacks.setdefault((frame.image.shape, frame.image.dtype, frame.nv12, frame.rotate90), []).append(frame)
         images: ImageDict = {}
         ready: torch.cuda.Event | None = None
         for stack in stacks.values():

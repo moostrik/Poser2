@@ -12,7 +12,7 @@ import torch
 
 import torch.nn.functional as F
 
-from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, FrameType, TrackingStatus
+from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, FrameType, TrackingStatus, upright_image
 from modules.utils import Rect
 from modules.inference.tests.wait import wait_for
 
@@ -163,6 +163,30 @@ class HandOffTest(unittest.TestCase):
         self.assertAlmostEqual(handed[1].tracklets[0].roi.x, 0.6)        # mirrored, not shifted
         self.assertTrue(all(message.straightened for message in handed))
 
+    def test_tracklets_are_turned_and_flipped_with_their_frame(self) -> None:
+        handed: list[CameraTracklets] = []
+        self.uploader.add_tracklet_callback(handed.append)
+        self.uploader.submit_frame(CameraFrame(0, FrameType.VIDEO, np.zeros((48, 64, 3), np.uint8), 1.0, rotate90=True, flip_v=True))
+        self.uploader.submit_tracklets(CameraTracklets(0, 1.0, [_tracklet(Rect(0.1, 0.2, 0.3, 0.4), 1.0)]))
+        self.uploader.start()
+        end = time.perf_counter() + 5.0
+        while not handed and time.perf_counter() < end:
+            time.sleep(0.005)
+        roi = handed[0].tracklets[0].roi
+        self.assertAlmostEqual(roi.x, 0.2)      # transposed: x is the delivered y
+        self.assertAlmostEqual(roi.y, 1.0 - 0.1 - 0.3)     # then flipped top to bottom
+
+    def test_a_depth_frame_still_to_be_turned_is_refused_with_one_error(self) -> None:
+        depths: list[GpuDepth] = []
+        self.uploader.add_gpu_depth_callback(depths.append)
+        self.uploader.start()
+        with self.assertLogs('modules.inference.preprocessing.serial_uploader', 'ERROR') as logs:
+            for t in (1.0, 2.0):
+                self.uploader.submit_frame(CameraFrame(0, FrameType.DEPTH, np.full((30, 40), 1500, np.uint16), t, rotate90=True))
+            time.sleep(0.2)
+        self.assertEqual(len(logs.records), 1)
+        self.assertEqual(depths, [])
+
     def test_tracklets_straightened_already_pass_as_they_are(self) -> None:
         handed: list[CameraTracklets] = []
         self.uploader.add_tracklet_callback(handed.append)
@@ -214,6 +238,35 @@ class ImageUploadTest(unittest.TestCase):
             alone_ready.synchronize()
             self.assertEqual(tuple(image.shape), (3, 48, 64))
             self.assertTrue(torch.allclose(image.float(), alone[0].float(), atol=1e-3))
+
+    def test_the_torch_path_turns_and_flips_as_upright_image_does(self) -> None:
+        rng = np.random.default_rng(2)
+        bgr = rng.integers(0, 255, (6, 10, 3), np.uint8)
+        stream = torch.cuda.Stream()
+        upload = ImageUpload()
+        for rotate90, flip_v, flip_h in ((True, False, False), (False, True, False), (True, True, True)):
+            frame = CameraFrame(0, FrameType.VIDEO, bgr, 1.0, rotate90=rotate90, flip_v=flip_v, flip_h=flip_h)
+            images, ready = upload.upload([frame], stream, kernel=False)
+            ready.synchronize()
+            expected = torch.from_numpy(upright_image(frame)[..., ::-1].copy()).permute(2, 0, 1).float() / 255.0     # RGB CHW
+            self.assertEqual(tuple(images[0].shape), tuple(expected.shape))
+            self.assertTrue(torch.allclose(images[0].float().cpu(), expected, atol=1e-3), (rotate90, flip_v, flip_h))
+
+    def test_the_kernel_turns_and_flips_as_the_torch_path_does(self) -> None:
+        rng = np.random.default_rng(3)
+        shift = np.array([[1.0, 0.0, 0.1], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+        stream = torch.cuda.Stream()
+        upload = ImageUpload()
+        for image, nv12 in ((rng.integers(0, 255, (48, 64, 3), np.uint8), False), (rng.integers(0, 255, (72, 64), np.uint8), True)):
+            for rotate90, flip_v, flip_h in ((True, False, False), (False, True, False), (True, True, True)):
+                for homography in (None, shift):
+                    frame = CameraFrame(0, FrameType.VIDEO, image, 1.0, nv12=nv12, homography=homography,
+                                        rotate90=rotate90, flip_v=flip_v, flip_h=flip_h)
+                    by_kernel, ready = upload.upload([frame], stream, kernel=True)
+                    by_torch, torch_ready = upload.upload([frame], stream, kernel=False)
+                    torch_ready.synchronize()
+                    self.assertEqual(tuple(by_kernel[0].shape), tuple(by_torch[0].shape))
+                    self.assertLessEqual(float((by_kernel[0].float() - by_torch[0].float()).abs().max()), 1.0 / 255.0)
 
     def test_an_nv12_stack_all_straightened_gives_each_image_as_one_by_one_does(self) -> None:
         rng = np.random.default_rng(1)

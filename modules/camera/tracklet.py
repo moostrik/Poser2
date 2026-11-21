@@ -7,7 +7,8 @@ import numpy as np
 
 from modules.utils import Rect
 
-from .geometry import corrected_keypoints, corrected_roi, mirrored_keypoints, mirrored_roi
+from .geometry import corrected_keypoints, corrected_roi, flipped_keypoints, flipped_roi, mirrored_keypoints, mirrored_roi, \
+    turned_keypoints, turned_roi
 
 
 class TrackingStatus(Enum):
@@ -37,7 +38,7 @@ class CameraTracklets:
     timestamp: float                        # its frame's capture, as each tracklet's
     tracklets: list[CameraTracklet]         # may be empty: no player is a message too
     arrival: float | None = None            # its hand-over; None where `timestamp` is it
-    straightened: bool = False              # in the frame as the uploader makes it, straightened and mirrored
+    straightened: bool = False              # in the frame as the uploader makes it, straightened, turned and flipped
 
 
 def mirrored_tracklets(cam_tracklets: CameraTracklets) -> CameraTracklets:
@@ -47,14 +48,19 @@ def mirrored_tracklets(cam_tracklets: CameraTracklets) -> CameraTracklets:
     return replace(cam_tracklets, tracklets=tracklets)
 
 
-def straightened_tracklets(cam_tracklets: CameraTracklets, homography: np.ndarray | None, flip_h: bool) -> CameraTracklets:
-    """The tracklets in the frame as the uploader makes it: straightened with their frame's
-    homography, then mirrored when the frame is, as the image is."""
+def straightened_tracklets(cam_tracklets: CameraTracklets, homography: np.ndarray | None, rotate90: bool, flip_v: bool,
+                           flip_h: bool) -> CameraTracklets:
+    """The tracklets in the frame as the uploader makes it, as the image is: straightened with their frame's
+    homography, then turned and flipped as the frame is, in `CameraFrame`'s order."""
     tracklets: list[CameraTracklet] = []
     for tracklet in cam_tracklets.tracklets:
         roi, keypoints = tracklet.roi, tracklet.keypoints
         if homography is not None:
             roi, keypoints = corrected_roi(roi, homography), corrected_keypoints(keypoints, homography)
+        if rotate90:
+            roi, keypoints = turned_roi(roi), turned_keypoints(keypoints)
+        if flip_v:
+            roi, keypoints = flipped_roi(roi), flipped_keypoints(keypoints)
         if flip_h:
             roi, keypoints = mirrored_roi(roi), mirrored_keypoints(keypoints)
         tracklets.append(replace(tracklet, roi=roi, keypoints=keypoints))

@@ -69,8 +69,8 @@ def mirrored_image(frame: CameraFrame) -> np.ndarray:
 
 
 def upright_image(frame: CameraFrame) -> np.ndarray:
-    """The frame's BGR or gray image turned and flipped as its flags say, the homography left out. A new array where
-    a flag is set: an uploader does this on the GPU, so this is for a consumer that keeps the image on the host."""
+    """The frame's BGR or gray image turned and flipped as its flags say, the homography left out; a new array where
+    a flag is set."""
     assert not frame.nv12, 'upright_image takes BGR or gray frames'
     image: np.ndarray = frame.image
     if frame.rotate90:

@@ -23,6 +23,10 @@ logger = logging.getLogger(__name__)
 QUEUED: int = 2             # frames of a kind waiting per camera; beyond that the oldest is dropped and counted
 NOTED: int = 16             # color frames per camera whose straightening is kept for their tracklets, which come about 2 frames later
 
+# A color frame's way into the image the uploader makes: its homography, turn (`rotate90`), `flip_v` and `flip_h`
+Straightening = tuple[np.ndarray | None, bool, bool, bool]
+AS_DELIVERED: Straightening = (None, False, False, False)
+
 
 class SerialUploaderSettings(BaseSettings):
     """How the serial uploader does its GPU work."""
@@ -43,8 +47,8 @@ class SerialUploader:
     that cannot keep up loses frames instead of falling behind.
 
     The camera's tracklets come here too (`submit_tracklets`), as its model found them in the frame as delivered: this
-    thread straightens and mirrors them with the frame they were found in, whose homography and mirror `submit_frame`
-    notes by capture time (`NOTED` frames, a dropped one included), and hands them on, before any frame that waits.
+    thread straightens, turns and flips them as the frame they were found in, whose homography, turn and flips
+    `submit_frame` notes by capture time (`NOTED` frames, a dropped one included), and hands them on, before any frame that waits.
     Tracklets whose frame is no longer noted take the newest frame's; tracklets `straightened` already pass as they are.
 
     Input:  BGR uint8 (H, W, 3), grayscale uint8 (H, W) or packed NV12 uint8 (H * 3 / 2, W)
@@ -76,7 +80,8 @@ class SerialUploader:
         # How long a frame and a tracklet message wait in their queue for this thread (ms), as timer samples
         self._frame_wait: PerformanceTimer = PerformanceTimer(name="Wait upload")
         self._tracklet_wait: PerformanceTimer = PerformanceTimer(name="Wait upload tracklets")
-        self._straightening: dict[int, deque[tuple[float, np.ndarray | None, bool]]] = {}  # per camera: (capture, homography, flip_h)
+        self._straightening: dict[int, deque[tuple[float, Straightening]]] = {}  # per camera: (capture, its straightening)
+        self._refused_depth: bool = False           # a depth frame still to be turned or flipped top to bottom was refused
         self._wake: Condition = Condition()
         self._running: bool = False
         self._dropped: int = 0
@@ -102,7 +107,7 @@ class SerialUploader:
         with self._wake:
             if frame.kind == FrameType.VIDEO:
                 noted = self._straightening.setdefault(frame.cam_id, deque(maxlen=NOTED))
-                noted.append((frame.timestamp, frame.homography, frame.flip_h))
+                noted.append((frame.timestamp, (frame.homography, frame.rotate90, frame.flip_v, frame.flip_h)))
             waiting: list[tuple[CameraFrame, float]] = [item for item in self._queue
                                                         if item[0].cam_id == frame.cam_id and item[0].kind == frame.kind]
             if len(waiting) >= QUEUED:
@@ -130,7 +135,7 @@ class SerialUploader:
                     return
                 if self._tracklets:
                     cam_tracklets, queued = self._tracklets.popleft()
-                    homography, flip_h = self._straightening_at(cam_tracklets)
+                    straightening: Straightening = self._straightening_at(cam_tracklets)
                     frame: CameraFrame | None = None
                     wait: PerformanceTimer = self._tracklet_wait
                 else:
@@ -138,7 +143,7 @@ class SerialUploader:
                     wait = self._frame_wait
             wait.add_time((time.perf_counter() - queued) * 1000.0, report=False)
             if frame is None:
-                self._hand_on_tracklets(cam_tracklets, homography, flip_h)
+                self._hand_on_tracklets(cam_tracklets, straightening)
                 continue
             try:
                 if frame.kind == FrameType.VIDEO:
@@ -148,20 +153,20 @@ class SerialUploader:
             except Exception:
                 logger.exception("SerialUploader: frame of camera %d failed", frame.cam_id)
 
-    def _straightening_at(self, cam_tracklets: CameraTracklets) -> tuple[np.ndarray | None, bool]:
-        """The homography and mirror of the frame the tracklets were found in, the newest frame's when it is no
-        longer noted; none for tracklets straightened already or a camera without frames yet. Under the lock."""
+    def _straightening_at(self, cam_tracklets: CameraTracklets) -> Straightening:
+        """The straightening of the frame the tracklets were found in, the newest frame's when it is no longer noted;
+        none for tracklets straightened already or a camera without frames yet. Under the lock."""
         noted = self._straightening.get(cam_tracklets.cam_id)
         if cam_tracklets.straightened or not noted:
-            return None, False
-        for timestamp, homography, flip_h in reversed(noted):
+            return AS_DELIVERED
+        for timestamp, straightening in reversed(noted):
             if abs(timestamp - cam_tracklets.timestamp) <= CAPTURE_TOLERANCE:
-                return homography, flip_h
-        return noted[-1][1], noted[-1][2]
+                return straightening
+        return noted[-1][1]
 
-    def _hand_on_tracklets(self, cam_tracklets: CameraTracklets, homography: np.ndarray | None, flip_h: bool) -> None:
+    def _hand_on_tracklets(self, cam_tracklets: CameraTracklets, straightening: Straightening) -> None:
         if not cam_tracklets.straightened:
-            cam_tracklets = straightened_tracklets(cam_tracklets, homography, flip_h)
+            cam_tracklets = straightened_tracklets(cam_tracklets, *straightening)
         self._tracklet_callbacks(cam_tracklets)
 
     def add_gpu_image_callback(self, callback: GpuImageCallback) -> None:
@@ -214,7 +219,15 @@ class SerialUploader:
             self._finished_image_callbacks(gpu_image)
 
     def _upload_depth(self, frame: CameraFrame) -> None:
-        """A depth frame to the GPU: meters and its confidence, moved onto the color's view at its own grid, and handed on."""
+        """A depth frame to the GPU: meters and its confidence, moved onto the color's view at its own grid, and handed on.
+        The alignment straightens and mirrors only: a depth frame still to be turned or flipped top to bottom is
+        refused, with an error once."""
+        if frame.rotate90 or frame.flip_v:
+            if not self._refused_depth:
+                self._refused_depth = True
+                logger.error("SerialUploader: camera %d's depth frames carry rotate90 or flip_v, which the depth's "
+                             "alignment does not apply; they are not uploaded", frame.cam_id)
+            return
         cam_id: int = frame.cam_id
         image: np.ndarray = frame.image
         size: tuple[int, int] = (image.shape[1], image.shape[0])

@@ -1,14 +1,15 @@
 """ImageUpload: camera color frames onto the GPU, the work both uploaders share.
 
-One frame, or a stack of frames of one size and layout, goes through a pinned staging buffer to the GPU, is
+One frame, or a stack of frames of one size, layout and turn, goes through a pinned staging buffer to the GPU, is
 converted there (NV12, BGR or mono) to float16 RGB CHW in [0, 1], straightened by its camera's homography, then
 turned and flipped as its frame says (`CameraFrame`'s order: the turn, `flip_v`, `flip_h`), and comes out with one
 event recorded after it on the caller's stream; a turned frame comes out with its width and height swapped. A stack
 is one copy and one CUDA kernel compiled at runtime (`SOURCE`, `cuda_kernels`), which does it all per output pixel.
-Where the kernel cannot be compiled (logged once), with `kernel` off, or for a stack of turned and unturned frames,
-the same runs as torch ops: the conversion and the straightening over the whole stack (the cameras' grids stacked),
-the turn and the flips per frame; they are the reference `scripts/gpu_input_timing.py` holds the kernel to. Neither the caller's thread nor this waits for the GPU
-while it has room: a frame goes through its cameras' ring of staging buffers (`staging_ring.py`). Not thread-safe: one uploader's thread uses it."""
+Where the kernel cannot be compiled (logged once), or with `kernel` off, the same runs as torch ops: the conversion
+and the straightening over the whole stack (the cameras' grids stacked), the turn and the flips per frame; they are
+the reference `scripts/gpu_input_timing.py` holds the kernel to. Neither the caller's thread nor this waits for the
+GPU while it has room: a frame goes through its cameras' ring of staging buffers (`staging_ring.py`). Not
+thread-safe: one uploader's thread uses it."""
 
 import ctypes
 import logging
@@ -174,10 +175,10 @@ class ImageUpload:
 
     def upload(self, frames: list[CameraFrame], stream: torch.cuda.Stream,
                kernel: bool = True) -> tuple[list[torch.Tensor], torch.cuda.Event]:
-        """`frames`, color frames of one size and layout, onto the GPU on `stream`: each one's image, float16 RGB CHW
-        in [0, 1], straightened, turned and flipped, in the frames' order, and the event recorded after them all. With
-        `kernel`, as one CUDA kernel; without, where it cannot be compiled, or for a stack of turned and unturned
-        frames, as torch ops."""
+        """`frames`, color frames of one size, layout and turn, onto the GPU on `stream`: each one's image, float16 RGB
+        CHW in [0, 1], straightened, turned and flipped, in the frames' order, and the event recorded after them all.
+        With `kernel`, as one CUDA kernel; without, or where it cannot be compiled, as torch ops."""
+        assert len({frame.rotate90 for frame in frames}) == 1, 'a stack holds turned or unturned frames, not both'
         first: np.ndarray = frames[0].image
         cam_ids: tuple[int, ...] = tuple(frame.cam_id for frame in frames)
         staging: torch.Tensor = self.staging.buffer(cam_ids, (len(frames), *first.shape), torch.from_numpy(first[:0]).dtype)
@@ -186,8 +187,7 @@ class ImageUpload:
         with torch.cuda.stream(stream):
             gpu: torch.Tensor = staging.cuda(non_blocking=True)
             images: list[torch.Tensor] | None = None
-            turns: set[bool] = {frame.rotate90 for frame in frames}
-            if kernel and not self._kernel_failed and len(frames) <= MAX_STACK and gpu.dtype == torch.uint8 and len(turns) == 1:
+            if kernel and not self._kernel_failed and len(frames) <= MAX_STACK and gpu.dtype == torch.uint8:
                 try:
                     images = self._upload_kernel(gpu, frames, stream)
                 except (CudaKernelError, OSError):
@@ -218,7 +218,8 @@ class ImageUpload:
                     stack.inverse[index][i] = value
         out_height, out_width = (width, height) if first.rotate90 else (height, width)
         out: torch.Tensor = torch.empty((len(frames), 3, out_height, out_width), dtype=torch.float16, device='cuda')
-        grid: tuple[int, int] = ((out_width + BLOCK[0] - 1) // BLOCK[0], (out_height * len(frames) + BLOCK[1] - 1) // BLOCK[1])
+        grid: tuple[int, int] = ((out_width + BLOCK[0] - 1) // BLOCK[0],
+                                 (out_height * len(frames) + BLOCK[1] - 1) // BLOCK[1])
         self._kernels.launch('upload', grid, BLOCK, [ctypes.c_void_p(gpu.data_ptr()), ctypes.c_void_p(out.data_ptr()), stack], stream)
         return [out[index] for index in range(len(frames))]
 
