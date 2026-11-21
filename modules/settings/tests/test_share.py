@@ -422,5 +422,38 @@ class TestShareDirection(unittest.TestCase):
         self.assertEqual(pressed, [True])
 
 
+class _PressChild(BaseSettings):
+    go = Field(False, widget=Widget.button)
+
+
+class _PressParent(BaseSettings):
+    go = Field(False, widget=Widget.button)
+    first = Group(_PressChild, share=[go])
+    second = Group(_PressChild, share=[go])
+
+
+class TestSharedButtonOncePerPress(unittest.TestCase):
+    """A shared button runs each callback once per press, wherever it is pressed."""
+
+    def _pressed(self, parent: _PressParent) -> dict[str, int]:
+        counts = {"parent": 0, "first": 0, "second": 0}
+        parent.bind(_PressParent.go, lambda _: counts.__setitem__("parent", counts["parent"] + 1))
+        parent.first.bind(_PressChild.go, lambda _: counts.__setitem__("first", counts["first"] + 1))
+        parent.second.bind(_PressChild.go, lambda _: counts.__setitem__("second", counts["second"] + 1))
+        return counts
+
+    def test_a_press_on_a_child_runs_every_callback_once(self):
+        parent = _PressParent()
+        counts = self._pressed(parent)
+        _PressChild.go.fire(parent.first)
+        self.assertEqual(counts, {"parent": 1, "first": 1, "second": 1})
+
+    def test_a_press_on_the_parent_runs_every_callback_once(self):
+        parent = _PressParent()
+        counts = self._pressed(parent)
+        _PressParent.go.fire(parent)
+        self.assertEqual(counts, {"parent": 1, "first": 1, "second": 1})
+
+
 if __name__ == "__main__":
     unittest.main()

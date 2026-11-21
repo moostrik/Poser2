@@ -265,21 +265,22 @@ class Field(Generic[T]):
 
     # -- Callbacks -----------------------------------------------------------
 
-    def fire(self, obj, from_parent: bool = False) -> None:
+    def fire(self, obj, from_parent: bool = False, from_child: Any = None) -> None:
         """Press a button: its callbacks are called with ``True`` and its value stays; the press is shared with the
-        children and, unless it came from the parent, with the parent."""
+        children but the one it came from and, unless it came from the parent, with the parent, so each callback
+        runs once per press."""
         with obj._locks[self.name]:
             callbacks = list(obj._callbacks[self.name])
         self._call(callbacks, True)
         for child, child_name in obj._share_down.get(self.name, []):
-            if child_name in child._fields:
+            if child is not from_child and child_name in child._fields:
                 child._fields[child_name].fire(child, from_parent=True)
         if not from_parent:
             upward = obj._share_up.get(self.name)
             if upward is not None:
                 parent, parent_name = upward
                 if parent_name in parent._fields:
-                    parent._fields[parent_name].fire(parent)
+                    parent._fields[parent_name].fire(parent, from_child=obj)
 
     def bind(self, obj, callback) -> None:
         with obj._locks[self.name]:
