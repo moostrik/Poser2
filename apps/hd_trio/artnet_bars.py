@@ -13,7 +13,7 @@ CHANNELS_PER_PIXEL: int = 4     # R, G, B, W
 BARS: int = 2                   # the pair, one universe each
 
 
-class ChannelOrder(IntEnum):
+class RgbwChannelOrder(IntEnum):
     """Common RGBW channel orderings for different LED strips: every one that starts or ends with W."""
     # Ending with W
     RGBW = 0
@@ -32,7 +32,7 @@ class ChannelOrder(IntEnum):
 
 
 class ArtNetBarsSettings(ArtNetSenderSettings):
-    channel_order: Field[ChannelOrder] = Field(ChannelOrder.RGBW, description="DMX channel order (e.g., RGBW, GRBW, WRGB)")
+    channel_order: Field[RgbwChannelOrder] = Field(RgbwChannelOrder.RGBW, description="DMX channel order (e.g., RGBW, GRBW, WRGB)")
     pixels: Field[int]                 = Field(90, min=1, max=128, access=Field.INIT, widget=Widget.knob, description="Number of RGBW pixels per bar")
     color: Field[Color]                = Field(Color(1.0, 0.0, 0.0), widget=Widget.color, description="Accent color for lit pixels")
     white_strength: Field[float]       = Field(0.5, min=0.0, max=1.0, description="Base white intensity for all pixels")
