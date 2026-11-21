@@ -2,8 +2,8 @@ import unittest
 
 import numpy as np
 
-from modules.gl.font_atlas import GlyphMetrics
-from modules.gl.text_layout import text_layout
+from modules.gl.text.font_atlas import GlyphMetrics
+from modules.gl.text.text_layout import text_layout
 
 A = GlyphMetrics(u0=0.0, v0=0.0, u1=0.1, v1=0.2, width=8, height=10, bearing_x=1, bearing_y=9, advance=10)
 LOW = GlyphMetrics(u0=0.1, v0=0.0, u1=0.2, v1=0.2, width=6, height=7, bearing_x=0, bearing_y=5, advance=8)

@@ -2,7 +2,7 @@
 
 Fewer GL calls on the main thread, and the package held to the rules and to the textbook layout. G comes from the
 Cinder research (2026-11-20), H from the package scan, I from the structure review of the same day. Work order:
-I3, I4, G1, I6, G2, I5, I7: the shaders do not move after G1 edits them, G2's bind is written once on I6's base,
+I4, G1, I6, G2, I5, I7: the shaders do not move after G1 edits them, G2's bind is written once on I6's base,
 and I5 moves the files after their edits. Before
 the first step, `shader_check.py --reference` makes the reference images at HEAD; every shader check compares
 against them. The checks that run
@@ -17,8 +17,6 @@ buffers, programs, the blend state, GL debugging), and the window side is a pack
 is. gl's loose files are grouped in folders by job; that comes from CLAUDE.md's package rules, not from Cinder,
 whose `gl` is flat.
 
-- I3. `modules/gl/text/`: `text`, `font_atlas`, `text_layout`; the `glyphs` shader stays in `shaders/draw`;
-  `from modules.gl import Text` stays. Check: pyright, the guard tests, the text layout tests.
 - I4. The effects beside the shaders they are made of: `Bloom` into `shaders/filter` beside `DualFilter`,
   `DistanceField` into `shaders/mask` beside `JumpFlood`, `blue_noise` into `shaders/color` beside `Dither`, its one
   user. `shaders/generate` (two noises) merges into `shaders/draw`, `shaders/transition` (two wipes, a mix of two

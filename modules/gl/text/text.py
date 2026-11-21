@@ -10,10 +10,10 @@ import numpy as np
 from modules.utils import Color, Rect
 from OpenGL.GL import GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW, GL_FALSE, GL_FLOAT, glBindBuffer, glBufferData, glDeleteBuffers, glDeleteVertexArrays, glEnableVertexAttribArray, glGenBuffers, glGenVertexArrays, glVertexAttribPointer
 
-from . import style
-from .context import context
+from .. import style
+from ..context import context
+from ..shaders.draw import FillRect, Glyphs
 from .font_atlas import FontAtlas
-from .shaders.draw import FillRect, Glyphs
 from .text_layout import text_layout
 
 
