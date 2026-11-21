@@ -385,5 +385,42 @@ class TestGroupUpwardShare(unittest.TestCase):
         self.assertEqual(reader_calls, [True])
 
 
+class _PairChild(BaseSettings):
+    a = Field(0)
+    b = Field(0)
+
+
+class _PairParent(BaseSettings):
+    a = Field(0)
+    b = Field(0)
+    child = Group(_PairChild, share=[a, b])
+
+
+class TestShareDirection(unittest.TestCase):
+    """A share's direction belongs to the write it is part of, not to the instance."""
+
+    def test_a_child_write_during_a_push_down_reaches_the_parent(self):
+        parent = _PairParent()
+        # while the parent pushes `a` down into the child, the child's callback writes its `b`
+        parent.child.bind(_PairChild.a, lambda value: setattr(parent.child, "b", value * 10))
+        parent.a = 3
+        self.assertEqual(parent.child.b, 30)
+        self.assertEqual(parent.b, 30)
+
+    def test_a_button_pressed_on_a_child_reaches_the_parent(self):
+        class Child(BaseSettings):
+            go = Field(False, widget=Widget.button)
+
+        class Parent(BaseSettings):
+            go = Field(False, widget=Widget.button)
+            child = Group(Child, share=[go])
+
+        parent = Parent()
+        pressed: list[bool] = []
+        parent.bind(Parent.go, pressed.append)
+        Child.go.fire(parent.child)
+        self.assertEqual(pressed, [True])
+
+
 if __name__ == "__main__":
     unittest.main()

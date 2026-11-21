@@ -6,13 +6,6 @@ The package scan of 2026-11-20 (modules/settings held up to CLAUDE.md and its ru
 
 - E4. `widget.py`'s "Adding a widget" goes into SETTINGS.md; the `_propagate_*` docstrings and `Field.fire`'s say what
   each one is.
-- E7. A field's callbacks are called by one function (the list copied under the lock, each call logged on failure),
-  used by `Field._apply` and `Field.fire`; and share propagation carries its direction as an argument
-  (`_propagate_shared_field`, `_propagate_upward_field`, and `Field.fire`, which uses the same propagation as a write
-  in place of its own copy), not as the per-instance `_is_propagating` flag: shared fields are written from several
-  threads (the panel's link thread, the session's chunk timer, OSC, hd_trio's sequencer and render), and a write on
-  one thread can skip its upward share while another pushes down into the same instance. Test: a child's callback
-  that, during a push down from its parent, writes another shared field of the same child reaches the parent.
 - E8. The panel polls every value control (`modules/panel/controls.py` `Control.polls()`; buttons and `INIT` fields
   as now), so a value written by code shows whatever its access says; the polling runs in the panel's process, and
   the app's side (`mirror.ValueDiff`) already compares every field. SETTINGS.md's Access section says so. Checked by

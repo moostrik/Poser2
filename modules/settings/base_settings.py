@@ -19,7 +19,6 @@ class BaseSettings:
         object.__setattr__(self, "_initialized", False)
         object.__setattr__(self, "_share_down", {})     # parent_name → [(child, child_name), ...]
         object.__setattr__(self, "_share_up", {})        # child_name → (parent, parent_name)
-        object.__setattr__(self, "_is_propagating", False)
         object.__setattr__(self, "_fields", {})
         object.__setattr__(self, "_values", {})
         object.__setattr__(self, "_callbacks", {})
@@ -236,62 +235,34 @@ class BaseSettings:
 
     # -- Share propagation ---------------------------------------------------
 
-    def _propagate_shared(self):
-        """Copy shared field values from this parent into its children.
-
-        INIT fields are skipped when the child is already initialized — they
-        were frozen by ``initialize()`` and cannot be changed at runtime.
-        """
+    def _propagate_shared(self) -> None:
+        """Every shared field's value pushed down into the children."""
         for parent_name in self._share_down:
             self._propagate_shared_field(parent_name)
 
     def _propagate_shared_field(self, parent_name: str) -> None:
-        """Push one parent field to all directly shared child fields.
-
-        This is called after construction, after ``update_from_dict()``, and
-        after normal runtime assignment so shared values stay reactive.
-        Propagation is strictly downstream: parent → child.
-        """
+        """One shared field's value pushed down into the children it is shared to; a child's `INIT` field after
+        `initialize()` keeps its own."""
         if parent_name not in self._share_down or parent_name not in self._fields:
             return
         value = self._values[parent_name]
         for child, child_name in self._share_down[parent_name]:
-            if child_name not in child._fields:
+            child_field = child._fields.get(child_name)
+            if child_field is None or (child_field.access is Access.INIT and child._initialized):
                 continue
-            child_field = child._fields[child_name]
-            if child_field.access is Access.INIT and child._initialized:
-                continue
-            previous = child._is_propagating
-            object.__setattr__(child, '_is_propagating', True)
-            try:
-                child_field.set(child, value)
-            finally:
-                object.__setattr__(child, '_is_propagating', previous)
+            child_field._apply(child, value, from_parent=True)
 
     def _propagate_upward_field(self, child_name: str) -> None:
-        """Propagate one child field value up to the parent.
-
-        Called from ``Field._apply()`` on the child when a shared field changes.
-        After writing the parent, the parent fans out the value to any other
-        children that are wired to the same parent field.
-        """
+        """A shared field's value written into the parent it is shared from, which shares it on with its other
+        children and its own parent; a parent's `INIT` field after `initialize()` keeps its own."""
         upward = self._share_up.get(child_name)
         if upward is None:
             return
         parent, parent_name = upward
-        if parent_name not in parent._fields:
+        parent_field = parent._fields.get(parent_name)
+        if parent_field is None or (parent_field.access is Access.INIT and parent._initialized):
             return
-        parent_field = parent._fields[parent_name]
-        if parent_field.access is Access.INIT and parent._initialized:
-            return
-        value = self._values[child_name]
-        previous = parent._is_propagating
-        object.__setattr__(parent, '_is_propagating', True)
-        try:
-            parent_field._apply(parent, value)
-        finally:
-            object.__setattr__(parent, '_is_propagating', previous)
-        parent._propagate_upward_field(parent_name)
+        parent_field._apply(parent, self._values[child_name])
 
     # -- Helpers -------------------------------------------------------------
 

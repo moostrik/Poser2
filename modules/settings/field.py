@@ -142,34 +142,30 @@ class Field(Generic[T]):
             )
         self._apply(obj, value)
 
-    def _apply(self, obj, value):
-        """Write *value* unconditionally (coerce, store, fire callbacks)."""
+    def _apply(self, obj, value, from_parent: bool = False) -> None:
+        """Write *value* unconditionally: coerce, store, share it with the children and, unless it came from the
+        parent, with the parent; then call the callbacks."""
         value = self._coerce(value)
-        lock = obj._locks[self.name]
-        callbacks_to_fire = []
         changed = False
-
-        with lock:
+        callbacks: list = []
+        with obj._locks[self.name]:
             if obj._values[self.name] != value:
                 obj._values[self.name] = value
-                callbacks_to_fire = list(obj._callbacks[self.name])
+                callbacks = list(obj._callbacks[self.name])
                 changed = True
-
         if changed:
             obj._propagate_shared_field(self.name)
-            # Upward propagation: child → parent (only when not already propagating)
-            if not obj._is_propagating:
+            if not from_parent:
                 obj._propagate_upward_field(self.name)
+        self._call(callbacks, value)
 
-        # Fire callbacks outside the lock
-        for cb in callbacks_to_fire:
+    def _call(self, callbacks: list, value: Any) -> None:
+        """Call each of *callbacks* with *value*, outside the lock; a failing one is logged and the others go on."""
+        for callback in callbacks:
             try:
-                cb(value)
+                callback(value)
             except Exception:
-                logger.warning(
-                    "Callback %r for setting '%s' raised an exception",
-                    cb, self.name, exc_info=True,
-                )
+                logger.warning("Callback %r for setting '%s' raised an exception", callback, self.name, exc_info=True)
 
     # -- Type coercion -------------------------------------------------------
 
@@ -269,37 +265,17 @@ class Field(Generic[T]):
 
     # -- Callbacks -----------------------------------------------------------
 
-    def fire(self, obj) -> None:
-        """Invoke all registered callbacks (for Widget.button actions).
-
-        Unlike set(), fire() does not change the value — it triggers every
-        callback with ``True``.  Button callbacks therefore always receive
-        ``True``; this keeps the ``callback(value)`` signature uniform across
-        all field types, but callers should document which fields are buttons.
-        """
-        lock = obj._locks[self.name]
-        with lock:
+    def fire(self, obj, from_parent: bool = False) -> None:
+        """Press a button: its callbacks are called with ``True`` and its value stays; the press is shared with the
+        children and, unless it came from the parent, with the parent."""
+        with obj._locks[self.name]:
             callbacks = list(obj._callbacks[self.name])
-        for cb in callbacks:
-            try:
-                cb(True)
-            except Exception:
-                logger.warning(
-                    "Action callback %r for '%s' raised an exception",
-                    cb, self.name, exc_info=True,
-                )
-        # Propagate to shared children
-        for child, child_name in getattr(obj, '_share_down', {}).get(self.name, []):
+        self._call(callbacks, True)
+        for child, child_name in obj._share_down.get(self.name, []):
             if child_name in child._fields:
-                previous = child._is_propagating
-                object.__setattr__(child, '_is_propagating', True)
-                try:
-                    child._fields[child_name].fire(child)
-                finally:
-                    object.__setattr__(child, '_is_propagating', previous)
-        # Propagate upward to parent (skip if fire arrived from parent)
-        if not obj._is_propagating:
-            upward = getattr(obj, '_share_up', {}).get(self.name)
+                child._fields[child_name].fire(child, from_parent=True)
+        if not from_parent:
+            upward = obj._share_up.get(self.name)
             if upward is not None:
                 parent, parent_name = upward
                 if parent_name in parent._fields:
