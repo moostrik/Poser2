@@ -23,14 +23,13 @@ from .folder_scanner import FolderScanner
 from .settings import WallsSettings
 from .wall import Wall
 
-from modules.inout import OscSender, OscSenderSettings
+from modules.inout import OscSender
 
 logger = logging.getLogger(__name__)
 
 STATS_INTERVAL: float = 10.0    # s between the log lines with the frame rates
 START_DELAY: float = 0.5        # s between two cells starting when the loaded clips go round again
 MIN_START_GAP: float = 0.1      # s at least between two cells starting, when clips load faster than that
-BANG_PORT: int = 4115           # the Max patch's `udpreceive` for wall 0's `/bang`; wall 1 is the next port
 CELLS: int = sphere.CELLS       # per wall
 
 
@@ -55,11 +54,7 @@ class Player:
         self.settings: WallsSettings = settings
         self.walls: list[Wall] = walls
         # the Max patch places a clip's laugh by the cell its play starts in: `/bang <cell>` to the wall's port
-        self.osc: list[OscSender] = []
-        for wall in range(len(walls)):
-            osc_settings = OscSenderSettings()
-            osc_settings.port = BANG_PORT + wall
-            self.osc.append(OscSender(osc_settings, events=('/bang',)))
+        self.osc: list[OscSender] = [OscSender(settings.bangs[wall], events=('/bang',)) for wall in range(len(walls))]
         self._lines: CreditLines = lines        # the captions' lines, one at random per play
         self._lines_lock = threading.Lock()
         # the cell (0 to 47) that is SMILE Online's: no bang and no caption for the clip playing on unseen

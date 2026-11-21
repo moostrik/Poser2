@@ -1,4 +1,5 @@
-from modules.settings import BaseSettings, Field, Widget
+from modules.inout import OscSenderSettings
+from modules.settings import BaseSettings, Field, Group, Widget
 from modules.video import Hardware
 
 
@@ -12,3 +13,10 @@ class WallsSettings(BaseSettings):
     fps:            Field[float] = Field(20.0, min=0.0, max=60.0, step=1.0, description="Clip playback speed (fps); 0 plays each clip at its own rate")
     spread:         Field[float] = Field(0.1, min=0.0, max=0.9, step=0.05, description="Random speed difference per play, as a fraction of fps, so the cells drift apart")
     trail:          Field[float] = Field(0.0, min=0.0, max=0.99, step=0.01, description="Blend of each frame with the previous output; 0 = none")
+    bang_0:         Group[OscSenderSettings] = Group(OscSenderSettings, defaults={'port': 4115}, description="Wall 0's /bang <cell> to the Max patch when a clip starts")
+    bang_1:         Group[OscSenderSettings] = Group(OscSenderSettings, defaults={'port': 4116}, description="Wall 1's /bang <cell> to the Max patch when a clip starts")
+
+    @property
+    def bangs(self) -> list[OscSenderSettings]:
+        """The bang senders' settings, one per wall."""
+        return [self.bang_0, self.bang_1]

@@ -261,7 +261,19 @@
       "decoder": "CPU",
       "fps": 20.0,
       "spread": 0.1,
-      "trail": 0.0
+      "trail": 0.0,
+      "bang_0": {
+        "enabled": true,
+        "ip": "127.0.0.1",
+        "port": 4115,
+        "fps": 30.0
+      },
+      "bang_1": {
+        "enabled": true,
+        "ip": "127.0.0.1",
+        "port": 4116,
+        "fps": 30.0
+      }
     },
     "artnet": {
       "enabled": true,
