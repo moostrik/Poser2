@@ -1,5 +1,5 @@
 """The TensorRT runtime and logger the models share. Each model loads its engine and runs its own execution context on
-its own thread and stream: TensorRT's thread-safety model, which needs no lock between contexts."""
+its own thread and stream, without a lock between them."""
 from threading import Lock
 import tensorrt as trt
 

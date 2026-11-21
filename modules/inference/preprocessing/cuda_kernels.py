@@ -1,7 +1,7 @@
 """CUDA C kernels compiled at runtime (NVRTC) and launched on a torch stream, through ctypes.
 
 torch's wheel brings NVRTC (`nvrtc64_<major>0_0.dll` on Windows, `libnvrtc.so.<major>` on Linux) and the driver
-brings its API (`nvcuda.dll`, `libcuda.so.1`), so no CUDA toolkit, compiler or package is needed: the source is
+brings its API (`nvcuda.dll`, `libcuda.so.1`): the source is
 compiled for the GPU's own architecture once, on first use, and the kernels run on the context torch made current.
 The libraries are loaded on first use too: a machine without them imports this, and `CudaKernels.launch` raises.
 """

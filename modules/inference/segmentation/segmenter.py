@@ -28,8 +28,7 @@ class Segmenter(ModelWorker[Batch, SegmenterSettings]):
     """Person masks (Robust Video Matting) for the crops of a batch of poses, on its own thread, kept on the GPU.
 
     A single-slot queue: a batch still waiting when a newer one comes is dropped and counted in `settings.dropped`.
-    A dropped batch reaches no callback: a newer one is already waiting, and an empty one would read as no player and
-    blank the masks until it arrives. Poses without crops go to the callbacks without masks, from the submitting thread;
+    A dropped batch reaches no callback. Poses without crops go to the callbacks without masks, from the submitting thread;
     the masks from this thread.
     """
 
@@ -98,7 +97,7 @@ class Segmenter(ModelWorker[Batch, SegmenterSettings]):
     def _process(self, items: dict[int, Batch]) -> None:
         poses, track_ids, images, boxes, ready = items[0]
 
-        # Every player's memory cleared now and then, a failsafe against a state gone wrong
+        # Every player's memory cleared each `reset_interval` batches
         self._batch_count += 1
         if self._reset_interval > 0 and self._batch_count % self._reset_interval == 0:
             self._states.clear()

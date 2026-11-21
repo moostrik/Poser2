@@ -2,8 +2,7 @@
 
 The cameras run at one frame rate, so each keeps its phase, its place in the frame cycle (its capture time modulo
 `1 / fps`, averaged over `PHASE_FRAMES` frames). The rounds are cut in the middle of the largest gap between the
-phases of the live cameras (those with a message within `LIVE_FRAMES` frames), so a set holds the messages closest
-together in time. A set closes as soon as every live camera is in it, or when a message of a later round, or a
+phases of the live cameras (those with a message within `LIVE_FRAMES` frames). A set closes as soon as every live camera is in it, or when a message of a later round, or a
 camera's second message, comes; a camera that did not come is then left out. Every message is in one set.
 
 `submit` only queues a message, on the thread it comes on, at most `WAITING` per camera; beyond that the oldest

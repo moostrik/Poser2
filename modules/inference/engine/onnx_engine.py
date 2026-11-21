@@ -1,7 +1,6 @@
 """A model through ONNX Runtime's CUDA provider, run on the worker's stream (`user_compute_stream`), its inputs and
 outputs bound on the GPU and the outputs handed on as torch tensors without a copy (DLPack). Given `max_batch`, every
-input's batch is padded to it, the shape the model is warmed up at, and the outputs cut back: ONNX Runtime plans its
-kernels per shape."""
+input's batch is padded to it, the shape the model is warmed up at, and the outputs cut back."""
 
 import logging
 

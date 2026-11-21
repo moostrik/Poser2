@@ -80,6 +80,12 @@ camera's newest image. The thread loads its model on its stream, runs it once at
 made while running, and then runs every waiting item. Each worker keeps its model's own steps (the pose's ImageNet
 normalization and SimCC decode, the segmentation's recurrent states) and its callbacks.
 
+A batch the segmenter drops reaches no callback: a newer one is already waiting, and an empty one would read as no
+player and blank the masks until it arrives. Its players' recurrent states are cleared each `reset_interval` batches,
+a failsafe against a state gone wrong. The person detector stretches each image whole into its input, as the device
+manip does: nothing is cropped, nobody is lost at the edges, and its boxes map 1:1 onto the frame. It holds the
+images until its stream has synchronized, so the upload's memory is not reused while that stream reads it.
+
 The engines run a model's named GPU tensors on the worker's stream. `TrtEngine` gives each worker its own TensorRT
 execution context on the worker's thread, which needs no lock between contexts (TensorRT's thread-safety model,
 [`engine/trt_runtime.py`](engine/trt_runtime.py)), so the models run side by side. `OnnxEngine` runs ONNX Runtime's CUDA provider on the worker's stream
@@ -127,7 +133,7 @@ The model is held to these limits **(site fact)**:
 ## The upload
 
 `SerialUploader` is the camera's one hand-off: each frame onto the GPU on its own, the moment it comes, so the
-color goes up at once to start the pose. `submit_frame` queues the frame and returns: two frames of a kind per
+color goes up at once to start the pose and no GPU work and no consumer runs on the camera's thread. `submit_frame` queues the frame and returns: two frames of a kind per
 camera wait, and a third drops the oldest, counted (`dropped`). Its own thread makes the corrected camera frame,
 which every user of the camera needs:
 
@@ -147,12 +153,13 @@ which every user of the camera needs:
   a recording's 3 mm steps. A frame without a confidence (an older recording) reads 1, so nothing after it needs a
   case for it.
 
-`CameraSync` groups one moment's frames of several cameras into a set, which `BatchUploader.submit_set` puts on the
+`CameraSync` groups one moment's frames of several cameras into a set, cut in the middle of the largest gap between
+the cameras' phases so a set holds the messages closest together in time, which `BatchUploader.submit_set` puts on the
 GPU as one stack (one copy, one round of kernels, when the frames share a size). It stays in this package: it
 groups the frames for the upload, the input's first step, and holds nothing of a camera.
 
 The kernels are CUDA C compiled at runtime by the NVRTC torch ships (`preprocessing/cuda_kernels.py`, through ctypes, no extra
-package). `camera.uploader.depth_kernels` off, or kernels that cannot be compiled or loaded (logged once), run the
+package, no CUDA toolkit or compiler). `camera.uploader.depth_kernels` off, or kernels that cannot be compiled or loaded (logged once), run the
 same in torch ops, the reference the tests and the harness hold the kernels to; the depth's then run as one CUDA
 graph per lens, homography and size, with the depth and the confidence its inputs (255 where the frame has none). The torch ops are about a hundred small kernels; launched one by one they held
 the uploader 12 ms a frame while the GPU's queue was full, as each launch waits there. `scripts/depth_align_check.py`

@@ -2,9 +2,8 @@
 round in one batch, through ONNX Runtime or TensorRT, out as `Detection`s with boxes normalized to the frame.
 
 It takes the uploaded images (`GpuImage`), so a frame goes to the GPU once and nothing of it is worked
-on the CPU: each image is stretched whole into the model's input on the GPU, as the device manip does
-(nothing cropped, nobody lost at the edges, boxes map 1:1 onto the frame), and only the person rows
-come back. The image is straightened and mirrored, so are its boxes. A newer image of a camera replaces
+on the CPU: each image is stretched whole into the model's input on the GPU, as the device manip does, and
+only the person rows come back. The image is straightened and mirrored, so are its boxes. A newer image of a camera replaces
 one still waiting: the latest wins, as in the other workers.
 """
 
@@ -66,7 +65,7 @@ class PersonDetector(ModelWorker[GpuImage, PersonDetectorSettings]):
 
     def _process(self, items: dict[int, GpuImage]) -> None:
         """The waiting images, one per camera, as one batch. They are held until the model has synchronized its
-        stream, so the upload's memory is not reused while this stream reads it."""
+        stream."""
         start: float = time.perf_counter()
         cam_ids: list[int] = list(items.keys())
         batch: torch.Tensor = self._batch([items[cam_id] for cam_id in cam_ids])
