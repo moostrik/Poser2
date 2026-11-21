@@ -178,3 +178,4 @@ python -m unittest discover -s modules/<pkg>/tests -t .    # camera/oak4 in .ven
 ## Threads
 
 - A thread that finds a minor problem fixes it, and asks the thread the code belongs to for feedback
+- An open question is settled in the thread that has it, or the user decides where it goes
