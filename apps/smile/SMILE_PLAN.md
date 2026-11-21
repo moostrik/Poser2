@@ -3,48 +3,12 @@
 What is next for smile, the app in [SMILE.md](SMILE.md); what spans the apps is in the
 [refactor's plan](../../REFACTOR_PLAN.md).
 
-Each step is one commit. Every step runs the guard tests, the tests of the smile packages it touches and pyright.
-A step that moves or rewires code also starts smile once: ComfyUI first (`scripts/start_comfy.bat`), then
-`launcher.py -app smile -sim` on a recording; it reaches the camera screen with the walls playing,
-takes a recorded visitor through (flash, portrait, grin, bloom, the clip saved and on the walls) and leaves no error
-in the log. A rename or a text change needs no start. The whole of smile's tests run after the last step.
-
-## F. Documents
-
-- F1 SMILE.md and README.md: the settings paths (`Settings.setup.camera`, `Settings.setup.audio.osc`), `decoder` for
-  `hwaccel`, SMILE Online no longer "branch `online`, a proof of concept", American spelling, a link to `smile.md`'s
-  Names for "visitor" (the exception to the glossary's "player"), `smile.md`'s rules linked instead of restated;
-  "the players" reading `output/grins/` becomes the clip player, README's "player 1/2" for the walls becomes "wall",
-  and "movement" for a style becomes "style" (SMILE.md twice, README.md once); the docstrings that name
-  `modules/online/`, `modules/save/…` and `modules/audio/tape.py` name their real place in `apps/smile/`.
-  Tests: none (text only).
-
 ## Open questions
 
 - Recordings of real visitors: a few recorded with the Vimba camera (or a webcam) at the PC or on site, the camera
   in portrait. The PC the plan was built on has neither; its one recording (`data/recordings/20261121-110540`, 1280 × 960) is a
   photo handed by a stand-in webcam, turned and flipped as the camera delivers.
-
-## The rules it touches
-
-- `glossary.md`, a settings class is named after the class it configures: B2
-- `CLAUDE.md` Imports, a package's `__init__.py` is its public boundary: B1, B2, B3
-- `CLAUDE.md` Project shape and Packages, packages independent, one job per folder: B1, B2
-- `rendering.md` and the glossary, a `Compositor` owns an FBO and draws other things into it: B1
-- `CLAUDE.md` API evolution and Naming, code that does the same is written once, one term everywhere: B4, E1
-- `CLAUDE.md` Composition and wiring, share runtime data through `modules/board/`; `board.md`: C2
-- `CLAUDE.md` Concurrency, a callback list is a `utils.Broadcast`: C3
-- `app-lifecycle.md`, start workers only after the wiring: C4
-- `CLAUDE.md` Settings, read fields when they are used, never unpack them into constructor parameters: C4
-- `CLAUDE.md` Time, take time from the frame or the tick downstream: C1, C4
-- `CLAUDE.md` Types, `IntEnum` over string keys: C5
-- `glossary.md`, `enabled` not `active`, `FrameCallback` for the pose frame and every other frame type qualified,
-  `timestamp`, American spelling; `smile.md`, `music_id` / `style_id`: B2, C4, D1, F1
-- `camera.md`, the camera's thread runs only the camera, and `modules/camera`'s `CameraFrame`, a frame as delivered: C1
-- `CLAUDE.md` Testing, geometry in plain modules, drawing in renderers: C1
-- `smile.md`, `sphere.py` is the one place that knows the sphere: B1, E1
-- `docs.md`, each fact in one place: F1
-- `CLAUDE.md` Concurrency, the part that works on the item has its own thread: C6
-- `CLAUDE.md` Time, a thread that waits for a moment waits on a `utils.Waker`: C6
-- `CLAUDE.md` Plans and commits, a plan is named after the package, app or folder it is for, and sits in it: this
-  plan, in `apps/smile`
+- README.md's SMILE Online section keeps a **not yet** list: unbuilt work in a document, which `docs.md` puts in
+  the plan. Move its items here as steps?
+- `CaptionRenderer` (`render/layers/caption_renderer.py`) holds its font and title textures, where `rendering.md` has a
+  `Renderer` own no texture: a name that fits better, or the textures handed in?
