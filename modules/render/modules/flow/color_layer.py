@@ -35,8 +35,8 @@ class ColorOutput(StageOutput):
 
 class ColorLayerSettings(DensityColorSettings, StageLayerSettings):
     """Configuration for ColorLayer: the reset, the density's color, its monitors last."""
-    monitor_main:  Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=MAIN_TINT)
-    monitor_debug: Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=DEBUG_TINT)
+    monitor_main:  Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=MAIN_TINT, description="The color stage's monitor in the main panel")
+    monitor_debug: Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=DEBUG_TINT, description="The color stage's monitor in the debug panel")
 
 
 class ColorLayer(StageLayer[ColorInput, ColorOutput]):

@@ -16,8 +16,8 @@ from .lut_grade import LutGrade, LutSettings
 
 class LayerCompositorSettings(BaseSettings):
     """Configuration for LayerCompositor."""
-    blend_mode: Field[BlendState.BlendMode] = Field(BlendState.BlendMode.ALPHA)
-    lut:        Group[LutSettings]     = Group(LutSettings)
+    blend_mode: Field[BlendState.BlendMode] = Field(BlendState.BlendMode.ALPHA, description="How the layers are drawn over each other")
+    lut:        Group[LutSettings]     = Group(LutSettings, description="The LUT the composite is drawn through")
 
 
 # ============================================================================

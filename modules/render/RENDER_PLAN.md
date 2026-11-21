@@ -10,14 +10,6 @@ These stay as they are, on the user's word:
 
 The pixel buffer and fence code of `general/screen_recording` is not in this plan: `gl.PixelBufferPool` holds it, and `ScreenCapture` and `ScreenPreview` use it (GL plan D1, built in d1be9840). The pack and unpack alignment constants and their set-back in those two files go in GL's alignment item, where every transfer sets its own alignment.
 
-## B. Panel text
-
-- **B1** The render's settings fields and panels shown to the user get their one-line description, with the unit where there is one (seen: 24 fields and 17 panels with none; a hidden one, `visible=False`, is left out):
-  - Fields: `DataLayerSettings` (8), `LayerCompositorSettings.blend_mode`, `LutSettings.strength`, `SimilaritySilhouetteLayerSettings.blend_mode` and `max_players`, and the 12 colors of `ColorSettings`.
-  - Panels: `LayerCompositorSettings.lut`, and in `modules/flow`'s layers (the flow threads' files) `monitor_main` and `monitor_debug` of the motion, color, bridge, 2D fluid and 3D fluid settings, the 2D fluid's `lut`, the 3D fluid's `composite` and its composite's `lut`, the 2D and 3D monitors' `advanced` and the 3D monitor's `orbit`.
-  - Why: "Prefer a description for every field and panel shown to the user", and "Keep `Field` descriptions to one short line of panel text: what the value is and its unit"; these show the user no text.
-  - Check: pyright, and the render tests.
-
 ## C. Docstrings
 
 - **C1** The reasons left in the panorama's docstrings leave them, and the docstrings keep what each thing is: `marks.py`'s module docstring (27 lines, 14 bold), `GridDraw`, `LabelDraw`, `MarkDraw`, `SeamDraw`, `StitchDraw`, and `strip.elevation_window` (seen). A reason about reading the strip goes to white_space's `CALIBRATION.md`, where most of them are already stated; a reason about the code (such as a label never moving sideways, and flipping its side at the right edge because `Text.draw_box_text` does not clamp) goes to a panorama section in `RENDER.md`.
@@ -35,8 +27,6 @@ The pixel buffer and fence code of `general/screen_recording` is not in this pla
 
 ## Rules it touches
 
-- Settings: "Prefer a description for every field and panel shown to the user" (B1)
-- Settings: "Keep `Field` descriptions to one short line of panel text: what the value is and its unit" (B1)
 - Settings: "Components take their settings object (or a `Group` of it) in the constructor, never as a global" (D1)
 - Performance: "Prefer the design with the lower latency, measured in the context of the app" (D2)
 - Docstrings: "A docstring says what the thing is" (C1)

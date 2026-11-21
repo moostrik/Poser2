@@ -74,8 +74,8 @@ class MotionLayerSettings(StageLayerSettings):
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
     fps: Field[float] =                     Field(30.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate the capture gaps are held around")
 
-    monitor_main:  Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=MAIN_TINT)
-    monitor_debug: Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=DEBUG_TINT)
+    monitor_main:  Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=MAIN_TINT, description="The motion stage's monitor in the main panel")
+    monitor_debug: Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=DEBUG_TINT, description="The motion stage's monitor in the debug panel")
 
 
 class MotionLayer(StageLayer[MotionInput, MotionOutput]):

@@ -6,18 +6,18 @@ from modules.utils import Color
 
 class ColorSettings(BaseSettings):
     """Per-player track colors (one color picker per player in the panel)."""
-    player_0:    Field[Color] = Field(Color(1.0, 0.0, 0.0))  # Red
-    player_1:    Field[Color] = Field(Color(0.0, 0.0, 1.0))  # Blue
-    player_2:    Field[Color] = Field(Color(0.0, 1.0, 0.0))  # Green
-    player_3:    Field[Color] = Field(Color(1.0, 1.0, 0.0))  # Yellow
-    player_4:    Field[Color] = Field(Color(1.0, 0.0, 1.0))  # Magenta
-    player_5:    Field[Color] = Field(Color(0.0, 1.0, 1.0))  # Cyan
-    player_6:    Field[Color] = Field(Color(1.0, 0.5, 0.0))  # Orange
-    player_7:    Field[Color] = Field(Color(0.5, 0.0, 1.0))  # Purple
-    pose_left:   Field[Color] = Field(Color(1.0, 0.5, 0.0))  # Orange
-    pose_right:  Field[Color] = Field(Color(0.0, 1.0, 1.0))  # Cyan
-    pose_center: Field[Color] = Field(Color(1.0, 1.0, 1.0))  # White
-    history:     Field[Color] = Field(Color(0.5, 0.5, 0.5))  # Gray
+    player_0:    Field[Color] = Field(Color(1.0, 0.0, 0.0), description="Player 0's track color")
+    player_1:    Field[Color] = Field(Color(0.0, 0.0, 1.0), description="Player 1's track color")
+    player_2:    Field[Color] = Field(Color(0.0, 1.0, 0.0), description="Player 2's track color")
+    player_3:    Field[Color] = Field(Color(1.0, 1.0, 0.0), description="Player 3's track color")
+    player_4:    Field[Color] = Field(Color(1.0, 0.0, 1.0), description="Player 4's track color")
+    player_5:    Field[Color] = Field(Color(0.0, 1.0, 1.0), description="Player 5's track color")
+    player_6:    Field[Color] = Field(Color(1.0, 0.5, 0.0), description="Player 6's track color")
+    player_7:    Field[Color] = Field(Color(0.5, 0.0, 1.0), description="Player 7's track color")
+    pose_left:   Field[Color] = Field(Color(1.0, 0.5, 0.0), description="The pose's left side")
+    pose_right:  Field[Color] = Field(Color(0.0, 1.0, 1.0), description="The pose's right side")
+    pose_center: Field[Color] = Field(Color(1.0, 1.0, 1.0), description="The pose's center line")
+    history:     Field[Color] = Field(Color(0.5, 0.5, 0.5), description="A feature drawn in one color, as its history")
 
     @property
     def track_colors(self) -> list[Color]:

@@ -81,7 +81,7 @@ class Monitor2DLayerSettings(BaseSettings):
     texture: Field[str] =           Field("output.velocity", widget=Widget.path_select, options=names, description="The texture shown, picked a step at a time")
     view: Field[MonitorView] =      Field(MonitorView.COLORMAP, description="How the port is drawn: by its kind, glyphs, raw, histogram or strip")
 
-    advanced = Group(Monitor2DAdvancedSettings)
+    advanced = Group(Monitor2DAdvancedSettings, description="How the monitor draws: channels, scale, glyphs, legend, blend")
 
 
 @dataclass

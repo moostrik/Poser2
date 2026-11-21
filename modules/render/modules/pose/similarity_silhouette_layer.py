@@ -20,8 +20,8 @@ from .shaders import LayerComposite, AddMix
 class SimilaritySilhouetteLayerSettings(BaseSettings):
     """Configuration for SimilaritySilhouetteLayer."""
     stage:                  Field[int]   = Field(0, description="Pipeline stage for pose data")
-    max_players:            Field[int]   = Field(3, access=Field.INIT)
-    blend_mode:             Field[BlendState.BlendMode] = Field(BlendState.BlendMode.ALPHA)
+    max_players:            Field[int]   = Field(3, access=Field.INIT, description="Players tracked at most")
+    blend_mode:             Field[BlendState.BlendMode] = Field(BlendState.BlendMode.ALPHA, description="How the silhouettes are drawn over the layers before them")
     similarity_threshold:   Field[float] = Field(0.1, min=0.0, max=1.0, description="Similarity below this contributes nothing")
     motion_exponent:        Field[float] = Field(1.0, min=0.0, max=5.0, description="Similarity response curve")
     similarity_scale:       Field[float] = Field(1.0, min=0.0, max=1.0, description="0 = own silhouette only, 1 = full cross-camera response", access=Field.READWRITE)

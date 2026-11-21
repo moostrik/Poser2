@@ -27,12 +27,12 @@ class Monitor3DAdvancedSettings(Monitor2DAdvancedSettings):
     slice_position: Field[float] =  Field(0.5, min=0.0, max=1.0, description="The slice's place through the volume: 0 the front, 1 the back; the wheel steps it", access=Field.READWRITE)
     slice_focus: Field[float] =     Field(0.5, min=0.0, max=1.0, description="Opacity moved from the rest to the slice: 0 none, 1 only the slice at its amount")
 
-    orbit = Group(OrbitSettings)
+    orbit = Group(OrbitSettings, description="The 3D views' camera around the box")
 
 
 class Monitor3DLayerSettings(Monitor2DLayerSettings):
     """Configuration for Monitor3DLayer: the flat monitor's, its `advanced` with the volume views'."""
-    advanced = Group(Monitor3DAdvancedSettings)
+    advanced = Group(Monitor3DAdvancedSettings, description="How the monitor draws, the volume views included")
 
 
 def box_depth(port: Port) -> float:

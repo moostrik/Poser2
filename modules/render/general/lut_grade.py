@@ -16,7 +16,7 @@ class LutSettings(BaseSettings):
     files:    Field[list[str]] = Field([""], visible=False, access=Field.READWRITE)
     file:     Field[str]       = Field("", widget=Widget.text_select, options=files, description="LUT file", access=Field.READWRITE)
     rescan:   Field[bool]      = Field(False, widget=Widget.button, description="Rescan LUTs")
-    strength: Field[float]     = Field(1.0, min=0.0, max=1.0)
+    strength: Field[float]     = Field(1.0, min=0.0, max=1.0, description="How much of the LUT is applied, 0 to 1")
 
 
 class LutGrade:

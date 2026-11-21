@@ -63,8 +63,8 @@ class BridgeLayerSettings(StageLayerSettings):
     width: Field[int] =     Field(2160, min=32, max=4096, step=32, description="Width the bridge writes its outputs at")
     height: Field[int] =    Field(3840, min=32, max=4096, step=32, description="Height the bridge writes its outputs at")
 
-    monitor_main:  Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=MAIN_TINT)
-    monitor_debug: Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=DEBUG_TINT)
+    monitor_main:  Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=MAIN_TINT, description="The bridge stage's monitor in the main panel")
+    monitor_debug: Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=DEBUG_TINT, description="The bridge stage's monitor in the debug panel")
 
 
 class BridgeLayer(StageLayer[BridgeInput, BridgeOutput]):

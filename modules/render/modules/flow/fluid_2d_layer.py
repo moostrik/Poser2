@@ -19,10 +19,10 @@ class Fluid2DLayerSettings(Fluid2DSettings, FluidLayerSettings):
     stage's width and height are the fluid's simulation grid; how the picture is drawn over the layers before it, and
     the LUT it is drawn through."""
     blend_mode: Field[BlendState.BlendMode] =    Field(BlendState.BlendMode.ADD, newline=True, description="How the show is drawn over the layers before it")
-    lut: Group[LutSettings] =               Group(LutSettings)
+    lut: Group[LutSettings] =               Group(LutSettings, description="The LUT the fluid's picture is drawn through")
 
-    monitor_main:  Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=MAIN_TINT)
-    monitor_debug: Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=DEBUG_TINT)
+    monitor_main:  Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=MAIN_TINT, description="The fluid stage's monitor in the main panel")
+    monitor_debug: Group[Monitor2DLayerSettings] = Group(Monitor2DLayerSettings, last=True, tint=DEBUG_TINT, description="The fluid stage's monitor in the debug panel")
 
 
 class Fluid2DLayer(FluidLayer):

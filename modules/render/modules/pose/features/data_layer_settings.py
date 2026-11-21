@@ -96,14 +96,14 @@ class DataLayerSettingsProtocol(Protocol):
 
 class DataLayerSettings(BaseSettings):
     """Unified configuration for data visualization layers."""
-    mode:           Field[LayerMode]            = Field(LayerMode.WINDOW)
-    feature_field:  Field[IntEnum]              = Field(ScalarFeatureSelect.AngleMotion)
-    stage:          Field[int]                  = Field(0)
+    mode:           Field[LayerMode]            = Field(LayerMode.WINDOW, description="Off, one frame's values, or a window of them over time")
+    feature_field:  Field[IntEnum]              = Field(ScalarFeatureSelect.AngleMotion, description="The feature drawn")
+    stage:          Field[int]                  = Field(0, description="Pipeline stage for pose data")
 
-    line_width:     Field[float] = Field(3.0)
-    line_smooth:    Field[float] = Field(1.0)
+    line_width:     Field[float] = Field(3.0, description="Line width (pixels)")
+    line_smooth:    Field[float] = Field(1.0, description="Line edge softness (pixels)")
 
-    use_scores:     Field[bool]  = Field(False)
-    render_labels:  Field[bool]  = Field(True)
-    use_history_color: Field[bool] = Field(False)
+    use_scores:     Field[bool]  = Field(False, description="Fade a value by its score")
+    render_labels:  Field[bool]  = Field(True, description="The elements' names beside their lines")
+    use_history_color: Field[bool] = Field(False, description="All lines in the history color")
     angle_offset:   Field[AngleOffset] = Field(AngleOffset.NONE, description="Shift ±π angles before drawing: HALF_PI puts the seam at -π/2, PI at 0")
