@@ -160,8 +160,8 @@ the app off, and a 4090 with 24 GB **(measured 2026-11-19)**.
 
 The store is plain RAM (`ScreenFrameStore`, numpy blocks): a block allocates without locking any page, and its
 memory goes back when the store is cleared. It is not pinned: pinning a one-second block (about 750 MB at UHD60)
-locks every page and serializes the driver with the GPU, which stalled the render tick once a second
-**(seen in low_flow, 2026-11-19)**. Video memory gave the store nothing back for its length: the render tick does
+locks every page and serializes the driver with the GPU, which stalls the render tick once a second
+**(seen in low_flow, 2026-11-19)**. A store in video memory gives no more length: the render tick does
 the same work either way, the encode needs every frame in RAM, and the fluid and the models use the card's memory.
 
 The store grows while it records, in blocks of one second. The recorder's thread adds the next block when half of
@@ -170,7 +170,7 @@ counted. When the next block would leave less than `ram_reserve` free (default 8
 the recording stops when it is full. The check runs once per recorded second and Start makes no large allocation.
 
 A run in deep_flow (`-sim`, 20261112-130105_show, UHD portrait at 4:2:0, 60 Hz with v_sync, `ram_reserve` 10 GB,
-commit 51145c73) **(measured 2026-11-20)**:
+commit 51145c73, encoded at `-preset p5` without multipass or AQ) **(measured 2026-11-20)**:
 
 | Phase                 | Ticks | Mean (ms) | p95 (ms) | Max (ms) | Over 25 ms | Dropped |
 |-----------------------|-------|-----------|----------|----------|------------|---------|
@@ -183,9 +183,9 @@ commit 51145c73) **(measured 2026-11-20)**:
 The long ticks come as often idle as while recording and at no once-a-second rhythm. The 30 s take held 1800 frames
 at 59.93 fps (worst gap 33.3 ms) and encoded in 20.1 s, 90 frames/s (118.6 MB). The take to the reserve held 6151
 frames, 103 s, and stopped with 10.3 GB free; the app ran on while it was held, and `discard` gave the RAM back.
-That encode used `-preset p5` without multipass or AQ.
 
-The same run at the default format, 4:4:4 with today's encode (commit 7e32c69a and E1) **(measured 2026-11-20)**:
+The same run at the default format, 4:4:4, with the encode in [Encode](#encode-on-the-recorders-thread) (commits
+7e32c69a and fb119ec4) **(measured 2026-11-20)**:
 
 | Phase                 | Ticks | Mean (ms) | p95 (ms) | Max (ms) | Over 25 ms | Dropped |
 |-----------------------|-------|-----------|----------|----------|------------|---------|
@@ -195,7 +195,7 @@ The same run at the default format, 4:4:4 with today's encode (commit 7e32c69a a
 The 30 s take, 1782 frames at 59.34 fps (worst gap 36.1 ms), encoded in 48.7 s: 36.6 frames/s, under the show's
 58, so a take takes about 1.6 times its length to save (120.2 MB).
 
-At the heaviest read-back, 4:4:4 at 10 bits (33.2 MB a frame, E2) **(measured 2026-11-20)**:
+At the heaviest read-back, 4:4:4 at 10 bits (33.2 MB a frame, commit ef3adfa3) **(measured 2026-11-20)**:
 
 | Phase                 | Ticks | Mean (ms) | p95 (ms) | Max (ms) | Over 25 ms | Dropped |
 |-----------------------|-------|-----------|----------|----------|------------|---------|
@@ -248,8 +248,7 @@ store, or in look back empties it and records on. Start is refused while a take 
 dragged marker, or the place on the bar pressed, so it shows where the take is looked at. `scrub` and `seek` are
 bound, because the panel writes them back to −1 at once.
 
-While a marker is dragged, the main window shows the held frame nearest to it (`ScreenRecorder.preview_frame`), fit
-on black, so a cut is made on what is seen; render's preview draws it
+A dragged marker shows its frame in the main window through render's preview
 ([The preview](../render/general/screen_recording/SCREEN_RECORDING.md#the-preview)).
 
 `play` plays the held take over the main window through the same preview: each render tick the recorder moves the
@@ -272,8 +271,8 @@ The show's first ticks after play are its ordinary ones. Four plays of 2 s, each
 | 3 s after play        | 16.1–22.1        | 37.6–64.5         | 1.5–35.0                  |
 | 3 s of show, no play  |                  | 33.2–35.7         | 13.9–17.5                 |
 
-The fluid's update is the CPU time of its GL calls; a long one waits on the GPU **(deduction)**. A single 99.6 ms tick
-seen once after play did not come back in these four.
+The fluid's update is the CPU time of its GL calls; a long one waits on the GPU **(deduction)**. No tick in these
+four came near the single 99.6 ms tick an earlier run had once after play.
 
 ### Look back
 

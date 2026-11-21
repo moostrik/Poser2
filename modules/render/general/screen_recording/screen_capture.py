@@ -1,10 +1,5 @@
 """ScreenCapture: the recording's screen frame, converted to YUV planes, read back into RAM and handed over when it is done.
-
-The main thread draws into `frame` (or copies the window into it with `copy_window`) and calls `capture`; `poll`
-on every tick hands over each frame whose read-back has passed its fence. The pixel buffers are host memory mapped
-once, so the read-back needs no CUDA and the CPU never waits for it. Only the main thread makes GL calls; the
-consumer reads a lent buffer on its own thread and gives it back with the frame's `release`. See
-SCREEN_RECORDING.md.
+See SCREEN_RECORDING.md.
 """
 
 import logging
@@ -133,8 +128,7 @@ class ScreenCapture:
             raise
 
     def deallocate(self) -> None:
-        """Free the GL objects and the pool; raises when a buffer is still lent, as its memory would go under a
-        reader."""
+        """Free the GL objects and the pool; raises when a buffer is still lent."""
         with self._lock:
             if self._lent:
                 raise RuntimeError('a screen frame is still lent')

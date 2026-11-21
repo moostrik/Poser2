@@ -41,9 +41,16 @@ its overhang is cut. It is never stretched.
   the recorder captures this tick (`ScreenRecorder.capturing`).
 - No CUDA: the read-back is GL's own, and a mapped buffer in host memory reads as plain RAM. `scripts/screen_capture_check.py`
   checks the YUV codes of known colors and the preview in both chromas at both bit depths, a 10-bit gray ramp
-  (877 Y codes back, 75 % off the 8-bit steps), the pool's lending and skipping, and times one UHD frame's copy out
-  of a mapped buffer: 0.31 ms for 4:2:0, 0.70 to 0.90 ms for 4:4:4 and 1.27 ms for 4:4:4 at 10 bits over 20 copies
-  **(measured 2026-11-20, 2160 × 3840, partly from the CPU's cache)**, which says the mapped memory is cached.
+  (877 Y codes back, 75 % off the 8-bit steps), the pool's lending and skipping, and times one frame's copy out of
+  a mapped buffer. These times mean the mapped memory is cached **(deduction)**.
+
+| Format (2160 × 3840, 20 copies) | Copy out of a mapped buffer (ms) |
+|---------------------------------|----------------------------------|
+| 4:2:0, 8 bits                   | 0.31                             |
+| 4:4:4, 8 bits                   | 0.70–0.90                        |
+| 4:4:4, 10 bits                  | 1.27                             |
+
+`scripts/screen_capture_check.py`, partly from the CPU's cache **(measured 2026-11-20)**.
 
 ## The preview
 
@@ -55,10 +62,15 @@ changes), and the preview's own thread copies it straight into one of two unpack
 main thread (persistent and coherent), and marks it written. The render tick uploads the newest written buffer into
 the planes' textures, turns them back into RGB in `ScreenPreview.fbo` with the `YuvToRgb` shader
 (`shaders/yuv_to_rgb.py`), upright, and sets a fence on the buffer; once the fence has passed, checked on a later
-tick without waiting, the buffer is free again. No CUDA. A drag shows its frames while a save runs, as the recorder's
-thread takes no part. In deep_flow (`-sim`, UHD portrait at 4:2:0, 60 Hz with v_sync, commit 7e32c69a)
-**(measured 2026-11-20)**: dragging over a held 10 s take for 3 s drew 142 pictures in 181 ticks, the ticks 16.66 ms
-on average (max 33 ms, 11 % over 25 ms, 8 % held without a drag).
+tick without waiting, the buffer is free again. The preview's thread makes no GL call. No CUDA. A drag shows its
+frames while a save runs, as the recorder's thread takes no part.
+
+| Held 10 s take        | Ticks | Pictures drawn | Mean (ms) | Max (ms) | Over 25 ms |
+|-----------------------|-------|----------------|-----------|----------|------------|
+| Dragged for 3 s       | 181   | 142            | 16.66     | 33       | 11 %       |
+| Held, no drag         |       |                |           |          | 8 %        |
+
+deep_flow `-sim`, UHD portrait at 4:2:0, 60 Hz with v_sync, commit 7e32c69a **(measured 2026-11-20)**.
 
 ## Sources
 
@@ -72,8 +84,14 @@ on average (max 33 ms, 11 % over 25 ms, 8 % held without a drag).
 - The planes are made in a fragment shader, not a compute shader: GLSL has no byte arrays, and packing four pixels
   per integer would force widths to multiples of 4.
 - 4:4:4 at 10 bits is packed in one plane, not three 16-bit planes: the read-back runs on the GPU's graphics queue
-  at about 12 GB/s, so its time follows its bytes. Three 16-bit planes (49.8 MB at UHD) took 4.1 ms of GPU a frame
-  and slowed the show (19.0 ms mean tick, 6 frames dropped in 15 s); packed (33.2 MB) it takes 2.6 ms, against 2.1 ms
-  at 8 bits **(measured 2026-11-20, GL timer queries, UHD)**.
+  at about 12 GB/s, so its time follows its bytes, and three 16-bit planes slow the show.
+
+| 4:4:4 read-back at UHD       | Bytes a frame | GPU a frame (ms) | Mean tick (ms) | Dropped in 15 s |
+|------------------------------|---------------|------------------|----------------|-----------------|
+| 8 bits                       |               | 2.1              |                |                 |
+| 10 bits, one packed plane    | 33.2 MB       | 2.6              |                |                 |
+| 10 bits, three 16-bit planes | 49.8 MB       | 4.1              | 19.0           | 6               |
+
+GL timer queries **(measured 2026-11-20)**.
 - The packed 10-bit RGB formats NVENC takes (`x2rgb10le`) are converted inside it to 4:2:0 with the BT.601 matrix,
   so the shader makes the YUV itself at 10 bits too **(measured 2026-11-20, ffmpeg 2025-08-25)**.
