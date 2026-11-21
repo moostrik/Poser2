@@ -25,7 +25,8 @@ from OpenGL.GL import (GL_ALREADY_SIGNALED, GL_COLOR_BUFFER_BIT, GL_CONDITION_SA
                        glDeleteBuffers, glDeleteSync, glFenceSync, glGenBuffers, glMapBufferRange, glPixelStorei,
                        glReadPixels, glUnmapBuffer)
 
-from modules.gl import Fbo, Style, fill, fit
+from modules.gl import Fbo, Style
+from modules.utils import fill, fit
 from modules.video import BitDepth, Chroma, ScreenFormat, ScreenFrame, ScreenFrameCallback
 
 from .shaders import RgbToYuv, YuvPlane

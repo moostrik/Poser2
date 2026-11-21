@@ -5,14 +5,14 @@ from typing import Callable, cast
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import GpuTimer, Shader, Style, clear_color, fit, Texture, shaders
+from modules.gl import GpuTimer, Shader, Style, clear_color, Texture, shaders
 from modules.window import RenderBase
 from modules.video import ScreenRecorderSettings
 from modules.flow import Port, hold_tick
 from modules.inference import InferenceFrame, Masks, segmentation
 from modules.pose import Frame, FrameDict
 from modules import render
-from modules.utils import FPS, Color, Rect, Point2f
+from modules.utils import FPS, Color, Rect, Point2f, fit
 
 from ..board import RenderBoard
 from ..settings import FlowSettings, PoseFrame, RenderSettings, WindowsSettings

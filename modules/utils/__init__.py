@@ -20,6 +20,8 @@ from .interpolation import \
     ScalarPredictiveAngleHermite, \
     VectorPredictiveAngleHermite
 from .points_and_rects import Point2f, Rect, Quad
+from .fit import fill, fit
+from .lfo import lfo
 from .color import Color
 from .object_pool import ObjectPool
 from .thread_priority import ThreadPriority, set_current_thread_priority, get_current_thread_priority

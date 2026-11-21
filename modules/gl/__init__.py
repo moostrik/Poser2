@@ -4,7 +4,6 @@ from .compute_shader import ComputeShader
 from . import style as Style
 from .context import Context, context, draw_quad
 from .clear import clear_color
-from .fit import fill, fit
 from .colormap import Colormap
 
 # TEXTURE CLASSES

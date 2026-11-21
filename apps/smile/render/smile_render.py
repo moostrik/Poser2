@@ -9,7 +9,8 @@ from .screen_grab import ScreenGrab
 from ..comfy.messages import GeneratorMessage, GeneratorState
 from ..face import FaceObservations
 from .. import sphere
-from modules.gl import Fbo, Shader, Style, Texture, clear_color, fit
+from modules.gl import Fbo, Shader, Style, Texture, clear_color
+from modules.utils import fit
 from modules.window import RenderBase
 from ..player import WallRender, WallsSettings
 from ..settings import WindowsSettings

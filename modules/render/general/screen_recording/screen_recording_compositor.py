@@ -5,7 +5,8 @@ from dataclasses import dataclass, field
 
 from OpenGL.GL import glViewport
 
-from modules.gl import Style, Texture, clear_color, fill, fit
+from modules.gl import Style, Texture, clear_color
+from modules.utils import fill, fit
 from modules.video import ScreenRecorder, ScreenRecorderFrameSettings, ScreenRecorderSettings
 
 from ...layer_base import LayerBase
