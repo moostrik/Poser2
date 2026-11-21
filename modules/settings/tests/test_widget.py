@@ -6,6 +6,8 @@ from enum import Enum
 from modules.settings import Field, Widget, BaseSettings
 from modules.utils import Color, Point2f, Rect
 
+from .fixtures import RenderMode
+
 
 class Mode(Enum):
     A = 1
@@ -95,6 +97,149 @@ class TestResolve(unittest.TestCase):
 
     def test_keeps_a_set_widget(self):
         self.assertIs(Widget.resolve(self.fields["knob"]), Widget.knob)
+
+
+class TestWidgetClass(unittest.TestCase):
+    """Tests for the Widget Enum."""
+
+    def test_eq_same(self):
+        self.assertEqual(Widget.button, Widget.button)
+
+    def test_eq_different(self):
+        self.assertNotEqual(Widget.button, Widget.toggle)
+
+    def test_eq_non_widget(self):
+        self.assertNotEqual(Widget.button, "button")
+
+    def test_hash_consistent(self):
+        self.assertEqual(hash(Widget.button), hash(Widget.button))
+        self.assertNotEqual(hash(Widget.button), hash(Widget.toggle))
+
+    def test_hash_usable_as_dict_key(self):
+        d = {Widget.button: "b", Widget.toggle: "t"}
+        self.assertEqual(d[Widget.button], "b")
+
+    def test_repr(self):
+        self.assertEqual(repr(Widget.button), "Widget.button")
+        self.assertEqual(repr(Widget.default), "Widget.default")
+
+    def test_name_property(self):
+        self.assertEqual(Widget.slider.name, "slider")
+
+    def test_types_property(self):
+        self.assertEqual(Widget.switch.types, (bool,))
+        self.assertEqual(Widget.slider.types, (int, float))
+        self.assertIsNone(Widget.default.types)
+
+    def test_is_enum(self):
+        self.assertIsInstance(Widget.button, Widget)
+        self.assertIsInstance(Widget.default, Widget)
+
+    def test_identity(self):
+        self.assertIs(Widget.button, Widget.button)
+        self.assertIsNot(Widget.button, Widget.toggle)
+
+    def test_same_types_still_distinct(self):
+        """Members with identical compatible types must remain separate."""
+        self.assertIsNot(Widget.switch, Widget.toggle)
+        self.assertIsNot(Widget.switch, Widget.button)
+        self.assertIsNot(Widget.slider, Widget.number)
+        self.assertIsNot(Widget.select, Widget.radio)
+        self.assertIsNot(Widget.checklist, Widget.order)
+        self.assertIsNot(Widget.checklist, Widget.playlist)
+        self.assertIsNot(Widget.playlist, Widget.order)
+        self.assertIsNot(Widget.default, Widget.color)
+
+    def test_iteration(self):
+        members = list(Widget)
+        self.assertIn(Widget.button, members)
+        self.assertEqual(len(members), len(Widget.__members__))
+
+    def test_match_statement(self):
+        """Widget members work in match/case."""
+        w = Widget.slider
+        match w:
+            case Widget.slider:
+                result = "slider"
+            case _:
+                result = "other"
+        self.assertEqual(result, "slider")
+
+
+class TestWidgetResolve(unittest.TestCase):
+    """Widget.resolve() maps Widget.default to a concrete widget."""
+
+    def test_bool_resolves_to_toggle(self):
+        field = Field(True)
+        field.__set_name__(None, "test")
+        self.assertEqual(Widget.resolve(field), Widget.toggle)
+
+    def test_int_with_range_resolves_to_slider(self):
+        field = Field(50, min=0, max=100)
+        field.__set_name__(None, "test")
+        self.assertEqual(Widget.resolve(field), Widget.slider)
+
+    def test_int_without_range_resolves_to_number(self):
+        field = Field(50)
+        field.__set_name__(None, "test")
+        self.assertEqual(Widget.resolve(field), Widget.number)
+
+    def test_float_with_range_resolves_to_slider(self):
+        field = Field(0.5, min=0.0, max=1.0)
+        field.__set_name__(None, "test")
+        self.assertEqual(Widget.resolve(field), Widget.slider)
+
+    def test_enum_resolves_to_select(self):
+        field = Field(RenderMode.SOLID)
+        field.__set_name__(None, "test")
+        self.assertEqual(Widget.resolve(field), Widget.select)
+
+    def test_str_resolves_to_input(self):
+        field = Field("hello")
+        field.__set_name__(None, "test")
+        self.assertEqual(Widget.resolve(field), Widget.input)
+
+    def test_color_resolves_to_color(self):
+        field = Field(Color(1, 0, 0))
+        field.__set_name__(None, "test")
+        self.assertEqual(Widget.resolve(field), Widget.color)
+
+    def test_list_resolves_to_checklist(self):
+        field = Field([RenderMode.SOLID])
+        field.__set_name__(None, "test")
+        self.assertEqual(Widget.resolve(field), Widget.checklist)
+
+    def test_explicit_widget_returned_unchanged(self):
+        field = Field(True, widget=Widget.toggle)
+        field.__set_name__(None, "test")
+        self.assertEqual(Widget.resolve(field), Widget.toggle)
+
+
+class TestWidgetValidation(unittest.TestCase):
+    """Setting.__init__ rejects incompatible widget+type combinations."""
+
+    def test_incompatible_widget_raises(self):
+        with self.assertRaises(TypeError):
+            Field(1.0, widget=Widget.ip_field)
+
+    def test_incompatible_bool_on_slider(self):
+        with self.assertRaises(TypeError):
+            Field(True, widget=Widget.slider)
+
+    def test_compatible_passes(self):
+        # Should not raise
+        Field("0.0.0.0", widget=Widget.ip_field)
+        Field(True, widget=Widget.toggle)
+        Field(True, widget=Widget.button)
+        Field(50, widget=Widget.slider, min=0, max=100)
+        Field(RenderMode.SOLID, widget=Widget.radio)
+        Field(Color(1, 0, 0), widget=Widget.color_alpha)
+
+    def test_default_never_raises(self):
+        # Widget.default is always compatible
+        Field(1.0, widget=Widget.default)
+        Field("text", widget=Widget.default)
+        Field(True, widget=Widget.default)
 
 
 if __name__ == "__main__":
