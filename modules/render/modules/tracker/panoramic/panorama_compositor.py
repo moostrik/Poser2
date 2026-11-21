@@ -1,5 +1,4 @@
 # Standard library imports
-import time
 from typing import Protocol
 
 # Local application imports
@@ -70,6 +69,7 @@ class PanoramaCompositor(LayerBase):
         # blitted per frame; _static_key holds the inputs the cache was drawn for.
         self._static_fbo: Fbo = Fbo()
         self._static_key: tuple | None = None
+        self._frame_timestamp: float = 0.0     # the tick's time, which the marks' fades count from
 
         self._stitch: StitchRenderer = StitchRenderer(cam_textures, tracker, settings)
         self._seams: SeamRenderer = SeamRenderer(self.num_cams, self.target_fov, tracker, settings)
@@ -146,6 +146,10 @@ class PanoramaCompositor(LayerBase):
         self._static_fbo.deallocate()
         for _, renderer in self._order:
             renderer.deallocate()
+
+    def set_frame_timestamp(self, timestamp: float) -> None:
+        """The time of the tick it draws next (s, perf_counter)."""
+        self._frame_timestamp = timestamp
 
     def update(self) -> None:
         if not self._fbo.allocated:
@@ -240,7 +244,7 @@ class PanoramaCompositor(LayerBase):
             reacquire_angle=self._tracker.reacquire_angle,
             zone_max_radius=self._tracker.rig.zone_max_radius,
             lost_timeout=self._tracker.lost_timeout,
-            now=time.perf_counter(),
+            now=self._frame_timestamp,
         )
         marks: list[Mark] = build_marks(
             observations, primaries, self._color_settings.track_color_tuples, REJECTED_COLOR,

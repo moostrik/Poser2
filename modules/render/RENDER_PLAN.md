@@ -14,12 +14,6 @@ The pixel buffer and fence code of `general/screen_recording` is not in this pla
 ## A. Code that does the same, written once
 
 
-## D. Time
-
-- **D1** `PanoramaCompositor` takes the frame's time from white_space's render each tick (`set_frame_time`, from the window's `frame_time`) and hands it to `MarkContext`; `time.perf_counter()` goes.
-  - Why: the marks' fade reads a clock in the render, against "Downstream of the camera, take time from the frame or the tick instead of reading a clock" (seen).
-  - Check: white_space -sim, where a lost mark fades as before.
-
 ## E. Leftovers and documents
 
 - **E1** Leftovers go:
