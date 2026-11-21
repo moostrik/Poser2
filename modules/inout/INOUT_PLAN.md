@@ -9,19 +9,6 @@ which need depthai 2 and run in `.venv`.
 
 ## C. Art-Net
 
-- C1. `ArtNetSender` for both apps: universes, a flash switch, sends on a change, blackouts. Why: hd_trio's bars send one packet to two
-  consecutive universes, and their stop is a blackout only, while `ArtNetSender` sends one universe and flashes at
-  enable, address change and stop; disabled, it only stops sending, so the lights hold their last frame, and it
-  sends no blackout at start **(seen)**; it sends every tick, `ArtNetBars` on a change and once a second. How: the
-  count of consecutive universes and a flash switch through the constructor; one StupidArtnet per universe; one
-  sending mode for both apps, as Art-Net 4 has it (art-net.org.uk/downloads/art-net.pdf): a universe goes out when
-  its packet's bytes differ from the last sent, and as a keep-alive about once a second (the spec's revision notes:
-  800–1000 ms), at most 44 Hz; a blackout at start, on disable and at stop, after the flash where the flash is on,
-  for both apps. smile keeps one universe and the flash, sends less while its lights hold still, and no longer
-  holds its last frame when switched off. `ArtNetSender` owns its thread instead of subclassing `Thread`, its caller
-  (smile) and tests updated. Check:
-  `test_artnet_sender` (a send on a change, the keep-alive, the 44 Hz cap, the blackouts at start, disable and
-  stop, two universes); smile's tests updated.
 - C2. hd_trio's bars as a fill on `ArtNetSender`. Why: `ArtNetBars` and `ArtNetSender` each own a StupidArtnet, a
   thread and a tick; `ArtNetBars` is hd_trio's bar look, used only by hd_trio. Its own faults go with it:
   `_update_packet_size`, `_update_universe`, `_reinit_channel_order`, `_validate_and_reinit_artnet` and
@@ -57,7 +44,6 @@ which need depthai 2 and run in `.venv`.
 ## Rules this plan touches
 
 - `CLAUDE.md` Error handling, a thread's loop catches an exception per item and goes on: C2
-- `CLAUDE.md` Composition, prefer composition over inheritance: C1
 - `CLAUDE.md` Composition and wiring, clean up in an explicit stop or teardown, never in `__del__`: C2
 - `CLAUDE.md` API evolution, remove obsolete pathways; keep settings files in sync: C2, E1
 - `CLAUDE.md` Project shape, code only one app uses moves to that app: C2

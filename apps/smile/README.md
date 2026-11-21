@@ -79,6 +79,7 @@ not in git, safe to delete); the app's own logs are in Poser2's `logs\`.
 
 ### Lights (Art-Net)
 * the Art-Net node is at the panel's `artnet.ip` (10.0.0.11, universe 1); `data\artnet.json` lists the modules (`lights.py` over `modules.inout.ArtNetSender`): three cores (pc, audio, video) and the 24-LED ring around the camera (mako)
+* the lights flash and go black at start, when `artnet.enabled` is switched off and at stop; switched on they flash, then follow the show; the node gets a packet when the lights change and once a second while they hold still
 
 ## RUN
 

@@ -1,6 +1,8 @@
-"""Art-Net sender: a thread that sends one DMX packet to one universe at the settings' rate. Its owner
-fills the packet in `fill`, called from the thread before every send."""
+"""Art-Net sender: a thread that sends its owner's DMX packet to one or more consecutive universes. The owner fills
+the packet in `fill`, called from the thread before every tick."""
 
+from collections import deque
+from enum import IntEnum
 from threading import Thread, Lock
 from typing import Callable
 import logging
@@ -14,61 +16,96 @@ from .net_probe import is_valid_ip
 
 logger = logging.getLogger(__name__)
 
+MAX_FPS: float = 44.0       # Hz: a DMX universe refreshes at most 44 times a second
+KEEP_ALIVE: float = 0.9     # s: Art-Net 4 has an unchanged universe resent every 800 to 1000 ms
+
 
 class ArtNetSenderSettings(BaseSettings):
-    enabled:  Field[bool]  = Field(True, widget=Widget.switch, description="Send Art-Net to the lights")
+    enabled:  Field[bool]  = Field(True, widget=Widget.switch, description="Send Art-Net to the lights; off is black")
     ip:       Field[str]   = Field("127.0.0.1", widget=Widget.ip_field, description="Art-Net node IP address")
-    universe: Field[int]   = Field(0, min=0, max=254, widget=Widget.number_field, description="Art-Net universe")
-    fps:      Field[float] = Field(40.0, min=1.0, max=60.0, step=1.0, description="Packets sent per second")
+    universe: Field[int]   = Field(0, min=0, max=254, widget=Widget.number_field, description="Art-Net universe, the first of its universes")
+    fps:      Field[float] = Field(40.0, min=1.0, max=MAX_FPS, step=1.0, description="Ticks per second; a tick sends what changed")
+
+
+class _Frame(IntEnum):
+    """A one-tick frame on every universe in place of the packet."""
+    FLASH = 0       # all channels full
+    BLACKOUT = 1    # all channels zero
 
 
 def is_valid_universe(value: int) -> bool:
     return value in range(0, 255)
 
 
-class ArtNetSender(Thread):
-    """Sends on a fixed-rate grid, resynced after a late tick. A flash (all channels full) goes out in place of the
-    packet on the next tick; stop ends with a flash, then a blackout one interval later."""
+class ArtNetSender:
+    """Sends on a fixed-rate grid, resynced after a late tick. A universe goes out when its part of the packet differs
+    from what it last sent, and at least every `KEEP_ALIVE`. A blackout goes out at start, when switched off and at
+    stop; with `flash`, a flash goes out before each of them and when switched on or readdressed."""
 
-    def __init__(self, settings: ArtNetSenderSettings, channels: int, fill: Callable[[bytearray], None]) -> None:
-        """`channels` DMX channels; `fill` writes the packet before each send, on the sender's thread."""
-        super().__init__()
+    def __init__(self, settings: ArtNetSenderSettings, channels: int, fill: Callable[[bytearray], None],
+                 universes: int = 1, flash: bool = True) -> None:
+        """`channels` DMX channels per universe; `fill` writes the packet, `universes` parts of `packet_size` one
+        after the other, before each tick on the sender's thread."""
         self.settings: ArtNetSenderSettings = settings
         self.fill: Callable[[bytearray], None] = fill
-        self.mutex: Lock = Lock()
-        self.running: bool = False
-        self._waker: Waker = Waker()            # set by stop: ends the wait for the next tick at once
-        self._flash: bool = False               # the next tick sends a flash in place of the packet
+        self.universes: int = universes
+        self.flash: bool = flash
 
         # even: StupidArtnet rounds its own size up to even and refuses a packet of another length
         self.packet_size: int = channels + channels % 2
-        self.packet = bytearray(self.packet_size)
-        self.sender: StupidArtnet | None = None
+        self.packet: bytearray = bytearray(self.packet_size * universes)
+
+        self._lock: Lock = Lock()                           # the StupidArtnets and the frames
+        self._senders: list[StupidArtnet] = []
+        self._frames: deque[_Frame] = deque()               # one per tick, before the packet
+        self._last_sent: list[bytes | None] = [None] * universes    # None: send the packet on the next tick
+        self._last_time: list[float] = [0.0] * universes
+        self._running: bool = False
+        self._thread: Thread | None = None
+        self._waker: Waker | None = None                    # set by stop: ends the wait for the next tick at once
 
     def start(self) -> None:
-        self._update_sender()
+        if self._running:
+            return
+        self._update_senders()
+        self._queue_off()
         self.settings.bind(ArtNetSenderSettings.ip, self._on_address)
         self.settings.bind(ArtNetSenderSettings.universe, self._on_address)
         self.settings.bind(ArtNetSenderSettings.enabled, self._on_enabled)
-        self.running = True
-        super().start()
+        self._waker = Waker()
+        self._running = True
+        self._thread = Thread(target=self._run, daemon=True, name='ArtNetSender')
+        self._thread.start()
 
     def stop(self) -> None:
-        if not self.is_alive():
+        if not self._running:
             return
         self.settings.unbind(ArtNetSenderSettings.ip, self._on_address)
         self.settings.unbind(ArtNetSenderSettings.universe, self._on_address)
         self.settings.unbind(ArtNetSenderSettings.enabled, self._on_enabled)
-        self.running = False
+        self._running = False
+        assert self._waker is not None
         self._waker.set()
-        self.join()
+        if self._thread is not None:
+            self._thread.join()
+            self._thread = None
+        try:
+            self._end()
+        except Exception:
+            logger.exception('Art-Net: the blackout at stop failed')
+        with self._lock:
+            for sender in self._senders:
+                sender.close()
+            self._senders = []
         self._waker.close()
+        self._waker = None
 
-    def run(self) -> None:
+    def _run(self) -> None:
+        assert self._waker is not None
         next_time: float = time.perf_counter()
-        while self.running:
+        while self._running:
             try:
-                self.update()
+                self.update(next_time)
             except Exception:
                 logger.exception('Art-Net send failed')
             interval: float = self._interval()
@@ -77,56 +114,76 @@ class ArtNetSender(Thread):
                 next_time = now
             next_time += interval
             self._waker.wait(next_time)
-        try:
-            self._end()
-        except Exception:
-            logger.exception('Art-Net flash and blackout at stop failed')
 
     def _end(self) -> None:
-        """The flash, one interval, then the blackout."""
-        with self.mutex:
-            if self.sender:
-                self.sender.flash_all()
-        self._waker.wait(time.perf_counter() + self._interval())
-        with self.mutex:
-            if self.sender:
-                self.sender.blackout()
+        """The flash and, one interval later, the blackout."""
+        if self.flash:
+            self._send_frame(_Frame.FLASH)
+            assert self._waker is not None
+            self._waker.wait(time.perf_counter() + self._interval())
+        self._send_frame(_Frame.BLACKOUT)
 
     def _interval(self) -> float:
-        return 1.0 / max(self.settings.fps, 1.0)
+        return 1.0 / min(max(self.settings.fps, 1.0), MAX_FPS)
 
-    def update(self) -> None:
+    def update(self, now: float) -> None:
+        """One tick at `now`: a queued frame, or the universes whose part changed or is due for its keep-alive."""
+        with self._lock:
+            frame: _Frame | None = self._frames.popleft() if self._frames else None
+        if frame is not None:
+            self._send_frame(frame)
+            return
+        if not self.settings.enabled:
+            return
         self.fill(self.packet)
-        if self.sender and self.settings.enabled:
-            with self.mutex:
-                if self._flash:
-                    self._flash = False
-                    self.sender.flash_all()
-                else:
-                    self.sender.send(self.packet)
+        with self._lock:
+            for universe, sender in enumerate(self._senders):
+                part = bytes(self.packet[universe * self.packet_size:(universe + 1) * self.packet_size])
+                if part != self._last_sent[universe] or now - self._last_time[universe] >= KEEP_ALIVE:
+                    sender.set(bytearray(part))
+                    sender.show()
+                    self._last_sent[universe] = part
+                    self._last_time[universe] = now
+
+    def _send_frame(self, frame: _Frame) -> None:
+        value: int = 255 if frame == _Frame.FLASH else 0
+        with self._lock:
+            for universe, sender in enumerate(self._senders):
+                sender.set(bytearray([value]) * self.packet_size)
+                sender.show()
+                self._last_sent[universe] = None
+
+    def _queue_off(self) -> None:
+        """The flash, where it is on, and the blackout, on the next ticks."""
+        with self._lock:
+            if self.flash:
+                self._frames.append(_Frame.FLASH)
+            self._frames.append(_Frame.BLACKOUT)
 
     def _on_address(self, _=None) -> None:
-        self._update_sender()
+        self._update_senders()
+        if self.flash and self.settings.enabled:
+            with self._lock:
+                self._frames.append(_Frame.FLASH)
 
-    def _on_enabled(self, _=None) -> None:
-        self.flash()
+    def _on_enabled(self, enabled: bool) -> None:
+        if not enabled:
+            self._queue_off()
+        elif self.flash:
+            with self._lock:
+                self._frames.append(_Frame.FLASH)
 
-    def _update_sender(self) -> None:
+    def _update_senders(self) -> None:
         ip: str = self.settings.ip
         universe: int = self.settings.universe
-        if not is_valid_ip(ip) or not is_valid_universe(universe):
+        if not is_valid_ip(ip) or not is_valid_universe(universe + self.universes - 1):
             logger.warning('Invalid Art-Net address %s universe %s, keeping the current sender', ip, universe)
             return
 
-        with self.mutex:
-            if self.sender:
-                self.sender.stop()
-            self.sender = StupidArtnet(target_ip=ip, universe=universe, packet_size=self.packet_size, fps=int(self.settings.fps))
-            logger.info('Artnet sending to %s on universe %s', ip, universe)
-
-        self.flash()
-
-    def flash(self) -> None:
-        """All channels full for one tick: the next one sends the flash in place of the packet (any thread)."""
-        with self.mutex:
-            self._flash = True
+        with self._lock:
+            for sender in self._senders:
+                sender.close()
+            self._senders = [StupidArtnet(target_ip=ip, universe=universe + i, packet_size=self.packet_size,
+                                          fps=int(self.settings.fps)) for i in range(self.universes)]
+            self._last_sent = [None] * self.universes
+        logger.info('Art-Net sending to %s on universe %s (%s universes)', ip, universe, self.universes)
