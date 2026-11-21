@@ -12,16 +12,12 @@ import ctypes
 import logging
 from collections import deque
 from threading import Condition, Thread
-from typing import cast
 
 import numpy as np
-from OpenGL.GL import (GL_ALREADY_SIGNALED, GL_CONDITION_SATISFIED, GL_MAP_COHERENT_BIT, GL_MAP_PERSISTENT_BIT,
-                       GL_MAP_WRITE_BIT, GL_PIXEL_UNPACK_BUFFER, GL_RGBA8,
-                       GL_SYNC_GPU_COMMANDS_COMPLETE, GL_TEXTURE_2D, GL_UNPACK_ALIGNMENT,
-                       glBindBuffer, glBindTexture, glBufferStorage, glClientWaitSync, glDeleteBuffers, glDeleteSync,
-                       glFenceSync, glGenBuffers, glMapBufferRange, glPixelStorei, glTexSubImage2D, glUnmapBuffer)
+from OpenGL.GL import (GL_PIXEL_UNPACK_BUFFER, GL_RGBA8, GL_TEXTURE_2D, GL_UNPACK_ALIGNMENT, glBindTexture,
+                       glPixelStorei, glTexSubImage2D)
 
-from modules.gl import Fbo, BlendState
+from modules.gl import BlendState, Fbo, PixelBufferPool
 from modules.video import ScreenFormat
 
 from .screen_capture import yuv_planes
@@ -31,7 +27,6 @@ logger = logging.getLogger(__name__)
 
 BUFFERS: int = 2            # one written by the preview's thread while the other is uploaded
 _UNPACK_ALIGNMENT: int = 4  # GL's default, which nothing else in the apps changes: set back after the uploads
-_MAP_FLAGS: int = int(GL_MAP_WRITE_BIT) | int(GL_MAP_PERSISTENT_BIT) | int(GL_MAP_COHERENT_BIT)
 
 
 class ScreenPreview:
@@ -43,14 +38,14 @@ class ScreenPreview:
         self.fbo: Fbo = Fbo()
         self._planes = yuv_planes(ScreenFormat(2, 2))   # the textures the planes are uploaded into, remade at allocate
         self._shader: YuvToRgb = YuvToRgb()
-        self._buffers: list[int] = []
+        self._pixels: PixelBufferPool = PixelBufferPool(GL_PIXEL_UNPACK_BUFFER)    # the two buffers, mapped once
         self._arrays: list[np.ndarray] = []         # each buffer's mapped memory, the format's shape and dtype
         self._wake: Condition = Condition()         # guards what follows
         self._free: deque[int] = deque()
         self._written: deque[tuple[int, int]] = deque()     # (buffer, key), oldest first
         self._wanted: tuple[int, np.ndarray] | None = None  # the latest frame set, not yet copied
         self._exit: bool = False
-        self._in_flight: deque[tuple[int, object]] = deque()    # (buffer, fence) of the uploads
+        self._in_flight: deque[int] = deque()       # the buffers of the uploads, oldest first
         self.shown: int | None = None               # the key of the frame `fbo` holds
         self._thread: Thread | None = None
 
@@ -80,17 +75,9 @@ class ScreenPreview:
             for plane in self._planes:
                 plane.fbo.allocate(plane.width, plane.height, plane.internal_format)
             self._shader.allocate()
-            self._buffers = [int(b) for b in np.atleast_1d(glGenBuffers(BUFFERS))]
-            for buffer in self._buffers:
-                glBindBuffer(GL_PIXEL_UNPACK_BUFFER, buffer)
-                glBufferStorage(GL_PIXEL_UNPACK_BUFFER, size, None, _MAP_FLAGS)
-                pointer = cast(int | ctypes.c_void_p, glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, 0, size, _MAP_FLAGS))     # the stub says None
-                address = pointer if isinstance(pointer, int) else ctypes.cast(pointer, ctypes.c_void_p).value
-                if not address:
-                    raise RuntimeError('a pixel buffer could not be mapped')
-                data = (ctypes.c_uint8 * size).from_address(address)
-                self._arrays.append(np.ctypeslib.as_array(data).view(screen_format.dtype).reshape(screen_format.shape))
-            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
+            self._pixels.allocate(BUFFERS, size, mapped=True)
+            self._arrays = [self._pixels.memory(slot).view(screen_format.dtype).reshape(screen_format.shape)
+                            for slot in range(BUFFERS)]
         except Exception:
             self.deallocate()
             raise
@@ -111,17 +98,9 @@ class ScreenPreview:
                 self._wake.notify()
             self._thread.join()
             self._thread = None
-        for _, fence in self._in_flight:
-            glDeleteSync(fence)
         self._in_flight.clear()
-        for buffer in self._buffers:
-            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, buffer)
-            glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER)
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
         self._arrays = []
-        if self._buffers:
-            glDeleteBuffers(len(self._buffers), self._buffers)
-        self._buffers = []
+        self._pixels.deallocate()
         if self._shader.allocated:
             self._shader.deallocate()
         for texture in [self.fbo] + [plane.fbo for plane in self._planes]:
@@ -134,11 +113,10 @@ class ScreenPreview:
         """Free the buffers whose upload has passed its fence, then upload the newest written one and draw it, without
         waiting."""
         while self._in_flight:
-            buffer, fence = self._in_flight[0]
-            if glClientWaitSync(fence, 0, 0) not in (GL_ALREADY_SIGNALED, GL_CONDITION_SATISFIED):
+            buffer = self._in_flight[0]
+            if not self._pixels.passed(buffer):
                 break
             self._in_flight.popleft()
-            glDeleteSync(fence)
             with self._wake:
                 self._free.append(buffer)
                 self._wake.notify()
@@ -149,7 +127,7 @@ class ScreenPreview:
                 self._free.append(self._written.popleft()[0])
             buffer, key = self._written.popleft()
             self._wake.notify()
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, self._buffers[buffer])
+        self._pixels.bind(buffer)
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1)   # rows of any even width, unpadded
         for plane in self._planes:
             glBindTexture(GL_TEXTURE_2D, plane.fbo.tex_id)
@@ -157,8 +135,9 @@ class ScreenPreview:
                             ctypes.c_void_p(plane.offset))
         glBindTexture(GL_TEXTURE_2D, 0)
         glPixelStorei(GL_UNPACK_ALIGNMENT, _UNPACK_ALIGNMENT)
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
-        self._in_flight.append((buffer, glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0)))
+        self._pixels.unbind()
+        self._pixels.fence(buffer)
+        self._in_flight.append(buffer)
         BlendState.push()
         BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         self.fbo.begin()

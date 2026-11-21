@@ -17,17 +17,6 @@ tasklist check that no app is running, unless Matthias says he is using the PC o
 
 ## D. Every GL object from gl's classes
 
-- D1. `PixelBufferPool` in `texture/pixel_buffer_pool.py`, exported from `gl`: a pool of pixel buffers with their
-  fences, for a readback (GL_PIXEL_PACK_BUFFER) or an upload (GL_PIXEL_UNPACK_BUFFER); it makes, maps (persistently,
-  or not at all) and frees the buffers, and holds their fences: which slot is free, which is ready. The transfer
-  stays with each caller: `glReadPixels`, the upload, the copy out. In the same step gl moves its three users onto
-  it: `flow/bridge/velocity_peak.py` (`_buffers`, `_copy`, the read of the bins),
-  `render/general/screen_recording/screen_capture.py` (its pool) and `screen_preview.py` (its upload buffers), and asks
-  the render thread for feedback afterwards (RENDER_PLAN.md points here). Why: gl.md "A texture, framebuffer or
-  buffer is made by one of gl's classes"; these three make their buffers with `glGenBuffers`, give them storage
-  while bound and keep their own fences, each its own pool (seen); a class that also did the three transfers would
-  need an option per caller (deduction). Check: a -sim with the screen recorder on (capture and preview), and
-  deep_flow -sim (the bridge's velocity peak).
 - D2. `MultiTargetFbo` in `texture/multi_target_fbo.py`, exported from `gl`: a framebuffer that draws into the
   textures it is given, two or more at once (`begin`/`end`, its draw buffers set at `allocate`), and owns no
   texture; `Fbo`, one texture that draws into itself, stays as it is. `flow/fluid_3d/particle_density.py`
@@ -38,8 +27,8 @@ tasklist check that no app is running, unless Matthias says he is using the PC o
   gl, with its own `glDrawBuffers` (seen); extra targets on `Fbo` would mix its own texture with other ones in
   `begin`, `clear` and `deallocate` (deduction). Check: deep_flow -sim (the particles, the motion).
 
-GL.md says what each step adds where it is described: `upload` and `bgr` under the textures, `PixelBufferPool` and
-`MultiTargetFbo` beside them, the font's place under text. BRIDGE_3D.md is read for `velocity_peak` with D1.
+GL.md says what each step adds where it is described: `MultiTargetFbo` beside the textures, the font's place under
+text.
 
 Form, done only in a commit that opens the file anyway, never as a step of its own: PEP 8 in `fbo.py` and
 the imports of `image.py` and `tensor.py` (with A1 to A4); the docstrings of `Texture3D` and `Texture2DArray` (with

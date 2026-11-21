@@ -60,6 +60,11 @@ type, made contiguous and byte-aligned there; a texture made with `bgr` takes it
 A volume is a `Texture2DArray` where the 3D texture's tiling is slow at its size, layers of 2D tiles; it filters
 within a layer, not between layers, so a shader that reads between layers mixes them itself **(site fact)**.
 
+A readback or an upload that must not wait goes through a `PixelBufferPool`: pixel buffers of one size on the pack
+or the unpack target, mapped once for good or copied out with `read`, each with the fence of the transfer queued into
+it last (`fence`, then `passed` on a later tick, without waiting). The caller keeps which buffers are free and does
+the transfer itself, the buffer bound: `ScreenCapture`, `ScreenPreview` and the bridge's `VelocityPeak`.
+
 ## A texture draws itself
 
 `texture.draw(dst, src, opacity)` draws a texture, an `Fbo`, a `SwapFbo` or an `Image` into the bound target, as

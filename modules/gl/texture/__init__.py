@@ -7,3 +7,4 @@ from .fbo import Fbo, SwapFbo
 from .layered_fbo import LayeredFbo
 from .image import ChannelOrder, Image
 from .tensor import Tensor
+from .pixel_buffer_pool import PixelBufferPool

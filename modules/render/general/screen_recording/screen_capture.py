@@ -7,25 +7,19 @@ consumer reads a lent buffer on its own thread and gives it back with the frame'
 modules/video/VIDEO.md.
 """
 
-import ctypes
 import logging
 from collections import deque
 from functools import partial
 from threading import Lock
-from typing import cast
 
 import numpy as np
-from OpenGL.GL import (GL_ALREADY_SIGNALED, GL_COLOR_BUFFER_BIT, GL_CONDITION_SATISFIED, GL_DRAW_FRAMEBUFFER,
-                       GL_FRAMEBUFFER, GL_LINEAR, GL_MAP_COHERENT_BIT, GL_MAP_PERSISTENT_BIT, GL_MAP_READ_BIT,
-                       GL_NEAREST, GL_PACK_ALIGNMENT, GL_PIXEL_PACK_BUFFER, GL_R16, GL_R8, GL_READ_FRAMEBUFFER, GL_RED,
-                       GL_RG, GL_RG16, GL_RG8, GL_RGB10_A2, GL_RGBA, GL_RGBA16F, GL_RGBA8,
-                       GL_SYNC_GPU_COMMANDS_COMPLETE, GL_UNSIGNED_BYTE, GL_UNSIGNED_INT_2_10_10_10_REV, GL_UNSIGNED_SHORT,
-                       glBindBuffer,
-                       glBindFramebuffer, glBlitFramebuffer, glBufferStorage, glClear, glClearColor, glClientWaitSync,
-                       glDeleteBuffers, glDeleteSync, glFenceSync, glGenBuffers, glMapBufferRange, glPixelStorei,
-                       glReadPixels, glUnmapBuffer)
+from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER, GL_LINEAR, GL_NEAREST,
+                       GL_PACK_ALIGNMENT, GL_PIXEL_PACK_BUFFER, GL_R16, GL_R8, GL_READ_FRAMEBUFFER, GL_RED, GL_RG,
+                       GL_RG16, GL_RG8, GL_RGB10_A2, GL_RGBA, GL_RGBA16F, GL_RGBA8, GL_UNSIGNED_BYTE,
+                       GL_UNSIGNED_INT_2_10_10_10_REV, GL_UNSIGNED_SHORT, glBindFramebuffer, glBlitFramebuffer,
+                       glClear, glClearColor, glPixelStorei, glReadPixels)
 
-from modules.gl import Fbo, BlendState
+from modules.gl import BlendState, Fbo, PixelBufferPool
 from modules.utils import fill, fit
 from modules.video import BitDepth, Chroma, ScreenFormat, ScreenFrame, ScreenFrameCallback
 
@@ -35,7 +29,6 @@ logger = logging.getLogger(__name__)
 
 POOL: int = 4               # pixel buffers: one being read back, the rest with the recorder or waiting for it
 _PACK_ALIGNMENT: int = 4    # GL's default, which nothing else in the apps changes: set back after the capture's reads
-_MAP_FLAGS: int = int(GL_MAP_READ_BIT) | int(GL_MAP_PERSISTENT_BIT) | int(GL_MAP_COHERENT_BIT)
 
 
 class _Plane:
@@ -80,9 +73,9 @@ class ScreenCapture:
         self.frame: Fbo = Fbo()
         self._planes: list[_Plane] = []
         self._shader: RgbToYuv = RgbToYuv()
-        self._buffers: list[int] = []
+        self._pixels: PixelBufferPool = PixelBufferPool(GL_PIXEL_PACK_BUFFER)    # the pool, mapped once
         self._arrays: list[np.ndarray] = []         # each buffer's mapped memory, the format's shape and dtype
-        self._in_flight: deque[tuple[int, object, float, int]] = deque()     # (buffer, fence, timestamp, skipped)
+        self._in_flight: deque[tuple[int, float, int]] = deque()     # (buffer, timestamp, skipped), oldest first
         self._lock: Lock = Lock()                   # guards the free list and the lent count
         self._free: deque[int] = deque()
         self._lent: int = 0
@@ -135,17 +128,9 @@ class ScreenCapture:
             for plane in self._planes:
                 plane.fbo.allocate(plane.width, plane.height, plane.internal_format)
             self._shader.allocate()
-            self._buffers = [int(b) for b in np.atleast_1d(glGenBuffers(POOL))]
-            for buffer in self._buffers:
-                glBindBuffer(GL_PIXEL_PACK_BUFFER, buffer)
-                glBufferStorage(GL_PIXEL_PACK_BUFFER, size, None, _MAP_FLAGS)
-                pointer = cast(int | ctypes.c_void_p, glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, size, _MAP_FLAGS))     # the stub says None
-                address = pointer if isinstance(pointer, int) else ctypes.cast(pointer, ctypes.c_void_p).value
-                if not address:
-                    raise RuntimeError('a pixel buffer could not be mapped')
-                data = (ctypes.c_uint8 * size).from_address(address)
-                self._arrays.append(np.ctypeslib.as_array(data).view(screen_format.dtype).reshape(screen_format.shape))
-            glBindBuffer(GL_PIXEL_PACK_BUFFER, 0)
+            self._pixels.allocate(POOL, size, mapped=True)
+            self._arrays = [self._pixels.memory(slot).view(screen_format.dtype).reshape(screen_format.shape)
+                            for slot in range(POOL)]
             with self._lock:
                 self._free = deque(range(POOL))
                 self._skipped = 0
@@ -159,17 +144,9 @@ class ScreenCapture:
         with self._lock:
             if self._lent:
                 raise RuntimeError('a screen frame is still lent')
-        for _, fence, _, _ in self._in_flight:
-            glDeleteSync(fence)
         self._in_flight.clear()
-        for buffer in self._buffers:
-            glBindBuffer(GL_PIXEL_PACK_BUFFER, buffer)
-            glUnmapBuffer(GL_PIXEL_PACK_BUFFER)
-        glBindBuffer(GL_PIXEL_PACK_BUFFER, 0)
         self._arrays = []
-        if self._buffers:
-            glDeleteBuffers(len(self._buffers), self._buffers)
-        self._buffers = []
+        self._pixels.deallocate()
         with self._lock:
             self._free.clear()
         if self._shader.allocated:
@@ -209,24 +186,23 @@ class ScreenCapture:
             self._shader.use(self.frame, plane.plane, plane.sample_max)
         BlendState.pop()
         glPixelStorei(GL_PACK_ALIGNMENT, 1)     # rows of any even width, unpadded
-        glBindBuffer(GL_PIXEL_PACK_BUFFER, self._buffers[buffer])
+        self._pixels.bind(buffer)
         for plane in self._planes:
             glBindFramebuffer(GL_READ_FRAMEBUFFER, plane.fbo.fbo_id)
             glReadPixels(0, 0, plane.width, plane.height, plane.read_format, plane.sample_type, plane.offset)
-        glBindBuffer(GL_PIXEL_PACK_BUFFER, 0)
+        self._pixels.unbind()
         glPixelStorei(GL_PACK_ALIGNMENT, _PACK_ALIGNMENT)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
-        fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0)
-        self._in_flight.append((buffer, fence, timestamp, skipped))
+        self._pixels.fence(buffer)
+        self._in_flight.append((buffer, timestamp, skipped))
 
     def poll(self) -> None:
         """Hand over each read-back whose fence has passed, oldest first, without waiting for the others."""
         while self._in_flight:
-            buffer, fence, timestamp, skipped = self._in_flight[0]
-            if glClientWaitSync(fence, 0, 0) not in (GL_ALREADY_SIGNALED, GL_CONDITION_SATISFIED):
+            buffer, timestamp, skipped = self._in_flight[0]
+            if not self._pixels.passed(buffer):
                 return
             self._in_flight.popleft()
-            glDeleteSync(fence)
             with self._lock:
                 self._lent += 1
             frame = ScreenFrame(self._arrays[buffer], timestamp, skipped, partial(self._give_back, buffer))

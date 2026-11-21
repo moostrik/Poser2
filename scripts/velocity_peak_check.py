@@ -98,7 +98,7 @@ def main() -> None:
         settings.enabled = True
         peak = VelocityPeak(settings, HistogramCount())
         peak.allocate()
-        ms = mh.gpu_ms(lambda: peak._copy(0) or peak._release(), 40)
+        ms = mh.gpu_ms(lambda: peak._copy(0) or peak._pixels.reset(), 40)
         print(f'copy into a pixel buffer: {ms:.3f} ms', flush=True)
         peak.deallocate()
         count.deallocate()

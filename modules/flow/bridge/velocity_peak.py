@@ -8,13 +8,11 @@ import ctypes
 from typing import Protocol
 
 import numpy as np
-from OpenGL.GL import (GL_ALREADY_SIGNALED, GL_CONDITION_SATISFIED, GL_NEAREST, GL_PIXEL_PACK_BUFFER, GL_R32UI,
-                       GL_RED_INTEGER, GL_STREAM_READ, GL_SYNC_GPU_COMMANDS_COMPLETE, GL_TEXTURE_2D, GL_UNSIGNED_INT,
-                       glBindBuffer, glBindTexture, glBufferData, glClearTexImage, glClientWaitSync, glDeleteBuffers,
-                       glDeleteSync, glFenceSync, glGenBuffers, glGetBufferSubData)
+from OpenGL.GL import (GL_NEAREST, GL_PIXEL_PACK_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_TEXTURE_2D, GL_UNSIGNED_INT,
+                       glBindTexture, glClearTexImage)
 from OpenGL.raw.GL.VERSION.GL_1_0 import glGetTexImage as raw_get_tex_image
 
-from modules.gl import Texture
+from modules.gl import PixelBufferPool, Texture
 from modules.settings import BaseSettings, Field
 from ..visualization import histogram_grid
 
@@ -71,31 +69,23 @@ class VelocityPeak:
         self.settings: VelocityPeakSettings = settings
         self._bins: Texture = Texture(GL_NEAREST)       # an integer texture must not filter
         self._count: SpeedCount = count
-        self._buffers: list[int] = []
-        self._fences: list[object | None] = [None] * PIXEL_BUFFERS
+        self._pixels: PixelBufferPool = PixelBufferPool(GL_PIXEL_PACK_BUFFER)     # the copies of the bins
         self._next: int = 0                             # the buffer the next copy goes into
         self._elapsed: float = 0.0                      # s the bins have counted
         self._zero: np.ndarray = np.zeros(1, dtype=np.uint32)
 
     @property
     def allocated(self) -> bool:
-        return bool(self._buffers)
+        return self._pixels.allocated
 
     def allocate(self) -> None:
         self._bins.allocate(BINS, 1, GL_R32UI)
         self._count.allocate()
-        self._buffers = [int(b) for b in np.atleast_1d(glGenBuffers(PIXEL_BUFFERS))]
-        for buffer in self._buffers:
-            glBindBuffer(GL_PIXEL_PACK_BUFFER, buffer)
-            glBufferData(GL_PIXEL_PACK_BUFFER, 4 * BINS, None, GL_STREAM_READ)
-        glBindBuffer(GL_PIXEL_PACK_BUFFER, 0)
+        self._pixels.allocate(PIXEL_BUFFERS, 4 * BINS)
         self._restart()
 
     def deallocate(self) -> None:
-        self._release()
-        if self._buffers:
-            glDeleteBuffers(len(self._buffers), self._buffers)
-        self._buffers = []
+        self._pixels.deallocate()
         self._bins.deallocate()
         self._count.deallocate()
 
@@ -111,7 +101,7 @@ class VelocityPeak:
         self._collect()
         self._count.use(velocity, self._bins, 1.0, histogram_grid(velocity.width, velocity.height), (SPEED_LOW, SPEED_HIGH))
         self._elapsed += max(delta_time, 0.0)
-        if self._elapsed >= READ_INTERVAL and self._fences[self._next] is None:
+        if self._elapsed >= READ_INTERVAL and not self._pixels.waiting(self._next):
             self._copy(self._next)
             self._next = (self._next + 1) % PIXEL_BUFFERS
             self._elapsed = 0.0
@@ -119,24 +109,20 @@ class VelocityPeak:
     def _copy(self, slot: int) -> None:
         """The bins into pixel buffer `slot`, behind a fence; the bins cleared to count the next second."""
         glBindTexture(GL_TEXTURE_2D, self._bins.tex_id)
-        glBindBuffer(GL_PIXEL_PACK_BUFFER, self._buffers[slot])
+        self._pixels.bind(slot)
         raw_get_tex_image(GL_TEXTURE_2D, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, ctypes.c_void_p(0))
-        glBindBuffer(GL_PIXEL_PACK_BUFFER, 0)
+        self._pixels.unbind()
         glBindTexture(GL_TEXTURE_2D, 0)
-        self._fences[slot] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0)
+        self._pixels.fence(slot)
         self._clear_bins()
 
     def _collect(self) -> None:
         """The percentile of each copy the GPU has finished, written to `speed`."""
-        for slot, fence in enumerate(self._fences):
-            if fence is None or glClientWaitSync(fence, 0, 0) not in (GL_ALREADY_SIGNALED, GL_CONDITION_SATISFIED):
+        for slot in range(self._pixels.count):
+            if not self._pixels.passed(slot):
                 continue
-            glDeleteSync(fence)
-            self._fences[slot] = None
             counts = np.zeros(BINS, dtype=np.uint32)
-            glBindBuffer(GL_PIXEL_PACK_BUFFER, self._buffers[slot])
-            glGetBufferSubData(GL_PIXEL_PACK_BUFFER, 0, counts.nbytes, counts.ctypes.data_as(ctypes.c_void_p))
-            glBindBuffer(GL_PIXEL_PACK_BUFFER, 0)
+            self._pixels.read(slot, counts)
             self.settings.speed = round(speed_percentile(counts), 3)
 
     def _clear_bins(self) -> None:
@@ -144,13 +130,7 @@ class VelocityPeak:
 
     def _restart(self) -> None:
         """Nothing counted, nothing waiting."""
-        self._release()
+        self._pixels.reset()
         self._elapsed = 0.0
         if self._bins.allocated:
             self._clear_bins()
-
-    def _release(self) -> None:
-        for slot, fence in enumerate(self._fences):
-            if fence is not None:
-                glDeleteSync(fence)
-            self._fences[slot] = None
