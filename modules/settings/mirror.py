@@ -133,7 +133,7 @@ def _describe_field(settings: BaseSettings, name: str, field: Field, enums: dict
     }
 
 
-_GROUP_HINTS = ("description", "tint", "tab")      # the Group parameters carried as they are
+_GROUP_HINTS = ("description", "tint", "after")      # the Group parameters carried as they are
 
 
 def _group_hints(settings: BaseSettings, name: str) -> dict[str, Any]:

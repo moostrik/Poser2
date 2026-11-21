@@ -1,10 +1,11 @@
-"""The panel's tabs: the children of each root group, or one tab for a root group declared `tab`."""
+"""The panel's tabs: the children of each root group; a root group placed after a card has no tabs, its children
+follow that card."""
 
 import unittest
 
 from modules.settings import BaseSettings, Field, Group, mirror
 
-from ..page import TabEntry, tab_entries
+from ..page import TabEntry, placements, tab_entries
 
 
 class Camera(BaseSettings):
@@ -39,9 +40,9 @@ class Rooted(BaseSettings):
     flow: Group[Flow] = Group(Flow)
 
 
-class OneTab(BaseSettings):
+class Placed(BaseSettings):
     setup: Group[Setup] = Group(Setup)
-    flow: Group[Flow] = Group(Flow, tab=True)
+    flow: Group[Flow] = Group(Flow, after="setup.camera")
 
 
 class TestTabs(unittest.TestCase):
@@ -54,18 +55,19 @@ class TestTabs(unittest.TestCase):
             TabEntry("flow.view", "flow", root.flow.view),
         ])
 
-    def test_a_root_group_declared_tab_is_one_tab(self):
-        root = OneTab()
+    def test_a_placed_root_group_has_no_tabs_and_follows_its_card(self):
+        root = Placed()
         self.assertEqual(tab_entries(root), [
             TabEntry("setup.camera", "setup", root.setup.camera),
             TabEntry("setup.pose", "setup", root.setup.pose),
-            TabEntry("flow", "", root.flow),
         ])
+        self.assertEqual(placements(root), {"setup.camera": [(root.flow, "view")]})
 
-    def test_the_mirror_keeps_a_one_tab_root_group(self):
-        copy = mirror.build_mirror(mirror.describe(OneTab()))
-        self.assertEqual([(entry.path, entry.group) for entry in tab_entries(copy)],
-                         [("setup.camera", "setup"), ("setup.pose", "setup"), ("flow", "")])
+    def test_the_mirror_keeps_the_placement(self):
+        copy = mirror.build_mirror(mirror.describe(Placed()))
+        self.assertEqual([entry.path for entry in tab_entries(copy)], ["setup.camera", "setup.pose"])
+        self.assertEqual({card: [name for _, name in cards] for card, cards in placements(copy).items()},
+                         {"setup.camera": ["view"]})
 
 
 if __name__ == "__main__":

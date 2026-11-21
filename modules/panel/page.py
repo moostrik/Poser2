@@ -88,38 +88,50 @@ ACCESS_CLASS = {
 
 
 class TabEntry(NamedTuple):
-    """One tab: its path from the root, which is its state key, the root group it is listed under ("" for a root
-    group that is one tab) and its settings."""
+    """One tab: its path from the root, which is its state key, its root group and its settings."""
     path: str
     group: str
     settings: BaseSettings
 
 
+Placements = dict[str, list[tuple[BaseSettings, str]]]     # a card's path → the cards that follow it: their owner, name
+
+
+def _after(root: BaseSettings, group: str) -> str:
+    """The card a root group's children follow (`Group.after`), or "" for a tab per child."""
+    descriptor = getattr(type(root), group, None)
+    return descriptor.after if isinstance(descriptor, Group) else ""
+
+
 def tab_entries(root: BaseSettings) -> list[TabEntry]:
-    """The tabs: a root group declared `tab` is one tab, its children cards in it; another root group's children
-    are each a tab, grouped under it. Only those with visible content."""
-    entries: list[TabEntry] = []
+    """The tabs: the children of each root group, grouped under it; only those with visible content. A root group
+    whose children follow a card (`Group.after`) has no tabs."""
+    return [TabEntry(f"{group}.{name}", group, child)
+            for group, groups in root.children.items() if not _after(root, group)
+            for name, child in groups.children.items() if has_visible_content(child)]
+
+
+def placements(root: BaseSettings) -> Placements:
+    """The children of each root group that follow a card (`Group.after`), by that card's path."""
+    placed: Placements = {}
     for group, groups in root.children.items():
-        descriptor = getattr(type(root), group, None)
-        if isinstance(descriptor, Group) and descriptor.tab:
-            if has_visible_content(groups):
-                entries.append(TabEntry(group, "", groups))
-            continue
-        entries.extend(TabEntry(f"{group}.{name}", group, child)
-                       for name, child in groups.children.items() if has_visible_content(child))
-    return entries
+        after = _after(root, group)
+        if after:
+            placed.setdefault(after, []).extend(
+                (groups, name) for name, child in groups.children.items() if has_visible_content(child))
+    return placed
 
 
 # -- cards -------------------------------------------------------------------------------
 
 def body(settings: BaseSettings, controls: list[Control], state: PanelState, *,
-         depth: int, expansions: list[ui.expansion], path: str) -> None:
+         depth: int, expansions: list[ui.expansion], path: str, placed: Placements) -> None:
     """The controls of one settings instance, in declaration order in one wrapping row, then a
     card per child with visible content.
 
     A field's `newline` is a full-width break that carries the field's access class, so it hides
     with the field. *controls* collects the polled controls, *expansions* the cards, for the
-    page's timer and the expand/collapse-all buttons.
+    page's timer and the expand/collapse-all buttons; *placed* the cards that follow a card.
     """
     with ui.row().classes("w-full gap-4 flex-wrap items-center content-start"):
         for name, field in settings.fields.items():
@@ -136,15 +148,26 @@ def body(settings: BaseSettings, controls: list[Control], state: PanelState, *,
 
     for name, child in settings.children.items():
         if has_visible_content(child):
-            group = getattr(type(settings), name, None)
-            description: str = group.description if isinstance(group, Group) else ""
-            tint: str = group.tint if isinstance(group, Group) else ""
-            card(name, child, controls, state, depth=depth, expansions=expansions, path=path, description=description,
-                 tint=tint)
+            _child_card(settings, name, child, controls, state, depth=depth, expansions=expansions, path=path,
+                        placed=placed)
+            for owner, placed_name in placed.get(state.card_key(path, name), []):
+                _child_card(owner, placed_name, owner.children[placed_name], controls, state, depth=depth,
+                            expansions=expansions, path=path, placed=placed)
+
+
+def _child_card(owner: BaseSettings, name: str, child: BaseSettings, controls: list[Control], state: PanelState, *,
+                depth: int, expansions: list[ui.expansion], path: str, placed: Placements) -> None:
+    """The card of *owner*'s child *name*, with its group's description and tint."""
+    group = getattr(type(owner), name, None)
+    description: str = group.description if isinstance(group, Group) else ""
+    tint: str = group.tint if isinstance(group, Group) else ""
+    card(name, child, controls, state, depth=depth, expansions=expansions, path=path, description=description,
+         tint=tint, placed=placed)
 
 
 def card(name: str, settings: BaseSettings, controls: list[Control], state: PanelState, *,
-         depth: int, expansions: list[ui.expansion], path: str, description: str = "", tint: str = "") -> None:
+         depth: int, expansions: list[ui.expansion], path: str, placed: Placements, description: str = "",
+         tint: str = "") -> None:
     """One settings instance as a collapsible card: a header with its name, its group's
     `description` as the name's tooltip, and, when it has children, an expand/collapse-all button;
     its body inside, on its depth's grey or its group's `tint`. The state remembers whether it is open.
@@ -187,7 +210,7 @@ def card(name: str, settings: BaseSettings, controls: list[Control], state: Pane
                 button.on("click.stop", lambda: None)   # the click does not toggle the card itself
 
     with exp:
-        body(settings, controls, state, depth=depth + 1, expansions=children, path=key)
+        body(settings, controls, state, depth=depth + 1, expansions=children, path=key, placed=placed)
     expansions.extend(children)
 
 
@@ -334,11 +357,12 @@ class TabBar:
         self.buttons: dict[HideToggle, ui.button] = {}
 
         with ui.tabs().classes("w-full bg-[#121212] rounded").props("dense active-color=primary no-indicator") as self.tabs:
+            labelled: bool = len({entry.group for entry in entries}) > 1    # a root group's name only beside another's
             group = ""
             for entry in entries:
                 if entry.group != group:
                     group = entry.group
-                    if group:
+                    if labelled:
                         ui.label(generate_label(group).upper()).classes("text-xs text-grey-6 px-2 self-center")
                 tab = ui.tab(entry.path, label=generate_label(entry.path.rsplit(".", 1)[-1]))
                 tab.on("click", partial(self.select, entry.path))
@@ -353,7 +377,7 @@ class TabBar:
             ui.button(icon="unfold_more", on_click=self.toggle_all).props("dense flat size=sm").tooltip("Expand / Collapse All")
         self.show_toggles()
 
-    def panels_for(self, entries: list[TabEntry], controls: list[Control]) -> None:
+    def panels_for(self, entries: list[TabEntry], controls: list[Control], placed: Placements) -> None:
         """The tab panels, one per entry, each holding its settings' body with the tab's hidden
         types applied; the active tab's panel is shown."""
         with ui.tab_panels(self.tabs, value=self.tab_of[self.active]).classes("w-full bg-grey-10 rounded ").style("padding-bottom: 320px;"):
@@ -363,7 +387,7 @@ class TabBar:
                         if self.state.hidden(name, toggle.key, toggle.default):
                             panel.classes(add=toggle.css)
                     expansions: list[ui.expansion] = []
-                    body(settings, controls, self.state, depth=0, expansions=expansions, path=name)
+                    body(settings, controls, self.state, depth=0, expansions=expansions, path=name, placed=placed)
                 self.panels[name] = panel
                 self.expansions[name] = expansions
 
@@ -438,5 +462,5 @@ def build_page(root: BaseSettings, state: PanelState, *, title: str, port: int,
     ui.timer(POLL_INTERVAL, lambda: tick(controls, failed))
 
     if entries:
-        tab_bar.panels_for(entries, controls)
+        tab_bar.panels_for(entries, controls, placements(root))
     return len(controls)

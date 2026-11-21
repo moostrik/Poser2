@@ -95,8 +95,8 @@ as it was. A root group not named in `.startup.json` starts on the store's defau
 empty, holds a path separator or starts with a dot.
 
 The panel shows a row for each root group (`modules/panel/file_controls.py`) and a tab for each child of a root
-group; a root group declared with `Group(..., tab=True)` is one tab instead, its children cards in it (the flow apps'
-`flow`, the chain in its order).
+group; a root group declared with `Group(..., after="<card path>")` has no tabs: its children follow that card as
+cards in its tab (the flow apps' `flow`, the chain, after `setup.render.layer` in the render panel).
 
 ## The mirror
 

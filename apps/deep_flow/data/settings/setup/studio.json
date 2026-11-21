@@ -7,7 +7,7 @@
       "keyframe_interval": 50,
       "color": true,
       "resolution": "P800",
-      "sim_enabled": false,
+      "sim_enabled": true,
       "model_path": "data/models",
       "fov": 80.0,
       "split_seconds": 60,
@@ -75,21 +75,21 @@
           "VIDEO",
           "DEPTH"
         ],
-        "folder": "20261112-124918_hands",
+        "folder": "20261121-010616_measure_confidence",
         "replay": true
       },
       "uploader": {
         "depth_kernels": true
       },
       "person_detector": {
-        "enabled": false,
         "model_type": "TRT",
-        "resolution": "R640X512",
         "onnx_path": "data/models",
         "engine_path": "apps/deep_flow/data/models",
+        "verbose": false,
+        "enabled": false,
+        "resolution": "R640X512",
         "confidence": 0.5,
-        "overlap": 0.5,
-        "verbose": false
+        "overlap": 0.5
       },
       "recorded_poses": {
         "enabled": false
@@ -126,6 +126,7 @@
     "cadence": {},
     "pose": {
       "model_type": "TRT",
+      "onnx_path": "data/models",
       "engine_path": "apps/deep_flow/data/models",
       "verbose": false,
       "output_frequency": 60.0,
@@ -139,8 +140,8 @@
       },
       "pose_crop": {
         "padding": 0.1,
-        "output_width": 192,
-        "output_height": 256,
+        "output_width": 288,
+        "output_height": 384,
         "interval": 2
       },
       "inference_frame_sync": {
@@ -395,7 +396,9 @@
       "title": "Poser",
       "v_sync": true,
       "v_sync_window": "window_0",
+      "fps_limit": 0,
       "fullscreen_mouse": false,
+      "gl_debug": false,
       "window_0": {
         "enabled": true,
         "monitor": "M1",
