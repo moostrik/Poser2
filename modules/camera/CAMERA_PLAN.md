@@ -11,9 +11,6 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 
 ## C. Small fixes to the rules
 
-- C2. `ClipCamera._clip_callback` stamps a clip frame for the device with `perf_counter`, not `process_time()`, the
-  process's CPU time **(seen)**. Why: "Read `time.perf_counter()` for every stamp"; the device's tracker reads this
-  stamp **(deduction)**.
 - C3. `vimba.SensorControl._read_actual` reports a failed exposure or gain read through `_problem`, as its other
   reads do, not `except Exception: pass` **(seen)**. Why: "Log exceptions with context; never fail silently".
 - C4. The Vimba white balance fields take the backends' word, `balance`, in snake case: `WB_red` / `WB_blue` →
@@ -94,7 +91,6 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 ## Rules it touches
 
 - Inside a package, code that does the same is written once: E2
-- Read `time.perf_counter()` for every stamp and duration: C2
 - Log exceptions with context; never fail silently: C3
 - Follow PEP 8; one term everywhere; keep settings files in sync: C4
 - Keep `Field` descriptions to one short line of panel text: C5

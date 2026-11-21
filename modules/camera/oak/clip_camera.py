@@ -3,7 +3,7 @@ the rig."""
 
 import logging
 from datetime import timedelta
-from time import process_time
+from time import perf_counter
 
 import depthai as dai
 import numpy as np
@@ -84,7 +84,7 @@ class ClipCamera(Camera):
             if frame.ndim == 3:
                 frame = cvtColor(frame, COLOR_BGR2GRAY)  # clip frames arrive BGR (OpenCV convention); a gray-decoded clip skips this
             img.setData(frame.flatten())  # pyright: ignore[reportCallIssue, reportArgumentType]
-        img.setTimestamp(timedelta(seconds=process_time()))
+        img.setTimestamp(timedelta(seconds=perf_counter()))
         img.setWidth(width)
         img.setHeight(height)
         self.clips.send(img)
