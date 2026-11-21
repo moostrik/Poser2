@@ -10,9 +10,11 @@ import cv2
 import numpy as np
 
 from .. import CameraFrame, CameraReadings, CameraSettings, FrameType, CameraFrameCallback, TrackletCallback
-from modules.utils import Broadcast, FPS
+from modules.utils import Broadcast, FPS, Waker
 
 logger = logging.getLogger(__name__)
+
+READ_RETRY: float = 0.01        # s after a failed read before the next
 
 
 class Camera(Thread):
@@ -30,6 +32,7 @@ class Camera(Thread):
         self.video_fps: FPS = FPS()
 
         self.running: bool = False
+        self._waker: Waker = Waker()            # set by stop: ends the wait after a failed read at once
         self._capture: cv2.VideoCapture | None = None
 
     @property
@@ -61,10 +64,13 @@ class Camera(Thread):
 
     def stop(self) -> None:
         self.running = False
+        self._waker.set()
 
     def join(self, timeout: float | None = None) -> None:
         if self.ident is not None:      # started
             super().join(timeout)
+        if not self.is_alive():
+            self._waker.close()
 
     def run(self) -> None:
         capture: cv2.VideoCapture | None = self._capture
@@ -75,7 +81,7 @@ class Camera(Thread):
                 if ok:
                     self._emit(image)
                 else:
-                    time.sleep(0.01)
+                    self._waker.wait(time.perf_counter() + READ_RETRY)
         finally:
             # the thread first: it was reading from the device
             self._capture = None
