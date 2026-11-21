@@ -2,10 +2,8 @@
 
 from OpenGL.GL import GL_RGBA16F
 
-from .fbo import Fbo
-from .shaders import DualFilter
-from .texture import Texture
-from . import style as Style
+from ... import Fbo, Style, Texture
+from .dual_filter import DualFilter
 
 LEVELS: int = 5     # half sizes down: the glow reaches about 2^LEVELS pixels
 

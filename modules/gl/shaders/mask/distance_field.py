@@ -2,10 +2,8 @@
 
 from OpenGL.GL import GL_R32F, GL_RG32F
 
-from .fbo import Fbo, SwapFbo
-from .shaders import JumpFlood
-from .texture import Texture
-from . import style as Style
+from ... import Fbo, Style, SwapFbo, Texture
+from .jump_flood import JumpFlood
 
 
 class DistanceField:

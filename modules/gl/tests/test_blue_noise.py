@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from modules.gl.blue_noise import blue_noise
+from modules.gl.shaders.color.blue_noise import blue_noise
 
 
 class TestBlueNoise(unittest.TestCase):

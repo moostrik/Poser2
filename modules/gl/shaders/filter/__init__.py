@@ -11,3 +11,4 @@ from .displace import Displace
 from .median import Median
 from .bilateral import Bilateral
 from .dual_filter import DualFilter
+from .bloom import Bloom

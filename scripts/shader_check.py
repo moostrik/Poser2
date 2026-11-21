@@ -31,7 +31,7 @@ from apps.smile.render.shaders import FaceColor, FlashIn, FlashOut, Omission  # 
 from modules.flow import DepthCrop, DepthUpscale  # noqa: E402
 from modules.flow.shaders import AddRegion, ChannelAddRegion, ChannelSetRegion, SetRegion  # noqa: E402
 from modules.flow.visualization.shaders import ColormapKey  # noqa: E402
-from modules.gl import Bloom, Colormap, Context, DistanceField, Fbo, Style, Text, Texture, shaders  # noqa: E402
+from modules.gl import Colormap, Context, Fbo, Style, Text, Texture, shaders  # noqa: E402
 from modules.gl.shaders.filter import KERNEL_SIGMA  # noqa: E402
 from modules.pose import PointLandmark, Points2D  # noqa: E402
 from modules.inference.preprocessing.shaders import DepthAlign  # noqa: E402
@@ -134,7 +134,7 @@ class HarnessFeature:
         return (-1.0, 1.0)
 
 
-def exact_distance(field: DistanceField) -> None:
+def exact_distance(field: shaders.DistanceField) -> None:
     """Jump flooding held to the exact distance: every pixel's distance to the nearest mask pixel, by brute force."""
     y, x = np.mgrid[0:SIZE, 0:SIZE].astype(np.float32) / (SIZE - 1)
     mask = (np.hypot(x - 0.5, y - 0.5) < 0.3)                         # the 'hard' input, as `inputs` makes it
@@ -349,13 +349,13 @@ def cases() -> dict[str, tuple[Allocated | None, Case | None, Case | None]]:
     for mode in s.BlendShaderMode:
         add(f'blend_{mode.name.lower()}', blend, lambda t, m=mode: blend.use(t['gradient'], t['second'], m, 1.0))
 
-    bloom = Bloom(3)
+    bloom = shaders.Bloom(3)
     def bloom_process(t: dict[str, Texture]) -> None:
         if not bloom.allocated:
             bloom.allocate(SIZE, SIZE)
         bloom.process(t['second'], 0.5)
     add('bloom', None, lambda t: bloom.texture.draw(), bloom_process)
-    field = DistanceField()
+    field = shaders.DistanceField()
     def field_process(t: dict[str, Texture]) -> None:
         if not field.allocated:
             field.allocate(SIZE, SIZE)

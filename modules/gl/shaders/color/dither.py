@@ -4,8 +4,8 @@ from enum import IntEnum
 
 from OpenGL.GL import GL_NEAREST, GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
 from ... import Shader, draw_quad, Texture
-from ...blue_noise import blue_noise
 from ...image import Image
+from .blue_noise import blue_noise
 
 import logging
 logger = logging.getLogger(__name__)

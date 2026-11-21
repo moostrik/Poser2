@@ -19,10 +19,6 @@ from .tensor import Tensor
 # SHADERS (after the texture classes: they import `Texture` from this package)
 from . import shaders
 
-# EFFECTS OVER A CHAIN OF PASSES (after the shaders)
-from .bloom import Bloom
-from .distance_field import DistanceField
-
 # TEXT RENDERING
 from .text import Text
 
