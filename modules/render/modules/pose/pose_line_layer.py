@@ -7,7 +7,7 @@ from modules.gl import Fbo, Texture, clear_color
 from modules.pose import Frame, Points2D, BBox
 from ...layer_base import LayerBase, DataCache
 from .shaders import PosePointLines as shader
-from modules.utils import Color, Rect
+from modules.utils import Color
 
 
 class PoseLineLayerSettings(BaseSettings):
@@ -61,7 +61,7 @@ class PoseLineLayer(LayerBase):
         # Transform points to image space if use_bbox is enabled
         points = pose[Points2D]
         if self.settings.use_bbox:
-            points = PoseLineLayer._transform_to_image_space(points, pose[BBox].to_rect())
+            points = points.to_image(pose[BBox].to_rect())
 
         line_width: float = 1.0 / self._fbo.height * self.line_width
         line_smooth: float = 1.0 / self._fbo.height * self.line_smooth
@@ -70,11 +70,3 @@ class PoseLineLayer(LayerBase):
         clear_color()
         self._shader.use(points, line_width=line_width, line_smooth=line_smooth, color=self.settings.color.to_tuple(), use_scores=self.settings.use_scores)
         self._fbo.end()
-
-    @staticmethod
-    def _transform_to_image_space(points: Points2D, bbox: Rect) -> Points2D:
-        """Transform pose points from bbox-relative [0,1] to image space."""
-        x_bbox, y_bbox = points.get_xy_arrays()
-        x_image = x_bbox * bbox.width + bbox.x
-        y_image = y_bbox * bbox.height + bbox.y
-        return Points2D.from_xy_arrays(x_image, y_image, points.scores)

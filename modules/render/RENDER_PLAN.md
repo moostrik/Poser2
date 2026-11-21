@@ -13,9 +13,6 @@ The pixel buffer and fence code of `general/screen_recording` is not in this pla
 
 ## A. Code that does the same, written once
 
-- **A4** The pose box-to-image transform becomes one method on `Points2D` (`modules/pose/features/points_2d.py`). It takes the box (`Rect`) and gives the points in image coordinates, keeping their scores. `PoseRenderer` and `PoseLineLayer` use it, and their `_transform_to_image_space` goes.
-  - Why: `_transform_to_image_space` is written twice, and gl.md says "Simple geometry, as from poses, is worked out on the CPU, in plain modules" (seen).
-  - Check: a new unit test in `modules/pose/tests`, and white_space -sim.
 - **A5** `PanoramaCompositor` computes the camera's sector (`target_fov`) once and hands it to `GridRenderer` and `SeamRenderer`.
   - Why: `360 / num_cams` is written three times, while the compositor says it owns the strip's geometry (seen).
   - Check: the panoramic tests, and white_space -sim with the panorama shown.

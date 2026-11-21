@@ -4,7 +4,6 @@
 from modules.settings import Field, BaseSettings
 from modules.board import HasFrames
 from modules.pose import Frame, Points2D, BBox
-from modules.utils import Rect
 from ...layer_base import LayerBase
 from .shaders import PosePointLines
 from ...color_settings import ColorSettings
@@ -54,17 +53,9 @@ class PoseRenderer(LayerBase):
             # Transform points to image space if use_bbox is enabled
             points: Points2D = pose[Points2D]
             if self.settings.use_bbox:
-                points = self._transform_to_image_space(points, pose[BBox].to_rect())
+                points = points.to_image(pose[BBox].to_rect())
 
             self._shader.use(points, line_width, line_smooth, color=color, use_scores=self.settings.use_scores)
 
     def update(self) -> None:
         self._cam_poses = {p for p in self._board.get_frames(self.stage).values() if p.cam_id == self._cam_id}
-
-    @staticmethod
-    def _transform_to_image_space(points: Points2D, bbox: Rect) -> Points2D:
-        """Transform pose points from bbox-relative [0,1] to image space."""
-        x_bbox, y_bbox = points.get_xy_arrays()
-        x_image = x_bbox * bbox.width + bbox.x
-        y_image = y_bbox * bbox.height + bbox.y
-        return Points2D.from_xy_arrays(x_image, y_image, points.scores)

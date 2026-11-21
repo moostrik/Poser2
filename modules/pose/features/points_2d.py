@@ -167,7 +167,7 @@ from typing import Self
 
 from .base.base_feature import NORMALIZED_RANGE
 from .base.base_vector_feature import BaseVectorFeature
-from modules.utils import Point2f
+from modules.utils import Point2f, Rect
 
 
 class PointLandmark(IntEnum):
@@ -326,6 +326,11 @@ class Points2D(BaseVectorFeature[PointLandmark]):
             >>> y.shape  # (17,)
         """
         return self._values[:, 0], self._values[:, 1]
+
+    def to_image(self, box: Rect) -> Self:
+        """The points, given in their box (0 to 1), in the coordinates of the image the box lies in; scores kept."""
+        x, y = self.get_xy_arrays()
+        return type(self).from_xy_arrays(x * box.width + box.x, y * box.height + box.y, self.scores)
 
     def distance_to(self, other: 'Points2D', element: PointLandmark | int) -> float:
         """Calculate Euclidean distance between element positions in two features.

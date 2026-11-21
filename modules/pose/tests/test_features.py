@@ -163,6 +163,19 @@ class VectorAndBoxTest(unittest.TestCase):
         self.assertEqual(pts.get_y(PointLandmark.left_eye, fill=0.0), 0.0)
         self.assertEqual(pts.valid_count, 1)
 
+    def test_points_to_image(self) -> None:
+        pts = points({PointLandmark.nose: (0.25, 0.5), PointLandmark.left_eye: (1.0, 0.0)},
+                     {PointLandmark.nose: 0.75, PointLandmark.left_eye: 1.0})
+        image = pts.to_image(Rect(0.2, 0.1, 0.4, 0.8))
+        self.assertIs(type(image), Points2D)
+        self.assertAlmostEqual(image.get_x(PointLandmark.nose), 0.3, places=6)
+        self.assertAlmostEqual(image.get_y(PointLandmark.nose), 0.5, places=6)
+        self.assertAlmostEqual(image.get_x(PointLandmark.left_eye), 0.6, places=6)
+        self.assertAlmostEqual(image.get_y(PointLandmark.left_eye), 0.1, places=6)
+        self.assertEqual(image.get_score(PointLandmark.nose), 0.75)
+        self.assertTrue(math.isnan(image.get_x(PointLandmark.right_eye)))
+        self.assertEqual(image.get_score(PointLandmark.right_eye), 0.0)
+
     def test_bbox_rect_round_trip(self) -> None:
         box = BBox.from_rect(Rect(0.2, 0.1, 0.4, 0.8))
         self.assertAlmostEqual(box[BBoxElement.center_x], 0.4, places=6)
