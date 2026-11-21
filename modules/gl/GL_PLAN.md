@@ -26,14 +26,24 @@ unless Matthias says he is using the PC or the app.
   `SwapFbo`'s two framebuffers are no longer drawn into; gl has no swap of plain 2D textures, only `SwapFbo`,
   `SwapTexture3D` and `SwapTexture2DArray` (seen). Check: deep_flow -sim, the motion running, no GL error.
 
+## G. Minor fixes found here, in flow's code
+
+Each gets the flow thread's feedback after its commit.
+
+- G1. `ParticleSurface`'s unused `uOutputSize` goes: its declaration in `flow/fluid_3d/shaders/particle_surface.frag`,
+  the `glUniform2f` and the `output_size` parameter of `ParticleSurface.use`, and the argument
+  `particle_density._composite_surface` passes. Why: the fragment shader declares it and reads it nowhere, the vertex
+  shader does not have it, so the program leaves it out and the set warns (seen, D2's deep_flow -sim, 2026-11-21).
+  Check: pyright, flow's tests.
+- G2. The bridge's `WeightedSum` (`flow/bridge_3d/shaders/weighted_sum.py`) and `WeightedSum2D`
+  (`flow/bridge_2d/shaders/weighted_sum_2d.py`) are renamed `SourceMix` and `SourceMix2D`, class and file and every
+  call site. Why: they mix the bridge's sources (up to seven, a weight each, a source as its red or its length, the
+  sum capped if asked), another operation than `gl.shaders.WeightedSum` (two images, each times its weight) under
+  the same name (seen); `shaders.Mix` is taken. Check: pyright, flow's tests, an import of each app's main.
+
 Form, done only in a commit that opens the file anyway, never as a step of its own: PEP 8 in `fbo.py` (the one-line
 `if`, the double spaces before `->`, a class docstring, the end-of-file newline); the two swap tests become one
 `test_swap.py` in a commit that changes `Swap` or them.
-
-## Questions
-
-- `gl.shaders.WeightedSum` and `flow.bridge_3d`'s `WeightedSum` are two operations under one name (the flow's is the
-  bridge's mix of up to seven sources): the flow's renamed after what it does? The flow thread's call.
 
 ## Rules this plan touches
 
@@ -41,6 +51,8 @@ Form, done only in a commit that opens the file anyway, never as a step of its o
 - CLAUDE.md: Use Python 3.12 and follow PEP 8
 - CLAUDE.md: Similar things share the noun and differ by a qualifier (`Frame`, `CameraFrame`)
 - CLAUDE.md: Remove obsolete pathways instead of leaving parallel legacy ones
+- CLAUDE.md: Use no synonyms for one concept across modules; when a term changes, rename it everywhere in the same change
+- CLAUDE.md: A thread that finds a minor problem fixes it, and asks the thread the code belongs to for feedback
 - CLAUDE.md: A plan step that is checked by a run or a test is one commit
 - gl.md: A texture is held in GL's row order
 - gl.md: Shaders get checked in a GPU harness
