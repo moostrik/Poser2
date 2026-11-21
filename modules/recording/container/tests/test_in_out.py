@@ -35,7 +35,7 @@ class MarkerFileTest(unittest.TestCase):
 
 def record(root: Path, count: int) -> Path:
     """A recording of `count` frames, one chunk, with keyframes apart as the settings files record them. Both
-    streams tell the frame: the colour by its gray, the depth as 1000 + 30 per frame."""
+    streams tell the frame: the color by its gray, the depth as 1000 + 30 per frame."""
     rec = recorder([FrameType.VIDEO, FrameType.DEPTH], str(root / 'temp'), 'recordings', str(root), keyframe_interval=30)
     rec.start()
     rec.settings.start = True
@@ -90,7 +90,7 @@ class PlaybackTest(unittest.TestCase):
     def setUp(self) -> None:
         (self.recording / IN_OUT_FILE).unlink(missing_ok=True)
         self.depths: list[int] = []
-        self.colours: list[int] = []
+        self.colors: list[int] = []
         self.player: Player = make_player(self.root, self.recording)
 
         def on_frame(_cam: int, kind: FrameType, image: np.ndarray, _confidence: np.ndarray | None, _metadata: object,
@@ -98,7 +98,7 @@ class PlaybackTest(unittest.TestCase):
             if kind == FrameType.DEPTH:
                 self.depths.append(round((int(np.median(image)) - 1000) / 30))
             else:
-                self.colours.append(int(np.median(image)))
+                self.colors.append(int(np.median(image)))
         self.player.add_frame_callback(on_frame)
 
     def tearDown(self) -> None:
@@ -111,14 +111,14 @@ class PlaybackTest(unittest.TestCase):
         self.assertTrue(wait_for(lambda: self.depths and self.depths[-1] == frame), f'frame {frame}, last {self.depths[-1:]}')
 
     def test_a_seek_finds_both_streams_whole(self) -> None:
-        """A seek goes to a colour keyframe, so depth needs one there too, and its frames stored in
+        """A seek goes to a color keyframe, so depth needs one there too, and its frames stored in
         display order: the encoder calls its forward-only frames B as well, so the type says nothing."""
         chunk = self.recording / make_chunk_name(0, 0)
-        colour, depth = stream_packets(chunk, 0), stream_packets(chunk, 1)
-        self.assertEqual(len(colour), self.COUNT)
+        color, depth = stream_packets(chunk, 0), stream_packets(chunk, 1)
+        self.assertEqual(len(color), self.COUNT)
         stamps: list[int] = [pts for pts, _key in depth]
         self.assertEqual(stamps, sorted(stamps))
-        self.assertEqual(sorted(pts for pts, key in colour if key), [pts for pts, key in depth if key])
+        self.assertEqual(sorted(pts for pts, key in color if key), [pts for pts, key in depth if key])
 
     def test_markers_come_back_on_load_and_the_seek_finds_in(self) -> None:
         write_in_out(self.recording, [0.5, 1.0])
@@ -132,7 +132,7 @@ class PlaybackTest(unittest.TestCase):
         self.assertTrue(wait_for(lambda: len(self.depths) > 5))
         for frame in (60, 23, 71):
             self.scrub_to(frame)
-            self.assertLess(abs(self.colours[-1] - frame), 4)
+            self.assertLess(abs(self.colors[-1] - frame), 4)
         arrived: int = len(self.depths)
         time.sleep(0.4)
         self.assertEqual(len(self.depths), arrived)     # one frame each: no playback while paused
@@ -185,7 +185,7 @@ class PlaybackTest(unittest.TestCase):
         arrived: int = len(self.depths)
         self.seek_to(50)
         self.assertTrue(wait_for(lambda: 55 <= self.depths[-1] < 80))      # plays on, in step
-        self.assertLess(abs(self.colours[-1] - self.depths[-1]), 4)
+        self.assertLess(abs(self.colors[-1] - self.depths[-1]), 4)
         played: list[int] = self.depths[arrived:]
         self.assertEqual(played[played.index(50):], list(range(50, played[-1] + 1)))
         self.assertEqual(self.player.settings.in_out, [1 / 9, 8 / 9])

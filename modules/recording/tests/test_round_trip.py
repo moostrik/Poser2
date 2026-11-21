@@ -113,9 +113,9 @@ class RoundTripTest(unittest.TestCase):
             player.stop()
 
         depths = [entry for entry in played if entry[0] == FrameType.DEPTH]
-        colours = [entry for entry in played if entry[0] == FrameType.VIDEO]
+        colors = [entry for entry in played if entry[0] == FrameType.VIDEO]
         self.assertGreaterEqual(len(depths), count)
-        self.assertEqual(len(depths), len(colours))
+        self.assertEqual(len(depths), len(colors))
         for i in range(count):
             self.assertLess(abs(depths[i][1] - (1000 + i * 30)), 40)
             self.assertEqual(depths[i][2], FrameReadings(-30.0 + i, 1.0, 1000, 100))

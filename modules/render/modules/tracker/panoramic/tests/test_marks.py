@@ -169,7 +169,7 @@ class TestWaitingForASlot(unittest.TestCase):
     """A person tracked but waiting for a player slot keeps their own line and field, in the
     waiting color and labeled `waiting` — on the strip, belonging to no slot yet."""
 
-    def test_a_waiting_mark_has_the_waiting_colour_and_label(self) -> None:
+    def test_a_waiting_mark_has_the_waiting_color_and_label(self) -> None:
         t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=False, player=None), id=6)
         m: Mark = build_marks([t], set(), RED, GRAY, WAITING, CONTEXT)[0]
         self.assertFalse(m.rejected)
@@ -179,7 +179,7 @@ class TestWaitingForASlot(unittest.TestCase):
         self.assertTrue(m.label.startswith('#- c0'))
         self.assertTrue(m.label.endswith(' waiting'))
 
-    def test_the_colour_and_label_are_the_slot_not_the_world(self) -> None:
+    def test_the_color_and_label_are_the_slot_not_the_world(self) -> None:
         # The same index the pose figures color by, so the strip and the pose row cannot disagree;
         # the world id is unbounded and never displayed.
         colors = [(1.0, 0.0, 0.0, 1.0), (0.0, 1.0, 0.0, 1.0)]
@@ -200,10 +200,10 @@ class TestLostFade(unittest.TestCase):
                               id=0, last_active=NOW - seconds_lost)
         return build_marks([t], set(), RED, GRAY, WAITING, CONTEXT)[0]
 
-    def colour(self, seconds_lost: float, status: TrackingStatus = TrackingStatus.LOST):
+    def color(self, seconds_lost: float, status: TrackingStatus = TrackingStatus.LOST):
         return self.lost(seconds_lost, status).color
 
-    def test_the_field_keeps_its_colour_and_fades_out(self) -> None:
+    def test_the_field_keeps_its_color_and_fades_out(self) -> None:
         self.assertEqual(self.lost(0.0).field_color, (1.0, 0.0, 0.0, 1.0))
         self.assertEqual(self.lost(LOST_TIMEOUT / 2.0).field_color, (1.0, 0.0, 0.0, 0.5))
         self.assertEqual(self.lost(LOST_TIMEOUT).field_color, (1.0, 0.0, 0.0, 0.0))
@@ -214,23 +214,23 @@ class TestLostFade(unittest.TestCase):
                               id=0, last_active=NOW)
         self.assertTrue(build_marks([t], {t.obs_id}, RED, GRAY, WAITING, CONTEXT)[0].field_outline)
 
-    def test_fresh_is_the_world_colour(self) -> None:
-        self.assertEqual(self.colour(0.0), (1.0, 0.0, 0.0, 0.8))
+    def test_fresh_is_the_world_color(self) -> None:
+        self.assertEqual(self.color(0.0), (1.0, 0.0, 0.0, 0.8))
 
     def test_at_the_timeout_it_is_gray(self) -> None:
-        r, g, b, a = self.colour(LOST_TIMEOUT)
+        r, g, b, a = self.color(LOST_TIMEOUT)
         self.assertAlmostEqual(r, GRAY[0]); self.assertAlmostEqual(g, GRAY[1]); self.assertAlmostEqual(b, GRAY[2])
-        self.assertEqual(self.colour(LOST_TIMEOUT * 3.0)[:3], self.colour(LOST_TIMEOUT)[:3])   # and stays
+        self.assertEqual(self.color(LOST_TIMEOUT * 3.0)[:3], self.color(LOST_TIMEOUT)[:3])   # and stays
 
     def test_halfway_is_halfway(self) -> None:
-        r, g, b, a = self.colour(LOST_TIMEOUT / 2.0)
+        r, g, b, a = self.color(LOST_TIMEOUT / 2.0)
         self.assertAlmostEqual(r, (1.0 + GRAY[0]) / 2.0)
         self.assertAlmostEqual(g, GRAY[1] / 2.0)
         self.assertAlmostEqual(a, 0.8)
 
     def test_a_tracked_observation_does_not_fade(self) -> None:
         # Only LOST fades; an active passive view keeps its color at the passive alpha however old.
-        self.assertEqual(self.colour(LOST_TIMEOUT, status=TrackingStatus.TRACKED), (1.0, 0.0, 0.0, 0.8))
+        self.assertEqual(self.color(LOST_TIMEOUT, status=TrackingStatus.TRACKED), (1.0, 0.0, 0.0, 0.8))
 
 
 class TestPassiveField(unittest.TestCase):
