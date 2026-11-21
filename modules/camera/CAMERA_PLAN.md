@@ -9,11 +9,6 @@ smile, `vimba` and `webcam` by smile. That is general code with one user, which 
 The steps below are what is left of the scan of 2026-11-21. **(seen)** is read in the code,
 **(deduction)** inferred.
 
-## C. Small fixes to the rules
-
-- C8. "normalised" is spelled "normalized" in `tracklet.py`, `geometry/mirror.py`, `geometry/tilt_correction.py`,
-  `oak4/models.py`, `oak4/pipeline.py`, `oak4/keypoint_join.py` **(seen)**. Why: the glossary's American spelling.
-
 ## D. The documents
 
 - D1. OAK4.md names `ViewDepth`, not `ViewDepthLayer` **(seen: deep_flow `view_depth.py`)**. Why: the document
@@ -72,7 +67,6 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 ## Rules it touches
 
 - Inside a package, code that does the same is written once: E2
-- The glossary: C8
 - A document describes what is built: D1
 - Use that one term everywhere it appears: E1
 - Remove obsolete pathways instead of leaving parallel legacy ones: E3

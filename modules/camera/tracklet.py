@@ -25,10 +25,10 @@ class CameraTracklet:
     cam_id: int
     id: int                                 # the device tracker's id
     status: TrackingStatus
-    roi: Rect                               # normalised to the frame
+    roi: Rect                               # normalized to the frame
     age: int                                # frames
     timestamp: float                        # its frame's capture, as `CameraFrame.timestamp`
-    keypoints: np.ndarray | None = None     # with a pose model on the camera: float32 (17, 3), COCO, x y normalised, score
+    keypoints: np.ndarray | None = None     # with a pose model on the camera: float32 (17, 3), COCO, x y normalized, score
 
 
 @dataclass(frozen=True)

@@ -11,7 +11,7 @@ MIRROR_X: np.ndarray = np.diag([-1.0, 1.0, 1.0, 1.0])     # a 4x4 move's x turne
 
 
 def mirrored_roi(roi: Rect) -> Rect:
-    """A normalised box in the frame flipped left to right."""
+    """A normalized box in the frame flipped left to right."""
     return Rect(1.0 - roi.x - roi.width, roi.y, roi.width, roi.height)
 
 
@@ -25,7 +25,7 @@ def mirrored_keypoints(keypoints: np.ndarray | None) -> np.ndarray | None:
 
 
 def flipped_roi(roi: Rect) -> Rect:
-    """A normalised box in the frame flipped top to bottom."""
+    """A normalized box in the frame flipped top to bottom."""
     return Rect(roi.x, 1.0 - roi.y - roi.height, roi.width, roi.height)
 
 
@@ -39,7 +39,7 @@ def flipped_keypoints(keypoints: np.ndarray | None) -> np.ndarray | None:
 
 
 def turned_roi(roi: Rect) -> Rect:
-    """A normalised box in the frame turned as `CameraFrame.rotate90` turns it: transposed."""
+    """A normalized box in the frame turned as `CameraFrame.rotate90` turns it: transposed."""
     return Rect(roi.y, roi.x, roi.height, roi.width)
 
 

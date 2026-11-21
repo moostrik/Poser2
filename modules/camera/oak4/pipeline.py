@@ -124,7 +124,7 @@ def add_one_model_chain(pipeline: dai.Pipeline, frames: dai.Node.Output, archive
 
 def add_detector(pipeline: dai.Pipeline, frames: dai.Node.Output, archive: dai.NNArchive) -> dai.node.DetectionNetwork:
     """The delivered frame stretched into the model and the network on it: the first stage of every
-    chain. STRETCHED, never cropped or letterboxed: nothing is lost at the edges and the normalised
+    chain. STRETCHED, never cropped or letterboxed: nothing is lost at the edges and the normalized
     boxes map 1:1 onto the delivered frame; an aspect mismatch costs detection quality, never geometry."""
     size: tuple[int, int] | None = archive.getInputSize()
     if size is None:

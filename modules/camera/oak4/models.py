@@ -28,7 +28,7 @@ DETECTOR_ARCHIVE: str = 'yolov6n_coco_512x288_rvc4.tar.xz'
 TOP_DOWN_MODEL: str = 'luxonis/lite-hrnet:18-coco-192x256'
 TOP_DOWN_ARCHIVE: str = 'lite_hrnet18_coco_192x256_rvc4.tar.xz'
 NUM_KEYPOINTS: int = 17                 # COCO, the order of `modules.pose.PointLandmark`
-POSE_CROP_PADDING: float = 0.0          # margin round the person's box before the crop, normalised to the frame
+POSE_CROP_PADDING: float = 0.0          # margin round the person's box before the crop, normalized to the frame
 POSE_CONFIDENCE_THRESHOLD: float = 0.5
 POSE_OVERLAP_THRESHOLD: float = 0.5
 
@@ -66,7 +66,7 @@ def nn_frame_type(archive: dai.NNArchive) -> dai.ImgFrame.Type:
 
 
 def tracklet_keypoints(detection: dai.ImgDetection) -> np.ndarray | None:
-    """The detection's landmarks as the contract carries them: (17, 3) float32, x and y normalised
+    """The detection's landmarks as the contract carries them: (17, 3) float32, x and y normalized
     to the frame the detector saw (the delivered frame, stretched into the model), and the score;
     None when the detection carries none."""
     points = detection.getKeypoints()
@@ -77,7 +77,7 @@ def tracklet_keypoints(detection: dai.ImgDetection) -> np.ndarray | None:
 
 def keypoints_in_frame(message: dai.beta.Keypoints, frame: dai.ImgTransformation | None) -> np.ndarray | None:
     """A crop's keypoints from the top-down pose model, in the delivered frame, as the contract
-    carries them: (17, 3) float32, x and y normalised to the frame, and the score. The message's
+    carries them: (17, 3) float32, x and y normalized to the frame, and the score. The message's
     transformation is the crop's, the frame's is the delivered frame's (both descend from the same
     sensor, so depthai remaps one into the other); None without a transformation to remap through,
     or when the count is not 17."""

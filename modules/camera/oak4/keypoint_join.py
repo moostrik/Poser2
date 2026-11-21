@@ -8,7 +8,7 @@ import numpy as np
 
 from .. import CameraTracklet
 
-Box = tuple[float, float, float, float]      # xmin, ymin, xmax, ymax normalised to the delivered frame
+Box = tuple[float, float, float, float]      # xmin, ymin, xmax, ymax normalized to the delivered frame
 
 BOX_MATCH_TOLERANCE: float = 1e-4            # the tracker's source detection is the detection, bit for bit
 

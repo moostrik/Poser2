@@ -49,7 +49,7 @@ def homography_points(homography: np.ndarray, points: np.ndarray) -> np.ndarray:
 
 
 def corrected_roi(roi: Rect, homography: np.ndarray) -> Rect:
-    """A normalised box straightened with the frame: the box round its four moved corners, in the frame."""
+    """A normalized box straightened with the frame: the box round its four moved corners, in the frame."""
     x0, y0, x1, y1 = roi.x, roi.y, roi.x + roi.width, roi.y + roi.height
     corners: np.ndarray = homography_points(homography, np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]]))
     left, top = np.clip(corners.min(axis=0), 0.0, 1.0)

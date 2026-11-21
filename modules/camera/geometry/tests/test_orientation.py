@@ -1,4 +1,4 @@
-"""The camera readout: gravity to angles, and the verdicts that summarise the readings.
+"""The camera readout: gravity to angles, and the verdicts that summarize the readings.
 
 Neither needs a device. The gravity conversion is a pure function, and `CameraHealth` reads plain
 settings objects, so the interesting cases — a rig with no IMU, one camera out of four off — are
