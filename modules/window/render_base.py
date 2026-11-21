@@ -1,13 +1,9 @@
 from abc import ABC, abstractmethod
-from threading import Lock
 from typing import Any, Callable
 
-import logging
-
+from modules.utils import Broadcast
 from .window_manager import WindowManager
 from .window_settings import WindowManagerSettings
-
-logger = logging.getLogger(__name__)
 
 
 class RenderBase(ABC):
@@ -15,33 +11,21 @@ class RenderBase(ABC):
 
     def __init__(self, windows: WindowManagerSettings) -> None:
         """`windows` an app's `windows` group: the window loop's settings and its windows."""
-        self._update_callbacks: list[Callable[[float], Any]] = []     # run in registration order
-        self._update_lock = Lock()
+        self._update_callbacks: Broadcast[[float]] = Broadcast(name='update')     # run in registration order
         self.window_manager: WindowManager = WindowManager(self, windows)
 
     def add_update_callback(self, callback: Callable[[float], Any]) -> None:
         """Register a per-frame update callback; it gets the frame's time (perf_counter, the stamp of the
         frame's update), the clock of everything that advances on the render tick."""
-        with self._update_lock:
-            if callback not in self._update_callbacks:
-                self._update_callbacks.append(callback)
+        self._update_callbacks.add_callback(callback)
 
     def remove_update_callback(self, callback: Callable[[float], Any]) -> None:
         """Unregister a per-frame update callback."""
-        with self._update_lock:
-            if callback in self._update_callbacks:
-                self._update_callbacks.remove(callback)
+        self._update_callbacks.remove_callback(callback)
 
     def _notify_update(self) -> None:
         """Dispatch all registered update callbacks with the frame's time. Call from update()."""
-        now = self.window_manager.frame_timestamp
-        with self._update_lock:
-            callbacks = list(self._update_callbacks)
-        for callback in callbacks:
-            try:
-                callback(now)
-            except Exception:
-                logger.exception("Error in update callback")
+        self._update_callbacks(self.window_manager.frame_timestamp)
 
     def run(self) -> None:
         """The window loop on the calling thread, the main thread, until the windows close."""
@@ -51,7 +35,7 @@ class RenderBase(ABC):
         """Ask the window loop to end; from any thread."""
         self.window_manager.stop()
 
-    def add_exit_callback(self, callback: Callable) -> None:
+    def add_exit_callback(self, callback: Callable[[], Any]) -> None:
         """Register a callback invoked when the render window closes."""
         self.window_manager.add_exit_callback(callback)
 

@@ -5,13 +5,6 @@ commit, built on Matthias's go, checked by pyright and the window tests.
 
 ## A. Form
 
-- A1. The six callback lists become `utils.Broadcast`s: `RenderBase._update_callbacks`,
-  `WindowManager._exit_callbacks` and `WindowInput`'s key, mouse move, mouse button and scroll lists. Each is the same
-  lock, copy, call and log written out again, which `Broadcast` already is; `WindowInput.clear_callbacks`, which
-  `stop()` uses, needs a `clear()` on `Broadcast` or new `Broadcast`s. In the same files: `add_exit_callback`'s bare
-  `Callable` typed, `_swap_fences` and `_monitor_cb` typed, and `render_base.py`'s `import logging` with the standard
-  imports. Why: "A callback list is a `utils.Broadcast`" and "Inside a package, code that does the same is written
-  once" (seen: `render_base.py`, `window_manager.py`, `window_input.py`).
 - A2. `Monitor.connected` logs, at debug, a monitor it skips because pyGLFW raised for it (a monitor being
   unplugged), instead of a bare `continue`. Why: "Log exceptions with context; never fail silently" (seen:
   `monitor.py`).

@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-import logging
 from enum import IntEnum
-from threading import Lock
-from typing import Any, Callable
+from typing import Callable
 
 import glfw
 
+from modules.utils import Broadcast
 from .window import Window
-
-logger = logging.getLogger(__name__)
 
 
 class MouseButton(IntEnum):
@@ -39,11 +36,10 @@ class WindowInput:
     order, on the main thread, during the loop's event processing; a raising callback is logged and the next one runs."""
 
     def __init__(self) -> None:
-        self._lock = Lock()
-        self._key_callbacks: list[KeyCallback] = []
-        self._mouse_move_callbacks: list[MouseMoveCallback] = []
-        self._mouse_button_callbacks: list[MouseButtonCallback] = []
-        self._mouse_scroll_callbacks: list[MouseScrollCallback] = []
+        self._key_callbacks: Broadcast[[int, int, int, int]] = Broadcast(name='key')
+        self._mouse_move_callbacks: Broadcast[[int, float, float]] = Broadcast(name='mouse move')
+        self._mouse_button_callbacks: Broadcast[[int, float, float, MouseButton, bool]] = Broadcast(name='mouse button')
+        self._mouse_scroll_callbacks: Broadcast[[int, float]] = Broadcast(name='mouse scroll')
         self._mouse: dict[int, tuple[float, float]] = {}     # each window's cursor, in screen coordinates
 
     def attach(self, window: Window) -> None:
@@ -55,40 +51,24 @@ class WindowInput:
         glfw.set_scroll_callback(window.handle, lambda handle, x, y: self._on_scroll(index, y))
 
     def add_key_callback(self, callback: KeyCallback) -> None:
-        self._add(self._key_callbacks, callback)
+        self._key_callbacks.add_callback(callback)
 
     def add_mouse_move_callback(self, callback: MouseMoveCallback) -> None:
-        self._add(self._mouse_move_callbacks, callback)
+        self._mouse_move_callbacks.add_callback(callback)
 
     def add_mouse_button_callback(self, callback: MouseButtonCallback) -> None:
-        self._add(self._mouse_button_callbacks, callback)
+        self._mouse_button_callbacks.add_callback(callback)
 
     def add_mouse_scroll_callback(self, callback: MouseScrollCallback) -> None:
-        self._add(self._mouse_scroll_callbacks, callback)
+        self._mouse_scroll_callbacks.add_callback(callback)
 
     def clear_callbacks(self) -> None:
-        with self._lock:
-            self._key_callbacks.clear()
-            self._mouse_move_callbacks.clear()
-            self._mouse_button_callbacks.clear()
-            self._mouse_scroll_callbacks.clear()
-
-    def _add(self, callbacks: list[Any], callback: Any) -> None:
-        with self._lock:
-            if callback not in callbacks:
-                callbacks.append(callback)
-
-    def _call(self, callbacks: list[Any], *args: Any) -> None:
-        with self._lock:
-            listed = list(callbacks)
-        for callback in listed:
-            try:
-                callback(*args)
-            except Exception:
-                logger.exception("Error in input callback %s", getattr(callback, '__qualname__', callback))
+        for callbacks in (self._key_callbacks, self._mouse_move_callbacks, self._mouse_button_callbacks,
+                          self._mouse_scroll_callbacks):
+            callbacks.clear()
 
     def _on_key(self, index: int, key: int, action: int, mods: int) -> None:
-        self._call(self._key_callbacks, index, key, action, mods)
+        self._key_callbacks(index, key, action, mods)
 
     @staticmethod
     def _normalized(handle: glfw._GLFWwindowPointerT, x: float, y: float) -> tuple[float, float]:
@@ -97,14 +77,14 @@ class WindowInput:
 
     def _on_cursor(self, index: int, handle: glfw._GLFWwindowPointerT, x: float, y: float) -> None:
         self._mouse[index] = (x, y)
-        self._call(self._mouse_move_callbacks, index, *self._normalized(handle, x, y))
+        self._mouse_move_callbacks(index, *self._normalized(handle, x, y))
 
     def _on_button(self, index: int, handle: glfw._GLFWwindowPointerT, button: int, action: int) -> None:
         mouse_button: MouseButton | None = _GLFW_BUTTON_MAP.get(button)
         if mouse_button is None or action not in (glfw.PRESS, glfw.RELEASE):
             return
         x, y = self._normalized(handle, *self._mouse.get(index, (0.0, 0.0)))
-        self._call(self._mouse_button_callbacks, index, x, y, mouse_button, action == glfw.PRESS)
+        self._mouse_button_callbacks(index, x, y, mouse_button, action == glfw.PRESS)
 
     def _on_scroll(self, index: int, steps: float) -> None:
-        self._call(self._mouse_scroll_callbacks, index, float(steps))
+        self._mouse_scroll_callbacks(index, float(steps))

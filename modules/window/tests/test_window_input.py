@@ -7,7 +7,7 @@ from unittest import mock
 from modules.window.window_input import WindowInput
 
 MODULE = sys.modules['modules.window.window_input']
-LOGGER: str = 'modules.window.window_input'
+LOGGER: str = 'modules.utils.broadcast'      # a raising callback is logged by its Broadcast
 
 
 class TestWindowInput(unittest.TestCase):

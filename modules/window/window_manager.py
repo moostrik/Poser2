@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from threading import Event, Lock, Thread, current_thread
 from time import perf_counter
-from typing import Callable, TYPE_CHECKING
+from typing import Any, Callable, TYPE_CHECKING
 
 from OpenGL.GL import glBindFramebuffer, glClientWaitSync, glDeleteSync, glFenceSync, glFlush, glGetString, glViewport, \
     GL_FRAMEBUFFER, GL_SYNC_FLUSH_COMMANDS_BIT, GL_SYNC_GPU_COMMANDS_COMPLETE, GL_VERSION
@@ -12,7 +12,7 @@ import glfw
 if TYPE_CHECKING:
     from .render_base import RenderBase
 from modules.gl import Shader, enable_debug_output
-from modules.utils import FPS, PerformanceTimer, Waker
+from modules.utils import FPS, Broadcast, PerformanceTimer, Waker
 from .monitor import Monitor
 from .window import Window
 from .window_input import WindowInput
@@ -53,14 +53,13 @@ class WindowManager:
         self._sizes: list[tuple[int, int]] = []     # each window's framebuffer size, as the renderer knows it
         self._monitors: list[Monitor] = []          # the connected monitors, in MonitorId order
         self._monitors_changed: bool = False        # a hot-plug, handled at the top of the next frame
-        self._monitor_cb = None                     # strong ref to the monitor callback (prevents GC)
+        self._monitor_cb: Callable[[glfw._GLFWmonitorPointerT, int], None] | None = None    # kept: GLFW holds no reference
         self._swap_intervals: tuple[bool, int] | None = None    # (v_sync, v_sync_window) as applied
         self._waker = Waker()                       # the frame pacing's wait, ended at once by stop() and a new limit
         self._next_frame: float = 0.0               # the paced frame's deadline (perf_counter), 0 when not paced
-        self._swap_fences: list = []                # a fence after each paced swap, the newest last
+        self._swap_fences: list[object] = []        # a fence after each paced swap, the newest last
 
-        self._exit_callbacks: list[Callable[[], None]] = []
-        self._callback_lock = Lock()
+        self._exit_callbacks: Broadcast[[]] = Broadcast(name='exit')
 
         self._place_default: bool = False           # the button, applied at the tick
         self._cb_default = lambda v: self._ask_default_placement() if v else None
@@ -100,10 +99,8 @@ class WindowManager:
         """A window's framebuffer size (pixels), as the renderer knows it: from `allocate` on."""
         return self._sizes[window]
 
-    def add_exit_callback(self, callback: Callable[[], None]) -> None:
-        with self._callback_lock:
-            if callback not in self._exit_callbacks:
-                self._exit_callbacks.append(callback)
+    def add_exit_callback(self, callback: Callable[[], Any]) -> None:
+        self._exit_callbacks.add_callback(callback)
 
     def _setup(self) -> None:
         if not glfw.init():
@@ -169,13 +166,7 @@ class WindowManager:
             self._waker.close()
         except Exception:
             logger.exception("Error cleaning up GLFW")
-        with self._callback_lock:
-            callbacks = list(self._exit_callbacks)
-        for callback in callbacks:
-            try:
-                callback()
-            except Exception:
-                logger.exception("Error in exit callback")
+        self._exit_callbacks()
 
     # THE LOOP
     def _render_loop(self) -> None:

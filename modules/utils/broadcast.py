@@ -47,3 +47,8 @@ class Broadcast(Generic[P]):
         with self._lock:
             if callback in self._callbacks:
                 self._callbacks.remove(callback)
+
+    def clear(self) -> None:
+        """Every callback removed."""
+        with self._lock:
+            self._callbacks.clear()
