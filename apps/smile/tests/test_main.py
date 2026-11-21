@@ -19,8 +19,7 @@ class TestVisitorLimit(unittest.TestCase):
         self.limit: float = 100.0 + 45.0 + VISITOR_MARGIN
 
     def step(self, now: float, seq: SequenceType) -> None:
-        with mock.patch('apps.smile.main.time.perf_counter', lambda: now):
-            SmileMain._limit_visitor(self.app, seq)
+        SmileMain._limit_visitor(self.app, seq, now)
 
     def test_a_visitor_within_its_time_is_left_alone(self):
         self.step(self.limit - 1.0, SequenceType.DIFFUSION)

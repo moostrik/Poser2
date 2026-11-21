@@ -161,7 +161,9 @@ OpenGL engine: Poser2's `modules/gl/` (GL 4.6 core) and `modules/window/` (glfw,
 a deferred settings call raises: it is logged, and a monitor that is unplugged does not close the app
 (`modules/window/tests/test_window_manager.py`). The render is the display's 1024 x 1280 (`main.py` defaults, swapped by the
 default portrait mode): the same 4:5 as the workflow's 896 x 1120 portrait, which stays at the size SDXL is best at and fills
-the render as a texture. `render/smile_render.py` runs the `Sequencer` once per frame (it is the app clock:
+the render as a texture. `render/smile_render.py` reads `perf_counter()` once per frame, the frame's tick, and hands it
+to the grin player, the credit, the screen grab and the `Sequencer`, whose messages carry it (`timestamp`) for `Main`;
+it runs the `Sequencer` once per frame (it is the app clock:
 Art-Net, OSC and saving hang off its messages), then the stage for the current `SequenceType`
 (`stages.py`) renders the layers (`layers/`) and picks the one to show. What other threads make goes through the
 board (`board/`, `RenderBoard`), which the render reads at its tick: the camera's full frame as the uploader made it on
@@ -207,7 +209,7 @@ a test keeps the file equal to it) all come from it; a cabling that differs is c
 The **scrolling name** (`credit_scroll.py`, no GL): while the installation is idle each word of `credit_name` goes round its own ring of the sphere, the first word on the
 first of `credit_scroll_rows` (`plan_loops`, `RingPath`: all the ring's screens from the rib at the camera down the rib numbers, since the ribs count to the camera's left,
 the visitor's right, and a ticker moves to the visitor's left; `reverse` the other way round; `row_screens`, `screen_cell`, screens counted from 0 there). `CreditScroller`
-(stepped from `Main.sequence_callback` with `time.perf_counter()`; blocked during the laughter test and until `credit_scroll_idle` seconds after `Main._face_seen`, the last qualifying face or sequence frame outside
+(stepped from `Main.sequence_callback` with the frame's tick, `SequenceMessage.timestamp`; blocked during the laughter test and until `credit_scroll_idle` seconds after `Main._face_seen`, the last qualifying face or sequence frame outside
 the camera states, since the face finder gets no frames there) hands each wall its own cells with their place round the ring every `SEND_EVERY`
 second (`send_loops` to `Player.scroll_loop`: wall, word, px/s, gap, size, the ring's screens, `started` the time the loop began, the cells with their places, `last`),
 each word at its own speed (`credit_scroll_speed_1`, `_2`; a speed changed in the panel moves the start
@@ -226,8 +228,8 @@ first screen; with `last` it lights no place past that one and runs out at its l
 `save/clip_saver.py` saves each finished visitor for the players under `output/` (git-ignored):
 the grin as `grins/<style>/<id>.mp4` (silent h264 at the full portrait size, at `sequence.grin.fps`), the capture and the
 portrait as `portraits/<style>/<id>_capture.jpg` and `<id>_portrait.jpg`, and after the grin landed the phone's copy
-`shares/<style>/<id>.mp4` (`save/share.py`: the same grin re-encoded with the watermark, "SMILE", a circled "ai" and "by" the credit name, in the bottom
-right, no caption, built before the players' clip lands, and the visitor's track as its sound: `ClipSaver.submit_share` from `Main` at DIFF_LOOP's start with the seconds
+`shares/<style>/<id>.mp4` (`save/share.py`: the same grin re-encoded with the watermark, "SMILE", a circled "ai" and "by" the credit name as it is at
+that share, written again only when the name changed, in the bottom right, no caption, built before the players' clip lands, and the visitor's track as its sound: `ClipSaver.submit_share` from `Main` at DIFF_LOOP's start with the seconds
 since the flash, read with `video.read_audio`, played on the tape of `audio/tape.py`, the Max patch's spin-up over
 the first half second and a wind-down over the last, muxed by `video.make_share`; a share clip that fails is a warning and
 the players' clip goes to the phone instead). `<style>` is the visitor's

@@ -133,7 +133,7 @@ class SmileMain():
         self.credit_scroller: CreditScroller = CreditScroller(self.settings.setup.render, self.clip_player.scroll_loop)
         self._face_seen: float = time.perf_counter()    # the last qualifying face or visitor: the name waits from here
         self.save: ClipSaver = ClipSaver(self.settings.setup.sequence.saver, self.settings.setup.sequence.grin,
-                                         watermark=self.settings.setup.render.credit_name)
+                                         lambda: str(self.settings.setup.render.credit_name))
         self._grin_saved: bool = False      # the visitor's grin was saved to its last frame
         self._saving: bool = False          # the visitor's files are open in the saver
         self._style_picked: bool = False    # the style of the next visitor is picked: until the flash
@@ -169,6 +169,7 @@ class SmileMain():
         self.face.start()
         self.face_detector.start()
         self.uploader.start()
+        self.save.start()
 
         self.osc.start()
         self.lights.start()
@@ -220,6 +221,7 @@ class SmileMain():
         seq: SequenceType = message.sequence_type
         ani: AnimationType = message.animation_type
         state: str = AnimationTypeNames[message.animation_type]
+        now: float = message.timestamp      # the render frame's tick: every time this frame steps with
 
         # no visitor while the generator can't take a capture (ComfyUI not there, or still warming up):
         # the flash would hold until it can. The operator sees why on the image.
@@ -243,10 +245,10 @@ class SmileMain():
             self.pick_style()
         if seq == SequenceType.FLASH and message.initial:
             self._style_picked = False
-            self._flash_time = time.perf_counter()
+            self._flash_time = now
         if seq == SequenceType.DIFF_LOOP and message.initial:
             # the grin starts playing: the share clip gets the track from the point the room hears now
-            self.save.submit_share(self.music_map.track_path(), time.perf_counter() - self._flash_time)
+            self.save.submit_share(self.music_map.track_path(), now - self._flash_time)
 
         audio = self.settings.setup.audio
         if audio.osc.enabled:
@@ -265,15 +267,14 @@ class SmileMain():
             self.osc.submit('/laughter_offset', audio.laughter_offset)
             # the test closes the gate of the clips' laughs in the patch; its own bangs pass that gate
             self.osc.submit('/laughter_test', int(audio.laughter_test))
-        # the laughter test steps on the app clock too (the lights on the walls, the test bangs to Max), as do the
+        # the laughter test steps on the frame's tick too (the lights on the walls, the test bangs to Max), as do the
         # scrolling name and the online turn: `perf_counter`, the walls' clock as well
-        now: float = time.perf_counter()
         self.laughter_test.update(now)
-        # and the scrolling name's passes, timed on the app clock too; only after `credit_scroll_idle` s without a
-        # qualifying face (the finder sees no frames during a visitor, who counts as one) and not while the test lights the screens
+        # and the scrolling name's passes; only after `credit_scroll_idle` s without a qualifying face (the finder sees
+        # no frames during a visitor, who counts as one) and not while the test lights the screens
         if seq not in CAMERA_STATES:
-            self._face_seen = time.perf_counter()
-        waiting: bool = time.perf_counter() - self._face_seen < self.settings.setup.render.credit_scroll_idle
+            self._face_seen = now
+        waiting: bool = now - self._face_seen < self.settings.setup.render.credit_scroll_idle
         self.credit_scroller.update(now, self.settings.setup.audio.laughter_test or waiting)
         # the online turn: it takes the camera when the room's eye is free, and the sequence runs as for a visitor inside
         self.online.update(now, message, ready, self.settings.setup.render.show_camera or self.settings.setup.audio.laughter_test)
@@ -297,7 +298,7 @@ class SmileMain():
 
             if ready:
                 self.generator.set_image(cap_image)
-                self._visitor_start = time.perf_counter()
+                self._visitor_start = now
             else:
                 # ComfyUI went away during the flash: nobody would end it. The capture is the result
                 logger.warning('Generator not ready at the capture, ending the visitor')
@@ -312,7 +313,7 @@ class SmileMain():
             # a test run on images: the next visitor is the next file
             self.camera.next_image()
 
-        self._limit_visitor(seq)
+        self._limit_visitor(seq, now)
 
         if seq == SequenceType.TIMEOUT:
             if message.initial == True and self._saving:
@@ -345,12 +346,11 @@ class SmileMain():
             page += ('&' if '?' in page else '?') + 'pass=' + pass_value
         self.board.set_online_cell(OnlineCell(wall, cell, mode, page) if mode != 'clip' else None)
 
-    def _limit_visitor(self, seq: SequenceType) -> None:
+    def _limit_visitor(self, seq: SequenceType, now: float) -> None:
         """End a visitor the generator did not end: it does so itself at connection.job_timeout, so
         this only acts when its thread is stuck. Without it the flash, or the portrait, would stay."""
         if self._visitor_start is None:
             return
-        now: float = time.perf_counter()
         grin = self.settings.setup.generator.grin
         if not (SequenceType.CAPTURE <= seq <= SequenceType.DIFF_LOOP):
             self._visitor_start = None      # ended

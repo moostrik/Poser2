@@ -45,7 +45,7 @@ class TestMaxControls(unittest.TestCase):
                                    stalled=False, next_image=mock.Mock()),
             render=mock.Mock(), board=RenderBoard(), lights=mock.Mock(), face=mock.Mock(), save=mock.Mock(), sequencer=mock.Mock(),
             music_map=mock.Mock(get_music_id=lambda: '0001'), osc=mock.Mock(), laughter_test=mock.Mock(),
-            _limit_visitor=lambda seq: None,
+            _limit_visitor=lambda seq, now: None,
             _style_picked=False, _judging=False, _visitor_start=None, _saving=False, _grin_saved=False,
             _face_seen=0.0, credit_scroller=mock.Mock(), online=mock.Mock(showing=False, pass_value=''), clip_player=mock.Mock())
         self.app._online_cell = lambda: SmileMain._online_cell(self.app)
@@ -53,12 +53,12 @@ class TestMaxControls(unittest.TestCase):
     def frame(self) -> dict:
         """One sequencer frame: what went to the OSC sender, by address."""
         self.app.osc.submit.reset_mock()
-        SmileMain.sequence_callback(self.app, SequenceMessage(SequenceType.CAMERA_SHOW, 0.0))
+        SmileMain.sequence_callback(self.app, SequenceMessage(SequenceType.CAMERA_SHOW, 0.0, timestamp=time.perf_counter()))
         return {c.args[0]: c.args[1] for c in self.app.osc.submit.call_args_list}
 
     def name_held(self, sequence_type: SequenceType = SequenceType.CAMERA_SHOW) -> bool:
         """One sequencer frame: whether the scrolling name was held back in it."""
-        SmileMain.sequence_callback(self.app, SequenceMessage(sequence_type, 0.0))
+        SmileMain.sequence_callback(self.app, SequenceMessage(sequence_type, 0.0, timestamp=time.perf_counter()))
         return self.app.credit_scroller.update.call_args.args[1]
 
     def test_the_name_waits_the_idle_time_after_the_last_qualifying_face(self):

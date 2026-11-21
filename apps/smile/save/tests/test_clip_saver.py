@@ -18,6 +18,45 @@ from apps.smile.save.clip_saver import ClipSaver
 from modules import video
 
 
+def started(saver: ClipSaver) -> ClipSaver:
+    saver.start()
+    return saver
+
+
+class TestClipSaverStart(unittest.TestCase):
+    def test_a_saver_built_has_no_thread_and_makes_no_folder(self):
+        settings = SequencerSettings()
+        with tempfile.TemporaryDirectory() as root:
+            output = os.path.join(root, 'output')
+            saver = ClipSaver(settings.saver, settings.grin, lambda: '', root=output)
+            self.assertIsNone(saver.thread.ident)
+            self.assertFalse(os.path.exists(output))
+            saver.stop()                                    # a saver never started stops at once
+
+    @unittest.skipUnless(video.available(), 'ffmpeg not on the PATH')
+    def test_a_share_after_a_name_change_carries_the_new_name(self):
+        settings = SequencerSettings()
+        settings.saver.encoder = video.Hardware.CPU
+        name: list[str] = ['First Name']
+        with tempfile.TemporaryDirectory() as root:
+            saver = started(ClipSaver(settings.saver, settings.grin, lambda: name[0], root=root))
+            try:
+                path = saver._watermark()
+                assert path is not None
+                first = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+                written = os.path.getmtime(path)
+                self.assertEqual(saver._watermark(), path)          # the same name: the file stays
+                self.assertEqual(os.path.getmtime(path), written)
+                name[0] = 'A Much Longer Second Name'
+                self.assertEqual(saver._watermark(), path)
+                second = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+                self.assertNotEqual(first.shape, second.shape)      # the new name, a wider mark
+                name[0] = ''
+                self.assertIsNone(saver._watermark())               # no name, no mark
+            finally:
+                saver.stop()
+
+
 @unittest.skipUnless(video.available(), 'ffmpeg not on the PATH')
 class TestClipSaverStyle(unittest.TestCase):
 
@@ -26,7 +65,7 @@ class TestClipSaverStyle(unittest.TestCase):
         settings.saver.encoder = video.Hardware.CPU
         settings.saver.enabled = True
         with tempfile.TemporaryDirectory() as root:
-            saver = ClipSaver(settings.saver, settings.grin, root=root)
+            saver = started(ClipSaver(settings.saver, settings.grin, lambda: '', root=root))
             try:
                 image = np.full((64, 64, 3), 128, np.uint8)
                 saver.submit_open(image, 'B')
@@ -57,7 +96,7 @@ class TestClipSaverStyle(unittest.TestCase):
         made = {'description': 'a face, "quoted"', 'seed': 7, 'grin': {'smile': 2.0},
                 'settings': {'generator': GeneratorSettings().to_dict()}}
         with tempfile.TemporaryDirectory() as root:
-            saver = ClipSaver(settings.saver, settings.grin, root=root)
+            saver = started(ClipSaver(settings.saver, settings.grin, lambda: '', root=root))
             try:
                 image = np.full((64, 64, 3), 128, np.uint8)
                 saver.submit_open(image, 'A')
@@ -90,7 +129,7 @@ class TestClipSaverStyle(unittest.TestCase):
             process.communicate(timeout=30)
             self.assertEqual(process.returncode, 0)
             saved = []
-            saver = ClipSaver(settings.saver, settings.grin, root=root, watermark='Test Name')
+            saver = started(ClipSaver(settings.saver, settings.grin, lambda: 'Test Name', root=root))
             saver.add_saved_callback(lambda *args: saved.append(args))
             try:
                 image = np.full((64, 64, 3), 128, np.uint8)
@@ -150,7 +189,7 @@ class TestClipSaverStyle(unittest.TestCase):
         settings.saver.enabled = True
         with tempfile.TemporaryDirectory() as root:
             saved = []
-            saver = ClipSaver(settings.saver, settings.grin, root=root)
+            saver = started(ClipSaver(settings.saver, settings.grin, lambda: '', root=root))
             saver.add_saved_callback(lambda *args: saved.append(args))
             try:
                 image = np.full((64, 64, 3), 128, np.uint8)

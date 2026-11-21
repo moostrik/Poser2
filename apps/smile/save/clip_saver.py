@@ -47,29 +47,20 @@ class ClipSaver:
     lands after it: the visitor outside is waiting for theirs. The save thread is the only
     owner of the encoder process; the other threads only enqueue commands, in order."""
 
-    def __init__(self, settings: ClipSaverSettings, grin: GrinRate, root: str = 'apps/smile/output/', max_queue_size: int = 64,
-                 watermark: str = '') -> None:
+    def __init__(self, settings: ClipSaverSettings, grin: GrinRate, credit_name: Callable[[], str], root: str = 'apps/smile/output/',
+                 max_queue_size: int = 64) -> None:
         self.settings: ClipSaverSettings = settings
         self._grin: GrinRate = grin             # the clip's fps, read at each visitor's open
+        self._credit_name: Callable[[], str] = credit_name     # the watermark's name, read at each share
         self.temp_dir: str = os.path.join(root, 'temp')
         self.grins_dir: str = os.path.join(root, 'grins')
         self.portraits_dir: str = os.path.join(root, 'portraits')
         self.shares_dir: str = os.path.join(root, 'shares')
-        os.makedirs(self.temp_dir, exist_ok=True)
-        for style in STYLES:
-            os.makedirs(os.path.join(self.grins_dir, style), exist_ok=True)
-            os.makedirs(os.path.join(self.portraits_dir, style), exist_ok=True)
-            os.makedirs(os.path.join(self.shares_dir, style), exist_ok=True)
-        self._clean_temp()
-        self._watermark: str | None = os.path.join(self.shares_dir, 'watermark.png') if watermark else None    # beside the share clips
-        if self._watermark and not share.write_watermark(watermark, self._watermark):
-            self._watermark = None
+        self._watermark_path: str = os.path.join(self.shares_dir, 'watermark.png')     # beside the share clips
+        self._watermark_name: str | None = None     # the name the watermark file holds; None before it is written
 
-        self.available: bool = video.available()       # ffmpeg is there
-        if not self.available:
-            logger.error('ffmpeg not found on the PATH: visitors are not saved')
-        self.encoder: video.Hardware = video.pick_encoder(settings.encoder) if self.available else video.Hardware.CPU
-        logger.info('Clip encoder: %s', self.encoder.value)
+        self.available: bool = False        # ffmpeg is there: known at the start
+        self.encoder: video.Hardware = video.Hardware.CPU
 
         self.queue: queue.Queue[Command] = queue.Queue(max_queue_size)
         self._share: tuple[str | None, float] | None = None   # the open visitor's track and offset (save thread)
@@ -77,8 +68,22 @@ class ClipSaver:
         self._saved_callbacks: Broadcast[[str, str, bool, str, str, str]] = Broadcast(name='saved')
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self._save_loop, name='ClipSaver')
-        self.thread.start()
         self.settings.bind(ClipSaverSettings.enabled, self._on_save)
+
+    def start(self) -> None:
+        """The folders made, what a crash left in temp/ cleared, the encoder picked, and the save thread started."""
+        os.makedirs(self.temp_dir, exist_ok=True)
+        for style in STYLES:
+            os.makedirs(os.path.join(self.grins_dir, style), exist_ok=True)
+            os.makedirs(os.path.join(self.portraits_dir, style), exist_ok=True)
+            os.makedirs(os.path.join(self.shares_dir, style), exist_ok=True)
+        self._clean_temp()
+        self.available = video.available()
+        if not self.available:
+            logger.error('ffmpeg not found on the PATH: visitors are not saved')
+        self.encoder = video.pick_encoder(self.settings.encoder) if self.available else video.Hardware.CPU
+        logger.info('Clip encoder: %s', self.encoder.value)
+        self.thread.start()
 
     # ANY THREAD
 
@@ -126,6 +131,8 @@ class ClipSaver:
 
     def stop(self) -> None:
         self.settings.unbind(ClipSaverSettings.enabled, self._on_save)
+        if self.thread.ident is None:       # never started
+            return
         self.queue.put(('close', False))
         self.stop_event.set()
         self.thread.join()
@@ -220,13 +227,25 @@ class ClipSaver:
                     pass
         self._saved_callbacks(id, style, kept, grin, portrait, shared)
 
+    def _watermark(self) -> str | None:
+        """The watermark file with the credit name as it is now (save thread): written again only when the name
+        differs from the file's; None without a name, or when it could not be written."""
+        name: str = self._credit_name()
+        if not name:
+            return None
+        if name != self._watermark_name:
+            if not share.write_watermark(name, self._watermark_path):
+                return None
+            self._watermark_name = name
+        return self._watermark_path
+
     def _build_share(self, id: str, style: str, grin: str, to_share: tuple[str | None, float] | None) -> str:
         """The share clip from the landed grin: its path, or '' when it could not be made (a warning)."""
         temp: str = self._temp_path(id, '_share.mp4')
         path: str = os.path.join(self.shares_dir, style, id + '.mp4')
         track, offset = to_share if to_share is not None else (None, 0.0)
         try:
-            share.build_share(grin, track, offset, self._watermark, self.encoder, temp)
+            share.build_share(grin, track, offset, self._watermark(), self.encoder, temp)
             os.replace(temp, path)
             return path
         except Exception as e:

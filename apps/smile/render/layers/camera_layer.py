@@ -1,5 +1,4 @@
 import math
-import time
 
 from ...board import RenderBoard
 from ...face import FaceObservations
@@ -88,9 +87,9 @@ class CameraLayer(LayerBase):
     def texture(self) -> Texture:
         return self._fbo
 
-    def render(self, charge: float, marks: float = 1.0) -> None:
-        """Draw the newest camera frame in black and white; `charge` (0..1) is how far the chosen
-        face is toward the flash: the color inside its box.
+    def render(self, now: float, charge: float, marks: float = 1.0) -> None:
+        """Draw the newest camera frame in black and white at the render's tick `now`; `charge` (0..1) is how far the
+        chosen face is toward the flash: the color inside its box.
         `marks` is the opacity of the face marks (the flash fades them out before the capture)."""
         camera: Texture = self._camera.texture
         if not camera.allocated:
@@ -100,7 +99,6 @@ class CameraLayer(LayerBase):
         camera.draw(src=view_rect(camera.width, camera.height, self._width, self._height))
         self._view.end()
         r, g, b, a = self.settings.face_color
-        now: float = time.perf_counter()
         frame: FaceObservations | None = self._board.get_faces()
         if frame is not None and now - frame.timestamp > FACES_STALE:
             frame = None

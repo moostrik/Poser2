@@ -100,10 +100,12 @@ class SmileRender(RenderBase):
             wall.deallocate()
 
     def update(self) -> None:
-        self._play_grin()
+        # the frame's tick: the one clock read of the frame, handed to all that steps with it
+        now: float = time.perf_counter()
+        self._play_grin(now)
         # sequencer first: images handed over with a state change (the depth with CONTROL_0)
         # are then uploaded before the stage uses them
-        message = self.sequencer.update()
+        message = self.sequencer.update(now)
         self._notify_update()
         self.inputs.update()
 
@@ -119,7 +121,7 @@ class SmileRender(RenderBase):
 
         self._output = stage.output
         online: OnlineCell | None = self.board.get_online_cell()
-        self._render_credit(message.sequence_type, self.grab.due(time.perf_counter()), online)
+        self._render_credit(now, message.sequence_type, self.grab.due(now), online)
         status: str | None = self.board.get_status()
         if status:
             self._status.render(self._output, status)
@@ -131,11 +133,11 @@ class SmileRender(RenderBase):
         self._frozen = self.settings.freeze
         self._update_walls(online)
 
-    def _render_credit(self, sequence_type: SequenceType, grab: bool, online: OnlineCell | None) -> None:
-        """The credit over the output, with two copies for SMILE Online: the phone's (`CreditLayer.clean`), rendered
-        when `grab` takes it (the turn's last frame, `grab.clean`, without the caption: the phone fades it out itself
-        and keeps that frame), and the online cell's (`CreditLayer.cell`), rendered while that cell shows it."""
-        now: float = time.perf_counter()
+    def _render_credit(self, now: float, sequence_type: SequenceType, grab: bool, online: OnlineCell | None) -> None:
+        """The credit over the output at the tick `now`, with two copies for SMILE Online: the phone's
+        (`CreditLayer.clean`), rendered when `grab` takes it (the turn's last frame, `grab.clean`, without the caption:
+        the phone fades it out itself and keeps that frame), and the online cell's (`CreditLayer.cell`), rendered while
+        that cell shows it."""
         if new_line_due(sequence_type, self._credit_sequence):
             self._credit.new_visitor()
         self._credit_sequence = sequence_type
@@ -168,10 +170,10 @@ class SmileRender(RenderBase):
             if index + 1 < len(windows) and windows[index + 1].enabled:
                 wall.update()
 
-    def _play_grin(self) -> None:
-        """Show the grin frame that is due. Its first frame arrives during DIFFUSION and blends in as
+    def _play_grin(self, now: float) -> None:
+        """Show the grin frame that is due at the tick `now`. Its first frame arrives during DIFFUSION and blends in as
         a generation step; DIFF_LOOP starts when the grin player starts playing."""
-        frame: np.ndarray | None = self.grin_player.update(time.perf_counter())
+        frame: np.ndarray | None = self.grin_player.update(now)
         if frame is not None:
             self.inputs.diffusion.set_image(frame)
         started: bool = self.grin_player.plays != self._plays

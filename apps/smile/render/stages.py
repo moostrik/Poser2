@@ -41,7 +41,7 @@ class CameraStage(Stage):
 
     def update(self, message: SequenceMessage) -> None:
         # value_1 is the eased charge: 0 while nobody qualifies
-        self.layers.camera.render(message.value_1)
+        self.layers.camera.render(message.timestamp, message.value_1)
 
     @property
     def output(self) -> Texture:
@@ -60,7 +60,7 @@ class FlashStage(Stage):
     def update(self, message: SequenceMessage) -> None:
         if message.sequence_type == SequenceType.FLASH:
             marks: float = max(0.0, 1.0 - message.progress / (CAPTURE_AT * self.MARKS_GONE))
-            self.layers.camera.render(1.0, marks)
+            self.layers.camera.render(message.timestamp, 1.0, marks)
         elif message.sequence_type == SequenceType.CAPTURE:
             self.layers.diffusion.seed(self.inputs.capture)     # uploaded this frame
         self.layers.flash.render(message.value_1)
@@ -106,7 +106,7 @@ class BloomStage(Stage):
     def update(self, message: SequenceMessage) -> None:
         s: RenderSettings = self.settings
         layers: Layers = self.layers
-        layers.camera.render(0.0)
+        layers.camera.render(message.timestamp, 0.0)
         if message.sequence_type == SequenceType.BLOOM:
             if message.initial:
                 layers.bloom.set_mask()

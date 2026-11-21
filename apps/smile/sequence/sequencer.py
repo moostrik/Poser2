@@ -1,5 +1,4 @@
 from enum import IntEnum
-import time
 from threading import RLock
 from typing import Callable
 import pytweening as easing
@@ -71,28 +70,30 @@ class SequenceState():
         self.charge_time: float = 0.0       # when the charge was last moved
 
 class SequenceMessage():
-    def __init__(self, type: SequenceType, progress: float, initial: bool = False, value_1: float = 0.0, value_2: float = 0.0) -> None:
+    def __init__(self, type: SequenceType, progress: float, initial: bool = False, value_1: float = 0.0, value_2: float = 0.0,
+                 timestamp: float = 0.0) -> None:
         self.sequence_type: SequenceType = type
         self.animation_type: AnimationType = ani_type_from_seq_type(type)
         self.progress: float = progress
         self.initial: bool = initial
         self.value_1: float = value_1
         self.value_2: float = value_2
+        self.timestamp: float = timestamp       # the render frame's tick it was made at, s on `perf_counter`
 
 Easing = Callable[[float], float]
 
-def bloom_message(state: SequenceState, bloom_duration: float, bloom_easing: Easing, fade_duration: float, fade_easing: Easing) -> SequenceMessage:
+def bloom_message(state: SequenceState, now: float, bloom_duration: float, bloom_easing: Easing, fade_duration: float, fade_easing: Easing) -> SequenceMessage:
     initial = False
     if state.previous_type != state.type:
         initial = True
         state.previous_type = state.type
-        state.start_time = time.perf_counter()
+        state.start_time = now
 
     duration: float = bloom_duration + fade_duration
-    value: float = min((time.perf_counter() - state.start_time) / duration, 1.0)
+    value: float = min((now - state.start_time) / duration, 1.0)
     value = bloom_easing(value)
 
-    progress: float = min((time.perf_counter() - state.start_time) / bloom_duration, 1.0)
+    progress: float = min((now - state.start_time) / bloom_duration, 1.0)
     if progress < 1.0:
         return SequenceMessage(state.type, progress, initial, value)
     else:
@@ -100,18 +101,18 @@ def bloom_message(state: SequenceState, bloom_duration: float, bloom_easing: Eas
         state.type = SequenceType.FADE
         return SequenceMessage(state.type, 0, initial, 0.0, value)
 
-def fade_message(state: SequenceState, bloom_duration: float, bloom_easing: Easing, fade_duration: float, fade_easing: Easing) -> SequenceMessage:
+def fade_message(state: SequenceState, now: float, bloom_duration: float, bloom_easing: Easing, fade_duration: float, fade_easing: Easing) -> SequenceMessage:
     initial = False
     if state.previous_type != state.type:
         initial = True
         state.previous_type = state.type
-        state.start_time2 = time.perf_counter()
+        state.start_time2 = now
 
     duration: float = bloom_duration + fade_duration
-    bloom_value: float = min((time.perf_counter() - state.start_time) / duration, 1.0)
+    bloom_value: float = min((now - state.start_time) / duration, 1.0)
     bloom_value = bloom_easing(bloom_value)
 
-    progress: float = min((time.perf_counter() - state.start_time2) / fade_duration, 1.0)
+    progress: float = min((now - state.start_time2) / fade_duration, 1.0)
     omission_value: float = fade_easing(progress)
 
     if progress < 1.0:
@@ -128,11 +129,10 @@ FACE_STALE: float = 0.5
 # the part of the flash in at which the capture is taken (the FLASH state ends there)
 CAPTURE_AT: float = 0.5
 
-def camera_message(state: SequenceState, rising: bool, charge_duration: float, drain_duration: float, easing: Easing = easing.linear) -> SequenceMessage:
+def camera_message(state: SequenceState, now: float, rising: bool, charge_duration: float, drain_duration: float, easing: Easing = easing.linear) -> SequenceMessage:
     """The camera phase: the charge rises while a face qualifies and drains while none does.
     CAMERA_SHOW with an empty charge, CAMERA_DETECT while there is some (progress is the charge),
     and the flash starts when it is full."""
-    now: float = time.perf_counter()
     if state.previous_type not in CAMERA_STATES:
         # entering the camera phase: an empty charge, and the idle progress starts
         state.charge = 0.0
@@ -162,14 +162,14 @@ def camera_message(state: SequenceState, rising: bool, charge_duration: float, d
         state.type = SequenceType.FLASH
     return message
 
-def pre_capture_message(state: SequenceState, duration: float, easing: Easing, delay: float) -> SequenceMessage:
+def pre_capture_message(state: SequenceState, now: float, duration: float, easing: Easing, delay: float) -> SequenceMessage:
     initial = False
     if state.previous_type != state.type:
         initial = True
         state.previous_type = state.type
-        state.start_time = time.perf_counter()
+        state.start_time = now
 
-    progress: float = min((time.perf_counter() - state.start_time) / duration, 1.0)
+    progress: float = min((now - state.start_time) / duration, 1.0)
     value: float = easing(progress)
     if progress < delay:
         state.type = SequenceType.FLASH
@@ -178,24 +178,24 @@ def pre_capture_message(state: SequenceState, duration: float, easing: Easing, d
         state.type = SequenceType.CAPTURE
         return SequenceMessage(state.type, progress, initial, value)
 
-def capture_message(state: SequenceState, duration: float, easing: Easing = easing.linear) -> SequenceMessage:
+def capture_message(state: SequenceState, now: float, duration: float, easing: Easing = easing.linear) -> SequenceMessage:
     initial = False
     if state.previous_type != state.type:
         initial = True
         state.previous_type = state.type
 
-    progress: float = min((time.perf_counter() - state.start_time) / duration, 1.0)
+    progress: float = min((now - state.start_time) / duration, 1.0)
     value: float = easing(progress)
     state.type = SequenceType.ASK
     return SequenceMessage(state.type, progress, initial, value)
 
-def post_capture_message(state: SequenceState, duration: float, easing: Easing = easing.linear, hold: float = 0.0, reveal: bool = False) -> SequenceMessage:
+def post_capture_message(state: SequenceState, now: float, duration: float, easing: Easing = easing.linear, hold: float = 0.0, reveal: bool = False) -> SequenceMessage:
     initial = False
     if state.previous_type != state.type:
         initial = True
         state.previous_type = state.type
 
-    elapsed: float = time.perf_counter() - state.start_time
+    elapsed: float = now - state.start_time
     progress: float = min(elapsed / duration, 1.0)
     value: float = easing(progress)
     message = SequenceMessage(state.type, progress, initial, value)
@@ -204,35 +204,35 @@ def post_capture_message(state: SequenceState, duration: float, easing: Easing =
         state.type = SequenceType.CONTROL_0
     return message
 
-def control_message(state: SequenceState, duration: float, easing: Easing = easing.linear, first: bool = False) -> SequenceMessage:
+def control_message(state: SequenceState, now: float, duration: float, easing: Easing = easing.linear, first: bool = False) -> SequenceMessage:
     initial = False
     if state.previous_type != state.type:
         initial = True
         state.previous_type = state.type
         if first:
-            state.start_time = time.perf_counter()
+            state.start_time = now
 
-    progress: float = min((time.perf_counter() - state.start_time) / duration, 1.0)
+    progress: float = min((now - state.start_time) / duration, 1.0)
     value: float = easing(progress)
     return SequenceMessage(state.type, progress, initial, value)
 
-def diffusion_message(state: SequenceState, progress: float) -> SequenceMessage:
+def diffusion_message(state: SequenceState, now: float, progress: float) -> SequenceMessage:
     initial = False
     if state.previous_type != state.type:
         initial = True
         state.previous_type = state.type
-        state.start_time = time.perf_counter()
+        state.start_time = now
 
     return SequenceMessage(state.type, progress, initial)
 
-def timeout_message(state: SequenceState, duration: float, easing: Easing = easing.linear) -> SequenceMessage:
+def timeout_message(state: SequenceState, now: float, duration: float, easing: Easing = easing.linear) -> SequenceMessage:
     initial = False
     if state.previous_type != state.type:
         initial = True
         state.previous_type = state.type
-        state.start_time = time.perf_counter()
+        state.start_time = now
 
-    progress: float = min((time.perf_counter() - state.start_time) / duration, 1.0)
+    progress: float = min((now - state.start_time) / duration, 1.0)
     value: float = easing(progress)
     if progress < 1.0:
         return SequenceMessage(state.type, progress, initial)
@@ -293,55 +293,57 @@ class Sequencer():
         self.settings.unbind(SequencerSettings.reset, self._on_reset)
         self.settings.unbind(SequencerSettings.flash_out_auto, self._on_flash_out_auto)
 
-    def update(self) -> SequenceMessage:
-        # the callbacks run outside the state lock: they may set the sequence themselves
+    def update(self, now: float) -> SequenceMessage:
+        """One render frame at the tick `now` (`perf_counter`): the state stepped, its message, stamped with `now`, to
+        the callbacks. The callbacks run outside the state lock: they may set the sequence themselves."""
         with self._state_mutex:
-            self.message = self._next_message()
+            self.message = self._next_message(now)
+            self.message.timestamp = now
         self._message_callback(self.message)
         return self.message
 
-    def _next_message(self) -> SequenceMessage:
+    def _next_message(self, now: float) -> SequenceMessage:
         s: SequencerSettings = self.settings
         message = SequenceMessage(SequenceType.NONE, 0.0)
 
         if self._state.type == SequenceType.NONE:
             pass
         elif self._state.type == SequenceType.BLOOM:
-            message = bloom_message(self._state, s.bloom, easing_function(s.bloom_ease), s.fade, easing_function(s.fade_ease))
+            message = bloom_message(self._state, now, s.bloom, easing_function(s.bloom_ease), s.fade, easing_function(s.fade_ease))
         elif self._state.type == SequenceType.FADE:
-            message = fade_message(self._state, s.bloom, easing_function(s.bloom_ease), s.fade, easing_function(s.fade_ease))
+            message = fade_message(self._state, now, s.bloom, easing_function(s.bloom_ease), s.fade, easing_function(s.fade_ease))
         elif self._state.type in CAMERA_STATES:
-            message = camera_message(self._state, self._rising(), s.charge, s.drain, easing_function(s.charge_ease))
+            message = camera_message(self._state, now, self._rising(now), s.charge, s.drain, easing_function(s.charge_ease))
             if self._state.type == SequenceType.FLASH:
                 self._forced = False
         elif self._state.type == SequenceType.FLASH:
-            message = pre_capture_message(self._state, s.flash_in, easing_function(s.flash_in_ease), CAPTURE_AT)
+            message = pre_capture_message(self._state, now, s.flash_in, easing_function(s.flash_in_ease), CAPTURE_AT)
             if message.initial:
                 self._reveal = False
                 self._finish = False
         elif self._state.type == SequenceType.CAPTURE:
-            message = capture_message(self._state, s.flash_in, easing_function(s.flash_in_ease))
+            message = capture_message(self._state, now, s.flash_in, easing_function(s.flash_in_ease))
         elif self._state.type == SequenceType.ASK:
-            message = post_capture_message(self._state, s.flash_in, easing_function(s.flash_in_ease), s.flash_hold, self._reveal)
+            message = post_capture_message(self._state, now, s.flash_in, easing_function(s.flash_in_ease), s.flash_hold, self._reveal)
         elif self._state.type == SequenceType.CONTROL_0:
-            message = control_message(self._state, s.flash_out, easing_function(s.flash_out_ease), True)
+            message = control_message(self._state, now, s.flash_out, easing_function(s.flash_out_ease), True)
             # the generator finished without a portrait to end the flash out: the capture stands as the result
             if self._finish and message.progress >= 1.0:
                 self._state.type = SequenceType.TIMEOUT
         elif self._state.type == SequenceType.CONTROL_1:
-            message = control_message(self._state, s.flash_out, easing_function(s.flash_out_ease))
+            message = control_message(self._state, now, s.flash_out, easing_function(s.flash_out_ease))
         elif self._state.type == SequenceType.CONTROL_2:
-            message = control_message(self._state, s.flash_out, easing_function(s.flash_out_ease))
+            message = control_message(self._state, now, s.flash_out, easing_function(s.flash_out_ease))
         elif self._state.type == SequenceType.DIFFUSION:
-            message = diffusion_message(self._state, self.diffusion_progress)
+            message = diffusion_message(self._state, now, self.diffusion_progress)
         elif self._state.type == SequenceType.DIFF_LOOP:
-            message = diffusion_message(self._state, self.diffusion_progress)
+            message = diffusion_message(self._state, now, self.diffusion_progress)
         elif self._state.type == SequenceType.TIMEOUT:
-            message = timeout_message(self._state, s.timeout)
+            message = timeout_message(self._state, now, s.timeout)
         elif self._state.type == SequenceType.RESET:
             message = reset_message(self._state)
 
-        flash_out: float = self.calculate_flash_out_duration(message, s.flash_out)
+        flash_out: float = self.calculate_flash_out_duration(message, s.flash_out, now)
         if flash_out != s.flash_out:
             s.flash_out = flash_out
 
@@ -370,7 +372,7 @@ class Sequencer():
             self._face_qualified = qualified
             self._face_time = face_time
 
-    def _rising(self) -> bool:
+    def _rising(self, now: float) -> bool:
         """Whether the charge rises this frame: a manual start, or a fresh qualifying face while
         new visitors are welcome (not paused, the generator ready)."""
         if self.blocked:
@@ -380,7 +382,7 @@ class Sequencer():
             return True
         if self.settings.pause:
             return False    # no new visitors; the start button and the Enter key still work
-        return self._face_qualified and time.perf_counter() - self._face_time <= FACE_STALE
+        return self._face_qualified and now - self._face_time <= FACE_STALE
 
     def start_sequence(self) -> None:
         """A manual start: the charge rises to the flash without a face."""
@@ -416,7 +418,7 @@ class Sequencer():
     def set_diffusion_progress(self, value) -> None:
         self.diffusion_progress = value
 
-    def calculate_flash_out_duration(self, message: SequenceMessage, current_duration: float) -> float:
+    def calculate_flash_out_duration(self, message: SequenceMessage, current_duration: float, now: float) -> float:
         duration: float = current_duration
 
         if message.sequence_type == SequenceType.CONTROL_0 and message.initial:
@@ -424,7 +426,7 @@ class Sequencer():
                 self.flash_out_init = False
                 self.flash_out_calculation = False
                 return duration
-            self.flash_out_start = time.perf_counter()
+            self.flash_out_start = now
             self.flash_out_calculation = True
 
         if not self.settings.flash_out_auto:
@@ -435,7 +437,7 @@ class Sequencer():
             if message.initial:
                 if self.flash_out_calculation:
                     self.flash_out_calculation = False
-                    D: float = time.perf_counter() - self.flash_out_start
+                    D: float = now - self.flash_out_start
                     self.flash_out_history.append(D)
                     if len(self.flash_out_history) > 10:
                         self.flash_out_history.pop(0)
