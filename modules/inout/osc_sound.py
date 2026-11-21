@@ -20,7 +20,13 @@ logger = logging.getLogger(__name__)
 # keeps them from firing a cue for whichever stage happens to be numbered 0.
 _NO_STATE = -1
 
-_NAN_BBOX: np.ndarray = np.full(4, np.nan, dtype=np.float32)
+
+def _read_only(row: np.ndarray) -> np.ndarray:
+    row.setflags(write=False)
+    return row
+
+
+_NAN_BBOX: np.ndarray = _read_only(np.full(4, np.nan, dtype=np.float32))
 
 
 class OscSoundSettings(BaseSettings):
@@ -82,6 +88,9 @@ class OscSound:
         # Throttle: only send a slot's inactive reset for the first 2 ticks after it empties.
         self._inactive_counts: dict[int, int] = {track_id: 0 for track_id in range(self._slot_count)}
         self._inactive_encoded: dict[int, list[bytes]] = {}     # each slot's reset, encoded at its first use
+        # the rows of a missing feature, read-only: every message that has none shares them
+        self._zero_row: np.ndarray = _read_only(np.zeros(settings.max_players, dtype=np.float32))
+        self._zero_symmetry: np.ndarray = _read_only(np.zeros(AngleSymmetry.length(), dtype=np.float32))
 
     @property
     def running(self) -> bool:
@@ -92,7 +101,7 @@ class OscSound:
         if stage != self.settings.stage:
             return
         with self._input_lock:
-            self._frames = dict(frames)
+            self._frames = frames           # not changed once handed over
         self._update_event.set()
 
     def set_sequencer_state(self, state: SequencerState) -> None:
@@ -226,7 +235,7 @@ class OscSound:
 
     def _active_messages(self, frame: Frame) -> list[OscMessage]:
         track_id: int = frame.track_id
-        zeros: np.ndarray = np.zeros(self.settings.max_players, dtype=np.float32)
+        zeros: np.ndarray = self._zero_row
         # range [0, 1] - pose similarity per player; NaN (no pair, or no such player) is sent as 0
         similarity: np.ndarray = np.nan_to_num(frame[Similarity].values, nan=0.0) if Similarity in frame else zeros
         angles: np.ndarray = self._extras.angle_values(frame) if self._extras is not None else frame[Angles].values
@@ -243,7 +252,7 @@ class OscSound:
             # range [-finite, finite] -> [-2pi, 2pi]
             (f"/pose/{track_id}/angle/vel", (frame[AngleVelocity].values,)),
             # range [-1, 1] - signed left-minus-right per pair: shoulder, elbow, hip, knee, arms, legs
-            (f"/pose/{track_id}/angle/sym", (frame[AngleSymmetry].values if AngleSymmetry in frame else np.zeros(AngleSymmetry.length(), dtype=np.float32),)),
+            (f"/pose/{track_id}/angle/sym", (frame[AngleSymmetry].values if AngleSymmetry in frame else self._zero_symmetry,)),
             # range [0, 1] - joint-weighted leg deviation from standing straight
             (f"/pose/{track_id}/angle/legs", (float(frame[LegDeviation].value) if LegDeviation in frame else 0.0,)),
             # range [-1, 1] - signed sideways torso lean against the image vertical
