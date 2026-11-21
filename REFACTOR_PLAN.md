@@ -10,8 +10,6 @@ fixes found across packages, the apps' checks at the rig among them. A package w
 
 ## 2DO
 
-What is to do now, across the threads, in order.
-
 Nothing now; low_flow's G4 and the view's 2.9 ms wait in LOW_FLOW_PLAN.md for later.
 
 ## Open questions
@@ -31,17 +29,32 @@ line by line (where the code belongs, leftovers, tests, pyright spelled out), it
 and plan. The scan changes nothing. A decided fix becomes a step in the package's plan (or this one), built on your
 go; what is not decided is a question. Rule findings go to the rules thread as "Rules that go" and "New rules".
 
-Done: inference (20 Nov), settings (21 Nov), board (21 Nov), logging (21 Nov). Held up in their own plans: flow
-(FLOW_PLAN.md J), gl's window manager (GL_PLAN.md, built 20 Nov).
+Done: inference (20 Nov), settings (21 Nov), board (21 Nov), logging (21 Nov), gl (21 Nov), window (21 Nov), render (21 Nov), smile (21 Nov), inout (21 Nov). Held up in
+their own plans: flow (FLOW_PLAN.md J).
 
-- A1. `camera`
-- A2. `gl`, apart from the window manager
-- A3. `inout`. The OSC sound bundle (`osc_sound.py`, white_space's `OscSoundSender`), on its own thread at the
-  output tick: `.tolist()` of every feature and python-osc packing each float on its own, a few hundred floats a
-  tick, 5–20 ms of GIL a second **(deduction)**. Held against every app that uses it, and against app code that
-  sends or receives the same way on its own, so there is one system.
-- A4. `panel`
-- A5. `pose`; its `pipeline` changed with inference C4 (`SourceFramesCallback` and `AsyncInput` carry the capture
+- A1. `video`
+- A2. `camera`, scanned in its own thread after video
+- A3. `recording`, with its plan's split test (RECORDING_PLAN.md 4); its plan's line 3 (the pose model's drops) goes with this plan's commit: it
+  assumes a pose every frame, and deep_flow poses every other frame
+- A4. `utils`; `Broadcast` (utils/broadcast.py, since 94c65c84) is the one callback list: copied under its lock, called outside it, a
+  failing callback logged; each package's own callback lists move to it in that package's review. CLAUDE.md
+  Concurrency now says "A callback list is a `utils.Broadcast`" (1f734374).
+- A5. `session`
+- A6. `tracker`; `TrackerFrameSource.submit(cam_timestamps)` changed with inference C4
+- A7. `panel`
+- A8. The apps: `deep_flow`, `white_space` (smile is with the smile thread). white_space's checks at the rig, you there:
+  - live and back to back with `main`: its camera threads only hand over (under 1 ms per frame at p95), every sync
+    runs the pose step, the pose latency and the light's tick no worse than on `main`, its tests pass
+  - its clip camera (`oak.ClipCamera`), which needs an OAK
+  - the playhead's smoothing (`playhead.tracking`, `speed_smoothing`) against the motor's phase: on `perf_counter`
+    its error is 0.26° at p95 at 32 rpm against 4.3° on `monotonic` (simulated with the motor's own code,
+    2026-11-13), so the smoothing may be stronger than it needs
+- A9. `hd_trio`, after its rebuild with the flow ([the flow's line I](modules/flow/FLOW_PLAN.md#i-the-2d-flow-follows-the-3d)), with its check at the rig: a live recording with `mirrored` on (a live frame
+  comes with `flip_h` on, which a -sim clip does not); the fluid's look
+  - its render writes `fluid.density.fade_time` every tick from the player's motion, and its show stages write
+    `similarity_scale` (and the center geometry's `stage`): settings used to carry values while running. They become
+    inputs of the fluid and the color mask in the rebuild, and hd_trio looks exactly as before
+- A10. `pose`, after hd_trio; its `pipeline` changed with inference C4 (`SourceFramesCallback` and `AsyncInput` carry the capture
   times, `dict[int, float]`). It starts with one `py-spy record --gil` of the pose pipeline (deep_flow and
   white_space `-sim`, 30 s after 10 s warm-up), so its fixes are chosen on measured numbers. Its hot path: the steps
   run per player with a `Frame` replace each (white_space 37 a pose and 21 on the light tick), and every stage's
@@ -51,34 +64,11 @@ Done: inference (20 Nov), settings (21 Nov), board (21 Nov), logging (21 Nov). H
   per-track state. The pose recorder's chunk (`recorder/frame_io.py`, `write_chunk`) loops in Python over every
   buffered frame, up to 50,000, for each track and feature, at a split and at stop **(seen; its GIL time:
   deduction)**.
-- A6. `recording`, with its plan's split test (RECORDING_PLAN.md 4); its plan's line 3 (the pose model's drops) goes with this plan's commit: it
-  assumes a pose every frame, and deep_flow poses every other frame
-- A7. `render`
-  - `general/composite/layer_compositor.py` and `general/grade/lut_grade.py` move directly into `general/`
-    (rendering.md since 1f734374: a category no longer has to hold packages, only `modules` holds one per module;
-    CLAUDE.md Packages prefers no folder for one or two files, and each holds one; `general/screen_recording/` stays)
-- A8. `session`
-- A9. `tracker`; `TrackerFrameSource.submit(cam_timestamps)` changed with inference C4
-- A10. `utils`; `Broadcast` (utils/broadcast.py, since 94c65c84) is the one callback list: copied under its lock, called outside it, a
-  failing callback logged; each package's own callback lists move to it in that package's review. CLAUDE.md
-  Concurrency now says "A callback list is a `utils.Broadcast`" (1f734374).
-- A11. `video`
-- A12. The apps: `deep_flow`, `smile`, `white_space`. white_space's checks at the rig, you there:
-  - live and back to back with `main`: its camera threads only hand over (under 1 ms per frame at p95), every sync
-    runs the pose step, the pose latency and the light's tick no worse than on `main`, its tests pass
-  - its clip camera (`oak.ClipCamera`), which needs an OAK
-  - the playhead's smoothing (`playhead.tracking`, `speed_smoothing`) against the motor's phase: on `perf_counter`
-    its error is 0.26° at p95 at 32 rpm against 4.3° on `monotonic` (simulated with the motor's own code,
-    2026-11-13), so the smoothing may be stronger than it needs
-- A13. `hd_trio`, after its rebuild with the flow ([the flow's line I](modules/flow/FLOW_PLAN.md#i-the-2d-flow-follows-the-3d)), with its check at the rig: a live recording with `mirrored` on (a live frame
-  comes with `flip_h` on, which a -sim clip does not); the fluid's look
-  - its render writes `fluid.density.fade_time` every tick from the player's motion, and its show stages write
-    `similarity_scale` (and the center geometry's `stage`): settings used to carry values while running. They become
-    inputs of the fluid and the color mask in the rebuild, and hd_trio looks exactly as before
 
 ## The rules it touches
 
 - `CLAUDE.md` Project shape and Packages, what a package holds: A
+- `camera.md`, the camera's thread runs only the camera: A2
 - `CLAUDE.md` Concurrency, work that numpy or the GPU does faster is not done in a Python loop; the loop holds the GIL
-  and delays every other thread: A3, A5
-- `CLAUDE.md` Settings, settings connect the user and a component, not two components: A13
+  and delays every other thread: A10
+- `CLAUDE.md` Settings, settings connect the user and a component, not two components: A9

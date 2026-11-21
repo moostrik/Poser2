@@ -37,6 +37,11 @@ With the apps' refactors ([REFACTOR_PLAN.md](../../REFACTOR_PLAN.md)), each test
 split lands 1 to 3 frames early on one stream. No frame is lost (50 of 50 in all three streams), so it is the split's
 timing, not the recording's data. Looked at when the refactor's A6 reaches the recording module.
 
+## 4. Questions for the recording review (the refactor's A6)
+
+- `ClipFrameCallback`'s six positional arguments → a `ClipFrame` value object (cam_id, kind, image, confidence,
+  metadata, captured), so the signature does not grow with the next stream?
+
 ## The rules it touches
 
 - Keep settings files in sync with code changes: hd_trio's `container` in its settings file

@@ -2,6 +2,12 @@
 
 What is not built in `modules/pose`. **(deduction)** marks what is inferred.
 
+## A. Names
+
+- A1. `nodes/_utils/array_moving_average.py` says "ring buffer" in place of "circular buffer" (its docstring
+  and two comments). Why: the buffer is one, written at `_buffer_index = (_buffer_index + 1) % _window_size`, and
+  "ring buffer" is the repo's one term for it (`LogRingBuffer`, `WindowNode`) **(seen)**. Check: the pose unit tests.
+
 Questions:
 - Each keypoint's uncertainty for the One Euro filter (noted 2026-11-18): RTMPose gives per keypoint a distribution
   over its SimCC bins, a narrow peak where the model is sure and a wide or double one where it is not; today only the
@@ -19,7 +25,19 @@ Questions:
   `has_points` moved beside `Frame` in `frame/frame.py` (fd65fde4), with `modules/recording` now importing
   `modules.pose` for its pose packing
 
+## B. Teardown
+
+- B1. The six nodes that unbind their settings only in `__del__` get an explicit close that their owner calls:
+  `nodes/filters/ema_smoothers.py`, `euro_smoothers.py`, `moving_average_smoothers.py`, `predictors.py`,
+  `rate_limiters.py` and `nodes/interpolators/base_interpolator.py`; `__del__` goes. Why: their settings' callback
+  lists (`utils.Broadcast`, a plain list) hold the bound methods, so the object is never collected while its
+  settings live and `__del__` never runs (seen for `ArtNetBars` in the inout scan; for these six a **(deduction)**
+  from the same mechanism). Check: the pose unit tests.
+
 ## The rules it touches
 
+- `CLAUDE.md` Naming: use no synonyms for one concept across modules
+- `CLAUDE.md` Settings, components that bind() must unbind() the same callbacks on teardown: B1
+- `CLAUDE.md` Composition and wiring, clean up in an explicit stop or teardown, never in `__del__`: B1
 - `CLAUDE.md` Composition, a value derived from pose data is the pipeline's, and so are its settings: the width, and
   how much the filter follows it
