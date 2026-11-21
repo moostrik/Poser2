@@ -291,7 +291,7 @@ class ParticleDensity(DensityCarrier):
         BlendState.set_blend_mode(BlendState.BlendMode.SUM)
         BlendState.set_buffer_blend_equation(0, BlendState.BlendEquation.MIN)
         self._surface_shader.use(self._particles, self._ring, self._count, scale=self._scale, ring_fade=particles.ring_fade,
-                                 output_size=self._output, z_per_pixel=1.0 / (width * self._z_extent),
+                                 z_per_pixel=1.0 / (width * self._z_extent),
                                  radius=particles.radius, reference_mass=self._reference_mass(), spread=particles.spread,
                                  fade_time=self.settings.density.fade_time, max_point_size=self._max_point_size)
         BlendState.pop()

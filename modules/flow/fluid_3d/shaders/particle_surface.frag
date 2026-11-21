@@ -5,7 +5,6 @@
 // value times the sphere's height there over the disc's integral of it, (2/3) π r², so a sphere's
 // thickness sums to its value, as a point's and a blob's do.
 
-uniform vec2  uOutputSize;      // pixels
 uniform float uZPerPixel;       // the volume's z (0 to 1) one pixel deep is: 1 / (width × z_extent)
 
 flat in vec4 vColor;

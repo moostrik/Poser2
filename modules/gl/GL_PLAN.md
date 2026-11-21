@@ -52,13 +52,6 @@ unless Matthias says he is using the PC or the app.
 
 Each gets the flow thread's feedback after its commit.
 
-- G1. `ParticleSurface`'s unused `uOutputSize` goes: its declaration in `flow/fluid_3d/shaders/particle_surface.frag`,
-  the `glUniform2f` and the `output_size` parameter of `ParticleSurface.use`, and the argument
-  `particle_density._composite_surface` passes. The Fluid3D thread's fix of the surface's third target goes first,
-  on the current code (the third target and its clear); G1 and F1 build on top of it, and nothing here touches
-  `particle_density.py` before that commit is in. Why: the fragment shader declares it and reads it nowhere, the vertex
-  shader does not have it, so the program leaves it out and the set warns (seen, D2's deep_flow -sim, 2026-11-21).
-  Check: pyright, flow's tests, deep_flow -sim with the particles on SURFACE, no GL error.
 - G2. The bridge's `WeightedSum` (`flow/bridge_3d/shaders/weighted_sum.py` and `.frag`) and `WeightedSum2D`
   (`flow/bridge_2d/shaders/weighted_sum_2d.py` and `.frag`) are renamed `SourceMix` and `SourceMix2D`, class and
   files (a shader's source is found by its module's name) and every call site, and `BRIDGE_2D.md` and `BRIDGE_3D.md`
