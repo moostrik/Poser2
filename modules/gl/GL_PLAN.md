@@ -1,50 +1,96 @@
 # GL plan
 
-Shaders that reload and report errors well, fewer GL calls on the main thread, and the package held to the rules.
-F and G come from the Cinder research (2026-11-20), argued from the code and not measured, so G starts with a
-measurement; E and H from the package scan of the same day. The lines are in work order.
+Fewer GL calls on the main thread, and the package held to the rules and to the textbook layout. G comes from the
+Cinder research (2026-11-20), H from the package scan, I from the structure review of the same day. Work order:
+I1 to I4, G1, I6, G2, I5, I7: the shaders do not move after G1 edits them, G2's bind is written once on I6's base,
+and I5 moves the files after their edits. Before
+the first step, `shader_check.py --reference` makes the reference images at HEAD; every shader check compares
+against them. The checks that run
+the GPU (`shader_check.py`, the -sim runs) wait for a time Matthias is away from the PC; a step with such a check is
+committed after it passes.
+
+## I. The package's structure
+
+`modules/gl` holds the window side, text, two effects and helpers beside its GL resources, flat in its root, and writes
+the texture classes and their ping-pong pairs three times each. The target: `gl` holds GL (context, textures,
+buffers, programs, the blend state, GL debugging), and the window side is a package of its own, as Cinder's `app`
+is. gl's loose files are grouped in folders by job; that comes from CLAUDE.md's package rules, not from Cinder,
+whose `gl` is flat.
+
+- I1. `modules/window/` (new package): `render_base`, `window_manager`, `window`, `window_input`, `window_settings`,
+  `monitor`, their tests in its `tests/` (window, window_input, window_manager, monitor), and GL.md's "The windows" as its document, `WINDOW.md`. `window` imports `gl`, never the
+  reverse. Every importer moves: `RenderBase` in the five app renderers, `WindowSettings` and `WindowManagerSettings`
+  in the five apps' settings and hd_trio's main, `MouseButton` in deep_flow's renderer, the probe scripts; gl.md's
+  thread rule names the window loop. Check: pyright, the guard tests, window's tests, each app's main imported.
+- I2. `fit`, `fill` (rectangle layout) and `lfo` move to `modules/utils`, beside `Rect`, with `test_fit`; about 19
+  importers follow. `lfo` reads `perf_counter()` itself; it becomes `lfo(time, frequency, phase)` and its callers
+  pass the tick's time. Check: pyright, the guard tests, utils' tests.
+- I3. `modules/gl/text/`: `text`, `font_atlas`, `text_layout`; the `glyphs` shader stays in `shaders/draw`;
+  `from modules.gl import Text` stays. Check: pyright, the guard tests, the text layout tests.
+- I4. The effects beside the shaders they are made of: `Bloom` into `shaders/filter` beside `DualFilter`,
+  `DistanceField` into `shaders/mask` beside `JumpFlood`, `blue_noise` into `shaders/color` beside `Dither`, its one
+  user. `shaders/generate` (two noises) merges into `shaders/draw`, `shaders/transition` (two wipes, a mix of two
+  inputs) into `shaders/composite`; the empty `shaders/convenience` goes. GL.md's list of kinds follows. Check:
+  `shader_check.py`.
+- I5. gl's loose files in folders by job: `texture/` (`texture`, `texture_3d`,
+  `texture_2d_array`, `texture_format`, `fbo`, `layered_fbo`, `image`, `tensor`, and `cudart`, its CUDA side),
+  `shader/` (`shader`, `compute_shader`, `file_watcher`, and `storage_buffer`, the compute shaders' buffer),
+  `state/` (`context`, `style`, `clear`) and `debug/` (`gl_debug`, `gl_state`, `gpu_timer`); `shaders/` stays the
+  library of operations; `colormap` goes to `shaders/`
+  beside `colormap.glsl`. The tests stay in `gl/tests`. `from modules.gl import …` stays for every
+  name. Check: pyright, the guard tests, gl's tests, each app's main imported.
+- I6. One texture base: `TextureBase` (the GL name, size, format, wrap, filter, bind, clear, read) under `Texture`,
+  `Texture3D` and `Texture2DArray`. The pairs subclass what they swap, and callers pass a `SwapFbo` where an `Fbo`
+  goes, so a generic `Swap[T]` holds the pair and the swap, and `SwapFbo(Swap[Fbo], Fbo)`, `SwapTexture3D` and
+  `SwapTexture2DArray` stay as thin classes over it. Check: tests for clear, read and swap, and `shader_check.py`.
+- I7. `Style` becomes `BlendState` (GL.md's and Cinder's word), everywhere: the module `style.py`, its `Style`
+  import alias, `StyleState`, `StyleStack`, `push_style`/`pop_style`, `Context`'s stack, `test_style`, their users
+  and GL.md; the rules thread updates gl.md's line on it and adds `BlendState` (not `Style`) to the glossary in the
+  same work, and the coordinator is told when it is built. Check: pyright, the guard tests, gl's tests.
 
 ## G. Fewer GL calls
 
 Standard GL 4.5, not from Cinder. Measured (G0, 2026-11-20, -sim, 20 s from 10 s): white_space makes 1000 GL calls a
 frame, 72 of them sampler units and 153 texture binds; deep_flow 2338, 509 sampler units and 608 binds. One PyOpenGL
 call costs 0.4 to 0.7 µs on the main thread, so all of them take about 0.4 ms (white_space) and 1.3 ms (deep_flow) a
-frame (deduction). G1 and G2 wait for the coordinator's call on whether that gain is worth their size.
+frame (deduction). G1 and G2 are built as the textbook way, G1 after I4 and G2 after I6. After G2, one -sim run
+per app (about 45 s each) checks G1, I6 and G2 together: at each draw and dispatch every sampler the program reads
+has a texture at its unit, the GL calls a frame against G0's, and no GL error in the log; a fault it finds is fixed
+in a commit of its own.
 
 - G1. `layout(binding = N)` on samplers: no `glUniform1i` per texture, per pass, per frame. The one shader below
   `#version 420` (hd_trio's `temperature_bridge_shader.frag`, 410) is raised; `bind_texture*` of `Shader` and
-  `ComputeShader` lose their `uniform_name`, and every caller with them. Check: `scripts/shader_check.py` and G0's
-  count.
+  `ComputeShader` lose their `uniform_name`, and every caller with them. Check: each sampler's binding equal to
+  the unit its Python binds (a scan of the shader files), and `scripts/shader_check.py`.
 - G2. Direct state access: `glBindTextureUnit` for a texture's bind and `glTextureSubImage2D` for its upload; the CUDA
   upload in `tensor.py` from 6 calls to about 3, its `glGetError` behind the debug flag. Every caller of
-  `Texture.bind`/`unbind` moves with it. Check: `scripts/shader_check.py` and G0's count.
-
-## H. The package held to the rules
-
-- H8. `Style` gets the blend equation (min, max), and flow's `particle_density.py` sets it through `Style`;
-  modules/flow's owner is told when it is built. Check: flow's GPU check of the particle density.
+  `Texture.bind`/`unbind` moves with it. Check: `scripts/shader_check.py`, then the -sim runs above.
 
 ## Rules this plan touches
 
 - gl.md: Prefer as few GL calls and state switches as possible
 - gl.md: Prefer not to read back from the GPU or wait on it inside a frame
 - gl.md: All OpenGL calls execute on the main thread, in the window loop
-- gl.md: Pair every creation with its destruction
 - gl.md: Name a shader's `.frag`/`.vert`/`.comp` source after the `.py` file that holds its class, beside it; the loader resolves it by that module name
+- gl.md: A shader is named after the operation it does; the `shaders` package in front says what it is (`shaders.PosePointLines`)
 - gl.md: Shaders get checked in a GPU harness
-- glossary.md: A time stamp: `timestamp`; not `time`, `time_stamp`
-- docs.md: Leave out how a conclusion was reached, what the code used to do, and what changed; that belongs in commit messages
-- CLAUDE.md: Fix a problem where it is made, not where it shows
-- CLAUDE.md: Prefer the design with the lower latency, measured in the context of the app
-- CLAUDE.md: Its files each hold one class or one subject, named after it
+- gl.md: the line on `Style` (I7, by the rules thread)
+- docs.md: A component is described in its own document; other documents link to it
+- CLAUDE.md: A package is one thing, and its name is that thing
 - CLAUDE.md: Its `__init__.py` holds what other packages use
+- CLAUDE.md: Its files each hold one class or one subject, named after it
+- CLAUDE.md: A package with many loose files groups them in folders by job
+- CLAUDE.md: Prefer no folder for one or two files
+- CLAUDE.md: Inside a package, code that does the same is written once
+- CLAUDE.md: Its tests sit in its `tests/` folder
+- CLAUDE.md: Its shaders sit in its `shaders/` folder
+- CLAUDE.md: Downstream of the camera, take time from the frame or the tick instead of reading a clock
+- glossary.md: `BlendState`, not `Style` (I7, by the rules thread)
+- CLAUDE.md: Apps and modules import another package from its `__init__.py`, never from its internal files
 - CLAUDE.md: Inside a package, its subpackages included, import relatively; tests may import absolutely
-- CLAUDE.md: Put all imports from one package on a single `from` line
-- CLAUDE.md: Define module loggers as `logger = logging.getLogger(__name__)`
-- CLAUDE.md: Give public methods return type hints
-- CLAUDE.md: Prefer `IntEnum` over string keys for dict lookups and identifiers
-- CLAUDE.md: Log exceptions with context; never fail silently
-- CLAUDE.md: Rely on running the real-time system for integration; unit-test infrastructure (settings, frame/features, serialization, utility primitives, geometry)
+- CLAUDE.md: Name a concept after what it is in the domain, and use that one term everywhere it appears
+- CLAUDE.md: Use no synonyms for one concept across modules; when a term changes, rename it everywhere in the same change
+- CLAUDE.md: Prefer the design with the lower latency, measured in the context of the app
 - CLAUDE.md: Update all affected call sites in the same change
 - CLAUDE.md: Remove obsolete pathways instead of leaving parallel legacy ones
 - CLAUDE.md: Run a test of the app or a GPU harness only on the user's go, and only what the plan names
