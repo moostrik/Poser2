@@ -5,8 +5,8 @@ from modules.gl import Fbo, Text, clear_color
 from modules.pose import BaseScalarFeature
 from modules.utils import Color, Rect
 
-from ...color_settings import ColorSettings
-from ...layer_base import DataCache
+from ....color_settings import ColorSettings
+from ....data_cache import DataCache
 from .data_layer_settings import DataLayerSettingsProtocol, LayerMode, TRACK_COLOR_FEATURES
 
 T = TypeVar('T')

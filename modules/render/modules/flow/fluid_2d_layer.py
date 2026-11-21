@@ -9,7 +9,7 @@ density is held as its color times its coverage, and drawn, its picture, through
 from modules.gl import GpuTimer, BlendState, Texture
 from modules.settings import Field, Group
 from modules.flow import Fluid2D, Fluid2DSettings, HasPorts
-from ...general.grade import LutGrade, LutSettings
+from ...general.lut_grade import LutGrade, LutSettings
 from .fluid_layer import FluidLayer, FluidLayerSettings, FluidOutput, Injection
 from .monitor_2d_layer import DEBUG_TINT, MAIN_TINT, Monitor2DLayerSettings
 

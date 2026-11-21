@@ -11,11 +11,11 @@ from modules.gl import Texture, Image, clear_color
 from modules.utils import Rect
 from modules.pose import FeatureWindow, BaseScalarFeature
 from modules.settings import BaseSettings
-from ...layer_base import LayerBase
-from .shaders import Window
+from ....layer_base import LayerBase
+from ..shaders import Window
 from .data_layer_settings import DataLayerSettingsProtocol, LayerMode, FEATURE_MAP, AngleOffset, has_pi_range, offset_angles
 from .feature_plot import FeaturePlot
-from ...color_settings import ColorSettings
+from ....color_settings import ColorSettings
 
 
 class FeatureWindowLayer(LayerBase):

@@ -9,7 +9,7 @@ from ...layer_base import LayerBase
 
 from ..board import BoardImageLayer
 from ..inference import CropLayer
-from .pose_line_layer import PoseLineLayer, PoseLineLayerSettings
+from .lines import PoseLineLayer, PoseLineLayerSettings
 from ...color_settings import ColorSettings
 from modules.utils import Color
 

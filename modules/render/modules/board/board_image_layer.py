@@ -5,7 +5,8 @@ from OpenGL.GL import GL_CLAMP_TO_EDGE
 
 from modules.gl import Tensor, Texture
 
-from ...layer_base import LayerBase, DataCache
+from ...layer_base import LayerBase
+from ...data_cache import DataCache
 
 # The board read a layer shows: the image's tensor and the capture time of the frame it was made from (None where the
 # read has none), or None while the board holds no image

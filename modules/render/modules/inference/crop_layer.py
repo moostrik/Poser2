@@ -5,7 +5,8 @@ from modules.board import HasFrames
 from modules.gl import Fbo, Texture, clear_color
 from modules.utils import Rect
 from modules.pose import Frame, BBox
-from ...layer_base import LayerBase, DataCache
+from ...layer_base import LayerBase
+from ...data_cache import DataCache
 
 
 class CropLayer(LayerBase):

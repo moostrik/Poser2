@@ -15,7 +15,7 @@ ROOT: Path = Path(__file__).resolve().parents[5]
 SETTINGS_FILES_3D: list[Path] = [ROOT / 'apps' / 'deep_flow' / 'data' / 'settings' / 'flow' / 'settings.json']
 SETTINGS_FILES_2D: list[Path] = [ROOT / 'apps' / 'low_flow' / 'data' / 'settings' / 'flow' / 'studio.json']
 SOURCES: list[Path] = [ROOT / 'modules' / 'flow', ROOT / 'modules' / 'render' / 'modules' / 'flow',
-                       ROOT / 'modules' / 'render' / 'general' / 'grade']     # the fluid's LUT
+                       ROOT / 'modules' / 'render' / 'general' / 'lut_grade.py']     # the fluid's LUT
 STAGES: tuple[str, ...] = ('motion', 'bridge', 'fluid')
 SYSTEMS: dict[str, dict[str, type[BaseSettings]]] = {
     '2D': {'motion': Motion2DLayerSettings, 'bridge': Bridge2DLayerSettings, 'fluid': Fluid2DLayerSettings},
@@ -36,7 +36,8 @@ def settings_classes(cls: type[BaseSettings], seen: set[type[BaseSettings]] | No
 
 
 def flow_source() -> str:
-    return '\n'.join(path.read_text(encoding='utf-8') for root in SOURCES for path in sorted(root.rglob('*.py')))
+    return '\n'.join(path.read_text(encoding='utf-8') for root in SOURCES
+                     for path in (sorted(root.rglob('*.py')) if root.is_dir() else [root]))
 
 
 class SettingsFileTest(unittest.TestCase):

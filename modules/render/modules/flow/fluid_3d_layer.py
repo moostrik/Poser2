@@ -8,7 +8,7 @@ The density volume holds the colored density (RGBA16F GL_TEXTURE_3D on the simul
 from modules.gl import GpuTimer, BlendState, Texture
 from modules.flow import CompositeSettings, Fluid3D, Fluid3DSettings, HasPorts
 from modules.settings import Field, Group
-from ...general.grade import LutGrade, LutSettings
+from ...general.lut_grade import LutGrade, LutSettings
 from .fluid_layer import FluidLayer, FluidLayerSettings, FluidOutput, Injection
 from .monitor_2d_layer import DEBUG_TINT, MAIN_TINT
 from .monitor_3d_layer import Monitor3DLayerSettings

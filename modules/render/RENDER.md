@@ -15,8 +15,8 @@ Three categories, each a folder. A layer is found by what it draws, not by its t
 A layer that is not general and that one app uses sits in that app, in `apps/<app>/render/layers/`. It moves to
 `shared/` when a second app takes it.
 
-Beside the categories, the package's root holds what every layer uses: `LayerBase`, `DataCache` and
-`HasCaptureTime` (`layer_base.py`), `ColorSettings`, and the window's layout (`subdivision.py`).
+Beside the categories, the package's root holds what every layer uses: `LayerBase` and `HasCaptureTime`
+(`layer_base.py`), `DataCache`, `ColorSettings`, and the window's layout (`subdivision.py`).
 
 ## Packages
 

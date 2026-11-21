@@ -8,11 +8,11 @@ from modules.gl import Texture, clear_color
 from modules.utils import Rect
 from modules.pose import AngleVelocity, Angles, BaseScalarFeature, Frame
 from modules.settings import BaseSettings
-from ...layer_base import LayerBase
-from .shaders import Feature
+from ....layer_base import LayerBase
+from ..shaders import Feature
 from .data_layer_settings import DataLayerSettingsProtocol, LayerMode, FEATURE_MAP, AngleOffset, has_pi_range, offset_angles
 from .feature_plot import FeaturePlot
-from ...color_settings import ColorSettings
+from ....color_settings import ColorSettings
 
 
 def _label_place(i: int, count: int, rect: Rect) -> tuple[int, int]:

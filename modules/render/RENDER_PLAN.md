@@ -14,20 +14,6 @@ The pixel buffer and fence code of `general/screen_recording` is not in this pla
 ## A. Code that does the same, written once
 
 
-## B. The tree
-
-- **B1** `modules/pose` groups its files by job:
-  - `features/` holds the data layer settings and the feature frame and window layers.
-  - `lines/` holds the pose line layer, the pose renderer and the view pose layer.
-  - The box renderer, the compositor, the motion time renderer and the silhouette stay at the root.
-  - Why: ten loose files (seen); "A package with many loose files groups them in folders by job".
-- **B2** `DataCache` gets its own file and a unit test.
-  - Why: `layer_base.py` holds three subjects, and `DataCache`, a utility primitive, has no test (seen).
-- **B3** `general/composite/layer_compositor.py` and `general/grade/lut_grade.py` move directly into `general/`, and their one-file packages go. Their importers follow: `render/__init__.py` and the 2D and 3D fluid layers.
-  - Why: "Prefer no folder for one or two files", and rendering.md asks for packages only in `modules` (seen).
-- **B4** On the PC only (git does not track them): delete the folders `modules/render/layers/` and `modules/render/shaders/`, which hold only stale `__pycache__`.
-- Check for B1 to B3, one commit: the render tests, the guard tests (import layering), pyright and the new `DataCache` test. They are moves, so no app run.
-
 ## C. Names
 
 - **C1** These names change everywhere:

@@ -1,6 +1,7 @@
 from .color_settings import ColorSettings
 from .subdivision import    make_subdivision, best_grid, grid_cell_aspect_ratio, SubdivisionRow, Subdivision
-from .layer_base import     LayerBase, DataCache, HasCaptureTime
+from .layer_base import     LayerBase, HasCaptureTime
+from .data_cache import     DataCache
 
 # modules: the layers that draw a module's data
 from .modules.pose import       DataLayerSettings, ScalarFeatureSelect, LayerMode, AngleOffset, FEATURE_MAP, TRACK_COLOR_FEATURES, \
@@ -30,6 +31,6 @@ from .modules.flow import       StageLayer, StageLayerSettings, StageOutput, \
 from .modules.board import      BoardImageLayer, BoardImageRead, TimeSeriesLayer, TimeSeriesLayerSettings
 
 # general: the layers that draw no module's data
-from .general.composite import  LayerCompositor, LayerCompositorSettings
-from .general.grade import      LutGrade, LutSettings
+from .general.layer_compositor import LayerCompositor, LayerCompositorSettings
+from .general.lut_grade import LutGrade, LutSettings
 from .general.screen_recording import ScreenCapture, ScreenPreview, ScreenRecordingCompositor, ScreenRecordingInput, ScreenRecordingSource

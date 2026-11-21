@@ -5,9 +5,9 @@ from __future__ import annotations
 from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_RGBA16F, glClear, glClearColor
 
 from modules.gl import Fbo, Texture, BlendState
-from ...layer_base import LayerBase
+from ..layer_base import LayerBase
 from modules.settings import Field, BaseSettings, Group
-from ..grade import LutGrade, LutSettings
+from .lut_grade import LutGrade, LutSettings
 
 
 # ============================================================================

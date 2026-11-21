@@ -5,8 +5,9 @@ from modules.settings import Field, BaseSettings
 from modules.board import HasFrames
 from modules.gl import Fbo, Texture, clear_color
 from modules.pose import Frame, Points2D, BBox
-from ...layer_base import LayerBase, DataCache
-from .shaders import PosePointLines as shader
+from ....layer_base import LayerBase
+from ....data_cache import DataCache
+from ..shaders import PosePointLines as shader
 from modules.utils import Color
 
 

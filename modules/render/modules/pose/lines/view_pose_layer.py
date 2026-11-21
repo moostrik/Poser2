@@ -8,9 +8,9 @@ from modules.settings import Field, BaseSettings
 from modules.gl import Fbo, Texture, clear_color, shaders
 from modules.pose import PointLandmark, Points2D
 from modules.utils import Color, Point2f
-from ...layer_base import LayerBase
-from .shaders import PosePointLines
-from ...color_settings import ColorSettings
+from ....layer_base import LayerBase
+from ..shaders import PosePointLines
+from ....color_settings import ColorSettings
 
 
 class ViewPoseLayerSettings(BaseSettings):
