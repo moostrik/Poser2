@@ -1,4 +1,8 @@
 {
+  "inference_frame": {
+    "show": "BOTH",
+    "colormap": "JET"
+  },
   "view": {
     "width": 448,
     "height": 800,

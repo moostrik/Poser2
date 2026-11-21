@@ -270,11 +270,10 @@ class PoseMonitorSettings(BaseSettings):
     data    : Group[_DataLayerSettings]         = Group(_DataLayerSettings, share=[stage])
 
 class RenderSettings(BaseSettings):
-    """The render's panels and its monitors beside the flow: the camera's frame, the pose and the timings."""
+    """The render's panels and its monitors beside the flow: the pose and the timings."""
     debug: Field[bool]                           = Field(True, description="The main and the debug panel; off, the main panel alone, as on a second screen")
     freeze_frame: Field[bool]                    = Field(False, description="Hold the last frame; the view and the color are made again on it when a setting changes")
     layer  : Group[LayerSettings]                = Group(LayerSettings)
-    inference_frame: Group[InferenceFrameMonitorSettings] = Group(InferenceFrameMonitorSettings)
     pose   : Group[PoseMonitorSettings]          = Group(PoseMonitorSettings)
     # the display
     time_series: Group[render.TimeSeriesLayerSettings] = Group(render.TimeSeriesLayerSettings)
@@ -327,8 +326,10 @@ class SetupSettings(BaseSettings):
 
 
 class FlowSettings(BaseSettings):
-    """The flow chain, in its order: the view, the color, the motion, the bridge and the fluid."""
+    """The flow chain, in its order: the inference frame it takes in, the view, the color, the motion, the bridge and
+    the fluid."""
     input_fps: Field[float]                      = Field(60.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
+    inference_frame: Group[InferenceFrameMonitorSettings] = Group(InferenceFrameMonitorSettings)
     view   : Group[ViewLayerSettings]            = Group(ViewLayerSettings)
     color  : Group[render.ColorLayerSettings]    = Group(render.ColorLayerSettings)
     motion : Group[render.Motion3DLayerSettings] = Group(render.Motion3DLayerSettings, share=[input_fps.as_('fps')])
@@ -344,4 +345,4 @@ class Settings(BaseSettings):
     input_fps: Field[float] = Field(60.0, min=1.0, max=120.0, access=Field.INIT)
 
     setup: Group[SetupSettings] = Group(SetupSettings, share=[input_fps])
-    flow : Group[FlowSettings]  = Group(FlowSettings, share=[input_fps])
+    flow : Group[FlowSettings]  = Group(FlowSettings, share=[input_fps], tab=True)

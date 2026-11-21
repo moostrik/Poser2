@@ -321,4 +321,4 @@ class Settings(BaseSettings):
     input_fps: Field[float] = Field(60.0, min=1.0, max=120.0, access=Field.INIT)
 
     setup: Group[SetupSettings] = Group(SetupSettings, share=[input_fps])
-    flow : Group[FlowSettings]  = Group(FlowSettings, share=[input_fps])
+    flow : Group[FlowSettings]  = Group(FlowSettings, share=[input_fps], tab=True)

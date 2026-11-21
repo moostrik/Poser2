@@ -88,17 +88,26 @@ ACCESS_CLASS = {
 
 
 class TabEntry(NamedTuple):
-    """One tab: its path from the root, which is its state key, its root group and its settings."""
+    """One tab: its path from the root, which is its state key, the root group it is listed under ("" for a root
+    group that is one tab) and its settings."""
     path: str
     group: str
     settings: BaseSettings
 
 
 def tab_entries(root: BaseSettings) -> list[TabEntry]:
-    """The tabs: the children of each root group, grouped under it; only those with visible content."""
-    return [TabEntry(f"{group}.{name}", group, child)
-            for group, groups in root.children.items()
-            for name, child in groups.children.items() if has_visible_content(child)]
+    """The tabs: a root group declared `tab` is one tab, its children cards in it; another root group's children
+    are each a tab, grouped under it. Only those with visible content."""
+    entries: list[TabEntry] = []
+    for group, groups in root.children.items():
+        descriptor = getattr(type(root), group, None)
+        if isinstance(descriptor, Group) and descriptor.tab:
+            if has_visible_content(groups):
+                entries.append(TabEntry(group, "", groups))
+            continue
+        entries.extend(TabEntry(f"{group}.{name}", group, child)
+                       for name, child in groups.children.items() if has_visible_content(child))
+    return entries
 
 
 # -- cards -------------------------------------------------------------------------------
@@ -329,7 +338,8 @@ class TabBar:
             for entry in entries:
                 if entry.group != group:
                     group = entry.group
-                    ui.label(generate_label(group).upper()).classes("text-xs text-grey-6 px-2 self-center")
+                    if group:
+                        ui.label(generate_label(group).upper()).classes("text-xs text-grey-6 px-2 self-center")
                 tab = ui.tab(entry.path, label=generate_label(entry.path.rsplit(".", 1)[-1]))
                 tab.on("click", partial(self.select, entry.path))
                 self.tab_of[entry.path] = tab

@@ -60,7 +60,7 @@ class DeepFlowRender(RenderBase):
             fluid =         self.L[ChainLayers.fluid][i] =       render.Fluid3DLayer(        flow.fluid)
             self.L[ChainLayers.inference_frame_monitor][i] = InferenceFrameMonitorLayer(cast(render.InferenceFrameImageLayer, self.L[ChainLayers.inference_frame_image][i]),
                                                                     cast(render.InferenceFrameDepthLayer, self.L[ChainLayers.inference_frame_depth][i]),
-                                                                    settings.inference_frame, flow.view.crop)
+                                                                    flow.inference_frame, flow.view.crop)
             # each stage's main monitor in self.L, shown in the main panel; its debug monitor in self._debug_monitors,
             # shown in the debug panel; the flat stages' flat, the fluid's 3D
             for key, stage, flat in ((ChainLayers.view_monitor, render.FlowStage.VIEW, flow.view),

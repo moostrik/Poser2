@@ -274,10 +274,6 @@
           "fluid"
         ]
       },
-      "inference_frame": {
-        "show": "BOTH",
-        "colormap": "JET"
-      },
       "pose": {
         "stage": "LERP",
         "frame": "CAMERA",

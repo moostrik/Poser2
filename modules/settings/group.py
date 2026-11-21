@@ -30,6 +30,9 @@ class Group(Generic[T]):
     tint : str, optional
         The child's panel's background, a CSS color, in place of its depth's
         grey; empty for the grey. A GUI hint.
+    tab : bool, optional
+        A root group shown as one tab, its children as cards in it; without it,
+        each child is a tab of its own. A GUI hint.
     defaults : mapping of field name to value, optional
         The child's own fields' starting values in this place, in place of
         their class defaults (a shared field takes the parent's value). The
@@ -44,12 +47,14 @@ class Group(Generic[T]):
         last: bool = False,
         description: str = "",
         tint: str = "",
+        tab: bool = False,
         defaults: Mapping[str, Any] | None = None,
     ):
         self.settings_type = settings_type
         self.last: bool = last
         self.description: str = description
         self.tint: str = tint
+        self.tab: bool = tab
         self.defaults: dict[str, Any] = dict(defaults) if defaults else {}
         self._share_refs: list[Field | FieldAlias] = list(share) if share else []
         self.share_map: dict[str, str] = {}  # parent_name → child_name
