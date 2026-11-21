@@ -13,8 +13,8 @@ class MotionTimeDrawSettings(BaseSettings):
 
 
 class MotionTimeDraw(LayerBase):
-    def __init__(self, track_id: int, board: HasFrames, settings: MotionTimeDrawSettings | None = None) -> None:
-        self.settings: MotionTimeDrawSettings = settings or MotionTimeDrawSettings()
+    def __init__(self, track_id: int, board: HasFrames, settings: MotionTimeDrawSettings) -> None:
+        self.settings: MotionTimeDrawSettings = settings
         self._board: HasFrames = board
         self._track_id: int = track_id
         self._motion_time: str | None = None

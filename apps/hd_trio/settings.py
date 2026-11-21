@@ -316,6 +316,9 @@ class SessionGroup(BaseSettings):
 class _DataLayerSettings(render.DataLayerSettings):
     stage: Field[Stage] = Field(Stage.SMOOTH)
 
+class _MotionTimeDrawSettings(render.MotionTimeDrawSettings):
+    stage: Field[Stage] = Field(Stage.RAW, description="Pipeline stage for pose data")
+
 class _TrackerCompositorSettings(render.TrackerCompositorSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
     box_stage: Field[Stage] = Field(Stage.RAW, description="Pipeline stage of the bounding boxes")
@@ -480,6 +483,7 @@ class RenderSettings(BaseSettings):
     input_fps:   Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
     layer  : Group[LayerGroup]                = Group(LayerGroup)
     data   : Group[DataGroup]                 = Group(DataGroup)
+    data_time: Group[_MotionTimeDrawSettings] = Group(_MotionTimeDrawSettings, description="Each player's motion time, as text")
     preview: Group[PreviewGroup]              = Group(PreviewGroup)
     center : Group[CenterGroup]               = Group(CenterGroup, share=[similarity_scale])
     intro_sequence: Group[IntroSequenceSettings] = Group(IntroSequenceSettings)

@@ -116,7 +116,7 @@ class HDTrioRender(Render):
             self.L[Layers.data_A_F][i]  = render.FeatureFrameLayer( i, self.board, settings.data.a, settings.colors)
             self.L[Layers.data_B_W][i]  = render.FeatureWindowLayer(i, self.board, settings.data.b, settings.colors)
             self.L[Layers.data_B_F][i]  = render.FeatureFrameLayer( i, self.board, settings.data.b, settings.colors)
-            self.L[Layers.data_time][i] = render.MotionTimeDraw(i, self.board)
+            self.L[Layers.data_time][i] = render.MotionTimeDraw(i, self.board, settings.data_time)
 
             cam_layers = {layer: cam_dict[i] for layer, cam_dict in self.L.items() if i in cam_dict}
             for stage, cls in STAGES.items():

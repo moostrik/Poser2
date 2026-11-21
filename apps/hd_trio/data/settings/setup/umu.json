@@ -424,6 +424,9 @@
           "use_history_color": true
         }
       },
+      "data_time": {
+        "stage": "RAW"
+      },
       "preview": {
         "tracker": {
           "stage": "LERP",
