@@ -8,15 +8,12 @@
 //
 // Needs, declared before: uniform ivec3 uCells (the cell counts), uniform ivec3 uClosed and walls.glsl, uniform
 // bool uHasObstacles, sampler3D uObstacle (R8 at the cells). `#define FACES_IN_PLACE` before it for a pass that
-// reads and writes the same faces (`load_faces`).
-
-layout(binding = 4) uniform sampler3D uFaces;
-
-uniform vec3 uCell;           // a cell's sides in widths, x, y and z (`bind_faces`): the box's spacing, stretched in z
+// reads and writes the same faces through the image (`load_faces`), with no sampler.
 
 #ifdef FACES_IN_PLACE
 layout(rgba16f, binding = 4) uniform image3D uOutFaces;
 #else
+layout(binding = 4) uniform sampler3D uFaces;
 layout(rgba16f, binding = 4) writeonly uniform image3D uOutFaces;
 #endif
 
@@ -39,6 +36,7 @@ vec3 face_position(int c, ivec3 i) {
     return p;
 }
 
+#ifndef FACES_IN_PLACE
 // Component `c` interpolated at `p` (cells) from its own faces. Beyond a closed wall it reads the face at the
 // edge (the wall's own across, its neighbor's along: the free-slip mirror); beyond an open wall the water
 // outside, at rest, 0, faded in over the last texel as a border of 0 is: so a trace from outside carries
@@ -73,6 +71,7 @@ vec3 cell_velocity(ivec3 i) {
     return 0.5 * (here + vec3(face_fetch(0, i + ivec3(1, 0, 0)), face_fetch(1, i + ivec3(0, 1, 0)),
                               face_fetch(2, i + ivec3(0, 0, 1))));
 }
+#endif
 
 // The three components of index `i` written; a component the index holds no face of is never read
 void store_faces(ivec3 i, vec3 v) {

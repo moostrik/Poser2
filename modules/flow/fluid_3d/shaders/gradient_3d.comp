@@ -16,6 +16,7 @@ layout(binding = 0) uniform sampler3D uPressure;   // R32F at the cells
 layout(binding = 2) uniform sampler3D uObstacle;   // R8 at the cells
 
 uniform ivec3 uCells;
+uniform vec3  uCell;          // a cell's sides in widths, x, y and z: the box's spacing, stretched in z
 uniform ivec3 uClosed;
 uniform bool  uHasObstacles;
 

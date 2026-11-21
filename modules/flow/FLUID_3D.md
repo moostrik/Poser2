@@ -516,7 +516,7 @@ fast halves, its peak 0.76 of the body's, the step 11.5 ms with the harness (mea
 
 Every length in the fluid is in image widths, the motion's and the bridge's unit, and every time in
 seconds: a cell's sides 1 / the grid's width across and `depth_ratio` / `depth` in z (the z cells stretched),
-one `Cell` the fluid hands every face pass through `bind_faces`. The solvers' differences are over each
+one `Cell` the fluid hands every face pass that differences over it. The solvers' differences are over each
 axis's side (the divergence, the gradient, the pressure's solves, the viscosity, the curl, the velocity's own
 advection); the multigrid halves an axis only while its cells are shorter than the longest by more than 1.5,
 all of them once near cubic (semi-coarsening, `coarsening`), so a level's cells grow toward cubic before the

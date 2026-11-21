@@ -488,8 +488,7 @@ class Fluid3D:
     def _faces_to_centers(self) -> None:
         """The centers' volume, after the projection: each component the mean of its cell's two faces, which the
         particles, the densities and the monitors read."""
-        self._faces_to_centers_shader.use(self._faces.volume, self._velocity, self._obstacle, self._closed,
-                                          self._has_obstacles)
+        self._faces_to_centers_shader.use(self._faces.volume, self._velocity)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _advect_velocity(self) -> None:

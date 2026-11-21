@@ -4,7 +4,7 @@ from __future__ import annotations
 from OpenGL.GL import GL_RGBA16F, glUniform1f, glUniform1i, glUniform3fv, glUseProgram
 
 from modules.gl import Texture3D, ComputeShader
-from .face_binding import Cell, bind_faces
+from .face_binding import Cell, bind_faces, bind_obstacle, bind_walls
 
 
 class VorticityCurl3D(ComputeShader):
@@ -40,7 +40,9 @@ class VorticityCurl3D(ComputeShader):
         glUseProgram(self.shader_program)
 
         cells = (curls[0].width, curls[0].height, curls[0].depth)
-        bind_faces(self, faces, cells, cell, closed, has_obstacles, obstacle)
+        bind_faces(self, faces, cells)
+        bind_walls(self, closed)
+        bind_obstacle(self, obstacle, has_obstacles)
         for unit in range(count):
             self.bind_image_3d_write(unit, curls[unit], GL_RGBA16F)
 

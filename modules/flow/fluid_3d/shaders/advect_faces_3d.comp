@@ -27,6 +27,7 @@ layout(binding = 8) uniform sampler3D uPred;      // mode 2: the predictor's fac
 
 uniform int   uMode;          // 0 semi-Lagrangian, 1 the MacCormack predictor, 2 its correction
 uniform ivec3 uCells;         // the cell counts
+uniform vec3  uCell;          // a cell's sides in widths, x, y and z: the box's spacing, stretched in z
 uniform float uTimestep;      // dt * advection_scale
 uniform float uDissipation;   // the fade's multiplier this step
 uniform float uEvaporation;   // dt / evaporation_time: 1 width/s's share lost this step well above the knee; 0 off

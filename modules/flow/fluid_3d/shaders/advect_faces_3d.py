@@ -5,7 +5,7 @@ from OpenGL.GL import glUniform1f, glUniform1i, glUseProgram
 
 from modules.gl import Texture3D, ComputeShader
 from ...finite_guard import GuardSlot
-from .face_binding import Cell, bind_faces, bind_face_writes
+from .face_binding import Cell, bind_cell, bind_face_writes, bind_faces, bind_obstacle, bind_walls
 
 SEMI_LAGRANGIAN: int = 0
 PREDICTOR: int = 1
@@ -43,7 +43,10 @@ class AdvectFaces3D(ComputeShader):
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
-        bind_faces(self, source, cells, cell, closed, has_obstacles, obstacle)
+        bind_faces(self, source, cells)
+        bind_cell(self, cell)
+        bind_walls(self, closed)
+        bind_obstacle(self, obstacle, has_obstacles)
         bind_face_writes(self, result)
         if predictor is not None:
             self.bind_texture_3d(8, predictor, 'uPred')

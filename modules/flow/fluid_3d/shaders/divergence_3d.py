@@ -4,7 +4,7 @@ from __future__ import annotations
 from OpenGL.GL import GL_R16F, glUniform1f, glUniform1i, glUseProgram
 
 from modules.gl import StorageBuffer, Texture3D, ComputeShader
-from .face_binding import Cell, bind_faces
+from .face_binding import Cell, bind_cell, bind_faces, bind_obstacle
 
 
 class Divergence3D(ComputeShader):
@@ -34,7 +34,9 @@ class Divergence3D(ComputeShader):
             return
         glUseProgram(self.shader_program)
         cells = (divergence_out.width, divergence_out.height, divergence_out.depth)
-        bind_faces(self, faces, cells, cell, closed, has_obstacles, obstacle)
+        bind_faces(self, faces, cells)
+        bind_cell(self, cell)
+        bind_obstacle(self, obstacle, has_obstacles)
         glUniform1i(self.get_uniform_loc('uHasExpansion'), int(expansion is not None))
         glUniform1i(self.get_uniform_loc('uSubtractMean'), int(expansion is not None and expansion[2] is not None))
         if expansion is not None:

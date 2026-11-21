@@ -4,7 +4,7 @@ from __future__ import annotations
 from OpenGL.GL import glUniform1f, glUseProgram
 
 from modules.gl import Texture3D, ComputeShader
-from .face_binding import Cell, bind_faces, bind_face_writes
+from .face_binding import Cell, bind_cell, bind_face_writes, bind_faces, bind_obstacle, bind_walls
 
 
 class Gradient3D(ComputeShader):
@@ -31,7 +31,10 @@ class Gradient3D(ComputeShader):
             return
         glUseProgram(self.shader_program)
         cells = (pressure.width, pressure.height, pressure.depth)
-        bind_faces(self, source, cells, cell, closed, has_obstacles, obstacle)
+        bind_faces(self, source, cells)
+        bind_cell(self, cell)
+        bind_walls(self, closed)
+        bind_obstacle(self, obstacle, has_obstacles)
         bind_face_writes(self, result)
         self.bind_texture_3d(0, pressure, "uPressure")
         self.dispatch(cells[0] + 1, cells[1] + 1, cells[2] + 1)
