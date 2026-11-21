@@ -1,29 +1,11 @@
-"""One observation turned into one mark on the strip. No GL, no board, no settings — arithmetic.
+"""One observation turned into one mark on the strip: its line, foot tick, field and label, built once by the
+compositor for both `MarkDraw` and `LabelDraw`. Arithmetic: no GL, no board, no settings.
 
-A mark is everything drawn for one observation: its **line**, its **foot tick**, its **field** and
-its **label**. Built once by the compositor for both `MarkDraw` (line, tick, field) and
-`LabelDraw` (label), so the two cannot disagree about where a person is.
-
-**A mark is the tracker's belief, and its two axes use two different depths on purpose.**
-
-- **x** is the view's own `world_angle`, which the tracker derives at the fixed
-  `rig.parallax_radius`. What the tracker emits is a blend of a person's active views
-  (`Seams.world_azimuth`); the show's azimuth is drawn by the azimuth overlay. The field goes through the same depth, since
-  it is a statement about the same azimuth. So a mark sits a small constant distance from its own
-  pixels (the image is stitched at `focus_radius`), and two views of one person at a seam differ by
-  the residual for their depth: a depth indicator, not an error.
-- **y** goes through the person's own `annotation.distance`. There the lens height cancels,
-  `atan(tan(-atan(h / d)) * d / R) = atan(-h / R)`, which is the grid's zone-band formula: **the
-  foot tick sits on the R 3.5 edge iff the tracker reports this person at R 3.5.** On the parallax
-  cylinder that exactness would be lost. The distance is unclamped, so a person past the far edge
-  shows as a tick above the zone band.
-
-A mark's **field** is the join range that governs it, as a width (`_field`). A **rejected**
-detection is a gray line with no field, labeled with its rejection (`rejection_label`). A **LOST**
-mark keeps its line, fading to gray over `lost_timeout` while its field fades out (`_colors`).
-The primary view of a person is drawn strong; the other views are **passive**. A mark's color is
-its **player slot's**, the same index the pose figures use; a person tracked but **waiting** for a
-slot keeps their line and field in `waiting_color`, labeled `waiting`.
+x is the view's own `world_angle`, at `rig.parallax_radius`, and the field goes through the same depth; y goes through
+the person's own `annotation.distance`. A rejected detection is a gray line with no field (`rejection_label`), a LOST
+mark fades to gray over `lost_timeout` (`_colors`), the primary view is drawn strong and the others passive, and a
+person waiting for a player slot is drawn in `waiting_color`. What a mark shows and why: apps/white_space/docs/CALIBRATION.md, *Reading the
+panorama*; the layout in modules/render/RENDER.md, *The panorama*.
 """
 
 # Standard library imports

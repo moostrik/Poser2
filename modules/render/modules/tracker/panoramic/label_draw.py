@@ -12,27 +12,9 @@ _MARK_GAP_PX: float = 6.0    # between a label and the line it belongs to
 
 
 class LabelDraw(LayerBase):
-    """Each mark's label, laid out so labels never overlap and never lie about a bearing.
-
-    **Height is the player slot.** A label's lane is its player slot, the same index its color
-    comes from, so two different people can never collide however they move, no label shifts when
-    someone else arrives or leaves, and height becomes a second reading of *who* — useful where four
-    track colors are hard to tell apart against a bright stitch. An unoccupied slot is simply a
-    gap. Marks outside the lanes — rejected detections and people waiting for a slot — are labeled
-    at the top of their own line instead (`_draw_line_label`).
-
-    **x never moves.** The label anchors on its mark. It is never nudged sideways to make room,
-    because sideways is the axis that carries meaning here: a shifted label would imply a bearing
-    the person is not at. What flips instead is the *side*, and only at the right edge, where the
-    text would otherwise be cut off — nothing in `Text.draw_box_text` clamps, so a label running
-    past the edge is silently truncated by the FBO.
-
-    **The one real collision is a person's own two observations**, which share a world id and so a
-    lane, a few degrees apart at a seam. They diverge by position, not by role: the left mark's text
-    runs left and the right mark's runs right, so neither crosses the other's line.
-
-    Drawn last of all, so nothing is ever laid over text.
-    """
+    """Each mark's label: on a lane picked by its player slot, anchored on its mark's x, its text running away from the
+    other observation of the same person; marks outside the lanes (rejected, waiting) are labeled at the top of their
+    own line (`_draw_line_label`). Drawn last. The layout's reasons: modules/render/RENDER.md, *The panorama*."""
 
     def __init__(self) -> None:
         self._text: Text = Text()

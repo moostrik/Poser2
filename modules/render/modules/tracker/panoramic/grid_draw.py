@@ -14,26 +14,11 @@ from .strip import strip_y
 
 
 class GridDraw(LayerBase):
-    """Every reference line measured in the strip's own two axes — center azimuth and center
-    elevation — against its degree labels. Anything defined on a camera's own frame has no single
-    azimuth and lives in `SeamDraw`, against the picture.
-
-    **In azimuth**, exact and depth-free:
-
-    - the **degree lattice** at `grid_degrees`, faint;
-    - the **sector boundaries** in orange at `target_fov · cam_id`;
-    - the **camera axes** in blue at `camera_azimuth`, where the parallax correction is the identity;
-    - the **overlap** in yellow, two verticals per seam at `± rig.overlap / 2`: exactly where a
-      mark's field changes width (`Rig._update_overlap_band`). Not where the pictures meet — the
-      flag is deliberately generous.
-
-    **In elevation**, the horizon and the **zone band**: the tracked floor, a translucent band between
-    the two radii at `atan(camera_height / R)` below the horizon, the same at every azimuth. The only
-    thing on the strip in metres, so the one a tape on the floor checks, and what a mark's foot tick is
-    read against. A band rather than two lines, because at some settings files the zone runs below the
-    strip's bottom and a fill running off the edge says so, where a line pinned there would claim a
-    wrong elevation.
-    """
+    """Every reference line in the strip's own two axes, center azimuth and center elevation, with its degree labels:
+    in azimuth the degree lattice at `grid_degrees`, the sector boundaries at `target_fov · cam_id`, the camera axes at
+    `camera_azimuth` and the overlap, two verticals per seam at `± rig.overlap / 2`; in elevation the horizon and the zone
+    band between the two radii at `atan(camera_height / R)`. What each line tells: apps/white_space/docs/CALIBRATION.md, *Two axes, and the depth that
+    varies*."""
 
     def __init__(self, num_cams: int, target_fov: float, tracker: PanoramicTrackerSettings,
                  settings: PanoramaCompositorSettings) -> None:

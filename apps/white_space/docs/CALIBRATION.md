@@ -480,7 +480,8 @@ view is opaque and 2 px; a passive view — another camera's view of the same pe
 dimmer and 1 px, its field only outlined, so at a seam the passive field's edges show inside or beyond
 the primary's fill. A label's height on the strip is a lane picked by its player slot — the same
 index its color comes from, on the strip and in the pose row alike — so labels never collide and
-never move as people do, and its x always sits on its own line. A person tracked but waiting for a
+never move as people do, and its x always sits on its own line. A person's two observations at a seam share a
+lane: the left one's text runs left and the right one's runs right, so neither crosses the other's line. A person tracked but waiting for a
 free player slot is drawn in white with no lane, labelled `#- … waiting` at the top of their line.
 
 **Nobody leaves the strip without a reason.**

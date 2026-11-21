@@ -8,23 +8,9 @@ from .panorama_compositor_settings import PanoramaCompositorSettings
 
 
 class StitchDraw(LayerBase):
-    """The cameras' images unwrapped into one 360-degree strip: x is azimuth, 0 at the left edge.
-
-    **What it is for.** `fov` and `tilt` define the azimuth frame every other number in the
-    installation is expressed in, and nothing else in the app shows whether they are right — the
-    tracker fuses both cameras' views of a seam person into one `BBoxAzimuth` before anything draws it,
-    destroying the disagreement that would reveal the error. Here the two cameras' pixels are drawn
-    on top of each other at the azimuth each one claims. Right geometry: content in an overlap
-    coincides. Wrong geometry: it ghosts, and *what* ghosts says *which* number is wrong.
-
-    **Depth.** The image is stitched for one assumed depth, `focus_radius`, because a camera
-    0.36 m off center genuinely sees a different bearing than its neighbor and only the distance
-    to the subject resolves it. Nothing about a person feeds this — no box, no pose, no estimate —
-    so nothing can fool it: the ghost at other depths is a known, bounded residual rather than a
-    symptom.
-
-    Owns no FBO: the compositor's is bound when `draw()` is called.
-    """
+    """The cameras' images unwrapped into one 360-degree strip, x azimuth from 0 at the left edge, each camera drawn at the
+    azimuth it claims and stitched for one assumed depth, `focus_radius`. What it shows about `fov` and `tilt`, and why
+    one depth: apps/white_space/docs/CALIBRATION.md, *Reading the panorama*."""
 
     def __init__(self, cam_textures: list[Texture], tracker: PanoramicTrackerSettings,
                  settings: PanoramaCompositorSettings) -> None:

@@ -9,18 +9,9 @@ from .strip import strip_spans
 
 
 class SeamDraw(LayerBase):
-    """The seam rules defined on a camera's own frame, read against the picture rather than the grid
-    (an image column has no single azimuth; `GridDraw` holds what does).
-
-    Today that is the **dead zone**: `seam.dead_zone` degrees in from each camera's field edges, where
-    that camera refuses to start a new person. The band goes through the same map at the same depth
-    as the stitch, so band and pixels agree at every depth: a person whose pixels fall in the red is
-    one that camera will not start. Where two bands overlap on a seam (close to the fixture) nobody
-    can be born until they move. Each band's outer edge is its camera's field edge, so the pair also
-    shows where the two pictures reach.
-
-    Drawn faintly, beneath the grid.
-    """
+    """The seam rules defined on a camera's own frame, drawn against the picture: the dead zone, `seam.dead_zone` degrees in
+    from each camera's field edges, as a faint band through the same map and depth as the stitch, beneath the grid. How to
+    read it: apps/white_space/docs/CALIBRATION.md, *Two axes, and the depth that varies*."""
 
     def __init__(self, num_cams: int, target_fov: float, tracker: PanoramicTrackerSettings,
                  settings: PanoramaCompositorSettings) -> None:

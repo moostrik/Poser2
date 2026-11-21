@@ -41,6 +41,21 @@ an app's own shader sits in that app.
 `CameraReadingsDraw` draws each camera's frame rate, tilt and roll over that camera's own view. The pinned camera
 health says only OK or WARNING; the readings say which camera and which value, where the operator is already looking.
 
+## The panorama
+
+`modules/tracker/panoramic` draws white_space's calibration strip: `PanoramaCompositor` and its five Draw classes. How
+to read it, and why each line sits at its depth, is in white_space's
+[CALIBRATION.md](../../apps/white_space/docs/CALIBRATION.md) (*Reading the panorama*, *Two axes, and the depth that
+varies*). The layout's reasons:
+
+- `marks.py` builds each mark once for both `MarkDraw` and `LabelDraw`, so the two cannot disagree about where a
+  person is.
+- A label never moves sideways to make room: x carries the bearing, so a shifted label would claim one the person is
+  not at. Only its side flips, at the strip's right edge, because `Text.draw_box_text` does not clamp and the Fbo would
+  cut the text off.
+- The labels are drawn last, so nothing lies over text; the seams are drawn under the grid, so the lattice reads over a
+  band.
+
 ## Kinds of layer
 
 | Kind         | Owns              | Draws                     |

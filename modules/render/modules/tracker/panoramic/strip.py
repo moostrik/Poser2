@@ -117,22 +117,10 @@ def strip_aspect_ratio(elevation_window: tuple[float, float]) -> float:
 
 def elevation_window(band: tuple[float, float], camera_radius: float,
                      focus_radius: float) -> tuple[float, float]:
-    """(top, bottom) elevation of the 360-degree strip, measured AT THE RIG CENTER.
-
-    `band` is the (bottom, top) the delivered frames carry, measured at the camera — the tracker's
-    published `angle_bottom` and `angle_top`. Converted to the center's point of view, at the
-    bearing where the conversion is tightest. `tan(e_center) = tan(e_cam) * d / focus_radius`, and
-    `d` is smallest straight ahead (`focus_radius - camera_radius`), so taking the window there
-    guarantees every column of the strip is filled rather than fading to black near the camera axes.
-
-    **`focus_radius`, not `depth_radius`** — the one function here that names its depth, because it
-    has one caller and one meaning: it fixes the strip's **single, shared** y scale at the
-    picture's depth, and everything drawn on the strip is then placed on that same ruler. So it
-    moves the whole strip together and can never break a comparison between two things on it: drag
-    `focus_radius` and the horizon stays at y 0.7791, because the scale and the thing measured
-    move as one. That is the opposite of the per-call depths in `projection.py`, which do break
-    comparisons.
-    """
+    """(top, bottom) elevation of the 360-degree strip, measured at the rig center: the band the delivered frames carry
+    (`band`, (bottom, top) at the camera, the tracker's `angle_bottom` and `angle_top`) converted at `focus_radius` at the
+    bearing where the conversion is tightest, `d = focus_radius - camera_radius`, so every column of the strip is filled.
+    It is the strip's single y scale (apps/white_space/docs/CALIBRATION.md, *Two axes, and the depth that varies*)."""
     radius: float = max(1e-6, focus_radius)
     ratio: float = max(0.0, radius - camera_radius) / radius
     low, high = band

@@ -10,12 +10,6 @@ These stay as they are, on the user's word:
 
 The pixel buffer and fence code of `general/screen_recording` is not in this plan: `gl.PixelBufferPool` holds it, and `ScreenCapture` and `ScreenPreview` use it (GL plan D1, built in d1be9840). The pack and unpack alignment constants and their set-back in those two files go in GL's alignment item, where every transfer sets its own alignment.
 
-## C. Docstrings
-
-- **C1** The reasons left in the panorama's docstrings leave them, and the docstrings keep what each thing is: `marks.py`'s module docstring (27 lines, 14 bold), `GridDraw`, `LabelDraw`, `MarkDraw`, `SeamDraw`, `StitchDraw`, and `strip.elevation_window` (seen). A reason about reading the strip goes to white_space's `CALIBRATION.md`, where most of them are already stated; a reason about the code (such as a label never moving sideways, and flipping its side at the right edge because `Text.draw_box_text` does not clamp) goes to a panorama section in `RENDER.md`.
-  - Why: "A docstring says what the thing is", "Reasons sit in the package's document", and docs.md's "Give each document one audience and purpose": `CALIBRATION.md` is the operator's procedure; c866306e moved only `PanoramaCompositor`'s, `PanoramaBlend`'s and `PanoramaCompositorSettings`'s.
-  - Check: pyright, and the panoramic tests.
-
 ## D. Settings and work
 
 - **D1** hd_trio gets a `data_time` group in its render settings: like white_space's, a `_MotionTimeDrawSettings` subclass whose `stage` is a `Field[Stage]` of hd_trio's own `Stage`, defaulting to `Stage.RAW` (0, what it draws now), and passes it to its `MotionTimeDraw`s. `MotionTimeDraw` then takes its settings as required, and its `settings or …()` fallback goes. hd_trio's settings files (`studio.json`, `umu.json`) get the `data_time` key at stage 0, so they stay in step with the settings classes.
@@ -29,6 +23,3 @@ The pixel buffer and fence code of `general/screen_recording` is not in this pla
 
 - Settings: "Components take their settings object (or a `Group` of it) in the constructor, never as a global" (D1)
 - Performance: "Prefer the design with the lower latency, measured in the context of the app" (D2)
-- Docstrings: "A docstring says what the thing is" (C1)
-- Docstrings: "Reasons sit in the package's document, history in the commit" (C1)
-- docs.md: "Give each document one audience and purpose" (C1)
