@@ -2,8 +2,9 @@
 scores, the box distances and the keypoint distances from each anchor's center, decoded and kept above a threshold,
 then non-maximum suppression. Follows insightface/model_zoo/scrfd.py, without the insightface package."""
 
-import cv2
 import numpy as np
+
+from ..person import nms
 
 INPUT_SIZE: int = 640
 FEAT_STRIDES: tuple[int, ...] = (8, 16, 32)
@@ -59,8 +60,4 @@ def decode(outputs: list[np.ndarray], scale: float, threshold: float) -> list[tu
         return []
     all_boxes: np.ndarray = np.concatenate(boxes_list) / scale
     all_kps: np.ndarray = np.concatenate(kps_list) / scale
-    rects: list = [[float(b[0]), float(b[1]), float(b[2] - b[0]), float(b[3] - b[1])] for b in all_boxes]
-    keep = cv2.dnn.NMSBoxes(rects, all_scores.tolist(), threshold, NMS_THRESHOLD)
-    faces = [(all_boxes[i], float(all_scores[i]), all_kps[i]) for i in np.array(keep).reshape(-1)]
-    faces.sort(key=lambda face: face[1], reverse=True)
-    return faces
+    return [(all_boxes[i], float(all_scores[i]), all_kps[i]) for i in nms(all_boxes, all_scores, NMS_THRESHOLD)]
