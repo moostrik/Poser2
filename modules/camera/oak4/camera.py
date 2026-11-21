@@ -37,9 +37,7 @@ FRAME_CHECK: float = 0.5        # s between two looks at the time of the last fr
 
 
 class Camera(Thread):
-    _next_cam_id = 0
-
-    def __init__(self, settings: Oak4CameraSettings, rotate90: bool = False) -> None:
+    def __init__(self, settings: Oak4CameraSettings, rotate90: bool = False, cam_id: int = 0) -> None:
         super().__init__()
         self.rotate90: bool = rotate90      # carried on every frame as its flag (an app's portrait mode), fixed at start
         self._tilt_warned: bool = False
@@ -48,9 +46,7 @@ class Camera(Thread):
         self._problem: str = ''             # why there are no frames, as logged; '' while they come
         self._last_frame: float = 0.0
 
-        # ID
-        self.cam_id: int = Camera._next_cam_id
-        Camera._next_cam_id += 1
+        self.cam_id: int = cam_id
 
         # SETTINGS (reactive)
         self.settings: Oak4CameraSettings = settings

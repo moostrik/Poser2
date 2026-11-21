@@ -91,10 +91,10 @@ class HDTrioMain:
                     self.cameras.append(replay.Camera(self.player, self.settings.setup.camera.cameras[i], self.person_detector, replay.Tracker(), i))
             else:
                 for i in range(num_cams):
-                    self.cameras.append(ClipCamera(self.player, self.settings.setup.camera.cameras[i]))
+                    self.cameras.append(ClipCamera(self.player, self.settings.setup.camera.cameras[i], i))
         else:
             for i in range(num_cams):
-                self.cameras.append(Camera(self.settings.setup.camera.cameras[i]))
+                self.cameras.append(Camera(self.settings.setup.camera.cameras[i], i))
         self.frame_sync: CameraSync[CameraFrame] = CameraSync(self.settings.setup.camera.frame_sync, 'frame_sync')
         self.uploader = BatchUploader()          # a synced set of the cameras' frames onto the GPU as one batch, on its own thread
         self.tracker = OnePerCamTracker(self.settings.setup.camera.tracker, max_players)

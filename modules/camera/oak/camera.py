@@ -24,17 +24,13 @@ logger = logging.getLogger(__name__)
 
 
 class Camera(Thread):
-    _next_cam_id = 0
     _pipeline: dai.Pipeline | None = None
 
-    def __init__(self, settings: OakCameraSettings) -> None:
+    def __init__(self, settings: OakCameraSettings, cam_id: int = 0) -> None:
         super().__init__()
         self.stop_event = Event()
         self.running: bool = False
-
-        # ID
-        self.cam_id: int = Camera._next_cam_id
-        Camera._next_cam_id += 1
+        self.cam_id: int = cam_id
 
         # SETTINGS (reactive)
         self.settings: OakCameraSettings = settings

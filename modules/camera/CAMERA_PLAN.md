@@ -11,12 +11,6 @@ The steps below are proposals from the scan of 2026-11-21; nothing is built. **(
 
 ## B. Written once
 
-- B2. `cam_id` comes from the constructor in `oak.Camera`, `ClipCamera` and `oak4.Camera`, as in `vimba`, `webcam` and
-  `replay.Camera`. Why: "Pass collaborators and fixed structure (counts known at startup) through constructors";
-  the OAK backends count `Camera._next_cam_id` in creation order, a class-wide count that only holds while one app
-  makes its cameras in index order **(seen)**. Call sites: the mains of white_space, hd_trio, deep_flow, low_flow
-  and smile, `scripts/oak4_probe.py`. Tests: white_space's and hd_trio's in `.venv`, deep_flow's and low_flow's,
-  oak4's in `.venv-oak4`.
 - B3. `oak.pipeline.WarpConfig` is named `MountConfig`, as `oak4.pipeline.MountConfig`. Why: "Similar things share
   the noun": both are "how a camera is mounted and what its lens is" **(seen)**; the OAK-D's adds tilt and keystone.
 - B4. `rotate90` is a `Field.INIT` field of `CameraSettings` beside the flips, off by default; `oak4`, `vimba` and

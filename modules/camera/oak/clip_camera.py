@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 
 class ClipCamera(Camera):
 
-    def __init__(self, player: ClipSource, settings: OakCameraSettings) -> None:
-        super().__init__(settings)
+    def __init__(self, player: ClipSource, settings: OakCameraSettings, cam_id: int = 0) -> None:
+        super().__init__(settings, cam_id)
 
         self.player: ClipSource = player
         self.clips: dai.DataInputQueue | None = None

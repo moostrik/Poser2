@@ -78,7 +78,7 @@ class DeepFlowMain:
                 self.cameras.append(replay.Camera(self.player, cam, self.person_detector, replay.Tracker(), i, cam.tilt))
         else:
             for i in range(num_cams):
-                self.cameras.append(Camera(self.settings.setup.camera.cameras[i]))
+                self.cameras.append(Camera(self.settings.setup.camera.cameras[i], cam_id=i))
         self.tracker = OnePerCamTracker(self.settings.setup.camera.tracker, max_players)
         self.uploader = SerialUploader(self.settings.setup.camera.uploader)    # the camera's hand-off: each frame onto the GPU as it comes, on its own thread
         # The frame domain's async step: the crop step in, the pose model out
