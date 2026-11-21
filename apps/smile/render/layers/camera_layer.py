@@ -1,15 +1,15 @@
 import math
 import time
 
+from ...board import RenderBoard
 from ...face import FaceObservations
 from ...view import view_rect
-from modules.gl import Fbo, Image, BlendState, SwapFbo, Text, Texture, shaders
+from modules.gl import Fbo, BlendState, SwapFbo, Text, Texture, shaders
 from modules.utils import Color
-from ..inputs import Faces
 from ..settings import FaceEffect, FaceFill, RenderSettings
 from ..shaders import FaceColor
 
-from modules.render import LayerBase
+from modules.render import CameraImageLayer, LayerBase
 from .mark_drawer import MarkDrawer
 from .face_marks import BOX_PAD_PX, FACES_STALE, LABEL_BG, REJECTED_COLOR, Mark, SubjectMark, build_marks, face_fields
 from .passes import blur, copy
@@ -42,14 +42,13 @@ class CameraLayer(LayerBase):
     white, a rejected one in grey with its reason. A box that reaches past the image is drawn up to a
     padding inside it, so the chosen face's outline and fill stay whole. Keeps its last frame until
     render() is called again (the capture freeze).
-    While the generator is not ready (warmup is its step) the whole image is in pixels instead,
+    While the generator is not ready (the board's warm-up step) the whole image is in pixels instead,
     blocks that tile the image whole and halve with every step of the warm-up, and no face is shown."""
 
-    def __init__(self, camera: Image, faces: Faces, settings: RenderSettings) -> None:
-        self._camera: Image = camera
-        self._faces: Faces = faces
+    def __init__(self, camera: CameraImageLayer, board: RenderBoard, settings: RenderSettings) -> None:
+        self._camera: CameraImageLayer = camera     # the camera's full frame, upright
+        self._board: RenderBoard = board            # the faces and the warm-up
         self.settings: RenderSettings = settings
-        self.warmup: int | None = None  # the step the generator's warm-up reached; None is ready (any thread sets it)
         self._subject: SubjectMark = SubjectMark()
         self._view: Fbo = Fbo()             # the part of the camera frame the screen shows, at the output size
         self._fbo: Fbo = Fbo()
@@ -93,19 +92,20 @@ class CameraLayer(LayerBase):
         """Draw the newest camera frame in black and white; `charge` (0..1) is how far the chosen
         face is toward the flash: the color inside its box.
         `marks` is the opacity of the face marks (the flash fades them out before the capture)."""
-        if not self._camera.allocated:
+        camera: Texture = self._camera.texture
+        if not camera.allocated:
             return
         # the view: the frame's middle, covering the output size (`view.view_rect`), as the faces are measured in it
         self._view.begin()
-        self._camera.draw(src=view_rect(self._camera.width, self._camera.height, self._width, self._height))
+        camera.draw(src=view_rect(camera.width, camera.height, self._width, self._height))
         self._view.end()
         r, g, b, a = self.settings.face_color
         now: float = time.perf_counter()
-        frame: FaceObservations | None = self._faces.get()
+        frame: FaceObservations | None = self._board.get_faces()
         if frame is not None and now - frame.timestamp > FACES_STALE:
             frame = None
         # not ready: the image in pixels that halve per step, and no face (nobody can start)
-        warmup: int | None = self.warmup
+        warmup: int | None = self._board.get_warmup()
         mosaic: float = 1.0
         if warmup is not None:
             mosaic = float(warmup_block(self._width, self._height, max(warmup, 0)))

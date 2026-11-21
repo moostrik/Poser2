@@ -7,8 +7,9 @@ from modules import recording
 from modules.recording import replay
 from modules.camera import CameraFrame, CameraSource, upright_image, vimba, webcam
 from modules.session import Session
-from modules.inference import SerialUploader
+from modules.inference import GpuImage, SerialUploader
 from modules.inference.face import FaceDetector
+from .board import OnlineCell, RenderBoard
 from .face import FaceFinder, FaceObservations
 from .render import SmileRender
 from .sequence import CAMERA_STATES, AnimationType, AnimationTypeNames, GrinPlayer, Sequencer, SequenceMessage, SequenceType
@@ -87,15 +88,18 @@ class SmileMain():
         self.sequencer: Sequencer = Sequencer(self.settings.setup.sequence)
         # the generator fills the grin player with the grin frames, the render plays them on its own clock
         self.grin_player: GrinPlayer = GrinPlayer(self.settings.setup.sequence.grin)
-        self.render: SmileRender = SmileRender(self.settings.setup.render, self.settings.setup.windows, self.settings.setup.walls, self.sequencer, self.grin_player, self.width, self.height)
+        # what the app's threads make for the render, read at its tick
+        self.board: RenderBoard = RenderBoard()
+        self.render: SmileRender = SmileRender(self.board, self.settings.setup.render, self.settings.setup.windows, self.settings.setup.walls,
+                                               self.sequencer, self.grin_player, self.width, self.height)
         # the clip player of the sphere's walls: one pool for the 48 cells of the render's two walls
         self.clip_player: Player = Player(self.settings.setup.walls, list(self.render.walls),
                                           CreditLines(str(self.settings.setup.render.credit_lines)))
         self.generator: Generator = Generator(self.settings.setup.generator, self.grin_player)
         # the face crop is the image ComfyUI generates from, so it has the workflow's portrait size
         portrait_width, portrait_height = self.generator.workflow.portrait_size
-        # the faces as the other apps find them: the frames to judge uploaded, the faces found on the GPU, and smile's
-        # choice of a subject among them (the camera states hand over frames, sequence_callback)
+        # the faces as the other apps find them: every camera frame uploaded (the render shows it from the board), the
+        # faces found on the GPU while the camera states run, and smile's choice of a subject among them
         self.uploader: SerialUploader = SerialUploader(self.settings.setup.camera.uploader)
         self.face_detector: FaceDetector = FaceDetector(self.settings.setup.camera.face_detector)
         self.face: FaceFinder = FaceFinder(self.settings.setup.camera.face, self.settings.setup.camera.face_detector, portrait_width, portrait_height,
@@ -148,20 +152,20 @@ class SmileMain():
 
     def start(self) -> None:
         self.recorder.start()
-        self.camera.add_frame_callback(self.render.set_cam_image)
-        self.camera.add_frame_callback(self._judge_frame)
+        self.camera.add_frame_callback(self.uploader.submit_frame)
         self.camera.start()
         if self.recording_player is not None:
             self.recording_player.start()       # after the replay camera hooked into it
 
-        self.generator.add_message_callback(self.render.set_generator_message)
+        self.generator.add_message_callback(self._show_generator_message)
         self.generator.add_message_callback(self.generator_callback)
         self.generator.start()
 
         self.face.add_frame_callback(self.face_callback)
-        self.face.add_frame_callback(self.render.set_faces)
+        self.face.add_frame_callback(self.board.set_faces)
         self.face_detector.add_face_callback(self.face.submit)
-        self.uploader.add_gpu_image_callback(self.face_detector.submit)
+        self.uploader.add_gpu_image_callback(self._judge_image)
+        self.uploader.add_finished_gpu_image_callback(self.board.set_camera_image)
         self.face.start()
         self.face_detector.start()
         self.uploader.start()
@@ -227,8 +231,8 @@ class SmileMain():
         status: str | None = None if ready else self.settings.setup.generator.connection.status
         if status is None and self.camera.stalled:
             status = NO_CAMERA
-        self.render.set_status(status)
-        self.render.set_warmup(self.generator.warmup)
+        self.board.set_status(status)
+        self.board.set_warmup(self.generator.warmup)
 
         artnet_progress: float = message.progress
         if seq == SequenceType.TIMEOUT:
@@ -278,7 +282,7 @@ class SmileMain():
         if seq == SequenceType.CAMERA_SHOW and message.initial:
             self.face.reset()
 
-        # the camera states judge the camera's frames as they come (`_judge_frame`)
+        # the camera states judge the camera's frames as they come (`_judge_image`)
         self._judging = SequenceType.CAMERA_SHOW <= seq <= SequenceType.CAMERA_DETECT
 
         if seq == SequenceType.CAPTURE:
@@ -298,7 +302,10 @@ class SmileMain():
                 # ComfyUI went away during the flash: nobody would end it. The capture is the result
                 logger.warning('Generator not ready at the capture, ending the visitor')
                 self.sequencer.finish()
-            self.render.set_cap_image(cap_image)
+            # the capture is the first diffusion image too, until the generator sends one: without that, a failed
+            # generation would blend the previous visitor's last frame in
+            self.board.set_capture(cap_image)
+            self.board.set_diffusion_image(cap_image)
             self.save.submit_open(cap_image, self.settings.setup.generator.style_current)
             self._saving = True
             self._grin_saved = False
@@ -336,7 +343,7 @@ class SmileMain():
         page: str = str(online.page).strip() or http_base(str(online.relay)) + '/'
         if pass_value:
             page += ('&' if '?' in page else '?') + 'pass=' + pass_value
-        self.render.set_online_cell(wall, cell, mode, page)
+        self.board.set_online_cell(OnlineCell(wall, cell, mode, page) if mode != 'clip' else None)
 
     def _limit_visitor(self, seq: SequenceType) -> None:
         """End a visitor the generator did not end: it does so itself at connection.job_timeout, so
@@ -364,11 +371,28 @@ class SmileMain():
             style_id: str = self.generator.next_style()
             self.music_map.set_style(style_id)
 
-    def _judge_frame(self, frame: CameraFrame) -> None:
-        """A camera frame, on the camera's thread: to the faces while the camera states run. Only new frames come,
-        so a camera that stopped stops charging."""
+    def _judge_image(self, image: GpuImage) -> None:
+        """An uploaded camera frame, on the uploader's thread: to the faces while the camera states run. Only new
+        frames come, so a camera that stopped stops charging."""
         if self._judging:
-            self.uploader.submit_frame(frame)
+            self.face_detector.submit(image)
+
+    def _show_generator_message(self, message: GeneratorMessage) -> None:
+        """A generator message, on its thread: its image to the board first, so the render takes it no later than the
+        frame the new state starts, then the sequence's step (the capture's depth starts the reveal)."""
+        if message.state == GeneratorState.CAM_DEPTH:
+            if message.image is not None:
+                self.board.set_capture_depth(message.image)
+            self.sequencer.start_reveal()
+        elif message.state == GeneratorState.DIFFUSION:
+            if message.image is not None:
+                self.board.set_diffusion_image(message.image)
+            self.sequencer.set_sequence(SequenceType.DIFFUSION)
+            self.sequencer.set_diffusion_progress(message.progress)
+        elif message.state == GeneratorState.IDLE:
+            if message.image is not None:
+                self.board.set_diffusion_depth(message.image)
+            self.sequencer.finish()
 
     def face_callback(self, frame: FaceObservations) -> None:
         # the sequencer charges toward the flash while the face qualifies

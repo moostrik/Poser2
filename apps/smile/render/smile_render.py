@@ -5,10 +5,8 @@ import numpy as np
 from OpenGL.GL import GL_RGBA32F, glViewport
 
 from .screen_grab import ScreenGrab
-from ..comfy import GeneratorMessage, GeneratorState
-from ..face import FaceObservations
 from .. import sphere
-from modules.camera import CameraFrame, upright_corners
+from ..board import OnlineCell, RenderBoard
 from modules.gl import Fbo, Shader, BlendState, Texture, clear_color
 from modules.render import LayerBase
 from modules.utils import fit
@@ -32,10 +30,14 @@ class SmileRender(RenderBase):
     The two walls of the sphere (`walls`, `WallCompositor`) are composited after it, each shown in the
     window of its own: window 1 is wall 0, screens 1-24, window 2 wall 1;
     the online cell of one of them shows the output without the QR code during an online turn.
+    What the app's threads make it reads from the board at its tick (`RenderBoard`): the camera's frame, the faces,
+    the capture, the generator's images, the status line and warm-up, and the online cell.
     Keys: Enter starts a sequence; F fullscreen, Esc quit (the window manager)."""
 
-    def __init__(self, settings: RenderSettings, windows: WindowsSettings, walls_settings: WallsSettings, sequencer: Sequencer, grin_player: GrinPlayer, width: int, height: int) -> None:
+    def __init__(self, board: RenderBoard, settings: RenderSettings, windows: WindowsSettings, walls_settings: WallsSettings,
+                 sequencer: Sequencer, grin_player: GrinPlayer, width: int, height: int) -> None:
         super().__init__(windows)
+        self.board: RenderBoard = board
         self.windows: WindowsSettings = windows
         self.settings: RenderSettings = settings
         self.sequencer: Sequencer = sequencer
@@ -44,8 +46,8 @@ class SmileRender(RenderBase):
         self.width: int = width
         self.height: int = height
 
-        self.inputs: Inputs = Inputs()
-        camera = CameraLayer(self.inputs.camera, self.inputs.faces, settings)
+        self.inputs: Inputs = Inputs(board)
+        camera = CameraLayer(self.inputs.camera, board, settings)
         self.layers: Layers = Layers(
             camera=camera,
             flash=FlashLayer(camera, self.inputs.white),
@@ -60,7 +62,6 @@ class SmileRender(RenderBase):
         self._credit_sequence: SequenceType = SequenceType.NONE
         # the operator's status line, drawn over the output while there is something to say
         self._status: StatusLayer = StatusLayer()
-        self._status_text: str | None = None
         self._all_layers: list[LayerBase] = list(vars(self.layers).values()) + [self._credit, self._status]
 
         # one instance per stage class, shared by the sequence types it covers
@@ -74,10 +75,9 @@ class SmileRender(RenderBase):
         # the screen for the phones of SMILE Online: switched on and read by modules/online
         self.grab: ScreenGrab = ScreenGrab()
         self._cell_view: Texture = self._output      # the output as the online cell shows it: no QR code, no status line
-        # the walls of the sphere, and which cell of which one is SMILE Online's (wall, cell, mode, page)
+        # the walls of the sphere; which cell of which one is SMILE Online's is on the board
         self.walls: list[WallCompositor] = [WallCompositor(settings, walls_settings, [str(i) for i in range(sphere.CELLS)])
                                             for _ in range(sphere.WALLS)]
-        self._online: tuple[int, int, str, str] | None = None
 
         self.window_manager.input.add_key_callback(self._on_key)
 
@@ -118,8 +118,9 @@ class SmileRender(RenderBase):
         stage.update(message)
 
         self._output = stage.output
-        self._render_credit(message.sequence_type, self.grab.due(time.perf_counter()))
-        status: str | None = self._status_text
+        online: OnlineCell | None = self.board.get_online_cell()
+        self._render_credit(message.sequence_type, self.grab.due(time.perf_counter()), online)
+        status: str | None = self.board.get_status()
         if status:
             self._status.render(self._output, status)
             self._output = self._status.texture
@@ -128,9 +129,9 @@ class SmileRender(RenderBase):
                 copy(self._output, self._freeze_fbo)
             self._output = self._freeze_fbo
         self._frozen = self.settings.freeze
-        self._update_walls()
+        self._update_walls(online)
 
-    def _render_credit(self, sequence_type: SequenceType, grab: bool) -> None:
+    def _render_credit(self, sequence_type: SequenceType, grab: bool, online: OnlineCell | None) -> None:
         """The credit over the output, with two copies for SMILE Online: the phone's (`CreditLayer.clean`), rendered
         when `grab` takes it (the turn's last frame, `grab.clean`, without the caption: the phone fades it out itself
         and keeps that frame), and the online cell's (`CreditLayer.cell`), rendered while that cell shows it."""
@@ -141,12 +142,11 @@ class SmileRender(RenderBase):
         shown: bool = caption_shown(sequence_type, self.settings.credit_camera)
         self._credit_alpha = fade_step(self._credit_alpha, shown, now - self._credit_time)
         self._credit_time = now
-        online: tuple[int, int, str, str] | None = self._online
         if self.settings.credit:
             if grab:
                 self._credit.render(self._output, 0.0 if self.grab.clean else self._credit_alpha, CreditView.PHONE)
                 self.grab.grab(self._credit.clean)
-            if online is not None and online[2] == 'screen':
+            if online is not None and online.mode == 'screen':
                 self._credit.render(self._output, self._credit_alpha, CreditView.CELL)
             self._cell_view = self._credit.cell
             self._credit.render(self._output, self._credit_alpha)
@@ -156,14 +156,13 @@ class SmileRender(RenderBase):
             if grab:
                 self.grab.grab(self._output)
 
-    def _update_walls(self) -> None:
+    def _update_walls(self, online: OnlineCell | None) -> None:
         """The walls after the main screen, so the online cell shows this frame; only the walls that have a
         window shown are composited."""
-        online: tuple[int, int, str, str] | None = self._online
         windows = self.windows.windows
         for index, wall in enumerate(self.walls):
-            if online is not None and online[0] == index:
-                wall.set_online(str(online[1]), online[2], self._cell_view if online[2] == 'screen' else None, online[3])
+            if online is not None and online.wall == index:
+                wall.set_online(str(online.cell), online.mode, self._cell_view if online.mode == 'screen' else None, online.page)
             else:
                 wall.set_online(None)
             if index + 1 < len(windows) and windows[index + 1].enabled:
@@ -191,8 +190,8 @@ class SmileRender(RenderBase):
                 self._draw_fit(self.walls[window - 1].texture, width, height)
             return
         self._draw_fit(self._output, width, height)
-        if self.settings.show_camera and self.inputs.camera.allocated:
-            self._draw_fit(self.inputs.camera, width, height)
+        if self.settings.show_camera and self.inputs.camera.texture.allocated:
+            self._draw_fit(self.inputs.camera.texture, width, height)
 
     def on_window_resize(self, window: int, width: int, height: int) -> None:
         pass
@@ -208,46 +207,3 @@ class SmileRender(RenderBase):
     def _on_key(self, window: int, key: int, action: int, mods: int) -> None:
         if action == glfw.PRESS and key in (glfw.KEY_ENTER, glfw.KEY_KP_ENTER):
             self.sequencer.start_sequence()
-
-    # ANY THREAD
-    def set_cam_image(self, frame: CameraFrame) -> None:
-        """A camera frame, its turn and flips applied in its upload."""
-        self.inputs.camera.set_image(frame.image, upright_corners(frame))
-
-    def set_cap_image(self, image: np.ndarray) -> None:
-        """A new visitor's capture. It is the first diffusion image too, until the generator sends
-        one: without that, a failed generation would blend the previous visitor's last frame in."""
-        self.inputs.capture.set_image(image)
-        self.inputs.diffusion.set_image(image)
-
-    def set_status(self, text: str | None) -> None:
-        """A line for the operator in the corner of the image; None for no line."""
-        self._status_text = text
-
-    def set_warmup(self, step: int | None) -> None:
-        """The step the generator's warm-up has reached: the camera is in pixels, smaller per step; None is ready."""
-        self.layers.camera.warmup = step
-
-    def set_faces(self, frame: FaceObservations) -> None:
-        self.inputs.faces.set(frame)
-
-    def set_online_cell(self, wall: int, cell: int, mode: str, page: str) -> None:
-        """SMILE Online's cell on the walls: `mode` is `clip` (a cell like any), `qr` (the card with the code to
-        `page`) or `screen` (the main screen as the phone sees it); applied to the walls at the next frame."""
-        self._online = (wall, cell, mode, page) if mode != 'clip' else None
-
-    def set_generator_message(self, message: GeneratorMessage) -> None:
-        # the image first, so it is uploaded no later than the frame the new state starts
-        if message.state == GeneratorState.CAM_DEPTH:
-            if message.image is not None:
-                self.inputs.capture_depth.set_image(message.image)
-            self.sequencer.start_reveal()
-        elif message.state == GeneratorState.DIFFUSION:
-            if message.image is not None:
-                self.inputs.diffusion.set_image(message.image)
-            self.sequencer.set_sequence(SequenceType.DIFFUSION)
-            self.sequencer.set_diffusion_progress(message.progress)
-        elif message.state == GeneratorState.IDLE:
-            if message.image is not None:
-                self.inputs.diffusion_depth.set_image(message.image)
-            self.sequencer.finish()

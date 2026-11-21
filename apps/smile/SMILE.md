@@ -87,8 +87,8 @@ and one older than half a second counts as nobody. CAMERA_SHOW is an empty charg
 (its progress is the charge, also for OSC and Art-Net), and a full one starts the flash. A manual
 start charges without a face; one that gets blocked before it is full is dropped, it does not wait. The capture is the last frame in which the subject qualified (the
 last frame at all when none did), its own camera frame cropped by
-`portrait_crop` (`face/portrait.py`: eyes levelled, at the workflow's portrait size). Every frame's faces go to the render
-(`Inputs.faces`): `CameraLayer` draws the camera in black and white (`face_color.frag`). Every face's
+`portrait_crop` (`face/portrait.py`: eyes levelled, at the workflow's portrait size). Every frame's faces go to the board
+(`RenderBoard.set_faces`): `CameraLayer` draws the camera in black and white (`face_color.frag`). Every face's
 box (the portrait crop's, upright: `FaceObservation.crop`) shows the face's distance from good
 (`render.face_effect`: dark, pixels, blur or fog, at `render.face_amount`), so a visitor sees
 whether they get closer; the subject's box turns to colour as the charge fills (`render.face_fill`:
@@ -163,8 +163,11 @@ a deferred settings call raises: it is logged, and a monitor that is unplugged d
 default portrait mode): the same 4:5 as the workflow's 896 x 1120 portrait, which stays at the size SDXL is best at and fills
 the render as a texture. `render/smile_render.py` runs the `Sequencer` once per frame (it is the app clock:
 Art-Net, OSC and saving hang off its messages), then the stage for the current `SequenceType`
-(`stages.py`) renders the layers (`layers/`) and picks the one to show. Images from other threads go
-through `inputs.py` (`Image.set_image`, uploaded on the main thread); the grin frames go
+(`stages.py`) renders the layers (`layers/`) and picks the one to show. What other threads make goes through the
+board (`board/`, `RenderBoard`), which the render reads at its tick: the camera's full frame as the uploader made it on
+the GPU (`modules/board`'s camera image, drawn by `CameraImageLayer`), and smile's own slices: the judged faces, the
+capture and its depth, the generator's image and depth, the status line and warm-up, the online cell. `inputs.py`
+uploads a board image once when it is new; the grin frames go
 through `sequence/grin_player.py`, a buffer the generator fills and the render plays on its own clock, with
 its timings in the sequence settings' `grin` group. The `sequence/` package holds the sequencer and the grin player
 with their settings, the Sequence tab: the cycle's steps, with the grin's playback (`grin`) and the saver
@@ -332,7 +335,7 @@ QR code to the phone page (`online.page`, empty = the relay's host, `Link.http_b
 and the relay connected, and the main screen (`CreditLayer.cell`: the caption, no QR code, no status line)
 from the judging to the phone's last frame (`Online.showing`), then the card again; off or disconnected it is a clip cell like any
 (`online_cell_mode` in `player.py`). `Main._online_cell` sets it every frame: `Player.online_cell` (no bang, no caption: its clip plays
-unseen) and `SmileRender.set_online_cell`, which the walls take in `update()` (`WallCompositor.set_online`).
+unseen) and the board's online cell (`RenderBoard.set_online_cell`), which the walls take in `update()` (`WallCompositor.set_online`).
 Tests: `relay/tests` (the line, the server on aiohttp's test server, the page's files: `test_web.py`) and `online/tests`
 (a fake link and camera).
 

@@ -9,6 +9,7 @@ from unittest import mock
 
 import numpy as np
 
+from apps.smile.board import OnlineCell, RenderBoard
 from apps.smile.main import SmileMain
 from modules.camera import CameraFrame, FrameType
 from apps.smile.settings import Settings
@@ -42,10 +43,10 @@ class TestMaxControls(unittest.TestCase):
             # a Mock attribute is truthy: the camera must really not be stalled
             camera=SimpleNamespace(frame=lambda: CameraFrame(0, FrameType.VIDEO, np.zeros((4, 4, 3), np.uint8), 0.0),
                                    stalled=False, next_image=mock.Mock()),
-            render=mock.Mock(), lights=mock.Mock(), face=mock.Mock(), save=mock.Mock(), sequencer=mock.Mock(),
+            render=mock.Mock(), board=RenderBoard(), lights=mock.Mock(), face=mock.Mock(), save=mock.Mock(), sequencer=mock.Mock(),
             music_map=mock.Mock(get_music_id=lambda: '0001'), osc=mock.Mock(), laughter_test=mock.Mock(),
             _limit_visitor=lambda seq: None,
-            _style_picked=False, _face_frame_time=0.0, _visitor_start=None, _saving=False, _grin_saved=False,
+            _style_picked=False, _judging=False, _visitor_start=None, _saving=False, _grin_saved=False,
             _face_seen=0.0, credit_scroller=mock.Mock(), online=mock.Mock(showing=False, pass_value=''), clip_player=mock.Mock())
         self.app._online_cell = lambda: SmileMain._online_cell(self.app)
 
@@ -132,25 +133,26 @@ class TestMaxControls(unittest.TestCase):
         online = self.settings.setup.online
         online.active, online.screen = True, 27         # screen 27: wall 1, unit 1 output 3, cell 12
         online.connected = False
+        board: RenderBoard = self.app.board
         self.frame()
         self.assertIsNone(self.app.clip_player.online_cell)
-        self.app.render.set_online_cell.assert_called_with(1, 12, 'clip', 'http://127.0.0.1:8800/')
+        self.assertIsNone(board.get_online_cell())                      # a clip like any cell
         online.connected = True
         self.frame()
         self.assertIsNone(self.app.clip_player.online_cell)             # connected, but no pass from the relay yet: no code
-        self.app.render.set_online_cell.assert_called_with(1, 12, 'clip', 'http://127.0.0.1:8800/')
+        self.assertIsNone(board.get_online_cell())
         self.app.online.pass_value = 'abc'
         self.frame()
         self.assertEqual(self.app.clip_player.online_cell, 24 + 12)     # the clip player's cells count over both walls
-        self.app.render.set_online_cell.assert_called_with(1, 12, 'qr', 'http://127.0.0.1:8800/?pass=abc')
+        self.assertEqual(board.get_online_cell(), OnlineCell(1, 12, 'qr', 'http://127.0.0.1:8800/?pass=abc'))
         self.app.online.showing = True
         online.page = ' https://smile.example/ '
         self.frame()
-        self.app.render.set_online_cell.assert_called_with(1, 12, 'screen', 'https://smile.example/?pass=abc')
+        self.assertEqual(board.get_online_cell(), OnlineCell(1, 12, 'screen', 'https://smile.example/?pass=abc'))
         online.screen = 0
         self.frame()
         self.assertIsNone(self.app.clip_player.online_cell)
-        self.assertEqual(self.app.render.set_online_cell.call_args.args[2], 'clip')
+        self.assertIsNone(board.get_online_cell())
 
 
 if __name__ == '__main__':
