@@ -6,14 +6,17 @@ unless Matthias says he is using the PC or the app.
 
 ## E. Every pixel transfer sets its own alignment
 
-- E1. `Tensor._update_with_pbo`, `Tensor._update_with_cpu` and `TextureBase._read` set their own unpack or pack
-  alignment at the transfer, as `Texture.upload` does; `flow/motion/solve_capture.read_level` and
-  `apps/deep_flow/scripts/view_check.read` set the pack alignment at their read, or read through `TextureBase._read`;
-  `flow/bridge/velocity_peak` stays as it is (one row of 256 × R32UI, the same bytes at any alignment). Why: these
-  transfers rely on the alignment GL has at the moment, 4 by default or 1 as `Texture.upload` and `Image` leave it,
-  so a row whose bytes are not a multiple of 4 (an R8 or RGB8 texture of odd width) comes out sheared at 4 (seen:
-  the transfers, a scan of 2026-11-21; the shear, deduction). After it, the render plan's E1 drops
-  `ScreenCapture`'s and `ScreenPreview`'s set-back to 4. Check: shader_check.
+- E1. `Tensor._update_with_pbo` and `Tensor._update_with_cpu` set their own unpack alignment at the transfer, as
+  `Texture.upload` does; the textures' public read, `read_to_numpy`, takes a mip level (`level`, 0 by default, its
+  size halved per level) and sets its own pack alignment (`TextureBase._read`). `flow/motion/solve_capture.read_level`
+  reads through it, in place of its own bind and `glGetTexImage` (its `kind` and `dtype` go: the texture's own type),
+  and so does `apps/deep_flow/scripts/view_check.read` where its channels are the texture's; should the level turn
+  out more than a small change, they set the pack alignment at their own read instead. `flow/bridge/velocity_peak`
+  stays as it is (one row of 256 × R32UI, the same bytes at any alignment). Why: these transfers rely on the
+  alignment GL has at the moment, 4 by default or 1 as `Texture.upload` and `Image` leave it, so a row whose bytes
+  are not a multiple of 4 (an R8 or RGB8 texture of odd width) comes out sheared at 4 (seen: the transfers, a scan of
+  2026-11-21; the shear, deduction); a read-back is written once (Motion's review of 46df3c07). After it, the render
+  plan's E1 drops `ScreenCapture`'s and `ScreenPreview`'s set-back to 4. Check: shader_check.
 
 Form, done only in a commit that opens the file anyway, never as a step of its own: PEP 8 in `fbo.py` (the one-line
 `if`, the double spaces before `->`, a class docstring, the end-of-file newline); the two swap tests become one
