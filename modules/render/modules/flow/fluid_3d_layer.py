@@ -17,14 +17,14 @@ from .monitor_3d_layer import Monitor3DLayerSettings
 class Fluid3DCompositeSettings(CompositeSettings):
     """The fluid's composite, how the layer draws its picture over the layers before it, and the LUT it is drawn
     through."""
-    blend_mode: Field[BlendState.BlendMode] =    Field(BlendState.BlendMode.ADD, description="How the show is drawn over the layers before it")
+    blend_mode: Field[BlendState.BlendMode] =    Field(BlendState.BlendMode.ADD, description="How the fluid's picture is drawn over the layers before it")
     lut: Group[LutSettings] =               Group(LutSettings, description="The LUT the fluid's picture is drawn through")
 
 
 class Fluid3DLayerSettings(Fluid3DSettings, FluidLayerSettings):
     """Configuration for Fluid3DLayer: the stage's settings and its fluid's own, one panel, the stage's
     first; the fluid's width, height and depth are the stage's working size."""
-    composite: Group[Fluid3DCompositeSettings] = Group(Fluid3DCompositeSettings, description="How the fluid's picture is drawn over the layers before it")
+    composite: Group[Fluid3DCompositeSettings] = Group(Fluid3DCompositeSettings, description="The density marched into the picture: its glow, opacity, fog and light, the blend and the LUT")
 
     monitor_main:  Group[Monitor3DLayerSettings] = Group(Monitor3DLayerSettings, last=True, tint=MAIN_TINT, description="The fluid stage's monitor in the main panel")
     monitor_debug: Group[Monitor3DLayerSettings] = Group(Monitor3DLayerSettings, last=True, tint=DEBUG_TINT, description="The fluid stage's monitor in the debug panel")
