@@ -10,7 +10,7 @@ from ..board import OnlineCell, RenderBoard
 from modules.gl import Fbo, Shader, BlendState, Texture, clear_color
 from modules.render import LayerBase
 from modules.utils import fit
-from modules.window import RenderBase
+from modules.window import Render
 from ..player import OnlineCellMode, WallsSettings
 from .inputs import Inputs
 from .layers import (BloomLayer, CameraLayer, CreditLayer, CreditView, DiffusionLayer, FlashLayer, RevealLayer,
@@ -23,7 +23,7 @@ from .stages import STAGES, Layers, Stage
 COMPOSITION_FORMAT = GL_RGBA32F
 
 
-class SmileRender(RenderBase):
+class SmileRender(Render):
     """The installation display. Runs the sequencer every frame (it is the app clock), then lets the
     stage of the current sequence state render the layers, and fits its output in the window.
     The grin frames come from the grin player, which is asked every frame for the one that is due.

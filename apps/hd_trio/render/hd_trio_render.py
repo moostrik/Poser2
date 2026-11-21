@@ -7,7 +7,7 @@ import numpy as np
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import Shader, BlendState, clear_color, Texture, shaders
-from modules.window import RenderBase
+from modules.window import Render
 from modules.board import HasFrames
 from modules.camera import RigCameraSettings, CameraHealthSettings
 from modules.flow import hold_tick
@@ -60,7 +60,7 @@ BORDER: Color = Color(0.4, 0.4, 0.4)    # the border around each panel in the ma
 BORDER_WIDTH: float = 2.0       # px
 
 
-class HDTrioRender(RenderBase):
+class HDTrioRender(Render):
     def __init__(self, board: RenderBoard, settings: RenderSettings, windows: WindowsSettings,
                  cameras: Sequence[RigCameraSettings], camera_health: CameraHealthSettings, data_path: str = "") -> None:
         super().__init__(windows)

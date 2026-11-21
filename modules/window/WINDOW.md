@@ -6,7 +6,7 @@ monitors. It draws with `modules/gl` ([GL.md](../gl/GL.md)); `gl` never imports 
 ## The loop
 
 The window loop runs on the main thread: GLFW puts window creation, monitors and event processing there, and all its
-callbacks run there. The launcher calls `RenderBase.run()` after `app.start()`; the loop draws on the same thread, so
+callbacks run there. The launcher calls `Render.run()` after `app.start()`; the loop draws on the same thread, so
 nothing crosses a thread between the events and the draw. `stop()` works from any thread: it sets a close request,
 GLFW's should-close and an empty event, and from another thread waits up to 2 s for the loop to end. The structure
 is Cinder's: one update and a draw per window each frame, a context per window, the monitors as objects.
@@ -42,7 +42,7 @@ No callback calls GL: GLFW's callbacks store (a move, a size, a hot-plug) or han
 each key, mouse and scroll callback its window, and logs a raising callback and runs the next). The renderer's
 objects live in window 0's context: the loop makes it current at the top of each frame, around `allocate`,
 `on_window_resize` and `deallocate`, and makes a window's own context current only for its draw and swap. A window's
-size is its framebuffer's, known from `allocate` on (`RenderBase.window_size`). `default_placement` puts every window
+size is its framebuffer's, known from `allocate` on (`Render.window_size`). `default_placement` puts every window
 at its default place on its own monitor, windowed; so does the start, for a window under half on the monitors.
 
 ## Pacing

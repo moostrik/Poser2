@@ -7,7 +7,7 @@ from typing import cast
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import clear_color, BlendState
-from modules.window import RenderBase
+from modules.window import Render
 from modules.camera import RigCameraSettings, CameraHealthSettings, mono_frame_size, delivered_height
 from modules.tracker import PanoramicTrackerSettings
 from modules.pose import BaseScalarFeature, nodes
@@ -42,7 +42,7 @@ _SWITCHED_ROWS: dict[str, tuple[Layers, ...]] = {
 }
 
 
-class WhiteSpaceRender(RenderBase):
+class WhiteSpaceRender(Render):
     def __init__(self, board: RenderBoard, settings: RenderSettings, windows: WindowsSettings,
                  tracker: PanoramicTrackerSettings,
                  cameras: Sequence[RigCameraSettings], camera_health: CameraHealthSettings,

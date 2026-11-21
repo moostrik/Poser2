@@ -31,5 +31,5 @@ paths:
 ## Data flow
 
 - Wire producers to board setters via callbacks; consumers read via protocol-typed references
-- `RenderBase` owns the per-frame tick; register render-rate callbacks via `renderer.add_update_callback()`
+- `Render` owns the per-frame tick; register render-rate callbacks via `renderer.add_update_callback()`
 - Avoid bypass paths that make stage ownership ambiguous

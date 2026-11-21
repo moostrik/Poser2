@@ -7,7 +7,7 @@ commit, built on Matthias's go, checked by pyright and the window tests.
 
 The apps' render files are the Render thread's while it builds its plan; these steps touch them only once it is done.
 
-- B3. The loop gives the frame's time as Cinder's `App` does, forwarded by `RenderBase`: `frame_timestamp` (the
+- B3. The loop gives the frame's time as Cinder's `App` does, forwarded by `Render`: `frame_timestamp` (the
   frame's stamp, perf_counter, s), `frame_interval` (s since the last frame's stamp, 0 at the first) and
   `frame_count` (frames since the loop began), each set before the update. deep_flow and low_flow read
   `frame_timestamp` from it instead of `window_manager`; deep_flow, low_flow and hd_trio drop their `_measure_tick`
@@ -16,11 +16,6 @@ The apps' render files are the Render thread's while it builds its plan; these s
   interval again from the stamps (seen: the three `_measure_tick`s; `WindowManager._update` already takes it for its
   timer). Check: pyright, the window tests, a deep_flow -sim (the held interval drives the flow; low_flow and hd_trio
   run the same lines).
-- B4. `RenderBase` becomes `Render`, its file `render.py`: the class, `window`'s `__init__`, `window_manager.py`,
-  `WINDOW.md`, the five app renderers and the name in `.claude/rules/app-lifecycle.md`, renamed in the same commit, the
-  rules thread asked for feedback. Why: the glossary names an app's renderer `<App>Render`, and similar things share
-  the noun and differ by a qualifier; "Base" names its place in the hierarchy, not what it is (seen: `render_base.py`,
-  the five `<App>Render`s). Check: pyright, the guard and window tests.
 
 ## Rules this plan touches
 

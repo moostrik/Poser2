@@ -10,7 +10,7 @@ from OpenGL.GL import glBindFramebuffer, glClientWaitSync, glDeleteSync, glFence
 import glfw
 
 if TYPE_CHECKING:
-    from .render_base import RenderBase
+    from .render import Render
 from modules.gl import Shader, enable_debug_output
 from modules.utils import FPS, Broadcast, PerformanceTimer, Waker
 from .monitor import Monitor
@@ -26,7 +26,7 @@ class WindowManager:
     and its draw in each shown window."""
     _MIN_VISIBLE_SHARE = 0.5    # share of a window that must be on the monitors at start, else the default placement
 
-    def __init__(self, renderer: RenderBase, settings: WindowManagerSettings) -> None:
+    def __init__(self, renderer: Render, settings: WindowManagerSettings) -> None:
         """`settings` an app's `windows` group: the loop's fields and its declared windows."""
         self.renderer = renderer
         self.settings: WindowManagerSettings = settings

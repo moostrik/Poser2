@@ -6,7 +6,7 @@ from typing import Callable, cast
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import GpuTimer, Shader, BlendState, clear_color, Texture, shaders
-from modules.window import MouseButton, RenderBase
+from modules.window import MouseButton, Render
 from modules.video import ScreenRecorderSettings
 from modules.flow import Port, hold_tick
 from modules.inference import InferenceFrame, Poses
@@ -27,7 +27,7 @@ BORDER: Color = Color(0.4, 0.4, 0.4)    # the border around each layer in the ma
 BORDER_WIDTH: float = 2.0       # px
 
 
-class DeepFlowRender(RenderBase):
+class DeepFlowRender(Render):
     def __init__(self, board: RenderBoard, settings: RenderSettings, flow: FlowSettings, windows: WindowsSettings, recorder_settings: ScreenRecorderSettings, fov: float, screen_recordings: str,
                  num_cams: int = 1, max_players: int = 1) -> None:
         """`flow` is the flow chain's settings; `fov` is the camera image's horizontal field (degrees), for the metres

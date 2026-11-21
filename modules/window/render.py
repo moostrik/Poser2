@@ -6,7 +6,7 @@ from .window_manager import WindowManager
 from .window_settings import WindowManagerSettings
 
 
-class RenderBase(ABC):
+class Render(ABC):
     """A renderer: its update once a frame, its draw in each shown window, on the main thread's window loop."""
 
     def __init__(self, windows: WindowManagerSettings) -> None:
