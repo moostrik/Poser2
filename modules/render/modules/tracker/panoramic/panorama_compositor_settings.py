@@ -18,16 +18,16 @@ class PanoramaBlend(IntEnum):
 
 
 class Part(IntEnum):
-    """The pieces of the display, one member per renderer in this folder, named the same.
+    """The pieces of the display, one member per Draw class in this folder, named the same.
 
     `PanoramaCompositorSettings.parts` is a checklist over these, so each piece can be taken off the
     strip without disturbing the others.
     """
-    image  = 0       # StitchRenderer — the four camera frames
-    seams  = auto()  # SeamRenderer — the seam rules that live in image space
-    grid   = auto()  # GridRenderer — every reference line in the strip's own two axes
-    marks  = auto()  # MarkRenderer — each observation's line, foot tick and field
-    labels = auto()  # LabelRenderer — each mark's text
+    image  = 0       # StitchDraw — the four camera frames
+    seams  = auto()  # SeamDraw — the seam rules that live in image space
+    grid   = auto()  # GridDraw — every reference line in the strip's own two axes
+    marks  = auto()  # MarkDraw — each observation's line, foot tick and field
+    labels = auto()  # LabelDraw — each mark's text
 
 
 class PanoramaCompositorSettings(BaseSettings):
@@ -55,8 +55,8 @@ HORIZON_PX:    float = 1.0                        # the color sets it apart, not
 SEAM_COLOR:    Color = Color(1.0, 0.35, 0.0, 0.75)  # sector boundary
 AXIS_COLOR:    Color = Color(0.0, 0.7, 1.0, 0.6)    # camera optical axis
 # Yellow is permissive (a second camera sees here), red prohibitive (no new person is born here).
-# Shape and home differ too: yellow is a pair of lines in `GridRenderer`, because the overlap is a
-# statement about azimuth; red is a band in `SeamRenderer`, because the dead zone is a band of one
+# Shape and home differ too: yellow is a pair of lines in `GridDraw`, because the overlap is a
+# statement about azimuth; red is a band in `SeamDraw`, because the dead zone is a band of one
 # camera's image columns and only the picture can be read against it.
 OVERLAP_COLOR:  Color = Color(1.0, 0.85, 0.0, 0.65)  # two cameras see it
 DEAD_ZONE_COLOR: Color = Color(1.0, 0.15, 0.1, 0.10)  # no births here

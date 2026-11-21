@@ -8,9 +8,9 @@ from .panorama_compositor_settings import PanoramaCompositorSettings, DEAD_ZONE_
 from .strip import strip_spans
 
 
-class SeamRenderer(LayerBase):
+class SeamDraw(LayerBase):
     """The seam rules defined on a camera's own frame, read against the picture rather than the grid
-    (an image column has no single azimuth; `GridRenderer` holds what does).
+    (an image column has no single azimuth; `GridDraw` holds what does).
 
     Today that is the **dead zone**: `seam.dead_zone` degrees in from each camera's field edges, where
     that camera refuses to start a new person. The band goes through the same map at the same depth

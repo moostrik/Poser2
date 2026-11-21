@@ -266,7 +266,7 @@ class TestCameraLocalToAzimuth(unittest.TestCase):
             right: float = camera_local_to_azimuth(CAM_FOV, cam_id, CAM_FOV, TARGET_FOV,
                                                    CAMERA_RADIUS, FOCUS_RADIUS)
             # cam 0's left edge is below azimuth 0, so the span is a wrapped difference — the
-            # same modulo the renderer takes before handing the band to `strip_spans`.
+            # same modulo the seam Draw takes before handing the band to `strip_spans`.
             self.assertAlmostEqual((right - left) % 360.0, 110.5, delta=0.1)
             bare: float = (
                 camera_local_to_azimuth(CAM_FOV, cam_id, CAM_FOV, TARGET_FOV, 0.0,

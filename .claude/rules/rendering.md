@@ -15,12 +15,12 @@ paths:
 - A layer that is not general and that one app uses sits in `apps/<app>/render/layers/`
 - A package is named after its subject: a module (`modules/pose/`), a kind of work (`general/screen_recording/`), a shared thing
 - A package holds its layers, and the shaders of those layers in `shaders/`
-- A layer's class is named after what it draws, then its kind (`TrackletRenderer`, `PoseCompositor`)
+- A layer's class is named after what it draws, then its kind (`TrackletDraw`, `PoseCompositor`)
 
 ## Layers
 
 - `Layer`: owns its FBO or texture
-- `Renderer`: draws into a target it is given and owns no texture
+- `Draw`: draws into a target it is given and owns no texture
 - `Compositor`: owns an FBO and draws other layers into it
 - A layer hands out its Fbo or SwapFbo, not the texture inside it
 - Prefer to redraw a layer only when what it draws has changed

@@ -33,7 +33,7 @@ class FeaturePlot(Generic[T]):
         self.data_cache: DataCache[T] = DataCache[T]()
         self._labels: list[str] = []
         self.draw_labels: bool = draw_labels
-        self._text_renderer: Text = Text()
+        self._text: Text = Text()
 
     @property
     def active(self) -> bool:
@@ -43,12 +43,12 @@ class FeaturePlot(Generic[T]):
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
         self._label_fbo.allocate(width, height, internal_format)
-        self._text_renderer.allocate(font_size=self._font_size)
+        self._text.allocate(font_size=self._font_size)
 
     def deallocate(self) -> None:
         self.fbo.deallocate()
         self._label_fbo.deallocate()
-        self._text_renderer.deallocate()
+        self._text.deallocate()
 
     def clear(self) -> None:
         """Forget the data it last drew and its labels."""
@@ -92,7 +92,7 @@ class FeaturePlot(Generic[T]):
         clear_color()
         for i, string in enumerate(labels):
             x, y = place(i, len(labels), rect)
-            self._text_renderer.draw_box_text(
+            self._text.draw_box_text(
                 x, y, string, Color(*colors[i % len(colors)]), Color(0.0, 0.0, 0.0, 0.66),
                 screen_width=fbo.width, screen_height=fbo.height
             )

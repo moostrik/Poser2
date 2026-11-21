@@ -1,8 +1,8 @@
 """One observation turned into one mark on the strip. No GL, no board, no settings — arithmetic.
 
 A mark is everything drawn for one observation: its **line**, its **foot tick**, its **field** and
-its **label**. Built once by the compositor for both `MarkRenderer` (line, tick, field) and
-`LabelRenderer` (label), so the two cannot disagree about where a person is.
+its **label**. Built once by the compositor for both `MarkDraw` (line, tick, field) and
+`LabelDraw` (label), so the two cannot disagree about where a person is.
 
 **A mark is the tracker's belief, and its two axes use two different depths on purpose.**
 
@@ -259,7 +259,7 @@ def _field(annotation: PanoramicAnnotation, cam_id: int, c: MarkContext) -> tupl
 
 def _row_y(row: float, c: MarkContext, cam_distance: float, center_dist: float) -> float:
     """A normalised frame row to a normalised strip y, converted to the rig center through the given
-    distances. Not clamped — an extrapolated box may run past the frame — the renderer clips."""
+    distances. Not clamped — an extrapolated box may run past the frame — the Draw clips."""
     cam_elevation: float = elevation_from_row(row, *c.row_model)
     return strip_y(center_elevation(cam_elevation, cam_distance, center_dist), c.elevation_window)
 
@@ -268,7 +268,7 @@ def _foot_y(c: MarkContext, center_dist: float) -> float:
     """The strip y of the floor at radius `center_dist` — the foot tick.
 
     The same number as `_row_y` of the foot row through the person's own distance (the lens height
-    cancels), written as `GridRenderer._zone_band`'s own formula so the tick and the zone edges
+    cancels), written as `GridDraw._zone_band`'s own formula so the tick and the zone edges
     cannot drift apart. Below the strip for a box extrapolated far below the frame; not drawn then.
     """
     elevation: float = -math.degrees(math.atan(c.camera_height / max(1e-6, center_dist)))

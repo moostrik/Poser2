@@ -38,7 +38,7 @@ an app's own shader sits in that app.
 
 ## The camera's readings
 
-`CameraReadingsRenderer` draws each camera's frame rate, tilt and roll over that camera's own view. The pinned camera
+`CameraReadingsDraw` draws each camera's frame rate, tilt and roll over that camera's own view. The pinned camera
 health says only OK or WARNING; the readings say which camera and which value, where the operator is already looking.
 
 ## Kinds of layer
@@ -46,13 +46,13 @@ health says only OK or WARNING; the readings say which camera and which value, w
 | Kind         | Owns              | Draws                     |
 |--------------|-------------------|---------------------------|
 | `Layer`      | its FBO or texture | into its own             |
-| `Renderer`   | no texture        | into a target it is given |
+| `Draw`       | no texture        | into a target it is given |
 | `Compositor` | an FBO            | other layers into it      |
 
 A layer hands out its Fbo or SwapFbo, not the texture inside it.
 
 ## Names
 
-- A layer's class: what it draws, then its kind (`TrackletRenderer`, `PoseCompositor`).
+- A layer's class: what it draws, then its kind (`TrackletDraw`, `PoseCompositor`).
 - A shader: the operation it does, without a `Shader` ending; the `shaders` package in front says what it is
   (`shaders.PosePointLines`).

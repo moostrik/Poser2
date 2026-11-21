@@ -8,7 +8,7 @@ from ...sequence import SequenceType
 from ..settings import RenderSettings
 
 from modules.render import LayerBase
-from .caption_renderer import CaptionRenderer
+from .caption_draw import CaptionDraw
 from .passes import copy
 from .qr_code_layer import QrCodeLayer
 
@@ -68,7 +68,7 @@ class CreditLayer(LayerBase):
         self._clean: Fbo = Fbo()            # and without the title: the phone's copy
         self._targets: dict[CreditView, Fbo] = {CreditView.ROOM: self._fbo, CreditView.CELL: self._cell, CreditView.PHONE: self._clean}
         self._mix: shaders.Mix = shaders.Mix()
-        self._caption: CaptionRenderer = CaptionRenderer(FONT_SIZE, OUTLINE_PX, MARGIN_PX)
+        self._caption: CaptionDraw = CaptionDraw(FONT_SIZE, OUTLINE_PX, MARGIN_PX)
         self._qr: QrCodeLayer = QrCodeLayer()
         self._width: int = 1
         self._height: int = 1

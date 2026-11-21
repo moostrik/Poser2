@@ -11,7 +11,7 @@ _LANE_GAP_PX: float = 2.0
 _MARK_GAP_PX: float = 6.0    # between a label and the line it belongs to
 
 
-class LabelRenderer(LayerBase):
+class LabelDraw(LayerBase):
     """Each mark's label, laid out so labels never overlap and never lie about a bearing.
 
     **Height is the player slot.** A label's lane is its player slot, the same index its color

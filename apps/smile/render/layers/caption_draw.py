@@ -8,7 +8,7 @@ TEXT_COLOR: Color = Color(1.0, 1.0, 1.0)
 OUTLINE_COLOR: Color = Color(0.0, 0.0, 0.0)
 
 
-class CaptionRenderer:
+class CaptionDraw:
     """The machine's joke as a meme caption, into the target that is bound: the title SMILE(ai) centered over the
     top and the line in even lines (`wrap_balanced`), centered, white with a black edge; the line under the title
     (the main screen) or along the bottom (a clip's cell). Sizes in the target's pixels."""

@@ -8,11 +8,11 @@ from modules.tracker import PanoramicTrackerSettings, Tracklet, row_model
 
 from ....layer_base import LayerBase
 from ....color_settings import ColorSettings
-from .grid_renderer import GridRenderer
-from .label_renderer import LabelRenderer
-from .mark_renderer import MarkRenderer
-from .seam_renderer import SeamRenderer
-from .stitch_renderer import StitchRenderer
+from .grid_draw import GridDraw
+from .label_draw import LabelDraw
+from .mark_draw import MarkDraw
+from .seam_draw import SeamDraw
+from .stitch_draw import StitchDraw
 from .marks import Mark, MarkContext, build_marks
 from .panorama_compositor_settings import PanoramaCompositorSettings, Part, REJECTED_COLOR, WAITING_COLOR
 from .strip import elevation_window, strip_aspect_ratio
@@ -23,14 +23,14 @@ class PanoramaBoard(HasTracklets, HasObservations, Protocol):
 
 
 class PanoramaCompositor(LayerBase):
-    """The 360-degree calibration display: one strip, one FBO, five renderers in a fixed order, and the strip's
+    """The 360-degree calibration display: one strip, one FBO, five Draw classes in a fixed order, and the strip's
     geometry, which it hands down to them; `aspect_ratio` is read by the render's row layout.
 
     x is center azimuth, linear in degrees, 0 at the left edge; y is the tangent of center elevation
-    (`strip.strip_y`). The depth each renderer assumes: apps/white_space/docs/CALIBRATION.md, *Two axes, and the depth
+    (`strip.strip_y`). The depth each Draw assumes: apps/white_space/docs/CALIBRATION.md, *Two axes, and the depth
     that varies*.
 
-    Renderers own no FBO: each draws into this one between `begin()` and `end()`, in order, and an
+    The Draw classes own no FBO: each draws into this one between `begin()` and `end()`, in order, and an
     unticked `Part` is skipped entirely.
     """
 
@@ -51,11 +51,11 @@ class PanoramaCompositor(LayerBase):
         self._static_key: tuple | None = None
         self._frame_timestamp: float = 0.0     # the tick's time, which the marks' fades count from
 
-        self._stitch: StitchRenderer = StitchRenderer(cam_textures, tracker, settings)
-        self._seams: SeamRenderer = SeamRenderer(self.num_cams, self.target_fov, tracker, settings)
-        self._grid: GridRenderer = GridRenderer(self.num_cams, self.target_fov, tracker, settings)
-        self._marks: MarkRenderer = MarkRenderer()
-        self._labels: LabelRenderer = LabelRenderer()
+        self._stitch: StitchDraw = StitchDraw(cam_textures, tracker, settings)
+        self._seams: SeamDraw = SeamDraw(self.num_cams, self.target_fov, tracker, settings)
+        self._grid: GridDraw = GridDraw(self.num_cams, self.target_fov, tracker, settings)
+        self._marks: MarkDraw = MarkDraw()
+        self._labels: LabelDraw = LabelDraw()
 
         # Bottom to top. The image first because everything else is read against it; the seams
         # under the grid so the lattice stays legible over a band; the labels last so nothing
@@ -118,14 +118,14 @@ class PanoramaCompositor(LayerBase):
         self._fbo.allocate(width, height, internal_format)
         self._static_fbo.allocate(width, height, internal_format)
         self._static_key = None
-        for _, renderer in self._order:
-            renderer.allocate(width, height, internal_format)
+        for _, draw in self._order:
+            draw.allocate(width, height, internal_format)
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._static_fbo.deallocate()
-        for _, renderer in self._order:
-            renderer.deallocate()
+        for _, draw in self._order:
+            draw.deallocate()
 
     def set_frame_timestamp(self, timestamp: float) -> None:
         """The time of the tick it draws next (s, perf_counter)."""
@@ -151,7 +151,7 @@ class PanoramaCompositor(LayerBase):
         static_pending: bool = static_on
         self._fbo.begin()
         clear_color(0.0, 0.0, 0.0, 1.0)
-        for part, renderer in self._order:
+        for part, draw in self._order:
             if part is Part.seams or part is Part.grid:
                 continue                          # cached: blitted at their slot below
             if part not in parts:
@@ -159,8 +159,8 @@ class PanoramaCompositor(LayerBase):
             if static_pending and part is not Part.image:
                 self._blit_static()               # over the image, under the marks and labels
                 static_pending = False
-            renderer.update()
-            renderer.draw()
+            draw.update()
+            draw.draw()
         if static_pending:
             self._blit_static()
         self._fbo.end()
@@ -173,10 +173,10 @@ class PanoramaCompositor(LayerBase):
         self._static_key = key
         self._static_fbo.begin()
         clear_color(0.0, 0.0, 0.0, 0.0)
-        for part, renderer in self._order:
+        for part, draw in self._order:
             if part in parts and (part is Part.seams or part is Part.grid):
-                renderer.update()
-                renderer.draw()
+                draw.update()
+                draw.draw()
         self._static_fbo.end()
 
     def _blit_static(self) -> None:
@@ -189,7 +189,7 @@ class PanoramaCompositor(LayerBase):
         BlendState.set_blend_mode(BlendState.BlendMode.ALPHA)
 
     def _static_inputs(self, parts: list[Part], window: tuple[float, float]) -> tuple:
-        """Everything the seam and grid renderers read, so a change redraws the cache."""
+        """Everything the seam and grid Draw classes read, so a change redraws the cache."""
         t = self._tracker
         rig = t.rig
         seam = t.seam
@@ -204,7 +204,7 @@ class PanoramaCompositor(LayerBase):
                 self._static_fbo.width, self._static_fbo.height)
 
     def _set_marks(self, window: tuple[float, float]) -> None:
-        """Build the marks once, for the mark and label renderers."""
+        """Build the marks once, for the mark and label Draw classes."""
         chosen: list[Tracklet] = [t for t in self._board.get_tracklets().values() if t is not None]
         primaries: set[int] = {t.obs_id for t in chosen}
         # Every camera's own view, or only the primary. The disagreement is the whole point, so all

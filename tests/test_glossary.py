@@ -55,6 +55,7 @@ BANNED: list[tuple[str, str]] = [
     ('add/remove_<kind>_callback, not register/unregister_callback', r'^register_callback$|^unregister_callback$'),
     ('glyphs, not arrows (the monitor view)', r'arrow_spacing|ArrowSpacing|VelocityArrowField|process_arrows'),
     ('lowpass and bandpass, not the trail and change bridges', r'VelocityTrailBridge|VelocityChangeBridge'),
+    ('Draw, not Renderer (a layer that owns no texture)', r'Renderer'),
 ]
 
 # the flow's terms (modules/flow's documents, .claude/rules/flow.md): banned in the flow's code only,

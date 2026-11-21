@@ -69,7 +69,7 @@ class WhiteSpaceRender(Render):
                 settings.preview.tracker,
                 settings.colors,
             )
-            self.L[Layers.cam_readings][i] = render.CameraReadingsRenderer(cameras[i], camera_health)
+            self.L[Layers.cam_readings][i] = render.CameraReadingsDraw(cameras[i], camera_health)
 
         # Row 5 — per-player: the player's crop, pose compositor + data overlays
         # cam_image[0] texture used as fallback for non-GPU crop path (GPU crop is default)
@@ -85,7 +85,7 @@ class WhiteSpaceRender(Render):
             )
             self.L[Layers.data_W][i]    = render.FeatureWindowLayer(i, board, settings.data, settings.colors)
             self.L[Layers.data_F][i]    = render.FeatureFrameLayer( i, board, settings.data, settings.colors)
-            self.L[Layers.data_time][i] = render.MotionTimeRenderer(i, board, settings.data_time)
+            self.L[Layers.data_time][i] = render.MotionTimeDraw(i, board, settings.data_time)
             self.L[Layers.data_playhead_W][i] = render.FeatureWindowLayer(i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP)
             self.L[Layers.data_playhead_F][i] = render.FeatureFrameLayer( i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP)
 
@@ -98,7 +98,7 @@ class WhiteSpaceRender(Render):
         ), stage=int(Stage.LERP), line_width=settings.preview.pose.line_width, line_smooth=settings.preview.pose.line_smooth)
         self.L[Layers.data_W][d]    = render.FeatureWindowLayer(d, board, settings.data, settings.colors)
         self.L[Layers.data_F][d]    = render.FeatureFrameLayer( d, board, settings.data, settings.colors)
-        self.L[Layers.data_time][d] = render.MotionTimeRenderer(d, board, settings.data_time)
+        self.L[Layers.data_time][d] = render.MotionTimeDraw(d, board, settings.data_time)
         self.L[Layers.data_playhead_W][d] = render.FeatureWindowLayer(d, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP)
         self.L[Layers.data_playhead_F][d] = render.FeatureFrameLayer( d, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP)
 

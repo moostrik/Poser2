@@ -311,7 +311,7 @@ class _PoseCompositorSettings(render.PoseCompositorSettings):
     middle_stage: Field[Stage] = Field(Stage.SMOOTH, description="Pipeline stage of the middle line (white, 2x wide)")
     front_stage: Field[Stage] = Field(Stage.PREDICT, description="Pipeline stage of the front line (track color)")
 
-class _MotionTimeRendererSettings(render.MotionTimeRendererSettings):
+class _MotionTimeDrawSettings(render.MotionTimeDrawSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
 
 class _DataLayerSettings(render.DataLayerSettings):
@@ -366,7 +366,7 @@ class RenderSettings(BaseSettings):
     max_players: Field[int]  = Field(4, access=Field.INIT, visible=False, description="Players tracked at most (shared from the root): the pose row's columns")
     tilt:        Field[float] = Field(0.0, access=Field.INIT, visible=False, description="Camera up-tilt (°), shared from the root — relayed to the panorama layer")
     preview:     Group[PreviewGroup]        = Group(PreviewGroup)
-    data_time:   Group[_MotionTimeRendererSettings] = Group(_MotionTimeRendererSettings)
+    data_time:   Group[_MotionTimeDrawSettings] = Group(_MotionTimeDrawSettings)
     data:        Group[_DataLayerSettings]  = Group(_DataLayerSettings)
     playhead_data: Group[PlayheadDataLayerSettings] = Group(PlayheadDataLayerSettings)
     beam_light_sim: Group[BeamLightSimSettings] = Group(BeamLightSimSettings)

@@ -7,7 +7,7 @@ from ...color_settings import ColorSettings
 from modules.utils import Color, Rect
 
 
-class PoseBoxRenderer(LayerBase):
+class PoseBoxDraw(LayerBase):
     """The boxes of a camera's tracks, each in its track's color from `color_settings`, or in `color` without them.
     `stage`, `line_width` (pixels) and `color` are inputs its owner sets."""
 

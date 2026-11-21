@@ -9,18 +9,18 @@ from ..shaders import PosePointLines
 from ....color_settings import ColorSettings
 
 
-class PoseRendererSettings(BaseSettings):
+class PoseDrawSettings(BaseSettings):
     line_smooth:Field[float] = Field(0.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
     use_scores: Field[bool]  = Field(False, description="Use confidence scores for line opacity")
     use_bbox:   Field[bool]  = Field(True, description="Transform points to image space using bbox")
 
 
-class PoseRenderer(LayerBase):
+class PoseDraw(LayerBase):
     """The pose lines of a camera's tracks. `stage` and `line_width` (pixels) are inputs its owner sets."""
 
-    def __init__(self, cam_id: int, board: HasFrames, settings: PoseRendererSettings, color_settings: ColorSettings | None = None,
+    def __init__(self, cam_id: int, board: HasFrames, settings: PoseDrawSettings, color_settings: ColorSettings | None = None,
                  *, stage: int = 0, line_width: float = 1.0) -> None:
-        self.settings: PoseRendererSettings = settings
+        self.settings: PoseDrawSettings = settings
         self.stage: int = stage
         self.line_width: float = line_width
         self._board: HasFrames = board

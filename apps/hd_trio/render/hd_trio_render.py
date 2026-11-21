@@ -93,7 +93,7 @@ class HDTrioRender(Render):
 
             tracker_compositor = self.L[Layers.tracker][i] = render.TrackerCompositor(  i, self.board,      cam_image.texture,          settings.preview.tracker,   settings.colors)
             pose_compositor = self.L[Layers.pose][i] =      render.PoseCompositor(      i, self.board,      cam_image.texture, cam_crop, settings.preview.pose,      settings.colors)
-            self.L[Layers.cam_readings][i] =                 render.CameraReadingsRenderer( cameras[i], camera_health)
+            self.L[Layers.cam_readings][i] =                 render.CameraReadingsDraw( cameras[i], camera_health)
 
             center_geometry = self.L[Layers.center_geometry][i] = CenterGeometry(    i, self.board,     cam_image.texture,          settings.center.geometry)
             center_mask =   self.L[Layers.center_mask][i] = CenterMaskLayer(        i, center_geometry, cam_mask,               SourceSpace.CROP, settings.center.mask)
@@ -116,7 +116,7 @@ class HDTrioRender(Render):
             self.L[Layers.data_A_F][i]  = render.FeatureFrameLayer( i, self.board, settings.data.a, settings.colors)
             self.L[Layers.data_B_W][i]  = render.FeatureWindowLayer(i, self.board, settings.data.b, settings.colors)
             self.L[Layers.data_B_F][i]  = render.FeatureFrameLayer( i, self.board, settings.data.b, settings.colors)
-            self.L[Layers.data_time][i] = render.MotionTimeRenderer(i, self.board)
+            self.L[Layers.data_time][i] = render.MotionTimeDraw(i, self.board)
 
             cam_layers = {layer: cam_dict[i] for layer, cam_dict in self.L.items() if i in cam_dict}
             for stage, cls in STAGES.items():

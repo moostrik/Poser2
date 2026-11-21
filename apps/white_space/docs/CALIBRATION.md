@@ -730,7 +730,7 @@ must land on that edge of the yellow zone band, to the pixel (*Two axes, and the
 `R` on the label reads the taped distance at the same time — the same number as `rig.zone_max_radius`
 and the footer's `zone`, with nothing to convert — and the azimuth does not move through any of it.
 
-Judge the feet on the panorama, not on the camera row. `PoseBoxRenderer` there reads stage frames, whose
+Judge the feet on the panorama, not on the camera row. `PoseBoxDraw` there reads stage frames, whose
 `BBox` the crop extractor has overwritten with the crop ROI — zoomed 1.1× and aspect-filled to 3:4 —
 so its bottom sits 10–27 px below the tracker's real ROI bottom, by a distance-dependent amount. The
 crop box is the right thing to draw for a crop, and the pose skeleton draws the ankles where pixel

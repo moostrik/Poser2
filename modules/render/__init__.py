@@ -5,16 +5,16 @@ from .data_cache import     DataCache
 
 # modules: the layers that draw a module's data
 from .modules.pose import       DataLayerSettings, ScalarFeatureSelect, LayerMode, AngleOffset, FEATURE_MAP, TRACK_COLOR_FEATURES, \
-                                FeatureFrameLayer, FeatureWindowLayer, MotionTimeRenderer, MotionTimeRendererSettings, \
-                                PoseLineLayer, PoseLineLayerSettings, PoseBoxRenderer, \
-                                PoseRenderer, PoseRendererSettings, PoseCompositor, PoseCompositorSettings, \
+                                FeatureFrameLayer, FeatureWindowLayer, MotionTimeDraw, MotionTimeDrawSettings, \
+                                PoseLineLayer, PoseLineLayerSettings, PoseBoxDraw, \
+                                PoseDraw, PoseDrawSettings, PoseCompositor, PoseCompositorSettings, \
                                 ViewPoseLayer, ViewPoseLayerSettings, PosePlacement, landmark_midpoint, \
                                 SimilaritySilhouetteLayer, SimilaritySilhouetteLayerSettings, PosePointLines
-from .modules.camera import     camera_image_layer, CameraReadingsRenderer
-from .modules.tracker import    TrackerCompositor, TrackerCompositorSettings, TrackletRenderer, \
+from .modules.camera import     camera_image_layer, CameraReadingsDraw
+from .modules.tracker import    TrackerCompositor, TrackerCompositorSettings, TrackletDraw, \
                                 PanoramaCompositor, PanoramaCompositorSettings, PanoramaBlend, Part, \
-                                GridRenderer, LabelRenderer, MarkRenderer, SeamRenderer, \
-                                StitchRenderer, Mark, MarkContext, build_marks, strip_spans
+                                GridDraw, LabelDraw, MarkDraw, SeamDraw, \
+                                StitchDraw, Mark, MarkContext, build_marks, strip_spans
 from .modules.inference import  CropLayer, crop_image_layer, segmentation_mask_layer, segmentation_foreground_layer, \
                                 InferenceFrameImageLayer, InferenceFrameDepthLayer
 from .modules.flow import       StageLayer, StageLayerSettings, StageOutput, \

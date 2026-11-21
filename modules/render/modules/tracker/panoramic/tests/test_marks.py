@@ -1,6 +1,6 @@
 """The panorama's marks: where an observation lands on the strip, and how wide its rule is.
 
-`marks.py` is arithmetic with no GL in it, which is why it can be tested at all — the renderers
+`marks.py` is arithmetic with no GL in it, which is why it can be tested at all — the Draw classes
 around it cannot be, without a context. What is worth pinning here is the part a reader of the
 display has to be able to trust: **two fields of one color that overlap are two observations the
 tracker will join.** That is a claim about two separate pieces of code agreeing, so it is asserted
@@ -85,7 +85,7 @@ class TestPlacement(unittest.TestCase):
 
     def test_the_head_row_is_not_clamped_to_the_strip(self) -> None:
         # The device extrapolates a partly visible person, and that is real information about how
-        # close they are. The renderer clips when it draws; a mark must not throw it away first.
+        # close they are. The Draw clips when it draws; a mark must not throw it away first.
         m: Mark = mark(observation(0, 63.5, 45.0, overlap=False, top=-0.4, height=1.8))
         self.assertLess(m.top_y, 0.0)
 
@@ -359,7 +359,7 @@ class TestTheWrap(unittest.TestCase):
 
 
 class TestZoneLines(unittest.TestCase):
-    """The tracked zone as two rows on the strip — the arithmetic `GridRenderer._zone_lines` does.
+    """The tracked zone as two rows on the strip — the arithmetic `GridDraw._zone_lines` does.
 
     A floor circle of constant radius subtends a constant depression at the rig center, so each
     edge of the zone is one straight row at every azimuth. They are the only lines on the strip
@@ -431,7 +431,7 @@ class TestZoneLines(unittest.TestCase):
 
             atan(tan(-atan(h/d)) * d / R) = atan(-h/R)
 
-        the right-hand side being exactly what `GridRenderer._zone_band` draws. Put the rows on the
+        the right-hand side being exactly what `GridDraw._zone_band` draws. Put the rows on the
         parallax cylinder instead — tidier, since the x uses it — and this breaks by 20 px at R 1.5.
         That is what this test exists to catch.
         """

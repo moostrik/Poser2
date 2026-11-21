@@ -19,10 +19,10 @@ _FIELD_ALPHA: float = 0.2
 _OUTLINE_ALPHA: float = 0.6
 
 
-class MarkRenderer(LayerBase):
+class MarkDraw(LayerBase):
     """Every observation's mark, not one per person: each camera's own view of a seam person stands
     beside the other's in the same world color, which the fused `world_angle` hides everywhere else.
-    What a mark's position means is in `marks`; its label is `LabelRenderer`'s.
+    What a mark's position means is in `marks`; its label is `LabelDraw`'s.
 
     Per mark:
 

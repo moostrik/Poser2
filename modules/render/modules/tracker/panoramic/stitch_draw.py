@@ -7,7 +7,7 @@ from .shaders import PanoramicStitch
 from .panorama_compositor_settings import PanoramaCompositorSettings
 
 
-class StitchRenderer(LayerBase):
+class StitchDraw(LayerBase):
     """The cameras' images unwrapped into one 360-degree strip: x is azimuth, 0 at the left edge.
 
     **What it is for.** `fov` and `tilt` define the azimuth frame every other number in the

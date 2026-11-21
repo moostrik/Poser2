@@ -8,19 +8,19 @@ from modules.gl import Text
 from modules.utils import Color
 
 
-class MotionTimeRendererSettings(BaseSettings):
+class MotionTimeDrawSettings(BaseSettings):
     stage: Field[int] = Field(0, description="Pipeline stage for pose data")
 
 
-class MotionTimeRenderer(LayerBase):
-    def __init__(self, track_id: int, board: HasFrames, settings: MotionTimeRendererSettings | None = None) -> None:
-        self.settings: MotionTimeRendererSettings = settings or MotionTimeRendererSettings()
+class MotionTimeDraw(LayerBase):
+    def __init__(self, track_id: int, board: HasFrames, settings: MotionTimeDrawSettings | None = None) -> None:
+        self.settings: MotionTimeDrawSettings = settings or MotionTimeDrawSettings()
         self._board: HasFrames = board
         self._track_id: int = track_id
         self._motion_time: str | None = None
 
-        # Text renderer for GPU-based text drawing (allocate later)
-        self._text_renderer: Text = Text()
+        # Text for GPU-based text drawing (allocate later)
+        self._text: Text = Text()
         self._width: int = 0
         self._height: int = 0
 
@@ -28,10 +28,10 @@ class MotionTimeRenderer(LayerBase):
         if width and height:
             self._width = width
             self._height = height
-        self._text_renderer.allocate(font_size=40)
+        self._text.allocate(font_size=40)
 
     def deallocate(self) -> None:
-        self._text_renderer.deallocate()
+        self._text.deallocate()
 
     def draw(self) -> None:
         if self._motion_time is None or self._width == 0:
@@ -42,7 +42,7 @@ class MotionTimeRenderer(LayerBase):
         x = 20
         y = 20  # 20 pixels from top
 
-        self._text_renderer.draw_box_text(
+        self._text.draw_box_text(
             x, y, self._motion_time,
             color=Color(1.0, 1.0, 1.0),
             bg_color=Color(0.0, 0.0, 0.0, 0.8),

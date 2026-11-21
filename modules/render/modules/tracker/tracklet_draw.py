@@ -9,27 +9,27 @@ from ...layer_base import LayerBase
 
 
 
-class TrackletRenderer(LayerBase):
+class TrackletDraw(LayerBase):
     def __init__(self, cam_id: int, board: HasCameraTracklets) -> None:
         self._board: HasCameraTracklets = board
         self._cam_id: int = cam_id
         self._tracklets: list[CameraTracklet] = []
         self._shader: shaders.FillRect = shaders.FillRect()
-        self._text_renderer: Text = Text()
+        self._text: Text = Text()
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._shader.allocate()
-        self._text_renderer.allocate(font_size=14)
+        self._text.allocate(font_size=14)
         self._width = width
         self._height = height
 
     def deallocate(self) -> None:
         self._shader.deallocate()
-        self._text_renderer.deallocate()
+        self._text.deallocate()
 
     def draw(self) -> None:
         for tracklet in self._tracklets:
-            self.draw_tracklet(tracklet, self._shader, self._text_renderer, self._width, self._height)
+            self.draw_tracklet(tracklet, self._shader, self._text, self._width, self._height)
 
     def update(self) -> None:
         tracklets: list[CameraTracklet] | None = self._board.get_camera_tracklets(self._cam_id)
@@ -39,7 +39,7 @@ class TrackletRenderer(LayerBase):
             self._tracklets = tracklets
 
     def draw_tracklet(self, tracklet: CameraTracklet, shader: shaders.FillRect,
-                      text_renderer: Text, width: int, height: int) -> None:
+                      text: Text, width: int, height: int) -> None:
         if tracklet.status == TrackingStatus.REMOVED:
             return
 
@@ -71,13 +71,13 @@ class TrackletRenderer(LayerBase):
 
         # Combine ID and Age on one line with labels
         text_string: str = f'ID: {tracklet.id} Age: {tracklet.age}'
-        text_width, text_height = text_renderer.measure_text(text_string)
+        text_width, text_height = text.measure_text(text_string)
 
         # Clamp to viewport bounds if text would go outside
         final_x: float = max(0, min(text_x, width - text_width - padding))
         final_y: float = max(0, min(text_y, height - text_height - padding))
 
-        text_renderer.draw_box_text(final_x, final_y, text_string, Color(1.0, 1.0, 1.0),
+        text.draw_box_text(final_x, final_y, text_string, Color(1.0, 1.0, 1.0),
                                    Color(0.0, 0.0, 0.0, 0.6), width, height)
 
 

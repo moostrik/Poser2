@@ -13,10 +13,10 @@ from .panorama_compositor_settings import PanoramaCompositorSettings, \
 from .strip import strip_y
 
 
-class GridRenderer(LayerBase):
+class GridDraw(LayerBase):
     """Every reference line measured in the strip's own two axes — center azimuth and center
     elevation — against its degree labels. Anything defined on a camera's own frame has no single
-    azimuth and lives in `SeamRenderer`, against the picture.
+    azimuth and lives in `SeamDraw`, against the picture.
 
     **In azimuth**, exact and depth-free:
 

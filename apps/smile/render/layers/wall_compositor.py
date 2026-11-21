@@ -15,7 +15,7 @@ from ...player import OnlineCellMode, WallsSettings
 from modules.gl import ChannelOrder, Fbo, Image, Shader, BlendState, SwapFbo, Text, Texture, shaders
 from modules.utils import Color, Point2f, Quad
 from ..settings import RenderSettings
-from .caption_renderer import CaptionRenderer
+from .caption_draw import CaptionDraw
 from .qr_code_layer import QrCodeLayer
 
 # A texture turned a quarter counterclockwise, its top along the cell's left edge: the cell's corners in the texture
@@ -159,7 +159,7 @@ class WallCompositor:
         self._captions: dict[int, str] = {id: '' for id in ids}
         self._caption_drawn: dict[int, str | None] = {id: None for id in ids}
         self._caption_fbos: dict[int, Fbo] = {id: Fbo() for id in ids}
-        self._caption: CaptionRenderer = CaptionRenderer(CAPTION_PX, CAPTION_OUTLINE_PX, CAPTION_MARGIN_PX)
+        self._caption: CaptionDraw = CaptionDraw(CAPTION_PX, CAPTION_OUTLINE_PX, CAPTION_MARGIN_PX)
         # the scrolling name: the words going round, a strip texture per word and size in use, and per cell a
         # transparent portrait texture with the parts of the strips on that screen
         self._scrolls: list[Scroll] = []
