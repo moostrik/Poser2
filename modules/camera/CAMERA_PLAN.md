@@ -30,9 +30,18 @@ The steps below are proposals from the scan of 2026-11-21; nothing is built. **(
   `replay.Camera`. Why: "Pass collaborators and fixed structure (counts known at startup) through constructors";
   the OAK backends count `Camera._next_cam_id` in creation order, a class-wide count that only holds while one app
   makes its cameras in index order **(seen)**. Call sites: the mains of white_space, hd_trio, deep_flow, low_flow
-  and smile, `scripts/oak4_probe.py`.
+  and smile, `scripts/oak4_probe.py`. Tests: white_space's and hd_trio's in `.venv`, deep_flow's and low_flow's,
+  oak4's in `.venv-oak4`.
 - B3. `oak.pipeline.WarpConfig` is named `MountConfig`, as `oak4.pipeline.MountConfig`. Why: "Similar things share
   the noun": both are "how a camera is mounted and what its lens is" **(seen)**; the OAK-D's adds tilt and keystone.
+- B4. `rotate90` is a `Field.INIT` field of `CameraSettings` beside the flips, off by default; `oak4`, `vimba` and
+  `webcam` read it there and lose their `rotate90` parameter, and smile's portrait mode decides only the screen.
+  smile's webcam gets its own `CameraSettings` group. The OAK-D applies no turn (its flips are baked into its warp,
+  whose columns are the panoramic tracker's bearings): it logs once that `rotate90` is not applied (his word,
+  2026-11-21). Why: "Components take their settings object ... in the constructor"; today Vimba and the webcam take
+  portrait mode **(seen: `apps/smile/main.py`)**. Settings files: smile's four turn on only `camera.rotate90`; every
+  other app's gain it, off. Call sites: smile's main, oak4's, vimba's and webcam's tests. Tests: those, smile's; smile
+  -sim on 20261121-110540 portrait and `-lm`, on his go.
 
 ## C. Small fixes to the rules
 
@@ -46,14 +55,17 @@ The steps below are proposals from the scan of 2026-11-21; nothing is built. **(
 - C4. The Vimba white balance fields take the backends' word, `balance`, in snake case: `WB_red` / `WB_blue` →
   `balance_red` / `balance_blue`, `manual_WB_red` / `manual_WB_blue` → `manual_balance_red` / `manual_balance_blue`,
   `auto_WB` → `auto_balance`, `set_WB` → `measure_balance` **(seen: `vimba/settings.py`)**. Why: PEP 8, and "use
-  that one term everywhere": `oak` and `oak4` say `balance`, `auto_balance`. smile's settings files are migrated.
+  that one term everywhere": `oak` and `oak4` say `balance`, `auto_balance`. smile's `Smile.json`, `Studio.json` and
+  `GenerationTest.json` hold the keys and are migrated; `Grintest.json` has none **(seen)**.
 - C5. The fields without a description get one: `OakCameraSettings.square`, `yolo`, `model_path`,
   `Oak4CameraSettings.model_path` **(seen)**. Why: "Keep `Field` descriptions to one short line of panel text".
 - C6. `CameraHealth` keeps its settings as `self.settings`, not `self._settings` **(seen)**. Why: the glossary, "A
   component's settings object: `settings` / `self.settings`".
 - C7. `KeypointJoin` takes a lock round its frames, and holds a frame's two halves in a small dataclass instead of a
-  dict with string keys **(seen)**. Why: its two inputs come from two depthai queues, whose callbacks can run on
-  two threads **(deduction)**; "Use `Lock` and `Event` for shared mutable state", "Prefer `IntEnum` over string
+  dict with string keys **(seen)**. Why: its two inputs come from the tracklets' and the poses' queues
+  **(seen: `oak4/camera.py` `_tracker_callback`, `_poses_callback`)**, whose callbacks can run on two threads
+  **(deduction: depthai's docs bring each device output to the host through its own `XLinkInHost`, a threaded host
+  node; neither the docs nor `.venv-oak4`'s stubs say which thread runs a callback)**; "Use `Lock` and `Event` for shared mutable state", "Prefer `IntEnum` over string
   keys". No settings file runs the two-model chain today (CAMERA.md, what no settings file runs).
 - C8. "normalised" is spelled "normalized" in `tracklet.py`, `geometry/mirror.py`, `geometry/tilt_correction.py`,
   `oak4/models.py`, `oak4/pipeline.py`, `oak4/keypoint_join.py` **(seen)**. Why: the glossary's American spelling.
@@ -64,15 +76,38 @@ The steps below are proposals from the scan of 2026-11-21; nothing is built. **(
   OAK4.md names `ViewDepth`, not `ViewDepthLayer` **(seen: deep_flow `view_depth.py`)**. Why: the document matches
   the code.
 
-## F. One host-side flip
+## E. One host-side flip
 
-- F1. `oriented_image` applies `rotate90` and both flips in the frame's own layout, NV12 included (Y as a plain array, UV as (H/2, W/2, 2)); `mirrored_image` goes; `bgr_frame` stays. Why: "Inside a package, code that does the same is written once": `mirrored_image` and `oriented_image` both flip on the host, and only `mirrored_image` takes NV12 **(seen: `frame.py`)**. Tests: `oriented_image` on NV12 against `bgr_frame` then `oriented_image`, for all 8 flag sets.
-- F2. The recorder's `mirrored` option, which bakes in `flip_h` alone and skips a frame with `rotate90` **(seen: `recorder.py` `mirrored_capture`)**: becomes `oriented` and applies every flag to the image, the lens (`rotate90` swaps fx/fy and cx/cy), the depth alignment and the tracklets, the info line reading all flags off; tested by a recorder round trip with `oriented` on. A recording by default keeps the frame as delivered with its flags, and replay applies them (smile's -sim of 20261121-110540 came out upright). The recorder is recording's; Smile and Module Refactor agreed this step (2026-11-21). hd_trio's `studio.json` and `umu.json` (`mirrored: true`) get the key renamed.
-- F3. The host-side helpers are named after the flag they apply: `upright_image` → `oriented_image`, `upright_corners` → `oriented_corners`; `mirrored_roi` / `mirrored_keypoints` → `flip_h_roi` / `flip_h_keypoints`; `flipped_roi` / `flipped_keypoints` → `flip_v_roi` / `flip_v_keypoints`; `turned_roi` / `turned_keypoints` → `rotate90_roi` / `rotate90_keypoints`; `mirrored_intrinsics`, `mirrored_alignment`, `mirrored_tracklets` → `flip_h_intrinsics`, `flip_h_alignment`, `flip_h_tracklets`; `geometry/mirror.py` → `geometry/flips.py`; the documents say `rotate90`, not "the turn". Why: "use that one term everywhere": the frame's flags are `flip_h`, `flip_v`, `rotate90` **(seen: `frame.py`)**, and the three together are its orientation. Call sites: the recorder, inference's uploader, oak4's `sensor_region`, smile's face finder, render and main. Smile owns `rotate90` and the flips and checks it once built.
+- E1. The host-side helpers are named after the flag they apply: `upright_image` → `oriented_image`, `upright_corners`
+  → `oriented_corners`; `mirrored_roi` / `mirrored_keypoints` → `flip_h_roi` / `flip_h_keypoints`; `flipped_roi` /
+  `flipped_keypoints` → `flip_v_roi` / `flip_v_keypoints`; `turned_roi` / `turned_keypoints` → `rotate90_roi` /
+  `rotate90_keypoints`; `geometry/mirror.py` → `geometry/flips.py`; the documents say `rotate90`, not "the turn". Why:
+  "use that one term everywhere": the frame's flags are `flip_h`, `flip_v`, `rotate90` **(seen: `frame.py`)**, and the
+  three together are its orientation. `mirrored_image`, `mirrored_intrinsics`, `mirrored_alignment` and
+  `mirrored_tracklets` are not renamed: the recorder is their only caller outside `modules/camera`, and E3 takes them
+  away **(seen)**. Call sites: `tracklet.py`, oak4's `sensor_region`, smile's face finder and main, CAMERA.md, and the
+  tests of the camera, oak4, geometry and inference's uploader **(seen)**. Smile owns `rotate90` and the flips and
+  checks it once built.
+- E2. `oriented_image` applies `rotate90` and both flips in the frame's own layout, NV12 included (Y as a plain array,
+  UV as (H/2, W/2, 2)); `bgr_frame` stays. Why: "Inside a package, code that does the same is written once":
+  `mirrored_image` and `oriented_image` both flip on the host, and only `mirrored_image` takes NV12 **(seen:
+  `frame.py`)**. Every caller of `upright_image` converts with `bgr_frame` first **(seen: smile's face finder and
+  main)**, and `mirrored_image` goes in E3. Tests: `oriented_image` on NV12 against `bgr_frame` then `oriented_image`,
+  for all 8 flag sets.
+- E3. The recorder's `mirrored` option and `mirrored_capture` go: the option acts only on a frame with `flip_h`, and
+  the OAK-D, hd_trio's camera, bakes its flips into its warp and sets no flags **(seen: `oak/camera.py`
+  `_emit_frame`, `oak/clip_camera.py`, `oak/pipeline.py` `build_warp_mesh`; hd_trio's recordings hold `flip_h: false`,
+  so its replay sets none)**. A recording keeps the frame as delivered with its flags, and replay applies them.
+  `mirrored_image`, `mirrored_intrinsics`, `mirrored_alignment` and `mirrored_tracklets` go with it, with their tests
+  (`test_frame.py`, `geometry/tests/test_depth_projection.py`'s mirrored case) **(seen: no other caller)**.
+  RECORDING.md's section on it goes; hd_trio's `studio.json` and `umu.json` and deep_flow's and low_flow's
+  `studio.json` drop the key in the same commit. Why: "Remove obsolete pathways instead of leaving parallel legacy
+  ones". Tests: the recorder's tests and pyright, and each of the four settings files loads without an unknown-key
+  warning; no hd_trio run, as the path never ran there. Module Refactor agreed (2026-11-21).
 
-## E. With an OAK-D at the PC
+## F. With an OAK-D at the PC
 
-- E1. The `oak` backend stamps a frame and its tracklets with their capture, off the message's device timestamp as
+- F1. The `oak` backend stamps a frame and its tracklets with their capture, off the message's device timestamp as
   `oak4.messages.capture_time` does, instead of their arrival **(seen: `oak.Camera._emit_frame`,
   `_tracker_callback`)**; depthai 2 messages carry one **(deduction)**. Why: camera.md, "Stamp a frame once ... with
   its moment of capture where the device reports one". RECORDING_PLAN.md 2's OAK-D capture time is this step; it comes after the camera plan, in his order video, camera, recording. Test: an OAK-D, white_space
@@ -95,9 +130,10 @@ The steps below are proposals from the scan of 2026-11-21; nothing is built. **(
 ## Rules it touches
 
 - A callback list is a `utils.Broadcast`; a failing callback does not stop the others: A1
-- Inside a package, code that does the same is written once: B1, F1
+- Inside a package, code that does the same is written once: B1, E2
 - Pass collaborators and fixed structure through constructors: B2
 - Similar things share the noun: B3
+- Components take their settings object in the constructor: B4
 - A thread that waits for a moment waits on a `utils.Waker`: C1
 - Read `time.perf_counter()` for every stamp and duration: C2
 - Log exceptions with context; never fail silently: C3
@@ -106,6 +142,6 @@ The steps below are proposals from the scan of 2026-11-21; nothing is built. **(
 - The glossary: C6, C8
 - Use `Lock` and `Event` for shared mutable state; prefer `IntEnum` over string keys: C7
 - A document describes what is built: D1
-- Stamp a frame once, with its moment of capture where the device reports one: E1
-- Remove obsolete pathways instead of leaving parallel legacy ones: F2
-- Use that one term everywhere it appears: F3
+- Use that one term everywhere it appears: E1
+- Remove obsolete pathways instead of leaving parallel legacy ones: E3
+- Stamp a frame once, with its moment of capture where the device reports one: F1

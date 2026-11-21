@@ -292,13 +292,15 @@ class Shader():
 
     @classmethod
     def enable_hot_reload(cls) -> None:
-        """Watch the folders of every shader, so a changed file marks its programs for the next reload point."""
+        """Watch the folders of every shader, so a changed file marks its programs for the next reload point; a
+        program made later is watched when it is made. Calling it again changes nothing."""
         with Shader._lock:
+            if Shader._hot_reload_enabled:
+                return
             Shader._hot_reload_enabled = True
             for entry in Shader._programs.values():
                 Shader._watch_files(entry.files)
-            if Shader._directory_observers:
-                logger.info("Hot reload enabled for %s directories", len(Shader._directory_observers))
+            logger.info("Hot reload enabled for %s directories", len(Shader._directory_observers))
 
     @classmethod
     def disable_hot_reload(cls) -> None:

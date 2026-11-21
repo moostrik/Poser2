@@ -12,7 +12,7 @@ from ... import sphere
 from ...credit import FONT
 from ...credit_scroll import TIMEOUT as SCROLL_TIMEOUT, name_strip, scroll_copies, scroll_gone
 from ...player import OnlineCellMode, WallsSettings
-from modules.gl import ChannelOrder, Fbo, Image, Shader, BlendState, SwapFbo, Text, Texture, shaders
+from modules.gl import ChannelOrder, Fbo, Image, BlendState, SwapFbo, Text, Texture, shaders
 from modules.utils import Color, Point2f, Quad
 from ..settings import RenderSettings
 from .caption_draw import CaptionDraw
@@ -189,7 +189,6 @@ class WallCompositor:
             logger.warning('No font for the captions: the clips play without')
         for fbo in self._scroll_fbos.values():
             fbo.allocate(self.CELL_HEIGHT, self.CELL_WIDTH, GL_RGBA8)
-        Shader.enable_hot_reload()
 
     def deallocate(self) -> None:
         self._image_fbo.deallocate()
