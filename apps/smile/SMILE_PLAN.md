@@ -11,13 +11,8 @@ in the log. A rename or a text change needs no start. The whole of smile's tests
 
 ## B. How the packages split the work
 
-- B1 `WallRender` becomes `WallCompositor` and moves from `player/wall_render.py` to
-  `render/layers/wall_compositor.py`; `player/` keeps the clip player (`Player`, `ClipPool`, `ClipLoader`,
-  `FolderScanner`). `player` says what it drives in a `Wall` protocol (`set_image`, `light`, `scroll_loop`,
-  `set_caption`), which the compositor meets and `Main` hands in; the cell size (512×640) moves to `sphere.py`, and
-  `Main` hands `Player` the caption lines in place of `RenderSettings`. `player` then imports nothing from `render`,
-  the render–player cycle ends, and `render/__init__.py` exports `SmileRender`. smile.md, the glossary's smile line,
-  SMILE.md and the tests take the new name in this commit. Tests: `player/tests`, `render/tests`.
+- B1 `.claude/rules/smile.md`'s line on the walls names `WallCompositor` in place of `WallRender` (the class was
+  renamed in 589461b0; the rule file is the rules thread's). Tests: none (text only).
 - B2 A `sequence/` package: `sequencer.py`, `grin_player.py` and `SequencerSettings` out of `render/`, which keeps
   only the drawing. `main`, `lights`, `online`, `comfy` and `save` import `sequence`; comfy no longer imports
   render, which ends the render–comfy cycle. `SequencerSettings` splits by the class it configures:
