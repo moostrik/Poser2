@@ -11,16 +11,6 @@ in the log. A rename or a text change needs no start. The whole of smile's tests
 
 ## B. How the packages split the work
 
-- B1 `.claude/rules/smile.md`'s line on the walls names `WallCompositor` in place of `WallRender` (the class was
-  renamed in 589461b0; the rule file is the rules thread's). Tests: none (text only).
-- B2 A `sequence/` package: `sequencer.py`, `grin_player.py` and `SequencerSettings` out of `render/`, which keeps
-  only the drawing. `main`, `lights`, `online`, `comfy` and `save` import `sequence`; comfy no longer imports
-  render, which ends the render–comfy cycle. `SequencerSettings` splits by the class it configures:
-  `GrinPlayerSettings` (`delay`, `fps`, the readouts `made_fps`, `buffer_wait`, `start_wait`) and `ClipSaverSettings`
-  (`enabled`, `encoder`), each beside its class, become its groups `grin` and `saver`; the saver reads the clip's fps
-  from `GrinPlayerSettings.fps`. The Sequence tab stays one tab, with the two as cards; `Smile.json` migrated
-  (`sequence.grin_fps` to `sequence.grin.fps`, `sequence.save` to `sequence.saver.enabled`, …).
-  Tests: the sequencer's and grin player's tests move to `sequence/tests`; `render/tests`, `comfy/tests`, `save/tests`, `tests`.
 - B3 Every package's `__init__.py` exports what the others use (`comfy`, `online` export nothing now), and every
   import goes through it: no more `.comfy.generator`, `.online.online`, `.render.smile_render` and the like.
   Tests: all smile tests (every package's imports change).
