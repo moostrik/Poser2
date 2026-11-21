@@ -8,9 +8,11 @@ from typing import Callable
 
 import numpy as np
 
-from modules.video import (BitDepth, Chroma, ScreenFormat, ScreenFrame, ScreenRecorder, ScreenRecorderFrameSettings,
-                           ScreenRecorderRecordSettings, ScreenRecorderSettings, ScreenRecorderTakeSettings,
-                           ScreenRecorderState, ScreenSize, even, frames_for, matching_preset, preset_size)
+from modules.video import BitDepth, Chroma, ScreenFormat, ScreenFrame, ScreenRecorder, ScreenRecorderFrameSettings, \
+    ScreenRecorderSettings, ScreenSize
+from modules.video.screen.screen_recorder import ScreenRecorderRecordSettings, ScreenRecorderTakeSettings, \
+    ScreenRecorderState, frames_for
+from modules.video.screen.screen_size import even, matching_preset, preset_size
 
 FPS = 64.0      # ticks/s; 1/64 s and its multiples are exact in binary, so spans compare exactly
 TIMEOUT = 5.0   # s a test waits for the recorder's thread

@@ -10,8 +10,10 @@ import unittest
 import numpy as np
 
 from modules import video
+from modules.video.clip_writer import ClipInput, master_encode, stream_encode
 
 SIZE, FRAMES, FPS = 256, 10, 30.0     # NVENC refuses frames of 128 wide and less
+QUALITY = 18                          # the take's quality setting's default
 
 
 def yuv_gray(luma: int, rows: float, dtype: type[np.unsignedinteger] = np.uint8) -> np.ndarray:
@@ -37,10 +39,10 @@ GRADIENT_WIDTH = 1024
 RAMP = np.round(64 + np.arange(GRADIENT_WIDTH) * 876 / (GRADIENT_WIDTH - 1)).astype(np.uint32)
 
 
-def yuv_gradient(clip_input: video.ClipInput) -> np.ndarray:
+def yuv_gradient(clip_input: ClipInput) -> np.ndarray:
     """A 10-bit frame, GRADIENT_WIDTH × SIZE: Y from code 64 to 940 left to right, one 10-bit step a column or less,
     chroma neutral; P010 in uint16, or xv30le in uint32."""
-    if clip_input is video.ClipInput.XV30:
+    if clip_input is ClipInput.XV30:
         return np.repeat(np.asarray(xv30(RAMP), np.uint32)[None, :], SIZE, axis=0)
     frame = np.full((round(SIZE * 1.5), GRADIENT_WIDTH), 512 << 6, np.uint16)
     frame[:SIZE] = (RAMP << 6).astype(np.uint16)
@@ -87,22 +89,22 @@ def hevc_nvenc_works() -> bool:
 class TestClipHevc(unittest.TestCase):
 
     def test_nv12_frames_come_back_as_hevc(self) -> None:
-        self._round_trip(video.ClipInput.NV12, 1.5, 'yuv420p')
+        self._round_trip(ClipInput.NV12, 1.5, 'yuv420p')
 
     def test_yuv444p_frames_come_back_as_hevc_444(self) -> None:
-        self._round_trip(video.ClipInput.YUV444P, 3.0, 'yuv444p')
+        self._round_trip(ClipInput.YUV444P, 3.0, 'yuv444p')
 
     def test_p010_frames_come_back_as_hevc_main_10(self) -> None:
-        self._round_trip(video.ClipInput.P010, 1.5, 'yuv420p10le', np.uint16)
+        self._round_trip(ClipInput.P010, 1.5, 'yuv420p10le', np.uint16)
 
     def test_xv30_frames_come_back_as_hevc_444_10_bit(self) -> None:
-        self._round_trip(video.ClipInput.XV30, 1.0, 'yuv444p10le', np.uint32)
+        self._round_trip(ClipInput.XV30, 1.0, 'yuv444p10le', np.uint32)
 
     def test_a_10_bit_gradient_comes_back_finer_than_8_bit_steps(self) -> None:
-        for clip_input in (video.ClipInput.P010, video.ClipInput.XV30):
+        for clip_input in (ClipInput.P010, ClipInput.XV30):
             with self.subTest(clip_input=clip_input.name), tempfile.TemporaryDirectory() as folder:
                 path = os.path.join(folder, 'gradient.mp4')
-                writer = video.ClipWriter(path, FPS, video.master_encode(clip_input), clip_input)
+                writer = video.ClipWriter(path, FPS, master_encode(clip_input, QUALITY), clip_input)
                 for _ in range(FRAMES):
                     writer.add(yuv_gradient(clip_input))
                 self.assertTrue(writer.close())
@@ -111,13 +113,13 @@ class TestClipHevc(unittest.TestCase):
                 self.assertGreater(float(np.mean(row % 4 != 0)), 0.5)   # 8-bit codes come back as multiples of 4
                 self.assertLess(float(np.abs(row - RAMP.astype(np.int32)).max()), 4.0)
 
-    def _round_trip(self, clip_input: video.ClipInput, rows: float, pix_fmt: str,
+    def _round_trip(self, clip_input: ClipInput, rows: float, pix_fmt: str,
                     dtype: type[np.unsignedinteger] = np.uint8) -> None:
         with tempfile.TemporaryDirectory() as folder:
             path = os.path.join(folder, 'clip.mp4')
-            writer = video.ClipWriter(path, FPS, video.master_encode(clip_input), clip_input)
+            writer = video.ClipWriter(path, FPS, master_encode(clip_input, QUALITY), clip_input)
             for i in range(FRAMES):
-                writer.add(xv30_gray(luma_of(i)) if clip_input is video.ClipInput.XV30
+                writer.add(xv30_gray(luma_of(i)) if clip_input is ClipInput.XV30
                            else yuv_gray(luma_of(i), rows, dtype))
             self.assertTrue(writer.close())
 
@@ -139,7 +141,7 @@ class TestClipHevc(unittest.TestCase):
         self.assertTrue(video.encoder_works(video.Hardware.GPU))
 
     def test_nv12_shape_must_be_even_and_three_halves(self) -> None:
-        writer = video.ClipWriter('unused.mp4', FPS, video.master_encode(video.ClipInput.NV12), video.ClipInput.NV12)
+        writer = video.ClipWriter('unused.mp4', FPS, master_encode(ClipInput.NV12, QUALITY), ClipInput.NV12)
         with self.assertRaises(ValueError):
             writer.add(np.zeros((SIZE, SIZE), np.uint8))
 
@@ -147,10 +149,10 @@ class TestClipHevc(unittest.TestCase):
 class TestStreamEncode(unittest.TestCase):
 
     def test_a_camera_stream_takes_its_quality_keyframes_and_b_frames(self) -> None:
-        depth = video.stream_encode(video.ClipCodec.HEVC, video.Hardware.iGPU, 'p012le', 10, 30, b_frames=False)
+        depth = stream_encode(video.ClipCodec.HEVC, video.Hardware.iGPU, 'p012le', 10, 30, b_frames=False)
         self.assertEqual(depth, ['-c:v', 'hevc_qsv', '-pix_fmt', 'p012le', '-q:v', '10', '-bf', '0',
                                  '-g', '30', '-keyint_min', '30'])
-        color = video.stream_encode(video.ClipCodec.H264, video.Hardware.iGPU, 'yuv420p')
+        color = stream_encode(video.ClipCodec.H264, video.Hardware.iGPU, 'yuv420p')
         self.assertEqual(color, ['-c:v', 'h264_qsv', '-pix_fmt', 'yuv420p'])
 
 

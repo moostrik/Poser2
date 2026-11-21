@@ -7,16 +7,6 @@ What is to be built in `modules/video`: ffmpeg, the clips and streams it writes 
 
 E1. Check (built, its unit tests pass): smile `-sim` with one visitor, the share clip and `watermark.png` written.
 
-E3. `__init__.py` exports only what other packages use. Out, used by no other package on the PC's deep-flow
-   **(seen, grep)**: `FFMPEG`, `hwaccel_args`, `HEVC_QUALITY`, `ClipInput`, `master_encode`, `stream_encode`,
-   `DEPTH_PIX_FMT`, `DEPTH_QUALITY`, `depth_frame_bytes`, `depth_to_p012`, `p012_to_depth`, `ScreenFrameStore`,
-   `ClipSink`, `even`, `preset_size`, `matching_preset`, `frames_for`, `ScreenRecorderState`, and the recorder's
-   `quality`, `record` and `take` settings classes. `FFPROBE`, `ScreenRecorderFrameSettings` and `ScreenSize` stay:
-   recording's and render's tests and render's compositor use them. In: C1's `run` and `H264_OPTIONS`, for smile after E1. The package's
-   tests import the rest from their files. `HEVC_QUALITY` and `master_encode`'s default go: the take's `quality`
-   setting is the one value, and `test_clip_hevc` passes a quality. Why: Packages, "Its `__init__.py` holds what
-   other packages use"; API evolution, remove the stale default. Check: the video unit tests and the guard tests.
-
 ## F. Docstrings and VIDEO.md
 
 F1. Reasons and measurements leave the docstrings for VIDEO.md, which gets a short depth section (3 mm steps, 12 m

@@ -42,9 +42,6 @@ _MASTER_PIX_FMT: dict[ClipInput, str] = {ClipInput.NV12: 'nv12', ClipInput.YUV44
                                          ClipInput.P010: 'p010le', ClipInput.XV30: 'yuv444p16le'}
 
 
-HEVC_QUALITY: int = 18      # NVENC constant quality, lower is better
-
-
 # THE ENCODES: ffmpeg's output options, from the codec to the pixel format it is given
 
 def h264_encode(hardware: Hardware) -> list[str]:
@@ -53,7 +50,7 @@ def h264_encode(hardware: Hardware) -> list[str]:
     return ['-c:v', encoder_name(ClipCodec.H264, hardware), *quality, '-pix_fmt', pix_fmt]
 
 
-def master_encode(clip_input: ClipInput, quality: int = HEVC_QUALITY) -> list[str]:
+def master_encode(clip_input: ClipInput, quality: int) -> list[str]:
     """HEVC on the GPU at constant quality `quality`, from YUV planes in BT.709 video range: the slowest preset with a
     full-resolution second pass and spatial and temporal adaptive quantization, as the encode runs after a take and
     its time goes to quality. Tagged hvc1 so Windows and QuickTime play it, and told it is BT.709 video range."""
