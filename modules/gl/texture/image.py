@@ -58,11 +58,6 @@ class Image(Fbo):
         self._channel_order: ChannelOrder = channel_order
         self._source: Texture = Texture(interpolation, wrap, border_color,     # the upload's, in the image's order
                                         bgr=channel_order == ChannelOrder.BGR)
-        # Cache last uploaded dimensions/format to avoid redundant checks
-        self._cached_width: int = 0
-        self._cached_height: int = 0
-        self._cached_turned: bool = False
-        self._cached_format: Constant = GL_NONE
 
     def set_image(self, image: np.ndarray, src: Quad | None = None) -> None:
         """Set image to be uploaded to texture.
@@ -89,25 +84,12 @@ class Image(Fbo):
         if needs_update and image is not None:
             self.set_from_image(image, src)
 
-    def allocate(self, width: int, height: int, internal_format: Constant | int) -> None:
-        """Allocate source texture and FBO for flipped output.
-
-        Args:
-            width: Texture width in pixels
-            height: Texture height in pixels
-            internal_format: OpenGL internal format (e.g., GL_RGB8, GL_RGBA8)
-        """
-        # Allocate FBO (output texture in RGB format)
+    def allocate(self, width: int, height: int, internal_format: Constant | int, turned: bool = False) -> None:
+        """The texture at `width` × `height` in `internal_format`, and the source the image is uploaded into, in its
+        channel order: the same size, or `height` × `width` when the image is drawn a quarter turned."""
         super().allocate(width, height, internal_format)
-        if not self.allocated:
-            return
-
-        # Allocate source texture for numpy upload (with BGR support)
-        self._allocate_source(width, height, internal_format)
-
-    def _allocate_source(self, width: int, height: int, internal_format: Constant | int) -> None:
-        """The source texture the image is uploaded into, in the image's channel order."""
-        self._source.allocate(width, height, internal_format)
+        if self.allocated:
+            self._source.allocate(height if turned else width, width if turned else height, internal_format)
 
     def deallocate(self) -> None:
         """Deallocate source texture and FBO."""
@@ -127,31 +109,15 @@ class Image(Fbo):
         turned: bool = src is not None and _turned(src)
         out_width, out_height = (height, width) if turned else (width, height)
 
-        # Fast path: check cached dimensions/format first
-        needs_realloc: bool = (width != self._cached_width or
-                                height != self._cached_height or
-                                turned != self._cached_turned or
-                                self._cached_format == GL_NONE)
-
-        if needs_realloc:
-            internal_format: Constant = _get_internal_format(image)
-            if internal_format == GL_NONE:
-                return
-
-            # Reallocate if dimensions or format changed
-            if internal_format != self.internal_format or out_width != self.width or out_height != self.height \
-                    or width != self._source.width or height != self._source.height:
-                if self.allocated:
-                    self.deallocate()
-                super().allocate(out_width, out_height, internal_format)
-                if self.allocated:
-                    self._allocate_source(width, height, internal_format)
-
-            # Update cache to prevent unnecessary reallocations
-            self._cached_width = width
-            self._cached_height = height
-            self._cached_turned = turned
-            self._cached_format = internal_format
+        internal_format: Constant = _get_internal_format(image)
+        if internal_format == GL_NONE:
+            return
+        if not self.allocated or internal_format != self.internal_format \
+                or (out_width, out_height) != (self.width, self.height) \
+                or (width, height) != (self._source.width, self._source.height):
+            if self.allocated:
+                self.deallocate()
+            self.allocate(out_width, out_height, internal_format, turned)
 
         if not self.allocated:
             return

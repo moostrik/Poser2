@@ -6,13 +6,6 @@ Every step is one commit and is checked by pyright, the guard tests and gl's tes
 shader_check compares with references made at HEAD before the first step. A run happens at its step, after a
 tasklist check that no app is running, unless Matthias says he is using the PC or the app.
 
-## A. A texture is made one way
-
-- A4. `Image` compares an upload with its own size and format and its source's size; `_cached_width`,
-  `_cached_height`, `_cached_turned` and `_cached_format` go, and it reallocates through its own `allocate`. Why:
-  `Image` is the `Fbo` it fills and holds its source, so the cache repeats their sizes and format; since 56dbac09
-  `set_from_image` also allocates beside `Image.allocate`, its own second way (seen, `Image.set_from_image`).
-  Check: hd_trio -sim; smile -sim, turned.
 
 ## B. A compute shader binds an image one way
 
