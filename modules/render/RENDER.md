@@ -64,7 +64,7 @@ varies*). The layout's reasons:
 | `Draw`       | no target          | into a target it is given |
 | `Compositor` | an FBO             | other layers into it      |
 
-A layer hands out its Fbo or SwapFbo, not the texture inside it.
+A layer hands out its Fbo, SwapFbo or SwapTarget, never one buffer of a pair.
 
 ## Names
 
