@@ -81,8 +81,9 @@ class FeaturePlot(Generic[T]):
         return self._color_settings.default_color_tuples
 
     def update_labels(self, labels: list[str], place: LabelPlace) -> None:
-        """Draw the labels, each at its place, when the settings ask for them and they changed."""
-        if not self.settings.render_labels or labels == self._labels:
+        """Draw the labels, each at its place, while they are shown (`draw_labels`), the settings ask for them, and they
+        changed."""
+        if not self.draw_labels or not self.settings.render_labels or labels == self._labels:
             return
         fbo = self._label_fbo
         rect = Rect(0, 0, fbo.width, fbo.height)
