@@ -9,11 +9,6 @@ smile, `vimba` and `webcam` by smile. That is general code with one user, which 
 The steps below are what is left of the scan of 2026-11-21. **(seen)** is read in the code,
 **(deduction)** inferred.
 
-## D. The documents
-
-- D1. OAK4.md names `ViewDepth`, not `ViewDepthLayer` **(seen: deep_flow `view_depth.py`)**. Why: the document
-  matches the code.
-
 ## E. One host-side flip
 
 - E1. The host-side helpers are named after the flag they apply: `upright_image` → `oriented_image`, `upright_corners`
@@ -67,7 +62,6 @@ The steps below are what is left of the scan of 2026-11-21. **(seen)** is read i
 ## Rules it touches
 
 - Inside a package, code that does the same is written once: E2
-- A document describes what is built: D1
 - Use that one term everywhere it appears: E1
 - Remove obsolete pathways instead of leaving parallel legacy ones: E3
 - Stamp a frame once, with its moment of capture where the device reports one: F1
