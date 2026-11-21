@@ -9,12 +9,11 @@ paths:
 ## What the render holds
 
 - `modules/render` holds three categories, each a folder: `modules`, `general` and `shared`
-- `modules` holds the layers that draw a module's data
+- `modules` holds the layers that draw a module's data, in a package named after the module
 - `general` holds the layers that draw no module's data and are useful to any app
 - `shared` holds the layers that are not general and that more than one app uses
 - A layer that is not general and that one app uses sits in `apps/<app>/render/layers/`
-- A category holds packages
-- A package is named after its subject: a module (`modules/pose/`), a kind of work (`general/composite/`), a shared thing
+- A package is named after its subject: a module (`modules/pose/`), a kind of work (`general/screen_recording/`), a shared thing
 - A package holds its layers, and the shaders of those layers in `shaders/`
 - A layer's class is named after what it draws, then its kind (`TrackletRenderer`, `PoseCompositor`)
 

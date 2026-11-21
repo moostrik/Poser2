@@ -85,7 +85,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - The part that works on the item has its own thread and does all its work there, its inner steps included
 - When that part can't keep up, its queue drops the oldest item and counts it
 - A part that only needs the latest value, like the render, reads it at its own tick
-- A callback list has its own lock; register under it, copy the list under it, call the callbacks outside it
+- A callback list is a `utils.Broadcast`
 - A failing callback does not stop the others
 - Work that numpy or the GPU does faster is not done in a Python loop; the loop holds the GIL and delays every other thread
 
