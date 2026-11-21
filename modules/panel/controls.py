@@ -496,6 +496,21 @@ class Slider(Control):
         self.input.set_value(value)
 
 
+def log_position(value: float) -> float:
+    """A log slider's position of a value: its base-10 logarithm."""
+    return math.log10(value)
+
+
+def log_value(position: float) -> float:
+    """The value at a log slider's position, rounded to 3 significant digits."""
+    return float(f"{10.0 ** position:.3g}")
+
+
+def log_step(value: float) -> float:
+    """The arrow step of a log slider's number input: a tenth of the value's decade."""
+    return float(f"{10.0 ** (math.floor(math.log10(value)) - 1):.1g}")
+
+
 class LogSlider(Control):
     """Slider over log10(min)..log10(max); the number input holds the real value."""
     widget = Widget.log_slider
@@ -511,11 +526,11 @@ class LogSlider(Control):
                 # from min, so 0 keeps the values round. field.min is enforced on commit.
                 self.input = ui.number(
                     value=self.shown, min=0, max=field.max,
-                    step=Widget.log_step(self._clamp(self.shown)), format="%.3g",
+                    step=log_step(self._clamp(self.shown)), format="%.3g",
                 ).props("dense borderless" + self.lock()).classes("w-16")
             self.slider = ui.slider(
-                min=Widget.log_position(field.min), max=Widget.log_position(field.max),
-                step=0.01, value=Widget.log_position(self._clamp(self.shown)),
+                min=log_position(field.min), max=log_position(field.max),
+                step=0.01, value=log_position(self._clamp(self.shown)),
             ).props(f"dense color={color}" + self.lock()).classes("w-full")
 
         self._updating = False
@@ -524,7 +539,7 @@ class LogSlider(Control):
             # The arrow step follows the value (a tenth of its decade) on every change, not
             # only on commit: a held arrow keeps stepping in the browser without committing.
             if e.value is not None and e.value > 0:
-                self.input.props(f"step={Widget.log_step(self._clamp(e.value))}")
+                self.input.props(f"step={log_step(self._clamp(e.value))}")
         self.input.on_value_change(on_input_change)
 
         if self.locked:
@@ -533,13 +548,13 @@ class LogSlider(Control):
         def on_slider_change(e):
             if not self._updating:
                 self._updating = True
-                self.input.set_value(Widget.log_value(e.value))
+                self.input.set_value(log_value(e.value))
                 self._updating = False
         self.slider.on_value_change(on_slider_change)
 
         def commit_slider(pos):
             if pos is not None:
-                self.commit(field.type_(self._clamp(Widget.log_value(pos))))
+                self.commit(field.type_(self._clamp(log_value(pos))))
         _commit_while_dragging(self.slider, commit_slider)
 
         def commit_input(val):
@@ -547,7 +562,7 @@ class LogSlider(Control):
                 return
             self._updating = True
             self.commit(field.type_(self._clamp(float(f"{val:.3g}"))))
-            self.slider.set_value(Widget.log_position(self.shown))
+            self.slider.set_value(log_position(self.shown))
             self._updating = False
         _commit_typed(self.input, commit_input)
 
@@ -564,7 +579,7 @@ class LogSlider(Control):
 
     def show(self, value: Any) -> None:
         self._updating = True
-        self.slider.set_value(Widget.log_position(self._clamp(value)))
+        self.slider.set_value(log_position(self._clamp(value)))
         self.input.set_value(value)
         self._updating = False
 
