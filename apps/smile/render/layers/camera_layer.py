@@ -2,6 +2,7 @@ import math
 import time
 
 from ...face import FaceObservations
+from ...view import view_rect
 from modules.gl import Fbo, Image, BlendState, SwapFbo, Text, Texture, shaders
 from modules.utils import Color
 from ..inputs import Faces
@@ -50,6 +51,7 @@ class CameraLayer(LayerBase):
         self.settings: RenderSettings = settings
         self.warmup: int | None = None  # the step the generator's warm-up reached; None is ready (any thread sets it)
         self._subject: SubjectMark = SubjectMark()
+        self._view: Fbo = Fbo()             # the part of the camera frame the screen shows, at the output size
         self._fbo: Fbo = Fbo()
         self._face_color: FaceColor = FaceColor()
         self._drawer: MarkDrawer = MarkDrawer()
@@ -63,6 +65,7 @@ class CameraLayer(LayerBase):
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         assert width and height and internal_format
         self._width, self._height = width, height
+        self._view.allocate(width, height, internal_format)
         self._fbo.allocate(width, height, internal_format)
         self._face_color.allocate()
         self._drawer.allocate()
@@ -71,6 +74,7 @@ class CameraLayer(LayerBase):
         self._blur.allocate()
 
     def deallocate(self) -> None:
+        self._view.deallocate()
         self._fbo.deallocate()
         self._face_color.deallocate()
         self._drawer.deallocate()
@@ -91,6 +95,10 @@ class CameraLayer(LayerBase):
         `marks` is the opacity of the face marks (the flash fades them out before the capture)."""
         if not self._camera.allocated:
             return
+        # the view: the frame's middle, covering the output size (`view.view_rect`), as the faces are measured in it
+        self._view.begin()
+        self._camera.draw(src=view_rect(self._camera.width, self._camera.height, self._width, self._height))
+        self._view.end()
         r, g, b, a = self.settings.face_color
         now: float = time.perf_counter()
         frame: FaceObservations | None = self._faces.get()
@@ -114,11 +122,11 @@ class CameraLayer(LayerBase):
         amount: float = self.settings.face_amount
         blurred: Texture | None = None
         if effect is FaceEffect.BLUR and (fields or subject is not None):
-            copy(self._camera, self._blurred)
+            copy(self._view, self._blurred)
             blur(self._blurred, self._blur, amount * BLUR_SIGMA)
             blurred = self._blurred
         self._fbo.begin()
-        self._face_color.use(self._camera, self._width, self._height, fields, EFFECTS.index(effect), amount,
+        self._face_color.use(self._view, self._width, self._height, fields, EFFECTS.index(effect), amount,
                              rect, charge, FILLS.index(fill), (r, g, b, a), blurred, mosaic)
         if self.settings.face_marks and marks > 0.0 and warmup is None:
             face_marks: list[Mark] = build_marks(frame, (r, g, b, a), charge, pad) if frame is not None else []

@@ -30,7 +30,7 @@ def face(box: tuple[float, float, float, float], score: float = 0.9, eyes: float
 class TestFaceFinder(unittest.TestCase):
     def setUp(self):
         self.detector_settings = FaceDetectorSettings()
-        self.finder = FaceFinder(FaceFinderSettings(), self.detector_settings, 100, 125)
+        self.finder = FaceFinder(FaceFinderSettings(), self.detector_settings, 100, 125, (1000, 1250))
         self.observed: list[FaceObservations] = []
         self.finder.add_frame_callback(self.observed.append)
         self.image = np.full((1250, 1000, 3), 128, dtype=np.uint8)
@@ -63,6 +63,33 @@ class TestFaceFinder(unittest.TestCase):
         self.assertEqual(int(portrait[60, 50, 0]), 200)          # from the qualifying frame, not the later one
         self.finder.reset()
         self.assertIsNone(self.finder.best())
+
+    def test_in_a_frame_larger_than_the_view_the_faces_are_judged_in_the_view(self):
+        # 2000 x 1250 shown at 1000 x 1250: the view is the middle, x 500 to 1500
+        wide = np.full((1250, 2000, 3), 90, dtype=np.uint8)
+        wide[:, 800:1200] = 220                                      # the face's region, which the portrait is cut from
+        outside = face((50.0, 300.0, 450.0, 800.0))                 # its center at x 250: not shown, not counted
+        inside = face((800.0, 300.0, 1200.0, 800.0))
+        observed = self.finder.judge(frame_with((outside, inside), 1.0, wide))
+        self.assertEqual(len(observed.faces), 1)
+        subject = observed.subject
+        assert subject is not None
+        self.assertAlmostEqual(subject.bbox[0], 0.3)                # (800 - 500) / 1000, in the view
+        self.assertAlmostEqual(subject.bbox[2], 0.7)
+        self.assertTrue(observed.qualified)
+        portrait = self.finder.best()                               # cut from the full frame, at the face's place in it
+        assert portrait is not None
+        self.assertEqual(int(portrait[60, 50, 0]), 220)
+
+    def test_a_crop_past_the_views_edge_is_outside(self):
+        # the same face against the frame's edge would pass; against the view's it reaches past
+        wide = np.full((1250, 2000, 3), 128, dtype=np.uint8)
+        near_edge = face((520.0, 300.0, 920.0, 800.0))
+        observed = self.finder.judge(frame_with((near_edge,), 1.0, wide))
+        subject = observed.subject
+        assert subject is not None
+        self.assertLess(subject.edge, 0.0)
+        self.assertFalse(observed.qualified)
 
     def test_the_calibration_sets_the_detectors_pitch_zero(self):
         self.finder.judge(frame_with((face((300.0, 300.0, 700.0, 800.0)),), 1.0, self.image))

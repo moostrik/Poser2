@@ -1,20 +1,18 @@
 """The app's image source: the frames of a camera device (a `CameraSource`: the Vimba camera or the
 webcam, `modules/camera/`), or, with `use_image` on, an image from `input/`, whether a device was
 found or not; or, during an online turn, the frames of a phone (`set_online`, `submit_online_frame`: SMILE
-Online, modules/online/). The device and the phone only hand their newest frame over; this one's own thread fits
-every frame to the output size (`cover`: scaled to fill it, the middle kept, no distortion) and hands it to the
-callbacks as a `CameraFrame`, and paces the image input. A device frame keeps its turn and flips as flags, fitted
-to the output size as it will be shown, turned; who shows it applies them. Every device frame also goes, as it
-came, to the device frame callbacks (the recorder), after the live path took it. A missing device is a warning
-and the `device` readout says `none`; there is no automatic fallback to the image, so a failed
-camera on site stays visible. The device is kept when it did not connect: one that keeps trying
+Online, modules/online/). The device and the phone only hand their newest frame over; this one's own thread hands
+the live one on whole, as a `CameraFrame`, to the callbacks, and paces the image input. A device frame keeps its
+turn and flips as flags, which who shows it applies; what the screen shows of a frame is the view (`view.py`).
+Every device frame also goes, as it came, to the device frame callbacks (the recorder), after the live path took it.
+A missing device is a warning and the `device` readout says `none`; there is no automatic fallback to the image, so
+a failed camera on site stays visible. The device is kept when it did not connect: one that keeps trying
 (Vimba) delivers when it is there, and the readout follows it. Every frame has the time it arrived
 (`frame()`, on `time.perf_counter()`, the one clock of the frames and the sequence: a device frame the time
 its backend stamped), so a source that stopped is told from one that delivers (`stalled`)."""
 
 import logging
 import os
-from dataclasses import replace
 from threading import Lock, Thread
 from time import perf_counter
 from typing import Any
@@ -33,28 +31,7 @@ IMAGE_EXTENSIONS: tuple[str, ...] = ('.jpg', '.jpeg', '.png')
 IMAGE_FPS: float = 25.0
 STALLED_AFTER: float = 3.0      # s without a frame: the source has stopped
 READOUT_EVERY: float = 0.1      # s: the longest the thread waits, so the device readout follows the device
-
-
-def cover(image: np.ndarray, width: int, height: int) -> np.ndarray:
-    """Resize the image to cover width x height and crop the middle: no distortion. An image of that
-    size is returned as it is."""
-    image_height, image_width = image.shape[:2]
-    if (image_width, image_height) == (width, height):
-        return image
-    scale: float = max(width / image_width, height / image_height)
-    resized: np.ndarray = cv2.resize(image, (max(width, round(image_width * scale)), max(height, round(image_height * scale))), interpolation=cv2.INTER_AREA)
-    x0: int = (resized.shape[1] - width) // 2
-    y0: int = (resized.shape[0] - height) // 2
-    return np.ascontiguousarray(resized[y0:y0 + height, x0:x0 + width])
-
-
-def fitted(frame: CameraFrame, width: int, height: int) -> CameraFrame:
-    """The frame with its image covering width x height as shown: a frame still to be turned is fitted to height x
-    width, so it is width x height once turned. Its flags and time stay."""
-    if frame.rotate90:
-        width, height = height, width
-    image: np.ndarray = cover(frame.image, width, height)
-    return frame if image is frame.image else replace(frame, image=image)
+NO_FRAME: np.ndarray = np.zeros((8, 8, 3), dtype=np.uint8)     # the frame before the first: black
 
 
 def list_images(folder: str) -> list[str]:
@@ -64,9 +41,8 @@ def list_images(folder: str) -> list[str]:
 
 
 class Camera:
-    def __init__(self, settings: CameraSettings, size: tuple[int, int], device: CameraSource | None, device_name: str = 'none', folder: str = IMAGE_FOLDER) -> None:
+    def __init__(self, settings: CameraSettings, device: CameraSource | None, device_name: str = 'none', folder: str = IMAGE_FOLDER) -> None:
         self.settings: CameraSettings = settings
-        self._width, self._height = size
         self._device: CameraSource | None = device
         self._device_name: str = device_name
         self._device_shown: str | None = None       # what the device readout says
@@ -76,10 +52,10 @@ class Camera:
         self._callbacks: list[CameraFrameCallback] = []
         self._device_callbacks: Broadcast[[CameraFrame]] = Broadcast(name='device frame')
         # the newest frame, stamped when it arrived; 0 before the first
-        self._frame: CameraFrame = CameraFrame(0, FrameType.VIDEO, np.zeros((self._height, self._width, 3), dtype=np.uint8), 0.0)
+        self._frame: CameraFrame = CameraFrame(0, FrameType.VIDEO, NO_FRAME, 0.0)
         self._image: np.ndarray | None = None
         self._online: bool = False          # the online source has the image: the device and the image source are muted
-        # The newest frame handed over (the device's or the phone's), for this thread to fit
+        # The newest frame handed over (the device's or the phone's), for this thread to hand on
         self._lock: Lock = Lock()
         self._waker: Waker = Waker()
         self._handed: CameraFrame | None = None
@@ -123,8 +99,8 @@ class Camera:
 
     # FRAMES
     def frame(self) -> CameraFrame:
-        """The newest frame, fitted, stamped when it arrived: a source that stopped keeps its last frame, with its
-        old time; 0 before the first."""
+        """The newest frame, stamped when it arrived: a source that stopped keeps its last frame, with its old time;
+        a black one at 0 before the first."""
         with self._mutex:
             return self._frame
 
@@ -169,14 +145,14 @@ class Camera:
             self._online = active
 
     def submit_online_frame(self, frame: np.ndarray) -> None:
-        """A frame of the online source, handed over to be fitted like any other; dropped while the source is off."""
+        """A frame of the online source, handed over like any other; dropped while the source is off."""
         if not self._online:
             return
         self._hand_over(CameraFrame(0, FrameType.VIDEO, frame, perf_counter()))
 
     def _run(self) -> None:
-        """Fits each frame handed over and hands it on as it comes, and emits the image input at its own rate while it
-        is in use; what the fit or a callback raises is logged and the loop goes on."""
+        """Hands each frame handed over on as it comes, and emits the image input at its own rate while it is in use;
+        what a callback raises is logged and the loop goes on."""
         next_image: float = 0.0
         while True:
             self._show_device()
@@ -195,7 +171,7 @@ class Camera:
                 self._handed = None
             try:
                 if handed is not None and (self._online or not self.settings.use_image):
-                    self._emit(fitted(handed, self._width, self._height))
+                    self._emit(handed)
                 now = perf_counter()
                 if image_on and image is not None and now >= next_image:
                     # on an absolute schedule: each image is due a period after the last one's due time, not after
@@ -241,7 +217,7 @@ class Camera:
             logger.warning('Failed to load image %s', name)
             self._image = None
             return
-        self._image = cover(image, self._width, self._height)
+        self._image = image
 
     def next_image(self) -> None:
         """After a capture: move the image source to the next file of the folder, when asked to."""

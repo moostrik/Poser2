@@ -2,6 +2,7 @@
 and the grins of the visitors before play on the two walls of the sphere (README.md, SMILE.md)."""
 
 from .cam import Camera
+from .view import cover
 from modules import recording
 from modules.recording import replay
 from modules.camera import CameraFrame, CameraSource, upright_image, vimba, webcam
@@ -97,7 +98,8 @@ class SmileMain():
         # choice of a subject among them (the camera states hand over frames, sequence_callback)
         self.uploader: SerialUploader = SerialUploader(self.settings.setup.camera.uploader)
         self.face_detector: FaceDetector = FaceDetector(self.settings.setup.camera.face_detector)
-        self.face: FaceFinder = FaceFinder(self.settings.setup.camera.face, self.settings.setup.camera.face_detector, portrait_width, portrait_height)
+        self.face: FaceFinder = FaceFinder(self.settings.setup.camera.face, self.settings.setup.camera.face_detector, portrait_width, portrait_height,
+                                           (self.width, self.height))
 
         # the camera device; the panel can switch to an image from input/ at any time. -sim plays a recording in its place
         self.recording_player: recording.Player | None = None
@@ -113,7 +115,7 @@ class SmileMain():
         else:
             device = webcam.Camera(self.settings.setup.camera, rotate90=self.portrait_mode)
             device_name = 'webcam'
-        self.camera: Camera = Camera(self.settings.setup.camera, (self.width, self.height), device, device_name)
+        self.camera: Camera = Camera(self.settings.setup.camera, device, device_name)
         # the device's frames as they came, recorded after the live path took them, in chunks the session splits
         self.recorder: recording.Recorder = recording.Recorder(self.settings.setup.camera.recorder, data_path=DATA_PATH)
         self.session: Session = Session(self.settings.setup.camera.control)
@@ -131,7 +133,7 @@ class SmileMain():
         self._grin_saved: bool = False      # the visitor's grin was saved to its last frame
         self._saving: bool = False          # the visitor's files are open in the saver
         self._style_picked: bool = False    # the style of the next visitor is picked: until the flash
-        self._face_frame_time: float = 0.0  # arrival of the camera frame last handed over to be judged
+        self._judging: bool = False         # the camera states: the camera's frames go to the faces (the render's thread sets it)
         self._visitor_start: float | None = None    # the capture of the visitor the generator is working on
         self._flash_time: float = 0.0       # when the flash started: the music starts then (Max, the phone, the clip's sound)
         self.lights: Lights = Lights(self.settings.setup.artnet, f'{DATA_PATH}/artnet.json')
@@ -147,6 +149,7 @@ class SmileMain():
     def start(self) -> None:
         self.recorder.start()
         self.camera.add_frame_callback(self.render.set_cam_image)
+        self.camera.add_frame_callback(self._judge_frame)
         self.camera.start()
         if self.recording_player is not None:
             self.recording_player.start()       # after the replay camera hooked into it
@@ -227,7 +230,6 @@ class SmileMain():
         self.render.set_status(status)
         self.render.set_warmup(self.generator.warmup)
 
-        cam_frame: CameraFrame = self.camera.frame()
         artnet_progress: float = message.progress
         if seq == SequenceType.TIMEOUT:
             artnet_progress = 1.0
@@ -276,15 +278,13 @@ class SmileMain():
         if seq == SequenceType.CAMERA_SHOW and message.initial:
             self.face.reset()
 
-        if seq >= SequenceType.CAMERA_SHOW and seq <= SequenceType.CAMERA_DETECT and cam_frame.timestamp > self._face_frame_time:
-            # new frames only, with the time they arrived: a camera that stopped then stops charging
-            self._face_frame_time = cam_frame.timestamp
-            self.uploader.submit_frame(cam_frame)
+        # the camera states judge the camera's frames as they come (`_judge_frame`)
+        self._judging = SequenceType.CAMERA_SHOW <= seq <= SequenceType.CAMERA_DETECT
 
         if seq == SequenceType.CAPTURE:
-            # the last frame of the recording in which the face qualified; the full camera frame without one, turned
-            # and flipped here, once
-            cap_image: np.ndarray = upright_image(cam_frame)
+            # the last frame of the recording in which the face qualified; without one the view of the newest camera
+            # frame, turned, flipped and fitted here, once
+            cap_image: np.ndarray = cover(upright_image(self.camera.frame()), self.width, self.height)
             portrait: np.ndarray | None = self.face.best()
             if portrait is not None:
                 cap_image = portrait
@@ -363,6 +363,12 @@ class SmileMain():
             self._style_picked = True
             style_id: str = self.generator.next_style()
             self.music_map.set_style(style_id)
+
+    def _judge_frame(self, frame: CameraFrame) -> None:
+        """A camera frame, on the camera's thread: to the faces while the camera states run. Only new frames come,
+        so a camera that stopped stops charging."""
+        if self._judging:
+            self.uploader.submit_frame(frame)
 
     def face_callback(self, frame: FaceObservations) -> None:
         # the sequencer charges toward the flash while the face qualifies

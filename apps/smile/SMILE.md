@@ -25,10 +25,13 @@ alive and does nothing (the face finder: nobody is ever chosen; the generator: t
 camera contract (`modules.camera.vimba.Camera` default, `modules.camera.webcam.Camera` with `-wc`; both take
 `rotate90` for the portrait mode at construction), and an image source from `data/input/` that the panel's `use_image` switch puts in
 place of the device frames at any time. The device and the phone only hand their newest frame over; `Camera`'s own
-thread fits every frame to the render size with `cover()` (scaled to fill it, the middle kept, no distortion) and
-hands it on as a `CameraFrame`. A device frame keeps its turn and flips as flags: it is fitted to the size it has
-once turned, the render's camera image applies them in its upload, the uploader of the faces on the GPU, and the
-capture turns its CPU frame once. The camera's `start` and `stop` record the device's frames as they came, after the
+thread hands it on whole as a `CameraFrame` (`CameraFrameCallback`): to the render's camera image, and, while the
+camera states run, to the uploader of the faces. A device frame keeps its turn and flips as flags: the render's
+camera image applies them in its upload, the uploader on the GPU, and the capture turns its CPU frame once. What the
+screen shows of a frame is the view (`view.py`): its middle, covering the render size, no distortion. The camera
+layer draws the view on the GPU (`view_rect`); the face finder judges the faces, found on the whole frame, in the
+view, counting a face only inside it and measuring its crop against the view's edge; the portrait is cut from the
+whole frame, and a capture without a face is the view fitted on the host once (`cover`). The camera's `start` and `stop` record the device's frames as they came, after the
 live path took them (`Camera.add_device_frame_callback`), with `modules/recording`'s `Recorder`: an `MP4` chunk any
 player plays with its metadata beside it, the turn and the flips as flags, split into chunks of `split_seconds` by a
 `Session` (`camera.control`), in `data/recordings/`. `-sim` plays a recording in the device's place: a recording
@@ -51,8 +54,8 @@ value (sent while auto is off), a limit for auto and a readout of what the camer
 autos aim for `target_brightness`, the exposure going up first and the gain after it. "Set WB" (white balance) lets the camera measure
 once and takes the ratios it found into the panel.
 The camera is a GigE camera on the PC's Ethernet adapter. Its `UserSet2` holds the region of interest, 1200x960 of the
-1292x964 sensor, centred (OffsetX 46, OffsetY 2): the render's 4:5 turned, which `Camera.cover()` scales by exactly 16/15 to
-1024x1280 with nothing cropped; the log line at open shows the region the set loaded. It sends BGR, 3.5 MB per frame
+1292x964 sensor, centred (OffsetX 46, OffsetY 2): the render's 4:5 turned, whose view (`view.py`) is the whole frame, scaled by exactly
+16/15 to 1024x1280 with nothing cropped; the log line at open shows the region the set loaded. It sends BGR, 3.5 MB per frame
 (104 MB/s at 30 fps, the panel's `fps`, also written by `SensorControl`; `UserSet2` holds 20; `readings.video_fps` is the rate of the frames
 that arrive complete; one that lost network packets arrives `Incomplete`, with part of an older image still in its buffer,
 and is skipped and counted in `dropped_frames`). At every open `setup_camera` runs

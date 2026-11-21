@@ -1,20 +1,24 @@
 """smile's face finder: it judges the faces the detector found (`modules.inference.face.FaceDetector`) for a portrait
 and keeps the frame to cut it from.
 
-Each `FaceFrame` the detector hands over is judged on this one's own thread: every face against the gates (score, eye
-distance, the portrait crop's distance from the image edge, head pose, eyes; `quality`), the subject is the largest
+Each `FaceFrame` the detector hands over is judged on this one's own thread, in the view (the part of the frame the
+screen shows, `view.py`): every face inside it against the gates (score, eye distance, the portrait crop's distance
+from the view's edge, head pose, eyes; `quality`), the subject is the largest
 qualifying face, else the largest at all, and the judged faces go to the frame callbacks as `FaceObservations`, for
 the overlay and the sequencer's charge. The capture (`best()`) is the portrait cut from the last frame the subject
 qualified in, else the last frame with a face, from that frame's own CPU frame (`FaceFrame.image.frame`)."""
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from threading import Event, Lock, Thread
 
 import numpy as np
 
 from modules.camera import upright_image
 from modules.inference.face import Face, FaceDetectorSettings, FaceFrame
+from modules.utils import Rect
+
+from ..view import view_rect
 
 from .portrait import crop_edge, portrait_box, portrait_crop
 from .quality import FaceObservation, FaceObservations, FaceObservationsCallback, Rejection, distance, gate, readout, rejection_label
@@ -25,12 +29,21 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class _Judged:
-    face: Face
+    face: Face          # in the view's pixels
+    full: Face          # in the frame's, which the portrait is cut from
     edge: float
     eyes: float | None
     rejection: Rejection | None
     limit: float
     distance: float
+
+
+def face_in_view(face: Face, x0: float, y0: float, width_ratio: float) -> Face:
+    """The face in the pixels of the view whose top left is (x0, y0) in the frame: its points moved, its eye
+    distance relative to the view's width, `width_ratio` times the frame's."""
+    shift: np.ndarray = np.array([x0, y0], dtype=np.float32)
+    return replace(face, bbox=face.bbox - np.concatenate([shift, shift]), kps=face.kps - shift,
+                   landmarks=face.landmarks - shift, eye_dist=face.eye_dist * width_ratio)
 
 
 @dataclass(frozen=True)
@@ -44,12 +57,13 @@ class FaceFinder(Thread):
     """See the module docstring."""
 
     def __init__(self, settings: FaceFinderSettings, detector_settings: FaceDetectorSettings, composition_width: int,
-                 composition_height: int) -> None:
+                 composition_height: int, view_size: tuple[int, int]) -> None:
         super().__init__(daemon=True, name='FaceFinder')
         self.settings: FaceFinderSettings = settings
         self._detector_settings: FaceDetectorSettings = detector_settings     # its pitch zero, which the calibration sets
         self._composition_width: int = composition_width
         self._composition_height: int = composition_height
+        self._view_size: tuple[int, int] = view_size        # the output size: the faces are judged in the view
         self._running: bool = False
         self._wake: Event = Event()
         self._input_lock: Lock = Lock()
@@ -100,11 +114,19 @@ class FaceFinder(Thread):
     # ── Judging ───────────────────────────────────────────────────────
 
     def judge(self, frame: FaceFrame) -> FaceObservations:
-        """The faces of a detector's frame judged, the subject kept for the capture, and handed to the callbacks."""
+        """The faces of a detector's frame judged in the view (`view.view_rect`, the part the screen shows), the
+        subject kept for the capture, and handed to the callbacks. A face whose center is outside the view is not
+        counted."""
         s: FaceFinderSettings = self.settings
-        width, height = frame.width, frame.height
+        view: Rect = view_rect(frame.width, frame.height, *self._view_size)
+        x0, y0 = view.x * frame.width, view.y * frame.height
+        width, height = view.width * frame.width, view.height * frame.height
         judged: list[_Judged] = []
-        for face in frame.faces:
+        for full in frame.faces:
+            face: Face = face_in_view(full, x0, y0, frame.width / width)
+            cx, cy = (face.bbox[0] + face.bbox[2]) * 0.5, (face.bbox[1] + face.bbox[3]) * 0.5
+            if not (0.0 <= cx < width and 0.0 <= cy < height):
+                continue
             edge: float = crop_edge(face, s.zoom, s.offset, self._composition_width, self._composition_height, width, height)
             rejection: Rejection | None = gate(face.score, face.eye_dist, edge, face.pose, s.confidence, s.eye_min, s.crop_margin,
                                                s.max_yaw, s.max_pitch, s.max_roll)
@@ -121,7 +143,7 @@ class FaceFinder(Thread):
             limit: float = limits[rejection] if rejection is not None else 0.0
             far: float = distance(face.score, face.eye_dist, edge, face.pose, eyes, s.confidence, s.eye_min, s.crop_margin,
                                   s.max_yaw, s.max_pitch, s.max_roll, s.eye_open, s.falloff)
-            judged.append(_Judged(face, edge, eyes, rejection, limit, far))
+            judged.append(_Judged(face, full, edge, eyes, rejection, limit, far))
 
         # the subject: the largest qualifying face, or the largest face at all
         accepted: list[_Judged] = [j for j in judged if j.rejection is None]
@@ -130,7 +152,7 @@ class FaceFinder(Thread):
         if subject is not None:
             self._nose_ratio = subject.face.pose.nose_ratio
             with self._saved_lock:
-                self._last = _Saved(frame, subject.face)
+                self._last = _Saved(frame, subject.full)
                 if subject.rejection is None:
                     self._qualified = self._last
 
@@ -145,7 +167,7 @@ class FaceFinder(Thread):
                 logger.exception('Error in a face callback')
         return observations
 
-    def _observation(self, j: _Judged, subject: bool, width: int, height: int) -> FaceObservation:
+    def _observation(self, j: _Judged, subject: bool, width: float, height: float) -> FaceObservation:
         s: FaceFinderSettings = self.settings
         x0, y0, x1, y1 = j.face.bbox
         crop: tuple[float, float, float, float] = portrait_box(j.face, s.zoom, s.offset, self._composition_width, self._composition_height)

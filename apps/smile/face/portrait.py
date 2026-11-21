@@ -40,7 +40,7 @@ def portrait_box(face: Face, portrait_zoom: float, portrait_offset: float, portr
 
 
 def crop_edge(face: Face, portrait_zoom: float, portrait_offset: float, portrait_width: int, portrait_height: int,
-              image_width: int, image_height: int) -> float:
+              image_width: float, image_height: float) -> float:
     """Distance of the portrait crop's upright box (`portrait_box`: what the overlay draws) from the
     nearest image edge, relative to the crop width; negative when it reaches past. The rotated crop
     that `portrait_crop` cuts may reach further at a tilted head: its corners are then filled from

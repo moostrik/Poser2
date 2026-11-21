@@ -9,7 +9,7 @@ import unittest
 import cv2
 import numpy as np
 
-from apps.smile.cam.camera import Camera, cover, list_images
+from apps.smile.cam.camera import Camera, list_images
 from apps.smile.cam.settings import CameraSettings
 from modules.camera import CameraFrame, FrameType
 
@@ -71,7 +71,7 @@ class TestCamera(unittest.TestCase):
             self.camera.stop()
 
     def make(self, device):
-        self.camera = Camera(self.settings, (8, 6), device, 'fake', folder=self.folder)
+        self.camera = Camera(self.settings, device, 'fake', folder=self.folder)
         self.camera.add_frame_callback(self.frames.append)
         self.camera.start()
         return self.camera
@@ -86,30 +86,26 @@ class TestCamera(unittest.TestCase):
     def test_relays_device_frames_and_drops_them_with_the_image_on(self):
         device = FakeDevice()
         self.make(device)
-        # a frame of another shape is fitted to the output size: scaled to fill it, the middle kept
         frame = np.zeros((12, 8, 3), dtype=np.uint8)
-        frame[4:8] = 255                    # a band across the middle
         device.push(frame)
-        self.assertTrue(wait_for(lambda: len(self.frames) == 1))     # fitted and handed on by the camera's own thread
+        self.assertTrue(wait_for(lambda: len(self.frames) == 1))     # handed on whole by the camera's own thread
         shown = self.camera.frame().image
-        self.assertEqual(shown.shape, (6, 8, 3))
-        self.assertEqual(int(shown[0, 0, 0]), 0)
-        self.assertEqual(int(shown[3, 0, 0]), 255)
+        self.assertIs(shown, frame)
 
         self.settings.use_image = True
         device.push(frame)
         self.assertTrue(wait_for(lambda: len(self.frames) > 1 and self.frames[-1].image is not shown))
         image = self.camera.frame().image
-        self.assertEqual(image.shape, (6, 8, 3))
-        self.assertEqual(int(image[0, 0, 0]), 100)     # a.jpg, at the output size
+        self.assertEqual(image.shape, (30, 20, 3))
+        self.assertEqual(int(image[0, 0, 0]), 100)     # a.jpg, whole
 
-    def test_a_turned_frame_is_fitted_to_the_turned_size_and_keeps_its_flags(self):
+    def test_a_turned_frame_is_handed_on_whole_with_its_flags(self):
         device = FakeDevice()
         self.make(device)
         device.push(np.zeros((16, 12, 3), dtype=np.uint8), rotate90=True, flip_h=True)
         self.assertTrue(wait_for(lambda: len(self.frames) == 1))
         frame = self.frames[0]
-        self.assertEqual(frame.image.shape, (8, 6, 3))      # 6 x 8 once turned: the output size
+        self.assertEqual(frame.image.shape, (16, 12, 3))
         self.assertTrue(frame.rotate90 and frame.flip_h)
 
     def test_every_device_frame_goes_to_the_recorder_as_it_came(self):
@@ -140,7 +136,7 @@ class TestCamera(unittest.TestCase):
         # a camera that stops keeps its last frame, with the time of that frame
         self.assertEqual(self.camera.frame().timestamp, shown.timestamp)
 
-    def test_device_and_phone_frames_are_fitted_on_the_cameras_thread(self):
+    def test_device_and_phone_frames_are_handed_on_from_the_cameras_thread(self):
         threads: list[str] = []
         device = FakeDevice()
         self.make(device)
@@ -150,7 +146,7 @@ class TestCamera(unittest.TestCase):
         self.camera.set_online(True)
         self.camera.submit_online_frame(np.zeros((24, 16, 3), dtype=np.uint8))
         self.assertTrue(wait_for(lambda: len(self.frames) == 2))
-        self.assertEqual(self.frames[1].image.shape, (6, 8, 3))
+        self.assertEqual(self.frames[1].image.shape, (24, 16, 3))
         self.assertEqual(threads, ['SmileCamera', 'SmileCamera'])
 
     def test_a_failing_callback_is_logged_and_the_camera_goes_on(self):
@@ -230,12 +226,6 @@ class TestCamera(unittest.TestCase):
 
 
 class TestHelpers(unittest.TestCase):
-    def test_cover_keeps_the_aspect_and_fills_the_size(self):
-        wide = np.zeros((10, 40, 3), dtype=np.uint8)
-        self.assertEqual(cover(wide, 8, 6).shape, (6, 8, 3))
-        tall = np.zeros((40, 10, 3), dtype=np.uint8)
-        self.assertEqual(cover(tall, 8, 6).shape, (6, 8, 3))
-
     def test_list_images_sorted_and_missing_folder(self):
         self.assertEqual(list_images(os.path.join(tempfile.gettempdir(), 'no-such-folder-smile')), [])
 
