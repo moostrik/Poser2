@@ -6,8 +6,7 @@ from .process import run
 
 
 def transcode_aac(src: str, dst: str, bitrate: str = '128k') -> None:
-    """Write `dst` (an .m4a) from any audio file: AAC, which every phone decodes (Safari refuses some MP3s),
-    at about a third of the MP3's size. Raises when ffmpeg fails."""
+    """Write `dst` (an .m4a) from any audio file as AAC. Raises when ffmpeg fails."""
     args = ['-y', '-i', src, '-vn', '-c:a', 'aac', '-b:a', bitrate, '-movflags', '+faststart', dst]
     try:
         run(args, timeout=60)

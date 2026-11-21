@@ -20,7 +20,7 @@ TRIAL_SIZE: int = 256      # px, the trial frame's side; NVENC refuses frames 12
 
 
 def encoder_works(hardware: Hardware) -> bool:
-    """A one-frame trial h264 encode on `hardware`: the encoder list alone does not prove the driver works."""
+    """A one-frame trial h264 encode on `hardware`; True when it passes."""
     codec = encoder_name(ClipCodec.H264, hardware)
     quality, pix_fmt = H264_OPTIONS[hardware]
     args = ['-nostdin', '-f', 'lavfi', '-i', f'color=c=gray:size={TRIAL_SIZE}x{TRIAL_SIZE}:rate=15', '-frames:v', '1',

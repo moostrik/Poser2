@@ -1,8 +1,5 @@
-"""ffmpeg and ffprobe as subprocesses, and the pipes their frames go through.
-
-The apps run under pythonw, so every process is started with CREATE_NO_WINDOW
-and without inheriting stdin or stderr, which are invalid handles there. stderr is a pipe that is
-read when the process ends, so a failure has a message."""
+"""ffmpeg and ffprobe as subprocesses, each started without a window and with its stdin and stderr given, stderr a
+pipe; the pipes their frames go through; and a process run to its end."""
 
 import io
 import os

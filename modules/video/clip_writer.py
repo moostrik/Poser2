@@ -52,8 +52,7 @@ def h264_encode(hardware: Hardware) -> list[str]:
 
 def master_encode(clip_input: ClipInput, quality: int) -> list[str]:
     """HEVC on the GPU at constant quality `quality`, from YUV planes in BT.709 video range: the slowest preset with a
-    full-resolution second pass and spatial and temporal adaptive quantization, as the encode runs after a take and
-    its time goes to quality. Tagged hvc1 so Windows and QuickTime play it, and told it is BT.709 video range."""
+    full-resolution second pass and spatial and temporal adaptive quantization, tagged hvc1 and BT.709 video range."""
     return ['-c:v', encoder_name(ClipCodec.HEVC, Hardware.GPU), '-preset', 'p7', '-tune', 'hq', '-multipass',
             'fullres', '-rc', 'vbr', '-cq', str(quality), '-b:v', '0', '-spatial-aq', '1', '-temporal-aq', '1',
             '-tag:v', 'hvc1', '-pix_fmt', _MASTER_PIX_FMT[clip_input],

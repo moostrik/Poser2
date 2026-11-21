@@ -1,9 +1,8 @@
 """A ClipWriter fed raw frames from a queue on its own thread: the writer of one camera recording stream.
 
-It writes every frame it is given, in order: a stream of a recording must hold every frame its other streams and its
-metadata hold, so whatever is dropped is dropped whole, by the recorder, before any part of it is written. The bytes
-it holds are readable (`queued_bytes`), for the recorder's bound. An encoder that dies (an error, a full disk) ends
-the writer: it says so once (`failed`), drops what is queued, and `stop` and `split` return instead of waiting."""
+It writes every frame it is given, in order, and says how many bytes it holds (`queued_bytes`). An encoder that dies
+(an error, a full disk) ends the writer: it says so once (`failed`), drops what is queued, and `stop` and `split`
+return instead of waiting. Design: VIDEO.md."""
 
 import logging
 from threading import Event, Lock, Thread
@@ -129,7 +128,6 @@ class StreamWriter:
     def _open(self, frame: np.ndarray, nv12: bool, depth: bool) -> ClipWriter:
         clip_input: ClipInput = (ClipInput.P012 if depth else ClipInput.NV12 if nv12
                                  else ClipInput.GRAY if frame.ndim == 2 else ClipInput.BGR24)
-        # measured: with B-frames a seek in a merged chunk gave depth about 100 mm off, why is not settled
         encode: list[str] = stream_encode(self.codec, self.hardware, DEPTH_PIX_FMT if depth else 'yuv420p',
                                           DEPTH_QUALITY if depth else self.quality, self.keyframe_interval,
                                           b_frames=self.b_frames and not depth)

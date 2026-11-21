@@ -12,6 +12,8 @@ Three categories, each a folder. A layer is found by what it draws, not by its t
 | `general/` | the layers that draw no module's data and are useful to any app     | `layer_compositor.py`, `lut_grade.py`, `screen_recording/`             |
 | `shared/`  | the layers that are not general and that more than one app uses     | none yet: every layer two apps use draws a module's data or is general |
 
+`general/screen_recording/` is described in [SCREEN_RECORDING.md](general/screen_recording/SCREEN_RECORDING.md).
+
 A layer that is not general and that one app uses sits in that app, in `apps/<app>/render/layers/`. It moves to
 `shared/` when a second app takes it.
 

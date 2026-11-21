@@ -4,7 +4,7 @@ The main thread draws into `frame` (or copies the window into it with `copy_wind
 on every tick hands over each frame whose read-back has passed its fence. The pixel buffers are host memory mapped
 once, so the read-back needs no CUDA and the CPU never waits for it. Only the main thread makes GL calls; the
 consumer reads a lent buffer on its own thread and gives it back with the frame's `release`. See
-modules/video/VIDEO.md.
+SCREEN_RECORDING.md.
 """
 
 import logging

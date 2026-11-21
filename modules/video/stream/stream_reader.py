@@ -45,11 +45,10 @@ class StreamReader:
     def __init__(self, cam_id: int, frame_type: object, frame_callback: StreamFrameCallback, color: bool,
                  decoder: Hardware = Hardware.CPU, fps: float = 0.0, stream: int = 0, depth: bool = False,
                  schedule: FrameSchedule | None = None, nv12: bool = False) -> None:
-        """``color``: decode to BGR, or with ``nv12`` to packed NV12 (H * 3 / 2, W), half the bytes, as a camera
-        delivers it; otherwise to gray, so a mono pipeline gets the luma straight from ffmpeg, saving the colour
-        conversion and two thirds of the pipe. ``stream``: which video stream of the file. ``depth``: it holds
-        depth, delivered as uint16 millimetres. ``schedule``: when each frame is due, in place of every 1 / ``fps``
-        from the reader's start, for the frames it knows."""
+        """``color``: decode to BGR, or with ``nv12`` to packed NV12 (H * 3 / 2, W); otherwise to gray.
+        ``stream``: which video stream of the file. ``depth``: it holds depth, delivered as uint16 millimeters.
+        ``schedule``: when each frame is due, in place of every 1 / ``fps`` from the reader's start, for the frames it
+        knows."""
         self.frame_callback: StreamFrameCallback = frame_callback
         self.schedule: FrameSchedule | None = schedule
         self.nv12: bool = nv12 and color and not depth

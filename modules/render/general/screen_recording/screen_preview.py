@@ -5,7 +5,7 @@ waiting.
 unpack pixel buffers, mapped once on the main thread (persistent and coherent), and marks it written. `update`, on
 the render tick, uploads a written buffer into the planes' textures, turns them back into RGB in `fbo`, and sets
 a fence on the buffer; once that fence has passed, checked on a later tick without waiting, the buffer is free
-again. Only the main thread makes GL calls. See modules/video/VIDEO.md.
+again. Only the main thread makes GL calls. See SCREEN_RECORDING.md.
 """
 
 import ctypes
