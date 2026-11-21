@@ -11,13 +11,6 @@ in the log. A rename or a text change needs no start. The whole of smile's tests
 
 ## C. Wiring and time
 
-- C1 The view: the fit to the output size becomes a plain geometry module, which the render's camera layer draws on
-  the GPU; the face finder maps the detector's faces (found on the full frame) into it, counting a face only inside
-  and measuring `OUTSIDE` against the view's edge; `cover` runs once, at the capture. `cam` hands the full
-  `CameraFrame`s on, and the uploader takes them through `cam`'s `CameraFrameCallback`, not from `Main` polling
-  `camera.frame()`.
-  Check: the start check; `cam/tests`, `face/tests` (a frame larger than the view), `render/tests`, `save/tests`,
-  `tests`; a test of the view geometry.
 - C2 A board, `apps/smile/board/`, in place of `SmileRender`'s setters and its `Inputs` and `Faces`: `modules/board`'s
   `CameraImageStoreMixin` holds the full uploaded frame, so the render no longer uploads it a second time, and smile's
   own slices hold the faces, the capture and its depth, the generator's images, the status and warm-up, and the online
