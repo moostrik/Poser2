@@ -29,13 +29,23 @@ def name_error_lines(log: str, files: list[Path]) -> str:
     return '\n'.join(_LOG_LOCATION.sub(name, line) for line in log.splitlines())
 
 
+def file_stamp(path: Path) -> tuple[int, int] | None:
+    """A file's write time (ns) and size; None when it cannot be read."""
+    try:
+        status = path.stat()
+    except OSError:
+        return None
+    return status.st_mtime_ns, status.st_size
+
+
 @dataclass
 class _Program:
     """A shader class's compiled program, shared by all its objects: compiled at the first `allocate`, freed at the
     last `deallocate`, compiled again when a file it was made from changes."""
     program: int | None = None
     users: int = 0
-    files: set[Path] = field(default_factory=set)       # the files it was compiled from
+    # the files it was compiled from, each with its `file_stamp` as it was read
+    files: dict[Path, tuple[int, int] | None] = field(default_factory=dict)
     uniforms: dict[str, int] = field(default_factory=dict)     # read after linking; an array element at its use
     marked: bool = False                                # a file changed: compiled again at the next reload point
     marked_at: float = 0.0                              # the last change's time (perf_counter), for SETTLE
@@ -133,11 +143,10 @@ class Shader():
     def _read_sources(cls, entry: _Program) -> list[tuple[int, Path, str, list[Path]]]:
         """The stages' sources; the files they read, their includes too, become the ones whose change marks it."""
         sources: list[tuple[int, Path, str, list[Path]]] = []
-        files: set[Path] = set()
+        files: dict[Path, tuple[int, int] | None] = {}
         for stage, path in cls._stages():
             read: list[Path] = []
-            sources.append((stage, path, cls.read_shader_source(str(path), read), read))
-            files.update(read)
+            sources.append((stage, path, cls.read_shader_source(str(path), read, files), read))
         with Shader._lock:
             entry.files = files
         return sources
@@ -237,15 +246,20 @@ class Shader():
                 logger.error("%s reload failed; the previous program stays", shader_class.__name__)
 
     @staticmethod
-    def read_shader_source(filename: str, read: list[Path] | None = None, _included: frozenset[str] = frozenset()) -> str:
+    def read_shader_source(filename: str, read: list[Path] | None = None,
+                           stamps: dict[Path, tuple[int, int] | None] | None = None,
+                           _included: frozenset[str] = frozenset()) -> str:
         """Read shader source code from file; a line `#include "name.glsl"` is replaced by that file, beside
         the including one or else in `modules/gl/shaders` (as `position.glsl`), so passes can share one rule (each
         file included once per shader). `read` gets each file read, the first one first; an included file is framed by
-        `#line` directives numbering it by its place there, so a compile error names its file (`name_error_lines`)."""
+        `#line` directives numbering it by its place there, so a compile error names its file (`name_error_lines`);
+        `stamps` gets each file's `file_stamp`, taken before it is read, so a save during the read still counts."""
         if read is None:
             read = []
         index: int = len(read)
         read.append(Path(filename))
+        if stamps is not None:
+            stamps[Path(filename)] = file_stamp(Path(filename))
         try:
             with open(filename, 'r', encoding='utf-8') as file:
                 source = file.read()
@@ -266,7 +280,7 @@ class Shader():
                     lines.append('')                    # the line count stays
                     continue
                 child: int = len(read)
-                included = Shader.read_shader_source(path, read, _included | {path})
+                included = Shader.read_shader_source(path, read, stamps, _included | {path})
                 if not included:
                     logger.error("%s: include %s not found", filename, name)
                     lines.append('')
@@ -299,7 +313,7 @@ class Shader():
         logger.info("Hot reload disabled")
 
     @staticmethod
-    def _watch_files(files: set[Path]) -> None:
+    def _watch_files(files: dict[Path, tuple[int, int] | None]) -> None:
         """Start watching the folders of these files, each once; under the lock."""
         for directory in {path.parent for path in files}:
             if directory not in Shader._directory_observers:
@@ -307,12 +321,14 @@ class Shader():
 
     @staticmethod
     def _on_file_changed(filepath: str) -> None:
-        """The watcher's thread: mark each program made from the file."""
+        """The watcher's thread: mark each program made from the file, unless its write time and size are as when
+        that program read it: Windows reports a read as a change too (the read's last access time)."""
         path = Path(filepath)
+        stamp: tuple[int, int] | None = file_stamp(path)
         now: float = perf_counter()
         with Shader._lock:
             for entry in Shader._programs.values():
-                if path in entry.files:
+                if path in entry.files and (stamp is None or entry.files[path] != stamp):
                     entry.marked = True
                     entry.marked_at = now
                     Shader._marked = True

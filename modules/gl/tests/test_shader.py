@@ -100,9 +100,24 @@ class ShaderTest(unittest.TestCase):
             for shader in shaders:
                 shader.allocate()
             self.compiles.clear()
+            (root / 'common.glsl').write_text('float shared() { return 2.0; }\n')
             Shader._on_file_changed(str(root / 'common.glsl'))
             Shader.reload_marked()
         self.assertEqual(sorted(c.__name__ for c in self.compiles), ['_A', '_B'])
+
+    def test_a_file_only_read_marks_nothing_and_a_save_marks_it(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'a.frag'
+            path.write_text(SOURCE)
+            self.shader_on(path)
+            path.read_text()
+            Shader._on_file_changed(str(path))              # Windows: the read's last access time, reported
+            Shader.reload_marked()
+            self.assertEqual(self.compiles, [])
+            path.write_text(SOURCE + '// saved\n')
+            Shader._on_file_changed(str(path))
+            Shader.reload_marked()
+        self.assertEqual(len(self.compiles), 1)
 
     def test_an_error_in_an_include_names_that_file_and_line(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
@@ -161,6 +176,7 @@ class ShaderTest(unittest.TestCase):
             path = Path(folder) / 'a.frag'
             path.write_text(SOURCE)
             self.shader_on(path)
+            path.write_text(SOURCE + '// saved\n')
             clock = [10.0]
             with mock.patch.object(SHADER, 'SETTLE', 0.1), mock.patch.object(SHADER, 'perf_counter', lambda: clock[0]):
                 Shader._on_file_changed(str(path))
@@ -194,6 +210,8 @@ class ShaderTest(unittest.TestCase):
             for path in (first, second):
                 path.write_text(SOURCE)
             a, b = self.shader_on(first), self.shader_on(second)
+            for path in (first, second):
+                path.write_text(SOURCE + '// saved\n')
             Shader._on_file_changed(str(first))
             Shader._on_file_changed(str(second))            # within the same moment: nothing dropped
             Shader.reload_marked()

@@ -95,7 +95,8 @@ once, at the class's first `allocate`, shared by every object of the class (`Sha
 `deallocate`. A uniform's location is read once after linking; a name the program does not have warns once.
 
 Hot reload, where an app turns it on (`Shader.enable_hot_reload`): the watcher's thread marks each program made from a
-changed file, an include or `_generic.vert` included, and the window loop compiles the marked programs again at the
+changed file, an include or `_generic.vert` included (changed: its write time or size differs from when the program
+read it, since Windows reports a read as a change too), and the window loop compiles the marked programs again at the
 top of the next frame (`Shader.reload_marked`), once their files have been quiet for 0.1 s; a failed compile keeps the
 program it had, and a file that reads empty, a save under way, is tried again next frame. A compile error names the
 file and line it is in: each include is framed by `#line` directives that number it, and the driver's log is named by
