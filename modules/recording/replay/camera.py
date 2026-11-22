@@ -27,7 +27,7 @@ from modules.camera import CameraFrame, CameraTracklet, ClipFrame, CameraTrackle
     RigCameraReadings, TiltCorrection, TiltCorrectionSettings, TrackletCallback
 from modules.utils import FPS, Broadcast, Rect, Waker
 
-from ..container import ChunkInfo, FrameMetadata
+from ..chunk import ChunkInfo, FrameMetadata
 from .tracker import Track
 
 logger = logging.getLogger(__name__)

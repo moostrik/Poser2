@@ -30,7 +30,7 @@ from modules.camera import CAPTURE_TOLERANCE, CameraFrame, CameraTracklets, Capt
 from modules.pose import BBox, FrameDict, Points2D, has_points
 from modules.utils import Broadcast, Rect
 
-from ..container import PoseArrays
+from .chunk import PoseArrays
 
 logger = logging.getLogger(__name__)
 

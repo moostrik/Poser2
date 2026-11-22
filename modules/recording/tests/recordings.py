@@ -12,7 +12,7 @@ from modules import video
 from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, ClipFrame, FrameReadings, FrameType, TrackingStatus
 from modules.pose import BBox, Frame, FrameDict, Points2D
 from modules.recording import Container, FrameMetadata, Player, PlayerSettings, Recorder, RecorderSettings
-from modules.recording.recorder.recorder import RecState
+from modules.recording.recorder import RecState
 from modules.utils import Rect
 
 

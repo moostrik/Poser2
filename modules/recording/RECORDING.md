@@ -6,9 +6,9 @@ the design and its reasons; how each part works is in its module's docstring:
 
 | Part                         | Module                                                               |
 |------------------------------|----------------------------------------------------------------------|
-| what a chunk holds           | `container/chunk.py`                                                 |
-| a capture's parts together   | `recorder/recording_sync.py`, `modules/camera/sync/capture_match.py` |
-| writing                      | `recorder/recorder.py`, `modules/video/stream/stream_writer.py`      |
+| what a chunk holds           | `chunk.py`                                                           |
+| a capture's parts together   | `recording_sync.py`, `modules/camera/sync/capture_match.py`          |
+| writing                      | `recorder.py`, `modules/video/stream/stream_writer.py`               |
 | playing                      | `player/player.py` and [its parts](#the-players-parts)               |
 | the camera of a recording    | `replay/camera.py`, `replay/tracker.py`                              |
 | the poses of a recording     | `modules/inference/pose/recorded_poses.py`                           |
@@ -173,7 +173,7 @@ loaded and the last played, and its lines are parsed as the frames are read, so 
 | `player/play_clock.py`          | `PlayClock`                   | the recorded time of a play                                     |
 | `player/chunk_readers.py`       | `ChunkReaders`                | one chunk's readers of every camera, its metadata and its clock |
 | `player/frame_hand_over.py`     | `FrameHandOver`               | each camera's frames handed over in order, the drift            |
-| `container/recording_folder.py` | `RecordingFolder`, `Timeline` | the folders, a folder's chunks and markers, places on them      |
+| `player/recording_folder.py`    | `RecordingFolder`, `Timeline` | the folders, a folder's chunks and markers, places on them      |
 
 ## The replay camera
 
@@ -212,15 +212,14 @@ stage's features for the show to play, on the wall clock, apart from the video.
 that feeds recorded clips through its device (`oak.ClipCamera`) takes them by the camera's `ClipSource` protocol, each
 a `ClipFrame` whose metadata the recording's `FrameMetadata` is.
 
-| Folder      | Role                   | Holds                                                      |
-|-------------|------------------------|------------------------------------------------------------|
-| `container` | the file's format      | `chunk`, `recording_folder`                                |
-| `recorder`  | writing                | `recorder`, `recording_sync`                               |
-| `player`    | playing                | `player`, `play_clock`, `chunk_readers`, `frame_hand_over` |
-| `replay`    | the recording's camera | `camera`, `tracker`                                        |
+| Folder      | Role                                          | Holds                                                                          |
+|-------------|-----------------------------------------------|--------------------------------------------------------------------------------|
+| the root    | the file's format, a capture's parts, writing | `chunk`, `recording_sync`, `recorder`                                          |
+| `player`    | playing                                       | `player`, `play_clock`, `chunk_readers`, `frame_hand_over`, `recording_folder` |
+| `replay`    | the recording's camera                        | `camera`, `tracker`                                                            |
 
-Each folder has its tests beside it; `tests` holds the tests through the real encoders (`test_round_trip`,
-`test_rig`, `test_mp4`) and what the recording tests share (`recordings.py`).
+`player` and `replay` have their tests beside them; `tests` holds the root's tests, the tests through the real
+encoders (`test_round_trip`, `test_rig`, `test_mp4`) and what the recording tests share (`recordings.py`).
 
 ## Measured
 

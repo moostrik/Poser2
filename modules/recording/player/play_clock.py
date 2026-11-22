@@ -3,7 +3,7 @@
 from collections.abc import Mapping, Sequence
 from threading import Lock
 
-from ..container import FrameMetadata
+from ..chunk import FrameMetadata
 
 
 class _Origin:

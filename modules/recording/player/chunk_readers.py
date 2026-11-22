@@ -21,8 +21,9 @@ import numpy as np
 from modules.camera import CAPTURE_TOLERANCE
 from modules.video import Hardware, StreamFrameCallback, StreamReader
 
-from ..container import ChunkInfo, ChunkMetadata, ChunkStream, FrameMetadata, RecordingFolder, make_chunk_name, make_file_name, read_metadata
+from ..chunk import ChunkInfo, ChunkMetadata, ChunkStream, FrameMetadata, make_chunk_name, make_file_name, read_metadata
 from .play_clock import PlayClock
+from .recording_folder import RecordingFolder
 
 # (cam_id, stream, frame, chunk_id, frame_id): a reader's frame, of the stream it reads
 ChunkFrameCallback = Callable[[int, ChunkStream, np.ndarray, int, int], None]

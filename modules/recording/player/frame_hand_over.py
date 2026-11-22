@@ -18,7 +18,7 @@ from numpy import ndarray
 from modules.camera import ClipFrame, FrameType
 from modules.utils import Broadcast
 
-from ..container import ChunkInfo, ChunkStream, FrameMetadata
+from ..chunk import ChunkInfo, ChunkStream, FrameMetadata
 from .chunk_readers import ChunkReaders
 
 logger = logging.getLogger(__name__)

@@ -12,7 +12,7 @@ import numpy as np
 from modules import video
 from modules.camera import CameraFrame, FrameReadings, FrameType
 from modules.recording import ChunkInfo, Player, PlayerSettings, Recorder, RecorderSettings, make_chunk_name, read_metadata
-from modules.recording.recorder.recorder import RecState
+from modules.recording.recorder import RecState
 from modules.recording.tests.recordings import LENS, video_frame, poses, depth_frame, recorder, stream_frames, stream_images, stream_packets, \
     cam_frame, record, player, Played, clip_metadata, collect, FPS
 
@@ -294,7 +294,7 @@ class TwoRecordingsTest(unittest.TestCase):
 class DroppedCaptureTest(unittest.TestCase):
     def test_a_capture_dropped_for_the_bound_keeps_the_streams_and_metadata_alike(self) -> None:
         def flood(rec: Recorder) -> None:
-            with patch('modules.recording.recorder.recorder.HELD', 4 * (240 * 320 * 3 + 120 * 160 * 2)):
+            with patch('modules.recording.recorder.HELD', 4 * (240 * 320 * 3 + 120 * 160 * 2)):
                 for i in range(120):
                     t: float = 100.0 + i / FPS
                     rec.submit_frame(cam_frame(0, i * 2 % 250, t))

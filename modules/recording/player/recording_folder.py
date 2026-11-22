@@ -11,7 +11,7 @@ from pathlib import Path
 
 from modules.video import probe
 
-from .chunk import ChunkStream, Container, make_chunk_name, make_file_name
+from ..chunk import ChunkStream, Container, make_chunk_name, make_file_name
 
 logger = logging.getLogger(__name__)
 

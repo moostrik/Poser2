@@ -14,8 +14,8 @@ import numpy as np
 from modules import video
 from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, FrameType, TrackingStatus
 from modules.recording import ChunkStream, RecorderSettings
-from modules.recording.recorder import RecordedCapture
-from modules.recording.recorder.recorder import RecState
+from modules.recording import RecordedCapture
+from modules.recording.recorder import RecState
 from modules.recording.tests.recordings import LENS, video_frame, recorder
 from modules.utils import Rect
 
@@ -30,7 +30,7 @@ class QueueTest(unittest.TestCase):
 
     def test_beyond_the_bound_a_capture_is_dropped_whole_and_counted(self) -> None:
         bound: int = 3 * video_frame(0).image.nbytes
-        with patch('modules.recording.recorder.recorder.HELD', bound):
+        with patch('modules.recording.recorder.HELD', bound):
             for i in range(5):
                 self.recorder.submit_frame(video_frame(i))
         self.assertEqual(self.recorder.frames[0].qsize(), 3)
@@ -54,7 +54,7 @@ class QueueTest(unittest.TestCase):
         self.recorder.state = RecState.START
         self.recorder.settings.recording = True
         self.recorder._start_recording = lambda: (_ for _ in ()).throw(OSError('no disk'))  # pyright: ignore[reportAttributeAccessIssue]
-        with self.assertLogs('modules.recording.recorder.recorder', 'ERROR'):
+        with self.assertLogs('modules.recording.recorder', 'ERROR'):
             self.recorder._begin()
         self.assertEqual(self.recorder.state, RecState.IDLE)
         self.assertFalse(self.recorder.settings.recording)

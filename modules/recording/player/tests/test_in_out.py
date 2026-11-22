@@ -11,8 +11,8 @@ import numpy as np
 from modules import video
 from modules.camera import ClipFrame, FrameType
 from modules.recording import Player, PlayerSettings, make_chunk_name
-from modules.recording.container.recording_folder import IN_OUT_FILE, read_in_out, write_in_out
-from modules.recording.recorder.recorder import RecState
+from modules.recording.player.recording_folder import IN_OUT_FILE, read_in_out, write_in_out
+from modules.recording.recorder import RecState
 from modules.recording.tests.recordings import depth_frame, recorder, stream_packets, video_frame
 
 
@@ -29,7 +29,7 @@ class MarkerFileTest(unittest.TestCase):
     def test_a_damaged_file_plays_in_full_and_says_so(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             (Path(folder) / IN_OUT_FILE).write_text('{"in": 0.2', encoding='utf-8')
-            with self.assertLogs('modules.recording.container.recording_folder', level='ERROR'):
+            with self.assertLogs('modules.recording.player.recording_folder', level='ERROR'):
                 self.assertEqual(read_in_out(Path(folder)), [0.0, 1.0])
 
 

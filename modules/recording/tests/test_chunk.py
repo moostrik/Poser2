@@ -13,7 +13,7 @@ from modules import video
 from modules.camera import CameraTracklet, DepthAlignment, FrameReadings, TrackingStatus
 from modules.recording import ChunkInfo, ChunkStream, FrameMetadata, finish_unmerged, make_chunk_name, make_file_name, make_folder_name, \
     merge_chunk, read_metadata
-from modules.recording.container.chunk import METADATA_LABEL, METADATA_SUFFIX, frame_line, info_line, parse_metadata
+from modules.recording.chunk import METADATA_LABEL, METADATA_SUFFIX, frame_line, info_line, parse_metadata
 from modules.video import StreamWriter
 from modules.recording.tests.recordings import LENS
 from modules.utils import Rect

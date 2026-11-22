@@ -39,7 +39,7 @@ def probe(path: Path, entry: str) -> str:
 class Mp4Test(unittest.TestCase):
     def test_an_mp4_chunk_is_the_color_clip_with_its_metadata_beside(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
-            with self.assertLogs('modules.recording.recorder.recorder', 'WARNING'):     # depth asked for: color only
+            with self.assertLogs('modules.recording.recorder', 'WARNING'):     # depth asked for: color only
                 recording = record(Path(folder), [FrameType.VIDEO, FrameType.DEPTH], 1, feed, container=Container.MP4)
             self.assertEqual(sorted(p.name for p in recording.iterdir()), ['0_C_000.mp4', '0_M_000.jsonl'])
             clip = recording / '0_C_000.mp4'

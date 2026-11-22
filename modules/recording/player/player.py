@@ -24,8 +24,9 @@ from modules.settings import BaseSettings, Field, Widget
 from modules.utils import Broadcast, Waker
 from modules.video import Hardware
 
-from ..container import ChunkInfo, ChunkStream, Container, RecordingFolder, Timeline, chunk_streams, locate
+from ..chunk import ChunkInfo, ChunkStream, Container, chunk_streams
 from .chunk_readers import ChunkReaders, Decoding
+from .recording_folder import RecordingFolder, Timeline, locate
 from .frame_hand_over import FrameHandOver
 
 import logging

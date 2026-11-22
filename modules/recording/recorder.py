@@ -36,7 +36,7 @@ from modules.settings import BaseSettings, Field, Widget
 from modules.utils import Waker
 from modules.video import ClipCodec, DEPTH_CODEC, DEPTH_HARDWARE, Hardware, StreamWriter
 
-from ..container import DEPTH_SUFFIX, METADATA_LABEL, METADATA_SUFFIX, ChunkInfo, ChunkStream, Container, FrameMetadata, \
+from .chunk import DEPTH_SUFFIX, METADATA_LABEL, METADATA_SUFFIX, ChunkInfo, ChunkStream, Container, FrameMetadata, \
     chunk_streams, finish_unmerged, frame_line, info_line, keep_chunk, make_chunk_name, make_file_name, make_folder_name, merge_chunk
 from .recording_sync import FramePoses, RecordedCapture, RecordingSync
 

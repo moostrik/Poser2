@@ -42,12 +42,6 @@ None open.
 
 ## F. The tree and what it exports
 
-- F1. `container/` and `recorder/` fold into the root, and `recording_folder.py` goes to `player/`: the root holds
-  `chunk.py`, `recorder.py`, `recording_sync.py`; `player/` its five files, as RECORDING.md's "The player's parts"
-  lists them already; `replay/` stays, the namespace the apps use (`replay.Camera`, as `oak.Camera`). Their tests go
-  to `tests/` and `player/tests/`, and RECORDING.md's layout table follows. Why: "Prefer no folder for one or two
-  files": `container/`, `recorder/` and `replay/` hold two each **(seen)**. Callers outside import from the root and
-  do not change **(seen, grep)**. Tests: the recording tests, the guard tests, pyright.
 - F2. `__init__.py` exports only what other packages use. It keeps `ChunkStream`, `FrameMetadata`, `PoseArrays`,
   `Container`, `read_metadata`, `make_folder_name`, `Player`, `PlayerSettings`, `Recorder`, `RecorderSettings` and
   `replay` with `Camera` and `Tracker`. Out, used by no other package on the PC's deep-flow **(seen, grep)**:
@@ -78,7 +72,6 @@ None open.
 
 - Keep settings files in sync with code changes: hd_trio's `container` in its settings file
 - Run a test of the app or a GPU harness only on the user's go, and only what the plan names: the checks of A
-- Prefer no folder for one or two files: F1
 - Its `__init__.py` holds what other packages use: F2
 - Inside a package, code that does the same is written once: F3
 - Remove obsolete pathways; one term everywhere; `Field` descriptions: G1
