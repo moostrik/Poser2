@@ -194,7 +194,7 @@ class RigTest(unittest.TestCase):
             played: list[Played] = []
             drifts: list[float] = []
             collect(play, played)
-            play.add_frame_callback(lambda cam, kind, image, confidence, frame, captured: drifts.append(play.get_drift()))
+            play.add_frame_callback(lambda clip: drifts.append(play.get_drift()))
             play.start()
             try:
                 deadline = time.perf_counter() + 10.0

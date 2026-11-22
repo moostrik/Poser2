@@ -2,7 +2,7 @@
 
 What is next for recording and -sim, in order. How it works is in [RECORDING.md](RECORDING.md); the apps' move to
 the recorder is in [the refactor's plan](../../REFACTOR_PLAN.md). **(deduction)** marks what is inferred, **(site
-fact)** what was told.
+fact)** what was told, **(seen)** what is read in the code.
 
 ## A. Checks waiting for the camera
 
@@ -39,21 +39,6 @@ timing, not the recording's data. Looked at when the refactor's A6 reaches the r
 ## D. Questions for the recording review (the refactor's A6)
 
 None open.
-
-## E. Callbacks and waits
-
-Proposals from the scan of 2026-11-21; nothing is built. **(seen)** is read in the code, **(deduction)** inferred.
-
-- E4. The player hands a clip frame as one value: `ClipFrame`, a frozen dataclass in `modules/camera/source.py` beside
-  `ClipSource` (`cam_id`, `kind`, `image`, `confidence`, `metadata`, `timestamp`, the capture on the play's clock), and
-  `ClipFrameCallback` becomes `Callable[[ClipFrame], None]`. Recording's own `ClipFrameCallback` in
-  `frame_hand_over.py` goes. `metadata` is typed `object`, as the camera may not import recording; `FrameMetadata`
-  stays in recording, and `replay.Camera` and inference's `RecordedPoses.set_clip_frame` narrow it with `isinstance`.
-  `oak.ClipCamera` takes the new shape in `_clip_callback` and `_passthrough_callback`, which reads its time. Why: one name for two types today: camera's `ClipFrameCallback`
-  (metadata `object`) and recording's (metadata `FrameMetadata`) are the same six-argument tuple from one producer,
-  `FrameHandOver` **(seen)**; "Similar things share the noun". Touches
-  `modules/camera/source.py`, its `__init__.py` and CAMERA.md's `ClipSource` line; the camera thread agrees. Tests: the recording, camera
-  and inference pose tests and pyright in `.venv-oak4`; oak's tests and pyright in `.venv`, where `oak.ClipCamera` runs.
 
 ## F. The tree and what it exports
 
@@ -93,7 +78,6 @@ Proposals from the scan of 2026-11-21; nothing is built. **(seen)** is read in t
 
 - Keep settings files in sync with code changes: hd_trio's `container` in its settings file
 - Run a test of the app or a GPU harness only on the user's go, and only what the plan names: the checks of A
-- Similar things share the noun: E4
 - Prefer no folder for one or two files: F1
 - Its `__init__.py` holds what other packages use: F2
 - Inside a package, code that does the same is written once: F3

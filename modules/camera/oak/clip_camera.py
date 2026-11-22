@@ -9,7 +9,7 @@ import depthai as dai
 import numpy as np
 from cv2 import COLOR_BGR2GRAY, cvtColor
 
-from .. import ClipSource, FrameType
+from .. import ClipFrame, ClipSource, FrameType
 from ..geometry import frame_size, mode_size
 
 from .camera import Camera
@@ -70,12 +70,12 @@ class ClipCamera(Camera):
         self.clips = None
         super()._close()
 
-    def _clip_callback(self, cam_id: int, frame_type: FrameType, frame: np.ndarray, confidence: np.ndarray | None, metadata: object,
-                       captured: float | None) -> None:
+    def _clip_callback(self, clip: ClipFrame) -> None:
         """A decoded clip frame, into the device as the sensor would have sent it."""
-        if not self.running or cam_id != self.cam_id or frame_type != FrameType.VIDEO or self.clips is None:
+        if not self.running or clip.cam_id != self.cam_id or clip.kind != FrameType.VIDEO or self.clips is None:
             return
 
+        frame: np.ndarray = clip.image
         height, width = frame.shape[:2]
         self._check_frame_size(width, height)
         img = dai.ImgFrame()
@@ -106,14 +106,13 @@ class ClipCamera(Camera):
             self.cam_id, width, height, expected[0], expected[1],
         )
 
-    def _passthrough_callback(self, cam_id: int, frame_type: FrameType, frame: np.ndarray, confidence: np.ndarray | None,
-                              metadata: object, captured: float | None) -> None:
+    def _passthrough_callback(self, clip: ClipFrame) -> None:
         """Without a device: the clip frames go straight to the callbacks, no tracklets, stamped with their recorded
         capture on the play's clock, or with their arrival for a recording without one."""
-        if cam_id != self.cam_id:
+        if clip.cam_id != self.cam_id:
             return
         arrival: float = perf_counter()
-        self._emit_frame(frame_type, frame, captured if captured is not None else arrival, arrival)
+        self._emit_frame(clip.kind, clip.image, clip.timestamp if clip.timestamp is not None else arrival, arrival)
 
     @staticmethod
     def to_planar(image: np.ndarray) -> np.ndarray:

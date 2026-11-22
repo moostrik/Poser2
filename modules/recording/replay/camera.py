@@ -23,7 +23,7 @@ from typing import Protocol
 
 import numpy as np
 
-from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, CameraFrameCallback, DepthAlignment, FrameReadings, FrameType, \
+from modules.camera import CameraFrame, CameraTracklet, ClipFrame, CameraTracklets, CameraFrameCallback, DepthAlignment, FrameReadings, FrameType, \
     RigCameraReadings, TiltCorrection, TiltCorrectionSettings, TrackletCallback
 from modules.utils import FPS, Broadcast, Rect, Waker
 
@@ -132,14 +132,16 @@ class Camera:
 
     # ── Hand-over ──────────────────────────────────────────────────────
 
-    def _clip_callback(self, cam_id: int, frame_type: FrameType, image: np.ndarray, confidence: np.ndarray | None,
-                       metadata: FrameMetadata | None, captured: float | None) -> None:
+    def _clip_callback(self, clip: ClipFrame) -> None:
         """A clip frame, on the player's thread, to the callbacks: stamped with its capture on the play's clock,
         or its hand-over for a recording without metadata, and its hand-over as its arrival; a depth with its
         confidence. The player hands a recorded frame's video first, so its depth takes the video's stamp: one
         capture, one time."""
-        if not self.running or cam_id != self.cam_id:
+        if not self.running or clip.cam_id != self.cam_id:
             return
+        frame_type: FrameType = clip.kind
+        captured: float | None = clip.timestamp
+        metadata: FrameMetadata | None = clip.metadata if isinstance(clip.metadata, FrameMetadata) else None
         arrival: float = time.perf_counter()
         info: ChunkInfo | None = self.player.get_chunk_info(self.cam_id)
         if frame_type == FrameType.VIDEO:
@@ -156,9 +158,9 @@ class Camera:
         readings: FrameReadings | None = metadata.readings if frame_type == FrameType.VIDEO and metadata is not None else None
         intrinsics: list[list[float]] | None = info.intrinsics if info is not None else None
         nv12: bool = frame_type == FrameType.VIDEO and self.player.nv12
-        frame = CameraFrame(cam_id=self.cam_id, kind=frame_type, image=image, timestamp=timestamp, nv12=nv12, flip_h=flip_h,
+        frame = CameraFrame(cam_id=self.cam_id, kind=frame_type, image=clip.image, timestamp=timestamp, nv12=nv12, flip_h=flip_h,
                             homography=homography, readings=readings, intrinsics=intrinsics, alignment=alignment, arrival=arrival,
-                            confidence=confidence, rotate90=info.rotate90 if info is not None else False,
+                            confidence=clip.confidence, rotate90=info.rotate90 if info is not None else False,
                             flip_v=info.flip_v if info is not None else False)
         self.frame_callbacks(frame)
         if frame_type == FrameType.VIDEO and metadata is not None:

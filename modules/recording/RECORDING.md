@@ -158,7 +158,7 @@ frames gone out, in ms. A clip without metadata plays at `fps`.
 
 The player goes by the chunk's streams (`ChunkStream`) in its readers, the frames waiting to be paired and its
 hand-over, and reads the confidence grey where `ChunkInfo.confidence` says the chunk has it. The hand-over turns them
-into the camera's frames: the color a VIDEO frame, the depth a DEPTH frame with its confidence (`ClipFrameCallback`),
+into the camera's clip frames (`ClipFrame`): the color a VIDEO frame, the depth a DEPTH frame with its confidence,
 which the replay camera puts on the DEPTH `CameraFrame`.
 
 deep_flow's player decodes color to NV12 (`Player(nv12=True)`), as the camera hands it: half the bytes of BGR
@@ -209,7 +209,8 @@ stage's features for the show to play, on the wall clock, apart from the video.
 ## The package's layout
 
 `modules/recording` uses a camera and is not one: it depends on `modules/camera`, never the other way. A camera
-that feeds recorded clips through its device (`oak.ClipCamera`) takes them by the camera's `ClipSource` protocol.
+that feeds recorded clips through its device (`oak.ClipCamera`) takes them by the camera's `ClipSource` protocol, each
+a `ClipFrame` whose metadata the recording's `FrameMetadata` is.
 
 | Folder      | Role                   | Holds                                                      |
 |-------------|------------------------|------------------------------------------------------------|

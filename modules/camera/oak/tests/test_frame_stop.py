@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import numpy as np
 
-from modules.camera import CameraFrame, FrameType
+from modules.camera import CameraFrame, ClipFrame, FrameType
 from modules.camera.oak import Camera, ClipCamera, OakCameraSettings
 
 IMAGE: np.ndarray = np.zeros((4, 6), np.uint8)
@@ -31,11 +31,11 @@ class FrameStopTest(unittest.TestCase):
         camera.start()
         try:
             self.assertTrue(camera.connected)
-            camera._passthrough_callback(0, FrameType.VIDEO, IMAGE, None, None, 1.0)
+            camera._passthrough_callback(ClipFrame(0, FrameType.VIDEO, IMAGE, None, None, 1.0))
         finally:
             camera.stop()
             camera.join(1.0)
-        camera._passthrough_callback(0, FrameType.VIDEO, IMAGE, None, None, 2.0)
+        camera._passthrough_callback(ClipFrame(0, FrameType.VIDEO, IMAGE, None, None, 2.0))
         self.assertEqual([frame.timestamp for frame in frames], [1.0])
 
 

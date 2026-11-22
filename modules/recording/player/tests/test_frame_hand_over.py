@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.camera import FrameType
+from modules.camera import ClipFrame, FrameType
 from modules.recording import ChunkStream, FrameMetadata, PlayClock
 from modules.recording.player.frame_hand_over import FrameHandOver
 
@@ -40,12 +40,11 @@ class FrameHandOverTest(unittest.TestCase):
         self.confidences: list[tuple[FrameType, int | None]] = []
         self.hand_over.frame_callbacks.add_callback(self.on_frame)
 
-    def on_frame(self, cam: int, kind: FrameType, image: np.ndarray, confidence: np.ndarray | None, metadata: FrameMetadata | None,
-                 captured: float | None) -> None:
-        self.confidences.append((kind, None if confidence is None else int(confidence[0])))
-        if cam == 0:
-            self.out.append((int(image[0]), kind))
-        self.out_cams.append((cam, int(image[1]), int(image[0])))
+    def on_frame(self, clip: ClipFrame) -> None:
+        self.confidences.append((clip.kind, None if clip.confidence is None else int(clip.confidence[0])))
+        if clip.cam_id == 0:
+            self.out.append((int(clip.image[0]), clip.kind))
+        self.out_cams.append((clip.cam_id, int(clip.image[1]), int(clip.image[0])))
 
     def push(self, frame_id: int, kind: ChunkStream, chunk: int = 0, cam: int = 0) -> None:
         self.hand_over.submit_frame(cam, kind, np.array([frame_id, chunk]), chunk, frame_id)

@@ -12,23 +12,16 @@ the cameras are apart in recorded time is `drift`."""
 import logging
 from collections import defaultdict
 from threading import Lock
-from typing import Callable, TypeAlias
 
 from numpy import ndarray
 
-from modules.camera import FrameType
+from modules.camera import ClipFrame, FrameType
 from modules.utils import Broadcast
 
 from ..container import ChunkInfo, ChunkStream, FrameMetadata
 from .chunk_readers import ChunkReaders
 
 logger = logging.getLogger(__name__)
-
-# A clip frame as the player hands it over: (cam_id, frame_type, image, confidence, metadata, timestamp), a DEPTH
-# frame's confidence (None for a VIDEO frame and a chunk without it), the metadata the chunk keeps of the frame and its
-# capture on the play's clock (`PlayClock.capture`). The last two are None for a recording without metadata: the
-# source it feeds stamps the frame at its hand-over then.
-ClipFrameCallback: TypeAlias = Callable[[int, FrameType, ndarray, ndarray | None, FrameMetadata | None, float | None], None]
 
 FRAME_TYPES: dict[ChunkStream, FrameType] = {ChunkStream.VIDEO: FrameType.VIDEO, ChunkStream.DEPTH: FrameType.DEPTH}
 
@@ -38,8 +31,7 @@ class FrameHandOver:
         """`streams`: in the order a frame's streams go out, VIDEO first: its readings set up what the depth of the
         frame uses."""
         self.streams: list[ChunkStream] = streams
-        self.frame_callbacks: Broadcast[[int, FrameType, ndarray, ndarray | None, FrameMetadata | None, float | None]] = \
-            Broadcast(name='Player frame')
+        self.frame_callbacks: Broadcast[[ClipFrame]] = Broadcast(name='Player frame')
         self._lock: Lock = Lock()                   # the chunks handed over and the counts
         self._camera_locks: dict[int, Lock] = defaultdict(Lock)     # one camera's frames out at a time, in order
         self._readers: dict[int, ChunkReaders] = {}         # the chunks whose frames go out, by number
@@ -124,4 +116,5 @@ class FrameHandOver:
             for stream in self.streams:
                 kind: FrameType | None = FRAME_TYPES.get(stream)
                 if kind is not None and stream in frames:
-                    self.frame_callbacks(cam_id, kind, frames[stream], confidence if kind == FrameType.DEPTH else None, metadata, timestamp)
+                    self.frame_callbacks(ClipFrame(cam_id, kind, frames[stream], confidence if kind == FrameType.DEPTH else None,
+                                                   metadata, timestamp))

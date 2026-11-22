@@ -9,7 +9,7 @@ from typing import Callable
 import numpy as np
 
 from modules import video
-from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, FrameReadings, FrameType, TrackingStatus
+from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, ClipFrame, FrameReadings, FrameType, TrackingStatus
 from modules.pose import BBox, Frame, FrameDict, Points2D
 from modules.recording import Container, FrameMetadata, Player, PlayerSettings, Recorder, RecorderSettings
 from modules.recording.recorder.recorder import RecState
@@ -149,9 +149,18 @@ def player(root: Path, num_cams: int) -> Player:
 Played = tuple[int, FrameType, int, float | None, float | None, FrameMetadata | None]
 
 
+def clip_metadata(clip: ClipFrame) -> FrameMetadata | None:
+    """The metadata recorded with a clip frame."""
+    return clip.metadata if isinstance(clip.metadata, FrameMetadata) else None
+
+
 def collect(play: Player, out: list[Played]) -> None:
-    play.add_frame_callback(lambda cam, kind, image, confidence, frame, captured: out.append(
-        (cam, kind, int(np.median(image[..., 0] if image.ndim == 3 else image)), frame.timestamp if frame else None, captured, frame)))
+    def on_clip(clip: ClipFrame) -> None:
+        metadata: FrameMetadata | None = clip_metadata(clip)
+        image: np.ndarray = clip.image
+        out.append((clip.cam_id, clip.kind, int(np.median(image[..., 0] if image.ndim == 3 else image)),
+                    metadata.timestamp if metadata else None, clip.timestamp, metadata))
+    play.add_frame_callback(on_clip)
 
 
 FPS: float = 60.0

@@ -1,5 +1,6 @@
 """The camera contract: what an app and the pipeline see of a camera, whichever device fulfils it."""
 
+from dataclasses import dataclass
 from typing import Callable, Protocol, TypeAlias
 
 import numpy as np
@@ -10,9 +11,22 @@ from .tracklet import CameraTracklets
 
 CameraFrameCallback: TypeAlias = Callable[[CameraFrame], None]
 TrackletCallback: TypeAlias = Callable[[CameraTracklets], None]
-# A recorded frame: (cam_id, frame_type, image, a DEPTH frame's confidence or None, what was recorded with it, its
-# capture on the play's clock).
-ClipFrameCallback: TypeAlias = Callable[[int, FrameType, np.ndarray, np.ndarray | None, object, float | None], None]
+
+
+@dataclass(frozen=True)
+class ClipFrame:
+    """A recorded frame as the player hands it over: a DEPTH frame's `confidence` (None for a VIDEO frame and a
+    recording without it), the `metadata` recorded with it and its `timestamp`, its capture on the play's clock; the
+    last two are None for a recording without metadata."""
+    cam_id: int
+    kind: FrameType
+    image: np.ndarray
+    confidence: np.ndarray | None
+    metadata: object
+    timestamp: float | None
+
+
+ClipFrameCallback: TypeAlias = Callable[[ClipFrame], None]
 
 
 class ClipSource(Protocol):

@@ -1,4 +1,4 @@
-from .source import         CameraSource, CameraFrameCallback, TrackletCallback, ClipSource, ClipFrameCallback
+from .source import         CameraSource, CameraFrameCallback, TrackletCallback, ClipSource, ClipFrame, ClipFrameCallback
 from .frame import          CAPTURE_TOLERANCE, FrameType, FrameReadings, DepthAlignment, CameraFrame, \
                             bgr_frame, oriented_image, oriented_corners
 from .tracklet import       TrackingStatus, CameraTracklet, CameraTracklets, straightened_tracklets

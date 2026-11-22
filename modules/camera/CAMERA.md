@@ -294,7 +294,7 @@ whatever blob is in use. The input size is read off the blob, so a file name and
 
 | Part                 | Holds                                                                                        |
 |----------------------|----------------------------------------------------------------------------------------------|
-| `source.py`          | `CameraSource`, `ClipSource` and their callbacks                                             |
+| `source.py`          | `CameraSource`, `ClipSource`, `ClipFrame` and their callbacks                                |
 | `frame.py`           | `CameraFrame`, `FrameType`, `FrameReadings`, `DepthAlignment`                                |
 | `tracklet.py`        | `CameraTracklet`, `CameraTracklets`                                                          |
 | `settings.py`        | `CameraSettings`, `RigCameraSettings` and their readings                                     |

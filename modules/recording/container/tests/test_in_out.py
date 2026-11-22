@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 
 from modules import video
-from modules.camera import FrameType
+from modules.camera import ClipFrame, FrameType
 from modules.recording import Player, PlayerSettings, make_chunk_name
 from modules.recording.container.recording_folder import IN_OUT_FILE, read_in_out, write_in_out
 from modules.recording.recorder.recorder import RecState
@@ -93,12 +93,11 @@ class PlaybackTest(unittest.TestCase):
         self.colors: list[int] = []
         self.player: Player = make_player(self.root, self.recording)
 
-        def on_frame(_cam: int, kind: FrameType, image: np.ndarray, _confidence: np.ndarray | None, _metadata: object,
-                     _captured: float | None) -> None:
-            if kind == FrameType.DEPTH:
-                self.depths.append(round((int(np.median(image)) - 1000) / 30))
+        def on_frame(clip: ClipFrame) -> None:
+            if clip.kind == FrameType.DEPTH:
+                self.depths.append(round((int(np.median(clip.image)) - 1000) / 30))
             else:
-                self.colors.append(int(np.median(image)))
+                self.colors.append(int(np.median(clip.image)))
         self.player.add_frame_callback(on_frame)
 
     def tearDown(self) -> None:

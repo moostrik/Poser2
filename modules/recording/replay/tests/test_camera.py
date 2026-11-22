@@ -6,7 +6,7 @@ import unittest
 
 import numpy as np
 
-from modules.camera import CameraTracklet, FrameType, RigCameraReadings, TrackingStatus
+from modules.camera import CameraTracklet, ClipFrame, FrameType, RigCameraReadings, TrackingStatus
 from modules.recording import FrameMetadata
 from modules.recording.replay import Camera, Track
 from modules.utils import Rect
@@ -34,7 +34,7 @@ class FakePlayer:
     def push(self, cam_id: int, image: np.ndarray, frame_type: FrameType = FrameType.VIDEO, captured: float | None = None,
              metadata: FrameMetadata | None = None, confidence: np.ndarray | None = None) -> None:
         for c in self.callbacks:
-            c(cam_id, frame_type, image, confidence, metadata, captured)
+            c(ClipFrame(cam_id, frame_type, image, confidence, metadata, captured))
 
 
 class FakePersonDetector:

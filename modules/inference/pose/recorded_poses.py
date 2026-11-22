@@ -18,7 +18,7 @@ from collections import defaultdict
 from threading import Lock, Thread
 import numpy as np
 
-from modules.camera import CaptureStream, FrameType, MissedParts
+from modules.camera import CaptureStream, ClipFrame, FrameType, MissedParts
 from modules.recording import FrameMetadata, PoseArrays
 from modules.pose import BBox, Frame, FrameDict, FrameDictCallbackMixin, Points2D, replace
 from modules.settings import BaseSettings, Field
@@ -86,14 +86,13 @@ class RecordedPoses(FrameDictCallbackMixin):
 
     # ── The player's frames ────────────────────────────────────────────
 
-    def set_clip_frame(self, cam_id: int, frame_type: FrameType, image: np.ndarray, confidence: np.ndarray | None,
-                       metadata: FrameMetadata | None, captured: float | None) -> None:
+    def set_clip_frame(self, clip: ClipFrame) -> None:
         """A `ClipFrameCallback`, on the player's thread: the frame's recorded poses kept by its capture on the
         play's clock."""
-        if frame_type != FrameType.VIDEO or metadata is None or captured is None:
+        if clip.kind != FrameType.VIDEO or not isinstance(clip.metadata, FrameMetadata) or clip.timestamp is None:
             return
         with self._lock:
-            self._recorded[cam_id].add(captured, metadata)
+            self._recorded[clip.cam_id].add(clip.timestamp, clip.metadata)
 
     def clear_waiting(self) -> None:
         """The player's jump callback (a loop, a seek): the poses still waiting, and the frames kept, belong to

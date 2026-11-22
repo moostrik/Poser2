@@ -19,16 +19,14 @@ from enum import Enum, auto
 from queue import Queue, Empty
 from time import perf_counter
 
-from numpy import ndarray
-
-from modules.camera import FrameType
+from modules.camera import ClipFrame, ClipFrameCallback, FrameType
 from modules.settings import BaseSettings, Field, Widget
 from modules.utils import Broadcast, Waker
 from modules.video import Hardware
 
-from ..container import ChunkInfo, ChunkStream, Container, FrameMetadata, RecordingFolder, Timeline, chunk_streams, locate
+from ..container import ChunkInfo, ChunkStream, Container, RecordingFolder, Timeline, chunk_streams, locate
 from .chunk_readers import ChunkReaders, Decoding
-from .frame_hand_over import ClipFrameCallback, FrameHandOver
+from .frame_hand_over import FrameHandOver
 
 import logging
 logger = logging.getLogger(__name__)
@@ -148,7 +146,7 @@ class Player(Thread):
         self.settings.bind(PlayerSettings.video_path, self._on_refresh_path)
 
     @property
-    def frame_callbacks(self) -> Broadcast[[int, FrameType, ndarray, ndarray | None, FrameMetadata | None, float | None]]:
+    def frame_callbacks(self) -> Broadcast[[ClipFrame]]:
         return self.hand_over.frame_callbacks
 
     def stop(self) -> None:

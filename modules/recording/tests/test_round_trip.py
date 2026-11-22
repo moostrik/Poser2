@@ -14,7 +14,7 @@ from modules.camera import CameraFrame, FrameReadings, FrameType
 from modules.recording import ChunkInfo, Player, PlayerSettings, Recorder, RecorderSettings, make_chunk_name, read_metadata
 from modules.recording.recorder.recorder import RecState
 from modules.recording.tests.recordings import LENS, video_frame, poses, depth_frame, recorder, stream_frames, stream_images, stream_packets, \
-    cam_frame, record, player, Played, collect, FPS
+    cam_frame, record, player, Played, clip_metadata, collect, FPS
 
 
 @unittest.skipUnless(video.available() and video.encoder_works(video.Hardware.iGPU), 'no iGPU encoder')
@@ -103,8 +103,9 @@ class RoundTripTest(unittest.TestCase):
             player = Player(settings, str(root))
             played: list[tuple[FrameType, int, FrameReadings | None]] = []
             moments: list[tuple[float, float | None]] = []      # when each color frame came, and its capture on the play's clock
-            player.add_frame_callback(lambda cam, kind, image, confidence, frame, captured: played.append((kind, int(np.median(image)), frame.readings if frame else None)))
-            player.add_frame_callback(lambda cam, kind, image, confidence, frame, captured: moments.append((time.perf_counter(), captured)) if kind == FrameType.VIDEO else None)
+            player.add_frame_callback(lambda clip: played.append((clip.kind, int(np.median(clip.image)),
+                                                                  metadata.readings if (metadata := clip_metadata(clip)) else None)))
+            player.add_frame_callback(lambda clip: moments.append((time.perf_counter(), clip.timestamp)) if clip.kind == FrameType.VIDEO else None)
             player.start()
             deadline = time.perf_counter() + 10.0
             while len(played) < 2 * count and time.perf_counter() < deadline:
@@ -191,9 +192,9 @@ class ConfidencePlaybackTest(unittest.TestCase):
             settings.folder = chunk.parent.name
             play = Player(settings, str(root))
             depths: list[tuple[int, float | None]] = []      # each depth's frame, and its confidence's median
-            play.add_frame_callback(lambda cam, kind, image, confidence, frame, captured: depths.append(
-                (round((int(np.median(image)) - 1000) / 30), float(np.median(confidence)) if confidence is not None else None))
-                if kind == FrameType.DEPTH else None)
+            play.add_frame_callback(lambda clip: depths.append(
+                (round((int(np.median(clip.image)) - 1000) / 30), float(np.median(clip.confidence)) if clip.confidence is not None else None))
+                if clip.kind == FrameType.DEPTH else None)
             play.start()
             try:
                 deadline = time.perf_counter() + 10.0
