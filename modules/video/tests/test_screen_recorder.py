@@ -118,7 +118,7 @@ class StateTest(unittest.TestCase):
         self.settings = ScreenRecorderSettings()
         self.settings.frame.width, self.settings.frame.height = WIDTH, HEIGHT
         self.free = 1 << 40         # bytes of free RAM before the store
-        self.recorder = ScreenRecorder(self.settings, 'unused', FakeClip, lambda: self.free - self._ring_bytes())
+        self.recorder = ScreenRecorder(self.settings, 'unused', FakeClip, lambda: self.free - self._store_bytes())
         self.recorder.start()
         self.tick_count = 0
         self.interval = 1.0 / FPS
@@ -131,7 +131,7 @@ class StateTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.recorder.stop()
 
-    def _ring_bytes(self) -> int:
+    def _store_bytes(self) -> int:
         return self.recorder._store.nbytes
 
     def frame(self, tick: int, timestamp: float) -> ScreenFrame:

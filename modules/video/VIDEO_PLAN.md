@@ -5,10 +5,6 @@ What is to be built in `modules/video`: ffmpeg, the clips and streams it writes 
 
 ## B. Names and text
 
-B1. The screen recorder test's `_ring_bytes` is named after the store (`_store_bytes`): it reads
-   `ScreenFrameStore.nbytes` in both modes, and the store's rename left it **(seen, `test_screen_recorder.py`)**. Why:
-   Naming, one term everywhere. Check: `test_screen_recorder`.
-
 B2. `ScreenFrame`'s docstring says its data is uint8; at 10 bits it is uint16 or uint32 (`ScreenFormat.dtype`)
    **(seen)**. Why: a docstring says what the thing is. Check: none, text only.
 
