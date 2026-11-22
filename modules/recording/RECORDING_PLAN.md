@@ -44,9 +44,6 @@ None open.
 
 Proposals from the scan of 2026-11-21; nothing is built. **(seen)** is read in the code, **(deduction)** inferred.
 
-- E3. `Player.stop` unbinds the eight settings callbacks `Player.__init__` binds; `Recorder.stop` does already
-  **(seen)**. Why: "Components that `bind()` must `unbind()` the same callbacks on teardown". Tests: the recording
-  tests.
 - E4. The player hands a clip frame as one value: `ClipFrame`, a frozen dataclass in `modules/camera/source.py` beside
   `ClipSource` (`cam_id`, `kind`, `image`, `confidence`, `metadata`, `timestamp`, the capture on the play's clock), and
   `ClipFrameCallback` becomes `Callable[[ClipFrame], None]`. Recording's own `ClipFrameCallback` in
@@ -96,7 +93,6 @@ Proposals from the scan of 2026-11-21; nothing is built. **(seen)** is read in t
 
 - Keep settings files in sync with code changes: hd_trio's `container` in its settings file
 - Run a test of the app or a GPU harness only on the user's go, and only what the plan names: the checks of A
-- Components that `bind()` must `unbind()` the same callbacks on teardown: E3
 - Similar things share the noun: E4
 - Prefer no folder for one or two files: F1
 - Its `__init__.py` holds what other packages use: F2

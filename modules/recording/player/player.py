@@ -156,6 +156,14 @@ class Player(Thread):
         self.stop_event.set()
         self._send(Message(MessageType.STOP))
         self.join()
+        self.settings.unbind(PlayerSettings.start, self._on_start)
+        self.settings.unbind(PlayerSettings.stop, self._on_stop)
+        self.settings.unbind(PlayerSettings.folder, self._on_folder_changed)
+        self.settings.unbind(PlayerSettings.in_out, self._on_in_out)
+        self.settings.unbind(PlayerSettings.scrub, self._on_scrub)
+        self.settings.unbind(PlayerSettings.seek, self._on_seek)
+        self.settings.unbind(PlayerSettings.refresh, self._on_refresh_path)
+        self.settings.unbind(PlayerSettings.video_path, self._on_refresh_path)
         self._waker.close()
 
     def _send(self, message: Message) -> None:
