@@ -112,7 +112,7 @@ The rules the recorder keeps, each with its reason:
 | A frame nobody asked poses for does not wait for them                | the app says per image whether the pose model was asked (`Recorder.expect_poses`)     |
 | Each camera is synced in its own order                               | the order between cameras is not kept live either                                     |
 | The parts are matched on the sync's own thread, from one inbox       | the threads they come on only queue them, a camera's among them                       |
-| The sync's inbox is not bounded                                      | a recording needs every part; `HELD` bounds what waits after the match                |
+| The sync's inbox is not bounded; its length shows on the panel       | a recording needs every part; `HELD` bounds what waits after the match                |
 | A capture is dropped whole, before any part of it is written         | a chunk's color, depth and metadata then count alike, so frame `n` is one capture     |
 | One bound for what waits for the encoders, in bytes, for all cameras | a bound per queue grows with the cameras                                              |
 | A split cuts every camera at one capture time                        | the cameras' chunks start and end at one recorded moment, so a play runs through it   |
@@ -120,7 +120,10 @@ The rules the recorder keeps, each with its reason:
 
 What a capture went without is counted on the panel (`missed_depth`, `missed_color`, `missed_tracklets`,
 `missed_poses`, `dropped`) and warned of by the recorder's thread, at most once a second; what came before a
-camera's first capture of a recording, a few frames at every start, is counted apart and not warned of. An encoder
+camera's first capture of a recording, a few frames at every start, is counted apart and not warned of. The sync's
+inbox shows as `sync_queued`, and is warned of once a recording past four parts (frame, tracklets, asked, poses) of
+`KEPT` frames per camera: the sync's thread is then a whole `KEPT` window behind, where captures leave without their
+parts anyway **(deduction)**. An encoder
 that dies ends its writer and the recording; a recording that cannot start says why once and is given up. What a
 crash left unmerged is merged beside the next recording.
 

@@ -227,6 +227,12 @@ class RecordingSync(Thread):
             return camera
 
     @property
+    def queued(self) -> int:
+        """The parts in the inbox, not taken by the sync's thread yet."""
+        with self._wake:
+            return len(self._inbox)
+
+    @property
     def waiting(self) -> int:
         """The parts queued and not matched yet, and the captures complete and waiting for their tracklets or
         poses, over every camera."""

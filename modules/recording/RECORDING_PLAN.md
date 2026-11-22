@@ -62,15 +62,6 @@ Proposals; nothing is built.
   **(seen)**. B1 drops "its settings (`MP4`)", and "The rules it touches" drops its line on hd_trio's `container`:
   hd_trio's `studio.json` and `umu.json` hold `"container": "MP4"` already **(seen)**. Why: a plan holds only what is
   left.
-- E9. `RecordingSync`'s inbox length shows on the recorder's panel as a READ field, `RecorderSettings.sync_queued`
-  ("Parts waiting in the sync's inbox"), set beside the other counts in `Recorder._update_missed`; `RecordingSync`
-  gives the length as a property (`queued`), as `waiting` gives it with the cameras' waiting lines **(seen:
-  `waiting` adds `len(self._inbox)` and every camera's `waiting`)**. The inbox alone is shown, since each camera's
-  waiting line holds at most `KEPT` by design **(seen)**. A warning is logged once a recording when the inbox passes
-  `4 * KEPT * num_cams` parts (256 for four cameras): four parts come per frame (frame, tracklets, asked, poses) **(seen:
-  `_Part`)**, so past it the sync's thread is a whole `KEPT` window behind on every camera, some 320 ms at 50 fps,
-  where captures leave without their parts anyway **(deduction)**. Why: the inbox is not bounded, and nothing shows it
-  growing during a long recording. Tests: the recording tests.
 
 ## F. Code (the scan of 2026-11-22, second pass)
 
@@ -109,7 +100,7 @@ Proposals; nothing is built.
 
 - Keep settings files in sync with code changes: hd_trio's `container` in its settings file
 - Run a test of the app or a GPU harness only on the user's go, and only what the plan names: the checks of A
-- When that part can't keep up, its queue drops the oldest item and counts it: D3 (with the Rules thread), E9
+- When that part can't keep up, its queue drops the oldest item and counts it: D3 (with the Rules thread)
 - Similar things share the noun and differ by a qualifier: D2 (built in POSE_PLAN.md D1)
 - A docstring says what the thing is; `Field` descriptions: E6
 - A plan holds only what is left (plans.md, "A built step leaves the plan"): E7

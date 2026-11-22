@@ -38,7 +38,7 @@ from modules.video import ClipCodec, DEPTH_CODEC, DEPTH_HARDWARE, Hardware, Stre
 
 from .chunk import DEPTH_SUFFIX, ChunkInfo, ChunkStream, Container, FrameMetadata, chunk_streams, finish_unmerged, frame_line, \
     info_line, keep_chunk, make_chunk_name, make_file_name, make_folder_name, make_metadata_name, merge_chunk
-from .recording_sync import FramePoses, RecordedCapture, RecordingSync
+from .recording_sync import KEPT, FramePoses, RecordedCapture, RecordingSync
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +71,7 @@ class RecorderSettings(BaseSettings):
     missed_tracklets:   Field[int]              = Field(0, access=Field.READ, description="Frames recorded without their tracklets")
     missed_poses:       Field[int]              = Field(0, access=Field.READ, description="Frames recorded without the poses asked for")
     dropped:            Field[int]              = Field(0, access=Field.READ, description="Frames dropped because the writing fell behind")
+    sync_queued:        Field[int]              = Field(0, access=Field.READ, description="Parts waiting in the sync's inbox")
 
 
 STOP_WAIT: float = 1.0          # s a stopping recording waits for the parts its last captures wait for
@@ -78,6 +79,7 @@ PASS: float = 0.01              # s the recorder's thread waits at most between 
 SPLIT_WAIT: float = 1.0         # s a split waits for a camera's first capture after its time, before it cuts that camera's chunk anyway
 HELD: int = 1 << 30             # bytes waiting for the encoders, queued here and in the writers: 1 GB, some 6 s of four cameras with depth
 SURE: int = 255                 # the confidence of a depth that came without one, in a chunk that records it
+QUEUED_PER_FRAME: int = 4       # the parts of one frame in the sync's inbox: the frame, its tracklets, whether poses were asked, the poses
 
 
 def _latency(arrival: float | None, timestamp: float) -> float | None:
@@ -110,6 +112,7 @@ class Recorder(Thread):
         self._held_lock: Lock = Lock()
         self._queued_bytes: int = 0                     # what the queues here hold
         self._dropped: int = 0                          # captures dropped whole for the bound, this recording
+        self._queue_warned: bool = False                # the sync's inbox was warned of, this recording
         self._unmerged: Thread | None = None            # what a crash left, merged beside the recording
         self.sync: RecordingSync = RecordingSync(self.with_depth)
         self.sync.add_capture_callback(self._on_capture)
@@ -245,6 +248,7 @@ class Recorder(Thread):
             self._queued_bytes = 0
             self._dropped = 0
             self._newest.clear()
+        self._queue_warned = False
         self._split_at = None
         self.split_requested.clear()
         for c in range(self.settings.num_cams):
@@ -344,7 +348,8 @@ class Recorder(Thread):
         return min(self.chunks.values(), default=0)
 
     def _update_missed(self) -> None:
-        """The counts of what a recording went without, to the panel when they change."""
+        """The counts of what a recording went without and the sync's inbox, to the panel when they change; a warning,
+        once a recording, when the inbox holds more than a `KEPT` window of every camera's parts."""
         depth, color, tracklets, poses = (self.sync.missed.total(part) for part in ('depth', 'color', 'tracklets', 'poses'))
         if self.settings.missed_depth != depth:
             self.settings.missed_depth = depth
@@ -358,6 +363,13 @@ class Recorder(Thread):
             dropped: int = self._dropped
         if self.settings.dropped != dropped:
             self.settings.dropped = dropped
+        queued: int = self.sync.queued
+        if self.settings.sync_queued != queued:
+            self.settings.sync_queued = queued
+        limit: int = QUEUED_PER_FRAME * KEPT * self.settings.num_cams
+        if queued > limit and not self._queue_warned:
+            self._queue_warned = True
+            logger.warning("Recorder: %d parts wait in the sync's inbox, past %d: the sync falls behind", queued, limit)
 
     def _write_queued(self) -> None:
         """Everything queued, on every pass: with depth three streams arrive per camera at the full frame rate, more
