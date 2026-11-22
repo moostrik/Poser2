@@ -195,7 +195,9 @@ Its tracklets come one of two ways, by `PersonDetector.enabled` (off in deep_flo
 | off      | the recorded ones, at their frame's stamp plus their `tracklet_latency`       | the same messages at the same timing        |
 | on       | YOLOv8n on the uploaded image through `replay.Tracker`, marked `straightened` | another model, timing and GPU load          |
 
-The recorded ones go out from the camera's own thread, so nothing but the hand-over runs on the player's.
+Both go out from the camera's own thread, so nothing but the hand-over runs on the player's, and nothing but the
+hand-over on the detector's: its detections wait for the tracker there, and past `DETECTIONS_KEPT` (4) the oldest
+is dropped and counted (`dropped_detections`).
 
 ## The recorded poses
 

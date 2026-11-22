@@ -1,6 +1,7 @@
 """Tests for the replay camera: the clip frames become stamped contract frames, the detector's
 boxes become tracklets through the tracker, with their frame's time, and the readings follow."""
 
+import threading
 import time
 import unittest
 
@@ -9,6 +10,7 @@ import numpy as np
 from modules.camera import CameraTracklet, ClipFrame, FrameType, RigCameraReadings, TrackingStatus
 from modules.recording import FrameMetadata
 from modules.recording.replay import Camera
+from modules.recording.replay.camera import DETECTIONS_KEPT
 from modules.recording.replay.tracker import Track
 from modules.utils import Rect
 
@@ -64,6 +66,20 @@ class FakeTracker:
         return [Track(id=i, status=TrackingStatus.TRACKED, roi=box, age=1) for i, box in enumerate(boxes)]
 
 
+class BlockingTracker(FakeTracker):
+    """Holds its first update until `go`, and notes the thread it runs on."""
+    def __init__(self) -> None:
+        self.entered = threading.Event()
+        self.go = threading.Event()
+        self.thread: threading.Thread | None = None
+
+    def update(self, boxes: list[Rect]) -> list[Track]:
+        self.thread = threading.current_thread()
+        self.entered.set()
+        self.go.wait(1.0)
+        return super().update(boxes)
+
+
 class ReplayCameraTest(unittest.TestCase):
     def setUp(self) -> None:
         self.readings = RigCameraReadings()
@@ -76,6 +92,10 @@ class ReplayCameraTest(unittest.TestCase):
         self.camera.add_frame_callback(self.frames.append)
         self.camera.add_tracklet_callback(self.messages.append)
         self.camera.start()
+
+    def tearDown(self) -> None:
+        self.camera.stop()
+        self.camera.join(1.0)
 
     def test_a_clip_frame_of_this_camera_is_stamped_and_handed_over(self) -> None:
         image = np.zeros((4, 6, 3), dtype=np.uint8)
@@ -111,6 +131,8 @@ class ReplayCameraTest(unittest.TestCase):
     def test_the_detector_boxes_become_tracklets_with_their_frame_s_time(self) -> None:
         self.detector.report(1, [Rect(0.1, 0.2, 0.3, 0.4), Rect(0.5, 0.5, 0.2, 0.3)], 12.5)
         self.detector.report(0, [Rect(0.1, 0.2, 0.3, 0.4)])         # not this camera
+        self.assertTrue(wait_for(lambda: self.messages))
+        time.sleep(0.02)
         self.assertEqual(len(self.messages), 1)
         message = self.messages[0]
         tracklets, t = message.tracklets, message.timestamp
@@ -124,8 +146,21 @@ class ReplayCameraTest(unittest.TestCase):
 
     def test_nobody_is_a_message_too(self) -> None:
         self.detector.report(1, [])
-        self.assertEqual(len(self.messages), 1)
+        self.assertTrue(wait_for(lambda: self.messages))
         self.assertEqual(self.messages[0].tracklets, [])
+
+    def test_the_tracker_runs_on_the_camera_s_thread_and_drops_the_oldest_behind(self) -> None:
+        tracker = BlockingTracker()
+        self.camera.tracker = tracker
+        for i in range(DETECTIONS_KEPT + 3):           # the first holds the tracker, the rest wait
+            self.detector.report(1, [], float(i))
+            if i == 0:
+                self.assertTrue(tracker.entered.wait(1.0))
+        self.assertIsNot(tracker.thread, threading.current_thread())
+        self.assertEqual(self.camera.dropped_detections, 2)
+        tracker.go.set()
+        self.assertTrue(wait_for(lambda: len(self.messages) == DETECTIONS_KEPT + 1))
+        self.assertEqual([m.timestamp for m in self.messages], [0.0, 3.0, 4.0, 5.0, 6.0])
 
     def test_stopped_it_emits_nothing(self) -> None:
         self.camera.stop()
@@ -196,6 +231,7 @@ class RecordedTrackletsTest(unittest.TestCase):
         time.sleep(0.05)
         self.assertEqual(self.messages, [])
         self.detector.report(1, [Rect(0.1, 0.2, 0.3, 0.4)], 12.5)
+        self.assertTrue(wait_for(lambda: self.messages))
         self.assertTrue(self.messages[0][1].straightened)
 
 

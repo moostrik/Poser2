@@ -67,11 +67,6 @@ Proposals; nothing is built.
 
 Proposals; nothing is built.
 
-- F2. `replay.Camera._on_detection` only queues the detection and sets the camera's `Waker`; the box tracker runs on
-  `replay.Camera`'s own thread, beside the recorded tracklets. Today the detector's callback runs the whole SORT
-  tracker (Kalman and the Hungarian assignment) on the detector's thread **(seen)**. It matters only with the
-  detector on, off in deep_flow's settings file **(seen in RECORDING.md)**. Why: "A callback only hands the item over
-  and returns". Tests: the replay tests, the recording tests.
 - F3. `RecordingFolder.chunks` becomes `last_chunk`: it is the last chunk's number, as its docstring says, while
   `Player.get_num_folder_chunks` and `Player.num_chunks` call it a count **(seen)**; they follow. Why: "Name a concept
   after what it is in the domain, and use that one term everywhere it appears". Tests: the recording tests.
@@ -99,7 +94,6 @@ Proposals; nothing is built.
 - Similar things share the noun and differ by a qualifier: D2 (built in POSE_PLAN.md D1)
 - A docstring says what the thing is; `Field` descriptions: E6
 - A plan holds only what is left (plans.md, "A built step leaves the plan"): E7
-- A callback only hands the item over and returns: F2
 - Name a concept after what it is in the domain, and use that one term everywhere it appears: F3
 - Suppress only when a third-party stub is provably wrong or the type system cannot express the code, never to hide an error in our own code: F4
 - Use a `Protocol` for what a consumer needs from a collaborator: F4

@@ -12,12 +12,13 @@ frame's after its recorded latency, stamped with the frame's capture, as the cam
 uploader straightens them as it does live. They go out from this camera's own thread, so nothing but
 the hand-over runs on the player's. With a person detector enabled (`PersonDetector.enabled`), the
 detector's boxes play instead: the app feeds it the uploaded images, straightened and mirrored, its
-boxes go through a host tracker (`Tracker`) and out as tracklets marked `straightened`.
+boxes go through a host tracker (`Tracker`) on this camera's thread and out as tracklets marked `straightened`.
 """
 
 import heapq
 import logging
 import time
+from collections import deque
 from threading import Lock, Thread
 from typing import Callable, Protocol
 
@@ -32,6 +33,7 @@ from .tracker import Track
 
 logger = logging.getLogger(__name__)
 
+DETECTIONS_KEPT: int = 4        # detections waiting for the tracker, per camera
 
 
 class Detection(Protocol):
@@ -82,6 +84,8 @@ class Camera:
         # The recorded tracklets waiting for their moment: (due, order, message), on this camera's thread
         self._waiting: list[tuple[float, int, CameraTracklets]] = []
         self._order: int = 0
+        self._detections: deque[Detection] = deque()    # the detector's, for the tracker on this camera's thread
+        self.dropped_detections: int = 0                # dropped, oldest first, while the tracker fell behind
         self._lock: Lock = Lock()
         self._waker: Waker = Waker()
         self._thread: Thread | None = None
@@ -98,8 +102,8 @@ class Camera:
         return self.running
 
     def start(self) -> None:
-        """Hooks into the player (before it runs) and the detector, and starts the thread the recorded
-        tracklets go out on; the frames come on the player's threads, the detector's tracklets on its own."""
+        """Hooks into the player (before it runs) and the detector, and starts the thread the tracklets go out
+        on, the recorded and the detector's; the frames come on the player's threads."""
         self.player.add_frame_callback(self._clip_callback)
         self.player.add_jump_callback(self._on_jump)
         if self.detector is not None:
@@ -112,6 +116,7 @@ class Camera:
         with self._lock:
             self.running = False
             self._waiting.clear()
+            self._detections.clear()
         self._waker.set()
 
     def join(self, timeout: float | None = None) -> None:
@@ -202,28 +207,47 @@ class Camera:
         self._waker.set()
 
     def _send_recorded(self) -> None:
-        """This camera's thread: each waiting message out at its moment, stamped with its arrival."""
+        """This camera's thread: each waiting message out at its moment, stamped with its arrival, and each
+        detection through the tracker."""
         while True:
             with self._lock:
                 if not self.running:
                     return
+                detection: Detection | None = self._detections.popleft() if self._detections else None
                 due: float | None = self._waiting[0][0] if self._waiting else None
                 message: CameraTracklets | None = None
                 if due is not None and due <= time.perf_counter():
                     _, _, message = heapq.heappop(self._waiting)
-            if message is None:
+            try:
+                if detection is not None:
+                    self._track(detection)
+                if message is not None:
+                    self._emit_tracklets(CameraTracklets(message.cam_id, message.timestamp, message.tracklets, arrival=time.perf_counter()))
+            except Exception:
+                logger.exception("Replay camera %d: tracklets not sent", self.cam_id)
+            if detection is None and message is None:
                 self._waker.wait(due)
-                continue
-            self._emit_tracklets(CameraTracklets(message.cam_id, message.timestamp, message.tracklets, arrival=time.perf_counter()))
 
     # ── The detector's tracklets ───────────────────────────────────────
 
     def _on_detection(self, detection: Detection) -> None:
-        """The detector's boxes for one frame, on its thread: through the tracker, out as the
-        contract's tracklets with that frame's time, an empty list included. The boxes were found in the
-        straightened frame, so they are straightened already."""
+        """The detector's boxes for one frame, on its thread, queued for this camera's thread; the oldest goes,
+        counted, past `DETECTIONS_KEPT`."""
         if not self.running or detection.cam_id != self.cam_id or self.tracker is None:
             return
+        with self._lock:
+            self._detections.append(detection)
+            if len(self._detections) > DETECTIONS_KEPT:
+                self._detections.popleft()
+                self.dropped_detections += 1
+                if self.dropped_detections == 1:
+                    logger.warning("Replay camera %d: the tracker falls behind the detector, oldest detections dropped", self.cam_id)
+        self._waker.set()
+
+    def _track(self, detection: Detection) -> None:
+        """A detection through the tracker, out as the contract's tracklets with that frame's time, an empty list
+        included. The boxes were found in the straightened frame, so they are straightened already."""
+        assert self.tracker is not None
         timestamp: float = detection.timestamp
         tracklets: list[CameraTracklet] = [
             CameraTracklet(cam_id=self.cam_id, id=t.id, status=t.status, roi=t.roi, age=t.age, timestamp=timestamp)
