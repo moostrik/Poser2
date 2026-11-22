@@ -28,7 +28,7 @@ import numpy as np
 
 from modules.camera import CAPTURE_TOLERANCE, CameraFrame, CameraTracklets, CaptureStream, FrameType, MissedParts
 from modules.pose import BBox, FrameDict, Points2D, has_points
-from modules.utils import Rect
+from modules.utils import Broadcast, Rect
 
 from ..container import PoseArrays
 
@@ -141,17 +141,14 @@ class RecordingSync(Thread):
         self._cameras: dict[int, _Camera] = {}
         self._expected: dict[int, tuple[bool, bool]] = {}      # each camera's parts said ahead: (tracklets, poses)
         self.missed: MissedParts = MissedParts('Recorder')
-        self._callback_lock: Lock = Lock()
-        self._callbacks: list[RecordedCaptureCallback] = []
+        self._callbacks: Broadcast[[RecordedCapture]] = Broadcast(name='RecordingSync capture')
         self._inbox: deque[tuple[_Part, Any]] = deque()
         self._wake: Condition = Condition()
         self._running: bool = False
         self._stopped: bool = False
 
     def add_capture_callback(self, callback: RecordedCaptureCallback) -> None:
-        with self._callback_lock:
-            if callback not in self._callbacks:
-                self._callbacks.append(callback)
+        self._callbacks.add_callback(callback)
 
     # ── Lifecycle ─────────────────────────────────────────────────────
 
@@ -383,13 +380,5 @@ class RecordingSync(Thread):
         return captures
 
     def _emit(self, captures: list[RecordedCapture]) -> None:
-        if not captures:
-            return
-        with self._callback_lock:
-            callbacks: list[RecordedCaptureCallback] = list(self._callbacks)
         for capture in captures:
-            for callback in callbacks:
-                try:
-                    callback(capture)
-                except Exception:
-                    logger.exception("RecordingSync: a capture callback failed")
+            self._callbacks(capture)

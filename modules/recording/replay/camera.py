@@ -25,7 +25,7 @@ import numpy as np
 
 from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, CameraFrameCallback, DepthAlignment, FrameReadings, FrameType, \
     RigCameraReadings, TiltCorrection, TiltCorrectionSettings, TrackletCallback
-from modules.utils import FPS, Rect, Waker
+from modules.utils import FPS, Broadcast, Rect, Waker
 
 from ..container import ChunkInfo, FrameMetadata
 from .tracker import Track
@@ -85,8 +85,8 @@ class Camera:
 
         self.video_fps: FPS = FPS()
         self.tracklet_fps: FPS = FPS()
-        self.frame_callbacks: list[CameraFrameCallback] = []
-        self.tracklet_callbacks: list[TrackletCallback] = []
+        self.frame_callbacks: Broadcast[[CameraFrame]] = Broadcast(name='replay frame')
+        self.tracklet_callbacks: Broadcast[[CameraTracklets]] = Broadcast(name='replay tracklets')
 
     # ── CameraSource ───────────────────────────────────────────────────
 
@@ -122,15 +122,13 @@ class Camera:
         if self.running:
             logger.warning('cannot add callback while camera is running')
             return
-        if callback not in self.frame_callbacks:
-            self.frame_callbacks.append(callback)
+        self.frame_callbacks.add_callback(callback)
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
         if self.running:
             logger.warning('cannot add callback while camera is running')
             return
-        if callback not in self.tracklet_callbacks:
-            self.tracklet_callbacks.append(callback)
+        self.tracklet_callbacks.add_callback(callback)
 
     # ── Hand-over ──────────────────────────────────────────────────────
 
@@ -162,8 +160,7 @@ class Camera:
                             homography=homography, readings=readings, intrinsics=intrinsics, alignment=alignment, arrival=arrival,
                             confidence=confidence, rotate90=info.rotate90 if info is not None else False,
                             flip_v=info.flip_v if info is not None else False)
-        for c in self.frame_callbacks:
-            c(frame)
+        self.frame_callbacks(frame)
         if frame_type == FrameType.VIDEO and metadata is not None:
             self._queue_recorded(metadata, timestamp)
 
@@ -232,5 +229,4 @@ class Camera:
         self.tracklet_fps.processed()
         self.readings.tracker_fps = self.tracklet_fps.get_rate_average()
         self.readings.tracklets = len(message.tracklets)
-        for c in self.tracklet_callbacks:
-            c(message)
+        self.tracklet_callbacks(message)

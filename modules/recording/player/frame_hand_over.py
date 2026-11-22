@@ -17,6 +17,7 @@ from typing import Callable, TypeAlias
 from numpy import ndarray
 
 from modules.camera import FrameType
+from modules.utils import Broadcast
 
 from ..container import ChunkInfo, ChunkStream, FrameMetadata
 from .chunk_readers import ChunkReaders
@@ -37,7 +38,8 @@ class FrameHandOver:
         """`streams`: in the order a frame's streams go out, VIDEO first: its readings set up what the depth of the
         frame uses."""
         self.streams: list[ChunkStream] = streams
-        self.frame_callbacks: list[ClipFrameCallback] = []
+        self.frame_callbacks: Broadcast[[int, FrameType, ndarray, ndarray | None, FrameMetadata | None, float | None]] = \
+            Broadcast(name='Player frame')
         self._lock: Lock = Lock()                   # the chunks handed over and the counts
         self._camera_locks: dict[int, Lock] = defaultdict(Lock)     # one camera's frames out at a time, in order
         self._readers: dict[int, ChunkReaders] = {}         # the chunks whose frames go out, by number
@@ -122,5 +124,4 @@ class FrameHandOver:
             for stream in self.streams:
                 kind: FrameType | None = FRAME_TYPES.get(stream)
                 if kind is not None and stream in frames:
-                    for callback in self.frame_callbacks:
-                        callback(cam_id, kind, frames[stream], confidence if kind == FrameType.DEPTH else None, metadata, timestamp)
+                    self.frame_callbacks(cam_id, kind, frames[stream], confidence if kind == FrameType.DEPTH else None, metadata, timestamp)

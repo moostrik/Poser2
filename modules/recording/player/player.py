@@ -19,11 +19,14 @@ from enum import Enum, auto
 from queue import Queue, Empty
 from time import perf_counter, sleep
 
+from numpy import ndarray
+
 from modules.camera import FrameType
 from modules.settings import BaseSettings, Field, Widget
+from modules.utils import Broadcast
 from modules.video import Hardware
 
-from ..container import ChunkInfo, ChunkStream, Container, RecordingFolder, Timeline, chunk_streams, locate
+from ..container import ChunkInfo, ChunkStream, Container, FrameMetadata, RecordingFolder, Timeline, chunk_streams, locate
 from .chunk_readers import ChunkReaders, Decoding
 from .frame_hand_over import ClipFrameCallback, FrameHandOver
 
@@ -127,8 +130,8 @@ class Player(Thread):
         self.hand_over: FrameHandOver = FrameHandOver(self.num_cams, self.streams)
 
         self.playback_lock: Lock = Lock()
-        self.loop_callbacks: list[LoopCallback] = []
-        self.jump_callbacks: list[LoopCallback] = []
+        self.loop_callbacks: Broadcast[[]] = Broadcast(name='Player loop')
+        self.jump_callbacks: Broadcast[[]] = Broadcast(name='Player jump')
         self._gui_update_time: float = 0.0
 
         # Bind player settings callbacks
@@ -142,7 +145,7 @@ class Player(Thread):
         self.settings.bind(PlayerSettings.video_path, self._on_refresh_path)
 
     @property
-    def frame_callbacks(self) -> list[ClipFrameCallback]:
+    def frame_callbacks(self) -> Broadcast[[int, FrameType, ndarray, ndarray | None, FrameMetadata | None, float | None]]:
         return self.hand_over.frame_callbacks
 
     def stop(self) -> None:
@@ -269,21 +272,13 @@ class Player(Thread):
         self.hand_over.start(readers)
 
         if not runs_on:
-            for callback in self.jump_callbacks:
-                try:
-                    callback()
-                except Exception:
-                    logger.exception("Player jump callback failed")
+            self.jump_callbacks()
 
         if readers is not None:
             readers.play()
 
         if readers is not None and readers.chunk == self._timeline().start_chunk and loop:
-            for callback in self.loop_callbacks:
-                try:
-                    callback()
-                except Exception:
-                    logger.exception("Player loop callback failed")
+            self.loop_callbacks()
 
     def _follows(self) -> bool:
         """The one loading is the next chunk in the recording after the one playing: it starts as soon as it is
@@ -467,16 +462,14 @@ class Player(Thread):
         if self.running:
             logger.warning('Player: cannot add callback while it is running')
             return
-        if callback not in self.hand_over.frame_callbacks:
-            self.hand_over.frame_callbacks.append(callback)
+        self.hand_over.frame_callbacks.add_callback(callback)
 
     def add_loop_callback(self, callback: LoopCallback) -> None:
         """Called on the player thread when playback starts at the in marker: keep it short."""
         if self.running:
             logger.warning('Player: cannot add callback while it is running')
             return
-        if callback not in self.loop_callbacks:
-            self.loop_callbacks.append(callback)
+        self.loop_callbacks.add_callback(callback)
 
     def add_jump_callback(self, callback: LoopCallback) -> None:
         """Called on the player thread when playback starts somewhere that does not follow what played: a loop, a
@@ -484,8 +477,7 @@ class Player(Thread):
         if self.running:
             logger.warning('Player: cannot add callback while it is running')
             return
-        if callback not in self.jump_callbacks:
-            self.jump_callbacks.append(callback)
+        self.jump_callbacks.add_callback(callback)
 
     # ── Settings callbacks ────────────────────────────────────────────
 

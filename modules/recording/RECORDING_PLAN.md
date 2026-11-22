@@ -44,7 +44,6 @@ None open.
 
 Proposals from the scan of 2026-11-21; nothing is built. **(seen)** is read in the code, **(deduction)** inferred.
 
-- E1. `RecordingSync`'s capture callbacks, `replay.Camera`'s frame and tracklet callbacks, and the player's frame, loop and jump callbacks (`FrameHandOver.frame_callbacks`, `Player.loop_callbacks`, `Player.jump_callbacks`) become a `utils.Broadcast`, which takes any arguments (`ParamSpec`) **(seen)**. `RecordingSync` loses `_callback_lock` and the loop in `_emit`, `Player._start` its own `try`s. Why: "A callback list is a `utils.Broadcast`" and "A failing callback does not stop the others": `replay.Camera._clip_callback` and `_emit_tracklets` and `FrameHandOver.submit_frame` call their lists bare, so one that raises skips the rest and lands in a reader's thread or the replay's tracklet thread **(seen)**. As the camera plan's A1. Tests: the recording tests.
 - E2. `Player.run`, `Recorder.run` and `Recorder._stop_recording` wait on a `utils.Waker`, set by a message, a
   settings callback and a capture (`Recorder._on_capture`), instead of `sleep(0.01)` **(seen)**. The wait has a 10 ms deadline, as the player also checks whether its readers have loaded or ended, which nothing signals **(seen: `ChunkReaders.loaded`, `finished`)**. Why: "A thread that
   waits for a moment waits on a `utils.Waker`"; on Windows the sleep is a 15.6 ms pass, so a start, a seek or a split
@@ -102,7 +101,6 @@ Proposals from the scan of 2026-11-21; nothing is built. **(seen)** is read in t
 
 - Keep settings files in sync with code changes: hd_trio's `container` in its settings file
 - Run a test of the app or a GPU harness only on the user's go, and only what the plan names: the checks of A
-- A callback list is a `utils.Broadcast`; a failing callback does not stop the others: E1
 - A thread that waits for a moment waits on a `utils.Waker`: E2
 - Components that `bind()` must `unbind()` the same callbacks on teardown: E3
 - Similar things share the noun: E4

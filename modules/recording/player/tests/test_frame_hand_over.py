@@ -38,7 +38,7 @@ class FrameHandOverTest(unittest.TestCase):
         self.out: list[tuple[int, FrameType]] = []
         self.out_cams: list[tuple[int, int, int]] = []
         self.confidences: list[tuple[FrameType, int | None]] = []
-        self.hand_over.frame_callbacks.append(self.on_frame)
+        self.hand_over.frame_callbacks.add_callback(self.on_frame)
 
     def on_frame(self, cam: int, kind: FrameType, image: np.ndarray, confidence: np.ndarray | None, metadata: FrameMetadata | None,
                  captured: float | None) -> None:

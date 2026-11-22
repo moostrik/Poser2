@@ -38,10 +38,10 @@ OpenGL.ERROR_CHECKING = False
 import numpy as np  # noqa: E402
 
 from modules.logging import setup_logging, install_excepthooks  # noqa: E402
-from modules.camera import CameraFrame, CameraFrameCallback, FrameType  # noqa: E402
+from modules.camera import CameraFrame, FrameType  # noqa: E402
 from modules.pose import FrameDict  # noqa: E402
 from modules.render import Motion3DLayer, MotionInput  # noqa: E402
-from modules.utils import PerformanceTimer  # noqa: E402
+from modules.utils import Broadcast, PerformanceTimer  # noqa: E402
 from apps.deep_flow.main import DeepFlowMain  # noqa: E402
 from apps.deep_flow.settings import Stage  # noqa: E402
 
@@ -49,8 +49,8 @@ STARTUP: float = 30.0       # s the app takes at most to load its models and sta
 
 
 class CallbackCamera(Protocol):
-    """A camera as every backend builds it, its frame callbacks a list."""
-    frame_callbacks: list[CameraFrameCallback]
+    """A camera as every backend builds it, its frame callbacks a `Broadcast`."""
+    frame_callbacks: Broadcast[[CameraFrame]]
 
 
 def gaps(times: list[float]) -> dict:
@@ -101,16 +101,15 @@ def main() -> int:
     waits: dict[str, list[float]] = {}                  # per hand-over (timer name), ms
 
     camera = cast(CallbackCamera, app.cameras[0])
-    callbacks = list(camera.frame_callbacks)
+    callbacks = camera.frame_callbacks
 
     def hand_over(frame: CameraFrame) -> None:
         start = time.perf_counter()
-        for callback in callbacks:
-            callback(frame)
+        callbacks(frame)
         if on.is_set() and frame.cam_id == 0 and frame.kind == FrameType.VIDEO:
             handover.append(start)
             camera_thread.append((time.perf_counter() - start) * 1000.0)
-    camera.frame_callbacks = [hand_over]
+    camera.frame_callbacks = Broadcast([hand_over], name='probe hand-over')
 
     def timed(kind: str, method):
         def wrapper(frame: CameraFrame) -> None:

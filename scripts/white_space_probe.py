@@ -33,17 +33,17 @@ OpenGL.ERROR_CHECKING = False
 import numpy as np  # noqa: E402
 
 from modules.logging import setup_logging, install_excepthooks  # noqa: E402
-from modules.camera import CameraFrame, CameraFrameCallback, FrameType  # noqa: E402
+from modules.camera import CameraFrame, FrameType  # noqa: E402
 from modules.pose import FrameDict  # noqa: E402
 from modules.settings import BaseSettings, SettingsStore  # noqa: E402
-from modules.utils import PerformanceTimer  # noqa: E402
+from modules.utils import Broadcast, PerformanceTimer  # noqa: E402
 from apps.white_space.main import WhiteSpaceMain  # noqa: E402
 from apps.white_space.settings import Stage  # noqa: E402
 
 
 class CallbackCamera(Protocol):
-    """A camera as every backend builds it, its frame callbacks a list."""
-    frame_callbacks: list[CameraFrameCallback]
+    """A camera as every backend builds it, its frame callbacks a `Broadcast`."""
+    frame_callbacks: Broadcast[[CameraFrame]]
 
 
 STARTUP: float = 30.0       # s the app takes at most to load its models and start playing
@@ -106,16 +106,15 @@ def main() -> int:
 
     for source in app.cameras:
         camera = cast(CallbackCamera, source)
-        callbacks = list(camera.frame_callbacks)
+        callbacks = camera.frame_callbacks
 
         def hand_over(frame: CameraFrame, callbacks=callbacks) -> None:
             start = time.perf_counter()
-            for callback in callbacks:
-                callback(frame)
+            callbacks(frame)
             if on.is_set() and frame.kind == FrameType.VIDEO:
                 camera_thread.setdefault(frame.cam_id, []).append((time.perf_counter() - start) * 1000.0)
                 frames.setdefault(frame.cam_id, []).append(start)
-        camera.frame_callbacks = [hand_over]
+        camera.frame_callbacks = Broadcast([hand_over], name='probe hand-over')
 
     def on_set(name: str) -> None:
         if on.is_set():
