@@ -3,14 +3,6 @@
 What is to be built in `modules/video`: ffmpeg, the clips and streams it writes and reads, and the screen recorder
 ([VIDEO.md](VIDEO.md)).
 
-## B. Names and text
-
-B2. `ScreenFrame`'s docstring says its data is uint8; at 10 bits it is uint16 or uint32 (`ScreenFormat.dtype`)
-   **(seen)**. Why: a docstring says what the thing is. Check: none, text only.
-
-B3. `stream_reader.py`'s imports are grouped as PEP 8 has them: the standard library (`logging` among them, at the
-   top), then numpy, then the project's **(seen)**. Why: "Use Python 3.12 and follow PEP 8". Check: none, imports only.
-
 ## Rules
 
 - Log exceptions with context; never fail silently

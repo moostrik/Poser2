@@ -3,12 +3,14 @@ on `perf_counter` and handing each frame to a callback with its index. It paces 
 from its start, or on a `FrameSchedule` it is given, which several readers can share."""
 
 import io
+import logging
 import os
 import subprocess
-import numpy as np
+import time
 from threading import Thread, Event, Lock
 from typing import Callable, Protocol
-import time
+
+import numpy as np
 
 from modules.utils import Waker
 
@@ -17,7 +19,6 @@ from ..hardware import Hardware, hwaccel_args
 from ..probe import probe
 from ..process import ErrorReader, big_pipe, popen, read_exactly
 
-import logging
 logger = logging.getLogger(__name__)
 
 # (cam_id, frame_type, frame, chunk_id, frame_id): a stream knows which camera and kind it is
