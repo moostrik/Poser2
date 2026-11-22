@@ -35,7 +35,7 @@ class FakeReaders:
 class FrameHandOverTest(unittest.TestCase):
     def setUp(self) -> None:
         self.hand_over = FrameHandOver([ChunkStream.VIDEO, ChunkStream.DEPTH, ChunkStream.CONFIDENCE])
-        self.hand_over.start(FakeReaders(0, {0: [10.0, 10.02, 10.04, 10.06, 10.08, 10.10], 1: [10.0, 10.05, 10.1]}))  # pyright: ignore[reportArgumentType]
+        self.hand_over.start(FakeReaders(0, {0: [10.0, 10.02, 10.04, 10.06, 10.08, 10.10], 1: [10.0, 10.05, 10.1]}))
         self.out: list[tuple[int, FrameType]] = []
         self.out_cams: list[tuple[int, int, int]] = []
         self.confidences: list[tuple[FrameType, int | None]] = []
@@ -66,7 +66,7 @@ class FrameHandOverTest(unittest.TestCase):
         self.assertEqual(self.hand_over.take_unpaired(), 0)
 
     def test_a_depth_goes_out_with_its_confidence_once_all_three_are_in(self) -> None:
-        self.hand_over.start(FakeReaders(0, {0: [10.0, 10.02, 10.04]}, confidence=True))  # pyright: ignore[reportArgumentType]
+        self.hand_over.start(FakeReaders(0, {0: [10.0, 10.02, 10.04]}, confidence=True))
         self.push(1, ChunkStream.VIDEO)
         self.push(1, ChunkStream.DEPTH)
         self.assertEqual(self.out, [])
@@ -89,7 +89,7 @@ class FrameHandOverTest(unittest.TestCase):
         self.assertEqual(self.out_cams, [(1, 0, 1)])
 
     def test_the_next_chunk_plays_beside_the_one_ending_each_camera_in_order(self) -> None:
-        self.hand_over.follow(FakeReaders(1, {0: [10.12], 1: [10.15]}))  # pyright: ignore[reportArgumentType]
+        self.hand_over.follow(FakeReaders(1, {0: [10.12], 1: [10.15]}))
         self.push(0, ChunkStream.VIDEO, chunk=1, cam=1)       # camera 1's chunk ended first: its next goes out
         self.push(5, ChunkStream.VIDEO, chunk=0)              # camera 0 still plays the first
         self.push(5, ChunkStream.DEPTH, chunk=0)
@@ -98,8 +98,8 @@ class FrameHandOverTest(unittest.TestCase):
 
     def test_a_retired_chunk_s_frames_are_not_handed_over(self) -> None:
         readers = FakeReaders(1, {0: [10.12]})
-        self.hand_over.follow(readers)  # pyright: ignore[reportArgumentType]
-        self.hand_over.retire(readers)  # pyright: ignore[reportArgumentType]
+        self.hand_over.follow(readers)
+        self.hand_over.retire(readers)
         self.push(0, ChunkStream.VIDEO, chunk=1, cam=1)
         self.assertEqual(self.out_cams, [])
 

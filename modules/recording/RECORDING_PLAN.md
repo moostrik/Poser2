@@ -63,16 +63,6 @@ Proposals; nothing is built.
   hd_trio's `studio.json` and `umu.json` hold `"container": "MP4"` already **(seen)**. Why: a plan holds only what is
   left.
 
-## F. Code (the scan of 2026-11-22, second pass)
-
-Proposals; nothing is built.
-
-- F4. A `Protocol` for what `FrameHandOver` needs of `ChunkReaders` (`chunk`, `streams`, `frame`, `info`, `clock`)
-  **(seen)**, so `test_frame_hand_over`'s `FakeReaders` meets it and its five `# pyright: ignore[reportArgumentType]`
-  go **(seen)**. Why: "Use a `Protocol` for what a consumer needs from a collaborator, an `ABC` for a family of
-  classes that share code"; "Suppress only when a third-party stub is provably wrong or the type system cannot express
-  the code, never to hide an error in our own code". Tests: pyright, the recording tests.
-
 ## G. Text (one commit)
 
 - G1. RECORDING.md's first table names `modules/camera/sync/capture_match.py`, which is `modules/camera/capture_match.py`
@@ -91,7 +81,5 @@ Proposals; nothing is built.
 - Similar things share the noun and differ by a qualifier: D2 (built in POSE_PLAN.md D1)
 - A docstring says what the thing is; `Field` descriptions: E6
 - A plan holds only what is left (plans.md, "A built step leaves the plan"): E7
-- Suppress only when a third-party stub is provably wrong or the type system cannot express the code, never to hide an error in our own code: F4
-- Use a `Protocol` for what a consumer needs from a collaborator: F4
 - Keep `Field` descriptions to one short line of panel text: what the value is and its unit: E6
 - When renaming or removing a section, state or setting, search the documents for references to it: G1

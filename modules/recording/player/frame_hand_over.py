@@ -12,6 +12,7 @@ the cameras are apart in recorded time is `drift`."""
 import logging
 from collections import defaultdict
 from threading import Lock
+from typing import Protocol
 
 from numpy import ndarray
 
@@ -19,11 +20,24 @@ from modules.camera import ClipFrame, FrameType
 from modules.utils import Broadcast
 
 from ..chunk import ChunkInfo, ChunkStream, FrameMetadata
-from .chunk_readers import ChunkReaders
+from .play_clock import PlayClock
 
 logger = logging.getLogger(__name__)
 
 FRAME_TYPES: dict[ChunkStream, FrameType] = {ChunkStream.VIDEO: FrameType.VIDEO, ChunkStream.DEPTH: FrameType.DEPTH}
+
+
+class HandOverReaders(Protocol):
+    """A chunk's readers as the hand-over sees them: the chunk's number, each camera's streams, a frame's metadata,
+    the chunk's info and its clock (`ChunkReaders`)."""
+    @property
+    def chunk(self) -> int: ...
+    @property
+    def streams(self) -> dict[int, set[ChunkStream]]: ...
+    @property
+    def clock(self) -> PlayClock: ...
+    def frame(self, cam_id: int, frame_id: int) -> FrameMetadata | None: ...
+    def info(self, cam_id: int) -> ChunkInfo | None: ...
 
 
 class FrameHandOver:
@@ -34,14 +48,14 @@ class FrameHandOver:
         self.frame_callbacks: Broadcast[[ClipFrame]] = Broadcast(name='Player frame')
         self._lock: Lock = Lock()                   # the chunks handed over and the counts
         self._camera_locks: dict[int, Lock] = defaultdict(Lock)     # one camera's frames out at a time, in order
-        self._readers: dict[int, ChunkReaders] = {}         # the chunks whose frames go out, by number
+        self._readers: dict[int, HandOverReaders] = {}      # the chunks whose frames go out, by number
         self._waiting: dict[int, dict[tuple[int, int], dict[ChunkStream, ndarray]]] = defaultdict(dict)
         self._handed_over: dict[int, tuple[int, int]] = {}  # each camera's last frame gone out: (chunk, frame)
         self._recorded: dict[int, float] = {}               # and its recorded capture time
         self._unpaired: int = 0                     # frames dropped without their other stream, since taken
         self.shown_frame: int = -1                  # camera 0's frame last gone out, for the panel
 
-    def start(self, readers: ChunkReaders | None) -> None:
+    def start(self, readers: HandOverReaders | None) -> None:
         """Hand over the frames of `readers`' chunk from here, and of no other; None hands over none."""
         with self._lock:
             self._readers = {readers.chunk: readers} if readers is not None else {}
@@ -49,12 +63,12 @@ class FrameHandOver:
             self._handed_over.clear()
             self._recorded.clear()
 
-    def follow(self, readers: ChunkReaders) -> None:
+    def follow(self, readers: HandOverReaders) -> None:
         """Hand over `readers`' chunk too, the one after the chunk playing: its frames go out after that chunk's."""
         with self._lock:
             self._readers[readers.chunk] = readers
 
-    def retire(self, readers: ChunkReaders) -> None:
+    def retire(self, readers: HandOverReaders) -> None:
         """The chunk of `readers` ended: none of its frames go out any more."""
         with self._lock:
             if self._readers.get(readers.chunk) is readers:
@@ -64,7 +78,7 @@ class FrameHandOver:
         """The fixed info of the chunk a camera's last frame came from; of the first chunk before any did."""
         with self._lock:
             handed: tuple[int, int] | None = self._handed_over.get(cam_id)
-            readers: ChunkReaders | None = self._readers.get(handed[0]) if handed is not None else None
+            readers: HandOverReaders | None = self._readers.get(handed[0]) if handed is not None else None
             if readers is None and self._readers:
                 readers = self._readers[min(self._readers)]
         return readers.info(cam_id) if readers is not None else None
@@ -85,7 +99,7 @@ class FrameHandOver:
     def submit_frame(self, cam_id: int, stream: ChunkStream, frame: ndarray, chunk_id: int, frame_id: int) -> None:
         """A stream's frame, on its reader's thread (`StreamFrameCallback`)."""
         with self._lock:
-            readers: ChunkReaders | None = self._readers.get(chunk_id)
+            readers: HandOverReaders | None = self._readers.get(chunk_id)
         if readers is None:
             return
         if cam_id == 0 and stream == ChunkStream.VIDEO:
