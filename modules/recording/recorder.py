@@ -36,8 +36,8 @@ from modules.settings import BaseSettings, Field, Widget
 from modules.utils import Waker
 from modules.video import ClipCodec, DEPTH_CODEC, DEPTH_HARDWARE, Hardware, StreamWriter
 
-from .chunk import DEPTH_SUFFIX, METADATA_LABEL, METADATA_SUFFIX, ChunkInfo, ChunkStream, Container, FrameMetadata, \
-    chunk_streams, finish_unmerged, frame_line, info_line, keep_chunk, make_chunk_name, make_file_name, make_folder_name, merge_chunk
+from .chunk import DEPTH_SUFFIX, ChunkInfo, ChunkStream, Container, FrameMetadata, chunk_streams, finish_unmerged, frame_line, \
+    info_line, keep_chunk, make_chunk_name, make_file_name, make_folder_name, make_metadata_name, merge_chunk
 from .recording_sync import FramePoses, RecordedCapture, RecordingSync
 
 import logging
@@ -210,7 +210,7 @@ class Recorder(Thread):
 
     def _metadata_path(self, cam_id: int, chunk_index: int) -> Path:
         assert self.folder_path is not None
-        return self.folder_path / f"{cam_id}_{METADATA_LABEL}_{chunk_index:03d}{METADATA_SUFFIX}"
+        return self.folder_path / make_metadata_name(cam_id, chunk_index)
 
     def _open_metadata(self, cam_id: int) -> None:
         self.metadata[cam_id] = self._metadata_path(cam_id, self.chunks[cam_id]).open('w', encoding='utf-8')

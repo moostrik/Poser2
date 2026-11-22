@@ -11,8 +11,8 @@ import numpy as np
 
 from modules import video
 from modules.camera import CameraTracklet, DepthAlignment, FrameReadings, TrackingStatus
-from modules.recording.chunk import METADATA_LABEL, METADATA_SUFFIX, ChunkInfo, ChunkStream, FrameMetadata, finish_unmerged, frame_line, \
-    info_line, make_chunk_name, make_file_name, make_folder_name, merge_chunk, parse_metadata, read_metadata
+from modules.recording.chunk import ChunkInfo, ChunkStream, FrameMetadata, finish_unmerged, frame_line, info_line, make_chunk_name, \
+    make_file_name, make_folder_name, make_metadata_name, merge_chunk, parse_metadata, read_metadata
 from modules.video import StreamWriter
 from modules.recording.tests.recordings import LENS
 from modules.utils import Rect
@@ -81,7 +81,7 @@ def write_parts(folder: Path, confidence: bool = True) -> tuple[Path, Path, Path
             writers[ChunkStream.CONFIDENCE].submit_frame(np.full((300, 480), 100 + i * 10, np.uint8))
     for writer in writers.values():
         writer.stop()
-    metadata = folder / f'0_{METADATA_LABEL}_000{METADATA_SUFFIX}'
+    metadata = folder / make_metadata_name(0, 0)
     metadata.write_text(info_line(ChunkInfo(320, 240, LENS, True, 60.0, None, True, True))
                         + ''.join(frame_line(i, FrameMetadata(i / 60.0)) for i in range(PARTS)), encoding='utf-8')
     return parts[ChunkStream.VIDEO], parts[ChunkStream.DEPTH], parts.get(ChunkStream.CONFIDENCE), metadata

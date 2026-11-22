@@ -74,6 +74,11 @@ def make_chunk_name(cam_id: int, chunk: int) -> str:
     return f"{cam_id}_{chunk:03d}.mkv"
 
 
+def make_metadata_name(cam_id: int, chunk: int) -> str:
+    """A chunk's metadata file: while it is recorded, and beside an `.mp4` chunk's color clip."""
+    return f"{cam_id}_{METADATA_LABEL}_{chunk:03d}{METADATA_SUFFIX}"
+
+
 def make_folder_name(name: str = "", parent: Path | None = None) -> str:
     """A recording's folder: its start time, and its name; with a counter when `parent` has that folder already."""
     folder = time.strftime("%Y%m%d-%H%M%S")
@@ -284,7 +289,7 @@ def keep_chunk(video: Path, metadata: Path, output_folder: Path) -> bool:
 def metadata_beside(clip: Path) -> Path:
     """The metadata file beside an `.mp4` chunk's color clip: `0_M_001.jsonl` beside `0_C_001.mp4`."""
     cam, _, chunk = clip.stem.split('_')
-    return clip.with_name(f'{cam}_{METADATA_LABEL}_{chunk}{METADATA_SUFFIX}')
+    return clip.with_name(make_metadata_name(int(cam), int(chunk)))
 
 
 def read_metadata(path: Path, cam_id: int = 0) -> ChunkMetadata:
@@ -309,7 +314,7 @@ def finish_unmerged(temp_path: Path, output_path: Path, container: Container = C
     if not temp_path.is_dir():
         return
     for folder in (entry for entry in temp_path.iterdir() if entry.is_dir()):
-        for metadata in folder.glob(f'*_M_*{METADATA_SUFFIX}'):
+        for metadata in folder.glob(f'*_{METADATA_LABEL}_*{METADATA_SUFFIX}'):
             cam, _, chunk = metadata.stem.split('_')
             video, depth, confidence = (next(folder.glob(f'{cam}_{CHUNK_STREAM_LABELS[stream]}_{chunk}.*'), None)
                                         for stream in ChunkStream)

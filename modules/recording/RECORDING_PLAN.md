@@ -40,12 +40,6 @@ timing, not the recording's data. Looked at when the refactor's A6 reaches the r
 
 None open.
 
-## F. The tree and what it exports
-
-- F3. The metadata file's name is made once, by a `make_metadata_name(cam_id, chunk)` in `chunk.py`, for
-  `Recorder._metadata_path` and `metadata_beside`, which each build `<cam>_M_<chunk>.jsonl` themselves **(seen)**.
-  Why: "Inside a package, code that does the same is written once". Tests: the recording tests.
-
 ## G. Text
 
 - G1. Leftovers: the comment "The letter in a clip's file name" above `STOP_WAIT` in `recorder.py` goes, its labels
@@ -64,7 +58,6 @@ None open.
 
 - Keep settings files in sync with code changes: hd_trio's `container` in its settings file
 - Run a test of the app or a GPU harness only on the user's go, and only what the plan names: the checks of A
-- Inside a package, code that does the same is written once: F3
 - Remove obsolete pathways; one term everywhere; `Field` descriptions: G1
 - A docstring says what the thing is; reasons sit in the package's document: G2
 - A document describes what is built: G3
