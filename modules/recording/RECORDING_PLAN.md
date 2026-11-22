@@ -41,9 +41,6 @@ With the apps' refactors ([REFACTOR_PLAN.md](../../REFACTOR_PLAN.md)), each test
 
 Proposals; nothing is built.
 
-- E2. `Player` binds `_on_refresh_path` to `PlayerSettings.video_path`, a `Field.INIT` value, which cannot change after
-  `initialize()` **(seen)**; the bind and its unbind go. Why: leftovers; an INIT field has no change to hear. Tests:
-  the recording tests.
 - E3. `ChunkInfo`'s fields are listed twice, as `info_line`'s JSON and as `merge_chunk`'s tags **(seen)**; one
   function gives both their values, so a field added lands in both. `finish_unmerged` names the merged chunk
   `f'{cam}_{chunk}.mkv'` itself instead of by `make_chunk_name`, and its glob `f'{cam}_{label}_{chunk}.*'` rebuilds
@@ -143,7 +140,6 @@ Proposals; nothing is built.
 - Settings connect the user and a component, not two components: E8
 - When that part can't keep up, its queue drops the oldest item and counts it: D3 (with the Rules thread), E9
 - Similar things share the noun and differ by a qualifier: D2 (built in POSE_PLAN.md D1)
-- Remove obsolete pathways: E2
 - Inside a package, code that does the same is written once: E3
 - Use `@dataclass` for plain value objects; PEP 8: E4
 - Use a `Protocol` for what a consumer needs from a collaborator: E5

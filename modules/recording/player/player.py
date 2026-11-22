@@ -143,7 +143,6 @@ class Player(Thread):
         self.settings.bind(PlayerSettings.scrub, self._on_scrub)
         self.settings.bind(PlayerSettings.seek, self._on_seek)
         self.settings.bind(PlayerSettings.refresh, self._on_refresh_path)
-        self.settings.bind(PlayerSettings.video_path, self._on_refresh_path)
 
     @property
     def frame_callbacks(self) -> Broadcast[[ClipFrame]]:
@@ -161,7 +160,6 @@ class Player(Thread):
         self.settings.unbind(PlayerSettings.scrub, self._on_scrub)
         self.settings.unbind(PlayerSettings.seek, self._on_seek)
         self.settings.unbind(PlayerSettings.refresh, self._on_refresh_path)
-        self.settings.unbind(PlayerSettings.video_path, self._on_refresh_path)
         self._waker.close()
 
     def _send(self, message: Message) -> None:
