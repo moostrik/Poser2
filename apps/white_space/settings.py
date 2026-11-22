@@ -95,6 +95,7 @@ class OakGroup(BaseSettings):
     square            : Field[bool]            = Field(True, access=Field.INIT, description="Use square aspect ratio")
     resolution        : Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode, all four cameras. P800 is the full readout, P720 a vertical crop")
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
+    replay            : Field[bool]            = Field(False, access=Field.INIT, description="Play on the host without an OAK device: detector and tracker in software")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, description="Model files directory")
     ir_flood_light    : Field[float]           = Field(0.8, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
     tilt              : Field[float]           = Field(0.0, access=Field.INIT, description="Up-tilt of all four cameras (°), positive = upward; baked into the warp at open")

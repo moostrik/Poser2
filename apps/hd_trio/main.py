@@ -83,7 +83,7 @@ class HDTrioMain:
         self.person_detector: person.PersonDetector | None = None      # the replay backend's, shared by its cameras
         if self.settings.setup.camera.sim_enabled:
             self.player = Player(self.settings.setup.camera.simulator, data_path=DATA_PATH)
-            if self.settings.setup.camera.simulator.replay:
+            if self.settings.setup.camera.replay:
                 # the recordings on the host, without a device: the people found and followed here
                 if self.settings.setup.camera.yolo:
                     self.person_detector = person.PersonDetector(self.settings.setup.camera.person_detector)
@@ -117,7 +117,7 @@ class HDTrioMain:
         # What each camera's captures wait for from the first: live and through the clip camera, the device sends
         # tracklets (a replay's come or not with the recording); the crop step says per set whether it asked poses
         # (`_on_asked`)
-        device_tracklets: bool = not (self.settings.setup.camera.sim_enabled and self.settings.setup.camera.simulator.replay)
+        device_tracklets: bool = not (self.settings.setup.camera.sim_enabled and self.settings.setup.camera.replay)
         for i in range(num_cams):
             self.video_recorder.expect_parts(i, tracklets=device_tracklets, poses=True)
 

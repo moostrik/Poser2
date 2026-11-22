@@ -26,7 +26,7 @@ mirrored. The recorder runs with `mirrored` on ([RECORDING.md](../../modules/rec
 as mp4 chunks any player plays, so every hd_trio recording, old and new, is mirrored in the file and needs no flag
 read to match its poses. Nothing is straightened (the cameras' tilt is 0).
 
-The recordings hold no tracklets, so `-sim` replays them on the host with the person detector (`simulator.replay`
+The recordings hold no tracklets, so `-sim` replays them on the host with the person detector (`camera.replay`
 and `yolo` on, the detector on TensorRT); the replay hands the frames on as stored.
 
 ## The show

@@ -62,19 +62,6 @@ Proposals; nothing is built.
   **(seen)**. B1 drops "its settings (`MP4`)", and "The rules it touches" drops its line on hd_trio's `container`:
   hd_trio's `studio.json` and `umu.json` hold `"container": "MP4"` already **(seen)**. Why: a plan holds only what is
   left.
-- E8. `PlayerSettings.replay` ("Play on the host without an OAK device") leaves the player's settings for each app's
-  camera settings: `OakGroup.replay` in `apps/hd_trio/settings.py` and in `apps/white_space/settings.py`, beside
-  `sim_enabled`, an INIT field with the same description. Today hd_trio's and white_space's `main.py` read
-  `setup.camera.simulator.replay` to choose the camera and to set `device_tracklets`; the `Player` never reads it
-  **(seen)**. Their `main.py` read `setup.camera.replay`; `scripts/white_space_probe.py` sets
-  `root.setup.camera.replay` and its docstring says `replay` **(seen: it sets `simulator.replay` today)**. In the
-  settings files under `data/settings`, the key moves from `camera.simulator` to `camera`: hd_trio's
-  `setup/studio.json` and `setup/umu.json`, white_space's `setup/studio.json` and `setup/public.json` **(seen)**.
-  deep_flow's and low_flow's `setup/studio.json` hold `"replay": true` under `simulator` too, and their `main.py`
-  build `replay.Camera` in -sim without reading it **(seen)**: the key goes from both files. What a key the settings
-  no longer have does on load is not checked **(deduction: the files are kept in sync anyway)**. Why: "Settings
-  connect the user and a component"; the choice of camera is the app's, not the player's. Tests: the recording
-  tests, and each of hd_trio and white_space started briefly with `-sim` and `replay` on (no camera needed).
 - E9. `RecordingSync`'s inbox length shows on the recorder's panel as a READ field, `RecorderSettings.sync_queued`
   ("Parts waiting in the sync's inbox"), set beside the other counts in `Recorder._update_missed`; `RecordingSync`
   gives the length as a property (`queued`), as `waiting` gives it with the cameras' waiting lines **(seen:
@@ -120,9 +107,8 @@ Proposals; nothing is built.
 
 ## The rules it touches
 
-- Keep settings files in sync with code changes: hd_trio's `container` in its settings file; the `replay` key, E8
-- Run a test of the app or a GPU harness only on the user's go, and only what the plan names: the checks of A; E8's starts
-- Settings connect the user and a component, not two components: E8
+- Keep settings files in sync with code changes: hd_trio's `container` in its settings file
+- Run a test of the app or a GPU harness only on the user's go, and only what the plan names: the checks of A
 - When that part can't keep up, its queue drops the oldest item and counts it: D3 (with the Rules thread), E9
 - Similar things share the noun and differ by a qualifier: D2 (built in POSE_PLAN.md D1)
 - A docstring says what the thing is; `Field` descriptions: E6

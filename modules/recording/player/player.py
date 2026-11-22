@@ -48,7 +48,6 @@ class PlayerSettings(BaseSettings):
     available_folders:  Field[list[str]]        = Field([""], access=Field.READ, visible=False, description="Available recording folders")
     folder:             Field[str]              = Field("", widget=Widget.text_select, options=available_folders, description="Recording folder")
     refresh:            Field[bool]             = Field(False, widget=Widget.button, description="Refresh recording folders")
-    replay:             Field[bool]             = Field(False, access=Field.INIT, description="Play on the host without an OAK device: detector and tracker in software")
     playhead:           Field[list[float]]      = Field([0.0, 0.0], access=Field.READ, visible=False, description="Playhead and length of the recording (s)")
     scrub:              Field[float]            = Field(-1.0, visible=False, saved=False, description="Where the dragged marker is, as a fraction of the length; -1 when none is")
     seek:               Field[float]            = Field(-1.0, visible=False, saved=False, description="Where the bar was pressed, as a fraction of the length; -1 otherwise")

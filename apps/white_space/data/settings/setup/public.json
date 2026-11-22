@@ -235,6 +235,7 @@
       "color": false,
       "square": false,
       "sim_enabled": false,
+      "replay": true,
       "model_path": "data/models",
       "ir_flood_light": 0.75,
       "mono_auto_exposure": false,
@@ -355,8 +356,7 @@
         "video_frame_types": [
           "VIDEO"
         ],
-        "folder": "20261023-163234_ICK",
-        "replay": true
+        "folder": "20261023-163234_ICK"
       },
       "person_detector": {
         "model_type": "TRT",

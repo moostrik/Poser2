@@ -10,6 +10,7 @@
       "square": true,
       "resolution": "P1080",
       "sim_enabled": false,
+      "replay": true,
       "model_path": "data/models",
       "fov": 95.0,
       "cam_0": {
@@ -120,8 +121,7 @@
         "video_frame_types": [
           "VIDEO"
         ],
-        "folder": "20260607-152033_3_square_color_UMU260607-1500",
-        "replay": true
+        "folder": "20260607-152033_3_square_color_UMU260607-1500"
       },
       "person_detector": {
         "model_type": "TRT",

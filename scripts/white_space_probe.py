@@ -1,6 +1,6 @@
 """white_space's input cadence and latency in -sim, over one stretch of a recording.
 
-Runs white_space -sim headless on `--folder`, replayed on the host with the person detector (`simulator.replay` and
+Runs white_space -sim headless on `--folder`, replayed on the host with the person detector (`camera.replay` and
 `yolo` set on the loaded settings file before the app reads them; no settings file is written) and measures while the playhead is between `--start` and `--end`
 (seconds of the recording, a stretch found first from the recording's metadata):
 - the cameras' hand-over: each camera thread's time per frame (the frame's callbacks, which only queue);
@@ -84,7 +84,7 @@ def main() -> int:
     def load_for_replay(self: SettingsStore, root: BaseSettings) -> None:
         """The startup files, then the replay with the detector: both are read when the app builds its cameras."""
         load_startup(self, root)
-        root.setup.camera.simulator.replay = True
+        root.setup.camera.replay = True
         root.setup.camera.yolo = True
     SettingsStore.load_startup = load_for_replay
     app = WhiteSpaceMain(simulation=True, interface=False)

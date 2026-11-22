@@ -138,6 +138,7 @@ class OakGroup(BaseSettings):
     square            : Field[bool]            = Field(True, access=Field.INIT, description="Use square aspect ratio")
     resolution        : Field[CameraResolution] = Field(CameraResolution.P1080, access=Field.INIT, description="Sensor mode. P720 and P800 on both sensors, P1080 color only.")
     sim_enabled: Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
+    replay            : Field[bool]            = Field(False, access=Field.INIT, description="Play on the host without an OAK device: detector and tracker in software")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
     fov               : Field[float]           = Field(95.0, access=Field.INIT, description="Camera horizontal FOV over the full frame width (°)")  # OAK-1 W, IMX378 color, 16:9; the square crop keeps the degrees per pixel
 

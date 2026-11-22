@@ -235,6 +235,7 @@
       "color": false,
       "square": false,
       "sim_enabled": true,
+      "replay": false,
       "model_path": "data/models",
       "ir_flood_light": 0.75,
       "mono_auto_exposure": true,
@@ -355,8 +356,7 @@
         "video_frame_types": [
           "VIDEO"
         ],
-        "folder": "20260924-200758_2_person",
-        "replay": false
+        "folder": "20260924-200758_2_person"
       },
       "person_detector": {
         "model_type": "TRT",

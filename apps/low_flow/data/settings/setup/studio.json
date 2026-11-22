@@ -75,8 +75,7 @@
         "video_frame_types": [
           "VIDEO"
         ],
-        "folder": "20261112-125832_measure",
-        "replay": true
+        "folder": "20261112-125832_measure"
       },
       "uploader": {
         "depth_kernels": true

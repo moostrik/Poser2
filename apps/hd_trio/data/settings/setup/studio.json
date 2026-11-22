@@ -10,6 +10,7 @@
       "square": true,
       "resolution": "P720",
       "sim_enabled": false,
+      "replay": true,
       "model_path": "data/models",
       "fov": 95.0,
       "cam_0": {
@@ -120,8 +121,7 @@
         "video_frame_types": [
           "VIDEO"
         ],
-        "folder": "intro_1",
-        "replay": true
+        "folder": "intro_1"
       },
       "person_detector": {
         "model_type": "TRT",
