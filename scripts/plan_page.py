@@ -1,8 +1,8 @@
-"""The request to update a plan's page on claude.ai after the plan changed.
+"""The request for the link to a plan file after the plan changed.
 
 With `--hook` it reads the JSON a Claude Code hook hands on stdin after an `Edit` or `Write`; when the edited file
-is named `*_PLAN.md` it prints the JSON that asks Claude to update the plan's page before the turn ends and give
-the user the link. Any other file, or stdin it cannot read, gives no output. It refuses nothing.
+is named `*_PLAN.md` it prints the JSON that asks Claude to give the user the link to the file in the thread before
+the turn ends. Any other file, or stdin it cannot read, gives no output. It refuses nothing.
 
     python scripts/plan_page.py --hook
 """
@@ -15,7 +15,7 @@ from pathlib import Path
 
 ROOT: Path = Path(__file__).resolve().parent.parent
 SUFFIX: str = "_PLAN.md"
-REQUEST: str = "This plan changed. Update its page on claude.ai before this turn ends, and give the user the link."
+REQUEST: str = "This plan changed. Give the user the link to this file in the thread before this turn ends."
 
 
 def edited_file() -> Path | None:
