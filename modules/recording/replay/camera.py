@@ -1,5 +1,5 @@
 """A camera fed from recordings without a device: the `Player`'s clip frames, handed over as the camera
-delivered them, and the players in them as the camera's tracklets, so `-sim` needs no OAK plugged in.
+delivered them, and the players in them as the camera's tracklets.
 
 A frame is stamped with its capture on the play's clock (`PlayClock`), arriving as late after it as it
 came live, and goes on as the camera delivered it: the turn and the flips as recorded, depth frames with the recorded
@@ -8,9 +8,8 @@ carries the recorded readings and lens, so a recording played can be recorded ag
 The device's warp is not applied here: a replay plays what was recorded.
 
 The tracklets come one of two ways. A recording that keeps the camera's tracklets plays them: each
-frame's after its recorded latency, stamped with the frame's capture, as the camera gave them, so the
-uploader straightens them as it does live. They go out from this camera's own thread, so nothing but
-the hand-over runs on the player's. With a person detector enabled (`PersonDetector.enabled`), the
+frame's after its recorded latency, stamped with the frame's capture, as the camera gave them. They go out
+from this camera's own thread. With a person detector enabled (`PersonDetector.enabled`), the
 detector's boxes play instead: the app feeds it the uploaded images, straightened and mirrored, its
 boxes go through a host tracker (`Tracker`) on this camera's thread and out as tracklets marked `straightened`.
 """
@@ -49,7 +48,7 @@ class Detection(Protocol):
 class PersonDetector(Protocol):
     """A person detector the camera hears back from, on the detector's thread:
     `modules.inference.person.PersonDetector`. The app feeds it the uploaded images, straightened and
-    mirrored, so its boxes are too. Named here so the contract does not import the inference package."""
+    mirrored, so its boxes are too."""
     @property
     def enabled(self) -> bool: ...
     def add_detection_callback(self, callback: Callable[[Detection], None]) -> None: ...

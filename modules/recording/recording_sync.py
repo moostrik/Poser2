@@ -32,7 +32,7 @@ from .chunk import PoseArrays
 
 logger = logging.getLogger(__name__)
 
-KEPT: int = 16      # frames of each part kept, and captures waiting, per camera: 320 ms at 50 fps, three times the slowest pose
+KEPT: int = 16      # frames of each part kept, and captures waiting, per camera
 
 
 @dataclass(frozen=True)

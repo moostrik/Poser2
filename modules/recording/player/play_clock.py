@@ -19,8 +19,8 @@ class PlayClock:
     """The recorded time of one chunk's play, on `perf_counter`: the `FrameSchedule` every reader of the chunk
     shares. From `start` frame `n` of a camera is captured at the origin plus its recorded capture time minus the
     base, the earliest first frame's of the cameras (`capture`), and due at that plus its recorded latency
-    (`moment`), so a frame comes as late after its capture as it came live, and a frame lost live leaves its gap. A
-    reader that falls behind moves the origin for every reader, as far as its frame is still behind (`catch_up`).
+    (`moment`); a frame lost live leaves its gap. A reader that falls behind moves the origin for every reader, as
+    far as its frame is still behind (`catch_up`).
     The chunk after it in the recording carries its origin and base on (`carry_on`): the two clocks share the
     origin, so the recorded time runs on across the two while both play. A camera without recorded times (an old
     clip) is paced on the same origin at `fps`: frame `n` captured, and due, at the origin plus `n` from its first

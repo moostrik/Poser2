@@ -5,7 +5,7 @@ confidence, None where the chunk has none.
 
 The streams' readers call `submit_frame` on their own threads. Each camera is handed over apart, under its own lock,
 as live: one camera's frames never wait for another's. A camera's frames leave in their order, the chunk's and then
-the frame's, so the chunk after the one playing can start beside it (`follow`) while the first ends; a frame older
+the frame's, and the chunk after the one playing plays beside it (`follow`) while the first ends; a frame older
 than one gone out is dropped, as are frames left without their other stream, counted (`take_unpaired`). How far
 the cameras are apart in recorded time is `drift`."""
 
@@ -42,8 +42,7 @@ class HandOverReaders(Protocol):
 
 class FrameHandOver:
     def __init__(self, streams: list[ChunkStream]) -> None:
-        """`streams`: in the order a frame's streams go out, VIDEO first: its readings set up what the depth of the
-        frame uses."""
+        """`streams`: in the order a frame's streams go out, VIDEO first."""
         self.streams: list[ChunkStream] = streams
         self.frame_callbacks: Broadcast[[ClipFrame]] = Broadcast(name='Player frame')
         self._lock: Lock = Lock()                   # the chunks handed over and the counts

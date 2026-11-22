@@ -1,9 +1,8 @@
 """One recorded chunk: color, depth and its confidence when recorded, and what the camera reported, as one `.mkv`
 or as the color `.mp4` with the metadata `.jsonl` beside it (`Container`).
 
-The streams are recorded apart, in the temp folder, and for a `.mkv` merged by stream copy when the chunk ends,
-which re-encodes nothing and takes moments. The fixed info of the chunk goes into the file's tags,
-where any tool can read it; the per-frame lines go in as an attachment. The streams are `ChunkStream`'s: 0 color,
+The streams are recorded apart, in the temp folder, and for a `.mkv` merged by stream copy when the chunk ends.
+The fixed info of the chunk goes into the file's tags; the per-frame lines go in as an attachment. The streams are `ChunkStream`'s: 0 color,
 1 depth, 2 the depth's confidence.
 
 Nothing in a chunk is straightened, turned or mirrored: the frames and the tracklets are as the camera
@@ -120,7 +119,7 @@ class ChunkInfo:
 
 
 # A frame's poses by track_id: the box they were found in (x, y, width, height, float32 (4,)) and the
-# points in it (float32 (17, 3): x, y, score). The camera contract knows no pose; the app converts.
+# points in it (float32 (17, 3): x, y, score).
 PoseArrays: TypeAlias = dict[int, tuple[np.ndarray, np.ndarray]]
 
 

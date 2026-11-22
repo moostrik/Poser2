@@ -14,7 +14,7 @@ it a capture is dropped whole, before any part of it is written, so every stream
 chunk hold the same frames. A split cuts every camera's chunk at one capture time: a camera goes on in
 the new chunk with its first capture after it. On stop no frame is taken any more, and the captures
 still waiting are settled by the parts that still come, for at most `STOP_WAIT`. Recordings hold what
-the camera delivered, not straightened, turned or mirrored, so the correction can still be tuned on them;
+the camera delivered, not straightened, turned or mirrored;
 `rotate90`, `flip_v` and `flip_h` say the frames are still to be turned and flipped, and replay applies them. What a
 capture went without is counted on the panel and warned of. Every stream shares `keyframe_interval`. The depth's
 confidence rides on its depth frame and goes into a stream of its own when the chunk's first depth has one
@@ -46,8 +46,8 @@ logger = logging.getLogger(__name__)
 class RecorderSettings(BaseSettings):
 
     # ── Initial settings ───────────────────────────────────────────────
-    num_cams:        Field[int]              = Field(1, access=Field.INIT, description="Number of cameras")
-    fps:                Field[float]            = Field(30.0, access=Field.INIT, description="Camera frame rate")
+    num_cams:           Field[int]              = Field(1, access=Field.INIT, description="Number of cameras")
+    fps:                Field[float]            = Field(30.0, access=Field.INIT, description="Camera frame rate (fps)")
     keyframe_interval:  Field[int]              = Field(0, access=Field.INIT, description="Keyframe interval in frames (0 = encoder default, 1 = every frame)")
     temp_path:          Field[str]              = Field("temp", access=Field.INIT, description="Temporary files directory")
     video_encoder:      Field[Hardware]         = Field(Hardware.iGPU, access=Field.INIT, description="The chip the color is encoded on")
@@ -60,7 +60,7 @@ class RecorderSettings(BaseSettings):
     enabled:            Field[bool]             = Field(True, widget=Widget.switch, description="Enable video recording")
     start:              Field[bool]             = Field(False, widget=Widget.button, description="Start recording")
     stop:               Field[bool]             = Field(False, widget=Widget.button, description="Stop recording")
-    recording:          Field[bool]             = Field(False, access=Field.READ, description="Recording")
+    recording:          Field[bool]             = Field(False, access=Field.READ, description="Whether a recording runs")
     split:              Field[bool]             = Field(False, widget=Widget.button, description="Split chunk")
     output_path:        Field[str]              = Field("recordings", access=Field.INIT, description="Video recordings directory")
     name:               Field[str]              = Field("", widget=Widget.input, description="Recording name")
@@ -77,7 +77,7 @@ class RecorderSettings(BaseSettings):
 STOP_WAIT: float = 1.0          # s a stopping recording waits for the parts its last captures wait for
 PASS: float = 0.01              # s the recorder's thread waits at most between passes, without a wake
 SPLIT_WAIT: float = 1.0         # s a split waits for a camera's first capture after its time, before it cuts that camera's chunk anyway
-HELD: int = 1 << 30             # bytes waiting for the encoders, queued here and in the writers: 1 GB, some 6 s of four cameras with depth
+HELD: int = 1 << 30             # bytes waiting for the encoders, queued here and in the writers: 1 GB
 SURE: int = 255                 # the confidence of a depth that came without one, in a chunk that records it
 QUEUED_PER_FRAME: int = 4       # the parts of one frame in the sync's inbox: the frame, its tracklets, whether poses were asked, the poses
 

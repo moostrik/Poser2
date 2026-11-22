@@ -7,7 +7,7 @@ the design and its reasons; how each part works is in its module's docstring:
 | Part                         | Module                                                               |
 |------------------------------|----------------------------------------------------------------------|
 | what a chunk holds           | `chunk.py`                                                           |
-| a capture's parts together   | `recording_sync.py`, `modules/camera/sync/capture_match.py`          |
+| a capture's parts together   | `recording_sync.py`, `modules/camera/capture_match.py`               |
 | writing                      | `recorder.py`, `modules/video/stream/stream_writer.py`               |
 | playing                      | `player/player.py` and [its parts](#the-players-parts)               |
 | the camera of a recording    | `replay/camera.py`, `replay/tracker.py`                              |
@@ -25,7 +25,8 @@ plays. The camera cannot straighten its color frame itself (the oak4's `Warp` ta
 is aligned on the GPU, where it is straightened with the color), so straightening and mirroring are the uploader's,
 live and in -sim alike, and a recording made before them plays through the same path as the camera. The tracklets
 are stored as the camera gave them for the same reason: the uploader straightens them with the homography of the
-frame they were found in (`SerialUploader.submit_tracklets`). A frame's `rotate90`, `flip_v` and `flip_h` are
+frame they were found in (`SerialUploader.submit_tracklets`). The correction can so still be tuned on a recording.
+A frame's `rotate90`, `flip_v` and `flip_h` are
 stored with it, and replay applies them. The OAK-D bakes its flips into its warp and sets no flags, so hd_trio's
 clips play mirrored in any player, as shown.
 
@@ -54,12 +55,14 @@ recordings, plays at `fps`, its frames as stored (`flip_h` False). An `MKV` chun
 | tags          | the info line's values                                                                          |
 | attachment    | the metadata, one JSON line each (`.jsonl`)                                                     |
 
-The streams are `ChunkStream`'s, each its index in the file; `FrameType` is the camera's, which has no confidence.
+The streams are written apart and merged by stream copy when the chunk ends, which re-encodes nothing and takes
+moments; the info line goes into the tags too, where any tool can read it. The streams are `ChunkStream`'s, each its
+index in the file; `FrameType` is the camera's, which has no confidence.
 The confidence keeps its own stream, as the depth's empty chroma cannot hold it: `hevc_qsv` encodes 12 bits only as
 4:2:0, which halves it to 240 × 150, and 4:4:4 only up to 10 bits, which would take the depth from 3 mm to 12 mm
 steps. Every stream shares `keyframe_interval`, so a seek, which goes to a color keyframe, lands whole in all
-three; a stream with its keyframes elsewhere would come back with its references missing. A chunk records it when its first depth
-frame has one (`confidence` in the info line); a later depth without one is written as 255, so every stream of a
+three; a stream with its keyframes elsewhere would come back with its references missing. A chunk records the
+confidence when its first depth frame has one (`confidence` in the info line); a later depth without one is written as 255, so every stream of a
 chunk holds the same frames.
 
 The metadata, attached or beside, is the same lines:
@@ -145,6 +148,7 @@ crash left unmerged is merged beside the next recording.
 | A frame comes at its recorded capture plus its `video_latency`             | as late after its capture as live, and a frame lost live leaves its gap          |
 | One origin for every camera and stream, from the earliest first frame      | cameras that started apart or dropped unlike frames play in step                 |
 | A frame's streams go out together, stamped with its capture on the clock   | downstream takes time from the frame, as live                                    |
+| A frame's VIDEO goes out before its DEPTH                                  | its readings set up what the depth of the frame uses                             |
 | A reader that falls behind moves the origin for all, as far as it is late  | one stall moves the clock once, and the cameras stay together                    |
 | The next chunk carries the clock on and plays as soon as it is loaded      | its readers hold each frame until its moment, so no camera's first frame is late |
 | A loop, a seek or another folder starts the clock anew, and is told        | the replay camera and `RecordedPoses` drop what waits (`add_jump_callback`)      |
@@ -197,7 +201,8 @@ Its tracklets come one of two ways, by `PersonDetector.enabled` (off in deep_flo
 
 Both go out from the camera's own thread, so nothing but the hand-over runs on the player's, and nothing but the
 hand-over on the detector's: its detections wait for the tracker there, and past `DETECTIONS_KEPT` (4) the oldest
-is dropped and counted (`dropped_detections`).
+is dropped and counted (`dropped_detections`). The detector is a `Protocol` in `replay` (`PersonDetector`,
+`Detection`), so the camera contract does not import the inference package.
 
 ## The recorded poses
 

@@ -36,8 +36,8 @@ logger = logging.getLogger(__name__)
 class PlayerSettings(BaseSettings):
 
     # ── Initial settings ───────────────────────────────────────────────
-    num_cams:        Field[int]              = Field(1, access=Field.INIT, description="Number of cameras")
-    fps:                Field[float]            = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Simulation FPS")
+    num_cams:           Field[int]              = Field(1, access=Field.INIT, description="Number of cameras")
+    fps:                Field[float]            = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Frame rate of the playhead and of untimed clips (fps)")
     video_path:         Field[str]              = Field("recordings", access=Field.INIT, description="Video recordings directory")
     video_decoder:      Field[Hardware]         = Field(Hardware.iGPU, access=Field.INIT, description="The chip the video is decoded on")
     video_frame_types:  Field[list[FrameType]]  = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to play", visible=False)
@@ -52,7 +52,7 @@ class PlayerSettings(BaseSettings):
     scrub:              Field[float]            = Field(-1.0, visible=False, saved=False, description="Where the dragged marker is, as a fraction of the length; -1 when none is")
     seek:               Field[float]            = Field(-1.0, visible=False, saved=False, description="Where the bar was pressed, as a fraction of the length; -1 otherwise")
     in_out:             Field[list[float]]      = Field([0.0, 1.0], widget=Widget.timeline, options=playhead, drag=scrub, seek=seek, saved=False, label="In / Out", newline=True,
-                                                        description="Plays between the two handles; each recording keeps its own", access=Field.READWRITE)
+                                                        description="In and out markers, fractions of the length (0-1); kept per recording", access=Field.READWRITE)
     current_chunk:      Field[int]              = Field(0, access=Field.READ, description="Current chunk", newline=True)
     max_chunks:         Field[int]              = Field(0, access=Field.READ, description="Total chunks")
 

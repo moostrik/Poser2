@@ -25,9 +25,8 @@ deep_flow live, with the camera and a player in view:
 
 With the apps' refactors ([REFACTOR_PLAN.md](../../REFACTOR_PLAN.md)), each tested with its refactored app:
 
-- B1. hd_trio: its settings (`MP4`), its wiring (the tracklets from each camera as they come, `expect_parts` per camera,
-  `expect_poses` per camera and set), as white_space's is wired, and its pose `.h5` cut at the recorder's split.
-- B2. The OAK-D's capture stamp is built (`oak_device/capture_clock.py`); its live check with an OAK-D is the camera plan's F1.
+- B1. hd_trio: its wiring (the tracklets from each camera as they come, `expect_parts` per camera, `expect_poses` per
+  camera and set), as white_space's is wired, and its pose `.h5` cut at the recorder's split.
 - B3. A white_space recording of the new layout played by hand, beside the old ones, which play as they are.
 
 ## D. Questions for the recording review (the refactor's A6)
@@ -37,49 +36,8 @@ With the apps' refactors ([REFACTOR_PLAN.md](../../REFACTOR_PLAN.md)), each test
   **(seen)**, by RECORDING.md's completeness first. The code stays. Whether the rule "When that part can't keep up,
   its queue drops the oldest item and counts it" needs a limit on where it applies is with the Rules thread.
 
-## E. From the scan of 2026-11-22
-
-Proposals; nothing is built.
-
-- E6. Reasons leave the docstrings that G2 did not name: `replay/camera.py` ("so `-sim` needs no OAK plugged in", "so
-  the uploader straightens them as it does live", "so nothing but the hand-over runs on the player's"),
-  `chunk_readers.py` (the unsynced rig, "So cameras that dropped unlike frames start and end at one moment"),
-  `play_clock.py` ("so a frame comes as late after its capture as it came live"), `frame_hand_over.py` ("so the
-  chunk after the one playing can start beside it"), `chunk.py` ("which re-encodes nothing and takes moments",
-  "where any tool can read it"), `recorder.py`'s module docstring ("so the correction can still be tuned on them"),
-  `PersonDetector` ("Named here so the contract does not import the inference package"), `FrameHandOver.__init__`
-  (VIDEO first: "its readings set up what the depth of the frame uses"), and the comments on `HELD` ("some 6 s of
-  four cameras") and `KEPT` ("320 ms at 50 fps, three times the slowest pose"), which repeat RECORDING.md's constants
-  table **(seen)**; RECORDING.md takes any it does not hold yet, the `PersonDetector` and VIDEO-first reasons among
-  them **(seen: it holds neither)**. `chunk.py`'s comment above `PoseArrays` says "the app converts"; `recording_sync.pose_arrays`
-  converts **(seen)**: the sentence goes. `PlayerSettings.fps` reads "Simulation FPS"; it paces a clip without
-  recorded times and turns the playhead's frames into seconds **(seen)**. `RecorderSettings.fps` reads "Camera frame
-  rate", without its unit; `PlayerSettings.in_out` ("Plays between the two handles; each recording keeps its own")
-  says neither the value (two fractions of the length) nor its unit; `RecorderSettings.recording` reads "Recording"
-  **(seen)**. Why: "A docstring says what the thing is"; "Keep `Field` descriptions to one short line of panel text:
-  what the value is and its unit"; docs.md "State each fact in one place". Check: none, text only.
-- E7. B2 leaves this plan: it says what is built and points at the camera plan's F1, which holds the check
-  **(seen)**. B1 drops "its settings (`MP4`)", and "The rules it touches" drops its line on hd_trio's `container`:
-  hd_trio's `studio.json` and `umu.json` hold `"container": "MP4"` already **(seen)**. Why: a plan holds only what is
-  left.
-
-## G. Text (one commit)
-
-- G1. RECORDING.md's first table names `modules/camera/sync/capture_match.py`, which is `modules/camera/capture_match.py`
-  since the camera's sync folder went **(seen)**. Its sentence "A chunk records it when its first depth frame has
-  one" follows the keyframe sentence, so "it" reads as the keyframes **(seen)**: it names the confidence. Why: "When
-  renaming or removing a section, state or setting, search the documents for references to it"; "Write plain
-  declarative sentences, without emphasis phrases". Check: none, text only.
-- G2. `num_cams` stands a column out of its block in `RecorderSettings` and `PlayerSettings`, left from the
-  `num_cameras` rename **(seen)**: aligned. Why: PEP 8 and the block's own layout. Check: none, text only.
-
 ## The rules it touches
 
-- Keep settings files in sync with code changes: hd_trio's `container` in its settings file
 - Run a test of the app or a GPU harness only on the user's go, and only what the plan names: the checks of A
 - When that part can't keep up, its queue drops the oldest item and counts it: D3 (with the Rules thread)
 - Similar things share the noun and differ by a qualifier: D2 (built in POSE_PLAN.md D1)
-- A docstring says what the thing is; `Field` descriptions: E6
-- A plan holds only what is left (plans.md, "A built step leaves the plan"): E7
-- Keep `Field` descriptions to one short line of panel text: what the value is and its unit: E6
-- When renaming or removing a section, state or setting, search the documents for references to it: G1

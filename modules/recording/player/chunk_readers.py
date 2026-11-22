@@ -2,11 +2,10 @@
 clock (`PlayClock`). The player holds the readers of the chunk playing, of the one loading, of the one ending while
 the next plays, and of those closing; a chunk's readers load at once and start together.
 
-The range is given in camera 0's frames (the timeline's) and found in every other camera by recorded time: the
-cameras of a rig run unsynced, so a camera's frame of the same round is up to half a frame period from camera 0's,
-and each camera plays its frames captured from half a period before camera 0's first frame to half a period after
+The range is given in camera 0's frames (the timeline's) and found in every other camera by recorded time: each
+camera plays its frames captured from half a frame period before camera 0's first frame to half a period after
 its last; a range from a chunk's start or to its end takes every camera's from its start or to its end, where the
-recorder cut them all at one time. So cameras that dropped unlike frames start and end at one moment. A camera plays the streams it
+recorder cut them all at one time. A camera plays the streams it
 has (`ChunkStream`): color, depth where its chunk holds depth, and its confidence, decoded gray, where the chunk holds
 that too (`ChunkInfo.confidence`)."""
 
