@@ -3,6 +3,24 @@
 What is to be built in `modules/video`: ffmpeg, the clips and streams it writes and reads, and the screen recorder
 ([VIDEO.md](VIDEO.md)).
 
+## A. Shared state
+
+A1. `StreamWriter._failed` becomes an `Event`: it is written on the writer's thread (`_record`) and read through
+   `failed` on the recorder's **(seen)**. Why: Concurrency, "Use `Lock` and `Event` for shared mutable state and
+   lifecycle signals". Check: `test_stream_writer`.
+
+## B. Names and text
+
+B1. The screen recorder test's `_ring_bytes` is named after the store (`_store_bytes`): it reads
+   `ScreenFrameStore.nbytes` in both modes, and the store's rename left it **(seen, `test_screen_recorder.py`)**. Why:
+   Naming, one term everywhere. Check: `test_screen_recorder`.
+
+B2. `ScreenFrame`'s docstring says its data is uint8; at 10 bits it is uint16 or uint32 (`ScreenFormat.dtype`)
+   **(seen)**. Why: a docstring says what the thing is. Check: none, text only.
+
+B3. `stream_reader.py`'s imports are grouped as PEP 8 has them: the standard library (`logging` among them, at the
+   top), then numpy, then the project's **(seen)**. Why: "Use Python 3.12 and follow PEP 8". Check: none, imports only.
+
 ## Rules
 
 - Log exceptions with context; never fail silently
