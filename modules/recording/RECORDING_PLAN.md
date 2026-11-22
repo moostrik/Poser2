@@ -41,12 +41,6 @@ With the apps' refactors ([REFACTOR_PLAN.md](../../REFACTOR_PLAN.md)), each test
 
 Proposals; nothing is built.
 
-- E3. `ChunkInfo`'s fields are listed twice, as `info_line`'s JSON and as `merge_chunk`'s tags **(seen)**; one
-  function gives both their values, so a field added lands in both. `finish_unmerged` names the merged chunk
-  `f'{cam}_{chunk}.mkv'` itself instead of by `make_chunk_name`, and its glob `f'{cam}_{label}_{chunk}.*'` rebuilds
-  `make_file_name`'s pattern **(seen)**. A stem `<cam>_<x>_<chunk>` is parsed apart three times, by
-  `metadata_beside`, `finish_unmerged` and `RecordingFolder.find` **(seen)**: one parse in `chunk.py` for the three.
-  Why: "Inside a package, code that does the same is written once". Tests: the recording tests.
 - E4. player.py's `Message` is a plain class with an `__init__`, and its `state` holds a `MessageType` **(seen)**: a
   frozen `@dataclass` with `kind`. `LoopCallback` also types the jump callbacks **(seen)**: one alias per job, or
   `Callable[[], None]` for both. `import logging` follows the relative imports in player.py and recorder.py
@@ -140,7 +134,6 @@ Proposals; nothing is built.
 - Settings connect the user and a component, not two components: E8
 - When that part can't keep up, its queue drops the oldest item and counts it: D3 (with the Rules thread), E9
 - Similar things share the noun and differ by a qualifier: D2 (built in POSE_PLAN.md D1)
-- Inside a package, code that does the same is written once: E3
 - Use `@dataclass` for plain value objects; PEP 8: E4
 - Use a `Protocol` for what a consumer needs from a collaborator: E5
 - A docstring says what the thing is; `Field` descriptions: E6

@@ -79,6 +79,15 @@ def make_metadata_name(cam_id: int, chunk: int) -> str:
     return f"{cam_id}_{METADATA_LABEL}_{chunk:03d}{METADATA_SUFFIX}"
 
 
+def parse_name(stem: str) -> tuple[int, int] | None:
+    """The camera and the chunk number of a chunk's file name, `<cam>_<chunk>` or `<cam>_<label>_<chunk>`; None for
+    another name."""
+    parts: list[str] = stem.split('_')
+    if len(parts) not in (2, 3) or not (parts[0].isdigit() and parts[-1].isdigit()):
+        return None
+    return int(parts[0]), int(parts[-1])
+
+
 def make_folder_name(name: str = "", parent: Path | None = None) -> str:
     """A recording's folder: its start time, and its name; with a counter when `parent` has that folder already."""
     folder = time.strftime("%Y%m%d-%H%M%S")
@@ -137,11 +146,13 @@ class ChunkMetadata:
     frames: Sequence[FrameMetadata]     # by frame number
 
 
+def info_values(info: ChunkInfo) -> dict:
+    """The chunk's info by field name, the depth alignment as a dict: the info line's and the tags' values."""
+    return asdict(info)
+
+
 def info_line(info: ChunkInfo) -> str:
-    alignment: dict | None = asdict(info.depth_alignment) if info.depth_alignment is not None else None
-    return json.dumps({'width': info.width, 'height': info.height, 'intrinsics': info.intrinsics,
-                       'flip_h': info.flip_h, 'fps': info.fps, 'depth_alignment': alignment, 'depth': info.depth,
-                       'confidence': info.confidence, 'rotate90': info.rotate90, 'flip_v': info.flip_v}) + '\n'
+    return json.dumps(info_values(info)) + '\n'
 
 
 def chunk_info(values: dict) -> ChunkInfo:
@@ -255,11 +266,9 @@ def merge_chunk(video: Path, depth: Path | None, confidence: Path | None, metada
     info: ChunkInfo | None = parse_metadata(metadata.read_text(encoding='utf-8')).info
     tags: list[str] = []
     if info is not None:
-        alignment: dict | None = asdict(info.depth_alignment) if info.depth_alignment is not None else None
-        for key, value in (('width', info.width), ('height', info.height), ('fps', info.fps), ('flip_h', info.flip_h),
-                           ('intrinsics', json.dumps(info.intrinsics)), ('depth_alignment', json.dumps(alignment)), ('depth', info.depth),
-                           ('confidence', info.confidence), ('rotate90', info.rotate90), ('flip_v', info.flip_v)):
-            tags += ['-metadata', f'{key}={value}']
+        for key, value in info_values(info).items():
+            text: str = json.dumps(value) if value is None or isinstance(value, (list, dict)) else str(value)
+            tags += ['-metadata', f'{key}={text}']
     streams: list[Path] = [video] + ([depth] if depth is not None else []) + \
         ([confidence] if depth is not None and confidence is not None else [])     # no confidence without its depth
     inputs: list[str] = [arg for path in streams for arg in ('-i', str(path))]
@@ -286,8 +295,10 @@ def keep_chunk(video: Path, metadata: Path, output_folder: Path) -> bool:
 
 def metadata_beside(clip: Path) -> Path:
     """The metadata file beside an `.mp4` chunk's color clip: `0_M_001.jsonl` beside `0_C_001.mp4`."""
-    cam, _, chunk = clip.stem.split('_')
-    return clip.with_name(make_metadata_name(int(cam), int(chunk)))
+    name: tuple[int, int] | None = parse_name(clip.stem)
+    if name is None:
+        raise ValueError(f'Not a chunk file: {clip.name}')
+    return clip.with_name(make_metadata_name(*name))
 
 
 def read_metadata(path: Path, cam_id: int = 0) -> ChunkMetadata:
@@ -313,8 +324,11 @@ def finish_unmerged(temp_path: Path, output_path: Path, container: Container = C
         return
     for folder in (entry for entry in temp_path.iterdir() if entry.is_dir()):
         for metadata in folder.glob(f'*_{METADATA_LABEL}_*{METADATA_SUFFIX}'):
-            cam, _, chunk = metadata.stem.split('_')
-            video, depth, confidence = (next(folder.glob(f'{cam}_{CHUNK_STREAM_LABELS[stream]}_{chunk}.*'), None)
+            name: tuple[int, int] | None = parse_name(metadata.stem)
+            if name is None:
+                continue
+            cam, chunk = name
+            video, depth, confidence = (next(folder.glob(make_file_name(cam, stream, chunk, '.*')), None)
                                         for stream in ChunkStream)
             info: ChunkInfo | None = parse_metadata(metadata.read_text(encoding='utf-8')).info
             with_depth: bool = info is None or info.depth
@@ -322,10 +336,10 @@ def finish_unmerged(temp_path: Path, output_path: Path, container: Container = C
             if video is not None and (depth is not None or not with_depth) and (confidence is not None or not with_confidence):
                 target: Path = output_path / folder.name
                 target.mkdir(parents=True, exist_ok=True)
-                logger.info('Finishing chunk %s_%s of %s', cam, chunk, folder.name)
+                logger.info('Finishing chunk %s of %s', metadata.name, folder.name)
                 if container == Container.MP4:
                     keep_chunk(video, metadata, target)
                 else:
-                    merge_chunk(video, depth, confidence, metadata, target / f'{cam}_{chunk}.mkv')
+                    merge_chunk(video, depth, confidence, metadata, target / make_chunk_name(cam, chunk))
         if not any(folder.iterdir()):
             shutil.rmtree(folder, ignore_errors=True)

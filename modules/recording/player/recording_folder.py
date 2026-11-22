@@ -10,7 +10,7 @@ from pathlib import Path
 
 from modules.video import probe
 
-from ..chunk import ChunkStream, Container, make_chunk_name, make_file_name
+from ..chunk import ChunkStream, Container, make_chunk_name, make_file_name, parse_name
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +64,9 @@ class RecordingFolder:
                 max_chunk: int = -1
                 for file in folder.iterdir():
                     if file.is_file() and file.suffix in (Container.MKV.value, Container.MP4.value):
-                        n: str = file.stem.split('_')[-1]
-                        if n.isdigit():
-                            max_chunk = max(max_chunk, int(n))
+                        name: tuple[int, int] | None = parse_name(file.stem)
+                        if name is not None:
+                            max_chunk = max(max_chunk, name[1])
                 if max_chunk >= 0:
                     folders[folder.name] = RecordingFolder(folder.name, folder, max_chunk)
         return folders
