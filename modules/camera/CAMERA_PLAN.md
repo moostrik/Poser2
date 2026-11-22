@@ -11,7 +11,7 @@ its tests pass in both venvs, pyright clean in both). **(seen)** is read in the 
 
 ## F. With an OAK-D at the PC
 
-- F1. The live check of the OAK-D's capture stamp, which is built (`capture_clock.py`, shared with the OAK4): an
+- F1. The live check of the OAK-D's capture stamp, which is built (`oak_device/capture_clock.py`, shared with the OAK4): an
   OAK-D, white_space live, its frames' and tracklets' latency readings against oak4's. Waits for an OAK-D at the PC: none
   was attached on 2026-11-22 **(seen: depthai 2 found no device)**. RECORDING_PLAN.md B's OAK-D capture time is this
   step, and so is the live check of each OAK-D's own pipeline (built 2026-11-22): every camera, and every
@@ -19,30 +19,8 @@ its tests pass in both venvs, pyright clean in both). **(seen)** is read in the 
 
 ## H. The scan of 2026-11-22
 
-- H2. What both OAK backends write twice, written once **(seen)**: `MountConfig` (`oak/pipeline.py`,
-  `oak4/pipeline.py`; the OAK-D's adds `tilt` and `keystone`), `imu_rotation_to_camera` (`oak/imu.py`,
-  `oak4/imu.py`), `read_lens_calibration` and `log_connected_sensors` (`oak/device.py`, `oak4/device.py`),
-  `TRACKING_STATUS` (`oak/models.py`, `oak4/models.py`), and in both `Camera`s the frame geometry log
-  (`_log_frame_geometry`) and the lens report of `_read_mount_calibration`. How:
-  - `MountConfig`, the frame geometry log and the lens report call no depthai **(seen)**: they go into `geometry/`,
-    `MountConfig` with the OAK-D's `tilt` and `keystone` defaulting to 0, the log line and the report as functions.
-  - The depthai-calling code goes into `oak_device/`, what an OAK device reports through depthai: `capture_clock.py`,
-    `imu_rotation_to_camera`, `read_lens_calibration`, `log_connected_sensors`, `TRACKING_STATUS`. Each backend's
-    `device.py` keeps finding its devices; the OAK4's platform log line stays in `oak4/`, as depthai 2 has no
-    `getPlatformAsString` **(seen)**. Every other moved call exists alike in depthai 2.30.0.0 and 3.11.0 **(seen:
-    `getImuToCameraExtrinsics`, `getCameraIntrinsics`, `getDistortionModel`, `getFov(socket, useSpec)`,
-    `readCalibration`, `getConnectedCameraFeatures`, `getDeviceName`, `Tracklet.TrackingStatus`)**.
-  - `depthai_backend.py` stays at the top: it imports no depthai and the contract exports it; in a folder that loads
-    `capture_clock.py` it would make the contract load depthai.
-  - Updated with it: CAMERA.md's parts table, OAK4.md's `capture_clock.capture_time`, `test_capture_clock.py`'s
-    imports, and each backend's `camera`, `pipeline`, `imu`, `device` and `models` imports.
-  Checked by the oak tests in `.venv` and oak4's in `.venv-oak4`. Why: "Inside a package, code that does the same is
-  written once"; "A package is one thing, and its name is that thing".
 - H3. Stale text **(seen)**. Why: "A docstring says what the thing is"; a document matches the code.
   - `CameraHealth.update`: "Recompute both verdicts"; it sets three (`mount`, `camera_fps`, `video_rate`).
-  - `imu_rotation_to_camera`, both backends: its docstring says the matrix "decides whether the readout runs on the
-    board's figures or on `IMU_BOARD_ROLL`", its log "falling back to the board constant"; `MountReadout.update`
-    applies both, always.
   - `OakCameraSettings.resolution`: "P1080 is color only"; `P2160` is too (`COLOR_RESOLUTIONS`).
   - OAK4.md, Recording: "Frames are stored mirrored and not straightened"; a recording holds them as delivered with
     their flags (RECORDING.md). The section restates RECORDING.md: it becomes a link to it ("A component is
@@ -69,7 +47,7 @@ its tests pass in both venvs, pyright clean in both). **(seen)** is read in the 
   - `CameraFrame`'s flags in the order they are applied (`homography`, `rotate90`, `flip_v`, `flip_h`; `flip_h` sits
     first now); every call passes them by keyword **(seen: at most four positional arguments)**, confirmed by the
     full test run.
-  - `import logging` after the other imports in `sensor_modes.py`, `oak/imu.py`, `oak/device.py`: PEP 8.
+  - `import logging` after the other imports in `sensor_modes.py`: PEP 8.
   - `imu_to_camera` passes the vector on unchanged when the matrix is malformed, silently: logged once. Why: "never
     fail silently".
   - A docstring for `oak.Camera`, `oak4.Camera`, `oak.ClipCamera`, `vimba.SensorControl`.
@@ -90,7 +68,7 @@ its tests pass in both venvs, pyright clean in both). **(seen)** is read in the 
   go, and one test holds a region mapped straight through `to_source`. Why: a sensor control lives in the camera's
   own picture; the code is shorter and the region one thing.
 
-H2, H6 and H7 are each a step of their own, checked by the tests in both venvs, pyright and the guard tests;
+H6 and H7 are each a step of their own, checked by the tests in both venvs, pyright and the guard tests;
 H3 to H5 are one commit.
 
 ## Open
@@ -108,9 +86,6 @@ H3 to H5 are one commit.
 - Stamp a frame or tracklet message once, where the backend hands it over, with its moment of capture where the device reports one, else its arrival: F1
 - Fix a problem where it is made: H7
 - Keep `Field` descriptions to one short line of panel text: what the value is and its unit: H7
-- Inside a package, code that does the same is written once: H2
-- A package is one thing, and its name is that thing: H2
-- When renaming or removing a section, state or setting, search the documents for references to it: H2
 - A docstring says what the thing is: H3, H5
 - A component is described in its own document; other documents link to it: H3
 - Use that one term everywhere it appears: H4, H5

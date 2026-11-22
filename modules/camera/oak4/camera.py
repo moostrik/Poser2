@@ -13,18 +13,18 @@ from numpy import ndarray
 
 from .. import CameraResolution, CameraFrame, DepthAlignment, FrameReadings, RigCameraReadings, CameraTracklet, CameraTracklets, FrameType, CameraFrameCallback, \
     TrackletCallback, TiltCorrection
-from ..capture_clock import capture_time, smoothed_latency
-from ..geometry import MountReadout, frame_window, frame_coverage, coverage_summary, delivered_height, lens_field, \
-    rectilinear_field, lens_deviation
+from ..geometry import MountConfig, MountReadout, delivered_height, rectilinear_field, frame_summary, lens_report
+from ..oak_device import capture_time, smoothed_latency, read_lens_calibration, imu_rotation_to_camera, \
+    log_connected_sensors, TRACKING_STATUS
 from modules.utils import Broadcast, FPS, Rect
 
 from .control import DepthControl, SensorControl
-from .device import get_device_list, find_device, link_name, link_resolution, log_connected_sensors, read_lens_calibration, CameraLink
-from .imu import imu_rotation_to_camera, IMU_BOARD_ROLL
+from .device import get_device_list, find_device, link_name, link_resolution, log_platform, CameraLink
+from .imu import IMU_BOARD_ROLL
 from .messages import packed_nv12
-from .models import ModelChain, model_archives, TRACKING_STATUS, tracklet_keypoints, keypoints_in_frame
+from .models import ModelChain, model_archives, tracklet_keypoints, keypoints_in_frame
 from .sensor import SENSOR_SOCKET, requested_size, DepthModel
-from .pipeline import build_pipeline, delivered_size, MountConfig, PipelineOutputs, DEPTH_STREAM, CONFIDENCE_STREAM
+from .pipeline import build_pipeline, delivered_size, PipelineOutputs, DEPTH_STREAM, CONFIDENCE_STREAM
 from .keypoint_join import KeypointJoin, Box
 from .settings import Oak4CameraSettings
 
@@ -192,6 +192,7 @@ class Camera(Thread):
 
         logger.info(f'{self.device_id} OPEN over {info.protocol}')
         self.settings.readings.link = link_name(info.protocol)
+        log_platform(self.device, self.device_id)
         log_connected_sensors(self.device, self.device_id)
         self._read_mount_calibration()
         self._last_frame = time.perf_counter() + FIRST_FRAME_GRACE
@@ -281,16 +282,7 @@ class Camera(Thread):
         """The window the grey frame's warp delivers and where the sensor covers it, pure geometry
         from the settings file, logged so a rig check reads the horizon row off the log."""
         src: tuple[int, int] = requested_size(self.color, self.resolution)
-        out: tuple[int, int] = self.frame_size
-        window = frame_window(src, out, src[0], self.mount.fov_h, 0.0,
-                              self.mount.lens_fov, self.mount.lens_center)
-        coverage = frame_coverage(src, out, src[0], self.mount.fov_h, 0.0,
-                                  self.mount.flip_h, self.mount.flip_v,
-                                  self.mount.lens_fov, self.mount.lens_center)
-        logger.info(f'frame {out[0]}x{out[1]}: elevation {window.elevation_bottom:+.1f} to '
-                    f'{window.elevation_top:+.1f} deg, horizon at row {window.horizon_px:.1f}, '
-                    f'{window.focal:.1f} px/rad; '
-                    f'{coverage_summary(coverage, out, src[0], self.mount.fov_h, self.mount.flip_h)}')
+        logger.info(f'{self.device_id} {frame_summary(src, self.frame_size, self.mount)}')
 
     def _read_mount_calibration(self) -> None:
         """One-shot at open: what this unit says about its own lens and its IMU's orientation. The
@@ -299,15 +291,7 @@ class Camera(Thread):
         src: tuple[int, int] = requested_size(self.color, self.resolution)
         lens = None if self.color else read_lens_calibration(self.device, SENSOR_SOCKET, src, self.device_id)
         if lens is not None:
-            focal, cx, cy = lens
-            field: float = lens_field(focal, src[0])
-            error: float = lens_deviation(focal, cx, cy, src, src[0], self.mount.fov_h,
-                                          self.mount.lens_fov, self.mount.lens_center)
-            self.settings.readings.fov_factory = field
-            self.settings.readings.lens_error = error
-            logger.info(f'{self.device_id} lens: field {field:.1f} deg across {src[0]} px, '
-                        f'center offset ({cx - (src[0] - 1) / 2.0:+.1f}, {cy - (src[1] - 1) / 2.0:+.1f}) px; '
-                        f'{error:.2f} deg off the shared lens')
+            logger.info(f'{self.device_id} {lens_report(self.settings.readings, lens, src, self.mount)}')
         self.mount_readout.imu_rotation = imu_rotation_to_camera(self.device, SENSOR_SOCKET, self.device_id)
 
     # ── The queues' callbacks: the hand-over to the contract ───────────

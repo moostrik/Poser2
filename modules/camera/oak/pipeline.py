@@ -1,7 +1,6 @@
 """The depthai pipeline of one OAK-D camera: its source (the sensor or clips), the warp, the video output, the
 detector and tracker, and the IMU."""
 
-from dataclasses import dataclass
 from pathlib import Path
 import logging
 import math
@@ -10,7 +9,8 @@ import cv2
 import depthai as dai
 import numpy as np
 
-from ..geometry import CameraResolution, IMU_RATE_HZ, mode_size, frame_size, WARP_MESH, warp_mesh_points, source_lens
+from ..geometry import CameraResolution, IMU_RATE_HZ, MountConfig, mode_size, frame_size, WARP_MESH, warp_mesh_points, \
+    source_lens
 
 from .models import YOLOV8_WIDE_6S, YOLOV8_WIDE_7S, YOLOV8_SQUARE_6S, YOLOV8_SQUARE_7S, YOLO_CONFIDENCE_THRESHOLD, \
     YOLO_OVERLAP_THRESHOLD, detector_input_size, TRACKER_PERSON_LABEL, TRACKER_TYPE
@@ -25,23 +25,6 @@ TRACKLETS_STREAM: str = 'tracklets'     # the object tracker's output
 IMU_STREAM: str = 'imu'                 # the accelerometer, on a device
 CONTROL_STREAM: str = 'control'         # the sensor controls, on a device
 CLIPS_STREAM: str = 'clips'             # the clip camera's frames, in
-
-
-@dataclass
-class MountConfig:
-    """How a camera is mounted and what its lens is, as the warp needs it."""
-    flip_h: bool
-    flip_v: bool
-    tilt: float                 # °, positive aimed up; exclusive with `keystone`
-    keystone: float             # fraction of the frame
-    fov_h: float                # ° the delivered frame spans, quoted for the un-cropped sensor width
-    lens_fov: float = 0.0       # the lens (`geometry.source_lens`); 0 takes `fov_h`
-    lens_center_x: float = 0.0
-    lens_center_y: float = 0.0
-
-    @property
-    def lens_center(self) -> tuple[float, float]:
-        return (self.lens_center_x, self.lens_center_y)
 
 
 def model_path(models: str, square: bool, clips: bool) -> Path:

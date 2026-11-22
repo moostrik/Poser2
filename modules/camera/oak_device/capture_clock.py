@@ -1,5 +1,4 @@
-"""A depthai message's moment of capture and its latency on our clock, for the OAK backends (depthai 2 and 3 alike).
-Only the backends import it: the contract (`__init__.py`) never loads depthai."""
+"""A depthai message's moment of capture and its latency on our clock, for the OAK backends (depthai 2 and 3 alike)."""
 
 import logging
 import time

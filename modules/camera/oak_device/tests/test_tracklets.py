@@ -1,11 +1,12 @@
-"""The hand-over of depthai's tracklets to the contract: every device status maps, nothing else."""
+"""The hand-over of depthai's tracklets to the contract: every device status maps, nothing else. Runs on either
+depthai install (`.venv`, `.venv-oak4`)."""
 
 import unittest
 
 import depthai as dai
 
 from modules.camera import TrackingStatus
-from modules.camera.oak.models import TRACKING_STATUS
+from modules.camera.oak_device import TRACKING_STATUS
 
 
 class TrackingStatusMapTest(unittest.TestCase):

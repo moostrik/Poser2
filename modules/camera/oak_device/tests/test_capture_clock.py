@@ -7,8 +7,8 @@ from datetime import timedelta
 
 import depthai as dai
 
-from modules.camera import capture_clock
-from modules.camera.capture_clock import capture_time, smoothed_latency
+from modules.camera.oak_device import capture_clock
+from modules.camera.oak_device.capture_clock import capture_time, smoothed_latency
 
 
 class FakeMessage:
@@ -33,7 +33,7 @@ class CaptureTimeTest(unittest.TestCase):
     def test_a_capture_time_after_now_is_stamped_with_the_arrival_and_logged_once(self) -> None:
         capture_clock._future_capture_warned = False
         message = FakeMessage(-0.040)       # 40 ms in the future
-        with self.assertLogs('modules.camera.capture_clock', 'WARNING') as logs:
+        with self.assertLogs('modules.camera.oak_device.capture_clock', 'WARNING') as logs:
             before: float = time.perf_counter()
             stamp: float = capture_time(message)
             after: float = time.perf_counter()

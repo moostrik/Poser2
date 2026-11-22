@@ -7,8 +7,6 @@ from enum import IntEnum
 import depthai as dai
 import numpy as np
 
-from .. import TrackingStatus
-
 logger = logging.getLogger(__name__)
 
 
@@ -32,13 +30,6 @@ POSE_CROP_PADDING: float = 0.0          # margin round the person's box before t
 POSE_CONFIDENCE_THRESHOLD: float = 0.5
 POSE_OVERLAP_THRESHOLD: float = 0.5
 
-# The device tracker's statuses, as the contract names them.
-TRACKING_STATUS: dict[dai.Tracklet.TrackingStatus, TrackingStatus] = {
-    dai.Tracklet.TrackingStatus.NEW: TrackingStatus.NEW,
-    dai.Tracklet.TrackingStatus.TRACKED: TrackingStatus.TRACKED,
-    dai.Tracklet.TrackingStatus.LOST: TrackingStatus.LOST,
-    dai.Tracklet.TrackingStatus.REMOVED: TrackingStatus.REMOVED,
-}
 TRACKER_PERSON_LABEL: int = 0
 TRACKER_TYPE: dai.TrackerType = dai.TrackerType.SHORT_TERM_IMAGELESS    # this chip has no ZERO_TERM_IMAGELESS, the `oak` backend's type
 

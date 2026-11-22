@@ -11,7 +11,7 @@ import os
 import depthai as dai
 
 from .. import CAPTURE_TOLERANCE
-from ..geometry import CameraResolution, IMU_RATE_HZ, frame_size, WARP_MESH, warp_mesh_points
+from ..geometry import CameraResolution, IMU_RATE_HZ, MountConfig, frame_size, WARP_MESH, warp_mesh_points
 
 from .device import SYSTEM_RATE_HZ
 from .models import nn_frame_type, POSE_CONFIDENCE_THRESHOLD, POSE_OVERLAP_THRESHOLD, POSE_CROP_PADDING, TRACKER_PERSON_LABEL, \
@@ -22,21 +22,6 @@ logger = logging.getLogger(__name__)
 
 DEPTH_STREAM: str = 'depth'             # the depth's name in the depth's message group
 CONFIDENCE_STREAM: str = 'confidence'   # its confidence's
-
-
-@dataclass
-class MountConfig:
-    """How a camera is mounted and what its lens is, as the correction needs it."""
-    flip_h: bool
-    flip_v: bool
-    fov_h: float                # ° the delivered frame spans, quoted for the un-cropped sensor width; the lens `source_lens`'s
-    lens_fov: float = 0.0
-    lens_center_x: float = 0.0
-    lens_center_y: float = 0.0
-
-    @property
-    def lens_center(self) -> tuple[float, float]:
-        return (self.lens_center_x, self.lens_center_y)
 
 
 @dataclass

@@ -11,8 +11,9 @@ from unittest.mock import patch
 import depthai as dai
 
 from modules.camera import CameraResolution
+from modules.camera.geometry import MountConfig
 from modules.camera.oak import pipeline as oak_pipeline
-from modules.camera.oak.pipeline import MountConfig, build_pipeline, VIDEO_STREAM, TRACKLETS_STREAM, IMU_STREAM, \
+from modules.camera.oak.pipeline import build_pipeline, VIDEO_STREAM, TRACKLETS_STREAM, IMU_STREAM, \
     CONTROL_STREAM, CLIPS_STREAM
 
 

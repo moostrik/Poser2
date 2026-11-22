@@ -300,16 +300,19 @@ whatever blob is in use. The input size is read off the blob, so a file name and
 | `camera_health.py`   | `CameraHealth`, `CameraHealthSettings`                                                       |
 | `capture_match.py`   | `CaptureStream`, `MissedParts`: the parts of a capture matched by time, for the syncs        |
 | `depthai_backend.py` | `oak_backend`, `require_backend`                                                             |
-| `capture_clock.py`   | `capture_time`, `smoothed_latency`: a depthai message's capture and latency, for both OAKs   |
 | `geometry/`          | `sensor_modes`, `lens`, `frame_window`, `warp`, `orientation`, `tilt_correction`, `flips`,   |
-|                      | `depth_projection`                                                                           |
+|                      | `depth_projection`, `mount` (`MountConfig`, the open log's frame and lens lines)             |
+| `oak_device/`        | what an OAK reports through depthai, for both OAKs: `capture_clock` (a message's capture and |
+|                      | latency), `calibration` (lens, IMU extrinsics), `sensors`, `tracklets` (`TRACKING_STATUS`)   |
 | `oak/`               | the OAK-D: `camera`, `clip_camera`, `control`, `pipeline`, `settings`, `sensor`, `device`,   |
 |                      | `imu`, `models`                                                                              |
 | `oak4/`              | the OAK4: `camera`, `control`, `pipeline`, `settings`, `sensor`, `device`, `imu`,            |
 |                      | `messages`, `models`, `keypoint_join`                                                        |
 | `vimba/`, `webcam/`  | the Mako over GigE, the PC's own camera                                                      |
 
-The package's `__init__.py` exports what other packages use; a backend takes the geometry from `geometry`'s.
+The package's `__init__.py` exports what other packages use; a backend takes the geometry from `geometry`'s, and an
+OAK backend what both OAKs share from `oak_device`'s, which only the OAK backends import, so the contract never loads
+depthai.
 Recording and playback, the replay camera among them, are `modules/recording`, which uses a camera; the cameras'
 sync (`CameraSync`) is `modules/inference`'s, beside `InferenceFrameSync`.
 

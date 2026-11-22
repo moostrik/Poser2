@@ -1,4 +1,4 @@
-"""Finding an OAK4, the link it is on, and what an open one says about itself: its sensors and its lens."""
+"""Finding an OAK4, the link it is on, and the chip an open one runs on."""
 
 import logging
 from enum import IntEnum
@@ -66,32 +66,9 @@ def link_resolution(protocol: dai.XLinkProtocol, resolution: CameraResolution, e
     return ethernet_resolution if protocol == LINK_PROTOCOLS[CameraLink.ETHERNET] else resolution
 
 
-def log_connected_sensors(device: dai.Device, device_id: str = '') -> None:
-    """Log the sensor behind each socket of an open device, and the chip it runs on."""
+def log_platform(device: dai.Device, device_id: str = '') -> None:
+    """Log the device's name and the chip it runs on (depthai 3 only: depthai 2 has no `getPlatformAsString`)."""
     try:
         logger.info(f'{device_id} {device.getDeviceName()} on {device.getPlatformAsString()}')
-        for feature in device.getConnectedCameraFeatures():
-            logger.debug(f'{device_id} sensor {feature.socket.name}: {feature.sensorName} '
-                         f'{feature.width}x{feature.height}')
     except Exception as exc:                        # never let diagnostics break an open
-        logger.debug(f'{device_id} could not read sensor features: {exc}')
-
-
-def read_lens_calibration(device: dai.Device, socket: dai.CameraBoardSocket, size: tuple[int, int],
-                          device_id: str = '') -> tuple[float, float, float] | None:
-    """This unit's lens from its factory calibration: (focal px/rad, cx, cy) at `size`, or None
-    when the device carries none, which is not an error. Read so each unit's deviation from the
-    settings file's shared lens can be reported (`lens_deviation`)."""
-    try:
-        calibration = device.readCalibration()
-        matrix = calibration.getCameraIntrinsics(socket, size[0], size[1])
-        model = calibration.getDistortionModel(socket)
-        spec_fov: float = float(calibration.getFov(socket, True))
-        fx, fy = float(matrix[0][0]), float(matrix[1][1])
-        cx, cy = float(matrix[0][2]), float(matrix[1][2])
-        logger.debug(f'{device_id} calibration {socket.name}: model {model}, spec fov {spec_fov:.1f} deg, '
-                     f'fx {fx:.1f} fy {fy:.1f} px/rad, center ({cx:.1f}, {cy:.1f}) at {size[0]}x{size[1]}')
-        return fx, cx, cy
-    except Exception as exc:                        # never let diagnostics break an open
-        logger.debug(f'{device_id} could not read calibration: {exc}')
-        return None
+        logger.debug(f'{device_id} could not read its platform: {exc}')

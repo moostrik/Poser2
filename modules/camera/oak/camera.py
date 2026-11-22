@@ -9,16 +9,15 @@ from numpy import ndarray
 
 from .. import CameraResolution, CameraFrame, RigCameraReadings, CameraTracklet, CameraTracklets, FrameType, CameraFrameCallback, \
     TrackletCallback
-from ..capture_clock import capture_time, smoothed_latency
-from ..geometry import MountReadout, mode_size, frame_size, frame_window, frame_coverage, coverage_summary, \
-    delivered_height, lens_field, lens_deviation
+from ..geometry import MountConfig, MountReadout, mode_size, frame_size, delivered_height, frame_summary, lens_report
+from ..oak_device import capture_time, smoothed_latency, read_lens_calibration, imu_rotation_to_camera, \
+    log_connected_sensors, TRACKING_STATUS
 from modules.utils import Broadcast, FPS, Rect
 
 from .control import SensorControl
-from .device import get_device_list, log_connected_sensors, read_lens_calibration
-from .imu import imu_rotation_to_camera, IMU_BOARD_ROLL
-from .models import TRACKING_STATUS
-from .pipeline import build_pipeline, MountConfig, VIDEO_STREAM, TRACKLETS_STREAM, IMU_STREAM, CONTROL_STREAM
+from .device import get_device_list
+from .imu import IMU_BOARD_ROLL
+from .pipeline import build_pipeline, VIDEO_STREAM, TRACKLETS_STREAM, IMU_STREAM, CONTROL_STREAM
 from .settings import OakCameraSettings
 
 logger = logging.getLogger(__name__)
@@ -194,15 +193,7 @@ class Camera(Thread):
             return
         src: tuple[int, int] = mode_size(self.color, self.resolution)
         out: tuple[int, int] = frame_size(self.color, self.resolution, self.square, self.frame_height)
-        window = frame_window(src, out, src[0], self.mount.fov_h, self.mount.tilt,
-                              self.mount.lens_fov, self.mount.lens_center)
-        coverage = frame_coverage(src, out, src[0], self.mount.fov_h, self.mount.tilt,
-                                  self.mount.flip_h, self.mount.flip_v,
-                                  self.mount.lens_fov, self.mount.lens_center)
-        logger.info(f'frame {out[0]}x{out[1]}: elevation {window.elevation_bottom:+.1f} to '
-                    f'{window.elevation_top:+.1f} deg, horizon at row {window.horizon_px:.1f}, '
-                    f'{window.focal:.1f} px/rad; '
-                    f'{coverage_summary(coverage, out, src[0], self.mount.fov_h, self.mount.flip_h)}')
+        logger.info(f'{self.device_id} {frame_summary(src, out, self.mount)}')
 
     def _read_mount_calibration(self) -> None:
         """One-shot at open: what this unit says about its own lens and its IMU's orientation."""
@@ -211,15 +202,7 @@ class Camera(Thread):
         src: tuple[int, int] = mode_size(self.color, self.resolution)
         lens = read_lens_calibration(self.device, socket, src, self.device_id)
         if lens is not None:
-            focal, cx, cy = lens
-            field: float = lens_field(focal, src[0])
-            error: float = lens_deviation(focal, cx, cy, src, src[0], self.mount.fov_h,
-                                          self.mount.lens_fov, self.mount.lens_center)
-            self.settings.readings.fov_factory = field
-            self.settings.readings.lens_error = error
-            logger.debug(f'{self.device_id} lens: field {field:.1f} deg across {src[0]} px, '
-                         f'center offset ({cx - (src[0] - 1) / 2.0:+.1f}, {cy - (src[1] - 1) / 2.0:+.1f}) px; '
-                         f'{error:.2f} deg off the shared lens')
+            logger.debug(f'{self.device_id} {lens_report(self.settings.readings, lens, src, self.mount)}')
         self.mount_readout.imu_rotation = imu_rotation_to_camera(self.device, socket, self.device_id)
 
     # ── The device's callbacks: the hand-over to the contract ──────────

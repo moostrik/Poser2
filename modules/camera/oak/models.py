@@ -1,20 +1,10 @@
-"""The OAK-D's detector and tracker: the blobs, their input size, and the tracker's statuses."""
+"""The OAK-D's detector and tracker: the blobs and their input size."""
 
 # https://blobconverter.luxonis.com/
 
 from pathlib import Path
 
-from depthai import Tracklet, TrackerType, OpenVINO
-
-from .. import TrackingStatus
-
-# The device tracker's statuses, as the contract names them: the `ObjectTracker` has exactly these four.
-TRACKING_STATUS: dict[Tracklet.TrackingStatus, TrackingStatus] = {
-    Tracklet.TrackingStatus.NEW: TrackingStatus.NEW,
-    Tracklet.TrackingStatus.TRACKED: TrackingStatus.TRACKED,
-    Tracklet.TrackingStatus.LOST: TrackingStatus.LOST,
-    Tracklet.TrackingStatus.REMOVED: TrackingStatus.REMOVED,
-}
+from depthai import TrackerType, OpenVINO
 
 # The wide blobs (CAMERA.md, the OAK-D's detector): 6 shaves on a device, 7 for clips (`pipeline.model_path`).
 YOLOV8_WIDE_6S: str = "yolov8n_coco_512x448_6S.blob"
