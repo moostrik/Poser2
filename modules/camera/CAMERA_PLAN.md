@@ -14,21 +14,11 @@ its tests pass in both venvs, pyright clean in both). **(seen)** is read in the 
 - F1. The live check of the OAK-D's capture stamp, which is built (`capture_clock.py`, shared with the OAK4): an
   OAK-D, white_space live, its frames' and tracklets' latency readings against oak4's. Waits for an OAK-D at the PC: none
   was attached on 2026-11-22 **(seen: depthai 2 found no device)**. RECORDING_PLAN.md B's OAK-D capture time is this
-  step, and so is H1's live check: every camera, and every `ClipCamera` in -sim, opens on its own pipeline, its
-  geometry logged.
+  step, and so is the live check of each OAK-D's own pipeline (built 2026-11-22): every camera, and every
+  `ClipCamera` in -sim, opens on its own pipeline, its geometry logged.
 
 ## H. The scan of 2026-11-22
 
-- H1. Each OAK-D builds its own pipeline from its own settings. `oak.Camera._pipeline` is a class attribute, built in
-  `_open` from the first camera that opens; every other camera runs it, so the panel shows `flip_h`, `flip_v` and
-  `keystone` per camera, and only the first camera's are used **(seen)**. Every settings file sets them alike on
-  every camera, so nothing shows today **(seen: hd_trio `studio.json`, `umu.json`; white_space `studio.json`,
-  `public.json`)**. How: `_open` builds `self.pipeline` for its device and drops it in `_close`, as `oak4.Camera`
-  does; `_log_frame_geometry` then logs each camera's. The settings and settings files stay. Why: a camera is a
-  component that takes its settings object, and its device state lives on its instance; the model for every camera
-  backend to come. Checked by a unit test with `dai.Device` and `get_device_list` patched: two cameras with
-  different flips build two pipelines, each with its own mesh, and one camera builds one, for `Camera` and
-  `ClipCamera` alike; and the oak tests. The live check joins F1.
 - H2. What both OAK backends write twice, written once **(seen)**: `MountConfig` (`oak/pipeline.py`,
   `oak4/pipeline.py`; the OAK-D's adds `tilt` and `keystone`), `imu_rotation_to_camera` (`oak/imu.py`,
   `oak4/imu.py`), `read_lens_calibration` and `log_connected_sensors` (`oak/device.py`, `oak4/device.py`),
@@ -100,7 +90,7 @@ its tests pass in both venvs, pyright clean in both). **(seen)** is read in the 
   go, and one test holds a region mapped straight through `to_source`. Why: a sensor control lives in the camera's
   own picture; the code is shorter and the region one thing.
 
-H1, H2, H6 and H7 are each a step of their own, checked by the tests in both venvs, pyright and the guard tests;
+H2, H6 and H7 are each a step of their own, checked by the tests in both venvs, pyright and the guard tests;
 H3 to H5 are one commit.
 
 ## Open
@@ -116,8 +106,7 @@ H3 to H5 are one commit.
 ## Rules it touches
 
 - Stamp a frame or tracklet message once, where the backend hands it over, with its moment of capture where the device reports one, else its arrival: F1
-- Components take their settings object (or a `Group` of it) in the constructor, never as a global: H1
-- Fix a problem where it is made: H1, H7
+- Fix a problem where it is made: H7
 - Keep `Field` descriptions to one short line of panel text: what the value is and its unit: H7
 - Inside a package, code that does the same is written once: H2
 - A package is one thing, and its name is that thing: H2

@@ -25,8 +25,6 @@ logger = logging.getLogger(__name__)
 
 
 class Camera(Thread):
-    _pipeline: dai.Pipeline | None = None
-
     def __init__(self, settings: OakCameraSettings, cam_id: int = 0) -> None:
         super().__init__()
         self.stop_event = Event()
@@ -61,7 +59,8 @@ class Camera(Thread):
         self.frame_height: int = delivered_height(self.color, self.resolution, self.mount.fov_h, self.mount.tilt,
                                                   self.mount.lens_fov, self.mount.lens_center)
 
-        # DEVICE — its queues are opened in `_setup_queues` and closed with it.
+        # DEVICE — its pipeline is built in `_open`, its queues in `_setup_queues`; all are closed with it.
+        self.pipeline: dai.Pipeline | None = None
         self.device: dai.Device | None = None
         self.queues: list[dai.DataOutputQueue | dai.DataInputQueue] = []
         self.control: SensorControl | None = None
@@ -108,15 +107,15 @@ class Camera(Thread):
             logger.warning(f'{self.device_id} NOT AVAILABLE in {device_list}')
             return False
 
-        if Camera._pipeline is None:
-            Camera._pipeline = dai.Pipeline()
-            self._setup_pipeline(Camera._pipeline)
-            self._log_frame_geometry()
+        self.pipeline = dai.Pipeline()
+        self._setup_pipeline(self.pipeline)
+        self._log_frame_geometry()
 
         try:
-            self.device = dai.Device(Camera._pipeline, dai.DeviceInfo(self.device_id))
+            self.device = dai.Device(self.pipeline, dai.DeviceInfo(self.device_id))
         except Exception as e:
             logger.error(f'Could not open device: {e}')
+            self.pipeline = None
             return False
 
         self._setup_queues()
@@ -134,6 +133,7 @@ class Camera(Thread):
         if self.device is not None:
             self.device.close()
             self.device = None
+        self.pipeline = None
         for queue in self.queues:
             queue.close()
         self.queues.clear()
@@ -188,7 +188,7 @@ class Camera(Thread):
             logger.debug(f'{self.device_id} no IMU stream: {exc}')
 
     def _log_frame_geometry(self) -> None:
-        """Log once per pipeline the window the warp delivers and the rows the sensor covers; nothing on the
+        """Log at each open the window this camera's warp delivers and the rows the sensor covers; nothing on the
         keystone path, which keeps the raw frame."""
         if self.mount.keystone != 0.0 and self.mount.tilt == 0.0:
             return
