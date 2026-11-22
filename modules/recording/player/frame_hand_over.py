@@ -27,7 +27,7 @@ FRAME_TYPES: dict[ChunkStream, FrameType] = {ChunkStream.VIDEO: FrameType.VIDEO,
 
 
 class FrameHandOver:
-    def __init__(self, num_cams: int, streams: list[ChunkStream]) -> None:
+    def __init__(self, streams: list[ChunkStream]) -> None:
         """`streams`: in the order a frame's streams go out, VIDEO first: its readings set up what the depth of the
         frame uses."""
         self.streams: list[ChunkStream] = streams

@@ -128,7 +128,7 @@ class Player(Thread):
         self.ending: ChunkReaders | None = None         # of the one before it, its last frames while the next plays,
         self.closing: list[ChunkReaders] = []           # and of those stopped, until their threads end
         self.known: ChunkReaders | None = None          # the last chunk played: its metadata for a seek after a stop
-        self.hand_over: FrameHandOver = FrameHandOver(self.num_cams, self.streams)
+        self.hand_over: FrameHandOver = FrameHandOver(self.streams)
 
         self.playback_lock: Lock = Lock()
         self.loop_callbacks: Broadcast[[]] = Broadcast(name='Player loop')

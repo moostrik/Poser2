@@ -34,7 +34,7 @@ class FakeReaders:
 
 class FrameHandOverTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.hand_over = FrameHandOver(2, [ChunkStream.VIDEO, ChunkStream.DEPTH, ChunkStream.CONFIDENCE])
+        self.hand_over = FrameHandOver([ChunkStream.VIDEO, ChunkStream.DEPTH, ChunkStream.CONFIDENCE])
         self.hand_over.start(FakeReaders(0, {0: [10.0, 10.02, 10.04, 10.06, 10.08, 10.10], 1: [10.0, 10.05, 10.1]}))  # pyright: ignore[reportArgumentType]
         self.out: list[tuple[int, FrameType]] = []
         self.out_cams: list[tuple[int, int, int]] = []
