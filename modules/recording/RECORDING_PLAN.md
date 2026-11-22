@@ -30,12 +30,6 @@ With the apps' refactors ([REFACTOR_PLAN.md](../../REFACTOR_PLAN.md)), each test
 - B2. The OAK-D's capture stamp is built (`oak_device/capture_clock.py`); its live check with an OAK-D is the camera plan's F1.
 - B3. A white_space recording of the new layout played by hand, beside the old ones, which play as they are.
 
-## C. The split test that sometimes fails
-
-- C1. `test_a_split_keeps_the_streams_in_step_across_chunks` (`tests/test_round_trip.py`) fails about 2 runs in 5: the
-split lands 1 to 3 frames early on one stream. No frame is lost (50 of 50 in all three streams), so it is the split's
-timing, not the recording's data. Looked at when the refactor's A6 reaches the recording module.
-
 ## D. Questions for the recording review (the refactor's A6)
 
 None open.
