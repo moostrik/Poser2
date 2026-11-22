@@ -10,7 +10,8 @@ import numpy as np
 
 from modules import video
 from modules.camera import ClipFrame, FrameType
-from modules.recording import Player, PlayerSettings, make_chunk_name
+from modules.recording import Player, PlayerSettings
+from modules.recording.chunk import make_chunk_name
 from modules.recording.player.recording_folder import IN_OUT_FILE, read_in_out, write_in_out
 from modules.recording.recorder import RecState
 from modules.recording.tests.recordings import depth_frame, recorder, stream_packets, video_frame

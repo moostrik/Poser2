@@ -14,8 +14,8 @@ import numpy as np
 from modules import video
 from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, FrameType, TrackingStatus
 from modules.recording import ChunkStream, RecorderSettings
-from modules.recording import RecordedCapture
 from modules.recording.recorder import RecState
+from modules.recording.recording_sync import RecordedCapture
 from modules.recording.tests.recordings import LENS, video_frame, recorder
 from modules.utils import Rect
 

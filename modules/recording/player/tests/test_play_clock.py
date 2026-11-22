@@ -3,7 +3,8 @@ to chunk."""
 
 import unittest
 
-from modules.recording import FrameMetadata, PlayClock
+from modules.recording import FrameMetadata
+from modules.recording.player.play_clock import PlayClock
 
 
 def frames(times: list[float], latency: float = 0.03) -> list[FrameMetadata]:

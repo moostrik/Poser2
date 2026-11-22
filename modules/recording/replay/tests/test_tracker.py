@@ -7,7 +7,8 @@ import unittest
 import numpy as np
 
 from modules.camera import TrackingStatus
-from modules.recording.replay import Tracker, assign, overlap
+from modules.recording.replay import Tracker
+from modules.recording.replay.tracker import assign, overlap
 from modules.utils import Rect
 
 

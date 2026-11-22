@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from modules.recording import RecordingFolder, Timeline
+from modules.recording.player.recording_folder import RecordingFolder, Timeline
 
 
 class TimelineTest(unittest.TestCase):

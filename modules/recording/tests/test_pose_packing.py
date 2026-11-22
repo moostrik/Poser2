@@ -8,7 +8,7 @@ import numpy as np
 from modules.pose import BBox, Frame, FrameDict, Points2D
 from modules.utils import Rect
 
-from .. import RecordingSync, frame_poses
+from ..recording_sync import RecordingSync, frame_poses
 from .recordings import BOX, POINTS, cam_frame, poses
 
 

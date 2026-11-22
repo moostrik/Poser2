@@ -8,7 +8,8 @@ import numpy as np
 
 from modules.camera import CameraTracklet, ClipFrame, FrameType, RigCameraReadings, TrackingStatus
 from modules.recording import FrameMetadata
-from modules.recording.replay import Camera, Track
+from modules.recording.replay import Camera
+from modules.recording.replay.tracker import Track
 from modules.utils import Rect
 
 

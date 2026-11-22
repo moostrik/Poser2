@@ -42,14 +42,6 @@ None open.
 
 ## F. The tree and what it exports
 
-- F2. `__init__.py` exports only what other packages use. It keeps `ChunkStream`, `FrameMetadata`, `PoseArrays`,
-  `Container`, `read_metadata`, `make_folder_name`, `Player`, `PlayerSettings`, `Recorder`, `RecorderSettings` and
-  `replay` with `Camera` and `Tracker`. Out, used by no other package on the PC's deep-flow **(seen, grep)**:
-  `ChunkInfo`, `ChunkMetadata`, `merge_chunk`, `finish_unmerged`, `make_file_name`, `make_chunk_name`,
-  `RecordingFolder`, `Timeline`, `RecordingSync`, `RecordedCapture`, `FramePoses`, `frame_poses`, `PlayClock`,
-  `ClipFrameCallback`, `LoopCallback`, and replay's `PersonDetector`, `BoxTracker`, `Track`, `LOST_FRAMES`,
-  `MIN_OVERLAP`, `assign`, `overlap`. The package's tests import them from their files. Why: "Its `__init__.py` holds
-  what other packages use". Tests: the recording tests, the guard tests, pyright.
 - F3. The metadata file's name is made once, by a `make_metadata_name(cam_id, chunk)` in `chunk.py`, for
   `Recorder._metadata_path` and `metadata_beside`, which each build `<cam>_M_<chunk>.jsonl` themselves **(seen)**.
   Why: "Inside a package, code that does the same is written once". Tests: the recording tests.
@@ -72,7 +64,6 @@ None open.
 
 - Keep settings files in sync with code changes: hd_trio's `container` in its settings file
 - Run a test of the app or a GPU harness only on the user's go, and only what the plan names: the checks of A
-- Its `__init__.py` holds what other packages use: F2
 - Inside a package, code that does the same is written once: F3
 - Remove obsolete pathways; one term everywhere; `Field` descriptions: G1
 - A docstring says what the thing is; reasons sit in the package's document: G2

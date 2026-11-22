@@ -1,5 +1,5 @@
 """The host's poses recorded with the video, played back in place of the pose model. The recorder packs them
-(`modules.recording.frame_poses`).
+(`frame_poses` in `modules/recording/recording_sync.py`).
 
 `RecordedPoses` is the RAW stage's async output in -sim, between the crop step and the pose model: it takes the crop
 step's poses with their crops (`submit`, an `ImageCallback`) and emits the stage's poses. It hears the player's frames

@@ -6,8 +6,9 @@ import unittest
 import numpy as np
 
 from modules.camera import ClipFrame, FrameType
-from modules.recording import ChunkStream, FrameMetadata, PlayClock
+from modules.recording import ChunkStream, FrameMetadata
 from modules.recording.player.frame_hand_over import FrameHandOver
+from modules.recording.player.play_clock import PlayClock
 
 
 def frames(times: list[float], latency: float = 0.03) -> list[FrameMetadata]:

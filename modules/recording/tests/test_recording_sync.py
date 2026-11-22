@@ -7,9 +7,9 @@ import time
 import unittest
 
 from modules.camera import CameraFrame, FrameType
-from modules.recording import RecordedCapture, RecorderSettings, RecordingSync
+from modules.recording import RecorderSettings
 from modules.recording.recorder import RecState
-from modules.recording.recording_sync import KEPT
+from modules.recording.recording_sync import KEPT, RecordedCapture, RecordingSync
 from modules.recording.tests.recordings import LENS, cam_frame, cam_tracklets, video_frame, poses, tracklets, depth_frame, recorder
 
 FRAMES: int = 12           # under `KEPT`: one sender may run that far ahead of the other

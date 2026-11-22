@@ -11,7 +11,9 @@ import numpy as np
 
 from modules import video
 from modules.camera import CameraFrame, FrameType
-from modules.recording import ChunkStream, Recorder, RecorderSettings, RecordingFolder, make_chunk_name, read_metadata
+from modules.recording import ChunkStream, Recorder, RecorderSettings, read_metadata
+from modules.recording.chunk import make_chunk_name
+from modules.recording.player.recording_folder import RecordingFolder
 from modules.recording.player.chunk_readers import ChunkReaders, Decoding
 from modules.recording.tests.recordings import poses, stream_frames, cam_frame, cam_tracklets, record, \
     player, Played, collect, FPS, SPLIT, COUNT
