@@ -41,10 +41,6 @@ With the apps' refactors ([REFACTOR_PLAN.md](../../REFACTOR_PLAN.md)), each test
 
 Proposals; nothing is built.
 
-- E5. replay's protocols take untyped callbacks: `PlayerFeed.add_frame_callback`, `add_jump_callback`,
-  `PersonDetector.add_detection_callback` **(seen)**; they take `ClipFrameCallback`, `Callable[[], None]` and
-  `Callable[[Detection], None]`, so pyright checks `replay.Camera`'s callbacks against what calls them. Why: "Use a
-  `Protocol` for what a consumer needs from a collaborator", typed. Tests: pyright, the recording tests.
 - E6. Reasons leave the docstrings that G2 did not name: `replay/camera.py` ("so `-sim` needs no OAK plugged in", "so
   the uploader straightens them as it does live", "so nothing but the hand-over runs on the player's"),
   `chunk_readers.py` (the unsynced rig, "So cameras that dropped unlike frames start and end at one moment"),
@@ -129,7 +125,6 @@ Proposals; nothing is built.
 - Settings connect the user and a component, not two components: E8
 - When that part can't keep up, its queue drops the oldest item and counts it: D3 (with the Rules thread), E9
 - Similar things share the noun and differ by a qualifier: D2 (built in POSE_PLAN.md D1)
-- Use a `Protocol` for what a consumer needs from a collaborator: E5
 - A docstring says what the thing is; `Field` descriptions: E6
 - A plan holds only what is left (plans.md, "A built step leaves the plan"): E7
 - A thread's loop catches an exception per item, logs it and goes on with the next: F1
@@ -137,6 +132,6 @@ Proposals; nothing is built.
 - A callback only hands the item over and returns: F2
 - Name a concept after what it is in the domain, and use that one term everywhere it appears: F3
 - Suppress only when a third-party stub is provably wrong or the type system cannot express the code, never to hide an error in our own code: F4
-- Use a `Protocol` for what a consumer needs from a collaborator: E5, F4
+- Use a `Protocol` for what a consumer needs from a collaborator: F4
 - Keep `Field` descriptions to one short line of panel text: what the value is and its unit: E6
 - When renaming or removing a section, state or setting, search the documents for references to it: G1

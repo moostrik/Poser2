@@ -19,11 +19,11 @@ import heapq
 import logging
 import time
 from threading import Lock, Thread
-from typing import Protocol
+from typing import Callable, Protocol
 
 import numpy as np
 
-from modules.camera import CameraFrame, CameraTracklet, ClipFrame, CameraTracklets, CameraFrameCallback, DepthAlignment, FrameReadings, FrameType, \
+from modules.camera import CameraFrame, CameraTracklet, ClipFrame, ClipFrameCallback, CameraTracklets, CameraFrameCallback, DepthAlignment, FrameReadings, FrameType, \
     RigCameraReadings, TiltCorrection, TiltCorrectionSettings, TrackletCallback
 from modules.utils import FPS, Broadcast, Rect, Waker
 
@@ -36,9 +36,12 @@ logger = logging.getLogger(__name__)
 
 class Detection(Protocol):
     """What the detector reports for one frame: `modules.inference.person.Detection`."""
-    cam_id: int
-    timestamp: float
-    boxes: list[Rect]
+    @property
+    def cam_id(self) -> int: ...
+    @property
+    def timestamp(self) -> float: ...
+    @property
+    def boxes(self) -> list[Rect]: ...
 
 
 class PersonDetector(Protocol):
@@ -47,7 +50,7 @@ class PersonDetector(Protocol):
     mirrored, so its boxes are too. Named here so the contract does not import the inference package."""
     @property
     def enabled(self) -> bool: ...
-    def add_detection_callback(self, callback) -> None: ...
+    def add_detection_callback(self, callback: Callable[[Detection], None]) -> None: ...
 
 
 class BoxTracker(Protocol):
@@ -59,8 +62,8 @@ class PlayerFeed(Protocol):
     """What the replay camera needs of a player: its frames, its jumps, a chunk's info, and whether video comes as
     NV12 (`modules.recording.Player`)."""
     nv12: bool
-    def add_frame_callback(self, callback) -> None: ...
-    def add_jump_callback(self, callback) -> None: ...
+    def add_frame_callback(self, callback: ClipFrameCallback) -> None: ...
+    def add_jump_callback(self, callback: Callable[[], None]) -> None: ...
     def get_chunk_info(self, cam_id: int) -> ChunkInfo | None: ...
 
 
