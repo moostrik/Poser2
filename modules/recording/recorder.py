@@ -304,6 +304,13 @@ class Recorder(Thread):
         self.merges.append(merge)
 
     def _merge_chunk(self, cam_id: int, chunk_index: int) -> None:
+        """A chunk's thread: its parts into the chunk file; a failure is logged, and its parts stay."""
+        try:
+            self._merge_parts(cam_id, chunk_index)
+        except Exception:
+            logger.exception("Chunk %d of camera %d not merged", chunk_index, cam_id)
+
+    def _merge_parts(self, cam_id: int, chunk_index: int) -> None:
         video, depth, confidence = (self._stream_path(cam_id, stream, chunk_index) for stream in ChunkStream)
         metadata: Path = self._metadata_path(cam_id, chunk_index)
         if not (video.exists() and metadata.exists()):

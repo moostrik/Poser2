@@ -324,22 +324,34 @@ def finish_unmerged(temp_path: Path, output_path: Path, container: Container = C
         return
     for folder in (entry for entry in temp_path.iterdir() if entry.is_dir()):
         for metadata in folder.glob(f'*_{METADATA_LABEL}_*{METADATA_SUFFIX}'):
-            name: tuple[int, int] | None = parse_name(metadata.stem)
-            if name is None:
-                continue
-            cam, chunk = name
-            video, depth, confidence = (next(folder.glob(make_file_name(cam, stream, chunk, '.*')), None)
-                                        for stream in ChunkStream)
-            info: ChunkInfo | None = parse_metadata(metadata.read_text(encoding='utf-8')).info
-            with_depth: bool = info is None or info.depth
-            with_confidence: bool = info is not None and info.confidence
-            if video is not None and (depth is not None or not with_depth) and (confidence is not None or not with_confidence):
-                target: Path = output_path / folder.name
-                target.mkdir(parents=True, exist_ok=True)
-                logger.info('Finishing chunk %s of %s', metadata.name, folder.name)
-                if container == Container.MP4:
-                    keep_chunk(video, metadata, target)
-                else:
-                    merge_chunk(video, depth, confidence, metadata, target / make_chunk_name(cam, chunk))
-        if not any(folder.iterdir()):
-            shutil.rmtree(folder, ignore_errors=True)
+            try:
+                _finish_unmerged_chunk(folder, metadata, output_path, container)
+            except Exception:
+                logger.exception('Chunk %s of %s not finished', metadata.name, folder.name)
+        try:
+            if not any(folder.iterdir()):
+                shutil.rmtree(folder, ignore_errors=True)
+        except OSError:
+            logger.exception('Temp folder %s not removed', folder)
+
+
+def _finish_unmerged_chunk(folder: Path, metadata: Path, output_path: Path, container: Container) -> None:
+    """One chunk a crash left in `folder`, by its metadata file, once all its streams are there."""
+    name: tuple[int, int] | None = parse_name(metadata.stem)
+    if name is None:
+        return
+    cam, chunk = name
+    video, depth, confidence = (next(folder.glob(make_file_name(cam, stream, chunk, '.*')), None)
+                                for stream in ChunkStream)
+    info: ChunkInfo | None = parse_metadata(metadata.read_text(encoding='utf-8')).info
+    with_depth: bool = info is None or info.depth
+    with_confidence: bool = info is not None and info.confidence
+    if video is None or (depth is None and with_depth) or (confidence is None and with_confidence):
+        return
+    target: Path = output_path / folder.name
+    target.mkdir(parents=True, exist_ok=True)
+    logger.info('Finishing chunk %s of %s', metadata.name, folder.name)
+    if container == Container.MP4:
+        keep_chunk(video, metadata, target)
+    else:
+        merge_chunk(video, depth, confidence, metadata, target / make_chunk_name(cam, chunk))

@@ -67,11 +67,6 @@ Proposals; nothing is built.
 
 Proposals; nothing is built.
 
-- F1. `chunk.finish_unmerged` catches an exception per chunk, logs it and goes on; `Recorder._merge_chunk` logs its
-  own failure. Today one `OSError` (a `mkdir`, a move or an unlink) ends the `RecorderUnmerged` thread and leaves the
-  chunks after it, and `_merge_chunk` has no `try` **(seen)**; `merge_chunk` and `keep_chunk` log their own failures
-  already **(seen)**. Why: "A thread's loop catches an exception per item, logs it and goes on with the next"; "Log
-  exceptions with context; never fail silently". Tests: the recording tests.
 - F2. `replay.Camera._on_detection` only queues the detection and sets the camera's `Waker`; the box tracker runs on
   `replay.Camera`'s own thread, beside the recorded tracklets. Today the detector's callback runs the whole SORT
   tracker (Kalman and the Hungarian assignment) on the detector's thread **(seen)**. It matters only with the
@@ -104,8 +99,6 @@ Proposals; nothing is built.
 - Similar things share the noun and differ by a qualifier: D2 (built in POSE_PLAN.md D1)
 - A docstring says what the thing is; `Field` descriptions: E6
 - A plan holds only what is left (plans.md, "A built step leaves the plan"): E7
-- A thread's loop catches an exception per item, logs it and goes on with the next: F1
-- Log exceptions with context; never fail silently: F1
 - A callback only hands the item over and returns: F2
 - Name a concept after what it is in the domain, and use that one term everywhere it appears: F3
 - Suppress only when a third-party stub is provably wrong or the type system cannot express the code, never to hide an error in our own code: F4
