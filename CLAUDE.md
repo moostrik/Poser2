@@ -85,7 +85,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - An item handed to a callback is not changed afterwards
 - An item that leaves its package is finished, its GPU work included
 - The part that works on the item has its own thread and does all its work there, its inner steps included
-- When that part can't keep up, its queue drops the oldest item and counts it
+- A part that drops an item shows the count to the user
 - A part that only needs the latest value, like the render, reads it at its own tick
 - A callback list is a `utils.Broadcast`
 - A failing callback does not stop the others
