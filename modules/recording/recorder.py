@@ -20,6 +20,7 @@ capture went without is counted on the panel and warned of. Every stream shares 
 confidence rides on its depth frame and goes into a stream of its own when the chunk's first depth has one
 (`ChunkInfo.confidence`); a later depth without one gets 255, sure."""
 
+import logging
 from threading import Thread, Lock, Event
 from pathlib import Path
 import time
@@ -39,7 +40,6 @@ from .chunk import DEPTH_SUFFIX, ChunkInfo, ChunkStream, Container, FrameMetadat
     info_line, keep_chunk, make_chunk_name, make_file_name, make_folder_name, make_metadata_name, merge_chunk
 from .recording_sync import FramePoses, RecordedCapture, RecordingSync
 
-import logging
 logger = logging.getLogger(__name__)
 
 

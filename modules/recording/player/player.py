@@ -11,6 +11,8 @@ asked for as fast as a frame can be fetched; letting go plays from the in marker
 beside them moves only the playhead: playback goes on from there, and a place outside the markers
 shows its frame and plays from the in marker."""
 
+import logging
+from dataclasses import dataclass
 from threading import Thread, Event, Lock
 from pathlib import Path
 from typing import Callable, TypeAlias
@@ -28,7 +30,6 @@ from .chunk_readers import ChunkReaders, Decoding
 from .recording_folder import RecordingFolder, Timeline, locate
 from .frame_hand_over import FrameHandOver
 
-import logging
 logger = logging.getLogger(__name__)
 
 
@@ -61,6 +62,8 @@ PASS: float = 0.01      # s the player's thread waits at most between passes: it
 
 # Playback (re)starting at the in marker: the first play of a folder and every loop, not a scrub.
 LoopCallback: TypeAlias = Callable[[], None]
+# Playback starting somewhere that does not follow what played.
+JumpCallback: TypeAlias = Callable[[], None]
 
 
 class State(Enum):
@@ -80,11 +83,12 @@ class MessageType(Enum):
     RESUME = auto()
     SEEK = auto()
 
-class Message():
-    def __init__(self, state: MessageType, value: str = '', prepare: bool = False) -> None:
-        self.state: MessageType = state
-        self.value: str = value
-        self.prepare: bool = prepare
+@dataclass(frozen=True)
+class Message:
+    """A message to the player's thread: its kind, the folder for a start, and whether to probe that folder first."""
+    kind: MessageType
+    value: str = ''
+    prepare: bool = False
 
 
 class Player(Thread):
@@ -184,24 +188,24 @@ class Player(Thread):
                 except Empty:
                     message = None
 
-                if message and message.state == MessageType.START:
+                if message and message.kind == MessageType.START:
                     if message.prepare:
                         self._prepare_folder(message.value)
                     self._set_load_folder(message.value)
                     self._set_load_chunk(-1)
                     self._set_play_chunk(-1)
                     state = State.LOAD
-                if message and message.state == MessageType.STOP:
+                if message and message.kind == MessageType.STOP:
                     state = State.STOP
-                if message and message.state == MessageType.SCRUB and state in (State.LOAD, State.LOADING, State.PLAYING):
+                if message and message.kind == MessageType.SCRUB and state in (State.LOAD, State.LOADING, State.PLAYING):
                     self._stop()
                     self.scrub_shown = -1.0
                     state = State.SCRUB
-                if message and message.state == MessageType.RESUME and state == State.SCRUB:
+                if message and message.kind == MessageType.RESUME and state == State.SCRUB:
                     self._set_load_chunk(-1)
                     self._set_play_chunk(-1)
                     state = State.LOAD
-                if message and message.state == MessageType.SEEK and state in (State.LOAD, State.LOADING, State.PLAYING, State.SEEKING):
+                if message and message.kind == MessageType.SEEK and state in (State.LOAD, State.LOADING, State.PLAYING, State.SEEKING):
                     self._stop()
                     self._load_seek()
                     state = State.SEEKING
@@ -484,7 +488,7 @@ class Player(Thread):
             return
         self.loop_callbacks.add_callback(callback)
 
-    def add_jump_callback(self, callback: LoopCallback) -> None:
+    def add_jump_callback(self, callback: JumpCallback) -> None:
         """Called on the player thread when playback starts somewhere that does not follow what played: a loop, a
         seek, a scrub's frame, another folder. What waits for the frames before it is to be dropped: keep it short."""
         if self.running:

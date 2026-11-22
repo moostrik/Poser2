@@ -41,11 +41,6 @@ With the apps' refactors ([REFACTOR_PLAN.md](../../REFACTOR_PLAN.md)), each test
 
 Proposals; nothing is built.
 
-- E4. player.py's `Message` is a plain class with an `__init__`, and its `state` holds a `MessageType` **(seen)**: a
-  frozen `@dataclass` with `kind`. `LoopCallback` also types the jump callbacks **(seen)**: one alias per job, or
-  `Callable[[], None]` for both. `import logging` follows the relative imports in player.py and recorder.py
-  **(seen)**. Why: "Use `@dataclass` for plain value objects"; a name says what the thing is; PEP 8. Tests: the
-  recording tests.
 - E5. replay's protocols take untyped callbacks: `PlayerFeed.add_frame_callback`, `add_jump_callback`,
   `PersonDetector.add_detection_callback` **(seen)**; they take `ClipFrameCallback`, `Callable[[], None]` and
   `Callable[[Detection], None]`, so pyright checks `replay.Camera`'s callbacks against what calls them. Why: "Use a
@@ -134,7 +129,6 @@ Proposals; nothing is built.
 - Settings connect the user and a component, not two components: E8
 - When that part can't keep up, its queue drops the oldest item and counts it: D3 (with the Rules thread), E9
 - Similar things share the noun and differ by a qualifier: D2 (built in POSE_PLAN.md D1)
-- Use `@dataclass` for plain value objects; PEP 8: E4
 - Use a `Protocol` for what a consumer needs from a collaborator: E5
 - A docstring says what the thing is; `Field` descriptions: E6
 - A plan holds only what is left (plans.md, "A built step leaves the plan"): E7
