@@ -34,7 +34,7 @@ class RecordingFolderTest(unittest.TestCase):
             (Path(root) / 'clip' / '0_002.mkv').write_bytes(b'')
             folders = RecordingFolder.find(Path(root))
             self.assertEqual(list(folders), ['clip'])
-            self.assertEqual(folders['clip'].chunks, 2)
+            self.assertEqual(folders['clip'].last_chunk, 2)
 
 
 if __name__ == '__main__':

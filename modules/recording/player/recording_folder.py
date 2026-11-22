@@ -51,7 +51,7 @@ class RecordingFolder:
     """One recording: its folder and its last chunk's number."""
     name: str
     path: Path
-    chunks: int
+    last_chunk: int
 
     @staticmethod
     def find(video_path: Path) -> dict[str, 'RecordingFolder']:
@@ -74,7 +74,7 @@ class RecordingFolder:
     def frame_counts(self, stream: ChunkStream, suffix: str) -> list[int]:
         """Each chunk's frame count (camera 0), by chunk number; 0 for a chunk that is missing or cannot be read."""
         frames: list[int] = []
-        for chunk in range(self.chunks + 1):
+        for chunk in range(self.last_chunk + 1):
             path: Path = self.path / make_chunk_name(0, chunk)
             if not path.is_file():
                 path = self.path / make_file_name(0, stream, chunk, suffix)

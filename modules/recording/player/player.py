@@ -114,7 +114,7 @@ class Player(Thread):
         self.scrub_shown: float = -1.0      # and the last place a frame was fetched for
         self.seek_target: float = 0.0       # where the bar was pressed,
         self.seek_outside: bool = False     # and whether that is outside the markers
-        self.num_chunks: int = 0
+        self.last_chunk: int = 0             # the last chunk's number of the folder asked to play
         self.timeline: Timeline = Timeline()
         self.load_folder: str = ''
         self.active_folder: str = ''        # folder we currently intend to play ('' = stopped)
@@ -448,14 +448,14 @@ class Player(Thread):
             message = Message(MessageType.STOP)
             self.active_folder = ''
 
-        self.num_chunks = self.get_num_folder_chunks(name)
+        self.last_chunk = self.get_last_folder_chunk(name)
         self._send(message)
 
     def get_folder_names(self) -> list[str]:
         return list(self.folders.keys())
 
-    def get_num_folder_chunks(self, folder: str) -> int:
-        return self.folders[folder].chunks if folder in self.folders else 0
+    def get_last_folder_chunk(self, folder: str) -> int:
+        return self.folders[folder].last_chunk if folder in self.folders else 0
 
     def get_current_chunk(self) -> int:
         return self._get_play_chunk()
@@ -463,8 +463,8 @@ class Player(Thread):
     def get_current_folder(self) -> str:
         return self._get_load_folder()
 
-    def get_num_chunks(self) -> int:
-        return self.num_chunks
+    def get_last_chunk(self) -> int:
+        return self.last_chunk
 
     def get_drift(self) -> float:
         """How far apart the cameras' last frames gone out were captured, in ms."""

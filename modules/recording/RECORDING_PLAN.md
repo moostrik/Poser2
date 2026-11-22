@@ -67,9 +67,6 @@ Proposals; nothing is built.
 
 Proposals; nothing is built.
 
-- F3. `RecordingFolder.chunks` becomes `last_chunk`: it is the last chunk's number, as its docstring says, while
-  `Player.get_num_folder_chunks` and `Player.num_chunks` call it a count **(seen)**; they follow. Why: "Name a concept
-  after what it is in the domain, and use that one term everywhere it appears". Tests: the recording tests.
 - F4. A `Protocol` for what `FrameHandOver` needs of `ChunkReaders` (`chunk`, `streams`, `frame`, `info`, `clock`)
   **(seen)**, so `test_frame_hand_over`'s `FakeReaders` meets it and its five `# pyright: ignore[reportArgumentType]`
   go **(seen)**. Why: "Use a `Protocol` for what a consumer needs from a collaborator, an `ABC` for a family of
@@ -94,7 +91,6 @@ Proposals; nothing is built.
 - Similar things share the noun and differ by a qualifier: D2 (built in POSE_PLAN.md D1)
 - A docstring says what the thing is; `Field` descriptions: E6
 - A plan holds only what is left (plans.md, "A built step leaves the plan"): E7
-- Name a concept after what it is in the domain, and use that one term everywhere it appears: F3
 - Suppress only when a third-party stub is provably wrong or the type system cannot express the code, never to hide an error in our own code: F4
 - Use a `Protocol` for what a consumer needs from a collaborator: F4
 - Keep `Field` descriptions to one short line of panel text: what the value is and its unit: E6
