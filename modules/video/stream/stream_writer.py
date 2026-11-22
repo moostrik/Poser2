@@ -35,7 +35,7 @@ class StreamWriter:
         self.b_frames: bool = b_frames
         self._lock: Lock = Lock()
         self._queued_bytes: int = 0
-        self._failed: bool = False
+        self._failed: Event = Event()
 
     @property
     def queued_bytes(self) -> int:
@@ -46,14 +46,14 @@ class StreamWriter:
     @property
     def failed(self) -> bool:
         """The encoder of the file being written died."""
-        return self._failed
+        return self._failed.is_set()
 
     def start(self, output_file: str, fps: float) -> None:
         if self.is_recording.is_set():
             return
         self.fps = fps
         self.output_file = output_file
-        self._failed = False
+        self._failed.clear()
         self.is_recording.set()         # before the thread: a stop right after the start finds it recording
         self.is_receiving.set()
         self.thread = Thread(target=self._record, daemon=True, name='StreamWriter')
@@ -116,13 +116,13 @@ class StreamWriter:
                 finally:
                     self.frames.task_done()
         except Exception as e:
-            self._failed = True
+            self._failed.set()
             self.is_receiving.clear()
             logger.error('Encoder of %s ended: %s; the stream is dropped from here', self.output_file, e)
         finally:
             if writer is not None:
                 writer.close()
-        if self._failed:
+        if self._failed.is_set():
             self._clear()
 
     def _open(self, frame: np.ndarray, nv12: bool, depth: bool) -> ClipWriter:

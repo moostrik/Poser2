@@ -3,12 +3,6 @@
 What is to be built in `modules/video`: ffmpeg, the clips and streams it writes and reads, and the screen recorder
 ([VIDEO.md](VIDEO.md)).
 
-## A. Shared state
-
-A1. `StreamWriter._failed` becomes an `Event`: it is written on the writer's thread (`_record`) and read through
-   `failed` on the recorder's **(seen)**. Why: Concurrency, "Use `Lock` and `Event` for shared mutable state and
-   lifecycle signals". Check: `test_stream_writer`.
-
 ## B. Names and text
 
 B1. The screen recorder test's `_ring_bytes` is named after the store (`_store_bytes`): it reads
