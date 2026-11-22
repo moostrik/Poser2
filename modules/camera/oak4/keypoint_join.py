@@ -1,5 +1,5 @@
 """The join of the two-model chain's two streams per frame: the tracker's tracklets and the keypoints the pose
-model found in each person's crop."""
+model found in each player's crop."""
 
 from dataclasses import dataclass, replace
 from threading import Lock
@@ -42,7 +42,7 @@ class KeypointJoin:
             return self._complete(seq, halves)
 
     def put_keypoints(self, seq: int, boxes: list[Box], keypoints: list[np.ndarray | None]) -> list[CameraTracklet] | None:
-        """The people of frame `seq`, each box with its keypoints (None when the crop gave none); the joined
+        """The players of frame `seq`, each box with its keypoints (None when the crop gave none); the joined
         tracklets when the frame's tracklets are in."""
         with self._lock:
             halves: _Halves = self._frame(seq)

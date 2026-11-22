@@ -40,8 +40,8 @@ class OakCameraSettings(RigCameraSettings):
     device_id:      Field[str]   = Field("", access=Field.INIT, description="Camera device ID (MxID)")
     color:          Field[bool]  = Field(True, access=Field.INIT, newline=True, description="Color camera (False = mono)")
     square:         Field[bool]  = Field(True, access=Field.INIT, description="Square frame (False = wide), with the detector made for it")
-    yolo:           Field[bool]  = Field(True, access=Field.INIT, description="Run the YOLO person detector and tracker on the camera")
-    resolution:     Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode. P1080 is color only; mono falls back to P800")
+    yolo:           Field[bool]  = Field(True, access=Field.INIT, description="Run the YOLO detector and tracker on the camera")
+    resolution:     Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode. P1080 and P2160 are color only; mono falls back to P800")
     model_path:     Field[str]   = Field("data/models", access=Field.INIT, description="Folder of the camera's model files")
     tilt:           Field[float] = Field(0.0, access=Field.INIT,
                                          description="Camera up-tilt (°), positive = aimed up. Exclusive with keystone")

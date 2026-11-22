@@ -7,7 +7,7 @@ from time import perf_counter
 
 import depthai as dai
 import numpy as np
-from cv2 import resize, COLOR_BGR2GRAY, cvtColor
+from cv2 import COLOR_BGR2GRAY, cvtColor
 
 from .. import ClipSource, FrameType
 from ..geometry import frame_size, mode_size
@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 
 class ClipCamera(Camera):
+    """An OAK-D fed recorded clips instead of its sensor, through the device's own pipeline; with `clip_passthrough`
+    the clips go straight to the callbacks, no device."""
 
     def __init__(self, player: ClipSource, settings: OakCameraSettings, cam_id: int = 0) -> None:
         super().__init__(settings, cam_id)
@@ -79,7 +81,7 @@ class ClipCamera(Camera):
         img = dai.ImgFrame()
         if self.color:
             img.setType(dai.ImgFrame.Type.BGR888p)
-            img.setData(self.to_planar(frame, (width, height)))  # pyright: ignore[reportCallIssue, reportArgumentType]
+            img.setData(self.to_planar(frame))  # pyright: ignore[reportCallIssue, reportArgumentType]
         else:
             img.setType(dai.ImgFrame.Type.RAW8)
             if frame.ndim == 3:
@@ -114,5 +116,6 @@ class ClipCamera(Camera):
         self._emit_frame(frame_type, frame, captured if captured is not None else arrival, arrival)
 
     @staticmethod
-    def to_planar(arr: np.ndarray, shape: tuple) -> np.ndarray:
-        return resize(arr, shape).transpose(2, 0, 1).flatten()
+    def to_planar(image: np.ndarray) -> np.ndarray:
+        """An interleaved BGR image (H, W, 3) as planar BGR888p bytes: the B rows, then G, then R."""
+        return image.transpose(2, 0, 1).flatten()

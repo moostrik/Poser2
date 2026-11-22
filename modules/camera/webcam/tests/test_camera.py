@@ -71,7 +71,7 @@ class TestWebCamera(unittest.TestCase):
         self.assertGreater(self.settings.readings.video_fps, 0.0)
         self.assertGreater(self.settings.readings.video_min_fps, 0.0)
 
-    def test_the_frame_carries_its_turn_and_flips(self):
+    def test_the_frame_carries_its_rotate90_and_flips(self):
         settings = CameraSettings(flip_h=True, flip_v=True, rotate90=True)
         settings.initialize()
         self.camera = Camera(settings)

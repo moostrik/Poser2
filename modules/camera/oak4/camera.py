@@ -38,6 +38,8 @@ FRAME_CHECK: float = 0.5        # s between two looks at the time of the last fr
 
 
 class Camera(Thread):
+    """A `CameraSource` on an OAK4: its frames, its depth, the tracklets of its model chain, and its readings."""
+
     def __init__(self, settings: Oak4CameraSettings, cam_id: int = 0) -> None:
         super().__init__()
         self.rotate90: bool = settings.rotate90     # carried on every frame as its flag: how the camera is mounted
@@ -85,7 +87,6 @@ class Camera(Thread):
         self.queues: list[dai.MessageQueue] = []
         self.control: SensorControl | None = None
         self.depth_control: DepthControl | None = None
-        self.num_tracklets: int = 0
         self.flip_h_on_host: bool = False
         self.flip_v_on_host: bool = False
         self._frame_transformation: dai.ImgTransformation | None = None     # the delivered frame's, for the crops' keypoints
@@ -359,8 +360,8 @@ class Camera(Thread):
         return self._alignment
 
     def _tracklet(self, tracklet: dai.Tracklet, keypoints: ndarray | None, timestamp: float) -> CameraTracklet:
-        """One device tracklet as the contract's, in the frame as delivered: the uploader straightens
-        and mirrors it with its frame."""
+        """One device tracklet as the contract's, in the frame as delivered: the uploader straightens, rotates and
+        flips it with its frame."""
         roi = Rect(tracklet.roi.x, tracklet.roi.y, tracklet.roi.width, tracklet.roi.height)
         return CameraTracklet(cam_id=self.cam_id, id=tracklet.id, status=TRACKING_STATUS[tracklet.status], roi=roi,
                               age=tracklet.age, timestamp=timestamp, keypoints=keypoints)
@@ -378,8 +379,7 @@ class Camera(Thread):
         tracklets: list[CameraTracklet] = [
             self._tracklet(t, tracklet_keypoints(t.srcImgDetection) if one_model else None, timestamp)
             for t in msg.tracklets]
-        self.num_tracklets = len(tracklets)
-        self.settings.readings.tracklets = self.num_tracklets
+        self.settings.readings.tracklets = len(tracklets)
         if self.keypoint_join is None:
             self._emit_tracklets(tracklets, timestamp, arrival)
             return
@@ -390,8 +390,8 @@ class Camera(Thread):
             self._emit_tracklets(joined, timestamp, arrival)
 
     def _poses_callback(self, name: str, msg) -> None:
-        """The two-model chain's poses: depthai-nodes' `GatheredData`, the people's detections of one
-        frame (`reference_data`) with one keypoint message per person (`items`, in the same order),
+        """The two-model chain's poses: depthai-nodes' `GatheredData`, the players' detections of one
+        frame (`reference_data`) with one keypoint message per player (`items`, in the same order),
         each remapped from its crop into the delivered frame."""
         if self.keypoint_join is None:
             return
@@ -400,7 +400,7 @@ class Camera(Thread):
         boxes: list[Box] = [(d.xmin, d.ymin, d.xmax, d.ymax) for d in detections.detections]
         keypoints = [keypoints_in_frame(item, self._frame_transformation) for item in msg.items]
         if len(keypoints) != len(boxes):
-            logger.debug(f'{self.device_id} frame {detections.getSequenceNum()}: {len(keypoints)} poses for {len(boxes)} people')
+            logger.debug(f'{self.device_id} frame {detections.getSequenceNum()}: {len(keypoints)} poses for {len(boxes)} players')
             keypoints = (keypoints + [None] * len(boxes))[:len(boxes)]
         joined = self.keypoint_join.put_keypoints(detections.getSequenceNum(), boxes, keypoints)
         if joined is not None:
@@ -432,13 +432,13 @@ class Camera(Thread):
                                          confidence=confidence))
 
     def _homography(self) -> ndarray | None:
-        """The tilt correction's homography, none on a turned camera: on its side the IMU's tilt is a rotation about
-        the sensor's other axis, which the correction does not model. Tilt on with the turn is warned once."""
+        """The tilt correction's homography, none with `rotate90`: on its side the IMU's tilt is a rotation about the
+        sensor's other axis, which the correction does not model. Tilt on with `rotate90` is warned once."""
         if not self.rotate90:
             return self.tilt_correction.homography
         if self.settings.tilt.enabled and not self._tilt_warned:
             self._tilt_warned = True
-            logger.warning(f'{self.device_id} is turned (rotate90): its tilt correction is not applied')
+            logger.warning(f'{self.device_id} has rotate90 on: its tilt correction is not applied')
         return None
 
     def _emit_tracklets(self, tracklets: list[CameraTracklet], timestamp: float, arrival: float) -> None:

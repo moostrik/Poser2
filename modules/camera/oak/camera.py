@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 
 
 class Camera(Thread):
+    """A `CameraSource` on an OAK-D: its warped frames, the tracklets of its detector and tracker, and its readings."""
+
     def __init__(self, settings: OakCameraSettings, cam_id: int = 0) -> None:
         super().__init__()
         self.stop_event = Event()
@@ -53,7 +55,7 @@ class Camera(Thread):
             lens_center_y=settings.lens_center_y,
         )
         if settings.rotate90:
-            # the flips are baked into the warp, whose columns are the panoramic tracker's bearings: no turn on top
+            # the flips are baked into the warp, whose columns are the panoramic tracker's bearings: no rotate90 on top
             logger.warning(f'{self.device_id}: rotate90 is not applied on an OAK-D')
         self.frame_height: int = delivered_height(self.color, self.resolution, self.mount.fov_h, self.mount.tilt,
                                                   self.mount.lens_fov, self.mount.lens_center)
@@ -63,7 +65,6 @@ class Camera(Thread):
         self.device: dai.Device | None = None
         self.queues: list[dai.DataOutputQueue | dai.DataInputQueue] = []
         self.control: SensorControl | None = None
-        self.num_tracklets: int = 0
 
         # FPS
         self.video_fps: FPS = FPS()
@@ -231,8 +232,7 @@ class Camera(Thread):
             CameraTracklet(cam_id=self.cam_id, id=t.id, status=TRACKING_STATUS[t.status],
                            roi=Rect(t.roi.x, t.roi.y, t.roi.width, t.roi.height), age=t.age, timestamp=timestamp)
             for t in msg.tracklets]
-        self.num_tracklets = len(tracklets)
-        self.settings.readings.tracklets = self.num_tracklets
+        self.settings.readings.tracklets = len(tracklets)
         self._emit_tracklets(tracklets, timestamp, arrival)
 
     def _imu_callback(self, msg) -> None:

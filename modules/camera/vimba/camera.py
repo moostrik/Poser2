@@ -282,7 +282,7 @@ class Camera(Thread):
             logger.warning('Vimba camera: failed to grab a frame: %s', e)
 
     def _emit(self, image: np.ndarray, arrival: float) -> None:
-        """The frame becomes the contract's: as delivered, its turn and flips as flags, stamped with its arrival."""
+        """The frame becomes the contract's: as delivered, its rotate90 and flips as flags, stamped with its arrival."""
         self.frame_callbacks(CameraFrame(cam_id=self.cam_id, kind=FrameType.VIDEO, image=image, timestamp=arrival,
                                          rotate90=self.rotate90, flip_v=self.settings.flip_v,
                                          flip_h=self.settings.flip_h))

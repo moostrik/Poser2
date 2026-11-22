@@ -56,7 +56,8 @@ class CameraHealth:
         self.settings: CameraHealthSettings = settings
 
     def update(self, _now: float) -> None:
-        """Recompute both verdicts. Cheap; call it on the render tick (the frame time is not needed: the
+        """Recompute the three verdicts (`mount`, `camera_fps`, `video_rate`) and the worst readings. Cheap; call it on
+        the render tick (the frame time is not needed: the
         verdicts read the cameras' readouts)."""
         mount_deviations: list[float] = [abs(value) for camera in self._cameras
                                          for value in mount_deviation(camera) if not math.isnan(value)]

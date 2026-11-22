@@ -88,7 +88,7 @@ Auto exposure is on by default, and these settings in `sensor` shape it, live. M
 
 ### Recording
 
-Deep Flow records chunks of 60 s (`split_seconds`), each one `.mkv` holding color and depth. Play them with `-sim`. Frames are stored mirrored and not straightened, so `tilt.offset` can still be tuned on a recording.
+Recording and playback are in [RECORDING.md](../../recording/RECORDING.md).
 
 ### Measuring
 
@@ -284,7 +284,7 @@ where they become the contract's and get their capture time. The device runs the
 one-model chain, or in the two-model chain from its crop's pose, put on it per frame by `KeypointJoin`. With
 `depth_model` it delivers depth as DEPTH frames on the left camera's view, each with its confidence and the `DepthAlignment` that puts
 it on the frames' view on the GPU. An NV12 frame goes on packed, so the callback thread does no color work; the
-boxes and keypoints go on as the model found them, and the uploader straightens and mirrors them with their frame.
+boxes and keypoints go on as the model found them, and the uploader straightens, rotates and flips them with their frame.
 
 ## The frame
 
@@ -300,7 +300,7 @@ Lens of the delivered frame, as tagged on a recording, in pixels:
 
 That gives a view of about 79.6° by 67.6° **(deduction)**, and `readings.fov_factory` reports the horizontal figure from the first frame's lens (`rectilinear_field`). The color frame takes its lens from the camera; `fov` and the `lens_*` settings shape only the grey frame's warp. The color sensor spans 95° and the stereo pair 127° (Luxonis docs), so the whole frame has depth. Depth has about 291 rows of real detail inside the 720 rows, since the frame spans about 775 of the 800 mono rows **(deduction)**.
 
-`HORIZONTAL_MIRROR` has no effect on this camera: the mirrored frame matches the plain one. So a color frame leaves its flips to the PC: `flip_h` and `flip_v` go on the frame as its flags, and the uploader flips the image, boxes and keypoints to match. The settings' `rotate90`, a camera mounted on its side, goes on every frame as its flag the same way; with `rotate90`, the tilt correction is not applied (a warning when `tilt.enabled` is on), as on a camera on its side the IMU's tilt is a rotation about the sensor's other axis.
+`HORIZONTAL_MIRROR` has no effect on this camera: the flipped frame matches the plain one. So a color frame leaves its flips to the PC: `flip_h` and `flip_v` go on the frame as its flags, and the uploader flips the image, boxes and keypoints to match. The settings' `rotate90`, a camera mounted on its side, goes on every frame as its flag the same way; with `rotate90`, the tilt correction is not applied (a warning when `tilt.enabled` is on), as on a camera on its side the IMU's tilt is a rotation about the sensor's other axis.
 
 ## Depth
 
@@ -310,7 +310,7 @@ Neural Depth runs on the camera off 640x400 mono frames and arrives as 480x300 u
 |------------------|----------|---------------------|---------|---------|-----------|
 | With confidence  | 50.0 fps | 43.5 ms             | 49.3 ms | 51.0 ms | 20.0 ms   |
 
-which matches the depth alone in [Link](#link) and [Depth filters](#depth-filters). Each depth frame carries its `DepthAlignment`: both lenses and the move from the left camera to the color camera, 3.76 cm sideways, read once from the calibration the frames carry. The uploader puts depth on the color view on the GPU (`DepthAligner` in `modules/inference/preprocessing/depth_align.py`), together with the tilt correction and the mirror: each depth pixel goes to its point in space and into the color frame, the nearest point wins where two land on one pixel, and a pixel nothing lands on stays 0. The output is 374x300, the depth's rows at the color frame's aspect (`aligned_depth_size`).
+which matches the depth alone in [Link](#link) and [Depth filters](#depth-filters). Each depth frame carries its `DepthAlignment`: both lenses and the move from the left camera to the color camera, 3.76 cm sideways, read once from the calibration the frames carry. The uploader puts depth on the color view on the GPU (`DepthAligner` in `modules/inference/preprocessing/depth_align.py`), together with the tilt correction and the flips: each depth pixel goes to its point in space and into the color frame, the nearest point wins where two land on one pixel, and a pixel nothing lands on stays 0. The output is 374x300, the depth's rows at the color frame's aspect (`aligned_depth_size`).
 
 Next to a near object the color camera sees background the left camera could not, so that band has no depth. It is about `538 px × 3.76 cm × (1/Z_near − 1/Z_far)` wide, 12 px for a player at 1 m before a wall at 2.5 m. The black shadow bands beside near objects are this band and the stereo occlusion.
 
@@ -359,7 +359,7 @@ The filter's latency is the latency of a message: a moving body's depth lags by 
 
 For a camera above a big screen, looking down. A tilt is a pure rotation about the camera, so where a pixel lands does not depend on its distance. One homography therefore serves color, depth and boxes, with no point cloud and no holes.
 
-`H = K' R K⁻¹`, normalized uv to uv (`tilt_homography` in [tilt_correction.py](../geometry/tilt_correction.py)). `K` is the delivered lens and `R` the tilt. The frame's rows run opposite to the lens's and the IMU's **(site fact)**, so `TiltCorrection` makes `H` in their rows and turns it over to the frame's (`FLIP_V`). That is the opposite tilt on the lens with its center row mirrored. `K'` refits the picture to the frame, because plain `K` at 30° moves the frame's center by 0.58 focal lengths, about 310 of 720 rows.
+`H = K' R K⁻¹`, normalized uv to uv (`tilt_homography` in [tilt_correction.py](../geometry/tilt_correction.py)). `K` is the delivered lens and `R` the tilt. The frame's rows run opposite to the lens's and the IMU's **(site fact)**, so `TiltCorrection` makes `H` in their rows and turns it over to the frame's (`FLIP_V`). That is the opposite tilt on the lens with its center row flipped. `K'` refits the picture to the frame, because plain `K` at 30° moves the frame's center by 0.58 focal lengths, about 310 of 720 rows.
 
 Depth pixels move by `H`, and their values change too. Depth is measured along the tilted axis, so a standing player of 1.8 m at 30° reads as leaning by 0.9 m. The corrected depth is `z' = z × w`, with `w` from `H`'s third row, the distance along the level axis.
 

@@ -15,7 +15,7 @@ class ModelChain(IntEnum):
     OFF = 0             # no model on the camera: frames only
     DETECTOR = 1        # YOLOv8n: boxes only
     ONE_MODEL = 2       # YOLOv8-pose: boxes and keypoints in one pass
-    TWO_MODELS = 3      # YOLOv6 detector, then Lite-HRNet on each person's crop
+    TWO_MODELS = 3      # YOLOv6 detector, then Lite-HRNet on each player's crop
 
 
 PERSON_DETECTOR_ARCHIVE: str = 'yolov8n_coco_640x512_rvc4.tar.xz'     # compiled through HubAI: the zoo has no 5:4 size
@@ -26,9 +26,9 @@ DETECTOR_ARCHIVE: str = 'yolov6n_coco_512x288_rvc4.tar.xz'
 TOP_DOWN_MODEL: str = 'luxonis/lite-hrnet:18-coco-192x256'
 TOP_DOWN_ARCHIVE: str = 'lite_hrnet18_coco_192x256_rvc4.tar.xz'
 NUM_KEYPOINTS: int = 17                 # COCO, the order of `modules.pose.PointLandmark`
-POSE_CROP_PADDING: float = 0.0          # margin round the person's box before the crop, normalized to the frame
-POSE_CONFIDENCE_THRESHOLD: float = 0.5
-POSE_OVERLAP_THRESHOLD: float = 0.5
+POSE_CROP_PADDING: float = 0.0          # margin round the player's box before the crop, normalized to the frame
+DETECTOR_CONFIDENCE_THRESHOLD: float = 0.5   # the first model of every chain, a pose model included
+DETECTOR_OVERLAP_THRESHOLD: float = 0.5
 
 TRACKER_PERSON_LABEL: int = 0
 TRACKER_TYPE: dai.TrackerType = dai.TrackerType.SHORT_TERM_IMAGELESS    # this chip has no ZERO_TERM_IMAGELESS, the `oak` backend's type

@@ -1,12 +1,17 @@
 """The camera's orientation from its IMU: the gravity vector into the camera's frame, and its tilt and roll."""
 
+import logging
 import math
 from typing import cast
 
 from ..settings import RigCameraReadings
 
+logger = logging.getLogger(__name__)
+
 IMU_RATE_HZ: int = 5
 IMU_SMOOTHING: float = 0.1      # how hard each sample pulls the average: the camera is on a tripod, a reading is mostly noise
+
+_malformed_warned: bool = False # a malformed IMU-to-camera matrix is logged once per run
 
 
 class MountReadout:
@@ -56,15 +61,20 @@ def orientation_from_gravity(gx: float, gy: float, gz: float) -> tuple[float, fl
 def imu_to_camera(vector: tuple[float, float, float],
                   extrinsics: list[list[float]] | None) -> tuple[float, float, float]:
     """A vector from the IMU's frame into the camera's, by the rotation of the 4x4 `extrinsics`; the vector as
-    it is without them."""
-    if not extrinsics or len(extrinsics) < 3:
+    it is without them, or with a matrix that is not one (logged once)."""
+    global _malformed_warned
+    if not extrinsics:
         return vector
     try:
         return cast(tuple[float, float, float], tuple(
             sum(extrinsics[row][col] * vector[col] for col in range(3))
             for row in range(3)
         ))
-    except (IndexError, TypeError):
+    except (IndexError, TypeError) as exc:
+        if not _malformed_warned:
+            _malformed_warned = True
+            logger.warning(f'IMU-to-camera extrinsics {extrinsics!r} are no 3x3 rotation ({exc}): the IMU frame is '
+                           f'taken as the camera\'s (logged once)')
         return vector
 
 

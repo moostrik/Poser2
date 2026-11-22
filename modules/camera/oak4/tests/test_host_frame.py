@@ -1,5 +1,5 @@
 """What the host does for a frame the camera leaves alone: NV12 unpadded, and boxes and keypoints
-mirrored with the image. Runs on a depthai 3 install."""
+flipped with the image. Runs on a depthai 3 install."""
 
 import unittest
 from types import SimpleNamespace
@@ -24,7 +24,7 @@ class PackedNv12Test(unittest.TestCase):
         np.testing.assert_array_equal(packed_nv12(frame), [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]])
 
 
-class MirrorTest(unittest.TestCase):
+class FlipHTest(unittest.TestCase):
     def test_a_box_keeps_its_size_and_row(self) -> None:
         roi = flip_h_roi(Rect(0.1, 0.2, 0.3, 0.4))
         self.assertAlmostEqual(roi.x, 0.6)

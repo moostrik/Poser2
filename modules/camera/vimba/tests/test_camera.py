@@ -83,7 +83,7 @@ class TestVimbaCam(unittest.TestCase):
         self.assertGreaterEqual(self.frames[0].timestamp, before)
         self.assertLessEqual(self.frames[0].timestamp, time.perf_counter())
 
-    def test_the_frame_carries_its_turn_and_flips(self):
+    def test_the_frame_carries_its_rotate90_and_flips(self):
         self.cam.rotate90 = True
         self.settings.flip_h = True
         buffer = FakeFrame(0)

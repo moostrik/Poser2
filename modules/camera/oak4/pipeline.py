@@ -14,7 +14,7 @@ from .. import CAPTURE_TOLERANCE
 from ..geometry import CameraResolution, IMU_RATE_HZ, MountConfig, frame_size, WARP_MESH, warp_mesh_points
 
 from .device import SYSTEM_RATE_HZ
-from .models import nn_frame_type, POSE_CONFIDENCE_THRESHOLD, POSE_OVERLAP_THRESHOLD, POSE_CROP_PADDING, TRACKER_PERSON_LABEL, \
+from .models import nn_frame_type, DETECTOR_CONFIDENCE_THRESHOLD, DETECTOR_OVERLAP_THRESHOLD, POSE_CROP_PADDING, TRACKER_PERSON_LABEL, \
     TRACKER_TYPE
 from .sensor import SENSOR_SOCKET, STEREO_SOCKETS, STEREO_SIZE, DEPTH_MODELS, DepthModel, requested_size, direct_size
 
@@ -122,15 +122,15 @@ def add_detector(pipeline: dai.Pipeline, frames: dai.Node.Output, archive: dai.N
 
     network: dai.node.DetectionNetwork = pipeline.create(dai.node.DetectionNetwork)
     network.setNNArchive(archive)
-    network.setConfidenceThreshold(POSE_CONFIDENCE_THRESHOLD)
-    network.detectionParser.setIouThreshold(POSE_OVERLAP_THRESHOLD)
+    network.setConfidenceThreshold(DETECTOR_CONFIDENCE_THRESHOLD)
+    network.detectionParser.setIouThreshold(DETECTOR_OVERLAP_THRESHOLD)
     network.input.setBlocking(False)
     manip.out.link(network.input)
     return network
 
 
 def add_tracker(pipeline: dai.Pipeline, frames: dai.Node.Output, detections: dai.Node.Output) -> dai.Node.Output:
-    """The device's object tracker on the people; `frames` are the frames the detections were made
+    """The device's object tracker on the players; `frames` are the frames the detections were made
     on (the network's passthrough), so it only ever sees frames that were inferred."""
     tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
     tracker.setDetectionLabelsToTrack([TRACKER_PERSON_LABEL])

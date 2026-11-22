@@ -1,11 +1,11 @@
 """The sensor modes and the size of the frame each delivers."""
 
+import logging
 import math
 from enum import IntEnum, auto
 
 from .lens import output_focal, source_lens
 
-import logging
 logger = logging.getLogger(__name__)
 
 WARP_ALIGNMENT: int = 16        # `dai.node.Warp` needs both output dimensions divisible by this

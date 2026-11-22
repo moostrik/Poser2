@@ -1,4 +1,4 @@
-"""Boxes and keypoints as they are in the frame flipped left to right (`flip_h`), top to bottom (`flip_v`) and turned
+"""Boxes and keypoints as they are in the frame flipped left to right (`flip_h`), top to bottom (`flip_v`) and rotated
 (`rotate90`, transposed)."""
 
 import numpy as np
@@ -15,9 +15,9 @@ def flip_h_keypoints(keypoints: np.ndarray | None) -> np.ndarray | None:
     """Keypoints (N, 3) with x flipped; the labels stay the model's."""
     if keypoints is None:
         return None
-    mirrored: np.ndarray = keypoints.copy()
-    mirrored[:, 0] = 1.0 - mirrored[:, 0]
-    return mirrored
+    flipped: np.ndarray = keypoints.copy()
+    flipped[:, 0] = 1.0 - flipped[:, 0]
+    return flipped
 
 
 def flip_v_roi(roi: Rect) -> Rect:
@@ -35,7 +35,7 @@ def flip_v_keypoints(keypoints: np.ndarray | None) -> np.ndarray | None:
 
 
 def rotate90_roi(roi: Rect) -> Rect:
-    """A normalized box in the frame turned as `CameraFrame.rotate90` turns it: transposed."""
+    """A normalized box in the frame rotated as `CameraFrame.rotate90` rotates it: transposed."""
     return Rect(roi.y, roi.x, roi.height, roi.width)
 
 
@@ -43,6 +43,6 @@ def rotate90_keypoints(keypoints: np.ndarray | None) -> np.ndarray | None:
     """Keypoints (N, 3) in the transposed frame: x and y swapped; the labels stay the model's."""
     if keypoints is None:
         return None
-    turned: np.ndarray = keypoints.copy()
-    turned[:, [0, 1]] = keypoints[:, [1, 0]]
-    return turned
+    rotated: np.ndarray = keypoints.copy()
+    rotated[:, [0, 1]] = keypoints[:, [1, 0]]
+    return rotated

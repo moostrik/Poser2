@@ -10,7 +10,7 @@ from modules.utils import Rect
 
 TILT_STEP: float = 0.25             # ° the tilt moves before the frames are straightened anew
 MIN_CORNER_SCALE: float = 0.1       # a frame corner past the horizon has no place in the level picture
-# uv with its rows turned over, its own inverse: the frame's rows run opposite to the lens's and the IMU's.
+# uv flipped top to bottom, its own inverse: the frame's rows run opposite to the lens's and the IMU's.
 FLIP_V: np.ndarray = np.array([[1.0, 0.0, 0.0], [0.0, -1.0, 1.0], [0.0, 0.0, 1.0]])
 
 

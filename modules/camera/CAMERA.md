@@ -24,7 +24,7 @@ One job: hand an app a camera. That is three things.
   within `CAPTURE_TOLERANCE` (2 ms; on the OAK4 0.12 ms apart), so time pairs them. A depth frame's `confidence`
   rides on it, on the depth's own view, never as a frame of its own; a backend without one gives None.
 - A camera hands its frames and its model's boxes and keypoints as delivered: the uploader straightens them on the
-  GPU with the frame's `homography`, then turns them by `rotate90` (a transpose) and flips them by `flip_v` and
+  GPU with the frame's `homography`, then rotates them by `rotate90` (a transpose) and flips them by `flip_v` and
   `flip_h`, in that order; off the GPU `oriented_image` applies `rotate90` and the flips in the frame's own layout
   (NV12's luma as a plain array, its chroma as one pixel a pair), `bgr_frame` converts an NV12 frame (the OAK4's
   color) to BGR, and `oriented_corners` gives a drawing the same `rotate90` and flips. One
@@ -39,7 +39,7 @@ One job: hand an app a camera. That is three things.
   device takes a field live redeclares it without `Field.INIT`; the panel shows the backend's fields first.
 - `CameraSettings` holds the mount every camera has: `flip_h`, `flip_v` and `rotate90`, a camera on its side, which go
   on its frames as flags. The OAK-D bakes its flips into its warp, whose columns are the panoramic tracker's
-  bearings, and applies no turn: it logs once that `rotate90` is not applied.
+  bearings, and does not rotate: it logs once that `rotate90` is not applied.
 - Nothing in the show reads a rig camera's readings: they are for setting the rig up. A backend fills what its
   device measures and leaves the rest at its default, NaN for the angles. `roll_offset` sits with the readings,
   beside the roll it corrects.
@@ -270,9 +270,9 @@ the keystone avoids; both set warns and takes the tilt.
 
 **Raw clips.** A clip comes off the video output, after the warp, so it carries the flips and the square crop it
 was shot with. A raw clip (`clip_warp`: equidistant, shot at tilt 0, before the warp reprojected) gets only the
-difference: no flips, the clip as the source at its own size and the delivered size out, the tilt's sign turned
-under `flip_v` (a vertical mirror reverses a rotation about the horizontal axis, a horizontal one commutes with
-it), and the lens center mirrored with the pixels. A clip recorded since the warp is reprojected already and would
+difference: no flips, the clip as the source at its own size and the delivered size out, the tilt's sign reversed
+under `flip_v` (a vertical flip reverses a rotation about the horizontal axis, a horizontal one commutes with
+it), and the lens center flipped with the pixels. A clip recorded since the warp is reprojected already and would
 be reprojected twice; the geometry a clip was shot with is not stored with it.
 
 **The lens's reach.** `fov` is the frame's span, and the lens must reach half of it on each side of its own center,

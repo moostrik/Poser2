@@ -1,4 +1,4 @@
-"""`straightened_tracklets`: a camera's tracklets moved into the frame the uploader makes, straightened, then turned
+"""`straightened_tracklets`: a camera's tracklets moved into the frame the uploader makes, straightened, then rotated
 and flipped."""
 
 import unittest
@@ -25,7 +25,7 @@ class StraightenedTrackletsTest(unittest.TestCase):
         self.assertEqual(result.tracklets[0].roi, corrected_roi(roi, SHIFT))
         self.assertTrue(result.straightened)
 
-    def test_straightened_first_then_mirrored(self) -> None:
+    def test_straightened_first_then_flipped(self) -> None:
         points = np.array([[0.1, 0.5, 0.9]], dtype=np.float32)
         result = straightened_tracklets(message(Rect(0.1, 0.2, 0.3, 0.4), points), SHIFT, False, False, True)
         roi = result.tracklets[0].roi
@@ -34,7 +34,7 @@ class StraightenedTrackletsTest(unittest.TestCase):
         assert keypoints is not None
         np.testing.assert_array_almost_equal(keypoints, [[1.0 - 0.35, 0.5, 0.9]])
 
-    def test_turned_and_flipped_as_the_image_is(self) -> None:
+    def test_rotated_and_flipped_as_the_image_is(self) -> None:
         """A box and a keypoint land where `oriented_image` puts the pixels under them, for every flag set."""
         height, width = 20, 40
         roi = Rect(0.1, 0.2, 0.3, 0.4)
@@ -46,11 +46,11 @@ class StraightenedTrackletsTest(unittest.TestCase):
             for flip_v in (False, True):
                 for flip_h in (False, True):
                     flags = (rotate90, flip_v, flip_h)
-                    upright = oriented_image(CameraFrame(0, FrameType.VIDEO, image, 0.0, rotate90=rotate90, flip_v=flip_v, flip_h=flip_h))
-                    h, w = upright.shape
+                    oriented = oriented_image(CameraFrame(0, FrameType.VIDEO, image, 0.0, rotate90=rotate90, flip_v=flip_v, flip_h=flip_h))
+                    h, w = oriented.shape
                     result = straightened_tracklets(message(roi, point), None, *flags).tracklets[0]
                     box = result.roi
-                    rows, columns = np.nonzero(upright == 1)
+                    rows, columns = np.nonzero(oriented == 1)
                     self.assertAlmostEqual(box.x, columns.min() / w, msg=flags)
                     self.assertAlmostEqual(box.y, rows.min() / h, msg=flags)
                     self.assertAlmostEqual(box.width, (columns.max() + 1 - columns.min()) / w, msg=flags)
@@ -58,7 +58,7 @@ class StraightenedTrackletsTest(unittest.TestCase):
                     assert result.keypoints is not None
                     x, y = result.keypoints[0, :2]
                     # the keypoint's pixel center, (column + 0.5) / width: within the pixel it marks
-                    self.assertEqual(upright[min(int(y * h), h - 1), min(int(x * w), w - 1)], 2, msg=flags)
+                    self.assertEqual(oriented[min(int(y * h), h - 1), min(int(x * w), w - 1)], 2, msg=flags)
 
     def test_the_rest_of_the_message_stays(self) -> None:
         source = message(Rect(0.1, 0.2, 0.3, 0.4))

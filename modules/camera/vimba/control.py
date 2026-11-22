@@ -17,6 +17,8 @@ RATE_SMOOTHING: float = 0.2     # share of the newest half second in the frame r
 
 
 class SensorControl:
+    """One Vimba camera's panel values written to its features, and what it uses and its frame rate read back."""
+
     def __init__(self, settings: VimbaCameraSettings) -> None:
         self.settings: VimbaCameraSettings = settings
         self._applied: dict[str, Any] = {}      # values last written to the camera, per setting

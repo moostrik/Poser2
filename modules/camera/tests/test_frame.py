@@ -69,19 +69,19 @@ class OrientedImageTest(unittest.TestCase):
         frame = _frame(IMAGE)
         self.assertIs(oriented_image(frame), frame.image)
 
-    def test_the_turn_is_a_transpose(self) -> None:
+    def test_rotate90_is_a_transpose(self) -> None:
         np.testing.assert_array_equal(oriented_image(_frame(IMAGE, rotate90=True)), [[1, 4], [2, 5], [3, 6]])
 
-    def test_the_flips_come_after_the_turn(self) -> None:
+    def test_the_flips_come_after_rotate90(self) -> None:
         np.testing.assert_array_equal(oriented_image(_frame(IMAGE, rotate90=True, flip_v=True)), [[3, 6], [2, 5], [1, 4]])
         np.testing.assert_array_equal(oriented_image(_frame(IMAGE, rotate90=True, flip_h=True)), [[4, 1], [5, 2], [6, 3]])
 
     def test_a_color_image_keeps_its_channels(self) -> None:
         bgr = np.stack([IMAGE, IMAGE * 10, IMAGE * 20], axis=-1)
-        upright = oriented_image(_frame(bgr, rotate90=True, flip_h=True))
-        self.assertEqual(upright.shape, (3, 2, 3))
-        np.testing.assert_array_equal(upright[0, 0], [4, 40, 80])
-        self.assertTrue(upright.flags['C_CONTIGUOUS'])
+        oriented = oriented_image(_frame(bgr, rotate90=True, flip_h=True))
+        self.assertEqual(oriented.shape, (3, 2, 3))
+        np.testing.assert_array_equal(oriented[0, 0], [4, 40, 80])
+        self.assertTrue(oriented.flags['C_CONTIGUOUS'])
 
 
 class OrientedCornersTest(unittest.TestCase):
@@ -91,13 +91,13 @@ class OrientedCornersTest(unittest.TestCase):
             for flip_v in (False, True):
                 for flip_h in (False, True):
                     frame = _frame(IMAGE, rotate90=rotate90, flip_v=flip_v, flip_h=flip_h)
-                    upright = oriented_image(frame)
+                    oriented = oriented_image(frame)
                     quad = oriented_corners(frame)
                     h, w = IMAGE.shape
                     for corner, (row, column) in ((quad.top_left, (0, 0)), (quad.top_right, (0, -1)),
                                                   (quad.bottom_right, (-1, -1)), (quad.bottom_left, (-1, 0))):
                         source = IMAGE[min(int(corner.y * h), h - 1), min(int(corner.x * w), w - 1)]
-                        self.assertEqual(source, upright[row, column], (rotate90, flip_v, flip_h))
+                        self.assertEqual(source, oriented[row, column], (rotate90, flip_v, flip_h))
 
 
 if __name__ == '__main__':

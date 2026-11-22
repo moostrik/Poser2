@@ -262,7 +262,7 @@ class WarpMeshProjectionTest(unittest.TestCase):
                         cols.append(ox)
                     self.assertLess(max(cols) - min(cols), 1e-9)     # by construction: one column
 
-    def test_flips_mirror_the_reprojection(self) -> None:
+    def test_flips_flip_the_reprojection(self) -> None:
         n = 9
         base = mesh(0.0, mesh_w=n, mesh_h=n).reshape(n, n, 2)
         fh = mesh(0.0, flip_h=True, mesh_w=n, mesh_h=n).reshape(n, n, 2)
@@ -452,7 +452,7 @@ class FrameCoverageTest(unittest.TestCase):
                 expected = self._edge_row(0.0, bearing, MONO_H - 1.0)
                 self.assertAlmostEqual(float(cov[column, 1]), expected, delta=1.5)
 
-    def test_flip_h_mirrors_the_columns(self) -> None:
+    def test_flip_h_flips_the_columns(self) -> None:
         plain = self._coverage(0.0)
         flipped = self._coverage(0.0, flip_h=True)
         np.testing.assert_array_equal(flipped, plain[::-1])

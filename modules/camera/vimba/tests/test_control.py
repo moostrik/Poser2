@@ -3,7 +3,8 @@
 import time
 import unittest
 
-from modules.camera.vimba import SensorControl, VimbaCameraSettings
+from modules.camera.vimba import VimbaCameraSettings
+from modules.camera.vimba.control import SensorControl
 
 
 class FakeFeature:

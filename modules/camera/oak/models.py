@@ -11,8 +11,8 @@ YOLOV8_WIDE_6S: str = "yolov8n_coco_512x448_6S.blob"
 YOLOV8_WIDE_7S: str = "yolov8n_coco_512x448_7S.blob"
 YOLOV8_SQUARE_6S: str = "yolov8n_coco_416x416_6S.blob"
 YOLOV8_SQUARE_7S: str = "yolov8n_coco_416x416_7S.blob"
-YOLO_CONFIDENCE_THRESHOLD: float = 0.5
-YOLO_OVERLAP_THRESHOLD: float = 0.5
+DETECTOR_CONFIDENCE_THRESHOLD: float = 0.5
+DETECTOR_OVERLAP_THRESHOLD: float = 0.5
 
 TRACKER_PERSON_LABEL: int = 0
 TRACKER_TYPE: TrackerType = TrackerType.ZERO_TERM_IMAGELESS     # COLOR_HISTOGRAM is more accurate but can drift when it loses a player

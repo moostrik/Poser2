@@ -12,8 +12,8 @@ import numpy as np
 from ..geometry import CameraResolution, IMU_RATE_HZ, MountConfig, mode_size, frame_size, WARP_MESH, warp_mesh_points, \
     source_lens
 
-from .models import YOLOV8_WIDE_6S, YOLOV8_WIDE_7S, YOLOV8_SQUARE_6S, YOLOV8_SQUARE_7S, YOLO_CONFIDENCE_THRESHOLD, \
-    YOLO_OVERLAP_THRESHOLD, detector_input_size, TRACKER_PERSON_LABEL, TRACKER_TYPE
+from .models import YOLOV8_WIDE_6S, YOLOV8_WIDE_7S, YOLOV8_SQUARE_6S, YOLOV8_SQUARE_7S, \
+    DETECTOR_CONFIDENCE_THRESHOLD, DETECTOR_OVERLAP_THRESHOLD, detector_input_size, TRACKER_PERSON_LABEL, TRACKER_TYPE
 from .sensor import mono_mode, color_mode
 
 logger = logging.getLogger(__name__)
@@ -142,8 +142,8 @@ def add_detector(pipeline: dai.Pipeline, frames: dai.Node.Output, square: bool, 
     network.setNumInferenceThreads(2)
     network.setNumClasses(80)
     network.setCoordinateSize(4)
-    network.setConfidenceThreshold(YOLO_CONFIDENCE_THRESHOLD)
-    network.setIouThreshold(YOLO_OVERLAP_THRESHOLD)
+    network.setConfidenceThreshold(DETECTOR_CONFIDENCE_THRESHOLD)
+    network.setIouThreshold(DETECTOR_OVERLAP_THRESHOLD)
     network.input.setBlocking(False)
     manip.out.link(network.input)
 

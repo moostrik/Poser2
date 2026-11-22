@@ -88,7 +88,7 @@ class Camera(Thread):
             capture.release()
 
     def _emit(self, image: np.ndarray) -> None:
-        """The frame becomes the contract's: as delivered, its turn and flips as flags, with its host time on the one
+        """The frame becomes the contract's: as delivered, its rotate90 and flips as flags, with its host time on the one
         clock."""
         self.video_fps.processed()
         self.settings.readings.video_fps = self.video_fps.get_rate_average()

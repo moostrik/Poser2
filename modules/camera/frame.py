@@ -38,18 +38,18 @@ class DepthAlignment:
 
 @dataclass(frozen=True)
 class CameraFrame:
-    """One frame from one camera, as delivered: nothing straightened, turned or mirrored. Who shows it applies, in
-    this order: the homography, the turn (`rotate90`, a transpose: rows become columns), the vertical flip
-    (`flip_v`), the mirror (`flip_h`)."""
+    """One frame from one camera, as delivered: nothing straightened, rotated or flipped. Who shows it applies, in
+    this order: the homography, `rotate90` (a transpose: rows become columns), `flip_v` (top to bottom), `flip_h`
+    (left to right)."""
     cam_id: int
     kind: FrameType
     image: np.ndarray                       # BGR uint8 (H, W, 3) or gray (H, W); NV12 (H * 3 / 2, W) with `nv12`; DEPTH: uint16 mm, 0 none
     timestamp: float                        # its capture, s on `perf_counter`; its arrival where the backend cannot know it
     nv12: bool = False                      # packed NV12: the Y rows, then the interleaved UV rows
-    flip_h: bool = False                    # still to be mirrored
-    homography: np.ndarray | None = None    # still to be straightened with, uv to uv, before the turn and the flips
+    homography: np.ndarray | None = None    # still to be straightened with, uv to uv, before `rotate90` and the flips
     rotate90: bool = False                  # still to be transposed: shown W x H as H x W
     flip_v: bool = False                    # still to be flipped top to bottom
+    flip_h: bool = False                    # still to be flipped left to right
     readings: FrameReadings | None = None
     intrinsics: list[list[float]] | None = None     # its 3x3 lens, px
     alignment: DepthAlignment | None = None # a DEPTH frame on its own camera's view; None: on the video's already
@@ -59,14 +59,14 @@ class CameraFrame:
 
 def bgr_frame(frame: CameraFrame) -> CameraFrame:
     """The frame with its NV12 image converted to BGR, for a consumer that keeps the image on the host; any other
-    frame as it is. The flags stay: a turn would split NV12's interleaved chroma pairs, so it comes after this."""
+    frame as it is. The flags stay: `rotate90` would split NV12's interleaved chroma pairs, so it comes after this."""
     if not frame.nv12:
         return frame
     return replace(frame, image=cv2.cvtColor(frame.image, cv2.COLOR_YUV2BGR_NV12), nv12=False)
 
 
 def oriented_image(frame: CameraFrame) -> np.ndarray:
-    """The frame's image turned and flipped as its flags say, the homography left out, in the frame's own layout:
+    """The frame's image rotated and flipped as its flags say, the homography left out, in the frame's own layout:
     NV12 stays NV12, its chroma pairs kept pairs. A new array where a flag is set."""
     if not (frame.rotate90 or frame.flip_v or frame.flip_h):
         return frame.image
@@ -80,7 +80,7 @@ def oriented_image(frame: CameraFrame) -> np.ndarray:
 
 
 def _oriented(image: np.ndarray, frame: CameraFrame) -> np.ndarray:
-    """`image` (rows, columns, ...) turned and flipped as the frame's flags say: a view."""
+    """`image` (rows, columns, ...) rotated and flipped as the frame's flags say: a view."""
     if frame.rotate90:
         image = image.swapaxes(0, 1)
     if frame.flip_v:
@@ -91,8 +91,8 @@ def _oriented(image: np.ndarray, frame: CameraFrame) -> np.ndarray:
 
 
 def oriented_corners(frame: CameraFrame) -> Quad:
-    """Where in the frame's image (0..1, the origin top-left) each corner of the upright image comes from: its top
-    left, top right, bottom right and bottom left, after the turn and the flips."""
+    """Where in the frame's image (0..1, the origin top-left) each corner of the oriented image comes from: its top
+    left, top right, bottom right and bottom left, after `rotate90` and the flips."""
     def source(x: float, y: float) -> Point2f:
         if frame.flip_h:
             x = 1.0 - x

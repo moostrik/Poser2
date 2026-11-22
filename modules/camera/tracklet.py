@@ -1,4 +1,4 @@
-"""A tracklet as a camera reports it: the device's own track of one person in one camera's frame."""
+"""A tracklet as a camera reports it: the device's own track of one player in one camera's frame."""
 
 from dataclasses import dataclass, replace
 from enum import Enum
@@ -38,13 +38,13 @@ class CameraTracklets:
     timestamp: float                        # its frame's capture, as each tracklet's
     tracklets: list[CameraTracklet]         # may be empty: no player is a message too
     arrival: float | None = None            # its hand-over; None where `timestamp` is it
-    straightened: bool = False              # in the frame as the uploader makes it, straightened, turned and flipped
+    straightened: bool = False              # in the frame as the uploader makes it, straightened, rotated and flipped
 
 
 def straightened_tracklets(cam_tracklets: CameraTracklets, homography: np.ndarray | None, rotate90: bool, flip_v: bool,
                            flip_h: bool) -> CameraTracklets:
     """The tracklets in the frame as the uploader makes it, as the image is: straightened with their frame's
-    homography, then turned and flipped as the frame is, in `CameraFrame`'s order."""
+    homography, then rotated and flipped as the frame is, in `CameraFrame`'s order."""
     tracklets: list[CameraTracklet] = []
     for tracklet in cam_tracklets.tracklets:
         roi, keypoints = tracklet.roi, tracklet.keypoints
