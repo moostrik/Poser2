@@ -14,6 +14,7 @@ CAMERA: str = 'modules.camera.oak4.camera'
 
 def emitted(camera: Camera) -> CameraFrame:
     frames: list[CameraFrame] = []
+    camera.running = True                               # as an open camera is
     camera.add_frame_callback(frames.append)
     camera._emit_frame(FrameType.VIDEO, np.zeros((6, 4), np.uint8), 1.0, 1.0, nv12=True)
     return frames[0]
@@ -38,6 +39,15 @@ class FrameFlagsTest(unittest.TestCase):
             self.assertIsNone(emitted(camera).homography)
             camera._emit_frame(FrameType.VIDEO, np.zeros((6, 4), np.uint8), 2.0, 2.0, nv12=True)
         self.assertEqual(len(logs.records), 1)
+
+    def test_no_frame_after_stop(self) -> None:
+        camera = Camera(Oak4CameraSettings())
+        emitted(camera)
+        frames: list[CameraFrame] = []
+        camera.add_frame_callback(frames.append)
+        camera.stop()
+        camera._emit_frame(FrameType.VIDEO, np.zeros((6, 4), np.uint8), 3.0, 3.0, nv12=True)
+        self.assertEqual(frames, [])
 
 
 if __name__ == '__main__':

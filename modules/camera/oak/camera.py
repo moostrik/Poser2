@@ -239,7 +239,10 @@ class Camera(Thread):
         self.mount_readout.update([(p.acceleroMeter.x, p.acceleroMeter.y, p.acceleroMeter.z) for p in msg.packets])
 
     def _emit_frame(self, kind: FrameType, image: ndarray, timestamp: float, arrival: float) -> None:
-        """The hand-over: the frame, with its capture time (`capture_time`) and its arrival, goes to every callback."""
+        """The hand-over: the frame, with its capture time (`capture_time`) and its arrival, goes to every callback;
+        none after `stop()`."""
+        if not self.running:
+            return
         self.frame_callbacks(CameraFrame(cam_id=self.cam_id, kind=kind, image=image, timestamp=timestamp,
                                          arrival=arrival))
 

@@ -51,12 +51,6 @@ its tests pass in both venvs, pyright clean in both). **(seen)** is read in the 
   - `imu_to_camera` passes the vector on unchanged when the matrix is malformed, silently: logged once. Why: "never
     fail silently".
   - A docstring for `oak.Camera`, `oak4.Camera`, `oak.ClipCamera`, `vimba.SensorControl`.
-- H6. Frames stop at `stop()` as tracklets do. Both OAK backends' `_emit_tracklets` returns once `running` is off,
-  their `_emit_frame` does not **(seen)**, so the frame callbacks may get frames while the device closes
-  **(deduction)**. How: `_emit_frame` checks `running` as `_emit_tracklets` does, in both; one behavior for both
-  outputs. `ClipCamera` in passthrough never sets `running` (only `_open` does, **seen**), so it sets it in `start`;
-  `oak4/tests/test_frame_flags.py` calls `_emit_frame` on a camera never started and sets `running`. Checked by a
-  unit test per backend: no frame callback after `stop()`.
 - H7. The OAK4's exposure region is in the frame as the camera delivers it, before the homography and every flag.
   Now `sensor_region` takes it on the picture as shown and undoes the flips and `rotate90`, not the homography: the
   flags undone, the tilt correction not **(seen: `oak4/sensor.py` `sensor_region`, `oak4/control.py`
@@ -68,7 +62,7 @@ its tests pass in both venvs, pyright clean in both). **(seen)** is read in the 
   go, and one test holds a region mapped straight through `to_source`. Why: a sensor control lives in the camera's
   own picture; the code is shorter and the region one thing.
 
-H6 and H7 are each a step of their own, checked by the tests in both venvs, pyright and the guard tests;
+H7 is a step of its own, checked by the tests in both venvs, pyright and the guard tests;
 H3 to H5 are one commit.
 
 ## Open

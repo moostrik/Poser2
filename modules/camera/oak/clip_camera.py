@@ -35,6 +35,7 @@ class ClipCamera(Camera):
 
     def start(self) -> None:  # override
         if self.passthrough:
+            self.running = True         # no device to open: the camera runs from its start
             self.player.add_frame_callback(self._passthrough_callback)
         else:
             self.player.add_frame_callback(self._clip_callback)

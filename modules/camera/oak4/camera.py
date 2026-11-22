@@ -421,7 +421,10 @@ class Camera(Thread):
     def _emit_frame(self, kind: FrameType, image: ndarray, timestamp: float, arrival: float, nv12: bool = False,
                     readings: FrameReadings | None = None, alignment: DepthAlignment | None = None,
                     confidence: ndarray | None = None) -> None:
-        """The hand-over: the frame, with its capture time (`capture_time`) and its arrival, goes to every callback."""
+        """The hand-over: the frame, with its capture time (`capture_time`) and its arrival, goes to every callback;
+        none after `stop()`."""
+        if not self.running:
+            return
         self.frame_callbacks(CameraFrame(cam_id=self.cam_id, kind=kind, image=image, timestamp=timestamp,
                                          nv12=nv12, rotate90=self.rotate90, flip_v=self.flip_v_on_host,
                                          flip_h=self.flip_h_on_host, homography=self._homography(), readings=readings,

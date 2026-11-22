@@ -16,7 +16,8 @@ One job: hand an app a camera. That is three things.
 ## The contract
 
 - A camera's callbacks are a `utils.Broadcast`: they run on the backend's own thread in registration order, a
-  callback can be registered at any time, and one that raises is logged while the others still run.
+  callback can be registered at any time, and one that raises is logged while the others still run. An OAK hands
+  over no frame or tracklet after `stop()`.
 - A frame or tracklet message is stamped once, at hand-over, with its capture where the backend knows it (the end
   of the exposure, oak4; the device's timestamp on depthai's clock, oak), else its arrival, on `perf_counter`; where
   the two differ it also carries its arrival, so its latency needs no clock read downstream. A depth frame and the video frame of one capture carry timestamps
