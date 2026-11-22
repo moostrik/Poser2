@@ -32,7 +32,7 @@ go; what is not decided is a question. Rule findings go to the rules thread as "
 Done: inference (20 Nov), settings (21 Nov), board (21 Nov), logging (21 Nov), gl (21 Nov), window (21 Nov), render (21 Nov), smile (21 Nov), inout (21 Nov), video (22 Nov). Held up in
 their own plans: flow (FLOW_PLAN.md J).
 
-- A1. `camera`, scanned in its own thread after video
+- A1. `camera`: scanned (22 Nov); what is left, the OAK-D's live check, is in [CAMERA_PLAN.md F1](modules/camera/CAMERA_PLAN.md#f-with-an-oak-d-at-the-pc)
 - A2. `recording`, with its plan's split test (RECORDING_PLAN.md 4); its plan's line 3 (the pose model's drops) goes with this plan's commit: it
   assumes a pose every frame, and deep_flow poses every other frame
 - A3. `utils`; `Broadcast` (utils/broadcast.py, since 94c65c84) is the one callback list: copied under its lock, called outside it, a
