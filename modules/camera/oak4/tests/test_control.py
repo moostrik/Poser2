@@ -65,25 +65,11 @@ class SensorRegionTest(unittest.TestCase):
         """A frame that is the sensor's middle: 4000x3000 with 1000 cut off each side, none off the top."""
         return 1000.0 + x * 2000.0, y * 3000.0
 
-    def test_the_whole_picture_is_the_cropped_part_of_the_sensor(self) -> None:
-        self.assertEqual(sensor_region(Rect(0.0, 0.0, 1.0, 1.0), False, False, False, self.to_source), (1000, 0, 2000, 3000))
+    def test_the_whole_frame_is_the_cropped_part_of_the_sensor(self) -> None:
+        self.assertEqual(sensor_region(Rect(0.0, 0.0, 1.0, 1.0), self.to_source), (1000, 0, 2000, 3000))
 
-    def test_a_region_lands_in_the_sensors_pixels(self) -> None:
-        self.assertEqual(sensor_region(Rect(0.25, 0.5, 0.5, 0.25), False, False, False, self.to_source), (1500, 1500, 1000, 750))
-
-    def test_the_picture_is_mirrored_after_the_camera_so_the_region_is_mirrored_back(self) -> None:
-        self.assertEqual(sensor_region(Rect(0.0, 0.0, 0.25, 1.0), False, False, True, self.to_source), (2500, 0, 500, 3000))
-
-    def test_a_picture_flipped_top_to_bottom_flips_the_region_back(self) -> None:
-        self.assertEqual(sensor_region(Rect(0.0, 0.0, 1.0, 0.25), False, True, False, self.to_source), (1000, 2250, 2000, 750))
-
-    def test_a_turned_picture_turns_the_region_back(self) -> None:
-        # the left quarter of the picture as shown is the top quarter of the frame as delivered
-        self.assertEqual(sensor_region(Rect(0.0, 0.0, 0.25, 1.0), True, False, False, self.to_source), (1000, 0, 2000, 750))
-
-    def test_turn_and_flips_are_taken_back_in_reverse(self) -> None:
-        # shown = flip_h(flip_v(turn(delivered))): the shown top left quarter is the delivered bottom right one
-        self.assertEqual(sensor_region(Rect(0.0, 0.0, 0.5, 0.5), True, True, True, self.to_source), (2000, 1500, 1000, 1500))
+    def test_a_region_of_the_delivered_frame_maps_straight_to_the_sensors_pixels(self) -> None:
+        self.assertEqual(sensor_region(Rect(0.25, 0.5, 0.5, 0.25), self.to_source), (1500, 1500, 1000, 750))
 
 
 class SettingsTest(unittest.TestCase):

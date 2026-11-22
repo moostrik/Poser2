@@ -274,7 +274,7 @@ class Camera(Thread):
         self.queues.append(system)
         control: dai.InputQueue = outputs.control.createInputQueue()
         assert self.device is not None
-        self.control = SensorControl(self.settings, self.device, control, self.rotate90, self.flip_v_on_host, self.flip_h_on_host)
+        self.control = SensorControl(self.settings, self.device, control)
         if outputs.depth_config is not None:
             self.depth_control = DepthControl(self.settings.depth, outputs.depth_config.createInputQueue())
 

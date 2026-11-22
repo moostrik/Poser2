@@ -80,7 +80,7 @@ Auto exposure is on by default, and these settings in `sensor` shape it, live. M
 | `exposure_compensation` -9  | 2183  | 15.4      |
 | `exposure_compensation` +9  | 16585 | 42.4      |
 
-`exposure_region` is in fractions of the picture as shown, after the frame's `rotate90` and flips (`sensor_region` takes it back through them). The other new settings in `sensor` are `auto_exposure_lock`, `auto_balance_lock`, `anti_banding` and `chroma_denoise`.
+`exposure_region` is in fractions of the frame as the camera delivers it, before the tilt correction and the frame's flags (`sensor_region`). The other new settings in `sensor` are `auto_exposure_lock`, `auto_balance_lock`, `anti_banding` and `chroma_denoise`.
 
 ### Tilt
 

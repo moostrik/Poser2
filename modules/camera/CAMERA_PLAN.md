@@ -28,7 +28,7 @@ its tests pass in both venvs, pyright clean in both). **(seen)** is read in the 
 - H4. One word per flag in prose **(seen)**: "mirror"/"mirrored" for `flip_h`, "the turn"/"turned" for `rotate90`,
   "upright" for the oriented image. In `frame.py` (`CameraFrame`'s docstring and field comments, `oriented_corners`),
   `flips.py` (locals `mirrored`, `turned`), `tracklet.py` (`straightened`'s comment), `oak4/camera.py` (`_tracklet`,
-  `_homography` and its warning), `oak4/control.py`, `oak4/sensor.py` (`sensor_region`), `vimba/settings.py`
+  `_homography` and its warning), `vimba/settings.py`
   (`flip_h`: "Mirror the camera image horizontally", against `CameraSettings`' "Flip horizontal"), CAMERA.md (Raw
   clips), OAK4.md (the frame's flags, depth) and the tests' names. The IMU's "turn" on the board is its roll and
   stays. Also "person": `OakCameraSettings.yolo`'s panel text describes the detector, so "Run the YOLO detector and
@@ -51,19 +51,7 @@ its tests pass in both venvs, pyright clean in both). **(seen)** is read in the 
   - `imu_to_camera` passes the vector on unchanged when the matrix is malformed, silently: logged once. Why: "never
     fail silently".
   - A docstring for `oak.Camera`, `oak4.Camera`, `oak.ClipCamera`, `vimba.SensorControl`.
-- H7. The OAK4's exposure region is in the frame as the camera delivers it, before the homography and every flag.
-  Now `sensor_region` takes it on the picture as shown and undoes the flips and `rotate90`, not the homography: the
-  flags undone, the tilt correction not **(seen: `oak4/sensor.py` `sensor_region`, `oak4/control.py`
-  `_on_exposure_region`)**. Only the panel sets it, and every settings file that has it holds the full frame
-  **(seen: deep_flow's and low_flow's `studio.json`)**, so nothing changes in use. How: `sensor_region` keeps only
-  the mapping to sensor pixels (`to_source`); `SensorControl` loses its `rotate90`, `flip_v` and `flip_h`;
-  `SensorSettings.exposure_region`'s description says "Part of the delivered frame auto exposure measures, in
-  fractions of it"; OAK4.md's `exposure_region` line follows; `test_control.py`'s flipped and turned region tests
-  go, and one test holds a region mapped straight through `to_source`. Why: a sensor control lives in the camera's
-  own picture; the code is shorter and the region one thing.
-
-H7 is a step of its own, checked by the tests in both venvs, pyright and the guard tests;
-H3 to H5 are one commit.
+H3 to H5 are one commit, checked by the tests in both venvs, pyright and the guard tests.
 
 ## Open
 
@@ -78,8 +66,6 @@ H3 to H5 are one commit.
 ## Rules it touches
 
 - Stamp a frame or tracklet message once, where the backend hands it over, with its moment of capture where the device reports one, else its arrival: F1
-- Fix a problem where it is made: H7
-- Keep `Field` descriptions to one short line of panel text: what the value is and its unit: H7
 - A docstring says what the thing is: H3, H5
 - A component is described in its own document; other documents link to it: H3
 - Use that one term everywhere it appears: H4, H5

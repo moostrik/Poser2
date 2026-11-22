@@ -16,15 +16,11 @@ class SensorControl:
     """One camera's sensor fields bound to its open device: every value sent once on construction, the exposure
     region at the first frame; `close()` unbinds and turns the IR lights off, as they would stay lit."""
 
-    def __init__(self, settings: Oak4CameraSettings, device: dai.Device, control: dai.InputQueue, rotate90: bool = False,
-                 flip_v: bool = False, flip_h: bool = False) -> None:
+    def __init__(self, settings: Oak4CameraSettings, device: dai.Device, control: dai.InputQueue) -> None:
         self.settings: Oak4CameraSettings = settings
         self.sensor: SensorSettings = settings.sensor
         self.device: dai.Device = device
         self.control: dai.InputQueue = control
-        self.rotate90: bool = rotate90      # the frame's flags: the picture as shown is turned and flipped after the camera
-        self.flip_v: bool = flip_v
-        self.flip_h: bool = flip_h
         self._transformation: dai.ImgTransformation | None = None
         self._bindings: list[tuple] = [
             (SensorSettings.auto_exposure, self._on_auto_exposure),
@@ -133,7 +129,7 @@ class SensorControl:
             point = transformation.invTransformPoint(dai.Point2f(x * width, y * height, False))
             return point.x, point.y
         ctrl = dai.CameraControl()
-        ctrl.setAutoExposureRegion(*sensor_region(self.sensor.exposure_region, self.rotate90, self.flip_v, self.flip_h, to_source))
+        ctrl.setAutoExposureRegion(*sensor_region(self.sensor.exposure_region, to_source))
         self._send(ctrl)
 
     def _on_anti_banding(self, value=None) -> None:

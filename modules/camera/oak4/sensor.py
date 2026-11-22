@@ -8,7 +8,7 @@ import depthai as dai
 
 from modules.utils import Rect
 
-from ..geometry import CameraResolution, resolve_resolution, mode_size, flip_h_roi, flip_v_roi, rotate90_roi
+from ..geometry import CameraResolution, resolve_resolution, mode_size
 
 # The color sensor (IMX586), and with `depth_model` the OV9282 stereo pair. Grey is the ISP's luma of the color
 # sensor. A resolution label here is a delivered size; the Camera node picks the sensor mode from it.
@@ -88,15 +88,9 @@ ANTI_BANDING_MODES: dict[AntiBanding, dai.CameraControl.AntiBandingMode] = {
 }
 
 
-def sensor_region(region: Rect, rotate90: bool, flip_v: bool, flip_h: bool,
-                  to_source: Callable[[float, float], tuple[float, float]]) -> tuple[int, int, int, int]:
-    """A region of the picture as shown, in fractions of it, as the sensor pixels `setAutoExposureRegion`
-    takes: (x, y, width, height). `to_source` maps a frame fraction to the sensor's pixels; the picture is
-    turned and flipped after the camera as its frame's flags say, so the region is taken back through them first,
-    in reverse order."""
-    frame: Rect = flip_h_roi(region) if flip_h else region
-    frame = flip_v_roi(frame) if flip_v else frame
-    frame = rotate90_roi(frame) if rotate90 else frame
-    x0, y0 = to_source(frame.x, frame.y)
-    x1, y1 = to_source(frame.x + frame.width, frame.y + frame.height)
+def sensor_region(region: Rect, to_source: Callable[[float, float], tuple[float, float]]) -> tuple[int, int, int, int]:
+    """A region of the frame as the camera delivers it, in fractions of it, as the sensor pixels
+    `setAutoExposureRegion` takes: (x, y, width, height). `to_source` maps a frame fraction to the sensor's pixels."""
+    x0, y0 = to_source(region.x, region.y)
+    x1, y1 = to_source(region.x + region.width, region.y + region.height)
     return (round(x0), round(y0), round(x1 - x0), round(y1 - y0))

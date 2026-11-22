@@ -23,7 +23,7 @@ class SensorSettings(BaseSettings):
     exposure_compensation: Field[int] = Field(0, min=COMPENSATION_RANGE[0], max=COMPENSATION_RANGE[1], widget=Widget.slider, description="Auto exposure target, darker or brighter", newline=True)
     auto_iso_limit: Field[int]  = Field(ISO_RANGE[1], min=ISO_RANGE[0], max=ISO_RANGE[1], widget=Widget.slider, description="Highest ISO auto exposure may use")
     anti_banding:   Field[AntiBanding] = Field(AntiBanding.MAINS_50_HZ, description="Mains flicker auto exposure avoids")
-    exposure_region: Field[Rect] = Field(Rect(0.0, 0.0, 1.0, 1.0), newline=True, description="Part of the picture auto exposure measures, in fractions of it")
+    exposure_region: Field[Rect] = Field(Rect(0.0, 0.0, 1.0, 1.0), newline=True, description="Part of the delivered frame auto exposure measures, in fractions of it")
     balance:        Field[int]  = Field(BALANCE_RANGE[0], min=BALANCE_RANGE[0], max=BALANCE_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="White balance", newline=True)
     auto_balance:   Field[bool] = Field(True, widget=Widget.switch, description="Auto white balance")
     auto_balance_lock: Field[bool] = Field(False, widget=Widget.switch, description="Hold auto white balance where it is now")
