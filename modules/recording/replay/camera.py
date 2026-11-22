@@ -32,8 +32,6 @@ from .tracker import Track
 
 logger = logging.getLogger(__name__)
 
-DETECTIONS_KEPT: int = 4        # detections waiting for the tracker, per camera
-
 
 class Detection(Protocol):
     """What the detector reports for one frame: `modules.inference.person.Detection`."""
@@ -83,8 +81,7 @@ class Camera:
         # The recorded tracklets waiting for their moment: (due, order, message), on this camera's thread
         self._waiting: list[tuple[float, int, CameraTracklets]] = []
         self._order: int = 0
-        self._detections: deque[Detection] = deque()    # the detector's, for the tracker on this camera's thread
-        self.dropped_detections: int = 0                # dropped, oldest first, while the tracker fell behind
+        self._detections: deque[Detection] = deque()    # the detector's, every one for the tracker on this camera's thread
         self._lock: Lock = Lock()
         self._waker: Waker = Waker()
         self._thread: Thread | None = None
@@ -230,17 +227,11 @@ class Camera:
     # ── The detector's tracklets ───────────────────────────────────────
 
     def _on_detection(self, detection: Detection) -> None:
-        """The detector's boxes for one frame, on its thread, queued for this camera's thread; the oldest goes,
-        counted, past `DETECTIONS_KEPT`."""
+        """The detector's boxes for one frame, on its thread, queued for this camera's thread, none dropped."""
         if not self.running or detection.cam_id != self.cam_id or self.tracker is None:
             return
         with self._lock:
             self._detections.append(detection)
-            if len(self._detections) > DETECTIONS_KEPT:
-                self._detections.popleft()
-                self.dropped_detections += 1
-                if self.dropped_detections == 1:
-                    logger.warning("Replay camera %d: the tracker falls behind the detector, oldest detections dropped", self.cam_id)
         self._waker.set()
 
     def _track(self, detection: Detection) -> None:

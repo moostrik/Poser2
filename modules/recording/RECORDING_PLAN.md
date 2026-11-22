@@ -33,20 +33,7 @@ With the apps' refactors ([REFACTOR_PLAN.md](../../REFACTOR_PLAN.md)), each test
 
 - D2. Settled (2026-11-22): pose's `Recorder` becomes `PoseRecorder`, in [POSE_PLAN.md](../pose/POSE_PLAN.md) D1.
 
-## H. Drops shown to the user
-
-- H2. The replay camera's detection queue (`replay/camera.py`, `Camera._on_detection`) keeps `DETECTIONS_KEPT` (4)
-  and drops the oldest past it, counted in `dropped_detections` and one log warning, shown nowhere **(seen)**. The
-  limit came with F2 (cdbd69c7) beyond its step, and rests only on the queue line that was removed **(site fact)**. The
-  queue loses its limit and its drop: every detection reaches the tracker, so a replay tracks the same from run to
-  run. `DETECTIONS_KEPT`, `dropped_detections` and the warning go; nothing drops, so nothing is shown. A detection
-  is a few boxes, so an unbounded queue costs little **(deduction)**. RECORDING.md's sentence on the drop follows.
-  Touches `replay/camera.py` and RECORDING.md; no app code, no settings files. Tests: in
-  `replay/tests/test_camera.py` the drop-oldest test becomes one that the tracker gets every detection, on the
-  camera's thread.
-
 ## The rules it touches
 
 - Run a test of the app or a GPU harness only on the user's go, and only what the plan names: the checks of A
 - Similar things share the noun and differ by a qualifier: D2 (built in POSE_PLAN.md D1)
-- A part that drops an item shows the count to the user: H2 (nothing dropped)

@@ -10,7 +10,6 @@ import numpy as np
 from modules.camera import CameraTracklet, ClipFrame, FrameType, RigCameraReadings, TrackingStatus
 from modules.recording import FrameMetadata
 from modules.recording.replay import Camera
-from modules.recording.replay.camera import DETECTIONS_KEPT
 from modules.recording.replay.tracker import Track
 from modules.utils import Rect
 
@@ -149,18 +148,17 @@ class ReplayCameraTest(unittest.TestCase):
         self.assertTrue(wait_for(lambda: self.messages))
         self.assertEqual(self.messages[0].tracklets, [])
 
-    def test_the_tracker_runs_on_the_camera_s_thread_and_drops_the_oldest_behind(self) -> None:
+    def test_the_tracker_gets_every_detection_on_the_camera_s_thread(self) -> None:
         tracker = BlockingTracker()
         self.camera.tracker = tracker
-        for i in range(DETECTIONS_KEPT + 3):           # the first holds the tracker, the rest wait
+        for i in range(10):                             # the first holds the tracker, the rest wait
             self.detector.report(1, [], float(i))
             if i == 0:
                 self.assertTrue(tracker.entered.wait(1.0))
         self.assertIsNot(tracker.thread, threading.current_thread())
-        self.assertEqual(self.camera.dropped_detections, 2)
         tracker.go.set()
-        self.assertTrue(wait_for(lambda: len(self.messages) == DETECTIONS_KEPT + 1))
-        self.assertEqual([m.timestamp for m in self.messages], [0.0, 3.0, 4.0, 5.0, 6.0])
+        self.assertTrue(wait_for(lambda: len(self.messages) == 10))
+        self.assertEqual([m.timestamp for m in self.messages], [float(i) for i in range(10)])
 
     def test_stopped_it_emits_nothing(self) -> None:
         self.camera.stop()

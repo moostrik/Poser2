@@ -201,8 +201,8 @@ Its tracklets come one of two ways, by `PersonDetector.enabled` (off in deep_flo
 | on       | YOLOv8n on the uploaded image through `replay.Tracker`, marked `straightened` | another model, timing and GPU load          |
 
 Both go out from the camera's own thread, so nothing but the hand-over runs on the player's, and nothing but the
-hand-over on the detector's: its detections wait for the tracker there, and past `DETECTIONS_KEPT` (4) the oldest
-is dropped and counted (`dropped_detections`). The detector is a `Protocol` in `replay` (`PersonDetector`,
+hand-over on the detector's: its detections wait for the tracker there, every one, so a replay tracks the same
+from run to run; a detection is a few boxes, so the queue costs little **(deduction)**. The detector is a `Protocol` in `replay` (`PersonDetector`,
 `Detection`), so the camera contract does not import the inference package.
 
 ## The recorded poses
