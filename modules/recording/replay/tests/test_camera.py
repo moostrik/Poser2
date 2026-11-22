@@ -6,7 +6,7 @@ import unittest
 
 import numpy as np
 
-from modules.camera import CameraTracklet, FrameType, RigCameraSettings, TrackingStatus
+from modules.camera import CameraTracklet, FrameType, RigCameraReadings, TrackingStatus
 from modules.recording import FrameMetadata
 from modules.recording.replay import Camera, Track
 from modules.utils import Rect
@@ -65,11 +65,11 @@ class FakeTracker:
 
 class ReplayCameraTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.settings = RigCameraSettings()
-        self.settings.initialize()
+        self.readings = RigCameraReadings()
+        self.readings.initialize()
         self.player = FakePlayer()
         self.detector = FakePersonDetector()
-        self.camera = Camera(self.player, self.settings, self.detector, FakeTracker(), cam_id=1)
+        self.camera = Camera(self.player, self.readings, self.detector, FakeTracker(), cam_id=1)
         self.frames = []
         self.messages = []
         self.camera.add_frame_callback(self.frames.append)
@@ -119,7 +119,7 @@ class ReplayCameraTest(unittest.TestCase):
         self.assertEqual(tracklets[0].cam_id, 1)
         self.assertEqual(t, 12.5)
         self.assertTrue(all(tr.timestamp == t for tr in tracklets))
-        self.assertEqual(self.settings.readings.tracklets, 2)
+        self.assertEqual(self.readings.tracklets, 2)
 
     def test_nobody_is_a_message_too(self) -> None:
         self.detector.report(1, [])
@@ -152,11 +152,11 @@ def wait_for(condition, seconds: float = 2.0) -> bool:
 
 class RecordedTrackletsTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.settings = RigCameraSettings()
-        self.settings.initialize()
+        self.readings = RigCameraReadings()
+        self.readings.initialize()
         self.player = FakePlayer()
         self.detector = FakePersonDetector(enabled=False)
-        self.camera = Camera(self.player, self.settings, self.detector, FakeTracker(), cam_id=1)
+        self.camera = Camera(self.player, self.readings, self.detector, FakeTracker(), cam_id=1)
         self.messages = []
         self.camera.add_tracklet_callback(lambda message: self.messages.append((time.perf_counter(), message)))
         self.camera.start()
@@ -200,10 +200,10 @@ class RecordedTrackletsTest(unittest.TestCase):
 
 class WithoutDetectorTest(unittest.TestCase):
     def test_frames_only(self) -> None:
-        settings = RigCameraSettings()
-        settings.initialize()
+        readings = RigCameraReadings()
+        readings.initialize()
         player = FakePlayer()
-        camera = Camera(player, settings, None, FakeTracker(), cam_id=0)
+        camera = Camera(player, readings, None, FakeTracker(), cam_id=0)
         frames = []
         camera.add_frame_callback(frames.append)
         camera.start()

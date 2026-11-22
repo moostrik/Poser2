@@ -79,7 +79,7 @@ class LowFlowMain:
                 self.person_detector = person.PersonDetector(self.settings.setup.camera.person_detector)
             for i in range(num_cams):
                 cam = self.settings.setup.camera.cameras[i]
-                self.cameras.append(replay.Camera(self.player, cam, self.person_detector, replay.Tracker(), i, cam.tilt))
+                self.cameras.append(replay.Camera(self.player, cam.readings, self.person_detector, replay.Tracker(), i, cam.tilt))
         else:
             for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.setup.camera.cameras[i], cam_id=i))

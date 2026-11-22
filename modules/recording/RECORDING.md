@@ -180,7 +180,8 @@ loaded and the last played, and its lines are parsed as the frames are read, so 
 `replay.Camera` is a `CameraSource` without a device. Its frames come as the camera delivered them: `rotate90` and the
 flips as recorded, depth frames with the recorded alignment and confidence, and with `tilt` the homography of the recorded tilt plus the
 live offset on the recorded lens. That matches live's to within `TILT_STEP` (0.25°): live makes it from the IMU's
-newest tilt, the recording keeps the tilt read with the frame **(deduction)**.
+newest tilt, the recording keeps the tilt read with the frame **(deduction)**. It takes only its readings
+(`RigCameraReadings`), which it fills as a live camera does: its mount and lens come with the recording.
 
 Its tracklets come one of two ways, by `PersonDetector.enabled` (off in deep_flow's settings file):
 

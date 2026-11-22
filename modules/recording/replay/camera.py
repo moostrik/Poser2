@@ -24,7 +24,7 @@ from typing import Protocol
 import numpy as np
 
 from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, CameraFrameCallback, DepthAlignment, FrameReadings, FrameType, \
-    RigCameraReadings, RigCameraSettings, TiltCorrection, TiltCorrectionSettings, TrackletCallback
+    RigCameraReadings, TiltCorrection, TiltCorrectionSettings, TrackletCallback
 from modules.utils import FPS, Rect, Waker
 
 from ..container import ChunkInfo, FrameMetadata
@@ -65,10 +65,10 @@ class PlayerFeed(Protocol):
 
 
 class Camera:
-    def __init__(self, player: PlayerFeed, settings: RigCameraSettings, detector: PersonDetector | None, tracker: BoxTracker | None, cam_id: int = 0,
+    def __init__(self, player: PlayerFeed, readings: RigCameraReadings, detector: PersonDetector | None, tracker: BoxTracker | None, cam_id: int = 0,
                  tilt: TiltCorrectionSettings | None = None) -> None:
         self.cam_id: int = cam_id
-        self.settings: RigCameraSettings = settings
+        self.readings: RigCameraReadings = readings     # its only settings: the mount and the lens come with the recording
         self.player: PlayerFeed = player
         self.detector: PersonDetector | None = detector
         self.tracker: BoxTracker | None = tracker if detector is not None else None
@@ -89,10 +89,6 @@ class Camera:
         self.tracklet_callbacks: list[TrackletCallback] = []
 
     # ── CameraSource ───────────────────────────────────────────────────
-
-    @property
-    def readings(self) -> RigCameraReadings:
-        return self.settings.readings
 
     @property
     def connected(self) -> bool:
@@ -151,8 +147,8 @@ class Camera:
         if frame_type == FrameType.VIDEO:
             self._video_timestamp = captured if captured is not None else arrival
             self.video_fps.processed()
-            self.settings.readings.video_fps = self.video_fps.get_rate_average()
-            self.settings.readings.video_min_fps = self.video_fps.get_rate_minimum()
+            self.readings.video_fps = self.video_fps.get_rate_average()
+            self.readings.video_min_fps = self.video_fps.get_rate_minimum()
             self._update_tilt(metadata.readings if metadata is not None else None, info)
         # The player hands a frame's streams with one stamp; without metadata the depth takes its video's
         timestamp: float = captured if captured is not None else self._video_timestamp if self._video_timestamp is not None else arrival
@@ -175,8 +171,8 @@ class Camera:
         """The recorded tilt on the recorded lens."""
         if readings is None or info is None:
             return
-        self.settings.readings.tilt_measured = readings.tilt
-        self.settings.readings.roll_measured = readings.roll
+        self.readings.tilt_measured = readings.tilt
+        self.readings.roll_measured = readings.roll
         if self.tilt_correction is not None and info.intrinsics is not None:
             self.tilt_correction.update(readings.tilt, info.intrinsics, (info.width, info.height))
 
@@ -234,7 +230,7 @@ class Camera:
 
     def _emit_tracklets(self, message: CameraTracklets) -> None:
         self.tracklet_fps.processed()
-        self.settings.readings.tracker_fps = self.tracklet_fps.get_rate_average()
-        self.settings.readings.tracklets = len(message.tracklets)
+        self.readings.tracker_fps = self.tracklet_fps.get_rate_average()
+        self.readings.tracklets = len(message.tracklets)
         for c in self.tracklet_callbacks:
             c(message)

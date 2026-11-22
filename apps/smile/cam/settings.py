@@ -2,7 +2,7 @@
 from `input/` and the device readout, the OAK4's own (its mount, rate and sensor, read with `-oak`), the webcam's own
 (its mount and rate, read with `-wc`), the faces' settings (the upload, the detector and smile's face finder), the
 recording of the device's frames (the recorder and the session that splits it into chunks, started and stopped by one
-pair of buttons), and, read only in -sim, the player of a recording and the replay camera it feeds."""
+pair of buttons), and, read only in -sim, the player of a recording and the readings of the replay camera it feeds."""
 
 from modules import camera
 from modules.camera.oak4 import ModelChain, Oak4CameraSettings
@@ -52,4 +52,4 @@ class CameraSettings(VimbaCameraSettings):
     control:       Group[SessionSettings] = Group(SessionSettings, share=[start, stop, split, split_seconds])   # splits the recording into chunks
     recorder:      Group[_RecorderSettings] = Group(_RecorderSettings, share=[start, stop, split])             # the device's frames as they come
     simulator:     Group[PlayerSettings] = Group(PlayerSettings)          # -sim: the recording played in place of the device
-    replay:        Group[camera.RigCameraSettings] = Group(camera.RigCameraSettings)    # -sim: the camera the recording's frames come from
+    replay:        Group[camera.RigCameraReadings] = Group(camera.RigCameraReadings)    # -sim: the readings of the camera the recording plays

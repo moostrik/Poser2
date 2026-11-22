@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 
 from modules import video
-from modules.camera import CameraFrame, FrameType, RigCameraSettings
+from modules.camera import CameraFrame, FrameType, RigCameraReadings
 from modules.recording import Container, read_metadata
 from modules.recording.replay import Camera
 from modules.recording.tests.recordings import FPS, Played, cam_frame, cam_tracklets, collect, player, record
@@ -97,9 +97,9 @@ class Mp4Test(unittest.TestCase):
 
             play = player(root, 1)
             play.settings.folder = recording.name
-            settings = RigCameraSettings()
-            settings.initialize()
-            camera = Camera(play, settings, None, None)
+            readings = RigCameraReadings()
+            readings.initialize()
+            camera = Camera(play, readings, None, None)
             frames: list[CameraFrame] = []
             camera.add_frame_callback(frames.append)
             camera.start()

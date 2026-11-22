@@ -88,7 +88,7 @@ class HDTrioMain:
                 if self.settings.setup.camera.yolo:
                     self.person_detector = person.PersonDetector(self.settings.setup.camera.person_detector)
                 for i in range(num_cams):
-                    self.cameras.append(replay.Camera(self.player, self.settings.setup.camera.cameras[i], self.person_detector, replay.Tracker(), i))
+                    self.cameras.append(replay.Camera(self.player, self.settings.setup.camera.cameras[i].readings, self.person_detector, replay.Tracker(), i))
             else:
                 for i in range(num_cams):
                     self.cameras.append(ClipCamera(self.player, self.settings.setup.camera.cameras[i], i))
