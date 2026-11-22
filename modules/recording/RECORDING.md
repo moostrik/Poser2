@@ -153,6 +153,7 @@ crash left unmerged is merged beside the next recording.
 | The next chunk carries the clock on and plays as soon as it is loaded      | its readers hold each frame until its moment, so no camera's first frame is late |
 | A loop, a seek or another folder starts the clock anew, and is told        | the replay camera and `RecordedPoses` drop what waits (`add_jump_callback`)      |
 | Each camera's frames go out under its own lock, in chunk and frame order   | a camera never waits for another's; a frame older than one gone out is dropped   |
+| A dropped frame, unpaired or out of order, counts on the panel             | `dropped_frames`, from where a folder's play starts, not a chunk's or a loop's   |
 | A camera plays the streams its chunk has                                   | a color-only camera plays beside one with depth                                  |
 | A depth frame goes out with its confidence, None where the chunk has none  | the confidence rides on its depth, never paired with another frame's             |
 | The markers, a seek and a scrub are places on camera 0's frames            | the other cameras play the same recorded moment, found by time                   |

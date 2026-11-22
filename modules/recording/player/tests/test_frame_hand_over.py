@@ -56,14 +56,22 @@ class FrameHandOverTest(unittest.TestCase):
         self.push(4, ChunkStream.DEPTH)
         self.assertEqual(self.out, [(4, FrameType.VIDEO), (4, FrameType.DEPTH)])
 
-    def test_a_frame_older_than_one_gone_out_is_dropped_and_counted(self) -> None:
+    def test_a_frame_left_without_its_other_stream_is_dropped_and_counted(self) -> None:
         self.push(4, ChunkStream.VIDEO)
         self.push(5, ChunkStream.VIDEO)
         self.push(5, ChunkStream.DEPTH)       # 4 never gets its depth
         self.push(4, ChunkStream.DEPTH)       # too late: 5 went out
         self.assertEqual(self.out, [(5, FrameType.VIDEO), (5, FrameType.DEPTH)])
-        self.assertEqual(self.hand_over.take_unpaired(), 1)
-        self.assertEqual(self.hand_over.take_unpaired(), 0)
+        self.assertEqual(self.hand_over.take_dropped(), 1)
+        self.assertEqual(self.hand_over.take_dropped(), 0)
+
+    def test_a_frame_older_than_one_gone_out_is_dropped_and_counted(self) -> None:
+        self.push(5, ChunkStream.VIDEO)
+        self.push(5, ChunkStream.DEPTH)
+        self.push(4, ChunkStream.VIDEO)
+        self.push(4, ChunkStream.DEPTH)       # whole, but 5 went out
+        self.assertEqual(self.out, [(5, FrameType.VIDEO), (5, FrameType.DEPTH)])
+        self.assertEqual(self.hand_over.take_dropped(), 1)
 
     def test_a_depth_goes_out_with_its_confidence_once_all_three_are_in(self) -> None:
         self.hand_over.start(FakeReaders(0, {0: [10.0, 10.02, 10.04]}, confidence=True))

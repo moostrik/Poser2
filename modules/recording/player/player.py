@@ -55,6 +55,7 @@ class PlayerSettings(BaseSettings):
                                                         description="In and out markers, fractions of the length (0-1); kept per recording", access=Field.READWRITE)
     current_chunk:      Field[int]              = Field(0, access=Field.READ, description="Current chunk", newline=True)
     max_chunks:         Field[int]              = Field(0, access=Field.READ, description="Total chunks")
+    dropped_frames:     Field[int]              = Field(0, access=Field.READ, description="Frames dropped since the play started: unpaired or out of order")
 
 
 PASS: float = 0.01      # s the player's thread waits at most between passes: it looks whether its readers loaded or ended
@@ -190,6 +191,8 @@ class Player(Thread):
                 if message and message.kind == MessageType.START:
                     if message.prepare:
                         self._prepare_folder(message.value)
+                    self.hand_over.take_dropped()
+                    self.settings.dropped_frames = 0
                     self._set_load_folder(message.value)
                     self._set_load_chunk(-1)
                     self._set_play_chunk(-1)
@@ -397,12 +400,12 @@ class Player(Thread):
         return all(readers.stopped() for readers in self.closing)
 
     def _update_readouts(self) -> None:
-        """On the player's thread: the panel's playback readouts, and the frames dropped unpaired since the last."""
+        """On the player's thread: the panel's playback readouts, and the frames dropped since the play started."""
         if self.hand_over.shown_frame >= 0:
             self.update_gui(self.hand_over.shown_frame)
-        unpaired: int = self.hand_over.take_unpaired()
-        if unpaired:
-            logger.info("Player: %d frames dropped without their other stream", unpaired)
+        dropped: int = self.hand_over.take_dropped()
+        if dropped:
+            self.settings.dropped_frames += dropped
 
     # ── Getters and setters ───────────────────────────────────────────
 

@@ -6,8 +6,8 @@ confidence, None where the chunk has none.
 The streams' readers call `submit_frame` on their own threads. Each camera is handed over apart, under its own lock,
 as live: one camera's frames never wait for another's. A camera's frames leave in their order, the chunk's and then
 the frame's, and the chunk after the one playing plays beside it (`follow`) while the first ends; a frame older
-than one gone out is dropped, as are frames left without their other stream, counted (`take_unpaired`). How far
-the cameras are apart in recorded time is `drift`."""
+than one gone out is dropped, as are frames left without their other stream, both counted (`take_dropped`). How
+far the cameras are apart in recorded time is `drift`."""
 
 import logging
 from collections import defaultdict
@@ -51,7 +51,7 @@ class FrameHandOver:
         self._waiting: dict[int, dict[tuple[int, int], dict[ChunkStream, ndarray]]] = defaultdict(dict)
         self._handed_over: dict[int, tuple[int, int]] = {}  # each camera's last frame gone out: (chunk, frame)
         self._recorded: dict[int, float] = {}               # and its recorded capture time
-        self._unpaired: int = 0                     # frames dropped without their other stream, since taken
+        self._dropped: int = 0                      # frames dropped, unpaired or out of order, since taken
         self.shown_frame: int = -1                  # camera 0's frame last gone out, for the panel
 
     def start(self, readers: HandOverReaders | None) -> None:
@@ -89,11 +89,11 @@ class FrameHandOver:
             times: list[float] = list(self._recorded.values())
         return (max(times) - min(times)) * 1000.0 if len(times) > 1 else 0.0
 
-    def take_unpaired(self) -> int:
-        """The frames dropped without their other stream since the last call."""
+    def take_dropped(self) -> int:
+        """The frames dropped since the last call: left without their other stream, or older than one gone out."""
         with self._lock:
-            unpaired, self._unpaired = self._unpaired, 0
-        return unpaired
+            dropped, self._dropped = self._dropped, 0
+        return dropped
 
     def submit_frame(self, cam_id: int, stream: ChunkStream, frame: ndarray, chunk_id: int, frame_id: int) -> None:
         """A stream's frame, on its reader's thread (`StreamFrameCallback`)."""
@@ -114,9 +114,10 @@ class FrameHandOver:
                 stale: list[tuple[int, int]] = [k for k in cam_frames if k < key]
                 for k in stale:
                     del cam_frames[k]
-                self._unpaired += len(stale)
+                self._dropped += len(stale)
                 frames: dict[ChunkStream, ndarray] = cam_frames.pop(key)
                 if key <= self._handed_over.get(cam_id, (-1, -1)):
+                    self._dropped += 1
                     return          # a frame older than one gone out: the order holds
                 self._handed_over[cam_id] = key
 
