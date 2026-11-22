@@ -34,6 +34,18 @@ Questions:
   settings live and `__del__` never runs (seen for `ArtNetBars` in the inout scan; for these six a **(deduction)**
   from the same mechanism). Check: the pose unit tests.
 
+## D. The recorder's name
+
+- D1. The package's `Recorder` (HDF5 per stage, `recorder/recorder.py`) becomes `PoseRecorder`, and its
+  `RecorderSettings` becomes `PoseRecorderSettings`; `recorder/recorder.py` becomes `recorder/pose_recorder.py`.
+  `recorder/__init__.py`, the package's `__init__.py` and `tests/test_frame_io.py` follow **(seen)**. hd_trio's
+  `main.py` drops its aliases `Recorder as PoseRecorder`, `RecorderSettings as PoseRecorderSettings` and
+  `Recorder as VideoRecorder` for `modules/recording`'s `Recorder`, and white_space's `main.py` drops
+  `Recorder as VideoRecorder` **(seen)**. hd_trio's `settings.py` drops its alias too; its subclass
+  `_PoseRecorderSettings` then differs from its base by an underscore only and takes a name of its own
+  **(seen)**. The log text already says `PoseRecorder` **(seen)**. Why: "Similar things share the noun and differ
+  by a qualifier"; the user chose this on 2026-11-22. Tests: the pose tests, the recording tests, pyright.
+
 ## The rules it touches
 
 - `CLAUDE.md` Naming: use no synonyms for one concept across modules
@@ -41,3 +53,5 @@ Questions:
 - `CLAUDE.md` Composition and wiring, clean up in an explicit stop or teardown, never in `__del__`: B1
 - `CLAUDE.md` Composition, a value derived from pose data is the pipeline's, and so are its settings: the width, and
   how much the filter follows it
+- `CLAUDE.md` Naming, similar things share the noun and differ by a qualifier: D1
+- `glossary.md`, a settings class is `<ClassName>Settings`, after the class it configures: D1
