@@ -1,20 +1,18 @@
 """RecordingSync: the color frame, its depth, the camera's tracklets and the host's poses of one capture, brought
-together for the recorder. Completeness first: every capture waits for its parts in the order of capture, and a
-newer capture never ends the wait; the live `InferenceFrameSync` puts latency first instead.
+together for the recorder. Every capture waits for its parts in the order of capture, and a newer capture never ends
+the wait.
 
-Each camera is matched apart, as live: one camera's parts never wait for another's. A capture is complete with its
+Each camera is matched apart: one camera's parts never wait for another's. A capture is complete with its
 color frame and, when depth is recorded and the camera sends it, its depth, matched by capture time
 (`CaptureStream`); a camera that sent no depth while `KEPT` color frames came is a color-only camera, recorded without
 depth. Then a capture waits for its tracklets, once the camera has sent any, and for its poses, once the app says per
 frame whether the pose model was asked poses for it (`expect_poses`); a frame nobody asked poses for does not wait
-for them. No wait is timed: each stream comes in the order of capture, so a part of a later frame says that this
-frame's part will not come. Then the capture goes out without it, counted and warned of (`MissedParts`: `tracklets`,
+for them. No wait is timed: a part of a later frame says that this frame's part will not come. Then the capture goes out without it, counted and warned of (`MissedParts`: `tracklets`,
 `poses`; and a color frame or a depth no capture took: `depth`, `color`). A camera's captures go out in order: one
 still waiting holds the newer ones behind it, at most `KEPT` of them, beyond which the oldest goes out without what it
-waits for, for a stream that stopped.
+waits for.
 
-The submits only queue what they take, on the threads they come on, in one inbox that is not bounded: a recording
-needs every part. The sync's own thread matches the parts in the order they came and hands the captures on. A part
+The submits only queue what they take, on the threads they come on, in one inbox that is not bounded. The sync's own thread matches the parts in the order they came and hands the captures on. A part
 before `start` is an error; one after `stop` is dropped."""
 
 import logging

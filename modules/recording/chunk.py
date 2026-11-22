@@ -8,7 +8,7 @@ where any tool can read it; the per-frame lines go in as an attachment. The stre
 
 Nothing in a chunk is straightened, turned or mirrored: the frames and the tracklets are as the camera
 delivered them, and `rotate90`, `flip_v` and `flip_h` say the frames are still to be turned and flipped, as
-`CameraFrame`'s do; a chunk recorded before them reads them as off.
+`CameraFrame`'s do.
 One line per frame, in the frames' order, so a line's place is its frame's number.
 """
 
@@ -191,9 +191,7 @@ def _frame(values: dict, cam_id: int) -> FrameMetadata:
 
 
 class FrameLines(Sequence[FrameMetadata]):
-    """A chunk's frame lines, each parsed into its `FrameMetadata` when it is first read and kept: a chunk of a
-    minute is 3000 lines, some 40 ms of parsing at once **(measured: 8.3 ms for 597 lines with poses)**, which
-    spread over the frames read costs a frame nothing."""
+    """A chunk's frame lines, each parsed into its `FrameMetadata` when it is first read and kept."""
 
     def __init__(self, lines: list[str], cam_id: int) -> None:
         self._lines: list[str] = lines

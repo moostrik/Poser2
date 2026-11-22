@@ -6,8 +6,7 @@ depth and its confidence when they were recorded, and metadata (`chunk`), or a c
 streams it has, whatever `video_frame_types` asks for. A chunk's readers are `ChunkReaders`; the folders,
 their markers and the timeline are `RecordingFolder` and `Timeline`.
 
-The markers belong to the recording: each folder keeps its own in a file, so they survive a restart
-and a change of settings file. Dragging one pauses playback and shows the frame under it, the newest one
+Each folder keeps its own markers (`RecordingFolder`). Dragging one pauses playback and shows the frame under it, the newest one
 asked for as fast as a frame can be fetched; letting go plays from the in marker. Pressing the bar
 beside them moves only the playhead: playback goes on from there, and a place outside the markers
 shows its frame and plays from the in marker."""
@@ -40,7 +39,7 @@ class PlayerSettings(BaseSettings):
     fps:                Field[float]            = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Simulation FPS")
     video_path:         Field[str]              = Field("recordings", access=Field.INIT, description="Video recordings directory")
     video_decoder:      Field[Hardware]         = Field(Hardware.iGPU, access=Field.INIT, description="The chip the video is decoded on")
-    video_frame_types:  Field[list[FrameType]]  = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record", visible=False)
+    video_frame_types:  Field[list[FrameType]]  = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to play", visible=False)
 
     # ── Playback controls ─────────────────────────────────────────────
     start:              Field[bool]             = Field(False, widget=Widget.button, description="Start playback", newline=True)

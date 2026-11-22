@@ -21,7 +21,7 @@ next is in [RECORDING_PLAN.md](RECORDING_PLAN.md).
 ## What is recorded
 
 A recording holds what the camera delivered, nothing straightened, turned or mirrored, and only what its playback
-plays. The camera cannot straighten its color frame itself (the oak4's `Warp` takes grey frames only, and the depth
+plays. The camera cannot straighten its color frame itself (the oak4's `Warp` takes gray frames only, and the depth
 is aligned on the GPU, where it is straightened with the color), so straightening and mirroring are the uploader's,
 live and in -sim alike, and a recording made before them plays through the same path as the camera. The tracklets
 are stored as the camera gave them for the same reason: the uploader straightens them with the homography of the
@@ -50,14 +50,15 @@ recordings, plays at `fps`, its frames as stored (`flip_h` False). An `MKV` chun
 |---------------|-------------------------------------------------------------------------------------------------|
 | stream 0      | color, the camera's encoder (`video_encoder`, `video_codec`)                                    |
 | stream 1      | depth when recorded, uint16 mm, `DEPTH_CODEC` on `DEPTH_HARDWARE`, the same `keyframe_interval` |
-| stream 2      | the depth's confidence when the camera gives one, grey 8-bit HEVC on the iGPU, no B-frames      |
+| stream 2      | the depth's confidence when the camera gives one, gray 8-bit HEVC on the iGPU, no B-frames      |
 | tags          | the info line's values                                                                          |
 | attachment    | the metadata, one JSON line each (`.jsonl`)                                                     |
 
 The streams are `ChunkStream`'s, each its index in the file; `FrameType` is the camera's, which has no confidence.
 The confidence keeps its own stream, as the depth's empty chroma cannot hold it: `hevc_qsv` encodes 12 bits only as
 4:2:0, which halves it to 240 × 150, and 4:4:4 only up to 10 bits, which would take the depth from 3 mm to 12 mm
-steps. Its keyframes are the depth's, so a seek lands whole in all three. A chunk records it when its first depth
+steps. Every stream shares `keyframe_interval`, so a seek, which goes to a color keyframe, lands whole in all
+three; a stream with its keyframes elsewhere would come back with its references missing. A chunk records it when its first depth
 frame has one (`confidence` in the info line); a later depth without one is written as 255, so every stream of a
 chunk holds the same frames.
 
@@ -86,8 +87,8 @@ The metadata, attached or beside, is the same lines:
 - Not recorded: the homography and the tilt offset (a playback makes its own, from the recorded tilt and the live
   offset), the model chain (the keypoints say whether a pose model ran), the camera's settings, the depth's latency
   (the player hands a frame's depth with its color).
-- The in and out markers are the recording's, in `in_out.json` in its folder, not in the chunks: a recording is
-  many chunk files, ffmpeg changes a file's tags only by writing the whole file anew, and `mkvpropedit`, which
+- The in and out markers are the recording's, in `in_out.json` in its folder, so they survive a restart and a change
+  of settings file; not in the chunks: a recording is many chunk files, ffmpeg changes a file's tags only by writing the whole file anew, and `mkvpropedit`, which
   edits them in place, is not installed.
 - A recording of the layout before this one plays wrong: its `flip_h` meant "mirrored before storing".
 - A chunk recorded before `rotate90` and `flip_v` reads them as off.
@@ -157,13 +158,14 @@ cut them all at one time. How far the cameras play apart is `drift`, the recorde
 frames gone out, in ms. A clip without metadata plays at `fps`.
 
 The player goes by the chunk's streams (`ChunkStream`) in its readers, the frames waiting to be paired and its
-hand-over, and reads the confidence grey where `ChunkInfo.confidence` says the chunk has it. The hand-over turns them
+hand-over, and reads the confidence gray where `ChunkInfo.confidence` says the chunk has it. The hand-over turns them
 into the camera's clip frames (`ClipFrame`): the color a VIDEO frame, the depth a DEPTH frame with its confidence,
 which the replay camera puts on the DEPTH `CameraFrame`.
 
 deep_flow's player decodes color to NV12 (`Player(nv12=True)`), as the camera hands it: half the bytes of BGR
 through the pipe, and live's upload path. A chunk's metadata is read once and kept for the chunk playing, the one
-loaded and the last played, and its lines are parsed as the frames are read, so no load holds the interpreter.
+loaded and the last played, and its lines are parsed as the frames are read, so no load holds the interpreter: a
+chunk of a minute is 3000 lines, some 40 ms of parsing at once **(deduction, from the Measured 8.3 ms)**.
 
 ### The player's parts
 
@@ -239,9 +241,7 @@ By `scripts/pose_recording_probe.py`, on `20261112-124918_hands` (P800, one play
 | played with the pose model on, recorded again  | 594    | 488 (82%)            | 64.5 / 97.5 / 111                    |
 | that recording played with its recorded poses  | 463    | 463, all as recorded | 72.3 / 105 / 114                     |
 
-The frames without poses are batches the pose model dropped
-([RECORDING_PLAN.md](RECORDING_PLAN.md#3-the-poses-the-pose-model-drops)), which
-the replay drops alike. In the replay every pose had its recorded box and points, and the poses came about 8 ms
+The frames without poses are batches the pose model dropped, which the replay drops alike. In the replay every pose had its recorded box and points, and the poses came about 8 ms
 later after their capture than recorded: -sim's own delay on top of the recorded one. The recorded latencies hold
 the live host's own delay too (the callback waits for Python's lock, up to 5 ms under a busy render)
 **(deduction)**.

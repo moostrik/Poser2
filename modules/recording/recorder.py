@@ -16,10 +16,9 @@ the new chunk with its first capture after it. On stop no frame is taken any mor
 still waiting are settled by the parts that still come, for at most `STOP_WAIT`. Recordings hold what
 the camera delivered, not straightened, turned or mirrored, so the correction can still be tuned on them;
 `rotate90`, `flip_v` and `flip_h` say the frames are still to be turned and flipped, and replay applies them. What a
-capture went without is counted on the panel and warned of. Every stream shares `keyframe_interval`: a seek in a chunk goes to a color keyframe, so a
-depth stream with its keyframes elsewhere comes back with its references missing. The depth's confidence rides on
-its depth frame and goes into a stream of its own when the chunk's first depth has one (`ChunkInfo.confidence`), so
-every stream of a chunk holds the same frames: a later depth without one gets 255, sure."""
+capture went without is counted on the panel and warned of. Every stream shares `keyframe_interval`. The depth's
+confidence rides on its depth frame and goes into a stream of its own when the chunk's first depth has one
+(`ChunkInfo.confidence`); a later depth without one gets 255, sure."""
 
 from threading import Thread, Lock, Event
 from pathlib import Path
@@ -74,7 +73,6 @@ class RecorderSettings(BaseSettings):
     dropped:            Field[int]              = Field(0, access=Field.READ, description="Frames dropped because the writing fell behind")
 
 
-# The letter in a clip's file name: `0_C_001.mp4` is camera 0's video, chunk 1.
 STOP_WAIT: float = 1.0          # s a stopping recording waits for the parts its last captures wait for
 PASS: float = 0.01              # s the recorder's thread waits at most between passes, without a wake
 SPLIT_WAIT: float = 1.0         # s a split waits for a camera's first capture after its time, before it cuts that camera's chunk anyway
@@ -255,7 +253,7 @@ class Recorder(Thread):
                 self.recorders[c][t].start(str(self._stream_path(c, t, 0)), self.settings.fps)
             self._open_metadata(c)
 
-        logger.info("VideoRecorder started to %s", self.output_folder_path)
+        logger.info("Recorder started to %s", self.output_folder_path)
 
     def _stop_recording(self) -> None:
         """No frame is taken any more; the captures waiting are settled by the tracklets and poses that still come,
@@ -281,7 +279,7 @@ class Recorder(Thread):
         self._remove_temp_folder()
         self._update_missed()
         self.sync.missed.warn()
-        logger.info("VideoRecorder stopped")
+        logger.info("Recorder stopped")
 
     def _split_camera(self, cam_id: int) -> None:
         """Cut a camera's chunk, on the recorder's thread, between its captures: its streams and its metadata go on

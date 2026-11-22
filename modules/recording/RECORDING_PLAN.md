@@ -40,24 +40,7 @@ timing, not the recording's data. Looked at when the refactor's A6 reaches the r
 
 None open.
 
-## G. Text
-
-- G1. Leftovers: the comment "The letter in a clip's file name" above `STOP_WAIT` in `recorder.py` goes, its labels
-  being `chunk.CHUNK_STREAM_LABELS`; the log lines "VideoRecorder started" and "VideoRecorder stopped" say
-  "Recorder"; `PlayerSettings.video_frame_types` reads "Frame types to play", not "to record" **(seen)**. Why:
-  "Remove obsolete pathways"; one term everywhere; a description says what the value is.
-- G2. Reasons and measurements leave the docstrings for RECORDING.md, which holds them already: `recorder.py`'s
-  module docstring (keyframes, confidence), `recording_sync.py`'s (RECORDING.md's rules table), `FrameLines`'
-  measurement (RECORDING.md's Measured), `chunk.py`'s "a chunk recorded before them reads them as off", and the
-  markers' paragraph in `player.py` and `recording_folder.py` **(seen)**. Why: "A docstring says what the thing is"; "Reasons sit in the package's document, history in the
-  commit". Check: none, text only.
-- G3. RECORDING.md's link to `RECORDING_PLAN.md#3-the-poses-the-pose-model-drops` goes: the plan has no such topic
-  **(seen)**. Why: a document describes what is built. Check: none, text only.
-
 ## The rules it touches
 
 - Keep settings files in sync with code changes: hd_trio's `container` in its settings file
 - Run a test of the app or a GPU harness only on the user's go, and only what the plan names: the checks of A
-- Remove obsolete pathways; one term everywhere; `Field` descriptions: G1
-- A docstring says what the thing is; reasons sit in the package's document: G2
-- A document describes what is built: G3
