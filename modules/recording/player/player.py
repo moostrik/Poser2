@@ -17,13 +17,13 @@ from pathlib import Path
 from typing import Callable, TypeAlias
 from enum import Enum, auto
 from queue import Queue, Empty
-from time import perf_counter, sleep
+from time import perf_counter
 
 from numpy import ndarray
 
 from modules.camera import FrameType
 from modules.settings import BaseSettings, Field, Widget
-from modules.utils import Broadcast
+from modules.utils import Broadcast, Waker
 from modules.video import Hardware
 
 from ..container import ChunkInfo, ChunkStream, Container, FrameMetadata, RecordingFolder, Timeline, chunk_streams, locate
@@ -58,6 +58,8 @@ class PlayerSettings(BaseSettings):
     current_chunk:      Field[int]              = Field(0, access=Field.READ, description="Current chunk", newline=True)
     max_chunks:         Field[int]              = Field(0, access=Field.READ, description="Total chunks")
 
+
+PASS: float = 0.01      # s the player's thread waits at most between passes: it looks whether its readers loaded or ended
 
 # Playback (re)starting at the in marker: the first play of a folder and every loop, not a scrub.
 LoopCallback: TypeAlias = Callable[[], None]
@@ -103,6 +105,7 @@ class Player(Thread):
         self.running: bool = False
         self.state_messages: Queue[Message] = Queue()
         self.stop_event = Event()
+        self._waker: Waker = Waker()        # set by a message; the readers' loads and ends are seen at the next pass
 
         self.play_chunk: int = -1
         self.load_chunk: int = -1
@@ -150,9 +153,15 @@ class Player(Thread):
 
     def stop(self) -> None:
         self._set_play_chunk(-1)
-        self.state_messages.put(Message(MessageType.STOP))
         self.stop_event.set()
+        self._send(Message(MessageType.STOP))
         self.join()
+        self._waker.close()
+
+    def _send(self, message: Message) -> None:
+        """A message to the player's thread, which it wakes."""
+        self.state_messages.put(message)
+        self._waker.set()
 
     def run(self) -> None:
         state: State = State.IDLE
@@ -228,7 +237,7 @@ class Player(Thread):
             except Exception:
                 logger.exception("Player error")
 
-            sleep(0.01)
+            self._waker.wait(perf_counter() + PASS)
 
     # ── The chunks' readers ───────────────────────────────────────────
 
@@ -433,7 +442,7 @@ class Player(Thread):
             self.active_folder = ''
 
         self.num_chunks = self.get_num_folder_chunks(name)
-        self.state_messages.put(message)
+        self._send(message)
 
     def get_folder_names(self) -> list[str]:
         return list(self.folders.keys())
@@ -513,11 +522,11 @@ class Player(Thread):
         if not self.active_folder:
             return
         if value < 0.0:
-            self.state_messages.put(Message(MessageType.RESUME))
+            self._send(Message(MessageType.RESUME))
             return
         with self.playback_lock:
             self.scrub_target = value
-        self.state_messages.put(Message(MessageType.SCRUB))
+        self._send(Message(MessageType.SCRUB))
 
     def _on_seek(self, value: float) -> None:
         """The bar pressed, or back at -1. Without a recording playing there is nothing to move."""
@@ -525,7 +534,7 @@ class Player(Thread):
             return
         with self.playback_lock:
             self.seek_target = value
-        self.state_messages.put(Message(MessageType.SEEK))
+        self._send(Message(MessageType.SEEK))
 
     def update_gui(self, frame_id: int = 0) -> None:
         """The panel's playhead and chunk, on the player's thread, at most 4 times a second: a settings write runs

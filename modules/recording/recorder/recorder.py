@@ -33,6 +33,7 @@ import numpy as np
 from modules.camera import CameraFrame, CameraTracklets, FrameType
 from modules.pose import FrameDict
 from modules.settings import BaseSettings, Field, Widget
+from modules.utils import Waker
 from modules.video import ClipCodec, DEPTH_CODEC, DEPTH_HARDWARE, Hardware, StreamWriter
 
 from ..container import DEPTH_SUFFIX, METADATA_LABEL, METADATA_SUFFIX, ChunkInfo, ChunkStream, Container, FrameMetadata, \
@@ -75,6 +76,7 @@ class RecorderSettings(BaseSettings):
 
 # The letter in a clip's file name: `0_C_001.mp4` is camera 0's video, chunk 1.
 STOP_WAIT: float = 1.0          # s a stopping recording waits for the parts its last captures wait for
+PASS: float = 0.01              # s the recorder's thread waits at most between passes, without a wake
 SPLIT_WAIT: float = 1.0         # s a split waits for a camera's first capture after its time, before it cuts that camera's chunk anyway
 HELD: int = 1 << 30             # bytes waiting for the encoders, queued here and in the writers: 1 GB, some 6 s of four cameras with depth
 SURE: int = 255                 # the confidence of a depth that came without one, in a chunk that records it
@@ -145,6 +147,7 @@ class Recorder(Thread):
         self.state: RecState = RecState.IDLE
         self.state_lock = Lock()
         self.stop_event = Event()
+        self._waker: Waker = Waker()        # set by a settings callback, a capture and stop
 
         self.settings.bind(RecorderSettings.start, self._on_start)
         self.settings.bind(RecorderSettings.stop, self._on_stop)
@@ -153,11 +156,13 @@ class Recorder(Thread):
 
     def stop(self) -> None:
         self.stop_event.set()
+        self._waker.set()
         self.join()
         self.settings.unbind(RecorderSettings.start, self._on_start)
         self.settings.unbind(RecorderSettings.stop, self._on_stop)
         self.settings.unbind(RecorderSettings.split, self._on_split)
         self.settings.unbind(RecorderSettings.enabled, self._on_enabled)
+        self._waker.close()
 
     def run(self) -> None:
         self._set_state(RecState.IDLE)
@@ -175,7 +180,7 @@ class Recorder(Thread):
             except Exception:
                 logger.exception("Recorder error")
 
-            time.sleep(0.01)
+            self._waker.wait(time.perf_counter() + PASS)
 
         if self._get_state() in (RecState.REC, RecState.STOP):
             self._set_state(RecState.STOP)
@@ -258,7 +263,7 @@ class Recorder(Thread):
         deadline: float = time.perf_counter() + STOP_WAIT
         while self.sync.waiting and time.perf_counter() < deadline:
             self._write_queued()
-            time.sleep(0.01)
+            self._waker.wait(min(deadline, time.perf_counter() + PASS))
         self.sync.flush()
         self._write_queued()
         for c in range(self.settings.num_cams):
@@ -465,6 +470,7 @@ class Recorder(Thread):
                 return
             self._queued_bytes += capture.nbytes
         self.frames[capture.video.cam_id].put(capture)
+        self._waker.set()
 
     # SETTINGS CALLBACKS
     def _on_enabled(self, value: bool) -> None:
@@ -475,11 +481,13 @@ class Recorder(Thread):
         if self.settings.enabled and self._get_state() == RecState.IDLE:
             self._set_state(RecState.START)
             self.settings.recording = True
+            self._waker.set()
 
     def _on_stop(self, _=None) -> None:
         if self._get_state() in (RecState.START, RecState.REC):
             self._set_state(RecState.STOP)
             self.settings.recording = False
+            self._waker.set()
 
     def _on_split(self, _=None) -> None:
         """A split cuts after the newest frame any camera handed in by now: what came before it ends its chunk."""
@@ -487,3 +495,4 @@ class Recorder(Thread):
             with self._held_lock:
                 self._split_request_time = max(self._newest.values(), default=float('-inf'))
             self.split_requested.set()
+            self._waker.set()
