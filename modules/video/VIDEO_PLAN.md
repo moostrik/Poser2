@@ -3,6 +3,14 @@
 What is to be built in `modules/video`: ffmpeg, the clips and streams it writes and reads, and the screen recorder
 ([VIDEO.md](VIDEO.md)).
 
+## A. The screen recorder's queue
+
+A1. VIDEO.md's hand-over says why a full queue drops its oldest frame (`QUEUE_LIMIT`, `submit_screen_frame`):
+   waiting for the recorder's thread would stall the render tick and the show, and a drop needs the thread to fall
+   three ticks behind; no measured take dropped a frame, and the count shows on the panel (`dropped`) and in the
+   file's comment **(seen)**. Why: his choice (2026-11-23); "Reasons sit in the package's document". Check: none,
+   text only.
+
 ## Rules
 
 - Log exceptions with context; never fail silently
