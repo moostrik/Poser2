@@ -6,7 +6,7 @@ the capture match) is read by every app and by inference, recording, tracker and
 kind of camera, used now by the apps that have it: `oak` by white_space and hd_trio, `oak4` by deep_flow, low_flow
 and smile, `vimba` and `webcam` by smile. That is general code with one user, which stays.
 
-F is what is left of the scans, G the drops the camera does not show, I the scan of 2026-11-22 evening, J recordings
+F is what is left of the scans, I the scan of 2026-11-22 evening, J recordings
 through the camera's own models. **(seen)** is read in the code, **(deduction)** inferred.
 
 ## F. With an OAK-D at the PC
@@ -18,21 +18,6 @@ through the camera's own models. **(seen)** is read in the code, **(deduction)**
   with clips in -sim, opens on its own pipeline, its geometry logged. J1's clip path through the device is checked in
   the same run: a clip tracklet's `timestamp` equals the recorded capture of the frame it was found in, which J1's
   stamp rests on **(deduction)**.
-
-## G. The drops on the panel
-
-- G2. The join starts empty at each open. Why: "Fix a problem where it is made" (CLAUDE.md, Composition and
-  wiring), and no state outlives a reopen. The camera makes its `KeypointJoin` once, in `__init__`, and never clears
-  it **(seen)**. A new pipeline numbers its frames from 0 again **(deduction)**, so the half-frames left at a close
-  are never pruned: `_frame` prunes only numbers below the newest less `keep` **(seen)**. A frame after the reopen
-  with the same number joins with a half from before it **(deduction)**, and the join turns away every half at or
-  below the newest number it dropped, so after a restart it joins nothing until the numbers pass it **(seen:
-  `_frame`)**. Whether or not the numbers restart, no
-  half-frame outlives its pipeline. How: `KeypointJoin.clear()` empties `frames`, forgets the newest dropped number
-  and counts each half-frame it empties in `dropped`, which `dropped_tracklets` shows. `_open` calls it before the pipeline
-  starts. Files: `modules/camera/oak4/keypoint_join.py`, `modules/camera/oak4/camera.py`. Test: in
-  `oak4/tests/test_keypoint_join.py`, a half-frame put before `clear()` never joins with the frame of the same
-  number after it, and it is counted as dropped. Docs: OAK4.md, The backend.
 
 ## I. The scan of 2026-11-22 evening
 
@@ -198,8 +183,6 @@ internal and made by depthai **(seen in `.venv-oak4`, depthai 3.11; the Luxonis 
 ## Rules it touches
 
 - Stamp a frame or tracklet message once, where the backend hands it over, with its moment of capture where the device reports one, else its arrival: F1, J1
-- A part that drops an item shows the count to the user: G2
-- Fix a problem where it is made, not where it shows: G2
 - A callback only hands the item over and returns: J1
 - Its files each hold one class or one subject, named after it: I1, I3
 - Inside a package, code that does the same is written once: I1, I2

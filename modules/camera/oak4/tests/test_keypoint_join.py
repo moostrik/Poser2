@@ -49,6 +49,17 @@ class KeypointJoinTest(unittest.TestCase):
         self.assertEqual(counts, [1])
         self.assertEqual(set(join.frames), {4, 5})
 
+    def test_a_half_before_clear_never_joins_the_frame_of_its_number_after_it(self) -> None:
+        join = KeypointJoin(keep=2)
+        join.put_keypoints(3, [], [])
+        join.put_keypoints(9, [], [])                   # frame 3 drops
+        join.clear()                                    # a new pipeline: frame 9's half is left over
+        self.assertEqual(join.dropped, 2)
+        self.assertIsNone(join.put_tracklets(9, [], []))    # the new pipeline's frame 9 waits for its own keypoints
+        self.assertIsNotNone(join.put_keypoints(9, [], []))
+        self.assertIsNone(join.put_tracklets(3, [], []))    # and a number dropped before the clear is not too late
+        self.assertEqual(set(join.frames), {3})
+
 
 if __name__ == '__main__':
     unittest.main()

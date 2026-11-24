@@ -58,6 +58,16 @@ class KeypointJoin:
             halves.keypoints = (boxes, keypoints)
             return self._complete(seq, halves)
 
+    def clear(self) -> None:
+        """Empties the join for a new pipeline, whose frame numbers may start again: each half-frame left counts as
+        dropped, and no number is too late any more."""
+        with self._lock:
+            left: int = len(self.frames)
+            self.frames.clear()
+            self._newest_dropped = -1
+            if left:
+                self._count_dropped(left)
+
     def _frame(self, seq: int) -> _Halves | None:
         """Frame `seq`'s halves; None when the frame was dropped already."""
         if seq <= self._newest_dropped:

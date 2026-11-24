@@ -288,7 +288,8 @@ where they become the contract's and get their capture time. The device runs the
 `DETECTOR` gives boxes only; with a pose chain a tracklet carries its keypoints, from its own detection in the
 one-model chain, or in the two-model chain from its crop's pose, put on it per frame by `KeypointJoin`. A frame
 whose other half has not come within `keep` newer frames is dropped, neither half goes out, and it counts once in
-`dropped_tracklets`; a half that comes after that is turned away. With
+`dropped_tracklets`; a half that comes after that is turned away. The join is emptied at each open, as a new
+pipeline numbers its frames anew; what it held counts as dropped. With
 `depth_model` it delivers depth as DEPTH frames on the left camera's view, each with its confidence and the `DepthAlignment` that puts
 it on the frames' view on the GPU. An NV12 frame goes on packed, so the callback thread does no color work; the
 boxes and keypoints go on as the model found them, and the uploader straightens, rotates and flips them with their frame.

@@ -183,6 +183,8 @@ class Camera(Thread):
                                                       pose_archive=self.pose_archive,
                                                       detector_archive=self.detector_archive,
                                                       depth_model=self.depth_model)
+            if self.keypoint_join is not None:
+                self.keypoint_join.clear()          # the new pipeline numbers its frames anew
             self._setup_queues(outputs)
             self.pipeline.start()
         except Exception as e:                       # the camera is there and refuses the setup: a retry changes nothing
