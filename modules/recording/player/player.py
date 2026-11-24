@@ -236,6 +236,7 @@ class Player(Thread):
                     self._load()
                 if state == State.STOP:
                     self._stop()
+                    self._reset_readouts()
                     state = State.STOPPING
                 if state == State.STOPPING and self._finished_stopping():
                     state = State.IDLE
@@ -407,6 +408,11 @@ class Player(Thread):
         dropped: int = self.hand_over.take_dropped()
         if dropped:
             self.settings.dropped_frames += dropped
+
+    def _reset_readouts(self) -> None:
+        """On the player's thread, at a stop: the playhead and the chunk back to 0; a pause keeps them."""
+        self.settings.current_chunk = 0
+        self.settings.playhead = [0.0, self._timeline().total / self.fps]
 
     # ── Getters and setters ───────────────────────────────────────────
 
