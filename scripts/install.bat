@@ -4,6 +4,7 @@
 @REM   scripts\install.bat oakd     the PC part and .venv-oakd (depthai 2, white_space and hd_trio)
 @REM   scripts\install.bat APP      the PC part, the app's venv (scripts\app_venv.bat), its TensorRT engines and, for
 @REM                                the OAK4 apps, the OAK4's archives
+@REM   scripts\install.bat APP --startup   the same, and a shortcut to the app's start script in the Startup folder
 @REM The PC part offers what winget can install when it is missing (asked, Y/N) and checks what it cannot.
 setlocal EnableDelayedExpansion
 cd /d "%~dp0.."
@@ -11,6 +12,8 @@ echo.
 set "MISSING="
 set "APP="
 set "OAKD="
+set "STARTUP="
+if /i "%~2"=="--startup" set "STARTUP=1"
 if /i "%~1"=="oakd" (
     set "OAKD=1"
 ) else if not "%~1"=="" (
@@ -123,6 +126,7 @@ if defined APP (
     set "NOPAUSE=1"
     call scripts\makemodels.bat %APP%
     echo.
+    if defined STARTUP call :startup %APP%
 )
 
 :success
@@ -139,6 +143,25 @@ if not defined APP (
 echo.
 pause
 goto :eof
+
+@REM The app's start script in the user's Startup folder, as "Poser2 APP": a shortcut there is replaced.
+:startup
+set "START="
+if /i "%~1"=="deep_flow"   set "START=scripts\start\DF.bat"
+if /i "%~1"=="hd_trio"     set "START=scripts\start\HD.bat"
+if /i "%~1"=="white_space" set "START=scripts\start\WS.bat"
+if /i "%~1"=="smile"       set "START=apps\smile\scripts\startSMILE.bat"
+if not defined START (
+    echo [93m%~1 has no start script: no shortcut in the Startup folder[0m
+    exit /b 0
+)
+powershell -NoProfile -Command "$s = (New-Object -ComObject WScript.Shell).CreateShortcut([IO.Path]::Combine([Environment]::GetFolderPath('Startup'), 'Poser2 %~1.lnk')); $s.TargetPath = (Resolve-Path '%START%').Path; $s.WorkingDirectory = Split-Path $s.TargetPath; $s.Save()"
+if !errorlevel! neq 0 (
+    echo [91mThe shortcut in the Startup folder could not be written[0m
+    exit /b 0
+)
+echo [92mStartup: Poser2 %~1 starts %START% at login[0m
+exit /b 0
 
 @REM The OAK4's archives from Luxonis's zoo, the ones not there yet (scripts\oak4_models.py).
 :oak4_archives

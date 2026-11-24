@@ -13,9 +13,6 @@ what the READMEs list by hand today and a script can do, the scripts do; what st
 Each step leaves the install working; each is checked on this PC, in `C:\Developer\Poser2` or the clone in
 `C:\Developer\SmileClean`.
 
-- A4 `install.bat <app> --startup`: a shortcut to the app's start script (`scripts\start\<app>.bat`, smile's
-  `apps\smile\scripts\startSMILE.bat`) in the user's Startup folder, replaced when it is there. Check: the shortcut
-  appears in `shell:startup` and opens the right script; a second run leaves one shortcut.
 - A5 smile's ComfyUI venv on uv's Python 3.12 (`uv venv --seed --python 3.12` in `install_comfy.ps1`, so its pip
   steps run as now) in place of the py launcher; a missing Python 3.12 is uv's to fetch. The model tool's docstring
   (`py -3.12 -m apps.smile.comfy.models`) names `.venv\Scripts\python`. Check: in the clone, ComfyUI's venv deleted
