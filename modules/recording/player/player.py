@@ -20,7 +20,7 @@ from enum import Enum, auto
 from queue import Queue, Empty
 from time import perf_counter
 
-from modules.camera import ClipFrame, ClipFrameCallback, FrameType
+from modules.camera import ClipFrameCallback, FrameType
 from modules.settings import BaseSettings, Field, Widget
 from modules.utils import Broadcast, Waker
 from modules.video import Hardware
