@@ -61,7 +61,8 @@ The chunk held 2285 color and 2285 depth frames against 2285 metadata lines, at 
 missed; the screen take dropped no frame and saved in 24.6 s.
 
 A camera recording's stream is read by `StreamReader`: one decoder started with `popen`, its frames
-through the 8 MB pipe, its error lines logged. A mono pipeline gets gray, the luma straight from ffmpeg without a
+through the 8 MB pipe, its error lines logged until the reader ends the decoder itself (at its end frame, the
+stream's end, `stop` or a failed play), as a decoder cut off mid-write says so. A mono pipeline gets gray, the luma straight from ffmpeg without a
 color conversion and at a third of BGR's bytes in the pipe; NV12, as a camera delivers it, is half of BGR's bytes.
 It waits for each frame's moment on a `modules.utils.Waker`, which
 `stop` wakes: a timed `Event.wait` returns on Windows' 15.6 ms timer ticks. Its frame gaps in deep_flow `-sim`

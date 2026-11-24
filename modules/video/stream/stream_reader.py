@@ -75,6 +75,7 @@ class StreamReader:
         self._play_thread: Thread | None = None
         self.stop_event = Event()
         self._waker: Waker = Waker()      # wakes the play thread's wait for a frame's moment on stop
+        self._ending: Event = Event()     # the reader ends its decoder: the decoder's error lines after it are of that end
 
         self._watch_thread: Thread | None = None
         self._reading: Event = Event()          # a read waits for its frame
@@ -128,6 +129,7 @@ class StreamReader:
         with self._load_lock:
             process = self.ffmpeg_process
         if process is not None:
+            self._ending.set()
             process.terminate()
 
     def join(self) -> None:
@@ -189,8 +191,8 @@ class StreamReader:
             self._close()
 
     def _log_error(self, video_file: str, line: bytes) -> None:
-        """One of ffmpeg's error lines, logged unless the reader was stopped (an ended decoder may say so)."""
-        if not self.stop_event.is_set():
+        """One of ffmpeg's error lines, logged unless the reader ends its decoder (an ended decoder may say so)."""
+        if not self._ending.is_set():
             logger.error('Decoder of %s: %s', video_file, line.decode(errors='replace').strip())
 
     def _watch(self) -> None:
@@ -212,6 +214,7 @@ class StreamReader:
         with self._load_lock:
             process, self.ffmpeg_process = self.ffmpeg_process, None
             frames_in, self._frames_in = self._frames_in, None
+        self._ending.set()
         if frames_in is not None:
             frames_in.close()
         if process is not None:

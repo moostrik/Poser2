@@ -17,10 +17,10 @@ from modules.video.process import big_pipe
 from modules.video.stream import stream_reader
 
 
-def make_clip(path: str, frames: int) -> None:
+def make_clip(path: str, frames: int, shape: tuple[int, int, int] = (48, 64, 3)) -> None:
     writer = video.ClipWriter(path, 30.0, video.h264_encode(video.Hardware.CPU))
     for _ in range(frames):
-        writer.add(np.zeros((48, 64, 3), np.uint8))
+        writer.add(np.zeros(shape, np.uint8))
     writer.close()
 
 
@@ -197,6 +197,20 @@ class StreamReaderTest(unittest.TestCase):
         self.assertIn('callback broke', logs.output[0])
         self.assertIsNotNone(process.poll())
         self.assertFalse(reader.is_loaded())
+
+    def test_a_reader_that_ends_its_decoder_at_its_end_frame_logs_nothing(self) -> None:
+        """A clip larger than the pipe holds, so the decoder is still writing when the reader ends it."""
+        path: str = os.path.join(self.folder.name, 'long.mp4')
+        make_clip(path, 120, (480, 640, 3))
+        reader = self.reader()
+        reader.load(path, 0, 0, 5)
+        self.assertTrue(wait_for(reader.is_loaded))
+        with self.assertNoLogs('modules.video.stream.stream_reader', 'ERROR'):
+            reader.play()
+            self.assertTrue(wait_for(lambda: not reader.is_playing()))
+            reader.join()
+            time.sleep(0.3)         # the decoder's last error lines, read on their own thread
+        self.assertEqual(self.frames, [0, 1, 2, 3, 4])
 
     def test_a_range_counts_from_its_first_frame(self) -> None:
         reader = self.reader()
