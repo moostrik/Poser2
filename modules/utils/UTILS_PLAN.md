@@ -5,13 +5,6 @@ Each step names its finding, **(seen)** in the code or a run, **(deduction)** wh
 or pyright is one commit. Steps marked *owner* change another package: a minor fix, with that package's thread asked
 for feedback.
 
-## E. Document
-
-E1. UTILS.md's Waker section drops its list of the loops that wait on one, and keeps the measurements, the light
-clock's spin and the plain-wait timers.
-Why: the list is stale: it misses the webcam camera, the video stream reader and the window manager, and names "the
-recording player", which imports no Waker of its own **(seen**, PC grep**)**; CLAUDE.md Time already states the rule.
-
 ## F. What utils holds
 
 utils holds small tools with no domain that many packages share, and imports nothing else of the project **(seen**:
