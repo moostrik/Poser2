@@ -8,7 +8,7 @@ from functools import partial
 import glfw
 
 from modules.camera import CameraFrame, CameraHealth, CameraSource, CameraTracklets
-from modules.camera.oak import Camera, ClipCamera
+from modules.camera.oak import Camera
 from modules.recording import Player, Recorder as VideoRecorder, replay
 from modules.settings import SettingsStore
 from modules.panel import PanelServer
@@ -91,7 +91,7 @@ class WhiteSpaceMain:
                     self.cameras.append(replay.Camera(self.player, self.settings.setup.camera.cameras[i].readings, self.person_detector, replay.Tracker(), i))
             else:
                 for i in range(num_cams):
-                    self.cameras.append(ClipCamera(self.player, self.settings.setup.camera.cameras[i], i))
+                    self.cameras.append(Camera(self.settings.setup.camera.cameras[i], i, clips=self.player))
         else:
             for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.setup.camera.cameras[i], i))

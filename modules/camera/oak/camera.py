@@ -1,4 +1,5 @@
-"""One OAK-D camera on depthai 2 (https://oak-web.readthedocs.io/), as a `CameraSource`."""
+"""One OAK-D camera on depthai 2 (https://oak-web.readthedocs.io/), as a `CameraSource`: on its sensor, or fed
+recorded clips through its own pipeline."""
 
 import logging
 import time
@@ -8,25 +9,28 @@ import depthai as dai
 from numpy import ndarray
 
 from .. import CameraResolution, CameraFrame, RigCameraReadings, CameraTracklet, CameraTracklets, FrameType, CameraFrameCallback, \
-    TrackletCallback
+    TrackletCallback, ClipFrame, ClipSource
 from ..geometry import MountConfig, MountReadout, mode_size, frame_size, delivered_height, frame_summary, lens_report
 from ..oak_device import capture_time, smoothed_latency, read_lens_calibration, imu_rotation_to_camera, \
     log_connected_sensors, TRACKING_STATUS, ColorSensorControl
 from modules.utils import Broadcast, FPS, Rect
 
+from .clip_input import ClipInput
 from .control import MonoSensorControl
 from .device import get_device_list
 from .imu import IMU_BOARD_ROLL
-from .pipeline import build_pipeline, VIDEO_STREAM, TRACKLETS_STREAM, IMU_STREAM, CONTROL_STREAM
+from .pipeline import build_pipeline, VIDEO_STREAM, TRACKLETS_STREAM, IMU_STREAM, CONTROL_STREAM, CLIPS_STREAM
 from .settings import OakCameraSettings
 
 logger = logging.getLogger(__name__)
 
 
 class Camera(Thread):
-    """A `CameraSource` on an OAK-D: its warped frames, the tracklets of its detector and tracker, and its readings."""
+    """A `CameraSource` on an OAK-D: its warped frames, the tracklets of its detector and tracker, and its readings;
+    with `clips`, the recording's frames go through the device in place of the sensor's, without its IMU and sensor
+    controls."""
 
-    def __init__(self, settings: OakCameraSettings, cam_id: int = 0) -> None:
+    def __init__(self, settings: OakCameraSettings, cam_id: int = 0, clips: ClipSource | None = None) -> None:
         super().__init__()
         self.stop_event = Event()
         self.running: bool = False
@@ -43,6 +47,8 @@ class Camera(Thread):
         self.color: bool =              settings.color
         self.yolo: bool =               settings.yolo
         self.resolution: CameraResolution = settings.resolution
+        self.clip_warp: bool =          settings.clip_warp
+        self.clips: ClipSource | None = clips
 
         self.mount: MountConfig = MountConfig(
             flip_h=settings.flip_h,
@@ -65,6 +71,7 @@ class Camera(Thread):
         self.device: dai.Device | None = None
         self.queues: list[dai.DataOutputQueue | dai.DataInputQueue] = []
         self.control: ColorSensorControl | MonoSensorControl | None = None     # the camera's sensor's
+        self.clip_input: ClipInput | None = None       # the open device's clip queue, with clips
 
         # FPS
         self.video_fps: FPS = FPS()
@@ -83,6 +90,11 @@ class Camera(Thread):
     @property
     def connected(self) -> bool:
         return self.device is not None
+
+    def start(self) -> None:
+        if self.clips is not None:
+            self.clips.add_frame_callback(self._clip_callback)      # once: the player has no way to take it back
+        super().start()
 
     def stop(self) -> None:
         self.running = False
@@ -127,6 +139,7 @@ class Camera(Thread):
         return True
 
     def _close(self) -> None:
+        self.clip_input = None
         if self.control is not None:
             self.control.close()
             self.control = None
@@ -145,13 +158,21 @@ class Camera(Thread):
 
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
         build_pipeline(pipeline, self.model_path, self.fps, self.color, self.square, self.yolo, self.resolution,
-                       self.mount, frame_height=self.frame_height)
+                       self.mount, frame_height=self.frame_height, clips=self.clips is not None, warp_clips=self.clip_warp)
 
     def _setup_queues(self) -> None:
-        """The device's queues: the frames and tracklets every camera has, and on a device the
-        IMU and the sensor controls."""
+        """The device's queues: the frames and tracklets every camera has; with clips the clip input, without the IMU
+        (it would report a box on a bench) and the sensor controls (there is no sensor); else the IMU and the sensor
+        controls."""
         assert self.device is not None
         self._setup_frame_queues()
+        if self.clips is not None:
+            clips: dai.DataInputQueue = self.device.getInputQueue(name=CLIPS_STREAM, maxSize=1, blocking=False)  # pyright: ignore[reportCallIssue]
+            self.queues.append(clips)
+            expected: tuple[int, int] = (mode_size(self.color, self.resolution) if self.clip_warp
+                                         else frame_size(self.color, self.resolution, self.square, self.frame_height))
+            self.clip_input = ClipInput(clips, self.color, expected, self.cam_id)
+            return
         self._setup_imu_queue()
         control: dai.DataInputQueue = self.device.getInputQueue(CONTROL_STREAM)
         self.queues.append(control)
@@ -208,6 +229,14 @@ class Camera(Thread):
         self.mount_readout.imu_rotation = imu_rotation_to_camera(self.device, socket, self.device_id)
 
     # ── The device's callbacks: the hand-over to the contract ──────────
+
+    def _clip_callback(self, clip: ClipFrame) -> None:
+        """The player's clip frame of this camera, to the open device's clip input; nothing while it is closed. Only
+        the video frames: another kind (depth) would be another input."""
+        clip_input: ClipInput | None = self.clip_input
+        if not self.running or clip_input is None or clip.cam_id != self.cam_id or clip.kind != FrameType.VIDEO:
+            return
+        clip_input.send(clip)
 
     def _video_callback(self, msg: dai.ImgFrame) -> None:
         arrival: float = time.perf_counter()

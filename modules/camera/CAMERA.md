@@ -186,13 +186,20 @@ two land on one pixel; the background a near object uncovers stays empty, becaus
 
 ## The clip camera
 
-`oak.ClipCamera` sends recorded clips through the OAK-D's own pipeline, so the device's detector and tracker run on
-them as on the rig. A clip that is warped (`clip_warp`, for raw clips only, unwarped at tilt 0) feeds the warp's
+`oak.Camera` given the player as its `clips` sends recorded clips through the OAK-D's own pipeline, so the device's
+detector and tracker run on them as on the rig. Its `ClipInput` takes the open device's clip queue in place of the
+IMU and the sensor controls; the camera registers its one clip callback with the player at its start, and hands each
+of its own video frames to the open clip input, none while the device is closed. The callback makes the device's
+message (planar BGR, or grey) and sends it into the non-blocking queue: that send is the hand-over, as a thread of its
+own would add a hop and a copy to every frame. A fed frame is stamped with its recorded capture (`ClipFrame.timestamp`,
+on the play's clock), so the device's tracklets come back stamped with it through `capture_time` **(deduction: the
+tracker keeps its input frame's stamp, and depthai 2's clock reads the same counter as `perf_counter`)**; a frame
+without one is stamped at its send. Only video frames are fed; depth would be another input beside it. A clip that is warped (`clip_warp`, for raw clips only, unwarped at tilt 0) feeds the warp's
 input and must be the sensor's size; one that passes through must be the delivered size, its derived height
 included. A clip of another size still runs (the XLinkIn's size is a ceiling, the frame carries its own size, the
 detector resizes what comes), but every frame-relative setting is off by the ratio: the tracker's vfov and height
 gates, the pose distance thresholds. The fix is in the settings file, `camera.resolution` set to the clip's label; the
-clip camera warns once per size.
+clip input warns once per size.
 
 ## Vimba
 
@@ -306,7 +313,7 @@ whatever blob is in use. The input size is read off the blob, so a file name and
 | `oak_device/`        | what an OAK reports through depthai, for both OAKs: `capture_clock` (a message's capture and |
 |                      | latency), `calibration` (lens, IMU extrinsics), `sensors`, `tracklets` (`TRACKING_STATUS`),  |
 |                      | `color_sensor_control` (the color sensor's controls, which the OAK4's extend)                |
-| `oak/`               | the OAK-D: `camera`, `clip_camera`, `control`, `pipeline`, `warp_mesh`, `settings`, `sensor`,  |
+| `oak/`               | the OAK-D: `camera`, `clip_input`, `control`, `pipeline`, `warp_mesh`, `settings`, `sensor`,   |
 |                      | `device`, `imu`, `models`                                                                    |
 | `oak4/`              | the OAK4: `camera`, `control`, `pipeline`, `settings`, `sensor`, `device`, `imu`,            |
 |                      | `messages`, `models`, `keypoint_join`                                                        |
@@ -327,5 +334,5 @@ Kept, and listed so a reader knows what is live:
 | `KeypointJoin`, `add_pose_chain` | OAK4 `model_chain` is the detector plus a pose model | none        |
 | `add_one_model_chain`            | OAK4 `model_chain` is one pose model                 | none        |
 | `vimba`, `webcam`                | smile's image source                                 | smile       |
-| `oak.ClipCamera`                 | hd_trio and white_space in -sim, `replay` off        | both        |
+| `oak.Camera` with `clips`        | hd_trio and white_space in -sim, `replay` off        | both        |
 

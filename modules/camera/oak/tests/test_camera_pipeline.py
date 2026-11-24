@@ -1,10 +1,10 @@
-"""Each OAK-D builds its own pipeline from its own settings at open, a clip camera too. Runs without a device: the
+"""Each OAK-D builds its own pipeline from its own settings at open, a camera fed clips too. Runs without a device: the
 device and its list are stubbed, the pipeline and its warp mesh are depthai's own. On a depthai 2 install (`.venv`)."""
 
 import unittest
 from unittest.mock import MagicMock, patch
 
-from modules.camera.oak import Camera, ClipCamera, OakCameraSettings
+from modules.camera.oak import Camera, OakCameraSettings
 from modules.camera.oak import camera as oak_camera
 from modules.camera.oak import warp_mesh as oak_warp_mesh
 
@@ -54,7 +54,7 @@ class CameraPipelineTest(unittest.TestCase):
         for cam_id, flip_h in enumerate((False, True)):
             clip_settings = settings(DEVICE_IDS[cam_id], flip_h)
             clip_settings.clip_warp = True
-            cameras.append(ClipCamera(player, clip_settings, cam_id))
+            cameras.append(Camera(clip_settings, cam_id, clips=player))
         self.open_all(cameras)
         self.assertIsNot(cameras[0].pipeline, cameras[1].pipeline)
         self.assertEqual(len(self.meshes), 2)

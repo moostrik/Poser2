@@ -7,4 +7,3 @@ require_backend('oak')
 
 from .camera import     Camera
 from .settings import   OakCameraSettings
-from .clip_camera import ClipCamera

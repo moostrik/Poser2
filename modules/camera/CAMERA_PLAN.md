@@ -15,9 +15,9 @@ through the camera's own models. **(seen)** is read in the code, **(deduction)**
   OAK-D, white_space live, its frames' and tracklets' latency readings against oak4's. Waits for an OAK-D at the PC: none
   was attached on 2026-11-22 **(seen: depthai 2 found no device)**. RECORDING_PLAN.md B's OAK-D capture time is this
   step, and so is the live check of each OAK-D's own pipeline (built 2026-11-22): every camera, and the OAK-D camera
-  with clips in -sim, opens on its own pipeline, its geometry logged. J1's clip path through the device is checked in
-  the same run: a clip tracklet's `timestamp` equals the recorded capture of the frame it was found in, which J1's
-  stamp rests on **(deduction)**.
+  with clips in -sim, opens on its own pipeline, its geometry logged. The clip path through the device is checked in
+  the same run: a clip tracklet's `timestamp` equals the recorded capture of the frame it was found in, which the
+  clip camera's stamp rests on ([CAMERA.md, The clip camera](CAMERA.md#the-clip-camera)) **(deduction)**.
 
 ## J. Recordings through the camera's own models
 
@@ -26,44 +26,13 @@ scene. Our recording format stays, depth is not fed back, and the replay (`modul
 (Matthias's decision of 2026-11-23). Only what an app uses is built and tested: the OAK-D's mono or color frame. No
 OAK4 app is fed a recording; the OAK4's pipeline is made ready for it, without a clip input (Matthias, 2026-11-24).
 The design leaves room for the rest (the OAK4's clip input, its grey warp, depth) without building it. The OAK-D does
-this today: `oak.ClipCamera` sends the player's video frames into the
-pipeline where the sensor's would enter, and the device's warp (with `clip_warp`), YOLO and tracker run on them as on
-the rig **(seen)**; white_space's `studio.json` runs it (`replay` false) **(seen)**. The OAK4 has no such path
+this: `oak.Camera` with `clips` sends the player's video frames into the pipeline where the sensor's would enter
+([CAMERA.md, The clip camera](CAMERA.md#the-clip-camera)); white_space's `studio.json` runs it (`replay` false)
+**(seen)**. The OAK4 has no such path
 **(seen)**. depthai 3 sends a host frame into a device node with `Node.Input.createInputQueue()`; its `XLinkIn` is
 internal and made by depthai **(seen in `.venv-oak4`, depthai 3.11; the Luxonis porting guide)**. `add_detector`,
 `add_tracker` and `add_pose_chain` take their frames as one `dai.Node.Output` **(seen)**.
 
-- J1. The OAK-D's camera takes its clips as a part, chosen at build, instead of the `ClipCamera` subclass. Why:
-  "Prefer composition over inheritance for runtime assembly" (CLAUDE.md, Composition and wiring). `ClipCamera`
-  overrides `start`, `run`, `connected`, `_setup_pipeline`, `_setup_queues` and `_close` **(seen)**. How:
-  `oak.Camera(settings, cam_id, clips: ClipSource | None = None)`; with clips the pipeline is built with
-  `clips=True` and the camera makes a `ClipInput` (`oak/clip_input.py`: the clip `XLinkIn` queue, a clip frame sent
-  as the sensor would send it, the size warning, `to_planar`) in place of the IMU queue and the sensor controls. A fed
-  frame is stamped with its recorded capture (`ClipFrame.timestamp`, on the play's clock), not with its send as
-  `ClipCamera` does now (`perf_counter()` at send) **(seen)**; a clip frame without one is stamped at its send. The
-  device's tracklets then come back through `capture_time` as the recorded capture **(deduction: it rests on the
-  tracker keeping its input frame's stamp, and on depthai 2's `dai.Clock` reading `perf_counter`'s counter, measured
-  only on depthai 3, OAK4.md)**. A recorded clip is already warped and goes past the device's warp; only `clip_warp`
-  sends a raw one through it **(seen: `build_pipeline`, CAMERA.md, Raw clips)**. The clip input takes the clip frames
-  of the kind it feeds (`FrameType.VIDEO`) and leaves the others, so another kind (depth) is another input beside it,
-  not a change to `ClipSource` **(seen: `ClipFrame.kind`)**. `ClipSource` has only `add_frame_callback` **(seen)**,
-  so the camera registers one clip callback with the player at `start`; it hands each clip frame to the open
-  `ClipInput`, and to nothing while the device is closed. That callback turns the clip frame into the device's message
-  (one copy: planar BGR, or grey) and sends it into the non-blocking queue: the send is the hand-over to the device, and
-  a host thread of its own would add a hop and a copy to every frame **(deduction)**. Its queue stays `maxSize=1,
-  blocking=False`, a drop no count shows yet (Open, the drops inside depthai).
-  `clip_passthrough` goes, with its code path (`ClipCamera._passthrough_callback` and the branches in `start`, `run`
-  and `connected`): it hands clip frames on without a device and without tracklets, which `replay.Camera` does, and
-  no settings file sets it **(seen)**. Why: "Remove obsolete pathways instead of leaving parallel legacy ones"
-  (CLAUDE.md, API evolution); Matthias's decision of 2026-11-23. `clip_warp` stays. Files: `oak/settings.py` (the field),
-  `oak/camera.py`, the new `oak/clip_input.py`, `oak/clip_camera.py` goes, `oak/__init__.py` (no `ClipCamera`),
-  `apps/white_space/main.py` and `apps/hd_trio/main.py` (`Camera(..., clips=self.player)`, app files). Tests:
-  `oak/tests/test_camera_pipeline.py` and `oak/tests/test_frame_stop.py` take the camera with clips, and
-  `test_frame_stop.py`'s `test_a_passthrough_clip_camera_runs_from_its_start_until_stop` goes with the mode; a new test in
-  `oak/tests` that a clip frame goes into the clip queue planar BGR, gray for a mono camera, stamped with its recorded capture, without a device (a fake
-  queue); the clip path through the device is checked live with F1. Docs: CAMERA.md, The clip camera, The package's
-  parts and What no settings file runs; RECORDING.md and `modules/recording/player/player.py`'s docstring, which name
-  `oak.ClipCamera`.
 - J2. The OAK4's pipeline takes its frames from one source, so a clip input can stand in for the sensor later. Why:
   "Prefer composition over inheritance for runtime assembly" (CLAUDE.md, Composition and wiring), and Matthias's
   decision of 2026-11-24: ready, not wired. Today `build_pipeline` makes the `Camera` node inline, and its `frames`
@@ -101,7 +70,7 @@ internal and made by depthai **(seen in `.venv-oak4`, depthai 3.11; the Luxonis 
   the callback **(deduction)**.
 - Feeding the OAK4 a recording, when an OAK4 app needs it. One input node, its queue from `createInputQueue()`, as
   J2's frames source in place of the `Camera` node; `oak4.Camera(settings, cam_id, clips: ClipSource | None = None)`
-  as J1's camera, with no Neural Depth, no sensor controls and no IMU; the fed frame stamped as in J1. The Player is
+  as the OAK-D's camera with clips, with no Neural Depth, no sensor controls and no IMU; the fed frame stamped with its recorded capture, as the OAK-D's. The Player is
   built with `nv12=True` in the OAK4 apps **(seen)**, so a clip frame needs no conversion, only its strides and planes.
   First a probe with the OAK4 attached, on Matthias's go: the crops and their keypoints land in the frame (an
   `ImgTransformation` made from the recorded lens and size, through `FrameCropper` and `remapPointTo`), a stamp set on
@@ -110,8 +79,6 @@ internal and made by depthai **(seen in `.venv-oak4`, depthai 3.11; the Luxonis 
 
 ## Rules it touches
 
-- Stamp a frame or tracklet message once, where the backend hands it over, with its moment of capture where the device reports one, else its arrival: F1, J1
-- A callback only hands the item over and returns: J1
-- Prefer composition over inheritance for runtime assembly: J1, J2
-- Remove obsolete pathways instead of leaving parallel legacy ones: J1
+- Stamp a frame or tracklet message once, where the backend hands it over, with its moment of capture where the device reports one, else its arrival: F1
+- Prefer composition over inheritance for runtime assembly: J2
 - Run a test of the app or a GPU harness only on the user's go, and only what the plan names: F1, J2
