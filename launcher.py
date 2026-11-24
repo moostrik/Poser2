@@ -14,7 +14,7 @@ from threading import Event, Thread
 
 import psutil
 
-from modules.utils import setup_logging, install_excepthooks, crash_summary, timing
+from modules.utils import Waker, setup_logging, install_excepthooks, crash_summary, timing
 from apps import APP_NAMES, load_app
 
 
@@ -86,8 +86,10 @@ if __name__ == '__main__':
 
     Thread(target=_heartbeat, daemon=True, name="heartbeat").start()
 
+    timing_stop = Waker()
+
     def _timing_session() -> None:
-        stats = timing.run_session(args.timing_warmup, args.timing, shutdown_event)
+        stats = timing.run_session(args.timing_warmup, args.timing, timing_stop)
         if stats is None:
             return
         timing.write_report(log_file.parent, args.app, args.simulation, args.timing_warmup, args.timing, stats)
@@ -107,6 +109,7 @@ if __name__ == '__main__':
     signal(SIGINT, signal_handler_exit)
 
     app.render.run()            # the window loop on the main thread (GLFW's rule), until the windows close
+    timing_stop.set()           # windows closed before the session's end: no report
 
     while not app.is_finished:
         shutdown_event.wait(0.01)

@@ -9,12 +9,13 @@ import json
 import logging
 import platform
 import subprocess
+import time
 from datetime import datetime
 from importlib import metadata
 from pathlib import Path
-from threading import Event
 
 from .performance_timer import PerformanceTimer
+from .waker import Waker
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ def package_versions() -> dict[str, str]:
 
 def git_commit() -> str:
     """The checked-out commit, with `-dirty` when the tree has changes; empty without git."""
-    root = Path(__file__).resolve().parents[2]
+    root = Path(__file__).resolve().parents[3]
     try:
         commit = subprocess.run(['git', 'describe', '--always', '--dirty'], cwd=root,
                                 capture_output=True, text=True, timeout=5).stdout.strip()
@@ -48,16 +49,16 @@ def git_commit() -> str:
     return commit
 
 
-def run_session(warmup: float, duration: float, stop: Event) -> dict[str, dict[str, float]] | None:
+def run_session(warmup: float, duration: float, stop: Waker) -> dict[str, dict[str, float]] | None:
     """Wait `warmup` seconds, then keep every timer's samples for `duration` seconds.
 
     Returns the statistics per timer, or None when `stop` is set before the session ends.
     """
-    if stop.wait(warmup):
+    if stop.wait(time.perf_counter() + warmup):
         return None
     logger.info("Timing session started: %.0f s", duration)
     PerformanceTimer.start_session()
-    stopped = stop.wait(duration)
+    stopped = stop.wait(time.perf_counter() + duration)
     stats = PerformanceTimer.stop_session()
     if stopped:
         logger.warning("Timing session stopped early, no report written")

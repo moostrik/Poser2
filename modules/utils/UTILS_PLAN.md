@@ -3,15 +3,6 @@
 Proposed by the utils rescan of 2026-11-24 (deep-flow at 38929e26); not built. Each step names its finding,
 **(seen)** in the code or a run, **(deduction)** when inferred. A step checked by a test or pyright is one commit.
 
-## D. Time
-
-D1. `time/timing.py`: `git_commit` reads the repo root as `parents[3]`, where it reads `parents[2]`, `modules/`, since
-the move into `time/` **(seen)**; `run_session`'s `stop.wait(warmup)` and `stop.wait(duration)` wait on a `Waker`
-**(seen**, `timing.py:56,60`**)**. The file stays in utils: the launcher and `scripts/model_benchmark.py` share it
-(chosen 2026-11-24).
-Why: the move's stale path is the move's to fix; CLAUDE.md Time "A thread that waits for a moment waits on a
-`utils.Waker`". Check: pyright; one launcher timing session whose report holds the commit.
-
 ## E. Names
 
 E1. `lfo`'s `time` becomes `timestamp` **(seen)**, before F3.
