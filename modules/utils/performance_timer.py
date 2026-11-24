@@ -5,6 +5,9 @@ import numpy as np
 from typing import Callable, ClassVar, TypeAlias
 
 import logging
+
+from .broadcast import Broadcast
+
 logger = logging.getLogger(__name__)
 
 # A sample as it is added: the timer's name, the time (ms) and when it was added (perf_counter s)
@@ -24,7 +27,7 @@ class PerformanceTimer:
     _registry: ClassVar[weakref.WeakSet['PerformanceTimer']] = weakref.WeakSet()
     _registry_lock: ClassVar[threading.Lock] = threading.Lock()
     _session_active: ClassVar[bool] = False
-    _sample_callbacks: ClassVar[list[TimerSampleCallback]] = []
+    _sample_callbacks: ClassVar[Broadcast[[str, float, float]]] = Broadcast(name='timer sample')
 
     # ANSI color codes
     COLORS = {
@@ -95,27 +98,18 @@ class PerformanceTimer:
         if report and should_report:
             self._print_report()
 
-        callbacks: list[TimerSampleCallback] = PerformanceTimer._sample_callbacks
+        callbacks: Broadcast[[str, float, float]] = PerformanceTimer._sample_callbacks
         if callbacks:
-            name: str = self.name.strip()
-            now: float = time.perf_counter()
-            for callback in callbacks:
-                try:
-                    callback(name, time_ms, now)
-                except Exception:
-                    logger.exception("Error in timer sample callback")
+            callbacks(self.name.strip(), time_ms, time.perf_counter())
 
     @classmethod
     def add_sample_callback(cls, callback: TimerSampleCallback) -> None:
         """Hear every sample of every timer."""
-        with cls._registry_lock:
-            if callback not in cls._sample_callbacks:
-                cls._sample_callbacks = cls._sample_callbacks + [callback]     # replaced, never changed: add_time reads it unlocked
+        cls._sample_callbacks.add_callback(callback)
 
     @classmethod
     def remove_sample_callback(cls, callback: TimerSampleCallback) -> None:
-        with cls._registry_lock:
-            cls._sample_callbacks = [c for c in cls._sample_callbacks if c is not callback]
+        cls._sample_callbacks.remove_callback(callback)
 
     @classmethod
     def has_sample_callbacks(cls) -> bool:

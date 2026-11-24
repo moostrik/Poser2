@@ -6,13 +6,6 @@ commit. Steps marked *owner* change another package: a minor fix, with that pack
 
 ## A. Broadcast
 
-A4. `PerformanceTimer._sample_callbacks` becomes a `ClassVar[Broadcast[[str, float, float]]]` named 'timer sample',
-and `has_sample_callbacks()` its `bool()`.
-Why: CLAUDE.md "A callback list is a `utils.Broadcast`"; it is a hand-written list **(seen)**. `add_time` and
-`has_sample_callbacks()` (asked by the GPU timer each measurement) then take the list's lock per sample where they now
-read unlocked, a cost far below the stage they time **(deduction)**.
-Check: test_performance_timer.
-
 A5. Broadcast's docstrings say what it is. The reasons (copied under its lock and called outside it; an attribute,
 not a base class; `__bool__` lets a producer skip building the item) and its one spelling, `Broadcast[[X]]`, the
 only form that holds a callback without arguments, move to a Broadcast section in UTILS.md.
