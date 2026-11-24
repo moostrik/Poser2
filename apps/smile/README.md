@@ -14,27 +14,30 @@ not in git, safe to delete); the app's own logs are in Poser2's `logs\`.
 
 ## INSTALLATION
 
-### Visual C++ Redistributable
-* install the latest Visual C++ Redistributable from [site](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#latest-supported-redistributable-version) and RESTART
+A new PC follows Poser2's [README](../../README.md), New PC: Git and the clone, ```scripts\install.bat smile --startup```, then
+the by-hand steps below (the Vimba SDK, the PC section, Max and the sound) and ```apps\smile\scripts\install.bat --from <site folder>```.
 
-### Python
-* install Python 3.12 Windows Installer (64 bit) [download](https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe) or [site](https://www.python.org/downloads/release/python-31210/)
-* choose **Customize installation**, uncheck "Add python.exe to PATH" and keep the py launcher
-* verify with ```py -0p``` that `-3.12` is listed
+### ~~Visual C++ Redistributable~~
+* ~~install the latest Visual C++ Redistributable from [site](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#latest-supported-redistributable-version) and RESTART~~
 
-### Git for Windows
-* install the latest version from [site](https://git-scm.com/download/win)
-* configure the global user name and email
-```git config --global user.name "M.Oostrik"```
-```git config --global user.email "m.oostrik@gmail.com"```
-* initialize Git LFS: ```git lfs install``` (the face models in Poser2's `data\models\` and the fonts are LFS files)
+### ~~Python~~
+* ~~install Python 3.12 Windows Installer (64 bit) [download](https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe) or [site](https://www.python.org/downloads/release/python-31210/)~~
+* ~~choose **Customize installation**, uncheck "Add python.exe to PATH" and keep the py launcher~~
+* ~~verify with ```py -0p``` that `-3.12` is listed~~
 
-### VSCode (optional, for development)
-* install the latest version from [site](https://code.visualstudio.com/Download)
-* extensions: Python, Python Environments, Python Indent, Pylance
+### ~~Git for Windows~~
+* ~~install the latest version from [site](https://git-scm.com/download/win)~~
+* ~~configure the global user name and email~~
+~~```git config --global user.name "M.Oostrik"```~~
+~~```git config --global user.email "m.oostrik@gmail.com"```~~
+* ~~initialize Git LFS: ```git lfs install``` (the face models in Poser2's `data\models\` and the fonts are LFS files)~~
 
-### ExecutionPolicy
-* open PowerShell as administrator and type ```Set-ExecutionPolicy -ExecutionPolicy RemoteSigned```, so that PowerShell scripts run
+### ~~VSCode (optional, for development)~~
+* ~~install the latest version from [site](https://code.visualstudio.com/Download)~~
+* ~~extensions: Python, Python Environments, Python Indent, Pylance~~
+
+### ~~ExecutionPolicy~~
+* ~~open PowerShell as administrator and type ```Set-ExecutionPolicy -ExecutionPolicy RemoteSigned```, so that PowerShell scripts run~~
 
 ### Allied Vision camera
 * download the Vimba 6 SDK from [site](https://www.alliedvision.com/en/products/vimba-sdk/) (Vimba, not Vimba X: the app brings VimbaPython, which needs Vimba's C API, `VimbaC`; the Viewer and the drivers alone are not enough)
@@ -50,15 +53,15 @@ not in git, safe to delete); the app's own logs are in Poser2's `logs\`.
 * BIOS: Settings → APP Center Download & Install Configuration → Disabled (otherwise the firmware writes a GIGABYTE update service into Windows at every boot). No GIGABYTE APP Center, no NVIDIA App, no Intel Driver & Support Assistant on the rig
 * at login only the startup shortcut, the Realtek audio service and Windows Security start; the user logs in automatically
 
-### ffmpeg
-* download the "release full" build from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/), extract it to `C:\Developer\ffmpeg` and add `C:\Developer\ffmpeg\bin` to the PATH
-* without it the visitors are not saved as clips and the walls have nothing to play (`install.bat` checks)
+### ~~ffmpeg~~
+* ~~download the "release full" build from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/), extract it to `C:\Developer\ffmpeg` and add `C:\Developer\ffmpeg\bin` to the PATH~~
+* ~~without it the visitors are not saved as clips and the walls have nothing to play (`install.bat` checks)~~
 
 ### Install script (app, ComfyUI, models)
-* in a terminal run Poser2's ```scripts\install.bat``` (the LFS files, the `.venv` from `uv.lock` that SMILE runs in, depthai 3 for the OAK4), then ```apps\smile\scripts\install.bat```: it checks ffmpeg, installs ComfyUI in `apps\smile\ComfyUI\` (`scripts\install_comfy.ps1`: ComfyUI core at the commit and the node packs at the versions pinned in `data\comfy\comfy.lock`, the packs from their archives in `data\comfy\packs`, our node pack `data\comfy\aiia_grin` as a junction, the venv from `data\comfy\requirements.lock`), puts the models in place (below) and ends with a smoke test: ComfyUI started once from its venv, on CUDA, and the warm-up run through it
-* the face detector runs on TensorRT: build its engines for this PC's GPU once with Poser2's ```scripts\makemodels.bat smile``` (from `data\models\scrfd_10g_bnkps.onnx` and `2d106det.onnx` into `apps\smile\data\models\`; again after a driver or TensorRT update)
+* in a terminal run Poser2's ```scripts\install.bat smile``` (the PC part, the LFS files, the `.venv` from `uv.lock` that SMILE runs in, depthai 3 for the OAK4, the face detector's TensorRT engines), then ```apps\smile\scripts\install.bat```: it checks ffmpeg, installs ComfyUI in `apps\smile\ComfyUI\` (`scripts\install_comfy.ps1`: ComfyUI core at the commit and the node packs at the versions pinned in `data\comfy\comfy.lock`, the packs from their archives in `data\comfy\packs`, our node pack `data\comfy\aiia_grin` as a junction, the venv from `data\comfy\requirements.lock`), puts the models in place (below) and ends with a smoke test: ComfyUI started once from its venv, on CUDA, and the warm-up run through it
+* ~~the face detector runs on TensorRT: build its engines for this PC's GPU once with Poser2's ```scripts\makemodels.bat smile``` (from `data\models\scrfd_10g_bnkps.onnx` and `2d106det.onnx` into `apps\smile\data\models\`; again after a driver or TensorRT update)~~
 * safe to run again: everything in place is skipped, so a second run is the check of an install; "Install complete" means every step passed. It refuses to run the smoke test while a ComfyUI is on port 8188 (close it first)
-* **the site folder**: what git does not bring, in one folder (a disk, a USB stick): `models\` (a copy of `ComfyUI\models`), `online_token.txt` (one line, the relay has the same, see SMILE ONLINE) and `input\` (the photos for the panel's still image, `use_image`). ```apps\smile\scripts\install.bat --from F:\_scratch\SMILE``` takes them; without `--from` it asks for the folder. The token and the photos are copied where they are missing, never over a file that is there. For `-sim`, a recording in `data\recordings\` and its folder picked in the Camera tab's simulator and saved. ffmpeg and the Vimba SDK are the PC's (above); `data\settings\setup\Smile.json` comes with the clone
+* **the site folder**: what git does not bring, in one folder (a disk, a USB stick): `models\` (a copy of `ComfyUI\models`), `online_token.txt` (one line, the relay has the same, see SMILE ONLINE) and `input\` (the photos for the panel's still image, `use_image`). ```apps\smile\scripts\install.bat --from F:\_scratch\SMILE``` takes them; without `--from` it asks for the folder. The token and the photos are copied where they are missing, never over a file that is there. For `-sim`, a recording in `data\recordings\` and its folder picked in the Camera tab's simulator and saved. the Vimba SDK is the PC's (above); `data\settings\setup\Smile.json` comes with the clone
 * **models**: they live in `ComfyUI\models`, as ComfyUI has it. `data\comfy\models.json` lists every file (path, size, sha256, source); the install copies and verifies what the site folder's `models\` holds and fetches the rest from the file's source: its public page on Hugging Face (verified by hash, resumed after an interruption), or for the three LoRAs that exist nowhere else their copy in `data\comfy\loras` (git LFS, so a clone has them). About 17.5 GB when everything is downloaded
 * **backup**: copy the Poser2 folder. It holds the repo, `apps\smile\ComfyUI\` with its venv and models, and `apps\smile\output\`; a new PC either gets that copy or a clone plus the two install scripts, `apps\smile\scripts\install.bat --from` a site folder made from the copy
 * the model tool on its own, from the Poser2 root: ```.venv\Scripts\python -m apps.smile.comfy.models check``` (every file ok / missing / wrong size / corrupt, and the extra files in the folder), ```install [--mirror DIR]```, and after a model change: ```hash --write``` (the files in the folder into the manifest; ```--add PATH``` for a new one) and ```sources``` (the public pages still hold the same files)
@@ -123,8 +126,9 @@ Someone outside gets the eye when nobody inside has it: a phone page (one camera
 * **the online screen**: the Online tab's `screen` (1 to 48 in the sphere's numbering, as the laughter test shows them; 0 = none; pick one off the scrolling name's rows) shows a white card with a QR code to the phone page and `SMILE from your phone` under it while `enabled` is on and the relay connected, and during a turn the main screen (the caption, no QR code, no status line), from the judging to the end of the result, then the card again; with `enabled` off or the relay gone it plays clips like any cell. The code opens `page`, or the relay's host when `page` is empty (`https://<name>/` for `wss://<name>/ws/smile`), with the relay's pass (`?pass=`): the relay renews it every 10 minutes, so the code on the wall changes, and accepts each for 2 hours, so a scanned page keeps working that long (reloads included) and shows "link expired" after. `invite_link` is a link without an end for someone not at the machine (copy it to your phone and forward it); `new_invite` makes a new one and the old stops working
 
 ## STARTUP
-* make a shortcut to `apps\smile\scripts\startSMILE.bat`
-* press Windows+R, type `shell:startup`, move the shortcut into that folder
+* ~~make a shortcut to `apps\smile\scripts\startSMILE.bat`~~
+* ~~press Windows+R, type `shell:startup`, move the shortcut into that folder~~
+* ```scripts\install.bat smile --startup``` puts `startSMILE.bat` in the Startup folder
 
 ## ON SITE CHECKS
 
