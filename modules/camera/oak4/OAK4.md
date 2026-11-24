@@ -30,12 +30,17 @@ Start an app from the venv: `.venv-oak4\Scripts\python launcher.py -app deep_flo
 
 The pinned readouts measure capture to arrival on the PC.
 
-| Readout       | Expected    | When it is off                                |
-|---------------|-------------|-----------------------------------------------|
-| Video         | 60 fps      | The camera or the link is not keeping up      |
-| Video latency | 28 to 29 ms | Check the link: Ethernet adds about 6 ms      |
-| Depth latency | 42 to 52 ms | Moves between phases of a run; this is normal |
-| Link          | USB         | Fell back to Ethernet                         |
+| Readout           | Expected     | When it is off                                 |
+|-------------------|--------------|------------------------------------------------|
+| Video             | 60 fps       | The camera or the link is not keeping up       |
+| Video latency     | 28 to 29 ms  | Check the link: Ethernet adds about 6 ms       |
+| Depth latency     | 42 to 52 ms  | Moves between phases of a run; this is normal  |
+| Link              | USB          | Fell back to Ethernet                          |
+| Dropped tracklets | 0            | The pose crops do not keep up with the tracker |
+| Dropped depth     | Few per open | Rises with every frame: grey with depth        |
+
+The two drop counts run since the start and stay over a reopen. A depth frame waits for the first color frame's lens,
+so the first few at each open are dropped; a grey camera has no such lens, so with depth it drops every depth frame.
 
 The camera's `readings` show its own `cpu`, `memory` and `temperature` on the line under `video_latency`, once a second (see [camera load](#camera-load)).
 
@@ -281,7 +286,9 @@ Each camera opens its own device and builds its own pipeline on it, as a depthai
 It reads the frames, the tracklets and the IMU through queues on the node outputs, on depthai's callback thread,
 where they become the contract's and get their capture time. The device runs the chain `model_chain` names:
 `DETECTOR` gives boxes only; with a pose chain a tracklet carries its keypoints, from its own detection in the
-one-model chain, or in the two-model chain from its crop's pose, put on it per frame by `KeypointJoin`. With
+one-model chain, or in the two-model chain from its crop's pose, put on it per frame by `KeypointJoin`. A frame
+whose other half has not come within `keep` newer frames is dropped, neither half goes out, and it counts once in
+`dropped_tracklets`; a half that comes after that is turned away. With
 `depth_model` it delivers depth as DEPTH frames on the left camera's view, each with its confidence and the `DepthAlignment` that puts
 it on the frames' view on the GPU. An NV12 frame goes on packed, so the callback thread does no color work; the
 boxes and keypoints go on as the model found them, and the uploader straightens, rotates and flips them with their frame.

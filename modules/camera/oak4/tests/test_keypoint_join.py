@@ -38,6 +38,17 @@ class KeypointJoinTest(unittest.TestCase):
         self.assertEqual(join.dropped, 1)
         self.assertEqual(set(join.frames), {4})
 
+    def test_a_half_after_its_frame_was_dropped_is_counted_once(self) -> None:
+        counts: list[int] = []
+        join = KeypointJoin(keep=2, on_dropped=counts.append)
+        join.put_keypoints(1, [], [])
+        join.put_keypoints(4, [], [])                   # frame 1 drops
+        self.assertIsNone(join.put_tracklets(1, [], []))    # its tracklets come too late: turned away
+        join.put_keypoints(5, [], [])
+        self.assertEqual(join.dropped, 1)
+        self.assertEqual(counts, [1])
+        self.assertEqual(set(join.frames), {4, 5})
+
 
 if __name__ == '__main__':
     unittest.main()

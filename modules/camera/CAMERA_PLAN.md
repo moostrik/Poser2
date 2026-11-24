@@ -21,44 +21,18 @@ through the camera's own models. **(seen)** is read in the code, **(deduction)**
 
 ## G. The drops on the panel
 
-- G1. The OAK4's two drops into its readings. Why: "A part that drops an item shows the count to the user"
-  (CLAUDE.md, Concurrency). Readings show a count today as a `Field.READ` on the camera's readings, which the panel
-  shows under the camera (`tracklets`, Vimba's `dropped_frames`) **(seen)**. The two the OAK4 does not show:
-  - `KeypointJoin` drops a frame whose tracklets or keypoints never came within `keep` frames; neither half goes out.
-    It counts them in `dropped`, which only `scripts/oak4_probe.py` logs **(seen)**.
-  - `_depth_callback` returns without the depth frame until a video frame has given the alignment, uncounted
-    **(seen)**: the first frames after every open. The lens it waits for is read only off an NV12 frame, so a grey
-    camera with depth never hands a depth frame over and the count rises with every one **(seen)**; deep_flow's and
-    low_flow's settings files run color **(seen)**.
-
-  The join also counts some frames twice: a half that comes after its frame was pruned makes a new entry, which is
-  pruned and counted again **(seen: `_frame`)**.
-
-  How: `RigCameraReadings` gets `dropped_tracklets` (beside `tracklets`) and `dropped_depth` (beside
-  `depth_latency`), each "since the start", as Vimba's `dropped_frames`; `_close` leaves them, as they count across
-  reopens. The join remembers the newest number it pruned and turns away a half at or below it, so each frame is
-  counted once. It hands its count out under its lock: `put_tracklets` and `put_keypoints` return it beside the joined
-  tracklets, and the camera writes it into the readings when it has changed, so the two queue threads cannot write a
-  stale count over a newer one **(deduction)**. The camera counts a depth frame without its alignment: a `Field` write
-  on the callback path only on a drop. The OAK-D leaves both at 0, as a backend leaves what its device does not
-  measure. Files: `modules/camera/settings.py`, `modules/camera/oak4/keypoint_join.py`,
-  `modules/camera/oak4/camera.py`. Test: a new `oak4/tests/test_drop_readings.py`, run without a device as
-  `test_frame_flags.py` is: a frame the join drops and a depth frame before the first video frame each show in the
-  readings; in `oak4/tests/test_keypoint_join.py`, a half after its frame was pruned is counted once. A live look at
-  the panel, in the next OAK4 run on Matthias's go: with nobody in view `dropped_tracklets` stays at 0, as it rests on
-  `GatherData` sending a frame without players **(deduction)**. Docs: OAK4.md, Reading the panel (the two counts, that
-  a few depth frames at each open are expected, and grey with depth) and The backend (`KeypointJoin`'s drop).
 - G2. The join starts empty at each open. Why: "Fix a problem where it is made" (CLAUDE.md, Composition and
   wiring), and no state outlives a reopen. The camera makes its `KeypointJoin` once, in `__init__`, and never clears
   it **(seen)**. A new pipeline numbers its frames from 0 again **(deduction)**, so the half-frames left at a close
   are never pruned: `_frame` prunes only numbers below the newest less `keep` **(seen)**. A frame after the reopen
-  with the same number joins with a half from before it **(deduction)**. Whether or not the numbers restart, no
-  half-frame outlives its pipeline. How: `KeypointJoin.clear()` empties `frames`, forgets the newest pruned number
-  (G1) and counts each half-frame it empties in `dropped`, as G1 shows it. `_open` calls it before the pipeline
+  with the same number joins with a half from before it **(deduction)**, and the join turns away every half at or
+  below the newest number it dropped, so after a restart it joins nothing until the numbers pass it **(seen:
+  `_frame`)**. Whether or not the numbers restart, no
+  half-frame outlives its pipeline. How: `KeypointJoin.clear()` empties `frames`, forgets the newest dropped number
+  and counts each half-frame it empties in `dropped`, which `dropped_tracklets` shows. `_open` calls it before the pipeline
   starts. Files: `modules/camera/oak4/keypoint_join.py`, `modules/camera/oak4/camera.py`. Test: in
   `oak4/tests/test_keypoint_join.py`, a half-frame put before `clear()` never joins with the frame of the same
-  number after it, and it is counted as dropped. Docs: OAK4.md, The backend. Built after G1, as its own
-  commit.
+  number after it, and it is counted as dropped. Docs: OAK4.md, The backend.
 
 ## I. The scan of 2026-11-22 evening
 
@@ -194,6 +168,8 @@ internal and made by depthai **(seen in `.venv-oak4`, depthai 3.11; the Luxonis 
 
 ## Open
 
+- The OAK4's drop counts live, in the next OAK4 run on Matthias's go: with nobody in view `dropped_tracklets` stays at
+  0, as it rests on `GatherData` sending a frame without players **(deduction)**.
 - The OAK4 is to run standalone, as an OAK App **(site fact)**. Depth alignment then needs a home: `ImageAlign` is
   the only alignment on the camera and fattens near objects ([Depth](oak4/OAK4.md#depth)), and its firmware cannot be
   changed. The options are to keep sending raw depth with its `DepthAlignment` to a PC that runs `DepthAlign`, or to
@@ -222,8 +198,8 @@ internal and made by depthai **(seen in `.venv-oak4`, depthai 3.11; the Luxonis 
 ## Rules it touches
 
 - Stamp a frame or tracklet message once, where the backend hands it over, with its moment of capture where the device reports one, else its arrival: F1, J1
-- A part that drops an item shows the count to the user: G1, G2
-- Fix a problem where it is made, not where it shows: G1, G2
+- A part that drops an item shows the count to the user: G2
+- Fix a problem where it is made, not where it shows: G2
 - A callback only hands the item over and returns: J1
 - Its files each hold one class or one subject, named after it: I1, I3
 - Inside a package, code that does the same is written once: I1, I2
@@ -236,4 +212,4 @@ internal and made by depthai **(seen in `.venv-oak4`, depthai 3.11; the Luxonis 
 - Keep settings files in sync with code changes: I3
 - Prefer composition over inheritance for runtime assembly: J1, J2
 - Remove obsolete pathways instead of leaving parallel legacy ones: J1
-- Run a test of the app or a GPU harness only on the user's go, and only what the plan names: F1, G1, J2
+- Run a test of the app or a GPU harness only on the user's go, and only what the plan names: F1, J2

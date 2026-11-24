@@ -20,8 +20,10 @@ class RigCameraReadings(CameraReadings):
     tracker_fps:      Field[float] = Field(0.0, access=Field.READ, newline=True, description="Tracker updates/s")
     tracker_latency:  Field[float] = Field(0.0, access=Field.READ, unit="ms", description="Frame capture to the tracklets' arrival on the PC")
     tracklets:      Field[int]   = Field(0, access=Field.READ, description="Active tracklets")
+    dropped_tracklets: Field[int] = Field(0, access=Field.READ, description="Frames dropped without their keypoints, since the start")
     depth_fps:        Field[float] = Field(0.0, access=Field.READ, description="Depth FPS")
     depth_latency:    Field[float] = Field(0.0, access=Field.READ, unit="ms", description="Frame capture to the depth's arrival on the PC")
+    dropped_depth:  Field[int]   = Field(0, access=Field.READ, description="Depth frames dropped before the lens was known, since the start")
     # The mount as the board reports it: NaN until measured, and on a board without an IMU.
     tilt_measured:  Field[float] = Field(float('nan'), access=Field.READ, description="Up-tilt (°) from the camera's own IMU — compare with `tilt`")
     roll_measured:  Field[float] = Field(float('nan'), access=Field.READ, description="Roll (°) about the optical axis, `roll_offset` subtracted. Should be 0")

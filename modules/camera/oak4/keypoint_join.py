@@ -1,6 +1,7 @@
 """The join of the two-model chain's two streams per frame: the tracker's tracklets and the keypoints the pose
 model found in each player's crop."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from threading import Lock
 
@@ -23,21 +24,27 @@ class _Halves:
 
 class KeypointJoin:
     """Puts each frame's keypoints on its tracklets, by the frame's sequence number and the tracklet's source box;
-    a frame older than `keep` newer ones that never completed is dropped and counted (`dropped`). The two streams
-    come from two output queues, whose callbacks run on two threads: the frames are kept under a lock."""
+    a frame older than `keep` newer ones that never completed is dropped and counted once (`dropped`), and a half
+    that comes after its frame was dropped is turned away. The two streams come from two output queues, whose
+    callbacks run on two threads: the frames and the count are kept under a lock, and `on_dropped` gets each new
+    count under it, so a newer count is never written over by an older one."""
 
-    def __init__(self, keep: int = 8) -> None:
+    def __init__(self, keep: int = 8, on_dropped: Callable[[int], None] | None = None) -> None:
         self.keep: int = keep
+        self.on_dropped: Callable[[int], None] | None = on_dropped
         self._lock: Lock = Lock()
         self.frames: dict[int, _Halves] = {}
         self.dropped: int = 0
         self.joined: int = 0
+        self._newest_dropped: int = -1      # the newest frame number dropped; a half at or below it comes too late
 
     def put_tracklets(self, seq: int, tracklets: list[CameraTracklet], boxes: list[Box]) -> list[CameraTracklet] | None:
         """The tracklets of frame `seq`, each with the box of its source detection; the joined tracklets when the
         frame's keypoints are in."""
         with self._lock:
-            halves: _Halves = self._frame(seq)
+            halves: _Halves | None = self._frame(seq)
+            if halves is None:
+                return None
             halves.tracklets = (tracklets, boxes)
             return self._complete(seq, halves)
 
@@ -45,17 +52,30 @@ class KeypointJoin:
         """The players of frame `seq`, each box with its keypoints (None when the crop gave none); the joined
         tracklets when the frame's tracklets are in."""
         with self._lock:
-            halves: _Halves = self._frame(seq)
+            halves: _Halves | None = self._frame(seq)
+            if halves is None:
+                return None
             halves.keypoints = (boxes, keypoints)
             return self._complete(seq, halves)
 
-    def _frame(self, seq: int) -> _Halves:
+    def _frame(self, seq: int) -> _Halves | None:
+        """Frame `seq`'s halves; None when the frame was dropped already."""
+        if seq <= self._newest_dropped:
+            return None
         if seq not in self.frames:
             self.frames[seq] = _Halves()
-            for old in [s for s in self.frames if s < seq - self.keep]:
-                del self.frames[old]
-                self.dropped += 1
+            old: list[int] = [s for s in self.frames if s < seq - self.keep]
+            for s in old:
+                del self.frames[s]
+            if old:
+                self._newest_dropped = max(old)
+                self._count_dropped(len(old))
         return self.frames[seq]
+
+    def _count_dropped(self, count: int) -> None:
+        self.dropped += count
+        if self.on_dropped is not None:
+            self.on_dropped(self.dropped)
 
     def _complete(self, seq: int, halves: _Halves) -> list[CameraTracklet] | None:
         if halves.tracklets is None or halves.keypoints is None:

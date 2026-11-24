@@ -79,7 +79,7 @@ class Camera(Thread):
         pose, detector = model_archives(self.model_chain)
         self.pose_archive: Path | None = models / pose if pose else None
         self.detector_archive: Path | None = models / detector if detector else None
-        self.keypoint_join: KeypointJoin | None = KeypointJoin() if pose and detector else None
+        self.keypoint_join: KeypointJoin | None = KeypointJoin(on_dropped=self._set_dropped_tracklets) if pose and detector else None
 
         # DEVICE — its pipeline and queues are made in `_open` and closed with it.
         self.device: dai.Device | None = None
@@ -344,6 +344,7 @@ class Camera(Thread):
         readings.depth_fps = self.depth_fps.get_rate_average()
         alignment: DepthAlignment | None = self._depth_alignment(msg)
         if alignment is None:
+            readings.dropped_depth += 1
             return
         self._emit_frame(FrameType.DEPTH, msg.getFrame().copy(), timestamp, arrival, alignment=alignment,
                          confidence=confidence.getFrame().copy())
@@ -405,6 +406,10 @@ class Camera(Thread):
         joined = self.keypoint_join.put_keypoints(detections.getSequenceNum(), boxes, keypoints)
         if joined is not None:
             self._emit_tracklets(joined, capture_time(detections), arrival)
+
+    def _set_dropped_tracklets(self, dropped: int) -> None:
+        """The join's drop count, into the readings; called under the join's lock."""
+        self.settings.readings.dropped_tracklets = dropped
 
     def _system_callback(self, name: str, msg: dai.SystemInformationRVC4) -> None:
         readings: RigCameraReadings = self.settings.readings
