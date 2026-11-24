@@ -6,11 +6,6 @@ commit. Steps marked *owner* change another package: a minor fix, with that pack
 
 ## A. Broadcast
 
-A5. Broadcast's docstrings say what it is. The reasons (copied under its lock and called outside it; an attribute,
-not a base class; `__bool__` lets a producer skip building the item) and its one spelling, `Broadcast[[X]]`, the
-only form that holds a callback without arguments, move to a Broadcast section in UTILS.md.
-Why: CLAUDE.md Docstrings; both docstrings give reasons **(seen)**.
-
 A6. `tests/test_broadcast.py`: calls in registration order, a second add keeps the first place, a failing callback is
 logged and the next one runs, remove, clear, `bool`.
 Why: every callback list is a Broadcast and it has no test of its own **(seen)**; five other packages' tests lean on

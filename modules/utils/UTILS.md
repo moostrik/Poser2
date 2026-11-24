@@ -1,5 +1,16 @@
 # Utils
 
+## Broadcast
+
+A `Broadcast` is every callback list's type (CLAUDE.md, Concurrency). It is written `Broadcast[[X]]`, the argument
+types in a list, the only form that also holds a callback without arguments (`Broadcast[[]]`).
+
+- It copies its list under its lock and calls the callbacks outside it, so a callback may add or remove one, and a
+  slow callback does not block a registration.
+- It is an attribute of its producer, not a base class: a producer holds as many as it has outputs, and calling one
+  works wherever a single callback is expected.
+- `bool()` says whether any callback is registered, so a producer can skip building an item nobody hears.
+
 ## Waiting for a moment
 
 On Windows a wait's timeout ends on the system's 15.6 ms tick (CLAUDE.md, Time). A `utils.Waker` waits on a

@@ -1,4 +1,4 @@
-"""Composable typed callback fan-out."""
+"""Broadcast, a typed list of callbacks (UTILS.md)."""
 
 import logging
 from threading import Lock
@@ -10,13 +10,10 @@ P = ParamSpec('P')
 
 
 class Broadcast(Generic[P]):
-    """Thread-safe fan-out that calls the registered callbacks with what it is called with.
+    """A thread-safe list of callbacks that calls each with what it is called with.
 
-    Callbacks run in registration order; registering one twice keeps its first position. The list is copied under its
-    lock and the callbacks are called outside it; a failing callback is logged with `name` and the others still run.
-
-    Use as a composable building block — instantiate as an attribute, not as a base class. ``__call__`` makes the
-    instance directly usable wherever a single callback is expected.
+    Callbacks run in registration order; registering one twice keeps its first position. A failing callback is logged
+    with `name` and the others still run.
     """
 
     def __init__(self, callbacks: list[Callable[P, Any]] | None = None, name: str = "broadcast") -> None:
@@ -25,7 +22,7 @@ class Broadcast(Generic[P]):
         self.name: str = name
 
     def __bool__(self) -> bool:
-        """True when any callback is registered — lets producers skip building the payload."""
+        """True when any callback is registered."""
         with self._lock:
             return bool(self._callbacks)
 
