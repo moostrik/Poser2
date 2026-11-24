@@ -670,6 +670,8 @@ class ScreenRecorder:
                 written, target = self._written, self._target
                 self._dropped += frame.skipped
             if frame.data.shape != self._store.shape:
+                with self._lock:
+                    self._dropped += 1      # made at a size the take is not
                 return
             self._grow(written, target)
             slots = self._store.num_slots

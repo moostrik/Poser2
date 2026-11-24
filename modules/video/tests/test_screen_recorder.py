@@ -445,6 +445,14 @@ class StateTest(unittest.TestCase):
         self.broken = False
         self.tick_until(lambda: self.stored() >= 5)
 
+    def test_a_frame_of_another_shape_is_dropped_and_counted(self) -> None:
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
+        self.tick()
+        with self.lock:
+            self.lent += 1
+        self.recorder.submit_screen_frame(ScreenFrame(np.zeros((2, 2), np.uint8), self.now, 0, self._give_back))
+        self.tick_until(lambda: self.settings.record.dropped == 1 and self.lent == 0)
+
     def test_exit_while_recording_writes_what_was_stored(self) -> None:
         ScreenRecorderRecordSettings.start.fire(self.settings.record)
         self.tick_until(lambda: self.stored() >= 10)

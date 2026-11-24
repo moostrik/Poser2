@@ -219,8 +219,8 @@ as the take needs.
 - The recorder's thread copies each frame into its slot in the store and gives the buffer back. A full queue (three
   frames) drops its oldest frame and gives its buffer back: waiting for the recorder's thread would stall the render
   tick and the show, and a drop needs the thread to fall three ticks behind; no measured take dropped a frame.
-  Frames left out, by the queue or by the capture with no
-  buffer free, are counted for the take (`dropped`), shown on the panel and written in the file's comment.
+  Frames left out, by the queue, by the capture with no buffer free, or made at a size the take is not, are counted
+  for the take (`dropped`), shown on the panel and written in the file's comment.
 - Frames still on their way when a take is held, or from before a take began, are given back unused.
 
 ### Encode, on the recorder's thread
