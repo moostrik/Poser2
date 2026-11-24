@@ -10,7 +10,7 @@ it once, with internet: `scripts\\install.bat deep_flow` (or `low_flow`) runs th
 
 `models.PERSON_DETECTOR_ARCHIVE` is not fetched here: the zoo has no 5:4 size for this chip,
 so it is compiled from `data/models/base/yolov8n.pt` through Luxonis's HubAI, at 640x512, with
-`hubai-sdk` and a Hub API key, and copied to `data/models` by hand.
+`hubai-sdk` and a Hub API key, and kept in git LFS.
 """
 
 import argparse

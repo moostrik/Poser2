@@ -13,10 +13,6 @@ what the READMEs list by hand today and a script can do, the scripts do; what st
 Each step leaves the install working; each is checked on this PC, in `C:\Developer\Poser2` or the clone in
 `C:\Developer\SmileClean`.
 
-- A3 The OAK4 person detector, `data/models/yolov8n_coco_640x512_rvc4.tar.xz` (compiled by hand through HubAI), in
-  git LFS: `.gitattributes` gets `data/models/*.tar.xz` as LFS, `.gitignore` lets that one archive through; the
-  zoo's three stay ignored and fetched (A2). Check: `git lfs ls-files` lists it; the clone gets it with
-  `git lfs pull`.
 - A4 `install.bat <app> --startup`: a shortcut to the app's start script (`scripts\start\<app>.bat`, smile's
   `apps\smile\scripts\startSMILE.bat`) in the user's Startup folder, replaced when it is there. Check: the shortcut
   appears in `shell:startup` and opens the right script; a second run leaves one shortcut.

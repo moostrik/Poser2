@@ -19,10 +19,9 @@ Every number assumes this configuration unless its table says otherwise:
 
 ### First setup
 
-1. Build the venv with `scripts\install.bat` (see the [README](../../../README.md)).
-2. Put the model archives in `data/models`. `.venv\Scripts\python scripts/oak4_models.py` fetches the pose models; the detector archive is compiled through HubAI ([models.py](models.py), `PERSON_DETECTOR_ARCHIVE`).
-3. Update the camera to Luxonis OS 1.45.0 with `oakctl device update`. On 1.25.3 depthai could not start a session over USB. The `--info` form of that command needs `-y`, or it waits on a prompt.
-4. Connect USB. A camera on USB and Ethernet at once is listed twice under one id, so `link` picks the route; when that route is missing, the camera opens on the other with a warning.
+1. Build the venv and the model archives with `scripts\install.bat deep_flow` (or `low_flow`; see the [README](../../../README.md)): it runs `scripts/oak4_models.py`, which fetches the pose models from the zoo; the person detector, compiled through HubAI ([models.py](models.py), `PERSON_DETECTOR_ARCHIVE`), comes with git LFS.
+2. Update the camera to Luxonis OS 1.45.0 with `oakctl device update`. On 1.25.3 depthai could not start a session over USB. The `--info` form of that command needs `-y`, or it waits on a prompt.
+3. Connect USB. A camera on USB and Ethernet at once is listed twice under one id, so `link` picks the route; when that route is missing, the camera opens on the other with a warning.
 
 Start an app from the venv: `.venv\Scripts\python launcher.py -app deep_flow`.
 
