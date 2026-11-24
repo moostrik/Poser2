@@ -83,7 +83,7 @@ class Delivery:
     """A turn's result on its way to the phone: made at the flash, the saver's files uploaded as soon as
     they come (the phone fetches the video while the room still shows the result), the phone told once."""
     phone: str
-    saved: tuple[str, bool, str, str, str] | None = None    # id, kept, grin path, portrait path, share path
+    saved: SavedVisitor | None = None
     over: float | None = None                           # when the turn ended, None while it runs
     started: bool = False
 
@@ -225,8 +225,7 @@ class Online:
         if 'invite' in notes:
             self._invite = notes['invite']
         if 'saved' in notes and self._delivery is not None:
-            saved: SavedVisitor = notes['saved']
-            self._delivery.saved = (saved.id, saved.kept, saved.grin, saved.portrait, saved.share)
+            self._delivery.saved = notes['saved']
 
         if not s.enabled:
             if self._phase != Phase.OFF:
@@ -429,16 +428,17 @@ class Online:
         if delivery is None or delivery.started:
             return
         result: dict = {'type': 'result', 'phone': delivery.phone, 'name': self._name()}
-        if delivery.saved is not None:
-            id, kept, grin, portrait, shared = delivery.saved
+        saved: SavedVisitor | None = delivery.saved
+        if saved is not None:
             delivery.started = True
-            result['id'] = id
-            if kept:
+            result['id'] = saved.id
+            if saved.kept:
                 # the phone's video is the share clip (the track on the tape, the watermark); the walls' clip without one
-                files: list[tuple[str, str, str]] = [('portrait', id, portrait), ('grin', id, shared or grin)]
+                files: list[tuple[str, str, str]] = [('portrait', saved.id, saved.portrait),
+                                                     ('grin', saved.id, saved.share or saved.grin)]
                 link.submit_upload(files, lambda ok: link.submit({**result, 'ok': ok}))
             else:
-                logger.warning('online: the visitor %s was not saved, no result', id)
+                logger.warning('online: the visitor %s was not saved, no result', saved.id)
                 link.submit({**result, 'ok': False})
         elif delivery.over is not None and now - delivery.over > SAVE_TIMEOUT:
             delivery.started = True

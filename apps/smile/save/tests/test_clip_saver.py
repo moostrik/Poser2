@@ -147,7 +147,7 @@ class TestClipSaverStyle(unittest.TestCase):
             self.assertEqual(shares, [os.path.basename(clip)])
             shared = os.path.join(root, 'shares', 'A', shares[0])
             self.assertEqual(os.listdir(os.path.join(root, 'temp')), [])
-            self.assertEqual((saved[0].kept, saved[0].grin, saved[0].portrait, saved[0].share), (True, clip,os.path.join(root, 'portraits', 'A', os.path.splitext(shares[0])[0] + '_portrait.jpg'), shared))
+            self.assertEqual((saved[0].kept, saved[0].grin, saved[0].portrait, saved[0].share), (True, clip, os.path.join(root, 'portraits', 'A', os.path.splitext(shares[0])[0] + '_portrait.jpg'), shared))
 
             def audio_streams(path):
                 process = video.popen(['-select_streams', 'a', '-show_entries', 'stream=codec_name,duration', '-of', 'json', path],
