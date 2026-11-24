@@ -1,14 +1,11 @@
 {
   "setup": {
     "camera": {
-      "user_set": "UserSet2",
-      "use_image": false,
-      "image": "IMG_2307.jpeg",
-      "image_next": false,
+      "fps": 30.0,
       "flip_h": false,
       "flip_v": false,
       "rotate90": true,
-      "fps": 30.0,
+      "user_set": "UserSet2",
       "target_brightness": 33,
       "manual_exposure": 33000.0,
       "auto_exposure": true,
@@ -22,9 +19,87 @@
       "saturation": 1.0,
       "hue": 0.0,
       "gamma": 1.0,
+      "use_image": false,
+      "image": "IMG_2307.jpeg",
+      "image_next": false,
+      "split_seconds": 60,
+      "readings": {},
+      "oak4": {
+        "fps": 30.0,
+        "flip_h": false,
+        "flip_v": false,
+        "rotate90": false,
+        "fov": 127.0,
+        "lens_fov": 0.0,
+        "lens_center_x": 0.0,
+        "lens_center_y": 0.0,
+        "device_id": "",
+        "link": "USB",
+        "color": true,
+        "model_chain": "OFF",
+        "depth_model": "OFF",
+        "resolution": "P2160",
+        "ethernet_resolution": "P800",
+        "model_path": "data/models",
+        "readings": {
+          "roll_offset": 0.0
+        },
+        "tilt": {
+          "enabled": false,
+          "offset": 0.0
+        },
+        "sensor": {
+          "exposure": 86,
+          "iso": 65,
+          "auto_exposure": true,
+          "auto_exposure_lock": false,
+          "exposure_compensation": 0,
+          "auto_iso_limit": 16585,
+          "anti_banding": "MAINS_50_HZ",
+          "exposure_region": {
+            "x": 0.0,
+            "y": 0.0,
+            "width": 1.0,
+            "height": 1.0
+          },
+          "balance": 1000,
+          "auto_balance": true,
+          "auto_balance_lock": false,
+          "brightness": 0,
+          "contrast": 0,
+          "saturation": 0,
+          "denoise": 0,
+          "chroma_denoise": 0,
+          "sharpness": 0,
+          "dot_projector": 0.0,
+          "flood_light": 0.0
+        },
+        "depth": {
+          "confidence": 125,
+          "edge": 10,
+          "temporal_filter": false,
+          "temporal_alpha": 0.4,
+          "temporal_delta": 100,
+          "near": 0.0,
+          "far": 12.0
+        }
+      },
+      "webcam": {
+        "fps": 30.0,
+        "flip_h": false,
+        "flip_v": false,
+        "rotate90": false,
+        "readings": {}
+      },
+      "uploader": {
+        "depth_kernels": true
+      },
       "face_detector": {
         "model_type": "TRT",
+        "onnx_path": "data/models",
         "engine_path": "apps/smile/data/models",
+        "verbose": false,
+        "threshold": 0.5,
         "pitch_zero": 0.48
       },
       "face": {
@@ -39,7 +114,39 @@
         "zoom": 1.2,
         "offset": 0.0
       },
-      "readings": {}
+      "control": {
+        "output_path": "recordings",
+        "name": ""
+      },
+      "recorder": {
+        "num_cams": 1,
+        "fps": 30.0,
+        "keyframe_interval": 0,
+        "temp_path": "temp",
+        "video_encoder": "iGPU",
+        "video_codec": "H264",
+        "container": "MP4",
+        "video_quality": 0,
+        "video_frame_types": [
+          "VIDEO"
+        ],
+        "enabled": true,
+        "output_path": "recordings",
+        "name": ""
+      },
+      "simulator": {
+        "num_cams": 1,
+        "fps": 30.0,
+        "video_path": "recordings",
+        "video_decoder": "iGPU",
+        "video_frame_types": [
+          "VIDEO"
+        ],
+        "folder": "20261121-194424_Oak Test"
+      },
+      "replay": {
+        "roll_offset": 0.0
+      }
     },
     "generator": {
       "style_mode": "BOTH",
@@ -210,7 +317,9 @@
       "title": "SMILE",
       "v_sync": true,
       "v_sync_window": "window_0",
+      "fps_limit": 0,
       "fullscreen_mouse": false,
+      "gl_debug": false,
       "window_0": {
         "enabled": true,
         "monitor": "M0",

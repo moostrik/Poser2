@@ -28,12 +28,9 @@ smile runs in `.venv` (depthai 3, `scripts\install.bat`), as deep_flow and low_f
 
 - B1 A committed state that passes smile's tests, the guard tests and pyright; no other thread's uncommitted work in
   it.
-- B2 The site's `Smile.json` brought here, committed as it is, then migrated to this version's settings:
-  `online.active` to `enabled`, `render.trail_active` to `trail_enabled`, the grin and saver groups under `sequence`;
-  a `-sim` start on it, which loads it without a missing-setting warning.
-- B3 A live smile start on the OAK4 (`-oak`) in `.venv`, ComfyUI running, Matthias in front: one visitor through,
+- B2 A live smile start on the OAK4 (`-oak`) in `.venv`, ComfyUI running, Matthias in front: one visitor through,
   from the flash to the saved grin and portrait.
-- B4 The rule lines, for Matthias to change at the desktop (a PC session does not edit them):
+- B3 The rule lines, for Matthias to change at the desktop (a PC session does not edit them):
   - `CLAUDE.md`, the test commands: `python -m unittest discover -s modules/<pkg>/tests -t .    # camera/oak in .venv-oakd`
   - `.claude/rules/camera.md`: `- `modules/camera/oak4/` runs on depthai 3 in `.venv` (`install.bat`) and
     `modules/camera/oak/` on depthai 2 in `.venv-oakd` (`install.bat oakd`); an app imports one of them, never both`
@@ -54,8 +51,7 @@ smile runs in `.venv` (depthai 3, `scripts\install.bat`), as deep_flow and low_f
 
 ## The rules it touches
 
-- `.claude/rules/camera.md`, which backend runs in which venv: B4 (Matthias edits it)
-- `CLAUDE.md` Running code, the test commands per venv: B4 (Matthias edits it)
-- `CLAUDE.md` Running code, a run only on the user's go: A1, B2, B3
-- `CLAUDE.md` API evolution, settings files in sync with the code: B2
+- `.claude/rules/camera.md`, which backend runs in which venv: B3 (Matthias edits it)
+- `CLAUDE.md` Running code, the test commands per venv: B3 (Matthias edits it)
+- `CLAUDE.md` Running code, a run only on the user's go: A1, B2
 - `.claude/rules/smile.md`, README.md current (setup, on-site checks): A1, D1
