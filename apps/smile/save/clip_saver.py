@@ -6,6 +6,7 @@ import os
 import datetime
 import json
 import logging
+from dataclasses import dataclass
 from typing import Callable, Protocol
 
 from . import share
@@ -18,7 +19,21 @@ from modules.utils import Broadcast
 logger = logging.getLogger(__name__)
 
 Command = tuple
-SavedCallback = Callable[[str, str, bool, str, str, str], None]   # id, style, kept, grin path, portrait path, share path
+
+
+@dataclass(frozen=True)
+class SavedVisitor:
+    """A visitor whose files the saver closed; the paths are empty when the files were not kept (the share path also
+    when it could not be made)."""
+    id: str
+    style: str
+    kept: bool
+    grin: str           # the clip player's clip
+    portrait: str
+    share: str          # the share clip for the visitor's phone
+
+
+SavedCallback = Callable[[SavedVisitor], None]
 
 STYLES: tuple[str, ...] = ('A', 'B')
 
@@ -66,7 +81,7 @@ class ClipSaver:
         self.queue: queue.Queue[Command] = queue.Queue(max_queue_size)
         self._share: tuple[str | None, float] | None = None   # the open visitor's track and offset (save thread)
         self._dropped: bool = False
-        self._saved_callbacks: Broadcast[[str, str, bool, str, str, str]] = Broadcast(name='saved')
+        self._saved_callbacks: Broadcast[[SavedVisitor]] = Broadcast(name='saved')
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self._save_loop, name='ClipSaver')
         self.settings.bind(ClipSaverSettings.enabled, self._on_save)
@@ -226,7 +241,7 @@ class ClipSaver:
                     os.remove(path)
                 except FileNotFoundError:
                     pass
-        self._saved_callbacks(id, style, kept, grin, portrait, shared)
+        self._saved_callbacks(SavedVisitor(id, style, kept, grin, portrait, shared))
 
     def _watermark(self) -> str | None:
         """The watermark file with the credit name as it is now (save thread): written again only when the name
@@ -258,9 +273,7 @@ class ClipSaver:
             return ''
 
     def add_saved_callback(self, callback: SavedCallback) -> None:
-        """Called on the save thread when a visitor's files are closed: (id, style, kept, grin path,
-        portrait path, share path); the paths are empty when the files were not kept (the share path
-        also when it could not be made)."""
+        """Called on the save thread with the visitor when its files are closed."""
         self._saved_callbacks.add_callback(callback)
 
     def _temp_path(self, id: str, suffix: str) -> str:

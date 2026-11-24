@@ -35,6 +35,7 @@ from ..face import FaceFinder, FaceObservations, rejection_label
 from .link import Link, http_base, read_token
 from .settings import OnlineSettings
 from ..render import ScreenGrab
+from ..save import SavedVisitor
 from ..sequence import CAMERA_STATES, SequenceMessage, Sequencer, SequenceType
 
 logger = logging.getLogger(__name__)
@@ -201,9 +202,9 @@ class Online:
         if self._phase == Phase.JUDGING and self._link is not None:
             self._link.submit(face_message(frame, self._charge))
 
-    def on_saved(self, id: str, style: str, kept: bool, grin: str, portrait: str, share: str = '') -> None:
+    def on_saved(self, saved: SavedVisitor) -> None:
         """The saver closed the visitor's files (ClipSaver's callback, on its thread)."""
-        self._note(saved=(id, style, kept, grin, portrait, share))
+        self._note(saved=saved)
 
     # THE APP CLOCK
     def update(self, now: float, message: SequenceMessage, ready: bool, room_busy: bool) -> None:
@@ -224,8 +225,8 @@ class Online:
         if 'invite' in notes:
             self._invite = notes['invite']
         if 'saved' in notes and self._delivery is not None:
-            id, style, kept, grin, portrait, shared = notes['saved']
-            self._delivery.saved = (id, kept, grin, portrait, shared)
+            saved: SavedVisitor = notes['saved']
+            self._delivery.saved = (saved.id, saved.kept, saved.grin, saved.portrait, saved.share)
 
         if not s.enabled:
             if self._phase != Phase.OFF:

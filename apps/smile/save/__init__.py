@@ -1,1 +1,1 @@
-from .clip_saver import ClipSaver, ClipSaverSettings, GrinRate, SavedCallback
+from .clip_saver import ClipSaver, ClipSaverSettings, GrinRate, SavedCallback, SavedVisitor

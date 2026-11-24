@@ -6,17 +6,6 @@ commit. Steps marked *owner* change another package: a minor fix, with that pack
 
 ## A. Broadcast
 
-A7. smile's saved callback passes one `SavedVisitor` dataclass instead of six positional values (id, style, kept,
-grin path, portrait path, share path). *Owner: smile.*
-Why: three of the six are paths of one type, so a swapped pair passes pyright **(seen)**; CLAUDE.md Settings "`@dataclass`
-for plain value objects". clip_cells' image callback (cell, frame, first) and the window's mouse button (window, x, y,
-button, pressed) stay: their values differ in type, or are an x, y pair. smile's `save/` has no saved or result
-type to reuse: `clip_saver.py` holds only `ClipSaverSettings`, `GrinRate` and `ClipSaver`, and `record.py`'s record is a
-JSON dict written into the files **(seen)**. Changes with it: the `SavedCallback` alias and the call in
-`clip_saver.py`; the one consumer, `online.py`'s `on_saved` (registered in smile's `main.py`), whose `share` default
-of `''` goes, since the alias has none; the two registrations in `save/tests/test_clip_saver.py` **(seen**, PC grep at
-b0b50437**)**. Check: smile's save tests.
-
 A8. A producer's `Broadcast` is private, and its typed boundary is `add_<noun>_callback(callback: <Noun>Callback)`
 (and `remove_...` where a consumer leaves before the producer stops), with the alias named where the item is made
 (`CameraFrameCallback`, `TrackletCallback`). The public lists, all of which but one already have the typed add

@@ -14,7 +14,7 @@ import numpy as np
 from apps.smile.comfy import GeneratorSettings
 from apps.smile.sequence import SequencerSettings
 from apps.smile.save import record
-from apps.smile.save.clip_saver import ClipSaver
+from apps.smile.save.clip_saver import ClipSaver, SavedVisitor
 from modules import video
 
 
@@ -128,9 +128,9 @@ class TestClipSaverStyle(unittest.TestCase):
                                    subprocess.DEVNULL, subprocess.DEVNULL)
             process.communicate(timeout=30)
             self.assertEqual(process.returncode, 0)
-            saved = []
+            saved: list[SavedVisitor] = []
             saver = started(ClipSaver(settings.saver, settings.grin, lambda: 'Test Name', root=root))
-            saver.add_saved_callback(lambda *args: saved.append(args))
+            saver.add_saved_callback(saved.append)
             try:
                 image = np.full((64, 64, 3), 128, np.uint8)
                 saver.submit_open(image, 'A')
@@ -147,7 +147,7 @@ class TestClipSaverStyle(unittest.TestCase):
             self.assertEqual(shares, [os.path.basename(clip)])
             shared = os.path.join(root, 'shares', 'A', shares[0])
             self.assertEqual(os.listdir(os.path.join(root, 'temp')), [])
-            self.assertEqual(saved[0][2:], (True, clip, os.path.join(root, 'portraits', 'A', os.path.splitext(shares[0])[0] + '_portrait.jpg'), shared))
+            self.assertEqual((saved[0].kept, saved[0].grin, saved[0].portrait, saved[0].share), (True, clip,os.path.join(root, 'portraits', 'A', os.path.splitext(shares[0])[0] + '_portrait.jpg'), shared))
 
             def audio_streams(path):
                 process = video.popen(['-select_streams', 'a', '-show_entries', 'stream=codec_name,duration', '-of', 'json', path],
@@ -188,9 +188,9 @@ class TestClipSaverStyle(unittest.TestCase):
         settings.saver.encoder = video.Hardware.CPU
         settings.saver.enabled = True
         with tempfile.TemporaryDirectory() as root:
-            saved = []
+            saved: list[SavedVisitor] = []
             saver = started(ClipSaver(settings.saver, settings.grin, lambda: '', root=root))
-            saver.add_saved_callback(lambda *args: saved.append(args))
+            saver.add_saved_callback(saved.append)
             try:
                 image = np.full((64, 64, 3), 128, np.uint8)
                 saver.submit_open(image, 'A')
@@ -204,4 +204,4 @@ class TestClipSaverStyle(unittest.TestCase):
             self.assertEqual(len(clips), 1)
             self.assertEqual(os.listdir(os.path.join(root, 'shares', 'A')), [])
             self.assertEqual(os.listdir(os.path.join(root, 'temp')), [])
-            self.assertEqual(saved[0][5], '')
+            self.assertEqual(saved[0].share, '')

@@ -13,6 +13,7 @@ from modules.inference.face import HeadPose
 from ...face import FaceObservation, FaceObservations, Rejection
 from apps.smile.online.online import ASK_TIMEOUT, INSIDE, LOOKING, SAVE_TIMEOUT, Online, Phase, face_message
 from apps.smile.online.settings import OnlineSettings
+from apps.smile.save import SavedVisitor
 from apps.smile.sequence import SequenceMessage, SequenceType
 
 
@@ -444,7 +445,7 @@ class TestOnline(unittest.TestCase):
         self.step(seq=SequenceType.ASK)
         # the saver closes the files during the timeout: the upload starts then, before the turn is over
         self.step(seq=SequenceType.TIMEOUT, initial=True)
-        self.online.on_saved('v1', 'A', True, 'grins/A/v1.mp4', 'portraits/A/v1_portrait.jpg')
+        self.online.on_saved(SavedVisitor('v1', 'A', True, 'grins/A/v1.mp4', 'portraits/A/v1_portrait.jpg', ''))
         self.step(seq=SequenceType.TIMEOUT)
         files, done = self.link.uploads[0]
         self.assertEqual([f[0] for f in files], ['portrait', 'grin'])
@@ -468,7 +469,7 @@ class TestOnline(unittest.TestCase):
         self.step()                                         # idle: the free count starts
         self.step(dt=self.settings.eye_free_after + 0.1)
         self.assertTrue(self.link.last('eye')['free'])      # the delivery does not hold the eye
-        self.online.on_saved('v1', 'A', True, 'g.mp4', 'p.jpg', 'shares/A/v1.mp4')
+        self.online.on_saved(SavedVisitor('v1', 'A', True, 'g.mp4', 'p.jpg', 'shares/A/v1.mp4'))
         self.step()
         self.assertEqual(len(self.link.uploads), 1)
         self.assertEqual(self.link.uploads[0][0][1], ('grin', 'v1', 'shares/A/v1.mp4'))   # the phone's video is the share clip
@@ -494,7 +495,7 @@ class TestOnline(unittest.TestCase):
         self.assertFalse(self.camera.online)
         self.assertFalse(self.grab.on)
         self.assertFalse(self.online.showing)
-        self.online.on_saved('v1', 'A', False, '', '')
+        self.online.on_saved(SavedVisitor('v1', 'A', False, '', '', ''))
         self.step(seq=SequenceType.CAMERA_SHOW, dt=SAVE_TIMEOUT + 1)
         self.assertIsNone(self.link.last('result'))
 
@@ -502,7 +503,7 @@ class TestOnline(unittest.TestCase):
         self.start_turn()
         self.step(seq=SequenceType.FLASH, initial=True)
         self.step(seq=SequenceType.TIMEOUT, initial=True)
-        self.online.on_saved('v1', 'A', False, '', '')
+        self.online.on_saved(SavedVisitor('v1', 'A', False, '', '', ''))
         self.step(seq=SequenceType.CAMERA_SHOW)
         self.step(seq=SequenceType.CAMERA_SHOW)
         self.assertEqual(self.link.last('turn_end')['reason'], 'done')
