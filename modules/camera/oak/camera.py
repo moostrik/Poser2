@@ -11,10 +11,10 @@ from .. import CameraResolution, CameraFrame, RigCameraReadings, CameraTracklet,
     TrackletCallback
 from ..geometry import MountConfig, MountReadout, mode_size, frame_size, delivered_height, frame_summary, lens_report
 from ..oak_device import capture_time, smoothed_latency, read_lens_calibration, imu_rotation_to_camera, \
-    log_connected_sensors, TRACKING_STATUS
+    log_connected_sensors, TRACKING_STATUS, ColorSensorControl
 from modules.utils import Broadcast, FPS, Rect
 
-from .control import SensorControl
+from .control import MonoSensorControl
 from .device import get_device_list
 from .imu import IMU_BOARD_ROLL
 from .pipeline import build_pipeline, VIDEO_STREAM, TRACKLETS_STREAM, IMU_STREAM, CONTROL_STREAM
@@ -64,7 +64,7 @@ class Camera(Thread):
         self.pipeline: dai.Pipeline | None = None
         self.device: dai.Device | None = None
         self.queues: list[dai.DataOutputQueue | dai.DataInputQueue] = []
-        self.control: SensorControl | None = None
+        self.control: ColorSensorControl | MonoSensorControl | None = None     # the camera's sensor's
 
         # FPS
         self.video_fps: FPS = FPS()
@@ -155,7 +155,8 @@ class Camera(Thread):
         self._setup_imu_queue()
         control: dai.DataInputQueue = self.device.getInputQueue(CONTROL_STREAM)
         self.queues.append(control)
-        self.control = SensorControl(self.settings, self.device, control, self.color)
+        self.control = ColorSensorControl(self.settings.color_sensor, control) if self.color \
+            else MonoSensorControl(self.settings.mono_sensor, self.device, control)
 
     def _setup_frame_queues(self) -> None:
         assert self.device is not None

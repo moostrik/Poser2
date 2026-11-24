@@ -21,34 +21,6 @@ through the camera's own models. **(seen)** is read in the code, **(deduction)**
 
 ## I. The scan of 2026-11-22 evening
 
-- I2. The color sensor's controls, written once for both OAKs. Why: "Inside a package, code that does the same is
-  written once" (CLAUDE.md, Packages). Both OAKs deliver from a color sensor with the same controls: the OAK-D's
-  `ColorSensorSettings` and the OAK4's `SensorSettings` hold the same ten fields, by name: exposure, ISO, auto
-  exposure, white balance, auto white balance, brightness, contrast, saturation, luma denoise and sharpness, and both `SensorControl`s send them with the same
-  `dai.CameraControl` calls and read the same values back off the frames, on depthai 2 and 3 alike **(seen)**. The
-  mono sensors are another kind with neither white balance nor image controls: the OAK-D's has exposure, ISO and the
-  IR lights (`MonoSensorSettings`), the OAK4's stereo pair runs its own auto exposure, and its IR lights sit in
-  `SensorSettings` **(seen)**. Today the OAK-D's one `SensorControl` branches on `color` for its bindings, its
-  first send and its readback **(seen)**. How: `oak_device/color_sensor_control.py` holds `ColorSensorControl`: the
-  color sensor's fields bound (over a `ColorSensorFields` Protocol of the ten), every value sent once on
-  construction, `readback`, `close()` unbinding; the bindings typed. `BaseSettings.bind` takes a `Field` and finds
-  it by name **(seen)**, so the Protocol's members are `Field`s (`exposure: Field[int]`): read on the sensor they give
-  the value, read on its class (`type(sensor).exposure`) the `Field` to bind; pyright passes both reads and the two
-  settings classes against such a Protocol, and fails a Protocol of plain values or of `ClassVar`s **(seen: a
-  pyright check of 2026-11-24 in `.venv`)**. The OAK4 keeps its order at open: its `_apply` sends anti-banding,
-  compensation and the ISO limit before the shared values, and the IR lights after them, as now **(seen)**. Since the
-  shared class sends every value in `__init__`, the OAK4's `SensorControl` sets what its `_apply` uses (the device
-  for the IR lights, the exposure region's transformation) before it calls `super().__init__` **(deduction)**. The OAK-D's color camera uses it as it is; its
-  mono camera has a `MonoSensorControl` of its own (`oak/control.py`: exposure, ISO, auto exposure and the IR
-  lights). The OAK4's `SensorControl` extends `ColorSensorControl` with what only it has: the exposure and balance
-  locks, compensation, ISO limit, exposure region, anti-banding, chroma denoise and the IR lights. A subclass and not a
-  part, since the OAK4's lock goes out with each auto exposure and auto balance switch the shared class sends
-  **(seen: `oak4/control.py`, `_on_auto_exposure`, `_on_auto_balance`)**; `ColorSensorControl` is concrete, as the
-  OAK-D's color camera uses it as it is. Files: `oak_device/color_sensor_control.py`, `oak_device/__init__.py`,
-  `oak/control.py`, `oak/camera.py` (the control by the camera's sensor), `oak4/control.py`. Test:
-  `oak4/tests/test_control.py` passes as it is; a test in `oak_device/tests` that `ColorSensorControl` sends each
-  value and reads back exposure, ISO and color temperature, with a fake queue and frame. Docs: CAMERA.md, The
-  package's parts (`oak_device/` lists `color_sensor_control`).
 - I3. Form only. Each is checked by the tests and pyright:
   - `SYSTEM_RATE_HZ` moves from `oak4/device.py` to `oak4/pipeline.py`, its one user. Why: "Its files each hold one class
     or one subject, named after it"; `device.py` is finding a device **(seen)**.
@@ -165,12 +137,10 @@ internal and made by depthai **(seen in `.venv-oak4`, depthai 3.11; the Luxonis 
 - Stamp a frame or tracklet message once, where the backend hands it over, with its moment of capture where the device reports one, else its arrival: F1, J1
 - A callback only hands the item over and returns: J1
 - Its files each hold one class or one subject, named after it: I3
-- Inside a package, code that does the same is written once: I2
-- Use a `Protocol` for what a consumer needs from a collaborator, an `ABC` for a family of classes that share code: I2
 - Its `__init__.py` holds what other packages use: I3
 - Its tests sit in its `tests/` folder: I3
 - Use the terms in `.claude/rules/glossary.md`: I3
-- Use modern typing (`list[T]`, `dict[K, V]`, `X | Y`): I2, I3
+- Use modern typing (`list[T]`, `dict[K, V]`, `X | Y`): I3
 - Use no synonyms for one concept across modules; when a term changes, rename it everywhere in the same change: I3
 - Keep settings files in sync with code changes: I3
 - Prefer composition over inheritance for runtime assembly: J1, J2

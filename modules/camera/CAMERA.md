@@ -304,7 +304,8 @@ whatever blob is in use. The input size is read off the blob, so a file name and
 | `geometry/`          | `sensor_modes`, `lens`, `frame_window`, `warp`, `orientation`, `tilt_correction`, `flips`,   |
 |                      | `depth_projection`, `mount` (`MountConfig`, the open log's frame and lens lines)             |
 | `oak_device/`        | what an OAK reports through depthai, for both OAKs: `capture_clock` (a message's capture and |
-|                      | latency), `calibration` (lens, IMU extrinsics), `sensors`, `tracklets` (`TRACKING_STATUS`)   |
+|                      | latency), `calibration` (lens, IMU extrinsics), `sensors`, `tracklets` (`TRACKING_STATUS`),  |
+|                      | `color_sensor_control` (the color sensor's controls, which the OAK4's extend)                |
 | `oak/`               | the OAK-D: `camera`, `clip_camera`, `control`, `pipeline`, `warp_mesh`, `settings`, `sensor`,  |
 |                      | `device`, `imu`, `models`                                                                    |
 | `oak4/`              | the OAK4: `camera`, `control`, `pipeline`, `settings`, `sensor`, `device`, `imu`,            |
