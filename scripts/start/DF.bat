@@ -35,7 +35,7 @@ set "CURRENT_DIR=%~dp0..\..\"
 cd /d "%CURRENT_DIR%"
 
 echo Opening Main App
-start "Main App" cmd /k "cd /d "%CURRENT_DIR%" && "%CURRENT_DIR%.venv\Scripts\python.exe" "%CURRENT_DIR%launcher.py" -app deep_flow"
+start "Main App" cmd /k "cd /d "%CURRENT_DIR%" && "%CURRENT_DIR%.venv-oak4\Scripts\python.exe" "%CURRENT_DIR%launcher.py" -app deep_flow"
 timeout /t 2 /nobreak >nul
 
 @REM echo Press any key to continue . . .

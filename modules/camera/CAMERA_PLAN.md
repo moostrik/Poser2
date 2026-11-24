@@ -27,20 +27,6 @@ panel shows the loss only as `video_fps` below `fps`.
   Matthias's go: `dropped_clips` per camera with the host queue at 1, then at 2; the depth that holds the rate with
   the fewer drops stays, and the latency readings show what it costs.
 
-## H. Running the two OAK backends
-
-Each backend runs in its own venv: `oak` in `.venv` (depthai 2), `oak4` in `.venv-oak4` (depthai 3); the package
-stops at import in the other one, and its message names the right venv (`require_backend`, `depthai_backend.py`)
-**(seen)**. Each start script names its app's venv: `scripts/start/DF.bat` names `.venv`, so deep_flow stops at
-`require_backend('oak4')`, and `scripts/timing.bat` names `.venv` for every app, so it cannot time deep_flow, low_flow
-or smile **(seen)**. The tests follow from their app: every app suite and both backends' suites, run in the other
-venv, stop at `require_backend`'s message naming the right venv, and the suites that import no backend pass in
-either (`unittest discover` per suite, 2026-11-24) **(seen)**.
-
-- H1. The scripts name the app's venv. `scripts/start/DF.bat` starts deep_flow with `.venv-oak4\Scripts\python.exe`,
-  as `startSMILE.bat` does SMILE; `scripts/timing.bat` sets `.venv-oak4` for deep_flow, low_flow and smile and
-  `.venv` for the others, and its usage line lists all five apps.
-
 ## Open
 - The OAK4 is to run standalone, as an OAK App **(site fact)**. Depth alignment then needs a home: `ImageAlign` is
   the only alignment on the camera and fattens near objects ([Depth](oak4/OAK4.md#depth)), and its firmware cannot be
@@ -72,4 +58,3 @@ either (`unittest discover` per suite, 2026-11-24) **(seen)**.
 - A part that drops an item shows the count to the user: G1
 - Prefer the design with the lower latency, measured in the context of the app: G1
 - Run a test of the app or a GPU harness only on the user's go, and only what the plan names: G1
-- `oak` runs in `.venv`, `oak4` in `.venv-oak4`; an app imports one of them, never both: H1
