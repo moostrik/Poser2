@@ -36,9 +36,23 @@ Questions:
 
 ## C. Smoothing
 
+Questions:
+- One rate for the angle, point and box smoothers (noted 2026-11-24)? The Ema smoother node
+  (`nodes/filters/ema_smoothers.py`) hands one `EmaSmootherSettings` pair, attack 0.95 and release 0.8 by default, to
+  every feature it smooths **(seen)**. The filters keep one meaning, rise against fall (a positive against a negative
+  turn for an angle, on the shortest path), and are right as they are **(seen)**. For angle velocity, motion,
+  symmetry and similarity, which are levels, rise and fall mean something; for joint angles, point and box positions
+  they are only a direction, so a turn or a move one way follows faster than the other way, and with left and right
+  angles mirrored (`angle_utils.py`, `_SIGN`) the left and right elbow would follow at different speeds
+  **(deduction**, not measured**)**. Which rates suit a feature is the node's choice: should these features get one
+  rate, attack equal to release? A box's width and height are levels, its x and y are not.
+
 - C1. Interpolation smoothness with poses on every other frame: the user saw it less smooth than before in deep_flow
   -sim on `20261124-102304_Test`, and live not very smooth, the points sitting well **(site fact, 2026-11-24)**;
   never tested with the one-frame skip. Check live and in -sim.
+
+The array filters in `nodes/_utils` stay in pose, so pose can stand on its own; utils keeps its own single-value
+filters for the other packages (his word 2026-11-22).
 
 ## D. The recorder's name
 
