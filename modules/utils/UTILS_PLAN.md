@@ -3,12 +3,6 @@
 Proposed by the utils rescan of 2026-11-24 (deep-flow at 38929e26); not built. Each step names its finding,
 **(seen)** in the code or a run, **(deduction)** when inferred. A step checked by a test or pyright is one commit.
 
-## E. Names
-
-E2. `Rect.affine_transform` becomes `Rect.denormalized(target)`, with its callers (grepped at the build).
-Why: it maps a normalized rect into a target, not a general affine map **(seen)**; CLAUDE.md Naming "Name a concept
-after what it is". Chosen 2026-11-24. Check: pyright, test_geometry.
-
 ## F. What utils holds
 
 F1. `object_pool.py` goes, with `ObjectPool` from `__init__.py`.

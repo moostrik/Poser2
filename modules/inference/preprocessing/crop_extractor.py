@@ -173,7 +173,7 @@ class CropExtractor:
 
     @staticmethod
     def _roi(size: CropExtractorSettings, box: Rect, width: int, height: int) -> Rect:
-        roi = box.affine_transform(Rect(0.0, 0.0, float(width), float(height)))
+        roi = box.denormalized(Rect(0.0, 0.0, float(width), float(height)))
         return Rect(0, 0, size.output_width, size.output_height).aspect_fill(roi)
 
     @staticmethod

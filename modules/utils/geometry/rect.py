@@ -225,7 +225,7 @@ class Rect:
             height=self.height - margins.y - margins.height
         )
 
-    def affine_transform(self, target: "Rect") -> "Rect":
+    def denormalized(self, target: "Rect") -> "Rect":
         """Map this normalized rectangle into the coordinate space of another rectangle."""
         return Rect(
             x = target.x + self.x * target.width,
