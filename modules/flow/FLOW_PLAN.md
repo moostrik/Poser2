@@ -79,6 +79,8 @@ noise 2.4 / 3.1 against 9.1 / 5.1).
   with the square of the distance, so at 2–3.5 m they may need to be in disparity **(deduction)**. z's gate is in
   disparity since 2026-11-21, sized by the noise. A recording at 2–3.5 m, with the camera in its place, and the
   same rows measured there.
+- **C7.** The A/B of the depth's confidence through the motion needs a recording with it and a player moving. No
+  recording with a confidence is kept: the two probes of 2026-11-21 were made to measure the encoder and are deleted.
 
 Tried and undone (2026-11-21), C6: each sample of z's window weighted by the depth's confidence; it cut the
 edge's z noise and stopped z later, its rows in [MOTION.md](MOTION.md#depth_velocity-z).
