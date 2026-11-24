@@ -6,22 +6,42 @@ the capture match) is read by every app and by inference, recording, tracker and
 kind of camera, used now by the apps that have it: `oak` by white_space and hd_trio, `oak4` by deep_flow, low_flow
 and smile, `vimba` and `webcam` by smile. That is general code with one user, which stays.
 
-F is what is left of the scans. **(seen)** is read in the code, **(deduction)** inferred.
+**(seen)** is read in the code, **(deduction)** inferred.
 
-## F. With an OAK-D at the PC
+## G. The OAK-D's clip drops
 
-- F1. The live check of the OAK-D's capture stamp, which is built (`oak_device/capture_clock.py`, shared with the OAK4): an
-  OAK-D, white_space live, its frames' and tracklets' latency readings against oak4's. Waits for an OAK-D at the PC: none
-  was attached on 2026-11-22 **(seen: depthai 2 found no device)**. RECORDING_PLAN.md B's OAK-D capture time is this
-  step, and so is the live check of each OAK-D's own pipeline (built 2026-11-22): every camera, and the OAK-D camera
-  with clips in -sim, opens on its own pipeline, its geometry logged. The clip path through the device is checked in
-  the same run: a clip tracklet's `timestamp` equals the recorded capture of the frame it was found in, which the
-  clip camera's stamp rests on ([CAMERA.md, The clip camera](CAMERA.md#the-clip-camera)) **(deduction)**.
+The OAK-D's clip input loses about 1.1% of the clip frames in white_space -sim with four cameras (recording
+20261124-110331_probe_F1) **(site fact: the recording thread's run)**; the host's clip queue
+(`maxSize=1, blocking=False` in `oak/camera.py`) drops a frame the device has not taken yet **(deduction)**. The
+panel shows the loss only as `video_fps` below `fps`.
+
+- G1. Count the clip drops and try a deeper host queue. `ClipInput.send` numbers each `ImgFrame` it sends
+  (`setSequenceNum`, from 0 at each open); the camera's `_video_callback` counts the gaps in the returned frames'
+  `getSequenceNum()` as `dropped_clips`, a `Field.READ` on `RigCameraReadings` beside `dropped_depth` ("Clip frames
+  dropped before the device took them, since the start"), set only with clips. First check that the number comes
+  back: without `clip_warp` (off in every settings file) the video output is the XLinkIn's message itself (XLinkIn →
+  XLinkOut, `oak/tests/test_pipeline.py`) **(seen)**, so the number survives **(deduction)**; with `clip_warp` a Warp
+  sits between, which may renumber **(not checked)**. The run logs the first returned numbers against the sent ones;
+  if the device renumbers, `dropped_clips` is the frames sent minus the frames returned, the one in flight aside.
+  Then one white_space -sim run (`studio.json`, `replay` false, the recording above), run by the recording thread on
+  Matthias's go: `dropped_clips` per camera with the host queue at 1, then at 2; the depth that holds the rate with
+  the fewer drops stays, and the latency readings show what it costs.
+
+## H. Running the two OAK backends
+
+Each backend runs in its own venv: `oak` in `.venv` (depthai 2), `oak4` in `.venv-oak4` (depthai 3); the package
+stops at import in the other one, and its message names the right venv (`require_backend`, `depthai_backend.py`)
+**(seen)**. Each start script names its app's venv: `scripts/start/DF.bat` names `.venv`, so deep_flow stops at
+`require_backend('oak4')`, and `scripts/timing.bat` names `.venv` for every app, so it cannot time deep_flow, low_flow
+or smile **(seen)**. The tests follow from their app: every app suite and both backends' suites, run in the other
+venv, stop at `require_backend`'s message naming the right venv, and the suites that import no backend pass in
+either (`unittest discover` per suite, 2026-11-24) **(seen)**.
+
+- H1. The scripts name the app's venv. `scripts/start/DF.bat` starts deep_flow with `.venv-oak4\Scripts\python.exe`,
+  as `startSMILE.bat` does SMILE; `scripts/timing.bat` sets `.venv-oak4` for deep_flow, low_flow and smile and
+  `.venv` for the others, and its usage line lists all five apps.
 
 ## Open
-
-- The OAK4's drop counts live, in the next OAK4 run on Matthias's go: with nobody in view `dropped_tracklets` stays at
-  0, as it rests on `GatherData` sending a frame without players **(deduction)**.
 - The OAK4 is to run standalone, as an OAK App **(site fact)**. Depth alignment then needs a home: `ImageAlign` is
   the only alignment on the camera and fattens near objects ([Depth](oak4/OAK4.md#depth)), and its firmware cannot be
   changed. The options are to keep sending raw depth with its `DepthAlignment` to a PC that runs `DepthAlign`, or to
@@ -31,13 +51,12 @@ F is what is left of the scans. **(seen)** is read in the code, **(deduction)** 
   confidence is kept: the two probes of 2026-11-21 were made to measure the encoder and are deleted.
 - How to count the drops inside depthai, of both OAKs. The detector's input is non-blocking
   (`setBlocking(False)` in both `pipeline.py`) and skips the frames it has no time for. The OAK4's depth `Sync`
-  (`add_depth`) lets go of a depth or confidence without its partner within `CAPTURE_TOLERANCE` **(deduction)**. The OAK-D's clip input is
-  `maxSize=1, blocking=False` **(seen)** and so drops a clip frame the device has not taken yet **(deduction)**.
-  depthai reports no count of any of the three **(deduction)**. The panel shows them only as a rate: `tracker_fps`, and
-  `video_fps` against `fps` **(seen)**. A gap in a stream's sequence numbers at the hand-over would count them, if
-  ImageManip and Warp carry the numbers through, which is not checked. The host's output queues (`maxSize=1`,
-  non-blocking) lose nothing: their callback takes every message, and what the queue overflows has already gone to
-  the callback **(deduction)**.
+  (`add_depth`) lets go of a depth or confidence without its partner within `CAPTURE_TOLERANCE` **(deduction)**.
+  depthai reports no count of either **(deduction)**. The panel shows them only as a rate: `tracker_fps`, and the
+  depth rate against the video's **(seen)**. A gap in a stream's sequence numbers at the hand-over would count them,
+  if ImageManip and Warp carry the numbers through, which is not checked; G1's check answers it for the Warp. The
+  OAK-D's clip input's drops are G1. The host's output queues (`maxSize=1`, non-blocking) lose nothing: their
+  callback takes every message, and what the queue overflows has already gone to the callback **(deduction)**.
 - Feeding the OAK4 a recording, when an OAK4 app needs it; no OAK4 app is fed one, and depth is not fed back
   (Matthias, 2026-11-23 and 2026-11-24). One input node, its queue from `createInputQueue()`, as the frames source in
   place of `add_camera`'s (OAK4.md, The backend); `oak4.Camera(settings, cam_id, clips: ClipSource | None = None)`
@@ -50,5 +69,7 @@ F is what is left of the scans. **(seen)** is read in the code, **(deduction)** 
 
 ## Rules it touches
 
-- Stamp a frame or tracklet message once, where the backend hands it over, with its moment of capture where the device reports one, else its arrival: F1
-- Run a test of the app or a GPU harness only on the user's go, and only what the plan names: F1
+- A part that drops an item shows the count to the user: G1
+- Prefer the design with the lower latency, measured in the context of the app: G1
+- Run a test of the app or a GPU harness only on the user's go, and only what the plan names: G1
+- `oak` runs in `.venv`, `oak4` in `.venv-oak4`; an app imports one of them, never both: H1
