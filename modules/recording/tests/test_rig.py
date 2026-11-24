@@ -233,5 +233,59 @@ class RigTest(unittest.TestCase):
         self.check(True)
 
 
+def split_then_stop(after: list[int], more: int) -> Callable[[Recorder], None]:
+    """Two cameras of `SPLIT` captures each, a split, then one capture after the split time on each camera in
+    `after`, then `more` captures on both, then the stop."""
+    def feed(rec: Recorder) -> None:
+        for i in range(SPLIT):
+            for cam in (0, 1):
+                rec.submit_frame(cam_frame(cam, i * 4, 100.0 + i / FPS))
+            time.sleep(0.003)
+        RecorderSettings.split.fire(rec.settings)
+        deadline: float = time.perf_counter() + 5.0
+        while rec.split_requested.is_set() and time.perf_counter() < deadline:
+            time.sleep(0.01)
+        for i in range(SPLIT, SPLIT + 1 + more):
+            for cam in (after if i == SPLIT else (0, 1)):
+                rec.submit_frame(cam_frame(cam, i * 4, 100.0 + i / FPS))
+            time.sleep(0.003)
+    return feed
+
+
+@unittest.skipUnless(video.available() and video.encoder_works(video.Hardware.iGPU), 'no iGPU encoder')
+class SplitStopTest(unittest.TestCase):
+    """A stop while a split waits: every camera ends at the same chunk, with every capture handed in."""
+
+    def chunks(self, feed: Callable[[Recorder], None]) -> dict[int, list[list[float]]]:
+        """Each camera's chunks, as the recorded times of their frames; each chunk's streams hold as many."""
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            recording = record(Path(folder), [FrameType.VIDEO], 2, feed)
+            out: dict[int, list[list[float]]] = {}
+            for cam in (0, 1):
+                names = sorted(p.name for p in recording.glob(f'{cam}_*.mkv'))
+                self.assertEqual(names, [make_chunk_name(cam, k) for k in range(len(names))])
+                for name in names:
+                    times = [frame.timestamp for frame in read_metadata(recording / name, cam).frames]
+                    self.assertEqual(stream_frames(recording / name, 0), len(times))
+                    out.setdefault(cam, []).append(times)
+            return out
+
+    def test_a_stop_before_every_camera_has_a_capture_after_the_split_drops_it(self) -> None:
+        chunks = self.chunks(split_then_stop([1], 0))
+        self.assertEqual(len(chunks[0]), 1)
+        self.assertEqual(len(chunks[1]), 1)
+        self.assertEqual(len(chunks[0][0]), SPLIT)
+        self.assertEqual(len(chunks[1][0]), SPLIT + 1)
+
+    def test_the_cameras_are_cut_together_once_each_has_a_capture_after_the_split(self) -> None:
+        more: int = 10
+        chunks = self.chunks(split_then_stop([0, 1], more))
+        for cam in (0, 1):
+            self.assertEqual(len(chunks[cam]), 2, cam)
+            self.assertEqual(len(chunks[cam][0]), SPLIT)
+            self.assertEqual(len(chunks[cam][1]), 1 + more)
+            self.assertAlmostEqual(chunks[cam][1][0], 100.0 + SPLIT / FPS)
+
+
 if __name__ == '__main__':
     unittest.main()

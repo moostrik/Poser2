@@ -11,8 +11,9 @@ DEPTH is in `video_frame_types` and the camera sends it, the camera's tracklets 
 each part settled by the order its stream comes in. A camera that sends no depth is recorded color
 only. What waits for the encoders, queued here and in the writers, is bounded in bytes (`HELD`); beyond
 it a capture is dropped whole, before any part of it is written, so every stream and the metadata of a
-chunk hold the same frames. A split cuts every camera's chunk at one capture time: a camera goes on in
-the new chunk with its first capture after it. On stop no frame is taken any more, and the captures
+chunk hold the same frames. A split cuts every camera's chunk at one capture time, all in one pass: a camera
+holds its first capture after it until every camera holds one, or for at most `SPLIT_WAIT`, and goes on in the new
+chunk with it; a stop drops a split still waiting, so every camera ends at the same chunk. On stop no frame is taken any more, and the captures
 still waiting are settled by the parts that still come, for at most `STOP_WAIT`. Recordings hold what
 the camera delivered, not straightened, turned or mirrored;
 `rotate90`, `flip_v` and `flip_h` say the frames are still to be turned and flipped, and replay applies them. What a
@@ -76,7 +77,7 @@ class RecorderSettings(BaseSettings):
 
 STOP_WAIT: float = 1.0          # s a stopping recording waits for the parts its last captures wait for
 PASS: float = 0.01              # s the recorder's thread waits at most between passes, without a wake
-SPLIT_WAIT: float = 1.0         # s a split waits for a camera's first capture after its time, before it cuts that camera's chunk anyway
+SPLIT_WAIT: float = 1.0         # s the cameras wait for each other at a split, before every camera is cut anyway
 HELD: int = 1 << 30             # bytes waiting for the encoders, queued here and in the writers: 1 GB
 SURE: int = 255                 # the confidence of a depth that came without one, in a chunk that records it
 QUEUED_PER_FRAME: int = 4       # the parts of one frame in the sync's inbox: the frame, its tracklets, whether poses were asked, the poses
@@ -140,6 +141,7 @@ class Recorder(Thread):
         self.suffix: str = Container.MP4.value if self.container == Container.MP4 else Container.MKV.value
         self.split_requested = Event()
         self._split_at: float | None = None             # the capture time the chunks are cut after, while a split goes on
+        self._held: dict[int, RecordedCapture] = {}     # each camera's first capture after it, until the cut
         self._split_request_time: float = float('-inf')
         self._newest: dict[int, float] = {}             # each camera's newest color frame handed in
         self._split_deadline: float = 0.0
@@ -250,6 +252,7 @@ class Recorder(Thread):
             self._newest.clear()
         self._queue_warned = False
         self._split_at = None
+        self._held.clear()
         self.split_requested.clear()
         for c in range(self.settings.num_cams):
             self.chunks[c] = 0
@@ -261,7 +264,13 @@ class Recorder(Thread):
 
     def _stop_recording(self) -> None:
         """No frame is taken any more; the captures waiting are settled by the tracklets and poses that still come,
-        for at most `STOP_WAIT`, which only a stream that stopped with the recording runs out."""
+        for at most `STOP_WAIT`, which only a stream that stopped with the recording runs out. A split still waiting
+        is dropped: every camera's held capture goes into its current chunk, before its queue."""
+        self.split_requested.clear()
+        self._split_at = None
+        for c, capture in sorted(self._held.items()):
+            self._write_capture(c, capture)
+        self._held.clear()
         deadline: float = time.perf_counter() + STOP_WAIT
         while self.sync.waiting and time.perf_counter() < deadline:
             self._write_queued()
@@ -338,21 +347,14 @@ class Recorder(Thread):
             self._split_deadline = time.perf_counter() + SPLIT_WAIT
         self._write_queued()
         if self._split_at is not None and time.perf_counter() > self._split_deadline:
-            for c in range(self.settings.num_cams):         # a camera with no capture after the cut: cut anyway
-                if self.chunks[c] == self._split_from:
-                    self._split_camera(c)
-            self._split_at = None
+            self._cut()                 # a camera with no capture after the split time is cut too
+            self._write_queued()
         self._update_missed()
         self.sync.missed.warn()
         failed: list[str] = [w.output_file for writers in self.recorders.values() for w in writers.values() if w.failed]
         if failed:
             logger.error("Recording ended: the encoder of %s died", ', '.join(failed))
             self._on_stop()
-
-    @property
-    def _split_from(self) -> int:
-        """The chunk a split goes on from: the lowest of the cameras'."""
-        return min(self.chunks.values(), default=0)
 
     def _update_missed(self) -> None:
         """The counts of what a recording went without and the sync's inbox, to the panel when they change; a warning,
@@ -380,30 +382,49 @@ class Recorder(Thread):
 
     def _write_queued(self) -> None:
         """Everything queued, on every pass: with depth three streams arrive per camera at the full frame rate, more
-        than one frame per pass can keep up with. A camera's first capture after a split's time cuts its chunk."""
-        split_from: int = self._split_from
+        than one frame per pass can keep up with. While a split waits, a camera's first capture after its time is held
+        and its queue read no further; once every camera holds one, they are cut together."""
+        self._take_queued()
+        if self._split_at is not None and len(self._held) == self.settings.num_cams:
+            self._cut()
+            self._take_queued()
+
+    def _take_queued(self) -> None:
+        """Every camera's queue written, up to a capture after a waiting split's time, which is held."""
         for c in range(self.settings.num_cams):
-            while True:
+            while c not in self._held:
                 try:
                     capture: RecordedCapture = self.frames[c].get_nowait()
                 except Empty:
                     break
-                with self._held_lock:
-                    self._queued_bytes -= capture.nbytes
-                if self._split_at is not None and capture.video.timestamp > self._split_at and self.chunks[c] == split_from:
-                    self._split_camera(c)
-                self.recorders[c][ChunkStream.VIDEO].submit_frame(capture.video.image, capture.video.nv12)
-                depth: CameraFrame | None = capture.depth
-                if self.metadata_frames.get(c, 0) == 0:     # the chunk's first capture says whether it records a confidence
-                    self.with_confidence[c] = depth is not None and depth.confidence is not None
-                if depth is not None:
-                    self.recorders[c][ChunkStream.DEPTH].submit_frame(depth.image)
-                    if self.with_confidence[c]:
-                        confidence = depth.confidence if depth.confidence is not None else np.full(depth.image.shape, SURE, np.uint8)
-                        self.recorders[c][ChunkStream.CONFIDENCE].submit_frame(confidence)
-                self._write_metadata(c, capture)
-        if self._split_at is not None and all(chunk > split_from for chunk in self.chunks.values()):
-            self._split_at = None           # every camera goes on in the new chunk
+                if self._split_at is not None and capture.video.timestamp > self._split_at:
+                    self._held[c] = capture
+                else:
+                    self._write_capture(c, capture)
+
+    def _cut(self) -> None:
+        """Every camera's chunk cut in one pass, each held capture written into its new chunk: the split is done."""
+        for c in range(self.settings.num_cams):
+            self._split_camera(c)
+        self._split_at = None
+        for c, capture in sorted(self._held.items()):
+            self._write_capture(c, capture)
+        self._held.clear()
+
+    def _write_capture(self, cam_id: int, capture: RecordedCapture) -> None:
+        """A capture into the camera's current chunk: its streams and its metadata; its bytes leave the bound."""
+        with self._held_lock:
+            self._queued_bytes -= capture.nbytes
+        self.recorders[cam_id][ChunkStream.VIDEO].submit_frame(capture.video.image, capture.video.nv12)
+        depth: CameraFrame | None = capture.depth
+        if self.metadata_frames.get(cam_id, 0) == 0:     # the chunk's first capture says whether it records a confidence
+            self.with_confidence[cam_id] = depth is not None and depth.confidence is not None
+        if depth is not None:
+            self.recorders[cam_id][ChunkStream.DEPTH].submit_frame(depth.image)
+            if self.with_confidence[cam_id]:
+                confidence = depth.confidence if depth.confidence is not None else np.full(depth.image.shape, SURE, np.uint8)
+                self.recorders[cam_id][ChunkStream.CONFIDENCE].submit_frame(confidence)
+        self._write_metadata(cam_id, capture)
 
     def _write_metadata(self, cam_id: int, capture: RecordedCapture) -> None:
         file: TextIO | None = self.metadata.get(cam_id)

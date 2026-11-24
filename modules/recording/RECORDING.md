@@ -118,7 +118,8 @@ The rules the recorder keeps, each with its reason:
 | The sync's inbox is not bounded; its length shows on the panel       | a recording needs every part; `HELD` bounds what waits after the match                |
 | A capture is dropped whole, before any part of it is written         | a chunk's color, depth and metadata then count alike, so frame `n` is one capture     |
 | One bound for what waits for the encoders, in bytes, for all cameras | a bound per queue grows with the cameras                                              |
-| A split cuts every camera at one capture time                        | the cameras' chunks start and end at one recorded moment, so a play runs through it   |
+| A split cuts every camera at one capture time, in one pass           | the cameras' chunks start and end at one recorded moment, so a play runs through it   |
+| A stop drops a split still waiting                                   | every camera ends at the same chunk: the player plays chunk `n` of all together       |
 | On stop, the captures waiting are settled by the frames after it     | their tracklets and poses still come, after the last frame taken                      |
 
 What a capture went without is counted on the panel (`missed_depth`, `missed_color`, `missed_tracklets`,
@@ -135,7 +136,7 @@ crash left unmerged is merged beside the next recording.
 | `CAPTURE_TOLERANCE` | 2 ms  | the parts of one capture carry timestamps this close (oak4: 0.12 ms apart)        |
 | `KEPT`              | 16    | captures waiting per camera: 320 ms at 50 fps, three times the slowest pose       |
 | `STOP_WAIT`         | 1 s   | a stopping recording takes the parts its last captures wait for                   |
-| `SPLIT_WAIT`        | 1 s   | a split waits for a camera's first capture after the cut, then cuts it anyway     |
+| `SPLIT_WAIT`        | 1 s   | the cameras wait for each other at a split, then every camera is cut anyway       |
 | `HELD`              | 1 GB  | what waits for the encoders: some 6 s of four cameras with depth **(deduction)**  |
 
 ## Playback
