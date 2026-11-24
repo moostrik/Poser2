@@ -5,11 +5,6 @@ Proposed by the utils rescan of 2026-11-24 (deep-flow at 38929e26); not built. E
 
 ## F. What utils holds
 
-F1. `object_pool.py` goes, with `ObjectPool` from `__init__.py`.
-Why: written for the multipose prototype (2025-03-20), whose use went; unused since 2026-02-03 **(seen**, git log**)**;
-the repo's pools (gl's `PixelBufferPool`, the screen capture's slots, inference's `StagingRing`, smile's `ClipPool`)
-each need their own shape and could not use it **(seen)**. Chosen 2026-11-24. Check: pyright, utils tests.
-
 F2. `thread_priority.py` goes, with `ThreadPriority`, `set_current_thread_priority` and `get_current_thread_priority`
 from `__init__.py`.
 Why: added 2026-09-09 to raise white_space's light threads, removed from every caller 2026-10-08 after profiling showed
