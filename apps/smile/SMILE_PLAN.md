@@ -9,16 +9,12 @@ does not bring, is on the scratch disk, `F:\_scratch\SMILE`.
 
 ## A. Before leaving
 
-A1 and A3 run after smile is on the shared sequencer ([SESSION_PLAN](../../modules/session/SESSION_PLAN.md) topic B).
-
 - A1 The rehearsal: a new clone of the pushed branch (pushed on Matthias's word) in place of
   `C:\Developer\SmileClean`, installed only as the README's "New PC" says: `scripts\install.bat smile`, smile's
   `install.bat --from F:\_scratch\SMILE`; smile's tests, one `-sim` start with ComfyUI and a visitor through.
 - A2 A committed state that passes smile's tests, the guard tests and pyright; no other thread's uncommitted work in
   it.
-- A3 A live smile start on the OAK4 (`-oak`) in `.venv`, ComfyUI running, Matthias in front: one visitor through,
-  from the flash to the saved grin and portrait.
-- A4 The rule lines, for Matthias to change at the desktop (a PC session does not edit them):
+- A3 The rule lines, for Matthias to change at the desktop (a PC session does not edit them):
   - `CLAUDE.md`, the test commands: `python -m unittest discover -s modules/<pkg>/tests -t .    # camera/oak in .venv-oakd`
   - `.claude/rules/camera.md`: `- `modules/camera/oak4/` runs on depthai 3 in `.venv` (`install.bat`) and
     `modules/camera/oak/` on depthai 2 in `.venv-oakd` (`install.bat oakd`); an app imports one of them, never both`
@@ -41,8 +37,8 @@ A1 and A3 run after smile is on the shared sequencer ([SESSION_PLAN](../../modul
 
 ## The rules it touches
 
-- `.claude/rules/camera.md`, which backend runs in which venv: A4 (Matthias edits it)
-- `CLAUDE.md` Running code, the test commands per venv: A4 (Matthias edits it)
-- `CLAUDE.md` Running code, a run only on the user's go: A1, A3
+- `.claude/rules/camera.md`, which backend runs in which venv: A3 (Matthias edits it)
+- `CLAUDE.md` Running code, the test commands per venv: A3 (Matthias edits it)
+- `CLAUDE.md` Running code, a run only on the user's go: A1
 - `.claude/rules/docs.md`, each fact in one place: C1 (the struck lines go)
 - `.claude/rules/smile.md`, README.md current (on-site checks): C1
