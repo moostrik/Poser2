@@ -1,17 +1,10 @@
 # Utils plan
 
-Proposed by the utils scan of 2026-11-22 (deep-flow at 3c7a387d); nothing here is decided or built. Each step names
+Proposed by the utils scan of 2026-11-22 (deep-flow at 3c7a387d), go 2026-11-24; what is here is not built yet. Each step names
 its finding, **(seen)** in the code or a run, **(deduction)** when inferred. A step checked by a test or pyright is one
 commit. Steps marked *owner* change another package: a minor fix, with that package's thread asked for feedback.
 
 ## A. Broadcast
-
-A1. One spelling, `Broadcast[[X]]`. The 23 bare declarations become the list form: pose `frame/mixin.py` (3);
-inference `face_detector`, `inference_frame_sync`, `person_detector`, `batch_uploader` (4), `camera_sync`,
-`crop_extractor` (3), `serial_uploader` (7), `segmenter`; render `screen_capture`. *Owner: pose, inference, render.*
-Why: 20 lists use `Broadcast[[X]]` and 23 use `Broadcast[X]` **(seen)**, so one thing has two spellings (CLAUDE.md
-Naming). Only the list form holds a callback without arguments (`window_manager._exit_callbacks: Broadcast[[]]`), so
-it is the one that fits every list. The counts are from 3c7a387d and are recounted at the build. Check: pyright.
 
 A2. Every list typed and named. `pose_pipeline._Stage.outputs` becomes `Broadcast[[FrameDict]]` and `group_outputs`
 `Broadcast[[GroupRecord]]`; `osc_receiver._bindings` becomes `dict[str, Broadcast[...]]` (an address's arguments vary
@@ -34,8 +27,8 @@ read unlocked, a cost far below the stage they time **(deduction)**.
 Check: test_performance_timer.
 
 A5. Broadcast's docstrings say what it is. The reasons (copied under its lock and called outside it; an attribute,
-not a base class; `__bool__` lets a producer skip building the item) and the A1 spelling move to a Broadcast section in
-UTILS.md.
+not a base class; `__bool__` lets a producer skip building the item) and its one spelling, `Broadcast[[X]]`, the
+only form that holds a callback without arguments, move to a Broadcast section in UTILS.md.
 Why: CLAUDE.md Docstrings; both docstrings give reasons **(seen)**.
 
 A6. `tests/test_broadcast.py`: calls in registration order, a second add keeps the first place, a failing callback is

@@ -43,7 +43,7 @@ class Segmenter(ModelWorker[Batch, SegmenterSettings]):
         self._reset_interval: int = settings.reset_interval
         self._batch_count: int = 0
 
-        self._callbacks: Broadcast[FrameDict, ImageDict] = Broadcast(name="Segmentation mask")
+        self._callbacks: Broadcast[[FrameDict, ImageDict]] = Broadcast(name="Segmentation mask")
 
         self._process_timer = PerformanceTimer(name="Segmentation", sample_count=1000, report_interval=100, color='cyan', omit_init=25)
 

@@ -53,11 +53,11 @@ class CropExtractor:
         self._sizes: tuple[CropExtractorSettings, ...] = (settings, *more)
         self._processed: int = 0                        # the processes taken, for each size's `interval`
         # each size's callbacks, by the size's id
-        self._callbacks: dict[int, Broadcast[FrameDict, CropImageDict]] = {
+        self._callbacks: dict[int, Broadcast[[FrameDict, CropImageDict]]] = {
             id(size): Broadcast(name="crop") for size in self._sizes}
-        self._asked_callbacks: dict[int, Broadcast[float, int, FrameDict]] = {
+        self._asked_callbacks: dict[int, Broadcast[[float, int, FrameDict]]] = {
             id(size): Broadcast(name="crop asked") for size in self._sizes}
-        self._finished_callbacks: dict[int, Broadcast[FrameDict, CropImageDict]] = {
+        self._finished_callbacks: dict[int, Broadcast[[FrameDict, CropImageDict]]] = {
             id(size): Broadcast(name="finished crop") for size in self._sizes}
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
         self._snapshot_lock: Lock = Lock()              # the uploader's thread keeps them, the frame source's takes them

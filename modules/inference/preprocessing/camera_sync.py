@@ -52,7 +52,7 @@ class CameraSync(Generic[M]):
         self._open: dict[int, M] = {}                       # the set being filled
         self._open_round: int | None = None
 
-        self._callbacks: Broadcast[dict[int, M]] = Broadcast(name=self.name)
+        self._callbacks: Broadcast[[dict[int, M]]] = Broadcast(name=self.name)
         self._wake: Condition = Condition()
         self._running: bool = False
         self._inbox: deque[tuple[M, float]] = deque()               # (message, the moment it was queued)

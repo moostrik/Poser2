@@ -102,7 +102,7 @@ class InferenceFrameSync:
         self._last: dict[int, float] = {}               # the capture time of each camera's last frame
         self._waiting: dict[int, _Waiting] = {}
         self._missed: MissedParts = MissedParts('Inference frame sync')
-        self._callbacks: Broadcast[InferenceFrame] = Broadcast(name="inference frame")
+        self._callbacks: Broadcast[[InferenceFrame]] = Broadcast(name="inference frame")
 
     def add_frame_callback(self, callback: InferenceFrameCallback) -> None:
         self._callbacks.add_callback(callback)

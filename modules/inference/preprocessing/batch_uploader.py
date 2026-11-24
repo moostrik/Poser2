@@ -42,10 +42,10 @@ class BatchUploader:
         self._set_wait: PerformanceTimer = PerformanceTimer(name="Wait upload set")
         self._timer: PerformanceTimer = PerformanceTimer(name="GPU Set Upload", sample_count=200, report_interval=100,
                                                          color="green", omit_init=25)
-        self._image_callbacks: Broadcast[GpuImage] = Broadcast(name="BatchUploader image")
-        self._snapshot_callbacks: Broadcast[ImageSnapshot] = Broadcast(name="BatchUploader snapshot")
-        self._capture_callbacks: Broadcast[dict[int, float]] = Broadcast(name="BatchUploader capture")
-        self._finished_image_callbacks: Broadcast[GpuImage] = Broadcast(name="BatchUploader finished image")
+        self._image_callbacks: Broadcast[[GpuImage]] = Broadcast(name="BatchUploader image")
+        self._snapshot_callbacks: Broadcast[[ImageSnapshot]] = Broadcast(name="BatchUploader snapshot")
+        self._capture_callbacks: Broadcast[[dict[int, float]]] = Broadcast(name="BatchUploader capture")
+        self._finished_image_callbacks: Broadcast[[GpuImage]] = Broadcast(name="BatchUploader finished image")
         self._finish_timer: PerformanceTimer = PerformanceTimer(name="Wait upload finished")
 
     @property

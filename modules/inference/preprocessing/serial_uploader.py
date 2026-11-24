@@ -67,14 +67,14 @@ class SerialUploader:
             name="GPU Image Upload  ", sample_count=200, report_interval=100,
             color="green", omit_init=25,
         )
-        self._gpu_image_callbacks: Broadcast[GpuImage] = Broadcast(name="SerialUploader image")
-        self._snapshot_callbacks: Broadcast[ImageSnapshot] = Broadcast(name="SerialUploader snapshot")
-        self._capture_callbacks: Broadcast[dict[int, float]] = Broadcast(name="SerialUploader capture")
-        self._finished_image_callbacks: Broadcast[GpuImage] = Broadcast(name="SerialUploader finished image")
-        self._gpu_depth_callbacks: Broadcast[GpuDepth] = Broadcast(name="SerialUploader depth")
-        self._finished_depth_callbacks: Broadcast[GpuDepth] = Broadcast(name="SerialUploader finished depth")
+        self._gpu_image_callbacks: Broadcast[[GpuImage]] = Broadcast(name="SerialUploader image")
+        self._snapshot_callbacks: Broadcast[[ImageSnapshot]] = Broadcast(name="SerialUploader snapshot")
+        self._capture_callbacks: Broadcast[[dict[int, float]]] = Broadcast(name="SerialUploader capture")
+        self._finished_image_callbacks: Broadcast[[GpuImage]] = Broadcast(name="SerialUploader finished image")
+        self._gpu_depth_callbacks: Broadcast[[GpuDepth]] = Broadcast(name="SerialUploader depth")
+        self._finished_depth_callbacks: Broadcast[[GpuDepth]] = Broadcast(name="SerialUploader finished depth")
         self._finish_timer: PerformanceTimer = PerformanceTimer(name="Wait upload finished")
-        self._tracklet_callbacks: Broadcast[CameraTracklets] = Broadcast(name="SerialUploader tracklet")
+        self._tracklet_callbacks: Broadcast[[CameraTracklets]] = Broadcast(name="SerialUploader tracklet")
         self._queue: deque[tuple[CameraFrame, float]] = deque()            # each with the moment it was queued
         self._tracklets: deque[tuple[CameraTracklets, float]] = deque()    # never dropped: a tracker needs every message
         # How long a frame and a tracklet message wait in their queue for this thread (ms), as timer samples

@@ -49,7 +49,7 @@ class FaceDetector(ModelWorker[GpuImage, FaceDetectorSettings]):
         super().__init__(settings, "FaceDetector")
         self._detection: Engine = make_engine(settings.model_type, settings.model_file(DETECTION_MODEL))
         self._landmarks: Engine = make_engine(settings.model_type, settings.model_file(LANDMARKS_MODEL))
-        self._callbacks: Broadcast[FaceFrame] = Broadcast(name="face")
+        self._callbacks: Broadcast[[FaceFrame]] = Broadcast(name="face")
         self._timer: PerformanceTimer = PerformanceTimer(name="Face Detection", sample_count=200, report_interval=100, color='magenta', omit_init=10)
 
     def add_face_callback(self, callback: FaceFrameCallback) -> None:

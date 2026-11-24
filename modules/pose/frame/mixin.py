@@ -24,7 +24,7 @@ class FrameCallbackMixin:
 
     def __init__(self) -> None:
         """Initialize callback system."""
-        self._frame_callbacks: Broadcast[Frame] = Broadcast()
+        self._frame_callbacks: Broadcast[[Frame]] =Broadcast()
 
     def _notify_frame_callbacks(self, frame: Frame) -> None:
         """Emit callbacks with pose.
@@ -75,7 +75,7 @@ class FrameDictCallbackMixin:
 
     def __init__(self) -> None:
         """Initialize callback system."""
-        self._frames_callbacks: Broadcast[FrameDict] = Broadcast()
+        self._frames_callbacks: Broadcast[[FrameDict]] =Broadcast()
 
     def _notify_frames_callbacks(self, frames: FrameDict) -> None:
         """Emit callbacks with frames.
@@ -115,7 +115,7 @@ class FrameWindowDictCallbackMixin:
     """
 
     def __init__(self) -> None:
-        self._frame_window_callbacks: Broadcast[FrameWindowDict] = Broadcast()
+        self._frame_window_callbacks: Broadcast[[FrameWindowDict]] =Broadcast()
 
     def _notify_windows_callbacks(self, windows: FrameWindowDict) -> None:
         self._frame_window_callbacks(windows)

@@ -32,7 +32,7 @@ class PersonDetector(ModelWorker[GpuImage, PersonDetectorSettings]):
         self.height: int = settings.height
         self._engine: Engine = make_engine(settings.model_type, settings.model_file(settings.model))
 
-        self._callbacks: Broadcast[Detection] = Broadcast(name="detection")
+        self._callbacks: Broadcast[[Detection]] = Broadcast(name="detection")
 
         self._timer: PerformanceTimer = PerformanceTimer(name="Person Detection", sample_count=1000, report_interval=100, color='magenta', omit_init=25)
 

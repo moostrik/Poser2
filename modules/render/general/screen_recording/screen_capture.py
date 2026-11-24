@@ -74,7 +74,7 @@ class ScreenCapture:
         self._free: deque[int] = deque()
         self._lent: int = 0
         self._dropped: int = 0                      # ticks left out since the last frame went out
-        self._callbacks: Broadcast[ScreenFrame] = Broadcast(name="screen frame")
+        self._callbacks: Broadcast[[ScreenFrame]] = Broadcast(name="screen frame")
 
     @property
     def allocated(self) -> bool:
