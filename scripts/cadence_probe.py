@@ -16,9 +16,9 @@ Writes the report as JSON in `--out` and prints it. The app is stopped in a `fin
 twice the time it should take.
 
 With `--record` it records over the stretch, as `probe_<LABEL>` in the app's recordings, and reports what the
-recording went without.
+recording went without. With `--detector` the host detector finds the players in place of the recorded tracklets.
 
-    python scripts/cadence_probe.py LABEL --folder FOLDER --start S --end S [--out DIR] [--record]
+    python scripts/cadence_probe.py LABEL --folder FOLDER --start S --end S [--out DIR] [--record] [--detector]
 """
 import json
 import os
@@ -79,6 +79,7 @@ def main() -> int:
     parser.add_argument('--end', type=float, required=True, help='its end in the recording (s)')
     parser.add_argument('--out', default='.', help='the folder the report goes in')
     parser.add_argument('--record', action='store_true', help='record over the stretch, as `probe_<label>` in the recordings')
+    parser.add_argument('--detector', action='store_true', help='the host detector finds the players, in place of the recorded tracklets')
     args = parser.parse_args()
 
     setup_logging(verbose=False, name='deep_flow')
@@ -86,7 +87,7 @@ def main() -> int:
     app = DeepFlowMain(simulation=True, interface=False)
     settings = app.settings.setup
     settings.camera.simulator.folder = args.folder
-    settings.camera.person_detector.enabled = False         # the recorded tracklets
+    settings.camera.person_detector.enabled = args.detector     # the host detector, or the recorded tracklets
     settings.camera.recorded_poses.enabled = False          # the pose model in the app
     settings.pose.pose.enabled = True
 

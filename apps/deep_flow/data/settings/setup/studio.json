@@ -268,7 +268,8 @@
       "freeze_frame": false,
       "layer": {
         "main": [
-          "show"
+          "show",
+          "pose"
         ],
         "debug": [
           "fluid"
@@ -276,7 +277,7 @@
       },
       "pose": {
         "stage": "LERP",
-        "frame": "CAMERA",
+        "frame": "VIEW",
         "features": "NONE",
         "crop": {
           "back_stage": "CLEAN",

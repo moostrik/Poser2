@@ -12,7 +12,7 @@ operator saw.
 | #   | Line                                                                         | State                             | Documents                                          |
 |-----|------------------------------------------------------------------------------|-----------------------------------|----------------------------------------------------|
 | A   | [The measurements](#a-the-measurements)                                      | built                             | [FLOW.md](FLOW.md#the-goals)                       |
-| B   | [The view](#b-the-view)                                                      | built                             | [VIEW.md](VIEW.md)                                 |
+| B   | [The view](#b-the-view)                                                      | built; B3 the checks              | [VIEW.md](VIEW.md)                                 |
 | C   | [The motion](#c-the-motion)                                                  | built; C2 values, C3 range        | [MOTION.md](MOTION.md)                             |
 | D   | [The bridge](#d-the-bridge)                                                  | built; D6 the checks              | [BRIDGE_3D.md](BRIDGE_3D.md)                       |
 | E   | [The 3D fluid's physics](#e-the-3d-fluids-physics)                           | built; E6 the app's check         | [FLUID_3D.md](FLUID_3D.md)                         |
@@ -42,6 +42,10 @@ stated before it is made.
 ## B. The view
 
 Its goal and what is built: [VIEW.md](VIEW.md). New points go here.
+
+- **B3.** The checks, in deep_flow with the camera and a player in view: the cadence of the view's outputs; the
+  view's outputs on the monitors; the depth's edges on the measure recording (z's step inside the body, z's noise
+  at the edge and inside); the dye at drag 0.
 
 ## C. The motion
 
@@ -219,5 +223,6 @@ The cameras:
 
 - Compare a result only with rows of the same recording, settings and code paths: C2.
 - Ask to measure a time again when its pass's code or size changes: D6.
+- Run a test of the app or a GPU harness only on the user's go, and only what the plan names: B3.
 
 Not designed yet, so their rules are not named: C3, F1, F2, H1.
