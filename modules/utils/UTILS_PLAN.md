@@ -5,14 +5,6 @@ Each step names its finding, **(seen)** in the code or a run, **(deduction)** wh
 or pyright is one commit. Steps marked *owner* change another package: a minor fix, with that package's thread asked
 for feedback.
 
-## C. Color
-
-C1. `color.py`: "colour" becomes "color"; the module docstring says what `Color` is (an RGBA color in 0..1), not
-"for the settings system", since gl, render, flow, panel and the apps use it too; the hand-written `__eq__` goes, the
-dataclass makes the same one.
-Why: glossary (American spelling), Docstrings, written once **(seen)**. Check: settings tests (value types,
-serialization).
-
 ## D. Smoothing
 
 D1. `smoothing.py` becomes four small filters that are used the same way: `f(value, timestamp)` returns the smoothed

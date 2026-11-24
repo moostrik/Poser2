@@ -1,9 +1,4 @@
-"""Color utility class for the settings system.
-
-Canonical internal representation is RGBA floats in the 0.0–1.0 range.
-Factory classmethods provide construction from int (0–255), hex strings,
-HSV and HSL colour spaces.
-"""
+"""Color, an RGBA color in 0..1, made from and turned into 0-255 ints, hex strings, HSV and HSL."""
 
 from __future__ import annotations
 
@@ -15,7 +10,7 @@ from typing import Any, Generator
 
 @dataclass
 class Color:
-    """RGBA colour stored as floats in [0, 1]."""
+    """An RGBA color, its channels floats in [0, 1]."""
 
     r: float
     g: float
@@ -46,15 +41,6 @@ class Color:
 
     def __len__(self) -> int:
         return 4
-
-    # ------------------------------------------------------------------
-    # Equality — required for Setting change detection
-    # ------------------------------------------------------------------
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Color):
-            return NotImplemented
-        return (self.r, self.g, self.b, self.a) == (other.r, other.g, other.b, other.a)
 
     def __repr__(self) -> str:
         if self.a == 1.0:
