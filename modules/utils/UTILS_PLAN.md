@@ -5,17 +5,6 @@ Each step names its finding, **(seen)** in the code or a run, **(deduction)** wh
 or pyright is one commit. Steps marked *owner* change another package: a minor fix, with that package's thread asked
 for feedback.
 
-## B. Geometry
-
-B1. `points_and_rects.py` and `fit.py` become a `geometry/` folder: `point.py` (`Point2f`), `rect.py` (`Rect`),
-`quad.py` (`Quad`) and `fit.py` (`fit`, `fill`). `Rect.aspect_fit` and `Rect.aspect_fill` compute through `fit()` and
-`fill()`, and `fit`/`fill` share one body. Imports run one way: `rect.py` uses point, quad and fit. `tests/test_fit.py`
-becomes `tests/test_geometry.py`, with Rect cases added. Callers import from `__init__.py` and do not change.
-Why: the same centering arithmetic is written four times, twice in `fit.py` and twice in `points_and_rects.py`
-**(seen)**; CLAUDE.md Packages "code that does the same is written once", and "Its files each hold one class or one
-subject, named after it": `points_and_rects.py` holds three classes in 525 lines; four files make a folder (chosen
-2026-11-22). Check: test_geometry.
-
 ## C. Color
 
 C1. `color.py`: "colour" becomes "color"; the module docstring says what `Color` is (an RGBA color in 0..1), not

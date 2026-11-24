@@ -3,156 +3,10 @@ from typing import Any, Generator
 
 import numpy as np
 
-@dataclass
-class Point2f:
-    x: float
-    y: float
+from .fit import fill, fit
+from .point import Point2f
+from .quad import Quad
 
-    def __iter__(self) -> Generator[float, Any, None]:
-        """Iterate over x and y coordinates."""
-        yield self.x
-        yield self.y
-
-    def __getitem__(self, index: int) -> float:
-        """Get x or y by index (0 for x, 1 for y)."""
-        if index == 0:
-            return self.x
-        elif index == 1:
-            return self.y
-        else:
-            raise IndexError("Point2f index out of range (0-1)")
-
-    def copy(self) -> "Point2f":
-        """Return a copy of this point."""
-        return Point2f(x=self.x, y=self.y)
-
-    def __add__(self, other: "float | Point2f") -> "Point2f":
-        """Add another Point2f or scalar to this point."""
-        if isinstance(other, Point2f):
-            return Point2f(self.x + other.x, self.y + other.y)
-        else:
-            return Point2f(self.x + other, self.y + other)
-
-    def __sub__(self, other: "float | Point2f") -> "Point2f":
-        """Subtract another Point2f or scalar from this point."""
-        if isinstance(other, Point2f):
-            return Point2f(self.x - other.x, self.y - other.y)
-        else:
-            return Point2f(self.x - other, self.y - other)
-
-    def __mul__(self, other: "float | Point2f") -> "Point2f":
-        """Multiply this point by another Point2f or scalar."""
-        if isinstance(other, Point2f):
-            return Point2f(self.x * other.x, self.y * other.y)
-        else:
-            return Point2f(self.x * other, self.y * other)
-
-    def __truediv__(self, other: "float | Point2f") -> "Point2f":
-        """Divide this point by another Point2f or scalar."""
-        if isinstance(other, Point2f):
-            return Point2f(self.x / other.x, self.y / other.y)
-        else:
-            return Point2f(self.x / other, self.y / other)
-
-    def __eq__(self, other: object) -> bool:
-        """Check if two points are equal."""
-        if not isinstance(other, Point2f):
-            return NotImplemented
-        return self.x == other.x and self.y == other.y
-
-    @property
-    def length(self) -> float:
-        """Return the magnitude of the vector."""
-        return (self.x ** 2 + self.y ** 2) ** 0.5
-
-    @property
-    def is_zero(self) -> bool:
-        """Check if either coordinate is zero."""
-        return self.x == 0 and self.y == 0
-
-    def normalized(self) -> "Point2f":
-        """Return a normalized (unit length) vector."""
-        l = self.length
-        if l == 0:
-            return Point2f(0, 0)
-        return Point2f(self.x / l, self.y / l)
-
-    def dot(self, other: "Point2f") -> float:
-        """Return the dot product with another point."""
-        return self.x * other.x + self.y * other.y
-
-    def clamp(self, min_point: "Point2f", max_point: "Point2f") -> "Point2f":
-        """Clamp this point between min_point and max_point."""
-        return Point2f(
-            x=max(min_point.x, min(self.x, max_point.x)),
-            y=max(min_point.y, min(self.y, max_point.y))
-        )
-
-    def distance_to(self, other: "Point2f") -> float:
-        """Return the Euclidean distance to another point."""
-        dx = self.x - other.x
-        dy = self.y - other.y
-        return (dx ** 2 + dy ** 2) ** 0.5
-
-    def angle_to(self, other: "Point2f") -> float:
-        """Return the angle to another point in radians."""
-        from math import atan2
-        return atan2(other.y - self.y, other.x - self.x)
-
-    def rotate(self, angle_rad: float) -> "Point2f":
-        """Return a new Point2f rotated by angle_rad radians around the origin."""
-        from math import cos, sin
-        cos_a = cos(angle_rad)
-        sin_a = sin(angle_rad)
-        return Point2f(
-            x=self.x * cos_a - self.y * sin_a,
-            y=self.x * sin_a + self.y * cos_a
-        )
-
-    def rotate_around(self, center: "Point2f", angle_rad: float) -> "Point2f":
-        """Return a new Point2f rotated by angle_rad radians around another point."""
-        translated = self - center
-        rotated = translated.rotate(angle_rad)
-        return rotated + center
-
-    def lerp(self, other: "Point2f", t: float) -> "Point2f":
-        """Linearly interpolate between this point and another by t (0.0 to 1.0)."""
-        return Point2f(
-            x=self.x + (other.x - self.x) * t,
-            y=self.y + (other.y - self.y) * t
-        )
-
-    @staticmethod
-    def zero() -> "Point2f":
-        """Return a zero point (0.0, 0.0)."""
-        return Point2f(0.0, 0.0)
-
-    def to_array(self) -> np.ndarray:
-        """Return the point as a numpy array [x, y]."""
-        return np.array([self.x, self.y], dtype=np.float32)
-
-    @staticmethod
-    def from_array(arr: np.ndarray) -> "Point2f":
-        """Create a Point2f from a numpy array [x, y]."""
-        return Point2f(float(arr[0]), float(arr[1]))
-
-    def to_tuple(self) -> tuple[float, float]:
-        """Return the point as a tuple (x, y)."""
-        return (self.x, self.y)
-
-    @staticmethod
-    def from_tuple(coords: tuple[float, float]) -> "Point2f":
-        """Create a Point2f from a tuple (x, y)."""
-        return Point2f(coords[0], coords[1])
-
-    def to_dict(self) -> dict:
-        """Return the point as a dict for JSON serialization."""
-        return {"x": self.x, "y": self.y}
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "Point2f":
-        """Create a Point2f from a dict."""
-        return cls(data["x"], data["y"])
 
 @dataclass
 class Rect:
@@ -398,37 +252,13 @@ class Rect:
 
     def aspect_fit(self, target: "Rect") -> "Rect":
         """Return a rectangle that fits this rectangle into the target rectangle while preserving aspect ratio."""
-        aspect_ratio = self.width / self.height
-        if target.width / target.height > aspect_ratio:
-            # Outer is wider than inner aspect ratio
-            new_height = target.height
-            new_width = new_height * aspect_ratio
-        else:
-            # Outer is taller than inner aspect ratio
-            new_width = target.width
-            new_height = new_width / aspect_ratio
-
-        new_x = target.x + (target.width - new_width) / 2
-        new_y = target.y + (target.height - new_height) / 2
-
-        return Rect(x=new_x, y=new_y, width=new_width, height=new_height)
+        x, y, width, height = fit(self.width, self.height, target.width, target.height)
+        return Rect(x=target.x + x, y=target.y + y, width=width, height=height)
 
     def aspect_fill(self, target: "Rect") -> "Rect":
         """Scale this rectangle to completely fill the target rectangle while maintaining aspect ratio."""
-        aspect_ratio = self.width / self.height
-        if target.width / target.height < aspect_ratio:
-            # Outer is narrower than inner aspect ratio
-            new_height = target.height
-            new_width = new_height * aspect_ratio
-        else:
-            # Outer is shorter than inner aspect ratio
-            new_width = target.width
-            new_height = new_width / aspect_ratio
-
-        new_x = target.x + (target.width - new_width) / 2
-        new_y = target.y + (target.height - new_height) / 2
-
-        return Rect(x=new_x, y=new_y, width=new_width, height=new_height)
+        x, y, width, height = fill(self.width, self.height, target.width, target.height)
+        return Rect(x=target.x + x, y=target.y + y, width=width, height=height)
 
     def flip_x(self, axis: float) -> "Rect":
         """Flip the rectangle horizontally around a given axis (x coordinate)."""
@@ -494,13 +324,13 @@ class Rect:
         """Create a Rect from a dict."""
         return cls(data["x"], data["y"], data["width"], data["height"])
 
-    def corners(self) -> "Quad":
+    def corners(self) -> Quad:
         """The rectangle's four corners, as a `Quad`; a negative width or height gives them mirrored."""
         right: float = self.x + self.width
         bottom: float = self.y + self.height
         return Quad(Point2f(self.x, self.y), Point2f(right, self.y), Point2f(right, bottom), Point2f(self.x, bottom))
 
-    def turned(self, angle: float, center: Point2f, aspect: float = 1.0) -> "Quad":
+    def turned(self, angle: float, center: Point2f, aspect: float = 1.0) -> Quad:
         """The rectangle's corners turned by `angle` (radians, the image's top-left frame) about `center`, the turn
         round in pixels of an image `aspect` wide per unit high; all in 0..1 with the origin top-left."""
         cos_a: float = float(np.cos(angle))
@@ -513,13 +343,3 @@ class Rect:
 
         quad: Quad = self.corners()
         return Quad(turn(quad.top_left), turn(quad.top_right), turn(quad.bottom_right), turn(quad.bottom_left))
-
-
-@dataclass
-class Quad:
-    """Four corners in 0..1 with the origin top-left: where a rectangle's top left, top right, bottom right and bottom
-    left land, as a turned or mirrored rectangle."""
-    top_left: Point2f
-    top_right: Point2f
-    bottom_right: Point2f
-    bottom_left: Point2f

@@ -19,8 +19,7 @@ from .interpolation import \
     VectorPredictiveHermite, \
     ScalarPredictiveAngleHermite, \
     VectorPredictiveAngleHermite
-from .points_and_rects import Point2f, Rect, Quad
-from .fit import fill, fit
+from .geometry import Point2f, Quad, Rect, fill, fit
 from .lfo import lfo
 from .color import Color
 from .object_pool import ObjectPool
