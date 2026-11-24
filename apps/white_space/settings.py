@@ -97,14 +97,14 @@ class OakGroup(BaseSettings):
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
     replay            : Field[bool]            = Field(False, access=Field.INIT, description="Play on the host without an OAK device: detector and tracker in software")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, description="Model files directory")
-    ir_flood_light    : Field[float]           = Field(0.8, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
+    flood_light    : Field[float]           = Field(0.8, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
     tilt              : Field[float]           = Field(0.0, access=Field.INIT, description="Up-tilt of all four cameras (°), positive = upward; baked into the warp at open")
     lens_fov          : Field[float]           = Field(0.0, access=Field.INIT, step=0.1, description="Field (°) the lens spans across the full sensor width; 0 = same as fov")
     lens_center_x     : Field[float]           = Field(0.0, access=Field.INIT, step=0.5, description="Optical center offset from the frame center (px), full sensor mode")
     lens_center_y     : Field[float]           = Field(0.0, access=Field.INIT, step=0.5, description="Optical center offset from the frame center (px), positive = down")
     mono_auto_exposure: Field[bool]            = Field(True, widget=Widget.switch, description="Mono auto exposure, all four cameras")
 
-    _cam_share: list = [fps, color, square, yolo, resolution, model_path, ir_flood_light, fov, tilt,
+    _cam_share: list = [fps, color, square, yolo, resolution, model_path, flood_light, fov, tilt,
                         lens_fov, lens_center_x, lens_center_y, mono_auto_exposure]
 
     cam_0     : Group[OakCameraSettings]            = Group(OakCameraSettings, share=_cam_share)

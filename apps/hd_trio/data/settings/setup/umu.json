@@ -40,11 +40,11 @@
         "mono_sensor": {
           "exposure": 1000,
           "iso": 100,
-          "ir_grid_light": 0.0
+          "dot_projector": 0.0
         },
         "tilt": 0.0,
         "mono_auto_exposure": true,
-        "ir_flood_light": 0.0
+        "flood_light": 0.0
       },
       "cam_1": {
         "device_id": "19443010D1E4974800",
@@ -73,11 +73,11 @@
         "mono_sensor": {
           "exposure": 1000,
           "iso": 100,
-          "ir_grid_light": 0.0
+          "dot_projector": 0.0
         },
         "tilt": 0.0,
         "mono_auto_exposure": true,
-        "ir_flood_light": 0.0
+        "flood_light": 0.0
       },
       "cam_2": {
         "device_id": "19443010D14C874800",
@@ -106,11 +106,11 @@
         "mono_sensor": {
           "exposure": 1000,
           "iso": 100,
-          "ir_grid_light": 0.0
+          "dot_projector": 0.0
         },
         "tilt": 0.0,
         "mono_auto_exposure": true,
-        "ir_flood_light": 0.0
+        "flood_light": 0.0
       },
       "camera_health": {
         "mount_tolerance": 2.0

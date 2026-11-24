@@ -13,7 +13,6 @@ import depthai as dai
 from .. import CAPTURE_TOLERANCE
 from ..geometry import CameraResolution, IMU_RATE_HZ, MountConfig, frame_size, WARP_MESH, warp_mesh_points
 
-from .device import SYSTEM_RATE_HZ
 from .models import nn_frame_type, DETECTOR_CONFIDENCE_THRESHOLD, DETECTOR_OVERLAP_THRESHOLD, POSE_CROP_PADDING, TRACKER_PERSON_LABEL, \
     TRACKER_TYPE
 from .sensor import SENSOR_SOCKET, STEREO_SOCKETS, STEREO_SIZE, DEPTH_MODELS, DepthModel, requested_size, direct_size
@@ -22,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 DEPTH_STREAM: str = 'depth'             # the depth's name in the depth's message group
 CONFIDENCE_STREAM: str = 'confidence'   # its confidence's
+SYSTEM_RATE_HZ: float = 1.0             # how often the camera reports its CPU, memory and temperature
 
 
 @dataclass

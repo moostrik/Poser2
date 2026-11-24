@@ -138,7 +138,7 @@ class DepthControl:
     def __init__(self, settings: DepthSettings, queue: dai.InputQueue) -> None:
         self.settings: DepthSettings = settings
         self.queue: dai.InputQueue = queue
-        self._fields: list = [DepthSettings.confidence, DepthSettings.edge, DepthSettings.temporal_filter, DepthSettings.temporal_alpha,
+        self._fields: list[Field[Any]] = [DepthSettings.confidence, DepthSettings.edge, DepthSettings.temporal_filter, DepthSettings.temporal_alpha,
                               DepthSettings.temporal_delta, DepthSettings.near, DepthSettings.far]
         for field in self._fields:
             self.settings.bind(field, self._send)

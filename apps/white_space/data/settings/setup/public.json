@@ -237,7 +237,7 @@
       "sim_enabled": false,
       "replay": true,
       "model_path": "data/models",
-      "ir_flood_light": 0.75,
+      "flood_light": 0.75,
       "mono_auto_exposure": false,
       "cam_0": {
         "device_id": "14442C10110AD3D200",
@@ -263,7 +263,7 @@
         "mono_sensor": {
           "exposure": 20000,
           "iso": 1549,
-          "ir_grid_light": 0.0
+          "dot_projector": 0.0
         }
       },
       "cam_1": {
@@ -290,7 +290,7 @@
         "mono_sensor": {
           "exposure": 20000,
           "iso": 1149,
-          "ir_grid_light": 0.0
+          "dot_projector": 0.0
         }
       },
       "cam_2": {
@@ -317,7 +317,7 @@
         "mono_sensor": {
           "exposure": 20000,
           "iso": 1549,
-          "ir_grid_light": 0.0
+          "dot_projector": 0.0
         }
       },
       "cam_3": {
@@ -344,7 +344,7 @@
         "mono_sensor": {
           "exposure": 20000,
           "iso": 1549,
-          "ir_grid_light": 0.0
+          "dot_projector": 0.0
         }
       },
       "camera_health": {

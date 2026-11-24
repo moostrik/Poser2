@@ -6,7 +6,7 @@ the capture match) is read by every app and by inference, recording, tracker and
 kind of camera, used now by the apps that have it: `oak` by white_space and hd_trio, `oak4` by deep_flow, low_flow
 and smile, `vimba` and `webcam` by smile. That is general code with one user, which stays.
 
-F is what is left of the scans, I the scan of 2026-11-22 evening, J recordings
+F is what is left of the scans, J recordings
 through the camera's own models. **(seen)** is read in the code, **(deduction)** inferred.
 
 ## F. With an OAK-D at the PC
@@ -18,30 +18,6 @@ through the camera's own models. **(seen)** is read in the code, **(deduction)**
   with clips in -sim, opens on its own pipeline, its geometry logged. J1's clip path through the device is checked in
   the same run: a clip tracklet's `timestamp` equals the recorded capture of the frame it was found in, which J1's
   stamp rests on **(deduction)**.
-
-## I. The scan of 2026-11-22 evening
-
-- I3. Form only. Each is checked by the tests and pyright:
-  - `SYSTEM_RATE_HZ` moves from `oak4/device.py` to `oak4/pipeline.py`, its one user. Why: "Its files each hold one class
-    or one subject, named after it"; `device.py` is finding a device **(seen)**.
-  - `geometry/__init__.py` drops `MONO_RESOLUTIONS` and `COLOR_RESOLUTIONS`, which only `sensor_modes.py` uses
-    **(seen)**. Why: "Its `__init__.py` holds what other packages use".
-  - `geometry/tests/test_orientation.py`'s `TestMountCheck`, `TestCameraFpsCheck`, `TestPinnedLatency` and
-    `_TiltedCamera` move to `tests/test_camera_health.py`: they test `camera_health.py` **(seen)**. Its
-    `TestRollOffsetIsABox` moves to a new `tests/test_settings.py`: it tests `RigCameraReadings` **(seen)**. Why: "Its
-    tests sit in its `tests/` folder".
-  - `oak4/tests/test_keypoint_join.py`'s docstring says "the player", not "the person" **(seen)**. Why: the
-    glossary, a person in docs is "player".
-  - CAMERA.md, The lens: `log_connected_sensors` logs the sensor behind each socket at open, not
-    `get_device_list(verbose=True)`, which lists the devices **(seen)**.
-  - `DepthControl._fields` is typed with its element type, not bare `list` **(seen)**. Why: "Use modern typing".
-  - The IR lights have one name in both OAKs: the OAK-D's `ir_grid_light` and `ir_flood_light` (in
-    `MonoSensorSettings`, and the relayed `OakCameraSettings.ir_flood_light`) become the OAK4's `dot_projector` and
-    `flood_light` **(seen)**. Why: "Use no synonyms for one concept across modules; when a term changes, rename it
-    everywhere in the same change". Settings files: `apps/hd_trio/data/settings/setup/studio.json` and `umu.json`,
-    `apps/white_space/data/settings/setup/public.json` and `studio.json` **(seen)**. App files:
-    `apps/white_space/settings.py` (its `ir_flood_light` and `_cam_share`) and `apps/white_space/docs/CALIBRATION.md`
-    **(seen)**.
 
 ## J. Recordings through the camera's own models
 
@@ -136,13 +112,6 @@ internal and made by depthai **(seen in `.venv-oak4`, depthai 3.11; the Luxonis 
 
 - Stamp a frame or tracklet message once, where the backend hands it over, with its moment of capture where the device reports one, else its arrival: F1, J1
 - A callback only hands the item over and returns: J1
-- Its files each hold one class or one subject, named after it: I3
-- Its `__init__.py` holds what other packages use: I3
-- Its tests sit in its `tests/` folder: I3
-- Use the terms in `.claude/rules/glossary.md`: I3
-- Use modern typing (`list[T]`, `dict[K, V]`, `X | Y`): I3
-- Use no synonyms for one concept across modules; when a term changes, rename it everywhere in the same change: I3
-- Keep settings files in sync with code changes: I3
 - Prefer composition over inheritance for runtime assembly: J1, J2
 - Remove obsolete pathways instead of leaving parallel legacy ones: J1
 - Run a test of the app or a GPU harness only on the user's go, and only what the plan names: F1, J2

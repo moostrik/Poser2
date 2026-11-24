@@ -88,8 +88,8 @@ with another mode is wrong.
 | OAK-1 W     | OV9782 color           | 1280 x 800  | 150  | 127  | 79.5 |
 
 From [OAK-D Pro W](https://docs.luxonis.com/hardware/products/OAK-D%20Pro%20W) and
-[OAK-1 W](https://docs.luxonis.com/hardware/products/OAK-1%20W); `get_device_list(verbose=True)` logs the sensor
-behind each socket.
+[OAK-1 W](https://docs.luxonis.com/hardware/products/OAK-1%20W); `log_connected_sensors` logs the sensor behind each
+socket at open.
 
 `fov` is the field the delivered frame spans, a contract the tracker builds on (`cam_fov`, the overlaps, a column's
 azimuth). The lens is what the sensor sees, and it is not `fov`. The four White Space units' factory calibrations

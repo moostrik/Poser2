@@ -1,4 +1,4 @@
-"""The two-model chain's join: a tracklet gets the keypoints of the person whose box is its source
+"""The two-model chain's join: a tracklet gets the keypoints of the player whose box is its source
 detection, whichever of the two streams arrives second. Runs on a depthai 3 install."""
 
 import unittest

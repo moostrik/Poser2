@@ -9,8 +9,6 @@ from .. import CameraResolution
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_RATE_HZ: float = 1.0     # how often the camera reports its CPU, memory and temperature
-
 
 def get_device_list(verbose: bool = False) -> list[str]:
     """The ids of the OAK4s depthai sees now, each once: an OAK4 on both USB and Ethernet is listed

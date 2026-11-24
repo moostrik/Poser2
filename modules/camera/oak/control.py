@@ -22,14 +22,14 @@ class MonoSensorControl:
             (MonoSensorSettings.auto_exposure,  self._on_auto_exposure),
             (MonoSensorSettings.exposure,       self._on_exposure),
             (MonoSensorSettings.iso,            self._on_exposure),
-            (MonoSensorSettings.ir_flood_light, self._on_ir_flood_light),
-            (MonoSensorSettings.ir_grid_light,  self._on_ir_grid_light),
+            (MonoSensorSettings.flood_light, self._on_flood_light),
+            (MonoSensorSettings.dot_projector,  self._on_dot_projector),
         ]
         for field, callback in self._bindings:
             sensor.bind(field, callback)
         self._on_auto_exposure()
-        self._on_ir_flood_light()
-        self._on_ir_grid_light()
+        self._on_flood_light()
+        self._on_dot_projector()
 
     def close(self) -> None:
         for field, callback in self._bindings:
@@ -63,8 +63,8 @@ class MonoSensorControl:
         ctrl.setManualExposure(self.sensor.exposure, self.sensor.iso)
         self._send(ctrl)
 
-    def _on_ir_flood_light(self, value=None) -> None:
-        self.device.setIrFloodLightIntensity(self.sensor.ir_flood_light)
+    def _on_flood_light(self, value=None) -> None:
+        self.device.setIrFloodLightIntensity(self.sensor.flood_light)
 
-    def _on_ir_grid_light(self, value=None) -> None:
-        self.device.setIrLaserDotProjectorIntensity(self.sensor.ir_grid_light)
+    def _on_dot_projector(self, value=None) -> None:
+        self.device.setIrLaserDotProjectorIntensity(self.sensor.dot_projector)

@@ -227,7 +227,7 @@ relies on it. The sensor table for every OAK variant in use, with Luxonis links,
 [CAMERA.md](../../../modules/camera/CAMERA.md#the-lens); opening a device logs the sensor behind each socket and its lens.
 
 The mono sensors carry an IR filter and do not see the light show (site fact); they use the 940 nm
-flood (`camera.ir_flood_light`). Keep the dot projector off. `camera.mono_auto_exposure` applies to
+flood (`camera.flood_light`). Keep the dot projector off. `camera.mono_auto_exposure` applies to
 all four.
 
 ### The camera frame

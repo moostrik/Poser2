@@ -28,8 +28,8 @@ class MonoSensorSettings(BaseSettings):
     exposure:       Field[int]   = Field(EXPOSURE_RANGE[0], min=EXPOSURE_RANGE[0], max=EXPOSURE_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="Mono exposure (µs)", newline=True)
     iso:            Field[int]   = Field(ISO_RANGE[0], min=ISO_RANGE[0], max=ISO_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="Mono ISO")
     auto_exposure:  Field[bool]  = Field(True, widget=Widget.switch, description="Mono auto exposure")
-    ir_grid_light:  Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="IR dot projector", newline=True)
-    ir_flood_light: Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
+    dot_projector:  Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="IR dot projector", newline=True)
+    flood_light: Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
 
 
 class OakCameraSettings(RigCameraSettings):
@@ -56,10 +56,10 @@ class OakCameraSettings(RigCameraSettings):
     # `mono_sensor`, so the panel shows them where the rest of the mono controls are rather than
     # stranded at this level. Invisible here: they are plumbing, not a second copy to set.
     mono_auto_exposure: Field[bool]  = Field(True, visible=False, description="Relayed to mono_sensor.auto_exposure")
-    ir_flood_light:     Field[float] = Field(0.0, min=0.0, max=1.0, visible=False, description="Relayed to mono_sensor.ir_flood_light")
+    flood_light:     Field[float] = Field(0.0, min=0.0, max=1.0, visible=False, description="Relayed to mono_sensor.flood_light")
 
     color_sensor: Group[ColorSensorSettings] = Group(ColorSensorSettings)
-    mono_sensor:  Group[MonoSensorSettings]  = Group(MonoSensorSettings, share=[mono_auto_exposure.as_('auto_exposure'), ir_flood_light])
+    mono_sensor:  Group[MonoSensorSettings]  = Group(MonoSensorSettings, share=[mono_auto_exposure.as_('auto_exposure'), flood_light])
 
     @property
     def expected_tilt(self) -> float:
