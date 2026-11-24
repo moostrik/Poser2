@@ -17,11 +17,6 @@ Each step leaves the install working; each is checked on this PC, in `C:\Develop
   `models\`, a copy of `apps\smile\ComfyUI\models` (the 28 models, 48.5 GB); `online_token.txt` from
   `apps\smile\data`; `input\`, the photos for the panel's still image from `apps\smile\data\input`. The copy runs on
   Matthias's go.
-- A7 smile's `install.bat --from DIR` takes the folder of A6 in place of its `--mirror`: it hands `DIR\models` to the
-  model tool as its `--mirror` (the tool keeps that option: verified by hash, the rest from the sources) and copies
-  `DIR\online_token.txt` and `DIR\input\` into `apps\smile\data` where they are missing, never over a file that is
-  there; without `--from` it asks for the folder. Check: in the clone with the token and `data\input` removed,
-  `install.bat --from F:\_scratch\SMILE` puts them back and passes the smoke test; a second run copies nothing.
 - A8 The READMEs: one "New PC" section at the top of the root README: Git and the clone, `scripts\install.bat
   <app> [--startup]`, then what stays by hand, per app, with its link: the NVIDIA driver and the Intel graphics
   driver; for smile the Vimba 6 SDK, the Mako's UserSet2, Max and the Windows sound, the PC section (adapter,
