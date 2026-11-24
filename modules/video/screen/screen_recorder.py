@@ -621,15 +621,37 @@ class ScreenRecorder:
                 self._queue.clear()
                 take, free = self._take, self._free
             for frame in frames:
-                self._store_frame(frame)
+                try:
+                    self._store_frame(frame)
+                except Exception:
+                    logger.exception('Screen recorder: a frame at %.3f s not stored', frame.timestamp)
             if take is not None:
-                self._write(take)
+                ok = False
+                try:
+                    ok = self._write(take)
+                    if take.free_after:
+                        self._free_store()
+                except Exception:
+                    logger.exception('Screen recorder: the take %s failed', take.path)
+                with self._lock:
+                    self._take = None
+                    self._failed = not ok
+                self._done.set()
             elif free:
-                self._release()
+                try:
+                    self._free_store()
+                except Exception:
+                    logger.exception('Screen recorder: the store not freed')
+                with self._lock:
+                    self._free = False
+                self._done.set()
             now = time.perf_counter()
             if now - estimated_at >= ESTIMATE_INTERVAL:
                 estimated_at = now
-                self._estimate()
+                try:
+                    self._estimate()
+                except Exception:
+                    logger.exception('Screen recorder: max_duration not estimated')
 
     def _release_queue(self) -> None:
         with self._lock:
@@ -662,7 +684,12 @@ class ScreenRecorder:
                         self._reached = True        # the memory is reached
                     return
                 self._writing = slot
-            np.copyto(self._store.frame(slot), frame.data)
+            try:
+                np.copyto(self._store.frame(slot), frame.data)
+            except BaseException:
+                with self._lock:
+                    self._writing = None
+                raise
             with self._lock:
                 self._writing = None
                 if not self._accepting or self._take_id != take_id:
@@ -719,8 +746,8 @@ class ScreenRecorder:
         rate = frame_bytes * self._fps / max(1, self.settings.quality.frame_step)
         self.settings.quality.max_duration = round(usable / rate, 1)
 
-    def _write(self, take: _Take) -> None:
-        """Encode the take at the rate it was recorded at, then free the store when the take says so."""
+    def _write(self, take: _Take) -> bool:
+        """Encode the take at the rate it was recorded at; whether the file is written."""
         started = time.perf_counter()
         count = len(take.slots)
         span = take.stamps[-1] - take.stamps[0] if count > 1 else 0.0
@@ -743,18 +770,7 @@ class ScreenRecorder:
             logger.info('Screen recording %s: %s, encoded in %.1f s', take.path, comment, seconds)
         else:
             logger.error('Screen recording %s not written', take.path)
-        if take.free_after:
-            self._free_store()
-        with self._lock:
-            self._take = None
-            self._failed = not ok
-        self._done.set()
-
-    def _release(self) -> None:
-        self._free_store()
-        with self._lock:
-            self._free = False
-        self._done.set()
+        return ok
 
     def _free_store(self) -> None:
         self._store.clear()

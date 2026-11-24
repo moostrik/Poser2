@@ -118,7 +118,8 @@ class StateTest(unittest.TestCase):
         self.settings = ScreenRecorderSettings()
         self.settings.frame.width, self.settings.frame.height = WIDTH, HEIGHT
         self.free = 1 << 40         # bytes of free RAM before the store
-        self.recorder = ScreenRecorder(self.settings, 'unused', FakeClip, lambda: self.free - self._store_bytes())
+        self.broken = False         # reading the free RAM raises
+        self.recorder = ScreenRecorder(self.settings, 'unused', FakeClip, self._free_ram)
         self.recorder.start()
         self.tick_count = 0
         self.interval = 1.0 / FPS
@@ -131,8 +132,10 @@ class StateTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.recorder.stop()
 
-    def _store_bytes(self) -> int:
-        return self.recorder._store.nbytes
+    def _free_ram(self) -> int:
+        if self.broken:
+            raise RuntimeError('no free RAM reading')
+        return self.free - self.recorder._store.nbytes
 
     def frame(self, tick: int, timestamp: float) -> ScreenFrame:
         """A frame at the size the capture is made at, as a real capture hands it over."""
@@ -432,6 +435,15 @@ class StateTest(unittest.TestCase):
         self.assertIs(self.settings.record.state, ScreenRecorderState.ERROR)
         ScreenRecorderRecordSettings.start.fire(self.settings.record)
         self.tick_until(lambda: self.settings.record.state is ScreenRecorderState.RECORDING)
+
+    def test_a_frame_that_fails_to_store_is_logged_and_given_back_and_the_next_is_stored(self) -> None:
+        self.broken = True
+        ScreenRecorderRecordSettings.start.fire(self.settings.record)
+        with self.assertLogs('modules.video.screen.screen_recorder', 'ERROR'):
+            self.tick_until(lambda: self.handed >= 5 and self.lent == 0)
+        self.assertEqual(self.stored(), 0)
+        self.broken = False
+        self.tick_until(lambda: self.stored() >= 5)
 
     def test_exit_while_recording_writes_what_was_stored(self) -> None:
         ScreenRecorderRecordSettings.start.fire(self.settings.record)

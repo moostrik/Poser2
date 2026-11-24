@@ -5,13 +5,6 @@ What is to be built in `modules/video`: ffmpeg, the clips and streams it writes 
 
 ## A. The screen recorder's thread and state
 
-A2. `ScreenRecorder._run` catches an exception per item (a frame stored, a take written, a free), logs it and goes on;
-   a frame that failed is still released **(seen: `_run` catches nothing; `_grow` catches only MemoryError and
-   ValueError, `_write` and `_estimate` catch their own; anything else, as in `_store_frame`'s copy or `_release`,
-   ends the thread, and the frames queued after it are given back only at `stop`)**. Why: Error handling, "A thread's
-   loop catches an exception per item, logs it and goes on with the next". Check: `test_screen_recorder`, with one
-   test of a failing store.
-
 A3. `_store_frame` counts a frame of the wrong shape in `dropped` instead of returning silently **(seen)**. Why: "A part
    that drops an item shows the count to the user". Check: `test_screen_recorder`.
 
