@@ -2,11 +2,22 @@
 @REM Installs Poser2 on this PC: the PC part every app needs, then the venv.
 @REM   scripts\install.bat          the PC part and .venv (depthai 3, the OAK4 apps and smile)
 @REM   scripts\install.bat oakd     the PC part and .venv-oakd (depthai 2, white_space and hd_trio)
+@REM   scripts\install.bat APP      the PC part, the app's venv (scripts\app_venv.bat), its TensorRT engines and, for
+@REM                                the OAK4 apps, the OAK4's archives
 @REM The PC part offers what winget can install when it is missing (asked, Y/N) and checks what it cannot.
 setlocal EnableDelayedExpansion
 cd /d "%~dp0.."
 echo.
 set "MISSING="
+set "APP="
+set "OAKD="
+if /i "%~1"=="oakd" (
+    set "OAKD=1"
+) else if not "%~1"=="" (
+    call scripts\app_venv.bat %1 || (echo [91mUnknown app: %~1[0m & goto endofscript)
+    set "APP=%~1"
+    if "!VENV!"==".venv-oakd" set "OAKD=1"
+)
 
 echo [44m PC [0m
 where git >nul 2>nul
@@ -92,7 +103,7 @@ echo [44m Packages [0m
 @REM "install.bat oakd" builds a second venv, .venv-oakd, with depthai 2 for the OAK-D backend in place of depthai 3
 @REM (pyproject.toml, dependency-groups); .venv keeps depthai 3, so both live side by side.
 set SYNC_GROUPS=
-if /i "%~1"=="oakd" (
+if defined OAKD (
     set SYNC_GROUPS=--no-group oak4 --group oakd
     set UV_PROJECT_ENVIRONMENT=.venv-oakd
     echo [33mOAK-D: depthai 2 in .venv-oakd[0m
@@ -103,7 +114,16 @@ if %errorlevel% neq 0 (
     echo [91mPackage install failed![0m
     goto endofscript
 )
+echo.
 
+if defined APP (
+    echo [44m Models: %APP% [0m
+    if /i "%APP%"=="deep_flow" call :oak4_archives || goto endofscript
+    if /i "%APP%"=="low_flow"  call :oak4_archives || goto endofscript
+    set "NOPAUSE=1"
+    call scripts\makemodels.bat %APP%
+    echo.
+)
 
 :success
 echo.
@@ -112,14 +132,22 @@ if defined MISSING (
 ) else (
     echo [92mInstall complete.[0m
 )
-echo.
-echo Run makemodels.bat to build TensorRT engines:
-echo   scripts\makemodels.bat ^<app_name^>
-echo or
-echo   scripts\makemodels.bat all
+if not defined APP (
+    echo.
+    echo An app's TensorRT engines: scripts\install.bat ^<app^>, or scripts\makemodels.bat ^<app^>
+)
 echo.
 pause
 goto :eof
+
+@REM The OAK4's archives from Luxonis's zoo, the ones not there yet (scripts\oak4_models.py).
+:oak4_archives
+.venv\Scripts\python.exe scripts\oak4_models.py
+if !errorlevel! neq 0 (
+    echo [91mThe OAK4's archives could not all be fetched ^(internet?^)[0m
+    exit /b 1
+)
+exit /b 0
 
 :endofscript
 echo.

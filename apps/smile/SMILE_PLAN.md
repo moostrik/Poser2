@@ -13,14 +13,6 @@ what the READMEs list by hand today and a script can do, the scripts do; what st
 Each step leaves the install working; each is checked on this PC, in `C:\Developer\Poser2` or the clone in
 `C:\Developer\SmileClean`.
 
-- A2 `install.bat <app>`: the app's venv, then its TensorRT engines (`makemodels.bat <app>`, which skips the ones
-  there) and, for deep_flow and low_flow, the OAK4 archives `scripts/oak4_models.py` fetches, when missing.
-  `install.bat` and `install.bat oakd` keep building the bare venvs. Which app runs in which venv is written once,
-  in `scripts\app_venv.bat <app>` (sets `VENV`: `.venv-oakd` for white_space and hd_trio, `.venv` for the others),
-  which `install.bat`, `makemodels.bat` and `timing.bat` call in place of their own lists. `makemodels.bat` pauses
-  only when run on its own, not when `install.bat` calls it. Check: `install.bat smile` in the clone builds nothing
-  new; with smile's engines removed it builds them again; `install.bat deep_flow` here, with one zoo archive moved
-  aside, fetches it back; `timing.bat` still picks each app's venv.
 - A3 The OAK4 person detector, `data/models/yolov8n_coco_640x512_rvc4.tar.xz` (compiled by hand through HubAI), in
   git LFS: `.gitattributes` gets `data/models/*.tar.xz` as LFS, `.gitignore` lets that one archive through; the
   zoo's three stay ignored and fetched (A2). Check: `git lfs ls-files` lists it; the clone gets it with

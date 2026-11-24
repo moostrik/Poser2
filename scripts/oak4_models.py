@@ -5,8 +5,8 @@
 The chip takes a model compiled by Luxonis, which the zoo hands out as an NN archive (a `.tar.xz`
 with the compiled model and the config that says what its outputs mean). Public models need no
 key. The archive is copied under the name the backend expects (`models.POSE_ARCHIVE`); it is
-not in git (`data/models/*.tar.xz` is ignored until the models are settled), so every OAK4 PC runs
-this once, with internet, and again for a new model.
+not in git (`data/models/*.tar.xz` is ignored until the models are settled), so every OAK4 PC fetches
+it once, with internet: `scripts\\install.bat deep_flow` (or `low_flow`) runs this, which keeps an archive that is there.
 
 `models.PERSON_DETECTOR_ARCHIVE` is not fetched here: the zoo has no 5:4 size for this chip,
 so it is compiled from `data/models/base/yolov8n.pt` through Luxonis's HubAI, at 640x512, with
@@ -36,10 +36,13 @@ MODELS: dict[str, str] = {              # zoo slug -> file name in data/models
 
 
 def fetch(models: Path) -> int:
-    """Every model in `MODELS` into `models`; returns the count that failed."""
+    """Every model in `MODELS` that `models` does not hold yet; returns the count that failed."""
     failed: int = 0
     for slug, name in MODELS.items():
         target: Path = models / name
+        if target.is_file():
+            logger.info(f'{target} is there')
+            continue
         try:
             description = dai.NNModelDescription(slug, platform='RVC4')
             path = Path(dai.getModelFromZoo(description, useCached=True, progressFormat='pretty'))
