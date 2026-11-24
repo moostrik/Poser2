@@ -6,11 +6,6 @@ commit. Steps marked *owner* change another package: a minor fix, with that pack
 
 ## A. Broadcast
 
-A6. `tests/test_broadcast.py`: calls in registration order, a second add keeps the first place, a failing callback is
-logged and the next one runs, remove, clear, `bool`.
-Why: every callback list is a Broadcast and it has no test of its own **(seen)**; five other packages' tests lean on
-its logger name.
-
 A7. smile's saved callback passes one `SavedVisitor` dataclass instead of six positional values (id, style, kept,
 grin path, portrait path, share path). *Owner: smile.*
 Why: three of the six are paths of one type, so a swapped pair passes pyright **(seen)**; CLAUDE.md Settings "`@dataclass`
