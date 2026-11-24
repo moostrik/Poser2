@@ -1,13 +1,14 @@
 """Tests for the lights' packet and camera ring (no network: the sender is never started)."""
 
 import json
+import math
 import os
 import tempfile
 import unittest
 
 import numpy as np
 
-from apps.smile.lights import Lights, CAMERA_LEDS
+from apps.smile.lights import Lights, CAMERA_LEDS, lfor
 from apps.smile.sequence import AnimationType
 from modules.inout import ArtNetSenderSettings
 
@@ -43,6 +44,12 @@ class TestLights(unittest.TestCase):
         lights.fill(packet)
         start = lights.cameras['mako']
         self.assertEqual(bytes(packet[start:start + 72]), b'\xff' * 72)
+
+    def test_the_breath_is_a_sine_at_half_its_htz(self):
+        for timestamp in (0.0, 1.3, 3.0, 7.5, 12.0, 100.0):
+            for phase in (0.0, 0.25):
+                sine = 0.5 * math.sin(timestamp * math.pi * 0.1666 + (0.75 + phase) * math.pi * 2) + 0.5
+                self.assertAlmostEqual(lfor(timestamp, 0.1666, phase, 0.05, 1), sine * 0.95 + 0.05, places=12)
 
 
 if __name__ == '__main__':

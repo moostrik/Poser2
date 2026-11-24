@@ -11,6 +11,7 @@ import time
 import numpy as np
 
 from modules.inout import ArtNetSender, ArtNetSenderSettings
+from modules.utils import lfo
 from .sequence import AnimationType
 
 logger = logging.getLogger(__name__)
@@ -24,12 +25,10 @@ def read_json_file(file_path: str) -> dict:
         return json.load(file)
 
 
-def lfo(time: float, Htz: float, phase: float) -> float:
-    return 0.5 * math.sin(time * math.pi * Htz + (0.75 + phase) * math.pi * 2) + 0.5
-
-
-def lfor(time: float, Htz: float, phase: float, range_min: float, range_max: float) -> float:
-    return lfo(time, Htz, phase) * (range_max - range_min) + range_min
+def lfor(timestamp: float, Htz: float, phase: float, range_min: float, range_max: float) -> float:
+    """`utils.lfo` between `range_min` and `range_max`, at half of `Htz`, starting at `phase` (cycles) after its
+    lowest point."""
+    return lfo(timestamp, Htz / 2, (0.75 + phase) * 2 * math.pi) * (range_max - range_min) + range_min
 
 
 def get_counter_active_light(value: float) -> list[int]:

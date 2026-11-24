@@ -3,15 +3,6 @@
 Proposed by the utils rescan of 2026-11-24 (deep-flow at 38929e26); not built. Each step names its finding,
 **(seen)** in the code or a run, **(deduction)** when inferred. A step checked by a test or pyright is one commit.
 
-## F. What utils holds
-
-F3. smile's lights use `utils.lfo`, and `lights.py`'s own `lfo` goes; `lfor` scales `utils.lfo`, with the frequency
-halved and the phase turned to radians, so the breath looks as before. *Owner: smile*, a minor fix with smile's thread
-asked for feedback.
-Why: `apps/smile/lights.py`'s own `lfo` is the same 0..1 sine at half its `Htz` (`π·Htz` where `utils.lfo` has
-`2π·f`), with its phase in cycles plus 0.75 **(seen)**; written once. Chosen 2026-11-24. Check: smile's tests; the
-breath's value at a few times equals the old one.
-
 ## Unused but working, which stays
 
 `AngleFilter`, `SpringFilter`, `FPS`'s counts (`count_processed`, `count_dropped`, `dropped()`, their getters, `reset`)
