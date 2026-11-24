@@ -283,6 +283,8 @@ The node logs a warning on every frame, because the detector's stretched frame a
 ## The backend
 
 Each camera opens its own device and builds its own pipeline on it, as a depthai 3 pipeline is bound to one device.
+The pipeline is built on one frames source, `add_camera`'s sensor output with its control input: the model chain and
+the video output all take that one output, so another source (a clip input) can take the sensor's place.
 It reads the frames, the tracklets and the IMU through queues on the node outputs, on depthai's callback thread,
 where they become the contract's and get their capture time. The device runs the chain `model_chain` names:
 `DETECTOR` gives boxes only; with a pose chain a tracklet carries its keypoints, from its own detection in the

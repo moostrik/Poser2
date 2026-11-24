@@ -24,7 +24,7 @@ from .imu import IMU_BOARD_ROLL
 from .messages import packed_nv12
 from .models import ModelChain, model_archives, tracklet_keypoints, keypoints_in_frame
 from .sensor import SENSOR_SOCKET, requested_size, DepthModel
-from .pipeline import build_pipeline, delivered_size, PipelineOutputs, DEPTH_STREAM, CONFIDENCE_STREAM
+from .pipeline import add_camera, build_pipeline, delivered_size, PipelineOutputs, DEPTH_STREAM, CONFIDENCE_STREAM
 from .keypoint_join import KeypointJoin, Box
 from .settings import Oak4CameraSettings
 
@@ -178,8 +178,9 @@ class Camera(Thread):
             return False
         try:
             self.pipeline = dai.Pipeline(self.device)
-            outputs: PipelineOutputs = build_pipeline(self.pipeline, self.fps, self.color, self.resolution,
-                                                      self.mount, frame_height=self.frame_height,
+            frames, control = add_camera(self.pipeline, self.fps, self.color, self.resolution, self.mount,
+                                         frame_height=self.frame_height)
+            outputs: PipelineOutputs = build_pipeline(self.pipeline, frames, control, self.fps, self.color, self.mount,
                                                       pose_archive=self.pose_archive,
                                                       detector_archive=self.detector_archive,
                                                       depth_model=self.depth_model)

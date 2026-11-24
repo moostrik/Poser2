@@ -45,31 +45,44 @@ def delivered_size(color: bool, resolution: CameraResolution, frame_height: int 
     return direct_size(resolution) if color else frame_size(color, resolution, False, frame_height)
 
 
-def build_pipeline(
+def add_camera(
     pipeline: dai.Pipeline,
     fps: float,
     color: bool,
     resolution: CameraResolution,
     mount: MountConfig,
     frame_height: int = 0,
+) -> tuple[dai.Node.Output, dai.Node.Input]:
+    """The sensor as the pipeline's frames source: the color frame (cropped, undistorted, NV12) or the grey one through
+    the warp, and the sensor's control input; `frame_height` is the delivered height, 0 the sensor's rows."""
+    src_size: tuple[int, int] = requested_size(color, resolution)
+    out_size: tuple[int, int] = delivered_size(color, resolution, frame_height)
+    logger.info("OAK4 frames: %dx%d, %s", out_size[0], out_size[1], 'color' if color else 'grey')
+    camera: dai.node.Camera = pipeline.create(dai.node.Camera).build(SENSOR_SOCKET)
+    if color:
+        frames: dai.Node.Output = camera.requestOutput(out_size, dai.ImgFrame.Type.NV12, dai.ImgResizeMode.CROP, fps=fps,
+                                                       enableUndistortion=True)
+    else:
+        frames = add_warp(pipeline, camera.requestOutput(src_size, dai.ImgFrame.Type.GRAY8, fps=fps), src_size, out_size, mount)
+    return frames, camera.inputControl
+
+
+def build_pipeline(
+    pipeline: dai.Pipeline,
+    frames: dai.Node.Output,
+    control: dai.Node.Input,
+    fps: float,
+    color: bool,
+    mount: MountConfig,
     pose_archive: Path | None = None,
     detector_archive: Path | None = None,
     depth_model: DepthModel = DepthModel.OFF,
 ) -> PipelineOutputs:
-    """Build the camera's pipeline into `pipeline`, the one bound to its device; the archives set the model chain
-    (`model_archives`), `frame_height` is the delivered height, 0 the sensor's rows."""
-    src_size: tuple[int, int] = requested_size(color, resolution)
-    out_size: tuple[int, int] = delivered_size(color, resolution, frame_height)
+    """Build the camera's pipeline into `pipeline`, the one bound to its device, on the frames of its source
+    (`add_camera`), whose sensor `control` sets; the archives set the model chain (`model_archives`)."""
     model: Path | None = pose_archive or detector_archive
-    logger.info("OAK4 pipeline: %dx%d, %s%s%s", out_size[0], out_size[1], 'color' if color else 'grey',
-                f', model {model.name}' if model else '', f', depth {depth_model.name}' if depth_model != DepthModel.OFF else '')
-
-    camera: dai.node.Camera = pipeline.create(dai.node.Camera).build(SENSOR_SOCKET)
-    frames: dai.Node.Output
-    if color:
-        frames = camera.requestOutput(out_size, dai.ImgFrame.Type.NV12, dai.ImgResizeMode.CROP, fps=fps, enableUndistortion=True)
-    else:
-        frames = add_warp(pipeline, camera.requestOutput(src_size, dai.ImgFrame.Type.GRAY8, fps=fps), src_size, out_size, mount)
+    logger.info("OAK4 pipeline: %s%s", f'model {model.name}' if model else 'no model',
+                f', depth {depth_model.name}' if depth_model != DepthModel.OFF else '')
     imu: dai.Node.Output = add_imu(pipeline)
     tracklets: dai.Node.Output | None = None
     poses: dai.Node.Output | None = None
@@ -81,7 +94,7 @@ def build_pipeline(
     depth_config: dai.Node.Input | None = None
     if depth_model != DepthModel.OFF:
         depth, depth_config = add_depth(pipeline, fps, depth_model)
-    return PipelineOutputs(video=frames, control=camera.inputControl, imu=imu, system=add_system_logger(pipeline),
+    return PipelineOutputs(video=frames, control=control, imu=imu, system=add_system_logger(pipeline),
                            tracklets=tracklets, poses=poses, depth=depth, depth_config=depth_config,
                            flip_h_on_host=color and mount.flip_h, flip_v_on_host=color and mount.flip_v)
 

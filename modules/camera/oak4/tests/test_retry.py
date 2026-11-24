@@ -105,7 +105,8 @@ class RetryTest(unittest.TestCase):
             raise RuntimeError('no model')
 
         with patch(f'{CAMERA}.get_device_list', lambda verbose: ['x']), patch(f'{CAMERA}.find_device'), \
-             patch(f'{CAMERA}.dai.Device'), patch(f'{CAMERA}.dai.Pipeline'), patch(f'{CAMERA}.build_pipeline', refused), \
+             patch(f'{CAMERA}.dai.Device'), patch(f'{CAMERA}.dai.Pipeline'), \
+             patch(f'{CAMERA}.add_camera', return_value=(None, None)), patch(f'{CAMERA}.build_pipeline', refused), \
              self.assertLogs(CAMERA, 'ERROR'):
             camera.run()
         self.assertEqual(len(builds), 1)
