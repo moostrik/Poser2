@@ -5,12 +5,6 @@ Proposed by the utils rescan of 2026-11-24 (deep-flow at 38929e26); not built. E
 
 ## F. What utils holds
 
-F2. `thread_priority.py` goes, with `ThreadPriority`, `set_current_thread_priority` and `get_current_thread_priority`
-from `__init__.py`.
-Why: added 2026-09-09 to raise white_space's light threads, removed from every caller 2026-10-08 after profiling showed
-an elevated conductor caused playback stutter (GIL) **(seen**, e8f3e12f5**)**. Chosen 2026-11-24. Check: pyright, utils
-tests.
-
 F3. smile's lights use `utils.lfo`, and `lights.py`'s own `lfo` goes; `lfor` scales `utils.lfo`, with the frequency
 halved and the phase turned to radians, so the breath looks as before. *Owner: smile*, a minor fix with smile's thread
 asked for feedback.
