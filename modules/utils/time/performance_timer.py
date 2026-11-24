@@ -6,7 +6,7 @@ from typing import Callable, ClassVar, TypeAlias
 
 import logging
 
-from .broadcast import Broadcast
+from ..broadcast import Broadcast
 
 logger = logging.getLogger(__name__)
 

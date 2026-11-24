@@ -8,7 +8,7 @@ from modules.utils import FPS
 
 class TestFps(unittest.TestCase):
     def feed(self, fps: FPS, stamps: list[float]) -> None:
-        with mock.patch('modules.utils.fps.time.perf_counter', side_effect=stamps):
+        with mock.patch('modules.utils.time.fps.time.perf_counter', side_effect=stamps):
             for _ in stamps:
                 fps.processed()
 

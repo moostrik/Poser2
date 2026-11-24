@@ -1,5 +1,8 @@
 # Utils
 
+utils holds small tools with no domain that many packages share. It imports nothing else of the project, only the
+standard library and numpy. Its folders group them by job: `geometry/`, `logging/`, `smoothing/`, `time/`.
+
 ## Broadcast
 
 A `Broadcast` is every callback list's type (CLAUDE.md, Concurrency). It is written `Broadcast[[X]]`, the argument
