@@ -183,6 +183,8 @@ class ScreenRecorder:
         self._free: bool = False            # the thread is to free the store without an encode
         self._failed: bool = False          # the last take was not written
         self._done: Event = Event()         # the thread finished a take or a free
+        self._dragged: bool = False         # the panel drags the marker
+        self._moved_to: float | None = None # where the panel's marker or bar put the position, not yet taken
 
         # main thread only
         self._state: ScreenRecorderState = ScreenRecorderState.IDLE
@@ -320,13 +322,15 @@ class ScreenRecorder:
         self._discard_requested.set()
 
     def _on_scrub(self, value: float) -> None:
-        self._dragging = value >= 0.0
-        if value >= 0.0:
-            self._position = value
+        with self._lock:
+            self._dragged = value >= 0.0
+            if value >= 0.0:
+                self._moved_to = value
 
     def _on_seek(self, value: float) -> None:
         if value >= 0.0:
-            self._position = value
+            with self._lock:
+                self._moved_to = value
 
     def _on_size(self, size: ScreenSize) -> None:
         if size is ScreenSize.CUSTOM:
@@ -352,6 +356,7 @@ class ScreenRecorder:
     def update(self, timestamp: float) -> None:
         """Act on the buttons and the thread's news, then say whether this tick is captured (`capturing`)."""
         self._measure(timestamp)
+        self._take_position()
         if self._done.is_set():
             self._finish()
 
@@ -398,6 +403,14 @@ class ScreenRecorder:
             if interval > 0.0:
                 self._fps += FPS_SMOOTH * (1.0 / interval - self._fps)
         self._last_timestamp = timestamp
+
+    def _take_position(self) -> None:
+        """Take what the panel did to the position: the marker dragged, or moved by it or the bar."""
+        with self._lock:
+            self._dragging = self._dragged
+            moved_to, self._moved_to = self._moved_to, None
+        if moved_to is not None:
+            self._position = moved_to
 
     def _format_wanted(self) -> ScreenFormat:
         return ScreenFormat(even(self.settings.frame.width), even(self.settings.frame.height), self.settings.quality.chroma,

@@ -5,11 +5,6 @@ What is to be built in `modules/video`: ffmpeg, the clips and streams it writes 
 
 ## A. The screen recorder's thread and state
 
-A1. `_on_scrub` and `_on_seek` (panel thread) hand the position over under the recorder's lock, and `update` takes it
-   on the main thread, where `_play` and `preview_frame` use `_position` and `_dragging` **(seen: written without a
-   lock from the panel's thread)**. Why: Concurrency, "Use `Lock` and `Event` for shared mutable state and lifecycle
-   signals". Check: `test_screen_recorder`.
-
 A2. `ScreenRecorder._run` catches an exception per item (a frame stored, a take written, a free), logs it and goes on;
    a frame that failed is still released **(seen: `_run` catches nothing; `_grow` catches only MemoryError and
    ValueError, `_write` and `_estimate` catch their own; anything else, as in `_store_frame`'s copy or `_release`,

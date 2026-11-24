@@ -241,14 +241,18 @@ class StateTest(unittest.TestCase):
         whole = self.save_held().frames
         self.assertIsNone(self.recorder.preview_frame)
         self.settings.take.scrub = 0.5
+        self.assertIsNone(self.recorder.preview_frame)      # taken at the next tick
+        self.tick()
         shown = self.recorder.preview_frame
         assert shown is not None
         self.assertEqual(self.times[tick_of(shown[1])] - self.times[whole[0]], 0.5)
         self.settings.take.scrub = 1.0
+        self.tick()
         last = self.recorder.preview_frame
         assert last is not None
         self.assertEqual(tick_of(last[1]), whole[-1])
         self.settings.take.scrub = -1.0
+        self.tick()
         self.assertIsNone(self.recorder.preview_frame)
         self.discard(ScreenRecorderState.IDLE)
 
