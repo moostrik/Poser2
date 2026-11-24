@@ -20,11 +20,16 @@ def depth_frame_bytes(width: int, height: int) -> int:
     return width * height * 3
 
 
-def depth_to_p012(depth: np.ndarray) -> bytes:
-    """uint16 millimeters (H, W) as one `p012le` frame."""
-    luma: np.ndarray = np.minimum(depth // DEPTH_STEP_MM, MAX_DEPTH_COUNT).astype(np.uint16) << 4
-    chroma: np.ndarray = np.full((depth.shape[0] // 2, depth.shape[1]), DEPTH_NEUTRAL_UV, np.uint16)
-    return luma.tobytes() + chroma.tobytes()
+def depth_to_p012(depth: np.ndarray) -> np.ndarray:
+    """uint16 millimeters (H, W) as one `p012le` frame, (H × 3/2, W) uint16: the Y plane over the UV plane."""
+    height, width = depth.shape
+    frame: np.ndarray = np.empty((height * 3 // 2, width), np.uint16)
+    luma: np.ndarray = frame[:height]
+    np.floor_divide(depth, DEPTH_STEP_MM, out=luma)
+    np.minimum(luma, MAX_DEPTH_COUNT, out=luma)
+    np.left_shift(luma, 4, out=luma)
+    frame[height:] = DEPTH_NEUTRAL_UV
+    return frame
 
 
 def p012_to_depth(raw: bytes | bytearray, width: int, height: int) -> np.ndarray:

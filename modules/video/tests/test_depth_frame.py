@@ -16,15 +16,16 @@ from modules.video.stream.depth_frame import DEPTH_CODEC, DEPTH_HARDWARE, DEPTH_
 class PackingTest(unittest.TestCase):
     def test_depth_comes_back_within_a_step_and_no_depth_stays_zero(self) -> None:
         depth = np.array([[0, 1500, 12000, 300], [4000, 0, 25, 9000]], np.uint16)
-        raw = depth_to_p012(depth)
-        self.assertEqual(len(raw), depth_frame_bytes(4, 2))
-        back = p012_to_depth(raw, 4, 2)
+        packed = depth_to_p012(depth)
+        self.assertEqual((packed.shape, packed.dtype), ((3, 4), np.uint16))
+        self.assertEqual(packed.nbytes, depth_frame_bytes(4, 2))
+        back = p012_to_depth(packed.tobytes(), 4, 2)
         expected = np.where(depth < 100, 0, depth)
         self.assertTrue(np.all(np.abs(back.astype(int) - expected.astype(int)) < DEPTH_STEP_MM))
 
     def test_what_does_not_fit_stops_at_full_scale(self) -> None:
         depth = np.full((2, 2), 30000, np.uint16)
-        self.assertEqual(int(p012_to_depth(depth_to_p012(depth), 2, 2).max()), 4095 * DEPTH_STEP_MM)
+        self.assertEqual(int(p012_to_depth(depth_to_p012(depth).tobytes(), 2, 2).max()), 4095 * DEPTH_STEP_MM)
 
 
 @unittest.skipUnless(video.available() and video.encoder_works(video.Hardware.iGPU), 'no iGPU encoder')

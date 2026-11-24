@@ -3,13 +3,6 @@
 What is to be built in `modules/video`: ffmpeg, the clips and streams it writes and reads, and the screen recorder
 ([VIDEO.md](VIDEO.md)).
 
-## B. Depth without copies
-
-B1. `depth_to_p012` returns the (H × 3/2, W) uint16 frame, written in place into one array, which `StreamWriter._record`
-   hands to the writer as it is **(seen: today it builds bytes from two `tobytes` and a join, which `_record` wraps back
-   into an array, per depth frame)**. Why: Performance, "Avoid unnecessary copies". Check: `test_depth_frame`,
-   `test_stream_writer`.
-
 ## C. Names
 
 C1. Frames left out are `dropped` everywhere: `ScreenFrame.skipped` and the capture's side in render's

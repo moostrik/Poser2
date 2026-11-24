@@ -107,8 +107,7 @@ class StreamWriter:
                     if writer is None:
                         writer = self._open(frame, nv12, depth)
                     if depth:
-                        height, width = frame.shape
-                        writer.add(np.frombuffer(depth_to_p012(frame), np.uint16).reshape(height * 3 // 2, width))
+                        writer.add(depth_to_p012(frame))
                     else:
                         writer.add(np.ascontiguousarray(frame, dtype=np.uint8))
                     if writer.failed:
