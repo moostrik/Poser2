@@ -3,13 +3,6 @@
 Proposed by the utils rescan of 2026-11-24 (deep-flow at 38929e26); not built. Each step names its finding,
 **(seen)** in the code or a run, **(deduction)** when inferred. A step checked by a test or pyright is one commit.
 
-## A. Tests
-
-A1. `logging/tests/` moves into `utils/tests/` (`test_crash_log.py`, `test_ring_buffer.py`), beside the geometry,
-smoothing and time tests.
-Why: CLAUDE.md Packages "Its tests sit in its `tests/` folder"; today `discover -s modules/utils/tests` runs 53 tests and
-misses logging's 9 **(seen)**. Check: the utils tests, 62.
-
 ## B. Docstrings
 
 B1. Two docstrings that say the wrong thing: `geometry/point.py` `Point2f.is_zero` says "either coordinate", the code

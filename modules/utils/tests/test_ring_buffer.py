@@ -5,7 +5,7 @@ import unittest
 
 from modules.utils import LogEntry, LogRingBuffer
 
-from ..setup import ShortNameFormatter
+from ..logging.setup import ShortNameFormatter
 
 
 def _entry(i: int) -> LogEntry:
