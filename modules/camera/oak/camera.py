@@ -24,6 +24,8 @@ from .settings import OakCameraSettings
 
 logger = logging.getLogger(__name__)
 
+CLIP_QUEUE_SIZE: int = 1    # the host's clip queue; a send that finds it full drops the oldest (`dropped_clips`)
+
 
 class Camera(Thread):
     """A `CameraSource` on an OAK-D: its warped frames, the tracklets of its detector and tracker, and its readings;
@@ -167,7 +169,7 @@ class Camera(Thread):
         assert self.device is not None
         self._setup_frame_queues()
         if self.clips is not None:
-            clips: dai.DataInputQueue = self.device.getInputQueue(name=CLIPS_STREAM, maxSize=1, blocking=False)  # pyright: ignore[reportCallIssue]
+            clips: dai.DataInputQueue = self.device.getInputQueue(name=CLIPS_STREAM, maxSize=CLIP_QUEUE_SIZE, blocking=False)  # pyright: ignore[reportCallIssue]
             self.queues.append(clips)
             expected: tuple[int, int] = (mode_size(self.color, self.resolution) if self.clip_warp
                                          else frame_size(self.color, self.resolution, self.square, self.frame_height))
@@ -246,6 +248,9 @@ class Camera(Thread):
         readings.video_fps = self.video_fps.get_rate_average()
         readings.video_min_fps = self.video_fps.get_rate_minimum()
         readings.video_latency = smoothed_latency(readings.video_latency, msg)
+        clip_input: ClipInput | None = self.clip_input
+        if clip_input is not None:
+            readings.dropped_clips += clip_input.returned(msg.getSequenceNum())
         if self.control is not None:
             self.control.readback(msg)
         self._emit_frame(FrameType.VIDEO, msg.getCvFrame(), timestamp, arrival)

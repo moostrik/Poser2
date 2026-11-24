@@ -22,7 +22,8 @@ class ClipQueue(Protocol):
 
 class ClipInput:
     """One open device's clip queue: each clip frame goes in as the sensor would send it, planar BGR on a color
-    camera, grey on a mono one, stamped with its recorded capture. The send is the hand-over to the device."""
+    camera, grey on a mono one, stamped with its recorded capture and numbered from 0. The send is the hand-over to
+    the device; a gap in the numbers that come back is a clip frame dropped on the way."""
 
     def __init__(self, queue: ClipQueue, color: bool, expected_size: tuple[int, int], cam_id: int) -> None:
         self.queue: ClipQueue = queue
@@ -30,6 +31,8 @@ class ClipInput:
         self.expected_size: tuple[int, int] = expected_size     # the sensor's with `clip_warp`, else the delivered one
         self.cam_id: int = cam_id
         self._warned_size: tuple[int, int] | None = None        # the last size warned of, so it warns once per size
+        self._next_sequence: int = 0                            # the sender's thread's
+        self._last_returned: int | None = None                  # the device's output thread's
 
     def send(self, clip: ClipFrame) -> None:
         """The clip frame into the device, stamped with its recorded capture on the play's clock, or with its send
@@ -50,7 +53,18 @@ class ClipInput:
         img.setTimestamp(timedelta(seconds=timestamp))
         img.setWidth(width)
         img.setHeight(height)
+        img.setSequenceNum(self._next_sequence)
+        self._next_sequence += 1
         self.queue.send(img)
+
+    def returned(self, sequence: int) -> int:
+        """The clip frames dropped since the last one back, from the number of the one that came back now."""
+        last: int | None = self._last_returned
+        self._last_returned = sequence
+        if last is None:
+            logger.info("cam %d: first clip frame back is number %d", self.cam_id, sequence)
+            return sequence
+        return max(sequence - last - 1, 0)
 
     def _check_size(self, width: int, height: int) -> None:
         """Warn once per size when the clip's frames are not the size the pipeline was built for."""

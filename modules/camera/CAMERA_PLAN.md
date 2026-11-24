@@ -12,20 +12,16 @@ and smile, `vimba` and `webcam` by smile. That is general code with one user, wh
 
 The OAK-D's clip input loses about 1.1% of the clip frames in white_space -sim with four cameras (recording
 20261124-110331_probe_F1) **(site fact: the recording thread's run)**; the host's clip queue
-(`maxSize=1, blocking=False` in `oak/camera.py`) drops a frame the device has not taken yet **(deduction)**. The
-panel shows the loss only as `video_fps` below `fps`.
+(`CLIP_QUEUE_SIZE` 1, non-blocking, in `oak/camera.py`) drops a frame the device has not taken yet **(deduction)**.
+The count is built: `dropped_clips`, from the gaps in the numbers `ClipInput` gives each fed frame
+([CAMERA.md, The clip camera](CAMERA.md#the-clip-camera)).
 
-- G1. Count the clip drops and try a deeper host queue. `ClipInput.send` numbers each `ImgFrame` it sends
-  (`setSequenceNum`, from 0 at each open); the camera's `_video_callback` counts the gaps in the returned frames'
-  `getSequenceNum()` as `dropped_clips`, a `Field.READ` on `RigCameraReadings` beside `dropped_depth` ("Clip frames
-  dropped before the device took them, since the start"), set only with clips. First check that the number comes
-  back: without `clip_warp` (off in every settings file) the video output is the XLinkIn's message itself (XLinkIn →
-  XLinkOut, `oak/tests/test_pipeline.py`) **(seen)**, so the number survives **(deduction)**; with `clip_warp` a Warp
-  sits between, which may renumber **(not checked)**. The run logs the first returned numbers against the sent ones;
-  if the device renumbers, `dropped_clips` is the frames sent minus the frames returned, the one in flight aside.
-  Then one white_space -sim run (`studio.json`, `replay` false, the recording above), run by the recording thread on
-  Matthias's go: `dropped_clips` per camera with the host queue at 1, then at 2; the depth that holds the rate with
-  the fewer drops stays, and the latency readings show what it costs.
+- G1. One white_space -sim run (`studio.json`, `replay` false, the recording above), run by the recording thread on
+  Matthias's go, about 3 minutes. First the log's "first clip frame back is number N" per camera: a small N (0 or a
+  few) says the device keeps the host's numbers; anything else says it renumbers, and `dropped_clips` is then made
+  the frames sent minus the frames returned, the one in flight aside. Then `dropped_clips` per camera, against the
+  1.1% above, with `CLIP_QUEUE_SIZE` at 1, then at 2; the size with the fewer drops stays if the latency readings
+  hold, and the change is committed with the result.
 
 ## Open
 - The OAK4 is to run standalone, as an OAK App **(site fact)**. Depth alignment then needs a home: `ImageAlign` is

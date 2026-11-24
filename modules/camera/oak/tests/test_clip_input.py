@@ -58,6 +58,20 @@ class ClipInputTest(unittest.TestCase):
         ClipInput(queue, False, (6, 4), 0).send(clip(bgr(), timestamp=None))
         self.assertGreaterEqual(queue.sent[0].getTimestamp().total_seconds(), before - 1e-6)
 
+    def test_each_frame_is_numbered_from_0(self) -> None:
+        queue = FakeQueue()
+        clip_input = ClipInput(queue, False, (6, 4), 0)
+        for _ in range(3):
+            clip_input.send(clip(bgr()))
+        self.assertEqual([sent.getSequenceNum() for sent in queue.sent], [0, 1, 2])
+
+    def test_a_gap_in_the_numbers_back_counts_the_frames_dropped(self) -> None:
+        clip_input = ClipInput(FakeQueue(), False, (6, 4), 0)
+        with self.assertLogs('modules.camera.oak.clip_input', 'INFO'):
+            self.assertEqual(clip_input.returned(1), 1)            # number 0 never came back
+        self.assertEqual(clip_input.returned(2), 0)
+        self.assertEqual(clip_input.returned(5), 2)
+
     def test_a_frame_of_another_size_warns_once(self) -> None:
         queue = FakeQueue()
         clip_input = ClipInput(queue, False, (8, 8), 0)
@@ -78,6 +92,20 @@ class CameraClipsTest(unittest.TestCase):
         camera._clip_callback(clip(bgr(), cam_id=1, kind=FrameType.DEPTH))
         camera._clip_callback(clip(bgr(), cam_id=1))
         self.assertEqual(clip_input.send.call_count, 1)
+
+    def test_the_camera_counts_the_clip_frames_dropped_since_the_start(self) -> None:
+        camera = Camera(OakCameraSettings(), 0, clips=MagicMock())
+        frame = dai.ImgFrame()
+        frame.setType(dai.ImgFrame.Type.RAW8)
+        frame.setWidth(6)
+        frame.setHeight(4)
+        frame.setData(np.zeros(24, np.uint8))  # pyright: ignore[reportCallIssue, reportArgumentType]
+        for opening in range(2):                                    # each open numbers from 0 again
+            camera.clip_input = ClipInput(FakeQueue(), False, (6, 4), 0)
+            for sequence in (0, 2, 3):
+                frame.setSequenceNum(sequence)
+                camera._video_callback(frame)
+        self.assertEqual(camera.readings.dropped_clips, 2)
 
 
 if __name__ == '__main__':
