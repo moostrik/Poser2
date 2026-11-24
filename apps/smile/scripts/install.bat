@@ -1,6 +1,6 @@
 @REM Installs SMILE's image generator, or checks an install: ComfyUI (scripts\install_comfy.ps1), the models
 @REM (comfy\models.py), then a smoke test that runs the warm-up in ComfyUI once. The repo's own install
-@REM comes first: scripts\install.bat oak4 at the Poser2 root (the LFS files, the venv SMILE runs in, .venv-oak4).
+@REM comes first: scripts\install.bat at the Poser2 root (the LFS files, the venv SMILE runs in, .venv).
 @REM Safe to run again: everything in place is skipped. Extra arguments go to the model tool; without --mirror
 @REM it asks for a folder with the models to copy from (the backup's ComfyUI\models, a USB stick):
 @REM     apps\smile\scripts\install.bat --mirror E:\SMILE\ComfyUI\models
@@ -8,7 +8,7 @@
 setlocal EnableDelayedExpansion
 set "SMILE_DIR=%~dp0.."
 set "ROOT_DIR=%~dp0..\..\.."
-set "VENV_DIR=%ROOT_DIR%\.venv-oak4"
+set "VENV_DIR=%ROOT_DIR%\.venv"
 echo.
 
 echo [44m Prerequisites [0m
@@ -23,7 +23,7 @@ if %errorlevel% neq 0 (
     goto fail
 )
 if not exist "%VENV_DIR%\Scripts\python.exe" (
-    echo [91mNo venv at %VENV_DIR%: run scripts\install.bat oak4 at the Poser2 root first[0m
+    echo [91mNo venv at %VENV_DIR%: run scripts\install.bat at the Poser2 root first[0m
     goto fail
 )
 echo [92mgit, git lfs and the venv found[0m

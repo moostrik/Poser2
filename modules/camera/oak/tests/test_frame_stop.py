@@ -1,5 +1,5 @@
 """An OAK-D hands frames over while it runs and none after `stop()`, as with its tracklets. Runs without a device, on
-a depthai 2 install (`.venv`)."""
+a depthai 2 install (`.venv-oakd`)."""
 
 import unittest
 

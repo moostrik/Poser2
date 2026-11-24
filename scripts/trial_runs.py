@@ -20,7 +20,7 @@ POINTER = SETTINGS / '.startup.json'
 GROUPS = ('setup', 'flow')
 DEFAULT_STARTUP = 'studio'
 TRIAL = 'trial'
-PYTHON = ROOT / '.venv-oak4' / 'Scripts' / 'python.exe'
+PYTHON = ROOT / '.venv' / 'Scripts' / 'python.exe'
 
 
 def changed(tree: dict, changes: list[str]) -> dict:

@@ -1,6 +1,6 @@
 """`build_warp_mesh` hands each OAK-D the one correction it uses, as depthai points: the keystone alone gives the
 pre-step-3 builders' mesh (`geometry/tests/test_keystone.py`), a tilt the dense warp mesh. On a depthai 2 install
-(`.venv`)."""
+(`.venv-oakd`)."""
 
 import unittest
 

@@ -1,6 +1,6 @@
 """Deep Flow — single-camera 3D volumetric fluid installation.
 
-Runs in `.venv-oak4`, the depthai 3 venv (`scripts\\install.bat oak4`), on one OAK4. `-sim` plays the
+Runs in `.venv`, the depthai 3 venv (`scripts\\install.bat`), on one OAK4. `-sim` plays the
 recordings on the host with the replay backend, with no camera attached.
 """
 

@@ -1,5 +1,5 @@
 """Each OAK-D builds its own pipeline from its own settings at open, a camera fed clips too. Runs without a device: the
-device and its list are stubbed, the pipeline and its warp mesh are depthai's own. On a depthai 2 install (`.venv`)."""
+device and its list are stubbed, the pipeline and its warp mesh are depthai's own. On a depthai 2 install (`.venv-oakd`)."""
 
 import unittest
 from unittest.mock import MagicMock, patch

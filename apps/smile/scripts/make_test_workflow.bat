@@ -4,5 +4,5 @@
 @echo off
 
 cd /d "%~dp0..\..\..\"
-.venv-oak4\Scripts\python.exe -m apps.smile.comfy.testflow %*
+.venv\Scripts\python.exe -m apps.smile.comfy.testflow %*
 pause

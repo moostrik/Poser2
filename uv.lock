@@ -2,8 +2,8 @@ version = 1
 revision = 5
 requires-python = "==3.12.*"
 conflicts = [[
-    { package = "poser2", group = "oak" },
     { package = "poser2", group = "oak4" },
+    { package = "poser2", group = "oakd" },
 ]]
 
 [manifest]
@@ -990,7 +990,7 @@ wheels = [
 name = "poser2"
 version = "0.0.0"
 source = { virtual = "." }
-default-groups = ["oak"]
+default-groups = ["oak4"]
 dependencies = [
     { name = "aiohttp" },
     { name = "freetype-py" },
@@ -1016,12 +1016,12 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
-oak = [
-    { name = "depthai", version = "2.30.0.0", source = { registry = "https://pypi.org/simple" } },
-]
 oak4 = [
     { name = "depthai", version = "3.11.0", source = { registry = "https://pypi.org/simple" } },
     { name = "depthai-nodes" },
+]
+oakd = [
+    { name = "depthai", version = "2.30.0.0", source = { registry = "https://pypi.org/simple" } },
 ]
 
 [package.metadata]
@@ -1050,11 +1050,11 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-oak = [{ name = "depthai", specifier = "==2.30.0" }]
 oak4 = [
     { name = "depthai", specifier = ">=3.11" },
     { name = "depthai-nodes", specifier = ">=0.7" },
 ]
+oakd = [{ name = "depthai", specifier = "==2.30.0" }]
 
 [[package]]
 name = "propcache"

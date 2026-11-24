@@ -38,16 +38,16 @@ if %errorlevel% neq 0 (
     goto endofscript
 )
 
-@REM Builds or updates .venv to match uv.lock exactly (Python 3.12 included).
-@REM "install.bat oak4" builds a second venv, .venv-oak4, with depthai 3 for the OAK4 backend in place of depthai 2
-@REM (pyproject.toml, dependency-groups); .venv keeps depthai 2, so both live side by side.
+@REM Builds or updates .venv to match uv.lock exactly (Python 3.12 included), with depthai 3 for the OAK4 backend.
+@REM "install.bat oakd" builds a second venv, .venv-oakd, with depthai 2 for the OAK-D backend in place of depthai 3
+@REM (pyproject.toml, dependency-groups); .venv keeps depthai 3, so both live side by side.
 setlocal
 set SYNC_GROUPS=
-if /i "%~1"=="oak4" (
-    set SYNC_GROUPS=--no-group oak --group oak4
-    set UV_PROJECT_ENVIRONMENT=.venv-oak4
-    echo [33mOAK4: depthai 3 in .venv-oak4[0m
-    if not exist ".venv-oak4" uv venv .venv-oak4 --prompt poser2-oak4
+if /i "%~1"=="oakd" (
+    set SYNC_GROUPS=--no-group oak4 --group oakd
+    set UV_PROJECT_ENVIRONMENT=.venv-oakd
+    echo [33mOAK-D: depthai 2 in .venv-oakd[0m
+    if not exist ".venv-oakd" uv venv .venv-oakd --prompt poser2-oakd
 )
 uv sync --locked %SYNC_GROUPS%
 if %errorlevel% neq 0 (

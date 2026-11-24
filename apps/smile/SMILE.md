@@ -6,7 +6,7 @@ play on two walls of screens. The person in SMILE is a "visitor", the one except
 ([`smile.md`, Names](../../.claude/rules/smile.md)). SMILE is `apps/smile/` of Poser2: `launcher.py -app smile` from the Poser2 root starts it
 (`SmileMain` in `main.py`; its own arguments `-fs`, `-wc`, `-oak`, `-lm`, `-dw`, `-dh` follow the launcher's; the walls are windows 1
 and 2 of its render). Paths in this file are relative to `apps/smile/`; commands run from the Poser2 root with
-its `.venv-oak4`, the depthai 3 venv the OAK4 needs (`scripts/install.bat oak4` there makes it, `apps/smile/scripts/install.bat`
+its `.venv`, the depthai 3 venv the OAK4 needs (`scripts/install.bat` there makes it, `apps/smile/scripts/install.bat`
 adds ComfyUI). Tests:
 `python -m unittest discover -s apps/smile/<package>/tests -t .` (`tests`, `face`, `comfy`, ..., `relay`).
 The app's packages are its own (`cam`, `face`, `comfy`, `render`, `player`, ...); `modules/gl`, `modules/settings`

@@ -1,5 +1,5 @@
 """The camera's own report of its load reaches the readings, and leaves them when it closes. Runs
-without a device. On a depthai 3 install (`.venv-oak4`)."""
+without a device. On a depthai 3 install (`.venv`)."""
 
 import unittest
 from types import SimpleNamespace

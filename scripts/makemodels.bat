@@ -2,9 +2,10 @@
 echo.
 echo  TensorRT Model Conversion
 
+@REM Each app's engines are built in that app's venv: .venv for deep_flow, low_flow and smile, .venv-oakd for
+@REM hd_trio and white_space (TensorRT is the same in both; the engines do not depend on depthai).
 set APP=%1
 set MODE=%2
-set "VENV_DIR=%~dp0..\.venv"
 
 if "%APP%"=="" (
     echo Usage: %~nx0 APP [rebuild]
@@ -12,12 +13,6 @@ if "%APP%"=="" (
     echo   rebuild  build the engines that exist again ^(after a TensorRT upgrade^)
     goto endofscript
 )
-
-if not exist "%VENV_DIR%\Scripts\activate.bat" (
-    echo Virtual environment not found! Run scripts\install.bat first.
-    goto endofscript
-)
-call "%VENV_DIR%\Scripts\activate"
 
 if /I "%APP%"=="hd_trio"      call :section_hd_trio
 if /I "%APP%"=="white_space"  call :section_white_space
@@ -37,6 +32,7 @@ goto endofscript
 :section_hd_trio
 echo.
 echo hd_trio
+call :venv .venv-oakd "scripts\install.bat oakd" || exit /b 0
 call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_384x288_fp16.onnx --output apps\hd_trio\data\models\rtmpose-l_384x288_fp16.trt --opt-batch 3 --max-batch 3"
 call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_256x192_fp16.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_256x192_fp16.trt --opt-batch 3 --max-batch 3"
 call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_384x288_fp16.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_384x288_fp16.trt --opt-batch 3 --max-batch 3"
@@ -49,6 +45,7 @@ exit /b 0
 :section_white_space
 echo.
 echo white_space
+call :venv .venv-oakd "scripts\install.bat oakd" || exit /b 0
 call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_384x288_fp16.onnx --output apps\white_space\data\models\rtmpose-l_384x288_fp16.trt --opt-batch 6 --max-batch 8"
 
 call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_512x448.onnx --output apps\white_space\data\models\yolov8n_coco_512x448.trt --opt-batch 4 --max-batch 4"
@@ -57,6 +54,7 @@ exit /b 0
 :section_deep_flow
 echo.
 echo deep_flow
+call :venv .venv "scripts\install.bat" || exit /b 0
 call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_384x288_fp16.onnx --output apps\deep_flow\data\models\rtmpose-l_384x288_fp16.trt --opt-batch 1 --max-batch 1"
 
 call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_256x192_fp16.onnx --output apps\deep_flow\data\models\rvm_mobilenetv3_256x192_fp16.trt --opt-batch 1 --max-batch 1"
@@ -72,6 +70,7 @@ exit /b 0
 :section_low_flow
 echo.
 echo low_flow
+call :venv .venv "scripts\install.bat" || exit /b 0
 call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_384x288_fp16.onnx --output apps\low_flow\data\models\rtmpose-l_384x288_fp16.trt --opt-batch 1 --max-batch 1"
 
 call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_256x192_fp16.onnx --output apps\low_flow\data\models\rvm_mobilenetv3_256x192_fp16.trt --opt-batch 1 --max-batch 1"
@@ -87,8 +86,17 @@ exit /b 0
 :section_smile
 echo.
 echo smile
+call :venv .venv "scripts\install.bat" || exit /b 0
 call :build "python tools\models\export_face_onnx_to_trt.py --onnx data\models\scrfd_10g_bnkps.onnx --output apps\smile\data\models\scrfd_10g_bnkps.trt --size 640"
 call :build "python tools\models\export_face_onnx_to_trt.py --onnx data\models\2d106det.onnx --output apps\smile\data\models\2d106det.trt --size 192 --opt-batch 2 --max-batch 8"
+exit /b 0
+
+:venv
+if not exist "%~dp0..\%~1\Scripts\activate.bat" (
+    echo Virtual environment %~1 not found: run %~2 first.
+    exit /b 1
+)
+call "%~dp0..\%~1\Scripts\activate.bat"
 exit /b 0
 
 :build

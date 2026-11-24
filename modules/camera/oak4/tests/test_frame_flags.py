@@ -1,5 +1,5 @@
 """The flags a frame carries: the `rotate90` the app asked for, and the flips the camera leaves to the host; a
-camera with `rotate90` sends no tilt homography. Runs without a device. On a depthai 3 install (`.venv-oak4`)."""
+camera with `rotate90` sends no tilt homography. Runs without a device. On a depthai 3 install (`.venv`)."""
 
 import unittest
 

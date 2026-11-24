@@ -1,6 +1,6 @@
 """Low Flow — single-camera 2D fluid installation.
 
-Runs in `.venv-oak4`, the depthai 3 venv (`scripts\\install.bat oak4`), on one OAK4, without depth. `-sim` plays the
+Runs in `.venv`, the depthai 3 venv (`scripts\\install.bat`), on one OAK4, without depth. `-sim` plays the
 recordings' video on the host with the replay backend, with no camera attached.
 """
 

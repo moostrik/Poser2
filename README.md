@@ -43,9 +43,9 @@ depth cam pose synchony detection
 * ```git clone https://github.com/moostrik/Poser2.git```
 
 ### Install Script
-* in the terminal run ```scripts\install.bat```: it pulls the LFS files and builds `.venv` from `uv.lock` (run it again after every pull that changes `uv.lock`)
-* for OAK4 cameras also run ```scripts\install.bat oak4```: it builds a second venv, `.venv-oak4`, with depthai 3 in place of depthai 2; `.venv` keeps depthai 2, so both stay installed. An app started with `.venv-oak4\Scripts\python` uses the `oak4` backend (```.venv-oak4\Scripts\python launcher.py -app deep_flow```), one started with `.venv` the OAK-D's `oak` backend. Run it again after every pull that changes `uv.lock`, like `install.bat`
-* and make the models for an app ```scripts\makemodels.bat <app_name>``` or all apps ```scripts\makemodels.bat all``` using the .venv environment; it skips the engines that exist, ```scripts\makemodels.bat all rebuild``` builds them again (needed after a TensorRT upgrade: an engine only runs on the version that built it); run it again after a pull that changes the models in `data/models`, as the app looks for the engines of the models it names (the pose runs FP16, `rtmpose-l_<size>_fp16.trt`)
+* in the terminal run ```scripts\install.bat```: it pulls the LFS files and builds `.venv` from `uv.lock`, with depthai 3 for the OAK4 (deep_flow, low_flow, smile); run it again after every pull that changes `uv.lock`
+* for the OAK-D apps (white_space, hd_trio) also run ```scripts\install.bat oakd```: it builds a second venv, `.venv-oakd`, with depthai 2 in place of depthai 3; `.venv` keeps depthai 3, so both stay installed. An app started with `.venv\Scripts\python` uses the `oak4` backend (```.venv\Scripts\python launcher.py -app deep_flow```), one started with `.venv-oakd` the OAK-D's `oak` backend (```.venv-oakd\Scripts\python launcher.py -app white_space```). Run it again after every pull that changes `uv.lock`, like `install.bat`
+* and make the models for an app ```scripts\makemodels.bat <app_name>``` or all apps ```scripts\makemodels.bat all```, each app's in its own venv; it skips the engines that exist, ```scripts\makemodels.bat all rebuild``` builds them again (needed after a TensorRT upgrade: an engine only runs on the version that built it); run it again after a pull that changes the models in `data/models`, as the app looks for the engines of the models it names (the pose runs FP16, `rtmpose-l_<size>_fp16.trt`)
 * a pose model's FP16 file is made from its FP32 original once, when a model is added, and kept in LFS beside it: ```uv run --with onnxconverter-common python tools/models/convert_onnx_to_fp16.py --input data/models/<name>.onnx --output data/models/<name>_fp16.onnx --fp32-norms --keep-io-types```
 * The CUDA runtime comes with torch's wheel (CUDA 13) and TensorRT builds the engines from Python, so no CUDA toolkit is installed; the NVIDIA driver has to support CUDA 13
 
@@ -71,4 +71,4 @@ depth cam pose synchony detection
 
 
 ## HINTS
-* .\.venv-oak4\Scripts\Activate.ps1
+* .\.venv\Scripts\Activate.ps1

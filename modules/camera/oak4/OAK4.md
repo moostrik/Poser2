@@ -19,12 +19,12 @@ Every number assumes this configuration unless its table says otherwise:
 
 ### First setup
 
-1. Build the second venv with `scripts\install.bat oak4` (see the [README](../../../README.md)).
-2. Put the model archives in `data/models`. `.venv-oak4\Scripts\python scripts/oak4_models.py` fetches the pose models; the detector archive is compiled through HubAI ([models.py](models.py), `PERSON_DETECTOR_ARCHIVE`).
+1. Build the venv with `scripts\install.bat` (see the [README](../../../README.md)).
+2. Put the model archives in `data/models`. `.venv\Scripts\python scripts/oak4_models.py` fetches the pose models; the detector archive is compiled through HubAI ([models.py](models.py), `PERSON_DETECTOR_ARCHIVE`).
 3. Update the camera to Luxonis OS 1.45.0 with `oakctl device update`. On 1.25.3 depthai could not start a session over USB. The `--info` form of that command needs `-y`, or it waits on a prompt.
 4. Connect USB. A camera on USB and Ethernet at once is listed twice under one id, so `link` picks the route; when that route is missing, the camera opens on the other with a warning.
 
-Start an app from the venv: `.venv-oak4\Scripts\python launcher.py -app deep_flow`.
+Start an app from the venv: `.venv\Scripts\python launcher.py -app deep_flow`.
 
 ### Reading the panel
 
@@ -100,7 +100,7 @@ Recording and playback are in [RECORDING.md](../../recording/RECORDING.md).
 Measure before changing the path. A held frame rate says nothing about latency. With no flags the probe runs the setup at the top of this document.
 
 ```
-.venv-oak4\Scripts\python scripts/oak4_probe.py
+.venv\Scripts\python scripts/oak4_probe.py
 ```
 
 ## Latency

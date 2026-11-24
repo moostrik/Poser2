@@ -1,7 +1,7 @@
 # low_flow's plan
 
 A new app, `low_flow`: equal to deep_flow, on the 2D flow, with a higher-resolution solver. The same camera
-(one OAK4, `.venv-oak4`), view, pose, monitors and panels; the 2D motion, bridge and fluid in place of the 3D's.
+(one OAK4, `.venv`), view, pose, monitors and panels; the 2D motion, bridge and fluid in place of the 3D's.
 It is to the 2D flow what deep_flow is to the 3D, the place it is built and tried. The app comes first, without
 the flow, so each 2D stage is tried in it as it is built. Both apps take the flow plan's `color` stage and the
 bridge's `filters` group (its D8, D9, built).

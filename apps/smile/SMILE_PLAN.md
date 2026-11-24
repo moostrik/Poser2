@@ -11,45 +11,47 @@ cannot share an install (the same package name). Each backend's import error nam
 
 ## A. The venv change: depthai 3 in `.venv`, depthai 2 the special one
 
-- A1 The code: `.venv` holds depthai 3 (today's `.venv-oak4`), and `.venv-oak` depthai 2, named after its backend
-  `modules/camera/oak` and its dependency group `oak`. One commit, made once A2's checks pass (they run in the venvs
+- A1 The code: `.venv` holds depthai 3 (today's `.venv-oak4`), and `.venv-oakd` depthai 2, named after the camera
+  it drives, as its dependency group `oakd` (was `oak`) and `oak4` are; the backend package `modules/camera/oak` keeps
+  its name. One commit, made once A2's checks pass (they run in the venvs
   A2 builds):
-  - `pyproject.toml`: `default-groups = ["oak4"]`; `[tool.pyright] venv = ".venv"`; the comment over the groups.
+  - `pyproject.toml`: the group `oak` renamed `oakd`, in `conflicts` too; `default-groups = ["oak4"]`;
+    `[tool.pyright] venv = ".venv"`; the comment over the groups.
   - `uv.lock`: re-locked (`uv lock`); its `[manifest]` holds the default groups, and `uv sync --locked` fails without.
-  - `pyright.oak.json`: `"venv": ".venv-oak"`.
-  - `scripts/install.bat`: with no argument it builds `.venv` with `oak4`; `install.bat oak` builds `.venv-oak`
-    (`--no-group oak4 --group oak`, `uv venv .venv-oak --prompt poser2-oak`); the comments and the closing lines.
-  - `scripts/commit_rules.py` `PYRIGHT_RUNS`: `(".venv", [])` and `(".venv-oak", ["-p", "pyright.oak.json"])`.
+  - `pyright.oak.json` becomes `pyright.oakd.json`, with `"venv": ".venv-oakd"`.
+  - `scripts/install.bat`: with no argument it builds `.venv` with `oak4`; `install.bat oakd` builds `.venv-oakd`
+    (`--no-group oak4 --group oakd`, `uv venv .venv-oakd --prompt poser2-oakd`); the comments and the closing lines.
+  - `scripts/commit_rules.py` `PYRIGHT_RUNS`: `(".venv", [])` and `(".venv-oakd", ["-p", "pyright.oakd.json"])`.
   - `modules/camera/depthai_backend.py`: `VENVS`, the module docstring and the two messages name `.venv`
-    (depthai 3) and `.venv-oak` (depthai 2, `install.bat oak`).
+    (depthai 3) and `.venv-oakd` (depthai 2, `install.bat oakd`).
   - Start scripts: `scripts/start/DF.bat`, `scripts/timing.bat` (and its comment) and smile's `startSMILE.bat`,
     `install.bat` (`VENV_DIR` and its header comment), `clip_info.bat`, `make_test_workflow.bat`, `start_relay.bat`
-    to `.venv`; `scripts/start/HD.bat` and `WS.bat` to `.venv-oak`; `scripts/makemodels.bat` builds white_space's and
-    hd_trio's engines with `.venv-oak` (TensorRT is in both; the engines do not depend on depthai).
+    to `.venv`; `scripts/start/HD.bat` and `WS.bat` to `.venv-oakd`; `scripts/makemodels.bat` builds white_space's and
+    hd_trio's engines with `.venv-oakd` (TensorRT is in both; the engines do not depend on depthai).
   - Docs and docstrings that name `.venv-oak4` (31 files today): README.md, `apps/smile/README.md`, `SMILE.md`,
     `OAK4.md`, `LOW_FLOW_PLAN.md`, deep_flow's and low_flow's `main.py`, the oak4 and oak_device tests' docstrings,
     `oak4_models.py`, `oak4_probe.py`, `trial_runs.py`; and the `.venv` lines that mean depthai 2: README.md's and the
     docs' (white_space, hd_trio), `modules/camera/oak/__init__.py` and the `oak/tests` docstrings.
   - `.github/workflows/tests.yml`: both jobs build a plain `.venv`; the depthai 2 job exports
-    `--no-group oak4 --group oak`, the depthai 3 job the default groups; smile's test folders move to the depthai 3
+    `--no-group oak4 --group oakd`, the depthai 3 job the default groups; smile's test folders move to the depthai 3
     job; the job names and the comment over them.
   - The rule lines, for Matthias to change at the desktop (a PC session does not edit them):
-    - `CLAUDE.md`, the test commands: `python -m unittest discover -s modules/<pkg>/tests -t .    # camera/oak in .venv-oak`
+    - `CLAUDE.md`, the test commands: `python -m unittest discover -s modules/<pkg>/tests -t .    # camera/oak in .venv-oakd`
     - `.claude/rules/camera.md`: `- `modules/camera/oak4/` runs on depthai 3 in `.venv` (`install.bat`) and
-      `modules/camera/oak/` on depthai 2 in `.venv-oak` (`install.bat oak`); an app imports one of them, never both`
+      `modules/camera/oak/` on depthai 2 in `.venv-oakd` (`install.bat oakd`); an app imports one of them, never both`
 
   Check: no `.venv-oak4` left (`git grep`); `uv lock --check`; in `.venv` the guard tests, deep_flow's, low_flow's and smile's tests and
-  `modules/camera/oak4`'s; in `.venv-oak` white_space's and hd_trio's tests and `modules/camera/oak`'s; pyright in both
+  `modules/camera/oak4`'s; in `.venv-oakd` white_space's and hd_trio's tests and `modules/camera/oak`'s; pyright in both
   (`commit_rules.py`); one start each, after A2 has built the venvs: deep_flow, low_flow and smile (`-sim`) in `.venv`,
-  white_space (`-sim`) and hd_trio in `.venv-oak`.
+  white_space (`-sim`) and hd_trio in `.venv-oakd`.
 
 - A2 The venvs on this PC: both built new in this checkout, the old ones kept until the new ones pass. Only `.venv` and
   `.venv-oak4` move; every other file (recordings, outputs, ComfyUI, tokens, settings state) stays.
   1. No app runs (`tasklist`); ComfyUI's own venv (`apps/smile/ComfyUI/.venv`) stays as it is.
   2. Today's `.venv` (depthai 2) and `.venv-oak4` (depthai 3) are moved aside to `.venv.old` and `.venv-oak4.old`
      (a moved venv no longer runs: its scripts hold their own path), not deleted.
-  3. `scripts\install.bat` (LFS pull, `.venv` with depthai 3 from `uv.lock`), then `scripts\install.bat oak`
-     (`.venv-oak`, depthai 2).
+  3. `scripts\install.bat` (LFS pull, `.venv` with depthai 3 from `uv.lock`), then `scripts\install.bat oakd`
+     (`.venv-oakd`, depthai 2).
   4. The models in `data/` and each app's own `data/models`: in git LFS, pulled by the install; `git lfs ls-files`
      against the folders shows none missing.
   5. smile: `apps\smile\scripts\install.bat` checks ffmpeg, ComfyUI and its models and runs the smoke test (the

@@ -1,6 +1,6 @@
 """The OAK4 bring-up: the real backend on one device for a few seconds, reporting what arrives.
 
-    .venv-oak4/Scripts/python scripts/oak4_probe.py [device_id] [-s SECONDS] [--fps FPS] [--resolution P720|P800|P1080|P2160]
+    .venv/Scripts/python scripts/oak4_probe.py [device_id] [-s SECONDS] [--fps FPS] [--resolution P720|P800|P1080|P2160]
         [--link USB|ETHERNET] [--grey] [--flip-h] [--tilt-offset T]
         [--no-model | --one-model | --two-models] [--depth OFF|NEURAL_288|NEURAL_384|NEURAL_480]
         [--projector I] [--flood-light I]

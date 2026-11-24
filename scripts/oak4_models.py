@@ -1,6 +1,6 @@
 """The OAK4's models, fetched once from Luxonis's zoo into `data/models`.
 
-    .venv-oak4/Scripts/python scripts/oak4_models.py [--models data/models]
+    .venv/Scripts/python scripts/oak4_models.py [--models data/models]
 
 The chip takes a model compiled by Luxonis, which the zoo hands out as an NN archive (a `.tar.xz`
 with the compiled model and the config that says what its outputs mean). Public models need no

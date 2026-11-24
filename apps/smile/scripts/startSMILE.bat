@@ -49,7 +49,7 @@ explorer "%SMILE_DIR%data\audio\Smile-Music-Player.maxpat"
 timeout /t 4 /nobreak >nul
 
 echo Opening Main App
-start "" "%CURRENT_DIR%.venv-oak4\Scripts\pythonw.exe" launcher.py -app smile -fs
+start "" "%CURRENT_DIR%.venv\Scripts\pythonw.exe" launcher.py -app smile -fs
 timeout /t 2 /nobreak >nul
 
 echo Exit this script

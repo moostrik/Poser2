@@ -30,17 +30,18 @@ dependencies = [
     "tensorrt-cu13==11.4.0.106",
 ]
 
-# depthai 2 and depthai 3 are the same package name, so an install holds one of them: `oak` is the
-# OAK-D backend (White Space and HD Trio need depthai 2; 2.30 is more stable than 2.32), `oak4` the OAK4
-# backend (modules/camera/oak4, Deep Flow). `uv sync` installs `oak`; `scripts\install.bat oak4` installs `oak4` instead.
+# depthai 2 and depthai 3 are the same package name, so an install holds one of them: `oakd` is the
+# OAK-D's (modules/camera/oak: White Space and HD Trio need depthai 2; 2.30 is more stable than 2.32), `oak4` the
+# OAK4's (modules/camera/oak4: Deep Flow, Low Flow, SMILE). `uv sync` installs `oak4` in `.venv`;
+# `scripts\install.bat oakd` installs `oakd` instead, in `.venv-oakd`.
 [dependency-groups]
-oak = ["depthai==2.30.0"]
+oakd = ["depthai==2.30.0"]
 oak4 = ["depthai>=3.11", "depthai-nodes>=0.7"]
 
 [tool.uv]
 package = false
-default-groups = ["oak"]
-conflicts = [[{ group = "oak" }, { group = "oak4" }]]
+default-groups = ["oak4"]
+conflicts = [[{ group = "oakd" }, { group = "oak4" }]]
 # depthai-nodes asks for its own OpenCV (opencv-python-headless 4.10) beside the workspace's; a marker
 # that is never true drops that one requirement, so one cv2 is installed.
 override-dependencies = ["opencv-python-headless ; sys_platform == 'never'"]
@@ -57,5 +58,5 @@ explicit = true
 typeCheckingMode = "basic"      # this block overrides the VS Code setting
 stubPath = "modules/inference/engine"  # holds tensorrt.pyi
 venvPath = "."
-venv = ".venv-oak4"            # the venv of deep_flow, low_flow and oak4; pyright.oak.json checks the oak backend in .venv
+venv = ".venv"                 # the venv of deep_flow, low_flow, smile and oak4; pyright.oakd.json checks the oak backend in .venv-oakd
 exclude = ["**/__pycache__", "**/.*", "**/tests", "temp", "apps/smile/ComfyUI", "apps/smile/data/comfy", "data/models", "modules/camera/oak", "modules/camera/vimba/vimbapython", "scripts/test/multicam_barrier.py", "tools/models"]

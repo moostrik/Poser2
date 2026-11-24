@@ -1,5 +1,5 @@
 """The capture time of a depthai message on our clock: now less the message's age on depthai's clock. Runs on either
-depthai install (`.venv`, `.venv-oak4`)."""
+depthai install (`.venv`, `.venv-oakd`)."""
 
 import time
 import unittest

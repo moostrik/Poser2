@@ -4,7 +4,7 @@ A rule file in `.claude/rules/` governs the files its `paths` match; one without
 govern every file. With `--hook` the list goes out as the JSON a Claude Code hook hands to Claude, with the
 request to check the commit against those rules and report; the hook runs after every shell command and
 answers only when the command it reads on stdin held a `git commit`. Below the rules stands pyright's result over
-the repository, from its two runs: the oak4 venv with `pyproject.toml`, the main venv with `pyright.oak.json`.
+the repository, from its two runs: the main venv with `pyproject.toml`, the depthai 2 venv with `pyright.oakd.json`.
 
     python scripts/commit_rules.py [commit] [--hook]
 """
@@ -27,7 +27,7 @@ REQUEST: str = ("Check this commit against the rules below and report to the use
                 "one line per rule that is not met, with its file; one line when all are met. "
                 "Report the pyright result in one line.")
 PYTHON: str = "Scripts/python.exe" if os.name == "nt" else "bin/python"
-PYRIGHT_RUNS: list[tuple[str, list[str]]] = [(".venv-oak4", []), (".venv", ["-p", "pyright.oak.json"])]
+PYRIGHT_RUNS: list[tuple[str, list[str]]] = [(".venv", []), (".venv-oakd", ["-p", "pyright.oakd.json"])]
 PYRIGHT_TIMEOUT: float = 120.0  # seconds, per run
 PYRIGHT_SHOWN: int = 30         # the errors listed; the rest are counted
 

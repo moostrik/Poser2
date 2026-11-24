@@ -11,4 +11,4 @@ if not exist "apps\smile\relay\token.txt" (
     pause
     exit /b 1
 )
-start "SMILE relay" "%ROOT_DIR%\.venv-oak4\Scripts\python.exe" -m apps.smile.relay.server --port 8800 %*
+start "SMILE relay" "%ROOT_DIR%\.venv\Scripts\python.exe" -m apps.smile.relay.server --port 8800 %*

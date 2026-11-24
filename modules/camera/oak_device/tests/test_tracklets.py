@@ -1,5 +1,5 @@
 """The hand-over of depthai's tracklets to the contract: every device status maps, nothing else. Runs on either
-depthai install (`.venv`, `.venv-oak4`)."""
+depthai install (`.venv`, `.venv-oakd`)."""
 
 import unittest
 

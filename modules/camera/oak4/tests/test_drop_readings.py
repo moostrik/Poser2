@@ -1,5 +1,5 @@
 """The OAK4's drops on the panel: a frame the keypoint join drops and a depth frame before the frames' lens is known
-each count in the camera's readings. Runs without a device. On a depthai 3 install (`.venv-oak4`)."""
+each count in the camera's readings. Runs without a device. On a depthai 3 install (`.venv`)."""
 
 import unittest
 from unittest.mock import MagicMock

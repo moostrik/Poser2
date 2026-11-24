@@ -1,5 +1,5 @@
 """The camera keeps trying: a failed open waits and tries again, with its callbacks kept, and frames
-that stop open the camera again. Runs without a device. On a depthai 3 install (`.venv-oak4`)."""
+that stop open the camera again. Runs without a device. On a depthai 3 install (`.venv`)."""
 
 import time
 import unittest

@@ -1,6 +1,6 @@
 """An OAK-D fed a recording: a clip frame goes into the clip queue as the sensor would send it, planar BGR on a color
 camera, grey on a mono one, stamped with its recorded capture; the camera hands only its own video frames to the open
-device. Runs without a device (a fake queue), on a depthai 2 install (`.venv`)."""
+device. Runs without a device (a fake queue), on a depthai 2 install (`.venv-oakd`)."""
 
 import unittest
 from time import perf_counter
