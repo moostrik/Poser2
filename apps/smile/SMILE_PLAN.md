@@ -13,14 +13,6 @@ what the READMEs list by hand today and a script can do, the scripts do; what st
 Each step leaves the install working; each is checked on this PC, in `C:\Developer\Poser2` or the clone in
 `C:\Developer\SmileClean`.
 
-- A1 The PC part in the root `scripts\install.bat`, for every app, before the venv: each missing piece asked (Y/N)
-  and installed by winget: the Visual C++ Redistributable (`Microsoft.VCRedist.2015+.x64`; present when
-  `HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64` has `Installed` 1), uv (`astral-sh.uv`, used by its
-  full path in the same run), ffmpeg (`Gyan.FFmpeg`), VS Code (`Microsoft.VisualStudioCode`); then
-  `git lfs install`. Checked, not installed: the NVIDIA driver (580 or newer, from `nvidia-smi`; CUDA 13) and the
-  iGPU's Quick Sync (a short ffmpeg `h264_qsv` encode), each with its fix named. Git itself comes before the clone.
-  Check: on this PC every piece is found and nothing is offered; in a shell without ffmpeg on the PATH it offers
-  ffmpeg, answered Y, and winget installs it.
 - A2 `install.bat <app>`: the app's venv, then its TensorRT engines (`makemodels.bat <app>`, which skips the ones
   there) and, for deep_flow and low_flow, the OAK4 archives `scripts/oak4_models.py` fetches, when missing.
   `install.bat` and `install.bat oakd` keep building the bare venvs. Which app runs in which venv is written once,
