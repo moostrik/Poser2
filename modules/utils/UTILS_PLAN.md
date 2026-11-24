@@ -8,13 +8,7 @@ for feedback.
 ## F. What utils holds
 
 utils holds small tools with no domain that many packages share, and imports nothing else of the project **(seen**:
-its files import only each other, the standard library, numpy and one third-party package, `watchdog`**)**; after F1
-it imports no third-party package but numpy.
-
-F1. `hot_reload_methods.py` goes, with `HotReloadMethods`, `MethodType` and `MethodInfo` from `__init__.py`.
-Why: nothing uses it **(seen**, PC grep**)**, and through `__init__.py` every import of utils loads the third-party
-`watchdog` for it **(seen)**; removed as asked 2026-11-22. `watchdog` stays in `pyproject.toml`: gl's shader file
-watcher and smile's folder scanner use it **(seen**, PC grep at b0b50437**)**. Check: pyright, utils tests.
+its files import only each other, the standard library and numpy**)**.
 
 F2. `modules/logging` moves into utils as `utils/logging/` (`crash_log.py`, `ring_buffer.py`, `setup.py`, its tests);
 `crash_log.ROOT` becomes `parents[3]`, one level deeper; every caller imports it from utils in the same change:

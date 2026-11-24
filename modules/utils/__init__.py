@@ -4,7 +4,6 @@ from .performance_timer import PerformanceTimer, TimerSampleCallback
 from .time_series import SampleRing, bin_samples, hold_gaps
 from . import timing
 from .waker import Waker
-from .hot_reload_methods import HotReloadMethods, MethodType, MethodInfo
 from .smoothing import AngleFilter, EmaFilter, OneEuroFilter, SpringFilter
 from .geometry import Point2f, Quad, Rect, fill, fit
 from .lfo import lfo
