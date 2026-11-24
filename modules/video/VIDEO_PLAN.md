@@ -3,11 +3,6 @@
 What is to be built in `modules/video`: ffmpeg, the clips and streams it writes and reads, and the screen recorder
 ([VIDEO.md](VIDEO.md)).
 
-## A. The screen recorder's thread and state
-
-A5. `_Take` becomes a frozen `@dataclass` **(seen: a hand-written value class)**. Why: Settings, "Use `@dataclass` for
-   plain value objects". Check: `test_screen_recorder`.
-
 ## B. Depth without copies
 
 B1. `depth_to_p012` returns the (H × 3/2, W) uint16 frame, written in place into one array, which `StreamWriter._record`

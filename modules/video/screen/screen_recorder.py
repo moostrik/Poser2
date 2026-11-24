@@ -11,6 +11,7 @@ import logging
 import time
 from bisect import bisect_left
 from collections import deque
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
@@ -129,18 +130,16 @@ def hevc_clip(path: str, fps: float, quality: int, screen_format: ScreenFormat) 
     return ClipWriter(path, fps, master_encode(clip_input, quality), clip_input)
 
 
+@dataclass(frozen=True)
 class _Take:
     """One encode: the store's slots in recorded order, their timestamps, the file, the frames' format, the frames
     left out, and whether the store is freed after it."""
-
-    def __init__(self, slots: list[int], stamps: list[float], path: str, screen_format: ScreenFormat, dropped: int,
-                 free_after: bool) -> None:
-        self.slots: list[int] = slots
-        self.stamps: list[float] = stamps
-        self.path: str = path
-        self.format: ScreenFormat = screen_format
-        self.dropped: int = dropped
-        self.free_after: bool = free_after
+    slots: list[int]
+    stamps: list[float]
+    path: str
+    format: ScreenFormat
+    dropped: int
+    free_after: bool
 
 
 class ScreenRecorder:
