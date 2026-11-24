@@ -25,10 +25,10 @@ def read_json_file(file_path: str) -> dict:
         return json.load(file)
 
 
-def lfor(timestamp: float, Htz: float, phase: float, range_min: float, range_max: float) -> float:
-    """`utils.lfo` between `range_min` and `range_max`, at half of `Htz`, starting at `phase` (cycles) after its
+def lfor(timestamp: float, frequency: float, phase: float, range_min: float, range_max: float) -> float:
+    """`utils.lfo` between `range_min` and `range_max`, at half of `frequency`, starting at `phase` (cycles) after its
     lowest point."""
-    return lfo(timestamp, Htz / 2, (0.75 + phase) * 2 * math.pi) * (range_max - range_min) + range_min
+    return lfo(timestamp, frequency / 2, (0.75 + phase) * 2 * math.pi) * (range_max - range_min) + range_min
 
 
 def get_counter_active_light(value: float) -> list[int]:
