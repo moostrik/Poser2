@@ -195,9 +195,9 @@ own would add a hop and a copy to every frame. A fed frame is stamped with its r
 on the play's clock), so the device's tracklets come back stamped with it through `capture_time` **(deduction: the
 tracker keeps its input frame's stamp, and depthai 2's clock reads the same counter as `perf_counter`)**; a frame
 without one is stamped at its send. Each fed frame is numbered from 0 at each open; a gap in the numbers of the video
-frames that come back is a clip frame the full host queue (`CLIP_QUEUE_SIZE`) let go, counted in `dropped_clips`
-**(deduction: without `clip_warp` the video output is the clip input's message itself; a Warp between may renumber,
-which is not checked)**. Only video frames are fed; depth would be another input beside it. A clip that is warped (`clip_warp`, for raw clips only, unwarped at tilt 0) feeds the warp's
+frames that come back is a clip frame the full host queue (`CLIP_QUEUE_SIZE`) let go, counted in `dropped_clips`.
+Without `clip_warp` the device keeps the number: every OAK-D's first frame back is number 0 (white_space -sim,
+2026-11-24); with `clip_warp` a Warp sits between, which may renumber **(not checked)**. Only video frames are fed; depth would be another input beside it. A clip that is warped (`clip_warp`, for raw clips only, unwarped at tilt 0) feeds the warp's
 input and must be the sensor's size; one that passes through must be the delivered size, its derived height
 included. A clip of another size still runs (the XLinkIn's size is a ceiling, the frame carries its own size, the
 detector resizes what comes), but every frame-relative setting is off by the ratio: the tracker's vfov and height

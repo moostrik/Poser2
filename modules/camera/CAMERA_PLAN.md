@@ -8,22 +8,13 @@ and smile, `vimba` and `webcam` by smile. That is general code with one user, wh
 
 **(seen)** is read in the code, **(deduction)** inferred.
 
-## G. The OAK-D's clip drops
-
-The OAK-D's clip input loses about 1.1% of the clip frames in white_space -sim with four cameras (recording
-20261124-110331_probe_F1) **(site fact: the recording thread's run)**; the host's clip queue
-(`CLIP_QUEUE_SIZE` 1, non-blocking, in `oak/camera.py`) drops a frame the device has not taken yet **(deduction)**.
-The count is built: `dropped_clips`, from the gaps in the numbers `ClipInput` gives each fed frame
-([CAMERA.md, The clip camera](CAMERA.md#the-clip-camera)).
-
-- G1. One white_space -sim run (`studio.json`, `replay` false, the recording above), run by the recording thread on
-  Matthias's go, about 3 minutes. First the log's "first clip frame back is number N" per camera: a small N (0 or a
-  few) says the device keeps the host's numbers; anything else says it renumbers, and `dropped_clips` is then made
-  the frames sent minus the frames returned, the one in flight aside. Then `dropped_clips` per camera, against the
-  1.1% above, with `CLIP_QUEUE_SIZE` at 1, then at 2; the size with the fewer drops stays if the latency readings
-  hold, and the change is committed with the result.
-
 ## Open
+
+- Where the OAK-D's 1.1% clip loss is made. The recording thread saw about 1.1% of the clip frames lost in white_space
+  -sim with four cameras (recording 20261124-110331_probe_F1) **(site fact)**. It is not the host's clip queue: over
+  that whole recording, `studio.json` with `replay` false, `dropped_clips` is 0 on all four cameras, each about 1,133
+  frames back, video latency 35 ms and tracker latency 119 ms (2026-11-24) **(seen)**. What was counted as lost, and
+  against what, is to be asked of the recording thread before anything is changed.
 - The OAK4 is to run standalone, as an OAK App **(site fact)**. Depth alignment then needs a home: `ImageAlign` is
   the only alignment on the camera and fattens near objects ([Depth](oak4/OAK4.md#depth)), and its firmware cannot be
   changed. The options are to keep sending raw depth with its `DepthAlignment` to a PC that runs `DepthAlign`, or to
@@ -36,8 +27,8 @@ The count is built: `dropped_clips`, from the gaps in the numbers `ClipInput` gi
   (`add_depth`) lets go of a depth or confidence without its partner within `CAPTURE_TOLERANCE` **(deduction)**.
   depthai reports no count of either **(deduction)**. The panel shows them only as a rate: `tracker_fps`, and the
   depth rate against the video's **(seen)**. A gap in a stream's sequence numbers at the hand-over would count them,
-  if ImageManip and Warp carry the numbers through, which is not checked; G1's check answers it for the Warp. The
-  OAK-D's clip input's drops are G1. The host's output queues (`maxSize=1`, non-blocking) lose nothing: their
+  if ImageManip and Warp carry the numbers through, which is not checked. The OAK-D's clip input counts its own
+  (`dropped_clips`). The host's output queues (`maxSize=1`, non-blocking) lose nothing: their
   callback takes every message, and what the queue overflows has already gone to the callback **(deduction)**.
 - Feeding the OAK4 a recording, when an OAK4 app needs it; no OAK4 app is fed one, and depth is not fed back
   (Matthias, 2026-11-23 and 2026-11-24). One input node, its queue from `createInputQueue()`, as the frames source in
@@ -50,7 +41,3 @@ The count is built: `dropped_clips`, from the gaps in the numbers `ClipInput` gi
   run)**. deep_flow and low_flow have no `replay` switch; their -sim always runs `replay.Camera` **(seen)**.
 
 ## Rules it touches
-
-- A part that drops an item shows the count to the user: G1
-- Prefer the design with the lower latency, measured in the context of the app: G1
-- Run a test of the app or a GPU harness only on the user's go, and only what the plan names: G1
