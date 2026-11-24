@@ -5,15 +5,7 @@ from .time_series import SampleRing, bin_samples, hold_gaps
 from . import timing
 from .waker import Waker
 from .hot_reload_methods import HotReloadMethods, MethodType, MethodInfo
-from .smoothing import \
-    OneEuroFilter, \
-    OneEuroFilterAngular, \
-    SpringFilter, \
-    SpringFilterAngular, \
-    EmaFilter, \
-    EmaFilterAngular, \
-    EmaFilterAttackRelease, \
-    EmaFilterAttackReleaseAngular
+from .smoothing import AngleFilter, EmaFilter, OneEuroFilter, SpringFilter
 from .interpolation import \
     ScalarPredictiveHermite, \
     VectorPredictiveHermite, \

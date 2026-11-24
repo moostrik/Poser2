@@ -90,9 +90,8 @@ class TestPoseWaves(ProjectionLayer):
         self._player_states: dict[int, PlayerState] = {
             i: PlayerState() for i in range(max_players)
         }
-        # Stepped with the tick's time, so the filter derives its rate from the timestamps; the constructed
-        # frequency is only the first step's guess.
-        self._num_active_smoother: OneEuroFilter = OneEuroFilter(freq=1.0, mincutoff=1.0, beta=0.0)
+        # Stepped with the tick's time, so the filter derives its rate from the timestamps
+        self._num_active_smoother: OneEuroFilter = OneEuroFilter(min_cutoff=1.0, beta=0.0)
 
         self._Wh_L: np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
         self._Wh_R: np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)

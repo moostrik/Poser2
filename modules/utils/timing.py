@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # The packages whose versions a report names: the ones an upgrade can make faster or slower
 TIMED_PACKAGES: tuple[str, ...] = (
     'numpy', 'opencv-python', 'torch', 'tensorrt',
-    'onnxruntime-gpu', 'depthai', 'PyOpenGL', 'PyOpenGL-accelerate', 'glfw', 'OneEuroFilter',
+    'onnxruntime-gpu', 'depthai', 'PyOpenGL', 'PyOpenGL-accelerate', 'glfw',
 )
 
 

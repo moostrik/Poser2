@@ -7,40 +7,6 @@ for feedback.
 
 ## D. Smoothing
 
-D1. `smoothing.py` becomes four small filters that are used the same way: `f(value, timestamp)` returns the smoothed
-value, and each has `value` and `reset(value)`. The timestamp is required and `freq` goes from every filter: it is
-only the time step's fallback for a call without a timestamp, and both callers pass the tick's time **(seen**,
-`smoothing.py:143-147`, `:322-326`; CLAUDE.md Time**)**; a filter's first sample is its starting value. `OneEuroFilter`'s `target` and `velocity` go with their one reader,
-`OneEuroFilterAngular`.
-- `EmaFilter`: set by a time constant in seconds, settable between calls, corrected for the time between samples
-  (`1 − exp(−dt / τ)`), where a time constant of 0 passes the value through; an
-  optional second time constant for falling values gives attack and release, so `EmaFilterAttackRelease` goes into
-  it.
-- `OneEuroFilter`: our own One Euro filter (Casiez et al. 2012), set by `min_cutoff`, `beta` and `d_cutoff`; the
-  third-party `OneEuroFilter` package goes from `pyproject.toml` and `timing.py`'s version list, and with it the
-  subclass that read the package's private state through a name that resolves only because both classes share it.
-- `SpringFilter`: as it is but for `freq`, the one filter that overshoots.
-- `AngleFilter(filter)`: one wrapper for any of the three, which moves each target to the angle nearest the filter's
-  value (the shortest path), runs the filter and wraps its value to ±π. Rise and fall then mean a positive and a
-  negative turn, as they mean up and down for a number, so the filters stay agnostic of their input and keep one
-  meaning; the sin and cos form would break it, since sin and cos are not the angle and one rises while the other
-  falls on the same turn **(deduction)**. Pose's `AngleEmaSmooth` uses the same shortest path **(seen)**. Following a
-  speeding-up motion faster is the One Euro filter's job, not a second meaning of rise and fall. It replaces `OneEuroFilterAngular`, `SpringFilterAngular`,
-  `EmaFilterAngular` and `EmaFilterAttackReleaseAngular`, and the 15 copies of the angle wrap in them.
-The two callers move with it: white_space's `light/playhead.py` (the rpm's `EmaFilter`, whose alpha from the
-`speed_smoothing` setting is a rate per second, `1 - (1 - alpha)^dt` **(seen**, `smoothing.py:331`**)**, and converts at
-the call, each tick as now, to the time constant −1 / ln(1 − alpha), so it smooths as before) and
-`light/layers/projection/test_pose_waves.py` (a `OneEuroFilter` on the player count). *Owner: white_space.*
-Why: 8 classes serve 2 users **(seen**, PC grep at b0b50437**)**, built as a subclass per filter and one more per angle
-form, with the wrap written 15 times, a mangled `_EmaFilter__alpha` and a third-party base read by its private names
-**(seen)**; smoothing is the single-value tool for every package but pose (chosen 2026-11-22), and pose keeps its own
-array filters so it can stand on its own (his word 2026-11-22); the wrapper is composition. Nobody outside pose smooths an angle today **(seen)**; the wrapper keeps it
-at the cost of one class.
-Check: a small `tests/test_smoothing.py` (Ema step reaches 63% after one time constant at any sample rate; rise
-against fall; a time constant of 0 passes the value through; the rpm case, the new `EmaFilter` with the converted
-time constant against the old `1 − (1 − alpha)^dt` on the same samples; One Euro holds a constant input and follows a
-ramp; an angle filtered across ±π takes the short way; an angle Ema with a fall time follows a negative turn at it); white_space's tests.
-
 D2. `interpolation.py` goes, with its four exports from `__init__.py`.
 Why: its Hermite interpolators (scalar, vector, scalar angle, vector angle) predict a sampled signal between its
 samples, and pose's `nodes/_utils/array_predict.py` (`Predict`, `AnglePredict`, `PointPredict`, used by
@@ -59,8 +25,8 @@ recording player", which imports no Waker of its own **(seen**, PC grep**)**; CL
 ## F. What utils holds
 
 utils holds small tools with no domain that many packages share, and imports nothing else of the project **(seen**:
-its files import only each other, the standard library, numpy and two third-party packages, `watchdog` and
-`OneEuroFilter`**)**; after F1 and D1 it imports no third-party package but numpy.
+its files import only each other, the standard library, numpy and one third-party package, `watchdog`**)**; after F1
+it imports no third-party package but numpy.
 
 F1. `hot_reload_methods.py` goes, with `HotReloadMethods`, `MethodType` and `MethodInfo` from `__init__.py`.
 Why: nothing uses it **(seen**, PC grep**)**, and through `__init__.py` every import of utils loads the third-party
@@ -81,11 +47,12 @@ F3. The PC's `modules/oak` and `modules/tests` folders go: they hold only `__pyc
 in git **(seen)**. No commit.
 
 F4. `waker.py`, `fps.py`, `performance_timer.py`, `timing.py` and `time_series.py` move into a `time/` folder in
-utils; the rest stay at the root beside `geometry/` and `logging/`. Callers import from `__init__.py` and do not change.
-Why: the root holds 11 loose files after B1, D2 and F1, five of them about time **(seen)**; CLAUDE.md Packages "A
+utils; the rest stay at the root beside `geometry/`, `smoothing/` and `logging/`. Callers import from `__init__.py`
+and do not change.
+Why: the root holds 10 loose files after B1, D1, D2 and F1, five of them about time **(seen)**; CLAUDE.md Packages "A
 package with many loose files groups them in folders by job"; in utils, not a `modules/time` package, since these are
-shared tools with no domain (chosen 2026-11-24). `smoothing.py` and `lfo.py` alone would make a folder of two, which
-the rule prefers not. Check: pyright, utils tests.
+shared tools with no domain (chosen 2026-11-24). Smoothing is its own folder (D1); `lfo.py` stays at the root.
+Check: pyright, utils tests.
 
 ## Rules this plan touches
 

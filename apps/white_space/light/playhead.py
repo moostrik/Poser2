@@ -59,6 +59,11 @@ def _wrap_to_pi(x: float) -> float:
     return (x + math.pi) % math.tau - math.pi
 
 
+def _time_constant(rate: float) -> float:
+    """The time constant (s) of an average that takes `rate` (0..1] of the way to its input per second."""
+    return -1.0 / math.log(1.0 - rate) if rate < 1.0 else 0.0
+
+
 def _to_degrees(radians: float) -> float:
     """Radians (any range) → the operator's azimuth unit: degrees, 0–360."""
     return math.degrees(radians) % 360.0
@@ -87,7 +92,7 @@ class Playhead:
         self._prev_mode: MotorMode = MotorMode.STOPPED
         self._resyncing: bool = False                # left PROJECTION → free-running until the motor slows to content speed
         self._live:     bool  = False                # is there a real playhead this tick (locked, PROJECTION, or re-syncing)
-        self._rpm_ema = EmaFilter(freq=30.0)         # averages the per-revolution measured speed (feed-forward)
+        self._rpm_ema = EmaFilter(0.0)               # averages the per-revolution measured speed (feed-forward)
         self._time:    float = 0.0                   # accumulated time for the EMA's dt-correction
         self._tracking_prev: bool = False            # was the previous tick the locked-tracking branch (to seed the EMA)
         self._is_projecting: bool = False            # mode signal: the bar spins fast enough for the projection to show
@@ -152,7 +157,7 @@ class Playhead:
             # rate keeps the sweep steady; the low `tracking` gain then eases the phase onto the light.
             if not self._tracking_prev:
                 self._rpm_ema.reset(motor.measured_rpm)       # seed on (re)acquire → no ramp-in
-            self._rpm_ema.set_alpha(max(0.03, 1.0 - self._settings.speed_smoothing))   # 0=raw … 1=heavy
+            self._rpm_ema.time_constant = _time_constant(max(0.03, 1.0 - self._settings.speed_smoothing))   # 0=raw … 1=heavy
             rpm = self._rpm_ema(motor.measured_rpm, self._time)
             self._internal += (rpm / 60.0) * math.tau * dt
             self._internal += self._settings.tracking * _wrap_to_pi(motor.phase - self._internal)
