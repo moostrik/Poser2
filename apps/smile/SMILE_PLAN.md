@@ -9,6 +9,8 @@ does not bring, is on the scratch disk, `F:\_scratch\SMILE`.
 
 ## A. Before leaving
 
+A1 and A3 run after smile is on the shared sequencer ([SESSION_PLAN](../../modules/session/SESSION_PLAN.md) topic B).
+
 - A1 The rehearsal: a new clone of the pushed branch (pushed on Matthias's word) in place of
   `C:\Developer\SmileClean`, installed only as the README's "New PC" says: `scripts\install.bat smile`, smile's
   `install.bat --from F:\_scratch\SMILE`; smile's tests, one `-sim` start with ComfyUI and a visitor through.
