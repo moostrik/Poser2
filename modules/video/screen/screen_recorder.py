@@ -300,7 +300,7 @@ class ScreenRecorder:
                 self._queue.append(frame)
                 while len(self._queue) > QUEUE_LIMIT:
                     oldest = self._queue.popleft()
-                    self._dropped += 1 + oldest.skipped
+                    self._dropped += 1 + oldest.dropped
                     released.append(oldest)
                 self._wake.notify()
         for item in released:
@@ -662,7 +662,7 @@ class ScreenRecorder:
                     return
                 take_id, look_back = self._take_id, self._look_back
                 written, target = self._written, self._target
-                self._dropped += frame.skipped
+                self._dropped += frame.dropped
             if frame.data.shape != self._store.shape:
                 with self._lock:
                     self._dropped += 1      # made at a size the take is not

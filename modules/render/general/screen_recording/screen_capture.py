@@ -69,11 +69,11 @@ class ScreenCapture:
         self._shader: RgbToYuv = RgbToYuv()
         self._pixels: PixelBufferPool = PixelBufferPool(GL_PIXEL_PACK_BUFFER)    # the pool, mapped once
         self._arrays: list[np.ndarray] = []         # each buffer's mapped memory, the format's shape and dtype
-        self._in_flight: deque[tuple[int, float, int]] = deque()     # (buffer, timestamp, skipped), oldest first
+        self._in_flight: deque[tuple[int, float, int]] = deque()     # (buffer, timestamp, dropped), oldest first
         self._lock: Lock = Lock()                   # guards the free list and the lent count
         self._free: deque[int] = deque()
         self._lent: int = 0
-        self._skipped: int = 0                      # ticks left out since the last frame went out
+        self._dropped: int = 0                      # ticks left out since the last frame went out
         self._callbacks: Broadcast[ScreenFrame] = Broadcast(name="screen frame")
 
     @property
@@ -122,7 +122,7 @@ class ScreenCapture:
                             for slot in range(POOL)]
             with self._lock:
                 self._free = deque(range(POOL))
-                self._skipped = 0
+                self._dropped = 0
         except Exception:
             self.deallocate()
             raise
@@ -164,9 +164,9 @@ class ScreenCapture:
         with self._lock:
             buffer = self._free.popleft() if self._free else None
             if buffer is None:
-                self._skipped += 1
+                self._dropped += 1
                 return
-            skipped, self._skipped = self._skipped, 0
+            dropped, self._dropped = self._dropped, 0
         BlendState.push()
         BlendState.set_blend_mode(BlendState.BlendMode.DISABLED)
         for plane in self._planes:
@@ -181,18 +181,18 @@ class ScreenCapture:
         self._pixels.unbind()
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         self._pixels.fence(buffer)
-        self._in_flight.append((buffer, timestamp, skipped))
+        self._in_flight.append((buffer, timestamp, dropped))
 
     def poll(self) -> None:
         """Hand over each read-back whose fence has passed, oldest first, without waiting for the others."""
         while self._in_flight:
-            buffer, timestamp, skipped = self._in_flight[0]
+            buffer, timestamp, dropped = self._in_flight[0]
             if not self._pixels.passed(buffer):
                 return
             self._in_flight.popleft()
             with self._lock:
                 self._lent += 1
-            frame = ScreenFrame(self._arrays[buffer], timestamp, skipped, partial(self._give_back, buffer))
+            frame = ScreenFrame(self._arrays[buffer], timestamp, dropped, partial(self._give_back, buffer))
             if self._callbacks:
                 self._callbacks(frame)
             else:

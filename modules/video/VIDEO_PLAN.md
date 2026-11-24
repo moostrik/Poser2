@@ -5,11 +5,6 @@ What is to be built in `modules/video`: ffmpeg, the clips and streams it writes 
 
 ## C. Names
 
-C1. Frames left out are `dropped` everywhere: `ScreenFrame.skipped` and the capture's side in render's
-   `screen_recording` are renamed in the same commit **(seen)**. Why: Naming, "Use no synonyms for one concept across
-   modules; when a term changes, rename it everywhere in the same change". Check: `test_screen_recorder` and render's
-   unit tests.
-
 C2. A time stamp is `timestamp` in `screen_recorder.py`: `stamps`, `_stamps`, `held_stamps`, `_held_stamps`,
    `_Take.stamps` become `timestamps`, `_timestamps`, ... **(seen)**. Why: glossary, "A time stamp: `timestamp`".
    Check: `test_screen_recorder`.

@@ -10,7 +10,7 @@ fast is a frame copied out?
 2. The gradient: a 1024-wide gray ramp captured at 10 bits holds more than 600 Y codes, most of them off the 8-bit
    steps (multiples of 4 in 10 bits).
 3. The pool: with no frame given back, four captures go out and the fifth is left out; after one is given back,
-   the next frame says one was skipped before it.
+   the next frame says one was dropped before it.
 4. The copy: one 2160 × 3840 4:4:4 frame at 8 and at 10 bits copied out of its mapped buffer into plain RAM, as the recorder's thread
    does, timed over 20 copies; 60 frames a second need it well under 16.7 ms.
 
@@ -160,9 +160,9 @@ def check_pool(source) -> int:
     draw(capture, source)
     capture.capture(5.0)
     wait_for(capture, frames, 5)
-    if len(frames) != 5 or frames[-1].skipped != 1:
+    if len(frames) != 5 or frames[-1].dropped != 1:
         bad += 1
-        print(f'  after one given back: {len(frames)} frames, skipped {frames[-1].skipped if frames else None}, want 5 and 1')
+        print(f'  after one given back: {len(frames)} frames, dropped {frames[-1].dropped if frames else None}, want 5 and 1')
     if not capture.lent:
         bad += 1
         print('  the pool says nothing is lent while four frames are')

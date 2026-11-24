@@ -32,16 +32,16 @@ its overhang is cut. It is never stretched.
   RAM; the CPU does not wait.
 - `poll`, on every tick, checks the oldest fences without waiting; once one has passed, the frame goes to the
   callbacks (`add_screen_frame_callback`, a list with its own lock) as a `ScreenFrame`: the mapped buffer as an
-  array, its tick's `timestamp`, and the ticks skipped before it. The buffer is lent until the frame's `release`.
+  array, its tick's `timestamp`, and the ticks dropped before it. The buffer is lent until the frame's `release`.
   A frame enters the recorder's store one to two ticks after it was drawn.
-- With all four buffers lent the capture leaves the tick out; the next frame carries the count (`skipped`).
+- With all four buffers lent the capture leaves the tick out; the next frame carries the count (`dropped`).
 - The compositor makes the capture in the recorder's format when a take begins (`ScreenRecorder.capture_format`) and
   frees it after; never while a frame is lent or a read-back is on its way, as its memory would go under a reader.
 - The capture sets its own blend and viewport and leaves framebuffer 0 bound. Nothing is drawn or converted unless
   the recorder captures this tick (`ScreenRecorder.capturing`).
 - No CUDA: the read-back is GL's own, and a mapped buffer in host memory reads as plain RAM. `scripts/screen_capture_check.py`
   checks the YUV codes of known colors and the preview in both chromas at both bit depths, a 10-bit gray ramp
-  (877 Y codes back, 75 % off the 8-bit steps), the pool's lending and skipping, and times one frame's copy out of
+  (877 Y codes back, 75 % off the 8-bit steps), the pool's lending and dropping, and times one frame's copy out of
   a mapped buffer. These times mean the mapped memory is cached **(deduction)**.
 
 | Format (2160 × 3840, 20 copies) | Copy out of a mapped buffer (ms) |
