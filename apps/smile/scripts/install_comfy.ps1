@@ -172,8 +172,8 @@ try {
     $driver = [int](("$smi" -split '\.')[0])
     if ($driver -lt 580) { Fail "NVIDIA driver $smi is too old, the CUDA 13.0 torch needs 580 or newer" }
     Note "NVIDIA driver $smi"
-    if (-not (Quiet py -3.12 --version)) { Fail 'Python 3.12 not found (py -3.12): install it with the py launcher' }
-    Note "$(& py -3.12 --version)"
+    if (-not (Quiet uv --version)) { Fail 'uv not found: run scripts\install.bat at the Poser2 root first' }
+    Note "$(& uv --version)"
     if (-not (Quiet git --version)) { Fail 'git not found' }
 
     # --- ComfyUI core, pinned ------------------------------------------------------------------------
@@ -307,7 +307,8 @@ try {
     $venv = Join-Path $Target '.venv'
     $python = Join-Path $venv 'Scripts\python.exe'
     if (-not (Test-Path $python)) {
-        & py -3.12 -m venv $venv
+        # uv's Python 3.12 (uv fetches it when the PC has none); --seed puts pip in, which the steps below use
+        & uv venv --seed --python 3.12 $venv
         if ($LASTEXITCODE -ne 0) { Fail 'could not create the venv' }
         Note "venv created at $venv"
     }

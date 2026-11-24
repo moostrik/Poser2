@@ -13,10 +13,6 @@ what the READMEs list by hand today and a script can do, the scripts do; what st
 Each step leaves the install working; each is checked on this PC, in `C:\Developer\Poser2` or the clone in
 `C:\Developer\SmileClean`.
 
-- A5 smile's ComfyUI venv on uv's Python 3.12 (`uv venv --seed --python 3.12` in `install_comfy.ps1`, so its pip
-  steps run as now) in place of the py launcher; a missing Python 3.12 is uv's to fetch. The model tool's docstring
-  (`py -3.12 -m apps.smile.comfy.models`) names `.venv\Scripts\python`. Check: in the clone, ComfyUI's venv deleted
-  and built again this way, the smoke test passes.
 - A6 What the site needs that git does not bring, in one folder on the scratch disk, `F:\_scratch\SMILE`:
   `models\`, a copy of `apps\smile\ComfyUI\models` (the 28 models, 48.5 GB); `online_token.txt` from
   `apps\smile\data`; `input\`, the photos for the panel's still image from `apps\smile\data\input`. The copy runs on

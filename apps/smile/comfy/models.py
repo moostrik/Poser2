@@ -2,13 +2,13 @@
 
 The manifest lists every model file ComfyUI needs for SMILE: its path under ComfyUI/models, size, sha256 and
 source. A source is a public URL (Hugging Face, where the file came from) or a file in the repo
-(data/comfy/loras/..., the LoRAs that exist nowhere else, kept in git LFS). Standard library only, so it runs
-before any venv exists, from the repo root:
+(data/comfy/loras/..., the LoRAs that exist nowhere else, kept in git LFS). Standard library only; from the repo
+root:
 
-    py -3.12 -m apps.smile.comfy.models check [--quick]            every file ok / missing / wrong size / corrupt, extras listed
-    py -3.12 -m apps.smile.comfy.models install [--mirror DIR]     fetch what is not ok: a copy from the mirror, else the source
-    py -3.12 -m apps.smile.comfy.models hash [--write] [--add P]   size and sha256 of the files present, into the manifest
-    py -3.12 -m apps.smile.comfy.models sources [--write]          the sources still hold the manifest's files (no download)
+    .venv\\Scripts\\python -m apps.smile.comfy.models check [--quick]            every file ok / missing / wrong size / corrupt, extras listed
+    .venv\\Scripts\\python -m apps.smile.comfy.models install [--mirror DIR]     fetch what is not ok: a copy from the mirror, else the source
+    .venv\\Scripts\\python -m apps.smile.comfy.models hash [--write] [--add P]   size and sha256 of the files present, into the manifest
+    .venv\\Scripts\\python -m apps.smile.comfy.models sources [--write]          the sources still hold the manifest's files (no download)
 
 Defaults: the manifest in apps/smile/data/comfy/, the models folder apps/smile/ComfyUI\\models; --manifest and --models override. The mirror
 is any folder in the same layout: the backup disk's ComfyUI\\models, a USB stick. A download goes to <path>.part,
